@@ -365,6 +365,8 @@ around a little from time to time.
       allow-list.** Each one is checked against the list again right before
       it's deleted: a model put back on the list meanwhile is kept, and one
       taken off the list isn't downloaded.
+    - **A missing or unreadable allow-list is an error**, never an empty
+      list: nothing is allowed, and nothing is removed.
     - **A line the allow-list can't read never costs a model.** A model
       named on any line (say `gpt-oss:120b  RAM`, where the flag is
       misspelt) is never removed, in any letter case. While any line is
@@ -514,7 +516,8 @@ around a little from time to time.
       does, for the length of the test.
     - Undo: `sudo ./setup.sh --remove-encrypted-swap`. It stops, changing
       nothing, if the swap can't be taken back in (not enough free memory),
-      and it puts `/swap.img` back in fstab only if `on` took it out.
+      and it puts `/swap.img` back in fstab only if `on` took it out, and
+      removes the volume only if `on` made it.
 - **Dashboard:** it fills the desktop's monitor (tty1), and `ollama1-top` shows
   it over SSH (`q` quits, `--ascii` for plain terminals, `--once` for one
   text frame). It updates every second, and its charts cover the last 5
@@ -574,7 +577,8 @@ around a little from time to time.
   - During setup.sh, a model download or library sync, and updates, the
     power button does nothing at all: each holds a logind inhibitor
     (`sleep` and `handle-power-key`, mode block) until it ends, so the
-    button can't suspend the desktop mid-job. Holding the button down
+    button can't suspend the desktop mid-job. The inhibitor goes with its
+    job however the job ends, even if it is killed. Holding the button down
     still forces it off. `systemd-inhibit --list` shows who holds one.
   - After every wake a check runs. Ollama must answer (`/api/version`,
     `/api/ps`) and the GPU must report through sysfs; if not, Ollama and
@@ -638,8 +642,10 @@ token count.
 costs until you set one. They are kept in `/var/lib/ollama1/tariff.json`
 (root's, readable by the panel). Set them in the panel (**Prices**: the
 panel checks them, leaves them in its own folder and starts
-`ollama1-power-apply.service`, which reads that file without following a
-link, checks it again and writes root's), or from a file:
+`ollama1-power-apply.service`, which reads that file only if it is a
+regular file with one link, owned by the panel's user, without following a
+link, checks it again and writes root's; it never writes or deletes
+anything in the panel's folder), or from a file:
 
 ```bash
 sudo ollama1-power set-schedule prices.json                     # checked first; nothing changes on an error

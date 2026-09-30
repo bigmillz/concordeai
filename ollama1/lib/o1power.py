@@ -85,6 +85,22 @@ def default_schedule():
     return json.loads(json.dumps(o1tariff.DEFAULT))
 
 
+def old_tariff_file():
+    """Where the panel kept the schedule before it moved to root's folder."""
+    return os.path.join(Paths.admin_state, "tariff.json")
+
+
+def migrate_old_tariff(owner_uid=None):
+    """Once: if the panel's old tariff.json exists and root's doesn't, take
+    it through the same checks as a panel request. Returns a message."""
+    if os.path.lexists(tariff_file()):
+        return "nothing to move (the prices are already in %s)" % tariff_file()
+    if not os.path.lexists(old_tariff_file()):
+        return "nothing to move"
+    ok, errs = apply_request(owner_uid, old_tariff_file())
+    return "moved the panel's prices to %s" % tariff_file() if ok else "the old prices weren't moved: " + "; ".join(errs)
+
+
 def load_schedule():
     """The schedule in use; the default if the file is missing, not a
     regular file, too big or invalid. Never raises."""
@@ -109,24 +125,45 @@ def save_schedule(s):
     return clean
 
 
-def apply_request():
-    """Root, for the panel: apply the schedule it left in its own folder.
-    Returns (ok, errors). The request is read without following a symlink
-    and deleted afterwards (unlink never follows one)."""
-    s = read_json_safe(request_file(), max_bytes=MAX_SCHEDULE_BYTES)
+def panel_uid():
+    import pwd
     try:
-        os.unlink(request_file())
-    except OSError:
-        pass
-    if not isinstance(s, dict):
-        errs = ["no readable request (it must be a regular JSON file of at most 64 KiB)"]
+        return pwd.getpwnam("o1admin").pw_uid
+    except KeyError:
+        return None
+
+
+def trusted_request(path, owner_uid):
+    """The schedule at `path` if it is a regular file (no symlink followed,
+    no FIFO), with one link, owned by `owner_uid` and at most 64 KiB; else
+    None. Root touches nothing else there: the panel overwrites the file
+    each time."""
+    if owner_uid is None:
+        return None
+    s = read_json_safe(path, max_bytes=MAX_SCHEDULE_BYTES,
+                       check=lambda st: st.st_nlink == 1 and st.st_uid == owner_uid)
+    return s if isinstance(s, dict) else None
+
+
+def safe_errors(errs):
+    """Error text for a file others can read: fixed wording from validate(),
+    bounded in number and length."""
+    return [str(e)[:160] for e in errs[:20]]
+
+
+def apply_request(owner_uid=None, path=None):
+    """Root, for the panel: apply the schedule it left in its own folder.
+    Returns (ok, errors)."""
+    s = trusted_request(path or request_file(), owner_uid if owner_uid is not None else panel_uid())
+    if s is None:
+        errs = ["no trusted request (a regular JSON file of at most 64 KiB, with one link, owned by the panel)"]
     else:
-        errs = o1tariff.validate(s)[1]
+        errs = safe_errors(o1tariff.validate(s)[1])
         if not errs:
             save_schedule(s)
     try:
         os.makedirs(run_dir(), exist_ok=True)
-        write_json_atomic(apply_result_file(), {"ok": not errs, "errors": errs[:20], "at": int(time.time())},
+        write_json_atomic(apply_result_file(), {"ok": not errs, "errors": errs, "at": int(time.time())},
                           mode=0o640, group="o1view")
     except OSError:
         pass

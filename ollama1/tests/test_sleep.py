@@ -190,32 +190,99 @@ if __name__ == "__main__":
 
 class TestInhibitor(unittest.TestCase):
     """Long jobs hold a logind inhibitor for sleep and the power button, and
-    let it go when they end."""
+    it goes when they end, however they end (even SIGKILL or SIGHUP)."""
+
+    def setUp(self):
+        import tempfile
+        self.d = tempfile.mkdtemp(prefix="o1inh-")
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.fake = os.path.join(self.d, "systemd-inhibit")
+        self.log = os.path.join(self.d, "args")
+        # like the real one: take the options, then run the command (here in
+        # place, so the holder's pid is the one logged)
+        with open(self.fake, "w") as f:
+            f.write('#!/bin/sh\nargs="$*"\nwhile [ "${1#--}" != "$1" ]; do shift; done\n'
+                    'echo "$$ $args" >"%s"\nexec "$@"\n' % self.log)
+        os.chmod(self.fake, 0o755)
+
+    def holder(self):
+        import time
+        for _ in range(100):
+            if os.path.exists(self.log) and os.path.getsize(self.log):
+                break
+            time.sleep(0.05)
+        pid, args = open(self.log).read().split(" ", 1)
+        return int(pid), args
+
+    def gone(self, pid, wait=5.0):
+        import time
+        end = time.time() + wait
+        while time.time() < end:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return True
+            try:
+                if os.waitpid(pid, os.WNOHANG)[0] == pid:
+                    return True
+            except ChildProcessError:
+                pass
+            time.sleep(0.05)
+        return False
 
     def test_held_then_released(self):
         import o1sleep
-        import tempfile
-        import time
-        d = tempfile.mkdtemp(prefix="o1inh-")
-        self.addCleanup(shutil.rmtree, d, True)
-        fake = os.path.join(d, "systemd-inhibit")
-        log = os.path.join(d, "args")
-        with open(fake, "w") as f:
-            f.write('#!/bin/sh\necho "$$ $*" >"%s"\nexec sleep 300\n' % log)
-        os.chmod(fake, 0o755)
-        with o1sleep.Inhibit("the model library is being synced", exe=fake) as inh:
-            for _ in range(50):
-                if os.path.exists(log) and os.path.getsize(log):
-                    break
-                time.sleep(0.05)
-            pid, args = open(log).read().split(" ", 1)
+        with o1sleep.Inhibit("the model library is being synced", exe=self.fake) as inh:
+            pid, args = self.holder()
             self.assertIn("--what=sleep:handle-power-key", args)
             self.assertIn("--mode=block", args)
             self.assertIn("--why=the model library is being synced", args)
             self.assertIsNone(inh.p.poll())
-        self.assertIsNotNone(inh.p.poll())                 # gone with the job
-        with self.assertRaises(ProcessLookupError):
-            os.kill(int(pid), 0)
+        self.assertIsNotNone(inh.p.poll())                 # gone with the job, on EOF
+        self.assertTrue(self.gone(pid))
+
+    def run_parent_and_kill(self, sig):
+        import signal
+        code = ("import sys, time; sys.path.insert(0, %r); import o1sleep\n"
+                "with o1sleep.Inhibit('x', exe=%r):\n    print('ready', flush=True); time.sleep(60)\n"
+                % (U.LIB, self.fake))
+        p = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, text=True)
+        self.assertEqual(p.stdout.readline().strip(), "ready")
+        pid, _ = self.holder()
+        p.send_signal(sig)
+        p.wait(10)
+        self.assertTrue(self.gone(pid), "the inhibitor outlived its parent (signal %d)" % sig)
+        del signal
+
+    def test_dies_with_a_killed_parent(self):
+        import signal
+        self.run_parent_and_kill(signal.SIGKILL)
+
+    def test_dies_with_a_hung_up_parent(self):
+        import signal
+        self.run_parent_and_kill(signal.SIGHUP)
+
+    def test_setup_holder_dies_with_setup(self):
+        import signal
+        lib = os.path.join(U.LIB, "setuplib.sh")
+        script = ('die() { echo "DIE: $*"; exit 1; }; source "%s"; exec 9>"%s/lock"; '
+                  'hold_inhibitor "setup.sh is running"; echo ready; sleep 60' % (lib, self.d))
+        env = dict(os.environ, PATH=self.d + os.pathsep + os.environ["PATH"])
+        p = subprocess.Popen(["bash", "-c", script], stdout=subprocess.PIPE, text=True, env=env)
+        self.assertEqual(p.stdout.readline().strip(), "ready")
+        pid, args = self.holder()
+        self.assertIn("--why=setup.sh is running", args)
+        # it doesn't hold setup's lock (fd 9)
+        import fcntl
+        fd = os.open(os.path.join(self.d, "lock"), os.O_RDWR)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+        p.send_signal(signal.SIGKILL)
+        p.wait(10)
+        self.assertTrue(self.gone(pid), "setup's inhibitor outlived setup")
 
     def test_where_it_is_held(self):
         def src(*p):
@@ -226,6 +293,8 @@ class TestInhibitor(unittest.TestCase):
         self.assertIn('with L.Lock(), o1sleep.Inhibit("the model library is being synced"):', src("bin", "ollama1-models"))
         self.assertIn('with o1sleep.Inhibit("Ollama is being updated"):', src("bin", "ollama1-update-ollama"))
         setup = src("setup.sh")
-        self.assertIn("setsid systemd-inhibit --what=sleep:handle-power-key --mode=block", setup)
-        self.assertIn("trap 'kill -TERM -- \"-$INHIBIT_PID\"", setup)
-        self.assertLess(setup.index("systemd-inhibit --what"), setup.index('step "'))
+        self.assertIn('hold_inhibitor "setup.sh is running"', setup)
+        self.assertLess(setup.index('hold_inhibitor "setup.sh'), setup.index('step "'))
+        with open(os.path.join(U.LIB, "setuplib.sh")) as f:
+            lib = f.read()
+        self.assertIn("sh -c 'while kill -0 \"$1\" 2>/dev/null; do sleep 2; done' sh \"$$\" </dev/null >/dev/null 2>&1 9>&- &", lib)

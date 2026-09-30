@@ -87,6 +87,17 @@ vg_free_extents() { # free extents in ubuntu-vg as a plain integer, or fail
   echo "$n"
 }
 
+hold_inhibitor() { # why: hold off sleep and the power button until this shell is gone.
+  # The holder watches this shell's pid and exits within 2 s of it ending,
+  # however it ends (even SIGKILL), and the inhibitor goes with it. (A pipe
+  # wouldn't do: every command setup runs would inherit its write end.) It
+  # never inherits setup's lock (fd 9).
+  command -v systemd-inhibit >/dev/null 2>&1 || return 0
+  # shellcheck disable=SC2016  # $1 is the inner shell's, on purpose
+  systemd-inhibit --what=sleep:handle-power-key --mode=block --who=ollama1 --why="$1" \
+    sh -c 'while kill -0 "$1" 2>/dev/null; do sleep 2; done' sh "$$" </dev/null >/dev/null 2>&1 9>&- &
+}
+
 vg_extent_bytes() { # ubuntu-vg's extent size in bytes, or fail
   local n
   n=$(vgs --noheadings --units b --nosuffix -o vg_extent_size ubuntu-vg 2>/dev/null | tr -d '[:space:]')
@@ -96,8 +107,24 @@ vg_extent_bytes() { # ubuntu-vg's extent size in bytes, or fail
 
 vg_keep_extents() { # GiB -> extents of ubuntu-vg to leave free (rounded up), or fail
   local e
+  [ "${1:-0}" -gt 0 ] || { echo 0; return 0; }   # no reserve: no extent size needed
   e=$(vg_extent_bytes) || return 1
   echo $(( (${1:-0} * 1073741824 + e - 1) / e ))
+}
+
+grow_root() { # reserve GiB: grow ubuntu-lv and its filesystem (online) into ubuntu-vg's
+  # free space, leaving the reserve free. Nothing happens if the free space is
+  # already at or under the reserve. Sets ROOT_VG_FREE_EXT.
+  local free keep
+  free=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg (vgs -o vg_free_count ubuntu-vg)"
+  keep=$(vg_keep_extents "${1:-0}") || die "couldn't read ubuntu-vg's extent size (vgs -o vg_extent_size ubuntu-vg)"
+  if [ "$free" -gt "$keep" ]; then
+    run lvextend -r -l "+$((free - keep))" /dev/ubuntu-vg/ubuntu-lv
+    free=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg after growing it"
+    [ "$free" = "$keep" ] || die "ubuntu-vg has $free free extents after lvextend, not $keep"
+  fi
+  # shellcheck disable=SC2034  # read by setup.sh
+  ROOT_VG_FREE_EXT=$free
 }
 
 set_fstab() { # mountpoint "UUID=<uuid> <mountpoint> ..." : replaces that mountpoint's active line

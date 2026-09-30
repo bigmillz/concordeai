@@ -1,7 +1,9 @@
 # Applies the price schedule the admin panel saved in its own folder
 # (/var/lib/ollama1-admin/tariff-request.json): read without following a
-# symlink, only a regular file of at most 64 KiB, checked, then written to
-# root's /var/lib/ollama1/tariff.json. The panel can start only this.
+# symlink, only a regular file with one link, owned by o1admin, of at most
+# 64 KiB; checked, then written to root's /var/lib/ollama1/tariff.json. It
+# never writes or deletes anything in the panel's folder (read-only here).
+# The panel can start only this.
 [Unit]
 Description=ollama1: apply the price schedule saved in the admin panel
 
@@ -12,7 +14,7 @@ Environment=PYTHONDONTWRITEBYTECODE=1
 TimeoutStartSec=1min
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/var/lib/ollama1 /run/ollama1/power /var/lib/ollama1-admin
+ReadWritePaths=/var/lib/ollama1 /run/ollama1/power
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes

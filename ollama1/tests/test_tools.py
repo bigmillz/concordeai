@@ -105,6 +105,22 @@ class TestRamTestCleansUp(unittest.TestCase):
         main = src[src.index("def main():"):]
         self.assertLess(main.index("signal.signal(sig, exit_on_signal)"), main.index("results = []"))
 
+    def test_cleanup_before_any_output(self):
+        src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()
+        fin = src[src.index("    finally:\n        restore()"):]
+        self.assertLess(fin.index("restore()"), fin.index("say("))
+        import io
+        import sys as _sys
+
+        class Gone(io.StringIO):
+            def write(self, *a):
+                raise BrokenPipeError(32, "Broken pipe")
+        real, _sys.stdout = _sys.stdout, Gone()
+        try:
+            T.say("the terminal is gone")                  # must not raise
+        finally:
+            _sys.stdout = real
+
     def test_runs_in_tmux(self):
         sh = open(os.path.join(U.TOOLS, "ram-model-test.sh")).read()
         self.assertIn("exec tmux new-session -A -s ollama1-ramtest", sh)
@@ -250,6 +266,16 @@ class TestEncryptedSwapRuns(unittest.TestCase):
         self.assertNotIn("removed", r.stdout)
         self.assertEqual((self.read("etc/crypttab"), self.read("etc/fstab")), (crypttab, fstab))
         self.assertTrue(self.fake()["lv"])
+
+    def test_off_leaves_a_volume_it_didnt_make(self):
+        self.fake(lv=True)                                  # already there before "on"
+        self.assertEqual(self.run_it("on", "8G").returncode, 0)
+        self.assertFalse([x for x in self.fake()["log"] if x.startswith("lvcreate")])
+        r = self.run_it("off")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertTrue(self.fake()["lv"])
+        self.assertFalse([x for x in self.fake()["log"] if x.startswith("lvremove")])
+        self.assertIn("was there before", r.stdout)
 
     def test_off_restores_only_what_on_changed(self):
         # the plain swap was already commented out by hand: off leaves it that way

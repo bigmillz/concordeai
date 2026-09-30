@@ -148,7 +148,8 @@ def _validate(s):
     allowed = set(DEFAULT) | {"note"}
     for k in s:
         if k not in allowed:
-            errs.append("unknown setting %r" % k)
+            # a key is echoed only if it looks like one; the text is never an input value
+            errs.append("unknown setting %s" % (k if re.match(r"^[a-z_]{1,30}$", str(k)) else "(unreadable name)"))
     out = json.loads(json.dumps(DEFAULT))
     out.update({k: v for k, v in s.items() if k in allowed})
     if "note" in out and not (isinstance(out["note"], str) and len(out["note"]) <= 200):
@@ -164,7 +165,7 @@ def _validate(s):
     try:
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError, TypeError, KeyError, OSError):
-        errs.append("unknown timezone %r" % (tz,))
+        errs.append("unknown timezone (use a name like America/New_York)")
     tiers = out.get("tiers")
     if not isinstance(tiers, dict) or any(k not in TIERS for k in tiers):
         errs.append("tiers may only be on, mid, off and discount")
@@ -194,7 +195,7 @@ def _validate(s):
                 try:
                     datetime.date.fromisoformat(d)
                 except ValueError:
-                    errs.append("holidays.extra: %s isn't a date" % d)
+                    errs.append("holidays.extra has a date that doesn't exist")
         out["holidays"] = h
     seasons = out.get("seasons")
     if not isinstance(seasons, list) or not 1 <= len(seasons) <= 8:
@@ -208,10 +209,8 @@ def _validate(s):
             errs.append("%s: takes name, from, to and windows" % where)
             continue
         name = se.get("name")
-        if not isinstance(name, str) or not 0 < len(name) <= 40:
+        if not isinstance(name, str) or not 0 < len(name) <= 40:     # (names are never echoed back)
             errs.append("%s: needs a name (up to 40 characters)" % where)
-        else:
-            where = "%s (%s)" % (where, name)
         a, b = _mmdd_doy(se.get("from")), _mmdd_doy(se.get("to"))
         if a is None or b is None:
             errs.append("%s: from and to must be dates like 05-01" % where)

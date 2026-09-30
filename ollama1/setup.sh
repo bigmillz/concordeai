@@ -223,14 +223,8 @@ fi
 touch "$LOG"; chmod 600 "$LOG"
 
 # While setup runs, neither a sleep request nor the power button may suspend
-# the desktop (a logind inhibitor, held by a child in its own session and
-# ended with setup, however setup ends).
-if command -v systemd-inhibit >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
-  setsid systemd-inhibit --what=sleep:handle-power-key --mode=block --who=ollama1 \
-    --why="setup.sh is running" sleep infinity </dev/null >/dev/null 2>&1 &
-  INHIBIT_PID=$!
-  trap 'kill -TERM -- "-$INHIBIT_PID" 2>/dev/null || kill "$INHIBIT_PID" 2>/dev/null || true' EXIT
-fi
+# the desktop: a logind inhibitor that ends with setup, however it ends.
+hold_inhibitor "setup.sh is running"
 exec > >(tee -a "$LOG") 2>&1
 printf '\n===== ollama1 setup %s =====\n' "$(date -Is)"
 
@@ -336,15 +330,8 @@ ok "ttyd $(ttyd --version 2>&1 | awk '{print $NF}'), cloudflared $(cloudflared -
 
 # ---- 3. root volume -----------------------------------------------------------
 step "Root volume"
-free_ext=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg (vgs -o vg_free_count ubuntu-vg)"
-ext_bytes=$(vg_extent_bytes) || die "couldn't read ubuntu-vg's extent size (vgs -o vg_extent_size ubuntu-vg)"
-keep_ext=$(vg_keep_extents "$VG_RESERVE_GIB") || die "couldn't work out the --vg-reserve extents"
-if [ "$free_ext" -gt "$keep_ext" ]; then
-  run lvextend -r -l "+$((free_ext - keep_ext))" /dev/ubuntu-vg/ubuntu-lv
-  free_ext=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg after growing it"
-  [ "$free_ext" = "$keep_ext" ] || die "ubuntu-vg has $free_ext free extents after lvextend, not $keep_ext"
-fi
-ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); $((free_ext * ext_bytes >> 30)) GiB left free in ubuntu-vg"
+grow_root "$VG_RESERVE_GIB"
+ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); $ROOT_VG_FREE_EXT extents left free in ubuntu-vg"
 
 # ---- 4. /home onto the root filesystem -------------------------------------------
 step "/home onto the root filesystem"
@@ -509,6 +496,11 @@ if [ ! -f /etc/ollama1/devices.json ]; then
   printf '{"version": 1, "devices": []}\n' >/etc/ollama1/devices.json
 fi
 chown root:o1view /etc/ollama1/devices.json; chmod 0640 /etc/ollama1/devices.json
+# once: the panel's prices from before they moved to root's folder, through
+# the same checks as a panel request (never a symlink, owned by o1admin)
+if [ -e /var/lib/ollama1-admin/tariff.json ] && [ ! -e /var/lib/ollama1/tariff.json ]; then
+  "$LIBDIR/bin/ollama1-power" migrate-tariff || note "the panel's old prices weren't moved; set them again in the panel"
+fi
 
 LANIF=enp39s0
 if [ -d /sys/class/net/br0 ]; then

@@ -164,6 +164,12 @@ def cmd_apply(args):
     return 0 if ok else 1
 
 
+def cmd_migrate(args):
+    need_root()
+    print(P.migrate_old_tariff())
+    return 0
+
+
 def cmd_run(args):
     need_root()
     P.run(load_config())
@@ -177,7 +183,7 @@ def main():
         return 0
     cmds = {"status": cmd_status, "set-plug": cmd_set_plug, "test-plug": cmd_test_plug,
             "set-schedule": cmd_set_schedule, "export-schedule": cmd_export, "presets": cmd_presets,
-            "apply-request": cmd_apply, "run": cmd_run}
+            "apply-request": cmd_apply, "migrate-tariff": cmd_migrate, "run": cmd_run}
     if args[0] not in cmds:
         sys.exit(USAGE)
     return cmds[args[0]](args[1:])

@@ -295,6 +295,35 @@ class TestAllowListTypos(Base):
         self.assertEqual(self.deleted(), [])
         self.assertEqual(s["skipped"], ["gpt-oss:120b"])
 
+    def test_missing_or_unreadable_list_blocks_every_removal(self):
+        self.install("extra:3b")
+        os.unlink(self.allow) if os.path.exists(self.allow) else None
+        p = L.plan(base=self.base, allow_path=self.allow, manifest_fn=lambda n: (None, None))
+        self.assertEqual(p["remove"], [])
+        self.assertEqual([x["name"] for x in p["removals_blocked"]], ["extra:3b"])
+        self.assertIn("missing", p["allow_errors"][0]["reason"])
+        with open(self.allow, "wb") as f:
+            f.write(b"\xff\xfe not utf-8\n")
+        p = L.plan(base=self.base, allow_path=self.allow, manifest_fn=lambda n: (None, None))
+        self.assertEqual(p["remove"], [])
+        # and a sync planned earlier removes nothing once the list is gone
+        self.write_allow("")
+        p = L.plan(base=self.base, allow_path=self.allow, manifest_fn=lambda n: (None, None))
+        self.assertEqual([x["name"] for x in p["remove"]], ["extra:3b"])
+        os.unlink(self.allow)
+        s = self.run_plan(p)
+        self.assertEqual(self.deleted(), [])
+        self.assertEqual(s["skipped"], ["extra:3b"])
+
+    def test_freed_is_zero_if_a_kept_manifest_is_unreadable(self):
+        self.write_allow("keep:1b\n")
+        self.install("keep:1b")
+        self.install("extra:3b")
+        self.assertEqual(L.freed_bytes(["extra:3b"], ["keep:1b", "extra:3b"]), 1100)
+        host, repo, tag = L.split_name("keep:1b")
+        os.unlink(os.path.join(Paths.models, "manifests", host, repo, tag))
+        self.assertEqual(L.freed_bytes(["extra:3b"], ["keep:1b", "extra:3b"]), 0)
+
     def test_case_doesnt_matter(self):
         self.write_allow("GPT-OSS:120B\n")
         self.install("gpt-oss:120b")

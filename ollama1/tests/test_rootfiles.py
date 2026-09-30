@@ -71,16 +71,17 @@ class TestSafeReads(unittest.TestCase):
 
 class TestPanelScheduleHandOff(unittest.TestCase):
     """The panel leaves a schedule in its own folder; root only reads it
-    (safely) and writes root's own file."""
+    (a regular file, one link, owned by the panel, bounded) and writes
+    root's own file. It never writes or deletes anything in that folder."""
 
     def setUp(self):
         os.makedirs(os.path.dirname(P.request_file()), exist_ok=True)
         os.makedirs(os.path.dirname(P.tariff_file()), exist_ok=True)
-        for f in (P.request_file(), P.tariff_file()):
-            try:
+        for f in (P.request_file(), P.tariff_file(), P.old_tariff_file()):
+            if os.path.lexists(f):
                 os.unlink(f)
-            except FileNotFoundError:
-                pass
+        self.addCleanup(self.setUp_clean)
+        self.me = os.getuid()                 # stands in for o1admin
         self.d = tempfile.mkdtemp(prefix="o1victim-")
         self.addCleanup(shutil.rmtree, self.d, True)
         # a root-only file that happens to be a valid schedule: following a
@@ -93,6 +94,11 @@ class TestPanelScheduleHandOff(unittest.TestCase):
             f.write(self.victim_text)
         os.chmod(self.victim, 0o440)
 
+    def setUp_clean(self):
+        for f in (P.request_file(), P.tariff_file(), P.old_tariff_file()):
+            if os.path.lexists(f):
+                os.unlink(f)
+
     def sched(self):
         s = json.loads(json.dumps(T.DEFAULT))
         s["flat_rate"] = 0.15
@@ -102,21 +108,42 @@ class TestPanelScheduleHandOff(unittest.TestCase):
         self.assertEqual(os.path.dirname(P.tariff_file()), Paths.state)
         self.assertNotEqual(os.path.dirname(P.tariff_file()), Paths.admin_state)
         self.assertEqual(os.path.dirname(P.request_file()), Paths.admin_state)
+        u = unit("ollama1-power-apply.service")
+        self.assertNotIn("ollama1-admin", re.search(r"^ReadWritePaths=(.*)$", u, re.M).group(1))
+        with open(os.path.join(U.LIB, "o1power.py")) as f:
+            src = f.read()
+        body = src[src.index("def apply_request"):src.index("\ndef ", src.index("def apply_request") + 5)]
+        self.assertNotIn("unlink", body)
 
     def test_apply_a_good_request(self):
         write_json_atomic(P.request_file(), self.sched(), mode=0o600)
-        self.assertEqual(P.apply_request(), (True, []))
+        self.assertEqual(P.apply_request(self.me), (True, []))
         self.assertEqual(P.load_schedule()["flat_rate"], 0.15)
         self.assertEqual(oct(os.stat(P.tariff_file()).st_mode & 0o777), "0o640")
-        self.assertFalse(os.path.exists(P.request_file()))
+        self.assertTrue(os.path.exists(P.request_file()))          # left alone; the panel overwrites it
         self.assertTrue(json.load(open(P.apply_result_file()))["ok"])
+
+    def test_owner_and_links_are_checked(self):
+        write_json_atomic(P.request_file(), self.sched(), mode=0o600)
+        self.assertFalse(P.apply_request(self.me + 1)[0])          # not the panel's
+        os.unlink(P.request_file())
+        mine = os.path.join(self.d, "mine.json")
+        write_json_atomic(mine, self.sched(), mode=0o600)
+        os.link(mine, P.request_file())                           # a second name for another file
+        self.assertFalse(P.apply_request(self.me)[0])
+        self.assertFalse(os.path.exists(P.tariff_file()))
+
+    def test_no_panel_user_no_trust(self):
+        write_json_atomic(P.request_file(), self.sched(), mode=0o600)
+        if P.panel_uid() is None:
+            self.assertFalse(P.apply_request()[0])
 
     def test_planted_symlinks_are_refused(self):
         os.symlink(self.victim, P.request_file())
-        ok, errs = P.apply_request()
+        ok, errs = P.apply_request(self.me)
         self.assertFalse(ok)
         self.assertFalse(os.path.exists(P.tariff_file()))
-        self.assertFalse(os.path.lexists(P.request_file()))        # the link itself is removed
+        self.assertTrue(os.path.islink(P.request_file()))          # root didn't touch it
         self.assertEqual(open(self.victim).read(), self.victim_text)
         self.assertEqual(oct(os.stat(self.victim).st_mode & 0o777), "0o440")
         # and a link planted where root reads the tariff is ignored, not followed
@@ -127,7 +154,7 @@ class TestPanelScheduleHandOff(unittest.TestCase):
     def test_fifo_and_oversize_requests(self):
         os.mkfifo(P.request_file())
         out = []
-        t = threading.Thread(target=lambda: out.append(P.apply_request()), daemon=True)
+        t = threading.Thread(target=lambda: out.append(P.apply_request(self.me)), daemon=True)
         t.start()
         t.join(2.0)
         if t.is_alive():                      # blocked on the FIFO: let it go, then fail
@@ -136,14 +163,54 @@ class TestPanelScheduleHandOff(unittest.TestCase):
             t.join(2.0)
             self.fail("root blocked on a FIFO the panel planted")
         self.assertFalse(out[0][0])
+        os.unlink(P.request_file())
         with open(P.request_file(), "w") as f:
             f.write(json.dumps(dict(self.sched(), note="x")) + " " * (P.MAX_SCHEDULE_BYTES + 1))
-        self.assertFalse(P.apply_request()[0])
+        self.assertFalse(P.apply_request(self.me)[0])
         write_json_atomic(P.request_file(), dict(self.sched(), flat_rate=-5), mode=0o600)
-        ok, errs = P.apply_request()
+        ok, errs = P.apply_request(self.me)
         self.assertFalse(ok)
         self.assertTrue(any("flat_rate" in e for e in errs))
         self.assertFalse(os.path.exists(P.tariff_file()))
+
+    def test_errors_never_echo_the_request(self):
+        mark = "EVIL-MARKER<script>"
+        s = self.sched()
+        s.update({mark: 1, "timezone": mark, "currency": mark, "note": mark * 20})
+        s["holidays"] = {"enabled": True, "names": [mark], "observed": True, "extra": ["2026-02-30", mark]}
+        s["seasons"] = [{"name": mark, "from": "01-01", "to": "12-31", "windows": [
+                            {"tier": mark, "days": [mark], "start": mark, "end": mark}]},
+                        {"name": mark[:30], "from": "06-01", "to": "06-30", "windows": []}]
+        write_json_atomic(P.request_file(), s, mode=0o600)
+        ok, errs = P.apply_request(self.me)
+        self.assertFalse(ok)
+        self.assertTrue(errs)
+        text = open(P.apply_result_file()).read()
+        self.assertNotIn("EVIL", text)
+        self.assertNotIn("<script>", text)
+        self.assertTrue(all(len(e) <= 160 for e in errs))
+        self.assertLessEqual(len(errs), 20)
+
+    def test_one_time_migration(self):
+        old = P.old_tariff_file()
+        write_json_atomic(old, dict(self.sched(), flat_rate=0.21), mode=0o600)
+        msg = P.migrate_old_tariff(self.me)
+        self.assertIn("moved", msg)
+        self.assertEqual(P.load_schedule()["flat_rate"], 0.21)
+        # once only: root's file now exists, so a newer old file is ignored
+        write_json_atomic(old, dict(self.sched(), flat_rate=0.99), mode=0o600)
+        self.assertIn("nothing to move", P.migrate_old_tariff(self.me))
+        self.assertEqual(P.load_schedule()["flat_rate"], 0.21)
+        # a planted link in its place is never followed
+        os.unlink(P.tariff_file())
+        os.unlink(old)
+        os.symlink(self.victim, old)
+        self.assertIn("weren't moved", P.migrate_old_tariff(self.me))
+        self.assertFalse(os.path.exists(P.tariff_file()))
+        with open(os.path.join(U.KIT, "setup.sh")) as f:
+            setup = f.read()
+        self.assertIn('"$LIBDIR/bin/ollama1-power" migrate-tariff', setup)
+        self.assertIn("[ ! -e /var/lib/ollama1/tariff.json ]", setup)
 
 
 class TestValidateNeverRaises(unittest.TestCase):

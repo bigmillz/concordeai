@@ -103,7 +103,7 @@ class TestValidation(unittest.TestCase):
             (tou([{"name": "A", "from": "02-30", "to": "06-30", "windows": []}]), "dates like"),
             (tou([]), "1 to 8 seasons"),
             (sched(holidays={"enabled": True, "names": ["easter"]}), "holidays.names"),
-            (sched(holidays={"enabled": True, "extra": ["2026-02-30"]}), "isn't a date"),
+            (sched(holidays={"enabled": True, "extra": ["2026-02-30"]}), "a date that doesn't exist"),
             (sched(tiers={"super": 1}), "tiers may only"),
         ]
         for s, want in bad:

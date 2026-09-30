@@ -39,9 +39,11 @@ def _active_units(patterns):
 
 class Inhibit:
     """Hold a logind inhibitor (sleep and the power button, mode block) while
-    a long job runs: a model pull or library sync, updates. The holder runs
-    in its own session and is ended with the job. A no-op where
-    systemd-inhibit isn't there, when not root, and in tests."""
+    a long job runs: a model pull or library sync, updates. The holder reads
+    a pipe only this process writes: when the job ends, however it ends
+    (even SIGKILL), the holder gets EOF and exits, and the inhibitor with
+    it. A no-op where systemd-inhibit isn't there, when not root, and in
+    tests (unless `exe` is given)."""
 
     def __init__(self, why, exe=None):
         self.why = why
@@ -54,24 +56,27 @@ class Inhibit:
         if exe and (self.exe or (os.geteuid() == 0 and not os.environ.get("OLLAMA1_PREFIX"))):
             try:
                 self.p = subprocess.Popen([exe, "--what=sleep:handle-power-key", "--mode=block", "--who=ollama1",
-                                           "--why=" + self.why, "sleep", "infinity"],
-                                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                          stderr=subprocess.DEVNULL, start_new_session=True)
+                                           "--why=" + self.why, "sh", "-c", "cat >/dev/null"],
+                                          stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                          stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
             except OSError:
                 self.p = None
         return self
 
     def __exit__(self, *a):
         if self.p is not None:
-            import signal
             try:
-                os.killpg(self.p.pid, signal.SIGTERM)
+                self.p.stdin.close()             # EOF: the holder exits
             except OSError:
                 pass
             try:
                 self.p.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                pass
+                import signal
+                try:
+                    os.killpg(self.p.pid, signal.SIGTERM)
+                except OSError:
+                    pass
         return False
 
 

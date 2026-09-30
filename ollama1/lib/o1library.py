@@ -267,12 +267,16 @@ def plan(base=None, allow_path=None, manifest_fn=None):
 
 def freed_bytes(removed, installed):
     """Space the removals give back: the blobs of the removed models that no
-    kept model also uses. A manifest that can't be read counts nothing
-    (so the figure errs low, never high)."""
+    kept model also uses. If a kept model's manifest can't be read, nothing
+    is counted at all (its blobs might be any of them); a removed model's
+    unreadable manifest counts nothing. The figure errs low, never high."""
     keep = set()
     for n in installed:
         if n not in removed:
-            keep.update(layers(local_manifest(n)))
+            m = local_manifest(n)
+            if not isinstance(m, dict):
+                return 0
+            keep.update(layers(m))
     gone = {}
     for n in removed:
         gone.update(layers(local_manifest(n)))

@@ -130,10 +130,11 @@ def read_json(path, default=None, max_bytes=4 << 20):
         return default
 
 
-def read_json_safe(path, default=None, max_bytes=1 << 20):
+def read_json_safe(path, default=None, max_bytes=1 << 20, check=None):
     """read_json for root reading a file someone else could have placed:
     never follows a symlink in the last component, never blocks on a FIFO
-    or device, and reads only a regular file of at most max_bytes."""
+    or device, and reads only a regular file of at most max_bytes. `check`,
+    if given, gets the open file's stat and must return True."""
     import stat
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0))
@@ -142,6 +143,8 @@ def read_json_safe(path, default=None, max_bytes=1 << 20):
     try:
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode) or st.st_size > max_bytes:
+            return default
+        if check is not None and not check(st):
             return default
         with os.fdopen(fd, "rb") as f:
             fd = None
@@ -215,6 +218,9 @@ def parse_allow_list(path=None):
         with open(path or Paths.allow, "r", encoding="utf-8") as f:
             lines = f.read().splitlines()
     except (OSError, UnicodeDecodeError):
+        # missing or unreadable is an error, never an empty clean list: it
+        # allows nothing, and it blocks every removal in a library sync
+        errors.append({"line": 0, "text": "", "reason": "models.allow is missing or can't be read"})
         return entries, errors
     for no, raw in enumerate(lines, 1):
         text = raw.split("#", 1)[0].strip()

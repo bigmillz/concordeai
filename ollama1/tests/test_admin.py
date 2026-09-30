@@ -350,7 +350,7 @@ class TestPowerPanel(unittest.TestCase):
         self.assertEqual(A["started"], ["ollama1-power-apply.service"])
         self.assertFalse(os.path.exists(self.P.tariff_file()))
         self.assertEqual(oct(os.stat(self.P.request_file()).st_mode & 0o777), "0o600")
-        self.assertEqual(self.P.apply_request(), (True, []))          # what the unit runs, as root
+        self.assertEqual(self.P.apply_request(os.getuid()), (True, []))   # what the unit runs, as root (o1admin's file)
         self.assertEqual(oct(os.stat(self.P.tariff_file()).st_mode & 0o777), "0o640")
         s = json.loads(get("/api/power")[1])
         self.assertEqual(s["schedule"]["mode"], "tou")

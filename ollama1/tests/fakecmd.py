@@ -86,6 +86,13 @@ def main():
         rc = 0 if args[-1] in s.get("mounted", []) else 1
     elif cmd == "mount":
         s.setdefault("mounted", []).append(args[-1])
+    elif cmd == "lvextend":
+        if s.get("lvextend_fails"):
+            rc = 5
+        else:
+            n = int(args[args.index("-l") + 1].lstrip("+"))
+            free = int(s.get("vgs", "  451190 ").strip())
+            s["vgs"] = "  %d " % (s.get("lvextend_leaves", free - n))
     elif cmd == "vgs":
         if "vg_extent_size" in args:
             out = s.get("vgs_extent", "  4194304 ")

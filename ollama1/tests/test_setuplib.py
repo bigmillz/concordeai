@@ -14,7 +14,7 @@ from fakecmd import fu
 LIBSH = os.path.join(os.path.dirname(U.LIB) if os.environ.get("OLLAMA1_TEST_LIB") else U.KIT, "lib",
                      "setuplib.sh")
 TOOLS = ["lsblk", "blkid", "mdadm", "mkfs.ext4", "sgdisk", "wipefs", "partprobe", "udevadm",
-         "update-initramfs", "findmnt", "mountpoint", "mount", "vgs", "systemctl"]
+         "update-initramfs", "findmnt", "mountpoint", "mount", "vgs", "systemctl", "lvextend"]
 OLD_HOME_UUID = fu("9")
 
 
@@ -311,12 +311,68 @@ class TestVgFree(unittest.TestCase):
             self.sb.state["vgs_extent"] = bad
             self.assertEqual(self.sb.run('n=$(vg_keep_extents 1) || die "bad"; echo "K=$n"'), 1, bad)
 
-    def test_setup_grows_root_only_past_the_reserve(self):
+    def test_setup_calls_grow_root_with_the_reserve(self):
         setup = open(os.path.join(U.KIT, "setup.sh")).read()
-        self.assertIn('run lvextend -r -l "+$((free_ext - keep_ext))" /dev/ubuntu-vg/ubuntu-lv', setup)
-        self.assertIn('if [ "$free_ext" -gt "$keep_ext" ]; then', setup)
+        self.assertIn('grow_root "$VG_RESERVE_GIB"', setup)
         self.assertIn("VG_RESERVE_GIB=0\n", setup)                       # default: no reserve
-        self.assertNotIn("+100%FREE", setup)
+        self.assertNotIn("lvextend", setup)                               # only through grow_root
+        self.assertLess(setup.index('grow_root "$VG_RESERVE_GIB"'), setup.index('step "/home onto the root filesystem"'))
+
+
+class TestGrowRoot(unittest.TestCase):
+    """setup's step 3, which grows / online: exactly the free space less the
+    reserve, once, and it stops on anything unexpected."""
+
+    def setUp(self):
+        self.sb = Sandbox()
+        self.addCleanup(self.sb.close)
+
+    def grow(self, gib, free, extent="  4194304 ", **kw):
+        self.sb.state.update({"vgs": "  %s " % free, "vgs_extent": extent, "log": []}, **kw)
+        rc = self.sb.run('grow_root %d; echo "LEFT=$ROOT_VG_FREE_EXT"' % gib)
+        return rc, self.sb.log("lvextend")
+
+    def test_default_takes_everything_like_before(self):
+        rc, lv = self.grow(0, 451190)
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertEqual(lv, ["lvextend -r -l +451190 /dev/ubuntu-vg/ubuntu-lv"])
+        self.assertIn("LEFT=0", self.sb.out)
+        # no reserve: the extent size isn't even read
+        self.assertFalse([l for l in self.sb.state["log"] if "vg_extent_size" in l])
+
+    def test_reserve_left_free(self):
+        rc, lv = self.grow(64, 451190)
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertEqual(lv, ["lvextend -r -l +%d /dev/ubuntu-vg/ubuntu-lv" % (451190 - 16384)])
+        self.assertIn("LEFT=16384", self.sb.out)
+
+    def test_already_grown_does_nothing(self):
+        for gib, free in ((0, 0), (64, 16384), (64, 100), (64, 0)):
+            rc, lv = self.grow(gib, free)
+            self.assertEqual(rc, 0, (gib, free, self.sb.out))
+            self.assertEqual(lv, [], (gib, free))
+            self.assertIn("LEFT=%d" % free, self.sb.out)
+
+    def test_second_run_changes_nothing(self):
+        self.grow(64, 451190)
+        self.sb.state["log"] = []
+        rc = self.sb.run('grow_root 64; echo "LEFT=$ROOT_VG_FREE_EXT"')
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.sb.log("lvextend"), [])
+
+    def test_stops_on_the_unexpected(self):
+        rc, lv = self.grow(0, "<1762.47g")
+        self.assertEqual((rc, lv), (1, []))
+        self.assertIn("couldn't read the free space", self.sb.out)
+        rc, lv = self.grow(64, 451190, extent="  4m ")
+        self.assertEqual((rc, lv), (1, []))
+        self.assertIn("extent size", self.sb.out)
+        rc, lv = self.grow(64, 451190, lvextend_leaves=5)
+        self.assertEqual(rc, 1)
+        self.assertIn("5 free extents after lvextend, not 16384", self.sb.out)
+        rc, lv = self.grow(0, 451190, lvextend_fails=True)
+        self.assertNotEqual(rc, 0)                     # setup's run() stops on a failed command
+        self.assertNotIn("DONE", self.sb.out)
 
 
 if __name__ == "__main__":

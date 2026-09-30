@@ -154,8 +154,10 @@ off() {
     restored=1
   fi
   systemctl daemon-reload
-  if lv_exists; then
+  if state_has lv_created && lv_exists; then   # only a volume "on" made
     lvremove --yes "$VG/$LV" >/dev/null || die "lvremove $VG/$LV failed; crypttab and fstab are already back"
+  elif lv_exists; then
+    echo "  $LVDEV was there before; left as it is"
   fi
   if [ "$restored" = 1 ] && grep -qE "^${PLAIN}[[:space:]]" "$FSTAB" && [ -f "$R$PLAIN" ]; then
     swapon "$PLAIN" || echo "  note: swapon $PLAIN failed; it's in fstab and will be used after a reboot"

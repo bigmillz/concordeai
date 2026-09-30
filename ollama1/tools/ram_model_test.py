@@ -83,7 +83,12 @@ DEFAULT_CONFIGS = ["norepack", "norepack-moe"]
 
 
 def say(msg=""):
-    print(msg, flush=True)
+    """Print, but never fail: after a hangup the terminal may be gone, and
+    nothing printed may stop the cleanup."""
+    try:
+        print(msg, flush=True)
+    except (OSError, ValueError):    # BrokenPipeError is an OSError
+        pass
 
 
 # ---- pure helpers (tested) ----------------------------------------------------
@@ -416,8 +421,8 @@ def main():
                 say("  %s: %s" % (n, e))
                 results.append({"config": n, "loaded": False, "error": str(e)})
     finally:
-        say("\nputting Ollama back to its normal settings")
-        restore()
+        restore()               # first: nothing printed may stand in its way
+        say("\nOllama is back to its normal settings")
     say("\n===== results: %s, num_ctx %d =====" % (a.model, a.ctx))
     say(table(results))
     for r in results:

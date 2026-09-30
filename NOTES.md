@@ -621,6 +621,23 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
   - `setup.sh --vg-reserve SIZE`: when growing `/`, leave that much free in
     ubuntu-vg (for a future `--encrypted-swap`). Default 0, so the current
     behaviour is unchanged; it has no effect once `/` has been grown.
+    Step 3 is now `grow_root` in setuplib, tested against a fake LVM: no
+    reserve means exactly the old `lvextend` of all free extents; it stops
+    on unreadable figures or an unexpected result.
+  - Re-review lows:
+    - Inhibitors end with their job however it ends. The CLI jobs' holder
+      reads a pipe until EOF; setup's watches setup's pid and doesn't
+      inherit its lock.
+    - A missing or unreadable models.allow is an error that blocks all
+      removals. "Freed" is 0 if a kept model's manifest can't be read.
+    - The RAM test restores Ollama before printing anything, and `say()`
+      survives a closed terminal.
+    - The apply unit trusts a panel request only if it is a regular file
+      with one link, owned by o1admin. It never deletes or writes anything
+      in the panel's folder, and its errors use fixed wording (no input
+      echoed).
+    - `encrypted-swap.sh off` removes only a volume it made.
+    - setup moves the panel's old tariff.json once, through the same checks.
   - Setup, library syncs and pulls, and updates hold a logind inhibitor
     (sleep and the power button).
   - The gateway's RAM budget is capped at MemoryHigh, and logind's HUP
