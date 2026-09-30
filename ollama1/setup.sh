@@ -59,7 +59,7 @@ prev=""
 for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
   if [ "$prev" = --vg-reserve ]; then
-    [[ "$a" =~ ^[0-9]+G$ ]] || { echo "--vg-reserve takes a size in GiB, like 64G"; exit 2; }
+    [[ "$a" =~ ^[0-9]{1,6}G$ ]] || { echo "--vg-reserve takes a size in GiB, like 64G (at most 999999G)"; exit 2; }
     VG_RESERVE_GIB=$((10#${a%G})); prev=""; continue   # 10#: "08G" is decimal, not octal
   fi
   prev=$a
@@ -75,6 +75,8 @@ for a in "$@"; do
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
+# a flag left waiting for its value (the size forgotten) must not mean "no reserve"
+case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
 
 KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

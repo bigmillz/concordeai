@@ -421,6 +421,8 @@ def main():
                 say("  %s: %s" % (n, e))
                 results.append({"config": n, "loaded": False, "error": str(e)})
     finally:
+        for sig in (signal.SIGHUP, signal.SIGTERM):   # a second signal must not cut the restore short
+            signal.signal(sig, signal.SIG_IGN)
         restore()               # first: nothing printed may stand in its way
         say("\nOllama is back to its normal settings")
     say("\n===== results: %s, num_ctx %d =====" % (a.model, a.ctx))

@@ -377,3 +377,30 @@ class TestGrowRoot(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSetupArgs(unittest.TestCase):
+    """setup.sh's option parse runs before anything else (a non-root run
+    stops at the sudo check right after it), so it's safe to run here."""
+    def run_setup(self, *args):
+        r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh")] + list(args),
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30)
+        return r.returncode, r.stdout + r.stderr
+
+    def test_a_forgotten_size_is_refused_not_zero(self):
+        for flag in ("--vg-reserve", "--encrypted-swap"):
+            code, out = self.run_setup("--plan", flag)
+            self.assertEqual(code, 2, out)
+            self.assertIn("takes a size", out)
+
+    def test_reserve_bounded_so_bash_cannot_wrap_it(self):
+        for bad in ("18446744073709551616G", "1000000G", "", "G", "-5G", "1.5G", "5T"):
+            code, out = self.run_setup("--vg-reserve", bad)
+            self.assertEqual(code, 2, "%r: %s" % (bad, out))
+
+    def test_good_sizes_get_past_the_parse(self):
+        if os.geteuid() == 0:
+            self.skipTest("as root this would really run setup")
+        for good in ("64G", "08G", "999999G"):
+            code, out = self.run_setup("--vg-reserve", good)
+            self.assertIn("Run it with sudo", out, good)   # reached the sudo check

@@ -107,7 +107,9 @@ class TestRamTestCleansUp(unittest.TestCase):
 
     def test_cleanup_before_any_output(self):
         src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()
-        fin = src[src.index("    finally:\n        restore()"):]
+        fin = src[src.index("    finally:\n        for sig in (signal.SIGHUP, signal.SIGTERM)"):]
+        # signals ignored first, so a second HUP/TERM can't cut the restore short
+        self.assertLess(fin.index("signal.SIG_IGN"), fin.index("restore()"))
         self.assertLess(fin.index("restore()"), fin.index("say("))
         import io
         import sys as _sys

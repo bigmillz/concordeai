@@ -70,7 +70,7 @@ def tariff_file():
 
 def request_file():
     """Where the panel (o1admin) leaves a schedule for root to apply. Root
-    only reads it (no symlinks, regular file, bounded) and deletes it."""
+    only reads it (no symlinks, regular file, bounded) and leaves it in place."""
     return os.path.join(Paths.admin_state, "tariff-request.json")
 
 
