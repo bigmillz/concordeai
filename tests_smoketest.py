@@ -1888,7 +1888,7 @@ for _n in _ctree.body:
             getattr(_n, "name", "") in (
                 "_retired_on_disk", "model_updates", "superseded_installed",
                 "_gb_of", "_cleanup_stat", "auto_cleanup_on", "_resident",
-                "_auto_cleanup_pass", "start_model_update",
+                "_auto_cleanup_pass", "_auto_clean_targets", "start_model_update",
                 "_model_update_worker", "_app_models", "_app_models_add",
                 "_app_models_seed", "_offers_set")
             or (isinstance(_n, _ast.Assign) and any(
@@ -4553,11 +4553,503 @@ check("giant installs ask twice; long downloads read in hours",
       and 'const ROS_SKIP=new Set(["Ollama engine","Image generation","Video generation"]);' in page
       and "retry from the list" in page
       and "(m.giant?'\" data-giant=\"1':'')" in page
-      and 'function dlEta(m){' in page
-      and page.count("dlEta(st.eta_min)") == 4 and "dlEta(et)" in page
-      and page.count("min left") == 1
+      # (6b335) the one time-left helper, hours for long downloads; its
+      # own checks are in the time-left block below
+      and 'function dlLeft(key,have,want,now){' in page
+      and 'return "about "+h+" h"+(r?" "+r+" min":"")+" left";' in page
       and all('"%s":"' % g in page for g in ("GLM 5.3", "DeepSeek V3.2 671B",
                                              "DeepSeek V3.1 671B", "Qwen 3 Coder 480B")))
+# 6b335, per Patrick: "we should have time remaining here too, and a
+# details box before starting saying what changes to the model library
+# will be made". Then his bug report: the card stuck at "8.5 / 8.5 GB ·
+# 100%", then "0 / 8.5 GB · 0%" for good, with the model installed.
+#
+# 1. TIME LEFT, one helper for every bar, run in node on known timings.
+def _jsfn(src, head):
+    """A top-level page function, `function name(` to its closing brace."""
+    a = src.index(head)
+    return src[a:src.index("\n}\n", a) + 3]
+
+
+def _node_json(js, name, stdin=None):
+    _p = os.path.join(_si_dir, name)
+    open(_p, "w").write(js)
+    _r = subprocess.run(["node", _p], input=stdin, capture_output=True,
+                        text=True, timeout=30)
+    return json.loads(_r.stdout)
+
+
+_ETA_JS = (_jsfn(_MILLENAI_SRC, "function dlLeft(key,have,want,now){")
+           + _jsfn(_MILLENAI_SRC, "function dlLeftIn(s){")
+           + _MILLENAI_SRC[_MILLENAI_SRC.index("function dlTail(t){"):
+                           _MILLENAI_SRC.index("\n", _MILLENAI_SRC.index("function dlTail(t){")) + 1])
+try:
+    _eta = _node_json(_ETA_JS + r'''
+const o={};
+// warm-up: 1 MB/s of 1 GB says nothing for 3 s (0.2% arrived)...
+o.warm=[0,1,2,3].map(t=>dlLeft("w",t*1e6,1e9,t*1000));
+// ...and a fast one speaks once 1% is in, before 3 s
+o.pct=[dlLeft("p",0,1e8,0),dlLeft("p",2e6,1e8,1000)];
+// smoothing: 30 s at 10 MB/s, then one 2 s burst at 100 MB/s
+let b=0,t=0;for(;t<=30;t+=2){dlLeft("s",b,1e10,t*1000);b+=2e7;}
+b-=2e7;t-=2;const steady=dlLeft("s",b,1e10,t*1000+1);
+b+=2e8;t+=2;o.burst=dlLeft("s",b,1e10,t*1000);o.steady=steady;
+// a stall: text, then nothing after 5 s still, then waiting after 15 s,
+// then back once bytes move again
+b=0;for(t=0;t<=10;t+=2){dlLeft("st",b,1e9,t*1000);b+=1e7;}
+b-=1e7;t-=2;
+o.stall=[dlLeft("st",b,1e9,t*1000+4000),dlLeft("st",b,1e9,t*1000+6000),
+         dlLeft("st",b,1e9,t*1000+14000),dlLeft("st",b,1e9,t*1000+16000),
+         dlLeft("st",b+1e7,1e9,t*1000+18000)];
+// hours, an exact hour, under a minute, the 72-hour cap
+const run=(k,rate,want,secs)=>{let r="";for(let s=0;s<=secs;s+=2)
+  r=dlLeft(k,s*rate,want,s*1000);return r;};
+o.hm=run("h1",1e6,5e9+1e7,10);
+o.h=run("h2",1e6,3.6e9+1e7,10);
+o.under=run("u",1e6,4e7,10);
+o.cap=run("c",1e3,1e12,10);
+// a 40 s gap between looks, or bytes going backwards: a new download
+o.gap=dlLeft("h1",2e7,5e9+1e7,50000);
+o.back=dlLeft("h2",0,3.6e9+1e7,12000);
+o.tail=[dlTail("about 6 min left"),dlTail("")];
+process.stdout.write(JSON.stringify(o));''', "eta.js")
+except Exception as _e:
+    _eta = {"err": str(_e)}
+_bm_min = re.match(r"about (\d+) min left$", str(_eta.get("burst")))
+_st_min = re.match(r"about (\d+) min left$", str(_eta.get("steady")))
+check("time left: nothing in the warm-up, then from 3 s or 1% (node)",
+      _eta.get("warm") == ["", "", "", "about 17 min left"]
+      and _eta.get("pct", [0, ""])[0] == "" and _eta.get("pct", ["", ""])[1].endswith(" left"),
+      "%r" % _eta)
+check("time left: a 10 s moving average, not the last poll's burst (node)",
+      bool(_bm_min and _st_min) and int(_st_min.group(1)) == 16
+      # the burst alone would say 2 min; smoothed, it moves only part way
+      and 4 <= int(_bm_min.group(1)) < 16, "%r" % _eta)
+check("time left: quiet during a stall, waiting after 15 s, back when it moves (node)",
+      _eta.get("stall", [""])[0].startswith("about")
+      and _eta["stall"][1:4] == ["", "", "waiting for the download to resume"]
+      and _eta["stall"][4].startswith("about"), "%r" % _eta)
+check("time left: hours and minutes, an hour, under a minute, 72 h at most (node)",
+      _eta.get("hm") == "about 1 h 23 min left" and _eta.get("h") == "about 1 h left"
+      and _eta.get("under") == "under a minute left" and _eta.get("cap") == "about 72 h left"
+      and _eta.get("gap") == "" and _eta.get("back") == ""
+      and _eta.get("tail") == [" · about 6 min left", ""], "%r" % _eta)
+# every bar asks the one helper, and nothing reads the server's old
+# eta_min or the old formatter any more
+check("time left: the setup panel, strip, studio cards, Manage, Update models and the card share it",
+      page.count('dlLeft("batch",') == 5 and page.count('dlLeft("modup",') == 1
+      and "dlEta" not in page and "eta_min" not in page
+      and '"have_b": have, "want_b": want,' in _MILLENAI_SRC
+      and "have_b=have, want_b=want," in _MILLENAI_SRC
+      and 'const left=dlLeft("batch",st.have_b,st.want_b),' in page)
+
+# 2. THE DETAILS BOX: the server's plan, the page's list and what the
+# button does are the same thing. Run for real on a fake disk; each
+# protection is then broken in the source and shown caught.
+def _of_ns(src):
+    ns = dict(_LH)
+    tree = _ast.parse(src)
+    exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
+    exec(src[src.index("MODEL_INFO = {c[0]"):src.index("# a model is usable here")], ns)
+    st = {"disk": set(), "prefs": {}, "fit": 999.0, "ports": set(),
+          "removed": [], "dl": [], "max": []}
+    ns.update(
+        _OF=st, IS_ARM=True, SUPPORTED={l: True for l in ns["MODEL_INFO"]},
+        MODEL_ROUTES={}, _mlx_procs={}, _port_in_use=lambda p: p in st["ports"],
+        _update={"state": "idle"}, _setup_lock=threading.RLock(),
+        _setup_jobs={}, _CLEANUP_LAST_ERRORS={}, _prefs_lock=threading.RLock(),
+        hashlib=__import__("hashlib"), ollama_pulled_tags=lambda: set(),
+        model_cached=lambda l, pulled=None: l in st["disk"],
+        mlx_model_cached=lambda repo: repo in st["disk"],
+        model_fits_machine=lambda l: ns["MODEL_INFO"][l]["mem"] / 1e9 <= st["fit"],
+        plan_labels=lambda plan: list(st["max"]),
+        load_prefs=lambda base=None: dict(st["prefs"]),
+        store_prefs=lambda d, base=None: st.update(prefs=dict(d)),
+        _sweep_leftovers=lambda: 0)
+    _pref_stubs(ns)
+
+    def _rm(want):
+        st["removed"].append(list(want))
+        for l in want:
+            st["disk"].discard(ns["RETIRED_MODELS"][l][0] or l)
+        return list(want), {}
+
+    def _dl(labels):
+        st["dl"].append(list(labels))
+        return list(labels)
+    ns.update(_remove_models=_rm, start_model_downloads=_dl)
+    for n in tree.body:
+        if isinstance(n, _ast.FunctionDef) and n.name in (
+                "_retired_on_disk", "model_updates", "superseded_installed",
+                "_gb_of", "auto_cleanup_on", "_resident", "_auto_clean_targets",
+                "_auto_cleanup_pass", "_app_models", "_offers_set", "_family_of",
+                "_offer_reason", "model_offer_plan", "offer_matches",
+                "apply_model_offer"):
+            exec(_ast.get_source_segment(src, n), ns)
+    R = ns["RETIRED_MODELS"]
+    ns["_retired_on_disk"] = lambda l, pulled: (R[l][0] or l) in st["disk"]
+    return ns
+
+
+def _of_scene(ns):
+    """Mistral Nemo 12B (this app's), LLaVA (pulled for another tool)
+    and Qwen 3.6 27B (this app's, its engine up) are retired and on disk;
+    two current models are installed."""
+    st, R = ns["_OF"], ns["RETIRED_MODELS"]
+    st.update(disk={R["Mistral Nemo 12B"][0], "LLaVA Vision 7B",
+                    R["Qwen 3.6 27B"][0], "Llama 3.2 3B", "Hermes 3 8B"},
+              ports={R["Qwen 3.6 27B"][2]}, removed=[], dl=[],
+              max=["Gemma 4 12B", "Llama 3.2 3B", "Qwen 3.5 Vision 9B"],
+              prefs={"app_models": ["Mistral Nemo 12B", "Qwen 3.6 27B"],
+                     "seen_models": ["Llama 3.2 3B", "Hermes 3 8B",
+                                     "Qwen 3.5 Vision 9B"]})
+    ns["_setup_jobs"].clear()
+    ns["_update"]["state"] = "idle"
+
+
+def _of_render(src, plan):
+    """The page's own offerList and offerSum on a plan: the labels in each
+    group, the rows' text, the keep line and the totals."""
+    js = src[src.index("function esc(s){"):src.index(";}\n", src.index("function esc(s){")) + 3]
+    js += (src[src.index("function muGB(x){"):src.index("\n", src.index("function muGB(x){")) + 1]
+           + _jsfn(src, "function offerList(p){") + _jsfn(src, "function offerSum(p){")
+           + r'''
+const p=JSON.parse(require("fs").readFileSync(0,"utf8"));
+const h=offerList(p),grab=re=>[...h.matchAll(re)].map(m=>m[1]);
+const groups=grab(/<div class="og">([^<]*)<\/div>/g);
+process.stdout.write(JSON.stringify({h:h,groups:groups,
+  dl:grab(/data-dl="([^"]*)"/g),rm:grab(/data-rm="([^"]*)"/g),
+  sum:offerSum(p),keep:grab(/<div class="mmore">([^<]*)<\/div>/g)}));''')
+    return _node_json(js, "offer_render.js", stdin=json.dumps(plan))
+
+
+def _of_plan_checks(src):
+    """The plan: what downloads and why, what goes (exactly auto-clean's
+    rule), the rest kept, the totals."""
+    ns = _of_ns(src)
+    _of_scene(ns)
+    plan = ns["model_offer_plan"]()
+    why = {d["label"]: d["why"] for d in plan["download"]}
+    rm = [r["label"] for r in plan["remove"]]
+    # the same state, swept: auto-clean takes exactly the plan's list
+    _of_scene(ns)
+    swept = ns["_auto_cleanup_pass"]()
+    ok = (why == {"Gemma 4 12B": "new",
+                  "Qwen 3.5 Vision 9B": "replaces LLaVA Vision 7B",
+                  "Ministral 3 14B": "replaces Mistral Nemo 12B",
+                  "Qwen 3.8 27B": "newer version of Qwen 3.6 27B"}
+          and [d["label"] for d in plan["download"]][:2] == ["Gemma 4 12B", "Qwen 3.5 Vision 9B"]
+          and rm == ["Mistral Nemo 12B"] and swept == rm
+          and plan["keep_n"] == 4
+          and plan["dl_gb"] == round(sum(d["gb"] for d in plan["download"]), 1)
+          and plan["free_gb"] == ns["RETIRED_MODELS"]["Mistral Nemo 12B"][3]
+          and len(plan["plan_id"]) == 16
+          and [d["fresh"] for d in plan["download"]].count(False) == 1)
+    return ok, {"why": why, "rm": rm, "swept": swept, "keep": plan["keep_n"]}
+
+
+def _of_standdown(src):
+    """Nothing to remove while a download runs, with the switch off, or
+    when the retired models aren't this app's."""
+    ns = _of_ns(src)
+    out = []
+    _of_scene(ns)
+    ns["_setup_jobs"]["Gemma 4 12B"] = {"status": "downloading"}
+    out.append(ns["model_offer_plan"]()["remove"])
+    _of_scene(ns)
+    ns["_OF"]["prefs"]["auto_cleanup"] = False
+    out.append(ns["model_offer_plan"]()["remove"])
+    _of_scene(ns)
+    ns["_OF"]["prefs"]["app_models"] = []
+    out.append(ns["model_offer_plan"]()["remove"])
+    _of_scene(ns)
+    ns["_update"]["state"] = "downloading"
+    out.append(ns["model_offer_plan"]()["remove"])
+    return out == [[], [], [], []], out
+
+
+def _of_page(src):
+    """The page lists exactly the plan: each download with its size and
+    reason, each removal with the space, one line for the rest."""
+    ns = _of_ns(src)
+    _of_scene(ns)
+    plan = ns["model_offer_plan"]()
+    r = _of_render(src, plan)
+    ok = (r["dl"] == [d["label"] for d in plan["download"]]
+          and r["rm"] == [x["label"] for x in plan["remove"]]
+          and r["groups"] == ["Download", "Remove"]
+          and all(d["why"] in r["h"] for d in plan["download"])
+          and "<i>replaces Mistral Nemo 12B</i>" in r["h"]
+          and r["keep"] == ["4 other models unchanged"]
+          and r["sum"].startswith("%s GB to download · %s GB freed · "
+                                  % (round(plan["dl_gb"]), plan["free_gb"]))
+          and r["sum"].endswith(" free after"))
+    # a short plan: no Remove group, and no keep line with nothing kept
+    r2 = _of_render(src, {"download": [{"label": "Gemma 4 12B", "gb": 6.8, "why": "new"}],
+                          "remove": [], "keep_n": 0, "dl_gb": 6.8, "free_gb": 0,
+                          "after_gb": -2.5})
+    ok = ok and r2["groups"] == ["Download"] and r2["rm"] == [] and r2["keep"] == [] \
+        and r2["sum"] == "6.8 GB to download · 2.5 GB short of free space"
+    return ok, {"page": r, "short": r2}
+
+
+def _of_apply(src):
+    """The button: exactly the listed removals reach the deleter, then
+    exactly the listed downloads start; a click on any other list, or an
+    old plan, changes nothing."""
+    ns = _of_ns(src)
+    _of_scene(ns)
+    plan = ns["model_offer_plan"]()
+    shown = _of_render(src, plan)
+    asked = {"plan_id": plan["plan_id"], "remove": shown["rm"], "download": shown["dl"]}
+    bad = [dict(asked, remove=shown["rm"] + ["LLaVA Vision 7B"]),
+           dict(asked, remove=[]), dict(asked, plan_id="0" * 16),
+           dict(asked, download=shown["dl"][1:]), {}]
+    refused = [not ns["offer_matches"](plan, b) for b in bad]
+    matched = ns["offer_matches"](ns["model_offer_plan"](), asked)
+    res = ns["apply_model_offer"](plan)
+    st = ns["_OF"]
+    ok = (matched and all(refused)
+          and st["removed"] == [shown["rm"]] and res["removed"] == shown["rm"]
+          and st["dl"] == [shown["dl"]]
+          and ns["RETIRED_MODELS"]["LLaVA Vision 7B"][0] is None
+          and "LLaVA Vision 7B" in st["disk"]
+          and ns["RETIRED_MODELS"]["Qwen 3.6 27B"][0] in st["disk"]
+          and st["prefs"].get("model_offers") == ["Mistral Nemo 12B"]
+          # once done, the plan moved on: the old click no longer matches
+          and not ns["offer_matches"](ns["model_offer_plan"](), asked))
+    return ok, {"removed": st["removed"], "dl": st["dl"], "refused": refused,
+                "matched": matched}
+
+
+def _of_route(src):
+    """The route acts only on a match, and nothing else carries a plan out."""
+    a = src.index('        if self.path == "/api/models/offer":')
+    body = src[a:src.index("            return\n", src.index("apply_model_offer(plan)", a))]
+    return (src.count("apply_model_offer(") == 2
+            and body.index("plan = model_offer_plan()")
+                < body.index("if not offer_matches(plan, asked):")
+                < body.index("code=409)") < body.index("apply_model_offer(plan)")
+            and src.count("_remove_models(want) if want else") == 1), body[-300:]
+
+
+_OF_CHECKS = [
+    ("the card's plan: downloads with reasons, removals by auto-clean's own rule, the rest kept, totals", _of_plan_checks),
+    ("the card's plan: nothing removed during a download, an update, with the switch off, or not this app's", _of_standdown),
+    ("the card lists exactly the plan: Download, Remove, the keep line and totals (node)", _of_page),
+    ("the button removes exactly the listed models and starts exactly the listed downloads; any other list is refused", _of_apply),
+    ("the route carries out a plan only after matching it", _of_route),
+]
+
+
+def _of_run(src):
+    out = []
+    for name, fn in _OF_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n35, _o35, _d35 in _of_run(_MILLENAI_SRC):
+    check(_n35, _o35, "%r" % (_d35,))
+# EACH PROTECTION, BROKEN: planted in the source, each fails a check above
+_OF_MUT = [
+    ("the button removes every retired model, not the list",
+     '    want = [r["label"] for r in plan.get("remove") or []]\n',
+     "    want = superseded_installed()\n"),
+    ("the Remove list not auto-clean's rule",
+     "              for l in _auto_clean_targets()]", "              for l in superseded_installed()]"),
+    ("the page leaves a removal off the list",
+     'rm.map(r=>row("rm",r,', 'rm.slice(1).map(r=>row("rm",r,'),
+    ("a click with another Remove list accepted",
+     '            and asked.get("remove") == [r["label"] for r in plan["remove"]]\n', ""),
+    ("a model whose engine is up removed",
+     "    return [l for l in superseded_installed(auto=not manual)\n            if not _resident(l)]",
+     "    return list(superseded_installed(auto=not manual))"),
+    ("removals during a download",
+     "               for j in _setup_jobs.values()):\n            return []\n    if not manual",
+     "               for j in _setup_jobs.values()):\n            pass\n    if not manual"),
+    ("the route skips the match", "            if not offer_matches(plan, asked):", "            if False:"),
+]
+_ofm = []
+for _d35, _o35, _n35 in _OF_MUT:
+    if _MILLENAI_SRC.count(_o35) != 1:
+        _ofm.append((_d35, "anchor count %d" % _MILLENAI_SRC.count(_o35)))
+        continue
+    _r35 = _of_run(_MILLENAI_SRC.replace(_o35, _n35, 1))
+    _ofm.append((_d35, [n for n, o, _x in _r35 if not o][:1] or "MISSED"))
+check("the card: %d mutations of its protections, each caught by a check above" % len(_OF_MUT),
+      all(isinstance(v, list) for _d, v in _ofm),
+      "%r" % [x for x in _ofm if not isinstance(x[1], list)])
+check("the card's primary button reads exactly \"Update model library\"",
+      '<button class="about-btn primary" id="new-get">Update model library</button>' in page
+      and 'get.textContent="Update model library";' in page
+      and "Download and remove" not in page
+      and page.count("Update model library") == 2)
+# live: the plan answers, and a click on a plan that isn't the current
+# one is refused with the current plan and starts nothing
+s, h, b = req("/api/models/offer", cookie=K)
+try:
+    _lp = json.loads(b)
+except Exception:
+    _lp = {}
+s2, h2, b2 = req("/api/models/offer", method="POST", cookie=K,
+                 data={"plan_id": "0" * 16, "remove": ["Mistral Nemo 12B"], "download": []})
+try:
+    _lp2 = json.loads(b2)
+except Exception:
+    _lp2 = {}
+check("live: the plan answers; a stale click is refused with the plan and starts nothing",
+      s == 200 and {"plan_id", "download", "remove", "keep_n", "dl_gb", "free_gb",
+                    "disk_free_gb", "after_gb"} <= set(_lp)
+      and s2 == 409 and _lp2.get("changed") is True
+      and (_lp2.get("plan") or {}).get("plan_id") == _lp.get("plan_id")
+      and json.loads(req("/api/setup/busy", cookie=K)[2]) == {"busy": False},
+      "%s %s %r" % (s, s2, b2[:200]))
+
+# 3. STUCK AT 100% (Patrick's report). The root: mlx-community's
+# Ministral 3 14B ships two shards beside an index naming four, so
+# mlx_model_cached called the finished model missing forever (the
+# engine loaded it fine). Its job said done, so /api/setup said ready
+# and not busy, but _downloaded_bytes counted only cached models: the
+# bar fell back to 0 and the card, waiting for "not busy AND 100%",
+# never ended. Before that it sat at 100% for half the download:
+# _dir_bytes followed the snapshot links and counted every byte twice.
+_hfd = _tf0.mkdtemp()
+
+
+def _snap(repo, index_parts, files, incomplete=False):
+    d = os.path.join(_hfd, repo)
+    sd = os.path.join(d, "snapshots", "abc")
+    os.makedirs(sd, exist_ok=True)
+    os.makedirs(os.path.join(d, "blobs"), exist_ok=True)
+    open(os.path.join(sd, "config.json"), "w").write("{}")
+    if index_parts is not None:
+        json.dump({"weight_map": {"w%d" % i: p for i, p in enumerate(index_parts)}},
+                  open(os.path.join(sd, "model.safetensors.index.json"), "w"))
+    for f in files:
+        open(os.path.join(sd, f), "w").write("x")
+    if incomplete:
+        open(os.path.join(d, "blobs", "x.incomplete"), "w").write("x")
+    return repo
+
+
+_four = ["model-0000%d-of-00004.safetensors" % i for i in (1, 2, 3, 4)]
+_two = ["model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"]
+_mc = {"os": os, "json": json, "glob": __import__("glob"), "re": re}
+_exec_names(_mc, {"mlx_model_cached", "_shards_complete"})
+_mc["_hf_model_dir"] = lambda repo: os.path.join(_hfd, repo)
+_mcr = [_mc["mlx_model_cached"](r) for r in (
+    _snap("stale", _four, _two),                      # Ministral 3 14B's shape
+    _snap("gap", _four, _two[:1]),                    # stale index, a shard missing
+    _snap("part", _two, _two[:1]),                    # a real index, a shard missing
+    _snap("whole", _two, _two),
+    _snap("mid", _two, _two, incomplete=True),
+    _snap("single", None, ["model.safetensors"]),
+    _snap("odd", _four, ["weights.safetensors"]))]
+check("a finished model with a stale shard index reads installed; a gap never does",
+      _mcr == [True, False, False, True, False, True, False], "%r" % _mcr)
+# the bar: a finished job counts in full; an MLX download counts its
+# bytes once, and a bigger one than the catalog says grows the total
+_db2 = {"_setup_lock": threading.RLock(), "_STUDIO_ROWS": {},
+        "MLX_EST_BYTES": {"M": 8_500_000_000}, "MODEL_ROUTES": {"M": ("mlx", 8932)},
+        "MLX_REPOS": {"M": "repo"}, "_hf_model_dir": lambda r: r,
+        "model_cached": lambda l, p=None: False, "_batch_labels": lambda: ["M"],
+        "_dir_bytes": lambda p: 8_000_000_000,        # both copies: never read
+        "_dir_bytes_real": lambda p: 4_000_000_000}
+_exec_names(_db2, {"_downloaded_bytes"})
+_db2["_setup_jobs"] = {"M": {"status": "downloading"}}
+_bb = [_db2["_downloaded_bytes"](set())]
+_db2["_dir_bytes_real"] = lambda p: 9_000_000_000
+_bb.append(_db2["_downloaded_bytes"](set()))
+_db2["_setup_jobs"] = {"M": {"status": "done"}}
+_bb.append(_db2["_downloaded_bytes"](set()))
+_db2["_setup_jobs"] = {"M": {"status": "error"}}
+_bb.append(_db2["_downloaded_bytes"](set()))
+check("the bar: MLX bytes counted once, a finished job in full, never back to 0",
+      _bb == [(4_000_000_000, 8_500_000_000), (9_000_000_000, 9_000_000_000),
+              (8_500_000_000, 8_500_000_000), (0, 8_500_000_000)]
+      and '"overall_pct": min(99, round(have / want * 100)) if want else 99,' in _MILLENAI_SRC,
+      "%r" % _bb)
+# "loading": a model just downloaded whose engine is starting, five
+# minutes at most, and only while its process lives and its port is shut
+class _Proc:
+    def __init__(self, rc):
+        self.rc = rc
+
+    def poll(self):
+        return self.rc
+
+
+_el = {"time": time, "MODEL_ROUTES": {"M": ("mlx", 8932)}, "_mlx_procs": {"M": _Proc(None)},
+       "_port_in_use": lambda p: False}
+_exec_names(_el, {"_engine_loading"})
+_elr = [_el["_engine_loading"]("M", {"loading_since": time.time()}),
+        _el["_engine_loading"]("M", {"loading_since": time.time() - 301}),
+        _el["_engine_loading"]("M", {})]
+_el["_port_in_use"] = lambda p: True
+_elr.append(_el["_engine_loading"]("M", {"loading_since": time.time()}))
+_el["_port_in_use"] = lambda p: False
+_el["_mlx_procs"]["M"] = _Proc(1)
+_elr.append(_el["_engine_loading"]("M", {"loading_since": time.time()}))
+check("loading: while the new model's engine starts, and no longer than it should",
+      _elr == [True, False, False, False, False]
+      and '"loading": (status == "ready"' in _MILLENAI_SRC
+      and '_setup_jobs[label]["loading_since"] = time.time()' in _MILLENAI_SRC, "%r" % _elr)
+# the card's whole lifecycle, run in node on the states the server
+# reports: queued, downloading (every model in the bar and the time
+# left), finishing (Ollama's check), loading, done; and a failure with
+# its reason and a retry. Patrick's case is the last: the model ready,
+# the bar at 0, nothing busy. The card ended there, not never.
+try:
+    _lc = _node_json(_ETA_JS + _jsfn(_MILLENAI_SRC, "function offerProgress(started,s){") + r'''
+const S=["Ministral 3 14B","Llama 3.2 1B"],G=1e9;
+const snap=(a,b,have,extra)=>Object.assign({models:[
+  Object.assign({label:S[0]},a),Object.assign({label:S[1]},b)],
+  have_b:have,want_b:9.8*G,have_gb:Math.round(have/G*10)/10,want_gb:9.8,
+  overall_pct:Math.min(99,Math.round(have/(9.8*G)*100)),speed_mbs:20},extra||{});
+const seq=[
+  [0,snap({status:"queued"},{status:"queued"},0)],
+  [2000,snap({status:"downloading",pct:1},{status:"queued"},2e8)],
+  [4000,snap({status:"downloading",pct:3},{status:"queued"},4e8)],
+  [6000,snap({status:"ready",loading:true},{status:"downloading",pct:100,checking:true},9.8*G)],
+  [8000,snap({status:"ready",loading:true},{status:"ready"},9.8*G)],
+  [10000,snap({status:"ready"},{status:"ready"},9.8*G,{overall_pct:100})]];
+const out=seq.map(([t,s])=>{const n=Date.now;Date.now=()=>t;
+  const r=offerProgress(S,s);Date.now=n;return r;});
+out.push(offerProgress(S,snap({status:"error",note:"stalled — press Retry"},{status:"ready"},1.3*G)));
+out.push(offerProgress(S,snap({status:"downloading",pct:40},{status:"error",note:"disk full"},3*G)));
+out.push(offerProgress(["Ministral 3 14B"],{models:[{label:"Ministral 3 14B",status:"ready"}],
+  have_b:0,want_b:8.5*G,have_gb:0,want_gb:8.5,overall_pct:0,busy:false}));
+out.push(offerProgress(["Gone 1B"],{models:[]}));
+process.stdout.write(JSON.stringify(out));''', "lifecycle.js")
+except Exception as _e:
+    _lc = [{"err": str(_e)}] * 10
+_lcl = [x.get("line", "") for x in _lc]
+_lce = [x.get("end") for x in _lc]
+check("the card's lifecycle: queued, downloading with the time left for all, finishing, loading, done (node)",
+      _lcl[0] == "0 / 9.8 GB · 0% · 20 MB/s"
+      and _lcl[1].startswith("0.2 / 9.8 GB · 2% · 20 MB/s")
+      and re.search(r"· about \d+ min left$", _lcl[2])
+      and _lcl[3] == "Finishing: checking the files…"
+      and _lcl[4] == "Loading Ministral 3 14B…"
+      and _lcl[5] == "Done ✓ · added 2 models"
+      and _lce[:6] == ["", "", "", "", "", "done"], "%r" % _lc)
+check("the card's lifecycle: a failure says which and why, with a retry, once the rest is done (node)",
+      _lce[6] == "failed" and _lc[6].get("retry") == ["Ministral 3 14B"]
+      and _lcl[6] == "Couldn’t download Ministral 3 14B (stalled — press Retry)"
+      and _lce[7] == "" and _lce[9] == "failed" and _lcl[9] == "Couldn’t download Gone 1B (stopped)",
+      "%r" % _lc)
+check("the card's lifecycle: a model ready with the bar at 0 ends the card (Patrick's stuck card)",
+      _lce[8] == "done" and _lcl[8] == "Done ✓ · added 1 model"
+      and "(!s.busy&&(s.overall_pct||0)>=100)" not in page
+      and 'const pr=offerProgress(started,s);' in page
+      and 'id="new-retry" hidden>Retry</button>' in page
+      and '<button class="about-btn" id="new-bg" hidden>Run in background</button>' in page
+      and '$("#new-bg").onclick=()=>{stopPoll();veil.hidden=true;};' in page, "%r" % _lc)
 check("About leads the rail, Account right under it",
       _nav == _want and _panes == _want
       and '<button class="snav on" data-pane="p-about">About</button>' in page

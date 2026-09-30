@@ -9,6 +9,89 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b335 — the model offer says what will change, and how long is left
+Per Patrick, with a screenshot of "More models available" mid-download:
+"we should have time remaining here too, and a details box before
+starting saying what changes to the model library will be made". Then
+his report from the shipped app: the card stuck at "8.5 / 8.5 GB · 100%",
+then went back to "0 / 8.5 GB · 0%" and stayed there, with the model
+installed and its engine running.
+- THE PLAN IS THE SERVER'S. `model_offer_plan()` (GET /api/models/offer)
+  decides the whole change once. Download: the Max spread's models not on
+  disk, plus the replacement of every retired model (on disk, or swept with
+  its offer kept), one row per download, none already in flight, each with
+  a reason: "new", "not installed yet", "newer version of X" (same first
+  word and role) or "replaces X". Remove: exactly `_auto_clean_targets()`,
+  the rule the auto-clean pass now uses too (factored out of
+  `_auto_cleanup_pass`): retired models only, only ones this app
+  downloaded, never one whose engine is up, nothing with the switch off,
+  nothing during a download or an app update. keep_n: every other model on
+  disk. Totals: GB to download, GB freed, disk free after (from the home
+  volume, like /api/setup).
+- NOTHING UNLISTED GOES. The button POSTs the plan_id and both lists it
+  showed; the route makes a fresh plan and carries it out
+  (`apply_model_offer`: the Remove list through `_remove_models`, then the
+  downloads) only if `offer_matches` says it's the same plan. Otherwise it
+  answers 409 with the new plan, changes nothing, and the card shows the new
+  list ("The list changed. Check it again."). A removed model whose
+  replacement is listed keeps its offer until that lands, as a sweep does.
+- THE CARD. Download / Remove groups (name, size, reason), "N other models
+  unchanged", the totals, then "Update model library" (per Patrick: that
+  label whatever the mix, no counts; the list says what changes), "Not now"
+  and the existing "Don't remind me again". A long list scrolls inside
+  itself; the card never passes the window. It shows only when the plan
+  has something to download, and "fresh" now means a download not yet in
+  seen_models (it used to be any missing catalog row, and Download then
+  installed the Max plan whatever was fresh).
+- TIME LEFT, ONE HELPER. `dlLeft(key, have, want)` on the page: an
+  exponential moving average of the byte rate over ~10 s, weighted by time
+  so pollers at any pace agree, bias-corrected so the early estimate is the
+  average so far. Silent until 3 s or 1% has been seen, silent while bytes
+  stand still, "waiting for the download to resume" after 15 s, a new clock
+  after a 30 s gap or bytes going backwards. "about N min left", "about N h
+  M min left", "under a minute left", 72 h at most. Every bar uses it: the
+  setup panel, the studio cards, the Manage note, Update models ("modup"),
+  the card and the strip ("batch"). The strip shows the time left in the
+  speed's place (both outgrew the sidebar) and a stall on its left. The
+  server now sends have_b/want_b (a tenth of a GB is four seconds of a fast
+  line); its eta_min stays in the payloads but the page no longer reads it,
+  and `dlEta` is gone.
+- WHY IT STUCK. mlx-community's Ministral 3 14B ships two shards
+  (model-0000N-of-00002) beside a model.safetensors.index.json naming four
+  (-of-00004). `mlx_model_cached` required every indexed part, so the
+  finished model read missing forever (mlx_lm loads the files it finds, so
+  the engine ran). Its job said done, so /api/setup called it ready and not
+  busy, but `_downloaded_bytes` counted only cached models: the bar fell to
+  0, and the card, waiting for "not busy AND 100%", never ended. The 100%
+  before that was `_dir_bytes` following the snapshot links into blobs/,
+  counting every byte twice, so the bar hit 100% half way through. Fixed:
+  `_shards_complete` accepts a stale index when the one shard series that
+  IS there is whole (a gap still fails); a job that is done counts in full;
+  MLX progress uses `_dir_bytes_real`, and a download larger than the
+  catalog's figure grows the total; overall_pct is never 100 while anything
+  still downloads. The old check also had the model offered again on every
+  later launch, and roster and plans calling it missing; that ends too.
+- THE CARD FINISHES. `offerProgress(started, s)` reads the models the click
+  started: bytes line while any moves (covering the whole batch, time left
+  included); "Finishing: checking the files…" while only Ollama's hash
+  remains; "Loading <model>…" while a just-downloaded MLX engine opens its
+  port (`loading_since` on the job, `_engine_loading`, five minutes at
+  most); then "Done ✓ · added N models" plus what was removed, or
+  "Couldn't download X (reason)" with a Retry of just those. Run in
+  background works as before.
+- GAUNTLET: time left on known timings (warm-up, smoothing, a stall, hours,
+  the cap, a gap) in node; the plan on a fake disk, its Remove list equal to
+  what the auto-clean pass takes in the same state; the page's own list in
+  node matching the plan exactly; the button removing exactly the listed
+  models; any other list refused; the route matching before acting; seven
+  mutations (remove all retired, a Remove list off the rule, a row left off
+  the page, the match ignoring removals, a resident engine, removals during
+  a download, the route skipping the match), each caught; the primary label
+  pinned; live GET and a stale POST refused with 409; the stale-index check,
+  the byte counting, the loading state and the card's whole lifecycle
+  (queued, downloading, finishing, loading, done, failed, and Patrick's
+  stuck case) in node.
+
 ## 6b333 — ollama1: a private model server on Patrick's desktop (host kit)
 The spare Linux desktop (Ryzen 9 5950X, 64 GB, RX 6900 XT 16 GB, Ubuntu
 26.04) becomes **ollama1**, a model server for ConcordeAI that only

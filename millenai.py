@@ -5190,12 +5190,33 @@ def mlx_model_cached(repo: str) -> bool:
         try:
             with open(idx, "r", encoding="utf-8") as f:
                 parts = set(json.load(f)["weight_map"].values())
-            if not all(os.path.exists(os.path.join(snap_dir, p))
-                       for p in parts):
+            if (not all(os.path.exists(os.path.join(snap_dir, p))
+                        for p in parts)
+                    and not _shards_complete(snap_dir)):
                 return False
         except Exception:
             pass
     return True
+
+
+def _shards_complete(snap_dir: str) -> bool:
+    """Every part of the one shard series that IS in the snapshot
+    (6b335). mlx-community's Ministral 3 14B ships two shards
+    (model-0000N-of-00002) beside an index naming four (-of-00004), left
+    from an earlier conversion; mlx_lm loads the files it finds, so the
+    engine ran while this check called the model missing forever. A
+    download that stopped between files still fails: its series has a
+    gap."""
+    series = {}
+    for f in glob.glob(os.path.join(snap_dir, "*.safetensors")):
+        m = re.fullmatch(r"(.+)-(\d+)-of-(\d+)\.safetensors",
+                         os.path.basename(f))
+        if not m:
+            return False
+        series.setdefault((m.group(1), int(m.group(3))), set()).add(
+            int(m.group(2)))
+    return len(series) == 1 and all(
+        got == set(range(1, n + 1)) for (_b, n), got in series.items())
 
 
 def _dir_bytes(path: str) -> int:
@@ -5507,6 +5528,12 @@ def _download_model(label: str):
         # question starts it instead
         if not _bench["running"]:
             _spawn_mlx_engine(label)
+            # the card says "Loading <model>…" until it answers (6b335)
+            _proc = _mlx_procs.get(label)
+            if _proc is not None and _proc.poll() is None:
+                with _setup_lock:
+                    if (_setup_jobs.get(label) or {}).get("status") == "done":
+                        _setup_jobs[label]["loading_since"] = time.time()
     except Exception as exc:
         with _setup_lock:
             _setup_jobs[label] = {"status": "error", "note": str(exc)[:200]}
@@ -13544,12 +13571,21 @@ def _downloaded_bytes(pulled, labels=None) -> tuple:
         if kind == "ollama" and job.get("total_b"):
             est = int(job["total_b"])
         want += est
-        if model_cached(label, pulled):
+        # a finished job is finished (6b335): setup_status calls it
+        # ready, and counting it as nothing sent the More-models card
+        # back to "0 / 8.5 GB · 0%" for good, with the model installed
+        if model_cached(label, pulled) or job.get("status") == "done":
             have += est
         elif job.get("status") not in ("downloading", "queued"):
             pass          # stalled/never started — counts as nothing yet
         elif kind == "mlx":
-            have += min(est, _dir_bytes(_hf_model_dir(MLX_REPOS[label])))
+            # bytes on disk once (6b335): _dir_bytes follows the
+            # snapshot links into blobs/ and counted every byte twice, so
+            # the bar read 100% half way through. A download bigger than
+            # the catalog's figure grows the total instead of capping.
+            b = _dir_bytes_real(_hf_model_dir(MLX_REPOS[label]))
+            want += max(0, b - est)
+            have += b
         elif "done_b" in job:
             have += min(est, job["done_b"])       # bytes, all layers
         else:
@@ -13803,6 +13839,26 @@ def _resident(label: str) -> bool:
                               or bool(tgt and _port_in_use(tgt)))
 
 
+def _auto_clean_targets(manual=False) -> list:
+    """The models an auto-clean pass would delete right now, and the
+    More-models card's Remove list (6b335): one rule for both, so the
+    card can't promise a removal the sweep wouldn't make, or miss one.
+    Nothing while an app update or any download is in flight, nothing
+    with the switch off (unless it's the Clean-now button), only
+    retired models (and, unattended, only ones this app downloaded),
+    never one whose engine is up."""
+    if _update.get("state") not in (None, "", "idle", "error"):
+        return []
+    with _setup_lock:
+        if any((j or {}).get("status") in ("downloading", "queued")
+               for j in _setup_jobs.values()):
+            return []
+    if not manual and not auto_cleanup_on():
+        return []
+    return [l for l in superseded_installed(auto=not manual)
+            if not _resident(l)]
+
+
 def _auto_cleanup_pass(manual=False) -> list:
     """The auto-clean sweep (6b265, per Patrick's checkbox; on by
     default since 6b306). Stands down entirely while an app update or
@@ -13821,14 +13877,11 @@ def _auto_cleanup_pass(manual=False) -> list:
         # manual == the Clean-now button (6b268, per Patrick): the
         # user is asking RIGHT NOW, so the standing pref doesn't
         # gate it, and the list they were shown is the whole list.
-        # Every safety guard below still applies.
-        if not manual and not auto_cleanup_on():
-            return []
-        plan = {u["old"]: u for u in model_updates()}
-        targets = [l for l in superseded_installed(auto=not manual)
-                   if not _resident(l)]
+        # Every safety guard in _auto_clean_targets still applies.
+        targets = _auto_clean_targets(manual)
         if not targets:
             return []
+        plan = {u["old"]: u for u in model_updates()}
         removed, _errs = _remove_models(targets)
         _offers_set(add=[l for l in removed
                          if (plan.get(l) or {}).get("new")])
@@ -13837,6 +13890,103 @@ def _auto_cleanup_pass(manual=False) -> list:
         return removed
     except Exception:
         return []
+
+
+# THE MORE-MODELS CARD SAYS WHAT WILL CHANGE (6b335, per Patrick: "a
+# details box before starting saying what changes to the model library
+# will be made"). The server decides the change once, here; the page
+# lists exactly that, and POST /api/models/offer carries it out only
+# while a plan made fresh at the click is still the one listed. So
+# nothing is removed that the card didn't name.
+def _offer_reason(label: str, olds: list, seen: set) -> str:
+    """One line on why a model is in the Download list."""
+    if olds:
+        # the same line of models (first word and role): a newer version;
+        # anything else stands in for it
+        same = all(o.split()[0] == label.split()[0]
+                   and _family_of(o) == _family_of(label) for o in olds)
+        return ("newer version of " if same else "replaces ") + ", ".join(olds)
+    return "new" if label not in seen else "not installed yet"
+
+
+def model_offer_plan(pulled=None) -> dict:
+    """What the card's button will do.
+    download: the Max spread's models not on disk, and the replacement
+      of every retired model (on disk, or swept with its offer kept),
+      one row per download, none already in flight;
+    remove: exactly what an auto-clean pass would delete now
+      (_auto_clean_targets), with the space each frees;
+    keep_n: every other model on disk, unchanged.
+    plan_id names the two lists, so a click is checked against them."""
+    if pulled is None:
+        pulled = ollama_pulled_tags() or set()
+    seen = machine_prefs().get("seen_models")
+    seen = set(seen) if isinstance(seen, list) else set()
+    ups = model_updates(pulled)
+    olds_of = {}
+    for u in ups:
+        if u["new"]:
+            olds_of.setdefault(u["new"], []).append(u["old"])
+    with _setup_lock:
+        moving = {l for l, j in _setup_jobs.items()
+                  if (j or {}).get("status") in ("downloading", "queued")}
+    download, routes = [], set()
+    for l in list(plan_labels("max")) + list(olds_of):
+        key = MODEL_ROUTES.get(l, (None, l))
+        if (key in routes or not SUPPORTED.get(l) or l in moving
+                or model_cached(l, pulled)):
+            continue
+        routes.add(key)
+        download.append({"label": l, "gb": MODEL_INFO[l]["gb"],
+                         "why": _offer_reason(l, olds_of.get(l, []), seen),
+                         "fresh": l not in seen})
+    new_of = {u["old"]: u["new"] for u in ups}
+    remove = [{"label": l, "gb": _gb_of(l), "new": new_of.get(l)}
+              for l in _auto_clean_targets()]
+    gone = {r["label"] for r in remove}
+    on_disk = ([l for l in MODEL_INFO
+                if SUPPORTED.get(l) and model_cached(l, pulled)]
+               + [u["old"] for u in ups if not u.get("gone")])
+    dl_gb = round(sum(d["gb"] for d in download), 1)
+    free_gb = round(sum(r["gb"] for r in remove), 1)
+    try:
+        disk = shutil.disk_usage(os.path.expanduser("~")).free / 1e9
+    except OSError:
+        disk = None
+    ids = [[d["label"] for d in download], [r["label"] for r in remove]]
+    return {"plan_id": hashlib.sha1(json.dumps(ids).encode()).hexdigest()[:16],
+            "download": download, "remove": remove,
+            "keep_n": len([l for l in on_disk if l not in gone]),
+            "dl_gb": dl_gb, "free_gb": free_gb,
+            "disk_free_gb": round(disk, 1) if disk is not None else None,
+            "after_gb": (round(disk + free_gb - dl_gb, 1)
+                         if disk is not None else None)}
+
+
+def offer_matches(plan: dict, asked) -> bool:
+    """The click names the plan it was shown, list by list."""
+    return (isinstance(asked, dict)
+            and asked.get("plan_id") == plan["plan_id"]
+            and asked.get("remove") == [r["label"] for r in plan["remove"]]
+            and asked.get("download") == [d["label"] for d in plan["download"]])
+
+
+def apply_model_offer(plan: dict) -> dict:
+    """Carry out a plan the page showed: its Remove list through the one
+    careful deleter (the space first), then its downloads. Nothing else
+    is read here, so nothing unlisted can go. A removed model whose
+    replacement is listed keeps its offer until that lands, as a sweep
+    does."""
+    want = [r["label"] for r in plan.get("remove") or []]
+    removed, errors = _remove_models(want) if want else ([], {})
+    _offers_set(add=[r["label"] for r in plan.get("remove") or []
+                     if r["label"] in removed and r.get("new")])
+    started = start_model_downloads(
+        [d["label"] for d in plan.get("download") or []])
+    return {"ok": True, "removed": removed, "errors": errors,
+            "started": started,
+            "freed_gb": round(sum(_gb_of(l) for l in removed), 1),
+            "gb": round(sum(MODEL_INFO[l]["gb"] for l in started), 1)}
 
 
 # UPDATE MODELS (6b306, per Patrick: the post-update card recommends it
@@ -13932,6 +14082,9 @@ def model_update_status() -> dict:
         st.update(
             pct=min(99, round(have / want * 100)) if want else 99,
             have_gb=round(have / 1e9, 1), want_gb=round(want / 1e9, 1),
+            # the bytes themselves, for the page's time left (6b335):
+            # a tenth of a GB is four seconds of a fast line
+            have_b=have, want_b=want,
             speed_mbs=round(bps / 1e6, 1),
             eta_min=(min(ETA_CAP_MIN,
                          max(1, round((want - have) / bps / 60)))
@@ -13957,6 +14110,19 @@ def _post_update_cleanup():
         _SWEEP_DONE.set()
 
 
+def _engine_loading(label: str, job: dict) -> bool:
+    """A model this run just downloaded whose engine was started and
+    hasn't opened its port yet (6b335). Five minutes at most: an engine
+    that never comes up is the next question's problem, not the card's."""
+    since = job.get("loading_since")
+    if not since or time.time() - since > 300:
+        return False
+    proc = _mlx_procs.get(label)
+    if proc is None or proc.poll() is not None:
+        return False
+    return not _port_in_use(MODEL_ROUTES[label][1])
+
+
 def setup_busy() -> dict:
     """What the sidebar strip needs, and nothing else (6b304). The strip
     polled the full /api/setup every 4s for the life of the window, even
@@ -13972,7 +14138,10 @@ def setup_busy() -> dict:
     bps = _dl_speed(have)
     return {"busy": True,
             "updating": _modup.get("state") == "running",
-            "overall_pct": round(have / want * 100) if want else 100,
+            "have_b": have, "want_b": want,
+            # never 100% while anything still downloads (6b335): the
+            # last bytes, or Ollama's check of them, are still to come
+            "overall_pct": min(99, round(have / want * 100)) if want else 99,
             "speed_mbs": round(bps / 1e6, 1),
             "eta_min": (min(ETA_CAP_MIN,
                             max(1, round((want - have) / bps / 60)))
@@ -14056,7 +14225,8 @@ def setup_status() -> dict:
             status = job.get("status", "missing")
             if kind == "mlx":
                 pct = min(99, round(
-                    _dir_bytes(_hf_model_dir(MLX_REPOS[label])) / est * 100))
+                    _dir_bytes_real(_hf_model_dir(MLX_REPOS[label]))
+                    / est * 100))
             else:
                 pct = job.get("pct", 0)
         models.append({"label": label, "est_gb": round(est / 1e9, 1),
@@ -14067,6 +14237,9 @@ def setup_status() -> dict:
                        "checking": (status == "downloading"
                                     and job.get("phase") == "verifying"),
                        "giant": model_is_giant(label),
+                       # its engine starting after the download (6b335)
+                       "loading": (status == "ready"
+                                   and _engine_loading(label, job)),
                        "star": label in stars_now,
                        "supported": SUPPORTED.get(label, True),
                        "note": job.get("note", "")})
@@ -14115,7 +14288,10 @@ def setup_status() -> dict:
         "queued_n": sum(1 for m in models if m["status"] == "queued"),
         "plan_state": plan_state,
         "have_gb": round(have / 1e9, 1), "want_gb": round(want / 1e9, 1),
-        "overall_pct": round(have / want * 100) if want else 100,
+        "have_b": have, "want_b": want,
+        "overall_pct": ((min(99, round(have / want * 100)) if want else 99)
+                        if busy else
+                        (round(have / want * 100) if want else 100)),
         "speed_mbs": round(bps / 1e6, 1) if busy else 0,
         # only quote a time once the window holds a real rate, and never
         # quote a silly one — an hour-plus reads as "we don't know"
@@ -21579,6 +21755,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(setup_status())
         elif self.path == "/api/setup/busy":
             self._send_json(setup_busy())
+        elif self.path == "/api/models/offer":
+            # what the More-models card will change (6b335)
+            self._send_json(model_offer_plan())
         elif self.path.startswith("/api/model/update"):
             st = model_update_status()
             if "plan=1" in self.path:
@@ -22457,6 +22636,21 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "already": len(_want) - len(_started),
                              "gb": round(sum(MODEL_INFO[l]["gb"]
                                              for l in _started), 1)})
+            return
+        if self.path == "/api/models/offer":
+            # THE CARD'S BUTTON (6b335): carried out only if a plan made
+            # now is still the one the card listed. Otherwise nothing
+            # changes and the card gets the new plan to show instead.
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                asked = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                asked = {}
+            plan = model_offer_plan()
+            if not offer_matches(plan, asked):
+                self._send_json({"changed": True, "plan": plan}, code=409)
+                return
+            self._send_json(apply_model_offer(plan))
             return
         if self.path == "/api/update/install":
             if _update["state"] in ("idle", "error"):
@@ -28169,7 +28363,7 @@ body.gen #chip-model{color:var(--accent)}
 #up-detail,#new-detail{font-size:11.5px;color:var(--faint);margin:10px 0 4px;line-height:1.5}
 #about-sub{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5}
 #new-pct{font-family:var(--mono);font-size:11px;color:var(--dim);
-  margin:8px 0 2px}
+  margin:8px 0 2px;text-wrap:balance}
 #new-pct[hidden]{display:none}
 #new-bar{margin-top:16px}
 #new-list{margin:16px 0 2px;text-align:left}
@@ -28189,6 +28383,21 @@ body.gen #chip-model{color:var(--accent)}
 #new-list .mmore{
   padding:10px 2px 0;font-size:11.5px;color:var(--faint);text-align:center;
 }
+/* THE DETAILS BOX (6b335): Download / Remove, a line for the rest, the
+   totals. The card fits what it lists; a long list scrolls inside
+   itself, never the card, and nothing else moves */
+#new-veil #about-card{max-height:calc(100vh - 40px)}
+#new-veil #about-card>*{flex:none}
+#new-veil #new-list{flex:0 1 auto;min-height:0;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:#3a3b41 transparent}
+#new-list[hidden],#new-sum[hidden]{display:none}
+#new-list .og{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);padding:12px 2px 2px}
+#new-list .og:first-child{padding-top:0}
+#new-list .mname i{display:block;font-style:normal;font-family:var(--sans);
+  font-size:11px;color:var(--faint);margin-top:2px;white-space:normal}
+#new-sum{font-size:11.5px;color:var(--dim);line-height:1.5;
+  margin:10px 0 2px;padding-top:10px;border-top:1px solid var(--line-soft)}
 #turbo-row[hidden]{display:none}
 #turbo-row{display:flex;gap:8px;align-items:flex-start;font-size:11.5px;
   color:var(--dim);margin:12px 2px 2px;cursor:pointer;line-height:1.5;
@@ -29077,9 +29286,11 @@ __CODE_ROWS__
     <div id="new-title">New models available</div>
     <div id="new-detail">This version adds models you don&rsquo;t have yet.</div>
     <div id="new-list"></div>
+    <div id="new-sum" hidden></div>
     <div class="big-bar" id="new-bar" hidden><i></i></div>
     <div id="new-pct" hidden></div>
-    <button class="about-btn primary" id="new-get">Download</button>
+    <button class="about-btn primary" id="new-get">Update model library</button>
+    <button class="about-btn primary" id="new-retry" hidden>Retry</button>
     <button class="about-btn" id="new-bg" hidden>Run in background</button>
     <button class="about-btn" id="new-skip">Not now</button>
     <button class="about-btn quiet" id="new-off" hidden>Don&rsquo;t remind me again</button>
@@ -33995,11 +34206,51 @@ const TICK='<svg class="tick" viewBox="0 0 24 24" aria-label="installed">'
   +'<path d="M7 12.4l3.3 3.3L17 9" fill="none" stroke-width="2.7"'
   +' stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-/* time left in words (6b314): a giant takes many hours, and "about
-   1300 min" says nothing */
-function dlEta(m){
-  return m>=90?"about "+Math.round(m/60)+" hr":"about "+m+" min";
+/* TIME LEFT, ONE WAY (6b335, per Patrick: "we should have time
+   remaining here too"). Every download bar asks dlLeft: the setup panel,
+   the studio cards, the Manage note, Update models, the More-models card
+   and the strip. key names the bytes being counted ("batch" for the
+   installer's, "modup" for Update models'), so surfaces polling the
+   same batch share one clock. The rate is an exponential moving average
+   over ~10 s of what arrived, weighted by time (so polls at any pace
+   agree), never the last poll's burst. Nothing until 3 s or 1% of it
+   has been seen, nothing while the bytes stand still, and after 15 s
+   of that it says it's waiting. A gap of 30 s between looks, or bytes
+   going backwards, is a new download: the clock starts again. Long
+   downloads read in hours (6b314: "about 1300 min" says nothing). */
+function dlLeft(key,have,want,now){
+  const cs=dlLeft.c||(dlLeft.c={});
+  now=now==null?Date.now():now;have=+have;want=+want;
+  if(!(want>0)||!(have>=0))return "";
+  const c=cs[key];
+  if(!c||have<c.b||now-c.t>30000){
+    cs[key]={t0:now,b0:have,t:now,b:have,moved:now,r:0,w:0};
+    return "";
+  }
+  const dt=(now-c.t)/1000;
+  if(dt>0){
+    const a=1-Math.exp(-dt/10);          // tau 10 s
+    c.r+=a*((have-c.b)/dt-c.r);c.w+=a*(1-c.w);
+    if(have>c.b)c.moved=now;
+    c.t=now;c.b=have;
+  }
+  if(have>=want)return "";
+  const still=now-c.moved;
+  if(still>15000)return "waiting for the download to resume";
+  if(still>5000)return "";
+  if(now-c.t0<3000&&have-c.b0<want*0.01)return "";
+  const rate=c.w>0?c.r/c.w:0;           // the average, not biased to 0
+  return rate>0?dlLeftIn((want-have)/rate):"";
 }
+function dlLeftIn(s){
+  if(s<60)return "under a minute left";
+  const m=Math.min(72*60,Math.round(s/60));   // ETA_CAP_MIN's 72 hours
+  if(m<60)return "about "+m+" min left";
+  const h=Math.floor(m/60),r=m%60;
+  return "about "+h+" h"+(r?" "+r+" min":"")+" left";
+}
+// a line's " · about 6 min left", or nothing
+function dlTail(t){return t?" \u00b7 "+t:"";}
 function renderSetup(st){
   const stars=st.models.filter(m=>m.star);
   setupAllReady=stars.every(m=>m.status==="ready");
@@ -34012,7 +34263,7 @@ function renderSetup(st){
     '<span>'+(anyDl?pct+'%':(setupAllReady?'complete':'not started'))+'</span></div>'+
     (anyDl?'<div class="big-speed">'+
       (st.speed_mbs>0?st.speed_mbs+' MB/s':'starting\u2026')+
-      (st.eta_min?' \u00b7 '+dlEta(st.eta_min)+' left':'')+'</div>'
+      dlTail(dlLeft("batch",st.have_b,st.want_b))+'</div>'
       +'<div class="big-now">'+nowLine(st)+'</div>':'');
 
   // WHILE DOWNLOADING (first run or updates): one bar, bandwidth,
@@ -34341,13 +34592,16 @@ async function dlStripTick(){
       // what is happening on the left, how fast and how long on the
       // right: the time left is the part that must never be clipped
       const lbl=dlStrip.querySelector(".dllbl");
-      lbl.firstChild.textContent=
+      const left=dlLeft("batch",st.have_b,st.want_b),
+            wait=left.startsWith("waiting");
+      lbl.firstChild.textContent=wait?left:
         (st.updating?"updating":"downloading")
         +" \u00b7 "+(st.overall_pct||0)+"%";
-      lbl.lastChild.textContent=[
+      // (6b335) the time left, in the words every bar uses, takes the
+      // speed's place: both side by side outgrew the sidebar
+      lbl.lastChild.textContent=wait?(st.overall_pct||0)+"%":left||(
         st.speed_mbs>0?(st.speed_mbs>=10?Math.round(st.speed_mbs)
-          :st.speed_mbs)+" MB/s":"",
-        st.eta_min?dlEta(st.eta_min).replace("about ","~"):""].filter(Boolean).join(" \u00b7 ");
+          :st.speed_mbs)+" MB/s":"");
     }
   }catch(e){}
   finally{dlStripBusy=false;}
@@ -35095,6 +35349,62 @@ async function openAbout(){
 // (the full missing set can top 100 GB), and it carries its own permanent
 // opt-out. At most one card per launch, and never during first-run setup.
 const REMIND_GAP=20*60*60*1000;       // "daily", forgiving of launch times
+/* THE DETAILS BOX (6b335, per Patrick: "a details box before starting
+   saying what changes to the model library will be made"). The server's
+   plan (/api/models/offer) is all of it: Download (each model, its size,
+   why), Remove (exactly what auto-clean would delete now, and the space),
+   one line for the models that stay, then the totals. The button sends
+   the plan back by name and the server acts only while it still holds,
+   so the card never removes a model it didn't list. */
+function offerList(p){
+  const dl=p.download||[],rm=p.remove||[],n=p.keep_n||0;
+  const row=(k,x,why)=>'<div class="mrow" data-'+k+'="'+esc(x.label)+'">'
+    +'<span class="mname">'+esc(x.label)+'<i>'+esc(why)+'</i></span>'
+    +'<span class="msize">'+muGB(x.gb)+'</span></div>';
+  return (dl.length?'<div class="og">Download</div>'
+      +dl.map(d=>row("dl",d,d.why)).join(""):"")
+    +(rm.length?'<div class="og">Remove</div>'
+      +rm.map(r=>row("rm",r,"retired, not used by this version")).join(""):"")
+    +(n?'<div class="mmore">'+n+' other model'+(n>1?"s":"")+' unchanged</div>':"");
+}
+/* WHERE THE CARD'S DOWNLOADS ARE (6b335, from Patrick's "stuck at 8.5 /
+   8.5 GB · 100%"). The card used to wait for "not busy AND 100%", so a
+   batch that ended short of 100% (a failure, or a finished model the
+   bar stopped counting) left it up forever. Now the models it started
+   decide: still moving is the bytes line (every model in the batch, and
+   the time left for all of them); bytes all in but the engine still at
+   it says what it is doing, with no made-up progress; then Done, or
+   what failed and why. The line, and end: "" (keep polling), "done" or
+   "failed" (failed names the labels to retry). */
+function offerProgress(started,s){
+  const rows={};(s.models||[]).forEach(m=>{rows[m.label]=m;});
+  const st=started.map(l=>rows[l]||{label:l,status:"missing"});
+  const going=st.filter(m=>m.status==="downloading"||m.status==="queued");
+  const failed=st.filter(m=>m.status==="error"||m.status==="missing");
+  const loading=st.filter(m=>m.status==="ready"&&m.loading);
+  const names=ms=>ms.map(m=>m.label).join(", ");
+  if(going.length){
+    // Ollama hashes the whole file after the last byte (6b317)
+    if(going.every(m=>m.checking))
+      return {line:"Finishing: checking the files\u2026",end:""};
+    return {line:s.have_gb+" / "+s.want_gb+" GB \u00b7 "+(s.overall_pct||0)+"%"
+      +(s.speed_mbs?" \u00b7 "+s.speed_mbs+" MB/s":"")
+      +dlTail(dlLeft("batch",s.have_b,s.want_b)),end:""};
+  }
+  if(loading.length)return {line:"Loading "+names(loading)+"\u2026",end:""};
+  if(failed.length)return {line:"Couldn\u2019t download "+failed.map(m=>
+      m.label+(m.note?" ("+m.note+")":m.status==="missing"?" (stopped)":"")).join(", "),
+    end:"failed",retry:failed.map(m=>m.label)};
+  const n=st.length;
+  return {line:"Done \u2713 \u00b7 added "+n+" model"+(n>1?"s":""),end:"done"};
+}
+function offerSum(p){
+  const a=p.after_gb;
+  return [p.dl_gb?muGB(p.dl_gb)+" to download":"",
+          p.free_gb?muGB(p.free_gb)+" freed":"",
+          a==null?"":a<0?muGB(-a)+" short of free space"
+            :muGB(a)+" free after"].filter(Boolean).join(" \u00b7 ");
+}
 async function announceModels(){
   // the post-update card owns this launch and carries the model
   // offer itself (6b306): one card per launch, as promised above
@@ -35113,21 +35423,34 @@ async function announceModels(){
     if(!seen.length){await stamp();return;}   // first run: nothing is "new"
 
     const veil=$("#new-veil"),title=document.querySelector("#new-veil #new-title");
-    const missing=st.models.filter(m=>m.status!=="ready"&&m.supported!==false);
-    const fresh=missing.filter(m=>seen.indexOf(m.label)<0);
+    // the card offers what its button does: the server's plan, never
+    // the whole missing catalog (6b335)
+    let plan=await(await api("/api/models/offer")).json();
+    const fresh=(plan.download||[]).filter(d=>d.fresh);
 
     // ONE SENTENCE, per Patrick — the Basic/Pro/Max panel does the rest
     if(prefs.remind_models_off&&!fresh.length)return;
-    if(!missing.length)return;
+    if(!(plan.download||[]).length)return;
     if(!fresh.length&&
        Date.now()-(prefs.remind_models_ts||0)<REMIND_GAP)return;
     title.textContent="More models available";
     $("#new-detail").textContent=
       "More models to enhance your experience are available.";
-    $("#new-list").innerHTML="";
-    $("#new-bar").hidden=true;$("#new-pct").hidden=true;
-    $("#new-get").hidden=false;$("#new-get").textContent="Download";
+    const get=$("#new-get"),note=$("#new-pct");
+    const paint=p=>{
+      plan=p;
+      $("#new-list").innerHTML=offerList(p);$("#new-list").hidden=false;
+      $("#new-sum").textContent=offerSum(p);$("#new-sum").hidden=false;
+      get.hidden=!((p.download||[]).length||(p.remove||[]).length);
+      get.disabled=p.after_gb!=null&&p.after_gb<0;
+    };
+    paint(plan);
+    $("#new-bar").hidden=true;note.hidden=true;
+    // one label whatever the mix (6b335, per Patrick): the list above
+    // it already says what will change
+    get.textContent="Update model library";
     $("#new-bg").hidden=true;$("#new-skip").hidden=false;
+    $("#new-retry").hidden=true;
     $("#new-off").hidden=!!fresh.length;
     veil.hidden=false;
     let poll=null;
@@ -35136,30 +35459,72 @@ async function announceModels(){
     $("#new-off").onclick=async()=>{
       stopPoll();veil.hidden=true;await stamp({remind_models_off:true});};
     $("#new-bg").onclick=()=>{stopPoll();veil.hidden=true;};
-    $("#new-get").onclick=async()=>{
+    get.onclick=async()=>{
+      get.disabled=true;
+      let r=null,code=0;
+      try{
+        const res=await api("/api/models/offer",{method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({plan_id:plan.plan_id,
+            download:plan.download.map(d=>d.label),
+            remove:plan.remove.map(x=>x.label)})});
+        code=res.status;r=await res.json();
+      }catch(e){}
+      if(code===409&&r&&r.plan){
+        // the library changed since the card opened: nothing was done,
+        // and the card shows what's true now
+        paint(r.plan);
+        note.hidden=false;note.textContent="The list changed. Check it again.";
+        return;
+      }
+      if(!r||!r.ok){
+        get.disabled=false;note.hidden=false;
+        note.textContent="Couldn\u2019t start. Try again.";return;
+      }
       await stamp();
-      $("#new-get").hidden=true;$("#new-skip").hidden=true;
-      $("#new-off").hidden=true;
-      $("#new-bar").hidden=false;$("#new-pct").hidden=false;
-      $("#new-pct").textContent="starting\u2026";
+      const kept=Object.keys(r.errors||{});
+      const tail=(r.removed.length?" \u00b7 removed "+r.removed.length
+          +", freed "+muGB(r.freed_gb):"")
+        +(kept.length?" \u00b7 couldn\u2019t remove "+kept.join(", "):"");
+      $("#new-list").hidden=true;$("#new-sum").hidden=true;
+      get.hidden=true;$("#new-skip").hidden=true;$("#new-off").hidden=true;
+      note.hidden=false;
+      if(!(r.started||[]).length){
+        note.textContent="Done \u2713"+tail;
+        setTimeout(()=>{veil.hidden=true;},kept.length?4000:1600);
+        return;
+      }
+      $("#new-bar").hidden=false;
+      note.textContent="starting\u2026";
       $("#new-bg").hidden=false;
-      await api("/api/setup/install",{method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({plan:"max"})});
-      poll=setInterval(async()=>{
+      const started=r.started.slice();
+      const retry=$("#new-retry");
+      const tick=async()=>{
         try{
           const s=await(await api("/api/setup")).json();
           $("#new-bar").firstChild.style.width=(s.overall_pct||0)+"%";
-          $("#new-pct").textContent=
-            s.have_gb+" / "+s.want_gb+" GB \u00b7 "+(s.overall_pct||0)+"%"
-            +(s.speed_mbs?" \u00b7 "+s.speed_mbs+" MB/s":"");
-          if(!s.busy&&(s.overall_pct||0)>=100){
-            stopPoll();
-            $("#new-pct").textContent="Done \u2713";
-            setTimeout(()=>{veil.hidden=true;},1600);
+          const pr=offerProgress(started,s);
+          // a long line wraps between its parts, never inside one
+          note.textContent=(pr.end==="done"?pr.line+tail:pr.line)
+            .split(" \u00b7 ").map(x=>x.replace(/ /g,"\u00a0")).join("\u00a0\u00b7 ");
+          if(!pr.end)return;
+          stopPoll();
+          if(pr.end==="done"){
+            setTimeout(()=>{veil.hidden=true;},kept.length?4000:1600);
+            return;
           }
+          // a failure is said plainly, with a retry of just those
+          retry.hidden=false;
+          retry.onclick=async()=>{
+            retry.hidden=true;note.textContent="starting\u2026";
+            try{await api("/api/model/download",{method:"POST",
+              headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({labels:pr.retry})});}catch(e){}
+            if(!poll)poll=setInterval(tick,2000);
+          };
         }catch(e){}
-      },2000);
+      };
+      poll=setInterval(tick,2000);
     };
   }catch(e){}
 }
@@ -35373,11 +35738,10 @@ function studioHTML(key,st){
       +'</div></div>';
   }
   if(busy){
-    const sp=(lastSetup&&lastSetup.speed_mbs)||0,
-          et=(lastSetup&&lastSetup.eta_min)||0;
+    const ls=lastSetup||{},sp=ls.speed_mbs||0;
     h+='<div class="stprog"><div class="stbar"><i style="width:'+st.pct+'%"></i></div>'
       +'<div class="stnums"><span>'+st.pct+'%</span><span>'
-      +(sp?sp+" MB/s":"starting\u2026")+(et?" \u00b7 "+dlEta(et)+" left":"")
+      +(sp?sp+" MB/s":"starting\u2026")+dlTail(dlLeft("batch",ls.have_b,ls.want_b))
       +'</span></div></div>';
   }
   h+='<div class="stacts">';
@@ -35541,7 +35905,7 @@ function manageTick(){
       $("#manage-note").textContent="downloading \u2014 "+st.have_gb+" of "
         +st.want_gb+" GB \u00b7 "+st.overall_pct+"%"
         +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"")
-        +(st.eta_min?" \u00b7 "+dlEta(st.eta_min)+" left":"")
+        +dlTail(dlLeft("batch",st.have_b,st.want_b))
         +(st.now&&st.now.length?" \u2014 "+st.now.map(m=>m.label+" "+dlPct(m)).join(", "):"")
         +(st.queued_n?" \u00b7 "+st.queued_n+" waiting":"");
       manageTick();
@@ -35595,7 +35959,7 @@ function muPaint(el,st){
   const offers=muOffers(p),n=offers.length;
   let h;
   if(st&&st.state==="running"){
-    const eta=st.eta_min?dlEta(st.eta_min):"";
+    const eta=dlLeft("modup",st.have_b,st.want_b);
     h='<div class="mu-h">Updating your models</div>'
       +'<div class="mu-bar"><i style="width:'+(st.pct||0)+'%"></i></div>'
       +'<div class="mu-m">'+[(st.pct||0)+"%",
