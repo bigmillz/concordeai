@@ -96,7 +96,7 @@ MACHINE_STATE = frozenset((
     "MODEL_ROUTES", "OLLAMA_PORT", "_MINE_CACHE",
     "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache",
     # 6b315: the graphics cards, and when the engine update last failed
-    "_gpus", "_stage_last",
+    "_gpus", "_stage_last", "_proof",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
@@ -11374,7 +11374,7 @@ MACHINE_IO = frozenset((
     # 6b315: the app's own Ollama fetched beside it (bin.new), swapped in
     # at the next start
     "_fetch_engine_update", "_apply_staged_engine", "_rollback_engine",
-    "_prove_engine", "_update_note_set",
+    "_update_note_set", "_trial_proven", "_drop_trial",
     "_download_model", "studio_remove", "_remove_models",
     "_sweep_hf_carcasses", "_rm_hf_repo", "reap_orphan_engines",
     "_sweep_leftovers", "_crypto_record_write", "_crypto_pip",
@@ -12911,6 +12911,7 @@ _UPDATE_NOTE = _MANAGED_BIN_DIR + ".update.json"
 _stage_last = {"err_at": 0.0}     # when the last fetch failed
 OLLAMA_SUMS_URL = ("https://github.com/ollama/ollama/releases/latest/"
                    "download/sha256sum.txt")
+OLLAMA_LATEST_URL = "https://github.com/ollama/ollama/releases/latest"
 
 
 def _ollama_needed() -> tuple:
@@ -12953,11 +12954,19 @@ def _update_note() -> dict:
         return {}
 
 
-def _update_note_set(latest: tuple):
-    """Today's newest engine was fetched and won't do: not again today."""
+def _update_note_set(latest: tuple = (), bad: tuple = ()):
+    """Today's newest engine was fetched and won't do (`latest`: not
+    again today), or an engine failed its first start here (`bad`: never
+    again, until a newer release; re-review of the port). Other fields
+    are kept."""
+    d = _update_note()
+    if latest:
+        d.update(day=_today(), latest=list(latest))
+    if bad:
+        d["bad"] = list(bad)
     try:
         with open(_UPDATE_NOTE, "w", encoding="utf-8") as f:
-            json.dump({"day": _today(), "latest": list(latest)}, f)
+            json.dump(d, f)
     except OSError:
         pass
 
@@ -12979,6 +12988,29 @@ def _release_sha256(url: str) -> str:
     raise RuntimeError("%s is not in the release's sha256sum.txt" % name)
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None
+
+
+def _latest_release() -> tuple:
+    """The newest Ollama release's version, from where GitHub's "latest"
+    page points (no download), or () when it can't be read."""
+    try:
+        op = urllib.request.build_opener(_NoRedirect)
+        op.open(urllib.request.Request(OLLAMA_LATEST_URL, method="HEAD",
+                                       headers={"User-Agent": "MillenAI/1.0"}),
+                timeout=15)
+        return ()
+    except urllib.error.HTTPError as e:
+        loc = e.headers.get("Location", "") if e.code in (301, 302, 303,
+                                                           307, 308) else ""
+        m = re.search(r"/tag/v?(\d+)\.(\d+)\.(\d+)$", loc)
+        return tuple(int(x) for x in m.groups()) if m else ()
+    except Exception:
+        return ()
+
+
 def _stage_engine_update() -> str:
     """When the app's own Ollama is older than a model this computer runs
     on Ollama needs, fetch the latest beside it, in the background. Machine
@@ -12991,6 +13023,8 @@ def _stage_engine_update() -> str:
       arm64     6b317's native ARM64 engine is on its way (the latest)
       staged    a newer engine is ready for the next start
       released  today's newest release isn't enough either
+      bad       the newest release failed its first start here; the app
+                keeps its engine until a newer one is out (re-review)
       offline   the last fetch failed less than a minute ago
       sibling   another copy of the app is open: it neither fetches nor
                 swaps (6b317's rule)
@@ -13012,6 +13046,15 @@ def _stage_engine_update() -> str:
         return "released"
     if time.time() - _stage_last["err_at"] < 60:
         return "offline"
+    bad = tuple(note.get("bad") or ())
+    if bad:
+        # the newest release, from GitHub, or today's fetch when GitHub
+        # can't be asked; nothing at or below the bad one is fetched again
+        newest = _latest_release() or (
+            tuple(note.get("latest") or ()) if note.get("day") == _today()
+            else ())
+        if newest and newest <= bad:
+            return "bad"
     if not _STAGE_LOCK.acquire(blocking=False):
         return "staging"
     try:
@@ -13033,8 +13076,9 @@ def _fetch_engine_update(have: tuple, need: tuple):
     """The fetch, holding _STAGE_LOCK (taken by _stage_engine_update),
     which it lets go at the end. Marked ready only when the archive
     matches the release's checksum and the engine in it (at the top or
-    one folder down) runs, is newer than the one in use and is at least
-    what the models need; on an ARM64 PC it must be ARM64 too."""
+    one folder down) runs, is newer than the one in use, is at least what
+    the models need and is past any version that failed here before; on
+    an ARM64 PC it must be ARM64 too."""
     try:
         shutil.rmtree(_STAGED_DIR, ignore_errors=True)
         url = OLLAMA_ZIP_URL if IS_WIN else OLLAMA_TGZ_URL
@@ -13046,9 +13090,10 @@ def _fetch_engine_update(have: tuple, need: tuple):
             got = ()
         if not got:
             raise RuntimeError("the download holds no working engine")
-        if got <= have or got < need:
+        bad = tuple(_update_note().get("bad") or ())
+        if got <= have or got < need or (bad and got <= bad):
             shutil.rmtree(_STAGED_DIR, ignore_errors=True)
-            _update_note_set(got)
+            _update_note_set(latest=got)
             return
         with open(_STAGED_OK, "w", encoding="utf-8") as f:
             f.write(".".join(map(str, got)))
@@ -13059,38 +13104,67 @@ def _fetch_engine_update(have: tuple, need: tuple):
         _STAGE_LOCK.release()
 
 
-def _rollback_engine() -> bool:
+def _trial_version() -> tuple:
+    try:
+        with open(_SWAP_TRIAL, encoding="utf-8") as f:
+            return tuple(int(x) for x in re.findall(r"\d+", f.read())[:3])
+    except (OSError, ValueError):
+        return ()
+
+
+def _trial_proven():
+    """The swapped-in engine answered: the old one goes (the caller
+    holds _SWAP_LOCK)."""
+    try:
+        os.remove(_SWAP_TRIAL)
+    except OSError:
+        pass
+    shutil.rmtree(_MANAGED_BIN_DIR + ".old", ignore_errors=True)
+
+
+def _rollback_engine() -> str:
     """Put back the engine a swap replaced (the caller holds _SWAP_LOCK).
-    The one that didn't start here is noted, so today's release isn't
-    fetched again today."""
+    The one that didn't start here is noted as bad, so it is never
+    fetched again, only a newer one (re-review of the port). Windows can
+    hold the folder for a moment after its runner is stopped: the renames
+    are tried five times, a second apart (re-review, R2). Returns "back",
+    "held" (still refused: the trial stays for the next start) or "none"
+    (no old engine to put back: the trial goes)."""
     old = _MANAGED_BIN_DIR + ".old"
+    bad = _trial_version()
+    if bad:
+        _update_note_set(bad=bad)
     if not _engine_exe(old):
         try:
             os.remove(_SWAP_TRIAL)
         except OSError:
             pass
-        return False
-    try:
-        with open(_SWAP_TRIAL, encoding="utf-8") as f:
-            bad = tuple(int(x) for x in re.findall(r"\d+", f.read())[:3])
-    except (OSError, ValueError):
-        bad = ()
+        return "none"
     gone = _MANAGED_BIN_DIR + ".failed"
-    shutil.rmtree(gone, ignore_errors=True)
-    try:
-        if os.path.exists(_MANAGED_BIN_DIR):
-            os.replace(_MANAGED_BIN_DIR, gone)
-        os.replace(old, _MANAGED_BIN_DIR)
-    except OSError:
-        return False                 # still held: the next start tries
+    for i in range(5):
+        shutil.rmtree(gone, ignore_errors=True)
+        try:
+            if os.path.exists(_MANAGED_BIN_DIR):
+                os.replace(_MANAGED_BIN_DIR, gone)
+            os.replace(old, _MANAGED_BIN_DIR)
+            break
+        except OSError:
+            if (not os.path.exists(_MANAGED_BIN_DIR)
+                    and os.path.exists(gone)):
+                try:                         # the first rename went through
+                    os.replace(gone, _MANAGED_BIN_DIR)
+                except OSError:
+                    pass
+            if i < 4:
+                time.sleep(1)
+    else:
+        return "held"
     shutil.rmtree(gone, ignore_errors=True)
     try:
         os.remove(_SWAP_TRIAL)
     except OSError:
         pass
-    if bad:
-        _update_note_set(bad)
-    return True
+    return "back"
 
 
 def _apply_staged_engine():
@@ -13101,7 +13175,7 @@ def _apply_staged_engine():
     another copy of the app runs, and on an ARM64 PC only an ARM64 engine
     goes in. The old engine stays in bin.old until the new one has
     answered once (_prove_engine); one never seen answering is put back
-    at the next start."""
+    at the next start, unless it is answering right now (re-review)."""
     if not _SWAP_LOCK.acquire(blocking=False):
         return
     try:
@@ -13117,7 +13191,11 @@ def _apply_staged_engine():
             except OSError:
                 pass
         if os.path.exists(_SWAP_TRIAL) and _managed_serve() is None:
-            _rollback_engine()       # it never answered: the old one back
+            tv = _trial_version()
+            if tv and _engine_version_at(OLLAMA_PORT[0]) == tv:
+                _trial_proven()      # ours from before, and it answers
+            else:
+                _rollback_engine()   # it never answered: the old one back
             return
         if not os.path.exists(_SWAP_TRIAL) and os.path.exists(old):
             shutil.rmtree(old, ignore_errors=True)    # a proven swap's
@@ -13134,26 +13212,30 @@ def _apply_staged_engine():
             if _other_millenai_running():
                 return
             shutil.rmtree(old, ignore_errors=True)
+            # the trial first (re-review, R5): a swap nobody can check
+            # afterwards never starts
+            try:
+                with open(_SWAP_TRIAL, "w", encoding="utf-8") as f:
+                    f.write(".".join(map(str, ver)))
+            except OSError:
+                return
             try:
                 if os.path.exists(_MANAGED_BIN_DIR):
                     os.replace(_MANAGED_BIN_DIR, old)
             except OSError:
+                _drop_trial()
                 return
             try:
                 os.replace(_STAGED_DIR, _MANAGED_BIN_DIR)
             except OSError:
                 try:
                     os.replace(old, _MANAGED_BIN_DIR)
+                    _drop_trial()
                 except OSError:
-                    pass
+                    pass             # the next start undoes it (cut short)
                 return
             try:
                 os.remove(os.path.join(_MANAGED_BIN_DIR, "concorde-complete"))
-            except OSError:
-                pass
-            try:
-                with open(_SWAP_TRIAL, "w", encoding="utf-8") as f:
-                    f.write(".".join(map(str, ver)))
             except OSError:
                 pass
         finally:
@@ -13162,30 +13244,57 @@ def _apply_staged_engine():
         _SWAP_LOCK.release()
 
 
-def _engine_answers(port: int) -> bool:
+def _drop_trial():
+    try:
+        os.remove(_SWAP_TRIAL)
+    except OSError:
+        pass
+
+
+def _engine_version_at(port: int) -> tuple:
+    """The version the Ollama on `port` reports, or ()."""
     try:
         with urllib.request.urlopen(
                 "http://127.0.0.1:%d/api/version" % port, timeout=2) as r:
-            return bool(json.loads(r.read().decode("utf-8")).get("version"))
+            v = str(json.loads(r.read().decode("utf-8")).get("version", ""))
+        return tuple(int(x) for x in re.findall(r"\d+", v)[:3])
     except Exception:
-        return False
+        return ()
 
 
-def _prove_engine(proc, port: int, wait: float = 90.0) -> bool:
+def _engine_answers(port: int) -> bool:
+    return bool(_engine_version_at(port))
+
+
+_PROOF_LOCK = threading.Lock()
+_proof = {"trial": None}     # the trial a proof has run for (one each)
+
+
+def _prove_engine(proc, port: int, wait: float = 90.0):
     """A swapped-in engine's first start: once it answers, the old one
-    goes; if it dies or stays silent, it is stopped and the old one put
-    back, and started."""
+    goes. If it dies or stays silent, it is stopped and, unless another
+    serve of ours is up or anything answers on the port (re-review, R3),
+    the old one is put back. Whatever happens, an engine is started
+    again (R2, R4): the old one, or the one in place when there is no old
+    one or the folder is still held. One proof per trial (R3): a second
+    serve started while one is being proven (it fails: the port is
+    taken) starts none. Returns True, False, or None when skipped."""
+    try:
+        st = os.stat(_SWAP_TRIAL)
+        tid = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+    with _PROOF_LOCK:
+        if _proof["trial"] == tid:
+            return None
+        _proof["trial"] = tid
     end = time.time() + wait
     while time.time() < end:
         if proc.poll() is not None:
             break
         if _engine_answers(port):
             with _SWAP_LOCK:
-                try:
-                    os.remove(_SWAP_TRIAL)
-                except OSError:
-                    pass
-                shutil.rmtree(_MANAGED_BIN_DIR + ".old", ignore_errors=True)
+                _trial_proven()
             return True
         time.sleep(1)
     try:
@@ -13193,10 +13302,12 @@ def _prove_engine(proc, port: int, wait: float = 90.0) -> bool:
         proc.wait(10)
     except Exception:
         pass
+    if (_engine_answers(port) or _engine_answers(OLLAMA_PORT[0])
+            or _managed_serve() is not None):
+        return False                 # another serve of ours has it: leave it
     with _SWAP_LOCK:
-        back = _rollback_engine()
-    if back:
-        _spawn_ollama_serve()
+        _rollback_engine()
+    _spawn_ollama_serve()            # the old engine, or the one in place
     return False
 
 
@@ -13216,6 +13327,8 @@ _STAGE_SAY = {
                "connection, then press retry",
     "released": "Ollama's newest release is older than that; try again "
                 "tomorrow",
+    "bad": "Ollama's newest release didn't start on this computer, so the "
+           "app keeps its engine until a newer release is out",
 }
 
 

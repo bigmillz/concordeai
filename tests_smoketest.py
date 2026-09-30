@@ -3004,7 +3004,8 @@ _ENG_NAMES = {"_STAGED_DIR", "_STAGED_OK", "_STAGE_LOCK", "_SWAP_LOCK", "_SWAP_T
               "_UPDATE_NOTE", "_stage_last", "_STAGE_SAY", "_engine_exe", "_is_managed",
               "_today", "_update_note", "_update_note_set", "_ollama_needed",
               "_stage_engine_update", "_fetch_engine_update", "_rollback_engine",
-              "_apply_staged_engine", "_prove_engine"}
+              "_apply_staged_engine", "_prove_engine", "_trial_version", "_trial_proven",
+              "_drop_trial", "_PROOF_LOCK", "_proof"}
 def _eng_world(cur="0.28.1", staged="0.34.4", nested=False, arm=False, pe=0xAA64,
                sib=False, serve=False):
     d = __import__("tempfile").mkdtemp()
@@ -3026,7 +3027,10 @@ def _eng_world(cur="0.28.1", staged="0.34.4", nested=False, arm=False, pe=0xAA64
              OLLAMA_TGZ_URL="https://x/ollama-darwin.tgz",
              _release_sha256=lambda url: "f" * 64,
              _stop_proc=lambda p: log.__setitem__("stop", log["stop"] + 1),
-             _spawn_ollama_serve=lambda: log.__setitem__("spawn", log["spawn"] + 1))
+             _spawn_ollama_serve=lambda: log.__setitem__("spawn", log["spawn"] + 1),
+             OLLAMA_PORT=[11434], _latest_release=lambda: log.get("latest", ()),
+             _engine_version_at=lambda port: log.get("ver_at", ()),
+             _engine_answers=lambda port: bool(log.get("ver_at")))
     z["_ollama_bin"] = lambda: z["_engine_exe"](b)
     _exec_names(z, _ENG_NAMES)
     z["ctx_thread"] = lambda target, ctx=None, bind=True, args=(), **k: (
@@ -3065,7 +3069,7 @@ _z["_engine_answers"] = lambda port: False
 _ok_p = _z["_prove_engine"](_FP(_b, 1, alive=False), 1, 5)
 _sw["died"] = (_ok_p, _bv(_b), os.path.exists(_b + ".old"), os.path.exists(_b + ".failed"),
                os.path.exists(_z["_SWAP_TRIAL"]), _l["spawn"], _l["stop"],
-               _z["_update_note"]().get("latest"))
+               _z["_update_note"]().get("bad"))
 # ...never seen answering (the app quit or crashed): put back at the next start
 _z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
 _z["_apply_staged_engine"]()
@@ -3108,6 +3112,98 @@ check("the engine update: swapped only when it runs, the old one kept until it a
       and "    if os.path.exists(_SWAP_TRIAL):\n        # an engine swapped in" in _MILLENAI_SRC
       and "_MANAGED_BIN_DIR_FOUND" not in _MILLENAI_SRC,
       "%r" % _sw)
+# THE RE-REVIEW OF THE ROLLBACK (after 3eec6bb)
+_rr = {}
+_nsleep = []
+# R1: a release that failed its first start is never fetched again; a newer one is
+_z, _b, _l = _eng_world(cur="0.34.4", staged=None)
+_eng_file(os.path.join(_b + ".old", "ollama"), "0.28.1")
+open(_z["_SWAP_TRIAL"], "w").write("0.34.4")
+_z["_apply_staged_engine"]()                              # unproven: back to 0.28.1
+_rr["R1 back"] = (_bv(_b), _z["_update_note"]().get("bad"))
+def _dl_as(ver):
+    def _dl(dest, row=None, sha256=None):
+        _l["dl"].append(ver); _eng_file(os.path.join(dest, "ollama"), ver)
+    return _dl
+_z["_download_ollama_binary"] = _dl_as("0.34.4")
+_z["_release_sha256"] = lambda url: "f" * 64
+_l["latest"] = (0, 34, 4)
+_rr["R1 same day"] = (_z["_stage_engine_update"](), list(_l["dl"]))
+_z["_today"] = lambda: "2099-01-01"
+_rr["R1 next day"] = (_z["_stage_engine_update"](), list(_l["dl"]))
+_l["latest"] = ()                                         # GitHub unreadable: it fetches,
+_rr["R1 unknown"] = (_z["_stage_engine_update"](), list(_l["dl"]),   # but won't stage it
+                     os.path.exists(_z["_STAGED_OK"]), _z["_stage_engine_update"]())
+_z["_today"] = lambda: "2099-01-02"
+_l["latest"] = (0, 34, 5)
+_z["_download_ollama_binary"] = _dl_as("0.34.5")
+_rr["R1 newer"] = (_z["_stage_engine_update"](), _l["dl"][-1],
+                   open(_z["_STAGED_OK"]).read() if os.path.exists(_z["_STAGED_OK"]) else "")
+# R2 (Windows): the folder still held after the stop: tried five times, a
+# second apart; then the engine in place is started and the next start retries
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_real_replace = os.replace
+def _held_replace(a, b_):
+    if a == _b:
+        raise PermissionError("[WinError 32] held")
+    return _real_replace(a, b_)
+_z["os"] = _types.SimpleNamespace(**{k: getattr(os, k) for k in dir(os) if not k.startswith("__")})
+_z["os"].replace = _held_replace
+_z["time"] = _types.SimpleNamespace(time=time.time, sleep=lambda t: _nsleep.append(t),
+                                    strftime=time.strftime)
+_ok_p = _z["_prove_engine"](_FP(_b, 1), 1, 0)
+_rr["R2 held"] = (_ok_p, _bv(_b), os.path.exists(_z["_SWAP_TRIAL"]), _l["spawn"], len(_nsleep))
+_z["os"] = os
+_z["_apply_staged_engine"]()
+_rr["R2 next start"] = (_bv(_b), os.path.exists(_z["_SWAP_TRIAL"]))
+# R3: one proof per trial; and a proof never rolls back under another
+# serve of ours (the reviewer's race: a second `ollama serve` failed on the
+# taken port while the first was still loading)
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_l["serve"] = True
+_rr["R3 race"] = (_z["_prove_engine"](_FP(_b, 1, alive=False), 1, 5), _bv(_b),
+                  os.path.exists(_b + ".old"), _l["spawn"])
+_rr["R3 second proof"] = _z["_prove_engine"](_FP(_b, 1, alive=False), 1, 5)
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_l["ver_at"] = (0, 34, 4)                 # something answers on the port after all
+_z["_engine_answers"] = lambda port: False if port == 1 else True
+_rr["R3 answers"] = (_z["_prove_engine"](_FP(_b, 1, alive=False), 1, 5), _bv(_b))
+# R4: no bin.old and the new engine fails: the one in place is started anyway
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+__import__("shutil").rmtree(_b + ".old")
+_rr["R4"] = (_z["_prove_engine"](_FP(_b, 1, alive=False), 1, 5), _bv(_b),
+             os.path.exists(_z["_SWAP_TRIAL"]), _l["spawn"], _z["_update_note"]().get("bad"))
+# R5: the trial is written before the first rename; if it can't be, no swap
+_z, _b, _l = _eng_world()
+_z["_SWAP_TRIAL"] = os.path.join(_b + ".nowhere", "bin.trial")    # can't be written
+_z["_apply_staged_engine"]()
+_rr["R5"] = (_bv(_b), os.path.exists(_b + ".new"), os.path.exists(_b + ".old"))
+_src_apply = _MILLENAI_SRC[_MILLENAI_SRC.index("def _apply_staged_engine("):
+                           _MILLENAI_SRC.index("def _drop_trial(")]
+_rr["R5 order"] = (_src_apply.index('with open(_SWAP_TRIAL, "w"')
+                   < _src_apply.index("os.replace(_MANAGED_BIN_DIR, old)"))
+# a leftover trial while our Ollama from before still answers with that
+# version: proven, not rolled back; another version answering: rolled back
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_l["ver_at"] = (0, 34, 4); _z["_apply_staged_engine"]()
+_rr["answers first"] = (_bv(_b), os.path.exists(_b + ".old"), os.path.exists(_z["_SWAP_TRIAL"]))
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_l["ver_at"] = (0, 1, 0); _z["_apply_staged_engine"]()
+_rr["other answers"] = _bv(_b)
+check("a failed engine: never fetched again, always something running, one proof, trial first",
+      _rr["R1 back"] == ("0.28.1", [0, 34, 4])
+      and _rr["R1 same day"] == ("bad", []) and _rr["R1 next day"] == ("bad", [])
+      and _rr["R1 unknown"] == ("staging", ["0.34.4"], False, "bad")
+      and _rr["R1 newer"] == ("staging", "0.34.5", "0.34.5")
+      and _rr["R2 held"] == (False, "0.34.4", True, 1, 4)
+      and _rr["R2 next start"] == ("0.28.1", False)
+      and _rr["R3 race"] == (False, "0.34.4", True, 0) and _rr["R3 second proof"] is None
+      and _rr["R3 answers"] == (False, "0.34.4")
+      and _rr["R4"] == (False, "0.34.4", False, 1, [0, 34, 4])
+      and _rr["R5"] == ("0.28.1", True, False) and _rr["R5 order"]
+      and _rr["answers first"] == ("0.34.4", False, False)
+      and _rr["other answers"] == "0.28.1",
+      "%r" % _rr)
 # THE FETCH (review of the port): its own lock, never the install lock;
 # marked ready only when it runs and is new enough; each outcome says so
 def _fetch_world(got="0.34.4", nested=False, fail=None, gate=None, **kw):

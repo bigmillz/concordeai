@@ -6041,6 +6041,39 @@ hardware. Built, then reviewed (5 reviewers, 2 skeptics per finding:
     route names a port, never a tag with a floor). The first round's two
     equivalents (a "Properties" key, an NVIDIA driver record) are not
     rerun.
+- RE-REVIEW OF THE ROLLBACK (3eec6bb; fixed in the next commit):
+  - R1: a release that failed its first start was fetched and swapped in
+    again at every launch (the day note only skipped a release below the
+    need). bin.update.json now keeps `bad`, not tied to the day: the
+    roll-back records the version, `_stage_engine_update` asks GitHub
+    which release is newest (the "latest" page's redirect, a HEAD, no
+    download; today's fetch when GitHub can't be asked) and fetches
+    nothing while it isn't past `bad` (status "bad": the row says the
+    newest release didn't start here and the app keeps its engine), and
+    `_fetch_engine_update` stages nothing at or below it.
+  - R2 (Windows): a roll-back refused because the folder was still held
+    left nothing running. The renames are tried five times a second
+    apart; still held, the engine in place is started, and the trial
+    stays so the next start rolls back.
+  - R3: a second `ollama serve` (failing on the port the first holds)
+    started a second proof, which rolled back under the running engine.
+    One proof per trial (`_proof`, under `_PROOF_LOCK`), and a proof
+    rolls back only when nothing answers on the port and no serve of
+    ours is alive.
+  - R4: with bin.old gone, a failed proof left nothing running. The
+    engine in place is started anyway; its version is noted as bad.
+  - R5: bin.trial is written before the first rename; if it can't be,
+    there is no swap.
+  - A leftover trial while our Ollama from before still answers: if it
+    reports the trial's version, the swap counts as proven, not rolled
+    back.
+  - Gauntlet: one more check (each case above: the same day, the next
+    day and a GitHub that can't be asked refetch nothing past `bad`, a
+    newer release is fetched; the held folder; the reviewer's race; no
+    bin.old; the trial first; an answering engine). 18 mutations of R1-R5
+    and the last case, all caught; the earlier list rerun on this code:
+    77 of 78 caught (six re-aimed at the
+    changed code), the one missed the equivalent MLX-rows case above.
   - Not verified here: Windows itself (the registry and
     CM_Locate_DevNodeW run on fakes; in Patrick's ARM VM the Snapdragon's
     Adreno should read as no card, since it is neither AMD nor Intel), a
