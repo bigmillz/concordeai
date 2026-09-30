@@ -111,6 +111,168 @@ class TestRamModelTool(unittest.TestCase):
         self.assertLess(src.index('tty.readline().strip() != "yes"'), src.index("results.append(measure("))
 
 
+class TestStabilityTest(unittest.TestCase):
+    """tools/stability-test.sh against fake stress-ng, curl and journalctl
+    (no load, no root): a pass, a failed check, a hardware error logged
+    during a phase, an interrupted run, and the argument handling."""
+    SCRIPT = os.path.join(U.TOOLS, "stability-test.sh")
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="o1stab-")
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.bin = os.path.join(self.dir, "bin")
+        os.mkdir(self.bin)
+        self.state = os.path.join(self.dir, "state")
+        os.mkdir(self.state)
+        self.jcount = os.path.join(self.dir, "jcount")
+        self.fake("stress-ng", 'sleep 1; exit "${FAKE_STRESS_RC:-0}"')
+        # timeout(1) isn't on every machine the tests run on
+        self.fake("timeout", 'secs=$1; shift; "$@" & pid=$!; (sleep "$secs"; kill $pid 2>/dev/null) & wait $pid; exit 124')
+        self.fake("curl", 'case "$*" in *api/tags*) echo \'{"models":[{"name":"gemma4:12b"}]}\'; exit 0;; '
+                  '*api/generate*) [ -z "${FAKE_NO_ANSWER:-}" ] || exit 22;; esac; exit 0')
+        # journalctl: a hardware-error line appears from the Nth call on
+        self.fake("journalctl", 'n=$(cat "%s" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "%s"; '
+                  'if [ -n "${FAKE_MCE_AFTER:-}" ] && [ "$n" -ge "$FAKE_MCE_AFTER" ]; then '
+                  'echo "kernel: mce: [Hardware Error]: CPU 24: Machine Check: 0 Bank 5: bea0"; fi; exit 0'
+                  % (self.jcount, self.jcount))
+
+    def fake(self, name, body):
+        path = os.path.join(self.bin, name)
+        with open(path, "w") as f:
+            f.write("#!/bin/sh\n" + body + "\n")
+        os.chmod(path, 0o755)
+
+    def run_script(self, *args, env=None):
+        e = dict(os.environ, PATH=self.bin + os.pathsep + os.environ["PATH"], O1_STATE_DIR=self.state,
+                 O1_STABILITY_LOG=os.path.join(self.dir, "log"), O1_STABILITY_NOROOT="1",
+                 O1_NO_TMUX="1", O1_STABILITY_TICK="1", O1_HWMON=os.path.join(self.dir, "hwmon"))
+        e.update(env or {})
+        r = subprocess.run(["bash", self.SCRIPT] + list(args), capture_output=True, text=True, timeout=120, env=e,
+                           stdin=subprocess.DEVNULL)
+        return r.returncode, r.stdout + r.stderr
+
+    def record(self):
+        with open(os.path.join(self.state, "stability.state")) as f:
+            return f.read()
+
+    def test_wrapper(self):
+        self.assertEqual(subprocess.run(["bash", "-n", self.SCRIPT]).returncode, 0)
+        sc = shutil.which("shellcheck")
+        if sc:
+            r = subprocess.run([sc, self.SCRIPT], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_a_pass(self):
+        code, out = self.run_script("--phases", "cpu,memory", "--seconds", "2")
+        self.assertEqual(code, 0, out)
+        self.assertIn("PASSED", out)
+        rec = self.record()
+        self.assertIn("status=done", rec)
+        self.assertIn("result cpu OK", rec)
+        self.assertIn("result memory OK", rec)
+
+    def test_a_failed_check_fails_and_stops(self):
+        code, out = self.run_script("--phases", "cpu,memory", "--seconds", "2", env={"FAKE_STRESS_RC": "2"})
+        self.assertEqual(code, 1, out)
+        rec = self.record()
+        self.assertIn("status=failed", rec)
+        self.assertIn("result cpu FAIL", rec)
+        self.assertNotIn("result memory", rec)        # the first failure is the answer
+
+    def test_a_new_hardware_error_fails_the_phase(self):
+        # the count is read before and after each phase: calls 1 (start) and 2 (before) see none
+        code, out = self.run_script("--phases", "cpu", "--seconds", "2", env={"FAKE_MCE_AFTER": "3"})
+        self.assertEqual(code, 1, out)
+        self.assertIn("hardware-error record", self.record())
+        self.assertIn("result cpu FAIL", self.record())
+
+    def test_gpu_phase_needs_answers_and_the_model(self):
+        code, out = self.run_script("--phases", "gpu", "--seconds", "2", "--model", "nothere:1b")
+        self.assertEqual(code, 1, out)
+        self.assertIn("isn't installed", out)
+        code, out = self.run_script("--phases", "gpu", "--seconds", "3", "--model", "gemma4:12b")
+        self.assertEqual(code, 0, out)         # the fake curl answers, so the loop records answers
+        self.assertIn("result gpu OK", self.record())
+
+    def test_a_gpu_phase_with_no_answers_fails(self):
+        code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_NO_ANSWER": "1"})
+        self.assertEqual(code, 1, out)
+        self.assertIn("no answer", out)
+        self.assertIn("result gpu FAIL", self.record())
+
+    def test_too_hot_aborts_the_phase(self):
+        chip = os.path.join(self.dir, "hwmon", "hwmon0")
+        os.makedirs(chip)
+        with open(os.path.join(chip, "name"), "w") as f:
+            f.write("k10temp\n")
+        with open(os.path.join(chip, "temp1_input"), "w") as f:
+            f.write("96000\n")
+        self.fake("stress-ng", "sleep 30")
+        code, out = self.run_script("--phases", "cpu,memory", "--seconds", "20")
+        self.assertEqual(code, 1, out)
+        self.assertIn("ABORTED: CPU reached 96 C", out)
+        rec = self.record()
+        self.assertIn("result cpu ABORTED", rec)
+        self.assertIn("max_cpu_c=96", rec)
+        self.assertNotIn("result memory", rec)
+
+    def test_a_hot_graphics_card_aborts_the_phase(self):
+        chip = os.path.join(self.dir, "hwmon", "hwmon1")
+        os.makedirs(chip)
+        with open(os.path.join(chip, "name"), "w") as f:
+            f.write("amdgpu\n")
+        with open(os.path.join(chip, "temp1_input"), "w") as f:
+            f.write("70000\n")
+        with open(os.path.join(chip, "temp2_input"), "w") as f:      # the junction, what the limit is on
+            f.write("106000\n")
+        self.fake("stress-ng", "sleep 30")
+        code, out = self.run_script("--phases", "memory", "--seconds", "20")
+        self.assertEqual(code, 1, out)
+        self.assertIn("ABORTED: graphics junction reached 106 C", out)
+
+    def test_status_reports_an_interrupted_run(self):
+        with open(os.path.join(self.state, "stability.state"), "w") as f:
+            f.write("status=running\nphase=all\nstarted=2026-09-30T16:00:00-04:00\nresult cpu OK max_cpu_c=70 max_gpu_c=40\n")
+        code, out = self.run_script("status", env={"FAKE_MCE_AFTER": "1"})
+        self.assertEqual(code, 0, out)
+        self.assertIn("did not finish", out)
+        self.assertIn("phase all", out)
+        self.assertIn("Hardware-error records in the kernel log since this boot: 1", out)
+        self.assertIn("Machine Check", out)
+
+    def test_status_with_nothing_recorded(self):
+        code, out = self.run_script("status")
+        self.assertEqual(code, 0, out)
+        self.assertIn("No run recorded", out)
+        self.assertIn("since this boot: 0", out)
+
+    def test_bad_arguments(self):
+        for args in (["--phases", "nope"], ["--minutes", "x"], ["--minutes", "0"], ["--model", "a b"], ["--bogus"]):
+            code, out = self.run_script(*args)
+            self.assertEqual(code, 2, (args, out))
+        self.assertEqual(self.run_script("--help")[0], 0)
+
+    def test_root_is_required(self):
+        if os.geteuid() == 0:
+            self.skipTest("as root this would really run")
+        r = subprocess.run(["bash", self.SCRIPT, "--phases", "cpu"], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, env=dict(os.environ, O1_STABILITY_NOROOT=""))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("Run it with sudo", r.stdout + r.stderr)
+
+    def test_no_empty_argument_for_tmux(self):
+        with open(self.SCRIPT) as f:
+            src = f.read()
+        m = re.search(r"^quoted_args\(\) \{\n.*?^\}\n", src, re.S | re.M)
+        self.assertTrue(m)
+        script = m.group(0) + (
+            'out=$(quoted_args); [ -z "$out" ] || { echo "none: [$out]"; exit 1; }\n'
+            'eval "set -- $(quoted_args --minutes 15 --model "a b")"\n'
+            '[ "$#" -eq 4 ] && [ "$4" = "a b" ] || { echo "args: $#"; exit 1; }\n')
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+
 class TestRamTestCleansUp(unittest.TestCase):
     def test_hangup_and_term_leave_through_the_cleanup(self):
         src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()
