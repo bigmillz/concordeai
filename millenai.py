@@ -6835,7 +6835,14 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
     paint with it, whatever Use cloud power says (Patrick, 6b326). The
     picture is made in run/ and lands in ctx's pictures (1a 5.3)."""
     errs = []
-    if image_ready():
+    # a benchmark owns this computer's memory (review of 6b334): the local
+    # painter sits it out whoever asked (/api/chat holds the benchmark off
+    # while it paints); a saved Gemini key still may
+    _mine = image_ready()
+    if _mine and _bench["running"]:
+        _mine = False
+        errs.append("local: " + BENCH_BUSY)
+    if _mine:
         # mflux 0.19: a local/third-party model is --model <dir> with
         # --base-model naming the architecture (the old --path is gone)
         _t = studio_tier("image")
@@ -7809,6 +7816,15 @@ def export_name(want: str, ext: str, title: str = "") -> str:
     return "%s.%s" % (stem, ext)
 
 
+def header_text(v: str) -> str:
+    """A header value any text survives: printable ASCII but % as it is,
+    the rest percent-encoded as UTF-8 (the page's hdrText reverses it)."""
+    return urllib.parse.quote(str(v), safe=_HDR_SAFE)
+
+
+_HDR_SAFE = "".join(chr(c) for c in range(32, 127) if chr(c) != "%")
+
+
 def _x_disposition(name: str) -> str:
     """RFC 6266. http.server encodes headers as latin-1 strict, so a CJK or
     Cyrillic filename in a bare filename= raises inside send_header and kills
@@ -8155,7 +8171,12 @@ def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
     permission to use it, whatever Use cloud power says (6b326). Made in
     run/, landed in ctx's videos (1a 5.3)."""
     errs = []
-    if video_ready():
+    # sits a running benchmark out, as the painter does (review of 6b334)
+    _mine = video_ready()
+    if _mine and _bench["running"]:
+        _mine = False
+        errs.append("local: " + BENCH_BUSY)
+    if _mine:
         out = stage_path(".mp4")
         t = studio_tier("video")
         o = studio_opts("video", over)
@@ -10181,7 +10202,10 @@ def _kept_keys_raw(folder: str, every: bool):
     no profile's now); a cloud.json that can't be read goes whole, into
     the trash, since its synced keys can't be picked out. Idempotent: a
     start does it again for a kept folder, in case a crash came between
-    the commit and this."""
+    the commit and this. A removal or a deletion also takes servers.json's
+    Access tokens and device keys (6b334), the addresses and names kept."""
+    if every:
+        _kept_servers_raw(folder)
     p = os.path.join(folder, "cloud.json")
     if not os.path.exists(p):
         return
@@ -10201,6 +10225,29 @@ def _kept_keys_raw(folder: str, every: bool):
         if every:
             d["active"] = ""
         _write_file_raw(p, json.dumps(d).encode("utf-8"))
+
+
+def _kept_servers_raw(folder: str):
+    """servers.json without its secrets (the Access token, the device key
+    and what names it); one that can't be read goes whole, to the trash."""
+    p = os.path.join(folder, "servers.json")
+    if not os.path.exists(p):
+        return
+    try:
+        d = _read_file_json(p, dict, None)
+    except StoreReadError:
+        _trash_file(p)
+        return
+    rows = d.get("servers") if isinstance(d, dict) else None
+    if not isinstance(rows, list):
+        _trash_file(p)
+        return
+    gone = ("access_id", "access_secret", "seed", "device_id", "public_key",
+            "paired_at", "device_name")
+    clean = [{k: v for k, v in r.items() if k not in gone}
+             for r in rows if isinstance(r, dict)]
+    if clean != rows:
+        _write_file_raw(p, json.dumps({"v": 1, "servers": clean}).encode("utf-8"))
 
 
 def _unit_total(name: str) -> int:
@@ -16422,7 +16469,13 @@ SERVERS_NAME = "servers.json"
 SERVER_SEP = " \u00b7 "         # "<server> · <model>": no catalog label has it
 SERVER_MAX = 8
 SRV_CONNECT_S = 12              # to connect and for a whole short answer
-SRV_READ_S = 600                # a streamed answer may wait its turn and a load
+SRV_FIRST_S = 600               # to the first line: its turn in the queue and a load
+SRV_IDLE_S = 120                # then: this long with no byte ends the answer
+SRV_CHECK_S = 15                # a whole status check (whoami, tags, ps, version)
+SRV_MAX_CHARS = 2_000_000       # an answer longer than this is cut there
+# an Ollama cloud model's tag ("gpt-oss:120b-cloud", "kimi-k2:cloud"): the
+# gateway hides them; the app refuses one too (review of 6b334)
+_SRV_CLOUD_TAG = re.compile(r"(^|[-:])cloud$", re.I)
 _SRV_ID_RX = re.compile(r"[0-9a-f]{8}")
 _SRV_LABEL_RX = re.compile(r"[\w.:/+-]{1,120}")
 _SRV_HOST_RX = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
@@ -16433,6 +16486,9 @@ _srv_lock = threading.RLock()
 # per server id: the last check (reachable, models, latency) and the
 # offset to the server's clock; a profile's own, emptied at a switch
 _srv_seen = profile_cache("_srv_seen", {})
+# per server id: the status check running now (an Event); a second
+# ?refresh=1 waits for it instead of starting its own (review of 6b334)
+_srv_busy = profile_cache("_srv_busy", {})
 
 SRV_GONE = ("That server isn\u2019t in Settings \u203a Your servers any more. "
             "Pick another model.")
@@ -16541,7 +16597,7 @@ def o1_pair_proof(key: bytes, device_id: str, pub: str, nonce: str) -> bytes:
 
 # ---- the profile's servers.json
 _SRV_PLAIN = ("id", "name", "url", "device_id", "public_key", "device_name",
-              "paired_at", "added_at")
+              "paired_at", "added_at", "models")
 _SRV_SECRET = ("access_id", "access_secret", "seed")
 
 
@@ -16601,16 +16657,24 @@ def server_pick(label, ctx):
         return None, ""
     for e in _srv_read(ctx):
         p = e["name"] + SERVER_SEP
-        if label.startswith(p) and _SRV_LABEL_RX.fullmatch(label[len(p):]):
-            return e, label[len(p):]
+        m = label[len(p):]
+        if not label.startswith(p) or not _SRV_LABEL_RX.fullmatch(m) \
+                or _SRV_CLOUD_TAG.search(m):
+            continue
+        # once the server has listed its models, only those (review)
+        known = e.get("models")
+        if isinstance(known, list) and known and m not in known:
+            continue
+        return e, m
     return None, ""
 
 
 def server_only_request(req: dict, ctx) -> bool:
     """A chat that uses nothing but ctx's servers' models: no tier, no
-    picture, no agent. It never touches this computer's engines, so a
-    benchmark running here doesn't turn it away (6b334)."""
-    if req.get("tier") or req.get("images") or req.get("agent"):
+    agent; a picture goes to the same server. It never touches this
+    computer's engines, so a benchmark running here doesn't turn it away
+    (6b334); making a picture, a video or a file takes the hold later."""
+    if req.get("tier") or req.get("agent"):
         return False
     picks = [m for m in (req.get("models") or []) if isinstance(m, str)]
     picks = picks or [str(req.get("model") or "")]
@@ -16654,7 +16718,7 @@ def _srv_url(raw) -> tuple:
     if (not _SRV_HOST_RX.fullmatch(host) or u.username or u.password
             or u.query or u.fragment or u.path not in ("", "/")):
         return "", ("Type the server\u2019s address only, like "
-                    "https://ollama1.example.com.")
+                    "https://server.example.com.")
     return "%s://%s%s" % (u.scheme, host.lower(), ":%d" % port if port else ""), ""
 
 
@@ -16753,6 +16817,10 @@ def _srv_send(e, method: str, path: str, body: bytes = b"", signed=True,
     try:
         conn.request(method, path, body=body if method == "POST" else None,
                      headers=h)
+        # the socket itself: http.client hands it to an HTTP/1.0 or
+        # close-delimited response and sets conn.sock to None, and the
+        # stream's deadlines are set on it (review of 6b334)
+        conn.o1_sock = conn.sock
         return conn, conn.getresponse()
     except _ssl.SSLError:
         conn.close()
@@ -16781,8 +16849,9 @@ def _srv_fail(e, status: int, js: dict, model: str = "") -> ServerError:
     if status in (301, 302, 303, 307, 308) or code == "access" \
             or (status == 403 and not code):
         return ServerError("access", "Cloudflare Access turned the request "
-                           "away before it reached %s. Check the Access token "
-                           "in Settings \u203a Your servers." % name, code)
+                           "away before it reached %s. Use Change Access token "
+                           "on its card in Settings \u203a Your servers." % name,
+                           code)
     if code in ("unpaired", "bad_signature", "unsigned") or (
             status == 401 and code not in ("clock_skew", "replay")):
         return ServerError("auth", SRV_PAIR_LOST % name, code)
@@ -16866,10 +16935,11 @@ def server_stream(label: str, messages: list, emit) -> dict:
     if not cai_crypto.available():
         raise ServerError("crypto", SRV_NO_CRYPTO)
     import http.client as _hc
+    import socket as _socket
     body = json.dumps({"model": model, "messages": _srv_messages(messages),
                        "stream": True, "options": {"temperature": 0.75}},
                       separators=(",", ":")).encode("utf-8")
-    t0, sent, last = time.time(), [0], {}
+    t0, sent, last, got_any = time.time(), [0], {}, [False]
     try:
         skew = _srv_skew(e)
         for attempt in (0, 1):
@@ -16890,14 +16960,27 @@ def server_stream(label: str, messages: list, emit) -> dict:
                 continue
             raise _srv_fail(e, resp.status, js, model)
         try:
-            if conn.sock is not None:
-                conn.sock.settimeout(SRV_READ_S)
+            # its turn and a load first, then no more than SRV_IDLE_S
+            # without a byte (review of 6b334: a trickle can't hold the
+            # answer open for ever)
+            _sk = getattr(conn, "o1_sock", None) or conn.sock
+            if _sk is not None:
+                _sk.settimeout(SRV_FIRST_S)
             while True:
                 try:
                     line = resp.readline(1 << 22)
+                except (TimeoutError, _socket.timeout):
+                    _w = SRV_IDLE_S if got_any[0] else SRV_FIRST_S
+                    raise ServerError("offline", "%s sent nothing for %s, so "
+                                      "the answer stopped there." % (
+                                          e["name"], "%d minutes" % (_w // 60)
+                                          if _w >= 120 else "%d seconds" % _w))
                 except (OSError, _hc.HTTPException):
                     raise ServerError("offline", "%s stopped answering "
                                       "partway through." % e["name"]) from None
+                got_any[0] = True
+                if _sk is not None:
+                    _sk.settimeout(SRV_IDLE_S)
                 if not line:
                     raise ServerError("offline", "%s stopped answering "
                                       "partway through." % e["name"])
@@ -16908,6 +16991,10 @@ def server_stream(label: str, messages: list, emit) -> dict:
                     # a failure after the 200 is the stream's last line
                     raise _srv_fail(e, 0, obj, model)
                 chunk = str((obj.get("message") or {}).get("content") or "")
+                if chunk and sent[0] + len(chunk) > SRV_MAX_CHARS:
+                    raise ServerError("server", "%s\u2019s answer passed %s "
+                                      "characters, so it was cut there." % (
+                                          e["name"], format(SRV_MAX_CHARS, ",")))
                 if chunk:
                     sent[0] += len(chunk)
                     emit(chunk)
@@ -16920,14 +17007,55 @@ def server_stream(label: str, messages: list, emit) -> dict:
         usage_note(label, "server", messages, sent[0], last, t0)
 
 
+def _srv_reads_pictures(e, model: str) -> bool:
+    """Whether a model on server e takes pictures: Ollama's /api/show
+    capabilities through the gateway, remembered per server."""
+    s = _srv_seen.setdefault(e["id"], {})
+    caps = s.setdefault("caps", {})
+    if model not in caps:
+        st, js = _srv_json(e, "POST", "/api/show", {"model": model})
+        if st == 404:
+            return False
+        if st != 200:
+            raise _srv_fail(e, st, js, model)
+        caps[model] = "vision" in [str(c) for c in (js.get("capabilities") or [])]
+    return bool(caps[model])
+
+
+def server_vision(label: str) -> str:
+    """The label that reads a picture sent to server model `label`: that
+    model when it can, else another model on the SAME server that can,
+    else ''. Never a model anywhere else (review of 6b334)."""
+    e, model = server_pick(label, bound_ctx())
+    if e is None:
+        raise ServerError("gone", SRV_GONE)
+    if not _srv_paired(e):
+        raise ServerError("unpaired", "%s isn\u2019t paired with this "
+                          "computer. Pair it in Settings \u203a Your servers."
+                          % e["name"])
+    if not cai_crypto.available():
+        raise ServerError("crypto", SRV_NO_CRYPTO)
+    if _srv_reads_pictures(e, model):
+        return label
+    names = [m["name"] for m in (_srv_seen.get(e["id"]) or {}).get("models") or []] \
+        or list(e.get("models") or [])
+    if not names:
+        st, tags = _srv_json(e, "GET", "/api/tags")
+        if st != 200:
+            raise _srv_fail(e, st, tags)
+        names = [m["name"] for m in _srv_models(e, tags)]
+    for n in names:
+        if n != model and _srv_reads_pictures(e, n):
+            return e["name"] + SERVER_SEP + n
+    return ""
+
+
 def server_answer(label: str, messages: list, memit, emit, status, step):
     """A chat on one server model (the /api/chat branch): streamed and
-    guarded like a local model, and a failure said in one line."""
+    guarded like a local model, and a failure said in one line. A picture
+    goes to that server only: to the model picked when it reads pictures,
+    else to one on the same server that does, else it is said."""
     name = label.split(SERVER_SEP, 1)[0]
-    step("draft", "Writing the answer", "run", label)
-    status("asking " + name)
-    emit(Ctl(NUL + "RUN:" + json.dumps({"r": [label], "w": "server",
-                                        "s": name}) + NUL))
     said = [False]
 
     def _m(chunk):
@@ -16935,6 +17063,20 @@ def server_answer(label: str, messages: list, memit, emit, status, step):
             said[0] = True
         memit(chunk)
     try:
+        who = name
+        if any(isinstance(m, dict) and m.get("images") for m in messages):
+            status("asking %s which model reads pictures" % name)
+            use = server_vision(label)
+            if not use:
+                emit(AppText("\u26a0\ufe0f %s has no model that reads "
+                             "pictures. Nothing was sent anywhere else." % name))
+                return
+            if use != label:
+                who, label = use, use     # the badge says which one read it
+        step("draft", "Writing the answer", "run", label)
+        status("asking " + name)
+        emit(Ctl(NUL + "RUN:" + json.dumps({"r": [label], "w": "server",
+                                            "s": who}) + NUL))
         _stream_guarded(label, messages, _m, status, None,
                         "kept the part before it wandered")
     except ServerError as se:
@@ -16966,7 +17108,8 @@ def _srv_models(e, js: dict, ps=None) -> list:
         if not isinstance(m, dict):
             continue
         n = str(m.get("name") or m.get("model") or "")
-        if not _SRV_LABEL_RX.fullmatch(n) or "embed" in n.lower():
+        if not _SRV_LABEL_RX.fullmatch(n) or "embed" in n.lower() \
+                or _SRV_CLOUD_TAG.search(n):
             continue
         lm = loaded.get(n) or {}
         pl = m.get("placement") or lm.get("placement")
@@ -16985,7 +17128,34 @@ def _srv_models(e, js: dict, ps=None) -> list:
 def server_check(e) -> dict:
     """Test the connection: whoami (signed when paired; unsigned it proves
     the address and the Access token), then the models, what's loaded and
-    Ollama's version. Remembered for the pane and the picker."""
+    Ollama's version, within SRV_CHECK_S in all. Remembered for the pane
+    and the picker. A check of a server already under way is waited for,
+    not repeated (review of 6b334)."""
+    with _srv_lock:
+        ev = _srv_busy.get(e["id"])
+        mine = ev is None
+        if mine:
+            ev = _srv_busy[e["id"]] = threading.Event()
+    if not mine:
+        ev.wait(SRV_CHECK_S * 2 + 5)
+        return _srv_seen.get(e["id"]) or {}
+    try:
+        return _srv_check(e)
+    finally:
+        with _srv_lock:
+            _srv_busy.pop(e["id"], None)
+        ev.set()
+
+
+def _srv_check(e) -> dict:
+    end = time.monotonic() + SRV_CHECK_S
+
+    def left():
+        t = end - time.monotonic()
+        if t <= 0:
+            raise ServerError("offline", "%s took more than %d seconds to "
+                              "answer a check." % (e["name"], SRV_CHECK_S))
+        return t
     seen = {"at": time.time(), "reachable": False, "auth": False,
             "latency_ms": None, "models": [], "version": "", "err": "",
             "kind": ""}
@@ -16994,18 +17164,31 @@ def server_check(e) -> dict:
         if paired and not cai_crypto.available():
             raise ServerError("crypto", SRV_NO_CRYPTO)
         t = time.monotonic()
-        st, js = _srv_json(e, "GET", "/v1/whoami", signed=paired)
+        st, js = _srv_json(e, "GET", "/v1/whoami", signed=paired,
+                           timeout=left())
         seen["latency_ms"] = int((time.monotonic() - t) * 1000)
         if st == 200 and paired:
             seen["reachable"] = seen["auth"] = True
-            st2, tags = _srv_json(e, "GET", "/api/tags")
+            st2, tags = _srv_json(e, "GET", "/api/tags", timeout=left())
             if st2 != 200:
                 raise _srv_fail(e, st2, tags)
-            st3, ps = _srv_json(e, "GET", "/api/ps")
+            st3, ps = _srv_json(e, "GET", "/api/ps", timeout=left())
             seen["models"] = _srv_models(e, tags, ps if st3 == 200 else {})
-            st4, ver = _srv_json(e, "GET", "/api/version")
+            _srv_keep_models(e, [m["name"] for m in seen["models"]])
+            st4, ver = _srv_json(e, "GET", "/api/version", timeout=left())
             seen["version"] = (str(ver.get("version") or "")[:24]
                                if st4 == 200 else "")
+            # the server's graphics card, from whichever answer carries it
+            # (the gateway adds `gpu` to /api/version or a /v1/info); none
+            # said, none shown: never a guess (6b334)
+            gpu = _srv_gpu(ver if st4 == 200 else {}) or _srv_gpu(js)
+            if gpu is None and time.monotonic() < end - 1:
+                try:
+                    st5, info = _srv_json(e, "GET", "/v1/info", timeout=left())
+                    gpu = _srv_gpu(info) if st5 == 200 else None
+                except ServerError:
+                    gpu = None
+            seen["gpu"] = gpu
         elif not paired and st == 401 and js.get("code") == "unsigned":
             seen["reachable"] = True         # through Access; not paired yet
         else:
@@ -17014,10 +17197,40 @@ def server_check(e) -> dict:
         seen["err"], seen["kind"] = str(se), se.kind
         seen["reachable"] = se.kind not in ("offline", "tls", "crypto")
     prev = _srv_seen.get(e["id"]) or {}
-    if "skew" in prev:
-        seen["skew"] = prev["skew"]
+    for k in ("skew", "caps"):
+        if k in prev:
+            seen[k] = prev[k]
     _srv_seen[e["id"]] = seen
     return seen
+
+
+def _srv_gpu(js: dict):
+    """{vendor, name, vram_bytes} from an answer's `gpu`, or None: vendor
+    only amd, nvidia or intel; the rest checked, never made up."""
+    g = js.get("gpu") if isinstance(js, dict) else None
+    if not isinstance(g, dict) or g.get("vendor") not in ("amd", "nvidia", "intel"):
+        return None
+    name = " ".join("".join(ch if ch.isprintable() else " "
+                            for ch in str(g.get("name") or "")).split())[:60]
+    vb = g.get("vram_bytes")
+    vb = vb if isinstance(vb, int) and not isinstance(vb, bool) and 0 < vb < 1 << 44 else None
+    return {"vendor": g["vendor"], "name": name, "vram_bytes": vb}
+
+
+def _srv_keep_models(e, names: list):
+    """The model names a check saw, kept with the server (server_pick
+    takes only those). Into the thread's profile; a switch drops it."""
+    if e.get("models") == names:
+        return
+
+    def fn(entries):
+        x = _srv_find(entries, e["id"])
+        if x is None:
+            return {"err": SRV_GONE}
+        x["models"] = list(names)
+        return {"ok": True}
+    _srv_update(bound_ctx(), fn)
+    e["models"] = list(names)
 
 
 def _srv_public(e) -> dict:
@@ -17032,14 +17245,16 @@ def _srv_public(e) -> dict:
             "status": {k: s.get(k) for k in ("at", "reachable", "auth",
                                              "latency_ms", "version", "err",
                                              "kind")},
+            "gpu": s.get("gpu"),
             "models": list(s.get("models") or [])}
 
 
 def servers_view(ctx, refresh=False) -> dict:
     entries = _srv_read(ctx)
-    if refresh:
-        for e in entries:
-            server_check(e)
+    if refresh and entries:
+        # side by side, each within its own deadline
+        with ctx_executor(min(4, len(entries))) as pool:
+            list(pool.map(server_check, entries))
     return {"servers": [_srv_public(e) for e in entries],
             "crypto": cai_crypto.available(), "max": SERVER_MAX}
 
@@ -17105,8 +17320,7 @@ def server_remove(ctx, sid: str) -> dict:
 
 _PAIR_WHY = {
     "pair_closed": ("%s has no pairing window open. Open one at the server "
-                    "(sudo ollama1-pair, or its admin panel) and type the "
-                    "new code."),
+                    "and type the new code."),
     "rate_limited": "%s wants two seconds between tries. Try again.",
     "pair_not_saved": ("%s didn\u2019t finish saving the pairing. Open a new "
                        "window at the server and try again."),
@@ -17169,7 +17383,8 @@ def server_pair(ctx, sid: str, code) -> dict:
         got = o1_unb64u(proof)
     except (ValueError, TypeError):
         got = b""
-    if not (hmac.compare_digest(str(js.get("device_id") or ""), dev_id)
+    if not (hmac.compare_digest(str(js.get("device_id") or "").encode("utf-8"),
+                                dev_id.encode("utf-8"))
             and hmac.compare_digest(got, o1_pair_proof(key, dev_id, pub, nonce))):
         return {"err": "%s\u2019s answer didn\u2019t prove it knows the code, "
                        "so the pairing was discarded. Nothing was saved."
@@ -19146,6 +19361,7 @@ def run_council(labels: list, messages: list, emit, status,
     labels = (usable or labels[:1])[:12]
 
     drafts = []
+    _srv_errs = []           # your own servers' refusals (6b334)
     # ANSWER NOW (6b257): pressed mid-run, the button trades quality
     # for speed — skip what hasn't started, shorten every wait, hand
     # the merge to the fastest pen. Checked between waits, never
@@ -19330,6 +19546,8 @@ def run_council(labels: list, messages: list, emit, status,
                       else "(no answer — too slow)")
             continue
         if _err:
+            if type(_err[0]).__name__ == "ServerError":
+                _srv_errs.append(str(_err[0]))     # said if none answers
             took_part(label, f"(no answer — {type(_err[0]).__name__})")
             continue
         # the merger gets answers, never the reasoning that produced them
@@ -19359,6 +19577,11 @@ def run_council(labels: list, messages: list, emit, status,
             _deadline = min(_deadline, time.time() + 5)
 
     good = [d for d in drafts if not d[1].startswith("(no answer")]
+    if not good and _srv_errs and all(server_label(l) for l in labels):
+        # your own servers only (review of 6b334): their reason, and the
+        # handler tries no other model
+        raise ServerError("council", "None of the picked models answered. "
+                          + _srv_errs[0])
     if not good:
         raise RuntimeError("none of the selected models answered")
     if len(good) == 1:
@@ -24392,8 +24615,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             vm["images"] = b64s
             vm["image_urls"] = images     # media types, for the cloud (6b308)
             messages = messages[:-1] + [vm] if messages else [vm]
-            council = ["Qwen 3.5 Vision 9B"]
-            model_name = "Qwen 3.5 Vision 9B"
+            # a picture sent to your own server's model stays on that
+            # server (review of 6b334): server_answer finds its reader
+            if not (len(council) == 1 and not cloud_only
+                    and server_label(council[0])):
+                council = ["Qwen 3.5 Vision 9B"]
+                model_name = "Qwen 3.5 Vision 9B"
             prompt = vm["content"]
 
         # the model routing is settled by here — resolve it NOW, before
@@ -24407,11 +24634,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     and server_label(council[0]) else "")
         if _srv_lbl:
             route, route_label = (None, None), _srv_lbl
-        for label, target in ({} if _srv_lbl else MODEL_ROUTES).items():
+        elif server_label(model_name):
+            # a council led by a server model warms its first local one,
+            # never a catalog label found inside the server's name
+            route_label = next((l for l in council if l in MODEL_ROUTES), None)
+            route = MODEL_ROUTES.get(route_label) if route_label else None
+        for label, target in ({} if server_label(model_name)
+                              else MODEL_ROUTES).items():
             if label in model_name:
                 route, route_label = target, label
                 break
-        if route is None and not cloud_only:
+        if (route is None and not cloud_only
+                and not all(server_label(l) for l in council)):
             # smallest cached model, never a 40 GB bomb (see run_model)
             pulled = ollama_pulled_tags() or set()
             route_label = next((l for l in reversed(MERGE_RANK)
@@ -25130,7 +25364,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 and not cloud_only):     # the bench IS the council here
             xm_names += [lbl for lbl, _c in cloud_bench()]
         xm = ", ".join(xm_names)[:300]
-        self.send_header("X-Models", xm)
+        # a server's name may be anything ("Pat’s Desktop", "デスクトップ"),
+        # and http.server writes headers as latin-1 (review of 6b334):
+        # everything outside printable ASCII, and %, is percent-encoded;
+        # the page decodes it (hdrText)
+        self.send_header("X-Models", header_text(xm))
         # ANSWER NOW (6b257): an unguessable per-request id the client
         # may POST back to /api/chat/hurry. A header beats a frame here
         # — it arrives before the first body byte and costs the frame
@@ -25228,6 +25466,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             text = str(text).replace(NUL, "")
             last_status[0] = text
             _write(f"{NUL}STATUS:{text}{NUL}".encode("utf-8"))
+
+        # MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER (review of
+        # 6b334): a chat on your own server that took no hold takes it
+        # now, and while a benchmark runs it gets the benchmark's line
+        if (img_subject or vid_subject or export_req) and not self._bench_held:
+            if not bench_hold():
+                emit(AppText(BENCH_BUSY))
+                hb_stop.set()
+                return
+            self._bench_held = True
 
         if export_req and export_req["lane"] == "retro":
             src = str(_prior[-1].get("content") or "") if _prior else ""
@@ -25443,10 +25691,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # Gemini Flash beside it; the local vision model is the floor.
         # Only under the one gate (6b326): an Advanced list alone used to
         # send the picture with the switch off
+        # a server pick's picture goes to that server only (6b334)
         _vis_cloud = (gate_ladder(vision_ladder("Cloud Only" if cloud_only
                                                 else req_tier),
-                                  req_cloud, cloud_only) if images else [])
-        _vis_local = bool(images) and model_cached(
+                                  req_cloud, cloud_only)
+                      if images and not _srv_lbl else [])
+        _vis_local = bool(images) and not _srv_lbl and model_cached(
             "Qwen 3.5 Vision 9B", ollama_pulled_tags() or set())
 
         def _cloud_vision() -> bool:
@@ -25466,7 +25716,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return cloud_only or not _vis_local
         # first image before the vision engine exists: kick the download
         # and say so, instead of a cryptic connection error
-        if images and not cloud_only and not _vis_cloud and not _vis_local:
+        if (images and not cloud_only and not _vis_cloud and not _vis_local
+                and not _srv_lbl):
             try:
                 start_model_downloads(["Qwen 3.5 Vision 9B"])
                 # a Claude or Gemini key would read it with the switch on
@@ -25685,6 +25936,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                     "kept the part before it wandered")
         except (BrokenPipeError, ConnectionResetError):
             pass  # user hit Stop — browser closed the connection
+        except ServerError as exc:
+            # a council of your own servers' models that none answered
+            # (6b334): said, and no other model is tried
+            try:
+                emit(AppText("\n\u26a0\ufe0f " + str(exc)))
+            except (BrokenPipeError, ConnectionResetError):
+                pass
         except Exception as exc:
             try:
                 emit("\n" + offline_hint(kind, exc))
@@ -28672,7 +28930,8 @@ body.gen #chip-model{color:var(--accent)}
    app's own greyscale type instead of importing a green eye, and it
    stays legible at 9px where a logo would not. The dot carries the
    vendor colour so the two read apart at a glance. */
-#accel-chip{
+#srv-chips{display:contents}
+#accel-chip,.srv-chip{
   /* 10px, not 9: at 9 the pill came out 22px against the engine chip's
      23 and the two sat a hair out of true (measured) */
   font-family:var(--mono);font-size:10px;letter-spacing:.14em;
@@ -28681,11 +28940,13 @@ body.gen #chip-model{color:var(--accent)}
   border:1px solid var(--line);border-radius:999px;user-select:none;
   white-space:nowrap}
 #accel-chip[hidden]{display:none}
-#accel-chip i{width:5px;height:5px;border-radius:50%;flex:0 0 auto;
+#accel-chip i,.srv-chip i{width:5px;height:5px;border-radius:50%;flex:0 0 auto;
   background:var(--ac,#9aa0aa);box-shadow:0 0 7px -1px var(--ac,#9aa0aa)}
-#accel-chip b{color:var(--dim);font-weight:600;letter-spacing:.2em}
-#accel-chip.nvidia{--ac:#76b900}        /* NVIDIA green */
-#accel-chip.amd{--ac:#ed1c24}           /* AMD red */
+#accel-chip b,.srv-chip b{color:var(--dim);font-weight:600;letter-spacing:.2em}
+#accel-chip.nvidia,.srv-chip.nvidia{--ac:#76b900}   /* NVIDIA green */
+#accel-chip.amd,.srv-chip.amd{--ac:#ed1c24}         /* AMD red */
+.srv-chip.intel{--ac:#3d8fe0}           /* Intel blue, softened for the dark */
+.srv-chip.off{opacity:.45}              /* the server isn't answering */
 #accel-chip.mlx{--ac:#c9ccd2}           /* Apple silver */
 #accel-chip.cpu{--ac:#6b6f77}
 
@@ -29443,6 +29704,13 @@ body.gen #chip-model{color:var(--accent)}
 .srv-top b{font-size:13px;font-weight:600;color:var(--text);flex:none}
 .srv-host{font-family:var(--mono);font-size:10.5px;color:var(--faint);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv-tok{font-size:10.5px;color:var(--faint);margin-left:auto;flex:none}
+.srv-tokf{display:flex;gap:8px;align-items:center;margin-top:9px}
+.srv-tokf input{flex:1;min-width:0;background:rgba(18,20,26,.7);color:var(--text);
+  border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:12px;
+  padding:6px 9px;outline:none;font-family:var(--helv)}
+.srv-tokf input:focus{border-color:rgba(143,157,255,.6)}
+.srv-tokf .about-btn.slim{margin-top:0}
 .srv-st{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.45}
 .srv.ok .srv-st{color:#9fd8b4}
 .srv.warn .srv-st{color:#d9c08a}
@@ -29459,6 +29727,9 @@ body.gen #chip-model{color:var(--accent)}
   line-height:1.45}
 .srv-msg:empty,#srv-note:empty{display:none}
 .srv-none{font-size:11.5px;color:var(--faint);margin:0}
+.srv-about{font-size:11.5px;color:var(--faint);line-height:1.5;margin:0 0 12px}
+.srv-link{color:var(--dim);text-decoration:underline;text-underline-offset:2px}
+.srv-link:hover{color:var(--text)}
 #srv-add{padding:10px 12px;border-radius:12px;
   border:1px dashed rgba(255,255,255,.13)}
 .srv-h{font-family:var(--mono);font-size:10px;letter-spacing:.12em;
@@ -30130,6 +30401,9 @@ __CODE_ROWS__
       <div id="crow">
       <div id="model-chip" title="Change engine — opens the picker">engine <b id="chip-model">Llama 3.2 3B</b></div>
       <div id="accel-chip" hidden><i></i><b></b></div>
+      <!-- your servers' cards (6b334): one chip per paired server whose
+           card the server names, in the MLX chip's style -->
+      <div id="srv-chips"></div>
       <div id="cbtns">
       <button class="cbtn" id="attach" title="Attach a file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -30413,17 +30687,25 @@ __CODE_ROWS__
          reach the page: /api/servers answers with the public view only -->
     <section class="spane" id="p-servers">
       <div class="set-h">Your servers</div>
-      <p class="tdesc">Model servers you own, such as a desktop running
-      ollama1. Each is paired with this computer at the server, with the
-      code its screen shows. Their models answer when you pick them in the
-      engine menu, whether or not Use cloud power is on. A server that
-      can&rsquo;t answer says so; no other model answers in its place.</p>
+      <p class="tdesc">For advanced users. Connect a dedicated server you
+      run yourself, so it can take on queries and speed up answers.
+      Instructions for setting one up are available <a class="srv-link"
+      href="https://github.com/bigmillz/concordeai/blob/main/docs/your-own-server.md"
+      target="_blank" rel="noopener">here</a> &middot; <a class="srv-link"
+      href="https://github.com/bigmillz/concordeai/tree/main/ollama1"
+      target="_blank" rel="noopener">Setup scripts</a>.</p>
+      <p class="srv-about">Each server is paired with this computer at the
+      server, with the code its screen shows. Its models answer when you
+      pick them in the engine menu, whether or not Use cloud power is on.
+      A server that can&rsquo;t answer says so; no other model answers in
+      its place. In an Advanced council with a cloud compositor, the
+      server&rsquo;s drafts go to that cloud provider to be combined.</p>
       <div id="srv-list"></div>
       <div id="srv-add">
         <div class="srv-h">Add a server</div>
         <div class="srv-grid">
           <input id="srv-url" type="text" autocomplete="off" spellcheck="false"
-                 placeholder="https://ollama1.example.com" aria-label="Address">
+                 placeholder="https://server.example.com" aria-label="Address">
           <input id="srv-name" type="text" maxlength="40" autocomplete="off"
                  spellcheck="false" placeholder="Name: Desktop" aria-label="Name">
           <input id="srv-aid" type="password" autocomplete="off"
@@ -30759,6 +31041,8 @@ function apiStuck(){
   n.textContent="MillenAI’s window didn’t finish starting. Quit the app and open it again.";
   document.body.appendChild(n);
 }
+// X-Models comes percent-encoded outside printable ASCII (6b334)
+function hdrText(v){try{return decodeURIComponent(v||"");}catch(e){return v||"";}}
 async function api(u,o){
   o=o||{};
   const url=new URL(String(u),location.href);
@@ -30992,7 +31276,8 @@ let lastModels="";  // line-up the backend actually used
 // /api/servers says (no token, no key), when they were last checked,
 // a Remove clicked once, a Pair again opened
 let srvList=[],srvAt=0;
-const srvArmed={},srvPairOpen={};
+// a card's line and its open Access form survive a repaint (review)
+const srvArmed={},srvPairOpen={},srvMsgs={},srvTokOpen={};
 const SRV_SEP=" \u00b7 ";
 let councilManual=false;
 // declared up here: setCombine() runs during boot and reads it, which would
@@ -32865,7 +33150,7 @@ async function send(){
       myChat=landed;
     }
     searched=resp.headers.get("X-Web-Search")==="1";
-    lastModels=resp.headers.get("X-Models")||"";
+    lastModels=hdrText(resp.headers.get("X-Models"));
     curHid=resp.headers.get("X-Hurry")||"";   // Answer now (6b257)
     // the phase plan for THIS run — what the bar measures against
     stepPlan=[];
@@ -33060,9 +33345,7 @@ async function send(){
     const meta=document.createElement("div");meta.className="meta";
     // a server model's name is its own, not a provider's (6b334):
     // "Desktop · gpt-oss:20b" never reads as the cloud
-    const where=srvWho||(/cloud|gemini|groq|claude|gpt|openai/i
-      .test(lastModels.replace(/[^,]*\u00b7[^,]*/g,m=>/ cloud$/.test(m)?" cloud":""))
-      ?"cloud":"this Mac");
+    const where=whereBadge(lastModels,srvWho);
     meta.innerHTML='<span class="wbadge">'+esc(where)+'</span>'
       +"<b>"+lastRate.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
       +" tokens · "+secs.toFixed(1)+"s";
@@ -35669,7 +35952,7 @@ function ckBoard(provs,active){
 }
 ckBoard(null,"");
 /* ------------------------------------------ Settings › Your servers (6b334)
-   Model servers the person owns (ollama1). /api/servers gives each one's
+   Model servers the person owns. /api/servers gives each one's
    name, address, pairing, last check and models; never the Access token
    or the device key, which stay in the profile's servers.json. */
 function srvWhere(m){
@@ -35696,29 +35979,53 @@ function srvCard(s){
   const armed=srvArmed[s.id]&&Date.now()-srvArmed[s.id]<6000;
   return '<div class="srv'+cls+'" data-id="'+esc(s.id)+'">'
     +'<div class="srv-top"><b>'+esc(s.name)+'</b><span class="srv-host">'
-    +esc(s.host)+'</span></div>'
+    +esc(s.host)+'</span><span class="srv-tok">'
+    +(s.access?"Access token saved":"no Access token")+'</span></div>'
     +'<div class="srv-st">'+esc(srvStatus(s))+'</div>'
     +(s.paired&&ms?'<div class="srv-ms">'+ms+'</div>'
       :s.paired&&st.at&&!st.err?'<div class="srv-ms"><div class="srv-m">'
         +'no chat models installed</div></div>':"")
-    +(pairing?'<div class="srv-pair"><input class="srv-code" maxlength="20" '
+    +(pairing?'<div class="srv-pair"><input class="srv-code" data-k="code" maxlength="20" '
         +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
         +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
         +'<button class="about-btn slim" data-a="pair">Pair</button></div>'
-        +'<div class="srv-hint">Open a pairing window at the server (sudo '
-        +'ollama1-pair, or its admin panel), then type the code its screen '
-        +'shows.</div>':"")
+        +'<div class="srv-hint">Open a pairing window at the server, then '
+        +'type the code its screen shows.</div>':"")
     +'<div class="srv-acts"><button class="about-btn slim" data-a="test">Test</button>'
     +(s.paired&&!srvPairOpen[s.id]
       ?'<button class="about-btn slim" data-a="repair">Pair again</button>':"")
+    +(srvTokOpen[s.id]?"":'<button class="about-btn slim" data-a="tok">Change Access token</button>')
     +'<button class="about-btn slim danger" data-a="rm">'
     +(armed?"Remove it and its key? Click again":"Remove")+'</button></div>'
-    +'<div class="srv-msg"></div></div>';
+    +(srvTokOpen[s.id]?'<div class="srv-tokf"><input type="password" data-k="aid" '
+      +'autocomplete="off" placeholder="Access Client ID" aria-label="Access Client ID">'
+      +'<input type="password" data-k="asec" autocomplete="off" '
+      +'placeholder="Access Client Secret" aria-label="Access Client Secret">'
+      +'<button class="about-btn slim" data-a="toksave">Save</button>'
+      +'<button class="about-btn slim" data-a="tokcancel">Cancel</button></div>'
+      +'<div class="srv-hint">Both empty removes the token.</div>':"")
+    +'<div class="srv-msg">'+esc(srvMsgs[s.id]||"")+'</div></div>';
 }
 function paintServers(){
   const box=$("#srv-list");if(!box)return;
+  // what was typed, and where the cursor was, survive the repaint
+  const keep={},act=document.activeElement;let foc=null;
+  box.querySelectorAll(".srv").forEach(c=>{
+    const k=keep[c.dataset.id]={};
+    c.querySelectorAll("input[data-k]").forEach(i=>{k[i.dataset.k]=i.value;
+      if(i===act)foc=[c.dataset.id,i.dataset.k,i.selectionStart,i.selectionEnd];});
+  });
   box.innerHTML=srvList.map(srvCard).join("")
     ||'<p class="srv-none">No servers yet.</p>';
+  box.querySelectorAll(".srv").forEach(c=>{
+    const k=keep[c.dataset.id]||{};
+    c.querySelectorAll("input[data-k]").forEach(i=>{
+      if(k[i.dataset.k]!=null)i.value=k[i.dataset.k];});
+  });
+  if(foc){
+    const i=box.querySelector('.srv[data-id="'+foc[0]+'"] input[data-k="'+foc[1]+'"]');
+    if(i){i.focus();try{i.setSelectionRange(foc[2],foc[3]);}catch(e){}}
+  }
 }
 async function loadServers(refresh){
   try{
@@ -35728,12 +36035,14 @@ async function loadServers(refresh){
   }catch(e){return;}
   paintServers();
   paintEngMenuServers();
+  paintSrvChips();
 }
 async function srvPost(op,body){
   return await(await api("/api/servers/"+op,{method:"POST",
     headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
 }
 function srvMsg(id,t){
+  srvMsgs[id]=t||"";
   const el=document.querySelector('#srv-list .srv[data-id="'+id+'"] .srv-msg');
   if(el)el.textContent=t||"";
 }
@@ -35750,6 +36059,25 @@ $("#srv-list").addEventListener("click",async ev=>{
   const b=ev.target.closest("button[data-a]");if(!b)return;
   const card=b.closest(".srv"),id=card.dataset.id,a=b.dataset.a;
   const s=srvList.find(x=>x.id===id);if(!s)return;
+  if(a==="tok"||a==="tokcancel"){
+    srvTokOpen[id]=a==="tok";paintServers();
+    const f=document.querySelector('#srv-list .srv[data-id="'+id+'"] input[data-k="aid"]');
+    if(f)f.focus();
+    return;
+  }
+  if(a==="toksave"){
+    const v=k=>(card.querySelector('input[data-k="'+k+'"]')||{}).value||"";
+    b.disabled=true;srvMsg(id,"Saving\u2026");
+    let d={};
+    try{d=await srvPost("access",{id:id,access_id:v("aid").trim(),access_secret:v("asec").trim()});
+      if(d.ok)d=await srvPost("test",{id:id});}
+    catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
+    b.disabled=false;
+    if(d.server){srvPut(d.server);delete srvTokOpen[id];}
+    paintServers();
+    srvMsg(id,d.err||"Access token saved.");
+    return;
+  }
   if(a==="repair"){
     srvPairOpen[id]=true;paintServers();
     const c=document.querySelector('#srv-list .srv[data-id="'+id+'"] .srv-code');
@@ -35776,7 +36104,7 @@ $("#srv-list").addEventListener("click",async ev=>{
     if(!tier&&council.some(l=>l.indexOf(s.name+SRV_SEP)===0))setTier("Fast");
   }
   if(d.server){srvPut(d.server);if(a==="pair")delete srvPairOpen[id];}
-  paintServers();
+  paintServers();paintSrvChips();
   srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
   paintEngMenuServers();
 });
@@ -35795,6 +36123,23 @@ $("#srv-add-go").addEventListener("click",async()=>{
   note.textContent="Added. Pair it next.";
   paintServers();
 });
+// the badge under an answer (6b334): the server that answered, or the
+// line-up's places: "cloud" or "this Mac", plus each server by name. A
+// server model's name ("gpt-oss") or a server called "cloud" never reads
+// as the cloud; the " cloud" a RUN frame adds still does
+function whereBadge(lm,who){
+  if(who)return who;
+  const names=[],rest=[];
+  String(lm||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(p=>{
+    const i=p.indexOf(SRV_SEP);
+    if(i<0){rest.push(p);return;}
+    const n=p.slice(0,i);if(names.indexOf(n)<0)names.push(n);
+    if(/ cloud$/.test(p))rest.push("cloud");
+  });
+  const cloud=/cloud|gemini|groq|claude|gpt|openai/i.test(rest.join(","));
+  const base=cloud?"cloud":(rest.length||!names.length)?"this Mac":"";
+  return [base].concat(names).filter(Boolean).join(" + ");
+}
 // the engine menu's rows: each paired server's models, marked as yours
 function srvMenuRows(){
   const rows=[];
@@ -35815,6 +36160,23 @@ function srvMenuRows(){
       +esc(srvWhere(m)?"yours \u00b7 "+srvWhere(m):"your server")+'</span></div>'));
   });
   return rows.length?'<div class="engdiv"></div>'+rows.join(""):"";
+}
+// the composer's server chips (6b334): "● AMD", "● NVIDIA", "● INTEL"
+// for each paired server whose card its gateway names; dimmed while it
+// doesn't answer; no card named, no chip
+const SRV_GPU={amd:"AMD",nvidia:"NVIDIA",intel:"INTEL"};
+function srvChipsHtml(list){
+  return (list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).map(s=>{
+    const g=s.gpu,st=s.status||{};
+    const t=[s.name,g.name||"",g.vram_bytes?Math.round(g.vram_bytes/1073741824)+" GB":""]
+      .filter(Boolean).join(" \u00b7 ");
+    return '<div class="srv-chip '+g.vendor+(st.reachable===false||st.err?" off":"")
+      +'" title="'+esc(t)+'"><i></i><b>'+SRV_GPU[g.vendor]+'</b></div>';
+  }).join("");
+}
+function paintSrvChips(){
+  const box=document.getElementById("srv-chips");
+  if(box)box.innerHTML=srvChipsHtml(srvList);
 }
 function paintEngMenuServers(){
   const em=document.getElementById("engmenu");
@@ -37957,7 +38319,7 @@ async function zTransmit(){
       body:JSON.stringify({model:model,models:council,tier:tier,
         messages:[{role:"user",content:q}],auto_web:true,
         images:[],docs:[],agent:""})});
-    const line=resp.headers.get("X-Models")||"";
+    const line=hdrText(resp.headers.get("X-Models"));
     zDbg("[dispatch] "+(line?line.split(",").length:1)+" model"
       +(line&&line.split(",").length!==1?"s":"")+" \u00b7 "
       +(resp.headers.get("X-Web-Search")==="1"?"web on":"no web")

@@ -10329,7 +10329,8 @@ check("one cloud gate: an Advanced list narrows but never opens it; Cloud Only o
       _off == (False, [], [], True, ["Groq"]) and _onl == (["Groq"], [], 2) and _bad is False
       and "_fl = gate_ladder(_fl, req_cloud)" in _MILLENAI_SRC
       and "turbo = bool(_fl)\n" in _MILLENAI_SRC
-      and "req_cloud, cloud_only) if images else [])" in _MILLENAI_SRC
+      # (6b334) a server pick's picture never reaches the vision ladder
+      and "req_cloud, cloud_only)\n                      if images and not _srv_lbl else [])" in _MILLENAI_SRC
       and "or req_cloud" not in _MILLENAI_SRC,
       "%r" % [_off, _onl, _bad])
 
@@ -10594,7 +10595,8 @@ _gi.update(app_dir=lambda: _gdir, image_ready=lambda: True, video_ready=lambda: 
            _run_render=_fake_render26, _render_note=lambda *a, **k: None,
            engine_cfg=lambda k: {"fps": 24}, _ffmpeg_convert=lambda s, f, fps: s,
            STUDIOS={"image": {"venv": "/v/img"}, "video": {"venv": "/v/vid", "module": "m.gen"}},
-           cloud_allowed=lambda c=False: False, _cloud_all=lambda: {"providers": {}})
+           cloud_allowed=lambda c=False: False, _cloud_all=lambda: {"providers": {}},
+           _bench={"running": False}, BENCH_BUSY="busy")   # (6b334) no benchmark here
 # (6b329) renders are made in run/ and land in the asking profile's folder
 _gctx = _prof_ns(_gi, _gdir)
 _PC26, _NC26 = _canary("prompt"), _canary("negative")
@@ -13306,6 +13308,7 @@ def _rv8_run(src):
                    STUDIOS={"image": {"venv": "/v"}},
                    prompt_cmd=lambda *a: (["x"], None),
                    GEMINI_API="http://127.0.0.1:1/", APP_VERSION="t",
+                   _bench={"running": False}, BENCH_BUSY="busy",      # (6b334)
                    _cloud_all=lambda: {"providers": {"gemini": {"key": "PAID", "status": "ok"}}})
     ns["urllib"] = _ty8.SimpleNamespace(request=_ty8.SimpleNamespace(
         Request=lambda *a, **k: net.append(a) or 1,
@@ -17023,7 +17026,13 @@ def _sv_ns(src, hooks=("server-http-loopback",)):
     ns["_stream_guarded"] = lambda label, msgs, emit, status, fb, note: ns["run_model"](
         label, msgs, emit)
     exec(_sv_sect(src, "servers"), ns)
+    ns.update(ctx_executor=_ctx_exec34, _srv_send_real=ns["_srv_send"])
     return ns, ctx, d
+
+
+def _ctx_exec34(n):
+    import concurrent.futures as _cf34
+    return _cf34.ThreadPoolExecutor(n)
 
 
 def _sv_fake(ns, script):
@@ -17159,8 +17168,11 @@ def _svc_pairing(src):
     t = ns["server_pair"](ctx, sid, _SV_CODE)
     _sv_fake(ns, [_sv_pair_server(dev="0" * 16)])
     t2 = ns["server_pair"](ctx, sid, _SV_CODE)
+    _sv_fake(ns, [_sv_pair_server(dev="\u00e9" * 16)])
+    t3 = ns["server_pair"](ctx, sid, _SV_CODE)
     e0 = ns["_srv_read"](ctx)[0]
-    out["proof"] = ("didn’t prove" in t.get("err", "") and "didn’t prove" in t2.get("err", "")
+    out["proof"] = ("didn\u2019t prove" in t.get("err", "") and "didn\u2019t prove" in t2.get("err", "")
+                    and "didn\u2019t prove" in t3.get("err", "")
                     and not e0["seed"] and not e0.get("device_id"))
     # rate limited once (two seconds), then the right code: paired, and
     # every attempt had a fresh nonce
@@ -17218,7 +17230,7 @@ def _svc_secrets(src):
                     and secret not in views and "id34.access" not in views
                     and set(ns["_srv_public"](e)) == {"id", "name", "url", "host", "access", "paired",
                                                      "paired_at", "device_name", "device_id",
-                                                     "status", "models"})
+                                                     "status", "models", "gpu"})
     out["entry repr"] = seed not in repr(e) and secret not in repr(e)
     out["error text"] = all(secret not in str(ns["_srv_fail"](e, st, {"error": "x"}))
                             for st in (403, 401, 500, 530))
@@ -17293,6 +17305,17 @@ def _svc_stream(src):
     ns["server_stream"] = _ss
     out["catch-all"] = "".join(x for x in said if not isinstance(x, ns["Ctl"])) == (
         "\u26a0\ufe0f Desktop couldn\u2019t answer (ValueError). Nothing was sent anywhere else.")
+    # (review) an answer past SRV_MAX_CHARS is cut there, said
+    ns["SRV_MAX_CHARS"] = 8
+    _sv_fake(ns, [_SvResp(200, lines=[{"message": {"content": "Hello"}},
+                                      {"message": {"content": "World!!"}},
+                                      {"message": {"content": ""}, "done": True}])])
+    said = []
+    ns["server_answer"]("Desktop \u00b7 small:8b", msgs, said.append, said.append, [].append,
+                        lambda *a: None)
+    ns["SRV_MAX_CHARS"] = 2_000_000
+    out["size cap"] = "".join(x for x in said if not isinstance(x, ns["Ctl"])) == (
+        "Hello\n\n\u26a0\ufe0f Desktop\u2019s answer passed 8 characters, so it was cut there.")
     # a server removed, or not paired: said, nothing sent, no other model
     ns["_RAN"].clear()
     s4 = _sv_fake(ns, [])
@@ -17450,11 +17473,23 @@ def _svc_policy(src):
         and not ns["server_label"](None),
         "pick": ns["server_pick"](L, ctx)[1] == "small:8b"
         and ns["server_pick"]("Laptop · small:8b", ctx)[0] is None
-        and ns["server_pick"]("Desktop · ", ctx)[0] is None,
-        "only": sor({"model": L, "models": [L]}) and sor({"model": "", "models": [L]}),
+        and ns["server_pick"]("Desktop · ", ctx)[0] is None
+        # (review) only a model the server listed; never an Ollama cloud tag
+        and ns["server_pick"]("Desktop · other:1b", ctx)[0] is None,
+        "cloud tag": (ns["_srv_keep_models"](ns["_srv_read"](ctx)[0],
+                                             ["small:8b", "gpt-oss:120b-cloud", "kimi-k2:cloud"])
+                      or True)
+        and ns["server_pick"]("Desktop · gpt-oss:120b-cloud", ctx)[0] is None
+        and ns["server_pick"]("Desktop · kimi-k2:cloud", ctx)[0] is None
+        and ns["server_pick"](L, ctx)[1] == "small:8b"
+        and [m["name"] for m in ns["_srv_models"]({"name": "D"}, {"models": [
+            {"name": "gpt-oss:120b-cloud"}, {"name": "x:cloud"}, {"name": "cloudy:7b"}]})] == ["cloudy:7b"],
+        # (review) a picture goes to the same server, so it counts too
+        "only": sor({"model": L, "models": [L]}) and sor({"model": "", "models": [L]})
+        and sor({"model": L, "models": [L], "images": ["x"]}),
         "not only": not any(sor(r) for r in (
             {"model": L, "tier": "Fast"}, {"model": L, "models": [L, "Llama 3.2 3B"]},
-            {"model": L, "models": [L, L]}, {"model": L, "images": ["x"]},
+            {"model": L, "models": [L, L]},
             {"model": L, "agent": "Coding"}, {"model": "Llama 3.2 3B"},
             {"model": "Laptop · small:8b"})),
         # the section never asks about cloud power, the ladders or tiers
@@ -17491,8 +17526,29 @@ def _svc_pins(src):
         "picks": "                       or server_pick(m, self.ctx)[0] is not None]" in ch,
         "one server model": "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n"
                             "                    and server_label(council[0]) else \"\")" in ch
-        and "        for label, target in ({} if _srv_lbl else MODEL_ROUTES).items():" in ch
-        and "        if route is None and not cloud_only:" in ch,
+        and "        for label, target in ({} if server_label(model_name)\n"
+            "                              else MODEL_ROUTES).items():" in ch
+        and "        if (route is None and not cloud_only\n"
+            "                and not all(server_label(l) for l in council)):" in ch
+        # (review) a council led by a server model warms its first local one
+        and "        elif server_label(model_name):\n" in ch
+        and "            route_label = next((l for l in council if l in MODEL_ROUTES), None)" in ch,
+        # (review) a picture for a server pick stays on that server: no
+        # vision takeover, no cloud or local reader, no download
+        "picture stays": "            if not (len(council) == 1 and not cloud_only\n"
+                         "                    and server_label(council[0])):\n"
+                         "                council = [\"Qwen 3.5 Vision 9B\"]" in ch
+        and "                      if images and not _srv_lbl else [])" in ch
+        and "        _vis_local = bool(images) and not _srv_lbl and model_cached(" in ch
+        and "                and not _srv_lbl):\n            try:\n                start_model_downloads" in ch,
+        # (review) making a picture, a video or a file takes the hold
+        "making held": "        if (img_subject or vid_subject or export_req) and not self._bench_held:\n"
+                       "            if not bench_hold():\n                emit(AppText(BENCH_BUSY))" in ch
+        and ch.index("and not self._bench_held:\n            if not bench_hold():")
+        < ch.index('        if export_req and export_req["lane"] == "retro":')
+        < ch.index("        if vid_subject:\n            # A SAVED GEMINI KEY")
+        and src.count('    if _mine and _bench["running"]:\n        _mine = False\n'
+                      '        errs.append("local: " + BENCH_BUSY)') == 2,
         # before the Fast lane's cloud ladder and the council: not behind
         # cloud power, never a council unless picked
         "branch first": ch.index("            elif _srv_lbl:\n                server_answer(_srv_lbl,")
@@ -17514,8 +17570,9 @@ def _svc_page(src):
           + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={};'
           + 'let tier="",advOn=false,agent="",council=["Desktop \\u00b7 gpt-oss:120b"];'
           + src[src.index("function srvWhere(m){"):src.index("function paintServers(){")]
-          + src[src.index("function srvMenuRows(){"):src.index("function paintEngMenuServers(){")]
-          + "let srvList=[{id:'a1b2c3d4',name:'Desktop',host:'ollama1.example.com',paired:true,"
+          + src[src.index("function whereBadge(lm,who){"):src.index("function paintEngMenuServers(){")]
+          + "const srvMsgs={a1b2c3d4:'Paired.'},srvTokOpen={e5f6a7b8:true};"
+          + "let srvList=[{id:'a1b2c3d4',name:'Desktop',host:'s1.example.com',paired:true,"
           + "status:{at:1,reachable:true,auth:true,latency_ms:42,version:'0.34.4'},models:["
           + "{name:'gpt-oss:120b',label:'Desktop \\u00b7 gpt-oss:120b',placement:'gpu+ram',loaded:true},"
           + "{name:'qwen3:14b',label:'Desktop \\u00b7 qwen3:14b',placement:'gpu'},"
@@ -17524,36 +17581,327 @@ def _svc_page(src):
           + "reachable:false,err:'Studio didn\\u2019t answer.',kind:'offline'},models:[]},"
           + "{id:'c9d0e1f2',name:'Lost',host:'l.example.com',paired:true,status:{at:1,reachable:true,"
           + "err:'pairing lost',kind:'auth'},models:[]}];"
+          + "srvList[0].access=true;"
           + "process.stdout.write(JSON.stringify([srvCard(srvList[0]),srvCard(srvList[1]),"
-          + "srvCard(srvList[2]),srvMenuRows()]));")
+          + "srvCard(srvList[2]),srvMenuRows(),[whereBadge('Desktop \\u00b7 gpt-oss:20b',''),"
+          + "whereBadge('Llama 3.2 3B, Desktop \\u00b7 qwen3:14b',''),"
+          + "whereBadge('Llama 3.2 3B, Groq 120B, Desktop \\u00b7 x:1b',''),"
+          + "whereBadge('cloud box \\u00b7 x:1b',''),whereBadge('Llama 3.2 3B',''),"
+          + "whereBadge('Desktop \\u00b7 x:1b cloud',''),"
+          + "whereBadge('Desktop \\u00b7 x:1b','Desktop \\u00b7 llava:7b')]]));")
     open(os.path.join(_si_dir, "srv34.js"), "w").write(js)
     try:
         o = json.loads(subprocess.run(["node", os.path.join(_si_dir, "srv34.js")],
                                       capture_output=True, text=True, timeout=30).stdout)
     except Exception as e_:
         return False, "node: %r" % e_
-    wh = re.search(r"const where=srvWho\|\|\(/cloud\|gemini\|groq\|claude\|gpt\|openai/i\n"
-                   r"      \.test\(lastModels\.replace\((/\[\^,\]\*\\u00b7\[\^,\]\*/g),", src)
     got = {
         "card ok": 'class="srv ok"' in o[0] and "Paired · reachable · 42 ms · Ollama 0.34.4" in o[0]
         and "gpt-oss:120b <i>· card + memory, slower</i> <i>· loaded</i>" in o[0]
         and "qwen3:14b</div>" in o[0] and "old:7b</div>" in o[0]
         and 'data-a="repair">Pair again' in o[0] and 'class="srv-code"' not in o[0],
         "card unpaired": 'class="srv warn"' in o[1] and 'class="srv-code"' in o[1]
-        and "sudo ollama1-pair" in o[1] and "Not paired · Studio didn’t answer." in o[1],
+        and "Open a pairing window at the server, then type the code its screen shows." in o[1] and "Not paired · Studio didn’t answer." in o[1],
         "card lost": 'class="srv bad"' in o[2],
         "menu": o[3].count('" data-s="') == 3
         and '<span class="enm">Lost</span><span class="edsc">not answering</span>' in o[3] and 'data-s="Desktop · qwen3:14b"' in o[3]
         and "yours · card + memory, slower" in o[3] and o[3].count(">your server<") == 2
         and 'class="engrow srvrow on" data-s="Desktop · gpt-oss:120b"' in o[3]
         and "not in the cloud" in o[3] and "Studio" not in o[3],
-        "badge": bool(wh) and not re.search(r"cloud|gemini|groq|claude|gpt|openai",
-                                            re.sub(r"[^,]*·[^,]*", "", "Desktop · gpt-oss:20b"), re.I),
+        # the badge: the server by name; a server's model or name never
+        # reads as the cloud; a council names its servers beside "this Mac"
+        "badge": o[4] == ["Desktop", "this Mac + Desktop", "cloud + Desktop", "cloud box",
+                          "this Mac", "cloud + Desktop", "Desktop \u00b7 llava:7b"]
+        and "    const where=whereBadge(lastModels,srvWho);" in src,
+        # (review) the Access token: said on the card, changed from it
+        "token": ">Access token saved<" in o[0] and ">no Access token<" in o[1]
+        and 'data-a="tok">Change Access token' in o[0] and 'data-a="tok"' not in o[1]
+        and 'data-k="aid"' in o[1] and 'data-k="asec"' in o[1] and 'data-a="toksave"' in o[1]
+        and 'srvPost("access",{id:id,access_id:v("aid").trim(),access_secret:v("asec").trim()});' in src,
+        # (review) a repaint keeps what was typed, the cursor and the card's line
+        "kept": '<div class="srv-msg">Paired.</div>' in o[0]
+        and 'class="srv-code" data-k="code"' in o[1]
+        and "      if(k[i.dataset.k]!=null)i.value=k[i.dataset.k];});" in src
+        and "    if(i){i.focus();try{i.setSelectionRange(foc[2],foc[3]);}catch(e){}}" in src
+        and "  srvMsgs[id]=t||\"\";" in src,
         "pane": 'data-pane="p-servers">Your servers</button>' in src
         and 'if(id==="p-servers")loadServers(true);' in src and 'api("/api/servers' in src
         and 'fetch("/api/servers' not in src,
     }
     return all(got.values()), [got, o]
+
+
+def _svc_vision(src):
+    """A picture for a server pick stays on that server (review of 6b334)."""
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    out = {}
+    pic = [{"role": "user", "content": "what is this", "images": ["aGk="],
+            "image_urls": ["data:image/png;base64,aGk="]}]
+    lines = [{"message": {"content": "A cat."}, "done": True, "eval_count": 2}]
+
+    def run(msgs):
+        said = []
+        ns["server_answer"]("Desktop \u00b7 small:8b", msgs, said.append, said.append,
+                            [].append, lambda *a: None)
+        return ("".join(x for x in said if not isinstance(x, ns["Ctl"])),
+                [x for x in said if isinstance(x, ns["Ctl"])])
+    # the picked model reads pictures: it gets the picture
+    s1 = _sv_fake(ns, [_SvResp(200, {"capabilities": ["completion", "vision"]}),
+                       _SvResp(200, lines=lines)])
+    t1, f1 = run(pic)
+    b1 = json.loads(s1[1]["body"]) if len(s1) > 1 else {}
+    out["picked reads it"] = (t1 == "A cat." and s1[0]["path"] == "/api/show"
+                              and json.loads(s1[0]["body"]) == {"model": "small:8b"}
+                              and b1.get("model") == "small:8b"
+                              and b1["messages"][-1].get("images") == ["aGk="]
+                              and '"s": "Desktop"' in f1[0])
+    # asked once: the answer is remembered
+    s1b = _sv_fake(ns, [_SvResp(200, lines=lines)])
+    run(pic)
+    out["remembered"] = [r["path"] for r in s1b] == ["/api/chat"]
+    # it doesn't: another model on the same server that does, said in the badge
+    ns["_srv_seen"][e["id"]]["caps"] = {}
+    ns["_srv_seen"][e["id"]]["models"] = []
+    ns["_srv_keep_models"](e, ["small:8b", "llava:7b"])
+    s2 = _sv_fake(ns, [_SvResp(200, {"capabilities": ["completion"]}),
+                       _SvResp(200, {"capabilities": ["completion", "vision"]}),
+                       _SvResp(200, lines=lines)])
+    t2, f2 = run(pic)
+    out["same server's reader"] = (t2 == "A cat." and [r["path"] for r in s2] == [
+        "/api/show", "/api/show", "/api/chat"]
+        and json.loads(s2[2]["body"])["model"] == "llava:7b"
+        and '"s": "Desktop \\u00b7 llava:7b"' in f2[0])
+    # none does: said, nothing else sent
+    ns["_srv_seen"][e["id"]]["caps"] = {}
+    s3 = _sv_fake(ns, [_SvResp(200, {"capabilities": ["completion"]}),
+                       _SvResp(200, {"capabilities": ["completion"]})])
+    ns["_RAN"].clear()
+    t3, f3 = run(pic)
+    out["none reads it"] = (t3 == "\u26a0\ufe0f Desktop has no model that reads pictures. "
+                            "Nothing was sent anywhere else."
+                            and "/api/chat" not in [r["path"] for r in s3] and not ns["_RAN"])
+    # no picture: no question asked
+    s4 = _sv_fake(ns, [_SvResp(200, lines=lines)])
+    run([{"role": "user", "content": "hi"}])
+    out["text only"] = [r["path"] for r in s4] == ["/api/chat"]
+    return all(out.values()), out
+
+
+def _sv_stall_server(first_line=True, hold=4.0):
+    """A listener that answers a chat with a 200, maybe one line, then
+    nothing for `hold` seconds."""
+    from http.server import BaseHTTPRequestHandler as _BH, ThreadingHTTPServer as _TS
+
+    class _H(_BH):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.end_headers()
+            if first_line:
+                self.wfile.write(b'{"message":{"content":"Hel"},"done":false}\n')
+            self.wfile.flush()
+            time.sleep(hold)
+    srv = _TS(("127.0.0.1", 0), _H)
+    srv.daemon_threads = True
+    _t34.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def _svc_timing(src):
+    """A trickle ends, a check has a deadline, and one runs at a time."""
+    out = {}
+    # the stream: SRV_FIRST_S to the first line, then SRV_IDLE_S with no byte
+    for first, key in ((True, "idle"), (False, "first")):
+        ns, ctx, d = _sv_ns(src)
+        srv = _sv_stall_server(first_line=first)
+        _sv_paired(ns, ctx, url="http://127.0.0.1:%d" % srv.server_address[1])
+        ns["_srv_send"] = ns["_srv_send_real"]
+        ns.update(SRV_FIRST_S=2 if first else 1, SRV_IDLE_S=1)
+        got, t0 = [], time.monotonic()
+        try:
+            ns["server_stream"]("Desktop \u00b7 small:8b", [{"role": "user", "content": "q"}],
+                                got.append)
+            r = "answered"
+        except ns["ServerError"] as se:
+            r = str(se)
+        took = time.monotonic() - t0
+        srv.shutdown()
+        out[key] = (r == "Desktop sent nothing for 1 seconds, so the answer stopped there."
+                    and took < 1.9 and "".join(got) == ("Hel" if first else ""), r, round(took, 2))
+    # a check: one at a time per server, a second waits for the first
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    calls = []
+
+    def slow(rec, st=200, js=None):
+        calls.append(rec["path"])
+        time.sleep(0.4)
+        return _SvResp(st, js if js is not None else {"device_id": "x", "models": [],
+                                                      "version": "1"})
+    _sv_fake(ns, [slow] * 8)
+    res = []
+    ths = [ns["ctx_thread"](target=lambda: res.append(ns["server_check"](e))) for _ in range(2)]
+    for t_ in ths:
+        t_.start()
+        time.sleep(0.05)
+    for t_ in ths:
+        t_.join(10)
+    out["one at a time"] = (calls.count("/v1/whoami") == 1 and len(res) == 2
+                            and res[0].get("auth") is True and res[1].get("auth") is True
+                            and not ns["_srv_busy"])
+    # and a deadline over the whole check
+    calls.clear()
+    _sv_fake(ns, [slow] * 8)
+    ns["SRV_CHECK_S"] = 1
+    r2 = ns["server_check"](e)
+    out["deadline"] = (r2.get("err") == "Desktop took more than 1 seconds to answer a check."
+                       and len(calls) <= 3 and r2.get("reachable") is False)
+    return all(v if isinstance(v, bool) else v[0] for v in out.values()), out
+
+
+def _svc_review(src):
+    out = {}
+    # X-Models survives any name: printable ASCII as it is, the rest encoded
+    ns = dict(_LH)
+    ns["urllib"] = urllib
+    exec(src[src.index("def header_text(v: str) -> str:"):src.index("def _x_disposition(")], ns)
+    nm = "Pat\u2019s Desk \u2013 \u30c7\u30b9\u30af \u00b7 small:8b, Llama 3.2 3B, 50%"
+    h = ns["header_text"](nm)
+    h.encode("latin-1")
+    out["header"] = (urllib.parse.unquote(h) == nm and "Llama 3.2 3B" in h
+                     and ns["header_text"]("Gemma 4 26B, Qwen 3.5 9B") == "Gemma 4 26B, Qwen 3.5 9B"
+                     and 'self.send_header("X-Models", header_text(xm))' in src
+                     and src.count('send_header("X-Models"') == 1
+                     and 'lastModels=hdrText(resp.headers.get("X-Models"));' in src
+                     and 'const line=hdrText(resp.headers.get("X-Models"));' in src
+                     and "function hdrText(v){try{return decodeURIComponent(v||\"\");}" in src
+                     and 'resp.headers.get("X-Models")||' not in src)
+    # the kept state: a removal takes servers.json's secrets, keeps the rest
+    ns2 = {}
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    # this source's profile sections (a mutation may be in them)
+    global _PROF_SRC
+    _psave = _PROF_SRC
+    _PROF_SRC = _sv_sect(src, "profile caches") + "\n" + _sv_sect(src, "profile")
+    try:
+        _prof_ns(ns2, d)
+    finally:
+        _PROF_SRC = _psave
+    row = {"id": "a1b2c3d4", "name": "Desk", "url": "https://s.example.com", "models": ["x:1b"],
+           "access_id": "cid", "access_secret": "SEC34", "seed": "SEED34", "device_id": "0" * 16,
+           "public_key": "PUB", "paired_at": 1, "device_name": "Mac"}
+    sp = os.path.join(d, "servers.json")
+    open(sp, "w").write(json.dumps({"v": 1, "servers": [row]}))
+    ns2["_kept_keys_raw"](d, False)
+    kept_signout = json.load(open(sp))["servers"][0] == row
+    ns2["_kept_keys_raw"](d, True)
+    after = json.load(open(sp))["servers"][0]
+    out["kept"] = (kept_signout and after == {"id": "a1b2c3d4", "name": "Desk",
+                                              "url": "https://s.example.com", "models": ["x:1b"]}
+                   and "SEC34" not in open(sp).read() and "SEED34" not in open(sp).read())
+    # the pane's copy (Patrick): advanced users, the guide and the scripts,
+    # no "ollama1" shown anywhere in it
+    pane = src[src.index('<section class="spane" id="p-servers">'):]
+    pane = pane[:pane.index("</section>")]
+    shown = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", pane))
+    msgs = _sv_sect(src, "servers")
+    msgs = msgs[msgs.index("SRV_GONE = "):]
+    out["copy"] = (("For advanced users. Connect a dedicated server you run yourself, so it can "
+                    "take on queries and speed up answers. Instructions for setting one up are "
+                    "available here") in shown
+                   and pane.index("For advanced users.") < pane.index('id="srv-list"')
+                   and 'href="https://github.com/bigmillz/concordeai/blob/main/docs/your-own-server.md"\n'
+                       '      target="_blank" rel="noopener">here</a>' in pane
+                   and 'href="https://github.com/bigmillz/concordeai/tree/main/ollama1"\n'
+                       '      target="_blank" rel="noopener">Setup scripts</a>' in pane
+                   and "ollama1" not in shown and "ollama1" not in re.sub(r'href="[^"]*"', "", pane)
+                   and "ollama1" not in src[src.index("function srvWhere(m){"):
+                                            src.index("function paintEngMenuServers(){")]
+                   and not re.search(r'"[^"\n]*ollama1[^"\n]*"', re.sub(r'"ollama1-(req|pair|pair-key|pair-ok)-v1', "", msgs))
+                   and "a cloud compositor, the\n      server&rsquo;s drafts go to that cloud provider" in pane)
+    # a council of server models only: their reason, no local rescue
+    out["council"] = ('        raise ServerError("council", "None of the picked models answered. "' in src
+                      and "        except ServerError as exc:\n            # a council of your own servers'" in src
+                      and src.index("        except ServerError as exc:\n            # a council")
+                      < src.index("                    alt = next((l for l in reversed(MERGE_RANK)"))
+    return all(out.values()), out
+
+
+def _svc_gpu(src):
+    """The server's card: read only from what the gateway says, a chip per
+    paired server beside MLX (Patrick, 6b334)."""
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    G = ns["_srv_gpu"]
+    out["parse"] = (G({"gpu": {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968}})
+                    == {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968}
+                    and G({"gpu": {"vendor": "nvidia", "name": "RTX\n4090", "vram_bytes": True}})
+                    == {"vendor": "nvidia", "name": "RTX 4090", "vram_bytes": None}
+                    and G({"gpu": {"vendor": "apple"}}) is None and G({"gpu": None}) is None
+                    and G({}) is None and G({"gpu": {"vendor": "AMD"}}) is None and G(None) is None)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    ok = lambda js: _SvResp(200, js)
+    # from /api/version
+    s1 = _sv_fake(ns, [ok({"device_id": "x"}), ok({"models": [{"name": "small:8b"}]}), ok({"models": []}),
+                       ok({"version": "0.34", "gpu": {"vendor": "intel", "name": "Arc B580",
+                                                      "vram_bytes": 12 << 30}})])
+    r1 = ns["server_check"](e)
+    # from /v1/info when /api/version says nothing
+    s2 = _sv_fake(ns, [ok({"device_id": "x"}), ok({"models": [{"name": "small:8b"}]}), ok({"models": []}),
+                       ok({"version": "0.34"}), ok({"gpu": {"vendor": "nvidia", "name": "RTX 4090"}})])
+    r2 = ns["server_check"](e)
+    # neither: no card, nothing guessed
+    s3 = _sv_fake(ns, [ok({"device_id": "x"}), ok({"models": [{"name": "small:8b"}]}), ok({"models": []}),
+                       ok({"version": "0.34"}), _SvResp(404, {"error": "no", "code": "x"})])
+    r3 = ns["server_check"](e)
+    out["check"] = (r1.get("gpu", {}).get("vendor") == "intel" and len(s1) == 4
+                    and r2.get("gpu", {}).get("vendor") == "nvidia" and s2[-1]["path"] == "/v1/info"
+                    and r3.get("gpu") is None and not r3.get("err")
+                    and ns["_srv_public"](e)["gpu"] is None)
+    # the chips, in node
+    i0 = src.index("function esc(s){")
+    js = (src[i0:src.index(";}\n", i0) + 3]
+          + src[src.index("const SRV_GPU="):src.index("function paintSrvChips(){")]
+          + "const S=(id,v,x)=>Object.assign({id:id,name:'Desk '+id,paired:true,"
+          + "status:{at:1,reachable:true}},x||{},{gpu:v});"
+          + "process.stdout.write(JSON.stringify(["
+          + "srvChipsHtml([S('a',{vendor:'amd',name:'Radeon RX 6900 XT',vram_bytes:17163091968})]),"
+          + "srvChipsHtml([S('n',{vendor:'nvidia',name:'',vram_bytes:null})]),"
+          + "srvChipsHtml([S('i',{vendor:'intel',name:'Arc B580',vram_bytes:12884901888},"
+          + "{status:{at:1,reachable:false,err:'x'}})]),"
+          + "srvChipsHtml([S('z',null),S('u',{vendor:'apple'}),S('p',{vendor:'amd'},{paired:false})]),"
+          + "srvChipsHtml([S('a',{vendor:'amd'}),S('b',{vendor:'amd'})])]));")
+    open(os.path.join(_si_dir, "chips34.js"), "w").write(js)
+    try:
+        o = json.loads(subprocess.run(["node", os.path.join(_si_dir, "chips34.js")],
+                                      capture_output=True, text=True, timeout=30).stdout)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    out["chips"] = (o[0] == '<div class="srv-chip amd" title="Desk a · Radeon RX 6900 XT · 16 GB">'
+                    '<i></i><b>AMD</b></div>'
+                    and o[1] == '<div class="srv-chip nvidia" title="Desk n"><i></i><b>NVIDIA</b></div>'
+                    and o[2] == '<div class="srv-chip intel off" title="Desk i · Arc B580 · 12 GB">'
+                    '<i></i><b>INTEL</b></div>'
+                    and o[3] == "" and o[4].count('class="srv-chip amd"') == 2)
+    out["style"] = ('<div id="accel-chip" hidden><i></i><b></b></div>\n' in src
+                    and src.index('<div id="accel-chip" hidden>') < src.index('<div id="srv-chips"></div>')
+                    < src.index('<div id="cbtns">')
+                    and "#accel-chip,.srv-chip{" in src and "#accel-chip i,.srv-chip i{" in src
+                    and "#accel-chip.amd,.srv-chip.amd{--ac:#ed1c24}" in src
+                    and "#accel-chip.nvidia,.srv-chip.nvidia{--ac:#76b900}" in src
+                    and ".srv-chip.intel{--ac:#3d8fe0}" in src and ".srv-chip.off{opacity:.45}" in src
+                    and "  paintEngMenuServers();\n  paintSrvChips();\n}" in src)
+    return all(out.values()), [out, o]
 
 
 _SV_CHECKS = [("servers: PROTOCOL.md's vectors, rebuilt byte for byte (device id, both signatures, "
@@ -17574,7 +17922,15 @@ _SV_CHECKS = [("servers: PROTOCOL.md's vectors, rebuilt byte for byte (device id
               ("servers: labels, a one-model chat, no cloud gate, and profile B sees none of A's",
                _svc_policy),
               ("servers: where they meet run_model, the council, the benchmark and /api/chat", _svc_pins),
-              ("servers: the pane's cards and the engine menu's rows (node)", _svc_page)]
+              ("servers: the pane's cards and the engine menu's rows (node)", _svc_page),
+              ("servers: a picture for a server pick goes to that server's reader, or is said "
+               "(review)", _svc_vision),
+              ("servers: a trickling stream ends, a check has a deadline and runs once at a time "
+               "(review)", _svc_timing),
+              ("servers: a chip per paired server's card beside MLX, only from what its gateway "
+               "says (AMD red, NVIDIA green, Intel blue; none, no chip)", _svc_gpu),
+              ("servers: X-Models survives any server name, a removal takes the servers' secrets, "
+               "the pane's copy, and a server-only council's failure (reviews)", _svc_review)]
 
 
 def _sv_run(src):
@@ -17616,8 +17972,8 @@ _SV_MUT = [
     ("a code of any length", "return c if len(c) == 12 and all(", "return c if all("),
     ("the proof not checked", "            and hmac.compare_digest(got, o1_pair_proof(key, dev_id, pub, nonce))):",
      "            and True):"),
-    ("the device id not compared", 'if not (hmac.compare_digest(str(js.get("device_id") or ""), dev_id)',
-     'if not (True'),
+    ("the device id not compared", 'if not (hmac.compare_digest(str(js.get("device_id") or "").encode("utf-8"),\n'
+     '                                dev_id.encode("utf-8"))', 'if not (True'),
     ("one nonce for every attempt", '            ts, nonce = int(time.time() + skew), o1_nonce()',
      '            ts, nonce = int(time.time() + skew), "n" * 22'),
     ("no wait on a rate limit", '            if attempt == 0 and st == 429 and c == "rate_limited":\n                time.sleep(2.2)\n                continue\n', ""),
@@ -17647,7 +18003,7 @@ _SV_MUT = [
      '"stream": True, "keep_alive": "45s", "options": {"temperature": 0.75}},'),
     ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0)', 'usage_note(label, "local", messages, sent[0], last, t0)'),
     ("a guess for an unknown placement", '"placement": pl if pl in ("gpu", "gpu+ram") else "unknown",', '"placement": pl if pl in ("gpu", "gpu+ram") else "gpu",'),
-    ("embeddings offered", ' or "embed" in n.lower():', ':'),
+    ("embeddings offered", ' or "embed" in n.lower() \\\n', ' \\\n'),
     ("http anywhere", '    return "server-http-loopback" in TEST_HOOKS and u.hostname == "127.0.0.1"', '    return True'),
     ("a council called server-only", "    if len(picks) != 1:\n        return False", "    if False:\n        return False"),
     ("a failure passed to the catch-all", "    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except Exception as exc:",
@@ -17659,6 +18015,58 @@ _SV_MUT = [
      ""),
     ("the menu row not marked yours", '+esc(srvWhere(m)?"yours \\u00b7 "+srvWhere(m):"your server")', '+esc(srvWhere(m))'),
     ("the card without the note", 'return m&&m.placement==="gpu+ram"?"card + memory, slower":"";', 'return "";'),
+    # the first review's fixes
+    ("a server pick's picture taken by the vision model",
+     "            if not (len(council) == 1 and not cloud_only\n                    and server_label(council[0])):\n"
+     "                council = [\"Qwen 3.5 Vision 9B\"]",
+     "            if True:\n                council = [\"Qwen 3.5 Vision 9B\"]"),
+    ("the cloud reads a server pick's picture", "                      if images and not _srv_lbl else [])",
+     "                      if images else [])"),
+    ("the picked model never asked", "    if _srv_reads_pictures(e, model):\n        return label\n", ""),
+    ("no reader on the same server", "            return e[\"name\"] + SERVER_SEP + n\n    return \"\"",
+     "            return \"\"\n    return \"\""),
+    ("vision asked every time", "    if model not in caps:\n        st, js = _srv_json(e, \"POST\", \"/api/show\"",
+     "    if True:\n        st, js = _srv_json(e, \"POST\", \"/api/show\""),
+    ("the picture sent where none reads it", "            if not use:\n", "            if False:\n"),
+    ("the badge not naming the reader", "                who, label = use, use", "                label = use"),
+    ("making a picture unheld", "        if (img_subject or vid_subject or export_req) and not self._bench_held:",
+     "        if False:"),
+    ("the painter ignores a benchmark", '    _mine = image_ready()\n    if _mine and _bench["running"]:',
+     '    _mine = image_ready()\n    if False:'),
+    ("no idle deadline", "                got_any[0] = True\n                if _sk is not None:\n"
+     "                    _sk.settimeout(SRV_IDLE_S)", "                got_any[0] = True"),
+    ("the deadlines set on a socket http.client let go", "        conn.o1_sock = conn.sock\n", ""),
+    ("two checks at once", "        mine = ev is None\n", "        mine = True\n"),
+    ("no check deadline", "        if t <= 0:\n            raise ServerError(\"offline\", \"%s took more",
+     "        if False:\n            raise ServerError(\"offline\", \"%s took more"),
+    ("the badge without the servers", '  return [base].concat(names).filter(Boolean).join(" + ");',
+     '  return base||"this Mac";'),
+    ("a server's name read as the cloud", "    if(i<0){rest.push(p);return;}", "    rest.push(p);if(i<0)return;"),
+    ("typed values lost on a repaint", "      if(k[i.dataset.k]!=null)i.value=k[i.dataset.k];});", "      });"),
+    ("no Change Access token", "    +(srvTokOpen[s.id]?\"\":'<button class=\"about-btn slim\" data-a=\"tok\">Change Access token</button>')",
+     "+''"),
+    ("the card's line lost on a repaint", "    +'<div class=\"srv-msg\">'+esc(srvMsgs[s.id]||\"\")+'</div></div>';",
+     "    +'<div class=\"srv-msg\"></div></div>';"),
+    ("X-Models sent raw", 'self.send_header("X-Models", header_text(xm))', 'self.send_header("X-Models", xm)'),
+    ("the page not decoding X-Models", 'function hdrText(v){try{return decodeURIComponent(v||"");}',
+     'function hdrText(v){try{return (v||"");}'),
+    ("the servers' secrets kept at a removal", "    if every:\n        _kept_servers_raw(folder)\n", ""),
+    ("a server-only council rescued locally", '        raise ServerError("council", "None of the picked models answered. "\n'
+     '                          + _srv_errs[0])', '        raise RuntimeError("none")'),
+    ("no size cap", "                if chunk and sent[0] + len(chunk) > SRV_MAX_CHARS:", "                if False:"),
+    ("the proof compared as text", '    if not (hmac.compare_digest(str(js.get(\"device_id\") or \"\").encode(\"utf-8\"),\n                                dev_id.encode(\"utf-8\"))', '    if not (hmac.compare_digest(str(js.get(\"device_id\") or \"\"), dev_id)'),
+    ("any model name taken", "        if isinstance(known, list) and known and m not in known:\n            continue\n", ""),
+    ("an Ollama cloud tag taken", "                or _SRV_CLOUD_TAG.search(m):\n            continue", "                    :\n            continue"),
+    ("ollama1 in the pane", "      <p class=\"tdesc\">For advanced users.", "      <p class=\"tdesc\">For ollama1 users."),
+    ("a card guessed", '    if not isinstance(g, dict) or g.get("vendor") not in ("amd", "nvidia", "intel"):\n        return None',
+     '    if not isinstance(g, dict):\n        return None'),
+    ("no /v1/info asked", '            if gpu is None and time.monotonic() < end - 1:', '            if False:'),
+    ("a chip for an unpaired server", "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor])", "filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor])"),
+    ("a silent server's chip not dimmed", '(st.reachable===false||st.err?" off":"")', '""'),
+    ("the chips never painted", "  paintEngMenuServers();\n  paintSrvChips();\n}", "  paintEngMenuServers();\n}"),
+    ("a server-led council warms a catalog name inside it", "        for label, target in ({} if server_label(model_name)\n"
+     "                              else MODEL_ROUTES).items():",
+     "        for label, target in MODEL_ROUTES.items():"),
 ]
 _svm = []
 for _d34, _o34, _nw34 in _SV_MUT:
@@ -17957,16 +18365,31 @@ def _svq(path, method="GET", data=None):
         return s_, b_
 
 
-_SVL = "Desktop \u00b7 small:8b"
+# (review) a name outside latin-1: a curly apostrophe, an en dash, CJK
+_SVN = "Pat\u2019s Desk \u2013 \u30c7\u30b9\u30af"
+_SVL = _SVN + " \u00b7 small:8b"
 _SVLJ = json.dumps(_SVL)[1:-1]           # as it reads inside a frame's JSON
+_SVH = {}                                # the last chat's headers
 
 
-def _svchat(label=_SVL, text="hello server", tier="", models=None):
-    s_, b_ = _svq("/api/chat", "POST", {"model": label if not tier else "",
-                                        "models": [label] if models is None else models,
-                                        "tier": tier, "auto_web": False,
-                                        "messages": [{"role": "user", "content": text}]})
-    b_ = b_ if isinstance(b_, bytes) else json.dumps(b_).encode()
+def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None):
+    body = {"model": label if not tier and models is None else "",
+            "models": [label] if models is None else models,
+            "tier": tier, "auto_web": False,
+            "messages": [{"role": "user", "content": text}]}
+    if images:
+        body["images"] = images
+    r_ = urllib.request.Request(_SV.base + "/api/chat", data=json.dumps(body).encode(),
+                                headers=dict(_SV.headers, **{"Content-Type": "application/json"}),
+                                method="POST")
+    try:
+        with urllib.request.urlopen(r_, timeout=180) as resp:
+            s_, h_, b_ = resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as e_:
+        s_, h_, b_ = e_.code, dict(e_.headers), e_.read()
+    _SVREPLIES.append(b_)
+    _SVH.clear()
+    _SVH.update(h_)
     t_ = b_.decode("utf-8", "replace")
     frames = re.findall("\0([A-Z0-9]+):?([^\0]*)\0", t_)
     return s_, re.sub("\0[^\0]*\0", "", t_), frames
@@ -17975,7 +18398,7 @@ def _svchat(label=_SVL, text="hello server", tier="", models=None):
 check("servers (live): the real gateway starts on its stub Ollama behind the Access stand-in",
       _o1up, _o1log.name)
 # an address with the wrong Access token: turned away at "Access"
-_sa0 = _svq("/api/servers/add", "POST", {"url": "http://127.0.0.1:%d" % _O1FRONT, "name": "Desktop",
+_sa0 = _svq("/api/servers/add", "POST", {"url": "http://127.0.0.1:%d" % _O1FRONT, "name": _SVN,
                                           "access_id": _O1CID, "access_secret": "wrong-secret"})
 _sid34 = (_sa0[1].get("server") or {}).get("id", "")
 _sa1 = _svq("/api/servers/access", "POST", {"id": _sid34, "access_id": _O1CID, "access_secret": _O1SEC})
@@ -18003,7 +18426,8 @@ check("servers (live): pairing through the real gateway: no window and a wrong c
       and _sp2[1].get("ok") is True and _sp2[1]["server"]["paired"] is True
       and _sp2[1]["server"]["status"].get("auth") is True
       and [x["label"] for x in _sp2[1]["server"]["models"]] == [
-          "Desktop · huge:70b", "Desktop · small:8b", "Desktop · sneaky:14b"]
+          _SVN + " · huge:70b", _SVN + " · small:8b", _SVN + " · sneaky:14b"]
+      and _srow34.get("models") == ["huge:70b", "small:8b", "sneaky:14b"]
       and all(x["placement"] == "unknown" for x in _sp2[1]["server"]["models"])
       and [d_["id"] for d_ in _devs34] == [_srow34.get("device_id")]
       and _st34.S_IMODE(os.stat(_sfile34).st_mode) == 0o600,
@@ -18018,7 +18442,10 @@ _usage34 = [json.loads(x) for x in open(os.path.join(_SV.home, "usage.jsonl"))] 
     if os.path.exists(os.path.join(_SV.home, "usage.jsonl")) else []
 check("servers (live): a signed chat streams end to end with Use cloud power off, and carries only the chat",
       _sc1[0] == 200 and "ANSWER-e please 334" in _sc1[1] and "⚠" not in _sc1[1]
-      and ("RUN", json.dumps({"r": [_SVL], "w": "server", "s": "Desktop"})) in _sc1[2]
+      and ("RUN", json.dumps({"r": [_SVL], "w": "server", "s": _SVN})) in _sc1[2]
+      # (review) the name travels in X-Models percent-encoded, decoded whole
+      and urllib.parse.unquote(_SVH.get("X-Models", "")) == _SVL
+      and _SVH.get("X-Models", "").isascii()
       and all(_SVLJ in f[1] for f in _sc1[2] if f[0] == "RUN")
       and _chat34 and _chat34[-1]["access"] and "X-O1-Signature" in _chat34[-1]["headers"]
       and set(json.loads(_chat34[-1]["body"])) == {"model", "messages", "stream", "options"}
@@ -18045,9 +18472,9 @@ _sc3 = _svchat(text="again 334")
 _o1("/next", {"path": "/api/chat", "status": 507, "body": {"error": "no fit", "code": "gpu_fit"}})
 _sc4 = _svchat(text="fit?")
 check("servers (live): busy and a model that doesn't fit are said; a replay refusal is signed again once",
-      _sc2[1].strip() == "⚠️ Desktop is busy with other requests. Try again in a moment."
+      _sc2[1].strip() == "⚠️ %s is busy with other requests. Try again in a moment." % _SVN
       and "ANSWER-again 334" in _sc3[1] and "⚠" not in _sc3[1]
-      and _sc4[1].strip() == "⚠️ small:8b doesn’t fit in Desktop’s graphics memory.",
+      and _sc4[1].strip() == "⚠️ small:8b doesn’t fit in %s’s graphics memory." % _SVN,
       "%r" % [_sc2[1], _sc3[1], _sc4[1]])
 # Cloud Only never seats a server model; no tier lists one
 _nlog34 = len(_o1("/log")["log"])
@@ -18055,13 +18482,15 @@ _sc5 = _svchat(tier="Cloud Only", models=[_SVL])
 _tiers34 = _svq("/api/tiers")[1]
 check("servers (live): Cloud Only and the tiers never seat a server model",
       len([r for r in _o1("/log")["log"][_nlog34:] if r["path"] == "/api/chat"]) == 0
-      and _SVL not in json.dumps(_tiers34) and "Desktop" not in json.dumps(_tiers34)
+      and _SVN not in json.dumps(_tiers34, ensure_ascii=False)
       and "ANSWER" not in _sc5[1], "%r" % [_sc5[1][:200], _tiers34])
 # a benchmark running here doesn't turn a server chat away
 _bs34 = _svq("/api/bench/start", "POST", {})
 _sc6 = _svchat(text="during bench 334")
 _scL = _svq("/api/chat", "POST", {"model": "Llama 3.2 3B", "models": ["Llama 3.2 3B"], "tier": "",
                                    "messages": [{"role": "user", "content": "local during bench"}]})
+# (review) making a picture uses this computer: the benchmark's line
+_scP = _svchat(text="draw me a red bicycle")
 _svq("/api/bench/stop", "POST", {})
 for _i34 in range(200):
     if not _svq("/api/bench")[1].get("running"):
@@ -18070,13 +18499,37 @@ for _i34 in range(200):
 check("servers (live): during a benchmark a server chat answers, a local one is refused",
       _bs34[0] == 200 and "ANSWER-ng bench 334" in _sc6[1] and _scL[0] == 409
       and _scL[1].get("bench") is True, "%r" % [_bs34, _sc6[1][:120], _scL])
+check("servers (live): a server chat asking for a picture during a benchmark gets the benchmark's line",
+      _scP[1].strip().startswith("A hardware benchmark is running.") and "ANSWER" not in _scP[1],
+      "%r" % [_scP[1][:200]])
+# (review) a picture for a server pick, with cloud power on: to that server
+# only. The picked model reads pictures; then one that doesn't, whose
+# picture goes to the model on the same server that does
+_svq("/api/prefs", "POST", {"turbo": True})
+_PIC34 = ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="]
+_o1("/next", {"path": "/api/show", "status": 200,
+              "body": {"capabilities": ["completion", "vision"], "model_info": {}}})
+_nst = len(_o1("/stub")["calls"])
+_scV1 = _svchat(text="what is in picture 334", images=_PIC34)
+_stV1 = [c for c in _o1("/stub")["calls"][_nst:] if c[1] == "/api/chat"]
+_scV2 = _svchat(label=_SVN + " \u00b7 huge:70b", text="and in this one 334", images=_PIC34)
+_stV2 = [c for c in _o1("/stub")["calls"][_nst:] if c[1] == "/api/chat"]
+_svq("/api/prefs", "POST", {"turbo": False})
+check("servers (live): a picture for a server pick goes to that server's reader, cloud power on, "
+      "and nothing else reads it",
+      "ANSWER-ture 334" in _scV1[1] and "vision engine" not in _scV1[1] + _scV2[1]
+      and _stV1 and _stV1[0][2]["model"] == "small:8b"
+      and _stV1[0][2]["messages"][-1].get("images") == ["iVBORw0KGgoAAAANSUhEUg=="]
+      and "ANSWER-s one 334" in _scV2[1] and len(_stV2) == 2 and _stV2[1][2]["model"] == "small:8b"
+      and ("RUN", json.dumps({"r": [_SVL], "w": "server", "s": _SVL})) in _scV2[2],
+      "%r" % [_scV1[1][:160], _scV2[1][:160], [c[2].get("model") for c in _stV2], _scV2[2][-3:]])
 # the pairing lost at the server: "pair again"
 _o1("/unpair", {})
 _sc7 = _svchat(text="after unpair")
 _st7 = _svq("/api/servers/test", "POST", {"id": _sid34})[1].get("server") or {}
 check("servers (live): a device removed at the server (401/403) says the pairing was lost, pair again",
-      _sc7[1].strip() == ("⚠️ Desktop no longer accepts this computer: the pairing was "
-                          "lost. Pair again in Settings › Your servers.")
+      _sc7[1].strip() == ("⚠️ %s no longer accepts this computer: the pairing was "
+                          "lost. Pair again in Settings › Your servers." % _SVN)
       and _st7.get("status", {}).get("kind") == "auth" and _st7["status"]["reachable"] is True,
       "%r" % [_sc7[1], _st7.get("status")])
 _code34b = _o1("/open", {})["code"]
@@ -18087,16 +18540,24 @@ _svq("/api/prefs", "POST", {"turbo": True})
 _o1("/down", {})
 _sc9 = _svchat(text="anyone there")
 _st9 = _svq("/api/servers/test", "POST", {"id": _sid34})[1].get("server") or {}
+# (review) a council of this server's models only: their reason, and no
+# local model tried in their place
+_scC = _svchat(models=[_SVL, _SVN + " \u00b7 sneaky:14b"], text="council down")
 _o1("/up", {})
 _svq("/api/prefs", "POST", {"turbo": False})
 check("servers (live): pair again works; offline is said, with cloud power on, and no other model answers",
       _sp3[1].get("ok") is True and "ANSWER-ed again 334" in _sc8[1]
-      and _sc9[1].strip() == ("⚠️ Desktop didn’t answer. It may be off, asleep or "
-                              "offline. Nothing was sent anywhere else.")
+      and _sc9[1].strip() == ("⚠️ %s didn’t answer. It may be off, asleep or "
+                              "offline. Nothing was sent anywhere else." % _SVN)
       and [f for f in _sc9[2] if f[0] == "RUN"]
       and all(_SVLJ in f[1] for f in _sc9[2] if f[0] == "RUN")
       and _st9.get("status", {}).get("kind") == "offline" and _st9["status"]["reachable"] is False,
       "%r" % [_sp3, _sc8[1][:80], _sc9, _st9.get("status")])
+check("servers (live): a council of server models that none answers says why, and no other model answers",
+      _scC[1].strip() == ("⚠️ None of the picked models answered. %s didn’t answer. It may be off, "
+                          "asleep or offline. Nothing was sent anywhere else." % _SVN)
+      and "stopped responding" not in _scC[1] and "retrying on" not in json.dumps(_scC[2]),
+      "%r" % [_scC[1], _scC[2][-4:]])
 # profile isolation: B sees none of A's servers and can't use their labels
 _pB34 = _svq("/api/test/profile", "POST", {"op": "create"})[1].get("name", "")
 _svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})

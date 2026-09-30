@@ -150,6 +150,81 @@ kit is 6b333). This is the app side, against `ollama1/PROTOCOL.md`.
   `placement` field from the real gateway (the other agent's change; read
   from canned replies here), the ROCm desktop itself, WKWebView and
   WebView2 (the pane was checked in headless Chrome and Blink), Windows.
+- **Review round (regressions, security, Patrick's copy and chips).**
+  - *Pictures stay on the server that was picked.* The vision takeover
+    set the Qwen vision model before the server pick was known, so a
+    picture went to the cloud, to local vision or into a 6.6 GB download.
+    Now the pick keeps it: the picked model reads it when Ollama's
+    `/api/show` lists `vision` (asked once, remembered), else another
+    model on the SAME server that does (the badge names it:
+    "Desktop · llava:7b"), else "Desktop has no model that reads
+    pictures". Never the cloud or this computer, whatever Use cloud power
+    says. A picture no longer takes the benchmark hold.
+  - *Making things uses this computer.* A server chat that asks for a
+    picture, a video or a file takes the benchmark hold before those
+    branches and, during a run, gets the benchmark's line. The local
+    painter and the local video studio sit out a running benchmark
+    however they are reached (a saved Gemini key may still paint).
+  - *The stream's deadlines were on the wrong socket.* http.client hands
+    an HTTP/1.0 (close-delimited) response the socket and sets
+    `conn.sock` to None, so the 600 s wait was never set and the 12 s
+    connect timeout stayed: a model load over 12 s would have cut the
+    answer. The socket is kept when the request goes out
+    (`conn.o1_sock`); up to 600 s to the first line, then 120 s with no
+    byte ends the answer ("Desktop sent nothing for 2 minutes").
+  - *Status checks:* one at a time per server (a second `?refresh=1`
+    waits for the first), servers checked side by side, 15 s in all per
+    check.
+  - *X-Models* is percent-encoded outside printable ASCII
+    (`header_text`; the page's `hdrText` decodes it): a server named
+    "Pat’s Desktop", "Desktop – 4090" or in CJK raised in `send_header`
+    and every chat on it died after the question was saved. It is the
+    only header built from a person's text (Content-Disposition already
+    had its RFC 6266 fold; the rest are fixed or validated ids).
+  - *The kept state:* a removal or deletion strips servers.json's Access
+    tokens and device keys (`_kept_servers_raw`), the addresses and names
+    kept; an unreadable one goes to the trash.
+  - *A council of server models only* that none answers says why ("None
+    of the picked models answered. Desktop didn't answer…"); the
+    handler's local `alt` rescue is never tried for it.
+  - An answer past 2,000,000 characters is cut there, said. The pairing
+    proof compares bytes (a non-ASCII device id is a failed proof, not a
+    TypeError). `server_pick` takes only a model the server last listed
+    (the names are kept in servers.json) and never an Ollama cloud tag
+    (`-cloud`, `:cloud`), which the picker leaves out too.
+  - *The card:* whether an Access token is saved, and Change Access token
+    (both fields empty removes it); the Access error points at it. A
+    repaint keeps what was typed, the cursor and the card's line.
+  - *The badge:* a council names its servers beside "this Mac" or
+    "cloud" ("this Mac + Desktop"); a server called "cloud box" or a
+    model called gpt-oss never reads as the cloud. A council led by a
+    server model warms its first local model, never a catalog name found
+    inside the server's.
+  - *Patrick's copy:* the pane opens "For advanced users. Connect a
+    dedicated server you run yourself, so it can take on queries and
+    speed up answers. Instructions for setting one up are available
+    here · Setup scripts." (the guide at
+    docs/your-own-server.md and the ollama1 folder on GitHub, plain
+    `target=_blank` links like the site link, which pywebview opens in
+    the system browser). No "ollama1" is shown anywhere in the app. The
+    pane says a cloud compositor in an Advanced council gets the
+    server's drafts.
+  - *A chip per paired server's card* beside MLX, in its style: "● AMD"
+    red, "● NVIDIA" green (the existing chip colours), "● INTEL" blue
+    (#3d8fe0); the title "Desktop · Radeon RX 6900 XT · 16 GB"; dimmed
+    while the server doesn't answer; one per server. Read only from
+    `gpu: {vendor, name, vram_bytes}` in the gateway's `/api/version` or
+    `/v1/info` (the host kit is adding it); nothing said, no chip.
+  - Gauntlet: 4 more in-process checks (pictures, the deadlines and one
+    check at a time, the headers/kept state/copy/council, the chips in
+    node), 33 more mutations (68 in all), and live: a picture to the
+    picked reader and to the same server's reader with cloud power on, a
+    picture asked for during a benchmark, a council of server models
+    down, and the whole live run under a server named
+    "Pat’s Desk – デスク" (X-Models checked on the wire).
+  - Not verified: `docs/your-own-server.md` doesn't exist in the repo
+    yet (the link will 404 until it does); the chip against the real
+    gateway (canned `gpu` here).
 - **Patrick, once setup has finished on the desktop:**
   1. Keep the Access service token's Client ID and Client Secret that
      setup showed once.
