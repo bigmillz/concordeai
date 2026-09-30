@@ -126,7 +126,7 @@ MUTANTS = [
     ("mem: margin 6 GiB again", "bin/ollama1-gateway",
      'margin = max(8 << 30, int(mi.get("MemTotal", 0) * 0.12), int(self.cfg.get("ram_margin_gib") or 8) << 30)',
      "margin = 6 << 30", ["test_gateway"]),
-    ("mem: Ollama's cap ignored", "bin/ollama1-gateway", "        if cap:\n", "        if False:\n",
+    ("mem: Ollama's cap ignored", "bin/ollama1-gateway", "        if high:\n", "        if False:\n",
      ["test_gateway"]),
     ("mem: compute buffers not counted", "lib/o1ollama.py",
      "(RAM_COMPUTE_BYTES if ram else (256 << 20))", "(256 << 20)", ["test_gateway"]),
