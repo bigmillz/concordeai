@@ -324,9 +324,12 @@ so here falling back IS allowed.
 - Gauntlet: new `== your server first (6b339) ==`, eight in-process and
   node checks (the families and the ranking, the candidates and the switch,
   the seats, the failing seat, the council's parallel drafts and the merge,
-  the funnel's order, the box, the pins), 56 mutations each caught, and
-  one live check on the real gateway (Cloud Only never seats a server
-  model, Pro does while the switch is on and none with it off). Adapted: the
+  the funnel's order, the box, the pins, the rules review's refusals), each
+  mutation of its list caught, and live checks on the real gateway (Cloud
+  Only never seats a server model, Pro does while the switch is on and none
+  with it off; "<name> Only" refuses a picture, a video and an agent
+  without a model request reaching anything). The whole run on the branch
+  rebased onto the funnel pictures build (6b340): 623 of 623. Adapted: the
   6b337 live check "no tier lists a server model" says it of Cloud Only; the
   servers' public keys gain `prefer`; `server_check`'s deadline is read at
   call time. A live chat in Fast/Thinking/Pro isn't run against the real
