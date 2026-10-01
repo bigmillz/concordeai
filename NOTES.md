@@ -393,7 +393,8 @@ so here falling back IS allowed.
   Only never seats a server model, Pro does while the switch is on and none
   with it off; "<name> Only" refuses a picture, a video and an agent
   without a model request reaching anything). The whole run on the branch
-  rebased onto the funnel pictures build (6b340): 623 of 623. Adapted: the
+  rebased onto the funnel pictures build (6b340): 623 of 623, then 628 of
+  628 after the final review's fixes. Adapted: the
   6b337 live check "no tier lists a server model" says it of Cloud Only; the
   servers' public keys gain `prefer`; `server_check`'s deadline is read at
   call time. A live chat in Fast/Thinking/Pro against the real gateway
