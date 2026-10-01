@@ -125,6 +125,219 @@ Edit pressed with "word1 … word5" on screen left `generating` false, the
 question in the composer, the chat rewound to 0 and `chatTrunc` set. Not
 seen in WKWebView. One gauntlet check pins the flow, with five mutations.
 
+## 6b341 — benchmark servers and cloud models, and compare
+Patrick (2026-10-01): "can the benchmark feature also allow benchmarking
+your servers? cloud servers too with a warning that it may incur cost via
+api. then allow those benchmarks to be compared".
+
+Settings › Usage › Benchmark (6b331) tests this computer. It now tests one
+of three **targets** a run, and Compare puts any stored runs side by side.
+- **The test is the same.** `BENCH_TEST` is still `b1`: the passage, the
+  task, 256 tokens, seed 42, temperature 0 where the target takes one. The
+  gauntlet pins the passage and task by hash, so a change to either has to
+  be a new test name. Runs of different tests never compare.
+- **One target a run**: "This computer" (6b331, unchanged), one of the
+  profile's paired servers, or its cloud models. `POST /api/bench/start`
+  takes `{target: "local"}` (the default, so the old body `{}` still
+  means this computer), `{target: "server", server: <id>, models: [tags]}`
+  or `{target: "cloud", confirm: <id>, understood: true}`. `GET
+  /api/bench/targets[?refresh=<server id>]` lists what the profile can
+  test (the same read-only check Settings › Your servers makes, when a
+  server is named) and `POST /api/bench/cloud-plan` is the cloud's first
+  step (below). Nothing starts on its own: a run is a click on Run.
+
+**A server** (`_BenchServer`, the same `_bench_one` flow as an engine here):
+- Called through the app's own signed requests: `_srv_send` (Access
+  headers, Ed25519 signature, a fresh nonce, the clock-skew retry) and
+  `_srv_fail` (the same one-line refusals as a chat to it). It does not use
+  `server_stream`: that writes the usage ledger, takes no seed or
+  `num_predict`, and drops thinking text. Nothing here is in the ledger.
+- Per model: look at `/api/ps` (is it loaded?), load it with an empty
+  prompt on `/api/generate` (streamed: Cloudflare ends a plain call over
+  100 s; `num_ctx` 4096, which the gateway honours), then the fixed chat
+  (`options` temperature 0, seed 42, `num_predict` 256, `num_ctx` 4096).
+  `keep_alive` is not sent (the gateway drops it) and nothing is unloaded.
+- **Figures.** *Writes*: `eval_count / eval_duration` from Ollama's last
+  line, which the gateway relays byte for byte (`relay_stream` writes each
+  line it reads), `src` "engine". With a count and no duration the count
+  is exact and the time is measured here (`src` "measured"). *Reads*:
+  `prompt_eval_count / prompt_eval_duration` from the same line; **not
+  measured** when the line carries no duration (the first-token time would
+  include the network and the queue, so it is never used for reads).
+  *First token*: request sent to first word, **measured here**, so it
+  includes the network (the row says "incl. network"). *Load*: the
+  server's own `load_duration` for a model that was not in memory; **not
+  measured** for one that was (the gateway can't unload it for us) and
+  when the server reports none. *Memory*: none (this computer's memory
+  says nothing about the server); the row says how much of the model sits
+  on the server's card (`/api/ps` after the load) and its placement.
+- **The hardware line** is the server's card from `/v1/info` (via the
+  check: "Radeon RX 6900 XT · 16 GB"), "graphics card not reported" when it
+  says none; the versions are Ollama's.
+- **Which models start ticked**: only those `_srv_fits` says fit whole on
+  the card (placement `gpu`, and the weights plus the gateway's margin
+  within the card's memory, as for "<server> Only"). `gpu+ram` models are
+  listed with "It also uses the server's memory, which loads its CPU hard"
+  and unticked; so are models whose placement isn't reported and ones that
+  may not fit. The pane says the run loads the models on the server and
+  stores nothing there.
+- **The gateway is unchanged.** Its final line already carries every field
+  used here, and PROTOCOL.md already says `prompt_eval_*` stay in answers.
+
+**The cloud** (`_BenchCloud`):
+- **The cost warning is a hard gate.** `POST /api/bench/cloud-plan` takes
+  the models the person ticked (only models the pane could have offered, at
+  most 6, a repeat counts once) and answers the exact list, the calls and
+  tokens (about 1,000 in and up to 256 out each), the sentence "This uses
+  your API keys and may cost money with your provider. ConcordeAI doesn't
+  know your plan or prices." and a one-use confirmation id kept in a
+  profile cache (`_bench_confirms`): good 10 minutes, for this profile and
+  that list. The dialog lists them and its button stays disabled until "I
+  understand this may cost money" is ticked; it resets on every opening and
+  nothing is remembered anywhere. `bench_start` refuses a cloud run without
+  `understood: true` and a live id, takes the id as the run starts (a second
+  run asks again), and calls exactly the models the plan holds. No call is
+  made before that, and a refused start sends nothing.
+- **No invented prices.** The app holds none today (`BENCH_PRICES` is
+  empty), so the dialog says "ConcordeAI holds no prices for these models,
+  so it shows no estimate." A model with an entry gets "about $0.0003*" and
+  the footnote "* Rough estimate, not a quote."
+- **The models offered** are the ones the app uses from each provider with a
+  working key: the top two of each role (fast, seat, composite) and the
+  picked one, at most 4 a provider, none retired. All unticked.
+- **The call** uses the app's own body builders (`_openai_body`,
+  `_anthropic_body`) and headers, at `BENCH_MAX_TOKENS`, streamed, role
+  "fast" (so the effort the app sends is its low one), temperature 0 where
+  the body carries one (not Gemini's, Kimi's or Claude's: the app's own
+  bodies omit it), seed 42 on Groq only, `stream_options` for Groq and
+  Gemini as the app does. It does not use `cloud_text` or
+  `cloud_stream_conf`: they raise the cap to the provider's ceiling, rest
+  and fail providers on an error, write the usage ledger and can't be cut.
+  A benchmark never touches a provider's state: the gauntlet shows cloud.json
+  byte for byte the same after a run, and a pin fails the build if the
+  section names a function that rests a provider or writes the ledger.
+- **Figures.** *First token*: request sent to the first word (text or
+  reasoning), measured here. *Writes*: `(completion tokens - 1) / (last word
+  - first word)`, the count from the provider's usage when it sends one
+  (Anthropic's `message_delta`, an OpenAI-shaped last chunk; reasoning the
+  stream never showed is taken off), else the chunks counted and the row
+  says "estimated". *Total*: request sent to the end of the stream. *Reads*,
+  *load* and *memory*: none; the row shows "-". Every cloud row says "cloud,
+  includes the network" and the pane says these are not hardware speeds.
+- **Failures are one fixed line per model**, never the provider's words
+  (they can carry part of a key): "the key was rejected", "rate limited",
+  "the model isn't available on this key", "the account is out of credit",
+  "the provider isn't answering (HTTP 5xx)", "the provider refused the
+  request (HTTP 400)", "the provider didn't answer", "it used all 256 tokens
+  before writing (it thinks first)", "it answered with nothing". The run
+  goes on. Nothing falls back: a failed model is not asked again, not
+  asked elsewhere, and does not run on this computer.
+- **Keys never leave `cloud.json`.** `bench_cloud_models()` builds the pane's
+  list from named fields, the call holds the key in the engine for the call,
+  and every text a run keeps goes through `_bench_scrub`, which takes out
+  the run's own keys and anything shaped like a key or a bearer token. The
+  gauntlet greps the page's replies, the profile's file, the copy's log and
+  its whole folder for the canary keys.
+
+**Hold, Stop, profiles.**
+- *One thing at a time.* A run of a server or of the cloud refuses chats,
+  funnels, a chat on the server's own model (6b334's exemption is only for a
+  run of this computer), and every model call, and does not start while an
+  answer is being written. `_bench_busy["srv"]` counts chats that use only a
+  server's models: a run of this computer ignores it (6b334, as before), a
+  run of a server or the cloud waits for it. Nothing queues.
+- *Stop* cuts the call in flight in about a second. A connect, a TLS
+  handshake or a wait for headers has no socket to shut yet, so the call
+  runs on a helper thread that Stop (or the 2-minute limit) walks away from,
+  and the abandoned call closes what it opened (`_bench_wait`). Once the
+  answer is open its socket is shut from the route's thread, as for the
+  local engine; a close-delimited provider stream hands the socket to the
+  response, so it is kept when the request goes out (the 6b331 lesson, again
+  found by the gauntlet on the cloud's stream).
+- *Profiles.* A run of a server or the cloud belongs to the profile that
+  started it: its worker runs on that ctx (`ctx_thread(..., ctx=ctx)`), the
+  servers and keys it reads are that profile's, `GET /api/bench` shows its
+  run and results only to it (B sees `run: null`), and a switch (the old
+  ctx's `cancel`) stops it within a second or two, marks the rest "not run"
+  and does not save it. A confirmation made in A can't be spent in B.
+
+**Where results live.** This computer's runs stay in `benchmarks.jsonl`
+(the machine's, as in 6b331; every profile sees them). A server's or the
+cloud's belong to a profile (they name its servers and its providers), so
+they are in the profile's own `bench_targets.jsonl`, a personal file
+(0600, written only through the ctx, `PERSONAL_NAMES`). Each run has new
+fields: `target` ("local", "server", "cloud"), `target_name` (the person's
+own name for the server, "Cloud models", "This computer"), `card` (a
+server's line), `cost_warning` (the cloud run's confirmation, true); rows add
+`provider`, `model`, `network`, `placement`, `total_s`. A row without
+`target` (every row before this build) reads as this computer's. Never
+stored: a key, an Access token, the device key, an address. And a stored run is
+cleaned again on every read (`_bench_clean_run`: only the fields this build
+writes, every text scrubbed, an address or login taken out, a row that isn't a
+row dropped), so a file from another build or edited by hand can't put a key
+or a URL in the pane or in Compare; Compare reads a run with no models, no
+time, no hardware or an unknown target as blanks, not an error. **Retention** is
+`BENCH_KEEP` (100) for each target (each server by its name, the cloud, this
+computer), so a cloud run never pushes out a server's or this computer's
+history; the pane says so ("Keeps the last 100 runs for each target…").
+
+**Compare.** "Compare runs" (shown with two or more saved runs) opens a
+dialog: tick any stored runs, from any target and date; only runs of the
+test of the first one ticked can be ticked together. A table (model, where
+it ran and its hardware line, writes, reads, first token, load) and bars for
+the four figures (the best one green). The warning "These runs were measured
+on different hardware or versions, so the figures compare setups, not just
+models." wherever the setups differ. A model that ran in more than one place
+is shown side by side with "6.7× faster than This computer" (each against
+the slowest of them; an estimated figure is never compared): names are
+matched by a key all targets share (`gpt-oss:20b`, `GPT-OSS 20B` and
+`openai/gpt-oss-20b` are `gptoss20b`). Cloud rows are flagged "cloud,
+includes the network"; a server's first token "includes the network"; a
+figure a server didn't give says "not measured", a cloud row's is "-". The
+older "Compare with…" (a run against an earlier one on the same machine, with
+its % change) still works, now only against a run of the same target.
+`bmCompare` is pure and runs in node in the gauntlet.
+
+**The pane.** A target select (hidden until there is a server or a key), a
+checklist of the models (the server's with their placement and the note; the
+cloud's grouped by provider with a count and the estimate mark), the
+hardware line of what is selected, and the dialogs over Settings. Looked at
+in the Browser pane (Blink) at the default window size, 1320 x 860: with
+nothing but this computer the pane is as it was (the Usage pane doesn't
+scroll, 66 px under its last line); with a server and cloud keys and "This
+computer" selected the card grows by one row and stays under its limit; a
+server's or the cloud's checklist longer than the window scrolls in its own
+card (176 px) and the pane scrolls as it did. Esc closes a dialog first.
+
+**Gauntlet.** In process on the real servers and profile sections, a
+stand-in Ollama behind real signed calls and a stand-in provider, on a clock
+that ticks 25 ms a call so the figures are exact: a server run (the figures,
+signed calls, the fixed test, no keep_alive, a load time only for a model
+that wasn't loaded, the card, the record), a server's failures (full,
+spilled, busy, missing, pairing lost, off) with nothing run anywhere else,
+Stop mid-answer and during a load that never answers, the hold both ways, the
+confirmation (none, not ticked, forged, another profile's, old, spent, the
+cap of 6, the plan's numbers and line), the cloud's figures and requests
+(both shapes), its failures (fixed lines, no key echoed, provider state
+untouched), Stop mid-answer and before headers, secrets (the page, the
+file, the targets), the file (0600, retention per target, torn lines, old
+rows local), profile isolation and a switch mid-run, the pane's lists, and
+node for compare. Live: the real gateway on its stub Ollama (the figures,
+signed calls, a chat refused, Stop, the server off, profile B), and a copy
+with the stub provider (the routes behind the confirmation, one call each at
+256 tokens, cloud.json untouched, a chat refused, Stop, profile B, no key in
+any reply, log or file but cloud.json). 64 mutations of the new code each caught by the check that guards it (the 6b331 and 6b334 mutations still run).
+Gauntlet: 655 checks, 26 of them new. Four full runs before the last review fix gave 653/654 each time, the one miss a load-timing check: the profile-switch stream test three times (a real Llama 3.2 3B answer not yet streaming when the profile switched; the same test alone on this branch and on origin/main passed in 13-14 s, 4 of 4 and 3 of 3 once the machine was quiet), and once instead the 6b331 live Stop test (3.08 s against its 3 s limit). The review fix (clean on read, sparse Compare) was checked by the 15 new in-process and node checks and the 17 in-process 6b331 checks, not by a full run.
+
+**Not verified.** The pane in WKWebView (looked at in Blink only). A real
+cloud provider (the gauntlet's stand-in speaks the shapes the app already
+handles; Gemini's and Kimi's streams were not exercised, and their usage
+counts may count hidden reasoning, which makes writes read high), and a
+model that thinks before it writes may use its 256 tokens first (the row
+says so). A real Ollama's `load_duration` and `/api/ps` through the real
+gateway (the stub reports no load duration; the figure's path is covered by
+the in-process stand-in). A run against Patrick's own server. Windows.
+
 ## 6b340 — funnel pictures: three across, and always one
 Patrick (2026-09-30), with a screenshot of a picture funnel's stage of
 six: "For the funnel using images as well, if we can, let's make the

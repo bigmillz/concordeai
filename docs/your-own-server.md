@@ -289,6 +289,19 @@ gpt-oss:120b    ram
 - A line with any other word after the name is ignored: `ram` is the only
   flag.
 
+## Measuring it
+
+Settings › Usage › Benchmark can run its fixed test on a server's models:
+pick the server in the list, tick the models and press Run. It loads each
+ticked model on the server's card and stores nothing there. Models that fit
+the card whole start ticked; `gpu+ram` ones start unticked, because they load
+the server's CPU hard. Writes, reads and load are Ollama's own figures, which
+the gateway passes on as they are. First token is timed on the computer, so it
+includes the network. The gateway doesn't let a client unload a model, so a
+model that was already loaded has no load time to measure and the row says so.
+The results are kept per profile and can be compared with this computer's and
+with cloud models'.
+
 ## The other two ways in
 
 ### Cloudflare Tunnel

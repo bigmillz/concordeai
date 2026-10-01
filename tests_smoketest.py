@@ -9617,7 +9617,7 @@ import threading as _th26, contextlib as _cx26, hmac as _hm26, secrets as _se26
 _PHOSTS26 = ("generativelanguage.googleapis.com", "api.groq.com",
              "api.anthropic.com", "api.moonshot.ai")
 _S26 = {"reqs": [], "late401": {}, "t401": [], "bad": set(), "drop": set(), "busy": set(), "probe403": set(),
-        "lock": _th26.Lock()}
+        "lock": _th26.Lock(), "bench_calls": [], "bench_delay": 0}
 _STUB_TEXT26 = ("A stub provider wrote this reply for the gauntlet. It answers in plain "
                 "sentences so the repetition checks pass, it names no real place, and it "
                 "says nothing about any key. Every sentence here differs from the one "
@@ -9700,6 +9700,37 @@ class _Stub26(_hs26.BaseHTTPRequestHandler):
                        % (_STUB26.server_address[1], _PHOSTS26[0])}}]}})
         if "/files/clip26" in p:
             return self._out(200, b"\0\0\0\x18ftypmp42" + os.urandom(4000), "video/mp4")
+        if (d.get("stream") and d.get("max_tokens") == 256 and "tide mill" in json.dumps(d.get("messages"))
+                and (p.endswith("/messages") or p.endswith("/chat/completions"))):
+            # (6b341) the benchmark's own call: a stream of words, a usage count, its pace
+            _S26["bench_calls"].append({"p": self.path, "k": key, "body": d})
+            self.close_connection = True
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            anth = p.endswith("/messages")
+            try:
+                if anth:
+                    self.wfile.write(("data: %s\n\n" % json.dumps({"type": "message_start", "message": {
+                        "usage": {"input_tokens": 1000}}})).encode())
+                for i_ in range(40):
+                    ev_ = ({"type": "content_block_delta", "delta": {"type": "text_delta", "text": "w%d " % i_}}
+                           if anth else {"choices": [{"delta": {"content": "w%d " % i_}}]})
+                    self.wfile.write(("data: %s\n\n" % json.dumps(ev_)).encode())
+                    self.wfile.flush()
+                    if _S26["bench_delay"]:
+                        time.sleep(_S26["bench_delay"])
+                if anth:
+                    self.wfile.write(("data: %s\n\n" % json.dumps({"type": "message_delta", "delta": {
+                        "stop_reason": "end_turn"}, "usage": {"output_tokens": 40}})).encode())
+                else:
+                    self.wfile.write(("data: %s\n\ndata: [DONE]\n\n" % json.dumps({"choices": [], "usage": {
+                        "prompt_tokens": 1000, "completion_tokens": 40}})).encode())
+                self.wfile.flush()
+            except OSError:
+                pass
+            return
         if p.endswith("/messages"):                # Anthropic
             if d.get("stream"):
                 ev = [{"type": "message_start", "message": {"usage": {"input_tokens": 9}}},
@@ -16459,15 +16490,16 @@ def _bm_pins(src):
     ok = ("@_bench_guarded\ndef run_model(" in src
           and '        if not server_only_request(req_json, self.ctx):\n'
               '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, '
-              '"bench": True}, code=409)\n                return\n            self._bench_held = True\n\n'
-              '        messages = list(req_json.get("messages", []))' in src
+              '"bench": True}, code=409)\n                return\n            self._bench_held = True\n'
+              '        else:\n' in src
           and "            if self._bench_held:\n                self._bench_held = False\n"
-              "                bench_release()\n            bind_ctx(None)" in src
+              "                bench_release()\n            if self._bench_srv_held:" in src
           and 'if _mlx_procs and _mlx_last_use and not _bench["running"] and' in src
           and 'if time.time() - _mlx_last_use > 300 and \\\n                            not _bench["running"]:' in src
           and 'env=(dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")\n             if offline else None)' in src
-          and 'elif self.path == "/api/bench":\n            # the hardware benchmark (6b331): the run and the saved runs\n            self._send_json(bench_status())' in src
-          and 'if self.path in ("/api/bench/start", "/api/bench/stop"):' in src
+          and 'elif self.path == "/api/bench":\n            # the hardware benchmark (6b331): the run and the saved runs\n' in src
+          and "self._send_json(bench_status(self.ctx))" in src
+          and 'if self.path in ("/api/bench/start", "/api/bench/stop",' in src
           and "urlopen" not in _bm_slices(src)[1] and "https://" not in _bm_slices(src)[1]
           # the review's fixes where they meet the app and the page
           and '        if not _bench["running"]:\n            _spawn_mlx_engine(label)' in src
@@ -16492,7 +16524,7 @@ def _bm_pins(src):
           and '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, '
               '"bench": True}, code=409)\n                return\n            self._bench_held = True\n'
               '            goal = str(d.get("goal", "")).strip()[:300]' in src
-          and src.index('            self._bench_held = True\n\n        messages = list(req_json')
+          and src.index('            self._bench_srv_held = True\n\n        messages = list(req_json')
               < src.index('        _rw = req_json.get("rewind")')
               < src.index('            _landed, _n, _h = chat_append_turn(')
           and 'if(tr&&tr.id===myChat)turn.rewind={op:"truncate",id:tr.id,' in src
@@ -16789,7 +16821,7 @@ _BM_MUT = [
      "        kept = False"),
     ("a chat counted while a run goes", "        if _bench[\"running\"]:\n            return False\n        _bench_busy[\"n\"] += 1",
      "        _bench_busy[\"n\"] += 1"),
-    ("a run started while an answer is written", "        if _bench_busy[\"n\"]:\n            return False, BENCH_ANSWERING\n", ""),
+    ("a run started while an answer is written", "        if _bench_busy[\"n\"] or (target != \"local\" and _bench_busy[\"srv\"]):\n            return False, BENCH_ANSWERING\n", ""),
     ("model calls not gated", "        if not bench_hold():\n            raise RuntimeError(BENCH_BUSY)\n", "        bench_hold()\n"),
     ("Stop doesn't stop", "    if running:\n        _bench_stop.set()", "    if running:\n        pass"),
     ("the stand-in's Stop ignored", "            if _bench_stop.wait(self.pace):\n                raise BenchStopped()",
@@ -16803,8 +16835,8 @@ _BM_MUT = [
     ("a torn last line left open", "                        line = b\"\\n\" + line      # after a torn last line", "                        pass"),
     ("the history oldest first", "    runs.sort(key=lambda r: -r[\"t\"])", "    runs.sort(key=lambda r: r[\"t\"])"),
     ("the history never trimmed", "        if len(runs) > BENCH_KEEP:", "        if False:"),
-    ("the chat not held", '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n                return\n            self._bench_held = True\n\n        messages',
-     '            if False:\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n                return\n            self._bench_held = True\n\n        messages'),
+    ("the chat not held", '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n                return\n            self._bench_held = True\n        else:',
+     '            if False:\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n                return\n            self._bench_held = True\n        else:'),
     ("the chat's hold never released", "            if self._bench_held:\n                self._bench_held = False\n                bench_release()",
      "            if self._bench_held:\n                self._bench_held = False"),
     ("the janitor under a run", 'if _mlx_procs and _mlx_last_use and not _bench["running"] and', 'if _mlx_procs and _mlx_last_use and'),
@@ -16819,7 +16851,7 @@ _BM_MUT = [
     ("the settle doesn't watch the memory", "        if now is None or now <= floor:\n            break\n        floor = now",
      "        break"),
     ("an Ollama unload not waited for", "    while wait and tag in _ollama_loaded() and", "    while False and tag in _ollama_loaded() and"),
-    ("a run started while a download runs", "        if _bench_downloading():\n            return False, BENCH_DOWNLOADING\n", ""),
+    ("a run started while a download runs", "        if target == \"local\" and _bench_downloading():\n            return False, BENCH_DOWNLOADING\n", ""),
     ("a finished download's engine started mid-run", '        if not _bench["running"]:\n            _spawn_mlx_engine(label)',
      "        if True:\n            _spawn_mlx_engine(label)"),
     ("Ollama's models left loaded at the start", "        for tag in was:\n            _ollama_unload(tag)",
@@ -17561,7 +17593,10 @@ def _svc_pins(src):
                               "(6b334), never a fallback\n        return server_stream(label, messages, emit)")
         < rm.index("if label not in MODEL_ROUTES:"),
         "guard": "        if a and server_label(a[0]):\n            # your own server's model (6b334): "
-                 "not this computer's engines\n            return fn(*a, **k)\n        if not bench_hold():" in src,
+                 "not this computer's engines,\n" in src
+        and "            if not bench_hold_remote():\n                raise RuntimeError(BENCH_BUSY)\n"
+            "            try:\n                return fn(*a, **k)\n            finally:\n"
+            "                bench_release_remote()\n        if not bench_hold():" in src,
         "council keeps it": "        if server_label(l):\n            usable.append(l)" in src,
         "picks": "                       or server_pick(m, self.ctx)[0] is not None]" in ch,
         "one server model": "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n"
@@ -21192,6 +21227,129 @@ check("server only (live): profile B has no row for A's server, and A's mode say
                           "Pick another model. Nothing was sent anywhere else."
       and not [k_ for k_ in _tiB if k_.startswith("srv:")] and len(_o1("/log")["log"]) == _nlogB,
       "%r" % [_scBo[1], list(_tiB)])
+# ---- benchmark a server (6b341), through the REAL gateway and its stub Ollama: the figures Ollama gives and
+# the gateway passes on, the signed calls and the fixed test, a card from /v1/info, a chat refused while it
+# runs, Stop, a server that is off (no fallback), the profile's own file, and B seeing none of it
+_b41p = _bm_ns(_MILLENAI_SRC)["BENCH_PROMPT"]
+
+
+def _b41_wait_run(secs=60):
+    end_ = time.time() + secs
+    d_ = {}
+    while time.time() < end_:
+        d_ = _svq("/api/bench")[1]
+        if isinstance(d_, dict) and d_.get("running") is False:
+            return d_
+        time.sleep(0.2)
+    return d_ if isinstance(d_, dict) else {}
+
+
+_o1("/delay", {"s": 0})
+_bt1 = _svq("/api/bench/targets?refresh=" + _sid34)
+_bts = (_bt1[1].get("servers") or [{}])[0] if isinstance(_bt1[1], dict) else {}
+_btm = {m_["name"]: m_ for m_ in _bts.get("models") or []}
+_nlb = len(_o1("/log")["log"])
+_nsb = len(_o1("/stub")["calls"])
+_bs1 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b"]})
+_bd1 = _b41_wait_run()
+_br1 = (_bd1.get("run") or {})
+_brow1 = (_br1.get("models") or [{}])[0]
+_blog = [r_ for r_ in _o1("/log")["log"][_nlb:] if r_["path"] in ("/api/chat", "/api/generate", "/api/ps")]
+_bchat = [r_ for r_ in _blog if r_["path"] == "/api/chat"]
+_bstub = [c_ for c_ in _o1("/stub")["calls"][_nsb:] if c_[1] == "/api/chat"]
+_bfile = os.path.join(_SV.home, "bench_targets.jsonl")
+_braw = open(_bfile, "rb").read() if os.path.exists(_bfile) else b""
+_brec = [json.loads(x_) for x_ in _braw.splitlines()]
+_seedb = json.load(open(_sfile34))["servers"][0].get("seed", "")
+check("benchmark servers (live): the real gateway: the figures are Ollama's own from its last line, the card is "
+      "/v1/info's, every call is signed and carries the fixed test, nothing is unloaded",
+      _bts.get("name") == _SVN and _bts.get("card") == "Test Card · 16 GB" and "small:8b" in _btm
+      and _btm["small:8b"].get("tick") is True and "version" in _bts
+      and _bs1[0] == 200 and _br1.get("state") == "done" and _br1.get("target") == "server"
+      and _br1.get("target_name") == _SVN and _br1.get("card") == "Test Card · 16 GB"
+      and _brow1.get("status") == "done" and _brow1.get("src") == "engine" and _brow1.get("gen_tps") == 50.0
+      and _brow1.get("network") is True and _brow1.get("prompt_tps") is None
+      and _brow1.get("load_src") == "not measured" and _brow1.get("label") == _SVN + " · small:8b"
+      and len(_bchat) == 1 and "X-O1-Signature" in _bchat[0]["headers"]
+      and json.loads(_bchat[0]["body"])["messages"] == [{"role": "user", "content": _b41p}]
+      and json.loads(_bchat[0]["body"])["options"] == {"temperature": 0, "seed": 42, "num_predict": 256,
+                                                         "num_ctx": 4096}
+      and "keep_alive" not in json.loads(_bchat[0]["body"])
+      and _bstub and _bstub[0][2]["options"].get("num_predict") == 256 and _bstub[0][2]["options"].get("seed") == 42
+      and _bstub[0][2].get("keep_alive") is None,
+      "%r" % [_bts.get("card"), _bs1, _br1.get("state"), _brow1, [r_["path"] for r_ in _blog]])
+check("benchmark servers (live): kept in the profile's own file (0600, the server's name and card, no Access "
+      "secret, device key or address), none in the machine's benchmarks.jsonl",
+      os.path.exists(_bfile) and _st34.S_IMODE(os.stat(_bfile).st_mode) == 0o600
+      and len(_brec) == 1 and _brec[0].get("target") == "server" and _brec[0].get("target_name") == _SVN
+      and _brec[0].get("card") == "Test Card · 16 GB" and _brec[0].get("cost_warning") is False
+      and _braw.isascii() and _O1SEC.encode() not in _braw and _seedb.encode() not in _braw
+      and (":%d" % _O1FRONT).encode() not in _braw and b"127.0.0.1" not in _braw
+      and not any(json.loads(x_).get("target") != "local" for x_ in (
+          open(os.path.join(_SV.home, "benchmarks.jsonl"), "rb").read().splitlines()
+          if os.path.exists(os.path.join(_SV.home, "benchmarks.jsonl")) else [])),
+      "%r" % [_brec[:1], _braw[:300]])
+# a slow server: chats, a chat on this server's model and a funnel are refused, Stop cuts it within a few seconds
+_o1("/delay", {"s": 0.3})
+_nlb2 = len(_o1("/log")["log"])
+_bs2 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b", "sneaky:14b"]})
+_end_b = time.time() + 30
+_bm_ = {}
+while time.time() < _end_b:
+    _bm_ = _svq("/api/bench")[1]
+    _mr = ((_bm_.get("run") or {}).get("models") or [{}])[0]
+    if _mr.get("status") == "writing" and _mr.get("tok", 0) >= 2:
+        break
+    time.sleep(0.1)
+_bc_srv = _svchat(text="chat during a server benchmark q341")
+_bc_loc = _svchat(models=["Llama 3.2 3B"], text="local chat during a server benchmark q341")
+_bfun2 = _svq("/api/funnel", "POST", {"goal": "g341", "chat_id": "cfun341"})
+_bs3 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b"]})
+_bt0 = time.time()
+_bstop = _svq("/api/bench/stop", "POST", {})
+_bd2 = _b41_wait_run(15)
+_btook = time.time() - _bt0
+_br2 = _bd2.get("run") or {}
+_bchats2 = json.dumps(_svq("/api/chats")[1])
+_o1("/delay", {"s": 0})
+check("benchmark servers (live): while a run goes a chat, a chat on the server's own model and a funnel are "
+      "refused with the question unsaved; Stop ends it within seconds, the rest are not run",
+      _bs2[0] == 200 and _bc_srv[0] == 409 and _bc_loc[0] == 409 and _bfun2[0] == 409
+      and "A hardware benchmark is running" in _bc_srv[1] and "q341" not in _bchats2 and "cfun341" not in _bchats2
+      and _bs3[0] == 409 and _bstop == (200, {"ok": True, "stopped": True}) and _btook < 5
+      and _br2.get("state") == "stopped" and [r_.get("status") for r_ in _br2.get("models") or []] == ["stopped", "not run"],
+      "%r" % [_bs2, _bc_srv[:2], _bc_loc[:2], _bfun2, _bs3, _bstop, round(_btook, 2), _br2.get("state")])
+# the server off: its failure is the row's, nothing runs anywhere else
+_o1("/down", {})
+_nlb3 = len(_o1("/log")["log"])
+_bs4 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b"]})
+_bd4 = _b41_wait_run(60)
+_br4 = _bd4.get("run") or {}
+_o1("/up", {})
+check("benchmark servers (live): a server that is off fails on its row and nothing runs on this computer or in the cloud",
+      _bs4[0] == 200 and [r_.get("status") for r_ in _br4.get("models") or []] == ["failed"]
+      and ((_br4.get("models") or [{}])[0].get("note") or "").startswith("Failed: %s didn’t answer" % _SVN)
+      and all(r_["path"] != "/api/chat" for r_ in _o1("/log")["log"][_nlb3:]),
+      "%r" % [_bs4, _br4.get("models")])
+# a profile's own: B sees none of A's runs or server, and can't start A's
+_pB41 = _svq("/api/test/profile", "POST", {"op": "create"})[1].get("name", "")
+_svq("/api/test/profile", "POST", {"op": "switch", "to": _pB41})
+_bB1 = _svq("/api/bench")[1]
+_bB2 = _svq("/api/bench/targets")[1]
+_bB3 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b"]})
+_bB4 = _svq("/api/bench/cloud-plan", "POST", {"models": [{"pid": "groq", "model": "openai/gpt-oss-120b"}]})
+_svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
+_bA1 = _svq("/api/bench")[1]
+check("benchmark servers (live): profile B sees none of A's runs or servers and can't benchmark A's server; A's runs are intact",
+      _pB41 and [r_ for r_ in _bB1.get("history") or [] if r_.get("target") != "local"] == []
+      and _bB1.get("run") is None and _bB2.get("servers") == []
+      and _bB2.get("cloud") == [] and _bB3[0] == 400 and "isn’t in Settings" in _bB3[1].get("err", "")
+      and _bB4[0] == 400 and "err" in _bB4[1]
+      and [r_.get("target") for r_ in _bA1.get("history") or []].count("server") == 3
+      and [r_.get("target") for r_ in _bB1.get("history") or []].count("local") == [
+          r_.get("target") for r_ in _bA1.get("history") or []].count("local")
+      and not os.path.exists(os.path.join(_SV.home, "accounts", _pB41, "bench_targets.jsonl")),
+      "%r" % [_bB1, _bB2, _bB3, _bB4, len(_bA1.get("history") or [])])
 # the Access secret and the device key: in servers.json only
 _rowA = json.load(open(_sfile34))["servers"][0]
 _seed34 = _rowA.get("seed", "")
@@ -22665,6 +22823,1592 @@ check("funnel pictures (live): the ask-again route needs the launch key and the 
       and ".fopts.pics.n4{--fc:2}" in page and "function fnImgKeep(b,opts,st){" in page,
       "%r" % [_fg0, _fg1, _fg2, _fg3, _fg4, _fg5])
 # ==== 6b340 funnel pictures: end ====
+
+
+# ==== 6b341 benchmark targets: begin ====
+print("== benchmark servers, cloud models and compare (6b341) ==")
+# BENCHMARK A SERVER, A PROVIDER (6b341, per Patrick: "can the benchmark
+# feature also allow benchmarking your servers? cloud servers too with a
+# warning that it may incur cost via api. then allow those benchmarks to be
+# compared"). In process: the real servers section (signed requests, the
+# real _srv_send and _srv_fail) and the real cloud body builders against
+# stand-in servers on 127.0.0.1 (an Ollama behind a gateway; a provider
+# that streams), on a clock that ticks 25 ms a call so every figure is
+# exact. Nothing here touches the network or a real key. Then the compare
+# logic and the pane in node, the source pinned where it meets the app,
+# and each protection mutated in the source and shown caught.
+import http.server as _hs41
+import socketserver as _ss41
+import threading as _t41
+import stat as _st41
+
+
+class _B41Clock:
+    """time, with a monotonic that ticks 25 ms a call: the figures a
+    benchmark computes from it are exact (only the run's own thread asks)."""
+    def __init__(self):
+        self._n = 0
+        self._lk = _t41.Lock()
+
+    def monotonic(self):
+        with self._lk:
+            self._n += 1
+            return self._n * 0.025
+
+    def __getattr__(self, a):
+        return getattr(time, a)
+
+
+class _B41Server:
+    """An HTTP server on 127.0.0.1 whose handler is a function of (self,
+    method, path, body): the stand-ins' base."""
+    def __init__(self, fn):
+        outer = self
+        self.log, self.closed_early, self.gate = [], _t41.Event(), _t41.Event()
+
+        class H(_hs41.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *a):
+                pass
+
+            def _any(self):
+                n = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(n) if n else b""
+                try:
+                    body = json.loads(raw) if raw else {}
+                except ValueError:
+                    body = {}
+                outer.log.append((self.command, self.path, dict(self.headers), body))
+                try:
+                    fn(outer, self, self.command, self.path, body)
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    outer.closed_early.set()
+
+            do_GET = do_POST = _any
+
+        class S(_ss41.ThreadingMixIn, _hs41.HTTPServer):
+            daemon_threads = True
+
+            def handle_error(self, request, client_address):
+                pass                    # a client that went away (Stop) is not news
+        self.httpd = S(("127.0.0.1", 0), H)
+        self.port = self.httpd.server_address[1]
+        _t41.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def stop(self):
+        self.gate.set()
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+def _b41_send_json(h, status, obj):
+    raw = json.dumps(obj).encode()
+    h.send_response(status)
+    h.send_header("Content-Type", "application/json")
+    h.send_header("Content-Length", str(len(raw)))
+    h.end_headers()
+    h.wfile.write(raw)
+    h.wfile.flush()
+
+
+class _B41Ollama:
+    """A stand-in Ollama behind the gateway: what the app's own signed calls reach."""
+    def __init__(self):
+        self.models = [{"name": "small:8b", "placement": "gpu", "size": 5 << 30},
+                       {"name": "big:70b", "placement": "gpu+ram", "size": 40 << 30},
+                       {"name": "mid:14b", "placement": "gpu", "size": 9 << 30}]
+        self.loaded, self.tokens, self.delay = [], 40, 0.0
+        self.hang_load = False          # the empty load answers nothing, for ever
+        self.final = {"load_duration": 1_500_000_000, "prompt_eval_count": 1000,
+                      "prompt_eval_duration": 250_000_000}
+        self.fail = {}                  # (path, model) -> (status, body)
+        self.err_line = None            # an error line after two chunks
+        self.s = _B41Server(self._h)
+        self.log = self.s.log
+
+    def _h(self, srv, h, method, path, body):
+        if path == "/v1/whoami":
+            return _b41_send_json(h, 200, {"device_id": "x", "name": "t", "server_time": int(time.time())})
+        if path == "/api/tags":
+            return _b41_send_json(h, 200, {"models": [dict(m, gpu_pct=None) for m in self.models]})
+        if path == "/api/ps":
+            return _b41_send_json(h, 200, {"models": [
+                {"name": n, "size": 5 << 30, "size_vram": 5 << 30, "placement": "gpu", "gpu_pct": 100}
+                for n in self.loaded]})
+        if path == "/api/version":
+            return _b41_send_json(h, 200, {"version": "0.12.9"})
+        if path == "/v1/info":
+            return _b41_send_json(h, 200, {"gpu": {"vendor": "amd", "name": "Test Card",
+                                                   "vram_bytes": 16 << 30}})
+        model = body.get("model")
+        if (path, model) in self.fail or (path, None) in self.fail:
+            st, ob = self.fail.get((path, model)) or self.fail[(path, None)]
+            return _b41_send_json(h, st, ob)
+        if path == "/api/generate":
+            if self.hang_load:
+                srv.gate.wait(30)
+                return
+            if model not in self.loaded:
+                self.loaded.append(model)
+            line = dict({"model": model, "done": True, "done_reason": "load", "response": ""},
+                        load_duration=self.final.get("load_duration"))
+            line = {k: v for k, v in line.items() if v is not None}
+            return _b41_send_json(h, 200, line)
+        if path == "/api/chat":
+            h.send_response(200)
+            h.send_header("Content-Type", "application/x-ndjson")
+            h.send_header("Transfer-Encoding", "chunked")
+            h.end_headers()
+
+            def chunk(o):
+                d = json.dumps(o).encode() + b"\n"
+                h.wfile.write(b"%x\r\n%s\r\n" % (len(d), d))
+                h.wfile.flush()
+            for i in range(self.tokens):
+                if self.err_line and i == 2:
+                    chunk(self.err_line)
+                    h.wfile.write(b"0\r\n\r\n")
+                    return
+                chunk({"model": model, "message": {"role": "assistant", "content": "t%d " % i},
+                       "done": False})
+                if self.delay:
+                    time.sleep(self.delay)
+            fin = {"model": model, "done": True, "done_reason": "stop",
+                   "message": {"role": "assistant", "content": ""}, "eval_count": self.tokens,
+                   "eval_duration": self.tokens * 20_000_000}
+            for k, v in self.final.items():
+                if v is not None:
+                    fin[k] = v
+            if self.final.get("eval_duration", 1) is None:
+                fin.pop("eval_duration")
+            chunk(fin)
+            h.wfile.write(b"0\r\n\r\n")
+            return
+        _b41_send_json(h, 404, {"error": "not found"})
+
+    def stop(self):
+        self.s.stop()
+
+
+class _B41Cloud:
+    """A stand-in provider: OpenAI-shaped and Anthropic-shaped streams on
+    127.0.0.1, any answer to be forced, and every call recorded."""
+    def __init__(self):
+        self.tokens, self.delay, self.usage = 40, 0.0, True
+        self.status = {}                # path suffix -> (status, body)
+        self.hang = False               # no headers, for ever
+        self.empty = None               # a finish reason with no text
+        self.hidden = 0                 # reasoning tokens the usage counts but the stream hid
+        self.s = _B41Server(self._h)
+        self.log = self.s.log
+
+    def _h(self, srv, h, method, path, body):
+        if self.hang:
+            srv.gate.wait(30)
+            return
+        for suf, (st, ob) in self.status.items():
+            if path.endswith(suf):
+                raw = json.dumps(ob).encode() if not isinstance(ob, bytes) else ob
+                h.send_response(st)
+                h.send_header("Content-Length", str(len(raw)))
+                h.end_headers()
+                h.wfile.write(raw)
+                return
+        h.close_connection = True       # close-delimited, as a provider's stream is
+        h.send_response(200)
+        h.send_header("Content-Type", "text/event-stream")
+        h.send_header("Connection", "close")
+        h.end_headers()
+
+        def ev(o, name=None):
+            h.wfile.write((("event: %s\n" % name if name else "") + "data: " + (
+                json.dumps(o) if not isinstance(o, str) else o) + "\n\n").encode())
+            h.wfile.flush()
+        anth = path.endswith("/messages")
+        if anth:
+            ev({"type": "message_start", "message": {"usage": {"input_tokens": 1000, "output_tokens": 1}}})
+        if self.empty is not None:
+            if anth:
+                ev({"type": "message_delta", "delta": {"stop_reason": self.empty}, "usage": {"output_tokens": 256}})
+            else:
+                ev({"choices": [{"delta": {}, "finish_reason": self.empty}]})
+            return
+        for i in range(self.tokens):
+            if anth:
+                ev({"type": "content_block_delta", "delta": {"type": "text_delta", "text": "w%d " % i}})
+            else:
+                ev({"choices": [{"delta": {"content": "w%d " % i}}]})
+            if self.delay:
+                time.sleep(self.delay)
+        if anth:
+            if self.usage:
+                ev({"type": "message_delta", "delta": {"stop_reason": "end_turn"},
+                    "usage": {"output_tokens": self.tokens}})
+        else:
+            if self.usage:
+                u = {"prompt_tokens": 1000, "completion_tokens": self.tokens + self.hidden}
+                if self.hidden:
+                    u["completion_tokens_details"] = {"reasoning_tokens": self.hidden}
+                ev({"choices": [], "usage": u})
+            ev("[DONE]")
+
+    def stop(self):
+        self.s.stop()
+
+
+_B41_KEYS = {"groq": "gsk_" + _canary("GROQKEY"), "claude": "sk-ant-" + _canary("CLAUDEKEY")}
+
+
+class _B41World:
+    """The benchmark's section on the real servers section and profile
+    sections of src: a paired server on the stand-in Ollama, two cloud
+    providers on the stand-in provider, a recording stand-in for every
+    path that must stay unused."""
+    def __init__(self, src, name="Desk", prices=None):
+        ns, ctx, d = _sv_ns(src)
+        self.ns, self.ctx, self.d, self.src = ns, ctx, d, src
+        self.ollama, self.cloud = _B41Ollama(), _B41Cloud()
+        base = "http://127.0.0.1:%d" % self.cloud.s.port
+        self.conf = {
+            "groq": {"name": "Groq", "key": _B41_KEYS["groq"], "status": "ok",
+                     "base": base + "/api.groq.com/openai/v1", "model": "openai/gpt-oss-120b",
+                     "models": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3-32b"]},
+            "claude": {"name": "Claude", "key": _B41_KEYS["claude"], "status": "ok",
+                       "base": base + "/api.anthropic.com/v1", "model": "claude-sonnet-5",
+                       "models": ["claude-haiku-5", "claude-sonnet-5", "claude-opus-5"]}}
+        self.conf0 = json.dumps(self.conf, sort_keys=True)
+        self.local_calls, self.clock = [], _B41Clock()
+        import platform as _pf41
+        gate, sect = _bm_slices(src)
+        ns.update({
+            "socket": socket, "http": __import__("http.client"), "copy": __import__("copy"),
+            "functools": __import__("functools"), "platform": _pf41,
+            "plistlib": __import__("plistlib"), "HAS_PSUTIL": False, "psutil": None,
+            "APP_BUILD": 999, "_hook_arg": lambda n: "", "mem_pressure": lambda: 12.5,
+            "SUPPORTED": {}, "MODEL_MEM_BYTES": {}, "MLX_REPOS": {},
+            "model_cached": lambda l, pulled=None: True, "ollama_pulled_tags": lambda: set(),
+            "_spawn_ollama_serve": lambda: False, "_mlx_procs": {},
+            "_engine_lock": _t41.Lock(), "_stop_other_mlx": lambda keep: None,
+            "_own_engine_port": lambda l: 1, "_port_in_use": lambda p: False,
+            "_listener_is_mine": lambda p: True, "_spawn_mlx_engine": lambda l, offline=False: True,
+            "_retire_engine": lambda l: None, "model_fits_memory": lambda l: True,
+            "model_is_giant": lambda l: False, "giants_on": lambda: False,
+            "slow_giant": lambda l: False, "ollama_url": lambda p: "http://127.0.0.1:1" + p,
+            "_mlx_last_use": 0.0, "_setup_jobs": {}, "_setup_lock": _t41.Lock(),
+            "IS_WIN": False, "APP_VERSION": "9.9"})
+        exec(gate, ns)
+        exec(sect, ns)
+        # the real cloud body builders and pick rules, on a stand-in conf
+        for n_ in _ctree.body:
+            nm = getattr(n_, "name", None)
+            if nm is None and isinstance(n_, _ast.Assign):
+                nm = next((getattr(t, "id", None) for t in n_.targets), None)
+            if nm in {"_provider_of", "_openai_body", "_anthropic_body", "_anthropic_turns",
+                      "_openai_messages", "_img_parts", "_claude_takes_effort", "_CLAUDE_ID",
+                      "_EFFORT", "_STREAM_USAGE_ASK", "_stream_usage_off", "CLOUD_MAX_OUT",
+                      "cloud_failure_kind", "_QUOTA_RX", "_BAD_KEY_RX", "_MODEL_GONE_RX",
+                      "_NO_CREDIT_RX", "cloud_candidates", "_vtuple", "_GEM_FLASH",
+                      "_QWEN_ID", "_KIMI_ID", "CLOUD_PICK_ORDER"}:
+                exec(_ast.get_source_segment(_MILLENAI_SRC, n_), ns)
+        ns.update(_cloud_all=lambda: {"providers": json.loads(json.dumps(self.conf))
+                                      if ns["bound_ctx"]() is self.ctx else {}},
+                  cloud_model_alive=lambda m: True,
+                  _PROVIDER_STUB="http://127.0.0.1:%d" % self.cloud.s.port,
+                  _bench_engine=lambda l: self.local_calls.append(l) or 1 / 0,
+                  run_model=lambda *a, **k: self.local_calls.append(a))
+        ns["BENCH_PRICES"].update(prices or {})
+        self.entry = None
+        self.pair(name)
+        ns["time"] = self.clock
+
+    def pair(self, name="Desk"):
+        ns = self.ns
+        a, p, _sent = _sv_paired(ns, self.ctx, name=name,
+                                 url="http://127.0.0.1:%d" % self.ollama.s.port)
+        ns["_srv_send"] = ns["_srv_send_real"]
+        self.entry = ns["_srv_find"](ns["_srv_read"](self.ctx), a["id"])
+        ns["server_check"](self.entry)
+        return self.entry
+
+    def spec(self, models=("small:8b",)):
+        return {"target": "server", "server": self.entry["id"], "models": list(models)}
+
+    def plan(self, picks=(("groq", "openai/gpt-oss-120b"),), ctx=None):
+        return self.ns["bench_cloud_plan"](ctx or self.ctx, [{"pid": p, "model": m} for p, m in picks])
+
+    def cloud_spec(self, plan):
+        return {"target": "cloud", "confirm": plan["id"], "understood": True}
+
+    def wait(self, secs=30):
+        end = time.time() + secs
+        while time.time() < end and self.ns["_bench"]["running"]:
+            time.sleep(0.02)
+        return not self.ns["_bench"]["running"]
+
+    def run(self, spec, ctx=None):
+        ok, got = self.ns["bench_start"](spec, ctx or self.ctx)
+        return ok, got, (self.wait() if ok else True)
+
+    def rows(self):
+        return self.ns["_bench"]["run"]["models"]
+
+    def stop(self):
+        for x in (self.ollama, self.cloud):
+            try:
+                x.stop()
+            except Exception:
+                pass
+
+
+def _b41_world(src, **kw):
+    return _B41World(src, **kw)
+
+
+def _b41_wait_for(pred, secs=15):
+    end = time.time() + secs
+    while time.time() < end:
+        if pred():
+            return True
+        time.sleep(0.01)
+    return False
+
+
+_B41_PROMPT = _bm_ns(_MILLENAI_SRC)["BENCH_PROMPT"]
+
+
+def _b41_done(P, extra=None):
+    """(every part true, the parts that aren't and what was seen)."""
+    bad = [k for k, v in P.items() if not v]
+    return not bad, {"failed": bad, "seen": extra}
+
+
+def _b41_server_run(src):
+    """A server run: the figures are Ollama's own from the last line the
+    gateway passes on, the first token is timed here, the card comes from
+    /v1/info, and every call is signed and carries the fixed test."""
+    W = _b41_world(src)
+    try:
+        ns, ctx, o = W.ns, W.ctx, W.ollama
+        o.loaded = ["mid:14b"]                  # one is already in the server's memory
+        ok0, run, fin = W.run(W.spec(("small:8b", "mid:14b")))
+        rows = {r["model"]: r for r in W.rows()}
+        s, m = rows.get("small:8b", {}), rows.get("mid:14b", {})
+        recs = ns["bench_targets_history"](ctx)
+        rec = recs[0] if recs else {}
+        p = os.path.join(W.d, "bench_targets.jsonl")
+        chat = [x for x in o.log if x[1] == "/api/chat"]
+        gen = [x for x in o.log if x[1] == "/api/generate"]
+        P = {
+            "started and finished": ok0 and fin and run["state"] == "done",
+            "target and its names": run["target"] == "server" and run["target_name"] == "Desk"
+            and run["card"] == "Test Card · 16 GB"
+            and run["versions"] == {"mlx_lm": None, "ollama": "0.12.9"},
+            "row": s.get("status") == "done" and s.get("engine") == "Ollama"
+            and s["label"] == "Desk · small:8b" and s.get("network") is True,
+            "writes: the server's own": s["gen_tps"] == 50.0 and s["src"] == "engine" and s["gen_tokens"] == 40,
+            "reads: the server's own": s["prompt_tps"] == 4000.0,
+            "load: the server's own": s["load_s"] == 1.5 and s["load_src"] == "engine",
+            "first token: measured here": s["ttft_s"] == 0.025,
+            "placement and the card's share": s.get("placement") == "gpu"
+            and s.get("gpu_size") == 5 << 30 and s.get("gpu_vram") == 5 << 30,
+            "no load time for a model already loaded": m.get("status") == "done" and m["load_s"] is None
+            and m["load_src"] == "not measured" and "Already in the server" in m["note"]
+            and m["gen_tps"] == 50.0 and m["prompt_tps"] == 4000.0,
+            "no memory figures of this computer": "mem_rise" not in s and "mem_peak" not in s,
+            "every call signed": len(chat) == 2 and len(gen) == 2 and all(
+                "X-O1-Signature" in x[2] and "X-O1-Device" in x[2]
+                and x[2].get("User-Agent", "").startswith("ConcordeAI/")
+                for x in o.log if x[1] in ("/api/chat", "/api/generate", "/api/ps")),
+            "the fixed test, nothing unloaded": chat[0][3]["messages"] == [
+                {"role": "user", "content": _B41_PROMPT}] and chat[0][3]["stream"] is True
+            and "keep_alive" not in chat[0][3] and chat[0][3]["options"] == {
+                "temperature": 0, "seed": 42, "num_predict": 256, "num_ctx": 4096},
+            "the load call": gen[0][3] == {"model": "small:8b", "prompt": "", "stream": True,
+                                           "options": {"num_ctx": 4096}},
+            "the record": rec.get("target") == "server" and rec.get("target_name") == "Desk"
+            and rec.get("card") == "Test Card · 16 GB" and rec.get("cost_warning") is False
+            and rec.get("test") == "b1" and rec["hw"]["line"] == "Test Card · 16 GB"
+            and [x["status"] for x in rec["models"]] == ["done", "done"],
+            "the profile's file, 0600; none of the machine's": os.path.exists(p)
+            and _st41.S_IMODE(os.stat(p).st_mode) == 0o600
+            and not os.path.exists(os.path.join(W.d, "benchmarks.jsonl")),
+            "nothing on this computer": not W.local_calls}
+        # no engine duration: the count is exact, the time is measured here (and marked so)
+        o.final = {"load_duration": None, "prompt_eval_count": 1000, "eval_duration": None}
+        o.loaded = []
+        ok1, run1, fin1 = W.run(W.spec(("small:8b",)))
+        r1 = W.rows()[0]
+        P["no engine duration: measured here"] = (
+            ok1 and fin1 and r1["src"] == "measured" and r1["gen_tps"] == 40.0 and r1["gen_tokens"] == 40
+            and not r1.get("est") and r1["prompt_tps"] is None and r1["load_s"] is None
+            and r1["load_src"] == "not measured" and r1["note"] == "The server didn’t report a load time.")
+        return _b41_done(P, [s, m, r1])
+    finally:
+        W.stop()
+
+
+def _b41_server_fail(src):
+    """A server that can't answer says why on its row, the run goes on
+    with the next model, and nothing runs anywhere else: no engine of this
+    computer, no cloud model, no other server."""
+    W = _b41_world(src)
+    try:
+        ns, ctx, o = W.ns, W.ctx, W.ollama
+        out, started = {}, []
+        o.fail[("/api/chat", "small:8b")] = (507, {"error": "no fit", "code": "gpu_fit"})
+        ok, run, fin = W.run(W.spec(("small:8b", "mid:14b", "ghost:1b")))
+        started.append(ok and fin)
+        r = {x["model"]: x for x in W.rows()}
+        out["fit"] = [r["small:8b"]["status"], r["small:8b"]["note"], r["mid:14b"]["status"],
+                      r["ghost:1b"]["status"], r["ghost:1b"]["note"]]
+        o.fail.clear()
+        o.err_line = {"error": "ran out", "code": "gpu_spill", "done": True}
+        ok2, _r2, fin2 = W.run(W.spec(("small:8b",)))
+        started.append(ok2 and fin2)
+        out["spill"] = [W.rows()[0]["status"], W.rows()[0]["note"]]
+        o.err_line = None
+        o.fail[("/api/chat", None)] = (503, {"error": "queue", "code": "busy"})
+        ok3, _r3, fin3 = W.run(W.spec(("small:8b",)))
+        started.append(ok3 and fin3)
+        out["busy"] = [W.rows()[0]["status"], W.rows()[0]["note"]]
+        o.fail[("/api/chat", None)] = (401, {"error": "x", "code": "unpaired"})
+        ok4, _r4, fin4 = W.run(W.spec(("small:8b",)))
+        started.append(ok4 and fin4)
+        out["unpaired"] = W.rows()[0]["note"]
+        o.fail.clear()
+        o.stop()                                   # the server goes away
+        ok5, _r5, fin5 = W.run(W.spec(("small:8b", "mid:14b")))
+        started.append(ok5 and fin5)
+        out["off"] = [[x["status"], x["note"]] for x in W.rows()]
+        P = {
+            "every run started and ended": all(started),
+            "full": out["fit"][:3] == ["failed", "Failed: small:8b doesn’t fit in Desk’s "
+                                               "graphics memory.", "done"],
+            "missing": out["fit"][3:] == ["failed", "Failed: ghost:1b isn’t installed on Desk."],
+            "spilled": out["spill"][0] == "failed" and "couldn’t keep" in out["spill"][1],
+            "busy": out["busy"] == ["failed", "Failed: Desk is busy with other requests. Try again in a moment."],
+            "pairing lost": "no longer accepts this computer" in out["unpaired"],
+            "off": [x[0] for x in out["off"]] == ["failed", "failed"] and all(
+                x[1].startswith("Failed: Desk didn’t answer") for x in out["off"]),
+            "nothing on this computer": not W.local_calls,
+            "nothing in the cloud": not W.cloud.log}
+        return _b41_done(P, out)
+    finally:
+        W.stop()
+
+
+def _b41_server_stop(src):
+    """Stop cuts a slow server call within a second: mid-answer (the socket
+    is shut), and while the model loads (a call that never answers); the
+    rest are marked "not run" and the run is saved as stopped."""
+    P, seen = {}, []
+    for mode in ("stream", "load"):
+        W = _b41_world(src)
+        try:
+            ns, o = W.ns, W.ollama
+            if mode == "stream":
+                o.tokens, o.delay = 400, 0.05
+            else:
+                o.hang_load = True
+            ok0, run = ns["bench_start"](W.spec(("small:8b", "mid:14b", "big:70b")), W.ctx)
+            want = "writing" if mode == "stream" else "loading"
+            seen_ = _b41_wait_for(lambda: W.rows()[0]["status"] == want
+                                  and (mode == "load" or W.rows()[0].get("tok", 0) >= 2))
+            t0 = time.time()
+            was = ns["bench_stop"]()
+            fin = W.wait(5)
+            took = time.time() - t0
+            rec = (ns["bench_targets_history"](W.ctx) or [{}])[0]
+            cut = o.s.closed_early.wait(3) if mode == "stream" else True
+            P[mode + ": started, reached the step, stopped, ended"] = ok0 and seen_ and was and fin
+            P[mode + ": within a second"] = took < 1.0
+            P[mode + ": the rest not run, saved as stopped"] = (
+                [x["status"] for x in W.rows()] == ["stopped", "not run", "not run"]
+                and rec.get("state") == "stopped")
+            P[mode + ": the socket was cut"] = bool(cut)
+            seen.append((mode, round(took, 2), [x["status"] for x in W.rows()]))
+        finally:
+            W.stop()
+    return _b41_done(P, seen)
+
+
+def _b41_hold(src):
+    """One thing at a time, now for servers and the cloud: a run of a
+    server or of the cloud refuses chats, server-only chats and every
+    model call; a run of this computer keeps 6b334's rule (a server-only
+    chat goes through); and no run starts while an answer is being written."""
+    W = _b41_world(src)
+    try:
+        ns, o = W.ns, W.ollama
+        calls = []
+        guarded = ns["_bench_guarded"](lambda *a: calls.append(a) or "ran")
+        label = "Desk · small:8b"
+        # a run of this computer: a server-only call goes through (counted); a chat is refused
+        ns["_bench"].update(running=True, target="local")
+        a1 = ns["bench_hold_remote"]()
+        g1 = guarded(label)
+        n1 = ns["_bench_busy"]["srv"]
+        ns["bench_release_remote"]()
+        h1 = ns["bench_hold"]()
+        ns["_bench"].update(running=False)
+        # no start of a server's or the cloud's run while a server-only chat is written
+        ns["bench_hold_remote"]()
+        s_srv = ns["bench_start"](W.spec(), W.ctx)
+        s_cloud = ns["bench_start"](W.cloud_spec(W.plan()), W.ctx)
+        ns["bench_release_remote"]()
+        # ... nor while a chat is
+        ns["bench_hold"]()
+        s_n = ns["bench_start"](W.spec(), W.ctx)
+        ns["bench_release"]()
+        # a live server run
+        o.tokens, o.delay = 200, 0.05
+        ok0, _r = ns["bench_start"](W.spec(), W.ctx)
+        _b41_wait_for(lambda: W.rows()[0]["status"] == "writing")
+        h2, h3 = ns["bench_hold"](), ns["bench_hold_remote"]()
+        try:
+            guarded(label)
+            g2 = "ran"
+        except RuntimeError as e_:
+            g2 = str(e_)
+        try:
+            guarded("Llama 3.2 3B")
+            g3 = "ran"
+        except RuntimeError as e_:
+            g3 = str(e_)
+        again = ns["bench_start"](W.spec(), W.ctx)
+        ns["bench_stop"]()
+        W.wait(5)
+        # a live cloud run
+        W.cloud.tokens, W.cloud.delay = 200, 0.05
+        p = W.plan()
+        ok1, _r1 = ns["bench_start"](W.cloud_spec(p), W.ctx)
+        _b41_wait_for(lambda: W.rows()[0]["status"] == "writing")
+        c2, c3 = ns["bench_hold"](), ns["bench_hold_remote"]()
+        ns["bench_stop"]()
+        W.wait(5)
+        after = (ns["bench_hold"](), ns["bench_hold_remote"]())
+        ns["bench_release"]()
+        ns["bench_release_remote"]()
+        P = {
+            "a run of this computer lets a server-only call through, counted": a1 is True and g1 == "ran" and n1 == 1,
+            "a run of this computer refuses a chat": h1 is False,
+            "no server run while a server-only chat is written": s_srv == (False, ns["BENCH_ANSWERING"]),
+            "no cloud run while a server-only chat is written": s_cloud == (False, ns["BENCH_ANSWERING"]),
+            "no server run while a chat is written": s_n == (False, ns["BENCH_ANSWERING"]),
+            "a server run refuses chats and server-only chats": ok0 and h2 is False and h3 is False,
+            "a server run refuses model calls, its own server's and the local ones": g2 == ns["BENCH_BUSY"]
+            and g3 == ns["BENCH_BUSY"],
+            "no second run": again == (False, "A benchmark is already running."),
+            "a cloud run refuses chats and server-only chats": ok1 and c2 is False and c3 is False,
+            "both come back after": after == (True, True),
+            "nothing was let through while a run went": calls == [(label,)],
+            "the counts are back at zero": ns["_bench_busy"] == {"n": 0, "srv": 0}}
+        return _b41_done(P, [a1, g1, n1, h1, s_srv, s_cloud, s_n, h2, h3, g2, g3, again, c2, c3, after])
+    finally:
+        W.stop()
+
+
+def _b41_confirm(src):
+    """No cloud call without a confirmation made for that list, ticked,
+    spent by one run, fresh and this profile's; the plan holds the cost
+    line, the counts, no invented price and the cap of 6."""
+    W = _b41_world(src)
+    try:
+        ns, c = W.ns, W.cloud
+        start = ns["bench_start"]
+        p = W.plan((("groq", "openai/gpt-oss-120b"), ("claude", "claude-haiku-5")))
+        refused = "Confirm the cost first. Nothing was sent."
+        none = start({"target": "cloud"}, W.ctx)
+        forged = start({"target": "cloud", "confirm": "f" * 32, "understood": True}, W.ctx)
+        unticked = start({"target": "cloud", "confirm": p["id"]}, W.ctx)
+        falsy = start({"target": "cloud", "confirm": p["id"], "understood": "yes"}, W.ctx)
+        noctx = start({"target": "cloud", "confirm": p["id"], "understood": True})
+        calls0 = len(c.log)
+        dB = tempfile.mkdtemp(dir=_SMOKE_TMP)
+        ctxB = ns["ProfileCtx"]("test", dB, "b" * 32)
+        other = start(W.cloud_spec(p), ctxB)                       # another profile's
+        ns["_bench_confirms"][p["id"]]["t"] -= 700                  # an old one
+        old = start(W.cloud_spec(p), W.ctx)
+        ns["_bench_confirms"][p["id"]]["t"] += 700
+        calls1 = len(c.log)
+        ok0, run, fin = W.run(W.cloud_spec(p))
+        n_after, paths = len(c.log), [x[1] for x in c.log]
+        reuse = start(W.cloud_spec(p), W.ctx)                       # spent by that one run
+        n_reuse = len(c.log)
+        rec = (ns["bench_targets_history"](W.ctx) or [{}])[0]
+        unknown = W.plan((("groq", "not-offered"),))
+        empty = ns["bench_cloud_plan"](W.ctx, [])
+        junk = ns["bench_cloud_plan"](W.ctx, "x")
+        # more models offered than a run may call: eight across three providers
+        W.conf["kimi"] = {"name": "Kimi", "key": "sk-" + _canary("K"), "status": "ok",
+                          "base": W.conf["groq"]["base"].replace("api.groq.com/openai", "api.moonshot.ai"),
+                          "model": "kimi-k3", "models": ["kimi-k3", "kimi-k2"]}
+        offer = [(pv["pid"], m["id"]) for pv in ns["bench_cloud_models"]() for m in pv["models"]]
+        six = W.plan(offer[:6])
+        many = ns["bench_cloud_plan"](W.ctx, [{"pid": q, "model": m} for q, m in offer])
+        dup = W.plan([offer[0]] * 3)
+        P = {
+            "the plan: calls, tokens, the cost line": p.get("ok") and p["calls"] == 2
+            and p["tokens_in"] == 2000 and p["tokens_out"] == 512 and p["max"] == 6
+            and p["warning"] == "This uses your API keys and may cost money with your provider. "
+                                "ConcordeAI doesn't know your plan or prices.",
+            "the plan lists the exact models, in order": [m["model"] for m in p["models"]]
+            == ["openai/gpt-oss-120b", "claude-haiku-5"] and [m["provider"] for m in p["models"]] == ["Groq", "Claude"],
+            "no price invented": all(m["est"] is None for m in p["models"]) and "$" not in json.dumps(p),
+            "no confirmation: refused": none[0] is False,
+            "a forged id: refused": forged == (False, refused),
+            "not ticked: refused, and says so": unticked[0] is False
+            and "I understand this may cost money" in unticked[1] and "Nothing was sent." in unticked[1]
+            and falsy[0] is False,
+            "no profile: refused": noctx[0] is False,
+            "another profile's id: refused": other == (False, refused),
+            "an old id: refused": old == (False, refused),
+            "no call while refused": calls0 == 0 and calls1 == 0,
+            "the confirmed run called exactly the planned models, once each": ok0 and fin and n_after == 2 and paths == [
+                "/api.groq.com/openai/v1/chat/completions", "/api.anthropic.com/v1/messages"],
+            "the id is spent by one run": reuse == (False, refused) and n_reuse == 2,
+            "the warning is kept with the run": run["cost_warning"] is True and rec.get("cost_warning") is True
+            and rec.get("target") == "cloud" and rec.get("target_name") == "Cloud models"
+            and [x["provider"] for x in rec["models"]] == ["Groq", "Claude"],
+            "only models that are offered": "err" in unknown and "err" in empty and "err" in junk,
+            "six may be planned": len(offer) >= 8 and six.get("ok") and six["calls"] == 6,
+            "seven or more may not": "err" in many and "at most 6" in many["err"]
+            and many.get("id") is None and ns["BENCH_CLOUD_MAX"] == 6,
+            "a repeated model is one call": dup.get("ok") and dup["calls"] == 1}
+        return _b41_done(P, [none, forged, unticked, other, old, reuse, [calls0, calls1, n_after, n_reuse],
+                             paths, many.get("err"), len(offer)])
+    finally:
+        W.stop()
+
+
+def _b41_cloud_figures(src):
+    """A cloud call is the app's own body at 256 tokens, streamed: first
+    token, writes (from the provider's usage when it sends it, counted
+    from chunks and marked estimated when not), total time; no reading,
+    load or memory; every row says it includes the network."""
+    W = _b41_world(src)
+    try:
+        ns, c = W.ns, W.cloud
+        p = W.plan((("groq", "openai/gpt-oss-120b"), ("claude", "claude-haiku-5")))
+        ok0, run, fin = W.run(W.cloud_spec(p))
+        g, a = W.rows()
+        gl = [x for x in c.log if x[1].endswith("/chat/completions")][0]
+        al = [x for x in c.log if x[1].endswith("/messages")][0]
+        c.usage = False                    # no usage chunk: counted from the chunks, marked estimated
+        ok2, _r2, fin2 = W.run(W.cloud_spec(W.plan((("groq", "openai/gpt-oss-20b"),))))
+        nu = W.rows()[0]
+        c.usage, c.hidden = True, 10       # reasoning the stream hid: counted, but not in the time
+        ok3, _r3, fin3 = W.run(W.cloud_spec(W.plan((("groq", "openai/gpt-oss-120b"),))))
+        hid = W.rows()[0]
+        P = {
+            "ran": ok0 and fin and ok2 and ok3 and fin2 and fin3,
+            "the row": g["provider"] == "Groq" and g["model"] == "openai/gpt-oss-120b" and g["engine"] == "cloud"
+            and g["status"] == "done" and g["network"] is True,
+            "writes from the usage figures": g["gen_tps"] == 40.0 and g["gen_tokens"] == 40 and not g.get("est"),
+            "first token and total time": g["ttft_s"] == 0.025 and g["total_s"] == 1.025,
+            "no reading, load or memory": g["prompt_tps"] is None and g["load_s"] is None
+            and g["load_src"] is None and "mem_rise" not in g,
+            "the other provider's shape": a["provider"] == "Claude" and a["gen_tps"] == 40.0
+            and a["gen_tokens"] == 40 and a["network"] is True and a["prompt_tps"] is None and a["load_s"] is None,
+            "the OpenAI-shaped request": gl[3]["max_tokens"] == 256 and gl[3]["stream"] is True
+            and gl[3]["temperature"] == 0 and gl[3]["seed"] == 42
+            and gl[3]["stream_options"] == {"include_usage": True}
+            and gl[3]["messages"] == [{"role": "user", "content": _B41_PROMPT}]
+            and gl[3]["model"] == "openai/gpt-oss-120b"
+            and gl[2].get("Authorization") == "Bearer " + _B41_KEYS["groq"]
+            and gl[2].get("User-Agent", "").startswith("MillenAI/"),
+            "the Anthropic-shaped request": al[3]["max_tokens"] == 256 and al[3]["stream"] is True
+            and al[3]["messages"] == [{"role": "user", "content": _B41_PROMPT}]
+            and al[2].get("x-api-key") == _B41_KEYS["claude"] and "Authorization" not in al[2],
+            "each key goes to its own provider only": _B41_KEYS["claude"] not in json.dumps(gl)
+            and _B41_KEYS["groq"] not in json.dumps(al),
+            "no usage chunk: counted and marked estimated": nu["est"] is True and nu["gen_tokens"] == 40
+            and nu["gen_tps"] == 40.0,
+            "hidden reasoning is not counted": hid["gen_tokens"] == 40 and not hid.get("est")}
+        return _b41_done(P, [g, a, nu, hid])
+    finally:
+        W.stop()
+
+
+def _b41_cloud_fail(src):
+    """A cloud model that fails says why in a fixed line (never the
+    provider's words, which can carry part of a key), the run goes on, and
+    nothing runs elsewhere; the app's own provider state is untouched."""
+    W = _b41_world(src)
+    try:
+        ns, c = W.ns, W.cloud
+        keyg = _B41_KEYS["groq"]
+        out, started = {}, []
+        for name, status, body in (
+                ("401", 401, {"error": {"message": "Incorrect API key provided: " + keyg}}),
+                ("429", 429, {"error": {"message": "slow down " + keyg}}),
+                ("404", 404, {"error": {"message": "The model does not exist"}}),
+                ("500", 500, {"error": "boom " + keyg}),
+                ("402", 402, {"error": "insufficient_credits"}),
+                ("400", 400, {"error": "bad request " + keyg})):
+            c.status = {"/chat/completions": (status, body)}
+            p = W.plan((("groq", "openai/gpt-oss-120b"), ("claude", "claude-haiku-5")))
+            n0 = len(c.log)
+            ok, run, fin = W.run(W.cloud_spec(p))
+            started.append(ok and fin)
+            r = W.rows()
+            out[name] = [r[0]["status"], r[0]["note"], r[1]["status"], len(c.log) - n0]
+        c.status = {}
+        c.empty = "length"
+        started.append(W.run(W.cloud_spec(W.plan((("groq", "openai/gpt-oss-120b"),))))[2])
+        out["length"] = W.rows()[0]["note"]
+        c.empty = "stop"
+        started.append(W.run(W.cloud_spec(W.plan((("groq", "openai/gpt-oss-120b"),))))[2])
+        out["nothing"] = W.rows()[0]["note"]
+        c.empty = None
+        c.stop()                                   # the provider goes away
+        started.append(W.run(W.cloud_spec(W.plan((("groq", "openai/gpt-oss-120b"), ("claude", "claude-haiku-5")))))[2])
+        out["off"] = [[x["status"], x["note"]] for x in W.rows()]
+        recs = json.dumps(ns["bench_targets_history"](W.ctx))
+        P = {
+            "every run started and ended": all(started),
+            "key rejected": out["401"][:2] == ["failed", "Failed: the key was rejected."],
+            "rate limited": out["429"][:2] == ["failed", "Failed: rate limited."],
+            "model missing": out["404"][:2] == ["failed", "Failed: the model isn’t available on this key."],
+            "provider down": out["500"][:2] == ["failed", "Failed: the provider isn’t answering (HTTP 500)."],
+            "out of credit": out["402"][:2] == ["failed", "Failed: the account is out of credit."],
+            "refused": out["400"][:2] == ["failed", "Failed: the provider refused the request (HTTP 400)."],
+            "the run goes on with the next model": all(v[2] == "done" for k, v in out.items() if k.isdigit()),
+            "spent on thinking": out["length"] == "Failed: it used all 256 tokens before writing (it thinks "
+                                                  "first), so there is nothing to time.",
+            "answered with nothing": out["nothing"] == "Failed: it answered with nothing.",
+            "unreachable": [x[0] for x in out["off"]] == ["failed", "failed"]
+            and all(x[1] == "Failed: the provider didn’t answer." for x in out["off"]),
+            "one call a model, no retry, no other place": all(v[3] == 2 for k, v in out.items() if k.isdigit()),
+            "nothing on this computer": not W.local_calls,
+            "the app's provider state untouched": json.dumps(W.conf, sort_keys=True) == W.conf0,
+            "no key in what was kept": keyg not in recs and _B41_KEYS["claude"] not in recs}
+        return _b41_done(P, out)
+    finally:
+        W.stop()
+
+
+def _b41_cloud_stop(src):
+    """Stop cuts a slow provider call within a second, mid-answer and
+    before its headers, and the rest are "not run"."""
+    P, seen = {}, []
+    for mode in ("stream", "headers"):
+        W = _b41_world(src)
+        try:
+            ns, c = W.ns, W.cloud
+            if mode == "stream":
+                c.tokens, c.delay = 400, 0.05
+            else:
+                c.hang = True
+            p = W.plan((("groq", "openai/gpt-oss-120b"), ("claude", "claude-haiku-5"), ("groq", "openai/gpt-oss-20b")))
+            ok0, run = ns["bench_start"](W.cloud_spec(p), W.ctx)
+            seen_ = _b41_wait_for(lambda: W.rows()[0]["status"] == ("writing" if mode == "stream" else "reading")
+                                  and (mode == "headers" or W.rows()[0].get("tok", 0) >= 2))
+            t0 = time.time()
+            was = ns["bench_stop"]()
+            fin = W.wait(5)
+            took = time.time() - t0
+            rec = (ns["bench_targets_history"](W.ctx) or [{}])[0]
+            cut = c.s.closed_early.wait(3) if mode == "stream" else True
+            P[mode + ": started, reached the step, stopped, ended"] = ok0 and seen_ and was and fin
+            P[mode + ": within a second"] = took < 1.0
+            P[mode + ": the rest not run, saved as stopped"] = (
+                [x["status"] for x in W.rows()] == ["stopped", "not run", "not run"]
+                and rec.get("state") == "stopped")
+            P[mode + ": the socket was cut, one call only"] = bool(cut) and len(c.log) == 1
+            seen.append((mode, round(took, 2), [x["status"] for x in W.rows()], len(c.log)))
+        finally:
+            W.stop()
+    return _b41_done(P, seen)
+
+
+def _b41_secrets(src):
+    """No key, token, device key or address in the page's status, the
+    targets, a note or the file; anything shaped like one is taken out."""
+    W = _b41_world(src)
+    try:
+        ns, o, c = W.ns, W.ollama, W.cloud
+        e = W.entry
+        c.status = {"/messages": (401, {"error": "bad " + _B41_KEYS["claude"]})}
+        W.run(W.spec(("small:8b",)))
+        W.run(W.cloud_spec(W.plan((("groq", "openai/gpt-oss-120b"), ("claude", "claude-haiku-5")))))
+        secrets_ = [_B41_KEYS["groq"], _B41_KEYS["claude"], e["access_secret"].reveal(),
+                    e["seed"].reveal(), e["access_id"].reveal(), "127.0.0.1:%d" % o.s.port]
+        views = json.dumps([ns["bench_status"](W.ctx), ns["bench_targets"](W.ctx), ns["_bench"]["run"],
+                            ns["bench_cloud_plan"](W.ctx, [{"pid": "groq", "model": "openai/gpt-oss-120b"}])])
+        raw = open(os.path.join(W.d, "bench_targets.jsonl"), encoding="ascii").read()
+        scrub = ns["_bench_scrub"]
+        s1 = scrub("Incorrect API key provided: gsk_ABCDEFGHIJKLMNOPQRSTUVWX and sk-ant-api03-abcdefghijklmnopqr")
+        s2 = scrub("Authorization: Bearer abcdefgh12345678 failed")
+        s3 = scrub("the key MYSECRETKEY99 was refused", ["MYSECRETKEY99"])
+        s4 = scrub("llama-4-scout-17b-16e-instruct and task-oriented-thing")
+        hits = [s for s in secrets_ if s and (s in views or s in raw)]
+        P = {
+            "two runs kept": len(ns["bench_targets_history"](W.ctx)) == 2,
+            "no key, token, device key or address anywhere": not hits,
+            "a key-shaped string is taken out": "gsk_" not in s1 and "sk-ant" not in s1 and "***" in s1,
+            "a bearer token is taken out": "abcdefgh12345678" not in s2,
+            "a named key is taken out": "MYSECRETKEY99" not in s3 and "***" in s3,
+            "a model name is left alone": s4 == "llama-4-scout-17b-16e-instruct and task-oriented-thing"}
+        return _b41_done(P, [hits, s1, s2, s3, s4])
+    finally:
+        W.stop()
+
+
+def _b41_store(src):
+    """The profile's file: 0600, newest first, a torn last line skipped,
+    kept per target (a server by its name, the cloud) so a cloud run never
+    pushes out hardware history; old rows without a target are this
+    computer's; the pane's list carries all of them."""
+    W = _b41_world(src)
+    try:
+        ns, ctx, d = W.ns, W.ctx, W.d
+        sv = ns["bench_targets_save"]
+
+        def rec(i, target, name):
+            return {"id": "r%d%s" % (i, name), "t": 1000.0 + i, "test": "b1", "state": "done",
+                    "target": target, "target_name": name, "models": [{"label": "x", "status": "done"}]}
+        for i in range(105):
+            sv(ctx, rec(i, "server", "A"))
+        for i in range(3):
+            sv(ctx, rec(1000 + i, "cloud", "Cloud models"))
+        for i in range(105):
+            sv(ctx, rec(2000 + i, "server", "B"))
+        every = ns["bench_targets_history"](ctx)
+        per = {}
+        for r in every:
+            per[(r["target"], r["target_name"])] = per.get((r["target"], r["target_name"]), 0) + 1
+        oldA = [r["id"] for r in every if r["target_name"] == "A"]
+        p = os.path.join(d, "bench_targets.jsonl")
+        mode = _st41.S_IMODE(os.stat(p).st_mode)
+        with open(p, "ab") as f:
+            f.write(b'{"id":"torn","t":5')
+        sv(ctx, rec(9999, "cloud", "Cloud models"))
+        after = ns["bench_targets_history"](ctx)
+        newest = [r["id"] for r in ns["bench_targets_history"](ctx, 2)]
+        stray = [f_ for f_ in os.listdir(d) if f_.startswith(".bench")]
+        with open(os.path.join(d, "benchmarks.jsonl"), "w", encoding="ascii") as f:
+            f.write(json.dumps({"id": "old1", "t": 5.0, "test": "b1", "models": []}) + "\n")
+            f.write(json.dumps({"id": "old2", "t": 6.0, "test": "b1", "target": "local",
+                                "target_name": "This computer", "models": []}) + "\n")
+        old = ns["bench_history"]()
+        st = ns["bench_status"](ctx)
+        kinds = {r["id"]: (r["target"], r["target_name"]) for r in st["history"]}
+        for i in range(103):
+            ns["_bench_save"]({"id": "m%d" % i, "t": 100.0 + i, "models": []})
+        mach = ns["bench_history"](None)
+        P = {
+            "100 of each server, and the cloud's 3 kept": per == {("server", "A"): 100, ("server", "B"): 100,
+                                                                    ("cloud", "Cloud models"): 3},
+            "the oldest of a target go": "r0A" not in oldA and "r104A" in oldA and len(oldA) == 100,
+            "newest first, 0600": every[0]["id"] == "r2104B" and mode == 0o600,
+            "a torn line is skipped and the next run is kept": len(after) == 204
+            and after[0]["id"] == "r9999Cloud models" and "torn" not in json.dumps(after),
+            "the newest per target": len(newest) == 6 and newest[0] == "r9999Cloud models",
+            "no temp file left": not stray,
+            "old rows are this computer's": [(r["id"], r["target"]) for r in old]
+            == [("old2", "local"), ("old1", "local")],
+            "the pane's list holds every target": kinds.get("old1") == ("local", "This computer")
+            and kinds.get("r2104B") == ("server", "B") and kinds.get("r9999Cloud models") == ("cloud", "Cloud models"),
+            "this computer's file keeps 100 and holds only its own": len(mach) == 100
+            and all(r["target"] == "local" for r in mach)}
+        return _b41_done(P, [per, mode, len(after), newest, old, len(mach)])
+    finally:
+        W.stop()
+
+
+def _b41_isolation(src):
+    """A profile's servers, keys, runs and results are its own: B sees
+    none of A's, can't benchmark A's server or spend A's confirmation, and
+    a run of A's stops (and isn't saved) when the profile changes."""
+    W = _b41_world(src)
+    try:
+        ns, ctx, d = W.ns, W.ctx, W.d
+        dB = tempfile.mkdtemp(dir=_SMOKE_TMP)
+        ctxB = ns["ProfileCtx"]("test", dB, "b" * 32)
+        W.run(W.spec(("small:8b",)))
+        W.run(W.cloud_spec(W.plan()))
+        aS = ns["bench_status"](ctx)
+        bS = ns["bench_status"](ctxB)
+        # B has no servers file and no keys of its own: nothing to list, nothing to start
+        prev = ns["bind_ctx"](ctxB)
+        try:
+            tB = ns["bench_targets"](ctxB)
+            bs = ns["bench_start"](W.spec(), ctxB)
+        finally:
+            ns["bind_ctx"](prev)
+        # a run of A's, then the profile changes under it
+        W.ollama.tokens, W.ollama.delay = 400, 0.05
+        ok0, _r = ns["bench_start"](W.spec(("small:8b", "mid:14b")), ctx)
+        _b41_wait_for(lambda: W.rows()[0]["status"] == "writing" and W.rows()[0].get("tok", 0) >= 2)
+        mid_a = ns["bench_status"](ctx)["run"]
+        mid_b = ns["bench_status"](ctxB)
+        ns["_PROFILE"]["ctx"] = ctxB          # a switch: A is no longer active ...
+        ctx.cancel.set()                       # ... and its jobs are told
+        t0 = time.time()
+        fin = W.wait(5)
+        took = time.time() - t0
+        run = ns["_bench"]["run"]
+        P = {
+            "A holds both runs": len(aS["history"]) == 2 and {r["target"] for r in aS["history"]} == {"server", "cloud"},
+            "B sees none of them": bS["history"] == [] and bS["run"] is None,
+            "B lists none of A's servers or keys": tB["servers"] == [] and tB["cloud"] == [],
+            "B can't start A's server": bs[0] is False and "isn’t in Settings" in bs[1],
+            "A's run is A's alone while it goes": ok0 and mid_a and mid_a["state"] == "running"
+            and mid_b["run"] is None and mid_b["running"] is True,
+            "a switch stops it within a second or two": fin and took < 2.0 and run["state"] == "stopped"
+            and "The profile changed" in (run.get("note") or ""),
+            "the rest are not run": [x["status"] for x in run["models"]] == ["stopped", "not run"],
+            "and it is not saved, into A or B": run.get("saved") is False
+            and len(ns["bench_targets_history"](ctx)) == 2
+            and not os.path.exists(os.path.join(dB, "bench_targets.jsonl"))}
+        return _b41_done(P, [len(aS["history"]), bS["history"], tB["servers"], bs, took, run["state"],
+                             run.get("note")])
+    finally:
+        W.stop()
+
+
+def _b41_view(src):
+    """The pane's server list: the models that fit whole on the card start
+    ticked, "card + memory" ones are listed with the CPU note and unticked;
+    cloud models are listed per provider with no estimate unless the app
+    holds a price (marked *); never a key."""
+    W = _b41_world(src, prices={"groq/openai/gpt-oss-120b": (0.15, 0.6)})
+    try:
+        ns, o = W.ns, W.ollama
+        o.models.append({"name": "odd:3b", "size": 2 << 30})                     # no placement said
+        o.models.append({"name": "huge:30b", "placement": "gpu", "size": 20 << 30})   # won't fit 16 GB
+        ns["server_check"](W.entry)
+        t = ns["bench_targets"](W.ctx)
+        s = t["servers"][0]
+        m = {x["name"]: x for x in s["models"]}
+        cloud = {p["pid"]: p for p in t["cloud"]}
+        est = {x["id"]: x["est"] for p in t["cloud"] for x in p["models"]}
+        raw = json.dumps(t)
+        P = {
+            "the server: its name, card, version": s["name"] == "Desk" and s["card"] == "Test Card · 16 GB"
+            and s["version"] == "0.12.9" and s["reachable"] is True,
+            "models that fit are ticked": m["small:8b"]["tick"] is True and m["mid:14b"]["tick"] is True,
+            "card + memory: unticked, with the CPU note": m["big:70b"]["tick"] is False
+            and m["big:70b"]["placement"] == "gpu+ram" and "CPU hard" in m["big:70b"]["why"],
+            "placement not said: unticked": m["odd:3b"]["tick"] is False and "isn’t reported" in m["odd:3b"]["why"],
+            "too big for the card: unticked": m["huge:30b"]["tick"] is False and "may not fit" in m["huge:30b"]["why"],
+            "the cloud's providers and models": set(cloud) == {"groq", "claude"} and cloud["groq"]["name"] == "Groq"
+            and "openai/gpt-oss-120b" in [x["id"] for x in cloud["groq"]["models"]],
+            "an estimate only where a price is held, marked *": est["openai/gpt-oss-120b"].endswith("*")
+            and est["openai/gpt-oss-120b"].startswith("about $") and est["claude-haiku-5"] is None,
+            "the limits": t["cloud_max"] == 6 and t["cloud_in"] == 1000 and t["cloud_out"] == 256 and t["keep"] == 100,
+            "no key": '"key"' not in raw and _B41_KEYS["groq"] not in raw and _B41_KEYS["claude"] not in raw}
+        return _b41_done(P, [s, est, sorted(cloud)])
+    finally:
+        W.stop()
+
+
+_B41_CHECKS = [
+    ("benchmark servers: a run through the signed calls: Ollama's own figures, the first token timed here, "
+     "the card from /v1/info, no load time for a model already loaded, kept in the profile's file", _b41_server_run),
+    ("benchmark servers: a failure is said on its row (full, busy, missing, pairing lost, offline), the run goes on, "
+     "and nothing runs on this computer, in the cloud or on another server", _b41_server_fail),
+    ("benchmark servers: Stop cuts a slow server call (mid-answer, and a load that never answers) within a second", _b41_server_stop),
+    ("benchmark: one thing at a time for a server's and the cloud's runs: chats, server-only chats and model calls "
+     "refused, no start while an answer is written, this computer's run leaves server-only chats alone", _b41_hold),
+    ("benchmark cloud: no call without a confirmation made for that list, ticked, fresh, this profile's and spent "
+     "by one run; the plan says the counts and the cost line and holds the cap of 6", _b41_confirm),
+    ("benchmark cloud: the app's own body at 256 tokens streamed; first token, writes (usage or counted and marked), "
+     "total time, no load or memory, the network flagged", _b41_cloud_figures),
+    ("benchmark cloud: a failure is a fixed line (never the provider's words), per model, nothing runs elsewhere, "
+     "the app's provider state untouched", _b41_cloud_fail),
+    ("benchmark cloud: Stop cuts a slow provider call (mid-answer and before its headers) within a second", _b41_cloud_stop),
+    ("benchmark: no key, token, device key or address in the page, the targets, a note or the file; key-shaped text taken out", _b41_secrets),
+    ("benchmark: the profile's file is 0600, kept per target (a cloud run never pushes out a server's history), "
+     "old rows are this computer's", _b41_store),
+    ("benchmark: profiles never mix: B sees none of A's runs, servers or confirmations, and a switch stops A's run unsaved", _b41_isolation),
+    ("benchmark: the pane's lists: fit-on-the-card models ticked, card + memory ones noted and unticked, cloud models "
+     "unticked, an estimate only where a price is held", _b41_view),
+]
+
+
+def _b41_js(src):
+    """The pane's script from the first benchmark comment to the listeners,
+    for node (nothing in it touches the page until a function runs)."""
+    js = src[src.index("/* -------------------------------- Settings › Usage › Benchmark (6b331)"):]
+    return js[:js.index('(function(){\n  const go=$("#bm-go")')]
+
+
+def _b41_node(src):
+    """Compare and the pane's lists, run in node: only runs of the same
+    test; each row says where it ran and its hardware; the warning where
+    hardware or versions differ; one model on several targets side by side
+    ("N× faster"); cloud rows flagged as including the network; a figure a
+    target didn't give as "-" (cloud) or "not measured" (server); Run for
+    the cloud only with 1 to 6 models; a server's models ticked only if
+    they fit."""
+    js = _b41_js(src) + r"""
+const out={};
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);}
+function uInt(n){return String(Math.round(+n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+function uWhen(t){return "T"+t;}
+function u2(n){return (n<10?"0":"")+n;}
+const mac={id:"a",t:100,test:"b1",target:"local",target_name:"This computer",
+  hw:{line:"M4 Pro · 48 GB · 20-core GPU"},versions:{mlx_lm:"0.31.3",ollama:"0.12.9"},
+  models:[{label:"GPT-OSS 20B",engine:"MLX",src:"measured",status:"done",gen_tps:60,prompt_tps:900,ttft_s:1.1,load_s:3},
+          {label:"Llama 3.2 3B",engine:"Ollama",src:"engine",status:"done",gen_tps:90,prompt_tps:2000,ttft_s:.4,load_s:1.5},
+          {label:"Skipped one",engine:"MLX",status:"skipped"}]};
+const srv={id:"b",t:200,test:"b1",target:"server",target_name:"Pat's Desk",
+  hw:{line:"Radeon RX 6900 XT · 16 GB"},versions:{ollama:"0.12.9"},
+  models:[{label:"Pat's Desk · gpt-oss:20b",model:"gpt-oss:20b",engine:"Ollama",src:"engine",status:"done",
+           network:true,gen_tps:150,prompt_tps:null,ttft_s:.5,load_s:null,gpu_size:100,gpu_vram:100,placement:"gpu"}]};
+const cl={id:"c",t:300,test:"b1",target:"cloud",target_name:"Cloud models",cost_warning:true,hw:{line:""},
+  models:[{label:"openai/gpt-oss-20b",model:"openai/gpt-oss-20b",provider:"Groq",engine:"cloud",src:"measured",status:"done",
+           network:true,gen_tps:400,ttft_s:.3,total_s:1,prompt_tps:null,load_s:null},
+          {label:"x",model:"x",provider:"Groq",engine:"cloud",status:"failed",note:"Failed: rate limited."}]};
+const other={id:"d",t:50,test:"b2",target:"local",target_name:"This computer",hw:{line:"M4 Pro · 48 GB · 20-core GPU"},
+  versions:{mlx_lm:"0.31.3",ollama:"0.12.9"},models:[{label:"GPT-OSS 20B",engine:"MLX",status:"done",gen_tps:1}]};
+const mac2=Object.assign({},mac,{id:"a2",t:90});
+out.keys=[bmKey("gpt-oss:20b"),bmKey("GPT-OSS 20B"),bmKey("openai/gpt-oss-20b"),bmKey("Pat's Desk · gpt-oss:20b:latest"),
+  bmKey("Llama 3.2 3B"),bmKey("llama3.2:3b"),bmKey("Qwen 3.5 9B"),bmKey("qwen3.5:9b")];
+const c=bmCompare([mac,srv,cl]);
+out.rows=c.rows.map(r=>[r.key,r.where,r.net,r.cloud]);
+out.warn=c.warn;
+out.groups=c.groups.map(g=>[g.name,g.slow,g.items.map(i=>[i.where,i.x==null?null:+i.x.toFixed(2),i.isSlow,bmFaster(i,g.slow)])]);
+out.same=bmCompare([mac,mac2]);
+out.mixed=bmCompare([mac,other]);
+out.mixedFirst=bmCompare([other,mac]);
+out.none=bmCompare([]);
+out.html=bmCmpHtml(c);
+out.htmlNone=bmCmpHtml(bmCompare([]));
+out.htmlMixed=bmCmpHtml(out.mixed);
+out.htmlSame=bmCmpHtml(out.same);
+// the pane's rows for a server's and a cloud row
+out.rowSrv=bmRow(srv.models[0],false,null,256);
+out.rowCl=bmRow(cl.models[0],false,null,256);
+out.rowClF=bmRow(cl.models[1],false,null,256);
+out.rowClNow=bmRow({label:"m",provider:"Groq",model:"m",engine:"cloud",network:true,status:"reading"},true,null,256);
+out.rowEst=bmRow(Object.assign({},cl.models[0],{est:true}),false,null,256);
+out.rowMac=bmRow(mac.models[0],false,null,256);
+// Run: the cloud needs 1 to 6; a server a model and an answer
+const mods=[];for(let i=0;i<7;i++)mods.push({id:"m"+i,est:i===0?"about $0.001*":null});
+bmTD={servers:[{id:"s1",name:"Desk",card:"Test Card · 16 GB",version:"0.12.9",checked:true,reachable:true,err:"",
+  models:[{name:"small:8b",placement:"gpu",tick:true,why:""},{name:"big:70b",placement:"gpu+ram",tick:false,why:"It also uses the server’s memory, which loads its CPU hard."},
+          {name:"odd:3b",placement:"unknown",tick:false,why:"Where it runs isn’t reported."}]},
+  {id:"s2",name:"Down",checked:true,reachable:false,err:"Down didn’t answer.",models:[{name:"x:1b",placement:"gpu",tick:true,why:""}]}],
+  cloud:[{pid:"groq",name:"Groq",rest:0,models:mods}],cloud_max:6,cloud_in:1000,cloud_out:256};
+bmTg="cloud";
+const rdy=[];
+rdy.push(bmReady(bmPicked(),6));
+for(let i=0;i<7;i++){bmTick.cloud["groq/m"+i]=true;rdy.push(bmReady(bmPicked(),6));}
+out.cloudReady=rdy;                     // 0 ticked, then 1..7
+out.cloudPick=bmPicked();
+out.cloudHtml=bmPickHtml();
+bmTick.cloud["groq/m6"]=false;
+out.cloudHtml6=bmPickHtml();
+bmTg="srv:s1";
+bmTick.srv.s1={"small:8b":true,"big:70b":false,"odd:3b":false};
+out.srvPick=bmPicked();
+out.srvReady=bmReady(bmPicked(),6);
+out.srvHtml=bmPickHtml();
+bmTick.srv.s1={"small:8b":false,"big:70b":false,"odd:3b":false};
+out.srvNone=bmReady(bmPicked(),6);
+bmTick.srv.s2={"x:1b":true};
+bmTg="srv:s2";out.srvDown=[bmReady(bmPicked(),6),bmPickHtml(),bmPicked().models.length];
+bmTg="local";out.localReady=bmReady(bmPicked(),6);out.localPick=bmPicked();
+bmTg="srv:gone";out.gone=bmPicked();
+// the defaults: a server's models start ticked as the server says, the cloud's never
+async function api(p){return {ok:true,json:async()=>({servers:[bmTD.servers[0]],cloud:bmTD.cloud,cloud_max:6})};}
+function loadBench(){}
+for(const k of Object.keys(bmTick.srv))delete bmTick.srv[k];
+for(const k of Object.keys(bmTick.cloud))delete bmTick.cloud[k];
+// old or damaged runs: no models, a model list that isn't one, a row that is null, no time, no hardware, a target nobody knows
+const sparse=[{id:"x",test:"b1"},{id:"y",t:5,test:"b1",models:[{status:"done"},null,{status:"done",label:"A",gen_tps:"abc",ttft_s:"x"}]},
+  {id:"z",test:"b1",target:"weird",target_name:"Elsewhere",hw:null,versions:5,models:"no"},null,5,"s"];
+try{const sc=bmCompare(sparse);out.sparse={ok:true,rows:sc.rows.map(r=>[r.name,r.where,r.gen]),html:bmCmpHtml(sc),
+  lines:sparse.filter(Boolean).filter(x=>typeof x==="object").map(x=>bmRunLine(x)),
+  wh:[bmWhere({},null),bmWhere({target:"weird",target_name:"Elsewhere"},null),bmWhere({target:"weird"},null)],
+  list:bmRunsHtml(sparse.filter(x=>x&&typeof x==="object"))};}catch(e){out.sparse={ok:false,err:String(e)};}
+(async()=>{await loadBenchTargets("");
+  out.defaults={srv:bmTick.srv,cloud:bmTick.cloud};
+  console.log(JSON.stringify(out));})();
+"""
+    f = os.path.join(tempfile.mkdtemp(), "b41.js")
+    with open(f, "w", encoding="utf-8") as fh:
+        fh.write(js)
+    r = subprocess.run(["node", f], capture_output=True, text=True, timeout=30)
+    o = json.loads(r.stdout or "null") or {}
+    if not o:
+        return False, r.stderr[-1500:]
+    g = o["groups"][0] if o.get("groups") else [None, None, []]
+    h = o["html"]
+    P = {
+        "a model's name is one key everywhere": len(set(o["keys"][:4])) == 1 and o["keys"][0] == "gptoss20b"
+        and o["keys"][4] == o["keys"][5] == "llama323b" and o["keys"][6] == o["keys"][7],
+        "only done rows compare, each says where it ran": [r[1] for r in o["rows"]] == [
+            "This computer", "This computer", "Pat's Desk", "Groq"],
+        "cloud rows and a server's are flagged as including the network": [r[2] for r in o["rows"]] == [
+            False, False, True, True] and [r[3] for r in o["rows"]] == [False, False, False, True],
+        "different hardware or versions: the warning": o["warn"].startswith("These runs were measured on different hardware"),
+        "the same setup: no warning": o["same"]["warn"] == "" and len(o["same"]["rows"]) == 4,
+        "only the first run's test compares": o["mixed"]["left"] == 1 and len(o["mixed"]["rows"]) == 2
+        and o["mixed"]["test"] == "b1" and o["mixedFirst"]["test"] == "b2" and len(o["mixedFirst"]["rows"]) == 1
+        and "left out: only runs of the same test compare" in o["htmlMixed"],
+        "nothing ticked": o["none"]["rows"] == [] and "Tick two or more runs" in o["htmlNone"],
+        "a model on several targets is shown side by side, each against the slowest": len(o["groups"]) == 1
+        and g[0] == "GPT-OSS 20B" and g[1] == "This computer"
+        and [i[0] for i in g[2]] == ["Groq", "Pat's Desk", "This computer"]
+        and [i[1] for i in g[2]] == [6.67, 2.5, 1.0] and [i[2] for i in g[2]] == [False, False, True],
+        "N× faster, and the slowest says so": [i[3] for i in g[2]] == [
+            "6.7\u00d7 faster than This computer", "2.5\u00d7 faster than This computer", "slowest of these"],
+        "the table says where and on what": "This computer" in h and "M4 Pro \u00b7 48 GB \u00b7 20-core GPU" in h
+        and "Radeon RX 6900 XT \u00b7 16 GB" in h and "cloud, includes the network" in h
+        and "first token includes the network" in h,
+        "a server's missing figure is not measured, the cloud's is a dash": "not measured" in h
+        and '<td class="n">-</td>' in h,
+        "bars for the four figures": h.count('class="bmv-m"') == 4 and "Writes \u00b7 tok/s" in h
+        and "Reads \u00b7 tok/s" in h and "First token \u00b7 seconds, shorter is faster" in h
+        and "Load \u00b7 seconds, shorter is faster" in h and 'class="best"' in h,
+        "the pane's server row": "reads not measured" in o["rowSrv"] and "(incl. network)" in o["rowSrv"]
+        and "load not measured" in o["rowSrv"] and "100% on the server" in o["rowSrv"]
+        and ">gpt-oss:20b<" in o["rowSrv"],
+        "the pane's cloud row": "reads - \u00b7 first token 0.30 s \u00b7 load - \u00b7 total 1.00 s" in o["rowCl"]
+        and "cloud, includes the network" in o["rowCl"] and ">Groq</span>" in o["rowCl"]
+        and "memory" not in o["rowCl"] and ">400.0<small>" in o["rowCl"],
+        "a failed cloud row says why": "Failed: rate limited." in o["rowClF"] and "bm-v" not in o["rowClF"],
+        "a cloud row on the go": "waiting for the first token" in o["rowClNow"],
+        "an estimated cloud row": ">estimated</span>" in o["rowEst"] and "no token count" in o["rowEst"],
+        "this computer's row unchanged": "reads 900 tok/s \u00b7 first token 1.10 s \u00b7 load 3.0 s" in o["rowMac"],
+        "the cloud: Run for 1 to 6 models only": o["cloudReady"] == [False] + [True] * 6 + [False],
+        "the cloud's picks are provider and model": o["cloudPick"]["target"] == "cloud" and len(o["cloudPick"]["models"]) == 7
+        and o["cloudPick"]["models"][0] == {"pid": "groq", "model": "m0"},
+        "the cloud's list: unticked until ticked, an estimate marked, a count": 'data-m="m0" checked' in o["cloudHtml"]
+        and "about $0.001*" in o["cloudHtml"] and "* estimate" in o["cloudHtml"]
+        and "7 of 6 models ticked" in o["cloudHtml"] and 'class="bm-s bm-f"' in o["cloudHtml"]
+        and "6 of 6 models ticked: 6 calls, about 6,000 tokens in, up to 1,536 out." in o["cloudHtml6"],
+        "a server's picks": o["srvPick"] == {"target": "server", "server": "s1", "models": ["small:8b"]}
+        and o["srvReady"] is True and o["srvNone"] is False,
+        "a server's list: the notes and the placements": "card + memory" in o["srvHtml"] and "CPU hard" in o["srvHtml"]
+        and 'data-srv="small:8b" checked' in o["srvHtml"] and 'data-srv="big:70b" checked' not in o["srvHtml"]
+        and "isn\u2019t reported" in o["srvHtml"],
+        "a server that didn't answer can't be run, ticked or not": o["srvDown"][0] is False
+        and o["srvDown"][2] == 1 and "Down didn\u2019t answer." in o["srvDown"][1],
+        "this computer runs as before, a vanished server runs nothing": o["localReady"] is True
+        and o["localPick"] == {"target": "local"} and o["gone"] is None,
+        "old or damaged runs compare without throwing: missing fields read as blanks, an unknown target is named": o["sparse"]["ok"] is True
+        and o["sparse"]["rows"] == [["?", "This computer", None], ["A", "This computer", "abc"]]
+        and "NaN" not in o["sparse"]["html"] and "undefined" not in o["sparse"]["html"]
+        and "undefined" not in o["sparse"]["list"] and "NaN" not in o["sparse"]["list"]
+        and o["sparse"]["wh"] == ["This computer", "Elsewhere", "Other"] and len(o["sparse"]["lines"]) == 3,
+        "a server's models start ticked as it says, the cloud's never": o["defaults"]["srv"] == {
+            "s1": {"small:8b": True, "big:70b": False, "odd:3b": False}} and o["defaults"]["cloud"] == {}}
+    return _b41_done(P, [o["rowMac"], o["rows"], g, o["cloudReady"], o["defaults"]])
+
+
+def _b41_hard(src):
+    """A stored run that carries more than this build writes (a file from
+    another build, or edited by hand: a key, a token, an address with a
+    login, a header, a row that isn't a row) shows none of it to the pane
+    or to Compare, in either file; damaged lines are skipped."""
+    W = _b41_world(src)
+    try:
+        ns, ctx, d = W.ns, W.ctx, W.d
+        key = _B41_KEYS["groq"]
+        url = "https://user:pw@secret.example.com:8443/x"
+
+        def bad(i, target):
+            r = {"v": 1, "id": "t%d" % i, "t": 100.0 + i, "test": "b1", "state": "done", "target": target,
+                 "target_name": "Desk", "card": "Card \u00b7 16 GB", "cost_warning": False,
+                 "url": url, "api_key": key, "token": "TOKEN-XYZ", "access_secret": "ACCESS-XYZ",
+                 "hw": {"line": "Card \u00b7 16 GB", "url": url, "seed": "SEED-XYZ", "gpus": [["Card", 5]]},
+                 "versions": {"ollama": "0.1", "key": key}, "note": "failed at " + url + " with " + key,
+                 "models": [{"label": "Desk \u00b7 m", "status": "done", "gen_tps": 1.0, "note": "see " + url,
+                             "api_key": key, "headers": {"Authorization": "Bearer ABCDEFGH12345"}}, "junk", 5, None]}
+            return json.dumps(r) + "\n"
+        junk = ['{"id":"nomodels","t":1,"target":"server"}\n', '{"id":"badt","t":"x","models":[],"target":"cloud"}\n',
+                'not json\n', '[1,2]\n', '{"id":"badm","t":2,"models":"no","target":"server"}\n']
+        with open(os.path.join(d, "bench_targets.jsonl"), "w", encoding="ascii") as f:
+            f.write(bad(1, "server") + "".join(junk) + bad(2, "cloud"))
+        with open(os.path.join(d, "benchmarks.jsonl"), "w", encoding="ascii") as f:
+            f.write(bad(3, "local").replace('"target": "local", ', "") + "".join(junk))
+        st = ns["bench_status"](ctx)
+        raw = json.dumps(st)
+        runs = {r["id"]: r for r in st["history"]}
+        secrets_ = [key, "TOKEN-XYZ", "ACCESS-XYZ", "SEED-XYZ", "secret.example.com", "user:pw", "ABCDEFGH12345",
+                    "Authorization", "api_key", "access_secret"]
+        hits = [s for s in secrets_ if s in raw]
+        allowed = set(ns["_BENCH_RUN_KEYS"])
+        P = {
+            "the damaged lines are skipped, the good ones read": sorted(runs) == ["t1", "t2", "t3"],
+            "no key, token, login, address or header reaches the pane": not hits,
+            "only the fields this build writes": all(set(r) <= allowed for r in runs.values())
+            and all(set(r["hw"]) <= set(ns["_BENCH_HW_KEYS"]) and set(r["versions"]) <= set(ns["_BENCH_VER_KEYS"])
+                    for r in runs.values()),
+            "a row that isn't a row is dropped, a note's address is taken out": [len(r["models"]) for r in runs.values()] == [1, 1, 1]
+            and "(address)" in runs["t1"]["note"] and "(address)" in runs["t1"]["models"][0]["note"],
+            "the target's name and card stay": runs["t1"]["target_name"] == "Desk" and runs["t1"]["card"] == "Card \u00b7 16 GB",
+            "an old row without a target is this computer's": runs["t3"]["target"] == "local"}
+        return _b41_done(P, [hits, sorted(runs)])
+    finally:
+        W.stop()
+
+
+def _b41_pins(src):
+    """The source where the benchmark meets the app: the test is the same
+    one, nothing in the section writes the app's own provider state or the
+    usage ledger or reads cloud.json, the routes and the chat's hold, the
+    profile's file named as personal, the page's dialog and Run."""
+    import hashlib as _hl41
+    s0 = src.index("# ================================================ the hardware benchmark")
+    s1 = src.index("# The merge is where the final answer's VOICE")
+    sect = src[s0:s1]
+    jsr = _b41_js(src)
+    ns = _bm_ns(src)
+    sh = _hl41.sha256(ns["BENCH_PROMPT"].encode()).hexdigest()
+    pn = src[src.index("PERSONAL_NAMES = frozenset(("):]
+    pn = pn[:pn.index("))")]
+    mio = src[src.index("MACHINE_IO = frozenset(("):]
+    mio = mio[:mio.index("))")]
+    forbidden = ["cloud_note_failure(", "cloud_glitch(", "cloud_cool(", "_cloud_patch(", "_cloud_save_state(",
+                 "usage_note(", "usage_put(", "server_stream(", "cloud_text(", "cloud_stream_conf(", "run_model(",
+                 "cloud.json", "_cloud_file(", "CLOUD_NAME", "_cloud_write", "server_mark_down(", "_srv_update("]
+    used = [f for f in forbidden if f in sect]
+    P = {
+        "the same fixed test: the passage and task are untouched": sh == "e4fd96b72ce3178f57e229281c55c161a9d9be9532f1d5bda620c067c70740cf"
+        and ns["BENCH_TEST"] == "b1" and ns["BENCH_MAX_TOKENS"] == 256 and ns["BENCH_SEED"] == 42
+        and ns["BENCH_CTX"] == 4096 and ns["BENCH_KEEP"] == 100,
+        "the section never rests a provider, writes the ledger, reads cloud.json or marks a server down": not used,
+        "the profile's file is personal, the machine's writer is the only machine writer": '"bench_targets.jsonl"' in pn
+        and '"_bench_save"' in mio and "bench_targets" not in mio and "_bench_worker_remote" not in mio,
+        "confirmations are a profile cache": '_bench_confirms = profile_cache("_bench_confirms", {})' in sect,
+        "the routes": 'elif self.path.split("?")[0] == "/api/bench/targets":' in src
+        and '"/api/bench/cloud-plan"' in src and "bench_status(self.ctx)" in src
+        and "ok, got = bench_start(_bd, self.ctx)" in src
+        and "_bp = bench_cloud_plan(self.ctx, _bd.get(\"models\"))" in src,
+        "a chat on a server's models only is held too, and released": "            if not bench_hold_remote():\n"
+        "                self._send_json({\"err\": BENCH_BUSY, \"bench\": True}, code=409)\n                return\n"
+        "            self._bench_srv_held = True\n" in src
+        and "            if self._bench_srv_held:\n                self._bench_srv_held = False\n"
+        "                bench_release_remote()\n" in src,
+        "a run of a server or the cloud is the starting profile's job": "ctx_thread(target=_bench_worker_remote, args=(run, plan), ctx=ctx,"
+        in src and "ctx_thread(target=_bench_worker, args=(run,), bind=False," in src,
+        "the cloud's confirmation is spent as the run starts": 'if target == "cloud" and _bench_confirms.pop(plan["confirm"], None) is None:' in sect
+        and '    if spec.get("understood") is not True:' in sect,
+        "the pane: Run on the cloud asks first, the dialog is reset each time and its button waits for the box":
+            'if(p.target==="cloud"){go.disabled=true;await bmCloudAsk(p);go.disabled=false;return;}' in src
+            and src.index('if(p.target==="cloud"){go.disabled=true;await bmCloudAsk(p)') < src.index(
+                'bmErr=await benchPost("/api/bench/start",p);')
+            and '$("#bmc-ok").checked=false;$("#bmc-go").disabled=true;' in src
+            and 'if(!bmPlan||!$("#bmc-ok").checked)return;' in src
+            and 'benchPost("/api/bench/start",{target:"cloud",confirm:id,understood:true})' in src
+            and src.count('benchPost("/api/bench/start"') == 2
+            and 'id="bmc-go" class="about-btn slim" disabled>Call these models</button>' in src
+            and '<input type="checkbox" id="bmc-ok"> I understand this may cost money</label>' in src
+            and 'role="dialog" aria-modal="true" aria-labelledby="bmc-title"' in src
+            and 'for(const sel of ["#bmc-veil","#bmv-veil","#new-veil"' in src,
+        "the dialog's words: the cost line comes from the server, the counts and the estimate note are there":
+            '$("#bmc-warn").textContent=j.warning;' in src and "At most \"+j.max+\" models a run." in src
+            and "ConcordeAI holds no prices for these models, so it shows no estimate." in src
+            and "* Rough estimate, not a quote." in src,
+        "no cost choice is remembered": "localStorage" not in jsr and "sessionStorage" not in jsr,
+        "no new ollama1 in the pane or its dialogs": "ollama1" not in jsr.lower()
+        and "ollama1" not in src[src.index('<div id="bmc-veil" hidden>'):src.index('<div id="gear-veil" hidden>')].lower()
+        and "ollama1" not in src[src.index(".bm-tg{display:flex"):src.index("#bm-busy{font-size:12px")].lower(),
+        "a server's run is never started by the page on its own": src.count('loadBenchTargets(') >= 3
+        and "bmTick.srv[s.id]=bmTick.srv[s.id]||{};" in src and "t[m.name]=!!m.tick" in src
+        and 'benchPost("/api/bench/start",p)' in src}
+    return _b41_done(P, used)
+
+
+_B41_CHECKS += [
+    ("benchmark: a stored run with more in it than this build writes (a key, a token, an address with a login, a header, "
+     "a row that isn't a row) shows none of it to the pane or to Compare, in either file; damaged lines are skipped", _b41_hard),
+    ("benchmark compare (node): same test only, where each ran and on what, the hardware warning, a model on several "
+     "targets side by side with N× faster, the network flagged, a figure not given shown as - or not measured; the pane's "
+     "lists and Run's rules", _b41_node),
+    ("benchmark: pinned where it meets the app: the same test, nothing written to the app's provider state or the ledger, "
+     "the routes, the hold, the profile's file, the dialog before every cloud run", _b41_pins),
+]
+
+# EACH PROTECTION, MUTATED: every one of these, planted in the source,
+# fails the check named (by position in _B41_CHECKS) that guards it
+_B41_MUT = [
+    # the cost dialog and the confirmation (4)
+    ("a cloud run without the box ticked", '    if spec.get("understood") is not True:', '    if False:', [4, 14]),
+    ("a confirmation not spent by its run", 'and _bench_confirms.pop(plan["confirm"], None) is None:',
+     'and _bench_confirms.get(plan["confirm"], None) is None:', [4, 14]),
+    ("another profile's confirmation accepted", "            or rec.get(\"tag\") != ctx.tag):", "            or False):", [4]),
+    ("a confirmation that never expires", "    if (not isinstance(rec, dict) or time.time() - rec[\"t\"] > BENCH_CONFIRM_S",
+     "    if (not isinstance(rec, dict) or False", [4]),
+    ("no cap of 6", "    if len(chosen) > BENCH_CLOUD_MAX:", "    if False:", [4]),
+    ("a model that isn't offered planned", "        if k in offered and k not in [(c[\"pid\"], c[\"model\"]) for c in chosen]:",
+     "        if k not in [(c[\"pid\"], c[\"model\"]) for c in chosen]:", [4]),
+    ("the cost line dropped", '"provider. ConcordeAI doesn\'t know your plan or prices.")', '"provider.")', [4]),
+    ("a price invented", "BENCH_PRICES = {}\n", 'BENCH_PRICES = {"claude/claude-haiku-5": (1, 5)}\n', [4]),
+    ("an estimate for a model with no price", "    except (TypeError, ValueError, IndexError):\n        return None",
+     "    except (TypeError, ValueError, IndexError):\n        return \"about $0*\"", [11]),
+    # the hold (3)
+    ("a server's or cloud run not holding chats", "        if _bench[\"running\"] and _bench.get(\"target\") != \"local\":\n            return False",
+     "        if False:\n            return False", [3]),
+    ("a start not waiting for a server-only chat", "        if _bench_busy[\"n\"] or (target != \"local\" and _bench_busy[\"srv\"]):",
+     "        if _bench_busy[\"n\"]:", [3]),
+    ("a server's model call not refused", "            if not bench_hold_remote():\n                raise RuntimeError(BENCH_BUSY)\n            try:",
+     "            bench_hold_remote()\n            try:", [3]),
+    ("the run's target not kept", "        _bench[\"target\"] = target\n", "        _bench[\"target\"] = \"local\"\n", [3]),
+    # Stop (2, 7)
+    ("Stop doesn't cut a wait for an answer's headers", "        if _bench_stop.is_set() or _bench_live[\"capped\"]:\n            with lock:",
+     "        if False:\n            with lock:", [2, 7]),
+    ("the socket kept for Stop is not the answer's", "        _bench_live[\"conn\"], _bench_live[\"sock\"] = conn, sk\n",
+     "        _bench_live[\"conn\"], _bench_live[\"sock\"] = conn, None\n", [7]),
+    ("a provider's socket not kept when the request goes out", "                conn.o1_sock = conn.sock\n                resp = conn.getresponse()",
+     "                resp = conn.getresponse()", [7]),
+    # no fallback, no side effects (1, 6)
+    ("a failed server row runs on this computer", "    if plan[\"target\"] == \"server\":\n        return _BenchServer(plan[\"e\"], row[\"model\"], seen)",
+     "    if plan[\"target\"] == \"server\":\n        return _bench_engine(row[\"label\"])", [0, 1]),
+    ("a failed cloud call rests the provider", "                conn.close()\n                raise RuntimeError(self._why(resp.status, raw))",
+     "                conn.close()\n                cloud_glitch(self.c, \"x\")\n                raise RuntimeError(self._why(resp.status, raw))", [6, 14]),
+    ("the provider's words in a failure", "        return \"the provider refused the request (HTTP %d)\" % status", "        return body[:160]", [6]),
+    # secrets (8)
+    ("key-shaped text not taken out", "    v = _BENCH_KEYLIKE.sub(\"***\", v)\n", "", [8]),
+    ("a named key not taken out", "        if isinstance(k, str) and len(k) >= 8:\n            v = v.replace(k, \"***\")", "        pass", [8]),
+    ("a server's address kept with the run", "\"gpu_cores\": None, \"server\": e[\"name\"],", "\"gpu_cores\": None, \"server\": e[\"name\"], \"url\": e[\"url\"],", [8]),
+    # the file (9)
+    ("one retention for every target", "    return \"%s:%s\" % (t, r.get(\"target_name\") or \"\") if t == \"server\" else t", "    return \"all\"", [9]),
+    ("the profile's file never trimmed", "        if len(kept) < len(every):", "        if False:", [9]),
+    ("an old row not this computer's", "            r[\"target\"] = \"local\"\n", "", [9]),
+    ("the profile's file readable by anyone", "(json.dumps(r, separators=(\",\", \":\")) + \"\\n\").encode(\"ascii\")\n                for r in reversed(kept)), mode=0o600)",
+     "(json.dumps(r, separators=(\",\", \":\")) + \"\\n\").encode(\"ascii\")\n                for r in reversed(kept)), mode=0o644)", [9]),
+    # profiles (10)
+    ("another profile's run shown", "    if run and (run.get(\"target\") or \"local\") != \"local\" and (\n            ctx is None or owner is not ctx):\n        run = None",
+     "    if False:\n        run = None", [10]),
+    ("another profile's results shown", "bench_targets_history(ctx, BENCH_SHOW)", "bench_targets_history(owner or ctx, BENCH_SHOW)", [10]),
+    ("a run that outlives its profile", "        if ctx.cancel.is_set():\n            with _bench_lock:", "        if False:\n            with _bench_lock:", [10]),
+    # the figures and the request (0, 5)
+    ("the server's own test cut short", "                \"messages\": [{\"role\": \"user\", \"content\": BENCH_PROMPT}],\n                \"options\": {\"temperature\": 0, \"seed\": BENCH_SEED,\n                            \"num_predict\": BENCH_MAX_TOKENS,\n                            \"num_ctx\": BENCH_CTX}}\n        raw[\"t_send\"] = time.monotonic()\n        for line in self._lines(",
+     "                \"messages\": [{\"role\": \"user\", \"content\": BENCH_PROMPT[:100]}],\n                \"options\": {\"temperature\": 0, \"seed\": BENCH_SEED,\n                            \"num_predict\": BENCH_MAX_TOKENS,\n                            \"num_ctx\": BENCH_CTX}}\n        raw[\"t_send\"] = time.monotonic()\n        for line in self._lines(", [0]),
+    ("a load time for a model already loaded", "        if not self.was_loaded and _bench_pos(final.get(\"load_duration\")):",
+     "        if _bench_pos(final.get(\"load_duration\")):", [0]),
+    ("a reading speed from the first token", "        if nums.get(\"src\") != \"engine\":\n            nums[\"prompt_tps\"] = None        # reads: only from the server's own numbers",
+     "        if False:\n            nums[\"prompt_tps\"] = None", [0]),
+    ("a server's first token not flagged", "    def fix(self, nums: dict):\n        nums[\"network\"] = True", "    def fix(self, nums: dict):\n        nums[\"network\"] = False", [0]),
+    ("a cloud row not flagged", "        nums.update(network=True, prompt_tps=None, load_s=None, load_src=None,",
+     "        nums.update(network=False, prompt_tps=None, load_s=None, load_src=None,", [5]),
+    ("the server's calls unsigned", "                conn, resp = _srv_send(e, method, path, body, True,\n                                       SRV_CONNECT_S, skew)",
+     "                conn, resp = _srv_send(e, method, path, body, False,\n                                       SRV_CONNECT_S, skew)", [0]),
+    ("a cloud call at the provider's own ceiling", "            body = _openai_body(c, msgs, BENCH_MAX_TOKENS, stream=True)",
+     "            body = _openai_body(c, msgs, CLOUD_MAX_OUT.get(self.pid, 4096), stream=True)", [5]),
+    ("a cloud call to Claude at 16,000 tokens", "            body = _anthropic_body(c, _anthropic_turns(msgs), \"\",\n                                   BENCH_MAX_TOKENS, stream=True)",
+     "            body = _anthropic_body(c, _anthropic_turns(msgs), \"\",\n                                   16000, stream=True)", [5]),
+    ("a cloud call not at temperature 0", "                body[\"temperature\"] = 0     # where the app's body sends one", "                pass", [5]),
+    ("cards that don't fit ticked", "                       \"tick\": fit,", "                       \"tick\": True,", [11]),
+    # the pane's script, in node (12) and its pins (13)
+    ("runs of another test compared", "const use=runs.filter(x=>x.test===out.test);", "const use=runs;", [13]),
+    ("no warning for different hardware", "if(sets.size>1)out.warn=", "if(false)out.warn=", [13]),
+    ("a cloud row not flagged on the page", "net:!!r.network||run.target===\"cloud\",cloud:run.target===\"cloud\"", "net:!!r.network,cloud:false", [13]),
+    ("a provider's prefix kept in a model's key", "n=n.slice(n.lastIndexOf(\"/\")+1).toLowerCase()", "n=n.toLowerCase()", [13]),
+    ("a model alone shown as a pair", "if(new Set(g.map(r=>r.where)).size<2)return;", "if(false)return;", [13]),
+    ("faster than itself", "{x:slow&&!r.est&&r.gen>0?r.gen/slow.gen:null,isSlow:!!slow&&r===slow}", "{x:r.gen/1,isSlow:false}", [13]),
+    ("Run on more than six cloud models", "p.models.length>0&&p.models.length<=(cloudMax||6)", "p.models.length>0", [13]),
+    ("a server's models all ticked", "if(!(m.name in t))t[m.name]=!!m.tick;", "if(!(m.name in t))t[m.name]=true;", [13, 14]),
+    ("the cloud's models ticked", "const bmTick={srv:{},cloud:{}};", "const bmTick={srv:{},cloud:{\"groq/m0\":true}};", [13]),
+    ("a server that can't be reached run", "if(p.target===\"server\"){const s=bmSrv();return !!(s&&s.reachable&&p.models.length);}",
+     "if(p.target===\"server\"){const s=bmSrv();return !!(s&&p.models.length);}", [13]),
+    ("a figure not given shown as dashes for a server", "return v!=null&&isFinite(+v)?fmt(v):r.cloud?\"-\":r.net?\"not measured\":\"—\";", "return v!=null&&isFinite(+v)?fmt(v):\"-\";", [13]),
+    ("Run on the cloud without the dialog", "if(p.target===\"cloud\"){go.disabled=true;await bmCloudAsk(p);go.disabled=false;return;}", "", [14]),
+    ("the box not reset for each run", "$(\"#bmc-ok\").checked=false;$(\"#bmc-go\").disabled=true;", "", [14]),
+    ("the confirm button not waiting for the box", "if(!bmPlan||!$(\"#bmc-ok\").checked)return;", "if(!bmPlan)return;", [14]),
+    ("a confirmation remembered", "const bmTick={srv:{},cloud:{}};", "const bmTick={srv:{},cloud:{}};try{localStorage.setItem(\"bmok\",\"1\");}catch(e){}", [14]),
+    ("a server-only chat not held", "            self._bench_srv_held = True\n", "            pass\n", [14]),
+    ("the chat's server hold never released", "            if self._bench_srv_held:\n                self._bench_srv_held = False\n                bench_release_remote()\n",
+     "            if self._bench_srv_held:\n                self._bench_srv_held = False\n", [14]),
+    ("the profile's file not personal", "\"remote_known_hosts\", \"bench_targets.jsonl\", \"images\"", "\"remote_known_hosts\", \"images\"", [14]),
+    ("a provider rested by a benchmark call", "    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", "    cloud_glitch({}, '')\n    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", [14]),
+    ("the passage changed", "\"Using only the passage above, explain step by step how a tide mill \"", "\"Using only the passage above, explain how a tide mill \"", [13]),
+    # stored runs from other builds, hand-edited or damaged (12, 13)
+    ("a stored run shown as it is", "            runs.append(_bench_clean_run(r))", "            runs.append(r)", [12]),
+    ("an address left in a note", "    v = _BENCH_URL.sub(\"(address)\", v)\n", "", [12]),
+    ("a row that isn't a row kept", "                     for row in r.get(\"models\") or [] if isinstance(row, dict)]",
+     "                     for row in r.get(\"models\") or []]", [12]),
+    ("a damaged row breaks Compare", "if(!r||r.status!==\"done\")return;", "if(r.status!==\"done\")return;", [13]),
+    ("a missing time shown as NaN", "function bmWhen(t){return t!=null&&isFinite(+t)?uWhen(t):\"\";}", "function bmWhen(t){return uWhen(t);}", [13]),
+]
+
+
+def _b41_run(src, which=None):
+    out = []
+    for i, (name, fn) in enumerate(_B41_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        out.append((i, name, bool(ok), det))
+    return out
+
+for _n41, _f41 in _B41_CHECKS:
+    try:
+        _ok41, _d41 = _f41(_MILLENAI_SRC)
+    except Exception as _x41:
+        _ok41, _d41 = False, "raised %r" % (_x41,)
+    check(_n41, _ok41, "%r" % (_d41,))
+_mm41 = []
+for _d41, _o41, _n41, _w41 in _B41_MUT:
+    if _MILLENAI_SRC.count(_o41) != 1:
+        _mm41.append((_d41, "anchor missing"))
+        continue
+    _res41 = _b41_run(_MILLENAI_SRC.replace(_o41, _n41, 1), _w41)
+    _mm41.append((_d41, [n_[:60] for _i, n_, o_, _x in _res41 if not o_][:1] or "MISSED"))
+check("benchmark targets: %d mutations of the cost dialog, the hold, Stop, the secrets, the file, the profiles, the "
+      "figures and the pane, each caught by the check that guards it" % len(_B41_MUT),
+      all(isinstance(v_, list) for _d_, v_ in _mm41), "%r" % [x_ for x_ in _mm41 if not isinstance(x_[1], list)])
+# the served page carries the pane's new controls, the dialogs, and nothing unreplaced
+check("benchmark targets: the served page has the target picker, the checklist, the cost dialog (the box, the "
+      "button waiting for it) and Compare, and no ollama1",
+      'id="bm-target"' in page and 'id="bm-pk"' in page and 'id="bm-cv-open"' in page
+      and 'id="bmc-veil" hidden' in page and 'id="bmc-ok"' in page and 'id="bmc-go" class="about-btn slim" disabled>' in page
+      and 'id="bmv-veil" hidden' in page and 'I understand this may cost money' in page
+      and "__" not in page[page.index('id="bmc-veil"'):page.index('id="gear-veil"')]
+      and _bpg.index('id="bm-go"') < _bpg.index('id="bm-pk"') < _bpg.index('id="bm-prog"'),
+      "")
+
+# ---- live, on a copy of its own with the stub provider (6b326's): a cloud benchmark goes through the routes
+# behind the confirmation, calls each provider once with its own key, leaves the app's provider state alone,
+# is refused to chats while it runs, stops, and is the profile's own
+# the stub provider was shut down at the end of 6b326's checks: it serves again, on the same address
+_th26.Thread(target=_STUB26.serve_forever, daemon=True).start()
+_ENV41 = dict(_ENV26, MILLENAI_TEST_HOOKS=_ENV26["MILLENAI_TEST_HOOKS"] + ",profiles")
+_BC = Instance(9903, "BC41", seed=_seed_c26, env=_ENV41).start()
+_BCR = []
+
+
+def _bcq(path, method="GET", data=None):
+    s_, b_ = _ireq(_BC, path, method=method, data=None if data is None else json.dumps(data).encode(),
+                   headers={"Content-Type": "application/json"} if data is not None else None)
+    _BCR.append(b_)
+    try:
+        return s_, json.loads(b_ or b"{}")
+    except ValueError:
+        return s_, {}
+
+
+def _bc_wait(secs=60):
+    end_ = time.time() + secs
+    d_ = {}
+    while time.time() < end_:
+        d_ = _bcq("/api/bench")[1]
+        if isinstance(d_, dict) and d_.get("running") is False:
+            return d_
+        time.sleep(0.2)
+    return d_ if isinstance(d_, dict) else {}
+
+
+for _k41 in ("bad", "drop", "busy", "probe403"):
+    _S26[_k41].clear()                      # what earlier checks left on the stub
+_S26["late401"].clear()
+_S26["bench_delay"] = 0
+_bc_cj = os.path.join(_BC.home, "cloud.json")
+_bc_cj0 = open(_bc_cj, "rb").read()
+_bc_t1 = _bcq("/api/bench/targets")
+_bc_cl = {p_["pid"]: p_ for p_ in _bc_t1[1].get("cloud") or []}
+_bc_picks = [{"pid": "groq", "model": "openai/gpt-oss-120b"}, {"pid": "claude", "model": "claude-haiku-4-5-20251001"}]
+_bc_n0 = len(_S26["bench_calls"])
+_bc_c1 = _bcq("/api/bench/start", "POST", {"target": "cloud"})
+_bc_p1 = _bcq("/api/bench/cloud-plan", "POST", {"models": _bc_picks})
+_bc_id = _bc_p1[1].get("id", "")
+_bc_c2 = _bcq("/api/bench/start", "POST", {"target": "cloud", "confirm": _bc_id})
+_bc_c3 = _bcq("/api/bench/start", "POST", {"target": "cloud", "confirm": "x" * 32, "understood": True})
+_bc_none = len(_S26["bench_calls"]) - _bc_n0
+_bc_c4 = _bcq("/api/bench/start", "POST", {"target": "cloud", "confirm": _bc_id, "understood": True})
+_bc_d1 = _bc_wait()
+_bc_run = _bc_d1.get("run") or {}
+_bc_rows = _bc_run.get("models") or [{}, {}]
+_bc_calls = _S26["bench_calls"][_bc_n0:]
+_bc_c5 = _bcq("/api/bench/start", "POST", {"target": "cloud", "confirm": _bc_id, "understood": True})
+_bc_after = len(_S26["bench_calls"]) - _bc_n0
+_bc_file = os.path.join(_BC.home, "bench_targets.jsonl")
+_bc_raw = open(_bc_file, "rb").read() if os.path.exists(_bc_file) else b""
+check("benchmark cloud (live): the cloud's providers are listed with no key; no call without the confirmation "
+      "(none, not ticked, forged), one call to each provider with its own key at 256 tokens, the id spent by that run",
+      _bc_t1[0] == 200 and "groq" in _bc_cl and "claude" in _bc_cl
+      and "openai/gpt-oss-120b" in [m_["id"] for m_ in _bc_cl["groq"]["models"]]
+      and not any(k_ in _bc_t1[1].__repr__() for k_ in _SENT26.values())
+      and _bc_t1[1].get("cloud_max") == 6 and _bc_t1[1].get("servers") == []
+      and _bc_c1[0] == 400 and _bc_p1[0] == 200 and _bc_p1[1].get("calls") == 2
+      and _bc_p1[1].get("warning") == "This uses your API keys and may cost money with your provider. "
+                                       "ConcordeAI doesn't know your plan or prices."
+      and _bc_c2[0] == 400 and "I understand" in _bc_c2[1].get("err", "") and _bc_c3[0] == 400
+      and _bc_none == 0 and _bc_c4[0] == 200 and _bc_run.get("state") == "done"
+      and _bc_run.get("cost_warning") is True and _bc_run.get("target") == "cloud"
+      and len(_bc_calls) == 2
+      and [(c_["k"], "api.groq.com" in c_["p"], "api.anthropic.com" in c_["p"]) for c_ in _bc_calls]
+      == [(_SENT26["groq"], True, False), (_SENT26["claude"], False, True)]
+      and all(c_["body"].get("max_tokens") == 256 and c_["body"].get("stream") is True for c_ in _bc_calls)
+      and [r_.get("status") for r_ in _bc_rows] == ["done", "done"]
+      and all(r_.get("network") is True and r_.get("prompt_tps") is None and r_.get("load_s") is None
+              and r_.get("gen_tps") for r_ in _bc_rows)
+      and [r_.get("provider") for r_ in _bc_rows] == ["Groq", "Claude"]
+      and _bc_c5[0] == 400 and _bc_after == 2,
+      "%r" % [_bc_t1[0], _bc_c1, _bc_c2, _bc_c3, _bc_c4, _bc_none, _bc_run.get("state"), _bc_rows, _bc_calls[:2], _bc_c5, _bc_after])
+check("benchmark cloud (live): kept in the profile's own file (0600, cost warning flagged), the app's own provider "
+      "state (cloud.json) untouched, no key in the file",
+      os.path.exists(_bc_file) and _st34.S_IMODE(os.stat(_bc_file).st_mode) == 0o600
+      and json.loads(_bc_raw.splitlines()[0]).get("cost_warning") is True
+      and json.loads(_bc_raw.splitlines()[0]).get("target") == "cloud"
+      and not any(k_.encode() in _bc_raw for k_ in _SENT26.values())
+      and open(_bc_cj, "rb").read() == _bc_cj0
+      and not os.path.exists(os.path.join(_BC.home, "benchmarks.jsonl")),
+      "%r" % [_bc_raw[:200]])
+# a slow provider: chats refused, Stop cuts it
+_S26["bench_delay"] = 0.25
+_bc_p2 = _bcq("/api/bench/cloud-plan", "POST", {"models": _bc_picks[:1] + [{"pid": "groq", "model": "qwen/qwen3.8-27b"}]})
+_bc_s2 = _bcq("/api/bench/start", "POST", {"target": "cloud", "confirm": _bc_p2[1].get("id", ""), "understood": True})
+_bc_end = time.time() + 30
+while time.time() < _bc_end:
+    _bm2 = _bcq("/api/bench")[1]
+    _mr2 = ((_bm2.get("run") or {}).get("models") or [{}])[0]
+    if _mr2.get("status") == "writing" and _mr2.get("tok", 0) >= 2:
+        break
+    time.sleep(0.1)
+_CUR26[0] = _BC
+_bc_ch = _cchat26("chat during a cloud benchmark q341")
+_bc_t0 = time.time()
+_bc_st = _bcq("/api/bench/stop", "POST", {})
+_bc_d2 = _bc_wait(15)
+_bc_took = time.time() - _bc_t0
+_S26["bench_delay"] = 0
+_bc_r2 = _bc_d2.get("run") or {}
+check("benchmark cloud (live): while a run goes a chat is refused, unsaved; Stop ends it within seconds and the rest are not run",
+      _bc_s2[0] == 200 and _bc_ch[0] == 409 and "A hardware benchmark is running" in _bc_ch[2]
+      and "q341" not in json.dumps(_bcq("/api/chats")[1]) and _bc_st == (200, {"ok": True, "stopped": True})
+      and _bc_took < 5 and _bc_r2.get("state") == "stopped"
+      and [r_.get("status") for r_ in _bc_r2.get("models") or []] == ["stopped", "not run"],
+      "%r" % [_bc_s2, _bc_ch[:2], _bc_st, round(_bc_took, 2), _bc_r2.get("state")])
+# a profile's own: B has no cloud keys, sees none of A's runs and can't spend A's confirmation
+_bc_p3 = _bcq("/api/bench/cloud-plan", "POST", {"models": _bc_picks[:1]})
+_bc_pB = _bcq("/api/test/profile", "POST", {"op": "create"})[1].get("name", "")
+_bcq("/api/test/profile", "POST", {"op": "switch", "to": _bc_pB})
+_bc_nB = len(_S26["bench_calls"])
+_bc_B1 = _bcq("/api/bench")[1]
+_bc_B2 = _bcq("/api/bench/targets")[1]
+_bc_B3 = _bcq("/api/bench/cloud-plan", "POST", {"models": _bc_picks[:1]})
+_bc_B4 = _bcq("/api/bench/start", "POST", {"target": "cloud", "confirm": _bc_p3[1].get("id", ""), "understood": True})
+_bcq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
+_bc_A1 = _bcq("/api/bench")[1]
+_bc_A2 = _bcq("/api/bench/start", "POST", {"target": "cloud", "confirm": _bc_p3[1].get("id", ""), "understood": True})
+check("benchmark cloud (live): profile B has no keys, sees none of A's runs and can't spend A's confirmation (nor A, "
+      "after a switch); no call was made",
+      _bc_pB and _bc_B1.get("history") == [] and _bc_B1.get("run") is None and _bc_B2.get("cloud") == []
+      and _bc_B3[0] == 400 and _bc_B4[0] == 400 and _bc_A2[0] == 400
+      and len(_S26["bench_calls"]) == _bc_nB
+      and [r_.get("target") for r_ in _bc_A1.get("history") or []] == ["cloud", "cloud"]
+      and not os.path.exists(os.path.join(_BC.home, "accounts", _bc_pB, "bench_targets.jsonl")),
+      "%r" % [_bc_B1, _bc_B2, _bc_B3, _bc_B4, _bc_A2, len(_bc_A1.get("history") or [])])
+_BC.stop()
+_bc_hits = {k_: [p_ for p_ in _bytegrep(_BC.home, v_)] for k_, v_ in _SENT26.items()}
+_bc_log = open(os.path.join(_SMOKE_TMP, "BC41.log"), errors="replace").read()
+check("benchmark cloud (live): no key is in any reply, any log or any file but cloud.json",
+      all(set(v_) <= {_bc_cj} for v_ in _bc_hits.values())
+      and not any(v_.encode() in b_ for v_ in _SENT26.values() for b_ in _BCR)
+      and not any(v_ in _bc_log for v_ in _SENT26.values()) and len(_BCR) > 15,
+      "%r" % [_bc_hits])
 
 
 print()
