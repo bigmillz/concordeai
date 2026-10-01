@@ -16645,6 +16645,7 @@ SRV_CONNECT_S = 12              # to connect and for a whole short answer
 SRV_FIRST_S = 600               # to the first line: its turn in the queue and a load
 SRV_IDLE_S = 120                # then: this long with no byte ends the answer
 SRV_CHECK_S = 15                # a whole status check (whoami, tags, ps, version)
+SRV_USAGE_S = 3                 # one read of a server's card usage: short, the meter polls
 SRV_MAX_CHARS = 2_000_000       # an answer longer than this is cut there
 # an Ollama cloud model's tag ("gpt-oss:120b-cloud", "kimi-k2:cloud"): the
 # gateway hides them; the app refuses one too (review of 6b334)
@@ -18145,6 +18146,42 @@ def server_pair(ctx, sid: str, code) -> dict:
             server_check(e)
             out["server"] = _srv_public(e)
     return out
+def _srv_usage_gpu(js) -> dict:
+    """{busy_pct, vram_used_bytes, vram_total_bytes} from a gateway's
+    /v1/usage, each an int or None: those three and nothing else, so
+    nothing else a server might add can reach the page (6b342)."""
+    g = js.get("gpu") if isinstance(js, dict) else None
+    g = g if isinstance(g, dict) else {}
+
+    def num(k, hi):
+        v = g.get(k)
+        return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= hi else None
+    return {"busy_pct": num("busy_pct", 100),
+            "vram_used_bytes": num("vram_used_bytes", 1 << 50),
+            "vram_total_bytes": num("vram_total_bytes", 1 << 50)}
+
+
+def server_usage(ctx, sid: str) -> dict:
+    """The sidebar meter's read of one paired server's card (6b342, per
+    Patrick: "put the GPU name in a middle row"): {ok, gpu}. ok False: the
+    server didn't answer (or isn't paired any more). ok with gpu None: it
+    answered but its kit has no usage route yet (the name shows, the bar
+    stays empty). One short signed GET; it loads nothing, says nothing in
+    any chat, and keeps nothing; the reply is those three numbers."""
+    e = _srv_find(_srv_read(ctx), sid)
+    if e is None or not _srv_paired(e):
+        return {"ok": False}
+    try:
+        if not cai_crypto.available():
+            return {"ok": False}
+        st, js = _srv_json(e, "GET", "/v1/usage", timeout=SRV_USAGE_S)
+    except ServerError:
+        return {"ok": False}
+    if st == 200:
+        return {"ok": True, "gpu": _srv_usage_gpu(js)}
+    if st == 404 and str(js.get("code") or "") == "not_found":
+        return {"ok": True, "gpu": None}        # an older server kit
+    return {"ok": False}
 # ==== servers: end ====
 
 
@@ -24007,6 +24044,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             self._send_json(servers_view(
                 self.ctx, (_sq.get("refresh") or [""])[0] == "1"))
+        elif urllib.parse.urlparse(self.path).path == "/api/servers/usage":
+            # the sidebar meters' read of one server's card (6b342): while
+            # a benchmark runs nothing is asked of any server
+            _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            _sid = (_sq.get("id") or [""])[0]
+            if _bench["running"]:
+                self._send_json({"ok": True, "paused": True})
+            elif not _SRV_ID_RX.fullmatch(_sid):
+                self._send_json({"ok": False})
+            else:
+                self._send_json(server_usage(self.ctx, _sid))
         elif self.path == "/api/cloud":
             c = cloud_conf()
             d = _cloud_all()
@@ -29515,6 +29563,15 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
    dropped in 6b268 (per Patrick) — the bar carries the reading. */
 #telemetry .t-head .live{color:var(--text);white-space:nowrap}
 .meter-row{margin-bottom:7px}
+/* a paired server's graphics card, between this computer's bar and memory
+   pressure (6b342, per Patrick: "put the GPU name in a middle row"): the
+   name set like the chip's, the bar the same bar; dimmed while the server
+   doesn't answer. The rows are made by script, so a card with no server
+   is the markup it always was */
+#telemetry .srv-mrow{transition:opacity .3s}
+#telemetry .srv-mrow.off{opacity:.45}
+#telemetry .srv-mrow:last-child{margin-bottom:7px}   /* the one before memory keeps its gap */
+#telemetry .srv-mrow .t-head span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .meter-row:last-child{margin-bottom:0}
 .meter-label{
   display:flex;justify-content:space-between;align-items:center;
@@ -32824,6 +32881,9 @@ let lastModels="";  // line-up the backend actually used
 // /api/servers says (no token, no key), when they were last checked,
 // a Remove clicked once, a Pair again opened
 let srvList=[],srvAt=0,srvLoaded=false;
+// the sidebar meters' server rows (6b342): each paired server's last read of its
+// card {ok, gpu, fails, due, busy}; a timer; and a flag a profile switch sets
+const srvUse={};let srvUseT=0,srvUseDead=false;
 // a card's line and its open Access form survive a repaint (review)
 const srvArmed={},srvPairOpen={},srvMsgs={},srvTokOpen={};
 const SRV_SEP=" \u00b7 ";
@@ -38227,6 +38287,7 @@ function srvChipsHtml(list){
 function paintSrvChips(){
   const box=document.getElementById("srv-chips");
   if(box)box.innerHTML=srvChipsHtml(srvList);
+  srvMetersRefresh();
 }
 // "<server> Only" (6b337, per Patrick: "Under the cloud models only, can we
 // add a Olama one only or whatever the server name is in a user's case?"):
@@ -38276,6 +38337,136 @@ function paintEngMenuServers(){
   const em=document.getElementById("engmenu");
   if(em&&!em.hidden)openEngMenu();
 }
+// THE SIDEBAR CARD'S SERVER ROWS (6b342, per Patrick: "When a server is connected
+// for the user, can we have this box get bigger and put the GPU name in a middle
+// row? ... Hopefully this can adjust based on if the server is connected or not."):
+// one row per paired server whose gateway names a card, up to three, between this
+// computer's graphics bar and memory pressure. The row is the card's name set like
+// the chip's ("M4 PRO") and a bar for how busy the card is. A server that doesn't
+// answer is dimmed with an empty bar; a gateway with no usage reading (an older
+// kit) shows the name and an empty bar. No server paired: nothing is drawn, and
+// nothing is asked. Pure functions below, so the gauntlet can run them in node.
+const SRV_METER_MAX=3;
+function srvMeterServers(list){
+  return (list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);
+}
+function srvMeterName(g){
+  let n=String((g&&g.name)||"").replace(/\s+/g," ").trim().replace(/^(AMD|NVIDIA|INTEL)\s+/i,"");
+  n=(n||SRV_GPU[g&&g.vendor]||"").toUpperCase();
+  return n.length>26?n.slice(0,25)+"\u2026":n;
+}
+function srvMeterRows(list,use){
+  const all=(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);
+  return all.slice(0,SRV_METER_MAX).map((s,i)=>{
+    const g=s.gpu,u=(use&&use[s.id])||{},st=s.status||{};
+    // the poll's own answer wins over the last full check, which can be old
+    const off=u.ok===false||(u.ok==null&&(st.reachable===false||!!st.err));
+    const ug=u.gpu||null,busy=ug&&typeof ug.busy_pct==="number"?ug.busy_pct:null;
+    const vb=(ug&&ug.vram_total_bytes)||g.vram_bytes;
+    const t=[s.name,g.name||"",vb?Math.round(vb/1073741824)+" GB":""];
+    t.push(off?"not answering":busy!=null?busy+"% busy"
+      :u.ok?"usage not reported (update the server kit)":"");
+    if(i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX)t.push("+"+(all.length-SRV_METER_MAX)+" more");
+    return {id:s.id,name:srvMeterName(g),title:t.filter(Boolean).join(" \u00b7 "),
+      pct:off?null:busy,off:off};
+  });
+}
+// how long after a read the next one waits: 3 s while it answers, then 10 s,
+// then 30 s while it doesn't
+function srvUseWait(fails){return fails<=0?3000:fails===1?10000:30000;}
+// what a wake-up does: ids = the servers shown, due = when each is next due,
+// card/page = the sidebar card is on screen / the window is showing. It asks
+// only while there is a server and both are true; a card out of sight (the
+// narrow drawer closed) is looked at again in 3 s, asking nothing; a hidden
+// window asks nothing and sets no timer
+function srvUsagePlan(o){
+  if(!o.ids.length||!o.page)return {poll:[],next:null};
+  if(!o.card)return {poll:[],next:3000};
+  const poll=o.ids.filter(id=>(o.due[id]||0)<=o.now);
+  const left=o.ids.map(id=>(o.due[id]||0)-o.now);
+  return {poll:poll,next:Math.max(250,Math.min(...left))};
+}
+function srvCardShown(){
+  const t=document.getElementById("telemetry");
+  if(!t||document.hidden)return false;
+  const r=t.getBoundingClientRect();
+  return r.width>0&&r.height>0&&r.right>0&&r.left<innerWidth;
+}
+function srvMetersSync(){
+  const tel=document.getElementById("telemetry");if(!tel)return;
+  const rows=srvUseDead?[]:srvMeterRows(srvList,srvUse);
+  let box=document.getElementById("srv-meters");
+  if(!rows.length){if(box)box.remove();return;}
+  if(!box){
+    box=document.createElement("div");box.id="srv-meters";
+    const mem=document.getElementById("mem-meter"),mr=mem&&mem.closest(".meter-row");
+    tel.insertBefore(box,mr||null);
+  }
+  const have={};
+  Array.prototype.forEach.call(box.children,c=>{have[c.dataset.sid]=c;});
+  rows.forEach((r,i)=>{
+    let el=have[r.id];delete have[r.id];
+    if(!el){
+      el=document.createElement("div");el.className="meter-row srv-mrow";el.dataset.sid=r.id;
+      const hd=document.createElement("div"),bar=document.createElement("div");
+      hd.className="t-head";hd.appendChild(document.createElement("span"));
+      bar.className="meter";buildMeter(bar);
+      el.appendChild(hd);el.appendChild(bar);
+    }
+    if(box.children[i]!==el)box.insertBefore(el,box.children[i]||null);
+    el.firstChild.firstChild.textContent=r.name;
+    el.title=r.title;
+    el.classList.toggle("off",r.off);
+    paintMeter(el.lastChild,r.pct==null?0:r.pct);
+  });
+  Object.keys(have).forEach(k=>have[k].remove());
+}
+async function srvUsagePoll(s){
+  const u=srvUse[s.id]||(srvUse[s.id]={ok:null,gpu:null,fails:0,due:0,busy:false});
+  if(u.busy)return;
+  u.busy=true;
+  let d=null,gone=false;
+  try{
+    const r=await api("/api/servers/usage?id="+encodeURIComponent(s.id));
+    // the profile changed under this page (a reload is on its way): its
+    // rows go now, and nothing more is asked
+    if(r.status===409)gone=true;
+    else if(r.ok)d=await r.json();
+  }catch(e){}
+  u.busy=false;
+  if(gone){srvUseDead=true;srvMetersSync();return;}
+  if(d&&d.paused){u.due=Date.now()+3000;return;}     // a benchmark is running
+  if(d&&d.ok){u.ok=true;u.gpu=d.gpu||null;u.fails=0;}
+  else{u.ok=false;u.gpu=null;u.fails++;}
+  u.due=Date.now()+srvUseWait(u.fails);
+}
+async function srvUseTick(){
+  srvUseT=0;
+  if(srvUseDead)return;
+  const gs=srvMeterServers(srvList),ids=gs.map(s=>s.id);
+  const plan=()=>srvUsagePlan({ids:ids,due:Object.fromEntries(ids.map(id=>[id,(srvUse[id]||{}).due||0])),
+    now:Date.now(),card:srvCardShown(),page:!document.hidden});
+  const p=plan();
+  if(p.poll.length){
+    await Promise.all(gs.filter(s=>p.poll.indexOf(s.id)>=0).map(srvUsagePoll));
+    srvMetersSync();
+  }
+  if(srvUseT||srvUseDead)return;
+  const n=plan().next;
+  if(n!=null)srvUseT=setTimeout(srvUseTick,n);
+}
+// the servers (or what is known of them) changed: draw, forget what is gone,
+// and wake the poll if there is a server to read
+function srvMetersRefresh(){
+  const keep=new Set(srvMeterServers(srvList).map(s=>s.id));
+  Object.keys(srvUse).forEach(k=>{if(!keep.has(k))delete srvUse[k];});
+  srvMetersSync();
+  if(!srvUseT&&keep.size&&!document.hidden&&!srvUseDead)srvUseT=setTimeout(srvUseTick,0);
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){clearTimeout(srvUseT);srvUseT=0;}
+  else srvMetersRefresh();
+});
 function pickServerModel(label){
   tier="";advOn=false;councilManual=false;
   if(agent){agent="";if(typeof paintAgents==="function")paintAgents();}

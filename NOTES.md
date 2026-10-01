@@ -9,6 +9,111 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b342 — your server's graphics card in the sidebar meters
+Patrick (2026-10-01), with a screenshot of the sidebar's bottom card (a
+bar labelled "M4 PRO", then "MEMORY PRESSURE"): "When a server is
+connected for the user, can we have this box get bigger and put the GPU
+name in a middle row? So in this case, it would have M4 Pro in its GPU
+usage. Then in my case, Radeon 6900 XT and its usage, and then memory
+pressure. Hopefully this can adjust based on if the server is connected
+or not."
+
+The card (6b254's instrument cluster) keeps its first row (this
+computer's chip and its GPU bar) and its last (memory pressure). Each
+PAIRED server whose gateway names a card (the same ones that get a chip
+beside "MLX", 6b334) adds a row between them: the card's name set like
+"M4 PRO" (`.t-head`, uppercase mono, "NVIDIA "/"AMD "/"INTEL " dropped
+from the front, 26 characters then an ellipsis) over a bar that is
+the same bar, `paintMeter`, same ease and same hot colour from 80%.
+
+- WHAT THE SERVER SAYS. New signed, paired-only `GET /v1/usage` on the
+  gateway (`ollama1/bin/ollama1-gateway`, `Gateway.usage`, reading
+  `o1gpu.usage`): `{"gpu": {"busy_pct", "vram_used_bytes",
+  "vram_total_bytes"}}`, each an int or null, and nothing else: which
+  models are loaded, who is using the card, prompts, device ids and
+  request counts are not in it (the gateway builds the answer from those
+  three keys, whatever the reader returns). AMD: `gpu_busy_percent`,
+  `mem_info_vram_used` and `mem_info_vram_total`, the files the server's
+  own dashboard (`o1stats.gpu`) reads; NVIDIA: `nvidia-smi
+  --query-gpu=utilization.gpu,memory.used,memory.total`; Intel or no
+  card: all null. A missing file, a value out of range or a missing
+  `nvidia-smi` is null, not an error. Read at most once a second however
+  many devices ask (one reading at a time, behind a lock), and the
+  gateway's existing sixteen-at-once cap and signature checks apply as to
+  every route. `/v1/info` is unchanged (the protocol vectors are
+  byte for byte the same). PROTOCOL.md and docs/your-own-server.md say it.
+  SANDBOX: the gateway already reads `/sys/class/drm/*/device` for the
+  card's name and size under `ProtectKernelTunables=yes` and
+  `PrivateDevices=yes`, and those three amdgpu files sit beside
+  `mem_info_vram_total`, so nothing in the unit needed to change for AMD.
+  NOT checked on the real server: that `o1gw` can read them (they are
+  world-readable, 0444, on the amdgpu driver I know of), nor NVIDIA:
+  `PrivateDevices=yes` hides `/dev/nvidia*` from `nvidia-smi`, which
+  would also have hit the card detection that has always used it. An
+  NVIDIA server's row may therefore show its name with an empty bar.
+- WHAT THE APP DOES. `GET /api/servers/usage?id=<server id>` (behind the
+  launch key and the token like every /api route, and the profile
+  header): `server_usage` finds the server in the ACTIVE profile (another
+  profile's id reads nothing), and makes one short signed `/v1/usage`
+  call (`SRV_USAGE_S`, 3 s): `{ok, gpu}`. ok false: no answer, or not
+  paired. ok with gpu null: the gateway answered 404 not_found, an older
+  kit. While a benchmark runs it answers `{ok, paused}` and asks nothing.
+  It loads no model, creates no chat traffic and keeps nothing; the reply
+  is the three numbers, nothing secret.
+- WHAT THE PAGE DOES. The rows are made by script (`srvMetersSync`,
+  `#srv-meters` between the chip row and memory pressure), so with no
+  server the card's markup is exactly what it was (a gauntlet pin on the
+  markup and on the served page). It runs only while a server is paired,
+  the card is on screen (`srvCardShown`: the narrow drawer shut is not)
+  and the window is showing: every ~3 s per server, 10 s after one
+  miss, then 30 s while it doesn't answer, back to 3 s when it does.
+  A hidden window clears the timer and sets none. Up to three servers get
+  a row, the third's title ending "+N more"; only those are polled. A
+  row's bar is kept between readings, so it eases rather than
+  redrawing. A server that doesn't answer is dimmed (opacity .45, like
+  the chips) with an empty bar and "not answering" in its title; an
+  older kit (or nulls) shows the name, an empty bar and "usage not
+  reported (update the server kit)"; the title otherwise reads
+  "<server> · <card> · 16 GB · 37% busy". The rows appear, go and
+  change as servers are paired, tested or removed (`paintSrvChips` is
+  the one place that redraws the chips and the rows, so every path that
+  already repainted the chips moves them) with no reload. A 409 from the
+  profile header (the profile changed under the page; a reload follows)
+  removes the rows at once and stops the poll; a page only ever knows its
+  own profile's `srvList`.
+- LAYOUT (browser pane, Blink, 1320x860, the default window; the app's
+  own WKWebView is not checked). The card is 76.5 px tall with no server,
+  107 with one, 137.5 with two, 168 with three: 30.5 px a row (the
+  name's line, its 7 px, the 2 px bar, the 7 px between rows). The
+  padding is the same at every count: 10 px from the card's top to the
+  chip row's line box and 13 px from the last bar to the bottom (the 9
+  and 12 of the CSS plus the 1 px border), 13 px each side; the chat
+  list takes the difference (644, 613.5, 583, 552.5 px) and neither the
+  sidebar nor the page scrolls at any count. With the servers gone it is
+  76.5 again.
+- Gauntlet: new `== your server's graphics card in the sidebar meters
+  (6b342) ==`: the card's markup pinned (source and served page), the
+  app's read in process (three numbers kept, an older kit, a refusal, a
+  server that's off, an unpaired one, the 3 s limit, the handler's order),
+  the rows, the card's DOM and the scheduler in node on a stand-in
+  document, clock and timers (steady 3 s; 10 s, 30 s, 30 s then 3 s; a
+  thrown fetch; hidden; the card out of sight; a benchmark; a 409; no
+  server; two servers on their own schedules; a fourth never read), and
+  twenty-six mutations each caught; live on the REAL gateway (a signed GET
+  and nothing to Ollama, nulls, an older kit's 404, a server that is
+  off, a benchmark, bad ids, no key or token, another profile). The stub
+  gateway's harness gained `/usage` on its control port. Kit: tests for the
+  reader (AMD, NVIDIA, missing files, out-of-range values), the route (three
+  fields only, signed, paired, the cache, nulls from a missing sysfs) and
+  six mutations. One full run on the branch: 635 of 640; the five misses
+  were two old node checks that slice the page between `SRV_GPU` and
+  `paintSrvChips` (the new code sat in that span: moved after
+  `paintEngMenuServers`), a served-page pin that matched the script's own
+  `srv-meters`, one mutation the poll check let by (an unpaired server
+  polled: a check added) and a duplicate `paintSrvChips` I had left in. All
+  fixed; the full run was not repeated after them (the node checks were
+  re-run alone).
+
 ## 6b340 — funnel pictures: three across, and always one
 Patrick (2026-09-30), with a screenshot of a picture funnel's stage of
 six: "For the funnel using images as well, if we can, let's make the

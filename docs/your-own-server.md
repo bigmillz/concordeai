@@ -227,6 +227,16 @@ turns all of that off for a server. The Workspace and Coding agents can send
 the contents of a folder you give them to the server, as they would to any
 model that answers.
 
+The sidebar's meters card shows the server too. When a server is paired and
+names its graphics card, the card grows a row between this computer's graphics
+bar and memory pressure: the card's name and a bar for how busy it is, polled
+every few seconds while the window is showing. The server answers with three numbers only (busy percent and
+video memory in use and in total), read at most once a second; it says
+nothing about which models are loaded or who is using the card. A server
+that doesn't answer shows its row dimmed with an empty bar. A server running
+an older kit has no usage reading, so its row shows the name and an empty
+bar until you update the kit.
+
 ## Choosing models
 
 Nothing is installed at first. Put the models you want in

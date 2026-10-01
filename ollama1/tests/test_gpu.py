@@ -100,5 +100,58 @@ class TestGpuInfo(GpuFixture):
         self.assertEqual(o1gpu.detect(), {"vendor": None, "name": None, "vram_bytes": None})
 
 
+class TestGpuUsage(GpuFixture):
+    """o1gpu.usage(): the three numbers GET /v1/usage serves."""
+    AMD = {"vendor": "0x1002", "device": "0x73bf", "revision": "0xc0",
+           "mem_info_vram_total": "17163091968", "mem_info_vram_used": "9126805504",
+           "gpu_busy_percent": "37"}
+
+    def test_amd_reads_the_dashboards_files(self):
+        self.card(1, self.AMD)
+        self.assertEqual(o1gpu.usage("amd"), {"busy_pct": 37, "vram_used_bytes": 9126805504,
+                                              "vram_total_bytes": 17163091968})
+
+    def test_only_three_fields(self):
+        self.card(1, dict(self.AMD, product_name="Secret Card", serial_number="SN123"))
+        self.assertEqual(sorted(o1gpu.usage("amd")), ["busy_pct", "vram_total_bytes", "vram_used_bytes"])
+
+    def test_a_missing_file_is_null_not_an_error(self):
+        files = dict(self.AMD)
+        del files["gpu_busy_percent"], files["mem_info_vram_used"]
+        self.card(1, files)
+        self.assertEqual(o1gpu.usage("amd"), {"busy_pct": None, "vram_used_bytes": None,
+                                              "vram_total_bytes": 17163091968})
+
+    def test_no_card_at_all_is_all_null(self):
+        none = {"busy_pct": None, "vram_used_bytes": None, "vram_total_bytes": None}
+        self.assertEqual(o1gpu.usage("amd"), none)
+        self.assertEqual(o1gpu.usage(None), none)
+        self.assertEqual(o1gpu.usage("intel"), none)
+        self.assertEqual(o1gpu.usage("nvidia"), none)       # no nvidia-smi on the path
+
+    def test_garbage_and_out_of_range_are_null(self):
+        self.card(1, dict(self.AMD, gpu_busy_percent="lots", mem_info_vram_used="-4"))
+        got = o1gpu.usage("amd")
+        self.assertIsNone(got["busy_pct"])
+        self.assertIsNone(got["vram_used_bytes"])
+        self.card(1, dict(self.AMD, gpu_busy_percent="180"))
+        self.assertIsNone(o1gpu.usage("amd")["busy_pct"])
+
+    def test_amd_ignores_an_integrated_intel_card(self):
+        self.card(0, {"vendor": "0x8086", "device": "0x4680", "gpu_busy_percent": "99"})
+        self.card(1, self.AMD)
+        self.assertEqual(o1gpu.usage("amd")["busy_pct"], 37)
+
+    def test_nvidia(self):
+        self.nvidia_smi("61, 8123, 24564")
+        self.assertEqual(o1gpu.usage("nvidia"), {"busy_pct": 61, "vram_used_bytes": 8123 << 20,
+                                                 "vram_total_bytes": 24564 << 20})
+
+    def test_nvidia_odd_output_is_null(self):
+        self.nvidia_smi("[N/A], [N/A], 24564")
+        self.assertEqual(o1gpu.usage("nvidia"), {"busy_pct": None, "vram_used_bytes": None,
+                                                 "vram_total_bytes": 24564 << 20})
+
+
 if __name__ == "__main__":
     unittest.main()

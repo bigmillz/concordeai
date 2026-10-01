@@ -56,6 +56,8 @@ import o1gpu  # noqa: E402
 import o1stats  # noqa: E402
 
 VERSION = "1"
+USAGE_KEYS = ("busy_pct", "vram_used_bytes", "vram_total_bytes")
+USAGE_CACHE_S = 1.0     # GET /v1/usage reads the card at most this often
 GPU_RECHECK_S = 15      # how often a missing card is looked for again (Gateway.gpu)
 
 # Top-level fields and options passed on to Ollama. Anything else is dropped.
@@ -308,6 +310,9 @@ class Gateway:
         self.oom_kills = o1stats.ollama_oom_kills
         self.gpu_info = o1gpu.detect()   # vendor, name, vram_bytes (see gpu())
         self.gpu_at = time.monotonic()
+        self.usage_lock = threading.Lock()
+        self.usage_at = None
+        self.usage_val = {}
         self._allow_key = object()
         self._ram = set()
         self.tags = {}
@@ -327,6 +332,18 @@ class Gateway:
             self.gpu_at = time.monotonic()
             self.gpu_info = o1gpu.detect()
         return self.gpu_info
+    def usage(self):
+        """The card's busy percent and VRAM in use, for the app's meter:
+        three numbers and nothing else, read at most once a second however
+        many devices ask (and one reading at a time)."""
+        with self.usage_lock:
+            now = time.monotonic()
+            if self.usage_at is None or now - self.usage_at >= USAGE_CACHE_S:
+                self.usage_at = now
+                self.usage_val = o1gpu.usage((self.gpu() or {}).get("vendor"))
+            # only these three, whatever the reader returned
+            return {k: self.usage_val.get(k) for k in USAGE_KEYS}
+
     def check_access(self, headers, lan, client_ip, method="GET"):
         if lan:
             if not self.cfg.get("lan_mode"):
@@ -807,6 +824,8 @@ def make_handler(gw, lan=False):
                 g = gw.gpu() or {}
                 return self.send_json(200, {"gpu": {"vendor": g.get("vendor"), "name": g.get("name"),
                                                     "vram_bytes": g.get("vram_bytes")}})
+            if method == "GET" and route == "/v1/usage":
+                return self.send_json(200, {"gpu": gw.usage()})
             if method == "GET" and route == "/v1/whoami":
                 return self.send_json(200, {"device_id": dev_id, "name": dev["name"],
                                             "server_time": int(gw.clock())})

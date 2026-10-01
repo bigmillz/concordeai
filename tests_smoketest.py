@@ -20232,6 +20232,9 @@ loader.exec_module(GW)
 
 # a card for /v1/info to name (6b337): the real detect() finds none on a build machine
 GW.o1gpu.detect = lambda: {"vendor": "amd", "name": "Test Card", "vram_bytes": 16 << 30}
+# what /v1/usage serves (6b342); the control port's /usage changes it
+USAGE = {"v": {"busy_pct": 42, "vram_used_bytes": 6 << 30, "vram_total_bytes": 16 << 30}}
+GW.o1gpu.usage = lambda vendor: dict(USAGE["v"])
 DROPPED = {}
 CLONED = []
 
@@ -20437,6 +20440,9 @@ class Ctl(BaseHTTPRequestHandler):
             return self.reply({"ok": True})
         if p == "/reply":
             STUB.reply_text = str(d.get("text") or "")
+            return self.reply({"ok": True})
+        if p == "/usage":
+            USAGE["v"] = d
             return self.reply({"ok": True})
         if p == "/unload":
             with STUB.lock:
@@ -21138,6 +21144,67 @@ check("servers (live): a council of server models that none answers says why, an
                           "asleep or offline. Nothing was sent anywhere else." % _SVN)
       and "stopped responding" not in _scC[1] and "retrying on" not in json.dumps(_scC[2]),
       "%r" % [_scC[1], _scC[2][-4:]])
+# ==== 6b342 server meters (live): begin ====
+# the sidebar meters' read of a server's card (6b342): through the real
+# gateway's new /v1/usage, from the app's own endpoint
+_o1("/usage", {"busy_pct": 42, "vram_used_bytes": 6 << 30, "vram_total_bytes": 16 << 30})
+_nl42, _ns42 = len(_o1("/log")["log"]), len(_o1("/stub")["calls"])
+_u1 = _svq("/api/servers/usage?id=" + _sid34)
+_lg42 = _o1("/log")["log"][_nl42:]
+check("server meters (live): the card's usage is one signed GET to the real gateway, three numbers come "
+      "back, and nothing is asked of Ollama or sent to any chat",
+      _u1 == (200, {"ok": True, "gpu": {"busy_pct": 42, "vram_used_bytes": 6 << 30,
+                                        "vram_total_bytes": 16 << 30}})
+      and [(r["method"], r["path"], r["access"], r["body"]) for r in _lg42]
+      == [("GET", "/v1/usage", True, "")]
+      and {"X-O1-Device", "X-O1-Signature", "X-O1-Nonce", "X-O1-Timestamp"} <= set(_lg42[0]["headers"])
+      and len(_o1("/stub")["calls"]) == _ns42,
+      "%r" % [_u1, _lg42])
+time.sleep(1.2)                       # past the gateway's one-second cache
+_o1("/usage", {"busy_pct": None, "vram_used_bytes": None, "vram_total_bytes": None})
+_u2 = _svq("/api/servers/usage?id=" + _sid34)
+time.sleep(1.2)
+_o1("/usage", {"busy_pct": 42, "vram_used_bytes": 6 << 30, "vram_total_bytes": 16 << 30})
+# an older kit has no such route: the real gateway's own 404 for one it doesn't serve
+_o1("/next", {"path": "/v1/usage", "status": 404,
+              "body": {"error": "not available through the gateway", "code": "not_found",
+                       "server_time": int(time.time())}})
+_u3 = _svq("/api/servers/usage?id=" + _sid34)
+_o1("/next", {"path": "/v1/usage", "status": 404, "body": {"error": "no"}})
+_u3b = _svq("/api/servers/usage?id=" + _sid34)
+_o1("/down", {})
+_t42 = time.time()
+_u4 = _svq("/api/servers/usage?id=" + _sid34)
+_d42 = time.time() - _t42
+_o1("/up", {})
+check("server meters (live): a gateway reporting nulls or an older kit (404) answers ok with no usage, "
+      "a 404 that isn't the gateway's own and a server that is off answer not ok, quickly",
+      _u2 == (200, {"ok": True, "gpu": {"busy_pct": None, "vram_used_bytes": None, "vram_total_bytes": None}})
+      and _u3 == (200, {"ok": True, "gpu": None}) and _u3b == (200, {"ok": False})
+      and _u4 == (200, {"ok": False}) and _d42 < 6,
+      "%r" % [_u2, _u3, _u3b, _u4, _d42])
+# nothing asked: a benchmark running, a bad or unknown id, no key, no token
+time.sleep(1.2)
+_bs42 = _svq("/api/bench/start", "POST", {})
+_nl42 = len(_o1("/log")["log"])
+_u5 = _svq("/api/servers/usage?id=" + _sid34)
+_svq("/api/bench/stop", "POST", {})
+for _i42 in range(200):
+    if not _svq("/api/bench")[1].get("running"):
+        break
+    time.sleep(0.1)
+_u6 = [_svq("/api/servers/usage?id=" + x_) for x_ in ("", "zz", "00000000", "../..", _sid34.upper())]
+_u7 = [_ireq(_SV, "/api/servers/usage?id=" + _sid34, cookie=False)[0],
+       _ireq(_SV, "/api/servers/usage?id=" + _sid34, token=False)[0],
+       _ireq(_SV, "/api/servers/usage?id=" + _sid34, token="A" * 43)[0]]
+_u8 = _ireq(_SV, "/api/servers/usage?id=" + _sid34, headers={"X-Profile": "not-this-profile"})
+check("server meters (live): while a benchmark runs, for a bad or unknown id, without the launch key or "
+      "the token, or from a page drawn for another profile, nothing is asked of the server",
+      _bs42[0] == 200 and _u5 == (200, {"ok": True, "paused": True})
+      and [u_[1] for u_ in _u6] == [{"ok": False}] * 5 and _u7 == [403, 403, 403] and _u8[0] == 409
+      and len([r for r in _o1("/log")["log"][_nl42:] if r["path"] == "/v1/usage"]) == 0,
+      "%r" % [_bs42, _u5, _u6, _u7, _u8[0]])
+# ==== 6b342 server meters (live): end ====
 # profile isolation: B sees none of A's servers and can't use their labels
 _pB34 = _svq("/api/test/profile", "POST", {"op": "create"})[1].get("name", "")
 _svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
@@ -21165,6 +21232,15 @@ check("server only (live): profile B has no row for A's server, and A's mode say
                           "Pick another model. Nothing was sent anywhere else."
       and not [k_ for k_ in _tiB if k_.startswith("srv:")] and len(_o1("/log")["log"]) == _nlogB,
       "%r" % [_scBo[1], list(_tiB)])
+# ==== 6b342 server meters (live profile): begin ====
+# profiles never mix: in B, A's server id reads nothing and nothing leaves
+_svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
+_nl42 = len(_o1("/log")["log"])
+_uB42 = _svq("/api/servers/usage?id=" + _sid34)
+_svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
+check("server meters (live): in another profile a server of this one reads nothing and no request leaves",
+      _uB42 == (200, {"ok": False}) and len(_o1("/log")["log"]) == _nl42, "%r" % [_uB42])
+# ==== 6b342 server meters (live profile): end ====
 # the Access secret and the device key: in servers.json only
 _rowA = json.load(open(_sfile34))["servers"][0]
 _seed34 = _rowA.get("seed", "")
@@ -22372,6 +22448,446 @@ check("funnel pictures (live): the ask-again route needs the launch key and the 
       and ".fopts.pics.n4{--fc:2}" in page and "function fnImgKeep(b,opts,st){" in page,
       "%r" % [_fg0, _fg1, _fg2, _fg3, _fg4, _fg5])
 # ==== 6b340 funnel pictures: end ====
+
+# ==== 6b342 server meters: begin ====
+print("== your server's graphics card in the sidebar meters (6b342) ==")
+# Patrick: "When a server is connected for the user, can we have this box
+# get bigger and put the GPU name in a middle row?" In process: the app's
+# read of a server's card on the servers section alone, and the page's
+# functions in node on a small stand-in for the document, clock and timers;
+# live: the real gateway (checked in the servers section above).
+_M42_TEL = ('  <div id="telemetry">\n'
+            '    <div class="t-head"><span>__CHIP__</span></div>\n'
+            '    <div class="meter-row">\n'
+            '      <div class="meter" id="gpu-meter"></div>\n'
+            '    </div>\n'
+            '    <div class="meter-row">\n'
+            '      <div class="meter-label"><span>__MEM_LABEL__</span></div>\n'
+            '      <div class="meter" id="mem-meter"></div>\n'
+            '    </div>\n'
+            '  </div>\n</aside>')
+
+_M42_ENV = r'''
+let NOW=1000000;Date.now=()=>NOW;
+const TM=[];let TID=0;
+function setTimeout(fn,ms){TM.push({id:++TID,fn:fn,at:NOW+ms});return TID;}
+function clearTimeout(id){const i=TM.findIndex(t=>t.id===id);if(i>=0)TM.splice(i,1);}
+async function fire(){TM.sort((a,b)=>a.at-b.at);const t=TM.shift();if(!t)return false;
+  NOW=Math.max(NOW,t.at);await t.fn();return true;}
+const pend=()=>TM.length?TM[0].at-NOW:null;
+const CARD={width:300,height:100,right:300,left:0};
+class El{
+  constructor(tag,id){this.tag=tag;this.id=id||"";this.children=[];this.parent=null;this.dataset={};
+    this.className="";this.title="";this._t="";this.style={};
+    const self=this;
+    this.classList={toggle:(c,on)=>{const l=self.className.split(" ").filter(Boolean),i=l.indexOf(c);
+      const want=on===undefined?i<0:!!on;if(want&&i<0)l.push(c);if(!want&&i>=0)l.splice(i,1);
+      self.className=l.join(" ");},contains:c=>self.className.split(" ").indexOf(c)>=0};}
+  get firstChild(){return this.children[0]||null;}
+  get lastChild(){return this.children[this.children.length-1]||null;}
+  set textContent(v){this._t=String(v);}
+  get textContent(){return this._t+this.children.map(c=>c.textContent).join("");}
+  appendChild(c){c.remove();c.parent=this;this.children.push(c);return c;}
+  insertBefore(c,ref){c.remove();c.parent=this;const i=ref?this.children.indexOf(ref):-1;
+    if(i<0)this.children.push(c);else this.children.splice(i,0,c);return c;}
+  remove(){if(this.parent){const i=this.parent.children.indexOf(this);
+    if(i>=0)this.parent.children.splice(i,1);this.parent=null;}}
+  closest(sel){let e=this;const c=sel.slice(1);while(e){if(e.className.split(" ").indexOf(c)>=0)return e;e=e.parent;}return null;}
+  getBoundingClientRect(){return CARD;}
+}
+const root=new El("div");
+const tel=new El("div","telemetry");root.appendChild(tel);
+const head=new El("div");head.className="t-head";tel.appendChild(head);
+const gRow=new El("div");gRow.className="meter-row";tel.appendChild(gRow);
+const mRow=new El("div");mRow.className="meter-row";tel.appendChild(mRow);
+const memBar=new El("div","mem-meter");memBar.className="meter";mRow.appendChild(memBar);
+const VIS=[];
+const document={hidden:false,
+  getElementById(id){const f=e=>{if(e.id===id)return e;for(const c of e.children){const r=f(c);if(r)return r;}return null;};return f(root);},
+  createElement(t){return new El(t);},
+  addEventListener(ev,fn){if(ev==="visibilitychange")VIS.push(fn);}};
+const innerWidth=1320;
+const CALLS=[];let REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10}}});
+async function api(u){CALLS.push(u);const r=REPLY(u);if(r==="throw")throw new Error("x");
+  return {status:r.status,ok:r.ok,json:async()=>r.j};}
+let srvList=[];
+'''
+
+_M42_TESTS = r'''
+const mkS=(id,name,v,gn,x)=>Object.assign({id:id,name:name,paired:true,status:{at:1,reachable:true},
+  gpu:{vendor:v,name:gn,vram_bytes:17163091968}},x||{});
+const reset=()=>{TM.length=0;CALLS.length=0;Object.keys(srvUse).forEach(k=>delete srvUse[k]);
+  srvUseT=0;srvUseDead=false;document.hidden=false;CARD.right=300;
+  REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10}}});
+  const b=document.getElementById("srv-meters");if(b)b.remove();};
+const kids=()=>tel.children.map(c=>c.id||c.className);
+(async()=>{
+const R={};
+// ---- rows
+R.none=[srvMeterRows([],{}).length,
+  srvMeterRows([mkS('a','D','amd','X',{paired:false})],{}).length,
+  srvMeterRows([mkS('a','D','amd','X',{gpu:null})],{}).length,
+  srvMeterRows([mkS('a','D','apple','X')],{}).length,
+  srvMeterRows(undefined,undefined).length];
+const S1=mkS('a1','Desk','amd','Radeon RX 6900 XT');
+R.one=srvMeterRows([S1],{a1:{ok:true,gpu:{busy_pct:37,vram_total_bytes:17163091968}}})[0];
+R.off=srvMeterRows([S1],{a1:{ok:false,gpu:null}})[0];
+R.old=srvMeterRows([S1],{a1:{ok:true,gpu:null}})[0];
+R.nulls=srvMeterRows([S1],{a1:{ok:true,gpu:{busy_pct:null,vram_used_bytes:null,vram_total_bytes:null}}})[0];
+R.fresh=srvMeterRows([S1],{})[0];
+R.stale=[srvMeterRows([mkS('a1','Desk','amd','X',{status:{err:'x',reachable:false}})],{})[0].off,
+  srvMeterRows([mkS('a1','Desk','amd','X',{status:{err:'x',reachable:false}})],{a1:{ok:true,gpu:{busy_pct:5}}})[0].off];
+R.names=[srvMeterName({name:'NVIDIA GeForce RTX 4090',vendor:'nvidia'}),srvMeterName({name:'',vendor:'nvidia'}),
+  srvMeterName({name:'Radeon RX 7600/7600 XT/7650 GRE',vendor:'amd'}),srvMeterName({name:'  Arc   B580 ',vendor:'intel'}),
+  srvMeterName({name:'AMD Instinct MI300X',vendor:'amd'})];
+const five=[1,2,3,4,5].map(i=>mkS('s'+i,'Srv'+i,'amd','Card '+i));
+const rows5=srvMeterRows(five,{});
+R.many=[rows5.map(r=>r.id),rows5.map(r=>r.title),srvMeterServers(five).map(s=>s.id),
+  srvMeterRows(five.slice(0,3),{})[2].title];
+// ---- the card
+R.dom0=kids();
+srvList=[S1];srvUse.a1={ok:true,gpu:{busy_pct:37,vram_total_bytes:17163091968},fails:0,due:1e12};
+srvMetersSync();
+const box=document.getElementById("srv-meters"),row1=box.children[0];
+R.dom1=kids();
+R.row1={n:box.children.length,text:row1.textContent,title:row1.title,cls:row1.className,
+  w:row1.lastChild.firstChild.style.width,head:row1.firstChild.className,bar:row1.lastChild.className};
+srvUse.a1.gpu={busy_pct:85};srvMetersSync();
+R.keep=[box.children[0]===row1,row1.lastChild.firstChild.style.width,row1.lastChild.firstChild.classList.contains("hot"),
+  document.getElementById("srv-meters")===box];
+srvUse.a1.ok=false;srvMetersSync();
+R.dim=[row1.className,row1.lastChild.firstChild.style.width,row1.title];
+srvUse.a1.ok=true;srvUse.a1.gpu={busy_pct:20};srvMetersSync();
+R.undim=row1.className;
+srvList=[S1,mkS('b2','Rack','nvidia','GeForce RTX 4090')];srvUse.b2={ok:true,gpu:{busy_pct:10},fails:0,due:1e12};
+srvMetersSync();
+R.two=[box.children.map(c=>c.dataset.sid),box.children[0]===row1,kids()];
+srvList=[mkS('b2','Rack','nvidia','GeForce RTX 4090'),S1];srvMetersSync();
+R.order=box.children.map(c=>c.dataset.sid);
+srvList=[S1];srvMetersSync();
+R.drop=box.children.map(c=>c.dataset.sid);
+srvList=[];srvMetersRefresh();
+R.dom2=[kids(),!document.getElementById("srv-meters"),TM.length,Object.keys(srvUse)];
+// ---- the scheduler's plan and waits
+R.wait=[0,1,2,5,-1].map(srvUseWait);
+const P=o=>JSON.stringify(srvUsagePlan(o));
+R.plan=[P({ids:[],due:{},now:0,card:true,page:true}),P({ids:['a'],due:{},now:5,card:true,page:false}),
+  P({ids:['a'],due:{},now:5,card:false,page:true}),
+  P({ids:['a','b'],due:{a:0,b:9000},now:1000,card:true,page:true}),
+  P({ids:['a'],due:{a:1100},now:1000,card:true,page:true}),
+  P({ids:['a','b'],due:{a:5000,b:9000},now:1000,card:true,page:true})];
+// ---- running it: steady, 3 s apart
+reset();srvList=[S1];srvMetersRefresh();
+const st={t0:pend()};
+await fire();st.c1=CALLS.slice();st.g1=pend();
+await fire();st.c2=CALLS.length;st.g2=pend();
+R.steady=st;
+// ---- not answering: 10 s, 30 s, 30 s, and back to 3 s when it answers; the row dims and undims
+reset();srvList=[S1];srvMetersRefresh();
+REPLY=()=>({status:200,ok:true,j:{ok:false}});
+const bo={gaps:[],cls:[]};
+for(let i=0;i<4;i++){await fire();bo.gaps.push(pend());bo.cls.push(document.getElementById("srv-meters")?
+  document.getElementById("srv-meters").children[0].className:"");}
+bo.fails=srvUse.a1.fails;
+REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:5}}});
+await fire();bo.after=[pend(),srvUse.a1.fails,srvUse.a1.ok,document.getElementById("srv-meters").children[0].className];
+R.backoff=bo;
+// a thrown fetch counts the same
+reset();srvList=[S1];srvMetersRefresh();REPLY=()=>"throw";await fire();R.thrown=[pend(),srvUse.a1.ok,srvUse.a1.fails];
+// a 500
+reset();srvList=[S1];srvMetersRefresh();REPLY=()=>({status:500,ok:false,j:{}});await fire();R.s500=[pend(),srvUse.a1.ok];
+// ---- a hidden window asks nothing and sets no timer
+reset();srvList=[S1];srvMetersRefresh();
+document.hidden=true;VIS.forEach(f=>f());
+const hid={timers:TM.length,calls:CALLS.length};
+srvMetersRefresh();hid.refresh=TM.length;
+await srvUseTick();hid.tick=[CALLS.length,TM.length];
+document.hidden=false;VIS.forEach(f=>f());hid.back=TM.length;
+await fire();hid.after=CALLS.length;
+R.hidden=hid;
+// ---- a card out of sight (the narrow drawer shut) asks nothing and looks again in 3 s
+reset();srvList=[S1];srvMetersRefresh();CARD.right=-15;
+await fire();const out={calls:CALLS.length,next:pend()};
+CARD.right=300;await fire();out.shown=CALLS.length;R.cardout=out;
+// ---- a benchmark running (the app says paused): no failure, no dimming, 3 s
+reset();srvList=[S1];srvMetersSync();srvMetersRefresh();
+REPLY=()=>({status:200,ok:true,j:{ok:true,paused:true}});await fire();
+R.paused=[srvUse.a1.ok,srvUse.a1.fails,pend(),document.getElementById("srv-meters").children[0].className];
+// ---- the profile changed under the page (409): the rows go at once, nothing more asked
+reset();srvList=[S1];srvMetersSync();srvMetersRefresh();
+REPLY=()=>({status:409,ok:false,j:{}});await fire();
+const gone={box:!!document.getElementById("srv-meters"),dead:srvUseDead,timers:TM.length};
+srvMetersRefresh();gone.after=[TM.length,!!document.getElementById("srv-meters")];R.p409=gone;
+// ---- no server: nothing drawn, nothing asked, no timer
+reset();srvList=[];srvMetersRefresh();R.noserver=[TM.length,CALLS.length,kids()];
+// ---- two servers each on their own schedule; a fourth is never read
+reset();srvList=[S1,mkS('b2','Rack','nvidia','GeForce RTX 4090')];srvMetersRefresh();
+REPLY=u=>u.indexOf("id=b2")>=0?{status:200,ok:true,j:{ok:false}}:{status:200,ok:true,j:{ok:true,gpu:{busy_pct:9}}};
+await fire();const two={c1:CALLS.slice(),g1:pend()};await fire();two.c2=CALLS.slice(2);two.g2=pend();R.sched2=two;
+reset();srvList=[1,2,3,4].map(i=>mkS('x'+i,'S'+i,'amd','C'+i));srvMetersRefresh();await fire();
+R.cap=CALLS.slice();
+reset();srvList=[mkS('u1','U','amd','C',{paired:false}),S1];srvMetersRefresh();await fire();R.unp=CALLS.slice();
+process.stdout.write(JSON.stringify(R));
+})();
+'''
+
+
+def _m42_node(src):
+    gl = src.index("const SRV_GPU=")
+    gpu = src[gl:src.index("\n", gl) + 1]
+    st = src.index("const srvUse={};")
+    state = src[st:src.index("\n", st) + 1]
+    a = src.index("const SRV_METER_MAX=3;")
+    b = src.index("function pickServerModel(label){")
+    mt = src.index("function buildMeter(el){")
+    pm = src.index("function paintMeter(el,pct){")
+    meter = src[mt:src.index("buildMeter($(", mt)] + src[pm:src.index("let simGpu=", pm)]
+    js = _M42_ENV + gpu + state + meter + src[a:b] + _M42_TESTS
+    pth = os.path.join(_si_dir, "meters42.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    return json.loads(p.stdout), p.stderr[:600]
+
+
+def _m42c_markup(src):
+    # the card as it always was, with the tokens: exactly this, no server rows in it
+    i = src.index('  <div id="telemetry">')
+    return src[i:].startswith(_M42_TEL)
+
+
+def _m42c_server(src):
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    G = ns["_srv_usage_gpu"]
+    three = {"busy_pct": 37, "vram_used_bytes": 9126805504, "vram_total_bytes": 17163091968}
+    nul = {k: None for k in three}
+    out["parse"] = (G({"gpu": dict(three, models=["llama3:8b"], device_id="x", serial="S1", requests=9)}) == three
+                    and G({"gpu": {"busy_pct": True, "vram_used_bytes": "9", "vram_total_bytes": -1}}) == nul
+                    and G({"gpu": {"busy_pct": 140, "vram_used_bytes": 1.5}}) == nul
+                    and G({"gpu": {"busy_pct": 0}}) == dict(nul, busy_pct=0)
+                    and G({}) == nul and G(None) == nul and G({"gpu": []}) == nul)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    seen = []
+
+    def run(script, sid=None):
+        _sv_fake(ns, script)
+        sent = []
+        orig = ns["_srv_send"]
+
+        def w(e_, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+            sent.append((method, path, body, signed, timeout))
+            return orig(e_, method, path, body, signed, timeout, skew)
+        ns["_srv_send"] = w
+        return sent, ns["server_usage"](ctx, sid or e["id"])
+
+    def boom(rec):
+        raise ns["ServerError"]("offline", "x")
+    s1, r1 = run([_SvResp(200, {"gpu": dict(three, models=["x"], device_id="d")})])
+    s2, r2 = run([_SvResp(404, {"error": "no", "code": "not_found"})])
+    s3, r3 = run([_SvResp(404, {"error": "no"})])
+    s4, r4 = run([_SvResp(401, {"error": "no", "code": "unpaired"})])
+    s5, r5 = run([_SvResp(503, {"error": "no", "code": "busy"})])
+    s6, r6 = run([boom])
+    s7, r7 = run([_SvResp(200, {})], sid="deadbeef")
+    # an added server that was never paired: nothing is sent
+    _sv_fake(ns, [_sv_unsigned])
+    a2 = ns["server_add"](ctx, {"url": "https://other.example.com", "name": "Other", "access_id": "id.access",
+                                "access_secret": "SECRET-" + "y" * 20})
+    s8, r8 = run([_SvResp(200, {"gpu": three})], sid=a2.get("id"))
+    out["answers"] = (r1 == {"ok": True, "gpu": three} and r2 == {"ok": True, "gpu": None}
+                      and r3 == {"ok": False} and r4 == {"ok": False} and r5 == {"ok": False}
+                      and r6 == {"ok": False} and r7 == {"ok": False} and r8 == {"ok": False}
+                      and not s7 and not s8)
+    out["sent"] = (len(s1) == 1 and s1[0][0] == "GET" and s1[0][1] == "/v1/usage" and s1[0][2] == b""
+                   and s1[0][3] is True and 0 < s1[0][4] <= 5 and ns["SRV_USAGE_S"] <= 5)
+    out["secrets"] = not any(x in json.dumps([r1, r2, r3, r6]) for x in ("SECRET34", "seed", "access"))
+    h0 = src.index('elif urllib.parse.urlparse(self.path).path == "/api/servers/usage":')
+    out["handler"] = (src.index('if _bench["running"]:', h0) < src.index("_SRV_ID_RX.fullmatch(_sid)", h0)
+                      < src.index("server_usage(self.ctx, _sid)", h0) < src.index('elif self.path == "/api/cloud":', h0)
+                      and '"ok": True, "paused": True' in src[h0:h0 + 600])
+    return all(out.values()), out
+
+
+def _m42c_rows(src):
+    R, err = _m42_node(src)
+    gb = "16 GB"
+    one = R["one"]
+    out = {}
+    out["none"] = R["none"] == [0, 0, 0, 0, 0]
+    out["row"] = (one == {"id": "a1", "name": "RADEON RX 6900 XT",
+                          "title": "Desk · Radeon RX 6900 XT · 16 GB · 37% busy", "pct": 37, "off": False})
+    out["off"] = (R["off"]["off"] is True and R["off"]["pct"] is None
+                  and R["off"]["title"] == "Desk · Radeon RX 6900 XT · 16 GB · not answering")
+    out["old"] = all(R[k]["off"] is False and R[k]["pct"] is None
+                     and R[k]["title"] == "Desk · Radeon RX 6900 XT · 16 GB · usage not reported "
+                                          "(update the server kit)" for k in ("old", "nulls"))
+    out["fresh"] = (R["fresh"]["title"] == "Desk · Radeon RX 6900 XT · 16 GB" and R["fresh"]["pct"] is None
+                    and R["fresh"]["off"] is False and R["stale"] == [True, False])
+    out["names"] = R["names"] == ["GEFORCE RTX 4090", "NVIDIA", "RADEON RX 7600/7600 XT/76…", "ARC B580",
+                                  "INSTINCT MI300X"]
+    out["many"] = (R["many"][0] == ["s1", "s2", "s3"] and R["many"][2] == ["s1", "s2", "s3"]
+                   and R["many"][1][2].endswith("+2 more") and not R["many"][1][0].endswith("more")
+                   and not R["many"][1][1].endswith("more") and not R["many"][3].endswith("more"))
+    return all(out.values()), [out, err]
+
+
+def _m42c_card(src):
+    R, err = _m42_node(src)
+    out = {}
+    out["before"] = R["dom0"] == ["t-head", "meter-row", "meter-row"]
+    out["row"] = (R["dom1"] == ["t-head", "meter-row", "srv-meters", "meter-row"]
+                  and R["row1"] == {"n": 1, "text": "RADEON RX 6900 XT", "cls": "meter-row srv-mrow",
+                                    "title": "Desk · Radeon RX 6900 XT · 16 GB · 37% busy",
+                                    "w": "37%", "head": "t-head", "bar": "meter"})
+    out["easing"] = R["keep"] == [True, "85%", True, True]
+    out["dim"] = (R["dim"][0] == "meter-row srv-mrow off" and R["dim"][1] == "0%"
+                  and R["dim"][2].endswith("not answering") and R["undim"] == "meter-row srv-mrow")
+    out["two"] = (R["two"][0] == ["a1", "b2"] and R["two"][1] is True
+                  and R["two"][2] == ["t-head", "meter-row", "srv-meters", "meter-row"]
+                  and R["order"] == ["b2", "a1"] and R["drop"] == ["a1"])
+    out["gone"] = R["dom2"] == [["t-head", "meter-row", "meter-row"], True, 0, []]
+    return all(out.values()), [out, err]
+
+
+def _m42c_poll(src):
+    R, err = _m42_node(src)
+    out = {}
+    out["wait"] = R["wait"] == [3000, 10000, 30000, 30000, 3000]
+    out["plan"] = R["plan"] == ['{"poll":[],"next":null}', '{"poll":[],"next":null}', '{"poll":[],"next":3000}',
+                                '{"poll":["a"],"next":250}', '{"poll":[],"next":250}',
+                                '{"poll":[],"next":4000}']
+    out["steady"] = (R["steady"]["t0"] == 0 and R["steady"]["c1"] == ["/api/servers/usage?id=a1"]
+                     and R["steady"]["g1"] == 3000 and R["steady"]["c2"] == 2 and R["steady"]["g2"] == 3000)
+    bo = R["backoff"]
+    out["backoff"] = (bo["gaps"] == [10000, 30000, 30000, 30000] and bo["fails"] == 4
+                      and all(c == "meter-row srv-mrow off" for c in bo["cls"])
+                      and bo["after"] == [3000, 0, True, "meter-row srv-mrow"])
+    out["failures"] = R["thrown"] == [10000, False, 1] and R["s500"] == [10000, False]
+    h = R["hidden"]
+    out["hidden"] = (h["timers"] == 0 and h["calls"] == 0 and h["refresh"] == 0 and h["tick"] == [0, 0]
+                     and h["back"] == 1 and h["after"] == 1)
+    out["cardout"] = R["cardout"] == {"calls": 0, "next": 3000, "shown": 1}
+    out["paused"] = R["paused"] == [None, 0, 3000, "meter-row srv-mrow"]
+    out["profile"] = R["p409"] == {"box": False, "dead": True, "timers": 0, "after": [0, False]}
+    out["noserver"] = R["noserver"] == [0, 0, ["t-head", "meter-row", "meter-row"]]
+    s2 = R["sched2"]
+    out["sched2"] = (s2["c1"] == ["/api/servers/usage?id=a1", "/api/servers/usage?id=b2"] and s2["g1"] == 3000
+                     and s2["c2"] == ["/api/servers/usage?id=a1"] and s2["g2"] == 3000)
+    out["unpaired"] = R["unp"] == ["/api/servers/usage?id=a1"]
+    out["cap"] = R["cap"] == ["/api/servers/usage?id=x1", "/api/servers/usage?id=x2", "/api/servers/usage?id=x3"]
+    return all(out.values()), [out, err]
+
+
+def _m42c_text(src):
+    """Nothing secret and no product name in the new code, the card's
+    poll hooked to the chips' one place, and the style."""
+    a = src.index("const SRV_METER_MAX=3;")
+    b = src.index("function pickServerModel(label){")
+    seg = src[a:b]
+    c = src.index("/* a paired server's graphics card, between this computer's bar")
+    css = src[c:src.index(".meter-label{", c)]
+    srv = src[src.index("def _srv_usage_gpu(js)"):src.index("# ==== servers: end ====")]
+    out = {}
+    out["words"] = not re.search(r"(?i)ollama1|secret|seed|device_key|access_id|console\.", seg + css + srv)
+    out["hook"] = ("  if(box)box.innerHTML=srvChipsHtml(srvList);\n  srvMetersRefresh();\n}" in src
+                   and "  paintEngMenuServers();\n  paintSrvChips();\n}" in src)
+    out["css"] = ("#telemetry .srv-mrow.off{opacity:.45}" in css
+                  and "#telemetry .srv-mrow:last-child{margin-bottom:7px}" in css
+                  and "#telemetry .srv-mrow .t-head span{min-width:0;overflow:hidden;text-overflow:ellipsis}" in css)
+    out["dom"] = ("tel.insertBefore(box,mr||null);" in seg and 'box.id="srv-meters";' in seg)
+    return all(out.values()), out
+
+
+_M42_CHECKS = [
+    ("server meters: the card's own markup is exactly what it was with no server (the rows are made by script)",
+     lambda s: (_m42c_markup(s), "")),
+    ("server meters: the app reads a server's card with one short signed GET and keeps three numbers; an older "
+     "kit, a refusal, a server that is off and an unpaired one are each said, and nothing is sent for the last",
+     _m42c_server),
+    ("server meters: a row per paired server with a card (three, then \"+N more\"), its name tidied, its title, "
+     "an empty bar and the words for an older kit, dimmed while it doesn't answer (node)", _m42c_rows),
+    ("server meters: the card gets a row between this computer's graphics bar and memory pressure and loses it "
+     "again, rows kept (so the bar eases) as readings change (node)", _m42c_card),
+    ("server meters: it reads only while a server is paired, the card is on screen and the window is showing; "
+     "3 s, then 10 s, then 30 s while it doesn't answer; paused for a benchmark; the rows go with a profile "
+     "switch (node)", _m42c_poll),
+    ("server meters: no secret, no product name in the new code, one place draws the chips and the rows",
+     _m42c_text),
+]
+
+
+def _m42_run(src):
+    out = []
+    for name, fn in _M42_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n42, _o42, _d42 in _m42_run(_MILLENAI_SRC):
+    check(_n42, _o42, "%r" % (_d42,))
+
+# the served page: the card's markup, with the chip and the label filled in, and no row yet
+check("server meters: the served page's card is the same markup, tokens replaced, with no server rows in it",
+      re.search(r'<div id="telemetry">\n    <div class="t-head"><span>[^<]+</span></div>\n'
+                r'    <div class="meter-row">\n      <div class="meter" id="gpu-meter"></div>\n    </div>\n'
+                r'    <div class="meter-row">\n      <div class="meter-label"><span>MEMORY (PRESSURE|USED)</span></div>\n'
+                r'      <div class="meter" id="mem-meter"></div>\n    </div>\n  </div>\n</aside>', page)
+      is not None, "")
+
+_M42_MUT = [
+    ("a row baked into the card's markup", '    <div class="t-head"><span>__CHIP__</span></div>\n    <div class="meter-row">\n      <div class="meter" id="gpu-meter">',
+     '    <div class="t-head"><span>__CHIP__</span></div><div id="srv-meters"></div>\n    <div class="meter-row">\n      <div class="meter" id="gpu-meter">'),
+    ("a row for a server not paired", "const all=(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);",
+     "const all=(list||[]).filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor]);"),
+    ("polling a server not paired", "return (list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);",
+     "return (list||[]).filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);"),
+    ("no dimming", "pct:off?null:busy,off:off};", "pct:busy,off:false};"),
+    ("no backing off", "return fails<=0?3000:fails===1?10000:30000;", "return 3000;"),
+    ("a hidden window asked", "if(!o.ids.length||!o.page)return {poll:[],next:null};",
+     "if(!o.ids.length)return {poll:[],next:null};"),
+    ("a card out of sight asked", "if(!o.card)return {poll:[],next:3000};", "if(false)return {poll:[],next:3000};"),
+    ("the hidden window's timer kept", "if(document.hidden){clearTimeout(srvUseT);srvUseT=0;}", "if(document.hidden){}"),
+    ("woken while hidden", "if(!srvUseT&&keep.size&&!document.hidden&&!srvUseDead)", "if(!srvUseT&&keep.size&&!srvUseDead)"),
+    ("more than three rows", "return all.slice(0,SRV_METER_MAX).map((s,i)=>{", "return all.map((s,i)=>{"),
+    ("more than three servers read", "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);\n}",
+     "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);\n}"),
+    ("no \"+N more\"", "if(i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX)t.push(", "if(false)t.push("),
+    ("an older kit shown as a reading", ':u.ok?"usage not reported (update the server kit)":""', ':""'),
+    ("a profile switch leaving the rows", "if(gone){srvUseDead=true;srvMetersSync();return;}", "if(gone){return;}"),
+    ("the dead flag ignored when drawing", "const rows=srvUseDead?[]:srvMeterRows(srvList,srvUse);",
+     "const rows=srvMeterRows(srvList,srvUse);"),
+    ("a benchmark counted as a failure", "  if(d&&d.paused){u.due=Date.now()+3000;return;}     // a benchmark is running\n", ""),
+    ("rows made again at every reading", "let el=have[r.id];delete have[r.id];", "let el=null;"),
+    ("the row after memory pressure", "tel.insertBefore(box,mr||null);", "tel.appendChild(box);"),
+    ("the chips not waking the rows", "  if(box)box.innerHTML=srvChipsHtml(srvList);\n  srvMetersRefresh();\n}",
+     "  if(box)box.innerHTML=srvChipsHtml(srvList);\n}"),
+    ("the card growing no gap", "#telemetry .srv-mrow:last-child{margin-bottom:7px}", "#telemetry .srv-mrow:last-child{margin-bottom:0}"),
+    ("a benchmark not pausing the read", 'if _bench["running"]:\n                self._send_json({"ok": True, "paused": True})',
+     'if False:\n                self._send_json({"ok": True, "paused": True})'),
+    ("an unpaired server read", "    if e is None or not _srv_paired(e):\n        return {\"ok\": False}\n    try:\n        if not cai_crypto.available():\n            return {\"ok\": False}\n        st, js = _srv_json(e, \"GET\", \"/v1/usage\"",
+     "    if e is None:\n        return {\"ok\": False}\n    try:\n        if not cai_crypto.available():\n            return {\"ok\": False}\n        st, js = _srv_json(e, \"GET\", \"/v1/usage\""),
+    ("the server's extra fields passed on", '    return {"busy_pct": num("busy_pct", 100),\n            "vram_used_bytes": num("vram_used_bytes", 1 << 50),\n            "vram_total_bytes": num("vram_total_bytes", 1 << 50)}',
+     "    return g"),
+    ("any 404 taken for an older kit", 'if st == 404 and str(js.get("code") or "") == "not_found":', "if st == 404:"),
+    ("a long wait for a reading", "SRV_USAGE_S = 3 ", "SRV_USAGE_S = 60 "),
+    ("the reading unsigned", 'st, js = _srv_json(e, "GET", "/v1/usage", timeout=SRV_USAGE_S)',
+     'st, js = _srv_json(e, "GET", "/v1/usage", signed=False, timeout=SRV_USAGE_S)'),
+]
+_m42m = []
+for _d42, _o42, _n42 in _M42_MUT:
+    if _MILLENAI_SRC.count(_o42) != 1:
+        _m42m.append((_d42, "anchor missing"))
+        continue
+    _r42 = _m42_run(_MILLENAI_SRC.replace(_o42, _n42, 1))
+    _m42m.append((_d42, [n for n, o, _x in _r42 if not o][:1] or "MISSED"))
+check("server meters: %d mutations, each caught by a check above" % len(_M42_MUT),
+      all(isinstance(v, list) for _d, v in _m42m), "%r" % [x for x in _m42m if not isinstance(x[1], list)])
+# ==== 6b342 server meters: end ====
 
 
 print()
