@@ -22775,7 +22775,7 @@ def _m42c_card(src):
     R, err = _m42_node(src)
     out = {}
     out["before"] = R["dom0"] == ["t-head", "meter-row", "meter-row"]
-    out["row"] = (R["dom1"] == ["t-head", "meter-row", "srv-meters", "meter-row"]
+    out["row"] = (R["dom1"] == ["t-head", "meter-row", "meter-row", "srv-meters"]
                   and R["memrow"] == ["DESK MEMORY", "Desk \u00b7 memory \u00b7 1 of 4 GB in use",
                                       "meter-row srv-mrow", "25%", "a1:m"]
                   and R["row1"] == {"n": 2, "text": "RADEON RX 6900 XT", "cls": "meter-row srv-mrow",
@@ -22787,7 +22787,7 @@ def _m42c_card(src):
                   and R["dim"][3] == "meter-row srv-mrow off" and R["dim"][4] == "0%"
                   and R["dim"][5].endswith("not answering"))
     out["two"] = (R["two"][0] == ["a1", "a1:m", "b2", "b2:m"] and R["two"][1] is True
-                  and R["two"][2] == ["t-head", "meter-row", "srv-meters", "meter-row"]
+                  and R["two"][2] == ["t-head", "meter-row", "meter-row", "srv-meters"]
                   and R["order"] == ["b2", "b2:m", "a1", "a1:m"] and R["drop"] == ["a1", "a1:m"])
     out["gone"] = R["dom2"] == [["t-head", "meter-row", "meter-row"], True, 0, []]
     return all(out.values()), [out, err]
@@ -22830,7 +22830,7 @@ def _m42c_text(src):
     a = src.index("const SRV_METER_MAX=2;")
     b = src.index("function pickServerModel(label){")
     seg = src[a:b]
-    c = src.index("/* a paired server's graphics card, between this computer's bar")
+    c = src.index("/* a paired server's graphics card and memory, under this computer's chip")
     css = src[c:src.index(".meter-label{", c)]
     srv = src[src.index("def _srv_usage_gpu(js)"):src.index("# ==== servers: end ====")]
     out = {}
@@ -22838,9 +22838,8 @@ def _m42c_text(src):
     out["hook"] = ("  if(box)box.innerHTML=srvChipsHtml(srvList);\n  srvMetersRefresh();\n}" in src
                    and "  paintEngMenuServers();\n  paintSrvChips();\n}" in src)
     out["css"] = ("#telemetry .srv-mrow.off{opacity:.45}" in css
-                  and "#telemetry .srv-mrow:last-child{margin-bottom:7px}" in css
                   and "#telemetry .srv-mrow .t-head span{min-width:0;overflow:hidden;text-overflow:ellipsis}" in css)
-    out["dom"] = ("tel.insertBefore(box,mr||null);" in seg and 'box.id="srv-meters";' in seg)
+    out["dom"] = ("tel.appendChild(box);" in seg and 'box.id="srv-meters";' in seg)
     return all(out.values()), out
 
 
@@ -22850,9 +22849,9 @@ _M42_CHECKS = [
     ("server meters: the app reads a server's card with one short signed GET and keeps three numbers; an older "
      "kit, a refusal, a server that is off and an unpaired one are each said, and nothing is sent for the last",
      _m42c_server),
-    ("server meters: a row per paired server with a card (three, then \"+N more\"), its name tidied, its title, "
+    ("server meters: a row per paired server with a card (two servers, then \"+N more\"), its name tidied, its title, "
      "an empty bar and the words for an older kit, dimmed while it doesn't answer (node)", _m42c_rows),
-    ("server meters: the card gets a row between this computer's graphics bar and memory pressure and loses it "
+    ("server meters: the card gets its server rows under this computer's chip and memory pressure and loses them "
      "again, rows kept (so the bar eases) as readings change (node)", _m42c_card),
     ("server meters: it reads only while a server is paired, the card is on screen and the window is showing; "
      "3 s, then 10 s, then 30 s while it doesn't answer; paused for a benchmark; the rows go with a profile "
@@ -22915,10 +22914,9 @@ _M42_MUT = [
      "const rows=srvMeterRows(srvList,srvUse);"),
     ("a benchmark counted as a failure", "  if(d&&d.paused){u.due=Date.now()+3000;return;}     // a benchmark is running\n", ""),
     ("rows made again at every reading", "let el=have[r.id];delete have[r.id];", "let el=null;"),
-    ("the row after memory pressure", "tel.insertBefore(box,mr||null);", "tel.appendChild(box);"),
+    ("the rows before memory pressure", "    tel.appendChild(box);\n", '    tel.insertBefore(box,document.getElementById("mem-meter").closest(".meter-row"));\n'),
     ("the chips not waking the rows", "  if(box)box.innerHTML=srvChipsHtml(srvList);\n  srvMetersRefresh();\n}",
      "  if(box)box.innerHTML=srvChipsHtml(srvList);\n}"),
-    ("the card growing no gap", "#telemetry .srv-mrow:last-child{margin-bottom:7px}", "#telemetry .srv-mrow:last-child{margin-bottom:0}"),
     ("a benchmark not pausing the read", 'if _bench["running"]:\n                self._send_json({"ok": True, "paused": True})',
      'if False:\n                self._send_json({"ok": True, "paused": True})'),
     ("an unpaired server read", "    if e is None or not _srv_paired(e):\n        return {\"ok\": False}\n    try:\n        if not cai_crypto.available():\n            return {\"ok\": False}\n        st, js = _srv_json(e, \"GET\", \"/v1/usage\"",

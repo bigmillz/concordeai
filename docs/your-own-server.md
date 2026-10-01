@@ -228,8 +228,8 @@ the contents of a folder you give them to the server, as they would to any
 model that answers.
 
 The sidebar's meters card shows the server too. When a server is paired and
-names its graphics card, the card grows two rows between this computer's
-graphics bar and memory pressure: the card's name with a bar for how busy it
+names its graphics card, the card grows two rows under this computer's
+chip and memory pressure: the card's name with a bar for how busy it
 is, and "<server name> memory" with a bar for how much of the server's memory
 is in use. They are polled every few seconds while the window is showing, and
 at most two servers are shown. The server answers with five numbers only (busy
