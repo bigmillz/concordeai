@@ -1325,6 +1325,19 @@ class TestLanMode(unittest.TestCase):
         finally:
             gw.cfg["lan_mode"] = False
 
+    def test_no_lan_range_means_no_lan_access(self):
+        # a server whose config has no lan_cidr (nothing was ever told its LAN) lets nobody in
+        gw, mod = G["gw"], G["mod"]
+        saved = gw.lan_net
+        gw.lan_net = None
+        gw.cfg["lan_mode"] = True
+        try:
+            with self.assertRaises(mod.GatewayError):
+                gw.check_access({}, True, "10.0.0.20")
+        finally:
+            gw.cfg["lan_mode"] = False
+            gw.lan_net = saved
+
     def test_lan_off_by_default(self):
         self.assertFalse(DEFAULTS["lan_mode"])
 
