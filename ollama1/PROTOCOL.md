@@ -173,6 +173,8 @@ Ollama's own API shapes, minus anything that changes state on the desktop:
 | `GET /v1/whoami` | `{"device_id", "name", "server_time"}`: a cheap "am I paired" check |
 | `GET /v1/info` | `{"gpu": {"vendor", "name", "vram_bytes"}}`, see below |
 | `GET /v1/usage` | `{"gpu": {"busy_pct", "vram_used_bytes", "vram_total_bytes"}, "ram": {"used_bytes", "total_bytes"}}`, see below |
+| `GET /v1/sleep-config` | `{"enabled", "minutes", "supported", "wake"}`: the auto sleep setting, see below |
+| `POST /v1/sleep-config` | `{"enabled": bool, "minutes": int}` (either): saves it and answers as the GET does |
 | `GET /api/tags` | Installed local models. Ollama cloud models are never listed. Each has `placement` and `gpu_pct` (below) |
 | `GET /api/ps` | Loaded models, with `size`, `size_vram`, `placement` and `gpu_pct` |
 | `GET /api/version` | `{"version"}` |
@@ -220,6 +222,34 @@ server's memory is in use, for the app's meters:
   at most once a second however many devices ask, so poll every few seconds
   at most. A server that doesn't have this route (an older kit) answers 404:
   treat that as "usage not reported".
+
+`GET /v1/sleep-config` and `POST /v1/sleep-config` are the auto sleep setting
+(the desktop suspends itself after it has been idle for a while, and a magic
+packet wakes it). Signed and paired-only like every route here. The answer is
+always exactly these four keys:
+
+```json
+{"enabled": false, "minutes": 30, "supported": true, "wake": ["02:00:5e:10:00:01"]}
+```
+
+- `enabled`: a boolean, false until someone turns it on.
+- `minutes`: how long with no real work before it sleeps, a whole number, 5 to
+  1440 (default 30).
+- `supported`: true if the machine lists deep sleep (`deep` in
+  `/sys/power/mem_sleep`).
+- `wake`: the MAC addresses (lower case, at most 8) of the network cards, real
+  ones only, standalone or inside a bridge, that have wake on a magic packet
+  switched on. Empty if none, or if the sleep service hasn't published a list.
+- `POST` takes `enabled` (a boolean) and/or `minutes` (a whole number: a
+  boolean, a string or a decimal is a 400; a number outside 5..1440 is
+  brought to the nearest end). Any other key is a 400. An older kit answers
+  404 `not_found`: treat that as "update the server kit".
+- Only chat, generate and embeddings count as work. `/v1/info`, `/v1/usage`,
+  `/v1/whoami`, the model list and this route never keep the desktop awake.
+
+To wake it, send a magic packet: six `0xFF` bytes then the card's address
+sixteen times, as a UDP broadcast to port 9, and ask `/v1/info` every couple of
+seconds until it answers.
 
 Anything else is a 404: `pull`, `delete`, `create`, `copy`, `push` and `blobs`
 are never reachable from outside. Models are managed at the desktop only.

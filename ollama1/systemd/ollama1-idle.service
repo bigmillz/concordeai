@@ -1,0 +1,40 @@
+# Auto sleep (6b346): when the owner has turned it on (the app's Settings >
+# Your servers), suspend the desktop after it has been idle for the minutes
+# they chose. It reads the settings and the activity the gateway writes
+# (numbers only), publishes which network cards can wake the machine, and
+# starts ollama1-helper sleep, which refuses while a download, update or
+# setup runs. Root, because it asks logind and suspends; it can't reach the
+# network and writes only its own run file and the sleep record.
+[Unit]
+Description=ollama1 auto sleep (suspend when idle, if turned on)
+After=ollama1-gateway.service
+
+[Service]
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-idle run
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=10
+LimitCORE=0
+Nice=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1 /var/lib/ollama1
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+MemoryMax=128M
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022
+RestrictAddressFamilies=AF_UNIX AF_INET AF_NETLINK
+IPAddressDeny=any
+
+[Install]
+WantedBy=multi-user.target

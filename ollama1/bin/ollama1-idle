@@ -1,0 +1,91 @@
+#!/usr/bin/python3
+"""ollama1-idle: put the desktop to sleep when it has been idle, if the
+owner turned that on (Settings > Your servers, in the app).
+
+  ollama1-idle run          the service (ollama1-idle.service): every 30 s,
+                            decide, and suspend only when every condition holds
+  sudo ollama1-idle check   say what it would do right now, and why
+  sudo ollama1-idle wol-setup
+                            for each network card that can wake on a magic
+                            packet: its systemd .link file and `ethtool -s
+                            <card> wol g` (setup.sh runs it; safe to repeat)
+
+The settings and the activity are written by the gateway (numbers only; see
+lib/o1idle.py). The decision logs one line when its reason changes, and
+nothing else.
+"""
+import os
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1gpu  # noqa: E402
+import o1idle  # noqa: E402
+import o1sleep  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal; the reason, never what anyone asked
+
+
+class Gpu:
+    """The card's busy percent, found once and looked for again until there is one."""
+
+    def __init__(self):
+        self.vendor = None
+        self.at = -1e9
+
+    def busy(self):
+        if not self.vendor and time.monotonic() - self.at > 60:
+            self.at = time.monotonic()
+            self.vendor = o1gpu.detect().get("vendor")
+        return o1gpu.usage(self.vendor)["busy_pct"] if self.vendor else None
+
+
+def suspend():
+    return subprocess.run([os.path.join(HERE, "ollama1-helper"), "sleep"], timeout=600).returncode
+
+
+def probes():
+    gpu = Gpu()
+    return {"supported": o1idle.deep_sleep_supported, "wake": o1idle.wake_list, "sessions": o1idle.sessions_count,
+            "inhibitors": o1idle.inhibitors_blocking, "tools": o1idle.tools_running, "gpu_busy": gpu.busy,
+            "busy": o1sleep.busy_reasons, "boot_time": o1idle.boot_time}
+
+
+def need_root():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("run it with sudo")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "run":
+        idle = o1idle.Idle(probes(), suspend, log=log)
+        while True:
+            try:
+                idle.tick()
+            except Exception as e:                       # never stop ticking; say what kind, not what it held
+                log("tick failed: %s" % type(e).__name__)
+            time.sleep(o1idle.TICK_S)
+    elif cmd == "check":
+        need_root()
+        idle = o1idle.Idle(probes(), lambda: 0, log=lambda s: None)
+        sleep, why = idle.tick()
+        print(("would sleep now: " if sleep else "would not sleep: ") + why)
+    elif cmd == "wol-setup":
+        need_root()
+        macs = o1idle.wol_setup(ethtool=o1idle.ethtool_set)
+        if macs:
+            print("This computer can wake on a magic packet (%d network card%s). The BIOS must allow it too: turn on "
+                  "\"Wake on PCI-E\" / \"Resume by PCI-E device\" (MSI: Settings > Advanced > Wake Up Event Setup)."
+                  % (len(macs), "" if len(macs) == 1 else "s"))
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

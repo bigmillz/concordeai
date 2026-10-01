@@ -350,6 +350,99 @@ class TestSignatures(unittest.TestCase):
         self.assertEqual(json.loads(data)["device_id"], G["dev"].id)
 
 
+class TestSleepRoutes(unittest.TestCase):
+    """GET/POST /v1/sleep-config and what counts as activity (6b346): chats do,
+    the app's polls never do."""
+    def setUp(self):
+        import o1idle
+        self.o1idle = o1idle
+        self.gw = G["gw"]
+        for f in (o1idle.config_file(), o1idle.idle_file(), o1idle.activity_file()):
+            if os.path.exists(f):
+                os.unlink(f)
+        self.gw.activity.last = 0.0
+
+    tearDown = setUp
+
+    def view(self, st_data):
+        st, data, _ = st_data
+        self.assertEqual(st, 200, data)
+        return json.loads(data)
+
+    def test_default_view_has_exactly_four_keys(self):
+        v = self.view(call("GET", "/v1/sleep-config"))
+        self.assertEqual(sorted(v), ["enabled", "minutes", "supported", "wake"])
+        self.assertEqual((v["enabled"], v["minutes"], v["wake"]), (False, 30, []))
+        self.assertIsInstance(v["supported"], bool)
+
+    def test_signed_and_paired_only(self):
+        for method, obj in (("GET", None), ("POST", {"enabled": True})):
+            self.assertEqual(call(method, "/v1/sleep-config", obj, dev=False)[0], 401)
+            self.assertEqual(call(method, "/v1/sleep-config", obj, dev=U.Device())[0], 403)
+            self.assertEqual(call(method, "/v1/sleep-config", obj, jwt_token=None)[0], 403)
+        self.assertFalse(os.path.exists(self.o1idle.config_file()))
+
+    def test_set_clamps_and_persists(self):
+        v = self.view(call("POST", "/v1/sleep-config", {"enabled": True, "minutes": 1}))
+        self.assertEqual((v["enabled"], v["minutes"]), (True, 5))
+        v = self.view(call("POST", "/v1/sleep-config", {"minutes": 99999}))
+        self.assertEqual((v["enabled"], v["minutes"]), (True, 1440))
+        v = self.view(call("POST", "/v1/sleep-config", {"enabled": False}))
+        self.assertEqual((v["enabled"], v["minutes"]), (False, 1440))
+        self.assertEqual(json.load(open(self.o1idle.config_file())), {"enabled": False, "minutes": 1440})
+        self.assertEqual(self.view(call("GET", "/v1/sleep-config"))["minutes"], 1440)
+        self.assertEqual(os.stat(self.o1idle.config_file()).st_mode & 0o777, 0o600)
+
+    def test_bad_bodies_are_refused_and_change_nothing(self):
+        call("POST", "/v1/sleep-config", {"enabled": True, "minutes": 45})
+        for bad in ({"minutes": True}, {"minutes": "30"}, {"minutes": 30.5}, {"enabled": 1}, {"enabled": "yes"},
+                    {"enabled": True, "device": "x"}, {}, [1], "x"):
+            st, data, _ = call("POST", "/v1/sleep-config", bad)
+            self.assertEqual(st, 400, bad)
+            self.assertEqual(json.loads(data)["code"], "bad_request")
+        st, _, _ = call("POST", "/v1/sleep-config", raw=b"not json")
+        self.assertEqual(st, 400)
+        self.assertEqual(json.load(open(self.o1idle.config_file())), {"enabled": True, "minutes": 45})
+
+    def test_the_wake_list_is_what_the_root_service_published(self):
+        with open(self.o1idle.idle_file(), "w") as f:
+            json.dump({"at": 1, "supported": True, "wake": ["02:00:5e:10:00:01", "junk", 7]}, f)
+        self.assertEqual(self.view(call("GET", "/v1/sleep-config"))["wake"], ["02:00:5e:10:00:01"])
+
+    def test_polls_are_not_activity_chats_are(self):
+        gw = self.gw
+        for method, path in (("GET", "/v1/info"), ("GET", "/v1/usage"), ("GET", "/v1/whoami"),
+                             ("GET", "/v1/sleep-config"), ("GET", "/api/tags"), ("GET", "/api/ps"),
+                             ("GET", "/api/version")):
+            call(method, path)
+        call("POST", "/v1/sleep-config", {"minutes": 30})
+        self.assertEqual((gw.activity.last, gw.activity.inflight), (0.0, 0))
+        self.assertFalse(os.path.exists(self.o1idle.activity_file()) and
+                         json.load(open(self.o1idle.activity_file()))["last"] > 0)
+        call("POST", "/api/chat", {"model": "small:8b", "stream": False,
+                                   "messages": [{"role": "user", "content": "hi"}]})
+        self.assertGreater(gw.activity.last, 0)
+        self.assertEqual(gw.activity.inflight, 0)
+        gw.activity.write()                              # (the stats loop does this every second)
+        self.assertGreater(json.load(open(self.o1idle.activity_file()))["last"], 0)
+
+    def test_a_request_in_flight_is_counted_and_released_on_error(self):
+        gw = self.gw
+        seen = []
+        orig = gw.local_model
+
+        def peek(name):
+            seen.append(gw.activity.inflight)
+            return orig(name)
+        gw.local_model = peek
+        try:
+            call("POST", "/api/chat", {"model": "small:8b", "messages": [{"role": "user", "content": "hi"}]})
+        finally:
+            gw.local_model = orig
+        self.assertEqual(seen, [1])
+        self.assertEqual(gw.activity.inflight, 0)
+
+
 class TestRoutes(unittest.TestCase):
     def test_never_routes(self):
         before = len(G["stub"].calls)

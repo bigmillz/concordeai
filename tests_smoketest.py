@@ -17311,7 +17311,7 @@ def _svc_secrets(src):
                     and secret not in views and "id34.access" not in views
                     and set(ns["_srv_public"](e)) == {"id", "name", "url", "host", "access", "paired",
                                                      "paired_at", "device_name", "device_id",
-                                                     "status", "models", "gpu", "only", "prefer"})
+                                                     "status", "models", "gpu", "only", "prefer", "sleep", "wakeable"})
     out["entry repr"] = seed not in repr(e) and secret not in repr(e)
     out["error text"] = all(secret not in str(ns["_srv_fail"](e, st, {"error": "x"}))
                             for st in (403, 401, 500, 530))
@@ -17651,7 +17651,7 @@ def _svc_page(src):
     """The pane's cards and the engine menu's rows, run in node."""
     i0 = src.index("function esc(s){")
     js = (src[i0:src.index(";}\n", i0) + 3]
-          + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={};'
+          + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={},srvSleep={};'
           + 'let tier="",advOn=false,agent="",council=["Desktop \\u00b7 gpt-oss:120b"];'
           + src[src.index("function srvWhere(m){"):src.index("function paintServers(){")]
           + src[src.index("function whereBadge(lm,who){"):src.index("function paintEngMenuServers(){")]
@@ -17716,7 +17716,7 @@ def _svc_page(src):
         and "    if(i){i.focus();try{i.setSelectionRange(foc[2],foc[3]);}catch(e){}}" in src
         and "  srvMsgs[id]=t||\"\";" in src,
         "pane": 'data-pane="p-servers">Your servers</button>' in src
-        and 'if(id==="p-servers")loadServers(true);' in src and 'api("/api/servers' in src
+        and 'if(id==="p-servers")loadServers(true).then(srvSleepLoadAll);' in src and 'api("/api/servers' in src
         and 'fetch("/api/servers' not in src,
     }
     return all(got.values()), [got, o]
@@ -20307,6 +20307,9 @@ GW.o1gpu.detect = lambda: {"vendor": "amd", "name": "Test Card", "vram_bytes": 1
 USAGE = {"v": {"busy_pct": 42, "vram_used_bytes": 6 << 30, "vram_total_bytes": 16 << 30}}
 GW.o1gpu.usage = lambda vendor: dict(USAGE["v"])
 RAM = {"v": {"used_bytes": 22 << 30, "total_bytes": 62 << 30}}
+# auto sleep (6b346): a build machine has no deep sleep or cards; this one has
+GW.o1idle.deep_sleep_supported = lambda path=None: True
+GW.o1idle.published_wake = lambda path=None: ["02:00:5e:10:00:01"]
 GW.o1stats.ram_usage = lambda info=None: dict(RAM["v"])
 DROPPED = {}
 CLONED = []
@@ -21444,6 +21447,75 @@ _svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
 check("server meters (live): in another profile a server of this one reads nothing and no request leaves",
       _uB42 == (200, {"ok": False}) and len(_o1("/log")["log"]) == _nl42, "%r" % [_uB42])
 # ==== 6b342 server meters (live profile): end ====
+
+# ==== 6b346 auto sleep (live): begin ====
+# the real gateway's /v1/sleep-config, through the app's own routes
+_z_nl, _z_ns = len(_o1("/log")["log"]), len(_o1("/stub")["calls"])
+_z0 = _svq("/api/servers/sleep?id=" + _sid34)
+_z1 = _svq("/api/servers/sleep", "POST", {"id": _sid34, "enabled": True, "minutes": 45})
+_z2 = _svq("/api/servers/sleep?id=" + _sid34)
+_z_lg = _o1("/log")["log"][_z_nl:]
+_z_row = (json.load(open(_sfile34))["servers"] or [{}])[0]
+_z_pub = (_svq("/api/servers")[1].get("servers") or [{}])[0]
+check("auto sleep (live): the setting is read and saved through the real gateway with signed calls that carry only "
+      "the setting, kept with the server's row (0600), and the cards stay off the page",
+      _z0 == (200, {"ok": True, "sleep": {"enabled": False, "minutes": 30, "supported": True}, "wakeable": True})
+      and _z1 == (200, {"ok": True, "sleep": {"enabled": True, "minutes": 45, "supported": True}, "wakeable": True})
+      and _z2[1]["sleep"] == {"enabled": True, "minutes": 45, "supported": True}
+      and [(r["method"], r["path"], r["access"]) for r in _z_lg] == [("GET", "/v1/sleep-config", True),
+                                                                     ("POST", "/v1/sleep-config", True),
+                                                                     ("GET", "/v1/sleep-config", True)]
+      and json.loads(_z_lg[1]["body"]) == {"enabled": True, "minutes": 45} and _z_lg[0]["body"] == ""
+      and all({"X-O1-Device", "X-O1-Signature"} <= set(r["headers"]) for r in _z_lg)
+      and _z_row.get("wake") == ["02:00:5e:10:00:01"] and _z_row.get("sleep") == {"enabled": True, "minutes": 45}
+      and _st34.S_IMODE(os.stat(_sfile34).st_mode) == 0o600
+      and _z_pub.get("sleep") == {"enabled": True, "minutes": 45} and _z_pub.get("wakeable") is True
+      and "02:00:5e:10:00:01" not in json.dumps(_z_pub) and len(_o1("/stub")["calls"]) == _z_ns,
+      "%r" % [_z0, _z1, _z2, _z_lg[:1], _z_row.get("sleep"), _z_pub.get("sleep")])
+_z_nl = len(_o1("/log")["log"])
+_z3 = _svq("/api/servers/sleep", "POST", {"id": _sid34, "minutes": 1})
+_z4 = [_svq("/api/servers/sleep", "POST", dict({"id": _sid34}, **b_))[1] for b_ in
+       ({"minutes": True}, {"minutes": "30"}, {"enabled": 1}, {})]
+_z4g = [_svq("/api/servers/sleep?id=" + x_)[1] for x_ in ("", "zz", "00000000")]
+_z_calls = len([r for r in _o1("/log")["log"][_z_nl:] if r["path"] == "/v1/sleep-config"])
+_o1("/next", {"path": "/v1/sleep-config", "status": 404,
+              "body": {"error": "not available through the gateway", "code": "not_found", "server_time": int(time.time())}})
+_z5 = _svq("/api/servers/sleep?id=" + _sid34)
+_o1("/down", {})
+_z6 = _svq("/api/servers/sleep?id=" + _sid34)
+_z6s = _svq("/api/servers/sleep", "POST", {"id": _sid34, "enabled": False})
+_o1("/up", {})
+_z7 = _svq("/api/servers/sleep?id=" + _sid34)
+check("auto sleep (live): minutes are brought into 5..1440 by the gateway, a bad body or id never reaches it, an "
+      "older kit says to update, a server that is off says so, and a refused save changes nothing",
+      _z3[1]["sleep"]["minutes"] == 5 and _z3[1]["sleep"]["enabled"] is True
+      and all(z_.get("ok") is False and z_.get("kind") == "input" for z_ in _z4)
+      and all(z_ == {"ok": False, "kind": "gone", "err": "That server isn’t in Settings › Your servers any more."}
+              or z_.get("kind") == "gone" for z_ in _z4g)
+      and _z_calls == 1
+      and _z5[1] == {"ok": False, "kind": "old", "err": "Update the server kit to use sleep."}
+      and _z6[1].get("ok") is False and _z6[1].get("kind") == "offline"
+      and _z6s[1].get("ok") is False and _z6s[1].get("kind") == "offline"
+      and _z7[1].get("ok") is True and _z7[1]["sleep"] == {"enabled": True, "minutes": 5, "supported": True},
+      "%r" % [_z3, _z4, _z4g, _z_calls, _z5, _z6, _z6s, _z7])
+_z8 = [_ireq(_SV, "/api/servers/sleep?id=" + _sid34, cookie=False)[0],
+       _ireq(_SV, "/api/servers/sleep?id=" + _sid34, token=False)[0],
+       _ireq(_SV, "/api/servers/sleep", method="POST", data=b'{"id":"%s","enabled":false}' % _sid34.encode(),
+             token=False)[0]]
+_z8h = _ireq(_SV, "/api/servers/sleep?id=" + _sid34, headers={"X-Profile": "not-this-profile"})
+_svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
+_nl_b = len(_o1("/log")["log"])
+_zB = [_svq("/api/servers/sleep?id=" + _sid34)[1], _svq("/api/servers/sleep", "POST", {"id": _sid34, "enabled": False})[1]]
+_svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
+_z_cfg = _svq("/api/servers/sleep?id=" + _sid34)[1]
+check("auto sleep (live): behind the launch key, the token and the profile; another profile can't read or change this "
+      "one's server and nothing leaves; the cards aren't in the app's log",
+      _z8 == [403, 403, 403] and _z8h[0] == 409
+      and all(z_.get("ok") is False and z_.get("kind") == "gone" for z_ in _zB) and len(_o1("/log")["log"]) == _nl_b
+      and _z_cfg["sleep"]["enabled"] is True
+      and "02:00:5e:10:00:01" not in open(os.path.join(_SMOKE_TMP, "SRV.log"), errors="replace").read(),
+      "%r" % [_z8, _z8h[0], _zB, _z_cfg])
+# ==== 6b346 auto sleep (live): end ====
 # the Access secret and the device key: in servers.json only
 _rowA = json.load(open(_sfile34))["servers"][0]
 _seed34 = _rowA.get("seed", "")
@@ -23394,7 +23466,8 @@ _M42_MUT = [
      "    return g"),
     ("memory above the total kept", 'and out["used_bytes"] > out["total_bytes"]:', "and False:"),
     ("an older kit's memory not null", '"ram": None}      # an older server kit', '"ram": {}}      # an older server kit'),
-    ("any 404 taken for an older kit", 'if st == 404 and str(js.get("code") or "") == "not_found":', "if st == 404:"),
+    ("any 404 taken for an older kit", 'if st == 404 and str(js.get("code") or "") == "not_found":\n        return {"ok": True, "gpu": None',
+     'if st == 404:\n        return {"ok": True, "gpu": None'),
     ("a long wait for a reading", "SRV_USAGE_S = 3 ", "SRV_USAGE_S = 60 "),
     ("the reading unsigned", 'st, js = _srv_json(e, "GET", "/v1/usage", timeout=SRV_USAGE_S)',
      'st, js = _srv_json(e, "GET", "/v1/usage", signed=False, timeout=SRV_USAGE_S)'),
@@ -23409,6 +23482,428 @@ for _d42, _o42, _n42 in _M42_MUT:
 check("server meters: %d mutations, each caught by a check above" % len(_M42_MUT),
       all(isinstance(v, list) for _d, v in _m42m), "%r" % [x for x in _m42m if not isinstance(x[1], list)])
 # ==== 6b342 server meters: end ====
+
+# ==== 6b346 auto sleep: begin ====
+print("== auto sleep for your server, and waking it (6b346) ==")
+# Patrick: "Build the feature in and have an option to turn this auto sleep
+# mode on or off under the Your Servers tab in Settings. Also allow the user
+# to put in a box there how many minutes of inactivity before it should
+# sleep. default 30 min". In process: the settings call, the wake flow on a
+# stand-in gateway with a fake clock and a recording UDP socket; node: the
+# pane's pure functions; live: the real gateway's /v1/sleep-config (above).
+_W46_MAC = "02:00:5e:10:00:01"
+_W46_MAC2 = "02:00:5e:10:00:02"
+
+
+def _w46_router(ns, routes, log):
+    """The stand-in transport: path -> responses (the last one repeats); a
+    callable is called (it may raise ServerError)."""
+    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+        log.append((method, path, body, signed, timeout))
+        q = routes.get(path)
+        r = (q.pop(0) if len(q) > 1 else q[0]) if q else _SvResp(404, {"error": "no", "code": "not_found"})
+        return _SvConn(), (r() if callable(r) else r)
+    ns["_srv_send"] = send
+
+
+def _w46_ok_routes(ns):
+    def off():
+        raise ns["ServerError"]("offline", "off")
+    return {"/v1/whoami": [_SvResp(200, {"device_id": "x"})], "/api/tags": [_SvResp(200, {"models": [{"name": "small:8b"}]})],
+            "/api/ps": [_SvResp(200, {"models": []})], "/api/version": [_SvResp(200, {"version": "0.1"})],
+            "/v1/info": [_SvResp(200, {"gpu": {}})]}, off
+
+
+def _w46c_settings(src):
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    sid = e["id"]
+    log = []
+    good = {"enabled": True, "minutes": 45, "supported": True, "wake": [_W46_MAC.upper(), _W46_MAC2, "junk", 5, _W46_MAC]}
+    _w46_router(ns, {"/v1/sleep-config": [_SvResp(200, good)]}, log)
+    r = ns["server_sleep_get"](ctx, sid)
+    row = ns["_srv_read"](ctx)[0]
+    out["get"] = (r == {"ok": True, "sleep": {"enabled": True, "minutes": 45, "supported": True}, "wakeable": True}
+                  and log == [("GET", "/v1/sleep-config", b"", True, ns["SRV_CONNECT_S"])]
+                  and row["wake"] == [_W46_MAC, _W46_MAC2] and row["sleep"] == {"enabled": True, "minutes": 45})
+    pub = ns["_srv_public"](row)
+    out["public"] = (pub["sleep"] == {"enabled": True, "minutes": 45} and pub["wakeable"] is True
+                     and _W46_MAC not in json.dumps(pub) and _W46_MAC2 not in json.dumps(pub))
+    # the file keeps them, 0600; a hand-edited file is not believed
+    fp = os.path.join(d, "servers.json")
+    out["file"] = (_W46_MAC in open(fp).read() and _st34.S_IMODE(os.stat(fp).st_mode) == 0o600)
+    raw = json.load(open(fp))
+    raw["servers"][0]["wake"] = ["nope", "AA:BB:CC:DD:EE:FF", "aa:bb:cc:dd:ee:ff", 7] + ["00:00:00:00:00:%02x" % i for i in range(12)]
+    raw["servers"][0]["sleep"] = {"enabled": "yes", "minutes": 9}
+    open(fp, "w").write(json.dumps(raw))
+    r0 = ns["_srv_read"](ctx)[0]
+    raw["servers"][0]["sleep"] = {"enabled": True, "minutes": 99999}
+    open(fp, "w").write(json.dumps(raw))
+    r1 = ns["_srv_read"](ctx)[0]
+    out["clean"] = (len(r0["wake"]) == 8 and r0["wake"][0] == "aa:bb:cc:dd:ee:ff" and r0["sleep"] is None
+                    and r1["sleep"] == {"enabled": True, "minutes": 1440}
+                    and ns["_srv_clean_sleep"]({"enabled": True, "minutes": True}) == {"enabled": True, "minutes": 30}
+                    and ns["_srv_clean_sleep"]({"enabled": 1, "minutes": 30}) is None and ns["_srv_clean_sleep"](None) is None
+                    and ns["_srv_clean_wake"]("x") == [])
+    # set: only a bool and a whole number are sent, minutes brought into 5..1440
+    log.clear()
+    _w46_router(ns, {"/v1/sleep-config": [_SvResp(200, dict(good, minutes=5)), _SvResp(200, dict(good, minutes=1440)),
+                                          _SvResp(200, dict(good, enabled=False, minutes=1440))]}, log)
+    s1 = ns["server_sleep_set"](ctx, sid, {"enabled": True, "minutes": 1})
+    s2 = ns["server_sleep_set"](ctx, sid, {"minutes": 99999})
+    s3 = ns["server_sleep_set"](ctx, sid, {"enabled": False})
+    bodies = [json.loads(b) for _m, _p, b, _s, _t in log]
+    out["set"] = (bodies == [{"enabled": True, "minutes": 5}, {"minutes": 1440}, {"enabled": False}]
+                  and all(m == "POST" and sg for m, _p, _b, sg, _t in log)
+                  and s1["ok"] and s1["sleep"]["minutes"] == 5 and s3["sleep"]["enabled"] is False)
+    log.clear()
+    bad = [ns["server_sleep_set"](ctx, sid, x) for x in ({"minutes": True}, {"minutes": "30"}, {"minutes": 30.0},
+                                                       {"enabled": 1}, {"enabled": "on"}, {})]
+    out["input"] = (all(b["ok"] is False and b["kind"] == "input" for b in bad) and not log)
+    # an older kit, a server that's off, a refusal, nonsense, an unknown or unpaired server
+    def boom():
+        raise ns["ServerError"]("offline", "%s didn\u2019t answer." % e["name"])
+    cases = {"old": _SvResp(404, {"error": "no", "code": "not_found"}), "offline": boom,
+             "server": _SvResp(200, {"enabled": "x"}), "server2": _SvResp(500, {"error": "bad"}),
+             "server3": _SvResp(400, {"error": "x", "code": "bad_request"}),
+             "server4": _SvResp(404, {"error": "no"})}
+    got = {}
+    for k, v in cases.items():
+        _w46_router(ns, {"/v1/sleep-config": [v]}, [])
+        got[k] = ns["server_sleep_get"](ctx, sid)
+    out["errors"] = (got["old"] == {"ok": False, "kind": "old", "err": "Update the server kit to use sleep."}
+                     and got["offline"]["kind"] == "offline" and got["server"]["kind"] == "server"
+                     and got["server2"]["kind"] == "server" and got["server3"]["kind"] == "server"
+                     and got["server4"]["kind"] == "server"
+                     and ns["server_sleep_get"](ctx, "deadbeef")["kind"] == "gone"
+                     and ns["server_sleep_get"](ctx, sid)["ok"] is False)
+    a2 = ns["server_add"](ctx, {"url": "https://other.example.com", "name": "Other", "access_id": "id.access",
+                                "access_secret": "SECRET-" + "y" * 20})
+    log.clear()
+    _w46_router(ns, {"/v1/sleep-config": [_SvResp(200, good)]}, log)
+    out["unpaired"] = (ns["server_sleep_get"](ctx, a2["id"])["kind"] == "unpaired" and not log)
+    out["secrets"] = not any(x in json.dumps([r, s1, bad, got]) for x in ("SECRET34", "seed", "access_secret"))
+    return all(out.values()), out
+
+
+def _w46c_wake(src):
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    t = [1000.0]
+    packets = []
+    ns["_srv_wake_clock"] = lambda: t[0]
+    def _spin(s):
+        if t[0] > 5000:
+            raise RuntimeError("the wake never gave up")
+        t[0] += s
+    ns["_srv_wake_sleep"] = _spin
+    ns["_srv_udp"] = lambda pkt, addr: packets.append((pkt, addr))
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255", "192.168.1.255"]
+    good = {"enabled": True, "minutes": 30, "supported": True, "wake": [_W46_MAC, _W46_MAC2]}
+    routes, off = _w46_ok_routes(ns)
+    routes["/v1/sleep-config"] = [_SvResp(200, good)]
+    log = []
+    _w46_router(ns, routes, log)
+    ns["server_sleep_get"](ctx, sid)                     # learns the cards and that sleep is on
+    e = ns["_srv_read"](ctx)[0]
+    pkt = ns["srv_magic_packet"](_W46_MAC)
+    out["packet"] = (pkt == b"\xff" * 6 + bytes.fromhex("02005e100001") * 16 and len(pkt) == 102
+                     and ns["srv_magic_packet"]("AA:bb:cc:dd:ee:ff"[:0] + "aa:bb:cc:dd:ee:ff") == b"\xff" * 6 + bytes.fromhex("aabbccddeeff") * 16)
+
+    def down():
+        routes["/v1/whoami"] = [off]
+        ns["server_check"](e)
+
+    def up_after(n):
+        # /v1/info fails n times, then answers; the check after it finds the server up
+        routes["/v1/info"] = [off] * n + [_SvResp(200, {"gpu": {}})]
+        routes["/v1/whoami"] = [off] * n + [_SvResp(200, {"device_id": "x"})]
+    # woken: packets to each card on each network, port 9; polls every 2 s; the check after
+    down()
+    log.clear()
+    routes["/v1/info"] = [off, off, _SvResp(200, {"gpu": {}})]
+    routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
+    r1 = ns["server_wake_if_down"](e)
+    notes = ns["server_take_wake_notes"]()
+    infos = [x for x in log if x[1] == "/v1/info"]
+    out["woke"] = (sorted(packets) == sorted([(ns["srv_magic_packet"](m), (a, 9)) for m in (_W46_MAC, _W46_MAC2)
+                                              for a in ("255.255.255.255", "192.168.1.255")])
+                   and [x[1] for x in log[:3]] == ["/v1/info"] * 3 and t[0] == 1000.0 + 6 and all(x[0] == "GET" and x[3] for x in infos)
+                   and notes == [("Desktop", True)] and ns["server_take_wake_notes"]() == []
+                   and ns["_srv_seen"][sid]["reachable"] is True)
+    # a second try within a minute asks nothing and sends nothing
+    n0 = len(packets)
+    down()
+    t[0] += 30
+    ns["server_wake_if_down"](e)
+    out["rate"] = (len(packets) == n0 and ns["server_take_wake_notes"]() == [])
+    # a minute later it may ask again; with no answer it gives up after 60 s and says so
+    t[0] += 31
+    routes["/v1/info"] = [off]
+    routes["/v1/whoami"] = [off]
+    ta = t[0]
+    ns["server_wake_if_down"](e)
+    out["timeout"] = (len(packets) == n0 + 4 and 60 <= t[0] - ta <= 62
+                      and ns["server_take_wake_notes"]() == [("Desktop", False)]
+                      and ns["_srv_seen"][sid]["reachable"] is False)
+    # an answer that isn't a 200 is not the server waking
+    down()
+    ns["_srv_wake_at"].clear()
+    routes["/v1/info"] = [_SvResp(503, {"error": "busy", "code": "busy"})]
+    ta = t[0]
+    ns["server_wake_if_down"](e)
+    out["refused"] = (ns["server_take_wake_notes"]() == [("Desktop", False)] and t[0] - ta >= 60)
+    routes["/v1/info"] = [_SvResp(200, {"gpu": {}})]
+    # nothing to wake: not known to sleep, no cards, not paired, answering, or failing another way
+    def quiet(row, seen=None, label=""):
+        before = len(packets)
+        ns["_srv_wake_at"].clear()
+        ns["_srv_seen"][row["id"]] = seen or {"at": 1, "reachable": False, "kind": "offline", "err": "x"}
+        ns["server_wake_if_down"](row)
+        return len(packets) == before and ns["server_take_wake_notes"]() == []
+    r_ = dict(e)
+    out["quiet"] = (quiet(dict(r_, sleep={"enabled": False, "minutes": 30})) and quiet(dict(r_, sleep=None))
+                    and quiet(dict(r_, wake=[])) and quiet(dict(r_, seed=ns["_Secret"]("")))
+                    and quiet(r_, {"at": 1, "reachable": True, "auth": True})
+                    and quiet(r_, {"at": 1, "reachable": False, "kind": "auth", "err": "x"})
+                    and quiet(r_, {"at": 1, "reachable": False, "kind": "tls", "err": "x"}))
+    # never from the sidebar's poll, Settings, or reading the setting
+    packets.clear()
+    ns["_srv_wake_at"].clear()
+    down()
+    ns["server_usage"](ctx, sid)
+    ns["server_sleep_get"](ctx, sid)
+    ns["servers_view"](ctx, True)
+    ns["server_check"](e)
+    out["never"] = (not packets and ns["server_take_wake_notes"]() == [])
+    # the two places that answer a question do wake: a mode (a server due for a check) and "<name> Only"
+    ns["_srv_wake_at"].clear()
+    ns["_srv_seen"][sid]["at"] = 0
+    routes["/v1/info"] = [_SvResp(200, {"gpu": {}})]
+    routes["/v1/whoami"] = [off, _SvResp(200, {"device_id": "x"})]
+    ns["server_refresh_modes"](ctx)
+    out["modes"] = (len(packets) == 4 and ns["server_take_wake_notes"]() == [("Desktop", True)])
+    packets.clear()
+    ns["_srv_wake_at"].clear()
+    ns["_srv_seen"][sid]["at"] = 0
+    routes["/v1/whoami"] = [off, _SvResp(200, {"device_id": "x"})]
+    ns["server_only_resolve"](sid, ctx)
+    out["only"] = (len(packets) == 4 and ns["server_take_wake_notes"]() == [("Desktop", True)])
+    # a server that has prefer off isn't refreshed for a mode, so isn't woken by one
+    packets.clear()
+    ns["_srv_wake_at"].clear()
+    ns["server_set_prefer"](ctx, sid, False)
+    ns["_srv_seen"][sid] = {"at": 0, "reachable": False, "kind": "offline", "err": "x"}
+    routes["/v1/whoami"] = [off]
+    ns["server_refresh_modes"](ctx)
+    out["prefer"] = not packets
+    # the chat's page: told after the headers, notes cleared before a request
+    h0 = src.index("server_take_wake_notes()           # none left from an earlier request")
+    h1 = src.index("server_refresh_modes(self.ctx)", h0)
+    h2 = src.index("for _wn, _wok in server_take_wake_notes():")
+    out["handler"] = (h0 < h1 < h2 and src.index("def status(text: str):", h1) < h2
+                      and 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)' in src[h2:h2 + 200])
+    # first-token deadlines start after the wake: the wake is in the refresh, before any deadline is set
+    out["deadline"] = (src.index("server_wake_if_down(e)") < src.index("def server_first_answer(")
+                       and "with server_first_deadline" not in src[src.index("def server_wake("):src.index("def server_wake_if_down(")])
+    return all(out.values()), out
+
+
+def _w46_node(src):
+    i0 = src.index("function esc(s){")
+    esc = src[i0:src.index(";}\n", i0) + 3]
+    a = src.index("function srvSleepParse(raw){")
+    b = src.index("function srvCard(s){")
+    js = esc + src[a:b] + r'''
+const R={};
+const P=srvSleepParse;
+R.parse=[P("30"),P("5"),P("1440"),P("4"),P("0"),P("1441"),P("99999"),P(""),P("abc"),P("3.5"),P("-5"),P("1e3"),P(" 45 "),
+  P("1234567"),P(null),P(undefined),P("\u0663\u0660"),P("007")];
+const V=srvSleepView;
+R.view=[V(),V({st:"load"}),V({st:"old"}),V({st:"off",enabled:true,minutes:40}),V({st:"err",msg:"Nope."}),V({st:"err"}),
+  V({st:"ok",enabled:true,minutes:45,supported:false}),V({st:"ok",enabled:false,minutes:45,supported:true,wakeable:true}),
+  V({st:"ok",enabled:true,minutes:5,supported:true,wakeable:false})];
+const N=srvSleepNext;
+const okd={ok:true,sleep:{enabled:true,minutes:45,supported:true},wakeable:true};
+R.next=[N(undefined,okd),N({st:"ok",minutes:45},{ok:false,kind:"old"}),N({st:"ok",enabled:true,minutes:45,supported:true,wakeable:true},{ok:false,kind:"offline",err:"x"}),
+  N({st:"ok",enabled:true,minutes:45,supported:true},{ok:false,kind:"input",err:"Say on or off."}),N({st:"load"},{ok:false,kind:"server",err:"It said no."}),
+  N({st:"ok",minutes:45},{ok:false,kind:"gone"}),N({st:"load"},{ok:false,kind:"offline"}),N(undefined,null),
+  N(undefined,{ok:true,sleep:{enabled:false,minutes:30,supported:false}})];
+const sv={id:"a1",paired:true,name:"Desk"};
+R.html=[srvSleepHtml({id:"a1",paired:false},{st:"ok"}),srvSleepHtml(sv,{st:"ok",enabled:true,minutes:45,supported:true,wakeable:true}),
+  srvSleepHtml(sv,{st:"load"}),srvSleepHtml(sv,{st:"err",msg:"<b>x</b> & y"}),srvSleepHtml(sv,undefined)];
+process.stdout.write(JSON.stringify(R));
+'''
+    pth = os.path.join(_si_dir, "sleep46.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    return json.loads(p.stdout), p.stderr[:500]
+
+
+def _w46c_ui(src):
+    R, err = _w46_node(src)
+    out = {}
+    out["parse"] = R["parse"] == [{"v": 30, "clamped": False}, {"v": 5, "clamped": False}, {"v": 1440, "clamped": False},
+                                  {"v": 5, "clamped": True}, {"v": 5, "clamped": True}, {"v": 1440, "clamped": True},
+                                  {"v": 1440, "clamped": True}, None, None, None, None, None, {"v": 45, "clamped": False},
+                                  None, None, None, None, {"v": 7, "clamped": False}]
+    v = R["view"]
+    out["view"] = (v[0] == v[1] == {"disabled": True, "checked": False, "minutes": 30, "hint": "Checking\u2026"}
+                   and v[2]["disabled"] and v[2]["hint"] == "Update the server kit to use sleep."
+                   and v[3] == {"disabled": True, "checked": True, "minutes": 40,
+                                "hint": "The server isn\u2019t answering, so this can\u2019t be changed now."}
+                   and v[4]["hint"] == "Nope." and v[4]["disabled"] and v[5]["hint"] == "Couldn\u2019t read the setting."
+                   and v[6] == {"disabled": True, "checked": True, "minutes": 45,
+                                "hint": "This server can\u2019t sleep (no deep sleep)."}
+                   and v[7] == {"disabled": False, "checked": False, "minutes": 45,
+                                "hint": "Sleeps after this long with no questions, and wakes when you ask."}
+                   and v[8]["disabled"] is False and v[8]["checked"] is True and v[8]["minutes"] == 5
+                   and v[8]["hint"].endswith("Waking it from here needs wake-on-LAN set up on the server."))
+    n = R["next"]
+    out["next"] = (n[0] == {"st": "ok", "enabled": True, "minutes": 45, "supported": True, "wakeable": True}
+                   and n[1] == {"st": "old"}
+                   and n[2] == {"st": "off", "enabled": True, "minutes": 45, "supported": True, "wakeable": True}
+                   and n[3] == {"st": "ok", "enabled": True, "minutes": 45, "supported": True, "msg": "Say on or off."}
+                   and n[4] == {"st": "err", "msg": "It said no."} and n[5] == {"st": "ok", "minutes": 45}
+                   and n[6] == {"st": "off"} and n[7] == {"st": "off"}
+                   and n[8] == {"st": "ok", "enabled": False, "minutes": 30, "supported": False, "wakeable": False})
+    h = R["html"]
+    out["html"] = (h[0] == ""
+                   and h[1] == ('<div class="srv-sleep"><div class="srv-row"><label class="srv-pref">'
+                                '<input type="checkbox" data-a="sleepon" checked><span>Sleep when idle</span></label>'
+                                '<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
+                                'data-a="sleepmin" data-k="smin" value="45" aria-label="Minutes with no questions before it sleeps">'
+                                '<span>minutes</span></span></div><div class="srv-hint">Sleeps after this long with no questions, '
+                                'and wakes when you ask.</div></div>')
+                   and h[2].count(" disabled") == 2 and "Checking\u2026" in h[2]
+                   and "&lt;b&gt;x&lt;/b&gt; &amp; y" in h[3] and "<b>x</b>" not in h[3]
+                   and h[4].count(" disabled") == 2 and 'value="30"' in h[4])
+    # the card carries it, loads it with the pane, and the strings have no product name
+    a = src.index("function srvSleepParse(raw){")
+    b = src.index("function srvCard(s){")
+    c = src.index("// the switch and the minutes box (6b346)")
+    dd = src.index('$("#srv-list").addEventListener("keydown"', c)
+    seg = src[a:b] + src[c:dd]
+    out["wiring"] = ("    +srvSleepHtml(s,srvSleep[s.id])" in src and "loadServers(true).then(srvSleepLoadAll);" in src
+                     and 'srvPost("sleep",body)' in seg and 'api("/api/servers/sleep?id="+encodeURIComponent(s.id))' in seg
+                     and "c.disabled=true;" in seg and 'c.dataset.a==="sleepon"' in seg
+                     and "body={id:id,minutes:p.v};" in seg and "body={id:id,enabled:c.checked};" in seg
+                     and ".srv-sleep input:disabled{opacity:.45;cursor:default}" in src)
+    out["words"] = not re.search(r"(?i)ollama1|secret|seed|console\.|\bmac\b", seg)
+    return all(out.values()), [out, err]
+
+
+def _w46c_text(src):
+    """Server side pins: nothing logged, only the request paths wake, the
+    routes sit behind the profile's ctx, and the cards are never shown."""
+    out = {}
+    w0 = src.index("# ---- sleep when idle and waking (6b346)")
+    w1 = src.index("# ==== servers: end ====")
+    seg = src[w0:w1]
+    out["nolog"] = not re.search(r"\bprint\(|logging|\.write\(|open\(", seg)
+    callers = [m.start() for m in re.finditer(r"server_wake_if_down\(", src)]
+    out["callers"] = len(callers) == 3                      # its definition, the refresh and "<name> Only"
+    out["routes"] = ('urllib.parse.urlparse(self.path).path == "/api/servers/sleep"' in src
+                     and "server_sleep_get(self.ctx, _sid)" in src and "server_sleep_set(self.ctx, sid," in src
+                     and '"prefer", "sleep")' in src)
+    out["ctx"] = ("def _srv_sleep_call(ctx, sid: str, method: str, obj=None) -> dict:" in seg
+                  and "_srv_find(_srv_read(ctx), sid)" in seg and "_srv_update(ctx, fn)" in seg)
+    out["public"] = '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),' in src
+    out["gap"] = ("SRV_WAKE_GAP_S = 60" in src and "SRV_WAKE_WAIT_S = 60" in src and "SRV_WAKE_POLL_S = 2" in src)
+    out["port"] = "_srv_udp(pkt, (tgt, 9))" in seg
+    return all(out.values()), out
+
+
+_W46_CHECKS = [
+    ("auto sleep: the setting is read and changed with one signed call; only a bool and a whole number are sent, "
+     "minutes brought into 5..1440; an older kit, a server that's off, a refusal, nonsense and an unpaired server are each "
+     "said; the cards and setting are kept in servers.json (0600), never shown to the page, and a hand-edited file isn't "
+     "believed", _w46c_settings),
+    ("auto sleep: a sleeping server is woken for the question (a magic packet to each card on each network, then its signed "
+     "/v1/info every 2 s for up to 60 s), once a minute at most, said in the chat, and never by the sidebar's poll, Settings "
+     "or reading the setting", _w46c_wake),
+    ("auto sleep: the pane's minutes box and switch (node): parsing, what is shown and disabled in each state, the next "
+     "state from each answer, the markup, the wiring", _w46c_ui),
+    ("auto sleep: nothing logged, only the question's paths wake a server, the routes use the profile's own servers, "
+     "the cards stay off the page", _w46c_text),
+]
+
+
+def _w46_run(src):
+    out = []
+    for name, fn in _W46_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n46, _o46, _d46 in _w46_run(_MILLENAI_SRC):
+    check(_n46, _o46, "%r" % (_d46,))
+
+_W46_MUT = [
+    ("a bool taken as minutes", 'if not isinstance(mn, int) or isinstance(mn, bool):\n            return {"ok": False, "kind": "input"',
+     'if not isinstance(mn, int):\n            return {"ok": False, "kind": "input"'),
+    ("minutes not clamped", 'body["minutes"] = max(SRV_SLEEP_MIN, min(SRV_SLEEP_MAX, mn))', 'body["minutes"] = mn'),
+    ("a non-bool for the switch", 'if not isinstance(d["enabled"], bool):\n            return {"ok": False, "kind": "input", "err": "Say on or off."}',
+     'if False:\n            return {"ok": False, "kind": "input", "err": "Say on or off."}'),
+    ("an older kit not recognised", 'if st == 404 and str(js.get("code") or "") == "not_found":\n        return {"ok": False, "kind": "old"',
+     'if st == 404:\n        return {"ok": False, "kind": "old"'),
+    ("the cards not kept", '        x["wake"] = v["wake"]\n', '        x["wake"] = []\n'),
+    ("the setting not kept", '        x["sleep"] = {"enabled": v["enabled"], "minutes": v["minutes"]}\n', ""),
+    ("a card address believed unchecked", "if _SRV_MAC_RX.fullmatch(m) and m not in out and len(out) < 8:", "if True:"),
+    ("a file's sleep setting believed", 'if not isinstance(v, dict) or not isinstance(v.get("enabled"), bool):\n        return None',
+     "if not isinstance(v, dict):\n        return None"),
+    ("the cards shown to the page", '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),',
+     '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")), "wake": e.get("wake"),'),
+    ("the packet's address once", 'return b"\\xff" * 6 + bytes.fromhex(mac.replace(":", "")) * 16',
+     'return b"\\xff" * 6 + bytes.fromhex(mac.replace(":", ""))'),
+    ("no rate limit", "if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:\n        return \"\"",
+     "if False:\n        return \"\""),
+    ("woken without the setting known", '(e.get("sleep") or {}).get("enabled") is True', "True"),
+    ("woken with no card", 'if not (_srv_paired(e) and e.get("wake") and (e.get("sleep")', "if not (_srv_paired(e) and (e.get(\"sleep\")"),
+    ("woken for any failure", 'if s.get("reachable") or s.get("kind") != "offline":\n        return', 'if s.get("reachable"):\n        return'),
+    ("waiting for ever", "if _srv_wake_clock() - t0 >= SRV_WAKE_WAIT_S:\n            return \"tried\"",
+     "if False:\n            return \"tried\""),
+    ("the answer not checked", "            if st == 200:\n                server_check(e)\n                return \"woke\"",
+     "            if True:\n                server_check(e)\n                return \"woke\""),
+    ("a wake that isn't said", "    if r:\n        _srv_wake_tl.notes", "    if False:\n        _srv_wake_tl.notes"),
+    ("woken by the refresh of a server not due", "        for e in due:\n            server_wake_if_down(e)\n",
+     "    for e in _srv_read(ctx):\n        server_wake_if_down(e)\n"),
+    ("woken by the usage poll", '    if st == 200:\n        return {"ok": True, "gpu": _srv_usage_gpu(js)',
+     '    server_wake_if_down(e)\n    if st == 200:\n        return {"ok": True, "gpu": _srv_usage_gpu(js)'),
+    ("woken by reading the setting", '    try:\n        st, js = _srv_json(e, method, "/v1/sleep-config"',
+     '    server_wake_if_down(e)\n    try:\n        st, js = _srv_json(e, method, "/v1/sleep-config"'),
+    ("the wake's notes kept from an earlier request", "server_take_wake_notes()           # none left from an earlier request on this thread (6b346)\n", ""),
+    ("the chat not told", 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)', "pass"),
+    ("the packet to the wrong port", "_srv_udp(pkt, (tgt, 9))", "_srv_udp(pkt, (tgt, 7))"),
+    ("the minutes box taking anything", 'if(!/^\\d{1,6}$/.test(t))return null;', "if(false)return null;"),
+    ("the minutes box not clamped", "return {v:Math.max(5,Math.min(1440,n)),clamped:n<5||n>1440};", "return {v:n,clamped:false};"),
+    ("the controls usable while it's off", 'else if(z.st==="off")v.hint', 'else if(z.st==="off"&&false)v.hint'),
+    ("an old kit usable", 'else if(z.st==="old")v.hint="Update the server kit to use sleep.";', 'else if(z.st==="old")v.hint="";'),
+    ("no deep sleep usable", "else if(z.supported===false)v.hint", "else if(false)v.hint"),
+    ("an old kit's answer lost", 'if(k==="old")return {st:"old"};', ""),
+    ("the pane not loading the setting", "loadServers(true).then(srvSleepLoadAll);", "loadServers(true);"),
+    ("the card without it", "    +srvSleepHtml(s,srvSleep[s.id])", ""),
+    ("a minutes box that saves nothing", 'body={id:id,minutes:p.v};', 'body={id:id};'),
+    ("the box left enabled while saving", "  c.disabled=true;\n  let d;\n  try{d=await srvPost(\"sleep\"", "  let d;\n  try{d=await srvPost(\"sleep\""),
+]
+_w46m = []
+for _d46, _o46, _n46 in _W46_MUT:
+    if _MILLENAI_SRC.count(_o46) != 1:
+        _w46m.append((_d46, "anchor missing %d" % _MILLENAI_SRC.count(_o46)))
+        continue
+    _r46 = _w46_run(_MILLENAI_SRC.replace(_o46, _n46, 1))
+    _w46m.append((_d46, [n for n, o, _x in _r46 if not o][:1] or "MISSED"))
+check("auto sleep: %d mutations, each caught by a check above" % len(_W46_MUT),
+      all(isinstance(v, list) for _d, v in _w46m), "%r" % [x for x in _w46m if not isinstance(x[1], list)])
+# ==== 6b346 auto sleep: end ====
 
 
 # ==== 6b341 benchmark targets: begin ====

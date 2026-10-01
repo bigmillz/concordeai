@@ -53,6 +53,7 @@ from o1jwt import AccessVerifier, JWTError  # noqa: E402
 import o1ollama  # noqa: E402
 from o1pair import DeviceStore, read_public, spool_request, wait_result  # noqa: E402
 import o1gpu  # noqa: E402
+import o1idle  # noqa: E402
 import o1stats  # noqa: E402
 
 VERSION = "1"
@@ -311,6 +312,9 @@ class Gateway:
         self.oom_kills = o1stats.ollama_oom_kills
         self.gpu_info = o1gpu.detect()   # vendor, name, vram_bytes (see gpu())
         self.gpu_at = time.monotonic()
+        # real work only (chat, generate, embeddings): what auto sleep waits on (6b346)
+        self.activity = o1idle.Activity(clock)
+        self.sleep_lock = threading.Lock()
         self.usage_lock = threading.Lock()
         self.usage_at = None
         self.usage_val = {}
@@ -334,6 +338,20 @@ class Gateway:
             self.gpu_at = time.monotonic()
             self.gpu_info = o1gpu.detect()
         return self.gpu_info
+    def sleep_view(self):
+        """The auto-sleep settings and what the desktop can do about them:
+        exactly {enabled, minutes, supported, wake}."""
+        cfg = o1idle.read_config()
+        return {"enabled": cfg["enabled"], "minutes": cfg["minutes"],
+                "supported": o1idle.deep_sleep_supported(), "wake": o1idle.published_wake()}
+
+    def sleep_set(self, changes):
+        with self.sleep_lock:
+            cfg = o1idle.read_config()
+            cfg.update(changes)
+            o1idle.write_config(cfg)
+        return self.sleep_view()
+
     def usage(self):
         """The card's busy percent and VRAM in use and the server's memory
         in use, for the app's meter: five numbers and nothing else, read at
@@ -834,6 +852,17 @@ def make_handler(gw, lan=False):
                                                     "vram_bytes": g.get("vram_bytes")}})
             if method == "GET" and route == "/v1/usage":
                 return self.send_json(200, gw.usage())
+            if route == "/v1/sleep-config" and method == "GET":
+                return self.send_json(200, gw.sleep_view())
+            if route == "/v1/sleep-config" and method == "POST":
+                changes, err = o1idle.parse_config_update(self.json_body(body))
+                if err:
+                    raise GatewayError(400, "bad_request", err)
+                try:
+                    view = gw.sleep_set(changes)
+                except OSError:
+                    raise GatewayError(500, "internal", "couldn't save the setting")
+                return self.send_json(200, view)
             if method == "GET" and route == "/v1/whoami":
                 return self.send_json(200, {"device_id": dev_id, "name": dev["name"],
                                             "server_time": int(gw.clock())})
@@ -866,7 +895,11 @@ def make_handler(gw, lan=False):
             kinds = {"/api/chat": "chat", "/api/generate": "generate",
                      "/api/embed": "embed", "/api/embeddings": "embeddings"}
             if method == "POST" and route in kinds:
-                return self.model_job(kinds[route], self.json_body(body), dev_id, dev, t0)
+                gw.activity.begin()
+                try:
+                    return self.model_job(kinds[route], self.json_body(body), dev_id, dev, t0)
+                finally:
+                    gw.activity.end()
             raise GatewayError(404, "not_found", "not available through the gateway")
 
         def json_body(self, body):
@@ -1049,6 +1082,7 @@ def stats_loop(gw, stop):
     Every 5 s: which models are loaded. Every 60 s: the day's counters."""
     n = 0
     while not stop.is_set():
+        gw.activity.write()            # every second: the file says what is running and that the gateway is alive
         if n % 5 == 0:
             try:
                 st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=5)

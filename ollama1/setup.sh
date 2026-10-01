@@ -324,7 +324,7 @@ fi
 ok "Cloudflare apt key $CF_KEY_FPR (only that key)"
 echo "deb [signed-by=$KEYRING] https://pkg.cloudflare.com/cloudflared any main" >/etc/apt/sources.list.d/cloudflared.list
 run apt-get update -q
-run apt-get install -y -q ttyd python3-nacl mdadm rsync zstd nftables ufw gdisk parted curl gnupg unattended-upgrades tmux cloudflared
+run apt-get install -y -q ttyd python3-nacl mdadm rsync zstd nftables ufw gdisk parted curl gnupg unattended-upgrades tmux cloudflared ethtool
 # ttyd must never listen on its own; only ollama1-ttyd (a UNIX socket, login) may run.
 systemctl disable --now ttyd.service >/dev/null 2>&1 || true
 python3 -c 'import nacl.signing' || die "python3-nacl did not install"
@@ -722,10 +722,16 @@ run systemctl enable ollama1-gateway.service ollama1-admin.service ollama1-ttyd.
 run systemctl restart ollama1-gateway.service ollama1-admin.service ollama1-ttyd.service
 systemctl mask getty@tty1.service >/dev/null 2>&1 || true
 run systemctl enable ollama1-dash.service
+# auto sleep (6b346): the service waits for the owner to turn it on in the app; the cards that
+# can wake the desktop on a magic packet are set up now (a .link file each, and ethtool), quietly
+# when there are none
+run systemctl enable ollama1-idle.service
+run systemctl restart ollama1-idle.service
+"$LIBDIR/bin/ollama1-idle" wol-setup || note "couldn't set up wake on a magic packet; auto sleep still works, waking it from the app won't"
 systemctl stop getty@tty1.service >/dev/null 2>&1 || true
 run systemctl restart ollama1-dash.service
 sleep 2
-for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power; do
+for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power ollama1-idle; do
   if systemctl is-active --quiet "$s"; then ok "$s running"; else note "$s is not running: journalctl -u $s"; later "$s did not start: journalctl -u $s"; fi
 done
 if id -nG o1gw | tr ' ' '\n' | grep -qx o1pair; then

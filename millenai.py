@@ -16645,6 +16645,13 @@ SRV_CONNECT_S = 12              # to connect and for a whole short answer
 SRV_FIRST_S = 600               # to the first line: its turn in the queue and a load
 SRV_IDLE_S = 120                # then: this long with no byte ends the answer
 SRV_CHECK_S = 15                # a whole status check (whoami, tags, ps, version)
+SRV_SLEEP_MIN, SRV_SLEEP_MAX, SRV_SLEEP_DEFAULT = 5, 1440, 30   # minutes idle before it sleeps
+SRV_WAKE_GAP_S = 60             # one wake-up call a minute per server (6b346)
+SRV_WAKE_WAIT_S = 60            # then up to this long for it to answer
+SRV_WAKE_POLL_S = 2
+_SRV_MAC_RX = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}")
+_srv_wake_at = profile_cache("_srv_wake_at", {})
+_srv_wake_tl = threading.local()
 SRV_USAGE_S = 3                 # one read of a server's card usage: short, the meter polls
 SRV_MAX_CHARS = 2_000_000       # an answer longer than this is cut there
 # an Ollama cloud model's tag ("gpt-oss:120b-cloud", "kimi-k2:cloud"): the
@@ -16791,7 +16798,7 @@ def o1_pair_proof(key: bytes, device_id: str, pub: str, nonce: str) -> bytes:
 
 # ---- the profile's servers.json
 _SRV_PLAIN = ("id", "name", "url", "device_id", "public_key", "device_name",
-              "paired_at", "added_at", "models", "prefer")
+              "paired_at", "added_at", "models", "prefer", "wake", "sleep")
 _SRV_SECRET = ("access_id", "access_secret", "seed")
 
 
@@ -16805,6 +16812,7 @@ def _srv_read(ctx) -> list:
             continue
         e = {k: s.get(k) for k in _SRV_PLAIN}
         e["name"], e["url"] = str(e["name"] or ""), str(e["url"] or "")
+        e["wake"], e["sleep"] = _srv_clean_wake(e.get("wake")), _srv_clean_sleep(e.get("sleep"))
         for k in _SRV_SECRET:
             e[k] = _Secret(s.get(k))
         out.append(e)
@@ -17479,6 +17487,7 @@ def server_only_resolve(sid: str, ctx):
         if not (s.get("models") and s.get("reachable") and not s.get("err")
                 and time.time() - float(s.get("at") or 0) < SRV_ONLY_FRESH_S):
             server_check(e)
+            server_wake_if_down(e)
     st = server_only_state(e)
     return st["label"], e["name"], st["why"]
 
@@ -17661,6 +17670,14 @@ def server_copy(tag: str, cands: list, speeds=None):
     return max(hits, key=lambda m: speeds.get(m["label"]) or 0.0) if speeds else hits[0]
 
 
+def server_take_wake_notes() -> list:
+    """[(server name, woke?)] for the wakes this thread did since the last
+    call, and forget them (6b346): the chat says what happened."""
+    n = getattr(_srv_wake_tl, "notes", None) or []
+    _srv_wake_tl.notes = []
+    return n
+
+
 def server_refresh_modes(ctx, limit: float = 5.0):
     """Before a mode resolves: servers that opted in and were last checked
     over a minute ago (or never) are asked again, side by side, each
@@ -17677,6 +17694,10 @@ def server_refresh_modes(ctx, limit: float = 5.0):
     if due:
         with ctx_executor(min(4, len(due))) as pool:
             list(pool.map(lambda e: server_check(e, limit), due))
+        # a server that sleeps is woken for this question (6b346), and only
+        # here: the sidebar's poll, Settings and background passes never do
+        for e in due:
+            server_wake_if_down(e)
 
 
 def server_mark_down(ctx, name: str, why: str):
@@ -17968,6 +17989,9 @@ def _srv_public(e) -> dict:
             "only": server_only_state(e),
             # "Use for Fast, Thinking and Pro" (6b339): on unless turned off
             "prefer": e.get("prefer") is not False,
+            # sleep when idle (6b346): the last setting the server gave, and
+            # whether it has a card to wake it with (the addresses stay here)
+            "sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),
             "models": list(s.get("models") or [])}
 
 
@@ -18198,6 +18222,194 @@ def server_usage(ctx, sid: str) -> dict:
     if st == 404 and str(js.get("code") or "") == "not_found":
         return {"ok": True, "gpu": None, "ram": None}      # an older server kit
     return {"ok": False}
+# ---- sleep when idle and waking (6b346)
+# Patrick: "Build the feature in and have an option to turn this auto sleep
+# mode on or off under the Your Servers tab in Settings. Also allow the user
+# to put in a box there how many minutes of inactivity before it should
+# sleep. default 30 min". The server's gateway keeps the setting (signed
+# /v1/sleep-config); the app keeps the last answer and the network cards that
+# can wake the server, with the server's row in servers.json.
+def _srv_clean_wake(v) -> list:
+    out = []
+    for m in (v if isinstance(v, list) else [])[:32]:
+        m = str(m).lower()
+        if _SRV_MAC_RX.fullmatch(m) and m not in out and len(out) < 8:
+            out.append(m)
+    return out
+
+
+def _srv_clean_sleep(v):
+    """{enabled, minutes} as last saved, or None (never asked): a bool and a
+    whole number, nothing else is believed."""
+    if not isinstance(v, dict) or not isinstance(v.get("enabled"), bool):
+        return None
+    mn = v.get("minutes")
+    mn = mn if isinstance(mn, int) and not isinstance(mn, bool) else SRV_SLEEP_DEFAULT
+    return {"enabled": v["enabled"], "minutes": max(SRV_SLEEP_MIN, min(SRV_SLEEP_MAX, mn))}
+
+
+def _srv_sleep_parse(js):
+    """The gateway's {enabled, minutes, supported, wake}, or None when it
+    isn't that shape."""
+    if not isinstance(js, dict):
+        return None
+    mn = js.get("minutes")
+    if not isinstance(js.get("enabled"), bool) or not isinstance(js.get("supported"), bool) \
+            or not isinstance(mn, int) or isinstance(mn, bool):
+        return None
+    return {"enabled": js["enabled"], "supported": js["supported"],
+            "minutes": max(SRV_SLEEP_MIN, min(SRV_SLEEP_MAX, mn)), "wake": _srv_clean_wake(js.get("wake"))}
+
+
+def _srv_sleep_call(ctx, sid: str, method: str, obj=None) -> dict:
+    """One signed /v1/sleep-config call to ctx's server sid. {ok, sleep:
+    {enabled, minutes, supported}, wakeable}, or {ok False, kind, err}. A
+    good answer is kept with the server's row: the setting, and its cards."""
+    try:
+        e = _srv_find(_srv_read(ctx), sid)
+    except (StoreReadError, NoProfile):
+        return {"ok": False, "kind": "gone", "err": "Couldn\u2019t read your servers."}
+    if e is None:
+        return {"ok": False, "kind": "gone", "err": SRV_GONE}
+    if not _srv_paired(e):
+        return {"ok": False, "kind": "unpaired", "err": "%s isn\u2019t paired with this computer." % e["name"]}
+    if not cai_crypto.available():
+        return {"ok": False, "kind": "crypto", "err": SRV_NO_CRYPTO}
+    try:
+        st, js = _srv_json(e, method, "/v1/sleep-config", obj, timeout=SRV_CONNECT_S)
+    except ServerError as se:
+        return {"ok": False, "kind": se.kind, "err": str(se)}
+    if st == 404 and str(js.get("code") or "") == "not_found":
+        return {"ok": False, "kind": "old", "err": "Update the server kit to use sleep."}
+    if st != 200:
+        return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
+    v = _srv_sleep_parse(js)
+    if v is None:
+        return {"ok": False, "kind": "server", "err": "%s answered in a way this app doesn\u2019t understand."
+                % e["name"]}
+
+    def fn(entries):
+        x = _srv_find(entries, sid)
+        if x is None:
+            return {"err": SRV_GONE}
+        x["wake"] = v["wake"]
+        x["sleep"] = {"enabled": v["enabled"], "minutes": v["minutes"]}
+        return {"ok": True}
+    _srv_update(ctx, fn)
+    return {"ok": True, "sleep": {"enabled": v["enabled"], "minutes": v["minutes"], "supported": v["supported"]},
+            "wakeable": bool(v["wake"])}
+
+
+def server_sleep_get(ctx, sid: str) -> dict:
+    return _srv_sleep_call(ctx, sid, "GET")
+
+
+def server_sleep_set(ctx, sid: str, d: dict) -> dict:
+    """Turn auto sleep on or off and/or set the minutes (5 to 1440): only a
+    bool and a whole number are sent."""
+    body = {}
+    if "enabled" in d:
+        if not isinstance(d["enabled"], bool):
+            return {"ok": False, "kind": "input", "err": "Say on or off."}
+        body["enabled"] = d["enabled"]
+    if "minutes" in d:
+        mn = d["minutes"]
+        if not isinstance(mn, int) or isinstance(mn, bool):
+            return {"ok": False, "kind": "input", "err": "Minutes must be a whole number, %d to %d."
+                    % (SRV_SLEEP_MIN, SRV_SLEEP_MAX)}
+        body["minutes"] = max(SRV_SLEEP_MIN, min(SRV_SLEEP_MAX, mn))
+    if not body:
+        return {"ok": False, "kind": "input", "err": "Nothing to change."}
+    return _srv_sleep_call(ctx, sid, "POST", body)
+
+
+def srv_magic_packet(mac: str) -> bytes:
+    """Six 0xFF bytes, then the card's address sixteen times."""
+    return b"\xff" * 6 + bytes.fromhex(mac.replace(":", "")) * 16
+
+
+def _srv_bcast_addrs() -> list:
+    """Where a magic packet goes: the whole-network broadcast and each local
+    network's own broadcast address."""
+    out = ["255.255.255.255"]
+    try:
+        import ipaddress as _ipa
+        import psutil as _ps
+        import socket as _so
+        for addrs in _ps.net_if_addrs().values():
+            for a in addrs:
+                if a.family == _so.AF_INET and a.address and a.netmask \
+                        and not a.address.startswith(("127.", "169.254.")):
+                    b = str(_ipa.IPv4Network("%s/%s" % (a.address, a.netmask), strict=False).broadcast_address)
+                    if b not in out:
+                        out.append(b)
+    except Exception:
+        pass
+    return out[:8]
+
+
+def _srv_udp(pkt: bytes, addr: tuple):
+    import socket as _so
+    sk = _so.socket(_so.AF_INET, _so.SOCK_DGRAM)
+    try:
+        sk.setsockopt(_so.SOL_SOCKET, _so.SO_BROADCAST, 1)
+        sk.sendto(pkt, addr)
+    finally:
+        sk.close()
+
+
+def _srv_wake_sleep(s: float):
+    time.sleep(s)
+
+
+def _srv_wake_clock() -> float:
+    return time.monotonic()
+
+
+def server_wake(e) -> str:
+    """Wake server e with a magic packet and wait for it to answer. "woke",
+    "tried" (no answer in SRV_WAKE_WAIT_S), or "" (nothing asked: it has no
+    card to wake it, it wasn't known to sleep, or a call went out within the
+    last SRV_WAKE_GAP_S). The packet carries nothing but the card's address;
+    the answer is waited for with the server's own signed /v1/info."""
+    if not (_srv_paired(e) and e.get("wake") and (e.get("sleep") or {}).get("enabled") is True):
+        return ""
+    t0 = _srv_wake_clock()
+    last = _srv_wake_at.get(e["id"])
+    if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:
+        return ""
+    _srv_wake_at[e["id"]] = t0
+    for mac in e["wake"]:
+        pkt = srv_magic_packet(mac)
+        for tgt in _srv_bcast_addrs():
+            try:
+                _srv_udp(pkt, (tgt, 9))
+            except OSError:
+                pass
+    while True:
+        _srv_wake_sleep(SRV_WAKE_POLL_S)
+        try:
+            st, _js = _srv_json(e, "GET", "/v1/info", timeout=SRV_WAKE_POLL_S + 1)
+            if st == 200:
+                server_check(e)
+                return "woke"
+        except ServerError:
+            pass
+        if _srv_wake_clock() - t0 >= SRV_WAKE_WAIT_S:
+            return "tried"
+
+
+def server_wake_if_down(e):
+    """After a check that found e not answering: wake it for the question
+    being asked. Only the request paths call this."""
+    s = _srv_seen.get(e["id"]) or {}
+    if s.get("reachable") or s.get("kind") != "offline":
+        return
+    r = server_wake(e)
+    if r:
+        _srv_wake_tl.notes = (getattr(_srv_wake_tl, "notes", None) or []) + [(e["name"], r == "woke")]
+
+
 # ==== servers: end ====
 
 
@@ -25003,6 +25215,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             self._send_json(servers_view(
                 self.ctx, (_sq.get("refresh") or [""])[0] == "1"))
+        elif urllib.parse.urlparse(self.path).path == "/api/servers/sleep":
+            # Settings › Your servers (6b346): this server's auto sleep setting
+            _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            _sid = (_sq.get("id") or [""])[0]
+            self._send_json(server_sleep_get(self.ctx, _sid)
+                            if _SRV_ID_RX.fullmatch(_sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
         elif urllib.parse.urlparse(self.path).path == "/api/servers/usage":
             # the sidebar meters' read of one server's card (6b342): while
             # a benchmark runs nothing is asked of any server
@@ -25597,7 +25815,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             sid, op = str(d.get("id") or ""), self.path[len("/api/servers/"):]
             if op == "add":
                 out = server_add(self.ctx, d)
-            elif op not in ("pair", "test", "access", "remove", "prefer"):
+            elif op not in ("pair", "test", "access", "remove", "prefer", "sleep"):
                 self.send_error(404)
                 return
             elif not _SRV_ID_RX.fullmatch(sid):
@@ -25610,6 +25828,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 out = server_remove(self.ctx, sid)
             elif op == "prefer":
                 out = server_set_prefer(self.ctx, sid, d.get("on"))
+            elif op == "sleep":
+                out = server_sleep_set(self.ctx, sid, {k: d[k] for k in ("enabled", "minutes") if k in d})
             else:
                 _se = _srv_find(_srv_read(self.ctx), sid)
                 out = {"err": SRV_GONE}
@@ -26813,6 +27033,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # council is a placeholder label and `_so_fail` says why: no other
         # model ever answers in its place.
         _so_c0, _so_fail = "", ""
+        server_take_wake_notes()           # none left from an earlier request on this thread (6b346)
         # a mode's server seats -> what answers in their place (6b339), and
         # how the turn's one seat went ("server", "fallback", "failed")
         _seat_fb = {}
@@ -27932,6 +28153,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             text = str(text).replace(NUL, "")
             last_status[0] = text
             _write(f"{NUL}STATUS:{text}{NUL}".encode("utf-8"))
+
+        # a server that was asleep was woken before this answer (6b346)
+        for _wn, _wok in server_take_wake_notes():
+            status(("Woke %s." if _wok else "%s didn\u2019t wake.") % _wn)
 
         # MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER (review of
         # 6b334): a chat on your own server that took no hold takes it
@@ -32396,6 +32621,16 @@ body.gen #chip-model{color:var(--accent)}
 .srv-pref{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:11.5px;
   color:var(--dim);cursor:pointer}
 .srv-pref input{margin:0;flex:none}
+/* sleep when idle (6b346): the switch and the minutes box on one line */
+.srv-sleep .srv-pref{margin-top:10px}
+.srv-sleep .srv-mins{margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;color:var(--dim)}
+.srv-sleep .srv-mins input{width:64px;background:rgba(255,255,255,.05);color:var(--text);
+  border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:12px;padding:5px 7px;
+  outline:none;font-family:var(--mono)}
+.srv-sleep .srv-mins input:focus{border-color:rgba(143,157,255,.6)}
+.srv-sleep input:disabled{opacity:.45;cursor:default}
+.srv-sleep .srv-row{display:flex;align-items:center;gap:10px}
 .srv-msg,#srv-note{font-size:11px;color:var(--faint);margin-top:6px;
   line-height:1.45}
 .srv-msg:empty,#srv-note:empty{display:none}
@@ -33998,6 +34233,9 @@ let srvList=[],srvAt=0,srvLoaded=false;
 // the sidebar meters' server rows (6b342): each paired server's last read of its
 // card {ok, gpu, ram, fails, due, busy}; a timer; and a flag a profile switch sets
 const srvUse={};let srvUseT=0,srvUseDead=false;
+// each server's auto sleep setting as the pane shows it (6b346): {st: load|ok|old|off|err, enabled,
+// minutes, supported, wakeable, msg}
+const srvSleep={};
 // a card's line and its open Access form survive a repaint (review)
 const srvArmed={},srvPairOpen={},srvMsgs={},srvTokOpen={};
 const SRV_SEP=" \u00b7 ";
@@ -39301,6 +39539,54 @@ function srvStatus(s){
     +(st.latency_ms!=null?" \u00b7 "+st.latency_ms+" ms":"")
     +(st.version?" \u00b7 Ollama "+st.version:"");
 }
+// SLEEP WHEN IDLE (6b346, per Patrick: "have an option to turn this auto sleep
+// mode on or off under the Your Servers tab in Settings. Also allow the user to
+// put in a box there how many minutes of inactivity before it should sleep.
+// default 30 min"). Pure functions, so the gauntlet can run them in node.
+// The minutes box: a whole number, 5 to 1440 (more or less is brought to the
+// nearest end and says so); anything else is no number
+function srvSleepParse(raw){
+  const t=String(raw==null?"":raw).trim();
+  if(!/^\d{1,6}$/.test(t))return null;
+  const n=parseInt(t,10);
+  return {v:Math.max(5,Math.min(1440,n)),clamped:n<5||n>1440};
+}
+// what the controls show and whether they can be used
+function srvSleepView(z){
+  z=z||{st:"load"};
+  const v={disabled:true,checked:!!z.enabled,minutes:z.minutes||30,hint:""};
+  if(z.st==="load")v.hint="Checking\u2026";
+  else if(z.st==="old")v.hint="Update the server kit to use sleep.";
+  else if(z.st==="off")v.hint="The server isn\u2019t answering, so this can\u2019t be changed now.";
+  else if(z.st==="err")v.hint=z.msg||"Couldn\u2019t read the setting.";
+  else if(z.supported===false)v.hint="This server can\u2019t sleep (no deep sleep).";
+  else{
+    v.disabled=false;
+    v.hint="Sleeps after this long with no questions, and wakes when you ask."
+      +(z.wakeable?"":" Waking it from here needs wake-on-LAN set up on the server.");
+  }
+  return v;
+}
+// the next state from what the app answered (d = {ok, sleep, wakeable} or {ok:false, kind, err})
+function srvSleepNext(prev,d){
+  if(d&&d.ok&&d.sleep)return {st:"ok",enabled:!!d.sleep.enabled,minutes:d.sleep.minutes,
+    supported:d.sleep.supported!==false,wakeable:!!d.wakeable};
+  const k=d&&d.kind,p=prev||{},msg=(d&&d.err)||"";
+  if(k==="old")return {st:"old"};
+  if(k==="input"||k==="server")return p.st==="ok"?Object.assign({},p,{msg:msg}):{st:"err",msg:msg};
+  if(k==="gone")return p;
+  return Object.assign({},p,{st:"off"});
+}
+function srvSleepHtml(s,z){
+  if(!s.paired)return "";
+  const v=srvSleepView(z),dis=v.disabled?" disabled":"";
+  return '<div class="srv-sleep"><div class="srv-row"><label class="srv-pref">'
+    +'<input type="checkbox" data-a="sleepon"'+(v.checked?" checked":"")+dis+'><span>Sleep when idle</span></label>'
+    +'<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
+    +'data-a="sleepmin" data-k="smin" value="'+esc(String(v.minutes))+'"'+dis
+    +' aria-label="Minutes with no questions before it sleeps"><span>minutes</span></span></div>'
+    +'<div class="srv-hint">'+esc(v.hint)+'</div></div>';
+}
 function srvCard(s){
   const st=s.status||{};
   const cls=!s.paired?(st.err?" warn":""):st.err?(st.kind==="auth"?" bad":" warn")
@@ -39325,6 +39611,7 @@ function srvCard(s){
       +(s.prefer!==false?" checked":"")+'><span>Use for Fast, Thinking, Pro and the Code lane</span></label>'
       +'<div class="srv-hint">The Workspace and Coding agents can send the contents of a '
       +'folder you give them to this server.</div>':"")
+    +srvSleepHtml(s,srvSleep[s.id])
     +(pairing?'<div class="srv-pair"><input class="srv-code" data-k="code" maxlength="20" '
         +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
         +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
@@ -39406,6 +39693,45 @@ $("#srv-list").addEventListener("change",async ev=>{
   if(typeof paintTierAvail==="function")paintTierAvail();
   paintEngMenuServers();
   if(d.err)srvMsg(id,d.err);
+});
+// the switch and the minutes box (6b346): saved on change, shown as the server holds them
+async function srvSleepLoad(s){
+  if(!s.paired)return;
+  let d=null;
+  try{
+    const r=await api("/api/servers/sleep?id="+encodeURIComponent(s.id));
+    if(r.ok)d=await r.json();
+  }catch(e){}
+  srvSleep[s.id]=srvSleepNext(srvSleep[s.id],d||{ok:false,kind:"offline"});
+}
+async function srvSleepLoadAll(){
+  const gs=srvList.filter(s=>s.paired);
+  gs.forEach(s=>{if(!srvSleep[s.id])srvSleep[s.id]={st:"load"};});
+  paintServers();
+  await Promise.all(gs.map(srvSleepLoad));
+  Object.keys(srvSleep).forEach(k=>{if(!gs.some(s=>s.id===k))delete srvSleep[k];});
+  paintServers();
+}
+$("#srv-list").addEventListener("change",async ev=>{
+  const c=ev.target.closest('input[data-a="sleepon"],input[data-a="sleepmin"]');if(!c)return;
+  const id=c.closest(".srv").dataset.id,z=srvSleep[id];
+  if(!z||z.st!=="ok")return;
+  let body;
+  if(c.dataset.a==="sleepon")body={id:id,enabled:c.checked};
+  else{
+    const p=srvSleepParse(c.value);
+    if(!p){c.value=z.minutes;srvMsg(id,"Enter whole minutes, 5 to 1440.");return;}
+    c.value=p.v;
+    if(p.v===z.minutes){srvMsg(id,p.clamped?"Minutes go from 5 to 1440.":"");return;}
+    body={id:id,minutes:p.v};
+  }
+  c.disabled=true;
+  let d;
+  try{d=await srvPost("sleep",body);}
+  catch(e){d={ok:false,kind:"offline",err:"Couldn\u2019t reach the app. Try again."};}
+  srvSleep[id]=srvSleepNext(z,d);
+  srvMsgs[id]=d.ok?"Saved.":(d.err||"");
+  paintServers();
 });
 $("#srv-list").addEventListener("keydown",ev=>{
   if(ev.key!=="Enter"||!ev.target.classList.contains("srv-code"))return;
@@ -40098,7 +40424,7 @@ function settingsPane(id){
   const bd=$("#about-body"); if(bd)bd.scrollTop=0;
   if(id==="p-usage")loadUsage();      // fresh numbers on every visit (6b325)
   if(id==="p-usage")loadBench();      // and the benchmark's runs (6b331)
-  if(id==="p-servers")loadServers(true);   // each server checked (6b334)
+  if(id==="p-servers")loadServers(true).then(srvSleepLoadAll);   // each server checked (6b334), its sleep setting read (6b346)
 }
 /* ------------------------------------------------ Settings › Usage (6b325)
    The four figures and the chart come from /api/usage (the usage

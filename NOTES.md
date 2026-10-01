@@ -9,6 +9,116 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b346 — auto sleep for your server, and waking it
+Patrick (2026-10-01): "Build the feature in and have an option to turn this
+auto sleep mode on or off under the Your Servers tab in Settings. Also allow
+the user to put in a box there how many minutes of inactivity before it should
+sleep. default 30 min." He had checked by hand that suspend-to-RAM
+(`mem_sleep` deep) and a magic packet wake his desktop, with wake on 'g' set by
+systemd .link files on both of its network cards, which sit in a bridge.
+
+KIT (`ollama1/`)
+- ACTIVITY. The gateway records real work only: chat, generate and
+  embeddings (a counter of requests in flight and when one last started or
+  ended; `o1idle.Activity`), written to `/run/ollama1/stats/activity.json`
+  (the gateway's own stats folder, writable under its sandbox as it is).
+  `/v1/info`, `/v1/usage`, `/v1/whoami`, the model list and the new route
+  never touch it, so the sidebar's 3-second poll can't keep the desktop up
+  (a gateway test pins each). A start is written at once; an end is left to
+  the stats loop's one-second write, because writing a file between an answer
+  and the release of the request's slot slowed that release enough to fail an
+  old race test (`test_inflight_cap`). A file the gateway hasn't refreshed in
+  120 s says nothing is running (a gateway that died with requests open can't
+  hold the desktop awake for ever).
+- THE SETTING. `GET/POST /v1/sleep-config` (signed, paired-only; PROTOCOL.md):
+  exactly `{enabled, minutes, supported, wake}`. Default off and 30. POST takes
+  `enabled` (a bool) and/or `minutes` (a whole number: a bool, string or
+  decimal is a 400, the number is brought into 5..1440), nothing else.
+  Stored in `/var/lib/ollama1-gateway/sleep.json` (0600); the root service
+  reads it as untrusted (a bool exactly, a whole number, clamped). `supported`:
+  `deep` in `/sys/power/mem_sleep`. `wake`: the MACs the root service published
+  in `/run/ollama1/idle.json`. `/v1/info` and the protocol vectors are
+  byte for byte as they were: a new route, not a new key.
+- THE SERVICE. `ollama1-idle` (new bin and `ollama1-idle.service`, root, every
+  30 s; setup.sh enables and restarts it, and installs `ethtool`). Sleeps
+  (`ollama1-helper sleep`, which re-checks downloads, updates and setup and
+  records it) only when ALL hold, in `o1idle.decide` (pure: inputs to
+  (yes/no, reason)): enabled; supported; nobody logged in (`loginctl`, so an
+  SSH session keeps it up); no request in flight; no download, sync, update
+  or setup (`o1sleep.busy_reasons`); none of stability-test.sh,
+  ram_model_test.py, setup.sh, apt, dpkg or unattended-upgrade running (the
+  first two words of each process's command line); no block-mode inhibitor
+  lock that mentions sleep (`systemd-inhibit --list`); the graphics card
+  under 10% busy (no reading doesn't block); and idle for the minutes since
+  the latest of the last request, boot and the last resume. A probe that
+  can't answer blocks (never a guess). A resume is noticed by the wall clock
+  running ahead of the monotonic one by over 15 s between ticks, and counts as
+  activity; a sleep the helper refuses is not asked again for 5 minutes. The
+  journal gets one line when the reason changes: the reason, nothing else.
+  `sudo ollama1-idle check` says what it would do now.
+- WAKING. `setup.sh` runs `ollama1-idle wol-setup`: for each real card
+  (a device behind it; not loopback, veth, docker, tap, bridge, VLAN or wifi,
+  standalone or a bridge member) that supports magic-packet wake, a
+  `/etc/systemd/network/50-wol-<card>.link` (Match MACAddress, WakeOnLan=magic)
+  and `ethtool -s <card> wol g`; a file already right isn't rewritten, a
+  machine with no such card prints nothing, and one with one prints that the
+  BIOS must allow it too ("Wake on PCI-E" / "Resume by PCI-E device"; MSI:
+  Settings > Advanced > Wake Up Event Setup). The cards with wake on are
+  re-read every 5 minutes and published (MAC addresses only).
+- NOT CHECKED here: that the unit's sandbox lets `systemctl suspend` through
+  the helper, `ethtool` and `loginctl` run in it (`ProtectSystem=strict`, only
+  `/run/ollama1` and `/var/lib/ollama1` writable, no network, no namespaces),
+  a real suspend and resume, and a real packet: Pat's to try.
+
+APP
+- SETTINGS > YOUR SERVERS. Each paired server's card gets "Sleep when idle"
+  (a switch) and a minutes box (5 to 1440, 30 until the server says
+  otherwise), saved on change or when the box loses focus, showing what the
+  server holds. Disabled with a line saying why: "Checking…" (reading it),
+  "The server isn't answering, so this can't be changed now.", "Update the
+  server kit to use sleep." (an older kit's 404), "This server can't sleep (no
+  deep sleep)." The enabled line: "Sleeps after this long with no questions,
+  and wakes when you ask." plus, with no card to wake it, " Waking it from here
+  needs wake-on-LAN set up on the server." A number outside 5..1440 is brought
+  to the end and said ("Minutes go from 5 to 1440."); anything that isn't a
+  whole number goes back to the saved one ("Enter whole minutes, 5 to 1440.").
+  `GET /api/servers/sleep?id=` and `POST /api/servers/sleep {id, enabled,
+  minutes}` call that server's gateway signed, in the active profile only (an
+  id from another profile is "gone"; a gauntlet check proves nothing leaves).
+  The last answer, and the cards' MACs, are kept on the server's row in
+  servers.json (0600; a hand-edited file isn't believed; the page gets the
+  setting and whether a card exists, never the addresses; nothing logs them).
+- WAKING FROM THE APP. `server_wake`: when a request that would use a server
+  (a mode's server seat, "<name> Only", a funnel's server seat) finds it
+  not answering (`server_refresh_modes` and `server_only_resolve`, the only two
+  callers, both on a person's request) AND the row has cards AND sleep was last
+  known on: a magic packet (six 0xFF, the address sixteen times) as a UDP
+  broadcast to port 9, for each card, to 255.255.255.255 and each local
+  network's broadcast address (psutil, else just the first), at most once a
+  minute per server; then the server's signed `/v1/info` every 2 s for up to
+  60 s; answering, the check is repeated and the request goes on with the
+  server as normal, else the existing path (marked down, next choice) runs
+  unchanged. Never from the sidebar poll, Settings, reading the setting, a
+  benchmark or a background pass (each pinned by a check that counts packets).
+  First-token deadlines start after it, since the wake is before the stream.
+  DEVIATION, said plainly: the chat's headers go out after the models are
+  resolved, so "Woke <name>." (or "<name> didn't wake.") is sent as the first
+  status after the wake, not "Waking…" during it; the page shows its usual
+  waiting state for up to a minute meanwhile. Streaming during the wait needs
+  the headers sent earlier, which the X-Models header prevents without
+  restructuring the handler. An explicit pick of a server's model (not a mode)
+  doesn't wake it, as it isn't one of the three cases.
+- A server that doesn't answer is still just dimmed in the sidebar meters (the
+  app can't know it is asleep).
+- Tests. Kit: `tests/test_idle.py` (the decision's table, the settings, the
+  activity file, the probes' parsers, the card list on fixture sysfs trees, the
+  link files, the root service's tick on a fake clock) and a gateway class
+  for the routes, 38 mutations in mutate.py. Gauntlet: `== auto sleep for your
+  server, and waking it (6b346) ==` (the settings call and the wake flow in
+  process on a stand-in transport with a fake clock and a recording UDP
+  socket, the pane's functions in node, source pins, 33 mutations) and live
+  checks of the routes on the real gateway. Not run in full here.
+
 ## 6b345 — dictation starts at once
 (Independent review, same build: the warm microphone defaulted ON and now
 defaults OFF; a blur while a start is in flight is NOT cancelled on purpose,

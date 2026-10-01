@@ -239,6 +239,38 @@ using the card. A server that doesn't answer shows its rows dimmed with empty
 bars. A server running an older kit has no usage reading (or no memory
 reading), so its row shows the name and an empty bar until you update the kit.
 
+## Sleep when idle
+
+Under Settings, Your servers, each server has "Sleep when idle" and a box for
+the minutes with no questions before it sleeps (5 to 1440, 30 to start). It is
+off until you turn it on. The server suspends itself to memory after that long
+if, and only if, all of these hold: nothing is being answered, nobody is logged
+in (an open SSH or terminal session keeps it awake), the graphics card is under
+10% busy, no download, update, setup or stability test is running, and nothing
+holds a sleep inhibitor lock. Only questions count as use: the app's sidebar
+meters and Settings never keep it awake. Whatever the setting, the time since
+the server last started, or last woke, counts as use too.
+
+Waking is a magic packet. `setup.sh` switches it on for every real network card
+that supports it (a `/etc/systemd/network/50-wol-<card>.link` file and `ethtool
+-s <card> wol g`) and prints one line if it did. Your BIOS must allow it too:
+"Wake on PCI-E" or "Resume by PCI-E device" (MSI: Settings > Advanced > Wake Up
+Event Setup). When you ask a question that would use a sleeping server, the app
+sends the packet, says "Woke <name>." in the chat once it answers (up to a
+minute), and carries on with that server; if it doesn't answer, nothing changes
+from today (its models are skipped, and an explicit pick says it isn't
+answering). Waking works on the network the server is on: away from home the
+packet goes nowhere. The app never wakes a server for the sidebar meters,
+Settings or a benchmark, and sends at most one wake-up a minute per server.
+
+The pieces: `ollama1-idle.service` (root, checks every 30 seconds, logs only
+why it did or didn't sleep: `journalctl -u ollama1-idle`), `sudo ollama1-idle
+check` (what it would do right now), the gateway's activity file
+`/run/ollama1/stats/activity.json` and settings file
+`/var/lib/ollama1-gateway/sleep.json` (numbers only; the service doesn't trust
+either), and `/run/ollama1/idle.json` (the cards that can wake it). Deep sleep
+must be what suspend uses: `cat /sys/power/mem_sleep` shows `[deep]`.
+
 ## Choosing models
 
 Nothing is installed at first. Put the models you want in
