@@ -8825,8 +8825,8 @@ ACCOUNTS_DIR = "accounts"
 PERSONAL_NAMES = frozenset((
     CHATS_FILE, MEMORY_FILE, LEGACY_CHATS, LEGACY_MEMORY, PERSONAL_FILE,
     LOCAL_FILE, QUALITY_FILE, "usage.jsonl", "cloud.json", "remote.json",
-    "remote_known_hosts", "images", "videos", "exports", "sync",
-    "account.key", "servers.json"))
+    "remote_known_hosts", "bench_targets.jsonl", "images", "videos",
+    "exports", "sync", "account.key", "servers.json"))
 # absent means "not written yet" for these only until their first write
 # (0b 5.2, L1); after it a missing file is a read error, never empty
 _FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json", PERSONAL_FILE,
@@ -18405,8 +18405,15 @@ BENCH_BUSY = ("A hardware benchmark is running. Ask again when it "
               "finishes, or stop it in Settings › Usage.")
 BENCH_ANSWERING = ("An answer is being written. Run the benchmark when it "
                    "has finished.")
-_bench = {"running": False, "run": None}
-_bench_busy = {"n": 0}
+# (6b341, per Patrick: "can the benchmark feature also allow benchmarking
+# your servers? cloud servers too ...") A run has one TARGET: this computer,
+# one of the profile's servers, or its cloud models. A run of the last two
+# is bound to the profile that started it ("ctx"), and a server's or a
+# provider's call counts as work: "srv" counts the chats that use only a
+# server's models, which a run of this computer never refused (6b334) but a
+# run of a server or of the cloud does.
+_bench = {"running": False, "run": None, "target": "local", "ctx": None}
+_bench_busy = {"n": 0, "srv": 0}
 _bench_lock = threading.Lock()
 
 
@@ -18425,13 +18432,37 @@ def bench_release():
         _bench_busy["n"] = max(0, _bench_busy["n"] - 1)
 
 
+def bench_hold_remote() -> bool:
+    """A chat or call that uses only a server's models starts (6b341): it
+    takes no hold of this computer's engines, so a run of this computer
+    leaves it alone, as in 6b334. A run of a server or of the cloud
+    refuses it (False), and while it runs the start of such a run waits."""
+    with _bench_lock:
+        if _bench["running"] and _bench.get("target") != "local":
+            return False
+        _bench_busy["srv"] += 1
+        return True
+
+
+def bench_release_remote():
+    with _bench_lock:
+        _bench_busy["srv"] = max(0, _bench_busy["srv"] - 1)
+
+
 def _bench_guarded(fn):
     """run_model under bench_hold: refused while a benchmark runs."""
     @functools.wraps(fn)
     def guarded(*a, **k):
         if a and server_label(a[0]):
-            # your own server's model (6b334): not this computer's engines
-            return fn(*a, **k)
+            # your own server's model (6b334): not this computer's engines,
+            # so a run of this computer lets it through; a run of a server
+            # or of the cloud refuses it (6b341)
+            if not bench_hold_remote():
+                raise RuntimeError(BENCH_BUSY)
+            try:
+                return fn(*a, **k)
+            finally:
+                bench_release_remote()
         if not bench_hold():
             raise RuntimeError(BENCH_BUSY)
         try:
@@ -18556,8 +18587,10 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
 # temperature 0 and a fixed seed. Per model: generation speed (the
 # headline), prompt-reading speed, time to first token, load time, the
 # memory the model took and whether the machine came under memory
-# pressure or swapped. Cloud models are out (their speed isn't this
-# computer's). Nothing leaves the computer: every call goes to an engine
+# pressure or swapped. A run of THIS COMPUTER leaves cloud models out
+# (their speed isn't this computer's); a server and the cloud are
+# targets of their own (6b341, below). Nothing leaves the computer on a
+# run of it: every call goes to an engine
 # on 127.0.0.1, an MLX engine it starts may not ask the Hub anything, and
 # no model is ever downloaded. The history is the MACHINE's, not a
 # person's: benchmarks.jsonl in the data folder, written only by
@@ -18655,7 +18688,12 @@ BENCH_FIELDS = ("label", "engine", "status", "note", "gen_tps", "prompt_tps",
                 "cached_tokens", "src", "load_src", "est", "capped",
                 "mem_base", "mem_peak", "mem_total", "mem_rise",
                 "pressure_pct", "pressure_level", "pressured", "swapped",
-                "swap_mb", "gpu_size", "gpu_vram")
+                "swap_mb", "gpu_size", "gpu_vram",
+                # (6b341) a server's or a provider's row: the model as that
+                # target names it, the provider, where a server runs it, the
+                # first token (or all of it) includes the network, a cloud
+                # call's whole time
+                "provider", "model", "placement", "network", "total_s")
 _bench_live = {"conn": None, "sock": None, "capped": False}
 _bench_stop = threading.Event()
 _bench_file_lock = threading.Lock()
@@ -19278,10 +19316,13 @@ def _bench_set(row: dict, **kw):
         row.update(kw)
 
 
-def _bench_one(row: dict, keep: bool):
+def _bench_one(row: dict, keep: bool, eng=None):
     """Test one model; its row gets the figures, or skipped/failed/
-    stopped and a note."""
-    eng = _bench_engine(row["label"])
+    stopped and a note. eng: a server's or a provider's engine
+    (6b341); it has no memory of this computer to sample, no engine
+    to settle."""
+    eng = eng or _bench_engine(row["label"])
+    remote = bool(getattr(eng, "remote", False))
     _bench_live["capped"] = False
     _bench_set(row, engine=eng.name, status="checking")
     try:
@@ -19295,12 +19336,13 @@ def _bench_one(row: dict, keep: bool):
                                 else "stopped" if why == "Stopped."
                                 else "failed"), note=why)
         return
-    base = _bench_vm()
+    base = {} if remote else _bench_vm()
     acc = dict(base)
     done = threading.Event()
     smp = ctx_thread(target=_bench_sampler, args=(done, acc), bind=False,
                      daemon=True)
-    smp.start()
+    if not remote:
+        smp.start()
     ok = False
     try:
         _bench_set(row, status="loading")
@@ -19319,9 +19361,13 @@ def _bench_one(row: dict, keep: bool):
         _bench_live["capped"] = False
         nums = bench_numbers(raw)
         nums.update(eng.info())
+        if remote:
+            eng.fix(nums)
         if nums["capped"]:
-            nums["note"] = ("Stopped at the %d-minute limit after %d tokens."
-                            % (BENCH_RUN_CAP // 60, nums.get("gen_tokens") or 0))
+            nums["note"] = ((nums.get("note") or "") + " Stopped at the %d-minute "
+                            "limit after %d tokens." % (
+                                BENCH_RUN_CAP // 60,
+                                nums.get("gen_tokens") or 0)).strip()
         _bench_set(row, status="done", **nums)
         ok = True
     except BenchStopped:
@@ -19330,16 +19376,17 @@ def _bench_one(row: dict, keep: bool):
         _bench_set(row, status="failed", note="Failed: %s." % _bench_why(exc))
     finally:
         done.set()
-        smp.join(3)
-        end = _bench_vm()
-        _bench_fold(acc, end)
-        _bench_set(row, **bench_mem(base, acc, end))
+        if not remote:
+            smp.join(3)
+            end = _bench_vm()
+            _bench_fold(acc, end)
+            _bench_set(row, **bench_mem(base, acc, end))
         kept = keep and ok and not _bench_stop.is_set()
         try:
             eng.close(kept)
         except Exception:
             pass
-        if not kept:
+        if not kept and not remote:
             _bench_settle()      # the next model's base and fit, measured clean
 
 
@@ -19435,11 +19482,17 @@ def _bench_worker(run: dict):
             _bench["running"] = False
 
 
-def _bench_scrub(v):
+def _bench_scrub(v, keys=()):
     """A note with the home folder written as ~ (review of 6b331): an
-    engine's error can name a path, and a path names the person."""
+    engine's error can name a path, and a path names the person. And
+    (6b341) with every key it was told of, and anything shaped like a
+    provider key or a bearer token, taken out."""
     if not isinstance(v, str):
         return v
+    for k in keys or ():
+        if isinstance(k, str) and len(k) >= 8:
+            v = v.replace(k, "***")
+    v = _BENCH_KEYLIKE.sub("***", v)
     home = os.path.expanduser("~").rstrip("/\\")
     if len(home) > 1:
         v = re.sub(re.escape(home), "~", v,
@@ -19472,17 +19525,26 @@ def _bench_versions() -> dict:
     return out
 
 
-def _bench_record(run: dict) -> dict:
+def _bench_record(run: dict, keys=()) -> dict:
     """The run as the history keeps it: the row fields BENCH_FIELDS names,
-    every text with the home folder written as ~."""
+    every text with the home folder written as ~. (6b341) With its target
+    (local, server or cloud), the target's name (the person's own name for
+    a server), a server's card line and whether the cost warning was
+    confirmed. Never a key, a token, an address or a device key: nothing
+    here is read from a conf, only the run's own figures and names."""
     with _bench_lock:
         return {"v": 1, "id": run["id"], "t": run["t"], "end": run.get("end"),
                 "test": BENCH_TEST, "state": run.get("state"),
+                "target": run.get("target") or "local",
+                "target_name": _bench_scrub(run.get("target_name")
+                                            or "This computer", keys),
+                "card": _bench_scrub(run.get("card") or "", keys),
+                "cost_warning": bool(run.get("cost_warning")),
                 "hw": run.get("hw"), "app": run.get("app"),
                 "versions": run.get("versions") or {},
-                "restore": _bench_scrub(run.get("restore") or ""),
-                "note": _bench_scrub(run.get("note") or ""),
-                "models": [{k: _bench_scrub(r.get(k)) for k in BENCH_FIELDS
+                "restore": _bench_scrub(run.get("restore") or "", keys),
+                "note": _bench_scrub(run.get("note") or "", keys),
+                "models": [{k: _bench_scrub(r.get(k), keys) for k in BENCH_FIELDS
                             if k in r} for r in run.get("models") or []]}
 
 
@@ -19499,30 +19561,58 @@ def _bench_downloading() -> bool:
                    for j in _setup_jobs.values())
 
 
-def bench_start() -> tuple:
+def bench_start(spec=None, ctx=None) -> tuple:
     """(True, the run) or (False, why). Never while an answer is being
-    written or another run is going."""
+    written or another run is going. spec names the target (6b341):
+    {"target": "local"} (the default), {"target": "server", "server": id,
+    "models": [tags]} or {"target": "cloud", "confirm": the id
+    bench_cloud_plan gave, "understood": true}; a server's or the cloud's
+    run belongs to ctx, the profile that asked."""
+    spec = spec if isinstance(spec, dict) else {}
+    target = spec.get("target") or "local"
+    if target not in ("local", "server", "cloud"):
+        return False, "That isn't something the benchmark can test."
+    plan = None
+    if target != "local":
+        if ctx is None:
+            return False, "The benchmark couldn't start."
+        try:
+            plan = _bench_plan_remote(target, spec, ctx)
+        except _BenchRefuse as why:
+            return False, str(why)
     with _bench_lock:
         if _bench["running"]:
             return False, "A benchmark is already running."
-        if _bench_busy["n"]:
+        if _bench_busy["n"] or (target != "local" and _bench_busy["srv"]):
             return False, BENCH_ANSWERING
-        if _bench_downloading():
+        if target == "local" and _bench_downloading():
             return False, BENCH_DOWNLOADING
+        if target == "cloud" and _bench_confirms.pop(plan["confirm"], None) is None:
+            # one run to a confirmation: it is spent as the run starts
+            return False, "Confirm the cost first. Nothing was sent."
         _bench["running"] = True
+        _bench["target"] = target
+        _bench["ctx"] = ctx if plan else None
         _bench_stop.clear()
         run = {"id": secrets.token_hex(6), "t": time.time(), "end": None,
                "test": BENCH_TEST, "state": "running", "cur": -1,
-               "models": [], "restore": "", "note": "", "saved": False,
-               "hw": {}, "versions": {},
+               "models": plan["rows"] if plan else [], "restore": "",
+               "note": "", "saved": False, "hw": {}, "versions": {},
+               "target": target,
+               "target_name": plan["name"] if plan else "This computer",
+               "card": "", "cost_warning": target == "cloud",
                "app": "%s (%s)" % (APP_VERSION, APP_BUILD)}
         _bench["run"] = run
     try:
-        hw = bench_hardware()
-        with _bench_lock:
-            run["hw"] = hw
-        ctx_thread(target=_bench_worker, args=(run,), bind=False,
-                   daemon=True).start()
+        if plan:
+            ctx_thread(target=_bench_worker_remote, args=(run, plan), ctx=ctx,
+                       daemon=True).start()
+        else:
+            hw = bench_hardware()
+            with _bench_lock:
+                run["hw"] = hw
+            ctx_thread(target=_bench_worker, args=(run,), bind=False,
+                       daemon=True).start()
     except Exception:
         with _bench_lock:
             _bench["running"] = False
@@ -19563,6 +19653,10 @@ def bench_history(limit=BENCH_SHOW) -> list:
             continue
         if isinstance(r, dict) and isinstance(r.get("models"), list) \
                 and isinstance(r.get("t"), (int, float)):
+            # (6b341) a run from before servers and the cloud had no
+            # target: it is this computer's
+            r["target"] = "local"
+            r.setdefault("target_name", "This computer")
             runs.append(r)
     runs.sort(key=lambda r: -r["t"])
     return runs if limit is None else runs[:limit]
@@ -19608,6 +19702,803 @@ def _bench_save(rec: dict):
                 except OSError:
                     pass
                 raise
+
+
+# ------------------------------ servers and cloud models (6b341)
+# BENCHMARK A SERVER, A PROVIDER (6b341, per Patrick, 2026-10-01: "can the
+# benchmark feature also allow benchmarking your servers? cloud servers
+# too with a warning that it may incur cost via api. then allow those
+# benchmarks to be compared"). A run has ONE target: this computer (the
+# rest of this section), one of the profile's paired servers, or the
+# profile's cloud models. The test is the same fixed one (BENCH_TEST b1:
+# the passage, the task, 256 tokens, seed 42, temperature 0 where the
+# target takes one), so the figures compare across targets.
+#   * A SERVER is called through the app's own signed requests
+#     (_srv_send, _srv_fail: the same Access headers, signature and
+#     refusal lines as a chat to it), one model at a time, with the
+#     figures in Ollama's own last line, which the gateway passes through
+#     as it is. Nothing is unloaded (the gateway drops keep_alive), so a
+#     load time is the server's own load_duration, and "not measured"
+#     for a model that was already loaded.
+#   * The CLOUD is called with the app's own request bodies and headers
+#     (_openai_body, _anthropic_body) at 256 tokens, streamed, so the
+#     first token can be timed. No keys are ever shown, stored or put in
+#     an error; a call needs a confirmation made for exactly that list,
+#     once (bench_cloud_plan), and at most 6 models a run.
+#   * Both obey the hold (one thing at a time), Stop, and the no-fallback
+#     rule: a failed target says why and runs nowhere else.
+#   * Their results are the PROFILE's (bench_targets.jsonl, in its own
+#     folder); this computer's stay the machine's (benchmarks.jsonl).
+BENCH_TFILE = "bench_targets.jsonl"
+BENCH_CLOUD_MAX = 6              # cloud models in one run
+BENCH_CLOUD_IN = 1000            # about this many tokens go in with each call
+BENCH_CONFIRM_S = 600.0          # a confirmation is good for one run, this long
+BENCH_COST_LINE = ("This uses your API keys and may cost money with your "
+                   "provider. ConcordeAI doesn't know your plan or prices.")
+# USD per million tokens in and out, by "<provider id>/<model id>". The app
+# holds no prices today, so no estimate is shown (nothing is invented); a
+# model with an entry here gets a rough figure marked with an asterisk.
+BENCH_PRICES = {}
+BENCH_BUSY_REASONS = ("A benchmark is already running.",)
+_bench_confirms = profile_cache("_bench_confirms", {})
+# strings that look like a provider key, a bearer token or an Access
+# secret; whatever else a note says, these never reach the file or the page
+_BENCH_KEYLIKE = re.compile(
+    r"(?<![A-Za-z0-9])(?:sk-ant-|sk-|AIza|gsk_)[A-Za-z0-9_\-]{12,}"
+    r"|Bearer\s+[A-Za-z0-9._\-]{8,}", re.I)
+
+
+class _BenchRefuse(Exception):
+    """A start that can't go ahead: the message is the page's line."""
+
+
+def bench_cost_est(pid: str, model: str):
+    """A rough cost of one call, marked as an estimate, or None when the
+    app holds no price for the model."""
+    p = BENCH_PRICES.get("%s/%s" % (pid, model))
+    try:
+        usd = (BENCH_CLOUD_IN * float(p[0]) + BENCH_MAX_TOKENS * float(p[1])) / 1e6
+    except (TypeError, ValueError, IndexError):
+        return None
+    return "about $%s*" % ("%.4f" % usd if usd < 0.01 else "%.3f" % usd)
+
+
+def bench_cloud_models() -> list:
+    """The providers this thread's profile has a working key for, each
+    with the models the app uses from it: [{pid, name, models: [{id,
+    est}], rest}]. Nothing of the key leaves here."""
+    out, now = [], time.time()
+    for pid, v in (_cloud_all().get("providers") or {}).items():
+        if not (isinstance(v, dict) and v.get("status", "ok") == "ok"
+                and v.get("key") and v.get("base") and v.get("model")):
+            continue
+        ids = [v.get("model", "")] + list(v.get("models") or [])
+        got = []
+        for role in ("fast", "seat", "composite"):
+            for m in cloud_candidates(pid, ids, role)[:2]:
+                if m and m not in got and cloud_model_alive(m):
+                    got.append(m)
+        if v.get("model") and v["model"] not in got \
+                and cloud_model_alive(v["model"]):
+            got.insert(0, v["model"])
+        if not got:
+            continue
+        try:
+            rest = max(0, int(float(v.get("cool") or 0) - now))
+        except (TypeError, ValueError):
+            rest = 0
+        out.append({"pid": pid, "name": str(v.get("name") or pid.title())[:40],
+                    "models": [{"id": m, "est": bench_cost_est(pid, m)}
+                               for m in got[:4]], "rest": rest})
+    return out
+
+
+def bench_card_line(gpu) -> str:
+    """A server's card as its /v1/info says it: "Radeon RX 6900 XT · 16 GB"."""
+    if not isinstance(gpu, dict):
+        return "graphics card not reported"
+    parts = [str(gpu.get("name") or "").strip()
+             or str(gpu.get("vendor") or "").upper()]
+    vb = gpu.get("vram_bytes")
+    if isinstance(vb, int) and vb > 0:
+        parts.append("%d GB" % round(vb / 2 ** 30))
+    return " · ".join(p for p in parts if p) or "graphics card not reported"
+
+
+def bench_server_view(e) -> dict:
+    """What the pane shows of a paired server, from its last check: the
+    card, and each model with where it runs and whether it starts ticked
+    (only the ones that fit whole on the card, 6b341)."""
+    s = _srv_seen.get(e["id"]) or {}
+    gpu = s.get("gpu")
+    vram = (gpu or {}).get("vram_bytes") if isinstance(gpu, dict) else None
+    models = []
+    for m in s.get("models") or []:
+        fit = bool(_srv_fits(m, vram))
+        pl = m.get("placement")
+        why = ("It also uses the server\u2019s memory, which loads its CPU hard."
+               if pl == "gpu+ram" else
+               "Where it runs isn\u2019t reported." if pl != "gpu" else
+               "It may not fit on the card." if not fit else "")
+        models.append({"name": m.get("name"), "placement": pl, "fit": fit,
+                       "tick": fit, "why": why, "loaded": bool(m.get("loaded")),
+                       "size": m.get("size") or 0})
+    return {"id": e["id"], "name": e["name"], "card": bench_card_line(gpu),
+            "version": s.get("version") or "", "checked": bool(s),
+            "reachable": bool(s.get("auth")), "err": s.get("err") or "",
+            "models": models}
+
+
+def bench_targets(ctx, refresh: str = "") -> dict:
+    """GET /api/bench/targets: this profile's paired servers (checked
+    first when one is named: the same read-only look as Settings › Your
+    servers) and its cloud models. Only this profile's: both come from
+    its own files."""
+    entries = [e for e in _srv_read(ctx) if _srv_paired(e)]
+    for e in entries:
+        if refresh and e["id"] == refresh:
+            server_check(e)
+    return {"servers": [bench_server_view(e) for e in entries],
+            "cloud": bench_cloud_models(), "cloud_max": BENCH_CLOUD_MAX,
+            "cloud_in": BENCH_CLOUD_IN, "cloud_out": BENCH_MAX_TOKENS,
+            "cost": BENCH_COST_LINE, "keep": BENCH_KEEP}
+
+
+def bench_cloud_plan(ctx, picks) -> dict:
+    """POST /api/bench/cloud-plan: the exact models a cloud run would call,
+    the calls and tokens it would make and the cost line, with a one-use
+    confirmation id for them. Nothing is sent to a provider here."""
+    offered = {(p["pid"], m["id"]): p for p in bench_cloud_models()
+               for m in p["models"]}
+    chosen = []
+    for x in picks if isinstance(picks, list) else []:
+        k = (str(x.get("pid") or ""), str(x.get("model") or "")) \
+            if isinstance(x, dict) else ("", "")
+        if k in offered and k not in [(c["pid"], c["model"]) for c in chosen]:
+            chosen.append({"pid": k[0], "model": k[1],
+                           "provider": offered[k]["name"]})
+    if not chosen:
+        return {"err": "Tick at least one cloud model."}
+    if len(chosen) > BENCH_CLOUD_MAX:
+        return {"err": "A run calls at most %d cloud models. Untick %d."
+                % (BENCH_CLOUD_MAX, len(chosen) - BENCH_CLOUD_MAX)}
+    now = time.time()
+    for k in [k for k, r in _bench_confirms.items()
+              if now - r["t"] > BENCH_CONFIRM_S]:
+        _bench_confirms.pop(k, None)
+    cid = secrets.token_hex(16)
+    _bench_confirms[cid] = {"t": now, "tag": ctx.tag, "models": chosen}
+    return {"ok": True, "id": cid, "max": BENCH_CLOUD_MAX, "warning": BENCH_COST_LINE,
+            "calls": len(chosen), "tokens_in": BENCH_CLOUD_IN * len(chosen),
+            "tokens_out": BENCH_MAX_TOKENS * len(chosen),
+            "models": [{"pid": c["pid"], "provider": c["provider"],
+                        "model": c["model"],
+                        "est": bench_cost_est(c["pid"], c["model"])}
+                       for c in chosen]}
+
+
+def _bench_plan_remote(target: str, spec: dict, ctx) -> dict:
+    """The rows and the means of a run of a server or of the cloud, or
+    _BenchRefuse with the page's line. A cloud run needs the confirmation
+    bench_cloud_plan made for this profile, ticked "I understand"; it is
+    looked at here and taken when the run starts."""
+    if target == "server":
+        e = _srv_find(_srv_read(ctx), str(spec.get("server") or ""))
+        if e is None:
+            raise _BenchRefuse(SRV_GONE)
+        if not _srv_paired(e):
+            raise _BenchRefuse("%s isn\u2019t paired with this computer. Pair it in "
+                               "Settings › Your servers." % e["name"])
+        names = []
+        for n in spec.get("models") or []:
+            n = str(n)
+            if (_SRV_LABEL_RX.fullmatch(n) and not _SRV_CLOUD_TAG.search(n)
+                    and n not in names):
+                names.append(n)
+        if not names:
+            raise _BenchRefuse("Tick at least one model.")
+        return {"target": "server", "name": e["name"], "e": e, "ctx": ctx,
+                "rows": [{"label": e["name"] + SERVER_SEP + n, "model": n,
+                          "engine": "Ollama", "status": "waiting", "note": "",
+                          "tok": 0, "network": True} for n in names[:40]]}
+    if spec.get("understood") is not True:
+        raise _BenchRefuse("Tick “I understand this may cost money” "
+                           "first. Nothing was sent.")
+    cid = str(spec.get("confirm") or "")
+    rec = _bench_confirms.get(cid)
+    if (not isinstance(rec, dict) or time.time() - rec["t"] > BENCH_CONFIRM_S
+            or rec.get("tag") != ctx.tag):
+        raise _BenchRefuse("Confirm the cost first. Nothing was sent.")
+    return {"target": "cloud", "name": "Cloud models", "confirm": cid,
+            "ctx": ctx,
+            "rows": [{"label": c["model"], "model": c["model"],
+                      "provider": c["provider"], "pid": c["pid"],
+                      "engine": "cloud", "status": "waiting", "note": "",
+                      "tok": 0, "network": True} for c in rec["models"]]}
+
+
+# ---- the calls: cut within a second by Stop, to a server or a provider
+def _bench_wait(fn, cleanup=None):
+    """fn() on a helper thread, waited for in 0.1 s steps: a Stop (or the
+    time limit) returns at once, and the abandoned call closes what it
+    opened (cleanup). A connect, a TLS handshake or a wait for headers
+    has no socket to shut yet, so the wait itself is what Stop cuts."""
+    box, ev, lock = {}, threading.Event(), threading.Lock()
+
+    def work():
+        try:
+            r = fn()
+        except BaseException as exc:
+            with lock:
+                box["e"] = exc
+            ev.set()
+            return
+        with lock:
+            gone = box.get("gone")
+            if not gone:
+                box["r"] = r
+        if gone and cleanup:
+            try:
+                cleanup(r)
+            except Exception:
+                pass
+        ev.set()
+    ctx_thread(target=work, daemon=True).start()
+    while not ev.wait(0.1):
+        if _bench_stop.is_set() or _bench_live["capped"]:
+            with lock:
+                if "r" not in box and "e" not in box:
+                    box["gone"] = True
+                    break
+    with lock:
+        if "r" in box:
+            r = box["r"]
+            if (_bench_stop.is_set()) and cleanup:
+                try:
+                    cleanup(r)
+                except Exception:
+                    pass
+                raise BenchStopped()
+            return r
+        if "e" in box:
+            raise box["e"]
+    if _bench_stop.is_set():
+        raise BenchStopped()
+    raise RuntimeError("it didn\u2019t answer in time")
+
+
+def _bench_remote_lines(open_, read_s: float):
+    """The lines of one call to a server or a provider, as _bench_http
+    gives a local engine's: open_() is (connection, an open 200 response);
+    the socket is kept so Stop and the time limit can shut it from
+    another thread (a read blocked in this one returns at once), and a
+    Stop raises BenchStopped. A cut at the time limit ends the lines."""
+    conn = None
+    try:
+        if _bench_stop.is_set():
+            raise BenchStopped()
+        conn, resp = _bench_wait(open_, lambda r: r[0].close())
+        sk = getattr(conn, "o1_sock", None) or getattr(conn, "sock", None)
+        _bench_live["conn"], _bench_live["sock"] = conn, sk
+        if sk is not None:
+            try:
+                sk.settimeout(read_s)
+            except OSError:
+                pass
+        if _bench_stop.is_set() or _bench_live["capped"]:
+            _bench_cut()              # pressed while the answer was opening
+        while True:
+            line = resp.readline(1 << 22)
+            if not line:
+                break
+            yield line
+    except (OSError, http.client.HTTPException) as exc:
+        if _bench_stop.is_set():
+            raise BenchStopped() from exc
+        if not _bench_live["capped"]:
+            raise
+    finally:
+        _bench_live["conn"] = _bench_live["sock"] = None
+        if conn is not None:
+            conn.close()
+    if _bench_stop.is_set():
+        raise BenchStopped()
+
+
+class _BenchServer:
+    """One model on one of the profile's servers, through the app's own
+    signed calls. The figures are Ollama's, from the last line the
+    gateway passes through; the first token is timed here, and so
+    includes the network. Nothing is unloaded (the gateway drops
+    keep_alive), so a model already loaded has no load time to measure."""
+    kind, name, remote = "server", "Ollama", True
+
+    def __init__(self, e, model, seen):
+        self.e, self.model, self.seen = e, model, seen or {}
+        self.label = e["name"] + SERVER_SEP + model
+        self.ps, self.was_loaded, self.place = {}, False, ""
+        for m in self.seen.get("models") or []:
+            if m.get("name") == model:
+                self.place = m.get("placement") or ""
+
+    def secrets(self):
+        return [self.e[k].reveal() for k in ("access_id", "access_secret", "seed")
+                if self.e.get(k)]
+
+    def _open(self, method, path, obj):
+        e, model = self.e, self.model
+        body = b"" if obj is None else json.dumps(
+            obj, separators=(",", ":")).encode("utf-8")
+
+        def open_():
+            skew = _srv_skew(e)
+            for attempt in (0, 1):
+                conn, resp = _srv_send(e, method, path, body, True,
+                                       SRV_CONNECT_S, skew)
+                if resp.status == 200:
+                    return conn, resp
+                try:
+                    raw = resp.read(1 << 20)
+                except OSError:
+                    raw = b""
+                finally:
+                    conn.close()
+                js = _srv_js(raw)
+                if attempt == 0 and resp.status == 401 and js.get("code") in (
+                        "clock_skew", "replay"):
+                    skew = _srv_note_skew(e, js)     # signed again once
+                    continue
+                raise _srv_fail(e, resp.status, js, model)
+        return open_
+
+    def _lines(self, method, path, obj, read_s):
+        try:
+            yield from _bench_remote_lines(self._open(method, path, obj), read_s)
+        except (TimeoutError, socket.timeout):
+            raise ServerError("offline", "%s sent nothing for %d seconds, so the "
+                              "run stopped there." % (self.e["name"], read_s)) from None
+        except (OSError, http.client.HTTPException):
+            raise ServerError("offline", "%s stopped answering partway through."
+                              % self.e["name"]) from None
+
+    def _ps(self):
+        return _srv_js(b"".join(self._lines("GET", "/api/ps", None, 30)))
+
+    def prepare(self):
+        if not cai_crypto.available():
+            raise ServerError("crypto", SRV_NO_CRYPTO)
+        if not _srv_paired(self.e):
+            raise ServerError("unpaired", "%s isn\u2019t paired with this computer."
+                              % self.e["name"])
+        if self.model not in [m.get("name") for m in self.seen.get("models") or []]:
+            raise ServerError("missing", "%s isn\u2019t installed on %s."
+                              % (self.model, self.e["name"]))
+        return None
+
+    def load(self):
+        def mine(ps):
+            return [m for m in ps.get("models") or [] if isinstance(m, dict)
+                    and (m.get("name") or m.get("model")) == self.model]
+        self.was_loaded = bool(mine(self._ps()))
+        final = {}
+        # an empty prompt loads the model and answers nothing; streamed,
+        # because Cloudflare ends a plain call that takes over 100 s
+        for line in self._lines("POST", "/api/generate", {
+                "model": self.model, "prompt": "", "stream": True,
+                "options": {"num_ctx": BENCH_CTX}}, BENCH_LOAD_CAP):
+            obj = _srv_js(line)
+            if obj.get("error"):
+                raise _srv_fail(self.e, 0, obj, self.model)
+            if obj.get("done"):
+                final = obj
+        out = {}
+        if not self.was_loaded and _bench_pos(final.get("load_duration")):
+            out["load_duration"] = final["load_duration"]
+        try:
+            for m in mine(self._ps()):
+                self.ps = {"gpu_size": _bench_int(m.get("size")),
+                           "gpu_vram": _bench_int(m.get("size_vram"))}
+        except BenchStopped:
+            raise
+        except Exception:
+            pass
+        return out
+
+    def run(self, on_first, on_tok):
+        raw = {"chunks": 0, "t_first": None, "t_last": None}
+        body = {"model": self.model, "stream": True,
+                "messages": [{"role": "user", "content": BENCH_PROMPT}],
+                "options": {"temperature": 0, "seed": BENCH_SEED,
+                            "num_predict": BENCH_MAX_TOKENS,
+                            "num_ctx": BENCH_CTX}}
+        raw["t_send"] = time.monotonic()
+        for line in self._lines("POST", "/api/chat", body, BENCH_RUN_CAP + 30):
+            obj = _srv_js(line)
+            if obj.get("error"):
+                raise _srv_fail(self.e, 0, obj, self.model)
+            m = obj.get("message") or {}
+            if (m.get("content") or "") + (m.get("thinking") or ""):
+                now = time.monotonic()
+                if raw["t_first"] is None:
+                    raw["t_first"] = now
+                    on_first()
+                raw["t_last"] = now
+                raw["chunks"] += 1
+                on_tok(raw["chunks"])
+            if obj.get("done"):
+                for k in ("eval_count", "eval_duration", "prompt_eval_count",
+                          "prompt_eval_duration"):
+                    raw[k] = obj.get(k)
+                break
+        if raw["t_first"] is None:
+            raise RuntimeError(
+                "nothing came back within %d minutes" % (BENCH_RUN_CAP // 60)
+                if _bench_live["capped"] else "it answered with nothing")
+        ec = _bench_int(raw.get("eval_count"))
+        if ec and not _bench_pos(raw.get("eval_duration")):
+            # a count with no duration: the count is exact, the time is ours
+            raw["usage"] = {"completion_tokens": ec,
+                            "prompt_tokens": _bench_int(raw.get("prompt_eval_count"))}
+        return raw
+
+    def info(self):
+        return dict(self.ps, model=self.model, placement=self.place or None)
+
+    def fix(self, nums: dict):
+        nums["network"] = True
+        if nums.get("src") != "engine":
+            nums["prompt_tps"] = None        # reads: only from the server's own numbers
+        if nums.get("load_src") != "engine":
+            nums["load_s"], nums["load_src"] = None, "not measured"
+            nums["note"] = ("Already in the server\u2019s memory, so its load time "
+                            "wasn\u2019t measured." if self.was_loaded else
+                            "The server didn\u2019t report a load time.")
+
+    def close(self, keep):
+        pass
+
+
+class _BenchCloud:
+    """One model at one provider, called with the app's own request body
+    and headers, streamed, at BENCH_MAX_TOKENS. Everything here includes
+    the network. The key lives in self.c for the call and nowhere else;
+    an error is one of a few fixed lines, never the provider's text."""
+    kind, name, remote = "cloud", "cloud", True
+
+    def __init__(self, pid, model):
+        self.pid, self.model, self.c, self.total = pid, model, None, None
+
+    def secrets(self):
+        return [self.c["key"]] if self.c and self.c.get("key") else []
+
+    def prepare(self):
+        v = (_cloud_all().get("providers") or {}).get(self.pid)
+        if not (isinstance(v, dict) and v.get("key") and v.get("base")
+                and v.get("status", "ok") == "ok"):
+            return "Failed: there is no working key for this provider any more."
+        self.c = dict(v, model=self.model, role="fast")
+        u = urllib.parse.urlsplit(str(v["base"]))
+        if u.scheme != "https" and not (
+                _PROVIDER_STUB and str(v["base"]).startswith(_PROVIDER_STUB)):
+            return "Failed: the provider\u2019s address isn\u2019t https, so nothing was sent."
+        return None
+
+    def load(self):
+        return {}
+
+    @staticmethod
+    def _why(status: int, raw: bytes) -> str:
+        """A refusal as one fixed line: the provider's own words can name
+        part of a key, so none of them are kept."""
+        body = (raw or b"").decode("utf-8", "replace")
+        kind = cloud_failure_kind(status, body)
+        if status in (401, 403) or kind == "auth":
+            return "the key was rejected"
+        if status == 402 or _NO_CREDIT_RX.search(body):
+            return "the account is out of credit"
+        if status == 429 or kind == "quota":
+            return "rate limited"
+        if status == 404 or (status == 400 and _MODEL_GONE_RX.search(body)):
+            return "the model isn\u2019t available on this key"
+        if status >= 500:
+            return "the provider isn\u2019t answering (HTTP %d)" % status
+        return "the provider refused the request (HTTP %d)" % status
+
+    def _request(self):
+        c = self.c
+        msgs = [{"role": "user", "content": BENCH_PROMPT}]
+        if "anthropic.com" in c.get("base", ""):
+            body = _anthropic_body(c, _anthropic_turns(msgs), "",
+                                   BENCH_MAX_TOKENS, stream=True)
+            path = "/messages"
+            hdr = {"x-api-key": c["key"], "anthropic-version": "2023-06-01"}
+        else:
+            body = _openai_body(c, msgs, BENCH_MAX_TOKENS, stream=True)
+            if "temperature" in body:
+                body["temperature"] = 0     # where the app's body sends one
+            if self.pid == "groq":
+                body["seed"] = BENCH_SEED
+            if self.pid in _STREAM_USAGE_ASK and self.pid not in _stream_usage_off:
+                body["stream_options"] = {"include_usage": True}
+            path = "/chat/completions"
+            hdr = {"Authorization": "Bearer " + c["key"]}
+        hdr.update({"Content-Type": "application/json",
+                    "Accept": "text/event-stream",
+                    "User-Agent": "MillenAI/%s" % APP_VERSION})
+        return path, json.dumps(body).encode("utf-8"), hdr
+
+    def run(self, on_first, on_tok):
+        import ssl as _ssl
+        path, payload, hdr = self._request()
+        u = urllib.parse.urlsplit(self.c["base"].rstrip("/") + path)
+
+        def open_():
+            conn = (http.client.HTTPSConnection(
+                u.hostname, u.port or 443, timeout=30,
+                context=_ssl.create_default_context())
+                if u.scheme == "https" else
+                http.client.HTTPConnection(u.hostname, u.port or 80, timeout=30))
+            try:
+                conn.request("POST", u.path + ("?" + u.query if u.query else ""),
+                             body=payload, headers=hdr)
+                # the socket itself: a close-delimited answer (HTTP/1.0, no
+                # length) takes it from the connection (see _bench_cut)
+                conn.o1_sock = conn.sock
+                resp = conn.getresponse()
+            except _ssl.SSLError:
+                conn.close()
+                raise RuntimeError("its certificate didn\u2019t check out") from None
+            except (OSError, http.client.HTTPException):
+                conn.close()
+                raise RuntimeError("the provider didn\u2019t answer") from None
+            if resp.status != 200:
+                try:
+                    raw = resp.read(4096)
+                except OSError:
+                    raw = b""
+                conn.close()
+                raise RuntimeError(self._why(resp.status, raw))
+            return conn, resp
+        anth = "anthropic.com" in self.c.get("base", "")
+        raw = {"chunks": 0, "t_first": None, "t_last": None}
+        u_in = u_out = rsn = None
+        saw_reasoning, stop = False, ""
+        raw["t_send"] = time.monotonic()
+        try:
+            for line in _bench_remote_lines(open_, BENCH_RUN_CAP + 30):
+                s = line.decode("utf-8", "replace").strip()
+                if not s.startswith("data:"):
+                    continue
+                blob = s[5:].strip()
+                if blob == "[DONE]":
+                    break
+                try:
+                    d = json.loads(blob)
+                except ValueError:
+                    continue
+                if not isinstance(d, dict):
+                    continue
+                tok = ""
+                if anth:
+                    ty = d.get("type")
+                    if ty == "content_block_delta":
+                        dl = d.get("delta") or {}
+                        tok = dl.get("text") or dl.get("thinking") or ""
+                    elif ty == "message_start":
+                        mu = (d.get("message") or {}).get("usage")
+                        if isinstance(mu, dict):
+                            u_in = _bench_int(mu.get("input_tokens")) or u_in
+                    elif ty == "message_delta":
+                        stop = (d.get("delta") or {}).get("stop_reason") or stop
+                        mu = d.get("usage")
+                        if isinstance(mu, dict):
+                            u_out = _bench_int(mu.get("output_tokens")) or u_out
+                else:
+                    ch = (d.get("choices") or [{}])[0] or {}
+                    dl = ch.get("delta") or {}
+                    think = dl.get("reasoning_content") or dl.get("reasoning") or ""
+                    tok = (dl.get("content") or "") + (think or "")
+                    saw_reasoning = saw_reasoning or bool(think)
+                    stop = ch.get("finish_reason") or stop
+                    cu = (d.get("usage") or (d.get("x_groq") or {}).get("usage")
+                          or ch.get("usage"))
+                    if isinstance(cu, dict):
+                        u_in = _bench_int(cu.get("prompt_tokens")) or u_in
+                        u_out = _bench_int(cu.get("completion_tokens")) or u_out
+                        dt = cu.get("completion_tokens_details")
+                        rsn = _bench_int((dt if isinstance(dt, dict) else {})
+                                         .get("reasoning_tokens")) or rsn
+                if tok:
+                    now = time.monotonic()
+                    if raw["t_first"] is None:
+                        raw["t_first"] = now
+                        on_first()
+                    raw["t_last"] = now
+                    raw["chunks"] += 1
+                    on_tok(raw["chunks"])
+        except (TimeoutError, socket.timeout):
+            raise RuntimeError("the provider stopped answering (timed out)") from None
+        except (OSError, http.client.HTTPException):
+            raise RuntimeError("the provider stopped answering partway through") from None
+        self.total = round(time.monotonic() - raw["t_send"], 3)
+        if raw["t_first"] is None:
+            if stop in ("length", "max_tokens"):
+                raise RuntimeError("it used all %d tokens before writing (it "
+                                   "thinks first), so there is nothing to time"
+                                   % BENCH_MAX_TOKENS)
+            raise RuntimeError(
+                "nothing came back within %d minutes" % (BENCH_RUN_CAP // 60)
+                if _bench_live["capped"] else "it answered with nothing")
+        if u_out:
+            # reasoning the stream never showed was counted but is not in
+            # the time between the first and the last word
+            hid = rsn if (rsn and not saw_reasoning) else 0
+            raw["usage"] = {"prompt_tokens": u_in,
+                            "completion_tokens": max(0, u_out - hid)}
+        return raw
+
+    def info(self):
+        return {"model": self.model}
+
+    def fix(self, nums: dict):
+        nums.update(network=True, prompt_tps=None, load_s=None, load_src=None,
+                    total_s=self.total)
+
+    def close(self, keep):
+        pass
+
+
+def _bench_make(plan: dict, row: dict, seen):
+    if plan["target"] == "server":
+        return _BenchServer(plan["e"], row["model"], seen)
+    return _BenchCloud(row["pid"], row["model"])
+
+
+def _bench_watch(ctx, done):
+    """A run of a server or of the cloud belongs to the profile that
+    started it: when that stops being the active one the run is stopped
+    (the sockets cut, the rest "not run") and not saved."""
+    while not done.wait(0.25):
+        if ctx.cancel.is_set():
+            with _bench_lock:
+                run = _bench.get("run")
+                if run is not None and not run.get("note"):
+                    run["note"] = "The profile changed, so the run was stopped."
+            bench_stop()
+            return
+
+
+def _bench_worker_remote(run: dict, plan: dict):
+    """A run of a server or of the cloud, on the starting profile's ctx."""
+    ctx, rows, engs, seen = plan["ctx"], run["models"], [], {}
+    done = threading.Event()
+    ctx_thread(target=_bench_watch, args=(ctx, done), daemon=True).start()
+    try:
+        if plan["target"] == "server":
+            e = plan["e"]
+            try:
+                seen = _bench_wait(lambda: server_check(e)) or {}
+            except BenchStopped:
+                seen = {}
+            gpu = seen.get("gpu") if isinstance(seen.get("gpu"), dict) else None
+            line = bench_card_line(gpu)
+            with _bench_lock:
+                run["card"] = line
+                run["hw"] = {"line": line, "cpu": None, "mem": 0,
+                             "gpu_cores": None, "server": e["name"],
+                             "gpus": [[(gpu.get("name") or gpu.get("vendor")),
+                                       gpu.get("vram_bytes")]] if gpu else []}
+                run["versions"] = {"mlx_lm": None,
+                                   "ollama": seen.get("version") or None}
+            if not _bench_stop.is_set() and not (
+                    seen.get("reachable") and seen.get("auth")):
+                why = seen.get("err") or "%s didn't answer." % e["name"]
+                for row in rows:
+                    _bench_set(row, status="failed",
+                               note="Failed: %s." % _bench_why(why))
+        for i, row in enumerate(rows):
+            if row["status"] == "failed":
+                continue
+            if _bench_stop.is_set():
+                _bench_set(row, status="not run")
+                continue
+            _bench_set(run, cur=i)
+            eng = _bench_make(plan, row, seen)
+            engs.append(eng)
+            _bench_one(row, keep=False, eng=eng)
+        _bench_set(run, cur=-1)
+        with _bench_lock:
+            run["state"] = "stopped" if _bench_stop.is_set() else "done"
+    except Exception as exc:
+        with _bench_lock:
+            run["state"] = "failed"
+            run["note"] = "The benchmark stopped: %s." % _bench_why(exc)
+    finally:
+        done.set()
+        keys = [k for g in engs for k in g.secrets() if k]
+        with _bench_lock:
+            run["end"] = time.time()
+            run["cur"] = -1
+            for r in rows:                  # no key in a line the page can read
+                r["note"] = _bench_scrub(r.get("note") or "", keys)
+        saved, why = False, ""
+        try:
+            bench_targets_save(ctx, _bench_record(run, keys))
+            saved = True
+        except StaleProfile:
+            why = "The profile changed, so this run wasn't saved."
+        except Exception:
+            why = "This run couldn't be saved."
+        with _bench_lock:
+            run["saved"] = saved
+            if why:
+                run["note"] = ((run.get("note") or "") + " " + why).strip()
+            _bench["running"] = False
+
+
+# ---- the profile's results (bench_targets.jsonl, in its own folder)
+def _bench_tkey(r: dict) -> str:
+    """What a run is kept per (BENCH_KEEP each): this computer, a
+    server by its name, the cloud."""
+    t = r.get("target") or "local"
+    return "%s:%s" % (t, r.get("target_name") or "") if t == "server" else t
+
+
+def bench_targets_history(ctx, per_key=None) -> list:
+    """The profile's saved runs of servers and of the cloud, newest
+    first (per_key: at most that many of each target). A line a crash cut
+    short, or anything that isn't such a run, is skipped."""
+    try:
+        with open(_pfile(BENCH_TFILE, ctx), "rb") as f:
+            data = f.read()
+    except OSError:
+        return []
+    runs = []
+    for ln in data.splitlines():
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue
+        if (isinstance(r, dict) and isinstance(r.get("models"), list)
+                and isinstance(r.get("t"), (int, float))
+                and r.get("target") in ("server", "cloud")):
+            runs.append(r)
+    runs.sort(key=lambda r: -r["t"])
+    if per_key:
+        n, keep = {}, []
+        for r in runs:
+            k = _bench_tkey(r)
+            n[k] = n.get(k, 0) + 1
+            if n[k] <= per_key:
+                keep.append(r)
+        runs = keep
+    return runs
+
+
+def bench_targets_save(ctx, rec: dict):
+    """One run onto the profile's bench_targets.jsonl: appended, fsynced,
+    0600, only while that profile is the active one (StaleProfile
+    otherwise, nothing written). Past BENCH_KEEP runs of one target (a
+    server by name, the cloud) its oldest go, in one atomic rewrite, so a
+    cloud run never pushes out a server's history."""
+    line = (json.dumps(rec, separators=(",", ":")) + "\n").encode("ascii")
+    with _bench_file_lock:
+        try:
+            with open(_pfile(BENCH_TFILE, ctx), "rb") as f:
+                f.seek(0, 2)
+                if f.tell():
+                    f.seek(-1, 2)
+                    if f.read(1) != b"\n":
+                        line = b"\n" + line      # after a torn last line
+        except OSError:
+            pass
+        ctx.append(BENCH_TFILE, line)
+        every = bench_targets_history(ctx)
+        kept = bench_targets_history(ctx, BENCH_KEEP)
+        if len(kept) < len(every):
+            ctx.write_bytes(BENCH_TFILE, b"".join(
+                (json.dumps(r, separators=(",", ":")) + "\n").encode("ascii")
+                for r in reversed(kept)), mode=0o600)
 
 
 # ------------------------------------------- the hardware line (6b331)
@@ -19713,15 +20604,24 @@ def bench_hardware() -> dict:
     return dict(hw)
 
 
-def bench_status() -> dict:
+def bench_status(ctx=None) -> dict:
     """GET /api/bench: the hardware line, the run (going, or the last one
     this launch), the saved runs, and when idle the models a run would
-    test."""
+    test. (6b341) A run of a server or of the cloud, and the saved ones,
+    are only shown to the profile they belong to (ctx)."""
     with _bench_lock:
         running = _bench["running"]
         run = json.loads(json.dumps(_bench["run"])) if _bench["run"] else None
+        owner = _bench.get("ctx")
+    if run and (run.get("target") or "local") != "local" and (
+            ctx is None or owner is not ctx):
+        run = None
+    hist = bench_history()
+    if ctx is not None:
+        hist = sorted(hist + bench_targets_history(ctx, BENCH_SHOW),
+                      key=lambda r: -r["t"])
     out = {"hw": bench_hardware().get("line", ""), "running": running,
-           "run": run, "history": bench_history(),
+           "run": run, "history": hist, "keep": BENCH_KEEP,
            "test": {"name": BENCH_TEST, "max_tokens": BENCH_MAX_TOKENS,
                     "cap_s": BENCH_RUN_CAP}}
     if not running:
@@ -23549,6 +24449,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         self._turn = None
         self._head_sent = False
         self._bench_held = False       # an /api/chat counted (6b331)
+        self._bench_srv_held = False   # a server-only /api/chat counted (6b341)
         # a switch under way (M9): wait for it, then work for the profile
         # it leaves active (the page's old X-Profile then gets 409). One
         # that outlasts the wait is not served under the switch's hold
@@ -23575,6 +24476,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if self._bench_held:
                 self._bench_held = False
                 bench_release()
+            if self._bench_srv_held:
+                self._bench_srv_held = False
+                bench_release_remote()
             bind_ctx(None)
 
     def do_GET(self):
@@ -24053,7 +24957,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "err": BENCH_BUSY if _bench["running"] else ""})
         elif self.path == "/api/bench":
             # the hardware benchmark (6b331): the run and the saved runs
-            self._send_json(bench_status())
+            # (6b341: this profile's, and a run of its own server or cloud)
+            self._send_json(bench_status(self.ctx))
+        elif self.path.split("?")[0] == "/api/bench/targets":
+            # what a run can test (6b341): this profile's paired servers
+            # and cloud models; ?refresh=<server id> checks that server first
+            _bq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            _bs = (_bq.get("refresh") or [""])[0]
+            self._send_json(bench_targets(
+                self.ctx, _bs if _SRV_ID_RX.fullmatch(_bs) else ""))
         elif self.path == "/api/engines":
             self._send_engines()
         elif self.path == "/api/setup":
@@ -25646,20 +26558,33 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                  _gb_of(l) for l in removed), 1),
                              "errors": errors})
             return
-        if self.path in ("/api/bench/start", "/api/bench/stop"):
+        if self.path in ("/api/bench/start", "/api/bench/stop",
+                         "/api/bench/cloud-plan"):
             # the hardware benchmark (6b331). A start is refused (409)
             # while an answer is being written or a run is going
             n = int(self.headers.get("Content-Length", 0) or 0)
-            if n:
-                self.rfile.read(n)
+            try:
+                _bd = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                _bd = {}
+            _bd = _bd if isinstance(_bd, dict) else {}
             if self.path == "/api/bench/stop":
                 self._send_json({"ok": True, "stopped": bench_stop()})
                 return
-            ok, got = bench_start()
+            if self.path == "/api/bench/cloud-plan":
+                # (6b341) what a cloud run would call, and the one-use
+                # confirmation for it: nothing is sent to a provider here
+                _bp = bench_cloud_plan(self.ctx, _bd.get("models"))
+                self._send_json(_bp, code=200 if _bp.get("ok") else 400)
+                return
+            ok, got = bench_start(_bd, self.ctx)
             if ok:
                 self._send_json({"ok": True, "id": got["id"]})
             else:
-                self._send_json({"err": got}, code=409)
+                self._send_json({"err": got}, code=(
+                    409 if got in BENCH_BUSY_REASONS + (BENCH_ANSWERING,
+                                                         BENCH_DOWNLOADING)
+                    else 400))
             return
         if self.path != "/api/chat":
             self.send_error(404)
@@ -25676,12 +26601,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # from here to the end of the request (_run), so no benchmark
         # starts while this answer is being written. A chat on one model
         # of your own server (6b334) uses none of this computer's engines,
-        # so a benchmark neither turns it away nor waits for it.
+        # so a run of this computer neither turns it away nor waits for it
+        # (a run of a server or of the cloud does both, 6b341).
         if not server_only_request(req_json, self.ctx):
             if not bench_hold():
                 self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)
                 return
             self._bench_held = True
+        else:
+            # (6b341) a run of a server or of the cloud refuses it too, and
+            # counts it so that no such run starts while it is written
+            if not bench_hold_remote():
+                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)
+                return
+            self._bench_srv_held = True
 
         messages = list(req_json.get("messages", []))
         # THE QUESTION IS SAVED ON ARRIVAL (0b 5.4, 6b322), when the page
@@ -30790,6 +31723,81 @@ body.gen #chip-model{color:var(--accent)}
 .bm-row .pbar-track{height:2px;margin-top:6px}
 #bm-note{font-size:11.5px;color:var(--faint);line-height:1.5;margin:8px 0 0}
 #bm-note[hidden]{display:none}
+/* (6b341) the target, the checklist, the cost dialog and Compare */
+.bm-tg{display:flex;gap:7px;align-items:center;margin:0 0 6px;min-width:0}
+.bm-tg[hidden]{display:none}
+.bm-tg select{font:inherit;font-size:11.5px;color:var(--text);
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:4px 6px;min-width:0;max-width:250px;cursor:pointer;
+  text-overflow:ellipsis}
+.bm-tg select[hidden]{display:none}
+.bm-tg select:focus-visible{outline:2px solid rgba(255,255,255,.3);
+  outline-offset:1px}
+.bm-tg .bm-btn{margin-left:auto}
+.bm-pk{margin-bottom:8px;max-height:176px;overflow-y:auto}
+.bm-ck{display:flex;align-items:baseline;gap:8px;min-width:0;cursor:pointer}
+.bm-ck input{accent-color:#5b8cff;flex:none;margin:0;transform:translateY(1px)}
+.bm-ck .bm-d{margin-left:auto}
+.bm-ckn{margin-left:22px}
+.bm-gh{font-family:var(--mono);font-size:9px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--faint);padding:8px 0 0}
+.bm-gh:first-child{padding-top:6px}
+#bmc-veil,#bmv-veil{position:fixed;inset:0;z-index:66;display:flex;
+  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#bmc-veil[hidden],#bmv-veil[hidden]{display:none}
+#bmc-card,#bmv-card{width:min(460px,calc(100vw - 48px));padding:22px 24px 16px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);max-height:min(86vh,720px);
+  overflow:hidden auto;animation:doorPop .4s cubic-bezier(.16,1,.3,1) both}
+#bmv-card{width:min(720px,calc(100vw - 48px))}
+#bmc-card .set-h,#bmv-card .set-h{margin-bottom:4px}
+#bmc-list{list-style:none;margin:8px 0;padding:0;font-size:12.5px;
+  color:var(--text)}
+#bmc-list li{display:flex;gap:10px;align-items:baseline;padding:5px 0;
+  border-top:1px solid var(--line-soft)}
+#bmc-list li:first-child{border-top:none}
+#bmc-list li span:first-child{flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+#bmc-sum,#bmc-est{font-size:11.5px;color:var(--dim);line-height:1.5;margin:6px 0}
+#bmc-warn{font-size:12.5px;color:#e6b422;line-height:1.5;margin:8px 0 10px}
+.bmc-ck{display:flex;gap:8px;align-items:center;font-size:12.5px;
+  color:var(--text);cursor:pointer}
+.bmc-ck input{accent-color:#5b8cff;margin:0}
+#bmc-card .sh-foot,#bmv-card .sh-foot{display:flex;gap:8px;
+  justify-content:flex-end;margin-top:14px}
+#bmc-card .ghost{background:none;border:1px solid var(--line);
+  color:var(--faint)}
+#bmc-card .ghost:hover{color:var(--text);border-color:var(--dim)}
+#bmv-runs{max-height:140px;overflow-y:auto;border:1px solid var(--line);
+  border-radius:10px;padding:2px 12px;margin:8px 0}
+.bmv-r{padding:6px 0;border-top:1px solid var(--line-soft)}
+.bmv-r:first-child{border-top:none}
+.bmv-r input:disabled+span{opacity:.4}
+.bmv-w{font-size:11.5px;color:#e6b422;line-height:1.5;margin:8px 0}
+.bmv-t{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+.bmv-t th{font-family:var(--mono);font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);text-align:left;
+  font-weight:400;padding:4px 6px 4px 0}
+.bmv-t td{padding:6px 6px 6px 0;border-top:1px solid var(--line-soft);
+  vertical-align:top;color:var(--text)}
+.bmv-t .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bmv-t th.n{padding-left:8px}
+.bmv-g,.bmv-m{margin-top:12px}
+.bmv-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+.bmv-s{display:flex;gap:10px;align-items:baseline;font-size:12px;padding:2px 0}
+.bmv-s span:first-child{flex:1;min-width:0}
+.bmv-s .n{font-variant-numeric:tabular-nums}
+.bmv-b{display:grid;grid-template-columns:minmax(90px,38%) 1fr 74px;gap:8px;
+  align-items:center;font-size:11px;padding:2px 0}
+.bmv-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)}
+.bmv-bar{display:block;height:6px;background:rgba(255,255,255,.07);
+  border-radius:3px;overflow:hidden}
+.bmv-bar i{display:block;height:100%;background:rgba(255,255,255,.4);
+  border-radius:3px}
+.bmv-bar i.best{background:#57c98e}
+.bmv-v{text-align:right;font-variant-numeric:tabular-nums;color:var(--text)}
 #bm-busy{font-size:12px;color:var(--dim);line-height:1.5;padding:0 16px 8px}
 #bm-busy[hidden]{display:none}
 /* Models: the roster */
@@ -32306,8 +33314,10 @@ __CODE_ROWS__
           <button class="bm-btn" id="bm-go">Run benchmark</button>
           <button class="bm-btn" id="bm-stop" hidden>Stop</button>
         </div>
+        <div class="bm-tg" id="bm-tg" hidden><select id="bm-target" aria-label="What to benchmark" hidden></select><button class="bm-btn" id="bm-cv-open" hidden>Compare runs</button></div>
         <div id="bm-hw">&mdash;</div>
-        <div class="bm-desc">The same test on each model installed here: read a passage of about 1,000 tokens, then write 256. About a minute a model. Questions asked during a run are turned away. Results stay on this computer.</div>
+        <div class="bm-desc" id="bm-desc">The same test on each model installed here: read a passage of about 1,000 tokens, then write 256. About a minute a model. Questions asked during a run are turned away. Results stay on this computer.</div>
+        <div class="us-card bm-list bm-pk" id="bm-pk" hidden></div>
         <div id="bm-prog" hidden><div class="pbar-track"><div class="pbar-fill" id="bm-fill"></div></div>
           <div id="bm-status"></div></div>
         <div class="bm-pick" id="bm-pick" hidden>
@@ -32337,6 +33347,32 @@ __CODE_ROWS__
      Only controls the engines actually honour are here; two flags that
      look useful are silently ignored by the image engine, confirmed by
      running it, so neither has a row. -->
+<!-- BENCHMARK (6b341): the cost dialog every cloud run goes through, and
+     Compare. Both sit over Settings -->
+<div id="bmc-veil" hidden>
+  <div id="bmc-card" role="dialog" aria-modal="true" aria-labelledby="bmc-title">
+    <div class="set-h" id="bmc-title">Call these cloud models?</div>
+    <ul id="bmc-list"></ul>
+    <p id="bmc-sum"></p>
+    <p id="bmc-est"></p>
+    <p id="bmc-warn"></p>
+    <label class="bmc-ck"><input type="checkbox" id="bmc-ok"> I understand this may cost money</label>
+    <div class="sh-foot">
+      <button id="bmc-cancel" class="about-btn slim ghost">Cancel</button>
+      <button id="bmc-go" class="about-btn slim" disabled>Call these models</button>
+    </div>
+  </div>
+</div>
+<div id="bmv-veil" hidden>
+  <div id="bmv-card" role="dialog" aria-modal="true" aria-labelledby="bmv-title">
+    <div class="set-h" id="bmv-title">Compare runs</div>
+    <p class="bm-desc">Tick the runs to put side by side. Only runs of the same test compare.</p>
+    <div id="bmv-runs"></div>
+    <div id="bmv-out"></div>
+    <div class="sh-foot"><button id="bmv-close" class="about-btn slim">Done</button></div>
+  </div>
+</div>
+
 <div id="gear-veil" hidden>
   <div id="gear-card">
     <div class="set-h" id="gear-title">Settings</div>
@@ -36486,8 +37522,8 @@ document.addEventListener("keydown",e=>{
     if(engMenuEsc()){e.preventDefault();return;}
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
-    for(const sel of ["#new-veil","#update-veil","#about-veil",
-                      "#setup-veil"]){
+    for(const sel of ["#bmc-veil","#bmv-veil","#new-veil","#update-veil",
+                      "#about-veil","#setup-veil"]){
       const el=$(sel);
       if(el&&!el.hidden){el.hidden=true;return;}
     }
@@ -38731,11 +39767,29 @@ async function loadUsage(){
    the pane is open) and the saved runs. Writes, tokens a second while
    writing, is the headline; reads, first token, load and memory go on
    the line under it. A run can be compared with an earlier one of the
-   same test on this computer. */
+   same test on this computer.
+   (6b341, per Patrick: "can the benchmark feature also allow benchmarking
+   your servers? cloud servers too ... then allow those benchmarks to be
+   compared") The pane picks a target: this computer, a paired server (its
+   models listed with where they run, the ones that fit its card ticked) or
+   the cloud (nothing ticked; a dialog with the cost warning, every run).
+   Compare puts any stored runs of the same test side by side
+   (bmCompare, pure, run in node by the gauntlet). */
 const BM_STEP={checking:"checking memory",loading:"loading",
   reading:"reading the passage",writing:"writing"};
+// (6b341) a server's and a provider's rows say what they are doing
+const BM_STEP_S={checking:"checking the server",loading:"loading on the server",
+  reading:"reading the passage",writing:"writing"};
+const BM_STEP_C={checking:"checking the key",loading:"sending",
+  reading:"waiting for the first token",writing:"writing"};
+function bmStep(r){return (r.provider?BM_STEP_C:r.network?BM_STEP_S:BM_STEP)[r.status]||r.status;}
 const BM_GIB=1073741824;
 let bmSeq=0,bmT=0,bmErr="",bmShow="",bmCmp="";
+// (6b341) what the pane tests: "local", "srv:<server id>" or "cloud"; what
+// that offers (/api/bench/targets), what is ticked, the last status, the
+// cloud plan the dialog shows, the runs ticked in Compare
+let bmTg="local",bmTD=null,bmLast=null,bmPlan=null,bmSel={},bmTdSeq=0,bmTdAt=0;
+const bmTick={srv:{},cloud:{}};
 function bmTps(v){if(v==null||!isFinite(+v))return "—";v=+v;
   return v>=100?uInt(v):v.toFixed(1);}
 // the headline keeps its decimal at any speed
@@ -38763,15 +39817,18 @@ function bmMatch(old,r){return old&&(old.models||[]).find(o=>o.label===r.label
 // "mlx_lm 0.31.3 · Ollama 0.12.1"
 function bmVer(v){v=v||{};return [v.mlx_lm?"mlx_lm "+v.mlx_lm:"",v.ollama?"Ollama "+v.ollama:""]
   .filter(Boolean).join(" · ");}
+// a figure a target didn't give: a server says so, the cloud has none
+function bmNM(r,v,fmt){return v!=null&&isFinite(+v)?fmt(v):r.provider?"-":r.network?"not measured":"—";}
 function bmRow(r,cur,old,max){
   const done=r.status==="done";
-  let top='<span class="bm-n">'+esc(r.label)+'</span>'
-    +(r.engine?'<span class="bm-e">'+esc(r.engine)+'</span>':"");
+  let top='<span class="bm-n">'+esc(r.network&&r.model?r.model:r.label)+'</span>'
+    +((r.provider||r.engine)?'<span class="bm-e">'+esc(r.provider||r.engine)+'</span>':"");
   if(done){
     top+='<span class="bm-v">'+bmGen(r.gen_tps)+'<small>tok/s</small></span>';
     // a model cut at the time limit is estimated, and never compared
     // (review of 6b331); a change inside run-to-run noise stays grey
-    if(bmEst(r))top+='<span class="bm-d" title="Cut at the time limit: counted from what arrived">estimated</span>';
+    if(bmEst(r))top+='<span class="bm-d" title="'+(r.capped?'Cut at the time limit: counted from what arrived'
+      :'Counted from what arrived: no token count came with it')+'">estimated</span>';
     else if(old&&!bmEst(old)&&old.gen_tps>0&&r.gen_tps>0){
       const p=(r.gen_tps-old.gen_tps)/old.gen_tps*100;
       top+='<span class="bm-d'+(p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":"")+'" title="'
@@ -38780,11 +39837,15 @@ function bmRow(r,cur,old,max){
   }
   let sub="",mem="";
   if(done){
-    sub="reads "+bmTps(r.prompt_tps)+" tok/s · first token "+bmS(r.ttft_s)
-      +" · load "+bmS(r.load_s,1);
+    // (6b341) a provider's row has no reading or load figure and says it
+    // includes the network; a server's first token does too
+    sub=r.provider?"reads - · first token "+bmS(r.ttft_s)+" · load - · total "+bmS(r.total_s)
+      :"reads "+bmNM(r,r.prompt_tps,v=>bmTps(v)+" tok/s")+" · first token "+bmS(r.ttft_s)
+      +(r.network?" (incl. network)":"")+" · load "+bmNM(r,r.load_s,v=>bmS(v,1));
+    if(r.provider)sub+='<br><span class="bm-f">cloud, includes the network</span>';
     if(r.note)sub+="<br>"+esc(r.note);
   }else if(cur){
-    sub=esc((BM_STEP[r.status]||r.status)+(r.status==="writing"
+    sub=esc(bmStep(r)+(r.status==="writing"
       ?", "+uInt(r.tok||0)+" of "+uInt(max)+" tokens":""));
   }else sub=esc(r.status==="waiting"?"waiting":r.note||r.status);
   // memory: how far it rose while the model loaded and wrote, the peak,
@@ -38797,6 +39858,10 @@ function bmRow(r,cur,old,max){
     if(r.pressured)mem+=' · <span class="bm-f">memory pressure</span>';
     if(r.swapped)mem+=' · <span class="bm-f sw">swapped'
       +(r.swap_mb?" "+uInt(r.swap_mb)+" MB":"")+"</span>";
+  }else if(done&&r.network&&!r.provider&&r.gpu_size){
+    // a server: how much of the model sits on its card
+    mem=esc(Math.round(100*(r.gpu_vram||0)/r.gpu_size)+"% on the server's GPU"
+      +(r.placement?" · "+r.placement:""));
   }
   let h='<div class="bm-row"><div class="bm-l">'+top+'</div><div class="bm-s">'+sub+"</div>";
   if(mem)h+='<div class="bm-s">'+mem+"</div>";
@@ -38805,30 +39870,200 @@ function bmRow(r,cur,old,max){
     +'%"></div></div>';
   return h+"</div>";
 }
+// ---- (6b341) comparing runs: any set of stored runs of the same test, from
+// any target. Pure: nothing here touches the page.
+// a model's name as each target spells it: "gpt-oss:20b" on a server,
+// "GPT-OSS 20B" here, "openai/gpt-oss-20b" at a provider all read gptoss20b
+function bmKey(name){
+  let n=String(name||"");const i=n.indexOf(" · ");if(i>=0)n=n.slice(i+3);
+  n=n.slice(n.lastIndexOf("/")+1).toLowerCase().replace(/:latest$/,"");
+  return n.replace(/[^a-z0-9]/g,"");}
+// where a row ran: this computer, a server by the person's own name, a provider
+function bmWhere(run,r){
+  return run.target==="cloud"?(r&&r.provider)||"Cloud":run.target==="server"?(run.target_name||"Server"):"This computer";}
+// the hardware a run was measured on, as the pane says it
+function bmHw(run){
+  return run.target==="cloud"?"cloud, includes the network":(run.hw&&run.hw.line)||"";}
+// what must match for two figures to be like for like
+function bmSetup(run,r){
+  return [run.target||"local",bmWhere(run,r),(run.hw&&run.hw.line)||"",bmVer(run.versions)].join("|");}
+function bmCompare(runs){
+  const out={test:"",left:0,rows:[],groups:[],warn:"",max:{}};
+  runs=(runs||[]).filter(Boolean);
+  if(!runs.length)return out;
+  out.test=runs[0].test;
+  const use=runs.filter(x=>x.test===out.test);
+  out.left=runs.length-use.length;       // another test's runs don't compare
+  const sets=new Set();
+  use.forEach(run=>(run.models||[]).forEach(r=>{
+    if(r.status!=="done")return;
+    const nm=r.model||r.label,row={run:run.id,t:run.t,target:run.target||"local",
+      where:bmWhere(run,r),hw:bmHw(run),setup:bmSetup(run,r),name:nm,key:bmKey(nm),
+      net:!!r.network||run.target==="cloud",cloud:run.target==="cloud",est:bmEst(r),
+      gen:r.gen_tps,prompt:r.prompt_tps,ttft:r.ttft_s,load:r.load_s,total:r.total_s};
+    out.rows.push(row);sets.add(row.setup);}));
+  if(sets.size>1)out.warn="These runs were measured on different hardware or versions, so the figures compare setups, not just models.";
+  ["gen","prompt","ttft","load"].forEach(k=>{
+    const v=out.rows.map(r=>r[k]).filter(x=>x>0);out.max[k]=v.length?Math.max.apply(null,v):0;});
+  // a model that ran in more than one place, side by side: each against the slowest
+  const by={};out.rows.forEach(r=>{(by[r.key]=by[r.key]||[]).push(r);});
+  Object.keys(by).forEach(k=>{
+    const g=by[k];
+    if(new Set(g.map(r=>r.where)).size<2)return;
+    const ok=g.filter(r=>!r.est&&r.gen>0),slow=ok.length>1?ok.reduce((a,b)=>b.gen<a.gen?b:a):null;
+    out.groups.push({key:k,name:g[0].name,slow:slow&&slow.where,
+      items:g.slice().sort((a,b)=>(b.gen||0)-(a.gen||0)).map(r=>Object.assign({},r,
+        {x:slow&&!r.est&&r.gen>0?r.gen/slow.gen:null,isSlow:!!slow&&r===slow}))});});
+  return out;
+}
+// "2.4× faster than This computer", "slowest of these" or nothing
+function bmFaster(it,slowWhere){
+  if(it.x==null)return it.est?"estimated":"";
+  if(it.isSlow)return "slowest of these";
+  return it.x>=1.05?it.x.toFixed(1)+"× faster than "+slowWhere:"about the same as "+slowWhere;}
+// a cell of the table: the figure, "-" where the cloud has none, "not measured" where a server gave none
+function bmCell(r,v,fmt){return v!=null&&isFinite(+v)?fmt(v):r.cloud?"-":r.net?"not measured":"—";}
+function bmCmpHtml(c){
+  if(!c.rows.length)return '<p class="bmv-w">Tick two or more runs to compare them.</p>';
+  let h="";
+  if(c.left)h+='<p class="bmv-w">'+esc(c.left+(c.left===1?" run":" runs")+" of another test left out: only runs of the same test compare.")+"</p>";
+  if(c.warn)h+='<p class="bmv-w">'+esc(c.warn)+"</p>";
+  h+='<table class="bmv-t"><thead><tr><th>Model</th><th>Ran on</th><th class="n">Writes</th><th class="n">Reads</th><th class="n">First token</th><th class="n">Load</th></tr></thead><tbody>';
+  c.rows.forEach(r=>{
+    h+="<tr><td>"+esc(r.name)+'<div class="bm-s">'+esc(uWhen(r.t))+(r.est?" · estimated":"")+"</div></td><td>"+esc(r.where)
+      +'<div class="bm-s">'+esc(r.hw)+(r.net&&!r.cloud?" · first token includes the network":"")+"</div></td>"
+      +'<td class="n">'+bmCell(r,r.gen,bmGen)+'</td><td class="n">'+bmCell(r,r.prompt,v=>bmTps(v))
+      +'</td><td class="n">'+bmCell(r,r.ttft,v=>bmS(v))+'</td><td class="n">'+bmCell(r,r.load,v=>bmS(v,1))+"</td></tr>";});
+  h+="</tbody></table>";
+  c.groups.forEach(g=>{
+    h+='<div class="bmv-g"><div class="bmv-k">'+esc(g.name)+" on "+g.items.length+" setups</div>";
+    g.items.forEach(it=>{h+='<div class="bmv-s"><span>'+esc(it.where)+'</span><span class="n">'
+      +bmGen(it.gen)+' tok/s</span><span class="bm-d'+(it.x>=1.05&&!it.isSlow?" up":"")+'">'+esc(bmFaster(it,g.slow||""))+"</span></div>";});
+    h+="</div>";});
+  [["gen","Writes","tok/s",1,v=>bmGen(v)],["prompt","Reads","tok/s",1,v=>bmTps(v)],
+   ["ttft","First token","seconds, shorter is faster",0,v=>bmS(v)],["load","Load","seconds, shorter is faster",0,v=>bmS(v,1)]].forEach(m=>{
+    const vals=c.rows.filter(r=>r[m[0]]>0),best=vals.length?(m[3]?Math.max:Math.min).apply(null,vals.map(r=>r[m[0]])):0;
+    h+='<div class="bmv-m"><div class="bmv-k">'+m[1]+" · "+m[2]+"</div>";
+    c.rows.forEach(r=>{
+      const v=r[m[0]],has=v>0;
+      h+='<div class="bmv-b"><span class="bmv-l">'+esc(r.name+" · "+r.where)+'</span><span class="bmv-bar"><i'
+        +(has&&v===best?' class="best"':"")+' style="width:'+(has&&c.max[m[0]]?Math.max(2,Math.round(100*v/c.max[m[0]])):0)+'%"></i></span><span class="bmv-v">'
+        +bmCell(r,v,m[4])+"</span></div>";});
+    h+="</div>";});
+  return h;
+}
+// what a click on Run would test on this pane's target
+function bmSrv(){const m=/^srv:(.+)$/.exec(bmTg);return m&&bmTD?(bmTD.servers||[]).find(s=>s.id===m[1])||null:null;}
+function bmCloudTicked(){
+  const out=[];((bmTD&&bmTD.cloud)||[]).forEach(p=>p.models.forEach(m=>{
+    if(bmTick.cloud[p.pid+"/"+m.id])out.push({pid:p.pid,model:m.id});}));return out;}
+function bmPicked(){
+  if(bmTg==="local")return {target:"local"};
+  const s=bmSrv();
+  if(s)return {target:"server",server:s.id,
+    models:(s.models||[]).filter(m=>(bmTick.srv[s.id]||{})[m.name]).map(m=>m.name)};
+  if(bmTg==="cloud")return {target:"cloud",models:bmCloudTicked()};
+  return null;}
+// whether Run can be pressed: a server needs a model ticked and an answer, the cloud 1 to 6
+function bmReady(p,cloudMax){
+  if(!p)return false;
+  if(p.target==="local")return true;
+  if(p.target==="server"){const s=bmSrv();return !!(s&&s.reachable&&p.models.length);}
+  return p.models.length>0&&p.models.length<=(cloudMax||6);}
+const BM_DESC_LOCAL="The same test on each model installed here: read a passage of about 1,000 tokens, then write 256. About a minute a model. Questions asked during a run are turned away. Results stay on this computer.";
+function bmDesc(){
+  const s=bmSrv();
+  if(s)return "Loads each ticked model on "+s.name+" and runs the same test: read about 1,000 tokens, write 256. Nothing is stored on the server. Models that also use its memory start unticked: they load its CPU hard. Questions asked during a run are turned away.";
+  if(bmTg==="cloud")return "Sends the same test to each ticked model: about 1,000 tokens in, up to 256 out. This uses your API keys and may cost money. Up to "+((bmTD&&bmTD.cloud_max)||6)+" models a run. Questions asked during a run are turned away.";
+  return BM_DESC_LOCAL;}
+// the checklist for a server or the cloud
+function bmPickHtml(){
+  const s=bmSrv();
+  if(s){
+    if(!s.checked)return '<div class="bm-row"><div class="bm-s">Checking '+esc(s.name)+"…</div></div>";
+    if(!s.reachable)return '<div class="bm-row"><div class="bm-s">'+esc(s.err||s.name+" didn’t answer.")+"</div></div>";
+    if(!(s.models||[]).length)return '<div class="bm-row"><div class="bm-s">'+esc(s.name)+" lists no models.</div></div>";
+    const t=bmTick.srv[s.id]||{};
+    return s.models.map(m=>'<div class="bm-row"><label class="bm-ck"><input type="checkbox" data-srv="'+esc(m.name)+'"'
+      +(t[m.name]?" checked":"")+'><span class="bm-n">'+esc(m.name)+'</span><span class="bm-e">'
+      +esc(m.placement==="gpu"?"GPU":m.placement==="gpu+ram"?"card + memory":"?")+"</span></label>"
+      +(m.why?'<div class="bm-s bm-ckn"><span class="bm-f">'+esc(m.why)+"</span></div>":"")+"</div>").join("");
+  }
+  const P=(bmTD&&bmTD.cloud)||[];
+  if(!P.length)return '<div class="bm-row"><div class="bm-s">No cloud key is saved. Add one in Settings › Cloud power.</div></div>';
+  let h="",est=false;
+  P.forEach(p=>{
+    h+='<div class="bm-gh">'+esc(p.name)+(p.rest?" · resting after a limit":"")+"</div>";
+    p.models.forEach(m=>{est=est||!!m.est;
+      h+='<div class="bm-row"><label class="bm-ck"><input type="checkbox" data-pid="'+esc(p.pid)+'" data-m="'+esc(m.id)+'"'
+        +(bmTick.cloud[p.pid+"/"+m.id]?" checked":"")+'><span class="bm-n">'+esc(m.id)+"</span>"
+        +(m.est?'<span class="bm-d">'+esc(m.est)+"</span>":"")+"</label></div>";});});
+  const n=bmCloudTicked().length,mx=(bmTD&&bmTD.cloud_max)||6;
+  h+='<div class="bm-row"><div class="bm-s'+(n>mx?" bm-f":"")+'">'+n+" of "+mx+" models ticked"
+    +(n?": "+n+(n===1?" call":" calls")+", about "+uInt(n*((bmTD&&bmTD.cloud_in)||1000))+" tokens in, up to "
+      +uInt(n*((bmTD&&bmTD.cloud_out)||256))+" out.":".")+(est?" * estimate":"")+"</div></div>";
+  return h;}
+// the saved runs one line each, for Compare
+function bmRunLine(x){
+  const n=(x.models||[]).filter(r=>r.status==="done").length;
+  return uWhen(x.t)+" · "+(x.target==="cloud"?"cloud":x.target==="server"?(x.target_name||"server"):"this computer")
+    +" · "+n+(n===1?" model":" models");}
+function bmRunsHtml(runs){
+  const first=runs.find(x=>bmSel[x.id]);
+  return runs.map(x=>{const off=first&&x.test!==first.test;
+    return '<label class="bm-ck bmv-r"'+(off?' title="A different test"':"")+'><input type="checkbox" data-run="'+esc(x.id)+'"'
+      +(bmSel[x.id]?" checked":"")+(off?" disabled":"")+'><span class="bm-n">'+esc(bmRunLine(x))+"</span>"
+      +'<span class="bm-e">'+esc(x.test||"")+"</span></label>";}).join("");}
 function paintBench(d){
-  $("#bm-hw").textContent=d?d.hw||"":"—";
+  bmLast=d;
   const max=(d&&d.test&&d.test.max_tokens)||256,going=!!(d&&d.running&&d.run);
+  const gone=going?d.run:null,sv=bmSrv();
+  // what is tested, or what was: the computer, a server's card, the cloud
+  $("#bm-hw").textContent=going?(gone.target==="cloud"?"cloud, includes the network"
+      :gone.target==="server"?(gone.card||"")+(gone.versions&&gone.versions.ollama?" · Ollama "+gone.versions.ollama:"")
+      :d.hw||"")
+    :sv?(sv.card||"")+(sv.version?" · Ollama "+sv.version:"")
+    :bmTg==="cloud"?"cloud, includes the network":d?d.hw||"":"—";
   $("#bm-go").hidden=going;$("#bm-stop").hidden=!going;
+  $("#bm-desc").textContent=going&&gone.target==="cloud"?bmDescFor("cloud"):going&&gone.target==="server"
+    ?"Running on "+gone.target_name+". Questions asked during a run are turned away.":bmDesc();
   const prog=$("#bm-prog");prog.hidden=!going;
   if(going){
     const run=d.run,M=run.models||[],r=M[run.cur];
     $("#bm-fill").style.width=Math.round(100*bmFrac(run,max))+"%";
-    $("#bm-status").textContent=r?"Model "+(run.cur+1)+" of "+M.length+" · "+r.label
-      :M.length?"Finishing":"Listing the models on this computer";
+    $("#bm-status").textContent=r?"Model "+(run.cur+1)+" of "+M.length+" · "+(r.network&&r.model?r.model:r.label)
+      :M.length?"Finishing":run.target==="local"?"Listing the models on this computer":"Getting ready";
   }
+  // the target and its checklist; neither while a run goes
+  const tg=$("#bm-target"),pk=$("#bm-pk");
+  const opts=[["local","This computer"]].concat(((bmTD&&bmTD.servers)||[]).map(s=>["srv:"+s.id,s.name]))
+    .concat(bmTD&&(bmTD.cloud||[]).length?[["cloud","Cloud models (may cost money)"]]:[]);
+  if(!opts.some(o=>o[0]===bmTg))bmTg="local";
+  if(tg.dataset.k!==opts.map(o=>o.join("=")).join("|")){
+    tg.textContent="";opts.forEach(o=>{const e=document.createElement("option");e.value=o[0];e.textContent=o[1];tg.appendChild(e);});
+    tg.dataset.k=opts.map(o=>o.join("=")).join("|");}
+  tg.value=bmTg;tg.hidden=opts.length<2;tg.disabled=going;
+  pk.hidden=going||bmTg==="local";
+  if(!pk.hidden){const keep=pk.scrollTop;pk.innerHTML=bmPickHtml();pk.scrollTop=keep;}
+  $("#bm-go").disabled=!going&&!bmReady(bmPicked(),bmTD&&bmTD.cloud_max);
   // the runs: the one going (or one this launch couldn't save), then the saved
   let runs=(d&&d.history)||[];
   if(d&&d.run&&(going||(d.run.end&&!d.run.saved)))runs=[d.run].concat(runs.filter(x=>x.id!==d.run.id));
+  $("#bm-cv-open").hidden=going||(((d&&d.history)||[]).length<2);
+  $("#bm-tg").hidden=tg.hidden&&$("#bm-cv-open").hidden;
   const pick=$("#bm-pick"),show=$("#bm-show"),cmp=$("#bm-cmp");
   if(going)bmShow=d.run.id;
   if(!runs.some(x=>x.id===bmShow))bmShow=runs.length?runs[0].id:"";
   const shown=runs.find(x=>x.id===bmShow)||null;
-  const same=runs.filter(x=>shown&&x.id!==shown.id&&x.test===shown.test&&x.t<shown.t);
+  // an earlier run of the same test on the same machine, server or cloud
+  const same=runs.filter(x=>shown&&x.id!==shown.id&&x.test===shown.test&&x.t<shown.t
+    &&(x.target||"local")===(shown.target||"local")&&(x.target_name||"")===(shown.target_name||""));
   if(!same.some(x=>x.id===bmCmp))bmCmp="";
   // two runs in one minute get their seconds (review of 6b331)
   const when=x=>{const w=uWhen(x.t);
     return runs.some(y=>y.id!==x.id&&uWhen(y.t)===w)?w+":"+u2(new Date(x.t*1000).getSeconds()):w;};
-  const lbl=x=>(going&&x.id===d.run.id?"Now":when(x))+(x.state==="stopped"?" (stopped)":"");
+  const lbl=x=>(going&&x.id===d.run.id?"Now":when(x))+(x.target&&x.target!=="local"
+    ?" · "+(x.target==="cloud"?"cloud":x.target_name||"server"):"")+(x.state==="stopped"?" (stopped)":"");
   show.textContent="";cmp.textContent="";
   runs.forEach(x=>{const o=document.createElement("option");o.value=x.id;o.textContent=lbl(x);show.appendChild(o);});
   [{id:"",t:0}].concat(same).forEach(x=>{const o=document.createElement("option");o.value=x.id;
@@ -38849,20 +40084,27 @@ function paintBench(d){
     if(shown.restore)bits.push(shown.restore);
     // what each run was measured on and with, when they differ
     const on=x=>[(x.hw&&x.hw.line)||"",bmVer(x.versions)].filter(Boolean).join(" · ");
+    const cloud=shown.target==="cloud";
     if(old&&on(old)!==on(shown))bits.push("This run: measured on "+on(shown)
       +". The run compared: measured on "+on(old)+".");
-    else if(shown.hw&&shown.hw.line&&d&&shown.hw.line!==d.hw)bits.push("Measured on "+on(shown)+".");
-    if((shown.models||[]).some(r=>r.status==="done"))bits.push(
-      "Speeds are tokens a second. MLX is timed by the app; Ollama reports its own. "
+    else if(shown.target==="server")bits.push("Ran on "+shown.target_name+(on(shown)?" ("+on(shown)+")":"")+".");
+    else if(!cloud&&shown.hw&&shown.hw.line&&d&&shown.hw.line!==d.hw)bits.push("Measured on "+on(shown)+".");
+    if((shown.models||[]).some(r=>r.status==="done"))bits.push(cloud
+      ?"Cloud, includes the network: these are not hardware speeds. Writes use the provider’s token counts when it sends them. This run used your API keys."
+      :shown.target==="server"
+      ?"Speeds are tokens a second, as the server's Ollama reports them. First token is timed here and includes the network. A model already loaded on the server has no load time to measure."
+      :"Speeds are tokens a second. MLX is timed by the app; Ollama reports its own. "
       +"Memory is the rise in memory in use while the model loaded and wrote.");
   }
-  if(!shown&&d&&!going){
+  if(!shown&&d&&!going&&bmTg==="local"){
     const n=(d.installed||[]).length;
     bits.push(n?n+(n===1?" model":" models")+" installed here: about "+n
       +(n===1?" minute.":" minutes."):"No local models are installed on this computer.");
   }
+  if(d&&!going&&(shown||(d.history||[]).length))bits.push("Keeps the last "+(d.keep||100)+" runs for each target: this computer, each server and the cloud.");
   const note=$("#bm-note");note.textContent=bits.join(" ");note.hidden=!bits.length;
 }
+function bmDescFor(t){return t==="cloud"?"Sends the same test to each ticked model: about 1,000 tokens in, up to 256 out. This uses your API keys and may cost money. Questions asked during a run are turned away.":"";}
 // the composer's check before a send: true (and said above the composer)
 // while a benchmark runs; a failed check lets the send go, and the
 // server's 409 still refuses it
@@ -38883,26 +40125,106 @@ async function loadBench(){
   if(seq!==bmSeq)return;
   paintBench(d);
   bmErr="";                     // said once; the next paint drops it
+  // what a run can test is looked at when the pane opens, and now and then
+  if(Date.now()-bmTdAt>30000)loadBenchTargets();
   clearTimeout(bmT);
   if(d&&d.running&&!aboutVeil.hidden&&$("#p-usage").classList.contains("on"))
     bmT=setTimeout(loadBench,1000);
 }
-async function benchPost(path){
+// (6b341) what the pane can test: this profile's paired servers and cloud
+// models. A server named in refresh is checked first (its models, its
+// card): the same read-only look as Settings › Your servers.
+async function loadBenchTargets(refresh){
+  const seq=++bmTdSeq;let d=null;bmTdAt=Date.now();
+  try{const r=await api("/api/bench/targets"+(refresh?"?refresh="+encodeURIComponent(refresh):""));
+    if(r.ok)d=await r.json();}catch(e){}
+  if(seq!==bmTdSeq||!d)return;
+  bmTD=d;
+  // a server's models start ticked when they fit whole on its card; the cloud's never
+  (d.servers||[]).forEach(s=>{const t=bmTick.srv[s.id]=bmTick.srv[s.id]||{};
+    (s.models||[]).forEach(m=>{if(!(m.name in t))t[m.name]=!!m.tick;});});
+  if(bmLast)paintBench(bmLast);else loadBench();
+}
+async function benchPost(path,body){
   let j={},ok=false;
-  try{const r=await api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+  try{const r=await api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
     ok=r.ok;j=await r.json().catch(()=>({}));}catch(e){}
   return ok?"":(j.err||"The benchmark couldn’t start.");
+}
+// ---- the cost dialog: every cloud run, never remembered
+async function bmCloudAsk(p){
+  let j={};
+  try{const r=await api("/api/bench/cloud-plan",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({models:p.models})});j=await r.json().catch(()=>({}));}catch(e){}
+  if(!j.ok){bmErr=j.err||"Couldn’t prepare the run.";loadBench();return;}
+  bmPlan=j;
+  const anyEst=j.models.some(m=>m.est);
+  $("#bmc-list").innerHTML=j.models.map(m=>"<li><span>"+esc(m.provider)+" · "+esc(m.model)+"</span>"
+    +(m.est?'<span class="bm-d">'+esc(m.est)+"</span>":"")+"</li>").join("");
+  $("#bmc-sum").textContent=j.calls+(j.calls===1?" call":" calls")+". Each sends about "+uInt(bmTD&&bmTD.cloud_in||1000)
+    +" tokens in and asks for up to "+uInt(bmTD&&bmTD.cloud_out||256)+" tokens out: about "+uInt(j.tokens_in)
+    +" in and up to "+uInt(j.tokens_out)+" out in all. At most "+j.max+" models a run.";
+  $("#bmc-est").textContent=anyEst?"* Rough estimate, not a quote. A model with no estimate has no price held here."
+    :"ConcordeAI holds no prices for these models, so it shows no estimate.";
+  $("#bmc-warn").textContent=j.warning;
+  $("#bmc-ok").checked=false;$("#bmc-go").disabled=true;
+  $("#bmc-veil").hidden=false;$("#bmc-ok").focus();
+}
+function bmCloudClose(){$("#bmc-veil").hidden=true;bmPlan=null;}
+// ---- Compare
+function bmCvOpen(){
+  const runs=(bmLast&&bmLast.history)||[];
+  bmSel={};
+  $("#bmv-runs").innerHTML=bmRunsHtml(runs);
+  $("#bmv-out").innerHTML=bmCmpHtml(bmCompare([]));
+  $("#bmv-veil").hidden=false;
+}
+function bmCvPaint(){
+  const runs=(bmLast&&bmLast.history)||[];
+  const keep=$("#bmv-runs").scrollTop;
+  $("#bmv-runs").innerHTML=bmRunsHtml(runs);$("#bmv-runs").scrollTop=keep;
+  $("#bmv-out").innerHTML=bmCmpHtml(bmCompare(runs.filter(x=>bmSel[x.id])));
 }
 (function(){
   const go=$("#bm-go");if(!go)return;
   go.addEventListener("click",async()=>{
-    go.disabled=true;bmErr=await benchPost("/api/bench/start");bmShow="";bmCmp="";
+    const p=bmPicked();if(!p||!bmReady(p,bmTD&&bmTD.cloud_max))return;
+    if(p.target==="cloud"){go.disabled=true;await bmCloudAsk(p);go.disabled=false;return;}
+    go.disabled=true;bmErr=await benchPost("/api/bench/start",p);bmShow="";bmCmp="";
     go.disabled=false;loadBench();});
   $("#bm-stop").addEventListener("click",async()=>{
     const b=$("#bm-stop");b.disabled=true;await benchPost("/api/bench/stop");
     b.disabled=false;loadBench();});
   $("#bm-show").addEventListener("change",e=>{bmShow=e.target.value;bmCmp="";loadBench();});
   $("#bm-cmp").addEventListener("change",e=>{bmCmp=e.target.value;loadBench();});
+  // the target: a server is checked when picked, and never run until Run is pressed
+  $("#bm-target").addEventListener("change",e=>{bmTg=e.target.value;
+    const s=bmSrv();if(bmLast)paintBench(bmLast);loadBenchTargets(s?s.id:"");});
+  $("#bm-pk").addEventListener("change",e=>{
+    const i=e.target;if(!i||i.type!=="checkbox")return;
+    const s=bmSrv();
+    if(i.dataset.srv&&s)(bmTick.srv[s.id]=bmTick.srv[s.id]||{})[i.dataset.srv]=i.checked;
+    else if(i.dataset.pid)bmTick.cloud[i.dataset.pid+"/"+i.dataset.m]=i.checked;
+    if(bmLast)paintBench(bmLast);
+    const again=i.dataset.srv?'[data-srv="'+CSS.escape(i.dataset.srv)+'"]'
+      :'[data-pid="'+CSS.escape(i.dataset.pid)+'"][data-m="'+CSS.escape(i.dataset.m)+'"]';
+    const n=$("#bm-pk").querySelector(again);if(n)n.focus();});
+  // the cost dialog
+  $("#bmc-ok").addEventListener("change",e=>{$("#bmc-go").disabled=!e.target.checked;});
+  $("#bmc-cancel").addEventListener("click",bmCloudClose);
+  $("#bmc-veil").addEventListener("click",e=>{if(e.target===$("#bmc-veil"))bmCloudClose();});
+  $("#bmc-go").addEventListener("click",async()=>{
+    if(!bmPlan||!$("#bmc-ok").checked)return;
+    const id=bmPlan.id;$("#bmc-go").disabled=true;bmCloudClose();
+    // the id is spent by this one run; a second run asks again
+    bmErr=await benchPost("/api/bench/start",{target:"cloud",confirm:id,understood:true});
+    bmShow="";bmCmp="";loadBench();});
+  // Compare
+  $("#bm-cv-open").addEventListener("click",bmCvOpen);
+  $("#bmv-close").addEventListener("click",()=>{$("#bmv-veil").hidden=true;});
+  $("#bmv-veil").addEventListener("click",e=>{if(e.target===$("#bmv-veil"))$("#bmv-veil").hidden=true;});
+  $("#bmv-runs").addEventListener("change",e=>{const i=e.target;if(!i||!i.dataset.run)return;
+    bmSel[i.dataset.run]=i.checked;bmCvPaint();});
 })();
 async function openAbout(){
   // Settings always opens on About (6b318, per Patrick), never on
