@@ -23854,6 +23854,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              'VERSION <b class="vnum">%s</b>' % short_version())
                     .replace("__CHIP__", chip_name())
                     .replace("__IS_PC__", json.dumps(IS_WIN))
+                    .replace("__DICT_TRACE__",
+                             json.dumps("dict-trace" in TEST_HOOKS))
                     .replace("__GIANT_LABEL__", _html_escape(giant_blurb()[0]))
                     .replace("__GIANT_TIP__", _html_escape(giant_blurb()[1]))
                     .replace("__MEM_LABEL__", mem_label())
@@ -24471,6 +24473,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if not self._csrf_ok():
             self._refuse(403, "cross-site")
+            return
+        if self.path == "/api/test/trace" and "dict-trace" in TEST_HOOKS:
+            # one dictation's timings (6b345), dev copies only: a line in
+            # the log, nothing kept
+            d = self._json_body()
+            print("[dict-trace] %s" % str(d.get("line", ""))[:200], flush=True)
+            self._send_json({"ok": True})
             return
         if self.path == "/api/test/profile" and "profiles" in TEST_HOOKS:
             # the local-test-profile hook (1a 5.13), dev copies only
@@ -28892,6 +28901,8 @@ body.resizing{cursor:col-resize;user-select:none}
 #brand-row #settings-btn{margin-left:2px}
 #p-about .toggle-row{margin-top:10px;font-size:12px;padding:2px 2px}
 #p-about .toggle-row span{color:var(--dim)}
+#micwarm-note{font-size:11px;line-height:1.5;color:var(--faint);
+  margin:0 2px 2px 36px}
 /* 6b294, per Patrick: an arrow, sized like the buttons beside it */
 #update-flag{
   width:26px;height:26px;flex-shrink:0;border-radius:8px;
@@ -32117,6 +32128,13 @@ __CODE_ROWS__
       <div class="toggle-row" id="fx-toggle"
            title="The moving backdrop behind the chat. Everything else stays as it is.">
         <div class="switch"></div><span>Enable visual effects</span></div>
+      <!-- 6b345, per Patrick ("it takes about a, two seconds each time for
+           it to switch on"): the microphone stays open for 15 s after a
+           dictation, so the next hold starts at once. Open, not listening. -->
+      <div class="toggle-row" id="micwarm-toggle"
+           title="After you dictate, the microphone stays open for 15 seconds, recording nothing, so the next hold starts at once.">
+        <div class="switch"></div><span>Keep the microphone ready for 15 seconds after dictating</span></div>
+      <div id="micwarm-note">The next hold starts at once. macOS shows its microphone indicator while it's ready.</div>
     </section>
     <!-- ACCOUNT sits directly under About (6b260, per Patrick):
          identity reads as part of the front matter, not a footnote. -->
@@ -32579,6 +32597,7 @@ function profileChanged(){
     return;
   }
   try{sessionStorage.setItem("millen.p409",String(Date.now()));}catch(e){}
+  try{micClose(true);}catch(e){}       // the warm microphone (6b345) goes first
   location.reload();
 }
 // no token after 20 s: say so, and keep waiting (never go on without it)
@@ -32670,6 +32689,8 @@ async function apiDownload(p,nm){
 }
 // a Windows PC (6b317): its commands, settings and words differ
 const IS_PC=__IS_PC__;
+// the dictation timing line (6b345): only a dev copy with the dict-trace hook
+const DICT_TRACE=__DICT_TRACE__;
 // the sun is down where you are (6b318): the backdrop goes dark
 const SKY_NIGHT=__SKY_NIGHT__;
 
@@ -37251,7 +37272,7 @@ haloTick();
 
 /* ------------------------------------------- mic: whisper voice input */
 const micBtn=$("#mic");
-let recording=false,recCtx=null,recProc=null,recSrc=null,recStream=null,recBuf=[];
+let recording=false,recBuf=[];
 let voiceReady=false,voicePoll=null;
 
 function wavEncode(chunks,srIn){
@@ -37371,33 +37392,147 @@ function audioSecs(bufs,sr){
   return sr?n/sr:0;
 }
 
-async function startRec(){
-  recStream=await navigator.mediaDevices.getUserMedia({audio:true});
-  recCtx=new (window.AudioContext||window.webkitAudioContext)();
-  recSrc=recCtx.createMediaStreamSource(recStream);
-  recProc=recCtx.createScriptProcessor(4096,1,1);
-  recBuf=[];
-  recProc.onaudioprocess=e=>recBuf.push(new Float32Array(e.inputBuffer.getChannelData(0)));
-  recSrc.connect(recProc);recProc.connect(recCtx.destination);
-  recording=true;micBtn.classList.add("rec");
-  input.placeholder=dictPrompt();
+/* MIC CAPTURE, FAST (6b345, per Patrick: "can we reduce the delay when I
+   hold Command D to dictate? Because it takes about a, two seconds each
+   time for it to switch on."). On a keydown the old path awaited, in
+   order: ensureVoice (a /api/voice/status round trip until the first
+   success), then getUserMedia (WKWebView starts a capture session: with
+   the default constraints that is the voice-processing audio unit, which
+   alone takes a second or two, and longer through a Bluetooth headset),
+   then a NEW AudioContext, source and processor. Now:
+   - getUserMedia is the first thing a press does, in parallel with the
+     voice-ready check (which only has to pass before recording counts as
+     started, so a not-ready engine still shows its message and discards
+     the clip) and the barge-in, neither awaited before it;
+   - echoCancellation, noiseSuppression and autoGainControl are off:
+     those are what put the voice-processing unit on the path. The
+     engine takes plain mono audio and asks for none of them, and nothing
+     here plays sound for echo to cancel;
+   - the AudioContext and its processor are made once and kept (suspended
+     when the mic is let go), the source is made once per stream;
+   - the stream itself stays open MIC_WARM_S seconds after a dictation
+     (a setting, on by default), so the next hold starts at once. WARM
+     MEANS OPEN, NOT LISTENING: the source is disconnected from the
+     processor, micCap is false and the handler returns before it touches
+     a sample, so nothing is kept or sent; the next start empties recBuf
+     and sets micCap only after the source is reconnected. The macOS
+     microphone indicator is on while it waits: a deliberate trade, said
+     beside the setting. It closes on the timer, on blur or the page
+     hiding, on a new chat, on a profile change, on the page going away,
+     and when the setting goes off. Never while a recording or a start is
+     under way: that is not the warm window's to cut.
+   - "listening" is said when the first audio chunk arrives (recHeard),
+     "getting the microphone" until then. A start in flight still counts
+     as 0 s of audio for the tap and hold rules of 6b338. */
+const MIC_WARM_S=15;
+const MIC_CONSTRAINTS={audio:{echoCancellation:false,noiseSuppression:false,
+  autoGainControl:false}};
+let micCtx=null,micProc=null,micSrc=null,micStream=null,micGum=null,
+    micTimer=null,micCap=false,recHeard=false,dictVoiceP=null;
+// dev copies with the dict-trace hook only: the page writes one line to
+// the server's log per dictation, keydown to microphone to first sound
+const dictT={};
+function dictTrace(what){
+  const n=Date.now();
+  if(what==="down"){
+    for(const k of Object.keys(dictT))delete dictT[k];
+    dictT.down=n;return;
+  }
+  if(dictT.down==null||dictT[what]!=null)return;
+  dictT[what]=n-dictT.down;
+  if(what==="chunk"&&DICT_TRACE)
+    api("/api/test/trace",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({line:"keydown to microphone "+dictT.gum+" ms, to voice check "
+        +dictT.voice+" ms, to first sound "+dictT.chunk+" ms, "
+        +(dictT.warm?"warm":"cold")})}).catch(()=>{});
+}
+function micWarmOn(){
+  try{return localStorage.getItem("millen.micwarm")!=="0";}catch(e){return true;}
+}
+function micLive(){
+  return !!(micStream&&micStream.getTracks().some(t=>t.readyState==="live"));
+}
+// the stream: the warm one, one already being asked for, or a new ask
+function micStreamGet(){
+  if(micTimer){clearTimeout(micTimer);micTimer=null;}
+  if(micLive()){dictTrace("gum");return Promise.resolve(micStream);}   // warm: at once
+  if(micGum)return micGum;
+  micGum=navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS).then(s=>{
+    micStream=s;micSrc=null;dictTrace("gum");micGum=null;return s;
+  },e=>{micGum=null;throw e;});
+  return micGum;
+}
+function micCtxGet(){
+  if(!micCtx){
+    micCtx=new (window.AudioContext||window.webkitAudioContext)();
+    micProc=micCtx.createScriptProcessor(4096,1,1);
+    micProc.onaudioprocess=micChunk;
+  }
+  return micCtx;
+}
+function micChunk(e){
+  if(!micCap)return;                   // the warm window records nothing
+  recBuf.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  if(!recHeard){recHeard=true;dictTrace("chunk");recPaint();}
+}
+function recPaint(){
+  if(recording&&recHeard)input.placeholder=dictPrompt();
+}
+// begin capturing; resolves once the processor is wired and micCap is on
+async function micAttach(){
+  dictT.warm=micLive();
+  const gum=micStreamGet();            // the first thing a press does
+  const ctx=micCtxGet();
+  let rs=null;
+  if(ctx.state!=="running"){           // a keydown is the gesture resume needs
+    try{rs=ctx.resume();}catch(e){}
+  }
+  const stream=await gum;
+  if(rs){try{await rs;}catch(e){}}
+  if(!micSrc)micSrc=ctx.createMediaStreamSource(stream);
+  recBuf=[];recHeard=false;
+  micSrc.connect(micProc);micProc.connect(ctx.destination);
+  micCap=true;
+}
+// stop capturing; the clip is returned and the warm window starts (or, with
+// keep false or the setting off, the microphone is let go at once)
+function micDetach(keep){
+  micCap=false;
+  try{if(micSrc)micSrc.disconnect();if(micProc)micProc.disconnect();}catch(e){}
+  const out={bufs:recBuf,sr:micCtx?micCtx.sampleRate:0};
+  recBuf=[];recHeard=false;
+  if(keep!==false&&micWarmOn()&&micLive()){
+    if(micTimer)clearTimeout(micTimer);
+    micTimer=setTimeout(micClose,MIC_WARM_S*1000);
+  }else micClose(true);
+  return out;
+}
+function micClose(force){
+  // a recording or a start under way is not the warm window's to cut
+  if(micCap||micGum||(!force&&dictStarting))return;
+  if(micTimer){clearTimeout(micTimer);micTimer=null;}
+  try{if(micSrc)micSrc.disconnect();}catch(e){}
+  micSrc=null;
+  if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
+  if(micCtx&&micCtx.state==="running"){
+    try{micCtx.suspend().catch(()=>{});}catch(e){}
+  }
 }
 
 async function stopRec(){
   recording=false;micBtn.classList.remove("rec");
   dictKey({type:"end"},0);             // however it ended, the hotkey starts clean
-  try{recProc.disconnect();recSrc.disconnect();}catch(e){}
-  recStream.getTracks().forEach(t=>t.stop());
-  const sr=recCtx.sampleRate;recCtx.close();
+  const clip=micDetach();
   // under DICT_MIN_CLIP_S is a slip, not speech: never transcribed, and
   // never sent in voice chat (6b338)
-  if(audioSecs(recBuf,sr)<DICT_MIN_CLIP_S){
-    recBuf=[];input.placeholder="didn\u2019t catch anything";return;}
+  if(audioSecs(clip.bufs,clip.sr)<DICT_MIN_CLIP_S){
+    input.placeholder="didn\u2019t catch anything";return;}
   input.placeholder="transcribing\u2026";
   try{
-    const wav=wavEncode(recBuf,sr);recBuf=[];
+    const wav=wavEncode(clip.bufs,clip.sr);
     const r=await api("/api/transcribe",{method:"POST",body:wav});
-    if(!r.ok)throw new Error("transcribe failed");
+    // a 503 is the engine gone from under a cached "ready": ask again next time
+    if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("transcribe failed");}
     const text=(await r.json()).text;
     input.placeholder="Message MillenAI\u2026";
     if(text){
@@ -37407,10 +37542,6 @@ async function stopRec(){
   }catch(e){input.placeholder="couldn\u2019t transcribe \u2014 try again";}
 }
 
-// the hotkey's glue (6b338): the DOM onto dictKey, and dictKey onto the
-// mic button's own path
-micBtn.title="Dictate \u2014 speak your message. Hold "+DICT_KEY
-  +" to talk and let go to finish, or tap it to keep listening";
 // Settings, Advanced, the palette, the first-run and update dialogs, the
 // ZITO board: every veil hides with the hidden attribute
 function dictModal(){
@@ -37418,26 +37549,46 @@ function dictModal(){
   return !!((p&&!p.hidden)||(z&&z.classList.contains("on"))
     ||[...document.querySelectorAll('[id$="-veil"]')].some(v=>!v.hidden));
 }
-function recSecs(){return recording&&recCtx?audioSecs(recBuf,recCtx.sampleRate):0;}
+function recSecs(){return recording&&micCtx?audioSecs(recBuf,micCtx.sampleRate):0;}
 let dictStarting=false,dictPend=false;
+function micMsg(e){
+  return e&&e.name==="NotFoundError"?"no microphone found"
+    :IS_PC?"microphone blocked \u2014 allow it in Settings \u25b8 Privacy & security \u25b8 Microphone"
+    :"microphone blocked \u2014 allow it in System Settings \u25b8 Privacy";
+}
 async function dictStart(){
   if(dictStarting){dictPend=true;dictKey({type:"end"},0);return;}  // a second ask is a stop
   dictStarting=true;dictPend=false;
   let on=false;
+  dictTrace("down");
+  input.placeholder="getting the microphone\u2026";
   try{
     api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in: stop any reply audio
-    if(await ensureVoice()){
-      try{await startRec();on=true;}
-      catch(e){
-        try{recStream&&recStream.getTracks().forEach(t=>t.stop());}catch(_){}
-        input.placeholder=e&&e.name==="NotFoundError"
-        ?"no microphone found"
-        :IS_PC?"microphone blocked \u2014 allow it in Settings \u25b8 Privacy & security \u25b8 Microphone"
-        :"microphone blocked \u2014 allow it in System Settings \u25b8 Privacy";}
+      body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in: not awaited
+    const cap=micAttach();             // capture starts now...
+    cap.catch(()=>{});
+    const vp=dictVoiceP=ensureVoice(); // ...beside the voice check (cached: no call)
+    vp.catch(()=>{});
+    let ok=null;
+    try{ok=await vp;dictTrace("voice");}catch(e){}
+    if(ok!==true){
+      // not ready (its own words are on the page now) or the server gone:
+      // the clip is discarded, the microphone let go
+      const msg=ok===false?input.placeholder
+        :"couldn\u2019t reach the voice engine \u2014 try again";
+      await cap.catch(()=>{});
+      micDetach(false);
+      input.placeholder=msg;
+    }else{
+      try{
+        await cap;
+        recording=true;micBtn.classList.add("rec");
+        recPaint();on=true;
+      }catch(e){
+        micDetach(false);input.placeholder=micMsg(e);
+      }
     }
-  }catch(e){input.placeholder="couldn\u2019t reach the voice engine \u2014 try again";}
-  finally{dictStarting=false;}
+  }finally{dictStarting=false;}
   // every failed start (not ready, no mic, the server gone) resets the
   // hotkey, so the next press starts rather than stopping nothing
   if(!on){dictPend=false;dictKey({type:"end"},0);return;}
@@ -37447,8 +37598,19 @@ async function dictStart(){
 function dictAct(a){
   if(a==="start")dictStart();
   else if(a==="stop"){if(recording)stopRec();else if(dictStarting)dictPend=true;}
-  else if(recording)input.placeholder=dictPrompt();   // hold became toggle
+  else recPaint();                     // hold became toggle
 }
+function dictAway(){
+  dictAct(dictKey({type:"away",starting:dictStarting,rec:recording},Date.now()));
+  micClose();                          // the warm microphone goes with the focus
+}
+function micGone(){micClose();}        // a new chat, a profile change
+/*@mic-end*/
+
+// the hotkey's glue (6b338): the DOM onto dictKey, and dictKey onto the
+// mic button's own path
+micBtn.title="Dictate \u2014 speak your message. Hold "+DICT_KEY
+  +" to talk and let go to finish, or tap it to keep listening";
 micBtn.addEventListener("click",()=>{
   if(recording){stopRec();return;}
   dictStart();
@@ -37467,11 +37629,25 @@ document.addEventListener("keyup",e=>{
   if(!modUp&&!dictIsD(e.key,e.code))return;
   dictAct(dictKey({type:"up",mod:modUp,secs:recSecs()},Date.now()));
 },true);
-function dictAway(){
-  dictAct(dictKey({type:"away",starting:dictStarting,rec:recording},Date.now()));
-}
 addEventListener("blur",dictAway);
 document.addEventListener("visibilitychange",()=>{if(document.hidden)dictAway();});
+// the warm microphone (6b345) ends with a new chat and with the page itself
+// (a profile change reloads it, and profileChanged lets go first)
+$("#newchat").addEventListener("click",micGone);
+addEventListener("pagehide",()=>micClose(true));
+// ...and is a setting, on by default: localStorage "millen.micwarm"
+function setMicWarm(on){
+  try{localStorage.setItem("millen.micwarm",on?"1":"0");}catch(e){}
+  const t=$("#micwarm-toggle");if(t)t.classList.toggle("on",on);
+  if(!on)micClose();                   // turned off: let go of it now
+}
+(function(){
+  const t=$("#micwarm-toggle");if(!t)return;
+  t.classList.toggle("on",micWarmOn());
+  t.addEventListener("click",()=>setMicWarm(!micWarmOn()));
+  if(IS_PC)$("#micwarm-note").textContent="The next hold starts at once. "
+    +"Windows shows its microphone icon while it\u2019s ready.";
+})();
 
 input.focus();
 

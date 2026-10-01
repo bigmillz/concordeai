@@ -9,6 +9,98 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b345 — dictation starts at once
+Patrick (2026-10-01): "can we reduce the delay when I hold Command D to
+dictate? Because it takes about a, two seconds each time for it to
+switch on." Holding ⌘D, about two seconds passed before the page was
+recording, and the first words were lost. Read from the code (WKWebView
+can't be run here), the keydown path was, in order:
+
+1. `dictStart` fires the barge-in `/api/speak {stop:true}` (not awaited,
+   already cheap).
+2. `await ensureVoice()`: nothing once `voiceReady` is cached, but a
+   `/api/voice/status` round trip on the first press of every page load.
+3. `await startRec()` → `getUserMedia({audio:true})`. WKWebView starts a
+   capture session each call, and with the default constraints that
+   puts echo cancellation and noise suppression on, which is the
+   voice-processing audio unit: a second or two on its own, and longer
+   through a Bluetooth headset (profile switch). THE BIG ONE.
+4. A new `AudioContext`, `MediaStreamSource` and `ScriptProcessor`,
+   every recording, then the first 4096-frame chunk (about 85 ms at
+   48 kHz) before any sound is kept.
+
+The order only ever added: status, then the microphone, then the audio
+graph. Now:
+- **getUserMedia is the first thing a press does** (`micAttach`), in
+  parallel with `ensureVoice` (cached: no call at all, as before; and a
+  503 from `/api/transcribe` now clears the cached "ready", which the old
+  code never did) and the barge-in. The voice check only has to pass
+  before recording counts as started (`recording=true`), so a not-ready
+  engine still shows its message, discards the clip and lets the
+  microphone go, exactly as before. A start still in flight counts as
+  0 s of audio for the tap and hold rules of 6b338, unchanged.
+- **Less processing**: `echoCancellation`, `noiseSuppression` and
+  `autoGainControl` are off. The engine (`_transcribe_wav`) takes plain
+  mono and asks for none of them; nothing here plays sound for echo to
+  cancel (voice chat is parked, and the barge-in stops any reply first).
+  The cost to watch: without gain a very quiet microphone is quieter.
+  Unverified on real hardware.
+- **One `AudioContext` and one `ScriptProcessor` for the page**, made
+  on the first dictation; `resume()`d in the keydown (the gesture
+  WebKit wants) and `suspend()`ed when the microphone is let go. The
+  source node is made once per stream.
+- **The warm microphone** (Settings › About, "Keep the microphone ready
+  for 15 seconds after dictating", on by default, `millen.micwarm` in
+  localStorage). After a dictation the stream stays open `MIC_WARM_S =
+  15` s, so the next hold has no capture start at all.
+  DELIBERATE PRIVACY TRADE-OFF: while it waits the macOS microphone
+  indicator is on. The setting says so beside the switch. What it cannot
+  do: the source is disconnected from the processor, `micCap` is false,
+  and `micChunk` returns before touching a sample, so nothing is kept,
+  sent or even copied; the next start empties `recBuf` and sets `micCap`
+  only after the source is reconnected. It closes (stream stopped, context
+  suspended) on the 15 s timer, on blur or the page hiding (`dictAway`),
+  on a new chat, on a profile change (`profileChanged`, then the reload),
+  on `pagehide`, and the moment the setting goes off. It is never closed
+  under a recording or a start in flight (`micClose`'s guard), so none of
+  these can cut a dictation. Off: the stream closes at once, as before.
+- **"listening…" is said when the first audio chunk arrives**
+  (`recHeard`); until then the placeholder reads "getting the
+  microphone…", from the keydown itself. Hold or toggle changes
+  repaint only once audio is flowing.
+- **Timings** (dev copy only): started with `MILLENAI_TEST_HOOKS=dict-trace`,
+  the page POSTs one line per dictation to `/api/test/trace`, printed to
+  the dev copy's log as `[dict-trace] keydown to microphone N ms, to voice
+  check N ms, to first sound N ms, cold|warm`. The page learns it from
+  `__DICT_TRACE__` (off everywhere else, and the endpoint doesn't exist
+  without the hook). `window` has `dictT` too, for the console.
+
+Expected effect: the status round trip leaves the start (it overlapped
+nothing before); the audio-graph construction leaves every start but the
+first; and the capture start leaves it entirely while warm. A cold press
+pays only getUserMedia, now without the voice-processing unit. In the
+Blink pane with stubs (1.5 s microphone, 150 ms status, 150 ms
+AudioContext): before, press 1 reached "recording" at 1805 ms with the
+microphone asked for at 154 ms, and press 2 at 1651 ms; after, press 1
+asks at 1 ms and reaches it at 1638 ms (the 1.5 s is the stub's own),
+and a press inside the warm window reaches it at once (the pane's
+timers round to ~100 ms, so read it as "immediately"). The real numbers
+come from the dict-trace line on Patrick's Mac. Not verified in
+WKWebView: the real getUserMedia time with and without the three
+constraints, whether the voice-processing unit is what it was, a warm
+stream surviving a Bluetooth profile change (a track that ends is
+detected, `micLive`, and the next press asks again), Windows.
+
+Tests: the capture path in node on stubs of getUserMedia, AudioContext,
+timers and the API (26 scenarios, the old 6b338 glue ones included), 33
+mutations each of which must break the scenario aimed at it: capture
+before the voice check answers, no status call when cached, the
+constraints, one AudioContext, warm reuse and its 15 s, closing on
+timer / blur / new chat / pagehide, the setting off, nothing recorded
+while warm, a new recording starting empty, no cut of a recording or a
+start, "listening" only after the first chunk, the trace marks, the 503,
+and the failed starts. The 6b338 hold/tap scenarios run unchanged.
+
 ## 6b343 — Edit & resend works while an answer is being written
 Patrick (2026-10-01), with a screenshot of a question mid-answer ("Searched
 the web, Consulting models 3 of 3") and its edit icon: "the edit icon
