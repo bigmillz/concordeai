@@ -139,10 +139,24 @@ memory … four bars total". With a server paired the card has four bars:
 this computer's chip, the server's card, the server's memory, this
 computer's memory pressure. The server's memory row is below.
 
+THEN THE ORDER CHANGED, same day, Pat: "Start with M4 Pro or whatever GPU
+the local system has. Then under that, put memory pressure. Then under
+that, put the name of the server's GPU and how much load it's under. And
+then for the last bar, put server memory usage." So the card reads: this
+computer's chip, this computer's memory pressure, then for each server
+(two at most) its card row and its memory row. `#srv-meters` is appended
+after the memory-pressure row instead of inserted before it, so the
+memory row is no longer the last child and keeps its own 7 px gap; the
+rule that gave the last server row a gap is gone. A third server still
+shows only as "+N more" in the second server's row titles; the "+N
+servers more" link that would open a simple dialog with every server's
+full details is PARKED by Pat for later (not built). Heights are the
+same as before the move (below).
+
 The card (6b254's instrument cluster) keeps its first row (this
 computer's chip and its GPU bar) and its last (memory pressure). Each
 PAIRED server whose gateway names a card (the same ones that get a chip
-beside "MLX", 6b334) adds a row between them: the card's name set like
+beside "MLX", 6b334) adds rows under them (the first order put one between them; see the change below): the card's name set like
 "M4 PRO" (`.t-head`, uppercase mono, "NVIDIA "/"AMD "/"INTEL " dropped
 from the front, 26 characters then an ellipsis) over a bar that is
 the same bar, `paintMeter`, same ease and same hot colour from 80%.
@@ -186,7 +200,7 @@ the same bar, `paintMeter`, same ease and same hot colour from 80%.
   It loads no model, creates no chat traffic and keeps nothing; the reply
   is the three numbers, nothing secret.
 - WHAT THE PAGE DOES. The rows are made by script (`srvMetersSync`,
-  `#srv-meters` between the chip row and memory pressure), so with no
+  `#srv-meters`, after memory pressure), so with no
   server the card's markup is exactly what it was (a gauntlet pin on the
   markup and on the served page). It runs only while a server is paired,
   the card is on screen (`srvCardShown`: the narrow drawer shut is not)

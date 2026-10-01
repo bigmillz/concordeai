@@ -30560,14 +30560,15 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
    dropped in 6b268 (per Patrick) — the bar carries the reading. */
 #telemetry .t-head .live{color:var(--text);white-space:nowrap}
 .meter-row{margin-bottom:7px}
-/* a paired server's graphics card, between this computer's bar and memory
-   pressure (6b342, per Patrick: "put the GPU name in a middle row"): the
-   name set like the chip's, the bar the same bar; dimmed while the server
-   doesn't answer. The rows are made by script, so a card with no server
-   is the markup it always was */
+/* a paired server's graphics card and memory, under this computer's chip and
+   memory pressure (6b342, per Patrick: "Start with M4 Pro ... Then under that,
+   put memory pressure. Then under that, put the name of the server's GPU and
+   how much load it's under. And then for the last bar, put server memory
+   usage."): the name set like the chip's, the bar the same bar; dimmed while
+   the server doesn't answer. The rows are made by script, so a card with no
+   server is the markup it always was */
 #telemetry .srv-mrow{transition:opacity .3s}
 #telemetry .srv-mrow.off{opacity:.45}
-#telemetry .srv-mrow:last-child{margin-bottom:7px}   /* the one before memory keeps its gap */
 #telemetry .srv-mrow .t-head span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .meter-row:last-child{margin-bottom:0}
 .meter-label{
@@ -39620,8 +39621,8 @@ function paintEngMenuServers(){
 // THE SIDEBAR CARD'S SERVER ROWS (6b342, per Patrick: "When a server is connected
 // for the user, can we have this box get bigger and put the GPU name in a middle
 // row? ... Hopefully this can adjust based on if the server is connected or not."):
-// one row per paired server whose gateway names a card, up to three, between this
-// computer's graphics bar and memory pressure. The row is the card's name set like
+// two rows per paired server whose gateway names a card (its card, then its memory),
+// up to two servers, under this computer's chip and memory pressure. The row is the card's name set like
 // the chip's ("M4 PRO") and a bar for how busy the card is. A server that doesn't
 // answer is dimmed with an empty bar; a gateway with no usage reading (an older
 // kit) shows the name and an empty bar. No server paired: nothing is drawn, and
@@ -39694,8 +39695,7 @@ function srvMetersSync(){
   if(!rows.length){if(box)box.remove();return;}
   if(!box){
     box=document.createElement("div");box.id="srv-meters";
-    const mem=document.getElementById("mem-meter"),mr=mem&&mem.closest(".meter-row");
-    tel.insertBefore(box,mr||null);
+    tel.appendChild(box);
   }
   const have={};
   Array.prototype.forEach.call(box.children,c=>{have[c.dataset.sid]=c;});
