@@ -11,10 +11,18 @@ It is for people comfortable with a Linux shell. The pieces are in
 - a pairing tool;
 - systemd units and a model updater.
 
-> **Status.** `ollama1/setup.sh` is written for one particular machine
-> (fixed disks, one domain) and is not meant to be run elsewhere. A general
+> **Status.** `ollama1/setup.sh` installs everything in one go, but for one
+> machine layout (Ubuntu 26.04, an OS disk, a models disk and two mirror
+> disks, which it wipes). Your server's name, user, LAN, domain and disks are
+> arguments to it (see [ollama1/README.md](../ollama1/README.md)). A general
 > installer is coming, as the app's "Add a server". Until then, the manual
-> steps below are the way.
+> steps below are the way for any other machine.
+>
+> **"ollama1" is the kit's name** (its folders, commands and unit files),
+> not your server's. Name your server whatever you like (for example `ai`,
+> `workshop` or `gpu-2`, and a second one `gpu-3`): the name is `server_name`
+> in `config.json`, and the app shows the server by the name you give it
+> when you add it.
 
 ## What you get
 
@@ -363,12 +371,21 @@ plan.
    ```json
    {
      "access": "cloudflare",
+     "server_name": "ai",
      "cf_zone": "example.com",
      "hostname_gateway": "ai.example.com",
      "hostname_admin": "ai-admin.example.com",
+     "owner_label": "Sam",
      "admin_email": "you@users.noreply.github.com"
    }
    ```
+
+   `server_name` is yours to choose: lowercase letters, digits and hyphens,
+   1 to 32 characters, starting with a letter. The two hostnames default to
+   `<server_name>.<cf_zone>` and `<server_name>-admin.<cf_zone>`, and the
+   Cloudflare names follow it: the tunnel `<server_name>`, the service token
+   `<server_name>-app`, the policy `<server_name> admin - <owner_label> only`
+   (set `tunnel_name`, `token_name`, `policy_admin_name` to use other names).
 
    `admin_email` is the address allowed into the admin panel. Keep it on
    the server; it never needs to be anywhere else.

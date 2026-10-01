@@ -1,16 +1,25 @@
-# ollama1: a private model server on the desktop
+# ollama1: a private model server kit
 
-This kit turns the spare Linux desktop into **ollama1**, a model server that
-only ConcordeAI on Patrick's own devices can use. It runs Ollama on the
-Radeon RX 6900 XT and nothing else.
+This kit turns a spare Linux machine into a model server that only your own
+devices, running ConcordeAI, can use. It runs Ollama on the GPU and nothing
+else. (It was built on a machine with a Radeon RX 6900 XT, 16 GB of VRAM and
+64 GB of RAM; the numbers below are that machine's.)
+
+**"ollama1" is the kit's name, not your server's name.** It is in the kit's
+file and command names (`ollama1-pair`, `/etc/ollama1`, `ollama1-gateway.service`)
+and stays there. Your server's name is yours to choose when you run setup
+(`--name`), and you can run as many servers as you like, named and numbered
+however you like. This page writes it as `<server-name>`, your user as
+`<your-user>`, your domain as `<your-domain>`, the server's LAN address as
+`<server-ip>` and your LAN as `<lan-cidr>`.
 
 - It is reachable from anywhere through a Cloudflare Tunnel. No port is open
   at home, and the home IP stays hidden.
-  - `ollama1.flyconcordefly.com` is the gateway the app talks to.
-  - `ollama1-admin.flyconcordefly.com` is the admin panel.
+  - `<server-name>.<your-domain>` is the gateway the app talks to.
+  - `<server-name>-admin.<your-domain>` is the admin panel.
 - Every request needs **both** of these:
   - a Cloudflare Access service token;
-  - a signature from a device that was paired **at the desktop**.
+  - a signature from a device that was paired **at the server**.
 
   There is no invite, share or join. Nobody else can use it, and requests
   never mix.
@@ -22,12 +31,13 @@ Radeon RX 6900 XT and nothing else.
   the request gets an error.
 - It is locked down:
   - The firewall only lets in SSH, and only from the home LAN.
-  - SSH accepts keys only (your Mac's), with no root login.
+  - SSH accepts keys only (your Mac's), for the one user you name, with no
+    root login.
   - Services run as users with no shell.
   - Security updates install automatically, with a reboot at 04:00 when an
     update needs one.
   - Ollama is updated weekly, from verified downloads.
-- It has a text dashboard on the desktop's monitor, and a web admin panel
+- It has a text dashboard on the server's monitor, and a web admin panel
   with a terminal that still asks for your Linux password.
 
 The request-signing and pairing rules the app follows are in
@@ -38,11 +48,11 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 
 | | |
 |---|---|
-| Host name | `ollama1` (was `concordeai`), time zone America/New_York |
-| Address | 192.168.86.10 on `br0`. The bridge over both wired ports keeps the Raspberry Pi on the LAN. The kit never changes network settings |
-| OS disk (nvme, S6B0NU0W805372Z) | Kept. The root volume grows into the free 1.7 TB, and `/home` moves onto it |
-| Models disk (nvme, S6B0NG0R906564E) | **Wiped**, ext4, `/srv/models`. This is Ollama's model folder |
-| 8 TB disks (ZR127RMQ, ZR11ZRGJ) | **Wiped**, RAID1 mirror, ext4, `/srv/data`. Holds backups and bulk storage, including a nightly copy of the settings and the model list |
+| Host name | `<server-name>` (what you give with `--name`). The time zone stays as the machine has it, unless you give `--timezone` |
+| Address | `<server-ip>` on the LAN port (`br0` if you have a bridge over both wired ports, which keeps a second device, like a Raspberry Pi, on the LAN). The kit never changes network settings |
+| OS disk (`--os-serial`) | Kept. The root volume grows into the free space on it, and `/home` moves onto it |
+| Models disk (`--models-serial`) | **Wiped**, ext4, `/srv/models`. This is Ollama's model folder |
+| Two mirror disks (`--hdd1-serial`, `--hdd2-serial`) | **Wiped**, RAID1 mirror, ext4, `/srv/data`. Holds backups and bulk storage, including a nightly copy of the settings and the model list |
 | Ollama | 127.0.0.1:11434 only, ROCm build, in `/opt/ollama` |
 | Gateway | 127.0.0.1:8431, user `o1gw` |
 | Admin panel | 127.0.0.1:8432, user `o1admin` |
@@ -53,12 +63,12 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 
 ## Before you start
 
-1. **Put your Mac's SSH key on the desktop.** Setup turns password login
+1. **Put your Mac's SSH key on the server.** Setup turns password login
    off, and after that only a key can log in. On the Mac:
 
    ```bash
-   ssh-copy-id pmiller@192.168.86.10
-   ssh pmiller@192.168.86.10        # should log in without asking for the password
+   ssh-copy-id <your-user>@<server-ip>
+   ssh <your-user>@<server-ip>        # should log in without asking for the password
    ```
 
    Setup refuses to turn passwords off until `~/.ssh/authorized_keys` holds
@@ -75,14 +85,44 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 
 ## Run it
 
-At the desktop or over SSH:
+At the server or over SSH:
 
 ```bash
 git clone https://github.com/bigmillz/concordeai.git ~/concordeai
 cd /                                          # not inside /home: /home is about to move
 bash ~/concordeai/ollama1/setup.sh --plan     # optional: shows the plan, changes nothing
-sudo bash ~/concordeai/ollama1/setup.sh
+sudo bash ~/concordeai/ollama1/setup.sh --name <server-name> --zone <your-domain> \
+     --os-serial <serial> --models-serial <serial> --hdd1-serial <serial> --hdd2-serial <serial>
 ```
+
+### What you tell setup
+
+Setup takes nothing about your machine from the kit: you give it these (and
+it asks for any it can't find, at the terminal):
+
+| Argument | What it is |
+|---|---|
+| `--name <server-name>` | Your server's name: lowercase letters, digits and hyphens, 1 to 32 characters, starting with a letter (`gpu-2`, `workshop`, `srv01`). It becomes the host name, the gateway `<server-name>.<your-domain>`, the panel `<server-name>-admin.<your-domain>`, and the names of the tunnel (`<server-name>`), the service token (`<server-name>-app`) and the Access policies and applications (`<server-name> admin - <your-name> only`, `<server-name> app - service token`, `<server-name> admin`, `<server-name> app`). Run several servers by giving each its own name |
+| `--user <your-user>` | The one Linux user who may log in over SSH. Default: the user who ran `sudo` |
+| `--lan <lan-cidr>` | The network SSH is allowed from, like `10.0.0.0/24`. Default: the network of the machine's LAN port (detected, and shown in the plan: check it before you type `yes`) |
+| `--zone <your-domain>` | Your domain on Cloudflare. Not needed with `--skip-cloudflare` |
+| `--owner <your-name>` | Your name, used only in the Access policy's name. Default: from your admin email |
+| `--timezone <Area/City>` | Default: the time zone the machine already has |
+| `--os-serial`, `--models-serial`, `--hdd1-serial`, `--hdd2-serial` | The four disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything |
+
+What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
+server's name and domain in `/etc/ollama1/config.json`, so a re-run needs
+none of it again. A name already in `config.json` is never changed by
+setup: the tunnel, DNS and Access carry it.
+
+**A server set up before the name was a setting** has no `server_name` in
+`config.json`. Setup treats that as the name `ollama1`, so it keeps its
+hostnames, tunnel, token and policies. Run setup again with the values it
+has always had, so they are written down: `--user`, `--lan`, `--zone`, the
+four serials, and `--owner` with the name that is in its Access policy's name
+(for the policy `ollama1 admin - Sam only`, that is `--owner Sam`). Anything
+already in `config.json` (hostnames, `tunnel_name`, `token_name`,
+`policy_admin_name`, ...) wins over what is derived from the name.
 
 Setup starts itself inside **tmux** (session `ollama1-setup`), so a dropped
 SSH connection can't stop it halfway. If you get disconnected, log in again
@@ -94,15 +134,15 @@ Setup prints its plan and a table of the disks with their serials and
 models. It stops unless you type `yes`. Here is what it does, in order.
 Every step skips what is already done, so it is safe to run again.
 
-1. It sets the host name `ollama1` and the time zone America/New_York. The
-   boot menu shows for 5 seconds, via `/etc/default/grub.d/99-ollama1.cfg`:
+1. It sets the host name `<server-name>` (and the time zone, if you gave
+   one). The boot menu shows for 5 seconds, via `/etc/default/grub.d/99-ollama1.cfg`:
    - `GRUB_TIMEOUT=5`
    - `GRUB_RECORDFAIL_TIMEOUT=5`
    - `GRUB_TIMEOUT_STYLE=menu`
 
    It then runs `update-grub` and checks that every `set timeout=` in
    `/boot/grub/grub.cfg` is 5. That includes the recordfail path, which is
-   what made it wait 30 seconds on this LVM machine.
+   what made it wait 30 seconds on the LVM machine this was built on.
 2. It installs packages: ttyd, python3-nacl, mdadm, nftables, zstd, tmux,
    and cloudflared from Cloudflare's apt repository. That repository's key
    must have the pinned fingerprint, and only that one key is kept.
@@ -121,7 +161,7 @@ Every step skips what is already done, so it is safe to run again.
      old `/home` open, it detaches it, and the mirror step waits.
 5. It wipes the models disk and mounts it at `/srv/models` (by UUID,
    noatime). An earlier `o1models` filesystem is kept, never wiped.
-6. It builds the RAID1 mirror of both 8 TB disks and mounts it at
+6. It builds the RAID1 mirror of the two mirror disks and mounts it at
    `/srv/data`. The first sync takes many hours in the background; the mirror
    is usable meanwhile (`cat /proc/mdstat`). The safety rules for both disk
    steps are:
@@ -143,18 +183,18 @@ Every step skips what is already done, so it is safe to run again.
 8. It installs the kit to `/usr/local/lib/ollama1`, along with the systemd
    units, the polkit rule and the local port guard. It asks for the admin
    email: the only address allowed into the admin panel. The email is stored
-   root-only on the desktop.
-9. It sets up the firewall: nothing comes in except SSH from 192.168.86.0/24.
+   root-only on the server.
+9. It sets up the firewall: nothing comes in except SSH from `<lan-cidr>`.
 10. It sets up SSH:
     - no root login;
-    - only `pmiller` can log in, and only from the LAN;
+    - only `<your-user>` can log in, and only from the LAN;
     - passwords go off once it has shown you the comment and fingerprint of
       each key it counts as yours and you type `yes`.
 
     **Keep that session open** and check a NEW login from another terminal
     on the Mac before closing it. If your SSH agent offers several keys
     first, name yours:
-    `ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 pmiller@192.168.86.10`.
+    `ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 <your-user>@<server-ip>`.
 11. It installs Ollama from its GitHub release (the linux-amd64 archive plus
     the ROCm component). Each file must match the release's `sha256sum.txt`.
     The firewall and SSH are done before this long download.
@@ -189,7 +229,7 @@ Setup offers three choices when it gets there:
   fallback, described at the end of this section.
 - **3: later.** Run `sudo bash .../setup.sh` again when you're ready.
 
-Nothing reaches the desktop from outside until this step is done: the
+Nothing reaches the server from outside until this step is done: the
 tunnel only starts once Access is in place.
 
 ### The API token
@@ -197,7 +237,7 @@ tunnel only starts once Access is in place.
 This is the only thing to click in Cloudflare:
 
 1. Go to dash.cloudflare.com > **My Profile > API Tokens > Create Token >
-   Create Custom Token**. Name it `ollama1 setup`.
+   Create Custom Token**. Name it whatever you like, like `<server-name> setup`.
 2. Add exactly these permissions:
 
    | Scope | Permission | Level |
@@ -209,7 +249,7 @@ This is the only thing to click in Cloudflare:
    | Zone | DNS | Edit |
    | Zone | Zone | Read |
 
-3. Set **Zone Resources** to **Include > Specific zone > flyconcordefly.com**.
+3. Set **Zone Resources** to **Include > Specific zone > `<your-domain>`**.
 4. Set **TTL** so the token ends tomorrow (a 1-day expiry). It is needed
    for a few minutes only.
 5. Click **Continue to summary > Create Token**, and copy the token.
@@ -231,15 +271,15 @@ With the token, `ollama1-cf-access` does the following. Each step reuses
 what already exists, so running setup again changes nothing that's
 already right.
 
-1. It finds the zone `flyconcordefly.com`, the account that owns it, and
+1. It finds the zone `<your-domain>`, the account that owns it, and
    the Zero Trust team domain.
-2. **Tunnel `ollama1`.** This is a *locally-managed* tunnel (`config_src:
+2. **Tunnel `<server-name>`.** This is a *locally-managed* tunnel (`config_src:
    local`). Its routes, and cloudflared's own Access check, are in
-   `/etc/ollama1/cloudflared.yml` on the desktop, not in the dashboard.
+   `/etc/ollama1/cloudflared.yml` on the server, not in the dashboard.
    - The tunnel's credential is written to `/etc/cloudflared/ollama1.json`
      (root, 0600).
    - If that file is ever lost, a rerun rebuilds it for the same tunnel.
-3. **DNS.** One proxied CNAME for each of `ollama1` and `ollama1-admin`,
+3. **DNS.** One proxied CNAME for each of `<server-name>` and `<server-name>-admin`,
    pointing to `<tunnel id>.cfargotunnel.com`.
    - A wrong target is corrected and duplicate CNAMEs are removed, but only
      for CNAMEs that point at a tunnel or that it made itself.
@@ -247,9 +287,9 @@ already right.
      else) makes it stop and name the record. It never changes or deletes
      records it didn't make.
 4. **Access.**
-   - The service token `ollama1-app`, which never expires.
-   - The policies `ollama1 admin - Patrick only` (your email) and
-     `ollama1 app - service token`.
+   - The service token `<server-name>-app`, which never expires.
+   - The policies `<server-name> admin - <your-name> only` (your email) and
+     `<server-name> app - service token`.
    - One self-hosted application per hostname. The app hostname answers a
      bad token with a plain 401, not a login page.
 
@@ -260,7 +300,7 @@ already right.
 6. It shows the service token's **Client ID and Client Secret once**, for
    ConcordeAI, straight on the terminal (not through the setup log), the
    moment the token is made, so a later failure can't lose it. Copy them
-   then: the secret is saved nowhere, in the repo or on the desktop. If a
+   then: the secret is saved nowhere, in the repo or on the server. If a
    run stops before it could show the secret, the next run makes a new
    secret by itself.
    - Running it again doesn't show the secret again.
@@ -278,7 +318,7 @@ Choose **2** in setup.
 **The tunnel.** `cloudflared tunnel login` prints a link:
 
 1. Open the link on your Mac.
-2. Pick **flyconcordefly.com** and click **Authorize**.
+2. Pick **`<your-domain>`** and click **Authorize**.
 
 Setup then creates the tunnel, puts its credential in
 `/etc/cloudflared/ollama1.json` (0600), and runs `cloudflared tunnel route
@@ -292,25 +332,25 @@ around a little from time to time.
    **One-time PIN** is there by default. Keep it.
 2. **Service token.** Go to **Access > Service auth > Service Tokens >
    Create Service Token**.
-   - Name: `ollama1-app`. Duration: **Non-expiring**.
+   - Name: `<server-name>-app`. Duration: **Non-expiring**.
    - Click **Generate token**.
    - Copy the **Client ID** and the **Client Secret** now. The secret is
      shown once.
 3. **Admin application.** Go to **Access > Applications > Add an application
    > Self-hosted**.
-   - Name: `ollama1 admin`. Session duration: 24 hours.
-   - Public hostname: `ollama1-admin`.`flyconcordefly.com`.
+   - Name: `<server-name> admin`. Session duration: 24 hours.
+   - Public hostname: `<server-name>-admin`.`<your-domain>`.
    - **Create new policy**:
-     - Name: `ollama1 admin - Patrick only`
+     - Name: `<server-name> admin - <your-name> only`
      - Action: **Allow**
      - Include: **Emails**, your email
    - Save.
 4. **App application.** Go to **Add an application > Self-hosted** again.
-   - Name: `ollama1 app`. Hostname: `ollama1.flyconcordefly.com`.
+   - Name: `<server-name> app`. Hostname: `<server-name>.<your-domain>`.
    - Policy:
-     - Name: `ollama1 app - service token`
+     - Name: `<server-name> app - service token`
      - Action: **Service Auth**
-     - Include: **Service Token**, `ollama1-app`
+     - Include: **Service Token**, `<server-name>-app`
    - In the application's settings, turn on **Return 401 response for
      service auth policies**.
    - Save.
@@ -324,12 +364,12 @@ around a little from time to time.
 
 ## After setup
 
-- **SSH:** only your Mac's key can log in, as `pmiller`, from the home LAN.
+- **SSH:** only your Mac's key can log in, as `<your-user>`, from the home LAN.
   Passwords and root login are off.
   - If you removed the setup key, it is only your key.
   - To add another Mac later, log in with the first one and append its key
     to `~/.ssh/authorized_keys`.
-- **Pairing a device:** at the desktop, run `sudo ollama1-pair`, or click
+- **Pairing a device:** at the server, run `sudo ollama1-pair`, or click
   **Open pairing window** in the panel. The code shows, large, on the
   monitor and in that terminal for 5 minutes: 12 characters, like
   `7K4M-2QXD-9FHT`. Type it into ConcordeAI.
@@ -383,15 +423,15 @@ around a little from time to time.
     - A sync that would leave under 2 GiB free is refused.
     - Ollama's `cloud` entries aren't models on this disk: a sync leaves them
       alone, and the gateway never serves them.
-    - One sync at a time. The desktop won't sleep during one.
+    - One sync at a time. The server won't sleep during one.
   - **In the panel**, **Update model library** shows the same preview.
     **Apply these N changes** then starts a root unit that recomputes the
     plan and carries it out only if it is still the one you saw; if the
     list or the registry changed, it refuses and shows the new preview
     instead. A preview is good for 30 minutes. Progress shows in the panel.
   - The panel's **Pull** and **Remove** buttons still work for one model.
-    The panel can't add to the list: that stays at the desktop.
-  - On the desktop, `sudo ollama list` shows what's installed. Ollama only
+    The panel can't add to the list: that stays at the server.
+  - On the server, `sudo ollama list` shows what's installed. Ollama only
     answers root and the kit's services.
 
   **Models that may use system memory.** Every model runs entirely on the
@@ -405,7 +445,7 @@ around a little from time to time.
   ```
 
   - A `ram` model loads whatever doesn't fit in the 16 GB of VRAM into the
-    desktop's 64 GB of RAM. Mixture-of-experts models are the ones worth
+    server's 64 GB of RAM. Mixture-of-experts models are the ones worth
     doing this for: only a few experts work on each token, so they stay
     usable.
   - Expect a few to low tens of tokens per second, against 50 to 100+ for a
@@ -418,7 +458,7 @@ around a little from time to time.
     Otherwise it refuses with the numbers (`gpu_fit`) instead of trying.
   - **Repacking decides whether VRAM counts.** By default llama.cpp repacks
     the weights it keeps on the CPU into a new anonymous buffer
-    (`CPU_REPACK`) whose size Ollama doesn't predict. On the desktop,
+    (`CPU_REPACK`) whose size Ollama doesn't predict. On the server,
     gpt-oss:120b got a 58 GiB `CPU_REPACK` buffer and almost nothing on the
     GPU, and the kernel OOM-killed it at about 62 GB. So while repacking is
     on (the default), the gateway counts the whole model against system
@@ -436,7 +476,7 @@ around a little from time to time.
     and writes it to `ollama.service.d/10-ollama1-memory.conf`.
     - A load that doesn't fit ends in Ollama's own cgroup: the kernel kills
       the runner, Ollama carries on (`OOMPolicy=continue`), and the app gets
-      `ram_oom`. The desktop stays up; that is what happened on the second
+      `ram_oom`. The server stays up; that is what happened on the second
       try.
     - Ollama can't use swap (`MemorySwapMax=0`). A load that makes anything
       else swap is unloaded and refused (`ram_pressure`).
@@ -450,7 +490,7 @@ around a little from time to time.
     and it is unloaded before a GPU-only model runs.
   - The only flag is `ram`. A line with any other word after the name is
     ignored entirely, and the panel shows it with the reason.
-  - **The controlled test**, run at the desktop:
+  - **The controlled test**, run at the server:
 
     ```bash
     sudo bash ~/concordeai/ollama1/tools/ram-model-test.sh
@@ -500,7 +540,7 @@ around a little from time to time.
     - **It needs that much free space in `ubuntu-vg`.** Check with
       `sudo vgs ubuntu-vg`: the `VFree` column is what's left. By default
       setup.sh gives all of the volume group's free space to `/`, and `/`
-      can't shrink while it's mounted, so on a desktop set up that way
+      can't shrink while it's mounted, so on a server set up that way
       (VFree `0`) it stops with the numbers and changes nothing.
     - For a new install that should have room for it, run setup the first
       time with `sudo ./setup.sh --vg-reserve 64G`: when it grows `/` it
@@ -518,7 +558,7 @@ around a little from time to time.
       nothing, if the swap can't be taken back in (not enough free memory),
       and it puts `/swap.img` back in fstab only if `on` took it out, and
       removes the volume only if `on` made it.
-- **Dashboard:** it fills the desktop's monitor (tty1), and `ollama1-top` shows
+- **Dashboard:** it fills the server's monitor (tty1), and `ollama1-top` shows
   it over SSH (`q` quits, `--ascii` for plain terminals, `--once` for one
   text frame). It updates every second, and its charts cover the last 5
   minutes, or an hour after pressing `t`.
@@ -556,7 +596,7 @@ around a little from time to time.
   - It never shows a prompt or an answer: only counts, sizes, times and
     names.
   - A frame takes a few milliseconds.
-- **Admin panel:** `https://ollama1-admin.flyconcordefly.com`. Access asks
+- **Admin panel:** `https://<server-name>-admin.<your-domain>`. Access asks
   for your email and a one-time code. The panel has:
   - the same figures, plus 1 h / 24 h graphs;
   - buttons to apply updates, restart the services, reboot, back up, and
@@ -566,18 +606,18 @@ around a little from time to time.
   - a counts-only log;
   - **Open terminal**, which asks for your Linux user and password.
 - **Sleep.** The panel's **Sleep** button (next to Reboot) suspends the
-  desktop. Its power button does the same.
+  server. Its power button does the same.
   - To wake it, press the power button again. Holding the button down
     still forces it off.
   - While it sleeps it can't be reached, and anything plugged into its
-    second network port (the Pi) loses its connection.
+    second network port (a Raspberry Pi, say) loses its connection.
   - Sleep is refused while a model download or library sync, an update, or
     setup.sh is running. It is allowed during the mirror's first sync,
     which pauses and carries on after waking.
   - During setup.sh, a model download or library sync, and updates, the
     power button does nothing at all: each holds a logind inhibitor
     (`sleep` and `handle-power-key`, mode block) until it ends, so the
-    button can't suspend the desktop mid-job. The inhibitor goes with its
+    button can't suspend the server mid-job. The inhibitor goes with its
     job however the job ends, even if it is killed. Holding the button down
     still forces it off. `systemd-inhibit --list` shows who holds one.
   - After every wake a check runs. Ollama must answer (`/api/version`,
@@ -585,24 +625,24 @@ around a little from time to time.
     the tunnel restart.
   - The dashboard and the panel show the last sleep and wake times, and the
     result of that check.
-  - **Untested until Patrick tries it by hand.** AMD GPU compute (ROCm)
+  - **Untested until someone tries it by hand.** AMD GPU compute (ROCm)
     after a suspend is a known weak spot.
   - Automatic idle sleep and Wake-on-LAN are on hold.
 - **LAN mode** is off by default. With it on, the gateway also answers on
-  `http://192.168.86.10:8431` from the home LAN, without Access. Signatures
+  `http://<server-ip>:8431` from the home LAN, without Access. Signatures
   are still required, and traffic on the LAN is unencrypted. To change it:
   `sudo ollama1-lan on|off`, or use the panel.
 
 ## Power and electricity cost
 
-The panel's **Power and cost** card shows what the desktop draws now (with
+The panel's **Power and cost** card shows what the server draws now (with
 an hour's chart), the energy and cost over the last hour, 24 hours, 7 days
 and 30 days, a 30-day projection, and the electricity cost per million tokens.
 The console dashboard's Health panel has a one-line version. A root
 sampler, `ollama1-power.service`, takes a reading every 10 seconds.
 
 **Where the watts come from.** A smart plug is best: it measures the
-whole desktop at the wall. Without one, the kit estimates.
+whole server at the wall. Without one, the kit estimates.
 
 - **Smart plug**, on the home LAN only: its address must be an IP in
   10/8, 172.16/12, 192.168/16 or fc00::/7 (not link-local), and the
@@ -613,11 +653,11 @@ whole desktop at the wall. Without one, the kit estimates.
   only.
 
   ```bash
-  sudo ollama1-power set-plug shelly2 192.168.86.40               # Shelly Plus / Pro / Gen3
-  sudo ollama1-power set-plug shelly1 192.168.86.40 --user admin  # Shelly Gen1 (Plug S), asks the password
-  sudo ollama1-power set-plug kasa 192.168.86.41                  # TP-Link Kasa HS110 / KP115
-  sudo ollama1-power set-plug tasmota 192.168.86.42               # Tasmota
-  sudo ollama1-power set-plug none                                 # back to the estimate
+  sudo ollama1-power set-plug shelly2 <plug-ip>               # Shelly Plus / Pro / Gen3
+  sudo ollama1-power set-plug shelly1 <plug-ip> --user admin  # Shelly Gen1 (Plug S), asks the password
+  sudo ollama1-power set-plug kasa <plug-ip>                  # TP-Link Kasa HS110 / KP115
+  sudo ollama1-power set-plug tasmota <plug-ip>               # Tasmota
+  sudo ollama1-power set-plug none                            # back to the estimate
   ```
 
   It reads the plug once before saving. Newer Kasa firmware encrypts its
@@ -719,7 +759,7 @@ idle time is included.
 
 | Rule | Where |
 |---|---|
-| Only Patrick's devices | The Access service token (checked by cloudflared and again by the gateway, pinned to the one token's Client ID), plus an Ed25519 signature from a key in `devices.json`. Keys are added only by a root step that checks the pairing code shown at the desktop; the gateway never sees the code |
+| Only your devices | The Access service token (checked by cloudflared and again by the gateway, pinned to the one token's Client ID), plus an Ed25519 signature from a key in `devices.json`. Keys are added only by a root step that checks the pairing code shown at the server; the gateway never sees the code |
 | Before the body | Access and the signature headers (a paired device, a fresh timestamp) are checked before any body is read; at most 16 requests are handled at once; bodies are capped at 32 MiB (8 KiB for pairing). Any error closes the connection, so a leftover body can't pass as the next request on a connection cloudflared reuses |
 | Replay, old requests | 60 s timestamp window, nonces remembered for 2 minutes, anything signed before the gateway last started is refused |
 | Nothing mixes, nothing kept | One request at a time on the GPU. When the next request comes from a different paired device, every loaded model is unloaded first, so not even Ollama's prompt cache is shared (the cost: one reload when the device changes). No history; bodies are never written or logged (`tests/test_stateless.py` checks the source and does a live check with markers); Ollama and the gateway run with no core dumps and no swap, and Ollama at its normal log level (its debug levels could print prompts) |
@@ -732,7 +772,7 @@ idle time is included.
 ## Updates
 
 - **Ubuntu security updates and cloudflared:** unattended-upgrades runs
-  daily and reboots at 04:00 New York time when an update needs it.
+  daily and reboots at 04:00 (the server's time zone) when an update needs it.
 - **Ollama:** `ollama1-update-ollama.timer` runs Sundays around 03:30.
   - It downloads the release's linux-amd64 archive and the ROCm component.
   - Each must match the release's `sha256sum.txt`, and GitHub's own digest
@@ -746,23 +786,23 @@ idle time is included.
 
 ## The network
 
-The desktop sits on `br0`, a bridge over `enp39s0` (to the router) and
-`enp38s0` (the Raspberry Pi), at 192.168.86.10. That comes from Patrick's
-bridge script (`/etc/netplan/60-ollama1-bridge.yaml`).
+The kit never touches your network settings. It works with a plain wired
+port, and also with a bridge. If your server has a bridge `br0` over its
+two wired ports (one to the router, one to another device, like a
+Raspberry Pi), at `<server-ip>`, that comes from your own bridge script
+(for example `/etc/netplan/60-ollama1-bridge.yaml`). Setup then only reads
+`br0`'s address for LAN mode and checks that the bridge is up.
 
-Setup never touches netplan or the bridge. It only reads `br0`'s address
-for LAN mode and checks that the bridge is up.
-
-The firewall is set so it can't cut the Pi off:
+With a bridge, the firewall is set so it can't cut the other device off:
 
 - **Bridge netfilter stays off.** `/etc/sysctl.d/60-ollama1-bridge.conf`
   sets `net.bridge.bridge-nf-call-iptables=0`, so bridged frames between
-  the Pi and the router never go through iptables. ufw's FORWARD policy
+  the other device and the router never go through iptables. ufw's FORWARD policy
   therefore never applies to them. Setup checks this.
 - **`ufw route allow in on br0 out on br0`** is added as a second line of
   defence, in case something loads `br_netfilter` later.
 - **Interface rules use `br0`.** SSH is allowed in on `br0`, from
-  192.168.86.0/24.
+  `<lan-cidr>`.
 
 ## Troubleshooting
 
@@ -773,19 +813,19 @@ The firewall is set so it can't cut the Pi off:
 | GPU seen by Ollama | `journalctl -u ollama \| grep -i "inference compute"` should say ROCm, gfx1030. The RX 6900 XT is supported as is, so `HSA_OVERRIDE_GFX_VERSION` is not set. If Ollama ever reports no GPU, the gateway refuses every model instead of running it on the CPU |
 | Mirror | `cat /proc/mdstat`, `sudo mdadm --detail /dev/md/o1data` |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
-| SSH | `sudo sshd -T -C user=pmiller,host=x,addr=192.168.86.20 \| grep -E 'password\|permitroot'` |
+| SSH | `sudo sshd -T -C user=<your-user>,host=x,addr=<a-lan-address> \| grep -E 'password\|permitroot'` |
 
 ## Tests (on the Mac)
 
 ```bash
 cd ollama1/tests
 python3 -m unittest discover -s .      # ~20 s; stub Ollama, fake Access certs, all on 127.0.0.1
-python3 mutate.py                      # ~20 min; breaks each of 142 protections on purpose, expects a failing test
+python3 mutate.py                      # ~20 min; breaks each of about 250 protections on purpose, expects a failing test
 python3 gen_vectors.py                 # regenerates PROTOCOL.md's test vectors
 ```
 
 The tests need Python 3.12 or later, plus `cryptography` or PyNaCl for
-Ed25519 (the desktop uses PyNaCl). They cover:
+Ed25519 (the server uses PyNaCl). They cover:
 
 - signatures, replay, clock skew, unpaired devices;
 - the pairing window, its rate limit and the root re-check;

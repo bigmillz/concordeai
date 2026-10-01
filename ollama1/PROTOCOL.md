@@ -1,29 +1,30 @@
 # ollama1 protocol: request signing and pairing (v1)
 
-This is what the ConcordeAI app implements to use the desktop model server
-("Desktop · …" in the model picker). The desktop side is
+This is what the ConcordeAI app implements to use your own model server
+("<server-name> · …" in the model picker: the app shows the name you gave
+it). The server side is
 `ollama1/bin/ollama1-gateway`; `ollama1/lib/o1auth.py` holds the exact
 rules. The test vectors at the end are checked against the code by
 `tests/test_vectors.py`, so this document and the gateway can't drift.
 
 Everything here sits behind Cloudflare Access. The app adds two things:
 a service-token header pair on every request (so Access lets it through)
-and an Ed25519 signature from a key that was paired at the desktop (so
-the gateway knows it is Patrick's device). Both are required. Neither is
+and an Ed25519 signature from a key that was paired at the server (so
+the gateway knows it is one of your devices). Both are required. Neither is
 enough on its own.
 
 There is no invite, share, join or pool. A key is added only while a
-pairing window is open at the desktop, and the window closes after one
+pairing window is open at the server, and the window closes after one
 success.
 
 ## 1. Transport
 
-- Base URL: `https://ollama1.flyconcordefly.com`
+- Base URL: `https://<server-name>.<your-domain>`
 - Every request carries the Access service token:
   - `CF-Access-Client-Id: <client id>`
   - `CF-Access-Client-Secret: <client secret>`
 
-  Access then adds `Cf-Access-Jwt-Assertion` on its way to the desktop,
+  Access then adds `Cf-Access-Jwt-Assertion` on its way to the server,
   and the gateway checks that JWT (signature against the team's certs,
   issuer, AUD tag, expiry, and the service token's client id).
 - A server set up without Cloudflare (`"access": "none"`, reached through
@@ -48,8 +49,8 @@ success.
 - Store the client secret and the device's private key in the macOS
   Keychain. Never in a file, a log or a sync payload.
 
-LAN mode (off unless Patrick turns it on at the desktop) also accepts
-`http://192.168.86.10:8431` (the desktop's address on br0) from 192.168.86.0/24 without Access headers.
+LAN mode (off unless the owner turns it on at the server) also accepts
+`http://<server-ip>:8431` (the server's address on its LAN port) from `<lan-cidr>` without Access headers.
 Signatures are still required. Traffic on the LAN is then unencrypted.
 Pairing (`/v1/pair`) is refused on the LAN listener: it works only through
 the tunnel, so a pairing request is never sent in the clear.
@@ -61,14 +62,14 @@ the tunnel, so a pairing request is never sent in the clear.
 - `public_key` = the 32-byte public key, base64url **without padding**
   (43 characters).
 - `device_id` = the first 16 lowercase hex characters of
-  SHA-256(public key bytes). The desktop derives it the same way.
+  SHA-256(public key bytes). The server derives it the same way.
 
 ## 3. Pairing (POST /v1/pair)
 
-Patrick opens a window at the desktop (`sudo ollama1-pair`, or the admin
-panel's button). For five minutes the desktop's screen and that terminal
+The owner opens a window at the server (`sudo ollama1-pair`, or the admin
+panel's button). For five minutes the server's screen and that terminal
 show a code like `7K4M-2QXD-9FHT`: 12 characters (60 bits) of Crockford
-base32 (`0-9 A-Z` without `I L O U`), in groups of four. The app asks Patrick
+base32 (`0-9 A-Z` without `I L O U`), in groups of four. The app asks the owner
 to type it.
 
 Normalize the code: uppercase, drop `-` and spaces, then `O`→`0`,
@@ -80,10 +81,10 @@ message = "ollama1-pair-v1\n" NAME "\n" PUBLIC_KEY "\n" TIMESTAMP "\n" NONCE
 mac     = HMAC-SHA256(key, message)                                     (32 bytes)
 ```
 
-- `NAME`: how the device shows up at the desktop, 1–40 printable
+- `NAME`: how the device shows up at the server, 1–40 printable
   characters, no newline, no leading/trailing spaces (UTF-8).
 - `PUBLIC_KEY`: the unpadded base64url public key.
-- `TIMESTAMP`: unix seconds, decimal, within 60 s of the desktop's clock.
+- `TIMESTAMP`: unix seconds, decimal, within 60 s of the server's clock.
 - `NONCE`: 16–64 characters of `[A-Za-z0-9_-]`, fresh for every attempt
   (16 random bytes as base64url is the intended shape).
 
@@ -104,11 +105,11 @@ Responses:
 | 429 | `rate_limited` | Less than 2 s since the last attempt. Wait and retry |
 | 401 | `clock_skew` / `replay` | Timestamp off by more than 60 s / nonce reused |
 | 400 | `bad_request` | Malformed field |
-| 503 | `pair_not_saved` | The desktop didn't answer in 10 s. Open a new window |
+| 503 | `pair_not_saved` | The server didn't answer in 10 s. Open a new window |
 | 403 | `pair_closed` | Also: the request came in on the LAN listener |
 
 On 200 the app must check `proof` before trusting the pairing. It proves
-the desktop knows the code too:
+the server knows the code too:
 
 ```
 proof = HMAC-SHA256(key, "ollama1-pair-ok-v1\n" DEVICE_ID "\n" PUBLIC_KEY "\n" NONCE)
@@ -120,7 +121,7 @@ derived. If either check fails, discard the pairing.
 The window allows 5 wrong codes, then closes. One success also closes it.
 Wrong codes are also spaced: at most one attempt every 2 seconds. The
 gateway never sees the code: it passes the request to a root-only step on
-the desktop that checks the MAC, counts wrong codes, refuses a reused
+the server that checks the MAC, counts wrong codes, refuses a reused
 nonce, adds the key and computes `proof`.
 
 ## 4. Signed requests
@@ -155,7 +156,7 @@ The gateway refuses a request when:
 | 403 | `access` | Access JWT missing or invalid, wrong host, or another service token |
 | 401 | `unsigned` | A signature header is missing |
 | 403 | `unpaired` | The device id isn't paired |
-| 401 | `clock_skew` | Timestamp more than 60 s from the desktop's clock, or dated before the gateway last started |
+| 401 | `clock_skew` | Timestamp more than 60 s from the server's clock, or dated before the gateway last started |
 | 401 | `bad_signature` | The signature doesn't verify |
 | 401 | `replay` | This nonce was already used |
 
@@ -166,7 +167,7 @@ before the restart are refused with `clock_skew`; a retry fixes that.
 
 ## 5. What the gateway passes on
 
-Ollama's own API shapes, minus anything that changes state on the desktop:
+Ollama's own API shapes, minus anything that changes state on the server:
 
 | Call | Notes |
 |---|---|
@@ -224,7 +225,7 @@ server's memory is in use, for the app's meters:
   treat that as "usage not reported".
 
 `GET /v1/sleep-config` and `POST /v1/sleep-config` are the auto sleep setting
-(the desktop suspends itself after it has been idle for a while, and a magic
+(the server suspends itself after it has been idle for a while, and a magic
 packet wakes it). Signed and paired-only like every route here. The answer is
 always exactly these four keys:
 
@@ -245,14 +246,14 @@ always exactly these four keys:
   brought to the nearest end). Any other key is a 400. An older kit answers
   404 `not_found`: treat that as "update the server kit".
 - Only chat, generate and embeddings count as work. `/v1/info`, `/v1/usage`,
-  `/v1/whoami`, the model list and this route never keep the desktop awake.
+  `/v1/whoami`, the model list and this route never keep the server awake.
 
 To wake it, send a magic packet: six `0xFF` bytes then the card's address
 sixteen times, as a UDP broadcast to port 9, and ask `/v1/info` every couple of
 seconds until it answers.
 
 Anything else is a 404: `pull`, `delete`, `create`, `copy`, `push` and `blobs`
-are never reachable from outside. Models are managed at the desktop only.
+are never reachable from outside. Models are managed at the server only.
 
 Request shaping (so every request stands alone and stays on the GPU):
 
@@ -260,7 +261,7 @@ Request shaping (so every request stands alone and stays on the GPU):
   format options stream think logprobs top_logprobs`; generate: `model
   prompt suffix images format options system template stream raw context
   think logprobs top_logprobs`; embed: `model input truncate options
-  dimensions`). `keep_alive` is dropped: the desktop decides how long
+  dimensions`). `keep_alive` is dropped: the server decides how long
   weights stay loaded.
 - Only sampling options go through (`temperature top_k top_p min_p
   typical_p repeat_last_n repeat_penalty presence_penalty
@@ -270,17 +271,17 @@ Request shaping (so every request stands alone and stays on the GPU):
   `num_batch`...) are dropped.
 - `options.num_ctx` is honored between 512 and the model's maximum;
   the default is 8192.
-- The desktop keeps no chat history. Send the whole conversation each time.
+- The server keeps no chat history. Send the whole conversation each time.
 - Nothing is shared between devices, not even Ollama's prompt cache: when a
   request comes from a different paired device than the one before it, the
-  desktop unloads every loaded model first. Expect one model reload (a few
+  server unloads every loaded model first. Expect one model reload (a few
   seconds) when you switch devices. `prompt_eval_count` and
   `prompt_eval_duration` stay in the answers.
 
-GPU only, unless the desktop's owner allows a model system memory:
+GPU only, unless the server's owner allows a model system memory:
 
 - Every model runs entirely in VRAM, except models the owner marked `ram`
-  in the desktop's allow-list (mixture-of-experts models such as
+  in the server's allow-list (mixture-of-experts models such as
   gpt-oss:120b). Those may load partly into system memory, and run slower.
 - `placement` tells the app which kind a model is, so it can label the
   slow ones:
@@ -293,7 +294,7 @@ GPU only, unless the desktop's owner allows a model system memory:
   less a reserve (16 GB here). A `gpu+ram` model is counted with 2.5 GiB of
   compute buffers, against the free system memory less the larger of 8 GiB
   and 12% of RAM, under Ollama's own memory cap. VRAM counts too only when
-  the desktop has turned llama.cpp's weight repacking off, because the
+  the server has turned llama.cpp's weight repacking off, because the
   repacked CPU copy can be as big as the whole model. If it doesn't fit, the
   answer is **507** `gpu_fit`, with `need_bytes` and `budget_bytes`. Try
   a smaller `num_ctx` or a smaller model. For a `gpu+ram` model sent
@@ -302,10 +303,10 @@ GPU only, unless the desktop's owner allows a model system memory:
   any of it landed on the CPU, the gateway unloads it and answers
   `gpu_spill` (507 for non-streamed calls).
 - If the load itself runs out of Ollama's memory cap, the kernel stops it
-  inside Ollama (the desktop stays up) and the answer is `ram_oom` (507).
+  inside Ollama (the server stays up) and the answer is `ram_oom` (507).
 - A `gpu+ram` model is unloaded and refused with `ram_pressure` (507) if
-  loading it pushed the desktop into swap or left under 1 GiB free.
-- A `gpu+ram` model loads alone: the desktop unloads other models first,
+  loading it pushed the server into swap or left under 1 GiB free.
+- A `gpu+ram` model loads alone: the server unloads other models first,
   and unloads it before a GPU-only model runs. Expect a reload when you
   switch between them.
 
@@ -387,18 +388,18 @@ as JSON escapes.
     "code_shown": "7K4M-2QXD-9FHT",
     "code_normalized": "7K4M2QXD9FHT",
     "key_hex": "0cb34d68726b5dfa6196ddb20f2f9c3ea864b821b235bb545692bd0138e3502e",
-    "name": "Patrick's MacBook Pro",
+    "name": "Alice's MacBook Pro",
     "public_key_b64url": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg",
     "timestamp": 1790000100,
     "nonce": "EBESExQVFhcYGRobHB0eHw",
-    "message_utf8": "ollama1-pair-v1\nPatrick's MacBook Pro\nA6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg\n1790000100\nEBESExQVFhcYGRobHB0eHw",
-    "mac_b64url": "zytUgalW6zDLx2taZpTve4SqP5iaJKGNkwpOvPDoioc",
+    "message_utf8": "ollama1-pair-v1\nAlice's MacBook Pro\nA6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg\n1790000100\nEBESExQVFhcYGRobHB0eHw",
+    "mac_b64url": "xL_ruufA23aPmkbEgTPXlIefvH0I0N2uQ2AxpVCPZqE",
     "request_json": {
-      "name": "Patrick's MacBook Pro",
+      "name": "Alice's MacBook Pro",
       "public_key": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg",
       "timestamp": 1790000100,
       "nonce": "EBESExQVFhcYGRobHB0eHw",
-      "mac": "zytUgalW6zDLx2taZpTve4SqP5iaJKGNkwpOvPDoioc"
+      "mac": "xL_ruufA23aPmkbEgTPXlIefvH0I0N2uQ2AxpVCPZqE"
     },
     "response_device_id": "56475aa75463474c",
     "proof_b64url": "F_m7YSSE-XjggeJ1cJjieXKyDA-ZcpnHyV4vr20K6aQ"
@@ -410,7 +411,7 @@ as JSON escapes.
 The JSON is generated by `python3 tests/gen_vectors.py`. The signatures
 were made with the RFC 8032 reference code in `tests/o1test_util.py`
 (itself checked against RFC 8032's TEST 1 and TEST 2) and verified by the
-gateway's backend (libsodium via PyNaCl on the desktop, OpenSSL via
+gateway's backend (libsodium via PyNaCl on the server, OpenSSL via
 `cryptography` elsewhere).
 
 A checklist for the app's implementation:
