@@ -32804,6 +32804,9 @@ function applyPrefs(){
 
 /* ------------------------------------------------------------- state */
 let messages=[], generating=false, abortCtl=null;
+// an Edit & resend pressed while an answer is being written (6b343): the answer
+// is stopped, and the edit opens once the stop has finished and saved
+let pendingEdit=null;
 // (M9) the single-model pick in browser storage is "This computer"'s: an
 // account's page neither reads nor writes it (prefs.json holds each
 // profile's own), so a later root boot can't adopt an account's pick
@@ -34566,7 +34569,13 @@ function regenNow(){
 }
 // EDIT & RESEND: rewind to that question with the text in the composer
 function editResend(text){
-  if(generating)return;
+  // mid-answer (6b343, per Patrick: "the edit icon doesn't work"): stop the
+  // answer as Stop does, then open the edit when send() has finished saving
+  // it, so the partial answer and the rewind land in order
+  if(generating){
+    if(!abortCtl)return;
+    pendingEdit=text;abortCtl.abort();return;
+  }
   const i=messages.findIndex(m=>m.role==="user"&&m.content===text);
   if(i<0)return;
   messages.splice(i,messages.length-i);
@@ -35135,6 +35144,11 @@ async function send(){
   if(saved&&!saved.named&&full&&!isErr){
     const first=(saved.messages||[]).find(m=>m.role==="user");
     if(first)nameChat(saved,first.content);
+  }
+  // an Edit & resend asked for while this answer was running (6b343)
+  if(pendingEdit!==null){
+    const t=pendingEdit;pendingEdit=null;
+    if(curChat===myChat&&!generating)editResend(t);
   }
 }
 
@@ -36513,6 +36527,7 @@ document.addEventListener("keydown",e=>{
 
 /* ----------------------------------------------------------- new chat */
 $("#newchat").addEventListener("click",()=>{
+  pendingEdit=null;                 // a new chat drops an edit that was waiting (6b343)
   if(generating&&abortCtl)abortCtl.abort();
   chatTrunc=null;
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel

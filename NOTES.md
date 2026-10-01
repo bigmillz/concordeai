@@ -9,6 +9,30 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b343 — Edit & resend works while an answer is being written
+Patrick (2026-10-01), with a screenshot of a question mid-answer ("Searched
+the web, Consulting models 3 of 3") and its edit icon: "the edit icon
+doesn't work unless that's because the request already started. If that's
+the case, it should hide the edit button if it's not going to work.
+Otherwise, let's fix it so that it can be edited."
+
+It was the request already running: `editResend` began with
+`if(generating)return;`, so the button did nothing, silently. It now works:
+- Pressed mid-answer, it stops the answer exactly as Stop does
+  (`abortCtl.abort()`), remembers the edit in `pendingEdit`, and returns.
+- `send()` finishes as it always does after a Stop: the partial answer is
+  kept and saved (`syncChat`). Only then, at the very end, the pending edit
+  opens: the chat is rewound to that question, its text is in the composer,
+  and the saved chat rewinds when the edited question is sent (6b322's
+  `chatTrunc`). So the partial answer and the rewind land in order, as
+  "Stop then ask" does.
+- A new chat drops a waiting edit; an edit is opened only if the same chat
+  is still showing.
+Checked in a real page (Blink) with the answer stubbed to stream slowly:
+Edit pressed with "word1 … word5" on screen left `generating` false, the
+question in the composer, the chat rewound to 0 and `chatTrunc` set. Not
+seen in WKWebView. One gauntlet check pins the flow, with five mutations.
+
 ## 6b340 — funnel pictures: three across, and always one
 Patrick (2026-09-30), with a screenshot of a picture funnel's stage of
 six: "For the funnel using images as well, if we can, let's make the

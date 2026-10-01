@@ -8234,6 +8234,32 @@ check("review: funnel Try again, deferred rewinds, refused requests, Cmd+Q",
       and "if _turns_flushing[0]:" in _MILLENAI_SRC,
       _rg[:120])
 
+# EDIT & RESEND mid-answer (6b343, per Patrick: "the edit icon doesn't work"):
+# the button used to return at once while an answer was being written. It
+# now stops the answer as Stop does and opens the edit once send() has
+# finished saving, so the partial answer and the rewind land in order.
+_er = page[page.index("function editResend(text){"):page.index("function addMsg(")]
+_sd = page[page.index("const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);"):][:700]
+_nc = page[page.index('$("#newchat").addEventListener("click",()=>{'):][:200]
+def _edit_ok(er, sd, nc, decl):
+    return ("let pendingEdit=null;" in decl
+            and "if(generating){" in er and "pendingEdit=text;abortCtl.abort();return;" in er
+            and er.index("pendingEdit=text") < er.index("messages.splice(")
+            and "if(pendingEdit!==null){" in sd and "const t=pendingEdit;pendingEdit=null;" in sd
+            and "if(curChat===myChat&&!generating)editResend(t);" in sd
+            and "pendingEdit=null;" in nc)
+_decl = page[page.index("let messages=[], generating=false, abortCtl=null;"):][:400]
+_edit_mut = {
+    "silent return back": (_er.replace("pendingEdit=text;abortCtl.abort();return;", "return;"), _sd, _nc, _decl),
+    "no stop": (_er.replace("pendingEdit=text;abortCtl.abort();return;", "pendingEdit=text;return;"), _sd, _nc, _decl),
+    "never reopened": (_er, _sd.replace("editResend(t);", ""), _nc, _decl),
+    "edit before the save": (_er, _sd.replace("const saved=await syncChat", "const saved=await syncChat"), _nc.replace("pendingEdit=null;", ""), _decl),
+    "not declared": (_er, _sd, _nc, _decl.replace("let pendingEdit=null;", "")),
+}
+check("review: Edit & resend while an answer is being written stops it, waits for the save, then edits",
+      _edit_ok(_er, _sd, _nc, _decl) and not any(_edit_ok(*m) for m in _edit_mut.values()),
+      "%r" % [k for k, m in _edit_mut.items() if _edit_ok(*m)])
+
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
 _porig = open(_pf, "rb").read() if os.path.exists(_pf) else b"{}"
