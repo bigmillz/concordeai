@@ -154,3 +154,58 @@ def detect():
     if "amd" in seen:
         return _amd(seen["amd"])
     return {"vendor": None, "name": None, "vram_bytes": None}
+
+
+def _pct(v):
+    """A whole number 0-100, or None."""
+    try:
+        v = int(float(v))
+    except (TypeError, ValueError):
+        return None
+    return v if 0 <= v <= 100 else None
+
+
+def _bytes(v):
+    try:
+        v = int(v)
+    except (TypeError, ValueError):
+        return None
+    return v if 0 <= v < 1 << 50 else None
+
+
+def usage(vendor):
+    """How busy the card is right now, for the app's meter. Exactly three
+    numbers, each None when it can't be read (a card with no such file, an
+    older driver, nvidia-smi missing): never an error, never a guess.
+
+      {"busy_pct": int | None, "vram_used_bytes": int | None, "vram_total_bytes": int | None}
+
+    amdgpu: gpu_busy_percent, mem_info_vram_used and mem_info_vram_total,
+    the same files the server's own dashboard reads. NVIDIA: nvidia-smi.
+    Intel and no card: all None."""
+    out = {"busy_pct": None, "vram_used_bytes": None, "vram_total_bytes": None}
+    try:
+        if vendor == "amd":
+            for dev in sorted(glob.glob(_sys() + "/class/drm/card[0-9]*/device")):
+                if (_read(dev + "/vendor") or "").lower() == "0x1002" \
+                        and os.path.exists(dev + "/mem_info_vram_total"):
+                    out["busy_pct"] = _pct(_read(dev + "/gpu_busy_percent"))
+                    out["vram_used_bytes"] = _bytes(_read(dev + "/mem_info_vram_used"))
+                    out["vram_total_bytes"] = _bytes(_read(dev + "/mem_info_vram_total"))
+                    break
+        elif vendor == "nvidia":
+            r = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total",
+                                "--format=csv,noheader,nounits"],
+                               capture_output=True, text=True, timeout=5)
+            if r.returncode == 0 and r.stdout.strip():
+                parts = [p.strip() for p in r.stdout.strip().splitlines()[0].split(",")]
+                if len(parts) == 3:
+                    out["busy_pct"] = _pct(parts[0])
+                    for key, p in (("vram_used_bytes", parts[1]), ("vram_total_bytes", parts[2])):
+                        try:
+                            out[key] = _bytes(int(float(p)) << 20)
+                        except ValueError:
+                            pass
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return out
