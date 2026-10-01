@@ -107,6 +107,8 @@ MACHINE_STATE = frozenset((
     # the backdrops, the search proxy, provider quirks, locks' depth
     "_sky_jobs", "_sky_tls", "_SEARCH_PROXY", "_stream_usage_off",
     "_cloud_depth", "_usage_thread",
+    # the local-record test hook's list (6b339): dev copies only
+    "_LOCAL_CALLS",
     # (6b339, per Patrick: server first) the first-word deadline of the
     # call in flight on this thread: a number of seconds, nothing personal
     "_srv_first",
@@ -551,6 +553,14 @@ SYNC_URL = ((os.environ.get("MILLENAI_SYNC_URL", "").strip()
 ACCOUNTS = bool(DEV_HOME)
 # `import nacl` blocked, as if PyNaCl weren't there (0a 5.14, CRY-4)
 cai_crypto.blocked = "no-nacl" in TEST_HOOKS
+
+
+# EVERY LOCAL MODEL CALL RECORDED, NOT RUN (6b339, final review), dev copies
+# only: with the `local-record` hook run_model answers for a model of this
+# computer with a stub line and ensure_mlx_engine starts nothing, each noted
+# here and read at /api/test/local, so the gauntlet can prove that a request
+# in the page's real shape never warms or asks an engine here.
+_LOCAL_CALLS = []
 
 
 def _hook_arg(name: str) -> str:
@@ -3906,6 +3916,12 @@ def _tier_ready(name: str) -> list:
 # The agents of the Code lane keep their own rule (a server's coder, else the
 # server's copy of their first pick).
 _TIER_ROLE = {"Fast": "fast", "Thinking": "think", "Pro": "all"}
+# the most server models a mode seats (6b339, final review): Pro seats every
+# model that fits, and a server holding a dozen drafts one after another
+# (one card) past the 240 s the council's loop gets, so only the first
+# four drafts landed. The rest fall to this computer's normal picks or are
+# left out, and the tier's bubble says so
+SRV_SEATS_MAX = 4
 # the agents that may: the Code lane's prefer a coder; Research and Remote
 # run their own flows on this computer and keep them
 _AGENT_ROLE = {"Coding": "code", "Workspace": "code", "Math & Logic": "think",
@@ -3943,7 +3959,7 @@ def resolve_tier_seats(name: str, ctx=None) -> list:
     # same tag). The per-server switch is the way back to local-first.
     seats = []
     for m in srv_rank(cands, role, "normal", speeds):
-        if len(seats) >= count:
+        if len(seats) >= min(count, SRV_SEATS_MAX):
             break
         seats.append({"label": m["label"], "fb": "", "params": m.get("params"),
                       "tag": _srv_tag_key(m["name"])})
@@ -3963,6 +3979,23 @@ def resolve_tier_seats(name: str, ctx=None) -> list:
         if server_label(st["label"]):
             st["fb"] = local_tag.get(st.pop("tag", ""), "") or first_local
     return seats
+
+
+def tier_server_cap(name: str, ctx=None):
+    """(seated, of): when a mode's server models outnumber the seats the cap
+    gives them (6b339, final review), how many sit and how many there are; else
+    None. The tier's bubble says it."""
+    t = TIERS.get(name)
+    role = _TIER_ROLE.get(name)
+    if not t or t.get("cloud_only") or not role or ctx is None:
+        return None
+    try:
+        cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m["name"], role)]
+    except Exception:
+        return None
+    if t["count"] <= SRV_SEATS_MAX:       # the cap only binds where a mode seats more
+        return None
+    return (SRV_SEATS_MAX, len(cands)) if len(cands) > SRV_SEATS_MAX else None
 
 
 def resolve_agent_seat(name, ctx=None):
@@ -5442,6 +5475,9 @@ def _stop_other_mlx(keep_label: str):
 
 def ensure_mlx_engine(label: str, timeout: float = 180.0) -> bool:
     """Bring up the engine for `label` on demand, freeing the others first."""
+    if "local-record" in TEST_HOOKS:
+        _LOCAL_CALLS.append(("ensure", label))
+        return True
     port = _own_engine_port(label)
     if _port_in_use(port):
         _stop_other_mlx(label)
@@ -18415,6 +18451,10 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
     if server_label(label):
         # a model on the person's own server (6b334), never a fallback
         return server_stream(label, messages, emit)
+    if "local-record" in TEST_HOOKS:
+        _LOCAL_CALLS.append(("run", label))
+        emit("LOCAL-ANSWER-" + label)
+        return
     if label not in MODEL_ROUTES:
         pulled = ollama_pulled_tags() or set()
         label = next((l for l in reversed(MERGE_RANK)
@@ -20319,6 +20359,12 @@ def run_council(labels: list, messages: list, emit, status,
 
     def _run_group(_g):
         for _j, _lbl in enumerate(_g, 1):
+            # a server that failed its first draft (it stalled, or said no)
+            # is marked down: its other seats are not asked, or each would
+            # wait out a deadline of its own (6b339, final review)
+            if _j > 1 and server_label_down(bound_ctx(), _lbl):
+                took_part(_lbl, "(no answer \u2014 server down)")
+                continue
             _draft_one(_j, _lbl, _local_deadline, True)
     _gthreads = []
     for _g in _groups.values():
@@ -23786,6 +23832,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     def _do_GET(self):
         if not self._gate():
             return
+        if self.path == "/api/test/local" and "local-record" in TEST_HOOKS:
+            self._send_json({"calls": [list(c) for c in _LOCAL_CALLS]})
+            return
         if self.path == "/":
             # exactly "/" (6b321): "/?anything" is no longer the page, so
             # "/?key=" gets the gate's 403 even with the cookie. The page
@@ -24135,6 +24184,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _fl = fast_cloud_ladder()
                     if _fl:
                         out[name]["fastcloud"] = _fl[0].get("name", "")
+                # a mode with more server models than seats says how many
+                # sit (6b339, final review)
+                try:
+                    _cap = tier_server_cap(name, self.ctx)
+                except (StoreReadError, NoProfile):
+                    _cap = None
+                if _cap:
+                    out[name]["srvcap"] = {"seated": _cap[0], "of": _cap[1]}
             # "<server> Only" (6b337): one row per paired server, from its
             # last check; greyed on the page while it can't answer
             try:
@@ -25717,6 +25774,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # how the turn's one seat went ("server", "fallback", "failed")
         _seat_fb = {}
         _seat_res = [""]
+        _page_model = model_name       # what the page last had picked by hand
         if tier in TIERS:
             try:
                 # Cloud Only never contacts the server (6b339, rules review)
@@ -25729,6 +25787,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _seats = resolve_tier_seats(tier, self.ctx)
             council = [x["label"] for x in _seats]
             _seat_fb = {x["label"]: x["fb"] for x in _seats if server_label(x["label"])}
+            # THE PAGE'S `model` IS NOT THE MODE'S (6b339, final review: the page
+            # always sends the model last picked by hand, "Llama 3.2 3B" on a
+            # fresh install, beside a tier). Routing on it ran Fast on that model
+            # whatever the seats said, never reached a server seat, and warmed
+            # its engine on a Mac that should stay quiet. A mode answers from its
+            # own seats; the stale pick is the last resort of an empty roster.
+            model_name = ""
         elif srv_only_tier(tier):
             try:
                 _so_lbl, _so_name, _so_why = server_only_resolve(
@@ -25762,7 +25827,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             council = [lbl for lbl, _c in cloud_bench()]
             model_name = council[0] if council else ""
         elif not council:
-            council = [model_name]
+            council = [model_name or _page_model]
         # THE MERGER DRAFTS LAST (6b243). The council's local loop leaves
         # the LAST engine resident, and the merge stage wants the biggest
         # Gemma — when Gemma drafted mid-roster the next model's swap
@@ -25774,10 +25839,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                    else merge_pref_label())
             if _mp in council:
                 council = [l for l in council if l != _mp] + [_mp]
-        # a tier request arrives with model="" — the router matches on
-        # model_name, and an empty one fell through to the smallest-cached
-        # fallback: the header said Gemma while Llama 1B answered (seen
-        # live). The resolved council leader IS the model.
+        # a tier request has model_name "" here (the page's own is set aside
+        # above, 6b339) — the router matches on model_name, and an empty one
+        # fell through to the smallest-cached fallback: the header said Gemma
+        # while Llama 1B answered (seen live). The resolved council leader IS
+        # the model.
         model_name = model_name or (council[0] if council[0:] else "")
         prompt = messages[-1]["content"] if messages else ""
         # A PICTURE, NOT PROSE (6b294): "generate an image of a cat" used
@@ -32929,6 +32995,10 @@ async function showTierPop(el,name){
           :list.length>1?'<span class="note">answers blended by Gemma</span>'
                         :'<span class="note">single model — fastest</span>')
       : '<div class="mline">nothing downloaded yet</div>')+
+    // a mode with more server models than seats (6b339, final review)
+    (info.srvcap
+      ? '<span class="note">seats '+info.srvcap.seated+' of the '+info.srvcap.of
+        +' models on your server: that many fit in the time a blend has</span>' : "")+
     ((info.skipped||[]).length
       ? '<span class="note">skipped, needs more memory: '+
         esc(info.skipped.join(", "))+'</span>' : "");
@@ -33193,6 +33263,16 @@ function openEngSub(id,keepScroll,byHover){
     });
   });
 }
+// a click on a server's row (6b339, final review): the hover timer a quick click
+// races is cleared FIRST, or it fires after the click and opens the flyout again
+// as a hover one, resetting its scroll
+function srvRowClick(id){
+  clearTimeout(engSubTimer);engSubTimer=0;
+  const a=flyClick(engSubId,engSub.hidden,engSubByHover,id);
+  if(a==="close")closeEngSub();
+  else if(a==="pin")engSubByHover=false;   // a hover opened it; the click keeps it
+  else openEngSub(id,false,false);
+}
 function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
   srvSyncOff();
@@ -33236,10 +33316,7 @@ function openEngMenu(){
     if(el.dataset.sv){
       el.addEventListener("click",ev=>{
         ev.stopPropagation();hideTierPop();
-        const a=flyClick(engSubId,engSub.hidden,engSubByHover,el.dataset.sv);
-        if(a==="close")closeEngSub();
-        else if(a==="pin")engSubByHover=false;   // a hover opened it; the click keeps it
-        else openEngSub(el.dataset.sv,false,false);
+        srvRowClick(el.dataset.sv);
       });
       el.addEventListener("mouseenter",()=>{
         clearTimeout(engSubTimer);
@@ -37899,9 +37976,13 @@ function srvCard(s){
     +(s.paired&&ms?'<div class="srv-ms">'+ms+'</div>'
       :s.paired&&st.at&&!st.err?'<div class="srv-ms"><div class="srv-m">'
         +'no chat models installed</div></div>':"")
-    // "Use for Fast, Thinking and Pro" (6b339): on unless turned off
+    // "Use for Fast, Thinking, Pro and the Code lane" (6b339): on unless turned
+    // off. The Code lane's Workspace and Coding agents read a folder, and what
+    // they read goes to the model that answers, so the switch says so
     +(s.paired?'<label class="srv-pref"><input type="checkbox" data-a="prefer"'
-      +(s.prefer!==false?" checked":"")+'><span>Use for Fast, Thinking and Pro</span></label>':"")
+      +(s.prefer!==false?" checked":"")+'><span>Use for Fast, Thinking, Pro and the Code lane</span></label>'
+      +'<div class="srv-hint">The Workspace and Coding agents can send the contents of a '
+      +'folder you give them to this server.</div>':"")
     +(pairing?'<div class="srv-pair"><input class="srv-code" data-k="code" maxlength="20" '
         +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
         +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
@@ -37977,6 +38058,11 @@ $("#srv-list").addEventListener("change",async ev=>{
   catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
   if(d.server)srvPut(d.server);
   paintServers();
+  // the modes' seats moved with the switch (6b339, final review): the chip, the
+  // tiers' bubbles and the greyed rows follow now, not at the next refresh
+  srvModesRefresh();
+  if(typeof paintTierAvail==="function")paintTierAvail();
+  paintEngMenuServers();
   if(d.err)srvMsg(id,d.err);
 });
 $("#srv-list").addEventListener("keydown",ev=>{
@@ -38155,7 +38241,9 @@ function tierShown(t){
   if(!isSrvMode(t)){
     // Fast, Thinking or Pro routed to a server says so: "Fast · Ollama1 gpt-oss:20b"
     const sv=((tierInfo[t]||{}).models||[]).filter(m=>m.indexOf(SRV_SEP)>=0);
-    if(!sv.length)return t;
+    // Fast with cloud power on asks the cloud first (the server seat is the
+    // fallback), so the chip doesn't claim the server answers (final review)
+    if(!sv.length||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return t;
     const nm=[...new Set(sv.map(m=>m.slice(0,m.indexOf(SRV_SEP))))].join(" + ");
     return t==="Fast"?t+" \u00b7 "+sv[0].replace(SRV_SEP," "):t+" \u00b7 "+nm+(sv.length>1?" \u00d7"+sv.length:"");
   }

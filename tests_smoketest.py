@@ -44,8 +44,9 @@ def _port_open(port):
 class Instance:
     """One windowless dev copy of the app in a folder of its own."""
 
-    def __init__(self, port, name, seed=None, env=None, py=None):
+    def __init__(self, port, name, seed=None, env=None, py=None, cwd=None):
         self.port, self.name = port, name
+        self.cwd = cwd          # the folder it runs from (a mutated copy of the app, 6b339)
         # the Python it runs on (6b327: a throwaway venv, for the PyNaCl
         # install checks); SMOKE_PY or this script's by default
         self.py = py
@@ -84,7 +85,7 @@ class Instance:
         self.proc = subprocess.Popen(
             [self.py or os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
             env=self.env, stdout=self.log, stderr=subprocess.STDOUT,
-            start_new_session=True)
+            start_new_session=True, cwd=self.cwd)
         _INSTANCES.append(self)
         note = os.path.join(self.home, "run", "instance.json")
         end = time.time() + timeout
@@ -18672,10 +18673,12 @@ def _soc_flyout(src):
         and o["s2"] == [True, True] and o["e3"] is False,
         "closes together": o["s3"] == [True, True, ""],
         # a click opens it, a second click closes it; hovering opens it after a pause
-        "click": "        const a=flyClick(engSubId,engSub.hidden,engSubByHover,el.dataset.sv);\n"
-                 "        if(a===\"close\")closeEngSub();\n"
-                 "        else if(a===\"pin\")engSubByHover=false;   // a hover opened it; the click keeps it\n"
-                 "        else openEngSub(el.dataset.sv,false,false);" in src,
+        "click": "        srvRowClick(el.dataset.sv);" in src
+        and "function srvRowClick(id){\n  clearTimeout(engSubTimer);engSubTimer=0;\n"
+            "  const a=flyClick(engSubId,engSub.hidden,engSubByHover,id);\n"
+            "  if(a===\"close\")closeEngSub();\n"
+            "  else if(a===\"pin\")engSubByHover=false;   // a hover opened it; the click keeps it\n"
+            "  else openEngSub(id,false,false);" in src,
         "hover": "        engSubTimer=setTimeout(()=>{\n          if(!engMenu.hidden)openEngSub(el.dataset.sv,false,true);},300);" in src
         and "      el.addEventListener(\"mouseleave\",()=>clearTimeout(engSubTimer));" in src
         and "      clearTimeout(engSubTimer);if(engSubByHover)closeEngSub();});" in src,
@@ -18925,9 +18928,9 @@ _SO_MUT = [
      "function closeEngMenus(){engMenu.hidden=true;}"),
     ("Escape closing everything at once", "  if(!engSub.hidden){closeEngSub();return true;}",
      "  if(!engSub.hidden){closeEngMenus();return true;}"),
-    ("no click to open the flyout", "        else openEngSub(el.dataset.sv,false,false);", "        else{}"),
+    ("no click to open the flyout", "  else openEngSub(id,false,false);", "  else{}"),
     ("a click after a hover closing the flyout", '  return byHover?"pin":"close";', '  return "close";'),
-    ("a hover's flyout not kept by the click", '        else if(a==="pin")engSubByHover=false;   // a hover opened it; the click keeps it\n', ''),
+    ("a hover's flyout not kept by the click", '  else if(a==="pin")engSubByHover=false;   // a hover opened it; the click keeps it\n', ''),
     ("a repaint closing the flyout", "  if(engSubId)openEngSub(engSubId,true,engSubByHover);\n  else engSub.hidden=true;",
      "  engSub.hidden=true;"),
     ("the flyout's scroll lost on a repaint", "  const keep=keepScroll&&!engSub.hidden?engSub.scrollTop:-1;",
@@ -18954,7 +18957,7 @@ _SO_MUT = [
     ("a server's models not grouped", "'<div class=\"advgrp\"><b>'", "'<div class=\"advrow\"><b>'"),
     ("an unpaired server's models in Advanced", "  const gs=srvList.filter(s=>s.paired);\n  return gs.map(s=>{",
      "  const gs=srvList;\n  return gs.map(s=>{"),
-    ("the chip not naming a seat", '    if(!sv.length)return t;', '    return t;'),
+    ("the chip not naming a seat", '    if(!sv.length||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return t;', '    return t;'),
     ("a ghost pick sent", 'function advSendList(){return ((adv&&adv.local)||[]).filter(l=>!advGhost(l));}', 'function advSendList(){return ((adv&&adv.local)||[]);}'),
     ("a guard or embedding model picked by Only", '          and srv_role_ok(m["name"], "all")]', '          ]'),
     ("a ghost pick not shown", '    const ghosts=sel.local.filter(l=>advGhost(l)&&', '    const ghosts=[].filter(l=>advGhost(l)&&'),
@@ -19197,10 +19200,17 @@ def _p2_seat_ns(src, servers, local, tiers=None):
             base += [l for l in rank if l in local and l not in base]
         return base or [l for l in rank if l in local]
     ns["_tier_ready"] = tier_ready
-    for fn in ("_label_params", "resolve_tier_seats", "resolve_agent_seat"):
+    ns["SRV_SEATS_MAX"] = int(re.search(r"^SRV_SEATS_MAX = (\d+)", src, re.M).group(1))
+    for fn in ("_label_params", "resolve_tier_seats", "tier_server_cap", "resolve_agent_seat"):
         exec(_p2_fn(src, fn), ns)
     exec("_TIER_ROLE = {'Fast': 'fast', 'Thinking': 'think', 'Pro': 'all'}\n_AGENT_ROLE = {'Coding': 'code'}", ns)
     return ns, ctx, ents
+
+
+def n5_cap(src, models):
+    """tier_server_cap for a server holding exactly these models: None when they all fit under the cap."""
+    n_, c_, e_ = _p2_seat_ns(src, [("Desk", "https://desk.example.com", models, {})], local=set())
+    return n_["tier_server_cap"]("Pro", c_)
 
 
 def _p2c_seats(src):
@@ -19236,6 +19246,18 @@ def _p2c_seats(src):
         _m("gpt-oss:20b", size=13 * GIB_), _m("mistral-small:24b", size=14 * GIB_)], {})], local=LOCAL)
     got["partly filled"] = [(s["label"], s["fb"]) for s in n2["resolve_tier_seats"]("Thinking", c2)] == [
         ("Desk · mistral-small:24b", "Gemma 4 26B"), ("Desk · gpt-oss:20b", "GPT-OSS 20B"), ("Gemma 4 26B", "")]
+    # THE CAP (final review): Pro seats at most four of a server's models, the rest of the roster is this computer's
+    # normal picks; Thinking and Fast keep their counts; the figure the bubble gives is the cap only where it binds
+    six = [_m("%s:8b" % n_, size=5 * GIB_) for n_ in ("alpha", "beta", "gamma", "delta", "epsilon", "zeta")]
+    n6, c6, e6 = _p2_seat_ns(src, [("Desk", "https://desk.example.com", six, {})], local=LOCAL)
+    pro6 = [s_["label"] for s_ in n6["resolve_tier_seats"]("Pro", c6)]
+    got["cap"] = (len([l for l in pro6 if l.startswith("Desk")]) == 4 and pro6[:4] == [l for l in pro6 if l.startswith("Desk")]
+                  and pro6[4:] == ["Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.5 9B", "Llama 3.2 3B"]
+                  and len([s_ for s_ in n6["resolve_tier_seats"]("Thinking", c6)]) == 3
+                  and len(n6["resolve_tier_seats"]("Fast", c6)) == 1)
+    got["cap note"] = (n6["tier_server_cap"]("Pro", c6) == (4, 6) and n6["tier_server_cap"]("Thinking", c6) is None
+                       and n6["tier_server_cap"]("Fast", c6) is None and n6["tier_server_cap"]("Cloud Only", c6) is None
+                       and n5_cap(src, six[:4]) is None)
     # the switch off: this computer's answer, as before; a server that isn't answering too
     base = [(l, "") for l in ns["_tier_ready"]("Thinking")[:3]]
     ns["server_set_prefer"](ctx, ents["Desk"]["id"], False)
@@ -19435,7 +19457,9 @@ def _p2_council(src, run_model, **over):
           "_answered": {}, "cloud_glitch": lambda *a: None, "cloud_text": lambda *a, **k: "",
           "server_copy": lambda *a, **k: None, "server_mode_candidates": lambda c: [], "server_speeds": lambda c: {},
           "bound_ctx": lambda: None, "ServerError": type("ServerError", (RuntimeError,), {}),
-          "server_first_deadline": _RcDeadline, "server_mark_down": lambda ctx, name, why: downs.append((name, why))}
+          "server_first_deadline": _RcDeadline, "server_mark_down": lambda ctx, name, why: downs.append((name, why)),
+          # a server marked down is down (6b339, final review), by the name before the separator
+          "server_label_down": lambda ctx, label: label.split(" \u00b7 ", 1)[0] in {d[0] for d in downs}}
     ns.update(over)
     exec(rc, ns)
     ns["_downs"] = downs
@@ -19495,6 +19519,28 @@ def _p2c_council(src):
                       lambda c: (frames if isinstance(c, _RcCtl) else out).append(c), [].append, srv_first_s=60.0)
     got["absent, marked down"] = (any("Desk \\u00b7 bad" in f and "no answer" in f for f in frames) and "MERGED" in out
                                   and ns["_downs"] == [("Desk", "Desk didn’t answer.")])
+    # a server that stalls its first draft loses the rest of its group: the council ends near ONE deadline, not one per
+    # seat (final review); another server's group and this Mac's loop are untouched
+    box = {}
+    R.clear()
+
+    def stall(label, msgs, emit, thinking=False):
+        R.append((label, "unset", "d"))
+        if label.startswith("Desk"):
+            time.sleep(0.5)
+            raise box["ns"]["ServerError"]("Desk didn’t answer.")
+        emit("answer from " + label + " " * 3)
+    ns, calls = _p2_council(src, stall)
+    box["ns"] = ns
+    fr = []
+    t1 = time.time()
+    ns["run_council"](["Desk · a", "Desk · b", "Desk · c", "Lab · d", "Llama"], [{"role": "user", "content": "q"}],
+                      lambda c: fr.append(c) if isinstance(c, _RcCtl) else None, [].append, srv_first_s=60.0)
+    wall = time.time() - t1
+    got["a stalled server: one deadline"] = (
+        [l for l, _d, _k in R if l.startswith("Desk")] == ["Desk · a"] and wall < 0.95
+        and any("Desk \\u00b7 b" in f and "server down" in f for f in fr) and any("Desk \\u00b7 c" in f and "server down" in f for f in fr)
+        and [l for l, _d, _k in R if l in ("Lab · d", "Llama")] != [] and ns["_downs"][0][0] == "Desk")
     # peer review and reflection on a server's models carry the deadline; on this Mac's they are as they were
     R.clear()
     ns, calls = _p2_council(src, rm)
@@ -19720,15 +19766,14 @@ def _p2c_pins(src):
     rc = _p2_fn(src, "run_council", "\n\n\nRESEARCH_PLAN = (")
     sect = src[src.index("# ==== servers: begin ===="):src.index("# ==== servers: end ====")]
     got = {
-        "seats": "            _seats = resolve_tier_seats(tier, self.ctx)\n            council = [x[\"label\"] for x in _seats]\n" in ch
-        and "                # Cloud Only never contacts the server (6b339, rules review)\n                if not cloud_only:\n"
-            "                    server_refresh_modes(self.ctx)" in ch
-        and "        if tier in TIERS:\n            try:\n" in ch,
+        # (the seats the handler takes, and what the page's own request runs, are the live checks of the page's request)
+        "not an explicit pick": "        _srv_seat = bool(_srv_lbl) and _srv_lbl in _seat_fb\n        if _srv_seat:\n            _srv_lbl = \"\"" in ch
+        and "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n                    and server_label(council[0]) else \"\")" in ch,
+        "refresh": "                # Cloud Only never contacts the server (6b339, rules review)\n                if not cloud_only:\n"
+        "                    server_refresh_modes(self.ctx)" in ch,
         "agent": "            ag_label, ag, _ag_fb = resolve_agent_seat(agent_name, self.ctx)" in ch
         and "                    _seat_fb = ({ag_label: _ag_fb} if server_label(ag_label)\n                                else {})" in ch
         and "                if agent_name in _AGENT_ROLE and not cloud_only:\n                    server_refresh_modes(self.ctx)" in ch,
-        "not an explicit pick": "        _srv_seat = bool(_srv_lbl) and _srv_lbl in _seat_fb\n        if _srv_seat:\n            _srv_lbl = \"\"" in ch
-        and "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n                    and server_label(council[0]) else \"\")" in ch,
         # Fast asks the cloud first (when it is on), then the server, then this Mac
         "after the cloud ladder": ch.index('status("cloud power unavailable — running locally")')
         < ch.index("                if lbl in _seat_fb:\n                    # a mode's server seat")
@@ -19744,11 +19789,6 @@ def _p2c_pins(src):
         and ch.index("            if _seat_fb:\n                # a mode's server seat") < ch.index("            # a picture sent to your own server's model stays on that"),
         "tiers": "                    chosen = [x[\"label\"] for x in resolve_tier_seats(name, self.ctx)]" in src,
         # the ladder: the server's best suitable models first, by the chooser, then this Mac's own picks
-        "server first": "    for m in srv_rank(cands, role, \"normal\", speeds):\n        if len(seats) >= count:\n            break\n" in tr
-        and "        if _srv_tag_key((MODEL_INFO.get(l) or {}).get(\"ollama\")) in taken:\n            continue\n" in tr
-        and "            st[\"fb\"] = local_tag.get(st.pop(\"tag\", \"\"), \"\") or first_local" in tr
-        and "            cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m[\"name\"], role)]" in tr
-        and "    speeds = server_speeds(ctx)" in tr,
         "no gate in the section": not re.search(r"cloud_allowed|gate_ladder|\bturbo\b|cloud_bench|resolve_tier|TIERS", sect),
         "fits": "            if _srv_fits(m, vram, True):\n                out.append(dict(m, server=e[\"name\"]" in sect
         and '        if not _srv_paired(e) or e.get("prefer") is False:\n            continue' in sect
@@ -19854,6 +19894,71 @@ def _p4c_rules(src):
     return all(got.values()), [got, o]
 
 
+def _p5c_nodes(src):
+    """The page's pieces of the final review, run in node: a quick click on a server's row clears the hover timer; the
+    switch refreshes the chip, the bubbles and the greyed rows; Fast with the cloud first doesn't claim the server; the
+    bubble says when the cap bound; the switch's label and help say what the Code lane sends."""
+    i0 = src.index("function esc(s){")
+    esc = src[i0:src.index(";}\n", i0) + 3]
+    fly = src[src.index("function flyClick("):src.index("// where a flyout goes")]
+    row = src[src.index("// a click on a server's row (6b339, final review)"):src.index("function openEngMenu(){")]
+    pref = src[src.index('$("#srv-list").addEventListener("change",async ev=>{'):src.index('$("#srv-list").addEventListener("keydown"')]
+    pop = src[src.index("async function showTierPop(el,name){"):src.index("function hideTierPop(){tierPop.hidden=true;}")]
+    shown = src[src.index("function isSrvMode(t){"):src.index("function tierLabel(){")]
+    js = (esc + 'const SRV_SEP=" \\u00b7 ";let srvList=[],tierInfo={},tier="Fast",model="x",srvLoaded=true;' + shown + fly
+          + "const log=[];let engSubTimer=0,engSubId='',engSubByHover=false;const engSub={hidden:true};"
+          + "function closeEngSub(){log.push('close');engSub.hidden=true;engSubId='';}"
+          + "function openEngSub(id,k,h){log.push('open:'+id+':'+h);engSubId=id;engSub.hidden=false;engSubByHover=!!h;}"
+          + row
+          + "const h={};const $=s=>({addEventListener:(t,f)=>{h[t]=f;}});const calls=[];"
+          + "function srvPost(){calls.push('post');return Promise.resolve({server:{id:'x',prefer:false}});}"
+          + "function srvPut(){calls.push('put');}function paintServers(){calls.push('paint');}function srvMsg(){calls.push('msg');}"
+          + "function srvModesRefresh(){calls.push('modes');}function paintTierAvail(){calls.push('avail');}"
+          + "function paintEngMenuServers(){calls.push('menu');}"
+          + pref
+          + "const tierPop={innerHTML:'',hidden:true,offsetWidth:100,style:{}};const innerWidth=1000;"
+          + "const T={Pro:{models:['A \\u00b7 a','A \\u00b7 b','Gemma'],srvcap:{seated:4,of:6},skipped:[]},"
+          + "Thinking:{models:['A \\u00b7 a'],skipped:[]}};"
+          + "async function api(p){return {json:async()=>p==='/api/tiers'?T:{configured:false,turbo:false}};}"
+          + pop
+          + "(async()=>{const out={};"
+          # a quick click: the hover timer a mouseenter set is cleared, so it never re-opens the flyout as a hover one
+          + "let fired=0;engSubTimer=setTimeout(()=>{fired=1;log.push('timer');},60);srvRowClick('a1');"
+          + "await new Promise(r=>setTimeout(r,160));out.quick=[fired,log.slice(),engSubByHover];"
+          # a click while a hover-opened flyout is up keeps it, pinned; another click closes it
+          + "log.length=0;engSubId='a1';engSub.hidden=false;engSubByHover=true;srvRowClick('a1');out.pin=[log.slice(),engSubByHover];"
+          + "srvRowClick('a1');out.close=log.slice();"
+          # the switch: the modes' seats, the tiers and the open menu follow now
+          + "await h.change({target:{closest:s=>s.indexOf('prefer')>=0?{checked:false,closest:()=>({dataset:{id:'x'}})}:null}});"
+          + "out.pref=calls.slice();"
+          # Fast with the cloud first doesn't name the server; Thinking still does
+          + "tierInfo={Fast:{models:['Desk \\u00b7 gpt-oss:20b'],fastcloud:'Groq'},Thinking:{models:['A \\u00b7 x'],fastcloud:'Groq'}};"
+          + "out.chip=[tierShown('Fast'),tierShown('Thinking')];tierInfo={Fast:{models:['Desk \\u00b7 gpt-oss:20b']}};out.chip2=tierShown('Fast');"
+          # the bubble: Pro says it seats four of six; Thinking says nothing of it
+          + "const el={getBoundingClientRect:()=>({right:10,left:5,top:5})};"
+          + "await showTierPop(el,'Pro');out.pro=tierPop.innerHTML;await showTierPop(el,'Thinking');out.th=tierPop.innerHTML;"
+          + "process.stdout.write(JSON.stringify(out));})();")
+    try:
+        o = _so_node("p5c.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    got = {
+        "quick click": o["quick"][0] == 0 and o["quick"][1] == ["open:a1:false"] and o["quick"][2] is False,
+        "pin, close": o["pin"] == [[], False] and o["close"] == ["close"],
+        "switch": o["pref"] == ["post", "put", "paint", "modes", "avail", "menu"],
+        "chip": o["chip"] == ["Fast", "Thinking \u00b7 A"] and o["chip2"] == "Fast \u00b7 Desk gpt-oss:20b",
+        "bubble": "seats 4 of the 6 models on your server" in o["pro"] and "seats" not in o["th"],
+        # the switch's words: the Code lane's agents read a folder, and what they read goes to the model that answers
+        "label": "<span>Use for Fast, Thinking, Pro and the Code lane</span></label>'" in src
+        and "      +'<div class=\"srv-hint\">The Workspace and Coding agents can send the contents of a '\n"
+            "      +'folder you give them to this server.</div>':\"\")" in src,
+        "tiers say the cap": "                if _cap:\n                    out[name][\"srvcap\"] = {\"seated\": _cap[0], \"of\": _cap[1]}" in src,
+        "wired": "        ev.stopPropagation();hideTierPop();\n        srvRowClick(el.dataset.sv);" in src
+        and "      clearTimeout(engSubTimer);if(engSubByHover)closeEngSub();});" in src,
+    }
+    return all(got.values()), [got, o]
+
+
 _P2_CHECKS = [
     ("your server first: which family a model is (whole words), who may take which seat, how the chooser ranks for "
      "the modes and for each funnel effort, the measured speed", _p2c_roles),
@@ -19915,9 +20020,7 @@ def _p3c_quiet(src):
         "no memory pass without an answer": "                    and not _gone and not _so_fail\n"
                                             "                    and not (_srv_lbl and not _model_said[0])\n" in ch,
         "export title": "                    and not (_srv_only or _srv_lbl or _seat_fb) else \"\")" in ch,
-        # no pre-warm, no local route, no rescue for a server pick
-        "no pre-warm": "        if _srv_lbl:\n            route, route_label = (None, None), _srv_lbl\n" in ch
-        and "        if route[0] == \"mlx\" and route_label and not _no_text_model:" in ch,
+        # no local rescue for a server pick (no pre-warm: the live check counts the engines started)
         "no rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
         # the place-pin pass reads a MODEL's answer, never the app's own error line (which could be 120 characters)
         "no pins from an error": "                    elif (query and sent[0] > 120 and _model_said[0]\n" in ch,
@@ -19926,11 +20029,14 @@ def _p3c_quiet(src):
 
 
 _P2_CHECKS += [
+    ("the final review's page pieces (node): a quick click clears the hover timer, the switch refreshes the chip, the "
+     "bubbles and the rows, Fast with the cloud first doesn't name the server, the bubble says when the cap bound, the "
+     "switch says what the Code lane sends", _p5c_nodes),
     ("the rules review: \"<name> Only\" makes no picture or video, asks no model to word one and runs no agent; a seat's "
      "title is the server's or none; choosing an agent turns an Only pick off (node)", _p4c_rules),
     ("a server's gpu_spill at 0% on the card says the card isn't in use; a partial spill keeps its words", _p3c_spill),
     ("a plain server pick keeps this Mac quiet: its title by the same server or none, no memory pass without an "
-     "answer, no export title, no pre-warm, no local rescue (pinned)", _p3c_quiet),
+     "answer, no export title, no local rescue (pinned)", _p3c_quiet),
 ]
 
 
@@ -20014,10 +20120,21 @@ _P2_MUT = [
     ("a model that spills, one too big or with no card figure used", '            if _srv_fits(m, vram, True):\n                out.append(dict(m, server=e["name"]',
      '            if True:\n                out.append(dict(m, server=e["name"]'),
     ("a card figure not required for a mode", '    if need_vram and not vram:\n        return False\n', ''),
-    ("a server's models not seated first", '    for m in srv_rank(cands, role, "normal", speeds):\n        if len(seats) >= count:',
+    ("a server's models not seated first", '    for m in srv_rank(cands, role, "normal", speeds):\n        if len(seats) >= min(count, SRV_SEATS_MAX):',
      '    for m in []:\n        if len(seats) >= count:'),
-    ("the count not kept", '    for m in srv_rank(cands, role, "normal", speeds):\n        if len(seats) >= count:\n            break\n',
+    ("the count not kept", '    for m in srv_rank(cands, role, "normal", speeds):\n        if len(seats) >= min(count, SRV_SEATS_MAX):\n            break\n',
      '    for m in srv_rank(cands, role, "normal", speeds):\n        if False:\n            break\n'),
+    ("Pro's server seats uncapped", '        if len(seats) >= min(count, SRV_SEATS_MAX):', '        if len(seats) >= count:'),
+    ("the cap's figure given where it doesn't bind", '    if t["count"] <= SRV_SEATS_MAX:       # the cap only binds where a mode seats more\n        return None\n', ''),
+    ("a stalled server's other seats still asked", '            if _j > 1 and server_label_down(bound_ctx(), _lbl):', '            if False:'),
+    ("a quick click's hover timer left running", 'function srvRowClick(id){\n  clearTimeout(engSubTimer);engSubTimer=0;', 'function srvRowClick(id){'),
+    ("a click not routed through the row handler", '        ev.stopPropagation();hideTierPop();\n        srvRowClick(el.dataset.sv);', '        ev.stopPropagation();hideTierPop();'),
+    ("the switch not refreshing the modes", '  srvModesRefresh();\n  if(typeof paintTierAvail==="function")paintTierAvail();\n  paintEngMenuServers();\n',
+     ''),
+    ("the switch not refreshing the tiers", '  if(typeof paintTierAvail==="function")paintTierAvail();\n  paintEngMenuServers();\n  if(d.err)srvMsg(id,d.err);',
+     '  paintEngMenuServers();\n  if(d.err)srvMsg(id,d.err);'),
+    ("the chip naming a server for Fast with the cloud first", '||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return t;', ')return t;'),
+    ("the cap not said in the bubble", "    (info.srvcap\n      ? '<span class=\"note\">seats '", "    (false\n      ? '<span class=\"note\">seats '"),
     ("a model seated twice", '        if _srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) in taken:\n            continue\n', ''),
     ("no local copy behind a server seat", '            st["fb"] = local_tag.get(st.pop("tag", ""), "") or first_local', '            st["fb"] = ""'),
     ("a server seat with no fallback", '    if not fallback:\n        emit(AppText("\\u26a0\\ufe0f " + why))\n        return "failed"',
@@ -20318,6 +20435,13 @@ class Ctl(BaseHTTPRequestHandler):
         if p == "/delay":
             STUB.delay = float(d.get("s") or 0)
             return self.reply({"ok": True})
+        if p == "/reply":
+            STUB.reply_text = str(d.get("text") or "")
+            return self.reply({"ok": True})
+        if p == "/unload":
+            with STUB.lock:
+                STUB.loaded.clear()
+            return self.reply({"ok": True})
         self.send_error(404)
 
     def do_GET(self):
@@ -20371,7 +20495,7 @@ for _i34 in range(240):
             break
         time.sleep(0.5)
 _SV = Instance(9903, "SRV", env={"MILLENAI_TEST_HOOKS":
-                                 "server-http-loopback,profiles,bench-fake,bench-pace=0.05"}).start()
+                                 "server-http-loopback,profiles,bench-fake,bench-pace=0.05,local-record"}).start()
 _SVREPLIES = []
 
 
@@ -20569,6 +20693,207 @@ check("servers (live): Cloud Only never seats a server model; Pro seats the serv
       and _pf1[1]["server"]["prefer"] is True and _tiOn["Pro"]["models"] == _tiers34["Pro"]["models"]
       and _pfBad[1].get("err") == "Say on or off." and "ANSWER" not in _sc5[1],
       "%r" % [_sc5[1][:200], _tiers34["Cloud Only"], _tiers34["Pro"], _tiOff["Pro"], _pf0, _pfBad])
+# ---- THE PAGE'S OWN REQUEST (6b339, final review). The page posts the model last picked by hand beside the
+# tier (`model`, and `models` = the council), "Llama 3.2 3B" on a fresh install. The server read it: Fast ran
+# that model whatever the seats said, never reached a server seat, and Thinking and Pro warmed its engine on a
+# Mac that should stay quiet ("I selected the pro setting and the GPU on the server isn't doing anything").
+# These checks send the page's REAL payload to the real handler, with a paired server holding suitable models,
+# and count what the copy would have run on this computer (the `local-record` hook records the calls instead of
+# starting an engine).
+import hashlib as _hl39
+
+_PG39 = re.sub(r"\s+", "", _MILLENAI_SRC[_MILLENAI_SRC.index('?{model:"",models:advList,tier:"",messages:askCtx(myMessages),'):
+                                          _MILLENAI_SRC.index("// refused before anything was saved")])
+_TURN39 = re.sub(r"\s+", "", _MILLENAI_SRC[_MILLENAI_SRC.index("const turn={chat_id:myChat,"):
+                                           _MILLENAI_SRC.index("generating=true; document.body.classList.add")])
+check("the page's chat request is the shape the live checks send: the stale model and council beside the tier, "
+      "the saved chat's turn fields",
+      ':{model:advGhostOnly?"":model,models:advGhostOnly?[]:council,tier:advGhostOnly?"Fast":tier,'
+      "messages:askCtx(myMessages),auto_web:autoWeb,images:sentImages,docs:sentDocs,agent," in _PG39
+      and "autonomy:agent===\"Remote\"?autonomy:undefined},turn))" in _PG39
+      and _TURN39.startswith("constturn={chat_id:myChat,lane:(chats.find(x=>x.id===myChat)||{}).lane||uiMode,"
+                             "after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};"),
+      "%r %r" % (_PG39[:400], _TURN39[:200]))
+_EMPTY39 = _hl39.sha256(b"").hexdigest()          # the hash of a new chat's empty prefix, as chatHash()
+
+
+def _page_body39(tier, text, stale="Llama 3.2 3B"):
+    """What sendMsg posts for a mode: the stale hand pick beside the tier, and the turn of a new chat."""
+    return {"model": stale, "models": [stale], "tier": tier, "messages": [{"role": "user", "content": text}],
+            "auto_web": True, "images": [], "docs": [], "agent": "",
+            "chat_id": "c" + os.urandom(6).hex(), "lane": "ai", "after_len": 0, "after_hash": _EMPTY39}
+
+
+def _mq39(inst, path, method="GET", data=None):
+    s_, b_ = _ireq(inst, path, method=method, data=None if data is None else json.dumps(data).encode(),
+                   headers={"Content-Type": "application/json"} if data is not None else None)
+    try:
+        return s_, json.loads(b_ or b"{}")
+    except ValueError:
+        return s_, b_
+
+
+def _mchat39(inst, body):
+    r_ = urllib.request.Request(inst.base + "/api/chat", data=json.dumps(body).encode(),
+                                headers=dict(inst.headers, **{"Content-Type": "application/json"}), method="POST")
+    try:
+        with urllib.request.urlopen(r_, timeout=240) as resp:
+            s_, h_, b_ = resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as e_:
+        s_, h_, b_ = e_.code, dict(e_.headers), e_.read()
+    t_ = b_.decode("utf-8", "replace")
+    return s_, h_, re.sub("\0[^\0]*\0", "", t_)
+
+
+def _loc39(inst):
+    return [tuple(c) for c in _mq39(inst, "/api/test/local")[1].get("calls", [])]
+
+
+def _chats39():
+    return [c for c in _o1("/stub")["calls"] if c[1] == "/api/chat"]
+
+
+def _modes_live39(inst, sid, svn, only=None):
+    """The page's request for each mode against a paired server with six suitable models, the switch on and off, and
+    a funnel stage. Returns {check: bool} and the details. `only` names the groups to run."""
+    got, det = {}, {}
+    lab = svn + " · "
+    q = lambda *a, **k: _mq39(inst, *a, **k)
+    q("/api/prefs", "POST", {"turbo": False})
+    q("/api/servers/prefer", "POST", {"id": sid, "on": True})
+    _o1("/drop", {"name": "sneaky:14b"})
+    for n_ in ("alpha:8b", "beta:8b", "gamma:8b", "delta:8b", "epsilon:8b"):
+        _o1("/clone", {"name": n_, "from": "small:8b"})
+    q("/api/servers/test", "POST", {"id": sid})
+    try:
+        tiers = q("/api/tiers")[1]
+
+        def run(tier, text):
+            time.sleep(1.0)                              # what an earlier request left behind lands first
+            n_loc, n_st = len(_loc39(inst)), len(_chats39())
+            s_, h_, t_ = _mchat39(inst, _page_body39(tier, text))
+            time.sleep(2.5)
+            sc = [c for c in _chats39()[n_st:] if text in str(c[2]["messages"][-1]["content"])]
+            return {"status": s_, "models": [x_.strip() for x_ in urllib.parse.unquote(h_.get("X-Models", "")).split(",")
+                                             if x_.strip()], "text": t_, "loc": _loc39(inst)[n_loc:],
+                    "drafted": {c[2]["model"] for c in sc}}
+        srv = lambda t: [m for m in tiers[t]["models"] if m.startswith(lab)]
+        tag = lambda l: l[len(lab):]
+        if only in (None, "modes"):
+            f = run("Fast", "say hello in one word 339f")
+            got["Fast: the server's seat answers"] = (
+                f["status"] == 200 and "ANSWER-" in f["text"] and "LOCAL-ANSWER" not in f["text"]
+                and len(srv("Fast")) == 1 and tiers["Fast"]["models"] == srv("Fast") and f["models"] == srv("Fast")
+                and f["drafted"] == {tag(srv("Fast")[0])})
+            got["Fast: nothing on this computer"] = f["loc"] == []
+            th = run("Thinking", "say hello in one word 339t")
+            got["Thinking: the server's three seats draft"] = (
+                th["status"] == 200 and len(srv("Thinking")) == 3 and th["models"] == tiers["Thinking"]["models"]
+                and {tag(l) for l in srv("Thinking")} <= th["drafted"])
+            got["Thinking: no engine warmed or started here"] = (
+                [c for c in th["loc"] if c[0] == "ensure"] == [] and len({c[1] for c in th["loc"] if c[0] == "run"}) <= 1)
+            pr = run("Pro", "say hello in one word 339p")
+            # (the council puts the merger last, so the line-up is compared by what is the server's)
+            got["Pro: four server seats draft"] = (
+                pr["status"] == 200 and len(srv("Pro")) == 4
+                and [m for m in pr["models"] if m.startswith(lab)] == srv("Pro")
+                and sorted(pr["models"]) == sorted(tiers["Pro"]["models"])
+                and {tag(l) for l in srv("Pro")} <= pr["drafted"])
+            got["Pro: the cap says so, and only where it binds"] = (
+                tiers["Pro"].get("srvcap") == {"seated": 4, "of": 6} and "srvcap" not in tiers["Thinking"]
+                and "srvcap" not in tiers["Fast"])
+            # (Pro also seats this computer's own models, and warms the first of those: nothing else)
+            got["Pro: no engine warmed here but a seat of its own"] = (
+                {c[1] for c in pr["loc"] if c[0] == "ensure"} <= {m for m in tiers["Pro"]["models"] if not m.startswith(lab)})
+            det["modes"] = [f["loc"], th["loc"], pr["loc"], f["models"], th["models"], pr["models"], tiers["Pro"].get("srvcap")]
+            # the switch off: the same request runs on this computer, as before, and the server isn't asked
+            q("/api/servers/prefer", "POST", {"id": sid, "on": False})
+            off = run("Fast", "say hello in one word 339o")
+            q("/api/servers/prefer", "POST", {"id": sid, "on": True})
+            got["switch off: this computer answers, the server isn't asked"] = (
+                off["status"] == 200 and off["drafted"] == set() and "LOCAL-ANSWER" in off["text"]
+                and any(c[0] == "run" for c in off["loc"]))
+            det["off"] = [off["loc"], off["text"][:80], off["drafted"]]
+        if only in (None, "funnel"):
+            # a funnel stage in the page's shape: the server's model asks first, nothing runs here
+            _o1("/reply", {"text": json.dumps({"q": "Which way should it lean?", "options": [
+                {"label": "Alpha", "why": "one"}, {"label": "Beta", "why": "two"}, {"label": "Gamma", "why": "three"}]})})
+            cid = "c" + os.urandom(6).hex()
+            time.sleep(1.0)
+            n_loc, n_st = len(_loc39(inst)), len(_chats39())
+            s_, d_ = q("/api/funnel", "POST", {"goal": "pick a lighthouse 339", "reqs": "", "opts": 3, "stages": 3,
+                                              "images": False, "picks": [], "asked": [], "effort": "normal",
+                                              "chat": cid, "chat_id": cid, "cloud": True, "after_len": 0,
+                                              "after_hash": _EMPTY39})
+            time.sleep(1.5)
+            _o1("/reply", {"text": ""})
+            fs = [c for c in _chats39()[n_st:] if "DECISION:" in str(c[2]["messages"][-1]["content"])]
+            got["funnel stage: the server's model asks, nothing runs here"] = (
+                s_ == 200 and isinstance(d_, dict) and [o["label"] for o in d_.get("options", [])] == ["Alpha", "Beta", "Gamma"]
+                and str(d_.get("engine", "")).startswith("server:" + svn) and len(fs) == 1
+                and _loc39(inst)[n_loc:] == [])
+            det["funnel"] = [s_, d_ if not isinstance(d_, dict) else {k: d_[k] for k in d_ if k != "chat"},
+                             _loc39(inst)[n_loc:], len(fs)]
+    finally:
+        _o1("/restore", {})
+        _o1("/unload", {})
+        _o1("/reply", {"text": ""})
+        q("/api/servers/prefer", "POST", {"id": sid, "on": True})
+        q("/api/servers/test", "POST", {"id": sid})
+    return got, det
+
+
+_mg39, _md39 = _modes_live39(_SV, _sid34, _SVN)
+check("modes (live, the page's own request): Fast, Thinking and Pro run on the server's models, with the stale hand pick "
+      "ignored: the server drafts, the answer carries its label, no engine is warmed or started on this computer; Pro seats "
+      "four and says so; the switch off runs it here; a funnel stage asks the server first",
+      bool(_mg39) and all(_mg39.values()), "%r %r" % (_mg39, _md39))
+# a plain server pick keeps this Mac quiet in the same terms: no engine warmed or started for it either
+_nl39 = len(_loc39(_SV))
+_scQ = _svchat(text="say hello in one word 339q", models=[_SVL], tier="")
+time.sleep(2.0)
+check("servers (live): a plain server pick starts no engine on this computer",
+      "ANSWER-" in _scQ[1] and _loc39(_SV)[_nl39:] == [], "%r" % [_scQ[1][:80], _loc39(_SV)[_nl39:]])
+
+# ---- the same checks on a MUTATED copy of the app must fail: put the stale model back, and warm an engine for a seat
+_MUT39 = [
+    ("the page's stale model used for a mode",
+     '            model_name = ""\n        elif srv_only_tier(tier):', '        elif srv_only_tier(tier):', "modes"),
+    ("an engine warmed for a mode's server seat",
+     '        if route[0] == "mlx" and route_label and not _no_text_model:\n            def _prewarm(_lbl=route_label):',
+     '        if _seat_fb and not _no_text_model:\n            def _prewarm(_lbl="Llama 3.2 3B"):', "modes"),
+]
+INST_B.stop()
+_bad39 = []
+for _i39, (_what39, _a39, _b39, _grp39) in enumerate(_MUT39):
+    if _MILLENAI_SRC.count(_a39) != 1:
+        _bad39.append("anchor: " + _what39)
+        continue
+    _dir39 = os.path.join(_SMOKE_TMP, "mut39-%d" % _i39)
+    os.makedirs(_dir39)
+    open(os.path.join(_dir39, "millenai.py"), "w", encoding="utf-8").write(_MILLENAI_SRC.replace(_a39, _b39))
+    for _n39 in ("vfx", "fonts"):
+        if os.path.exists(_n39):
+            os.symlink(os.path.abspath(_n39), os.path.join(_dir39, _n39))
+    _M39 = Instance(9902, "M39-%d" % _i39, cwd=_dir39,
+                    env={"MILLENAI_TEST_HOOKS": "server-http-loopback,local-record"}).start()
+    try:
+        _a1 = _mq39(_M39, "/api/servers/add", "POST", {"url": "http://127.0.0.1:%d" % _O1FRONT, "name": _SVN,
+                                                        "access_id": _O1CID, "access_secret": _O1SEC})
+        _msid = (_a1[1].get("server") or {}).get("id", "")
+        _mq39(_M39, "/api/servers/access", "POST", {"id": _msid, "access_id": _O1CID, "access_secret": _O1SEC})
+        _mc = _o1("/open", {})["code"]
+        _mp = _mq39(_M39, "/api/servers/pair", "POST", {"id": _msid, "code": _mc[:4] + "-" + _mc[4:8] + " " + _mc[8:]})
+        if _mp[1].get("ok") is not True:
+            _bad39.append("pairing: %r" % (_mp,))
+        else:
+            _mg, _md = _modes_live39(_M39, _msid, _SVN, only=_grp39)
+            if _mg and all(_mg.values()):
+                _bad39.append("survived: " + _what39)
+    finally:
+        _M39.stop()
+check("modes (live): each mutation of the handler (the stale model put back, an engine warmed for a seat) fails the "
+      "page-request checks on a mutated copy of the app", not _bad39, "%r" % _bad39)
 # a benchmark running here doesn't turn a server chat away
 _bs34 = _svq("/api/bench/start", "POST", {})
 _sc6 = _svchat(text="during bench 334")

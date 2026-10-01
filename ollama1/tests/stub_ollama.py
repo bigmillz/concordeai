@@ -55,6 +55,7 @@ class Stub:
         self.lock = threading.Lock()
         self.tokens = 6
         self.delay = 0.0
+        self.reply_text = ""        # when set, the whole answer (a test that wants JSON back)
         # pulls: name -> [(digest, size, already on disk)], the digest the
         # model gets once pulled, and how many pulls fail before one works
         self.pull_layers = {}
@@ -177,6 +178,8 @@ class Stub:
                 else:
                     return self.js(404, {"error": "not found"})
                 pieces = [text] + ["t%d" % i for i in range(stub.tokens - 1)]
+                if stub.reply_text:
+                    pieces = [stub.reply_text]
                 final = {"model": name, "done": True, "done_reason": "stop",
                          "eval_count": len(pieces), "eval_duration": len(pieces) * 20_000_000,
                          "prompt_eval_count": 7, "total_duration": 1}
