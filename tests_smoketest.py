@@ -25152,7 +25152,8 @@ def _b41_pins(src):
                  "cloud.json", "_cloud_file(", "CLOUD_NAME", "_cloud_write", "server_mark_down(", "_srv_update("]
     used = [f for f in forbidden if f in sect]
     P = {
-        "the same fixed test: the passage and task are untouched": sh == "e4fd96b72ce3178f57e229281c55c161a9d9be9532f1d5bda620c067c70740cf"
+        "the same fixed test: the passage and task are untouched": sh == ("e4fd96b72ce3178f57e229281c55c161a9d9be9532f1d5bda620c067"
+                                                                    "c70740cf")
         and ns["BENCH_TEST"] == "b1" and ns["BENCH_MAX_TOKENS"] == 256 and ns["BENCH_SEED"] == 42
         and ns["BENCH_CTX"] == 4096 and ns["BENCH_KEEP"] == 100,
         "the section never rests a provider, writes the ledger, reads cloud.json or marks a server down": not used,
