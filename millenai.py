@@ -36246,7 +36246,7 @@ async function send(){
   }
   const turn={chat_id:myChat,lane:(chats.find(x=>x.id===myChat)||{}).lane||uiMode,
     after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};
-  generating=true; genChat=myChat; document.body.classList.add("gen");
+  generating=true; document.body.classList.add("gen"); genChat=myChat;
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
   const aiDiv=addMsg("assistant",""); const body=aiDiv.querySelector(".body");
   aiDiv.classList.add("live");     // soft mask on the newest line

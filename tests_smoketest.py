@@ -8253,7 +8253,7 @@ def _edit_ok(er, sd, nc, decl):
             and "let pendingEdit=null,genChat=null;" in decl)
 # an edit only stops the answer of the chat on screen: genChat is set when an answer starts and
 # cleared when it ends
-_gc_ok = lambda p: ("generating=true; genChat=myChat;" in p
+_gc_ok = lambda p: ("generating=true; document.body.classList.add(\"gen\"); genChat=myChat;" in p
                     and "generating=false;abortCtl=null;genChat=null;" in p)
 _decl = page[page.index("let messages=[], generating=false, abortCtl=null;"):][:400]
 _edit_mut = {
