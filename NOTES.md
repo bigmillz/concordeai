@@ -9,6 +9,94 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b347 — the server kit and docs carry nobody's name; the server's name is yours
+Patrick (2026-10-01): "Looking at the instructions to set up a server, I see
+references to my name as in PMiller, Bigmillz, and my IP addresses. replace
+these with placeholders. also, ollama1 is only the server name i picked, and
+the user should be able to set these themselves, especially if they want to run
+more servers named and numbered however they'd like." Then: "also swap out the
+term desktop for server in our chats and in the documentation."
+
+The repo is public (GPL-3.0), so the kit and its docs now hold only
+placeholders (`<your-user>`, `<server-ip>`, `<lan-cidr>`, `<your-domain>`,
+`<server-name>`, `<your-name>`) and made-up fixtures (`testsrv`, `alice`,
+`example.test`, `10.0.0.0/24`, MACs `02:00:5e:10:00:xx`). Git history is not
+rewritten: the old values are still in it (the GitHub Support purge request is
+Patrick's own to-do).
+
+THE NAME IS A SETTING
+- `setup.sh --name <server-name>`: lowercase letters, digits, hyphens, 1-32,
+  starts with a letter, no trailing hyphen (`valid_name` in `lib/setuplib.sh`
+  and `valid_server_name` in `lib/o1common.py`, one rule). Stored as
+  `server_name` in `/etc/ollama1/config.json`. It becomes the host name, the
+  gateway `<name>.<zone>`, the panel `<name>-admin.<zone>` (derived in
+  `o1common.resolve`, so every `cfg["hostname_*"]` reader is unchanged), the
+  Cloudflare tunnel `<name>`, the service token `<name>-app`, the policies
+  `<name> admin - <owner> only` / `<name> app - service token` and the Access
+  applications `<name> admin` / `<name> app` (`o1common.access_names`, read by
+  `ollama1-cf-access`), and the admin panel's page title and heading.
+- The other things that were constants are settings too: `--user` (the one SSH
+  user; default the `sudo` user), `--lan` (default: the network of the LAN
+  port, shown in the plan), `--zone`, `--owner` (only the policy's name;
+  default from the admin email's local part), `--timezone` (default: as the
+  machine has it), and the four disk serials `--os-serial --models-serial
+  --hdd1-serial --hdd2-serial` (an empty serial can no longer match a disk:
+  `disk_by_serial` returns nothing for one). Anything missing is asked for at the
+  terminal, after the tmux relaunch. After "yes" the values are saved to
+  `/etc/ollama1/setup.env` (root-only), so a re-run needs none.
+- Templates keep placeholders: `10-ollama1-sshd.conf.in` has
+  `AllowUsers @ADMIN_USER_AT_LAN@`, filled by setup.sh. `o1common` defaults
+  hold no domain, LAN, address or user (`cf_zone`, `lan_bind`, `lan_cidr` empty;
+  a gateway with no LAN range refuses LAN-mode requests, and `ollama1-lan on`
+  says to run setup with `--lan`). The dashboard's network card finds the wired
+  port itself (`o1stats._wired_port`) instead of naming `enp39s0`.
+- "ollama1" stays in the kit's file, command, unit and folder names (product
+  naming). The README, PROTOCOL.md and the guide say so in plain words.
+
+MIGRATION (the existing ollama1 server keeps working)
+- No `server_name` in config.json means `ollama1` (`LEGACY_NAME`;
+  `resolve_server_name` in the shell, `server_name()` in Python). Hostnames come
+  from `cf_zone`; hostnames, `tunnel_name`, `token_name`, `policy_admin_name`,
+  `policy_app_name` already in config.json win over derived ones.
+- setup.sh refuses to rename an install that has a name (its tunnel, DNS and
+  Access carry it).
+- The old code read the domain from its built-in defaults, so the old
+  config.json has no zone, user, LAN or serials: the first re-run must be given
+  them once (README, "A server set up before the name was a setting"). Until
+  that re-run, nothing is changed on the server.
+
+TESTS: made-up fixtures everywhere (`U.BASE_CFG`); new `tests/test_name.py`;
+migration and validation tests in `test_setuplib.py` and `test_cloudflare.py`;
+`test_repo.TestNoPersonalValues` fails if a maintainer value (user, domain,
+LAN, NIC names, disk serials, the name Pat/Patrick, any MAC outside the
+made-up ranges) is in `ollama1/` or `docs/`, and checks that the scan itself
+is not vacuous. PROTOCOL.md's vectors were regenerated for the example device
+name "Alice's MacBook Pro" (`tests/gen_vectors.py`). New mutants cover the name
+rules, the migration, the derived names and the empty serial.
+
+"DESKTOP" BECOMES "SERVER": 125 hits in `ollama1/` and `docs/` (README,
+PROTOCOL, the gateway's error texts, the panel's button texts, comments, unit
+descriptions, tests) all meant the model-server machine and were changed;
+none left. Left on purpose, because they mean the ConcordeAI desktop app:
+CLAUDE.md (desktop app, port convention), DRILL_LOOP.md, release.sh,
+`millenai.py` (22 hits: the desktop updater, the desktop app, WKWebView
+comments) and `tests_smoketest.py` (the "Desktop" fixture server). In the app,
+two examples were changed: the add-server name placeholder ("Name: My server")
+and comments with Pat's name.
+
+LEFT ON PURPOSE
+- `github.com/bigmillz/concordeai` (the real clone URL) in the docs.
+- `flyconcordefly.com` in the About card and release.sh: that is the product's
+  own website, not a server's domain.
+- "per Patrick" in code comments and this log: the repo's own convention.
+- The app's fallback server name "Desktop" (when the name box is left empty)
+  and the smoketest's fixtures named "Desktop": changing the default needs a
+  decision and a gauntlet run.
+
+NOT VERIFIED: a real `setup.sh` run on Linux (only `--plan`, the argument
+checks and the shell functions against fakes ran, on macOS bash 3.2), and a
+real Cloudflare run (the helper ran only against the fake API).
+
 ## 6b346 — auto sleep for your server, and waking it
 Patrick (2026-10-01): "Build the feature in and have an option to turn this
 auto sleep mode on or off under the Your Servers tab in Settings. Also allow

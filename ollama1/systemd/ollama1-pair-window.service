@@ -1,5 +1,5 @@
 [Unit]
-Description=ollama1: open a 5-minute pairing window (code on the desktop's screen)
+Description=ollama1: open a 5-minute pairing window (code on the server's screen)
 
 [Service]
 Type=exec

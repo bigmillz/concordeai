@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ram-model-test.sh: measure how a big 'ram' model loads on this desktop,
+# ram-model-test.sh: measure how a big 'ram' model loads on this server,
 # in several configurations, each under a hard memory cap on Ollama.
 #
 #   sudo bash ram-model-test.sh                  gpt-oss:120b, num_ctx 4096,

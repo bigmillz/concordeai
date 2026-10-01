@@ -41,7 +41,7 @@ def sample(now=None, pairing=False, marker=None):
             ("refused: gpu_fit", "llama3.3:70b"), ("unload: make room", "qwen3:14b"), ("load", "gpt-oss:120b"),
             ("refused: ram_pressure", "gpt-oss:120b"), ("load", "embeddinggemma"), ("unload", "embeddinggemma"),
             ("load", "qwen3:14b")])],
-        "devices": [{"id": "56475aa75463474c", "name": "Patrick's MacBook Pro", "last_seen": int(now) - 5,
+        "devices": [{"id": "56475aa75463474c", "name": "Alice's MacBook Pro", "last_seen": int(now) - 5,
                      "active": 1, "connected": True},
                     {"id": "a1b2c3d4e5f60718", "name": "iPad", "last_seen": int(now) - 7200, "active": 0,
                      "connected": False}],
@@ -52,7 +52,7 @@ def sample(now=None, pairing=False, marker=None):
         gw["messages"] = marker
         gw["content"] = marker
     st = {
-        "time": now, "host": "ollama1", "uptime": 3 * 86400 + 4 * 3600 + 17 * 60,
+        "time": now, "host": "testsrv", "uptime": 3 * 86400 + 4 * 3600 + 17 * 60,
         "gw": gw,
         "gpu": {"busy_pct": 97, "vram_used": 14.6 * GIB, "vram_total": 16 * GIB,
                 "temps": {"edge": 64.0, "junction": 78.0, "mem": 70.0}, "power_w": 212.0, "power_cap_w": 289,
@@ -69,8 +69,8 @@ def sample(now=None, pairing=False, marker=None):
                   "progress": 41.3, "finish": "312.4min"}],
         "io": {"read_bps": 52e6, "write_bps": 3.1e6},
         "net": {"name": "br0", "address": "192.168.1.10/24", "state": "up", "rx_bps": 2.4e6, "tx_bps": 3.1e5,
-                "ports": [{"name": "enp38s0", "carrier": True, "speed_mbps": 1000},
-                          {"name": "enp39s0", "carrier": True, "speed_mbps": 1000}]},
+                "ports": [{"name": "enp5s0", "carrier": True, "speed_mbps": 1000},
+                          {"name": "enp6s0", "carrier": True, "speed_mbps": 1000}]},
         "tunnel": {"up": True, "connections": 4, "rtt_ms": 23.4},
         "updates": {"reboot_required": False, "last_unattended": int(now) - 5 * 3600,
                     "ollama": {"result": "current", "version": "v0.35.1"},

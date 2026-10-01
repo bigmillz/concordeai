@@ -15,7 +15,7 @@ from o1common import DEFAULTS, Paths, name_hash
 from stub_ollama import Stub
 
 A = {}
-ADMIN_HOST = "ollama1-admin.flyconcordefly.com"
+ADMIN_HOST = "testsrv-admin.example.test"
 ORIGIN = "https://" + ADMIN_HOST
 
 
@@ -34,6 +34,7 @@ def setUpModule():
     A["stub"] = Stub(U.free_port())
     A["started"] = []
     cfg = dict(DEFAULTS)
+    cfg.update(U.BASE_CFG)
     cfg.update({"access_team_domain": U.TEAM, "gateway_aud": U.GW_AUD, "admin_aud": U.ADMIN_AUD,
                 "admin_email": U.ADMIN_EMAIL, "admin_port": U.free_port(),
                 "ollama_url": "http://127.0.0.1:%d" % A["stub"].port, "certs_url": A["jwks"].url,
@@ -91,7 +92,8 @@ class TestPanelAuth(unittest.TestCase):
     def test_page_needs_admin(self):
         st, data, r = get("/")
         self.assertEqual(st, 200)
-        self.assertIn(b"ollama1", data)
+        self.assertIn(b"<title>testsrv admin</title>", data)       # the server's own name, from config.json
+        self.assertIn(b"<h1>testsrv</h1>", data)
         self.assertIn("frame-ancestors 'none'", r.getheader("Content-Security-Policy"))
 
     def test_no_jwt(self):
@@ -176,7 +178,7 @@ class TestActions(unittest.TestCase):
 
     def test_sleep_confirmation_text(self):
         st, page, _ = get("/")
-        self.assertIn(b"The desktop will sleep. Press its power button to wake it. While it sleeps it can\\'t be "
+        self.assertIn(b"The server will sleep. Press its power button to wake it. While it sleeps it can\\'t be "
                       b"reached, and anything plugged into its second network port loses its connection.", page)
         self.assertIn(b"sync pauses while it sleeps", page)
 

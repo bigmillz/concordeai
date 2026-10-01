@@ -15,6 +15,6 @@ const cases=[['o1admin','org.freedesktop.systemd1.manage-units','ollama1-restart
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-power-apply.service','start','yes'],
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-power.service','start','no'],
 ['o1admin','org.freedesktop.login1.reboot',undefined,undefined,'no'],
-['pmiller','org.freedesktop.systemd1.manage-units','ollama1-restart.service','start',undefined]];
+['alice','org.freedesktop.systemd1.manage-units','ollama1-restart.service','start',undefined]];
 let bad=0;for(const c of cases){const r=t(...c.slice(0,4));if(r!==c[4]){bad++;console.log('MISMATCH',c,r);}}
 console.log(bad?'FAIL':'polkit rule ok ('+cases.length+' cases)');

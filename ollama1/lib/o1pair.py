@@ -16,7 +16,7 @@ adds the key and closes the window after one success, and computes the
 proof the app checks. Only root writes devices.json and the window.
 
 There is no invite, share, join or pool anywhere. A device is added only
-through a window opened at the desktop.
+through a window opened at the server.
 """
 import datetime
 import json
@@ -155,7 +155,7 @@ def _result(req_id, status, body):
 def _check(req, w, now, devices_path):
     """One request against the open window. Returns (status, body)."""
     if not w or req.get("window") != w["id"]:
-        return 403, {"error": "no pairing window is open at the desktop", "code": "pair_closed"}
+        return 403, {"error": "no pairing window is open at the server", "code": "pair_closed"}
     try:
         name, pub, pub_b64, ts, nonce, mac = parse_pair_request(req.get("body"))
     except AuthError as e:

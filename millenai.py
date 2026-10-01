@@ -16612,8 +16612,8 @@ atexit.register(_usage_at_exit)
 
 # ==== servers: begin ====
 # YOUR OWN SERVERS (6b334, per Patrick, 2026-09-29). A model server the
-# person owns answers chats with its own Ollama models: first Patrick's
-# desktop "ollama1", at https://ollama1.flyconcordefly.com behind a
+# person owns answers chats with its own Ollama models: a server at
+# https://<server-name>.<your-domain> behind a
 # Cloudflare Tunnel and Access. The rules are ollama1/PROTOCOL.md's:
 # every request carries the Access service token (when one is saved)
 # and an Ed25519 signature from a key this computer made and paired AT
@@ -17506,7 +17506,7 @@ def server_only_resolve(sid: str, ctx):
 # asked is narrow: a paired server the person hasn't turned off ("Use for
 # Fast, Thinking and Pro", on by default), answering on its last check,
 # and models whose placement is "gpu" and that fit the card (_srv_fits):
-# never "gpu+ram" (the desktop's CPU is unstable under that load) and never
+# never "gpu+ram" (a server's CPU can be unstable under that load) and never
 # a model whose placement is unknown.
 #
 # ONE CHOOSER, shared by the tiers, the Code lane and funnels: which of a
@@ -28051,7 +28051,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 and not cloud_only):     # the bench IS the council here
             xm_names += [lbl for lbl, _c in cloud_bench()]
         xm = ", ".join(xm_names)[:300]
-        # a server's name may be anything ("Pat’s Desktop", "デスクトップ"),
+        # a server's name may be anything ("Sam’s server", "サーバー"),
         # and http.server writes headers as latin-1 (review of 6b334):
         # everything outside printable ASCII, and %, is percent-encoded;
         # the page decodes it (hdrText)
@@ -33626,7 +33626,7 @@ __CODE_ROWS__
           <input id="srv-url" type="text" autocomplete="off" spellcheck="false"
                  placeholder="https://server.example.com" aria-label="Address">
           <input id="srv-name" type="text" maxlength="40" autocomplete="off"
-                 spellcheck="false" placeholder="Name: Desktop" aria-label="Name">
+                 spellcheck="false" placeholder="Name: My server" aria-label="Name">
           <input id="srv-aid" type="password" autocomplete="off"
                  placeholder="Access Client ID (optional)" aria-label="Access Client ID">
           <input id="srv-asec" type="password" autocomplete="off"
@@ -36514,7 +36514,7 @@ async function send(){
   if(full&&!isErr){
     const meta=document.createElement("div");meta.className="meta";
     // a server model's name is its own, not a provider's (6b334):
-    // "Desktop · gpt-oss:20b" never reads as the cloud
+    // "<server name> · gpt-oss:20b" never reads as the cloud
     const where=whereBadge(lastModels,srvWho);
     meta.innerHTML='<span class="wbadge">'+esc(where)+'</span>'
       +"<b>"+lastRate.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
@@ -39908,7 +39908,7 @@ function srvModeOf(t){
 // what the composer chip says: the model the mode resolved to
 function tierShown(t){
   if(!isSrvMode(t)){
-    // Fast, Thinking or Pro routed to a server says so: "Fast · Ollama1 gpt-oss:20b"
+    // Fast, Thinking or Pro routed to a server says so: "Fast · <your server's name> gpt-oss:20b"
     const sv=((tierInfo[t]||{}).models||[]).filter(m=>m.indexOf(SRV_SEP)>=0);
     // Fast with cloud power on asks the cloud first (the server seat is the
     // fallback), so the chip doesn't claim the server answers (final review)

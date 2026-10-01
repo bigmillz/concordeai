@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""ollama1-cf-access: all of ollama1's Cloudflare setup through the API,
+"""ollama1-cf-access: all of the server's Cloudflare setup through the API,
 with one API token. setup.sh runs it; it can also be run on its own:
 
   sudo ollama1-cf-access                 asks for the token (not echoed)
@@ -13,27 +13,29 @@ Create Token > Create Custom Token, with a 1-day TTL:
   Account  Access: Apps and Policies                            Edit
   Account  Access: Service Tokens                               Edit
   Account  Access: Organizations, Identity Providers, and Groups Read
-  Zone     DNS    Edit   (Specific zone: your zone, flyconcordefly.com here)
+  Zone     DNS    Edit   (Specific zone: your zone, <your-domain>)
   Zone     Zone   Read   (Specific zone: the same)
 Delete it in the dashboard afterwards.
 
 What it does (each step finds what exists and reuses it, so reruns change
 nothing that is already right):
-  1. finds the zone (cf_zone in config.json, flyconcordefly.com here) and
+  1. finds the zone (cf_zone in config.json, <your-domain>) and
      the account that owns it
   2. finds the Zero Trust team domain (needs a one-time dashboard visit if
      the account has no Zero Trust organization yet; it says which click)
-  3. tunnel "ollama1": a LOCALLY-MANAGED tunnel (config_src "local"), so its
+  3. tunnel "<server-name>": a LOCALLY-MANAGED tunnel (config_src "local"), so its
      routes and the Access check live in /etc/ollama1/cloudflared.yml on
-     the desktop. Its credential is written to /etc/cloudflared/ollama1.json
+     the server. Its credential is written to /etc/cloudflared/ollama1.json
      (root, 0600), rebuilt from the tunnel's token if the file is missing
   4. DNS: one proxied CNAME per hostname to <tunnel id>.cfargotunnel.com;
      only CNAMEs pointing at a tunnel or made by this helper are fixed or
      deduplicated; any other record on those names stops it (it never
      changes or deletes records it didn't make)
-  5. Access: service token "ollama1-app" (never expires), policies "ollama1 admin - Patrick
-     only" (email) and "ollama1 app - service token", and one self-hosted
-     application per hostname
+  5. Access: service token "<server-name>-app" (never expires), policies
+     "<server-name> admin - <your-name> only" (email) and "<server-name> app -
+     service token", and one self-hosted application per hostname. The
+     names come from server_name and owner_label in config.json (setup.sh
+     --name and --owner); ollama1 in this command's name is the kit's, not yours
   6. writes the team domain, both AUD tags, the admin email, the service
      token's Client ID and the tunnel id to /etc/ollama1/config.json (0600)
 The service token's Client Secret is shown once on the terminal (never
@@ -54,13 +56,12 @@ import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
-from o1common import Paths, load_config, read_json, write_json_atomic  # noqa: E402
+from o1common import Paths, access_names, load_config, read_json, write_json_atomic  # noqa: E402
 
 API = "https://api.cloudflare.com/client/v4"
-TUNNEL = "ollama1"
-TOKEN_NAME = "ollama1-app"
-POL_ADMIN = "ollama1 admin - Patrick only"
-POL_APP = "ollama1 app - service token"
+# The names below are filled in from config.json by main() (server_name and
+# what derives from it; see o1common.access_names).
+TUNNEL = TOKEN_NAME = POL_ADMIN = POL_APP = APP_ADMIN = APP_GATEWAY = ""
 NO_ORG = """This Cloudflare account has no Zero Trust organization yet. That needs one visit:
   dash.cloudflare.com > Zero Trust (left sidebar) > choose a team name (e.g. concorde)
   > select the Free plan > Proceed. Then run this again."""
@@ -281,8 +282,8 @@ def access_step(cf, acct, cfg, admin, interactive, rotate, test_mode=False):
             say("Access application %s: created" % domain)
         return res["aud"]
 
-    admin_aud = app("ollama1 admin", cfg["hostname_admin"], pid_admin, {})
-    gw_aud = app("ollama1 app", cfg["hostname_gateway"], pid_app, {"service_auth_401_redirect": True})
+    admin_aud = app(APP_ADMIN, cfg["hostname_admin"], pid_admin, {})
+    gw_aud = app(APP_GATEWAY, cfg["hostname_gateway"], pid_app, {"service_auth_401_redirect": True})
     return tok["client_id"], admin_aud, gw_aud
 
 
@@ -294,7 +295,7 @@ def show_secret(client_id, secret, test_mode):
         with open(tty, "w") as t:
             t.write("\nThe app's service token. Copy both lines now: the secret is shown this once\n"
                     "and is saved nowhere (not even in the setup log). ConcordeAI asks for them\n"
-                    "when you add the desktop.\n"
+                    "when you add the server.\n"
                     "  CF-Access-Client-Id:     %s\n"
                     "  CF-Access-Client-Secret: %s\n\n" % (client_id, secret))
         say("The service token's Client ID and Secret were shown on the terminal (not logged).")
@@ -306,7 +307,7 @@ def show_secret(client_id, secret, test_mode):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="ollama1's Cloudflare setup, through the API")
+    ap = argparse.ArgumentParser(description="the server's Cloudflare setup, through the API")
     ap.add_argument("--token-stdin", action="store_true", help="read the API token from stdin")
     ap.add_argument("--no-prompt", action="store_true", help="never ask; keep an existing service token")
     ap.add_argument("--rotate-service-token", action="store_true")
@@ -317,8 +318,14 @@ def main():
     base = os.environ.get("OLLAMA1_CF_API") if test_mode and os.environ.get("OLLAMA1_CF_API") else API
     os.umask(0o077)
     interactive = not a.no_prompt
+    global TUNNEL, TOKEN_NAME, POL_ADMIN, POL_APP, APP_ADMIN, APP_GATEWAY
     cfg = load_config(Paths.config)
     raw = read_json(Paths.config, {}) or {}
+    names = access_names(cfg)
+    TUNNEL, TOKEN_NAME, POL_ADMIN, POL_APP = names["tunnel"], names["token"], names["policy_admin"], names["policy_app"]
+    APP_ADMIN, APP_GATEWAY = names["app_admin"], names["app_gateway"]
+    if not cfg.get("hostname_gateway") or not cfg.get("hostname_admin"):
+        sys.exit("no hostnames: set cf_zone (setup.sh --zone <your-domain>) in /etc/ollama1/config.json first")
     admin = (cfg.get("admin_email") or "").strip()
     if not admin:
         admin = ask_tty("Admin email (the only one allowed into %s)" % cfg["hostname_admin"], "", interactive)

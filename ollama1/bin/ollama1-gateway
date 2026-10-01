@@ -1,11 +1,11 @@
 #!/usr/bin/python3
-"""ollama1-gateway: the only door from the outside to Ollama on this desktop.
+"""ollama1-gateway: the only door from the outside to Ollama on this server.
 
-Listens on 127.0.0.1:8431; cloudflared forwards ollama1.flyconcordefly.com
+Listens on 127.0.0.1:8431; cloudflared forwards <server-name>.<your-domain>
 to it. Every request must carry:
   1. a valid Cloudflare Access JWT for the app's Access application
      (Cf-Access-Jwt-Assertion; the service token's), and
-  2. an Ed25519 signature from a device paired at the desktop (PROTOCOL.md).
+  2. an Ed25519 signature from a device paired at the server (PROTOCOL.md).
 LAN mode (off by default) adds a second listener on the LAN address where
 the JWT is not required; signatures still are.
 
@@ -324,7 +324,7 @@ class Gateway:
         self.tags = {}
         self.tags_at = 0.0
         self.info = {}
-        self.lan_net = ipaddress.ip_network(cfg["lan_cidr"], strict=False)
+        self.lan_net = ipaddress.ip_network(cfg["lan_cidr"], strict=False) if cfg.get("lan_cidr") else None
 
     # -- Access ---------------------------------------------------------
 
@@ -339,7 +339,7 @@ class Gateway:
             self.gpu_info = o1gpu.detect()
         return self.gpu_info
     def sleep_view(self):
-        """The auto-sleep settings and what the desktop can do about them:
+        """The auto-sleep settings and what the server can do about them:
         exactly {enabled, minutes, supported, wake}."""
         cfg = o1idle.read_config()
         return {"enabled": cfg["enabled"], "minutes": cfg["minutes"],
@@ -375,7 +375,7 @@ class Gateway:
             if not self.cfg.get("lan_mode"):
                 raise GatewayError(403, "access", "LAN mode is off")
             try:
-                if ipaddress.ip_address(client_ip) not in self.lan_net:
+                if self.lan_net is None or ipaddress.ip_address(client_ip) not in self.lan_net:
                     raise GatewayError(403, "access", "not from the home network")
             except ValueError:
                 raise GatewayError(403, "access", "not from the home network")
@@ -432,7 +432,7 @@ class Gateway:
             for k, m in self.refresh_tags(force).items():
                 if o1ollama.same_model(k, name):
                     return k, m
-        raise GatewayError(404, "no_model", "model is not installed on this desktop")
+        raise GatewayError(404, "no_model", "model is not installed on this server")
 
     def model_info(self, name, entry):
         key = (name, entry.get("digest"))
@@ -494,7 +494,7 @@ class Gateway:
         info = self.model_info(name, entry)
         # With llama.cpp's CPU weight repacking on (Ollama's default), the
         # CPU copy of the weights is an anonymous buffer whose size Ollama
-        # doesn't predict: on the desktop gpt-oss:120b got a 58 GiB
+        # doesn't predict: on the server gpt-oss:120b got a 58 GiB
         # CPU_REPACK buffer and almost nothing on the GPU. So a 'ram' model
         # must then fit in system memory on its own, as if nothing went to
         # the GPU. Only with repacking off (ollama_no_repack, which needs
@@ -549,7 +549,7 @@ class Gateway:
         except (OSError, ValueError):
             left = victims
         if any(o1ollama.same_model(v, n) for v in victims for n in left):
-            raise GatewayError(503, "busy", "the desktop could not unload another model first; try again")
+            raise GatewayError(503, "busy", "the server could not unload another model first; try again")
         log("make-room", model=",".join(victims))
 
     def check_oom(self, before):
@@ -560,7 +560,7 @@ class Gateway:
             self.stats.event("refused: ram_oom", "")
             raise GatewayError(507, "ram_oom",
                                "the model did not fit in memory: Ollama's memory limit stopped the load "
-                               "(the desktop itself is fine); try a smaller num_ctx or model")
+                               "(the server itself is fine); try a smaller num_ctx or model")
 
     def check_placement(self, name, ram, before):
         """After loading: a GPU-only model must be 100% in VRAM; a 'ram'
@@ -578,7 +578,7 @@ class Gateway:
             self.unload(name)
             log("ram-pressure", model=name, gpu_pct=int(share * 100))
             raise GatewayError(507, "ram_pressure",
-                               "loading the model would push the desktop into swap; it was unloaded")
+                               "loading the model would push the server into swap; it was unloaded")
 
     def gpu_share(self, name):
         try:
@@ -639,7 +639,7 @@ class Gateway:
                 pass
         if not cleared:
             log("device-switch", reason="unload_unconfirmed")
-            raise GatewayError(503, "busy", "the desktop could not clear the previous device's model; try again")
+            raise GatewayError(503, "busy", "the server could not clear the previous device's model; try again")
         log("device-switch", model=",".join(names) or "-")
         self.last_device = dev_id
 
@@ -811,7 +811,7 @@ def make_handler(gw, lan=False):
             now = gw.clock()
             pub = read_public(now)
             if not pub:
-                raise GatewayError(403, "pair_closed", "no pairing window is open at the desktop")
+                raise GatewayError(403, "pair_closed", "no pairing window is open at the server")
             with gw.pair_lock:
                 if now - gw.pair["last_try"] < PAIR_MIN_INTERVAL:
                     gw.pair["last_try"] = now
@@ -831,7 +831,7 @@ def make_handler(gw, lan=False):
             res = wait_result(req_id)
             if res is None:
                 raise GatewayError(503, "pair_not_saved",
-                                   "the desktop did not answer; open a new window and retry")
+                                   "the server did not answer; open a new window and retry")
             status, out = res
             out = dict(out, server_time=int(gw.clock()))
             if status == 200:
@@ -927,13 +927,13 @@ def make_handler(gw, lan=False):
             got = None
             try:
                 if gw.slot.busy and gw.stats.queued >= gw.slot.max_waiting:
-                    raise GatewayError(503, "busy", "the desktop is busy; try again shortly")
+                    raise GatewayError(503, "busy", "the server is busy; try again shortly")
                 if streaming:
                     self.start_stream()
                     headers_sent = True
                 got = gw.slot.acquire(float(cfg["queue_wait_s"]))
                 if got == "full":
-                    raise GatewayError(503, "busy", "the desktop is busy; try again shortly")
+                    raise GatewayError(503, "busy", "the server is busy; try again shortly")
                 if got == "timeout":
                     raise GatewayError(503, "busy", "waited too long in the queue")
                 gw.switch_device(dev_id)
@@ -1120,7 +1120,7 @@ def serve(cfg, stop=None):
     if not gw.access.configured and cfg.get("access") != "none":
         log("warning", reason="access_not_configured_all_tunnel_requests_refused")
     servers = [ThreadingHTTPServer(("127.0.0.1", int(cfg["gateway_port"])), make_handler(gw))]
-    if cfg.get("lan_mode"):
+    if cfg.get("lan_mode") and cfg.get("lan_bind") and cfg.get("lan_cidr"):
         servers.append(ThreadingHTTPServer((cfg["lan_bind"], int(cfg["gateway_port"])),
                                            make_handler(gw, lan=True)))
     stop = stop or threading.Event()

@@ -85,8 +85,8 @@ class TestRender(unittest.TestCase):
             self.assertIn(title, text)
         for fact in ("48.6", "first token 0.83 s", "prompt 612.4", "fit 2", "gpt-oss:120b", "rest in RAM",
                      "refused: gpu_fit", "sclk 2310", "mclk 1000", "junction 78", "212/289 W",
-                     "Ollama 47.1 GiB of cap 52.7 GiB", "resync 41.3%", "rtt 23 ms", "enp38s0 link 1000",
-                     "Patrick's MacBook Pro", "connected", "last sleep", "EDT",
+                     "Ollama 47.1 GiB of cap 52.7 GiB", "resync 41.3%", "rtt 23 ms", "enp5s0 link 1000",
+                     "Alice's MacBook Pro", "connected", "last sleep", "EDT",
                      "power 312 W (plug)  24 h 3.54 kWh  $0.61  on-peak until 19:00"):
             self.assertIn(fact, text)
 

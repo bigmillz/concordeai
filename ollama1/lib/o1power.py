@@ -8,7 +8,7 @@ Where the watts come from, best first:
      power (RAPL energy counter, wraparound handled) + a 40 W baseline for
      the rest of the machine, divided by 90% PSU efficiency. Always labelled
      "estimate".
-While the desktop sleeps it counts 3 W (from the sleep record). Any other
+While the server sleeps it counts 3 W (from the sleep record). Any other
 gap is unknown time: never counted as zero.
 
 The root sampler (ollama1-power.service, every 10 s) keeps per-minute
@@ -187,7 +187,7 @@ def lan_ip(host):
     try:
         ip = ipaddress.ip_address(str(host).strip("[]"))
     except ValueError:
-        raise PlugError("the plug's address must be its LAN IP, e.g. 192.168.86.40")
+        raise PlugError("the plug's address must be its LAN IP, e.g. 10.0.0.40")
     if ip.version == 6 and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
     if not any(ip in n for n in LAN_NETS if n.version == ip.version):

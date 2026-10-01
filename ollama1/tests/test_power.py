@@ -431,7 +431,7 @@ class TestSampler(unittest.TestCase):
             return 250.0
         P.read_plug = fake
         try:
-            s, clock = self.sampler(plug={"type": "shelly2", "host": "192.168.86.40"})
+            s, clock = self.sampler(plug={"type": "shelly2", "host": "10.0.0.40"})
             live = s.tick()
             self.assertEqual((live["watts"], live["src"]), (250.0, "plug"))
             self.assertEqual(live["estimate_w"], round(190 / 0.9, 1))
@@ -450,7 +450,7 @@ class TestSampler(unittest.TestCase):
             raise ValueError("\x00EVIL-MARKER raw plug bytes")
         P.read_plug = boom
         try:
-            s, clock = self.sampler(plug={"type": "kasa", "host": "192.168.86.40"})
+            s, clock = self.sampler(plug={"type": "kasa", "host": "10.0.0.40"})
             live = s.tick()
         finally:
             P.read_plug = real
@@ -638,9 +638,9 @@ class TestPlugs(unittest.TestCase):
         self.assertEqual(P.kasa_decrypt(P.kasa_encrypt(msg)), msg)
 
     def test_lan_only(self):
-        for ok in ("192.168.86.40", "10.0.0.7", "172.16.5.4", "172.31.255.1", "fd00::5"):
+        for ok in ("10.0.0.40", "10.0.0.7", "172.16.5.4", "172.31.255.1", "fd00::5"):
             self.assertTrue(P.lan_ip(ok), ok)
-        self.assertEqual(P.lan_ip("::ffff:192.168.86.40"), "192.168.86.40")
+        self.assertEqual(P.lan_ip("::ffff:10.0.0.40"), "10.0.0.40")
         for bad in ("8.8.8.8", "127.0.0.1", "0.0.0.0", "224.0.0.1", "plug.local", "192.168.1.5.nip.io",
                     "http://192.168.1.5", "", None, "::1", "2001:4860::8888",
                     "169.254.3.3", "169.254.169.254", "fe80::1", "::ffff:8.8.8.8", "::ffff:127.0.0.1",

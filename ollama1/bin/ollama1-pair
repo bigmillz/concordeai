@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""ollama1-pair: pair a device with this desktop. Runs as root.
+"""ollama1-pair: pair a device with this server. Runs as root.
 
   sudo ollama1-pair              open a 5-minute window, show the code, wait
   sudo ollama1-pair --list       paired devices
@@ -10,7 +10,7 @@ Used by systemd (not for typing):
   ollama1-pair --headless        open a window without a terminal (admin panel button)
   ollama1-pair --commit          move a code-checked request into devices.json
 
-Pairing happens only here, at the desktop. There is no invite, share or
+Pairing happens only here, at the server. There is no invite, share or
 join: the code is shown on this screen and in this terminal, never sent
 anywhere, and the window closes after one device pairs, after 5 wrong
 codes, or after 5 minutes.
@@ -46,8 +46,8 @@ def wait_window(w, headless):
     code = format_code(w["code"])
     if not headless:
         print()
-        print("Pairing window open for 5 minutes. In ConcordeAI, choose")
-        print("Desktop > Pair and type this code:")
+        print("Pairing window open for 5 minutes. In ConcordeAI, open")
+        print("Settings > Your servers, add this server, and type this code:")
         print()
         width = __import__("shutil").get_terminal_size((100, 30)).columns - 4
         for row in o1big.render_code(code, width):
@@ -55,7 +55,7 @@ def wait_window(w, headless):
         print()
         print("   %s" % code)
         print()
-        print("The code is also on the desktop's screen. Ctrl+C closes the window.")
+        print("The code is also on the server's screen. Ctrl+C closes the window.")
     try:
         while True:
             now = time.time()
@@ -84,7 +84,7 @@ def wait_window(w, headless):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Pair a device with this desktop (at the desktop only).")
+    ap = argparse.ArgumentParser(description="Pair a device with this server (at the server only).")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--list", action="store_true")
     g.add_argument("--remove", metavar="ID")

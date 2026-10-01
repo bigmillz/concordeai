@@ -1,7 +1,7 @@
 #!/usr/bin/python3
-"""Measure how a big 'ram' model (gpt-oss:120b) loads on this desktop, in
+"""Measure how a big 'ram' model (gpt-oss:120b) loads on this server, in
 several configurations, each under a hard memory cap on Ollama so the
-worst case is an Ollama restart, never a frozen desktop.
+worst case is an Ollama restart, never a frozen server.
 
 Run through ram-model-test.sh (it checks root and passes the arguments):
 

@@ -218,7 +218,17 @@ def make_jwt(key, claims, alg="RS256", kid=None):
 TEAM = "o1test.cloudflareaccess.com"
 GW_AUD = "a" * 64
 ADMIN_AUD = "b" * 64
-ADMIN_EMAIL = "patrick@users.noreply.github.com"
+# Made-up fixtures: nothing here is any real server, person, domain or LAN.
+SERVER_NAME = "testsrv"
+ZONE = "example.test"
+GW_HOST = SERVER_NAME + "." + ZONE
+ADMIN_HOST = SERVER_NAME + "-admin." + ZONE
+LAN_CIDR = "10.0.0.0/24"
+LAN_IP = "10.0.0.10"
+ADMIN_EMAIL = "alice@example.test"
+# What setup.sh writes to config.json for a server like that
+BASE_CFG = {"server_name": SERVER_NAME, "cf_zone": ZONE, "hostname_gateway": GW_HOST,
+            "hostname_admin": ADMIN_HOST, "lan_bind": LAN_IP, "lan_cidr": LAN_CIDR}
 CLIENT_ID = "0123456789abcdef.access"
 
 
@@ -261,7 +271,7 @@ class FakeJWKS:
         self.srv.shutdown()
 
 
-def request(port, method, path, body=b"", headers=None, host="ollama1.flyconcordefly.com",
+def request(port, method, path, body=b"", headers=None, host="testsrv.example.test",
             timeout=30, addr="127.0.0.1"):
     c = http.client.HTTPConnection(addr, port, timeout=timeout)
     h = {"Host": host}

@@ -39,13 +39,14 @@ def setUpModule():
     G["jwks"] = U.FakeJWKS([G["key"]])
     G["stub"] = Stub(U.free_port())
     cfg = dict(DEFAULTS)
+    cfg.update(U.BASE_CFG)
     cfg.update({"access_team_domain": U.TEAM, "gateway_aud": U.GW_AUD, "admin_aud": U.ADMIN_AUD,
                 "admin_email": U.ADMIN_EMAIL, "service_token_client_id": U.CLIENT_ID,
                 "gateway_port": U.free_port(), "ollama_url": "http://127.0.0.1:%d" % G["stub"].port,
                 "certs_url": G["jwks"].url, "allow_insecure_certs_url": True,
                 "vram_total_bytes": 16 * GIB, "queue_wait_s": 20})
     G["cfg"] = cfg
-    G["dev"] = U.Device(name="Pat's Mac")
+    G["dev"] = U.Device(name="Alice's Mac")
     U.write_devices([G["dev"]])
     G["gw"], G["servers"], G["stop"] = G["mod"].serve(cfg)
     G["port"] = cfg["gateway_port"]
@@ -680,13 +681,13 @@ class TestPairing(unittest.TestCase):
         try:
             w = o1pair.open_window()
             b = json.dumps(self.body(U.Device(), w["code"])).encode()
-            st, data, _ = U.request(port, "POST", "/v1/pair", b, {}, host="192.168.86.10")
+            st, data, _ = U.request(port, "POST", "/v1/pair", b, {}, host="10.0.0.10")
             self.assertEqual(st, 403)
             self.assertIn(b"only through the tunnel", data)
             self.assertIsNotNone(o1pair.read_window())  # nothing reached the root step
             # signed requests still work on the LAN listener in LAN mode
             h = G["dev"].headers("GET", "/v1/whoami")
-            st, _, _ = U.request(port, "GET", "/v1/whoami", b"", h, host="192.168.86.10")
+            st, _, _ = U.request(port, "GET", "/v1/whoami", b"", h, host="10.0.0.10")
             self.assertEqual(st, 200)
         finally:
             srv.shutdown()
@@ -733,19 +734,19 @@ class TestConnectionSafety(unittest.TestCase):
         return data
 
     def inner(self):
-        h = {"Host": "ollama1.flyconcordefly.com", "Cf-Access-Jwt-Assertion": jwt()}
+        h = {"Host": "testsrv.example.test", "Cf-Access-Jwt-Assertion": jwt()}
         h.update(G["dev"].headers("GET", "/v1/whoami", b""))
         return ("GET /v1/whoami HTTP/1.1\r\n" + "".join("%s: %s\r\n" % kv for kv in h.items()) + "\r\n").encode()
 
     def test_no_smuggling_after_errors(self):
         inner = self.inner()
         heads = [
-            "POST /api/chat HTTP/1.1\r\nHost: ollama1.flyconcordefly.com\r\nTransfer-Encoding: chunked\r\n"
+            "POST /api/chat HTTP/1.1\r\nHost: testsrv.example.test\r\nTransfer-Encoding: chunked\r\n"
             "Content-Length: %d\r\n\r\n" % len(inner),
-            "POST /api/chat HTTP/1.1\r\nHost: ollama1.flyconcordefly.com\r\nContent-Length: %d\r\n\r\n" % (65 << 20),
-            "POST /api/chat?%s HTTP/1.1\r\nHost: ollama1.flyconcordefly.com\r\nContent-Length: %d\r\n\r\n"
+            "POST /api/chat HTTP/1.1\r\nHost: testsrv.example.test\r\nContent-Length: %d\r\n\r\n" % (65 << 20),
+            "POST /api/chat?%s HTTP/1.1\r\nHost: testsrv.example.test\r\nContent-Length: %d\r\n\r\n"
             % ("a" * 2100, len(inner)),
-            "POST /api/chat HTTP/1.1\r\nHost: ollama1.flyconcordefly.com\r\nContent-Length: %d\r\n\r\n" % len(inner),
+            "POST /api/chat HTTP/1.1\r\nHost: testsrv.example.test\r\nContent-Length: %d\r\n\r\n" % len(inner),
         ]
         for head in heads:
             data = self.raw(head.encode(), inner)
@@ -756,7 +757,7 @@ class TestConnectionSafety(unittest.TestCase):
     def test_body_not_read_before_auth(self):
         """An unauthenticated request with a big declared body gets its
         answer without the gateway waiting for (or reading) the body."""
-        head = ("POST /api/chat HTTP/1.1\r\nHost: ollama1.flyconcordefly.com\r\n"
+        head = ("POST /api/chat HTTP/1.1\r\nHost: testsrv.example.test\r\n"
                 "Content-Length: %d\r\n\r\n" % (20 << 20)).encode()
         t0 = time.time()
         data = self.raw(head, b"", wait=5)
@@ -765,7 +766,7 @@ class TestConnectionSafety(unittest.TestCase):
 
     def test_unpaired_signed_request_not_read(self):
         dev = U.Device()
-        h = {"Host": "ollama1.flyconcordefly.com", "Cf-Access-Jwt-Assertion": jwt(),
+        h = {"Host": "testsrv.example.test", "Cf-Access-Jwt-Assertion": jwt(),
              "Content-Length": str(20 << 20)}
         h.update(dev.headers("POST", "/api/chat", b"x"))
         head = ("POST /api/chat HTTP/1.1\r\n" + "".join("%s: %s\r\n" % kv for kv in h.items()) + "\r\n").encode()
@@ -812,7 +813,7 @@ class TestDeviceSwitch(unittest.TestCase):
     comes from another paired device, loaded models are unloaded first."""
 
     def setUp(self):
-        self.other = U.Device(name="Pat's iPad")
+        self.other = U.Device(name="Alice's iPad")
         U.write_devices([G["dev"], self.other])
         G["stub"].loaded.clear()
 
@@ -1190,7 +1191,7 @@ class TestAccessNone(unittest.TestCase):
                             headers={"Host": "127.0.0.1:8431"})                  # signatures still needed
             self.assertEqual(st, 401)
             with self.assertRaises(mod.GatewayError):
-                gw.check_access({}, True, "192.168.86.20")                       # LAN mode still off
+                gw.check_access({}, True, "10.0.0.20")                       # LAN mode still off
         finally:
             gw.cfg["access"] = "cloudflare"
         with self.assertRaises(mod.GatewayError):
@@ -1312,11 +1313,11 @@ class TestLanMode(unittest.TestCase):
         gw = G["gw"]
         mod = G["mod"]
         with self.assertRaises(mod.GatewayError):
-            gw.check_access({}, True, "192.168.86.20")        # LAN mode off (the default)
+            gw.check_access({}, True, "10.0.0.20")        # LAN mode off (the default)
         gw.cfg["lan_mode"] = True
         try:
-            gw.check_access({}, True, "192.168.86.20")        # on, from the LAN: no JWT needed
-            for ip in ("10.0.0.5", "192.168.87.20", "not-an-ip"):
+            gw.check_access({}, True, "10.0.0.20")        # on, from the LAN: no JWT needed
+            for ip in ("10.0.1.5", "192.168.87.20", "not-an-ip"):
                 with self.assertRaises(mod.GatewayError):
                     gw.check_access({}, True, ip)
             with self.assertRaises(mod.GatewayError):

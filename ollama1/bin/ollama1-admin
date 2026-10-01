@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""ollama1-admin: the web admin panel, at ollama1-admin.flyconcordefly.com.
+"""ollama1-admin: the web admin panel, at <server-name>-admin.<your-domain>.
 
 Bound to 127.0.0.1:8432; only cloudflared reaches it. Every request must
 carry a valid Cloudflare Access JWT for the admin application whose email
@@ -12,7 +12,7 @@ nothing else. Units that take an argument get a hash or a device id,
 which the root helper checks against its own lists.
 
 /term/ is a proxy to ttyd (a UNIX socket only this panel's user can open) running `login`: a terminal
-that still asks for Patrick's Linux password.
+that still asks for the admin user's Linux password.
 """
 import collections
 import datetime
@@ -350,7 +350,7 @@ def make_handler(panel):
             if path == "/":
                 nonce = secrets.token_urlsafe(16)
                 page = PAGE.replace("{{CSRF}}", panel.csrf(email)).replace("{{NONCE}}", nonce) \
-                    .replace("{{EMAIL}}", html.escape(email)).replace("{{HOST}}", html.escape(cfg["hostname_gateway"]))
+                    .replace("{{EMAIL}}", html.escape(email)).replace("{{NAME}}", html.escape(cfg.get("server_name") or "")).replace("{{HOST}}", html.escape(cfg["hostname_gateway"]))
                 csp = ("default-src 'none'; script-src 'nonce-%s'; style-src 'nonce-%s'; "
                        "connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
                        "base-uri 'none'; form-action 'none'" % (nonce, nonce))
@@ -524,7 +524,7 @@ PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf" content="{{CSRF}}">
-<title>ollama1 admin</title>
+<title>{{NAME}} admin</title>
 <style nonce="{{NONCE}}">
 :root{--bg:#f6f6f4;--card:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#8a8984;--line:#e4e3de;
 --grid:#ecebe6;--series:#2a78d6;--good:#008300;--warn:#b86e00;--bad:#c62f2f;--btn:#fff;--btnline:#cfcec8}
@@ -564,7 +564,7 @@ label{color:var(--ink2);font-size:13px}#pseasontabs button.on{border-color:var(-
 .bar{height:8px;background:var(--grid);border-radius:4px;overflow:hidden;margin:4px 0 8px}.bar i{display:block;height:100%;background:var(--series)}.between{justify-content:space-between}.mt{margin-top:10px}
 @media (max-width:600px){main{padding:10px}header{padding:12px}}
 </style></head><body>
-<header><h1>ollama1</h1><span class="who">{{EMAIL}}</span></header>
+<header><h1>{{NAME}}</h1><span class="who">{{EMAIL}}</span></header>
 <main>
 <div class="grid">
  <div class="card"><h2>Tokens per second</h2><div class="big" id="tps">-</div><div class="sub" id="tpsavg"></div></div>
@@ -608,11 +608,11 @@ label{color:var(--ink2);font-size:13px}#pseasontabs button.on{border-color:var(-
 <div class="card"><h2>Models</h2><table id="models"></table>
  <div class="row mt"><button id="libbtn">Update model library</button><span class="sub" id="libmsg"></span></div>
  <div id="lib"></div>
- <p class="note">Update model library shows what it would change first: it downloads models on the allow-list that aren't installed, updates the ones with a newer version, and removes installed models that aren't on the allow-list (nothing else). Only models on the allow-list (/etc/ollama1/models.allow, or <code>sudo ollama1-models add NAME</code> at the desktop) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p><div id="pull" class="sub"></div></div>
+ <p class="note">Update model library shows what it would change first: it downloads models on the allow-list that aren't installed, updates the ones with a newer version, and removes installed models that aren't on the allow-list (nothing else). Only models on the allow-list (/etc/ollama1/models.allow, or <code>sudo ollama1-models add NAME</code> at the server) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p><div id="pull" class="sub"></div></div>
 <div class="grid">
  <div class="card"><h2>Paired devices</h2><table id="devices"></table>
   <div class="row mt"><button data-act="pair">Open pairing window</button></div>
-  <p class="note">The code appears on the desktop's screen only.</p></div>
+  <p class="note">The code appears on the server's screen only.</p></div>
  <div class="card"><h2>Actions</h2><div class="row">
   <button data-act="update">Apply updates now</button><button data-act="restart">Restart services</button>
   <button data-act="backup">Back up now</button><button data-act="lan" id="lanbtn">LAN mode</button>
@@ -642,8 +642,8 @@ async function act(action,arg,confirm){const m=$('msg');m.textContent='Starting 
  setTimeout(refreshSlow,1500);}
 let lan=false;
 document.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',()=>{const a=b.dataset.act;
- if(a==='reboot'){if(confirm('Reboot the desktop now?'))act('reboot',null,'reboot');return;}
- if(a==='sleep'){let t='The desktop will sleep. Press its power button to wake it. While it sleeps it can\'t be reached, and anything plugged into its second network port loses its connection.';
+ if(a==='reboot'){if(confirm('Reboot the server now?'))act('reboot',null,'reboot');return;}
+ if(a==='sleep'){let t='The server will sleep. Press its power button to wake it. While it sleeps it can\'t be reached, and anything plugged into its second network port loses its connection.';
   if((lastState.raid||[]).some(r=>r.action))t+=' The mirror\'s sync pauses while it sleeps and carries on after it wakes.';
   if(confirm(t))act('sleep',null,'sleep');return;}
  if(a==='lan'){if(confirm(lan?'Turn LAN mode off?':'Turn LAN mode on? The gateway will also answer on the home network without Cloudflare Access (signatures still required, traffic unencrypted).'))act(lan?'lan-off':'lan-on');return;}
@@ -673,12 +673,12 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){retur
  const mem=s.memory||{},pairs=[['Uptime',dur(s.uptime)],['CPU',(s.cpu_pct??'?')+'%  ·  load '+(s.load||[]).map(x=>x.toFixed(2)).join(' ')],
   ['Memory',gib(mem.used)+' of '+gib(mem.total)]];
  const net=s.network;if(net){pairs.push([net.name,(net.address||'no address')+'  ·  '+(net.state==='up'?'up':net.state),net.state==='up'?'':'bad']);
-  (net.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+p.speed_mbps+' Mb/s':''):'no link')+(p.name==='enp38s0'?'  ·  Pi port':'')]));}
+  (net.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+p.speed_mbps+' Mb/s':''):'no link')]));}
  (s.disks||[]).forEach(d=>pairs.push([d.mount,d.mounted?tib(d.used)+' of '+tib(d.total)+' ('+Math.round(100*d.used/d.total)+'%)':'not mounted',d.mounted?'':'bad']));
  (s.raid||[]).forEach(a=>pairs.push([a.name,a.level+' ['+a.members+'] '+(a.healthy?'healthy':'DEGRADED')+(a.action?'  ·  '+a.action+' '+a.progress+'%'+(a.finish?' ('+a.finish+' left)':''):''),a.healthy?'ok':'bad']));
  if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn']);kv($('sys'),pairs);}
 async function refreshSlow(){try{const d=await api('/api/devices');table($('devices'),['Name','Id','Paired',''],d.devices.map(x=>{
-  const b=el('button','Remove','danger');b.addEventListener('click',()=>{if(confirm('Unpair '+x.name+'? It will need to pair again at the desktop.'))act('remove-device',x.id);});
+  const b=el('button','Remove','danger');b.addEventListener('click',()=>{if(confirm('Unpair '+x.name+'? It will need to pair again at the server.'))act('remove-device',x.id);});
   return [x.name,x.id,(x.paired_at||'').slice(0,16).replace('T',' '),b];}));}catch(e){}
  try{const m=await api('/api/models');const rows=[];const allowed=new Set(m.allow.map(a=>a.name));
   m.installed.forEach(x=>{const b=el('button','Remove','danger');b.addEventListener('click',()=>{const c=prompt('Type the model name to remove it: '+x.name);if(c===x.name)act('remove-model',x.hash,c);});
@@ -708,7 +708,7 @@ async function refreshLib(){let l;try{l=await api('/api/library');}catch(e){retu
  if(!p)return;
  if(libWant){$('libmsg').textContent='';}
  (p.allow_errors||[]).forEach(e=>box.append(el('div','Allow-list line '+e.line+' ignored ('+e.reason+'): '+e.text,'bad')));
- if((p.removals_blocked||[]).length)box.append(el('div','Not removing '+p.removals_blocked.map(x=>x.name).join(', ')+' while the allow-list has a line it can\'t read. Fix it at the desktop first.','warn'));
+ if((p.removals_blocked||[]).length)box.append(el('div','Not removing '+p.removals_blocked.map(x=>x.name).join(', ')+' while the allow-list has a line it can\'t read. Fix it at the server first.','warn'));
  const rows=[];p.remove.forEach(x=>rows.push(['Remove',x.name,gib(x.bytes)]));p.download.forEach(x=>rows.push(['Download',x.name,gib(x.bytes)]));
  p.update.forEach(x=>rows.push(['Update',x.name,gib(x.bytes)]));(p.unknown||[]).forEach(x=>rows.push(['?',x.name,x.why]));
  const t=el('table');table(t,['','Model','Size'],rows);box.append(t);const tt=p.totals;
@@ -744,7 +744,7 @@ function renderPower(){const s=pw,sym=s.symbol,live=s.live;
   const split=Object.entries(w.by_tier).filter(([t])=>t!=='flat').sort((a,b)=>b[1].kwh-a[1].kwh).map(([t,v])=>TIERN[t]+' '+v.kwh.toFixed(2)+' kWh'+(v.cost!=null?' '+money(v.cost,sym):'')).join(', ');
   const r=[lab,w.kwh.toFixed(3)+' kWh',s.priced?money(w.cost,sym):'set a price'];if(s.mode==='tou')r.push(split||'-');r.push(w.unknown_h>=0.1?w.unknown_h.toFixed(1)+' h':'');return r;});
  table($('ptable'),['','Energy','Cost'].concat(s.mode==='tou'?['By tier']:[],['Unknown']),rows);
- if(s.since&&s.since>Date.now()/1000-30*86400){const r=el('tr'),td=el('td','Measured since '+new Date(s.since*1000).toLocaleString()+'. Unknown = time with no reading (the desktop off, or the sampler stopped); it is never counted as zero.','note');td.colSpan=5;r.append(td);$('ptable').append(r);}
+ if(s.since&&s.since>Date.now()/1000-30*86400){const r=el('tr'),td=el('td','Measured since '+new Date(s.since*1000).toLocaleString()+'. Unknown = time with no reading (the server off, or the sampler stopped); it is never counted as zero.','note');td.colSpan=5;r.append(td);$('ptable').append(r);}
  const p=s.projection;$('pproj').textContent=p?'Next 30 days: about '+p.kwh.toFixed(0)+' kWh'+(p.cost!=null?', about '+money(p.cost,sym):'')+' (the average of each hour of the week over the last '+p.basis_days+' days, at '+Math.round(p.avg_w)+' W on average)':'Next 30 days: not enough data yet.';
  const m=s.windows['1m'];$('ptok').textContent=m.cost_per_1k_tokens!=null?'Cost per 1 million tokens: '+money(m.cost_per_1k_tokens*1000,sym)+' (all electricity in the last 30 days over '+m.tokens.toLocaleString()+' tokens generated)':'';}
 function editorFrom(s){edit=JSON.parse(JSON.stringify(s));seasonIx=0;drawEditor();}

@@ -24,7 +24,7 @@
 #     "on" offers to overwrite it with zeros.
 # It does NOT let Ollama swap: ollama.service keeps MemorySwapMax=0. Only
 # tools/ram-model-test.sh's "swap" configuration allows it, for the length
-# of that test, so Patrick can see the numbers first.
+# of that test, so you can see the numbers first.
 set -euo pipefail
 R=${O1_SWAP_TESTROOT:-}          # tests only: all files under this folder, fake tools on PATH
 NAME=ollama1swap

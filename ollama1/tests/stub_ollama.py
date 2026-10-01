@@ -3,7 +3,7 @@
 the dashboard. Models are fake; answers contain a marker built from the
 prompt so tests can prove the marker never reaches a file or a log.
 
-    python3 stub_ollama.py PORT        # standalone (user-mode trial on the desktop)
+    python3 stub_ollama.py PORT        # standalone (user-mode trial on the server)
 """
 import json
 import sys

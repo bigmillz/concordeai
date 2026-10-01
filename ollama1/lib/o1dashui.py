@@ -543,7 +543,7 @@ def render(st, width, height, glyphs="blocks", range_s=300, page=0):
     clock = datetime.datetime.fromtimestamp(now).astimezone().strftime("%a %d %b %H:%M:%S %Z") if now else ""
     gw = st.get("gw")
     status = "gateway running" if gw and not gw.get("stale") else "GATEWAY NOT RUNNING"
-    head = " %s  %s  up %s  %s " % (st.get("host", "ollama1"), clock, dur(st.get("uptime")), status)
+    head = " %s  %s  up %s  %s " % (st.get("host", "server"), clock, dur(st.get("uptime")), status)
     c.put(0, 0, head.ljust(width)[:width], "header")
     rng = "5 min" if range_s <= 300 else "1 h"
     W, H = width, height - 2

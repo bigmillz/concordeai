@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""ollama1-power: what the desktop draws, and what the electricity costs.
+"""ollama1-power: what the server draws, and what the electricity costs.
 
   sudo ollama1-power status                  live watts, the last hour/day/week/month
   sudo ollama1-power set-plug TYPE IP [--user NAME]

@@ -94,7 +94,7 @@ checks), each in a temporary `MILLENAI_HOME`, windowless, with keys read from th
 keeps them). Ports 9901–9903 must be free. Then:
 
 ```bash
-cd "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI"
+cd "$(git rev-parse --show-toplevel)"        # the repo root
 "$VENV" tests_smoketest.py > /tmp/gauntlet.log 2>&1; echo "exit=$?"; tail -20 /tmp/gauntlet.log
 ```
 
@@ -309,6 +309,13 @@ These are the ones that have bitten repeatedly. Most are invisible from the code
   in-app" is usually a UA fingerprint, not logic.
 
 ## Repo hygiene
+
+The server kit (`ollama1/`) and the docs are public: no maintainer user, LAN,
+domain, disk serial or name in them, only placeholders (`<your-user>`,
+`<server-ip>`, `<your-domain>`, `<server-name>`) or made-up fixtures (`testsrv`,
+`alice`, `example.test`, `10.0.0.0/24`). `ollama1/tests/test_repo.py` fails if
+one comes back. "ollama1" in the kit's file and command names is the kit's
+name; a server's own name is the owner's (`setup.sh --name`, 6b347).
 
 `.gitignore` covers build artifacts across all three brand generations
 (`MillenAI`/`Concorde`/`ConcordeAI` — `.app` bundles, DMGs, Windows zips and

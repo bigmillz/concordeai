@@ -10,13 +10,13 @@ Signed request (every gateway call except POST /v1/pair):
     canonical = "ollama1-req-v1\n" METHOD "\n" PATH "\n" hex(sha256(body))
                 "\n" TIMESTAMP "\n" NONCE "\n" DEVICE_ID
 
-Pairing (POST /v1/pair, only while a window is open at the desktop):
+Pairing (POST /v1/pair, only while a window is open at the server):
 
     key       = sha256("ollama1-pair-key-v1\n" + normalized code)
     mac       = HMAC-SHA256(key, "ollama1-pair-v1\n" NAME "\n" PUBKEY_B64URL
                             "\n" TIMESTAMP "\n" NONCE)
     proof     = HMAC-SHA256(key, "ollama1-pair-ok-v1\n" DEVICE_ID "\n"
-                            PUBKEY_B64URL "\n" NONCE)   (sent back by the desktop)
+                            PUBKEY_B64URL "\n" NONCE)   (sent back by the server)
 """
 import hashlib
 import hmac
@@ -110,7 +110,7 @@ class RequestVerifier:
         ts = int(ts_s)
         dev = self.devices().get(dev_id)
         if dev is None:
-            raise AuthError("unpaired", "device is not paired with this desktop", 403)
+            raise AuthError("unpaired", "device is not paired with this server", 403)
         now = self.clock()
         if abs(now - ts) > self.skew:
             raise AuthError("clock_skew", "timestamp is more than %d s off" % self.skew)

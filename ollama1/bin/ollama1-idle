@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""ollama1-idle: put the desktop to sleep when it has been idle, if the
+"""ollama1-idle: put the server to sleep when it has been idle, if the
 owner turned that on (Settings > Your servers, in the app).
 
   ollama1-idle run          the service (ollama1-idle.service): every 30 s,

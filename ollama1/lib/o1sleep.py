@@ -103,7 +103,7 @@ def setup_running(lock=None):
 
 
 def busy_reasons(active_units=_active_units, setup_lock=None):
-    """Why the desktop must not sleep now ([] = it may)."""
+    """Why the server must not sleep now ([] = it may)."""
     reasons = []
     active = active_units([p for p, _ in BUSY_UNITS])
     if active is None:

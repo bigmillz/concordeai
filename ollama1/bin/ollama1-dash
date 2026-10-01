@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """ollama1-dash: the live dashboard.
 
-  ollama1-dash --console        on the desktop's monitor (tty1), as the no-shell
+  ollama1-dash --console        on the server's monitor (tty1), as the no-shell
                                 user o1dash; systemd restarts it if it exits.
                                 Keys only change the view: t (5 min / 1 h), p (page)
   ollama1-top                   the same over SSH; q quits

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# stability-test.sh: does this desktop stay up under sustained load?
+# stability-test.sh: does this server stay up under sustained load?
 #
-# The desktop once reset itself with a fatal CPU hardware error ("Machine
+# The server once reset itself with a fatal CPU hardware error ("Machine
 # Check") while loading a big model, so this runs the loads that found it,
 # all at once by default (or one phase at a time), and keeps a record that
 # survives a crash:

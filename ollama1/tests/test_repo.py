@@ -150,7 +150,7 @@ class TestRepo(unittest.TestCase):
 
 class TestGuide(unittest.TestCase):
     """docs/your-own-server.md: what it names exists, its config keys are
-    real, and it carries nothing of Patrick's machine."""
+    real."""
 
     def guide(self):
         return open(os.path.join(REPO, "docs", "your-own-server.md"), encoding="utf-8").read()
@@ -171,10 +171,55 @@ class TestGuide(unittest.TestCase):
             for k in _json.loads(block):
                 self.assertIn(k, DEFAULTS, k)
 
-    def test_nothing_of_patricks(self):
-        g = self.guide()
-        for needle in ("pmiller", "192.168.86.", "ZR127", "ZR11Z", "S6B0N", "flyconcordefly"):
-            self.assertNotIn(needle, g)
+
+class TestNoPersonalValues(unittest.TestCase):
+    """The kit and its docs are public (6b347): nothing of the maintainer's
+    machine, user, LAN, domain or disks may be in them. Every example uses a
+    placeholder (<your-user>, <server-ip>, <your-domain>, <server-name>) or a
+    made-up value (testsrv, alice, example.test, 10.0.0.0/24). NOTES.md is a
+    dated log and is not scanned; this file holds the needles, so it is not
+    either."""
+
+    NEEDLES = ("pmiller", "flyconcordefly", "192.168.86.", "enp38s0", "enp39s0", "patrick", "bigmillz",
+               "s6b0n", "zr127", "zr11z")
+    PUBLIC_URL = "github.com/bigmillz/concordeai"          # the real clone address: it must work
+    MAC = re.compile(r"\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b")
+    MADE_UP_MACS = ("02:00:5e:10:00:", "aa:bb:cc:dd:ee:", "00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff")
+
+    def files(self):
+        for top in (U.KIT, os.path.join(REPO, "docs")):
+            for root, dirs, names in os.walk(top):
+                dirs[:] = [d for d in dirs if d != "__pycache__"]
+                for n in names:
+                    path = os.path.join(root, n)
+                    if os.path.abspath(path) == os.path.abspath(__file__) or n.endswith(".pyc"):
+                        continue
+                    try:
+                        with open(path, encoding="utf-8") as f:
+                            yield os.path.relpath(path, REPO), f.read()
+                    except (UnicodeDecodeError, OSError):
+                        continue
+
+    def test_kit_and_docs_carry_no_personal_values(self):
+        seen = 0
+        for rel, text in self.files():
+            seen += 1
+            low = text.replace(self.PUBLIC_URL, "").lower()
+            for needle in self.NEEDLES:
+                self.assertNotIn(needle, low, "%s has %r: use a placeholder" % (rel, needle))
+            self.assertIsNone(re.search(r"\bPat\b", text), "%s names Pat" % rel)
+            for mac in self.MAC.findall(text):
+                self.assertTrue(mac.lower().startswith(self.MADE_UP_MACS), "%s has the MAC %s" % (rel, mac))
+        self.assertGreater(seen, 60)          # it really walked the kit
+
+    def test_the_scan_catches_what_it_is_for(self):
+        # the check itself must not be vacuous
+        for bad in ("ssh pmiller@host", "https://ollama1.flyconcordefly.com", "ip 192.168.86.10", "port enp39s0",
+                    "Patrick's MacBook Pro", "mac 3c:7c:3f:12:34:56", "serial ZR127RMQ"):
+            hit = any(n in bad.lower() for n in self.NEEDLES) or bool(
+                [m for m in self.MAC.findall(bad) if not m.lower().startswith(self.MADE_UP_MACS)])
+            self.assertTrue(hit, bad)
+        self.assertNotIn("bigmillz", ("see " + self.PUBLIC_URL + "/tree/main").replace(self.PUBLIC_URL, "").lower())
 
 
 class TestUnits(unittest.TestCase):

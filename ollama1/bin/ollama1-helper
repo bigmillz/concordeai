@@ -148,12 +148,16 @@ def lan(mode):
     cfg_path = Paths.config
     cfg = read_json(cfg_path, {}) or {}
     c = load_config(cfg_path)
+    have_lan = bool(c.get("lan_cidr") and c.get("lan_bind"))
+    if mode == "on" and not have_lan:
+        record("lan", "failed", "no LAN address or range set: run setup.sh --lan <your-lan>")
+        return 1
     cfg["lan_mode"] = mode == "on"
     write_json_atomic(cfg_path, cfg, mode=0o600)
     rule = ["from", c["lan_cidr"], "to", c["lan_bind"], "port", str(c["gateway_port"]), "proto", "tcp"]
     if mode == "on":
         run(["ufw", "allow"] + rule)
-    else:
+    elif have_lan:
         run(["ufw", "delete", "allow"] + rule)
     rc = run(["systemctl", "restart", "ollama1-gateway.service"])
     record("lan", "ok" if rc == 0 else "failed", mode)
@@ -203,7 +207,7 @@ def sleep():
 
 
 def stamp(which):
-    """From the system-sleep hook: when the desktop went to sleep / woke."""
+    """From the system-sleep hook: when the server went to sleep / woke."""
     if which not in ("sleep", "wake"):
         return 2
     o1sleep.record(**{"last_" + which: int(time.time())})

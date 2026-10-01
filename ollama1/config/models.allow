@@ -1,4 +1,4 @@
 # ollama1 model allow-list. Only models named here can be pulled from the
 # admin panel. One Ollama model name per line, e.g. qwen3:14b
-# Edit at the desktop: sudo nano /etc/ollama1/models.allow
-# It starts empty on purpose: models are chosen with Patrick.
+# Edit at the server: sudo nano /etc/ollama1/models.allow
+# It starts empty on purpose: models are chosen by you.

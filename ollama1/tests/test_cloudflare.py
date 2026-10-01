@@ -20,8 +20,9 @@ import o1test_util as U
 TOKEN = "cfT0ken-" + uuid.uuid4().hex + "-SECRET"
 ACCT = "fake-account-id"
 ZONE_ID = "fake-zone-id"
-GW = "ollama1.flyconcordefly.com"
-ADMIN = "ollama1-admin.flyconcordefly.com"
+BASE = {"server_name": U.SERVER_NAME, "cf_zone": U.ZONE, "owner_label": "Alice", "admin_email": U.ADMIN_EMAIL}
+GW = "testsrv.example.test"
+ADMIN = "testsrv-admin.example.test"
 CREDS = os.path.join(U.PREFIX, "etc/cloudflared/ollama1.json")
 CONFIG = os.path.join(U.PREFIX, "etc/ollama1/config.json")
 CF_STATE = os.path.join(U.PREFIX, "var/lib/ollama1/cf-state.json")
@@ -107,8 +108,8 @@ class FakeCF:
     def route(self, m, p, qs, b):
         A = "/accounts/%s" % ACCT
         if m == "GET" and p == "/zones":
-            return 200, [{"id": ZONE_ID, "name": "flyconcordefly.com", "account": {"id": ACCT, "name": "Patrick"}}] \
-                if qs.get("name") == "flyconcordefly.com" else []
+            return 200, [{"id": ZONE_ID, "name": "example.test", "account": {"id": ACCT, "name": "Alice"}}] \
+                if qs.get("name") == "example.test" else []
         if m == "GET" and p == A + "/access/organizations":
             return (200, {"auth_domain": "concorde.cloudflareaccess.com"}) if self.org else (404, "no org")
         if p == A + "/cfd_tunnel":
@@ -196,7 +197,7 @@ class TestCloudflareHelper(unittest.TestCase):
                 os.unlink(f)
         os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
         with open(CONFIG, "w") as f:
-            json.dump({"admin_email": U.ADMIN_EMAIL}, f)
+            json.dump(BASE, f)
         self.tmp = tempfile.mkdtemp(prefix="o1cf-")
 
     def tearDown(self):
@@ -244,8 +245,46 @@ class TestCloudflareHelper(unittest.TestCase):
         gw_app = next(a for a in CF.apps.values() if a["domain"] == GW)
         self.assertTrue(gw_app["service_auth_401_redirect"])
         pols = {p["name"]: p for p in CF.policies.values()}
-        self.assertEqual(pols["ollama1 admin - Patrick only"]["include"], [{"email": {"email": U.ADMIN_EMAIL}}])
-        self.assertEqual(pols["ollama1 app - service token"]["decision"], "non_identity")
+        self.assertEqual(pols["testsrv admin - Alice only"]["include"], [{"email": {"email": U.ADMIN_EMAIL}}])
+        self.assertEqual(pols["testsrv app - service token"]["decision"], "non_identity")
+
+    def test_names_come_from_the_server_name(self):
+        self.assertEqual(self.run_helper(), 0, self.out)
+        self.assertEqual([t["name"] for t in CF.tunnels.values()], ["testsrv"])
+        self.assertEqual([t["name"] for t in CF.stokens.values()], ["testsrv-app"])
+        self.assertEqual(sorted(p["name"] for p in CF.policies.values()),
+                         ["testsrv admin - Alice only", "testsrv app - service token"])
+        self.assertEqual(sorted(a["name"] for a in CF.apps.values()), ["testsrv admin", "testsrv app"])
+
+    def test_install_from_before_the_name_was_a_setting_keeps_its_names(self):
+        # config.json with no server_name and no hostnames: the name is ollama1,
+        # the hostnames are derived from the zone, nothing is renamed
+        with open(CONFIG, "w") as f:
+            json.dump({"cf_zone": U.ZONE, "owner_label": "Alice", "admin_email": U.ADMIN_EMAIL}, f)
+        self.assertEqual(self.run_helper(), 0, self.out)
+        self.assertEqual([t["name"] for t in CF.tunnels.values()], ["ollama1"])
+        self.assertEqual([t["name"] for t in CF.stokens.values()], ["ollama1-app"])
+        self.assertEqual(sorted(p["name"] for p in CF.policies.values()),
+                         ["ollama1 admin - Alice only", "ollama1 app - service token"])
+        self.assertEqual(sorted(a["domain"] for a in CF.apps.values()),
+                         ["ollama1-admin." + U.ZONE, "ollama1." + U.ZONE])
+
+    def test_names_already_in_config_win_over_derived_ones(self):
+        with open(CONFIG, "w") as f:
+            json.dump(dict(BASE, tunnel_name="old-tunnel", token_name="old-app", policy_admin_name="old admin policy",
+                           hostname_gateway="gw.example.test", hostname_admin="panel.example.test"), f)
+        self.assertEqual(self.run_helper(), 0, self.out)
+        self.assertEqual([t["name"] for t in CF.tunnels.values()], ["old-tunnel"])
+        self.assertEqual([t["name"] for t in CF.stokens.values()], ["old-app"])
+        self.assertIn("old admin policy", [p["name"] for p in CF.policies.values()])
+        self.assertEqual(sorted(a["domain"] for a in CF.apps.values()), ["gw.example.test", "panel.example.test"])
+
+    def test_no_zone_stops_before_calling_cloudflare(self):
+        with open(CONFIG, "w") as f:
+            json.dump({"admin_email": U.ADMIN_EMAIL}, f)
+        self.assertNotEqual(self.run_helper(), 0)
+        self.assertEqual(CF.calls, [])
+        self.assertIn("--zone", self.out)
 
     def test_rerun_changes_nothing(self):
         self.assertEqual(self.run_helper(), 0, self.out)
@@ -308,7 +347,7 @@ class TestCloudflareHelper(unittest.TestCase):
         # a run that made the token but had no terminal to show it on
         self.assertEqual(self.run_helper(tty_ok=False), 0, self.out)
         old = next(iter(CF.stokens.values()))["client_secret"]
-        self.assertEqual(json.load(open(CF_STATE))["secret_unshown"], "ollama1-app")
+        self.assertEqual(json.load(open(CF_STATE))["secret_unshown"], "testsrv-app")
         self.assertEqual(self.run_helper(), 0, self.out)   # --no-prompt, yet it rotates
         new = next(iter(CF.stokens.values()))["client_secret"]
         self.assertNotEqual(old, new)
@@ -345,7 +384,7 @@ class TestCloudflareHelper(unittest.TestCase):
         self.assertEqual(self.run_helper(), 1)
         self.assertIn("already has A record", self.out)
         self.assertIn("a1", CF.dns)  # never deleted
-        self.assertEqual(json.load(open(CONFIG)), {"admin_email": U.ADMIN_EMAIL})
+        self.assertEqual(json.load(open(CONFIG)), BASE)
 
     def test_no_zero_trust_org(self):
         CF.org = False

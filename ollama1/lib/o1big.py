@@ -1,4 +1,4 @@
-"""Large block letters for the pairing code on the desktop's screen.
+"""Large block letters for the pairing code on the server's screen.
 5 rows x 5 columns per glyph; covers Crockford base32 and '-'."""
 
 FONT = {

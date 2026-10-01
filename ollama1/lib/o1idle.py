@@ -1,4 +1,4 @@
-"""Auto sleep for ollama1 (6b346): suspend the desktop when nobody has used
+"""Auto sleep for ollama1 (6b346): suspend the server when nobody has used
 it for a while, and say which network cards can wake it again.
 
 Three parts:
@@ -99,7 +99,7 @@ def write_config(cfg, path=None):
 class Activity:
     """Real work in progress and when it last happened. Written to a file
     the root service reads; /v1/info, /v1/usage and the other polls never
-    touch it, so the app's sidebar can't keep the desktop awake."""
+    touch it, so the app's sidebar can't keep the server awake."""
 
     def __init__(self, clock=time.time, path=None):
         import threading
@@ -287,7 +287,7 @@ def deep_sleep_supported(path=None):
     return "deep" in words
 
 
-# ---- which cards can wake the desktop --------------------------------------------
+# ---- which cards can wake the server --------------------------------------------
 
 def _sysnet():
     return os.path.join(os.environ.get("OLLAMA1_SYS", "/sys"), "class", "net")

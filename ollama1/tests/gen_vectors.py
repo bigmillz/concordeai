@@ -39,7 +39,7 @@ def vectors():
         })
     out["requests"] = reqs
     code = "7K4M-2QXD-9FHT"
-    name = "Patrick's MacBook Pro"
+    name = "Alice's MacBook Pro"
     ts, nonce = 1790000100, U.b64u(bytes(range(16, 32)))
     pub_b64 = U.b64u(pub)
     out["pairing"] = {

@@ -27,9 +27,64 @@
 : "${MD_DEV:=/dev/md/o1data}"
 : "${MD_NAME:=ollama1:data}"
 
+# ---- the owner's settings -----------------------------------------------------
+# Nothing about a particular server is written in setup.sh or the repo: the
+# server's name, the admin's user, the LAN, the domain and the disks are
+# arguments, else what an earlier run saved, else (for some) detected.
+: "${SAVED:=/etc/ollama1/setup.env}"
+: "${CONFIG_JSON:=/etc/ollama1/config.json}"
+# What the server was called before the name was a setting. An install whose
+# config.json has no server_name keeps this name (6b347).
+LEGACY_SERVER_NAME=ollama1
+
+valid_name() { [[ "$1" =~ ^[a-z][a-z0-9-]{0,31}$ ]] && [[ "$1" != *- ]]; }
+valid_user() { [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; }
+valid_lan() {
+  [[ "$1" =~ ^[0-9.]{7,15}/[0-9]{1,2}$ ]] || return 1
+  python3 -c 'import ipaddress,sys; ipaddress.IPv4Network(sys.argv[1], strict=True)' "$1" 2>/dev/null
+}
+valid_zone() { [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; }
+valid_owner() { local rx='^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$'; [[ "$1" =~ $rx ]]; }
+valid_tz() { [[ "$1" =~ ^[A-Za-z0-9_+/-]{1,40}$ ]]; }
+valid_serial() { [[ "$1" =~ ^[A-Za-z0-9_.-]{4,40}$ ]]; }
+
+saved() { # KEY -> its value from the file an earlier run wrote, if any
+  [ -r "$SAVED" ] || return 0
+  sed -n "s/^$1=//p" "$SAVED" | head -n1
+}
+
+cfg_str() { # key -> a string from config.json, if there is one
+  [ -r "$CONFIG_JSON" ] || return 0
+  python3 -c 'import json,sys
+v = json.load(open(sys.argv[1])).get(sys.argv[2])
+print(v if isinstance(v, str) else "")' "$CONFIG_JSON" "$1" 2>/dev/null || true
+}
+
+# The server's name: the argument; else the saved one; else config.json's
+# server_name; else, if config.json exists without one, the legacy name (an
+# install from before the name was a setting). A different name from the
+# one an install already has is refused: its tunnel, DNS names and Access
+# policies are named after it.
+resolve_server_name() { # ARG -> the name on stdout, return 1 if there is none yet
+  local arg=$1 have="" n=""
+  have=$(cfg_str server_name)
+  if [ -z "$have" ] && [ -e "$CONFIG_JSON" ]; then have=$LEGACY_SERVER_NAME; fi
+  n=$arg
+  [ -n "$n" ] || n=$(saved SERVER_NAME)
+  [ -n "$n" ] || n=$have
+  [ -n "$n" ] || return 1
+  valid_name "$n" || { echo "the server name '$n' is not valid: lowercase letters, digits and hyphens, 1-32 characters, starting with a letter" >&2; return 2; }
+  if [ -n "$have" ] && [ "$n" != "$have" ]; then
+    echo "this server is already named '$have' (the tunnel, DNS names and Access policies carry it); setup will not rename it" >&2
+    return 2
+  fi
+  printf '%s\n' "$n"
+}
+
 disk_by_serial() { # serial -> /dev/<disk> (whole disk), empty if absent
   local d n ser
-  for d in /sys/block/*; do
+  [ -n "$1" ] || return 0   # no serial given: no disk (an empty one would match any)
+  for d in "${SYS_BLOCK:-/sys/block}"/*; do
     n=${d##*/}
     case $n in loop*|ram*|dm-*|md*|sr*|zram*) continue ;; esac
     ser=$(lsblk -dno SERIAL "/dev/$n" 2>/dev/null | tr -d '[:space:]')

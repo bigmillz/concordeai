@@ -1,6 +1,6 @@
 """Ed25519 signature checks and small encoding helpers.
 
-On the desktop the backend is PyNaCl (python3-nacl from apt, libsodium).
+On the server the backend is PyNaCl (python3-nacl from apt, libsodium).
 If it is missing, python3-cryptography (OpenSSL) is used instead; both do
 strict RFC 8032 verification. There is deliberately no pure-Python
 fallback here: if neither library loads, the gateway refuses to start.
@@ -11,7 +11,7 @@ import binascii
 BACKEND = None
 _verify = None
 
-try:  # the desktop's choice
+try:  # the server's choice
     from nacl.signing import VerifyKey as _NaclVerifyKey
     from nacl.exceptions import BadSignatureError as _NaclBad
 

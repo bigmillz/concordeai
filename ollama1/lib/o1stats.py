@@ -271,9 +271,28 @@ def _port(ifname):
             "speed_mbps": speed if speed and speed > 0 else None}
 
 
+def _wired_port():
+    """The server's wired LAN port when there is no bridge: a physical,
+    non-wireless interface, the one with a link first. None if there is none."""
+    try:
+        names = sorted(os.listdir(SYS + "/class/net"))
+    except OSError:
+        return None
+    found = []
+    for n in names:
+        base = SYS + "/class/net/" + n
+        if n == "lo" or not os.path.exists(base + "/device") or os.path.isdir(base + "/wireless"):
+            continue
+        found.append(n)
+    for n in found:
+        if _read(SYS + "/class/net/" + n + "/carrier") == "1":
+            return n
+    return found[0] if found else None
+
+
 def network():
     """The LAN side: br0 (the bridge over both wired ports, which keeps the
-    Raspberry Pi on the home LAN) with its address and each port's link,
+    second device on the home LAN) with its address and each port's link,
     or the plain wired port if there is no bridge."""
     now = time.time()
     if _net_cache["v"] is not None and now - _net_cache["t"] < 15:
@@ -284,9 +303,9 @@ def network():
             SYS + "/class/net/br0/brif") else []
         out = dict(_port("br0"), bridge=True, address=_ipv4("br0"), ports=[_port(m) for m in members])
     else:
-        for name in ("enp39s0",):
-            if os.path.isdir(SYS + "/class/net/" + name):
-                out = dict(_port(name), bridge=False, address=_ipv4(name), ports=[])
+        name = _wired_port()
+        if name:
+            out = dict(_port(name), bridge=False, address=_ipv4(name), ports=[])
     _net_cache.update(t=now, v=out)
     return out
 

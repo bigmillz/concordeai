@@ -1,5 +1,5 @@
 # Auto sleep (6b346): when the owner has turned it on (the app's Settings >
-# Your servers), suspend the desktop after it has been idle for the minutes
+# Your servers), suspend the server after it has been idle for the minutes
 # they chose. It reads the settings and the activity the gateway writes
 # (numbers only), publishes which network cards can wake the machine, and
 # starts ollama1-helper sleep, which refuses while a download, update or

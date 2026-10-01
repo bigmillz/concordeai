@@ -17505,7 +17505,7 @@ def _svc_input(src):
     ns, ctx, d = _sv_ns(src, hooks=())
     U = ns["_srv_url"]
     got = {
-        "https": U("https://Ollama1.flyconcordefly.com/") == ("https://ollama1.flyconcordefly.com", ""),
+        "https": U("https://Ollama1.example.com/") == ("https://ollama1.example.com", ""),
         "bare": U("ollama1.example.com") == ("https://ollama1.example.com", ""),
         "port": U("https://a.example.com:8443") == ("https://a.example.com:8443", ""),
         "http": U("http://ollama1.example.com")[0] == "" and U("http://127.0.0.1:9")[0] == "",

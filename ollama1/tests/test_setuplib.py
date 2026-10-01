@@ -33,9 +33,9 @@ class Sandbox:
         self.nvme = os.path.join(self.dir, "nvme1n1")
         for d in (self.sda, self.sdb, self.nvme):
             open(d, "w").close()
-        os.symlink(self.sda, os.path.join(self.byid, "ata-ST8000DM004-2CX188_ZR127RMQ"))
-        os.symlink(self.sdb, os.path.join(self.byid, "ata-ST8000DM004-2U9188_ZR11ZRGJ"))
-        os.symlink(self.nvme, os.path.join(self.byid, "nvme-Samsung_SSD_980_PRO_2TB_S6B0NG0R906564E"))
+        os.symlink(self.sda, os.path.join(self.byid, "ata-ST8000DM004-2CX188_SERIAL-HDD1"))
+        os.symlink(self.sdb, os.path.join(self.byid, "ata-ST8000DM004-2U9188_SERIAL-HDD2"))
+        os.symlink(self.nvme, os.path.join(self.byid, "nvme-Samsung_SSD_980_PRO_2TB_SERIAL-MODELS"))
         self.fstab = os.path.join(self.dir, "fstab")
         with open(self.fstab, "w") as f:
             f.write("/dev/disk/by-uuid/root / ext4 defaults 0 1\n"
@@ -43,7 +43,7 @@ class Sandbox:
                     "# /dev/disk/by-uuid/%s /home ext4 defaults 0 1\n" % OLD_HOME_UUID)
         self.state_path = os.path.join(self.dir, "state.json")
         self.state = {
-            "serial": {self.sda: "ZR127RMQ", self.sdb: "ZR11ZRGJ", self.nvme: "S6B0NG0R906564E"},
+            "serial": {self.sda: "SERIAL-HDD1", self.sdb: "SERIAL-HDD2", self.nvme: "SERIAL-MODELS"},
             "devs": {self.sda: [self.sda], self.sdb: [self.sdb], self.nvme: [self.nvme]},
             "blkid": {self.sda: {"TYPE": "ext4", "UUID": OLD_HOME_UUID},
                       self.sdb: {"TYPE": "ext4", "UUID": fu("5")},
@@ -99,7 +99,7 @@ echo DONE
 class TestRaid(unittest.TestCase):
     def setUp(self):
         self.sb = Sandbox()
-        self.call = 'raid_step "%s" "%s" ZR127RMQ ZR11ZRGJ' % (self.sb.sda, self.sb.sdb)
+        self.call = 'raid_step "%s" "%s" SERIAL-HDD1 SERIAL-HDD2' % (self.sb.sda, self.sb.sdb)
         self.md = os.path.join(self.sb.dir, "md-o1data")
 
     def tearDown(self):
@@ -111,8 +111,8 @@ class TestRaid(unittest.TestCase):
     def test_fresh_build(self):
         self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
         wiped = [l.split()[-1] for l in self.sb.log("wipefs")]
-        self.assertEqual(wiped, [os.path.join(self.sb.byid, "ata-ST8000DM004-2CX188_ZR127RMQ"),
-                                 os.path.join(self.sb.byid, "ata-ST8000DM004-2U9188_ZR11ZRGJ")])
+        self.assertEqual(wiped, [os.path.join(self.sb.byid, "ata-ST8000DM004-2CX188_SERIAL-HDD1"),
+                                 os.path.join(self.sb.byid, "ata-ST8000DM004-2U9188_SERIAL-HDD2")])
         self.assertEqual(len(self.sb.log("mkfs.ext4")), 1)
         lines = self.data_lines()
         self.assertEqual(len(lines), 1)
@@ -221,7 +221,7 @@ class TestRaid(unittest.TestCase):
         self.assertEqual(self.sb.log("wipefs"), [])
 
     def test_serial_mismatch_refused(self):
-        self.sb.state["serial"][self.sb.sdb] = "ZR11ZRGX"
+        self.sb.state["serial"][self.sb.sdb] = "SERIAL-HDDX"
         self.assertEqual(self.sb.run(self.call), 1)
         self.assertIn("serial check failed", self.sb.out)
         self.assertEqual(self.sb.log("wipefs"), [])
@@ -246,7 +246,7 @@ class TestRaid(unittest.TestCase):
 class TestModels(unittest.TestCase):
     def setUp(self):
         self.sb = Sandbox()
-        self.call = 'models_step "%s" S6B0NG0R906564E' % self.sb.nvme
+        self.call = 'models_step "%s" SERIAL-MODELS' % self.sb.nvme
 
     def tearDown(self):
         self.sb.close()
@@ -254,7 +254,7 @@ class TestModels(unittest.TestCase):
     def test_fresh(self):
         self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
         self.assertEqual([l.split()[-1] for l in self.sb.log("wipefs")],
-                         [os.path.join(self.sb.byid, "nvme-Samsung_SSD_980_PRO_2TB_S6B0NG0R906564E")])
+                         [os.path.join(self.sb.byid, "nvme-Samsung_SSD_980_PRO_2TB_SERIAL-MODELS")])
         self.assertIn("srv-models ext4 defaults,noatime", self.sb.fstab_text())
 
     def test_label_guard_keeps_models(self):
@@ -404,3 +404,117 @@ class TestSetupArgs(unittest.TestCase):
         for good in ("64G", "08G", "999999G"):
             code, out = self.run_setup("--vg-reserve", good)
             self.assertIn("Run it with sudo", out, good)   # reached the sudo check
+
+    def test_bad_settings_are_refused_before_anything_runs(self):
+        for flag, bad in (("--name", "Bad_Name"), ("--name", "1abc"), ("--name", "a" * 33), ("--name", "x-"),
+                          ("--user", "Bad User"), ("--lan", "10.0.0.5/24"), ("--lan", "10.0.0/24"), ("--lan", "lan"),
+                          ("--zone", "nodots"), ("--owner", "a;b"), ("--timezone", "A B"), ("--os-serial", "x y z w"),
+                          ("--hdd1-serial", "ab")):
+            code, out = self.run_setup("--plan", flag, bad)
+            self.assertEqual(code, 2, "%s %r: %s" % (flag, bad, out))
+            self.assertIn(flag, out)
+
+    def test_a_setting_without_its_value_is_refused(self):
+        for flag in ("--name", "--user", "--lan", "--zone", "--owner", "--timezone", "--os-serial",
+                     "--models-serial", "--hdd1-serial", "--hdd2-serial"):
+            code, out = self.run_setup("--plan", flag)
+            self.assertEqual(code, 2, flag)
+            self.assertIn("takes a value", out)
+
+    def test_the_plan_shows_the_settings_given(self):
+        code, out = self.run_setup("--plan", "--name", "testsrv", "--user", "alice", "--lan", "10.0.0.0/24",
+                                   "--zone", "Example.Test", "--os-serial", "SERIAL-OS")
+        self.assertEqual(code, 0, out)
+        self.assertIn("Server name testsrv, SSH user alice, LAN 10.0.0.0/24", out)
+        self.assertIn("testsrv.example.test", out)
+        self.assertIn("testsrv-admin.example.test", out)
+        self.assertIn("only alice with a key", out)
+
+    def test_the_plan_shows_placeholders_for_what_is_not_given(self):
+        code, out = self.run_setup("--plan")
+        self.assertEqual(code, 0, out)
+        for ph in ("<server-name>", "<server-name>.<your-domain>", "<os-serial>"):
+            self.assertIn(ph, out)
+
+    def test_the_machine_is_a_setting_not_a_constant_in_setup_sh(self):
+        # (test_repo's no-personal-values scan covers the values themselves)
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        self.assertNotRegex(setup, r"(?m)^(OS|MODELS|HDD1|HDD2)_SERIAL=\S")      # disks
+        self.assertNotRegex(setup, r"(?m)^(ADMIN_USER|HOME_LAN|NEW_HOSTNAME|SERVER_NAME|GW_HOST|ADMIN_HOST)=\S")
+
+
+class TestSettingsFromTheLibrary(unittest.TestCase):
+    """lib/setuplib.sh's validators and the server name's resolution
+    (arguments, then saved, then config.json; an old install is 'ollama1')."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="o1settings-")
+        self.addCleanup(shutil.rmtree, self.d, ignore_errors=True)
+        self.saved = os.path.join(self.d, "setup.env")
+        self.cfg = os.path.join(self.d, "config.json")
+
+    def sh(self, call):
+        r = subprocess.run(["bash", "-c", 'set -uo pipefail; source "$LIBSH"; %s' % call], capture_output=True,
+                           text=True, env=dict(os.environ, LIBSH=LIBSH, SAVED=self.saved, CONFIG_JSON=self.cfg), timeout=30)
+        return r.returncode, r.stdout.strip(), r.stderr
+
+    def write_cfg(self, data):
+        with open(self.cfg, "w") as f:
+            json.dump(data, f)
+
+    def test_validators(self):
+        good = {"valid_name": ["a", "testsrv", "gpu-2", "a" * 32], "valid_user": ["alice", "_svc", "a-b_c"],
+                "valid_lan": ["10.0.0.0/24", "172.16.0.0/16", "192.0.2.0/25"],
+                "valid_zone": ["example.test", "sub.example.co"], "valid_owner": ["Alice", "Alice B. Smith"],
+                "valid_tz": ["America/New_York", "UTC"], "valid_serial": ["SERIAL-1", "ab12.cd_3"]}
+        bad = {"valid_name": ["", "1a", "A", "a-", "a" * 33, "a_b"], "valid_user": ["", "Alice", "a b", "1a"],
+               "valid_lan": ["", "10.0.0.5/24", "10.0.0.0", "10.0.0.0/33", "a.b.c.d/8"],
+               "valid_zone": ["", "example", "Example.test", "-a.test"], "valid_owner": ["", "a;b", "$(x)", " a"],
+               "valid_tz": ["", "a b"], "valid_serial": ["", "abc", "a b c d"]}
+        for fn, vals in good.items():
+            for v in vals:
+                self.assertEqual(self.sh('%s "%s"' % (fn, v))[0], 0, (fn, v))
+        for fn, vals in bad.items():
+            for v in vals:
+                self.assertNotEqual(self.sh('%s "%s"' % (fn, v))[0], 0, (fn, v))
+
+    def test_an_old_install_without_a_name_is_ollama1(self):
+        self.write_cfg({"admin_email": "alice@example.test", "lan_mode": False})     # what an earlier setup.sh wrote
+        self.assertEqual(self.sh('resolve_server_name ""')[:2], (0, "ollama1"))
+        self.assertEqual(self.sh('resolve_server_name "ollama1"')[:2], (0, "ollama1"))
+
+    def test_an_old_install_is_never_renamed_by_a_new_argument(self):
+        self.write_cfg({"admin_email": "alice@example.test"})
+        rc, out, err = self.sh('resolve_server_name "other"')
+        self.assertEqual((rc, out), (2, ""))
+        self.assertIn("already named 'ollama1'", err)
+
+    def test_a_named_install_keeps_its_name(self):
+        self.write_cfg({"server_name": "testsrv"})
+        self.assertEqual(self.sh('resolve_server_name ""')[:2], (0, "testsrv"))
+        self.assertEqual(self.sh('resolve_server_name "other"')[0], 2)
+
+    def test_a_new_install_asks_for_a_name(self):
+        self.assertEqual(self.sh('resolve_server_name ""')[:2], (1, ""))          # nothing yet: the caller asks
+        self.assertEqual(self.sh('resolve_server_name "testsrv"')[:2], (0, "testsrv"))
+        self.assertEqual(self.sh('resolve_server_name "Bad Name"')[0], 2)
+
+    def test_the_saved_name_is_used_on_a_rerun(self):
+        with open(self.saved, "w") as f:
+            f.write("SERVER_NAME=srv2\nADMIN_USER=alice\n")
+        self.assertEqual(self.sh('resolve_server_name ""')[:2], (0, "srv2"))
+        self.assertEqual(self.sh('saved ADMIN_USER')[:2], (0, "alice"))
+        self.assertEqual(self.sh('saved NO_SUCH_KEY')[:2], (0, ""))
+
+    def test_no_serial_matches_no_disk(self):
+        # a disk that reports no serial would otherwise match an empty one
+        blk = os.path.join(self.d, "block")
+        os.makedirs(os.path.join(blk, "sda"))
+        stub = os.path.join(self.d, "bin")
+        os.makedirs(stub)
+        with open(os.path.join(stub, "lsblk"), "w") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(stub, "lsblk"), 0o755)
+        env = 'PATH="%s:$PATH" SYS_BLOCK="%s"' % (stub, blk)
+        self.assertEqual(self.sh('%s disk_by_serial ""' % env)[:2], (0, ""))
+        self.assertEqual(self.sh('%s disk_by_serial "SERIAL-A"' % env)[:2], (0, ""))

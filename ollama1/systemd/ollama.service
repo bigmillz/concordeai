@@ -46,7 +46,7 @@ MemorySwapMax=0
 # ollama.service.d/10-ollama1-memory.conf: RAM minus 8 GiB, so a load too
 # big for the machine ends in Ollama's own cgroup (its runner is a child of
 # "ollama serve", so it is inside the same cap) instead of freezing the
-# desktop, as loading gpt-oss:120b with mmap once did. If the OOM killer
+# server, as loading gpt-oss:120b with mmap once did. If the OOM killer
 # stops a runner, "ollama serve" keeps going and reports the failed load;
 # the gateway answers ram_oom. If "ollama serve" itself dies, Restart=always
 # brings it back.

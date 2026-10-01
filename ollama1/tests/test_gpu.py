@@ -57,7 +57,7 @@ class GpuFixture(unittest.TestCase):
 
 
 class TestGpuInfo(GpuFixture):
-    def test_the_desktops_card(self):
+    def test_the_servers_card(self):
         self.card(1, {"vendor": "0x1002", "device": "0x73bf", "revision": "0xc0",
                       "subsystem_vendor": "0x1002", "subsystem_device": "0x0e3a",
                       "mem_info_vram_total": "17163091968"})

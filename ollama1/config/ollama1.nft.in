@@ -5,7 +5,7 @@
 #   11434 (Ollama)         root, ollama, the gateway, the admin panel
 #   8431, 8432 (gateway,   root, cloudflared
 #               panel)
-# Everyone else (pmiller included, without sudo) gets a TCP reset. The web
+# Everyone else (the admin user included, without sudo) gets a TCP reset. The web
 # terminal has no TCP port at all: ttyd listens on a UNIX socket in a folder
 # only root and the panel's user can open.
 table inet ollama1
