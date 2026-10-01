@@ -216,6 +216,17 @@ ticked into a hand-picked council. They draft one after another on the
 server. They can't be the compositor, which is always on the computer or
 in the cloud.
 
+Fast, Thinking and Pro, the Code lane's agents and Funnels (after the cloud,
+when its box is ticked) use the server's models before this computer's: its best models that fit its card whole fill
+the seats first, and this computer's own picks fill what is left. Pro seats
+at most four of the server's models, since one card runs them one after
+another. If the server doesn't start answering within about half a minute
+(Fast) or a minute, this computer's copy answers instead. The switch under
+Settings › Your servers, "Use for Fast, Thinking, Pro and the Code lane",
+turns all of that off for a server. The Workspace and Coding agents can send
+the contents of a folder you give them to the server, as they would to any
+model that answers.
+
 ## Choosing models
 
 Nothing is installed at first. Put the models you want in

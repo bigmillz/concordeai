@@ -321,6 +321,70 @@ so here falling back IS allowed.
   same at-most-once-a-minute rule), and `server_funnel_pick` reads no ledger
   when no server is paired; the funnel box's tooltip has its own words for
   "no cloud keys saved" and "cloud power is off".
+- **The final verification review found the real page never reached the
+  server's seats** (the one serious defect, and what the tests had missed).
+  The page always sends `model`, the model last picked by hand ("Llama 3.2
+  3B" on a fresh install, `council[0]` after `paintModels`), and `models`,
+  that council, BESIDE the tier. The handler read `model` and never cleared
+  it for a tier, so the route loop matched that stale label: `route_label`
+  became a local model, Fast ran `lbl = route_label or model_name` (the
+  stale model; never `lbl in _seat_fb`, so never the server seat), and
+  Thinking and Pro pre-warmed that local engine on a Mac that should stay
+  quiet. That is exactly Patrick's "I selected the pro setting and the GPU
+  on the server isn't doing anything". Every earlier test posted `model: ""`
+  or an explicit pick, which no page ever sends with a tier. Fixed in the
+  handler: for a tier request the page's `model` is set aside
+  (`_page_model`, used only if the roster is empty) and the mode answers
+  from its own seats; the leader of the council is the model, so a server
+  seat routes to no local engine at all. That read of `model` is older than
+  this branch (the comment above it still says a tier arrives with
+  `model=""`); the server seats are what it hides. Whether a Mac with no
+  server ran the stale model through it on main was not measured here.
+  - **The tests now send the page's own request.** A check reads the page's
+    send code (`sendMsg`: `model`, `models`, `tier`, `messages`, `auto_web`,
+    `images`, `docs`, `agent`, and the turn: `chat_id`, `lane`, `after_len`,
+    `after_hash`) and fails if its shape moves from what the live checks
+    post. Against the real gateway on its stub Ollama, a paired server
+    holding six suitable models, and a copy of the app run with the
+    `local-record` test hook (dev copies only: `run_model` for a model of
+    this computer answers with a stub line and `ensure_mlx_engine` starts
+    nothing, each noted and read at `/api/test/local`), the stale pick
+    "Llama 3.2 3B" beside Fast, Thinking and Pro: the server drafts, the
+    answer carries its label in `X-Models`, nothing on this computer is
+    asked or warmed (Pro warms only a local seat of its own); the switch
+    off runs the same request here and asks the server nothing; a funnel
+    stage in the page's shape asks the server first. Two mutations (the
+    stale model put back, an engine warmed for a seat) are run against
+    MUTATED COPIES of the app paired to the same gateway and must fail
+    those checks. The replaced pins (`_p2c_pins` seats and server-first
+    shape, `_p3c_quiet` pre-warm) are gone; pins stay where nothing can
+    exercise a line (a seat isn't an explicit pick, the deadline wiring,
+    the title ticket).
+  - **A down server's later seats** (`_run_group`): a server marked down
+    by its first draft's failure or stall loses the rest of its group (they
+    were each asked, one deadline apiece); the draft shows as "server down".
+    Tested with a stub server that accepts and stalls: the council ends near
+    one deadline.
+  - **The flyout's quick click**: a click on a server's row within 300 ms of
+    hovering opened the flyout, then the pending hover timer opened it again
+    as a hover one and reset its scroll. `srvRowClick` clears `engSubTimer`
+    first (node check, with the real timer).
+  - **The switch refreshes the page**: the "Use for ..." handler also calls
+    `srvModesRefresh`, `paintTierAvail` and the open menu's repaint, so the
+    chip and the tiers' bubbles don't keep the old seats.
+  - **Pro's server seats are capped at four** (`SRV_SEATS_MAX`): one card
+    runs its models one after another and the loop gets 240 s, so only the
+    first four drafts of a dozen landed. The rest are this computer's normal
+    picks (or none); `/api/tiers` says `srvcap` {seated, of} where the cap
+    binds and the bubble says "seats 4 of the 6 models on your server".
+  - **Code lane copy**: the Workspace and Coding agents can now send the
+    contents of a local folder to the paired server, as they send it to any
+    model that answers. It is the person's own server, so the behaviour
+    stays; the switch's label is "Use for Fast, Thinking, Pro and the Code
+    lane" and a line under it says what the two agents send.
+  - **The chip** names the server for Fast only when the server will answer:
+    with cloud power on and a key, Fast asks the cloud first (the server
+    seat is the fallback) and the chip says "Fast".
 - Gauntlet: new `== your server first (6b339) ==`, eight in-process and
   node checks (the families and the ranking, the candidates and the switch,
   the seats, the failing seat, the council's parallel drafts and the merge,
@@ -332,9 +396,9 @@ so here falling back IS allowed.
   rebased onto the funnel pictures build (6b340): 623 of 623. Adapted: the
   6b337 live check "no tier lists a server model" says it of Cloud Only; the
   servers' public keys gain `prefer`; `server_check`'s deadline is read at
-  call time. A live chat in Fast/Thinking/Pro isn't run against the real
-  gateway: a mode also seats models installed on the machine running the
-  gauntlet, so it would load real engines.
+  call time. A live chat in Fast/Thinking/Pro against the real gateway
+  is run in the page's own request shape (above), with the `local-record`
+  hook standing in for this computer's engines.
 - Not verified here: a real GPU's measured speed (the ledger path is tested
   with canned records), WKWebView (the box and the page functions run in
   node; nothing was looked at on screen), a funnel against a real server
