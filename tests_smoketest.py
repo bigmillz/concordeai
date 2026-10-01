@@ -20235,6 +20235,8 @@ GW.o1gpu.detect = lambda: {"vendor": "amd", "name": "Test Card", "vram_bytes": 1
 # what /v1/usage serves (6b342); the control port's /usage changes it
 USAGE = {"v": {"busy_pct": 42, "vram_used_bytes": 6 << 30, "vram_total_bytes": 16 << 30}}
 GW.o1gpu.usage = lambda vendor: dict(USAGE["v"])
+RAM = {"v": {"used_bytes": 22 << 30, "total_bytes": 62 << 30}}
+GW.o1stats.ram_usage = lambda info=None: dict(RAM["v"])
 DROPPED = {}
 CLONED = []
 
@@ -20443,6 +20445,9 @@ class Ctl(BaseHTTPRequestHandler):
             return self.reply({"ok": True})
         if p == "/usage":
             USAGE["v"] = d
+            return self.reply({"ok": True})
+        if p == "/ram":
+            RAM["v"] = d
             return self.reply({"ok": True})
         if p == "/unload":
             with STUB.lock:
@@ -21151,10 +21156,11 @@ _o1("/usage", {"busy_pct": 42, "vram_used_bytes": 6 << 30, "vram_total_bytes": 1
 _nl42, _ns42 = len(_o1("/log")["log"]), len(_o1("/stub")["calls"])
 _u1 = _svq("/api/servers/usage?id=" + _sid34)
 _lg42 = _o1("/log")["log"][_nl42:]
-check("server meters (live): the card's usage is one signed GET to the real gateway, three numbers come "
+check("server meters (live): the card's and the server's memory usage is one signed GET to the real gateway, three numbers come "
       "back, and nothing is asked of Ollama or sent to any chat",
       _u1 == (200, {"ok": True, "gpu": {"busy_pct": 42, "vram_used_bytes": 6 << 30,
-                                        "vram_total_bytes": 16 << 30}})
+                                        "vram_total_bytes": 16 << 30},
+                    "ram": {"used_bytes": 22 << 30, "total_bytes": 62 << 30}})
       and [(r["method"], r["path"], r["access"], r["body"]) for r in _lg42]
       == [("GET", "/v1/usage", True, "")]
       and {"X-O1-Device", "X-O1-Signature", "X-O1-Nonce", "X-O1-Timestamp"} <= set(_lg42[0]["headers"])
@@ -21162,9 +21168,11 @@ check("server meters (live): the card's usage is one signed GET to the real gate
       "%r" % [_u1, _lg42])
 time.sleep(1.2)                       # past the gateway's one-second cache
 _o1("/usage", {"busy_pct": None, "vram_used_bytes": None, "vram_total_bytes": None})
+_o1("/ram", {"used_bytes": None, "total_bytes": None})
 _u2 = _svq("/api/servers/usage?id=" + _sid34)
 time.sleep(1.2)
 _o1("/usage", {"busy_pct": 42, "vram_used_bytes": 6 << 30, "vram_total_bytes": 16 << 30})
+_o1("/ram", {"used_bytes": 22 << 30, "total_bytes": 62 << 30})
 # an older kit has no such route: the real gateway's own 404 for one it doesn't serve
 _o1("/next", {"path": "/v1/usage", "status": 404,
               "body": {"error": "not available through the gateway", "code": "not_found",
@@ -21179,8 +21187,9 @@ _d42 = time.time() - _t42
 _o1("/up", {})
 check("server meters (live): a gateway reporting nulls or an older kit (404) answers ok with no usage, "
       "a 404 that isn't the gateway's own and a server that is off answer not ok, quickly",
-      _u2 == (200, {"ok": True, "gpu": {"busy_pct": None, "vram_used_bytes": None, "vram_total_bytes": None}})
-      and _u3 == (200, {"ok": True, "gpu": None}) and _u3b == (200, {"ok": False})
+      _u2 == (200, {"ok": True, "gpu": {"busy_pct": None, "vram_used_bytes": None, "vram_total_bytes": None},
+                    "ram": {"used_bytes": None, "total_bytes": None}})
+      and _u3 == (200, {"ok": True, "gpu": None, "ram": None}) and _u3b == (200, {"ok": False})
       and _u4 == (200, {"ok": False}) and _d42 < 6,
       "%r" % [_u2, _u3, _u3b, _u4, _d42])
 # nothing asked: a benchmark running, a bad or unknown id, no key, no token
@@ -22507,7 +22516,7 @@ const document={hidden:false,
   createElement(t){return new El(t);},
   addEventListener(ev,fn){if(ev==="visibilitychange")VIS.push(fn);}};
 const innerWidth=1320;
-const CALLS=[];let REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10}}});
+const CALLS=[];let REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10},ram:{used_bytes:1,total_bytes:2}}});
 async function api(u){CALLS.push(u);const r=REPLY(u);if(r==="throw")throw new Error("x");
   return {status:r.status,ok:r.ok,json:async()=>r.j};}
 let srvList=[];
@@ -22518,7 +22527,7 @@ const mkS=(id,name,v,gn,x)=>Object.assign({id:id,name:name,paired:true,status:{a
   gpu:{vendor:v,name:gn,vram_bytes:17163091968}},x||{});
 const reset=()=>{TM.length=0;CALLS.length=0;Object.keys(srvUse).forEach(k=>delete srvUse[k]);
   srvUseT=0;srvUseDead=false;document.hidden=false;CARD.right=300;
-  REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10}}});
+  REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10},ram:{used_bytes:1,total_bytes:2}}});
   const b=document.getElementById("srv-meters");if(b)b.remove();};
 const kids=()=>tel.children.map(c=>c.id||c.className);
 (async()=>{
@@ -22543,25 +22552,32 @@ R.names=[srvMeterName({name:'NVIDIA GeForce RTX 4090',vendor:'nvidia'}),srvMeter
 const five=[1,2,3,4,5].map(i=>mkS('s'+i,'Srv'+i,'amd','Card '+i));
 const rows5=srvMeterRows(five,{});
 R.many=[rows5.map(r=>r.id),rows5.map(r=>r.title),srvMeterServers(five).map(s=>s.id),
-  srvMeterRows(five.slice(0,3),{})[2].title];
+  srvMeterRows(five.slice(0,2),{})[3].title];
+const memR=u=>srvMeterRows([S1],{a1:u})[1];
+R.mem=[memR({ok:true,gpu:{busy_pct:1},ram:{used_bytes:23622320128,total_bytes:66571993088}}),
+  memR({ok:true,gpu:null,ram:null}),memR({ok:true,gpu:{busy_pct:1}}),memR({ok:false}),memR({}),
+  memR({ok:true,ram:{used_bytes:5,total_bytes:null}}),memR({ok:true,ram:{used_bytes:0,total_bytes:100}})];
+R.memname=[srvMemName('Desk'),srvMemName("  Pat's   very long server name here "),srvMemName('')];
 // ---- the card
 R.dom0=kids();
-srvList=[S1];srvUse.a1={ok:true,gpu:{busy_pct:37,vram_total_bytes:17163091968},fails:0,due:1e12};
+srvList=[S1];srvUse.a1={ok:true,gpu:{busy_pct:37,vram_total_bytes:17163091968},ram:{used_bytes:1073741824,total_bytes:4294967296},fails:0,due:1e12};
 srvMetersSync();
-const box=document.getElementById("srv-meters"),row1=box.children[0];
+const box=document.getElementById("srv-meters"),row1=box.children[0],mem1=box.children[1];
 R.dom1=kids();
 R.row1={n:box.children.length,text:row1.textContent,title:row1.title,cls:row1.className,
   w:row1.lastChild.firstChild.style.width,head:row1.firstChild.className,bar:row1.lastChild.className};
+R.memrow=[mem1.textContent,mem1.title,mem1.className,mem1.lastChild.firstChild.style.width,mem1.dataset.sid];
 srvUse.a1.gpu={busy_pct:85};srvMetersSync();
+srvUse.a1.ram={used_bytes:3221225472,total_bytes:4294967296};srvMetersSync();
 R.keep=[box.children[0]===row1,row1.lastChild.firstChild.style.width,row1.lastChild.firstChild.classList.contains("hot"),
-  document.getElementById("srv-meters")===box];
+  document.getElementById("srv-meters")===box,box.children[1]===mem1,mem1.lastChild.firstChild.style.width];
 srvUse.a1.ok=false;srvMetersSync();
-R.dim=[row1.className,row1.lastChild.firstChild.style.width,row1.title];
+R.dim=[row1.className,row1.lastChild.firstChild.style.width,row1.title,mem1.className,mem1.lastChild.firstChild.style.width,mem1.title];
 srvUse.a1.ok=true;srvUse.a1.gpu={busy_pct:20};srvMetersSync();
-R.undim=row1.className;
+R.undim=[row1.className,mem1.className];
 srvList=[S1,mkS('b2','Rack','nvidia','GeForce RTX 4090')];srvUse.b2={ok:true,gpu:{busy_pct:10},fails:0,due:1e12};
 srvMetersSync();
-R.two=[box.children.map(c=>c.dataset.sid),box.children[0]===row1,kids()];
+R.two=[box.children.map(c=>c.dataset.sid),box.children[0]===row1&&box.children[1]===mem1,kids()];
 srvList=[mkS('b2','Rack','nvidia','GeForce RTX 4090'),S1];srvMetersSync();
 R.order=box.children.map(c=>c.dataset.sid);
 srvList=[S1];srvMetersSync();
@@ -22579,7 +22595,7 @@ R.plan=[P({ids:[],due:{},now:0,card:true,page:true}),P({ids:['a'],due:{},now:5,c
 // ---- running it: steady, 3 s apart
 reset();srvList=[S1];srvMetersRefresh();
 const st={t0:pend()};
-await fire();st.c1=CALLS.slice();st.g1=pend();
+await fire();st.c1=CALLS.slice();st.g1=pend();st.ram=srvUse.a1.ram;
 await fire();st.c2=CALLS.length;st.g2=pend();
 R.steady=st;
 // ---- not answering: 10 s, 30 s, 30 s, and back to 3 s when it answers; the row dims and undims
@@ -22588,9 +22604,9 @@ REPLY=()=>({status:200,ok:true,j:{ok:false}});
 const bo={gaps:[],cls:[]};
 for(let i=0;i<4;i++){await fire();bo.gaps.push(pend());bo.cls.push(document.getElementById("srv-meters")?
   document.getElementById("srv-meters").children[0].className:"");}
-bo.fails=srvUse.a1.fails;
-REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:5}}});
-await fire();bo.after=[pend(),srvUse.a1.fails,srvUse.a1.ok,document.getElementById("srv-meters").children[0].className];
+bo.fails=srvUse.a1.fails;bo.ramnull=srvUse.a1.ram;
+REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:5},ram:{used_bytes:3,total_bytes:4}}});
+await fire();bo.after=[pend(),srvUse.a1.fails,srvUse.a1.ok,document.getElementById("srv-meters").children[0].className,srvUse.a1.ram];
 R.backoff=bo;
 // a thrown fetch counts the same
 reset();srvList=[S1];srvMetersRefresh();REPLY=()=>"throw";await fire();R.thrown=[pend(),srvUse.a1.ok,srvUse.a1.fails];
@@ -22637,7 +22653,7 @@ def _m42_node(src):
     gpu = src[gl:src.index("\n", gl) + 1]
     st = src.index("const srvUse={};")
     state = src[st:src.index("\n", st) + 1]
-    a = src.index("const SRV_METER_MAX=3;")
+    a = src.index("const SRV_METER_MAX=2;")
     b = src.index("function pickServerModel(label){")
     mt = src.index("function buildMeter(el){")
     pm = src.index("function paintMeter(el,pct){")
@@ -22661,6 +22677,15 @@ def _m42c_server(src):
     G = ns["_srv_usage_gpu"]
     three = {"busy_pct": 37, "vram_used_bytes": 9126805504, "vram_total_bytes": 17163091968}
     nul = {k: None for k in three}
+    ram = {"used_bytes": 23622320128, "total_bytes": 66571993088}
+    rnul = {"used_bytes": None, "total_bytes": None}
+    RG = ns["_srv_usage_ram"]
+    out["ramparse"] = (RG({"ram": dict(ram, models=["x"], serial="S")}) == ram
+                       and RG({"ram": {"used_bytes": True, "total_bytes": "9"}}) == rnul
+                       and RG({"ram": {"used_bytes": -1, "total_bytes": 1 << 60}}) == rnul
+                       and RG({"ram": {"used_bytes": 9, "total_bytes": 5}}) == {"used_bytes": None, "total_bytes": 5}
+                       and RG({"ram": {"used_bytes": 0, "total_bytes": 5}}) == {"used_bytes": 0, "total_bytes": 5}
+                       and RG({}) == rnul and RG(None) == rnul and RG({"ram": []}) == rnul)
     out["parse"] = (G({"gpu": dict(three, models=["llama3:8b"], device_id="x", serial="S1", requests=9)}) == three
                     and G({"gpu": {"busy_pct": True, "vram_used_bytes": "9", "vram_total_bytes": -1}}) == nul
                     and G({"gpu": {"busy_pct": 140, "vram_used_bytes": 1.5}}) == nul
@@ -22683,7 +22708,8 @@ def _m42c_server(src):
 
     def boom(rec):
         raise ns["ServerError"]("offline", "x")
-    s1, r1 = run([_SvResp(200, {"gpu": dict(three, models=["x"], device_id="d")})])
+    s1, r1 = run([_SvResp(200, {"gpu": dict(three, models=["x"], device_id="d"), "ram": dict(ram, pid=1)})])
+    s9, r9 = run([_SvResp(200, {"gpu": three})])         # a kit from before the memory reading
     s2, r2 = run([_SvResp(404, {"error": "no", "code": "not_found"})])
     s3, r3 = run([_SvResp(404, {"error": "no"})])
     s4, r4 = run([_SvResp(401, {"error": "no", "code": "unpaired"})])
@@ -22695,7 +22721,8 @@ def _m42c_server(src):
     a2 = ns["server_add"](ctx, {"url": "https://other.example.com", "name": "Other", "access_id": "id.access",
                                 "access_secret": "SECRET-" + "y" * 20})
     s8, r8 = run([_SvResp(200, {"gpu": three})], sid=a2.get("id"))
-    out["answers"] = (r1 == {"ok": True, "gpu": three} and r2 == {"ok": True, "gpu": None}
+    out["answers"] = (r1 == {"ok": True, "gpu": three, "ram": ram} and r9 == {"ok": True, "gpu": three, "ram": rnul}
+                      and r2 == {"ok": True, "gpu": None, "ram": None}
                       and r3 == {"ok": False} and r4 == {"ok": False} and r5 == {"ok": False}
                       and r6 == {"ok": False} and r7 == {"ok": False} and r8 == {"ok": False}
                       and not s7 and not s8)
@@ -22726,9 +22753,21 @@ def _m42c_rows(src):
                     and R["fresh"]["off"] is False and R["stale"] == [True, False])
     out["names"] = R["names"] == ["GEFORCE RTX 4090", "NVIDIA", "RADEON RX 7600/7600 XT/76…", "ARC B580",
                                   "INSTINCT MI300X"]
-    out["many"] = (R["many"][0] == ["s1", "s2", "s3"] and R["many"][2] == ["s1", "s2", "s3"]
-                   and R["many"][1][2].endswith("+2 more") and not R["many"][1][0].endswith("more")
-                   and not R["many"][1][1].endswith("more") and not R["many"][3].endswith("more"))
+    out["many"] = (R["many"][0] == ["s1", "s1:m", "s2", "s2:m"] and R["many"][2] == ["s1", "s2"]
+                   and R["many"][1][2].endswith("+3 more") and R["many"][1][3].endswith("+3 more")
+                   and not R["many"][1][0].endswith("more") and not R["many"][1][1].endswith("more")
+                   and not R["many"][3].endswith("more")
+                   and R["many"][1][1] == "Srv1 \u00b7 memory" and R["many"][3] == "Srv2 \u00b7 memory")
+    nk = "Desk \u00b7 memory \u00b7 usage not reported (update the server kit)"
+    mem = R["mem"]
+    out["mem"] = (mem[0] == {"id": "a1:m", "name": "DESK MEMORY", "title": "Desk \u00b7 memory \u00b7 22 of 62 GB in use",
+                             "pct": 35, "off": False}
+                  and all(m_["title"] == nk and m_["pct"] is None and m_["off"] is False for m_ in (mem[1], mem[2], mem[5]))
+                  and mem[3] == {"id": "a1:m", "name": "DESK MEMORY", "title": "Desk \u00b7 memory \u00b7 not answering",
+                                 "pct": None, "off": True}
+                  and mem[4]["title"] == "Desk \u00b7 memory" and mem[4]["pct"] is None and mem[4]["off"] is False
+                  and mem[6]["pct"] == 0 and mem[6]["title"].endswith("0 of 0 GB in use")
+                  and R["memname"] == ["DESK MEMORY", "PAT'S VERY LONG S\u2026 MEMORY", " MEMORY"])
     return all(out.values()), [out, err]
 
 
@@ -22737,15 +22776,19 @@ def _m42c_card(src):
     out = {}
     out["before"] = R["dom0"] == ["t-head", "meter-row", "meter-row"]
     out["row"] = (R["dom1"] == ["t-head", "meter-row", "srv-meters", "meter-row"]
-                  and R["row1"] == {"n": 1, "text": "RADEON RX 6900 XT", "cls": "meter-row srv-mrow",
+                  and R["memrow"] == ["DESK MEMORY", "Desk \u00b7 memory \u00b7 1 of 4 GB in use",
+                                      "meter-row srv-mrow", "25%", "a1:m"]
+                  and R["row1"] == {"n": 2, "text": "RADEON RX 6900 XT", "cls": "meter-row srv-mrow",
                                     "title": "Desk · Radeon RX 6900 XT · 16 GB · 37% busy",
                                     "w": "37%", "head": "t-head", "bar": "meter"})
-    out["easing"] = R["keep"] == [True, "85%", True, True]
+    out["easing"] = R["keep"] == [True, "85%", True, True, True, "75%"]
     out["dim"] = (R["dim"][0] == "meter-row srv-mrow off" and R["dim"][1] == "0%"
-                  and R["dim"][2].endswith("not answering") and R["undim"] == "meter-row srv-mrow")
-    out["two"] = (R["two"][0] == ["a1", "b2"] and R["two"][1] is True
+                  and R["dim"][2].endswith("not answering") and R["undim"] == ["meter-row srv-mrow"] * 2
+                  and R["dim"][3] == "meter-row srv-mrow off" and R["dim"][4] == "0%"
+                  and R["dim"][5].endswith("not answering"))
+    out["two"] = (R["two"][0] == ["a1", "a1:m", "b2", "b2:m"] and R["two"][1] is True
                   and R["two"][2] == ["t-head", "meter-row", "srv-meters", "meter-row"]
-                  and R["order"] == ["b2", "a1"] and R["drop"] == ["a1"])
+                  and R["order"] == ["b2", "b2:m", "a1", "a1:m"] and R["drop"] == ["a1", "a1:m"])
     out["gone"] = R["dom2"] == [["t-head", "meter-row", "meter-row"], True, 0, []]
     return all(out.values()), [out, err]
 
@@ -22758,11 +22801,13 @@ def _m42c_poll(src):
                                 '{"poll":["a"],"next":250}', '{"poll":[],"next":250}',
                                 '{"poll":[],"next":4000}']
     out["steady"] = (R["steady"]["t0"] == 0 and R["steady"]["c1"] == ["/api/servers/usage?id=a1"]
-                     and R["steady"]["g1"] == 3000 and R["steady"]["c2"] == 2 and R["steady"]["g2"] == 3000)
+                     and R["steady"]["g1"] == 3000 and R["steady"]["c2"] == 2
+                     and R["steady"]["ram"] == {"used_bytes": 1, "total_bytes": 2} and R["steady"]["g2"] == 3000)
     bo = R["backoff"]
     out["backoff"] = (bo["gaps"] == [10000, 30000, 30000, 30000] and bo["fails"] == 4
                       and all(c == "meter-row srv-mrow off" for c in bo["cls"])
-                      and bo["after"] == [3000, 0, True, "meter-row srv-mrow"])
+                      and bo["ramnull"] is None
+                      and bo["after"] == [3000, 0, True, "meter-row srv-mrow", {"used_bytes": 3, "total_bytes": 4}])
     out["failures"] = R["thrown"] == [10000, False, 1] and R["s500"] == [10000, False]
     h = R["hidden"]
     out["hidden"] = (h["timers"] == 0 and h["calls"] == 0 and h["refresh"] == 0 and h["tick"] == [0, 0]
@@ -22775,14 +22820,14 @@ def _m42c_poll(src):
     out["sched2"] = (s2["c1"] == ["/api/servers/usage?id=a1", "/api/servers/usage?id=b2"] and s2["g1"] == 3000
                      and s2["c2"] == ["/api/servers/usage?id=a1"] and s2["g2"] == 3000)
     out["unpaired"] = R["unp"] == ["/api/servers/usage?id=a1"]
-    out["cap"] = R["cap"] == ["/api/servers/usage?id=x1", "/api/servers/usage?id=x2", "/api/servers/usage?id=x3"]
+    out["cap"] = R["cap"] == ["/api/servers/usage?id=x1", "/api/servers/usage?id=x2"]
     return all(out.values()), [out, err]
 
 
 def _m42c_text(src):
     """Nothing secret and no product name in the new code, the card's
     poll hooked to the chips' one place, and the style."""
-    a = src.index("const SRV_METER_MAX=3;")
+    a = src.index("const SRV_METER_MAX=2;")
     b = src.index("function pickServerModel(label){")
     seg = src[a:b]
     c = src.index("/* a paired server's graphics card, between this computer's bar")
@@ -22846,18 +22891,25 @@ _M42_MUT = [
      "const all=(list||[]).filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor]);"),
     ("polling a server not paired", "return (list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);",
      "return (list||[]).filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);"),
-    ("no dimming", "pct:off?null:busy,off:off};", "pct:busy,off:false};"),
+    ("no dimming", "pct:off?null:busy,off:off},", "pct:busy,off:false},"),
+    ("the memory row not dimmed", "pct:off||!have?null:Math.round(ru/rt*100),off:off}];", "pct:off||!have?null:Math.round(ru/rt*100),off:false}];"),
+    ("the memory bar not a share", "Math.round(ru/rt*100)", "Math.round(ru/rt)"),
+    ("memory in the wrong unit", "const srvGB=b=>String(Math.round(b/1073741824*10)/10);", "const srvGB=b=>String(Math.round(b/1000000000*10)/10);"),
+    ("the memory row named for the card", "name:srvMemName(s.name),", "name:srvMeterName(g),"),
+    ("an older kit's memory shown as a reading", ':u.ok?"usage not reported (update the server kit)":"",more];', ':"",more];'),
+    ("the memory reading not kept", "u.ram=d.ram||null;u.fails=0;", "u.ram=null;u.fails=0;"),
+    ("memory kept through a miss", "u.gpu=null;u.ram=null;u.fails++;", "u.gpu=null;u.fails++;"),
     ("no backing off", "return fails<=0?3000:fails===1?10000:30000;", "return 3000;"),
     ("a hidden window asked", "if(!o.ids.length||!o.page)return {poll:[],next:null};",
      "if(!o.ids.length)return {poll:[],next:null};"),
     ("a card out of sight asked", "if(!o.card)return {poll:[],next:3000};", "if(false)return {poll:[],next:3000};"),
     ("the hidden window's timer kept", "if(document.hidden){clearTimeout(srvUseT);srvUseT=0;}", "if(document.hidden){}"),
     ("woken while hidden", "if(!srvUseT&&keep.size&&!document.hidden&&!srvUseDead)", "if(!srvUseT&&keep.size&&!srvUseDead)"),
-    ("more than three rows", "return all.slice(0,SRV_METER_MAX).map((s,i)=>{", "return all.map((s,i)=>{"),
-    ("more than three servers read", "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);\n}",
+    ("more than two servers' rows", "const rows=all.slice(0,SRV_METER_MAX).map((s,i)=>{", "const rows=all.map((s,i)=>{"),
+    ("more than two servers read", "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);\n}",
      "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);\n}"),
-    ("no \"+N more\"", "if(i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX)t.push(", "if(false)t.push("),
-    ("an older kit shown as a reading", ':u.ok?"usage not reported (update the server kit)":""', ':""'),
+    ("no \"+N more\"", "const more=i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX?", "const more=false?"),
+    ("an older kit shown as a reading", ':u.ok?"usage not reported (update the server kit)":"");', ':"");'),
     ("a profile switch leaving the rows", "if(gone){srvUseDead=true;srvMetersSync();return;}", "if(gone){return;}"),
     ("the dead flag ignored when drawing", "const rows=srvUseDead?[]:srvMeterRows(srvList,srvUse);",
      "const rows=srvMeterRows(srvList,srvUse);"),
@@ -22873,6 +22925,8 @@ _M42_MUT = [
      "    if e is None:\n        return {\"ok\": False}\n    try:\n        if not cai_crypto.available():\n            return {\"ok\": False}\n        st, js = _srv_json(e, \"GET\", \"/v1/usage\""),
     ("the server's extra fields passed on", '    return {"busy_pct": num("busy_pct", 100),\n            "vram_used_bytes": num("vram_used_bytes", 1 << 50),\n            "vram_total_bytes": num("vram_total_bytes", 1 << 50)}',
      "    return g"),
+    ("memory above the total kept", 'and out["used_bytes"] > out["total_bytes"]:', "and False:"),
+    ("an older kit's memory not null", '"ram": None}      # an older server kit', '"ram": {}}      # an older server kit'),
     ("any 404 taken for an older kit", 'if st == 404 and str(js.get("code") or "") == "not_found":', "if st == 404:"),
     ("a long wait for a reading", "SRV_USAGE_S = 3 ", "SRV_USAGE_S = 60 "),
     ("the reading unsigned", 'st, js = _srv_json(e, "GET", "/v1/usage", timeout=SRV_USAGE_S)',

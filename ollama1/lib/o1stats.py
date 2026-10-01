@@ -142,6 +142,22 @@ def meminfo():
     return info
 
 
+def ram_usage(info=None):
+    """The server's memory in use, for the app's meter (GET /v1/usage):
+    {"used_bytes", "total_bytes"}, each an int or None. In use is what
+    Linux calls memory in use, MemTotal minus MemAvailable (not MemFree,
+    which counts the cache as used); a value that can't be read, or that
+    makes no sense, is None."""
+    info = meminfo() if info is None else info
+    total, avail = info.get("MemTotal"), info.get("MemAvailable")
+    out = {"used_bytes": None, "total_bytes": None}
+    if isinstance(total, int) and 0 < total < 1 << 50:
+        out["total_bytes"] = total
+        if isinstance(avail, int) and 0 <= avail <= total:
+            out["used_bytes"] = total - avail
+    return out
+
+
 def ollama_oom_kills(unit="ollama.service"):
     """How many times the kernel's OOM killer has struck inside Ollama's
     cgroup (its MemoryMax); None if that can't be read."""

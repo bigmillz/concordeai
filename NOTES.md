@@ -18,6 +18,11 @@ usage. Then in my case, Radeon 6900 XT and its usage, and then memory
 pressure. Hopefully this can adjust based on if the server is connected
 or not."
 
+FOLLOW-UP, same day, Pat: "add another memory pressure line … server
+memory … four bars total". With a server paired the card has four bars:
+this computer's chip, the server's card, the server's memory, this
+computer's memory pressure. The server's memory row is below.
+
 The card (6b254's instrument cluster) keeps its first row (this
 computer's chip and its GPU bar) and its last (memory pressure). Each
 PAIRED server whose gateway names a card (the same ones that get a chip
@@ -29,10 +34,14 @@ the same bar, `paintMeter`, same ease and same hot colour from 80%.
 - WHAT THE SERVER SAYS. New signed, paired-only `GET /v1/usage` on the
   gateway (`ollama1/bin/ollama1-gateway`, `Gateway.usage`, reading
   `o1gpu.usage`): `{"gpu": {"busy_pct", "vram_used_bytes",
-  "vram_total_bytes"}}`, each an int or null, and nothing else: which
+  "vram_total_bytes"}, "ram": {"used_bytes", "total_bytes"}}`, each an
+  int or null, and nothing else (`ram`: MemTotal minus MemAvailable from
+  /proc/meminfo, `o1stats.ram_usage`, so the file cache isn't "in use";
+  MemFree is not used; a used figure above the total is null; a kit from
+  before `ram` leaves it out and the app reads that as not reported): which
   models are loaded, who is using the card, prompts, device ids and
   request counts are not in it (the gateway builds the answer from those
-  three keys, whatever the reader returns). AMD: `gpu_busy_percent`,
+  keys, whatever the reader returns). AMD: `gpu_busy_percent`,
   `mem_info_vram_used` and `mem_info_vram_total`, the files the server's
   own dashboard (`o1stats.gpu`) reads; NVIDIA: `nvidia-smi
   --query-gpu=utilization.gpu,memory.used,memory.total`; Intel or no
@@ -67,8 +76,18 @@ the same bar, `paintMeter`, same ease and same hot colour from 80%.
   the card is on screen (`srvCardShown`: the narrow drawer shut is not)
   and the window is showing: every ~3 s per server, 10 s after one
   miss, then 30 s while it doesn't answer, back to 3 s when it does.
-  A hidden window clears the timer and sets none. Up to three servers get
-  a row, the third's title ending "+N more"; only those are polled. A
+  A hidden window clears the timer and sets none. Up to TWO servers get
+  rows (two each, so six bars at most and a card of 198.5 px; it was
+  three servers while there was one row each), the second's titles
+  ending "+N more"; only those are polled. MEMORY ROW: under each
+  server's card row, "DESK MEMORY" (the server's name, 17 characters then
+  an ellipsis, plus " MEMORY"), the same bar at used/total, its title
+  "Desk · memory · 22 of 62 GB in use" (the GPU row's value is the bar and
+  "37% busy" in its title; this one's is the GB); dimmed and "not
+  answering" with its card row; "usage not reported (update the server
+  kit)" and an empty bar when the gateway has no `ram` (an older kit) or
+  nulls. Same endpoint and same poll (`/api/servers/usage` returns `ram`
+  beside `gpu`): no extra request. A
   row's bar is kept between readings, so it eases rather than
   redrawing. A server that doesn't answer is dimmed (opacity .45, like
   the chips) with an empty bar and "not answering" in its title; an
@@ -83,12 +102,12 @@ the same bar, `paintMeter`, same ease and same hot colour from 80%.
   own profile's `srvList`.
 - LAYOUT (browser pane, Blink, 1320x860, the default window; the app's
   own WKWebView is not checked). The card is 76.5 px tall with no server,
-  107 with one, 137.5 with two, 168 with three: 30.5 px a row (the
+  137.5 with one and 198.5 with two (a third is not shown): 30.5 px a row, two rows a server (the
   name's line, its 7 px, the 2 px bar, the 7 px between rows). The
   padding is the same at every count: 10 px from the card's top to the
   chip row's line box and 13 px from the last bar to the bottom (the 9
   and 12 of the CSS plus the 1 px border), 13 px each side; the chat
-  list takes the difference (644, 613.5, 583, 552.5 px) and neither the
+  list takes the difference (644, 583, 522 px) and neither the
   sidebar nor the page scrolls at any count. With the servers gone it is
   76.5 again.
 - Gauntlet: new `== your server's graphics card in the sidebar meters
@@ -99,13 +118,15 @@ the same bar, `paintMeter`, same ease and same hot colour from 80%.
   document, clock and timers (steady 3 s; 10 s, 30 s, 30 s then 3 s; a
   thrown fetch; hidden; the card out of sight; a benchmark; a 409; no
   server; two servers on their own schedules; a fourth never read), and
-  twenty-six mutations each caught; live on the REAL gateway (a signed GET
+  thirty-five mutations each caught (client ones re-run alone after the
+  memory row); live on the REAL gateway (a signed GET
   and nothing to Ollama, nulls, an older kit's 404, a server that is
   off, a benchmark, bad ids, no key or token, another profile). The stub
   gateway's harness gained `/usage` on its control port. Kit: tests for the
   reader (AMD, NVIDIA, missing files, out-of-range values), the route (three
   fields only, signed, paired, the cache, nulls from a missing sysfs) and
-  six mutations. One full run on the branch: 635 of 640; the five misses
+  nine mutations (the memory reading: MemTotal minus MemAvailable and not
+  MemFree, nulls, used above total, served at all). One full run on the branch: 635 of 640; the five misses
   were two old node checks that slice the page between `SRV_GPU` and
   `paintSrvChips` (the new code sat in that span: moved after
   `paintEngMenuServers`), a served-page pin that matched the script's own

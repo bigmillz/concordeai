@@ -172,7 +172,7 @@ Ollama's own API shapes, minus anything that changes state on the desktop:
 |---|---|
 | `GET /v1/whoami` | `{"device_id", "name", "server_time"}`: a cheap "am I paired" check |
 | `GET /v1/info` | `{"gpu": {"vendor", "name", "vram_bytes"}}`, see below |
-| `GET /v1/usage` | `{"gpu": {"busy_pct", "vram_used_bytes", "vram_total_bytes"}}`, see below |
+| `GET /v1/usage` | `{"gpu": {"busy_pct", "vram_used_bytes", "vram_total_bytes"}, "ram": {"used_bytes", "total_bytes"}}`, see below |
 | `GET /api/tags` | Installed local models. Ollama cloud models are never listed. Each has `placement` and `gpu_pct` (below) |
 | `GET /api/ps` | Loaded models, with `size`, `size_vram`, `placement` and `gpu_pct` |
 | `GET /api/version` | `{"version"}` |
@@ -196,18 +196,24 @@ hardware. It is detected once, when the gateway starts:
 All three keys are always there. The signed request is the third entry in
 the test vectors below.
 
-`GET /v1/usage` says how busy that card is right now, for the app's meter:
+`GET /v1/usage` says how busy that card is right now, and how much of the
+server's memory is in use, for the app's meters:
 
 ```json
-{"gpu": {"busy_pct": 37, "vram_used_bytes": 9126805504, "vram_total_bytes": 17163091968}}
+{"gpu": {"busy_pct": 37, "vram_used_bytes": 9126805504, "vram_total_bytes": 17163091968},
+ "ram": {"used_bytes": 23622320128, "total_bytes": 66571993088}}
 ```
 
-- Exactly these three keys, always there. Each is an integer, or `null` when
+- Exactly these keys, always there. `ram` is the server's memory: `used_bytes`
+  is what Linux calls memory in use (`MemTotal` minus `MemAvailable` in
+  `/proc/meminfo`, so the file cache doesn't count), `total_bytes` is
+  `MemTotal`. A kit from before `ram` was added leaves it out: treat that as
+  "not reported". Each is an integer, or `null` when
   the server can't read it (the card has no such file, or there is no card):
   a missing reading is `null`, never an error and never a guess.
 - `busy_pct` is 0 to 100. On AMD it is the card's `gpu_busy_percent`; on
   NVIDIA, `nvidia-smi`'s utilization.
-- Nothing else is in the answer: not which models are loaded, not which
+- Nothing else is in the answer (five numbers): not which models are loaded, not which
   device is using the card, not what was asked, not how many requests there
   were. A paired device already sees the card's name and size.
 - Signed and paired-only, like every route here. The server reads the card

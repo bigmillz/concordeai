@@ -282,7 +282,8 @@ class TestSignatures(unittest.TestCase):
         """GET /v1/usage: the card's busy percent and VRAM, nothing else:
         no models, no device, no counts (the app's sidebar meter)."""
         mod, gw = G["mod"], G["gw"]
-        saved = (gw.gpu_info, gw.usage_at, mod.o1gpu.usage)
+        saved = (gw.gpu_info, gw.usage_at, mod.o1gpu.usage, gw.meminfo)
+        gw.meminfo = lambda: {"MemTotal": 62 << 30, "MemAvailable": 40 << 30, "MemFree": 1 << 30}
         gw.gpu_info = {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968}
         gw.usage_at = None
         mod.o1gpu.usage = lambda vendor: {"busy_pct": 37, "vram_used_bytes": 9126805504,
@@ -292,35 +293,40 @@ class TestSignatures(unittest.TestCase):
             st, data, _ = call("GET", "/v1/usage")
             self.assertEqual(st, 200)
             self.assertEqual(json.loads(data), {"gpu": {"busy_pct": 37, "vram_used_bytes": 9126805504,
-                                                         "vram_total_bytes": 17163091968}})
+                                                         "vram_total_bytes": 17163091968},
+                                                "ram": {"used_bytes": 22 << 30, "total_bytes": 62 << 30}})
+            self.assertEqual(sorted(json.loads(data)), ["gpu", "ram"])
             self.assertEqual(sorted(json.loads(data)["gpu"]), ["busy_pct", "vram_total_bytes", "vram_used_bytes"])
+            self.assertEqual(sorted(json.loads(data)["ram"]), ["total_bytes", "used_bytes"])
             self.assertEqual(call("GET", "/v1/usage", dev=False)[0], 401)         # signed only
             self.assertEqual(call("GET", "/v1/usage", dev=U.Device())[0], 403)    # paired only
             self.assertEqual(call("GET", "/v1/usage", jwt_token=None)[0], 403)    # through Access
         finally:
-            gw.gpu_info, gw.usage_at, mod.o1gpu.usage = saved
+            gw.gpu_info, gw.usage_at, mod.o1gpu.usage, gw.meminfo = saved
 
     def test_usage_read_at_most_once_a_second(self):
         mod, gw = G["mod"], G["gw"]
         calls = []
-        saved = (gw.gpu_info, gw.usage_at, mod.o1gpu.usage)
+        saved = (gw.gpu_info, gw.usage_at, mod.o1gpu.usage, gw.meminfo)
+        gw.meminfo = lambda: calls.append("ram") or {"MemTotal": 1 << 30, "MemAvailable": 1 << 29}
         gw.gpu_info = {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 1}
         gw.usage_at = None
         mod.o1gpu.usage = lambda vendor: (calls.append(vendor) or
                                           {"busy_pct": len(calls), "vram_used_bytes": None, "vram_total_bytes": None})
         try:
             got = [json.loads(call("GET", "/v1/usage")[1])["gpu"]["busy_pct"] for _ in range(5)]
-            self.assertEqual(calls, ["amd"])           # five polls, one reading
+            self.assertEqual(sorted(calls), ["amd", "ram"])   # five polls, one reading of each
             self.assertEqual(got, [1] * 5)
             gw.usage_at = time.monotonic() - mod.USAGE_CACHE_S - 0.1
-            self.assertEqual(json.loads(call("GET", "/v1/usage")[1])["gpu"]["busy_pct"], 2)
-            self.assertEqual(len(calls), 2)            # the next one after the second is up
+            self.assertEqual(json.loads(call("GET", "/v1/usage")[1])["gpu"]["busy_pct"], 3)   # the reading counted: amd, ram, amd
+            self.assertEqual(len(calls), 4)            # the next one after the second is up
         finally:
-            gw.gpu_info, gw.usage_at, mod.o1gpu.usage = saved
+            gw.gpu_info, gw.usage_at, mod.o1gpu.usage, gw.meminfo = saved
 
     def test_usage_with_nothing_readable_is_nulls_not_an_error(self):
         mod, gw = G["mod"], G["gw"]
-        saved = (gw.gpu_info, gw.usage_at)
+        saved = (gw.gpu_info, gw.usage_at, gw.meminfo)
+        gw.meminfo = lambda: {}                                    # no /proc/meminfo at all
         gw.gpu_info = {"vendor": "amd", "name": None, "vram_bytes": None}
         gw.usage_at = None
         real_sys = os.environ.get("OLLAMA1_SYS")
@@ -328,14 +334,15 @@ class TestSignatures(unittest.TestCase):
         try:
             st, data, _ = call("GET", "/v1/usage")
         finally:
-            gw.gpu_info, gw.usage_at = saved
+            gw.gpu_info, gw.usage_at, gw.meminfo = saved
             if real_sys is None:
                 os.environ.pop("OLLAMA1_SYS", None)
             else:
                 os.environ["OLLAMA1_SYS"] = real_sys
         self.assertEqual(st, 200)
         self.assertEqual(json.loads(data), {"gpu": {"busy_pct": None, "vram_used_bytes": None,
-                                                     "vram_total_bytes": None}})
+                                                     "vram_total_bytes": None},
+                                            "ram": {"used_bytes": None, "total_bytes": None}})
 
     def test_whoami(self):
         st, data, _ = call("GET", "/v1/whoami")

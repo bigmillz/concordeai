@@ -18161,9 +18161,25 @@ def _srv_usage_gpu(js) -> dict:
             "vram_total_bytes": num("vram_total_bytes", 1 << 50)}
 
 
+def _srv_usage_ram(js) -> dict:
+    """{used_bytes, total_bytes} of the server's memory from /v1/usage,
+    each an int or None; a used figure above the total is None (6b342)."""
+    r = js.get("ram") if isinstance(js, dict) else None
+    r = r if isinstance(r, dict) else {}
+
+    def num(k):
+        v = r.get(k)
+        return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 1 << 50 else None
+    out = {"used_bytes": num("used_bytes"), "total_bytes": num("total_bytes")}
+    if out["used_bytes"] is not None and out["total_bytes"] is not None \
+            and out["used_bytes"] > out["total_bytes"]:
+        out["used_bytes"] = None
+    return out
+
+
 def server_usage(ctx, sid: str) -> dict:
     """The sidebar meter's read of one paired server's card (6b342, per
-    Patrick: "put the GPU name in a middle row"): {ok, gpu}. ok False: the
+    Patrick: "put the GPU name in a middle row"): {ok, gpu, ram}. ok False: the
     server didn't answer (or isn't paired any more). ok with gpu None: it
     answered but its kit has no usage route yet (the name shows, the bar
     stays empty). One short signed GET; it loads nothing, says nothing in
@@ -18178,9 +18194,9 @@ def server_usage(ctx, sid: str) -> dict:
     except ServerError:
         return {"ok": False}
     if st == 200:
-        return {"ok": True, "gpu": _srv_usage_gpu(js)}
+        return {"ok": True, "gpu": _srv_usage_gpu(js), "ram": _srv_usage_ram(js)}
     if st == 404 and str(js.get("code") or "") == "not_found":
-        return {"ok": True, "gpu": None}        # an older server kit
+        return {"ok": True, "gpu": None, "ram": None}      # an older server kit
     return {"ok": False}
 # ==== servers: end ====
 
@@ -32882,7 +32898,7 @@ let lastModels="";  // line-up the backend actually used
 // a Remove clicked once, a Pair again opened
 let srvList=[],srvAt=0,srvLoaded=false;
 // the sidebar meters' server rows (6b342): each paired server's last read of its
-// card {ok, gpu, fails, due, busy}; a timer; and a flag a profile switch sets
+// card {ok, gpu, ram, fails, due, busy}; a timer; and a flag a profile switch sets
 const srvUse={};let srvUseT=0,srvUseDead=false;
 // a card's line and its open Access form survive a repaint (review)
 const srvArmed={},srvPairOpen={},srvMsgs={},srvTokOpen={};
@@ -38346,7 +38362,7 @@ function paintEngMenuServers(){
 // answer is dimmed with an empty bar; a gateway with no usage reading (an older
 // kit) shows the name and an empty bar. No server paired: nothing is drawn, and
 // nothing is asked. Pure functions below, so the gauntlet can run them in node.
-const SRV_METER_MAX=3;
+const SRV_METER_MAX=2;
 function srvMeterServers(list){
   return (list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);
 }
@@ -38355,9 +38371,15 @@ function srvMeterName(g){
   n=(n||SRV_GPU[g&&g.vendor]||"").toUpperCase();
   return n.length>26?n.slice(0,25)+"\u2026":n;
 }
+// "DESK MEMORY": the server's name, shortened, and what the row is
+function srvMemName(n){
+  n=String(n||"").replace(/\s+/g," ").trim().toUpperCase();
+  return (n.length>18?n.slice(0,17)+"\u2026":n)+" MEMORY";
+}
+const srvGB=b=>String(Math.round(b/1073741824*10)/10);
 function srvMeterRows(list,use){
   const all=(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);
-  return all.slice(0,SRV_METER_MAX).map((s,i)=>{
+  const rows=all.slice(0,SRV_METER_MAX).map((s,i)=>{
     const g=s.gpu,u=(use&&use[s.id])||{},st=s.status||{};
     // the poll's own answer wins over the last full check, which can be old
     const off=u.ok===false||(u.ok==null&&(st.reachable===false||!!st.err));
@@ -38366,10 +38388,19 @@ function srvMeterRows(list,use){
     const t=[s.name,g.name||"",vb?Math.round(vb/1073741824)+" GB":""];
     t.push(off?"not answering":busy!=null?busy+"% busy"
       :u.ok?"usage not reported (update the server kit)":"");
-    if(i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX)t.push("+"+(all.length-SRV_METER_MAX)+" more");
-    return {id:s.id,name:srvMeterName(g),title:t.filter(Boolean).join(" \u00b7 "),
-      pct:off?null:busy,off:off};
+    const more=i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX?"+"+(all.length-SRV_METER_MAX)+" more":"";
+    t.push(more);
+    // the server's memory, under its card: the same bar, from the same reading
+    const rg=u.ram||null,ru=rg&&typeof rg.used_bytes==="number"?rg.used_bytes:null,
+      rt=rg&&typeof rg.total_bytes==="number"&&rg.total_bytes>0?rg.total_bytes:null,have=ru!=null&&rt!=null;
+    const m=[s.name,"memory",off?"not answering":have?srvGB(ru)+" of "+srvGB(rt)+" GB in use"
+      :u.ok?"usage not reported (update the server kit)":"",more];
+    return [{id:s.id,name:srvMeterName(g),title:t.filter(Boolean).join(" \u00b7 "),
+      pct:off?null:busy,off:off},
+      {id:s.id+":m",name:srvMemName(s.name),title:m.filter(Boolean).join(" \u00b7 "),
+      pct:off||!have?null:Math.round(ru/rt*100),off:off}];
   });
+  return [].concat.apply([],rows);
 }
 // how long after a read the next one waits: 3 s while it answers, then 10 s,
 // then 30 s while it doesn't
@@ -38436,8 +38467,8 @@ async function srvUsagePoll(s){
   u.busy=false;
   if(gone){srvUseDead=true;srvMetersSync();return;}
   if(d&&d.paused){u.due=Date.now()+3000;return;}     // a benchmark is running
-  if(d&&d.ok){u.ok=true;u.gpu=d.gpu||null;u.fails=0;}
-  else{u.ok=false;u.gpu=null;u.fails++;}
+  if(d&&d.ok){u.ok=true;u.gpu=d.gpu||null;u.ram=d.ram||null;u.fails=0;}
+  else{u.ok=false;u.gpu=null;u.ram=null;u.fails++;}
   u.due=Date.now()+srvUseWait(u.fails);
 }
 async function srvUseTick(){

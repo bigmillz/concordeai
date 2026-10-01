@@ -153,5 +153,37 @@ class TestGpuUsage(GpuFixture):
                                                  "vram_total_bytes": 24564 << 20})
 
 
+class TestRamUsage(unittest.TestCase):
+    """o1stats.ram_usage(): the server's memory in use, for GET /v1/usage."""
+    def test_in_use_is_total_minus_available_not_free(self):
+        import o1stats
+        self.assertEqual(o1stats.ram_usage({"MemTotal": 62 << 30, "MemAvailable": 40 << 30, "MemFree": 1 << 30}),
+                         {"used_bytes": 22 << 30, "total_bytes": 62 << 30})
+
+    def test_missing_or_nonsense_is_null(self):
+        import o1stats
+        null = {"used_bytes": None, "total_bytes": None}
+        self.assertEqual(o1stats.ram_usage({}), null)
+        self.assertEqual(o1stats.ram_usage({"MemTotal": 0, "MemAvailable": 0}), null)
+        self.assertEqual(o1stats.ram_usage({"MemTotal": 1 << 60}), null)
+        self.assertEqual(o1stats.ram_usage({"MemTotal": 8 << 30}), {"used_bytes": None, "total_bytes": 8 << 30})
+        self.assertEqual(o1stats.ram_usage({"MemTotal": 8 << 30, "MemAvailable": 9 << 30}),
+                         {"used_bytes": None, "total_bytes": 8 << 30})
+
+    def test_reads_a_proc_fixture(self):
+        import tempfile
+        import o1stats
+        d = tempfile.mkdtemp(prefix="o1ram-")
+        os.makedirs(d + "/proc")
+        with open(d + "/proc/meminfo", "w") as f:
+            f.write("MemTotal: 1000 kB\nMemFree: 10 kB\nMemAvailable: 400 kB\n")
+        saved, o1stats.PROC = o1stats.PROC, d + "/proc"
+        try:
+            self.assertEqual(o1stats.ram_usage(), {"used_bytes": 600 * 1024, "total_bytes": 1000 * 1024})
+        finally:
+            o1stats.PROC = saved
+            shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()
