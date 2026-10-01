@@ -2043,7 +2043,8 @@ TextEncoder Uint8Array Int32Array crypto RegExp sessionStorage""".split())
 # api(); a bare one would be an undeclared name here as well
 # L is Leaflet, loaded from unpkg before any map mounts; the __X__ names
 # are placeholders the server fills in before the page is sent
-_PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__"}
+_PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
+               "__DICT_TRACE__"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
