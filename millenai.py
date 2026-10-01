@@ -33974,7 +33974,7 @@ function applyPrefs(){
 let messages=[], generating=false, abortCtl=null;
 // an Edit & resend pressed while an answer is being written (6b343): the answer
 // is stopped, and the edit opens once the stop has finished and saved
-let pendingEdit=null;
+let pendingEdit=null,genChat=null;  // genChat: the chat whose answer is being written
 // (M9) the single-model pick in browser storage is "This computer"'s: an
 // account's page neither reads nor writes it (prefs.json holds each
 // profile's own), so a later root boot can't adopt an account's pick
@@ -35744,7 +35744,8 @@ function editResend(text){
   // answer as Stop does, then open the edit when send() has finished saving
   // it, so the partial answer and the rewind land in order
   if(generating){
-    if(!abortCtl)return;
+    // another chat's answer streaming on quietly is not this edit's to stop (6b343 review)
+    if(!abortCtl||curChat!==genChat)return;
     pendingEdit=text;abortCtl.abort();return;
   }
   const i=messages.findIndex(m=>m.role==="user"&&m.content===text);
@@ -36007,7 +36008,7 @@ async function send(){
   }
   const turn={chat_id:myChat,lane:(chats.find(x=>x.id===myChat)||{}).lane||uiMode,
     after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};
-  generating=true; document.body.classList.add("gen");
+  generating=true; genChat=myChat; document.body.classList.add("gen");
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
   const aiDiv=addMsg("assistant",""); const body=aiDiv.querySelector(".body");
   aiDiv.classList.add("live");     // soft mask on the newest line
@@ -36306,7 +36307,7 @@ async function send(){
       body:JSON.stringify({text:stripTokens(full)})});
   }
   setToks(0,"idle");
-  generating=false;abortCtl=null;document.body.classList.remove("gen");
+  generating=false;abortCtl=null;genChat=null;document.body.classList.remove("gen");
   sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
   if(curChat===myChat)autoScroll();
   input.focus();
@@ -38561,7 +38562,7 @@ function audioSecs(bufs,sr){
    - the AudioContext and its processor are made once and kept (suspended
      when the mic is let go), the source is made once per stream;
    - the stream itself stays open MIC_WARM_S seconds after a dictation
-     (a setting, on by default), so the next hold starts at once. WARM
+     (a setting, OFF until the user turns it on), so the next hold starts at once. WARM
      MEANS OPEN, NOT LISTENING: the source is disconnected from the
      processor, micCap is false and the handler returns before it touches
      a sample, so nothing is kept or sent; the next start empties recBuf
@@ -38597,7 +38598,7 @@ function dictTrace(what){
         +(dictT.warm?"warm":"cold")})}).catch(()=>{});
 }
 function micWarmOn(){
-  try{return localStorage.getItem("millen.micwarm")!=="0";}catch(e){return true;}
+  try{return localStorage.getItem("millen.micwarm")==="1";}catch(e){return false;}
 }
 function micLive(){
   return !!(micStream&&micStream.getTracks().some(t=>t.readyState==="live"));
@@ -38785,7 +38786,7 @@ document.addEventListener("visibilitychange",()=>{if(document.hidden)dictAway();
 // (a profile change reloads it, and profileChanged lets go first)
 $("#newchat").addEventListener("click",micGone);
 addEventListener("pagehide",()=>micClose(true));
-// ...and is a setting, on by default: localStorage "millen.micwarm"
+// ...and is a setting, off until the user turns it on: localStorage "millen.micwarm"
 function setMicWarm(on){
   try{localStorage.setItem("millen.micwarm",on?"1":"0");}catch(e){}
   const t=$("#micwarm-toggle");if(t)t.classList.toggle("on",on);

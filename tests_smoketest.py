@@ -8243,22 +8243,31 @@ _er = page[page.index("function editResend(text){"):page.index("function addMsg(
 _sd = page[page.index("const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);"):][:700]
 _nc = page[page.index('$("#newchat").addEventListener("click",()=>{'):][:200]
 def _edit_ok(er, sd, nc, decl):
-    return ("let pendingEdit=null;" in decl
+    return ("let pendingEdit=null," in decl
             and "if(generating){" in er and "pendingEdit=text;abortCtl.abort();return;" in er
             and er.index("pendingEdit=text") < er.index("messages.splice(")
             and "if(pendingEdit!==null){" in sd and "const t=pendingEdit;pendingEdit=null;" in sd
             and "if(curChat===myChat&&!generating)editResend(t);" in sd
-            and "pendingEdit=null;" in nc)
+            and "pendingEdit=null;" in nc
+            and "if(!abortCtl||curChat!==genChat)return;" in er
+            and "let pendingEdit=null,genChat=null;" in decl)
+# an edit only stops the answer of the chat on screen: genChat is set when an answer starts and
+# cleared when it ends
+_gc_ok = lambda p: ("generating=true; genChat=myChat;" in p
+                    and "generating=false;abortCtl=null;genChat=null;" in p)
 _decl = page[page.index("let messages=[], generating=false, abortCtl=null;"):][:400]
 _edit_mut = {
     "silent return back": (_er.replace("pendingEdit=text;abortCtl.abort();return;", "return;"), _sd, _nc, _decl),
     "no stop": (_er.replace("pendingEdit=text;abortCtl.abort();return;", "pendingEdit=text;return;"), _sd, _nc, _decl),
     "never reopened": (_er, _sd.replace("editResend(t);", ""), _nc, _decl),
     "edit before the save": (_er, _sd.replace("const saved=await syncChat", "const saved=await syncChat"), _nc.replace("pendingEdit=null;", ""), _decl),
-    "not declared": (_er, _sd, _nc, _decl.replace("let pendingEdit=null;", "")),
+    "not declared": (_er, _sd, _nc, _decl.replace("let pendingEdit=null,", "let _x=null,")),
+    "another chat's answer stopped": (_er.replace("||curChat!==genChat", ""), _sd, _nc, _decl),
 }
 check("review: Edit & resend while an answer is being written stops it, waits for the save, then edits",
-      _edit_ok(_er, _sd, _nc, _decl) and not any(_edit_ok(*m) for m in _edit_mut.values()),
+      _edit_ok(_er, _sd, _nc, _decl) and not any(_edit_ok(*m) for m in _edit_mut.values())
+      and _gc_ok(page) and not _gc_ok(page.replace("genChat=myChat;", "", 1))
+      and not _gc_ok(page.replace("abortCtl=null;genChat=null;", "abortCtl=null;", 1)),
       "%r" % [k for k, m in _edit_mut.items() if _edit_ok(*m)])
 
 # Forget with unreadable settings refuses before it erases anything
@@ -21733,7 +21742,7 @@ const reset=()=>{
   dictKey({type:"end"},0);recording=false;dictPend=false;recBuf=[];recHeard=false;
   calls.length=0;gumLog.length=0;streams.length=0;timers.length=0;
   ctxMade=srcMade=resumes=suspends=0;gumImpl=null;resumeImpl=null;apiImpl=null;srcThrow=false;
-  localStorage.v={};voiceReady=true;voiceChat=false;sent=0;input.placeholder="";
+  localStorage.v={"millen.micwarm":"1"};voiceReady=true;voiceChat=false;sent=0;input.placeholder="";
   for(const k of Object.keys(dictT))delete dictT[k];
 };
 const delayedGum=()=>{let rel;gumImpl=()=>new Promise(r=>{rel=()=>r(mkStream());});return ()=>rel();};
@@ -21825,6 +21834,14 @@ await sec("blurstart",async()=>{
   dictAway();const kept=live(0)&&dictSt.mode==="toggle";
   relR();await p;
   o.blurstart=kept&&recording===true&&live(0);
+});
+// 10b. the warm microphone is OFF until the user turns it on (6b345 review): a first
+// dictation lets the microphone go at once
+await sec("warmdefault",async()=>{
+  reset();delete localStorage.v["millen.micwarm"];
+  const d=micWarmOn()===false;
+  await dictStart();feed(1);await stopRec();
+  o.warmdefault=d&&!live(0)&&micStream===null;
 });
 // 11. "listening" only once the first sound has arrived
 await sec(["listening","trace"],async()=>{
@@ -21920,7 +21937,7 @@ def _fs_run(js):
 
 _FS_BASE = _fs_run(_FS_GLUE)
 _FS_NAMES = ["order", "statusskip", "constraints", "ctxonce", "warmreuse", "warmtimer", "warmblur",
-             "warmnew", "warmpage", "warmoff", "warmslip", "leak", "nocut", "blurstart", "listening",
+             "warmnew", "warmpage", "warmoff", "warmdefault", "warmslip", "leak", "nocut", "blurstart", "listening",
              "trace", "s503", "gone", "gonepend", "notready", "nomic", "prompt", "buttonblur",
              "taptap", "slip", "shorthold"]
 _fs_ok = lambda *ns: all(_FS_BASE.get(n_) is True for n_ in ns)
@@ -21929,7 +21946,7 @@ check("dictation fast: the capture starts before the voice check answers; a cach
       _fs_ok("order", "statusskip", "constraints"), "%r" % _FS_BASE)
 check("dictation fast: the AudioContext is made once, and the microphone is let go after each "
       "dictation when it is not kept warm (node)",
-      _fs_ok("ctxonce", "warmoff", "warmslip"), "%r" % _FS_BASE)
+      _fs_ok("ctxonce", "warmoff", "warmslip", "warmdefault"), "%r" % _FS_BASE)
 check("dictation fast: the warm microphone is reused for 15 s, and closes on the timer, on blur, "
       "on a new chat and when the page leaves (node)",
       _fs_ok("warmreuse", "warmtimer", "warmblur", "warmnew", "warmpage"), "%r" % _FS_BASE)
@@ -21957,6 +21974,7 @@ _FS_MUT = [
     ("constraints", "noiseSuppression:false,", "noiseSuppression:true,"),
     ("ctxonce", "if(!micCtx){", "if(true){"),
     ("warmoff", "if(keep!==false&&micWarmOn()&&micLive()){", "if(keep!==false&&micLive()){"),
+    ("warmdefault", 'localStorage.getItem("millen.micwarm")==="1"', 'localStorage.getItem("millen.micwarm")!=="0"'),
     ("warmreuse", 'if(micLive()){dictTrace("gum");return Promise.resolve(micStream);}   // warm: at once', ""),
     ("warmreuse", "if(micTimer){clearTimeout(micTimer);micTimer=null;}\n  if(micLive()){",
      "if(micLive()){"),
@@ -22018,7 +22036,7 @@ def _fs_pins(src):
                   "  autoGainControl:false}};" in src
                   and "navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS)" in src)
     _p["warm"] = ("const MIC_WARM_S=15;" in src
-                  and 'localStorage.getItem("millen.micwarm")!=="0"' in src)
+                  and 'localStorage.getItem("millen.micwarm")==="1"' in src)
     _p["toggle"] = ('id="micwarm-toggle"' in src
                     and "<span>Keep the microphone ready for 15 seconds after dictating</span>" in src
                     and "The next hold starts at once. macOS shows its microphone indicator while it's ready." in src)

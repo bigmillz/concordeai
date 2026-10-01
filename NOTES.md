@@ -10,6 +10,12 @@ Current: repo `bigmillz/concordeai` — version and build live in
 ---
 
 ## 6b345 — dictation starts at once
+(Independent review, same build: the warm microphone defaulted ON and now
+defaults OFF; a blur while a start is in flight is NOT cancelled on purpose,
+because the macOS microphone permission prompt takes the focus and a
+cancel there would make first use impossible; the microphone is opened
+before the voice-engine check, so a machine without the engine sees one
+permission prompt and a brief indicator, then the mic is released.)
 Patrick (2026-10-01): "can we reduce the delay when I hold Command D to
 dictate? Because it takes about a, two seconds each time for it to
 switch on." Holding ⌘D, about two seconds passed before the page was
@@ -50,10 +56,11 @@ graph. Now:
   WebKit wants) and `suspend()`ed when the microphone is let go. The
   source node is made once per stream.
 - **The warm microphone** (Settings › About, "Keep the microphone ready
-  for 15 seconds after dictating", on by default, `millen.micwarm` in
-  localStorage). After a dictation the stream stays open `MIC_WARM_S =
+  for 15 seconds after dictating", OFF until the user turns it on
+  (independent review: an open microphone is not for us to switch on),
+  `millen.micwarm` = "1" in localStorage). After a dictation the stream stays open `MIC_WARM_S =
   15` s, so the next hold has no capture start at all.
-  DELIBERATE PRIVACY TRADE-OFF: while it waits the macOS microphone
+  PRIVACY TRADE-OFF, so it is opt-in: while it waits the macOS microphone
   indicator is on. The setting says so beside the switch. What it cannot
   do: the source is disconnected from the processor, `micCap` is false,
   and `micChunk` returns before touching a sample, so nothing is kept,
@@ -120,6 +127,13 @@ It was the request already running: `editResend` began with
   "Stop then ask" does.
 - A new chat drops a waiting edit; an edit is opened only if the same chat
   is still showing.
+Independent review found one gap, fixed: `generating` is global, so
+editing a question in chat B while chat A's answer streamed on quietly
+stopped A's answer and then dropped the edit (the same-chat test at the end
+saw a different chat). `genChat` now records the chat whose answer is being
+written; the edit only takes this path when it is the chat on screen, and
+otherwise does nothing. Known and left: editing a repeated question rewinds
+to its first occurrence (older behaviour).
 Checked in a real page (Blink) with the answer stubbed to stream slowly:
 Edit pressed with "word1 … word5" on screen left `generating` false, the
 question in the composer, the chat rewound to 0 and `chatTrunc` set. Not
