@@ -95,6 +95,37 @@ another:
   is a filter, not a promise. Bing's strict setting and a word list both
   miss things, and the DuckDuckGo leg is only as good as its own setting.
   The search only ever sees the goal and the label.
+- HARDENING (re-review of the above):
+  - FAIL CLOSED. A ddgs upgrade can cost the pictures, never the filter.
+    The strict Bing class refuses any request that doesn't carry
+    `adlt=strict` in its params (a ddgs that stops using `build_payload`
+    or sends the query another way gets no answer from Bing, not an
+    unfiltered one). `backend="duckduckgo"` only runs while
+    `ddgs.engines.ENGINES["images"]` still lists `duckduckgo`; if an
+    upgrade renames it ddgs would fall back to its automatic choice,
+    which includes stock Bing, so the leg is skipped (and an unreadable
+    ENGINES counts as not listed).
+  - THE SOURCE PAGE. Bing's page URL (and DuckDuckGo's) is vetted like the
+    picture's: the adult sites' hosts and the whole-word list over its
+    host, path and query. Hosts also find the words run together
+    ("hotnude", "freeporn", "best-xxx-pics") by substring, minus the
+    ambiguous ones (no "sex": Sussex and Essex are places; no "naked" or
+    "escort"; "nude" not before an "l", "porn" not before "ic": a noodle
+    shop, Pornic), plus a host label of exactly "sex", and the sites'
+    picture servers (phncdn, xhcdn, xhpingcdn, rdtcdn, ypncdn,
+    xvideos-cdn...). Paths, queries and titles stay whole-word.
+  - DECODING. Addresses are percent-decoded up to three times before
+    matching, so "n%2575de" is "nude". A fourth round isn't tried.
+    A page URL that won't parse is refused.
+  - "escort" left the word list: "Ford Escort" is a goal people have.
+  - THE REAL CLASS. One gauntlet check builds the strict subclass over the
+    INSTALLED ddgs `BingImages` (no network, `http_client.request`
+    stubbed) and asserts `build_payload("q", "us-en", "on", None)` carries
+    `adlt=strict`, a request without it is refused and a real `search`
+    sends it, with three mutations of the subclass caught. If ddgs can't
+    be imported in the test environment it prints a SKIPPED banner and
+    records nothing; the app's venv has it, so a skip means that run
+    didn't test what it should.
 - Privacy is as before: only the goal and the option's label go out, to
   the search the funnel already used. The page loads each picture
   straight from its https URL, as before, now with
@@ -111,7 +142,7 @@ another:
   the wiring, the safe-search engines and their settings, the word and
   host lists (with the examples above), no search for an adult label
   (counted on a stubbed search), the two-search cap with a slow stub, and
-  54 mutations, each caught. Live: the route refuses without the launch
+  69 mutations, each caught. Live: the route refuses without the launch
   key or the token, and answers an adult label with no search.
 - Left as it is: relevance is only as good as the search. An abstract
   label ("Academic Hub") can still get a loosely related photo, a blog

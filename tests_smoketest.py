@@ -18995,6 +18995,8 @@ def _fi_ns(src, images=None, has=True, calls=None, bing=None):
         safe.append(("bing", "strict"))
         return (bing or images or (lambda q: []))(q)
     ns["_fimg_bing"] = _b
+    ns["_real_ddg_ok"] = ns["_fimg_ddg_ok"]
+    ns["_fimg_ddg_ok"] = lambda: True
     return ns, calls
 
 
@@ -19039,7 +19041,26 @@ def _fic_filter(src):
         "adult word in the title": _fi_row("https://x.com/a/p.jpg", t="Sexy summer sale"),
         "adult word in the host": _fi_row("https://cdn.xxx-pics.net/a/p.jpg"),
         "adult site": _fi_row("https://www.pornhub.com/a/p.jpg"),
-        "adult site, no adult word": _fi_row("https://cdn.xvideos.com/a/p.jpg")})
+        "adult site, no adult word": _fi_row("https://cdn.xvideos.com/a/p.jpg"),
+        # the page it was found on (Bing's purl), checked as the picture is
+        "adult page host": dict(_fi_row("https://x.com/a/p.jpg"), url="https://www.pornhub.com/view"),
+        "adult page path": dict(_fi_row("https://x.com/a/p.jpg"), url="https://site.example/nude-gallery/3"),
+        "adult page query": dict(_fi_row("https://x.com/a/p.jpg"), url="https://site.example/s?q=lingerie"),
+        # words run together in a host
+        "compound host: hotnude": _fi_row("https://hotnude.net/a/p.jpg"),
+        "compound host: freeporn": _fi_row("https://freeporn.example/a/p.jpg"),
+        "compound host: xxx": _fi_row("https://best-xxx-pics.example/a/p.jpg"),
+        "host label: sex": _fi_row("https://free-sex.example/a/p.jpg"),
+        # the sites' picture servers
+        "picture server: phncdn": _fi_row("https://ei.phncdn.com/a/p.jpg"),
+        "picture server: xvideos-cdn": _fi_row("https://img.xvideos-cdn.com/a/p.jpg"),
+        "picture server: xhcdn": _fi_row("https://static-hw.xhcdn.com/a/p.jpg"),
+        "picture server: erome": _fi_row("https://s1.erome.com/a/p.jpg"),
+        # percent-encoded twice, and three times
+        "double-encoded word": _fi_row("https://x.com/a/n%2575de-beach.jpg"),
+        "triple-encoded word": _fi_row("https://x.com/a/n%252575de-beach.jpg"),
+        "encoded query": _fi_row("https://x.com/a/p.jpg?q=sex%2579"),
+        "unparsable page": dict(_fi_row("https://x.com/a/p.jpg"), url="https://[bad/")})
     good = {"photo": _fi_row("https://x.com/wp-content/uploads/2024/05/old-town.jpg"),
             "iconic": _fi_row("https://x.com/a/iconic-skyline.jpg"),
             # words inside longer words are places and things, not furniture
@@ -19052,6 +19073,13 @@ def _fic_filter(src):
             "silicon title": _fi_row("https://x.com/a/p.jpg", t="Silicon Valley at dusk"),
             "sussex": _fi_row("https://sussex.ac.uk/essex/sussex-coast.jpg", t="Sussex beaches"),
             "adult education": _fi_row("https://x.com/adult-education.jpg"),
+            # a host that only contains a word, or a place, or a car
+            "noodle shop": _fi_row("https://nudelhaus.de/a/p.jpg"),
+            "French town": _fi_row("https://pornic.fr/a/p.jpg"),
+            "Jerome": _fi_row("https://jerome.org/a/p.jpg"),
+            "Essex page": dict(_fi_row("https://x.com/a/p.jpg"), url="https://essex.gov.uk/visit"),
+            "clean page": dict(_fi_row("https://x.com/a/p.jpg"), url="https://travel.example/prague/old-town?utm=1"),
+            "Ford Escort": _fi_row("https://x.com/ford-escort-rally.jpg", t="Ford Escort rally car"),
             "unknown size": {"image": "https://x.com/a/harbour.webp"},
             "loads": _fi_row("https://x.com/downloads/roads/old-town.jpg")}
     r_bad = {k: ok_(v) for k, v in bad.items()}
@@ -19183,6 +19211,98 @@ def _fic_safe(src):
     return ok, [rows, made, got3, seen, got4, got5]
 
 
+def _fic_closed(src):
+    """A ddgs upgrade can cost the pictures, never the filter: the
+    DuckDuckGo leg only while ddgs lists that engine under that name, and
+    a Bing request that doesn't carry adlt=strict is never sent."""
+    import types as _ty
+    keep = {k: sys.modules.get(k) for k in ("ddgs", "ddgs.engines", "ddgs.engines.bing_images")}
+
+    class _Bad:
+        def get(self, *a):
+            raise RuntimeError("ENGINES changed")
+    seen = {}
+    try:
+        ns, _c = _fi_ns(src)
+        for name, eng in (("listed", {"images": {"duckduckgo": 1, "bing": 1}}),
+                          ("renamed", {"images": {"ddg": 1, "bing": 1}}),
+                          ("gone", {"images": {"bing": 1}}), ("no images", {}), ("none", None),
+                          ("raises", _Bad()), ("missing", "MISSING")):
+            for k in ("ddgs", "ddgs.engines"):
+                sys.modules[k] = _ty.ModuleType(k)
+            if eng != "MISSING":
+                sys.modules["ddgs.engines"].ENGINES = eng
+            seen[name] = ns["_real_ddg_ok"]()
+        # a Bing whose requests never carry the setting is never asked
+        sent = []
+
+        class _B1:
+            def __init__(self, proxy=None, timeout=None):
+                pass
+
+            def build_payload(self, query, region="us-en", safesearch="on", timelimit=None, page=1, **kw):
+                return {"q": query}
+
+            def request(self, *a, **k):
+                sent.append(k)
+                return "<html></html>"
+
+        class _Row:
+            image, title, width, height, url = "https://x.com/a.jpg", "t", "900", "600", "https://x.com"
+
+        class _NoPayload(_B1):       # forgot build_payload
+            def search(self, query, **kw):
+                return [_Row()] if self.request("GET", "u", params={"q": query}) else []
+
+        class _Data(_B1):            # sends the query another way
+            def search(self, query, **kw):
+                return [_Row()] if self.request("POST", "u", data={"q": query, "adlt": "strict"}) else []
+
+        class _Good(_B1):
+            def search(self, query, **kw):
+                return [_Row()] if self.request(
+                    "GET", "u", params=self.build_payload(query, "us-en", "on", None)) else []
+        out = {}
+        for nm, cls in (("no payload", _NoPayload), ("data", _Data), ("good", _Good)):
+            sent.clear()
+            for k in keep:
+                sys.modules[k] = _ty.ModuleType(k)
+            sys.modules["ddgs.engines.bing_images"].BingImages = cls
+            ns2 = {"re": re, "time": time, "threading": _t340, "urllib": urllib, "profile_cache": lambda n, o: o,
+                   "IS_WIN": False, "HAS_SEARCH": True, "_RESULTS_TTL": 300.0, "_search_proxy": lambda: None}
+            exec(src[src.index("# ==== funnel images: begin ===="):src.index("# ==== funnel images: end ====")], ns2)
+            out[nm] = (len(ns2["_fimg_bing"]("q", 10)), [dict(k).get("params") for k in sent])
+    finally:
+        for k, v in keep.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+    # the DuckDuckGo leg is skipped when the gate says no
+    got = []
+
+    class _D2:
+        def __init__(self, proxy=None):
+            pass
+
+        def images(self, q, **kw):
+            got.append(kw)
+            return [_fi_row("https://d.com/a.jpg")]
+    ns3, _c3 = _fi_ns(src)
+    ns3["DDGS"] = _D2
+    ns3["_fimg_bing"] = lambda q, n, proxy=None: []
+    ns3["_fimg_ddg_ok"] = lambda: False
+    skipped = ns3["_ddg_images"]("q")
+    ns3["_fimg_ddg_ok"] = lambda: True
+    asked = ns3["_ddg_images"]("q")
+    ok = (seen == {"listed": True, "renamed": False, "gone": False, "no images": False, "none": False,
+                   "raises": False, "missing": False}
+          and out["no payload"] == (0, []) and out["data"] == (0, [])
+          and out["good"][0] == 1 and out["good"][1] and out["good"][1][0].get("adlt") == "strict"
+          and skipped == [] and len(got) == 1 and asked)
+    return ok, [seen, out, skipped, got]
+
+
 def _fic_adult(src):
     """An adult word in the goal or the option: no search at all (asserted
     with the search stubbed to count its calls), the stage marks the card
@@ -19191,14 +19311,15 @@ def _fic_adult(src):
     blocked = [ns["_fimg_blocked"](g, l) for g, l in (
         ("which city", "Lingerie district"), ("sexy swimwear", "Beach"),
         ("which city", "NSFW nights"), ("where to eat", "Sussex pubs"),
-        ("which city", "Old Town"), ("Essex weekend", "Harbour"))]
+        ("which city", "Old Town"), ("Essex weekend", "Harbour"),
+        ("a classic car", "Ford Escort"))]
     got = ns["funnel_images"]("which city", ["Lingerie district", "Old Town"])
     got2 = ns["funnel_images"]("sexy swimwear", ["Beach", "Pool"])
     n_after_blocked = [c for c in calls if "ingerie" in c[1] or c[1].startswith(("Beach", "Pool"))]
     one = ns["funnel_image"]("which city", "Naked mole rats")
     st = src[src.index("def funnel_stage("):src.index("# ==== funnel images: begin ====")]
     rt = src[src.index('        if self.path == "/api/funnel/image":'):src.index('        if self.path == "/api/funnel":')]
-    ok = (blocked == [True, True, True, False, False, False]
+    ok = (blocked == [True, True, True, False, False, False, False]
           and got[0] == "" and got[1] and got2 == ["", ""] and n_after_blocked == []
           and one == "" and calls == [("img", "Old Town city")]
           and '                o["img_none"] = True' in st
@@ -19458,7 +19579,9 @@ def _fic_node(src):
     return ok, o
 
 
-_FI_CHECKS = [("funnel pictures: an adult word in the goal or the option means no search and no asking",
+_FI_CHECKS = [("funnel pictures: fails closed: DuckDuckGo only while ddgs lists it under that name, "
+               "Bing never without adlt=strict in the request", _fic_closed),
+              ("funnel pictures: an adult word in the goal or the option means no search and no asking",
                _fic_adult),
               ("funnel pictures: at most two picture searches at once, and a turn isn't waited for "
                "past the budget", _fic_cap),
@@ -19542,9 +19665,11 @@ _FI_MUT = [
      '    r"(?:logos?|icons?|ico|favicons?|sprites?|avatars?|badges?|"'),
     ("word ends gone", '    r"promotions?|coupons?|ads?)(?![a-z])", re.I)', '    r"promotions?|coupons?|ads?)", re.I)'),
     ("a title's word boundaries gone", '    r"(?<![a-z])(?:logos?|icons?|banners?|clip ?art|vectors?|"', '    r"(?:logos?|icons?|banners?|clip ?art|vectors?|"'),
-    ("adult words let through in the address", '            or _FIMG_ADULT.search(host + " " + title + " " + path + " "\n                                  + urllib.parse.unquote(p.query))):',
-     '            ):'),
-    ("adult sites let through", "            or _FIMG_ADULT_HOST.search(host)\n", ""),
+    ("adult words let through in the address", "            or _fimg_adult_url(img)\n", ""),
+    ("adult words let through in the title", "            or _FIMG_ADULT.search(title)):", "            ):"),
+    ("adult words let through in the path", "                or _FIMG_ADULT.search(text))", "                or False)"),
+    ("adult sites let through", "    return bool(_FIMG_ADULT_HOST.search(host)\n                or _FIMG_ADULT_HOSTWORD", "    return bool(False\n                or _FIMG_ADULT_HOSTWORD"),
+    ("a host that is the word not found", "                or _FIMG_ADULT_LABEL.search(host)\n", ""),
     ("adult words not whole words", '    r"(?<![a-z0-9])(?:nudes?|nudity|', '    r"(?:nudes?|nudity|'),
     ("an adult label searched anyway", "or not str(label).strip() or _fimg_blocked(goal, label):", "or not str(label).strip():"),
     ("an adult label asked again by the page", '                o["img_none"] = True       # the page doesn\'t ask again\n', "                pass\n"),
@@ -19560,6 +19685,18 @@ _FI_MUT = [
      '      again(el);'),
     ("two options taking half the row", ".fopts.pics.n2{max-width:489px}", ".fopts.pics.n2{max-width:none}"),
     ("two options not marked", "(nop===4?' n4':nop===2?' n2':'')", "(nop===4?' n4':'')"),
+    ("the source page not checked", '            or _fimg_adult_url(row.get("url"))      # the page it was on\n', ""),
+    ("compound hosts not found", "                or _FIMG_ADULT_HOSTWORD.search(host)\n", ""),
+    ("compound words matched in noodles", "r\"nude(?!l)|porn(?!ic)|xxx|", "r\"nude|porn|xxx|"),
+    ("compound words matched in a town", "r\"nude(?!l)|porn(?!ic)|xxx|", "r\"nude(?!l)|porn|xxx|"),
+    ("a picture server not known", "fansly|phncdn|xhcdn|", "fansly|"),
+    ("one round of decoding", "    for _ in range(3):\n        u = urllib.parse.unquote(s)", "    for _ in range(1):\n        u = urllib.parse.unquote(s)"),
+    ("an unparsable page let through", "    except ValueError:\n        return True\n", "    except ValueError:\n        return False\n"),
+    ("escort back in the list", "r\"sexy?|sexual|lingerie|topless|fetish|hentai|onlyfans)\"", "r\"sexy?|sexual|lingerie|topless|fetish|hentai|escorts?|onlyfans)\""),
+    ("DuckDuckGo asked without the gate", "    if not _fimg_ddg_ok():\n        return []\n", ""),
+    ("the gate not looking for the engine", 'return "duckduckgo" in (de.ENGINES.get("images") or {})', "return True"),
+    ("the gate failing open", "    except Exception:\n        return False\n\n\ndef _ddg_images", "    except Exception:\n        return True\n\n\ndef _ddg_images"),
+    ("Bing sent without its setting", '            if (k.get("params") or {}).get("adlt") != "strict":\n                return None\n', ""),
     ("the stage's pictures not excluded", "            exclude:onStage()})", "            exclude:[]})"),
     ("retries outliving the stage", "  const live=el=>gen===fnImgGen&&fnState===st&&el.isConnected;",
      "  const live=el=>el.isConnected;"),
@@ -19571,6 +19708,64 @@ _FI_MUT = [
     ("pictures sought for the stock stage", "  const pics=!!fnState.images&&!/fallback$/.test(d.engine||\"\"),",
      "  const pics=!!fnState.images,"),
 ]
+# THE REAL CLASS (hardening of 6b340): the strict subclass over the INSTALLED
+# ddgs Bing images engine, no network. A ddgs release that breaks it (a
+# renamed method, a payload that no longer goes through build_payload)
+# fails here. If ddgs can't be imported at all this prints SKIPPED and
+# records nothing: the venv the gauntlet runs on has it, so a skip means
+# the run is not testing what it should.
+def _fic_real(src):
+    import types as _ty
+    from ddgs.engines.bing_images import BingImages as _Real
+    ns, _c = _fi_ns(src)
+    cls = ns["_fimg_strict_class"]()
+    eng = cls(timeout=5)
+    payload = eng.build_payload("q", "us-en", "on", None)
+    sent = []
+    eng.http_client.request = lambda *a, **k: sent.append((a, k)) or _ty.SimpleNamespace(
+        status_code=200, text="<html></html>")
+    refused = eng.request("GET", "https://www.bing.com/images/async", params={"q": "q"})
+    n_refused = len(sent)
+    eng.search("q", safesearch="on", max_results=5)
+    ok = (cls.__mro__[1] is _Real and payload.get("adlt") == "strict" and payload.get("q") == "q"
+          and refused is None and n_refused == 0 and len(sent) == 1
+          and sent[0][1].get("params", {}).get("adlt") == "strict")
+    return ok, [payload, refused, n_refused, [k for _a, k in sent]]
+
+
+try:
+    import ddgs.engines.bing_images as _ddg_bi340
+    _have_ddgs340 = True
+except Exception as _e340:
+    _have_ddgs340, _why340 = False, repr(_e340)
+if not _have_ddgs340:
+    print("  ####################################################################")
+    print("  SKIPPED  funnel pictures: the REAL strict Bing class was NOT checked:")
+    print("  SKIPPED  ddgs can't be imported here (%s). It is in the app's venv." % (_why340,))
+    print("  ####################################################################")
+else:
+    try:
+        _ok340, _d340 = _fic_real(_MILLENAI_SRC)
+    except Exception as _x340:
+        _ok340, _d340 = False, "raised %r" % (_x340,)
+    check("funnel pictures: the REAL strict Bing class (over the installed ddgs): build_payload gives "
+          "adlt=strict, a request without it is refused, a search sends it", _ok340, "%r" % (_d340,))
+    _RMUT = [("the strict setting dropped", '            p["adlt"] = "strict"\n', ""),
+             ("a request without it let through", '            if (k.get("params") or {}).get("adlt") != "strict":\n                return None\n', ""),
+             ("the wrong setting", '            p["adlt"] = "strict"\n', '            p["adlt"] = "moderate"\n')]
+    _rm340 = []
+    for _dd, _oo, _nn in _RMUT:
+        if _MILLENAI_SRC.count(_oo) != 1:
+            _rm340.append((_dd, "anchor missing"))
+            continue
+        try:
+            _r = _fic_real(_MILLENAI_SRC.replace(_oo, _nn, 1))[0]
+        except Exception:
+            _r = False
+        _rm340.append((_dd, "caught" if not _r else "MISSED"))
+    check("funnel pictures: the real-class check catches %d mutations of the subclass" % len(_RMUT),
+          all(v == "caught" for _d, v in _rm340), "%r" % _rm340)
+
 _fim = []
 for _d340, _o340, _n340 in _FI_MUT:
     if _MILLENAI_SRC.count(_o340) != 1:

@@ -22105,7 +22105,11 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
 # was down) is gone too. A second guard is ours (_FIMG_ADULT): a short
 # list of plain words and known hosts refused in a picture's address,
 # title and host, and no search at all when the goal or the option names
-# one. A filter can miss, so this is a limit, not a promise.
+# one. A filter can miss, so this is a limit, not a promise. And it
+# fails closed: a Bing request that doesn't carry adlt=strict is never
+# sent, and the DuckDuckGo leg is skipped unless ddgs still lists that
+# engine under that name (a rename would let ddgs's automatic choice
+# reach stock Bing); a ddgs upgrade can cost the pictures, not the filter.
 _FIMG_BUDGET = 9.0                     # the whole stage's pictures, in s
 _FIMG_MIN = (400, 240)                 # smaller is a thumbnail or an icon
 # page furniture, adverts, drawings, charts and screenshots, by the
@@ -22129,12 +22133,21 @@ _FIMG_BAD_TITLE = re.compile(
 # ("Sussex" and "Essex" are places), and the sites that are only that
 _FIMG_ADULT = re.compile(
     r"(?<![a-z0-9])(?:nudes?|nudity|naked|nsfw|porn\w*|xxx|erotic\w*|"
-    r"sexy?|sexual|lingerie|topless|fetish|hentai|escorts?|onlyfans)"
+    r"sexy?|sexual|lingerie|topless|fetish|hentai|onlyfans)"
     r"(?![a-z0-9])", re.I)
+# in a HOST the words run together ("hotnude", "freeporn"), so they are
+# found inside it; not "sex" (Sussex, Essex), "naked" (a juice) or
+# "escort" (a Ford), and not "nudel" or "pornic" (a noodle shop, a town)
+_FIMG_ADULT_HOSTWORD = re.compile(
+    r"nude(?!l)|porn(?!ic)|xxx|hentai|erotic|nsfw|fetish|lingerie|"
+    r"topless|onlyfans|sexy", re.I)
+# a host label that is the word itself ("sex.com", "free-sex.example")
+_FIMG_ADULT_LABEL = re.compile(r"(?:^|[.-])sex(?:[.-]|$)", re.I)
+# the sites that are only that, and their picture servers
 _FIMG_ADULT_HOST = re.compile(
-    r"(^|\.)(?:pornhub|xvideos|xnxx|xhamster|redtube|youporn|spankbang|"
-    r"eporner|chaturbate|stripchat|bongacams|livejasmin|fansly|erome|"
-    r"rule34|e621)\.", re.I)
+    r"pornhub|xvideos|xnxx|xhamster|redtube|youporn|spankbang|eporner|"
+    r"chaturbate|stripchat|bongacams|livejasmin|fansly|phncdn|xhcdn|"
+    r"xhpingcdn|rdtcdn|ypncdn|(?:^|\.)(?:erome|e621|rule34)\.", re.I)
 # words of a goal that say nothing about what a picture shows
 _FIMG_STOP = frozenset(
     "a an and are best buy can choose do does for get good how i in is it "
@@ -22167,21 +22180,53 @@ def _fimg_keys(url: str) -> set:
     return keys
 
 
+def _fimg_unq(s) -> str:
+    """Percent-decoded up to three times ("n%2575de" is "nude" after two),
+    lower-cased."""
+    s = str(s)
+    for _ in range(3):
+        u = urllib.parse.unquote(s)
+        if u == s:
+            break
+        s = u
+    return s.lower()
+
+
+def _fimg_adult_url(url) -> bool:
+    """True when a URL's host, path or query names something adult. A
+    URL that won't parse counts as one."""
+    if not url:
+        return False
+    try:
+        p = urllib.parse.urlsplit(str(url))
+        host = (p.hostname or "").lower()
+        text = _fimg_unq(p.path) + " " + _fimg_unq(p.query)
+    except ValueError:
+        return True
+    return bool(_FIMG_ADULT_HOST.search(host)
+                or _FIMG_ADULT_HOSTWORD.search(host)
+                or _FIMG_ADULT_LABEL.search(host)
+                or _FIMG_ADULT.search(text))
+
+
 def _fimg_ok(row) -> str:
     """The row's picture URL when it can be a card's photo, else ""."""
     img = str(row.get("image") or "").strip()
     if not img.startswith("https://") or len(img) > 400:
         return ""        # https only (6b310), and nothing absurd
-    p = urllib.parse.urlsplit(img)
-    path = urllib.parse.unquote(p.path).lower()
+    try:
+        p = urllib.parse.urlsplit(img)
+    except ValueError:
+        return ""
+    path = _fimg_unq(p.path)
     host, title = p.hostname or "", str(row.get("title") or "")
     if (re.search(r"\.(svg|gif|ico|bmp)$", path)
             or _FIMG_BAD_HOST.search(host)
             or _FIMG_BAD.search(path)
             or _FIMG_BAD_TITLE.search(title)
-            or _FIMG_ADULT_HOST.search(host)
-            or _FIMG_ADULT.search(host + " " + title + " " + path + " "
-                                  + urllib.parse.unquote(p.query))):
+            or _fimg_adult_url(img)
+            or _fimg_adult_url(row.get("url"))      # the page it was on
+            or _FIMG_ADULT.search(title)):
         return ""
     try:
         w, h = int(row.get("width") or 0), int(row.get("height") or 0)
@@ -22230,9 +22275,11 @@ def _fimg_queries(goal: str, label: str) -> list:
     return out
 
 
-def _fimg_bing(query: str, limit: int, proxy=None) -> list:
-    """Bing's image search with its adult filter at strict: ddgs's
-    engine class, asked for adlt=strict in the request it builds."""
+def _fimg_strict_class():
+    """ddgs's Bing images engine, asked for adlt=strict in the request it
+    builds, and made to refuse any request that doesn't carry it (a ddgs
+    that stops using build_payload, or sends the query another way, gets
+    no answer from Bing rather than an unfiltered one)."""
     from ddgs.engines.bing_images import BingImages
 
     class _Strict(BingImages):
@@ -22240,10 +22287,31 @@ def _fimg_bing(query: str, limit: int, proxy=None) -> list:
             p = super().build_payload(*a, **k)
             p["adlt"] = "strict"
             return p
-    rows = _Strict(proxy=proxy, timeout=8).search(
+
+        def request(self, *a, **k):
+            if (k.get("params") or {}).get("adlt") != "strict":
+                return None
+            return super().request(*a, **k)
+    return _Strict
+
+
+def _fimg_bing(query: str, limit: int, proxy=None) -> list:
+    """Bing's image search with its adult filter at strict."""
+    rows = _fimg_strict_class()(proxy=proxy, timeout=8).search(
         query, safesearch="on", max_results=limit) or []
     return [{k: getattr(r, k, "") for k in
              ("image", "title", "width", "height", "url")} for r in rows]
+
+
+def _fimg_ddg_ok() -> bool:
+    """True only while ddgs still lists its DuckDuckGo images engine under
+    that name. If an upgrade renames it, backend="duckduckgo" would fall
+    back to ddgs's automatic choice, which includes Bing unfiltered."""
+    try:
+        import ddgs.engines as de
+        return "duckduckgo" in (de.ENGINES.get("images") or {})
+    except Exception:
+        return False
 
 
 def _ddg_images(query: str, limit: int = 25) -> list:
@@ -22256,6 +22324,8 @@ def _ddg_images(query: str, limit: int = 25) -> list:
             return rows
     except Exception:
         pass
+    if not _fimg_ddg_ok():
+        return []
     try:
         return (DDGS(proxy=proxy) if proxy else DDGS()).images(
             query, max_results=limit, backend="duckduckgo",
