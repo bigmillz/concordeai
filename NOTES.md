@@ -155,7 +155,12 @@ own name for the server, "Cloud models", "This computer"), `card` (a
 server's line), `cost_warning` (the cloud run's confirmation, true); rows add
 `provider`, `model`, `network`, `placement`, `total_s`. A row without
 `target` (every row before this build) reads as this computer's. Never
-stored: a key, an Access token, the device key, an address. **Retention** is
+stored: a key, an Access token, the device key, an address. And a stored run is
+cleaned again on every read (`_bench_clean_run`: only the fields this build
+writes, every text scrubbed, an address or login taken out, a row that isn't a
+row dropped), so a file from another build or edited by hand can't put a key
+or a URL in the pane or in Compare; Compare reads a run with no models, no
+time, no hardware or an unknown target as blanks, not an error. **Retention** is
 `BENCH_KEEP` (100) for each target (each server by its name, the cloud, this
 computer), so a cloud run never pushes out a server's or this computer's
 history; the pane says so ("Keeps the last 100 runs for each target…").
@@ -205,8 +210,8 @@ node for compare. Live: the real gateway on its stub Ollama (the figures,
 signed calls, a chat refused, Stop, the server off, profile B), and a copy
 with the stub provider (the routes behind the confirmation, one call each at
 256 tokens, cloud.json untouched, a chat refused, Stop, profile B, no key in
-any reply, log or file but cloud.json). 59 mutations of the new code each caught by the check that guards it (the 6b331 and 6b334 mutations still run).
-Gauntlet: 654 checks (25 of them new). Three full runs gave 653/654: the one miss each time was "emit stops a stream once its profile isn't the active one" (a real Llama 3.2 3B answer that hadn't started streaming when the profile switched); the same test on a copy of this branch and of origin/main alone, six times in all, answered and passed in 13-14 s, so it is load, not the benchmark.
+any reply, log or file but cloud.json). 64 mutations of the new code each caught by the check that guards it (the 6b331 and 6b334 mutations still run).
+Gauntlet: 655 checks, 26 of them new. Four full runs before the last review fix gave 653/654 each time, the one miss a load-timing check: the profile-switch stream test three times (a real Llama 3.2 3B answer not yet streaming when the profile switched; the same test alone on this branch and on origin/main passed in 13-14 s, 4 of 4 and 3 of 3 once the machine was quiet), and once instead the 6b331 live Stop test (3.08 s against its 3 s limit). The review fix (clean on read, sparse Compare) was checked by the 15 new in-process and node checks and the 17 in-process 6b331 checks, not by a full run.
 
 **Not verified.** The pane in WKWebView (looked at in Blink only). A real
 cloud provider (the gauntlet's stand-in speaks the shapes the app already

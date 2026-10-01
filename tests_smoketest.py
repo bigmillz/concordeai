@@ -23626,6 +23626,13 @@ async function api(p){return {ok:true,json:async()=>({servers:[bmTD.servers[0]],
 function loadBench(){}
 for(const k of Object.keys(bmTick.srv))delete bmTick.srv[k];
 for(const k of Object.keys(bmTick.cloud))delete bmTick.cloud[k];
+// old or damaged runs: no models, a model list that isn't one, a row that is null, no time, no hardware, a target nobody knows
+const sparse=[{id:"x",test:"b1"},{id:"y",t:5,test:"b1",models:[{status:"done"},null,{status:"done",label:"A",gen_tps:"abc",ttft_s:"x"}]},
+  {id:"z",test:"b1",target:"weird",target_name:"Elsewhere",hw:null,versions:5,models:"no"},null,5,"s"];
+try{const sc=bmCompare(sparse);out.sparse={ok:true,rows:sc.rows.map(r=>[r.name,r.where,r.gen]),html:bmCmpHtml(sc),
+  lines:sparse.filter(Boolean).filter(x=>typeof x==="object").map(x=>bmRunLine(x)),
+  wh:[bmWhere({},null),bmWhere({target:"weird",target_name:"Elsewhere"},null),bmWhere({target:"weird"},null)],
+  list:bmRunsHtml(sparse.filter(x=>x&&typeof x==="object"))};}catch(e){out.sparse={ok:false,err:String(e)};}
 (async()=>{await loadBenchTargets("");
   out.defaults={srv:bmTick.srv,cloud:bmTick.cloud};
   console.log(JSON.stringify(out));})();
@@ -23692,9 +23699,62 @@ for(const k of Object.keys(bmTick.cloud))delete bmTick.cloud[k];
         and o["srvDown"][2] == 1 and "Down didn\u2019t answer." in o["srvDown"][1],
         "this computer runs as before, a vanished server runs nothing": o["localReady"] is True
         and o["localPick"] == {"target": "local"} and o["gone"] is None,
+        "old or damaged runs compare without throwing: missing fields read as blanks, an unknown target is named": o["sparse"]["ok"] is True
+        and o["sparse"]["rows"] == [["?", "This computer", None], ["A", "This computer", "abc"]]
+        and "NaN" not in o["sparse"]["html"] and "undefined" not in o["sparse"]["html"]
+        and "undefined" not in o["sparse"]["list"] and "NaN" not in o["sparse"]["list"]
+        and o["sparse"]["wh"] == ["This computer", "Elsewhere", "Other"] and len(o["sparse"]["lines"]) == 3,
         "a server's models start ticked as it says, the cloud's never": o["defaults"]["srv"] == {
             "s1": {"small:8b": True, "big:70b": False, "odd:3b": False}} and o["defaults"]["cloud"] == {}}
     return _b41_done(P, [o["rowMac"], o["rows"], g, o["cloudReady"], o["defaults"]])
+
+
+def _b41_hard(src):
+    """A stored run that carries more than this build writes (a file from
+    another build, or edited by hand: a key, a token, an address with a
+    login, a header, a row that isn't a row) shows none of it to the pane
+    or to Compare, in either file; damaged lines are skipped."""
+    W = _b41_world(src)
+    try:
+        ns, ctx, d = W.ns, W.ctx, W.d
+        key = _B41_KEYS["groq"]
+        url = "https://user:pw@secret.example.com:8443/x"
+
+        def bad(i, target):
+            r = {"v": 1, "id": "t%d" % i, "t": 100.0 + i, "test": "b1", "state": "done", "target": target,
+                 "target_name": "Desk", "card": "Card \u00b7 16 GB", "cost_warning": False,
+                 "url": url, "api_key": key, "token": "TOKEN-XYZ", "access_secret": "ACCESS-XYZ",
+                 "hw": {"line": "Card \u00b7 16 GB", "url": url, "seed": "SEED-XYZ", "gpus": [["Card", 5]]},
+                 "versions": {"ollama": "0.1", "key": key}, "note": "failed at " + url + " with " + key,
+                 "models": [{"label": "Desk \u00b7 m", "status": "done", "gen_tps": 1.0, "note": "see " + url,
+                             "api_key": key, "headers": {"Authorization": "Bearer ABCDEFGH12345"}}, "junk", 5, None]}
+            return json.dumps(r) + "\n"
+        junk = ['{"id":"nomodels","t":1,"target":"server"}\n', '{"id":"badt","t":"x","models":[],"target":"cloud"}\n',
+                'not json\n', '[1,2]\n', '{"id":"badm","t":2,"models":"no","target":"server"}\n']
+        with open(os.path.join(d, "bench_targets.jsonl"), "w", encoding="ascii") as f:
+            f.write(bad(1, "server") + "".join(junk) + bad(2, "cloud"))
+        with open(os.path.join(d, "benchmarks.jsonl"), "w", encoding="ascii") as f:
+            f.write(bad(3, "local").replace('"target": "local", ', "") + "".join(junk))
+        st = ns["bench_status"](ctx)
+        raw = json.dumps(st)
+        runs = {r["id"]: r for r in st["history"]}
+        secrets_ = [key, "TOKEN-XYZ", "ACCESS-XYZ", "SEED-XYZ", "secret.example.com", "user:pw", "ABCDEFGH12345",
+                    "Authorization", "api_key", "access_secret"]
+        hits = [s for s in secrets_ if s in raw]
+        allowed = set(ns["_BENCH_RUN_KEYS"])
+        P = {
+            "the damaged lines are skipped, the good ones read": sorted(runs) == ["t1", "t2", "t3"],
+            "no key, token, login, address or header reaches the pane": not hits,
+            "only the fields this build writes": all(set(r) <= allowed for r in runs.values())
+            and all(set(r["hw"]) <= set(ns["_BENCH_HW_KEYS"]) and set(r["versions"]) <= set(ns["_BENCH_VER_KEYS"])
+                    for r in runs.values()),
+            "a row that isn't a row is dropped, a note's address is taken out": [len(r["models"]) for r in runs.values()] == [1, 1, 1]
+            and "(address)" in runs["t1"]["note"] and "(address)" in runs["t1"]["models"][0]["note"],
+            "the target's name and card stay": runs["t1"]["target_name"] == "Desk" and runs["t1"]["card"] == "Card \u00b7 16 GB",
+            "an old row without a target is this computer's": runs["t3"]["target"] == "local"}
+        return _b41_done(P, [hits, sorted(runs)])
+    finally:
+        W.stop()
 
 
 def _b41_pins(src):
@@ -23765,6 +23825,8 @@ def _b41_pins(src):
 
 
 _B41_CHECKS += [
+    ("benchmark: a stored run with more in it than this build writes (a key, a token, an address with a login, a header, "
+     "a row that isn't a row) shows none of it to the pane or to Compare, in either file; damaged lines are skipped", _b41_hard),
     ("benchmark compare (node): same test only, where each ran and on what, the hardware warning, a model on several "
      "targets side by side with N× faster, the network flagged, a figure not given shown as - or not measured; the pane's "
      "lists and Run's rules", _b41_node),
@@ -23776,9 +23838,9 @@ _B41_CHECKS += [
 # fails the check named (by position in _B41_CHECKS) that guards it
 _B41_MUT = [
     # the cost dialog and the confirmation (4)
-    ("a cloud run without the box ticked", '    if spec.get("understood") is not True:', '    if False:', [4, 13]),
+    ("a cloud run without the box ticked", '    if spec.get("understood") is not True:', '    if False:', [4, 14]),
     ("a confirmation not spent by its run", 'and _bench_confirms.pop(plan["confirm"], None) is None:',
-     'and _bench_confirms.get(plan["confirm"], None) is None:', [4, 13]),
+     'and _bench_confirms.get(plan["confirm"], None) is None:', [4, 14]),
     ("another profile's confirmation accepted", "            or rec.get(\"tag\") != ctx.tag):", "            or False):", [4]),
     ("a confirmation that never expires", "    if (not isinstance(rec, dict) or time.time() - rec[\"t\"] > BENCH_CONFIRM_S",
      "    if (not isinstance(rec, dict) or False", [4]),
@@ -23808,7 +23870,7 @@ _B41_MUT = [
     ("a failed server row runs on this computer", "    if plan[\"target\"] == \"server\":\n        return _BenchServer(plan[\"e\"], row[\"model\"], seen)",
      "    if plan[\"target\"] == \"server\":\n        return _bench_engine(row[\"label\"])", [0, 1]),
     ("a failed cloud call rests the provider", "                conn.close()\n                raise RuntimeError(self._why(resp.status, raw))",
-     "                conn.close()\n                cloud_glitch(self.c, \"x\")\n                raise RuntimeError(self._why(resp.status, raw))", [6, 13]),
+     "                conn.close()\n                cloud_glitch(self.c, \"x\")\n                raise RuntimeError(self._why(resp.status, raw))", [6, 14]),
     ("the provider's words in a failure", "        return \"the provider refused the request (HTTP %d)\" % status", "        return body[:160]", [6]),
     # secrets (8)
     ("key-shaped text not taken out", "    v = _BENCH_KEYLIKE.sub(\"***\", v)\n", "", [8]),
@@ -23844,28 +23906,35 @@ _B41_MUT = [
     ("a cloud call not at temperature 0", "                body[\"temperature\"] = 0     # where the app's body sends one", "                pass", [5]),
     ("cards that don't fit ticked", "                       \"tick\": fit,", "                       \"tick\": True,", [11]),
     # the pane's script, in node (12) and its pins (13)
-    ("runs of another test compared", "const use=runs.filter(x=>x.test===out.test);", "const use=runs;", [12]),
-    ("no warning for different hardware", "if(sets.size>1)out.warn=", "if(false)out.warn=", [12]),
-    ("a cloud row not flagged on the page", "net:!!r.network||run.target===\"cloud\",cloud:run.target===\"cloud\"", "net:!!r.network,cloud:false", [12]),
-    ("a provider's prefix kept in a model's key", "n=n.slice(n.lastIndexOf(\"/\")+1).toLowerCase()", "n=n.toLowerCase()", [12]),
-    ("a model alone shown as a pair", "if(new Set(g.map(r=>r.where)).size<2)return;", "if(false)return;", [12]),
-    ("faster than itself", "{x:slow&&!r.est&&r.gen>0?r.gen/slow.gen:null,isSlow:!!slow&&r===slow}", "{x:r.gen/1,isSlow:false}", [12]),
-    ("Run on more than six cloud models", "p.models.length>0&&p.models.length<=(cloudMax||6)", "p.models.length>0", [12]),
-    ("a server's models all ticked", "if(!(m.name in t))t[m.name]=!!m.tick;", "if(!(m.name in t))t[m.name]=true;", [12, 13]),
-    ("the cloud's models ticked", "const bmTick={srv:{},cloud:{}};", "const bmTick={srv:{},cloud:{\"groq/m0\":true}};", [12]),
+    ("runs of another test compared", "const use=runs.filter(x=>x.test===out.test);", "const use=runs;", [13]),
+    ("no warning for different hardware", "if(sets.size>1)out.warn=", "if(false)out.warn=", [13]),
+    ("a cloud row not flagged on the page", "net:!!r.network||run.target===\"cloud\",cloud:run.target===\"cloud\"", "net:!!r.network,cloud:false", [13]),
+    ("a provider's prefix kept in a model's key", "n=n.slice(n.lastIndexOf(\"/\")+1).toLowerCase()", "n=n.toLowerCase()", [13]),
+    ("a model alone shown as a pair", "if(new Set(g.map(r=>r.where)).size<2)return;", "if(false)return;", [13]),
+    ("faster than itself", "{x:slow&&!r.est&&r.gen>0?r.gen/slow.gen:null,isSlow:!!slow&&r===slow}", "{x:r.gen/1,isSlow:false}", [13]),
+    ("Run on more than six cloud models", "p.models.length>0&&p.models.length<=(cloudMax||6)", "p.models.length>0", [13]),
+    ("a server's models all ticked", "if(!(m.name in t))t[m.name]=!!m.tick;", "if(!(m.name in t))t[m.name]=true;", [13, 14]),
+    ("the cloud's models ticked", "const bmTick={srv:{},cloud:{}};", "const bmTick={srv:{},cloud:{\"groq/m0\":true}};", [13]),
     ("a server that can't be reached run", "if(p.target===\"server\"){const s=bmSrv();return !!(s&&s.reachable&&p.models.length);}",
-     "if(p.target===\"server\"){const s=bmSrv();return !!(s&&p.models.length);}", [12]),
-    ("a figure not given shown as dashes for a server", "return v!=null&&isFinite(+v)?fmt(v):r.cloud?\"-\":r.net?\"not measured\":\"—\";", "return v!=null&&isFinite(+v)?fmt(v):\"-\";", [12]),
-    ("Run on the cloud without the dialog", "if(p.target===\"cloud\"){go.disabled=true;await bmCloudAsk(p);go.disabled=false;return;}", "", [13]),
-    ("the box not reset for each run", "$(\"#bmc-ok\").checked=false;$(\"#bmc-go\").disabled=true;", "", [13]),
-    ("the confirm button not waiting for the box", "if(!bmPlan||!$(\"#bmc-ok\").checked)return;", "if(!bmPlan)return;", [13]),
-    ("a confirmation remembered", "const bmTick={srv:{},cloud:{}};", "const bmTick={srv:{},cloud:{}};try{localStorage.setItem(\"bmok\",\"1\");}catch(e){}", [13]),
-    ("a server-only chat not held", "            self._bench_srv_held = True\n", "            pass\n", [13]),
+     "if(p.target===\"server\"){const s=bmSrv();return !!(s&&p.models.length);}", [13]),
+    ("a figure not given shown as dashes for a server", "return v!=null&&isFinite(+v)?fmt(v):r.cloud?\"-\":r.net?\"not measured\":\"—\";", "return v!=null&&isFinite(+v)?fmt(v):\"-\";", [13]),
+    ("Run on the cloud without the dialog", "if(p.target===\"cloud\"){go.disabled=true;await bmCloudAsk(p);go.disabled=false;return;}", "", [14]),
+    ("the box not reset for each run", "$(\"#bmc-ok\").checked=false;$(\"#bmc-go\").disabled=true;", "", [14]),
+    ("the confirm button not waiting for the box", "if(!bmPlan||!$(\"#bmc-ok\").checked)return;", "if(!bmPlan)return;", [14]),
+    ("a confirmation remembered", "const bmTick={srv:{},cloud:{}};", "const bmTick={srv:{},cloud:{}};try{localStorage.setItem(\"bmok\",\"1\");}catch(e){}", [14]),
+    ("a server-only chat not held", "            self._bench_srv_held = True\n", "            pass\n", [14]),
     ("the chat's server hold never released", "            if self._bench_srv_held:\n                self._bench_srv_held = False\n                bench_release_remote()\n",
-     "            if self._bench_srv_held:\n                self._bench_srv_held = False\n", [13]),
-    ("the profile's file not personal", "\"remote_known_hosts\", \"bench_targets.jsonl\", \"images\"", "\"remote_known_hosts\", \"images\"", [13]),
-    ("a provider rested by a benchmark call", "    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", "    cloud_glitch({}, '')\n    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", [13]),
+     "            if self._bench_srv_held:\n                self._bench_srv_held = False\n", [14]),
+    ("the profile's file not personal", "\"remote_known_hosts\", \"bench_targets.jsonl\", \"images\"", "\"remote_known_hosts\", \"images\"", [14]),
+    ("a provider rested by a benchmark call", "    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", "    cloud_glitch({}, '')\n    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", [14]),
     ("the passage changed", "\"Using only the passage above, explain step by step how a tide mill \"", "\"Using only the passage above, explain how a tide mill \"", [13]),
+    # stored runs from other builds, hand-edited or damaged (12, 13)
+    ("a stored run shown as it is", "            runs.append(_bench_clean_run(r))", "            runs.append(r)", [12]),
+    ("an address left in a note", "    v = _BENCH_URL.sub(\"(address)\", v)\n", "", [12]),
+    ("a row that isn't a row kept", "                     for row in r.get(\"models\") or [] if isinstance(row, dict)]",
+     "                     for row in r.get(\"models\") or []]", [12]),
+    ("a damaged row breaks Compare", "if(!r||r.status!==\"done\")return;", "if(r.status!==\"done\")return;", [13]),
+    ("a missing time shown as NaN", "function bmWhen(t){return t!=null&&isFinite(+t)?uWhen(t):\"\";}", "function bmWhen(t){return uWhen(t);}", [13]),
 ]
 
 

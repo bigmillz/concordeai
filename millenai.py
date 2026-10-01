@@ -19493,6 +19493,7 @@ def _bench_scrub(v, keys=()):
         if isinstance(k, str) and len(k) >= 8:
             v = v.replace(k, "***")
     v = _BENCH_KEYLIKE.sub("***", v)
+    v = _BENCH_URL.sub("(address)", v)
     home = os.path.expanduser("~").rstrip("/\\")
     if len(home) > 1:
         v = re.sub(re.escape(home), "~", v,
@@ -19655,6 +19656,7 @@ def bench_history(limit=BENCH_SHOW) -> list:
                 and isinstance(r.get("t"), (int, float)):
             # (6b341) a run from before servers and the cloud had no
             # target: it is this computer's
+            r = _bench_clean_run(r)
             r["target"] = "local"
             r.setdefault("target_name", "This computer")
             runs.append(r)
@@ -19746,6 +19748,41 @@ _bench_confirms = profile_cache("_bench_confirms", {})
 _BENCH_KEYLIKE = re.compile(
     r"(?<![A-Za-z0-9])(?:sk-ant-|sk-|AIza|gsk_)[A-Za-z0-9_\-]{12,}"
     r"|Bearer\s+[A-Za-z0-9._\-]{8,}", re.I)
+
+
+# an address (with a login, if it has one): a run keeps names, never where a server is
+_BENCH_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"'<>]+")
+_BENCH_RUN_KEYS = ("v", "id", "t", "end", "test", "state", "target",
+                   "target_name", "card", "cost_warning", "hw", "app",
+                   "versions", "restore", "note", "models")
+_BENCH_HW_KEYS = ("line", "cpu", "mem", "gpus", "gpu_cores", "server")
+_BENCH_VER_KEYS = ("mlx_lm", "ollama")
+
+
+def _bench_deep(v):
+    """v with every text in it scrubbed (lists of lists included)."""
+    if isinstance(v, str):
+        return _bench_scrub(v)
+    if isinstance(v, list):
+        return [_bench_deep(x) for x in v[:8]]
+    return v if isinstance(v, (int, float, bool)) or v is None else None
+
+
+def _bench_clean_run(r: dict) -> dict:
+    """A stored run as the page may see it (6b341): only the fields this
+    build writes, every text scrubbed again, a row that isn't a row
+    dropped. A file from another build, or one edited by hand, can't carry
+    a key, a token or an address to the pane or to Compare."""
+    out = {k: _bench_deep(r[k]) if isinstance(r[k], (str, list)) else r[k]
+           for k in _BENCH_RUN_KEYS if k in r
+           and k not in ("hw", "versions", "models")}
+    for k, allowed in (("hw", _BENCH_HW_KEYS), ("versions", _BENCH_VER_KEYS)):
+        d = r.get(k)
+        out[k] = ({a: _bench_deep(d[a]) for a in allowed if a in d}
+                  if isinstance(d, dict) else {})
+    out["models"] = [{k: _bench_scrub(row[k]) for k in BENCH_FIELDS if k in row}
+                     for row in r.get("models") or [] if isinstance(row, dict)]
+    return out
 
 
 class _BenchRefuse(Exception):
@@ -20462,7 +20499,7 @@ def bench_targets_history(ctx, per_key=None) -> list:
         if (isinstance(r, dict) and isinstance(r.get("models"), list)
                 and isinstance(r.get("t"), (int, float))
                 and r.get("target") in ("server", "cloud")):
-            runs.append(r)
+            runs.append(_bench_clean_run(r))
     runs.sort(key=lambda r: -r["t"])
     if per_key:
         n, keep = {}, []
@@ -39880,7 +39917,10 @@ function bmKey(name){
   return n.replace(/[^a-z0-9]/g,"");}
 // where a row ran: this computer, a server by the person's own name, a provider
 function bmWhere(run,r){
-  return run.target==="cloud"?(r&&r.provider)||"Cloud":run.target==="server"?(run.target_name||"Server"):"This computer";}
+  return run.target==="cloud"?(r&&r.provider)||"Cloud":run.target==="server"?(run.target_name||"Server")
+    :(!run.target||run.target==="local")?"This computer":(run.target_name||"Other");}
+// a time that may be missing in an old or damaged file
+function bmWhen(t){return t!=null&&isFinite(+t)?uWhen(t):"";}
 // the hardware a run was measured on, as the pane says it
 function bmHw(run){
   return run.target==="cloud"?"cloud, includes the network":(run.hw&&run.hw.line)||"";}
@@ -39889,15 +39929,15 @@ function bmSetup(run,r){
   return [run.target||"local",bmWhere(run,r),(run.hw&&run.hw.line)||"",bmVer(run.versions)].join("|");}
 function bmCompare(runs){
   const out={test:"",left:0,rows:[],groups:[],warn:"",max:{}};
-  runs=(runs||[]).filter(Boolean);
+  runs=(runs||[]).filter(x=>x&&typeof x==="object");
   if(!runs.length)return out;
   out.test=runs[0].test;
   const use=runs.filter(x=>x.test===out.test);
   out.left=runs.length-use.length;       // another test's runs don't compare
   const sets=new Set();
-  use.forEach(run=>(run.models||[]).forEach(r=>{
-    if(r.status!=="done")return;
-    const nm=r.model||r.label,row={run:run.id,t:run.t,target:run.target||"local",
+  use.forEach(run=>(Array.isArray(run.models)?run.models:[]).forEach(r=>{
+    if(!r||r.status!=="done")return;
+    const nm=r.model||r.label||"?",row={run:run.id,t:run.t,target:run.target||"local",
       where:bmWhere(run,r),hw:bmHw(run),setup:bmSetup(run,r),name:nm,key:bmKey(nm),
       net:!!r.network||run.target==="cloud",cloud:run.target==="cloud",est:bmEst(r),
       gen:r.gen_tps,prompt:r.prompt_tps,ttft:r.ttft_s,load:r.load_s,total:r.total_s};
@@ -39930,7 +39970,7 @@ function bmCmpHtml(c){
   if(c.warn)h+='<p class="bmv-w">'+esc(c.warn)+"</p>";
   h+='<table class="bmv-t"><thead><tr><th>Model</th><th>Ran on</th><th class="n">Writes</th><th class="n">Reads</th><th class="n">First token</th><th class="n">Load</th></tr></thead><tbody>';
   c.rows.forEach(r=>{
-    h+="<tr><td>"+esc(r.name)+'<div class="bm-s">'+esc(uWhen(r.t))+(r.est?" · estimated":"")+"</div></td><td>"+esc(r.where)
+    h+="<tr><td>"+esc(r.name)+'<div class="bm-s">'+esc(bmWhen(r.t))+(r.est?" · estimated":"")+"</div></td><td>"+esc(r.where)
       +'<div class="bm-s">'+esc(r.hw)+(r.net&&!r.cloud?" · first token includes the network":"")+"</div></td>"
       +'<td class="n">'+bmCell(r,r.gen,bmGen)+'</td><td class="n">'+bmCell(r,r.prompt,v=>bmTps(v))
       +'</td><td class="n">'+bmCell(r,r.ttft,v=>bmS(v))+'</td><td class="n">'+bmCell(r,r.load,v=>bmS(v,1))+"</td></tr>";});
@@ -40005,8 +40045,8 @@ function bmPickHtml(){
   return h;}
 // the saved runs one line each, for Compare
 function bmRunLine(x){
-  const n=(x.models||[]).filter(r=>r.status==="done").length;
-  return uWhen(x.t)+" · "+(x.target==="cloud"?"cloud":x.target==="server"?(x.target_name||"server"):"this computer")
+  const n=(Array.isArray(x.models)?x.models:[]).filter(r=>r&&r.status==="done").length;
+  return bmWhen(x.t)+" · "+(x.target==="cloud"?"cloud":x.target==="server"?(x.target_name||"server"):"this computer")
     +" · "+n+(n===1?" model":" models");}
 function bmRunsHtml(runs){
   const first=runs.find(x=>bmSel[x.id]);
