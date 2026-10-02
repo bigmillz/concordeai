@@ -41747,7 +41747,7 @@ function bmRow(r,cur,old,max,ow){
     else if(old&&!bmEst(old)&&old.gen_tps>0&&r.gen_tps>0){
       const p=(r.gen_tps-old.gen_tps)/old.gen_tps*100;
       top+='<span class="bm-d'+(p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":"")+'" title="'
-        +esc("Was "+bmGen(old.gen_tps)+" tok/s"+(ow?" on "+ow:""))+'">'+(p<0?"−":"+")
+        +esc("Was "+bmGen(old.gen_tps)+" tok/s"+(ow?" on "+ow:''))+'">'+(p<0?"−":"+")
         +Math.abs(p).toFixed(1)+"%</span>";}
   }
   let sub="",mem="";

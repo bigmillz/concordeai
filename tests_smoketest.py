@@ -8771,7 +8771,7 @@ def _xc_ok(src):
 _xc_mut = [_MILLENAI_SRC.replace("||(nm(r)&&rows.find(o=>nm(o)===nm(r)))", "", 1),
            _MILLENAI_SRC.replace("x.test===shown.test);", "x.test===shown.test&&x.t<shown.t&&(x.target||\"local\")===(shown.target||\"local\"));", 1),
            _MILLENAI_SRC.replace("(nm(r)&&rows.find(o=>nm(o)===nm(r)))", "rows.find(o=>nm(o)===nm(r))", 1),
-           _MILLENAI_SRC.replace('(ow?" on "+ow:"")', '""', 1)]
+           _MILLENAI_SRC.replace("(ow?\" on \"+ow:'')", '""', 1)]
 check("benchmark compare: any other run of the same test is offered, a model is matched across this computer, "
       "a server and the cloud, and the figure says where it ran (node)",
       _xc_ok(_MILLENAI_SRC) and all(m_ != _MILLENAI_SRC for m_ in _xc_mut) and not any(_xc_ok(m_) for m_ in _xc_mut),
@@ -17420,7 +17420,7 @@ _BM_MUT = [
     ("the engines' versions not kept", '                "versions": run.get("versions") or {},\n', ""),
     ("a cut model not marked estimated", "    if(bmEst(r))top+=", "    if(false)top+="),
     ("noise shown as a change", 'p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":""', 'p>=.05?" up":p<=-.05?" dn":""'),
-    ("rows compared by name alone", "o.label===r.label\n  &&o.engine===r.engine&&o.src===r.src&&", "o.label===r.label\n  &&"),
+    ("rows compared by name alone", "rows.find(o=>o.label===r.label&&o.engine===r.engine&&o.src===r.src)", "rows.find(o=>o.label===r.label)"),
     ("the composer cleared during a run", "  if(benchOn||generating)return;\n", ""),
     ("the attachments lost on a refusal", "          pendingImages=sentImages;pendingDocs=sentDocs;paintChips();}", "          }"),
     ("the rail's memory in decimal GB", '"mem_total_gb": round(vm.total / 2 ** 30, 1),', '"mem_total_gb": round(vm.total / 1e9, 1),'),
