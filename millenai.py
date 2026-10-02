@@ -40877,6 +40877,13 @@ function bmRunsHtml(runs){
     return '<label class="bm-ck bmv-r"'+(off?' title="A different test"':"")+'><input type="checkbox" data-run="'+esc(x.id)+'"'
       +(bmSel[x.id]?" checked":"")+(off?" disabled":"")+'><span class="bm-n">'+esc(bmRunLine(x))+"</span>"
       +'<span class="bm-e">'+esc(x.test||"")+"</span></label>";}).join("");}
+// the run the pane opens on is the newest one of the target chosen above (6b351, per Patrick: "the results for
+// both the server and the local machine are coming back identical": the pane showed this computer's last run
+// under a server that had never been run). A run picked from the list stays until the target changes.
+function bmOnTarget(x,tg,sv){
+  return tg==="cloud"?x.target==="cloud":sv?x.target==="server"&&(x.target_name||"")===(sv.name||"")
+    :(!x.target||x.target==="local");}
+function bmPickShow(runs,tg,sv){const r=(runs||[]).find(x=>bmOnTarget(x,tg,sv));return r?r.id:"";}
 function paintBench(d){
   bmLast=d;
   const max=(d&&d.test&&d.test.max_tokens)||256,going=!!(d&&d.running&&d.run);
@@ -40916,7 +40923,7 @@ function paintBench(d){
   $("#bm-tg").hidden=tg.hidden&&$("#bm-cv-open").hidden;
   const pick=$("#bm-pick"),show=$("#bm-show"),cmp=$("#bm-cmp");
   if(going)bmShow=d.run.id;
-  if(!runs.some(x=>x.id===bmShow))bmShow=runs.length?runs[0].id:"";
+  if(!runs.some(x=>x.id===bmShow))bmShow=bmPickShow(runs,bmTg,sv);
   const shown=runs.find(x=>x.id===bmShow)||null;
   // any other run of the same test, whatever it ran on: this computer, a server or the cloud
   // (6b351, per Patrick). Rows match by model; the note says when the machines differ
@@ -40931,6 +40938,8 @@ function paintBench(d){
   runs.forEach(x=>{const o=document.createElement("option");o.value=x.id;o.textContent=lbl(x);show.appendChild(o);});
   [{id:"",t:0}].concat(same).forEach(x=>{const o=document.createElement("option");o.value=x.id;
     o.textContent=x.id?"vs "+lbl(x):"Compare with…";cmp.appendChild(o);});
+  if(!shown&&runs.length){const o=document.createElement("option");o.value="";
+    o.textContent="No run on "+(sv?sv.name:bmTg==="cloud"?"the cloud":"this computer")+" yet";show.insertBefore(o,show.firstChild);}
   show.value=bmShow;cmp.value=bmCmp;cmp.disabled=!same.length;
   pick.hidden=!runs.length;
   const old=runs.find(x=>x.id===bmCmp);
@@ -40964,6 +40973,7 @@ function paintBench(d){
       :"Speeds are tokens a second. MLX is timed by the app; Ollama reports its own. "
       +"Memory is the rise in memory in use while the model loaded and wrote.");
   }
+  if(!shown&&d&&!going&&bmTg!=="local")bits.push("No run on "+(sv?sv.name:"the cloud")+" yet. Tick the models and press Run benchmark.");
   if(!shown&&d&&!going&&bmTg==="local"){
     const n=(d.installed||[]).length;
     bits.push(n?n+(n===1?" model":" models")+" installed here: about "+n
@@ -41066,7 +41076,7 @@ function bmCvPaint(){
   $("#bm-show").addEventListener("change",e=>{bmShow=e.target.value;bmCmp="";loadBench();});
   $("#bm-cmp").addEventListener("change",e=>{bmCmp=e.target.value;loadBench();});
   // the target: a server is checked when picked, and never run until Run is pressed
-  $("#bm-target").addEventListener("change",e=>{bmTg=e.target.value;
+  $("#bm-target").addEventListener("change",e=>{bmTg=e.target.value;bmShow="";bmCmp="";
     const s=bmSrv();if(bmLast)paintBench(bmLast);loadBenchTargets(s?s.id:"");});
   $("#bm-pk").addEventListener("change",e=>{
     const i=e.target;if(!i||i.type!=="checkbox")return;

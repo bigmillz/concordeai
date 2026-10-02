@@ -8421,6 +8421,45 @@ check("benchmark compare: any other run of the same test is offered, a model is 
       _xc_ok(_MILLENAI_SRC) and all(m_ != _MILLENAI_SRC for m_ in _xc_mut) and not any(_xc_ok(m_) for m_ in _xc_mut),
       "%r" % ([_xc_ok(_MILLENAI_SRC)] + [_xc_ok(m_) for m_ in _xc_mut],))
 
+# The benchmark pane opens on the newest run of the TARGET chosen above (6b351, per Patrick: "the results for both
+# the server and the local machine are coming back identical": it showed this computer's last run under a server)
+def _bt_run(src):
+    js = src[src.index("/* -------------------------------- Settings \u203a Usage \u203a Benchmark (6b331)"):]
+    js = js[:js.index('(function(){\n  const go=$("#bm-go")')]
+    js += r"""
+const out=[];
+const runs=[{id:"s2",target:"server",target_name:"Desk"},{id:"c1",target:"cloud"},{id:"l9"},{id:"s1",target:"server",target_name:"Rack"},
+  {id:"l8",target:"local"}];
+out.push(bmPickShow(runs,"local",null));                          // 0: this computer's newest, not the newest overall
+out.push(bmPickShow(runs,"srv:a",{name:"Desk"}));                 // 1: that server's
+out.push(bmPickShow(runs,"srv:b",{name:"Rack"}));                 // 2: another server's
+out.push(bmPickShow(runs,"cloud",null));                          // 3
+out.push(bmPickShow(runs,"srv:z",{name:"Never run"}));            // 4: a server with no run: nothing
+out.push(bmPickShow([{id:"l1"}],"cloud",null));                   // 5: no cloud run: nothing
+out.push(bmPickShow([],"local",null)+"|"+bmPickShow(null,"local",null));  // 6
+console.log(JSON.stringify(out));
+"""
+    f = os.path.join(tempfile.mkdtemp(), "bt.js")
+    with open(f, "w", encoding="utf-8") as fh:
+        fh.write(js)
+    return json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=30).stdout or "null")
+def _bt_ok(src):
+    try:
+        o = _bt_run(src)
+    except Exception:
+        return False
+    return (o == ["l9", "s2", "s1", "c1", "", "", "|"]
+            and "if(!runs.some(x=>x.id===bmShow))bmShow=bmPickShow(runs,bmTg,sv);" in src
+            and 'bmTg=e.target.value;bmShow="";bmCmp="";' in src
+            and '"No run on "+(sv?sv.name:bmTg==="cloud"?"the cloud":"this computer")+" yet"' in src)
+_bt_mut = [_MILLENAI_SRC.replace("bmShow=bmPickShow(runs,bmTg,sv);", 'bmShow=runs.length?runs[0].id:"";', 1),
+           _MILLENAI_SRC.replace('bmTg=e.target.value;bmShow="";bmCmp="";', "bmTg=e.target.value;", 1),
+           _MILLENAI_SRC.replace('x.target==="server"&&(x.target_name||"")===(sv.name||"")', 'x.target==="server"', 1),
+           _MILLENAI_SRC.replace(':(!x.target||x.target==="local");}', ':true;}', 1)]
+check("benchmark: the pane opens on the newest run of the chosen target, not the newest of any (node)",
+      _bt_ok(_MILLENAI_SRC) and all(m_ != _MILLENAI_SRC for m_ in _bt_mut) and not any(_bt_ok(m_) for m_ in _bt_mut),
+      "%r" % ([_bt_ok(_MILLENAI_SRC)] + [_bt_ok(m_) for m_ in _bt_mut],))
+
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
 _porig = open(_pf, "rb").read() if os.path.exists(_pf) else b"{}"

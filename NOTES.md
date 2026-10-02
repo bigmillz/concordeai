@@ -28,7 +28,22 @@ row never matches). The change chip's tooltip says where the other figure ran
 are on different machines (and, with a cloud run, that cloud figures include the
 network), so a difference is read as the machine as much as the model. Estimated
 rows are still never compared. One gauntlet check runs `bmMatch` and `bmRow` in
-node on all three spellings and four mutations. Not seen in WKWebView; a real
+node on all three spellings and four mutations.
+
+Same build, a bug Patrick found while using it ("It appears that the results for
+both the server and the local machine are coming back identical at least for
+several models why is that?", two screenshots: the server target with gemma4:12b
+ticked, and This computer, both listing Llama 3.2 1B MLX 243.6 tok/s, Hermes,
+Ministral...): they were the SAME stored run. The target dropdown only chooses
+where the NEXT run goes, but the pane opened on the newest run of any target
+(`runs[0]`), so with a server picked and never run, it showed this computer's
+last run under the server's card. Not a measurement problem: the server had
+produced nothing yet. The pane now opens on the newest run OF THE CHOSEN TARGET
+(`bmPickShow`: this computer, one server by its name, or the cloud), changing the
+target clears the picked run, and a target with no run says so ("No run on
+<name> yet. Tick the models and press Run benchmark.") instead of showing
+another place's figures. A run picked from the list still stays until the target
+changes. One gauntlet check runs `bmPickShow` in node, with four mutations. Not seen in WKWebView; a real
 server or cloud run was not made here.
 
 ## 6b350 — Settings rail: one Models row that opens Local, Cloud and Servers
