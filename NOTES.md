@@ -9,6 +9,25 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b349 — a table with a header and no rows is a line, not an empty grid
+Patrick (2026-10-02), with a screenshot of a retirement-visa answer from the
+server's model that ended in a four-cell grid with headings and nothing under
+them ("What you'll need to do | Transfer the funds | Show regular income |
+Provide documentation"): "why does it, for a lot of answers, keep showing that
+grid along the bottom? It's like part of a chart, but not a chart, and just
+lists various things related to the request."
+
+It is a markdown pipe table the model wrote as a header row and a divider and
+then no rows (the answer's shape rule already says no tables unless asked, and
+a small model ignores it). The client renderer drew exactly that: a table with
+a `<thead>` and an empty `<tbody>`. It now renders such a table as one line of
+its cells joined by " \u00b7 " (`<p>`), so nothing the model said is lost and no
+empty grid appears; a table with rows is unchanged. The prompt is NOT changed
+(the shape law at the default rung is already explicit). Not fixed here: why
+the model stops after the header; the raw reply was not seen. One gauntlet
+check runs the real renderer block in node on a header-only table, a normal one
+and a table with no divider, with one mutation.
+
 ## 6b348 — a server's action chips on one line, Remove as a red cross
 Patrick (2026-10-02), with a screenshot of a server card in Settings > Your
 servers where Remove wrapped to a second line: "find a way to put these

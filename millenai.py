@@ -35465,6 +35465,10 @@ function renderMD(raw){
     const rows=block.trim().split(/\n/).map(r=>r.trim());
     if(!/^\|[\s:|-]+\|$/.test(rows[1]||""))return m;   // needs a divider
     const cells=r=>r.replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
+    // a header and a divider with no rows under them (small models end an answer
+    // with one, 6b349, per Patrick: "why does it ... keep showing that grid along
+    // the bottom?") is a line of its cells, not an empty grid
+    if(rows.length<3)return pre+"<p>"+cells(rows[0]).join(" \u00b7 ")+"</p>";
     const head=cells(rows[0]).map(c=>"<th>"+c+"</th>").join("");
     const body=rows.slice(2).map(r=>
       "<tr>"+cells(r).map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");

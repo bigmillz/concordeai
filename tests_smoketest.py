@@ -8311,6 +8311,29 @@ check("sidebar meters: the chip, memory and server labels share one size, tracki
       _lab_ok(page) and not any(_lab_ok(m_) for m_ in _lab_mut) and all(m_ != page for m_ in _lab_mut),
       "%r %r" % [_lab_ok(page), [_lab_ok(m_) for m_ in _lab_mut]])
 
+# A pipe table with a header and no rows is a line of its cells, not an empty grid (6b349, per
+# Patrick: "why does it, for a lot of answers, keep showing that grid along the bottom?")
+_pt0 = page.index("s=s.replace(/(^|\\n)((?:\\|.*\\|[ \\t]*(?:\\n|$)){2,})/g")
+_pt1 = page.index("// setext headers FIRST", _pt0)
+def _pt_run(code):
+    cases = ["Intro line\n| What you\u2019ll need to do | Transfer the funds | Show income |\n|---|---|---|\n",
+             "| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n", "| A | B |\n| 1 | 2 |\n"]
+    js = ("const out=[];for(let s of %s){" % json.dumps(cases) + code + ";out.push(s);}"
+          "process.stdout.write(JSON.stringify(out));")
+    return _node_json(js, "pipetable.js")
+try:
+    _pt = _pt_run(page[_pt0:_pt1])
+except Exception as _e:
+    _pt = [str(_e)]
+def _pt_ok(r):
+    return (isinstance(r, list) and len(r) == 3 and "<table" not in r[0]
+            and r[0].startswith("Intro line\n<p>What you\u2019ll need to do \u00b7 Transfer the funds \u00b7 Show income</p>")
+            and r[1].count("<tr>") == 3 and "<td>3</td>" in r[1] and "<th>A</th>" in r[1]
+            and "<table" not in r[2])
+_pt_mut = page[_pt0:_pt1].replace('if(rows.length<3)return', 'if(false)return', 1)
+check("a header-only pipe table is a line of its cells; a table with rows still renders (node)",
+      _pt_ok(_pt) and _pt_mut != page[_pt0:_pt1] and not _pt_ok(_pt_run(_pt_mut)), "%r" % _pt)
+
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
 _porig = open(_pf, "rb").read() if os.path.exists(_pf) else b"{}"
