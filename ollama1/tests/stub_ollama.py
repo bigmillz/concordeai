@@ -148,7 +148,8 @@ class Stub:
                 if m is None:
                     return self.js(404, {"error": "model '%s' not found" % name})
                 if self.path == "/api/show":
-                    caps = ["embedding"] if m.get("embedding") else ["completion"]
+                    caps = (["embedding"] if m.get("embedding")
+                            else ["completion", "vision"] if m.get("vision") else ["completion"])
                     return self.js(200, {"model_info": m["info"], "capabilities": caps,
                                          "details": {"family": "x"}})
                 if (stub.fail_marker and self.path == "/api/chat" and stub.fail_marker in str(

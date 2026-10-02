@@ -9,6 +9,74 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b357 — the server trumps this computer: pictures and every side pass
+Patrick (2026-10-02), answering whether a picture sent in a mode should go to the
+server (6b344 found that "Writing the answer — Qwen 3.5 Vision 9B" is the
+picture takeover, not the merge): "only send it to the Mac if the server
+doesn't have a model that can handle it. Otherwise, for any user in any server,
+the server trumps anything run on the local machine."
+- **Pictures in a mode** (Fast, Thinking, Pro; `server_vision_pick`). A model
+  of the person's server that fits its card under the seats' rules
+  (`server_mode_candidates`: this profile's paired servers, "Use for Fast,
+  Thinking and Pro" on, answering, "gpu" placement, fitting a reported card),
+  that the server SAYS reads pictures (Ollama's `/api/show` "capabilities"
+  holds "vision", asked through the gateway over the signed channel and
+  remembered per server and model; no protocol change, no new endpoint), and
+  is no coder, embedding or guard model, strongest first, at most six asked a
+  turn. It takes the picture as the mode's seat (`server_first_answer`): the
+  same first-word deadline, a failure marks the server down, and before its
+  first word this computer's vision model answers (said in the status line, the
+  badge "this Mac"); no download of the local vision engine is started while
+  the server can read it. The cloud still reads it first when cloud power is on,
+  as for every mode seat. Cloud Only, a pick of the person's own (a local model,
+  a server model) and an Advanced council are untouched. The annotate grid
+  (6b355) is already the picture in `images`, so whichever model reads it gets
+  the grid copy. Funnels send no picture to any model (their pictures are web
+  photos, 6b340), so there is nothing to route there.
+- **The side passes** (`server_side_text`: the server's quick 7-15B model,
+  `SRV_SIDE_FIRST_S` = 30 s to a first word; a failure marks it down and the
+  caller runs what it ran before):
+  - moved: the chat's title (`make_title`, after a cloud answer's own provider;
+    an answer of the server's is still titled by that server or not at all), the
+    memory pass for an answer of this computer's, the place-pin pass for one,
+    an image prompt's rewrite (`_refine_with_model`), an export's title (a
+    server turn's by that server, a seat's never locally), the rescue after
+    every path went silent (the server's model first, unless it is the one that
+    failed or the turn has a picture), the Remote agent's planner (the server's
+    coder after the cloud ladder; a failed turn marks it down and the next
+    resolve is this computer's), and Research (`server_compositor` plans and
+    writes; before its first word this computer's writer, after one the brief
+    is cut there and said).
+  - already server-first: the modes' seats, councils and merge (6b339, 6b344),
+    the Code lane's agents (`resolve_agent_seat`), funnel stages and verdicts,
+    a server pick's and "<name> Only"'s title, memory and pins.
+  - left on this computer on purpose: the benchmark (it measures this
+    computer), dictation (whisper on this Mac; the server kit has no speech
+    model), picture and video MAKING (FLUX and Wan; a server has no image
+    generator), an explicit local pick (the person chose it), and Cloud Only.
+- **The review of 6b344 (MED)**: the server merge caught every exception, so a
+  Stop, a closed window or a profile switch while the server wrote the merge
+  marked a healthy server down and, before the first word, started this Mac's
+  multi-GB compositor for a client that was gone. `StaleProfile`,
+  `BrokenPipeError` and `ConnectionResetError` now pass through first, as the
+  seats' path does; every new server call here does the same.
+- Tests: in process, the picture reader (capabilities, families, the strongest,
+  six at most, remembered, none with no server, the switch off, an error or no
+  card figure), the side pass (quick model, deadline, failure marked down, a
+  Stop or a switch not), each moved pass (title, rewrite, Remote planner,
+  Research with its fallback and cut), the merge under a Stop and a switch, the
+  handler's lines pinned, and a mutation of each. Live, the page's own request
+  against the real gateway on its stub Ollama (which now says a model reads
+  pictures when told) with the `local-record` hook: a picture in Fast and in
+  Thinking goes to the server's reader and nothing runs here; a refusal falls to
+  this computer's reader or is said; Cloud Only and a pick of the person's don't
+  reach the server; with no reader the local vision model answers as before; an
+  answer of this computer's gets its title and memory pass from the server. Two
+  handler mutations run on mutated copies of the app.
+- Not verified here: a real server vision model reading a real picture (the stub
+  only says it can), its first-word time on a real card, and nothing was looked
+  at on screen.
+
 ## 6b352 — Find in chat (Cmd+F / Ctrl+F)
 Patrick (2026-10-02): "Command or Control F should open a find box for the
 current chat."

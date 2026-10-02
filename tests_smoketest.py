@@ -10819,6 +10819,9 @@ _exec_names(_ns26, {"_cloud_lock", "_cloud_depth", "_cloud_txn", "_cloud_read_st
                     "cloud_allowed", "gate_ladder", "make_title", "_extract_memory",
                     "_clean_title", "TITLE_PROMPT", "CLOUD_NAME", "_cloud_file",
                     "_cloud_write_to"})
+# (6b357) no server is paired here: the side passes' server-first step says so
+_ns26["server_side_text"] = lambda *a, **k: None
+_ns26.setdefault("server_label", lambda l: False)
 # (6b329) cloud.json is the profile's: a ctx on _cd26, bound here
 _prof_ns(_ns26, _cd26)
 # (a def's source leaves its decorator behind)
@@ -18170,7 +18173,7 @@ def _svc_pins(src):
                          "                council = [\"Qwen 3.5 Vision 9B\"]" in ch
         and "                      if images and not _srv_lbl else [])" in ch
         and "        _vis_local = bool(images) and not _srv_lbl and model_cached(" in ch
-        and "                and not _srv_lbl):\n            try:\n                start_model_downloads" in ch,
+        and "                and not _srv_lbl and _vis_srv is None):\n            try:\n                start_model_downloads" in ch,
         # (review) making a picture, a video or a file takes the hold
         "making held": "        if (img_subject or vid_subject or export_req) and not self._bench_held:\n"
                        "            if not bench_hold():\n                emit(AppText(BENCH_BUSY))" in ch
@@ -19011,7 +19014,7 @@ def _soc_answer(src):
                                        == "⚠️ Desktop has no model that reads pictures. "
                                           "Nothing was sent anywhere else.")
     # the title: the mode's server or nowhere; never a local engine or a cloud one
-    ms = src[src.index("def make_title(text: str, conf=None, server=None)"):]
+    ms = src[src.index("def make_title(text: str, conf=None, server=None"):]
     ms = ms[:ms.index("\n\n\n")]
     hit = []
 
@@ -19072,7 +19075,9 @@ def _soc_pins(src):
                        "                    target=_extract_memory,\n"
                        "                    args=(route_label or (council[0] if council else \"\"),"
         in ch,
-        "export title": "                    and not (_srv_only or _srv_lbl or _seat_fb) else \"\")" in ch,
+        "export title": "                or ((make_title(src[:600], server=_srv_lbl)\n"
+                        "                     if (_srv_only or _srv_lbl) else\n"
+                        "                     make_title(src[:600], local=not _seat_fb))" in ch,
         "title ticket": "            if (_srv_only or _srv_lbl) and _title_cid and not _gone:\n"
                         "                _srv_only_chats[(user_base.name, _title_cid)] = (\n"
                         "                    _srv_lbl if _model_said[0] and not _so_fail else \"\",\n"
@@ -19517,7 +19522,8 @@ _SO_MUT = [
     ("no title ticket", '            if (_srv_only or _srv_lbl) and _title_cid and not _gone:', '            if False:'),
     ("a title that falls to a local model", '            return _clean_title("".join(parts))\n        except Exception:\n            return ""',
      '            return _clean_title("".join(parts))\n        except Exception:\n            pass'),
-    ("an export titled by a local model", '                    and not (_srv_only or _srv_lbl or _seat_fb) else ""', '                    else ""'),
+    ("an export titled by a local model", 'make_title(src[:600], server=_srv_lbl)', 'make_title(src[:600])'),
+    ("a seat's export titled by a local model", 'make_title(src[:600], local=not _seat_fb))', 'make_title(src[:600]))'),
     ("no tiers row", 'out.update(server_only_tiers(self.ctx))', 'pass'),
     ("web search touched", '        bookish = False\n        placey = False\n',
      '        bookish = False\n        placey = _srv_only and False\n'),
@@ -20067,6 +20073,7 @@ def _p2_council(src, run_model, **over):
           "cloud_bench": lambda: [], "cloud_allowed": lambda: False, "_provider_of": lambda c: "",
           "ctx_thread": lambda target, ctx=None, bind=True, **kw: _t34.Thread(target=target, **kw),
           "_DraftAbandoned": type("_DraftAbandoned", (Exception,), {}), "MERGE_RANK": [], "merge_pref_label": lambda: "",
+          "StaleProfile": type("StaleProfile", (OSError,), {}),
           "MODEL_ROUTES": {}, "MODEL_INFO": {}, "run_model": run_model,
           "_stream_guarded": lambda label, msgs, emit, status, fb, note: (calls.append(("merge", label, getattr(_RC_DL, "s", "unset"))), emit("MERGED"), True)[2],
           "compositor_ladder": lambda: [], "fast_cloud_ladder": lambda: [], "claude_refusal_conf": lambda c: None,
@@ -20329,6 +20336,8 @@ def _p2c_funpage(src):
           "els['#fn-cloud']=mk();els['#fn-cloud-row']=mk();const $=s=>els[s];"
           "let prefs={funnel_cloud:false},cloud={configured:true,turbo:true};"
           "async function api(u){return {json:async()=>u==='/api/prefs'?prefs:cloud};}"
+          # (6b354) the box's paint also tells the composer's cloud chip; that chip has checks of its own
+          "function cloudChipSet(cs){}"
           + src[i0:i1]
           + "const out={};const R=()=>[els['#fn-cloud'].disabled,els['#fn-cloud'].checked,els['#fn-cloud-row'].classList.on,els['#fn-cloud-row'].title];"
           "fnCloudPaint({configured:true,turbo:true});out.ok=R();"
@@ -20403,8 +20412,9 @@ def _p2c_pins(src):
             "                            and _is_substantive(prompt))" in ch
         and "REVISE_INSTRUCTION + \"QUESTION: \" + _sq" in ch,
         # a picture in a mode goes to the vision ladder, not a server seat
-        "picture": "            if _seat_fb:\n                # a mode's server seat doesn't read it (6b339)" in ch
-        and ch.index("            if _seat_fb:\n                # a mode's server seat") < ch.index("            # a picture sent to your own server's model stays on that"),
+        # (6b357) unless the person's server reads pictures: then it takes the picture as the mode's seat
+        "picture": "            elif _seat_fb:\n                # a mode's server seat doesn't read it (6b339)" in ch
+        and ch.index("            elif _seat_fb:\n                # a mode's server seat") < ch.index("            # a picture sent to your own server's model stays on that"),
         "tiers": "                    chosen = [x[\"label\"] for x in resolve_tier_seats(name, self.ctx)]" in src,
         # the ladder: the server's best suitable models first, by the chooser, then this Mac's own picks
         "no gate in the section": not re.search(r"cloud_allowed|gate_ladder|\bturbo\b|cloud_bench|resolve_tier|TIERS", sect),
@@ -20441,7 +20451,7 @@ def _p2c_pins(src):
         "seat title": "            elif _seat_fb and _title_cid and not _gone:\n" in ch
         and "                _seat_t = server_seat_title(\n                    council, _seat_fb, _seat_res[0], _model_said[0],\n"
             "                    bool(_ans_conf), lambda l: server_label_down(user_base, l))\n                if _seat_t is not None:\n" in ch
-        and "                    and not (_srv_only or _srv_lbl or _seat_fb) else \"\")" in ch,
+        and "                     make_title(src[:600], local=not _seat_fb))" in ch,
         "funnel refresh": "        server_refresh_modes(bound_ctx())\n        srv = server_funnel_pick(bound_ctx(), effort)" in src
         and "            with server_first_deadline(30 if effort == \"fast\" else 60):\n                run_model(srv[\"label\"], msgs, parts.append)" in src
         and "            server_mark_down(bound_ctx(), srv[\"server\"], str(exc))" in src
@@ -20724,6 +20734,19 @@ def _p6c_merge(src):
     got["refused: the best draft"] = (seen == ["Desk · b"] and "LOCAL MERGE" not in f2[2]
                                       and any(x.startswith("answer from") for x in f2[2])
                                       and "Desk didn’t write the merge, so the best single answer is shown" in f2[4])
+    # a Stop, a closed window or a profile switch while the server writes it (the review of 6b344): not the server's
+    # failure (no mark down), and no compositor of this computer's for a client that is gone
+    for exc_name in ("StaleProfile", "BrokenPipeError"):
+        seen_x = []
+
+        def sx(label, msgs, emit, status, fb, note, _n=exc_name):
+            seen_x.append(label)
+            raise (box["ns"]["StaleProfile"]("switched") if _n == "StaleProfile" else BrokenPipeError())
+        try:
+            fx = go(True, server_compositor=comp, _stream_guarded=sx, **kw)
+            got["a %s mid-merge" % exc_name] = False
+        except (OSError, BrokenPipeError):
+            got["a %s mid-merge" % exc_name] = seen_x == ["Desk · b"] and box["ns"]["_downs"] == []
     # after its first word: one answer, cut there and said; no pen of this computer's, no second answer
     sg, seen = sg_factory("late")
     f3 = go(True, server_compositor=comp, _stream_guarded=sg, **kw)
@@ -20757,6 +20780,222 @@ def _p6c_page(src):
         > 0,
     }
     return all(got.values()), [got, o]
+
+
+def _p7c_vision(src):
+    """6b357: which model of the person's server reads a picture sent in a mode. The seats' rules (a paired server of
+    this profile with the switch on, answering, "gpu" models that fit a reported card); what the server says it can do
+    (Ollama's /api/show "capabilities", through the gateway, remembered); never a coder, embedding or guard model; the
+    strongest first; at most six asked; none when nothing qualifies or the server doesn't answer."""
+    models = [_m("qwen2.5vl:7b", size=6 * GIB_), _m("gemma3:12b", size=8 * GIB_), _m("gpt-oss:20b", size=13 * GIB_),
+              _m("llava:34b", "gpu+ram", 20 * GIB_), _m("qwen3-coder:30b", size=12 * GIB_),
+              _m("nomic-embed-text:335m", size=GIB_), _m("llama-guard3-vision:11b", size=7 * GIB_)]
+    vis = {"qwen2.5vl:7b", "gemma3:12b", "llava:34b", "qwen3-coder:30b", "llama-guard3-vision:11b"}
+    ns, ctx, ents = _p2_ns(src, [("Desk", "https://desk.example.com", models, {})])
+    asked, mode = [], {"st": 200}
+
+    def sj(e, method, path, obj=None, *a, **k):
+        asked.append((path, (obj or {}).get("model")))
+        if mode["st"] != 200:
+            return mode["st"], {"error": "down", "code": "busy"}
+        return 200, {"capabilities": ["completion", "vision"] if obj["model"] in vis else ["completion"]}
+    ns["_srv_json"] = sj
+    pick = lambda c=ctx: (ns["server_vision_pick"](c) or {}).get("name")
+    got = {"strongest that reads pictures": pick() == "gemma3:12b"
+           and asked == [("/api/show", "gpt-oss:20b"), ("/api/show", "gemma3:12b")]}
+    pick()
+    got["remembered"] = len(asked) == 2
+    # nothing that reads pictures: none, and no more than six asked
+    many = [_m("plain%d:8b" % i, size=5 * GIB_) for i in range(9)]
+    _so_seen(ns, ents["Desk"], many, gpu=dict(_P2_GPU))
+    asked.clear()
+    got["none, six asked"] = pick() is None and len(asked) == 6
+    # the server doesn't answer the question: this computer reads it
+    _so_seen(ns, ents["Desk"], models, gpu=dict(_P2_GPU))
+    mode["st"] = 503
+    got["server error"] = pick() is None
+    mode["st"] = 200
+    _so_seen(ns, ents["Desk"], models, gpu=dict(_P2_GPU))
+    ns["server_set_prefer"](ctx, ents["Desk"]["id"], False)
+    got["switch off"] = pick() is None
+    ns["server_set_prefer"](ctx, ents["Desk"]["id"], True)
+    n0, c0, e0 = _p2_ns(src, [])
+    got["no server"] = n0["server_vision_pick"](c0) is None
+    _so_seen(ns, ents["Desk"], models, gpu=None)
+    got["no card figure"] = pick() is None
+    return all(got.values()), got
+
+
+def _p7c_side(src):
+    """6b357: a side pass on the person's server first: its quick model (7-15B, the faster measured), inside a 30 s
+    first-word deadline; a failure marks the server down and says None, so the caller runs what it ran before; a Stop
+    or a profile switch is not a failure; no server, None."""
+    models = [_m("gpt-oss:20b", size=13 * GIB_), _m("qwen3:14b", size=9 * GIB_), _m("gemma3:12b", size=8 * GIB_)]
+    ns, ctx, ents = _p2_ns(src, [("Desk", "https://desk.example.com", models, {})])
+    calls, mode = [], {"x": None}
+
+    def ss(label, msgs, emit):
+        calls.append((label, getattr(ns["_srv_first"], "s", None), msgs[-1]["content"]))
+        if mode["x"]:
+            raise mode["x"]
+        emit("  the text  ")
+    ns["server_stream"] = ss
+    ns.setdefault("strip_think", lambda x: x)        # (the chat section's, not the servers')
+    ask = [{"role": "user", "content": "TITLE IT"}]
+    got = {"on the server": ns["server_side_text"](ask, ctx) == "  the text  "
+           and calls == [("Desk · qwen3:14b", 30.0, "TITLE IT")]}
+    mode["x"] = ns["StaleProfile"]("switched")
+    try:
+        ns["server_side_text"](ask, ctx)
+        got["a switch is raised"] = False
+    except ns["StaleProfile"]:
+        got["a switch is raised"] = not ns["server_label_down"](ctx, "Desk · qwen3:14b")
+    mode["x"] = BrokenPipeError()
+    try:
+        ns["server_side_text"](ask, ctx)
+        got["a stop is raised"] = False
+    except BrokenPipeError:
+        got["a stop is raised"] = not ns["server_label_down"](ctx, "Desk · qwen3:14b")
+    mode["x"] = ns["ServerError"]("offline", "Desk didn’t answer.")
+    got["a failure: None, marked down"] = (ns["server_side_text"](ask, ctx) is None
+                                           and ns["server_label_down"](ctx, "Desk · qwen3:14b"))
+    calls.clear()
+    got["down: not asked"] = ns["server_side_text"](ask, ctx) is None and calls == []
+    n0, c0, e0 = _p2_ns(src, [])
+    got["no server"] = n0["server_side_text"](ask, c0) is None
+    return all(got.values()), got
+
+
+def _p7c_passes(src):
+    """6b357: each side pass that ran on this computer asks the person's server first and runs its own model only when
+    the server says None: the chat's title (a seat's export title never locally), an image prompt's rewrite, the
+    Remote agent's planner (its coder; a failed turn marks the server down and the next resolve is local), Research
+    (the server plans and writes; before its first word this computer's writer, after one the answer cut there)."""
+    got = {}
+    ran = []
+    srv = {"text": "Lighthouse history"}
+    base = {"TITLE_PROMPT": "NAME IT: ", "_clean_title": lambda x: " ".join(str(x).split())[:40],
+            "server_side_text": lambda msgs, ctx=None, role="fast": srv["text"],
+            "_ticket_conf": lambda c: None, "cloud_role_model": lambda *a: "", "cloud_text": lambda *a, **k: "",
+            "ollama_pulled_tags": lambda: set(), "model_cached": lambda l, p=None: True, "model_fits_memory": lambda l: True,
+            "slow_giant": lambda l: False, "MODEL_ROUTES": {"Llama 3.2 3B": ("mlx", 1)}, "MODEL_MEM_BYTES": {"Llama 3.2 3B": 3e9},
+            "_engine_up": lambda p: True, "strip_think": lambda x: x, "strip_special": lambda x: x,
+            "_looks_degenerate": lambda x: False, "re": re,
+            "run_model": lambda l, m, cb, **k: (ran.append(l), cb("Local title"))[1],
+            "server_stream": lambda *a, **k: None}
+    ns = dict(base)
+    exec(_p2_fn(src, "make_title"), ns)
+    t1 = ns["make_title"]("tell me about lighthouses")
+    got["title: the server's"] = t1 == "Lighthouse history" and ran == []
+    srv["text"] = None
+    t2 = ns["make_title"]("tell me about lighthouses")
+    got["title: no server, this computer's"] = t2 == "Local title" and ran == ["Llama 3.2 3B"]
+    ran.clear()
+    got["a seat's export: never this computer"] = ns["make_title"]("x", local=False) == "" and ran == []
+    srv["text"] = ""
+    got["the server answered nothing: no local try"] = ns["make_title"]("x") == "" and ran == []
+    # an image prompt's rewrite
+    ns = dict(base)
+    srv["text"] = "a red bicycle by the sea, at dusk"
+    ns.update(_REFINE_PROMPT="%s / %s")
+    exec(_p2_fn(src, "_refine_with_model"), ns)
+    ran.clear()
+    r1 = ns["_refine_with_model"]("a red bicycle", "at dusk")
+    srv["text"] = None
+    ns["run_model"] = lambda l, m, cb, **k: (ran.append(l), cb("a blue bicycle by the sea"))[1]
+    r2 = ns["_refine_with_model"]("a red bicycle", "make it blue")
+    got["rewrite: the server's, else a resident one"] = (r1 == "a red bicycle by the sea, at dusk" and r2 == "a blue bicycle by the sea"
+                                                         and ran == ["Llama 3.2 3B"])
+    # the Remote agent: the server's coder after the cloud, before this computer; a failed turn marks it down
+    downs = []
+    pick = {"m": {"label": "Desk · qwen3-coder:30b", "server": "Desk"}}
+    rns = {"cloud_allowed": lambda: False, "work_ladder": lambda r: [], "bound_ctx": lambda: None, "NoProfile": KeyError,
+           "server_side_pick": lambda ctx, role="fast", effort="fast": pick["m"] if role == "code" and effort == "normal" else None,
+           "ollama_pulled_tags": lambda: set(), "MODEL_ROUTES": {"GPT-OSS 20B": 1}, "model_cached": lambda l, p=None: True,
+           "model_fits_memory": lambda l: True, "strip_think": lambda x: x, "cloud_text": lambda *a, **k: "",
+           "server_first_deadline": _RcDeadline, "server_mark_down": lambda c, n, w: downs.append(n),
+           "SERVER_SEP": " · ", "StaleProfile": type("StaleProfile", (OSError,), {})}
+    seen = []
+
+    def rm(l, convo, cb, **k):
+        seen.append((l, getattr(_RC_DL, "s", "unset")))
+        if l.startswith("Desk") and pick.get("fail"):
+            raise RuntimeError("down")
+        cb('{"run": "uptime"}')
+    rns["run_model"] = rm
+    exec(_p2_fn(src, "remote_driver"), rns)
+    exec(_p2_fn(src, "_agent_turn"), rns)
+    d1 = rns["remote_driver"]()
+    o1 = rns["_agent_turn"](d1, [{"role": "user", "content": "q"}])
+    pick["fail"] = True
+    o2 = rns["_agent_turn"](d1, [{"role": "user", "content": "q"}])
+    pick["m"] = None
+    d2 = rns["remote_driver"]()
+    got["remote: the server's coder, then this computer"] = (
+        d1 == ("server", "Desk · qwen3-coder:30b") and o1 == '{"run": "uptime"}' and seen[0] == ("Desk · qwen3-coder:30b", 60.0)
+        and o2 == "" and downs == ["Desk"] and d2 == ("local", "GPT-OSS 20B"))
+    # Research: the server plans and writes; a refusal before the first word is this computer's writer, said
+    out, st, seen2 = [], [], []
+
+    def sg(label, msgs, emit, status, fb, note):
+        seen2.append((label, getattr(_RC_DL, "s", "unset")))
+        if label.startswith("Desk") and pick.get("rfail"):
+            if pick["rfail"] == "late":
+                emit("partial ")
+            raise RuntimeError("down")
+        emit("BRIEF by " + label)
+        return True
+    res = {"HAS_SEARCH": True, "MERGE_RANK": ["Gemma 4 26B"], "model_cached": lambda l, p=None: True,
+           "model_fits_memory": lambda l: True, "bound_ctx": lambda: None, "NoProfile": KeyError,
+           "server_compositor": lambda ctx, d=(): {"label": "Desk · gpt-oss:20b"},
+           "server_first_deadline": _RcDeadline, "SRV_SIDE_FIRST_S": 30.0,
+           "_plan_queries": lambda w, q, s: (seen2.append(("plan", w, getattr(_RC_DL, "s", "unset"))), [])[1],
+           "search_results": lambda q: [{"url": "https://e.test/1", "body": "b" * 50, "title": "T"}],
+           "_page_text": lambda u: "", "ctx_thread": lambda target, args=(), **k: _t34.Thread(target=target, args=args),
+           "RESEARCH_WRITE": "W", "_stream_guarded": sg, "server_label": lambda l: " · " in str(l),
+           "SERVER_SEP": " · ", "Ctl": _RcCtl, "server_mark_down": lambda c, n, w: downs.append("R:" + n),
+           "StaleProfile": type("StaleProfile", (OSError,), {})}
+    exec(_p2_fn(src, "run_research"), res)
+    msgs = [{"role": "system", "content": "s"}, {"role": "user", "content": "what is new"}]
+    res["run_research"](["Gemma 4 26B"], msgs, out.append, st.append)
+    got["research: the server plans and writes"] = (
+        ("plan", "Desk · gpt-oss:20b", 30.0) in seen2 and ("Desk · gpt-oss:20b", 60.0) in seen2
+        and any("BRIEF by Desk" in x for x in out))
+    out.clear(), st.clear(), seen2.clear()
+    pick["rfail"] = "early"
+    res["run_research"](["Gemma 4 26B"], msgs, out.append, st.append)
+    got["research: a refusal, this computer writes it"] = (
+        any("BRIEF by Gemma 4 26B" in x for x in out) and "R:Desk" in downs
+        and any("didn’t answer, so Gemma 4 26B writes it here" in x for x in st))
+    out.clear(), st.clear(), seen2.clear()
+    pick["rfail"] = "late"
+    res["run_research"](["Gemma 4 26B"], msgs, out.append, st.append)
+    got["research: cut after a word"] = (out[0] == "partial " and out[1].startswith("\n\n⚠️")
+                                         and not any("Gemma" in x for x in out))
+    return all(got.values()), got
+
+
+def _p7c_pins(src):
+    """6b357, where the handler meets it (the live checks run these on the real gateway; pinned here so a mutation of
+    each line is caught in process): a picture in a mode only, Cloud Only and a pick untouched; the server reads it after
+    the cloud and before this computer; no download while the server can read it; the memory pass, the place pins and
+    the rescue ask the server first for an answer of this computer's."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    got = {
+        "a mode only": "            _mode_pic = tier in TIERS and not cloud_only\n" in ch
+        and ch.index("            _mode_pic = tier in TIERS and not cloud_only\n") < ch.index('            tier = ""\n            b64s = ['),
+        "the seat": "                council = [_vis_srv[\"label\"]]\n                model_name = _vis_srv[\"label\"]\n"
+                    "                _seat_fb = {_vis_srv[\"label\"]: _vfb}\n" in ch,
+        "cloud, then the server": "            if cloud_only or (not _vis_local and _vis_srv is None):\n" in ch
+        and "            return cloud_only or (not _vis_local and _vis_srv is None)" in ch,
+        "no download": "                and not _srv_lbl and _vis_srv is None):\n            try:\n                start_model_downloads" in ch,
+        "memory": "            out = None if server_label(label) else server_side_text(ask, base)\n" in src,
+        "pins": "                                _ps = (None if server_label(small)\n"
+                "                                       else server_side_text(_pin_ask, user_base))\n" in ch,
+        "rescue": "                _rs = (server_side_pick(user_base, \"fast\", \"normal\")\n                       if not images else None)\n" in ch
+        and "                if not sent[0]:\n                    try:\n                        pulled = ollama_pulled_tags() or set()" in ch,
+    }
+    return all(got.values()), got
 
 
 _P2_CHECKS = [
@@ -20819,7 +21058,7 @@ def _p3c_quiet(src):
         and "            if _so and time.time() - _so[1] < 300:" in tit,
         "no memory pass without an answer": "                    and not _gone and not _so_fail\n"
                                             "                    and not (_srv_lbl and not _model_said[0])\n" in ch,
-        "export title": "                    and not (_srv_only or _srv_lbl or _seat_fb) else \"\")" in ch,
+        "export title": "                or ((make_title(src[:600], server=_srv_lbl)\n" in ch,
         # no local rescue for a server pick (no pre-warm: the live check counts the engines started)
         "no rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
         # the place-pin pass reads a MODEL's answer, never the app's own error line (which could be 120 characters)
@@ -20829,6 +21068,15 @@ def _p3c_quiet(src):
 
 
 _P2_CHECKS += [
+    ("a picture in a mode: the server's model that says it reads pictures, fits its card and isn't a coder, embedding or "
+     "guard model; the strongest; asked at most six times, remembered; none with no server, the switch off or an error "
+     "(6b357)", _p7c_vision),
+    ("a side pass on the server first: its quick model in a 30 s deadline; a failure marks it down and leaves the pass "
+     "to this computer; a Stop or a switch is not a failure (6b357)", _p7c_side),
+    ("where the handler meets the server-first rule: a picture in a mode, the memory pass, the place pins, the rescue "
+     "(pinned; run live) (6b357)", _p7c_pins),
+    ("the side passes that ran here ask the server first: a title, an image prompt's rewrite, the Remote agent's planner, "
+     "Research (6b357)", _p7c_passes),
     ("the merge's pen: the server's strongest suitable general model, preferring one it already holds, none when no "
      "server qualifies (6b344)", _p6c_chooser),
     ("the merge on the server in a mode: its deadline and marked-down rules, this computer's pen or the best draft before "
@@ -20912,7 +21160,7 @@ _P2_MUT = [
     ("the box ticked with no cloud", '  cb.checked=ok&&fnCloudOn;', '  cb.checked=fnCloudOn;'),
     ("the flag not typed", '    "funnel_cloud": ("one of", (True, False)),', '    "funnel_cloud": ("text", 10),'),
     ("the box not remembered", '    body:JSON.stringify({funnel_cloud:fnCloudOn})}).catch(()=>{});', '    body:JSON.stringify({})}).catch(()=>{});'),
-    ("a picture read by a server seat", '            if _seat_fb:\n                # a mode\'s server seat doesn\'t read it', '            if False:\n                # a mode\'s server seat doesn\'t read it'),
+    ("a picture read by a server seat", '            elif _seat_fb:\n                # a mode\'s server seat doesn\'t read it', '            elif False:\n                # a mode\'s server seat doesn\'t read it'),
     ("a mode's seat an explicit pick", '        if _srv_seat:\n            _srv_lbl = ""', '        if False:\n            _srv_lbl = ""'),
     ("no fallback call", '                if lbl in _seat_fb:\n                    # a mode\'s server seat (6b339)', '                if False:\n                    # a mode\'s server seat (6b339)'),
     ("the tiers' list without seats", '                    chosen = [x["label"] for x in resolve_tier_seats(name, self.ctx)]', '                    chosen = resolve_tier(name)'),
@@ -21007,6 +21255,35 @@ _P2_MUT = [
     ("a merge on a server that can't hold it", '    cands = server_mode_candidates(ctx)\n    if not cands:\n        return None\n    ranked = srv_rank(cands, "compose"',
      '    cands = [m for m in server_mode_candidates(ctx)] or [{"name": "x", "label": "x"}]\n    ranked = srv_rank(cands, "compose"'),
     ("the page ignoring the merge's frame", '                  else if(d.w==="local"||d.w==="mix"){', '                  else if(d.w==="local"){'),
+    ("a Stop mid-merge marking the server down", '        except (StaleProfile, BrokenPipeError, ConnectionResetError):\n            # the person stopped, closed the window or switched profiles:',
+     '        except ZeroDivisionError:\n            # the person stopped, closed the window or switched profiles:'),
+    ("a side pass with no deadline", '        with server_first_deadline(SRV_SIDE_FIRST_S):\n            server_stream(m["label"], messages, parts.append)',
+     '        if True:\n            server_stream(m["label"], messages, parts.append)'),
+    ("a failed side pass not marked down", '        server_mark_down(ctx, m["server"], str(exc))\n        return None\n    return strip_think', '        return None\n    return strip_think'),
+    ("a Stop in a side pass marking the server down", '    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except Exception as exc:\n        server_mark_down(ctx, m["server"]',
+     '    except Exception as exc:\n        server_mark_down(ctx, m["server"]'),
+    ("a side pass on the strongest, not the quick", '    top = srv_rank(cands, role, effort, server_speeds(ctx))', '    top = srv_rank(cands, role, "normal", server_speeds(ctx))'),
+    ("a picture to a model that doesn't read it", '            if _srv_reads_pictures(e, m["name"]):\n                return m', '            if True:\n                return m'),
+    ("a coder reading the picture", '        if not (f["embed"] or f["guard"] or f["coder"]):', '        if not (f["embed"] or f["guard"]):'),
+    ("no limit to the questions", '    for m in ranked[:6]:', '    for m in ranked:'),
+    ("a server error read as an answer", "            return None           # the server didn't answer: this computer reads it", '            raise'),
+    ("the weakest reads it", '    ranked = sorted(cands, key=lambda m: (m.get("params") is None, -(m.get("params") or 0.0),',
+     '    ranked = sorted(cands, key=lambda m: (m.get("params") is None, (m.get("params") or 0.0),'),
+    ("a title here before the server", '    t = server_side_text([{"role": "user", "content": TITLE_PROMPT + text[:600]}])\n    if t is not None:\n        return _clean_title(t)\n', ''),
+    ("a seat's title on this computer", '    if not local:\n        return ""\n', ''),
+    ("a rewrite here before the server", '        out = server_side_text([{"role": "user", "content": _REFINE_PROMPT % (prev_subject, said)}])', '        out = None'),
+    ("the Remote agent never on the server", '    if _sd is not None:\n        return ("server", _sd["label"])', '    if False:\n        return ("server", _sd["label"])'),
+    ("the Remote agent's turn with no deadline", '            with server_first_deadline(60.0):\n                run_model(who, convo, parts.append)', '            if True:\n                run_model(who, convo, parts.append)'),
+    ("a failed Remote turn not marked down", '            server_mark_down(bound_ctx(), who.split(SERVER_SEP, 1)[0], str(exc))\n            return ""', '            return ""'),
+    ("Research here, not on the server", '    writer = _rs["label"] if _rs is not None else local_writer', '    writer = local_writer'),
+    ("a refused Research brief not written here", '            elif local_writer:\n', '            elif False:\n'),
+    ("a Research brief written twice", '            if _said[0]:\n                emit("\\n\\n\\u26a0\\ufe0f "', '            if False:\n                emit("\\n\\n\\u26a0\\ufe0f "'),
+    ("Cloud Only's picture to the server", '            _mode_pic = tier in TIERS and not cloud_only\n', '            _mode_pic = tier in TIERS\n'),
+    ("the server never reading after the cloud", '            if cloud_only or (not _vis_local and _vis_srv is None):\n', '            if cloud_only or not _vis_local:\n'),
+    ("a download while the server reads it", '                and not _srv_lbl and _vis_srv is None):\n', '                and not _srv_lbl):\n'),
+    ("the place pins on this computer", '                                _ps = (None if server_label(small)\n                                       else server_side_text(_pin_ask, user_base))\n',
+     '                                _ps = None\n'),
+    ("the rescue never on the server", '                _rs = (server_side_pick(user_base, "fast", "normal")\n                       if not images else None)\n', '                _rs = None\n'),
     ("a fallback answer badged as the server", '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}', ''),
 ]
 _p2m = []
@@ -21278,6 +21555,10 @@ class Ctl(BaseHTTPRequestHandler):
             return self.reply({"ok": True})
         if p == "/ram":
             RAM["v"] = d
+            return self.reply({"ok": True})
+        if p == "/vision":
+            with STUB.lock:
+                STUB.models[d["name"]]["vision"] = bool(d.get("on", True))
             return self.reply({"ok": True})
         if p == "/failmerge":
             STUB.fail_marker = str(d.get("marker") or "")
@@ -21561,10 +21842,10 @@ check("the page's chat request is the shape the live checks send: the stale mode
 _EMPTY39 = _hl39.sha256(b"").hexdigest()          # the hash of a new chat's empty prefix, as chatHash()
 
 
-def _page_body39(tier, text, stale="Llama 3.2 3B"):
+def _page_body39(tier, text, stale="Llama 3.2 3B", images=None):
     """What sendMsg posts for a mode: the stale hand pick beside the tier, and the turn of a new chat."""
     return {"model": stale, "models": [stale], "tier": tier, "messages": [{"role": "user", "content": text}],
-            "auto_web": True, "images": [], "docs": [], "agent": "",
+            "auto_web": True, "images": list(images or []), "docs": [], "agent": "",
             "chat_id": "c" + os.urandom(6).hex(), "lane": "ai", "after_len": 0, "after_hash": _EMPTY39}
 
 
@@ -21698,6 +21979,64 @@ def _modes_live39(inst, sid, svn, only=None):
                 and any("write the merge" in x_ for x_ in stat)
                 and len([f_ for f_ in bad["frames"] if f_[0] == "RUN" and '"w": "mix"' in f_[1]]) >= 1)
             det["bad"] = [bad["loc"], bad["text"][:80], stat[-2:], bad["merged"]]
+        if only in (None, "pic"):
+            # (6b357) A PICTURE IN A MODE: the server's model that reads pictures takes it; without one this computer's
+            # vision model, as before; Cloud Only and a pick of the person's are untouched; a refusal falls back
+            PIC = ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="]
+
+            def prun(body, text):
+                time.sleep(1.0)
+                n_loc, n_st = len(_loc39(inst)), len(_chats39())
+                s_, h_, t_, fr_ = _mchat39(inst, body)
+                time.sleep(2.0)
+                withpic = [c for c in _chats39()[n_st:] if (c[2]["messages"][-1] or {}).get("images")]
+                return {"status": s_, "text": t_, "frames": fr_, "loc": _loc39(inst)[n_loc:],
+                        "pic": [c[2]["model"] for c in withpic]}
+            # no reader on the server first: this computer's vision model, as before (what it asked is remembered:
+            # a model's capabilities don't change under one tag, so the reader comes as a model of its own)
+            v6 = prun(_page_body39("Fast", "what is in this picture 357f", images=PIC), "357f")
+            got["no reader on the server: this computer, as before"] = (
+                v6["pic"] == [] and ("LOCAL-ANSWER-Qwen 3.5 Vision 9B" in v6["text"] or "vision engine" in v6["text"]))
+            _o1("/clone", {"name": "aaa-vl:8b", "from": "small:8b"})
+            _o1("/vision", {"name": "aaa-vl:8b"})
+            q("/api/servers/test", "POST", {"id": sid})
+            v1 = prun(_page_body39("Fast", "what is in this picture 357a", images=PIC), "357a")
+            got["a picture in Fast: the server's reader takes it, nothing here"] = (
+                v1["status"] == 200 and v1["pic"] == ["aaa-vl:8b"] and "ANSWER-" in v1["text"]
+                and not any(c[0] == "run" for c in v1["loc"])
+                and any(f_[0] == "RUN" and '"w": "server"' in f_[1] for f_ in v1["frames"]))
+            v2 = prun(_page_body39("Thinking", "what is in this picture 357b", images=PIC), "357b")
+            got["a picture in Thinking: the same"] = v2["pic"] == ["aaa-vl:8b"] and not any(c[0] == "run" for c in v2["loc"])
+            # the server refuses before its first word: this computer's vision model, or the reason said
+            _o1("/failmerge", {"marker": "357c"})
+            v3 = prun(_page_body39("Fast", "what is in this picture 357c", images=PIC), "357c")
+            _o1("/failmerge", {"marker": ""})
+            q("/api/servers/test", "POST", {"id": sid})
+            got["a refused picture: this computer's reader, or said"] = (
+                v3["pic"] == ["aaa-vl:8b"] and ("LOCAL-ANSWER-Qwen 3.5 Vision 9B" in v3["text"] or "\u26a0" in v3["text"]))
+            # Cloud Only, and a pick of the person's: the server isn't asked
+            v4 = prun(_page_body39("Cloud Only", "what is in this picture 357d", images=PIC), "357d")
+            b5 = dict(_page_body39("", "what is in this picture 357e", images=PIC))
+            v5 = prun(b5, "357e")
+            got["Cloud Only and a pick: the server isn't asked"] = v4["pic"] == [] and v5["pic"] == []
+            det["pic"] = [v1["pic"], v1["loc"], v2["pic"], v3["text"][:120], v4["pic"], v5["pic"], v6["text"][:120]]
+            # (6b357) THE SIDE PASSES: an answer of this computer's (the person's own pick) gets its title and its
+            # memory pass from the server, and nothing of either runs here
+            n_loc, n_st = len(_loc39(inst)), len(_chats39())
+            lb = dict(_page_body39("", "my dog is called Biscuit and she is nine 357g"))
+            s_, h_, t_, fr_ = _mchat39(inst, lb)
+            time.sleep(3.0)
+            ts_, tj_ = q("/api/title", "POST", {"text": "my dog is called Biscuit and she is nine 357g",
+                                               "chat_id": h_.get("X-Chat-Id") or lb["chat_id"]})
+            time.sleep(1.0)
+            heads = [str(c[2]["messages"][-1]["content"])[:40] for c in _chats39()[n_st:]]
+            lheads = [c[3] if len(c) > 3 else "" for c in _loc39(inst)[n_loc:] if c[0] == "run"]
+            got["the title and the memory pass: on the server, not here"] = (
+                any(h.startswith("Summarise what this message") for h in heads)
+                and any(h.startswith("You maintain long-term memory") for h in heads)
+                and not any(h.startswith(("Summarise what this message", "You maintain long-term memory")) for h in lheads)
+                and isinstance(tj_, dict) and isinstance(tj_.get("title"), str))
+            det["side"] = [heads, lheads, tj_]
         if only in (None, "funnel"):
             # a funnel stage in the page's shape: the server's model asks first, nothing runs here
             _o1("/reply", {"text": json.dumps({"q": "Which way should it lean?", "options": [
@@ -21743,6 +22082,9 @@ check("servers (live): a plain server pick starts no engine on this computer",
 
 # ---- the same checks on a MUTATED copy of the app must fail: put the stale model back, and warm an engine for a seat
 _MUT39 = [
+    ("a picture in a mode never asking the server", '            if _mode_pic:\n                try:\n                    _vis_srv = server_vision_pick(self.ctx)',
+     '            if False:\n                try:\n                    _vis_srv = server_vision_pick(self.ctx)', "pic"),
+    ("the memory pass on this computer", '            out = None if server_label(label) else server_side_text(ask, base)', '            out = None', "pic"),
     ("the handler not asking for a server merge", 'srv_merge=(tier in TIERS and not cloud_only))', 'srv_merge=False)', "modes"),
     ("the page's stale model used for a mode",
      '            model_name = ""\n        elif srv_only_tier(tier):', '        elif srv_only_tier(tier):', "modes"),
