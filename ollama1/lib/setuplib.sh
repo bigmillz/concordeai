@@ -284,6 +284,36 @@ raid_members_on_disk() { # the partitions of our mirror found on these disks (no
   return 0
 }
 
+# The dashboard's console font (6b359). The monitor is read from across a room,
+# so the dashboard wants a big font (about 120 columns: 16x32 on a 1080p
+# screen), and the console's own small one gives 240. $1 the dashboard
+# program (its --set-font picks the font, o1font), $2 the tty. Nothing here
+# can leave the screen without a display: a font that won't load is a note,
+# and the screen keeps the one it has.
+# Opt out: OLLAMA1_DASH_FONT=off (or setup's --no-console-font) leaves the
+# font as it is, and drops the flag file that tells o1font to load nothing at
+# each start; running setup again without it brings the big font back.
+: "${DASH_FONT_OFF:=/etc/ollama1/dash-font.off}"
+dash_font_step() {
+  local dash=$1 tty=${2:-/dev/tty1} out
+  if [ "${OLLAMA1_DASH_FONT:-on}" = off ]; then
+    mkdir -p "$(dirname "$DASH_FONT_OFF")"
+    : >"$DASH_FONT_OFF"
+    note "console font: left as it is ($DASH_FONT_OFF). Delete that file and run setup again to get the big one"
+    return 0
+  fi
+  rm -f "$DASH_FONT_OFF"
+  # console-setup-linux: the Terminus fonts as /usr/share/consolefonts/*.psf.gz.
+  # console-terminus: the ter-v fonts, where the distribution has the package.
+  run apt-get install -y -q console-setup-linux || note "console-setup-linux did not install; the dashboard uses the console fonts that are there"
+  apt-get install -y -q console-terminus >/dev/null 2>&1 || note "console-terminus isn't available here; using the fonts that are"
+  if out=$("$dash" --set-font "$tty" 2>&1); then
+    ok "console font: $out"
+  else
+    note "couldn't load a console font ($out); the screen keeps the one it has"
+  fi
+}
+
 wait_for() { local _; for _ in $(seq 1 50); do [ -e "$1" ] && return 0; sleep 0.2; done; return 1; }
 
 # The models disk. $1 disk, $2 serial.

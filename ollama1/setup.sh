@@ -11,6 +11,9 @@
 #   sudo ./setup.sh --remove-setup-key also take claude-setup@concordeai out of
 #                                    ~<your-user>/.ssh/authorized_keys (your own key stays)
 #   sudo ./setup.sh --no-tmux        don't wrap the run in a tmux session
+#   sudo ./setup.sh --no-console-font  leave the server's monitor font as it is (by default
+#                                    the dashboard gets a big console font, about 120 columns;
+#                                    OLLAMA1_DASH_FONT=off does the same)
 #   sudo ./setup.sh --encrypted-swap 32G   opt in: encrypted swap (random key each boot),
 #                                    replacing the plain /swap.img; nothing else runs
 #   sudo ./setup.sh --remove-encrypted-swap  undo that
@@ -113,8 +116,9 @@ for a in "$@"; do
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
     --no-tmux) NO_TMUX=1 ;;
+    --no-console-font) export OLLAMA1_DASH_FONT=off ;;
     --lan-public-ok) LAN_PUBLIC_OK=1 ;;
-    -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,53p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
@@ -297,7 +301,7 @@ print_plan() {
    $(state '[ -f /etc/ssh/sshd_config.d/10-ollama1.conf ]') 10. SSH: passwords off, only $ADMIN_USER with a key, no root (after you confirm your key)
    $(state '[ -L /opt/ollama/current ]') 11. Ollama (ROCm build) from GitHub, checksums verified; GPU only; local only
    $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 04:00 when needed; weekly Ollama update
-   $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen, timers
+   $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen (big console font), timers
    $(state 'systemctl is-active ollama1-tunnel') 14. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          15. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
@@ -370,7 +374,7 @@ if [ "$NO_TMUX" = 0 ] && [ -z "${TMUX:-}" ] && [ -z "${STY:-}" ]; then
     echo "If you get disconnected, log in again and run:  sudo tmux attach -t $TMUX_SESSION"
     sleep 2
     rm -f "$STATUS_FILE"
-    inner="OLLAMA1_LOCKED=0 OLLAMA1_LOCK_WAIT=15 OLLAMA1_RELOCATED=1 bash $(printf '%q' "$KIT/setup.sh")"
+    inner="OLLAMA1_LOCKED=0 OLLAMA1_LOCK_WAIT=15 OLLAMA1_RELOCATED=1 ${OLLAMA1_DASH_FONT:+OLLAMA1_DASH_FONT=$(printf '%q' "$OLLAMA1_DASH_FONT") }bash $(printf '%q' "$KIT/setup.sh")"
     for a in "$@"; do inner+=" $(printf '%q' "$a")"; done
     inner+="; echo \$? >$STATUS_FILE; read -r -p 'Setup has finished. Press Enter to close this tmux session. ' _"
     flock -u 9; exec 9>&-
@@ -924,6 +928,7 @@ run systemctl enable ollama1-idle.service
 run systemctl restart ollama1-idle.service
 "$LIBDIR/bin/ollama1-idle" wol-setup || note "couldn't set up wake on a magic packet; auto sleep still works, waking it from the app won't"
 systemctl stop getty@tty1.service >/dev/null 2>&1 || true
+dash_font_step "$LIBDIR/bin/ollama1-dash" /dev/tty1
 run systemctl restart ollama1-dash.service
 sleep 2
 for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power ollama1-idle; do

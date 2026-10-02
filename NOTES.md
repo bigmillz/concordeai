@@ -85,6 +85,166 @@ the server trumps anything run on the local machine."
   only says it can), its first-word time on a real card, and nothing was looked
   at on screen.
 
+## 6b360 — more CPU figures in the web admin panel
+Patrick (2026-10-02): "can we add more cpu stats including frequency and temp
+into the web admin panel?"
+
+The server kit's panel (`ollama1/bin/ollama1-admin`, behind Cloudflare Access)
+had one line for the CPU ("12%, load 0.5 0.4 0.3"). It now has a **CPU card**
+under the top row of cards, and two more history charts. Read-only: no new
+route that writes, no new privilege, no unit change (the panel's unit keeps
+ProtectKernelTunables, which makes /sys read-only, not hidden).
+- **New module `ollama1/lib/o1cpu.py`** (`CpuProbe`), written so the console
+  dashboard can use it later instead of its own `o1metrics.cpu_temp()`; the
+  dashboard's files were not touched (another branch is rewriting it). Nothing
+  in `o1stats.py`/`o1metrics.py` changed.
+- Where each figure comes from: model, cores (distinct physical id + core id
+  pairs) and threads from `/proc/cpuinfo` (read every 5 minutes); driver,
+  governor, min/max/rated speed from `cpu*/cpufreq/` (`scaling_driver`,
+  `scaling_governor`, `scaling_min_freq`, `scaling_max_freq`,
+  `cpuinfo_max_freq`); speed now per thread from `scaling_cur_freq`, else
+  `cpu MHz` in `/proc/cpuinfo`; temperature from the hwmon whose NAME is
+  `k10temp`, `coretemp` or `zenpower` (never by number: they change from boot
+  to boot), preferring Tdie, then Tctl, then "Package id 0" (Tctl can carry a
+  vendor offset on some Ryzen models), with the other sensors (Tccd1...)
+  listed and the highest value seen since the panel started; busy % overall
+  and per thread from `/proc/stat` deltas; load and "running of tasks" from
+  `/proc/loadavg`; package power from RAPL `energy_uj` or the `amd_energy`
+  chip, else the card falls back to the power sampler's `cpu_w` that the
+  Power card already fetches, else the tile is hidden. RAPL's counter is
+  readable only by root on current kernels, so on the panel's own user this
+  is usually the sampler's figure, labelled that way.
+- The note ("Slower than it could be: ...") appears when Intel's
+  `thermal_throttle` counters rose in the last 5 minutes, or when the CPU is
+  at least 80% busy and averaging under half its rated top speed. Plain
+  words, amber text, no alarm. AMD has no throttle counter in sysfs, so only
+  the second rule can fire there.
+- Colours reuse the panel's thresholds for the temperature: amber at 80 C,
+  red at 90 C (the stability test aborts a phase at 95 C and says so itself).
+- **Every reading is optional.** One bounded reader (regular files only, never
+  a symlink as the last component, never a FIFO, at most 4 KiB, 4 MiB for
+  cpuinfo); numbers must be finite and in a sane range (temperature -30..150
+  C, a core 1..15000 MHz) or they are dropped to None; at most 1024 threads
+  are read and listed (the count is still right). A missing source is a blank
+  tile, not an error, and a probe that raises leaves `cpu: null` in the state
+  without touching the rest of it.
+- **The model name is text from the machine.** `clean_text` keeps printable
+  characters only, drops `< > & " ' ` \`, folds whitespace, and cuts at 80;
+  the page also puts every CPU figure in with `textContent` or an SVG
+  attribute, never markup (a test fails if `innerHTML` appears anywhere in the
+  page).
+- Wire and history: `/api/state` gains a `cpu` object (old fields unchanged);
+  history rows grow from 7 to 9 columns (`cpu_temp` in C, `cpu_ghz`), the
+  older 7-column file is still read and padded with nulls, the ring is the same
+  24 h at 10 s, no faster poll. The card's two 5-minute sparklines come from
+  those rows plus the latest 2-second reading.
+- Tests: `tests/test_cpu.py` (fixture /sys and /proc trees: AMD k10temp +
+  amd-pstate, Intel coretemp, no cpufreq, a virtual machine, a renumbered
+  hwmon, garbage, 1500 threads, symlink and FIFO, hostile model, the status
+  route, history, the page) and 10 mutants in `mutate.py` (hwmon by number, no
+  bounds, model not cleaned, divide by zero, symlink followed, two core caps
+  not applied, peak not kept, model as markup, old history dropped). Not run
+  on a real Ryzen: the fixture layout follows the kernel documentation
+  (k10temp, amd-pstate, cpufreq sysfs), and the card was looked at in the
+  browser pane at desktop and phone width with made-up data.
+- To get it on the server: `sudo bash ~/concordeai/ollama1/setup.sh` (it
+  installs `lib/*.py` and the panel), then `sudo systemctl restart
+  ollama1-admin`; or copy `lib/o1cpu.py` and `bin/ollama1-admin` into place
+  and restart the same unit.
+
+## 6b359 — the server's screen: boxes that can't overlap, and a bigger font
+Patrick (2026-10-02), with two photos of the monitor: "Clean up the panel
+that shows on the display connected to the server because it has charts
+overrunning text and stuff shifting around and everything. Like, it's
+impossible to read it if you look at the screenshots. It also doesn't have to
+be so high resolution."
+
+What the photos show (a 240x67 console, ASCII glyphs): wide walls of `#` from
+charts, labels overwritten by other text on the same row (a network line
+read "ports ... link 1000 M6.4K/s out 5.7K/s 00 Mb/s": two lines drawn into
+one row), bars far from their panel, text fragments left behind.
+
+Found in the code (the real console was not available to look at; each is
+a way to produce what the photos show):
+- `Canvas.put` clipped to the **screen**, never to a panel. A panel's text
+  and charts were placed with offsets taken from the panel's own width
+  (`ix + iw - 22`, a bar `iw - 36` wide at `ix + 13`), and in a narrow or
+  short box those landed on each other and past the border.
+- Widths were `len()`: the degree sign, wide characters in a model or device
+  name, and (in `_lines`) text cut *before* the ASCII mapping.
+- A name containing an escape sequence reached the screen as it was.
+- Charts were area charts filling every row left over, up to 19 rows high:
+  at 100% CPU in ASCII mode that is a solid block of `#` (the yellow wall),
+  and a chart's rows were computed from the panel's share of the screen, not
+  from what the text above it used.
+- Output went through curses, which keeps its own picture of the screen and
+  updates it with relative moves and insert/delete/repeat sequences it picks
+  from terminfo. On the Linux console, after the font change at start (the
+  unit runs `setfont` just before) or a resize, that picture and the glass
+  disagree, which is how rows end up shifted and old fragments stay.
+- The picked font was 8x16 (about 220-240 columns on 1080p), too small to
+  read at a distance.
+
+What changed (`lib/o1dashui.py` rewritten, new `lib/o1dashterm.py`,
+`bin/ollama1-dash`, `lib/o1font.py`):
+- One layout engine, `plan(w, h)`: the screen is a fixed grid of boxes, two
+  columns from 76 wide (one below), 120 columns at most and centred above
+  that, and the lowest-priority boxes are dropped when the screen is short
+  (Health, Network, Storage, ...). Seven boxes: GPU, CPU and memory,
+  Requests, Loaded models, Storage, Network, Health. Each is a label, a
+  value and one bar or one trend line (a sparkline of eighth blocks, or
+  `_.:-=+*#`), no chart walls. Built for about 100x30; 80x24 shows six boxes
+  and the header carries the problem count (ALL CLEAR / N TO CHECK /
+  N PROBLEMS); 240x67 is the same layout, centred.
+- Every box is drawn on its **own bounded `Cells` buffer**, cut at its
+  edges, and blitted (cut again) into the frame, so a widget cannot write a
+  cell outside its box (tested with a widget that writes everywhere). Rows
+  of a panel are columns with fixed widths, each cut with "..." to its own
+  width, so one cannot run into the next.
+- Text is `clean()`ed (escape sequences and control characters out) and
+  measured with the true display width (`cw`: wide = 2, combining = 0).
+  On the console only ASCII and the glyphs the font was checked for are
+  drawn; anything else is `?`. No more braille.
+- No curses. `o1dashterm.Screen` writes the frame composed in memory with
+  an absolute cursor position per row, only changed rows, every row every
+  30 s (heals a glitch), and a **clear whenever the size is not the one it
+  last drew**; line wrap and the cursor are off. The size is read every
+  time (`os.get_terminal_size` on stdout, stdin, stderr, then COLUMNS and
+  LINES) and SIGWINCH makes a redraw at once. Keys: `t` (chart range), `q`
+  off the console. `p` (pages) is gone: nothing is paged.
+- A widget that raises shows "no data" in its own box (`ERRORS` records it
+  for the tests) rather than blanking the screen.
+- **Font.** `o1font.pick` now aims at 120 columns (16x32 on 1080p is about
+  120x33), within 15 columns counts as the same size, then blocks over
+  ASCII, then Terminus. `setup.sh` runs `dash_font_step` (in `setuplib.sh`)
+  just before the dashboard restarts: `apt-get install console-setup-linux`
+  and, if the distribution has it, `console-terminus`, then
+  `ollama1-dash --set-font /dev/tty1`. Never fatal. Opt out with
+  `--no-console-font` or `OLLAMA1_DASH_FONT=off` (a flag file,
+  `/etc/ollama1/dash-font.off`, makes the unit's `--set-font` load nothing;
+  setup without the opt-out removes it). Not done on purpose: a kernel
+  `video=` parameter, which can leave a server with no display. The unit
+  is unchanged (user `o1dash`, tty1, `ExecStartPre` set-font).
+- Tests (`tests/test_dash.py`): every size 80x24, 100x30, 120x40, 160x50,
+  240x67 and nine small or odd ones (down to 1x1 and up to 300x90), with
+  sample, empty, None-filled and hostile data (long names, wide
+  characters, escape sequences, infinity, NaN, 10**40): every row exactly
+  `cols` cells, nothing outside a box but blanks, each box equal to its
+  panel drawn alone, no overlap in `plan` for a sweep of sizes, the right
+  panels at each size, identical on a second render, a virtual terminal
+  that follows the output shows the canvas exactly after a resize over
+  garbage, and a real pty run of `ollama1-dash` that is resized. Setup:
+  `TestDashFont`. 27 mutants in `mutate.py` for it (clipping, resize,
+  ANSI in width, truncation, wide characters, overlap, wrap, refresh,
+  font target, opt-out).
+- Not verified: a real Linux console. The font names (which package has
+  which `.psf`), the glyphs they hold, and how the console behaves with
+  the output were not tried on the server; the picker reads what is there
+  and falls back to ASCII. Run `sudo ./setup.sh` on the server again
+  (or just restart the dashboard after installing a font:
+  `sudo systemctl restart ollama1-dash`), and `cat /run/ollama1/dash-font.json`
+  says which font and glyphs it chose.
+
 ## 6b352 — Find in chat (Cmd+F / Ctrl+F)
 Patrick (2026-10-02): "Command or Control F should open a find box for the
 current chat."
