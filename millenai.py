@@ -8366,19 +8366,10 @@ def save_annotated_png(ctx, data_url: str) -> dict:
     if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) > ANNOTATE_SAVE_MAX:
         raise ValueError("not a PNG")
     token = secrets.token_urlsafe(16)
-    path = stage_path(".png")
-    kept = False
-    try:
-        with open(path, "wb") as f:
-            f.write(raw)
-        try:
-            ctx.adopt(path, "%s/%s.png" % (EXPORT_DIRNAME, token))
-        except NotLanded:
-            kept = True
-            raise
-    finally:
-        if not kept:
-            drop_run_file(path)
+    # through the profile's own writer (checked against the active profile
+    # at the moment of writing): after a switch nothing lands, and the
+    # caller is told by StaleProfile
+    ctx.write_bytes("%s/%s.png" % (EXPORT_DIRNAME, token), raw, mode=0o600)
     name = "annotated-picture.png"
     try:
         ctx.write("%s/%s.meta" % (EXPORT_DIRNAME, token),

@@ -113,6 +113,14 @@ a picture.
   phrasings, with nine gate mutations; the page has twelve mutations, the
   pins eight. A regenerated question still goes out without its picture, as it
   always has.
+- GAUNTLET FIXES. The integration gauntlet found the Save code wrote its PNG
+  with a bare open(), outside the profile rules, and its stage/adopt text
+  duplicated an anchor of the profiles mutation list. `save_annotated_png` now
+  writes through `ctx.write_bytes` (checked against the active profile at the
+  moment of writing, 0600): after a switch the old ctx is refused with
+  StaleProfile and nothing lands. One check proves a save under A lands in A's
+  exports/, is refused after a switch, and B can't see it. The page's host
+  names gain ClipboardItem, FileReader, ResizeObserver and Number.
 
 ## 6b351 — the benchmark's "Compare with..." crosses this computer, servers and the cloud
 Patrick (2026-10-02), with a screenshot of the benchmark pane mid-run on This
