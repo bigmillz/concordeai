@@ -8179,6 +8179,13 @@ def reveal_in_finder(path: str) -> bool:
 # draws them over the picture the person attached. The gate below is a
 # small word pattern and FAILS CLOSED: a picture with a plain question
 # ("what is this?") goes the way it always did.
+# 6b355 REVIEW: the first gate fired on "add up the numbers on this
+# receipt", "put the text in a table" and "show me where this was taken",
+# and on a cloud vision route that sent a picture out on a message that was
+# not about drawing. A request now needs a MARKING verb at the head of an
+# instruction; the weaker verbs (draw, outline, point out; add, put, place)
+# also need a shape or the picture as their target; a question that is not
+# a request ("label the parts of this cell?") never counts.
 _ANN_LEAD = re.compile(
     r"^(?:(?:ok(?:ay)?|hey|hi|now|then|also|so|well|just|please|pls|kindly|"
     r"thanks?|thank\s+you|great|good)\b[\s,.!:;-]*|"
@@ -8188,49 +8195,57 @@ _ANN_LEAD = re.compile(
     r"go\s+ahead\s+and\b\s*|try\s+to\b\s*|you\s+should\b\s*|"
     r"i['’]?d\s+like\s+(?:it\s+)?if\s+you\b\s*|ask\s+(?:the\s+app|"
     r"you)\s+to\b\s*|and\b\s*)+", re.I)
+# a question mark only belongs to a REQUEST when it opens like one
+_ANN_REQ = re.compile(
+    r"^(?:(?:ok(?:ay)?|hey|so|now|also|and|please|pls|kindly)\b[\s,]*)*"
+    r"(?:(?:can|could|would|will)\s+you|please|i['’]?d\s+like\s+you\s+"
+    r"to|i\s+(?:want|need)\s+you\s+to)\b", re.I)
 _ANN_QUESTION = re.compile(
     r"^\s*(?:what|why|who|whose|which|how|is|are|was|were|does|do|did|"
     r"when|where|whats|what['’]s)\b", re.I)
-_ANN_SHAPE = (r"(?:box(?:es)?|circles?|lines?|arrows?|outlines?|borders?|"
-              r"boundar(?:y|ies)|routes?|paths?|rectangles?|ovals?|"
-              r"ellipses?|shapes?|polygons?|zones?|regions?|areas?|"
-              r"overlays?|marks?|markers?|pins?|dots?|labels?|stars?|"
-              r"highlights?|x['’]?s|crosses|numbers?|text|notes?)")
-_ANN_PREP = r"(?:on|over|onto|around|across|upon|atop|in|inside|along)"
-# the verbs that mean "mark the picture" wherever they stand
+_ANN_SHAPE = (r"(?:circles?|box(?:es)?|arrows?|outlines?|rectangles?|ovals?|"
+              r"ellipses?|squares?|borders?|boundar(?:y|ies)|polygons?|"
+              r"markers?|pins?|dots?|lines?|x['’]?s)")
+_ANN_TARGET = (r"(?:on|over|onto|across|atop|upon)\s+(?:it|this|that|them|"
+               r"(?:the|this|that|my|your)\s+(?:map|image|picture|photo|pic|"
+               r"screenshot|screen\s*shot|diagram|floor\s*plan|plan|chart|"
+               r"drawing|layout|scan|figure))\b")
+# verbs that mean marking whenever they open an instruction
 _ANN_STRONG = re.compile(
-    r"^(?:annotate|highlight|circle|underline|ring|point\s+out|point\s+to|"
-    r"mark\s+up|colou?r\s+in|trace)\b", re.I)
-# "mark" and "label" are nouns as often as verbs: only an imperative one
+    r"^(?:annotate|highlight|circle|underline|mark\s+up|colou?r\s+in)\b"
+    r"\s*\S", re.I)
+# "mark", "label", "box", "shade": nouns as often as verbs, so only an
+# imperative one, and not "mark as read" / "mark my words"
 _ANN_MARK = re.compile(
-    r"^(?:mark|label|tag|pin)\b\s*(?!as\b|down\b|my\s+words|me\b|"
-    r"sure\b|that\b\s*$)\S", re.I)
-# draw / outline / shade / put / place / add need a place or a shape
-_ANN_PLACE = re.compile(
-    r"^(?:draw|sketch|outline|shade|overlay|put|place|add|insert)\b"
-    r"(?P<rest>.*)$", re.I)
-_ANN_SHOW = re.compile(
-    r"^show\b(?:\s+me)?\s+(?:on\b|where\b|(?:[^.?!]{0,80}\s)?on\s+"
-    r"(?:it|this|that|the\s+(?:map|image|picture|photo|screenshot|"
-    r"diagram|plan|chart|drawing|floor\s*plan)))", re.I)
+    r"^(?:mark|label|box|shade)\b\s*(?!as\b|down\b|off\b|my\s+words|me\b|"
+    r"sure\b|(?:it|this|that|them)\s+as\b|up\b)\S", re.I)
+# these draw only with a shape or onto the picture
+_ANN_DRAW = re.compile(
+    r"^(?:draw|sketch|outline|point\s+out|point\s+to)\b(?P<rest>.*)$", re.I)
+# and these only with a shape AND a place for it
+_ANN_PLACE = re.compile(r"^(?:add|put|place|insert)\b(?P<rest>.*)$", re.I)
 _ANN_PASSIVE = re.compile(
-    r"\b(?:want|like|need|have|get|make|prefer)\b[^.?!]{0,80}\b"
-    r"(?:highlighted|circled|marked(?:\s+up)?|outlined|labell?ed|"
-    r"annotated|shaded|underlined)\b", re.I)
-_ANN_EDIT = re.compile(
-    r"\b(?:bigger|larger|smaller|shrink|enlarge|expand|extend|widen|"
-    r"narrow|thicker|thinner|move|shift|nudge|remove|delete|erase|drop|"
-    r"clear|add|also|another|more|fewer|change|recolou?r|colou?r|rename|"
-    r"relabel|redo|adjust|fix|resize|instead|different|lighter|darker|"
-    r"red|blue|green|yellow|orange|purple|pink|black|white)\b", re.I)
+    r"\b(?:want|like|need)\s+(?:the|all|every|each|those|these|them|it|"
+    r"some|any|my)\b[^.?!]{0,80}?\s(?:highlighted|circled|marked(?:\s+up)?|"
+    r"outlined|annotated|shaded|boxed)(?:\s+(?:on|in|with)\b[^.?!]*)?"
+    r"\s*(?:please\s*)?$", re.I)
+
+
+def _ann_sentences(text: str):
+    """(sentence, is_a_question_that_is_not_a_request) for each sentence."""
+    for m in re.finditer(r"[^.!?\n;]+[.!?;]*", text or ""):
+        raw = m.group(0).strip()
+        body = raw.rstrip(".!?; ").strip()
+        if body:
+            yield body, (raw.endswith("?") and not _ANN_REQ.match(body))
 
 
 def _ann_clauses(text: str):
-    """The sentences of a request (a question opener drops its own) split
-    where an 'and' or a comma starts another instruction."""
-    for sent in re.split(r"[.!?\n;]+", text or ""):
-        sent = _ANN_LEAD.sub("", sent.strip())
-        if not sent or _ANN_QUESTION.match(sent):
+    """The instructions in a request: each sentence that is not a question,
+    split where an 'and' or a comma starts another one."""
+    for sent, asks in _ann_sentences(text):
+        sent = _ANN_LEAD.sub("", sent)
+        if not sent or asks or _ANN_QUESTION.match(sent):
             continue
         for cl in re.split(r"\b(?:and|then|but|so|to)\b|[,:&]", sent,
                            flags=re.I):
@@ -8243,36 +8258,64 @@ def annotate_wants(text: str) -> bool:
     """True when the request asks to mark, draw on, or label the attached
     picture. Fail-closed: no match means the picture is read as before."""
     t = str(text or "")[:2000]
-    if _ANN_PASSIVE.search(t):
-        return True
-    for cl in _ann_clauses(t):
-        if _ANN_STRONG.match(cl) or _ANN_MARK.match(cl) \
-                or _ANN_SHOW.match(cl):
+    for sent, asks in _ann_sentences(t):
+        if not asks and _ANN_PASSIVE.search(sent):
             return True
+    for cl in _ann_clauses(t):
+        if _ANN_STRONG.match(cl) or _ANN_MARK.match(cl):
+            return True
+        m = _ANN_DRAW.match(cl)
+        if m:
+            rest = m.group("rest")[:120]
+            if re.match(r"\s*me\s+an?\s+\w+\s*$", rest, re.I):
+                continue                 # "draw me a circle": a commission
+            if re.search(r"\b" + _ANN_SHAPE + r"\b", rest, re.I) \
+                    or re.search(r"\b" + _ANN_TARGET, rest, re.I):
+                return True
         m = _ANN_PLACE.match(cl)
         if m:
-            rest = m.group("rest")[:90]
-            head = cl.split(None, 1)[0].lower()
-            if re.match(r"\s*(?:\w+\s+){0,3}?" + _ANN_PREP + r"\s+"
-                        r"(?:it|this|that|them|the|my|a|an)\b", rest, re.I) \
-                    and head in ("draw", "sketch", "overlay"):
-                return True
-            if re.match(r"\s*(?:me\s+)?(?:an?|the|some|more|two|three|"
-                        r"\d+)?\s*(?:\w+\s+){0,2}?" + _ANN_SHAPE + r"\b",
-                        rest, re.I) and not re.match(
-                            r"\s*me\s+an?\s+\w+\s*$", rest, re.I):
+            rest = m.group("rest")[:120]
+            if re.search(r"\b" + _ANN_SHAPE + r"\b", rest, re.I) and (
+                    re.search(r"\b" + _ANN_TARGET, rest, re.I)
+                    or re.search(r"\b(?:around|pointing)\b", rest, re.I)):
                 return True
     return False
 
 
+# a FOLLOW-UP changes the drawing only when a change verb is aimed at a
+# drawn thing ("make the red box bigger", "remove the blue circle", "move it
+# left"); "tell me more", "explain", "recommend" and questions never do
+_ANN_CHANGE = re.compile(
+    r"^(?:make|move|shift|nudge|resize|recolou?r|colou?r|remove|delete|"
+    r"erase|drop|add|redo|enlarge|shrink|expand|widen|narrow|change|swap|"
+    r"turn|rename|relabel|extend|thicken)\b(?P<rest>.*)$", re.I)
+_ANN_DRAWN = re.compile(
+    r"^\s*(?:(?:the|a|an|another|one|more|that|this|those|these|all|every|"
+    r"each|some|two|three|new|extra|big|bigger|small|other|red|blue|green|"
+    r"yellow|orange|purple|pink|black|white|grey|gray)\s+){0,3}(?:\w+\s+)?"
+    r"(?:box(?:es)?|circles?|marks?|markers?|labels?|outlines?|arrows?|"
+    r"shapes?|areas?|zones?|regions?|polygons?|ellipses?|ovals?|"
+    r"rectangles?|lines?|highlights?|pins?|dots?|colou?rs?|ones?|"
+    r"map|picture|image|photo|drawing|overlay)\b", re.I)
+_ANN_IT = re.compile(
+    r"^\s*(?:it|them|those|these)\b[^.?!]*\b(?:bigger|larger|smaller|wider|"
+    r"narrower|thicker|thinner|left|right|up|down|higher|lower|red|blue|"
+    r"green|yellow|orange|purple|pink)\b", re.I)
+
+
 def annotate_edit_wants(text: str) -> bool:
     """A follow-up to marks already drawn ('make the red box bigger',
-    'also mark the park'): the change words, never a question."""
+    'also mark the park'): a change aimed at the drawing, never a question,
+    never 'tell me more'."""
     t = str(text or "")[:2000]
     if annotate_wants(t):
         return True
-    s = _ANN_LEAD.sub("", t.strip())
-    return bool(s and not _ANN_QUESTION.match(s) and _ANN_EDIT.search(s))
+    for cl in _ann_clauses(t):
+        m = _ANN_CHANGE.match(cl)
+        if m and (_ANN_DRAWN.match(m.group("rest"))
+                  or _ANN_IT.match(m.group("rest"))):
+            return True
+    return False
 
 
 def annotate_prev(messages) -> bool:
@@ -36041,6 +36084,13 @@ function annAdd(chat,at,img){
   while(annChats.size>5){const k=annChats.keys().next().value;
     (annChats.get(k)||[]).forEach(x=>annPicById.delete(x.id));annChats.delete(k);}
   return e;}
+// a rewind (Try again, Edit & resend) drops the questions from n on; their
+// pictures go with them, or the next answer could be drawn on one of them
+// (review of 6b355). `at` is the question's index in the chat's messages.
+function annTrim(chat,n){
+  const l=annChats.get(chat);if(!l)return;
+  for(let k=l.length-1;k>=0;k--)if(l[k].at>=n){annPicById.delete(l[k].id);l.splice(k,1);}
+}
 function annPicFor(){
   const l=annChats.get(annCtx.chat||curChat)||[],pos=annCtx.pos;
   let best=null;
@@ -37078,7 +37128,8 @@ async function send(){
   const myMessages=messages;
   // the picture this question carries, for a later ```annotate answer to
   // be drawn on (6b355): kept for this session only, never saved
-  if(sentImages.length)annAdd(myChat,inner.children.length-1,sentImages[0]);
+  annTrim(myChat,myMessages.length-1);
+  if(sentImages.length)annAdd(myChat,myMessages.length-1,sentImages[0]);
   // the chat shows in the list at once; the server makes it with the
   // question (0b 5.4) and the page adopts the saved copy at the end
   const madeChat=!chats.some(x=>x.id===myChat);
