@@ -19712,11 +19712,12 @@ def _p2_council(src, run_model, **over):
           "ctx_thread": lambda target, ctx=None, bind=True, **kw: _t34.Thread(target=target, **kw),
           "_DraftAbandoned": type("_DraftAbandoned", (Exception,), {}), "MERGE_RANK": [], "merge_pref_label": lambda: "",
           "MODEL_ROUTES": {}, "MODEL_INFO": {}, "run_model": run_model,
-          "_stream_guarded": lambda label, msgs, emit, status, fb, note: calls.append(("merge", label, getattr(_RC_DL, "s", "unset"))) or emit("MERGED"),
+          "_stream_guarded": lambda label, msgs, emit, status, fb, note: (calls.append(("merge", label, getattr(_RC_DL, "s", "unset"))), emit("MERGED"), True)[2],
           "compositor_ladder": lambda: [], "fast_cloud_ladder": lambda: [], "claude_refusal_conf": lambda c: None,
           "SYNTH_INSTRUCTION": "S", "PEER_INSTRUCTION": "P", "cloud_stream_conf": lambda *a: False,
           "_answered": {}, "cloud_glitch": lambda *a: None, "cloud_text": lambda *a, **k: "",
           "server_copy": lambda *a, **k: None, "server_mode_candidates": lambda c: [], "server_speeds": lambda c: {},
+          "server_compositor": lambda ctx, drafted=(): None,
           "bound_ctx": lambda: None, "ServerError": type("ServerError", (RuntimeError,), {}),
           "server_first_deadline": _RcDeadline, "server_mark_down": lambda ctx, name, why: downs.append((name, why)),
           # a server marked down is down (6b339, final review), by the name before the separator
@@ -20061,16 +20062,17 @@ def _p2c_pins(src):
         and "        _gt.join(timeout=max(1.0, _local_deadline - time.time() + 20))" in rc
         and "    LOCAL_CAP = 120.0" in rc and "        _jd = time.time() + min(LOCAL_CAP, max(15.0, _left))" in rc
         and "                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):" in rc
-        and "hurry=None, srv_first_s=None) -> None:" in rc
-        and "                            srv_first_s=(60.0 if _seat_fb else None))" in ch,
+        and "hurry=None, srv_first_s=None, srv_merge=False) -> None:" in rc
+        and "                            srv_first_s=(60.0 if _seat_fb else None),\n"
+            "                            srv_merge=(tier in TIERS and not cloud_only))" in ch,
         "council caps": "                _capped(label, lambda _l=label, _p=parts: run_model(" in rc
         and "            _capped(merger, lambda: run_model(merger, [" in rc
         and "        with server_first_deadline(srv_first_s if server_label(merger)\n                                   else None):" in rc
         and "            if on_server:\n                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0]," in rc
         and "                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                 str(_err[0]))" in rc,
-        "merge on the server": "    if merger in MODEL_ROUTES and comp not in MODEL_ROUTES:" in rc
+        "merge on the server": "    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES:" in rc
         and "                # the server didn't write it: this computer's copy does" in rc,
-        "page badge": '                  else if(d.w==="local"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
+        "page badge": '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
         "settings switch": ('    +(s.paired?\'<label class="srv-pref"><input type="checkbox" data-a="prefer"\'' in src
                             and '  try{d=await srvPost("prefer",{id:id,on:c.checked});}' in src
                             and 'elif op not in ("pair", "test", "access", "remove", "prefer"):' in src
@@ -20220,6 +20222,187 @@ def _p5c_nodes(src):
     return all(got.values()), [got, o]
 
 
+def _p6c_chooser(src):
+    """6b344: the model of the server that writes a mode's merge. The seats' chooser and filters (a coder, an embedding, a
+    guard, a picture reader or a reasoning distill never; gpu placement, fitting a card whose size is reported, the
+    switch on); the strongest by size; a model the council just drafted with (the server holds two) when it is within
+    70% of the strongest's size; none when no server qualifies."""
+    models = [_m("gpt-oss:20b", size=13 * GIB_), _m("mistral-small:24b", size=14 * GIB_), _m("gemma3:12b", size=8 * GIB_),
+              _m("qwen3-coder:30b", size=12 * GIB_), _m("nomic-embed-text:335m", size=GIB_), _m("llama-guard3:8b", size=5 * GIB_),
+              _m("llava:13b", size=8 * GIB_), _m("deepseek-r1:14b", size=9 * GIB_), _m("hog:70b", "gpu+ram", 40 * GIB_)]
+    ns, ctx, ents = _p2_ns(src, [("Desk", "https://desk.example.com", models, {})])
+    pick = lambda d=(): (ns["server_compositor"](ctx, d) or {}).get("name")
+    L = lambda n_: "Desk · " + n_
+    ok = ns["srv_role_ok"]
+    got = {
+        "strongest": pick() == "mistral-small:24b",
+        "families": all(not ok(n_, "compose") for n_ in ("qwen3-coder:30b", "nomic-embed-text:335m", "llama-guard3:8b",
+                                                         "llava:13b", "deepseek-r1:14b"))
+        and all(ok(n_, "compose") for n_ in ("gpt-oss:20b", "mistral-small:24b", "gemma3:12b")),
+        # the council's last two drafters are what the server still holds: one within 70% of the strongest takes the pen
+        "resident": pick([L("gpt-oss:20b")]) == "gpt-oss:20b"
+        and pick([L("gemma3:12b"), L("gpt-oss:20b")]) == "gpt-oss:20b"
+        and pick([L("gpt-oss:20b"), L("gemma3:12b")]) == "gpt-oss:20b",
+        # ...never a much smaller one, and only the last two count
+        "not a small one": pick([L("gemma3:12b")]) == "mistral-small:24b"
+        and pick([L("gpt-oss:20b"), L("gemma3:12b"), L("gemma3:12b")]) == "mistral-small:24b",
+        # a model of this computer's among the drafts is not the server's
+        "local draft": pick(["Gemma 4 26B"]) == "mistral-small:24b",
+    }
+    _so_seen(ns, ents["Desk"], [dict(m_, loaded=True) if m_["name"] == "gpt-oss:20b" else m_ for m_ in models],
+             gpu=dict(_P2_GPU))
+    got["the server says it holds one"] = pick() == "gpt-oss:20b"
+    _so_seen(ns, ents["Desk"], models, gpu=dict(_P2_GPU))
+    # nothing to write it: no server, the switch off, a server that doesn't answer, only gpu+ram models, no card figure
+    n0, c0, e0 = _p2_ns(src, [])
+    got["no server"] = n0["server_compositor"](c0, []) is None
+    ns["server_set_prefer"](ctx, ents["Desk"]["id"], False)
+    got["switch off"] = pick() is None
+    ns["server_set_prefer"](ctx, ents["Desk"]["id"], True)
+    _so_seen(ns, ents["Desk"], models, reachable=False, err="down", gpu=dict(_P2_GPU))
+    got["down"] = pick() is None
+    _so_seen(ns, ents["Desk"], [_m("gpt-oss:20b", "gpu+ram", 13 * GIB_), _m("deepseek-r1:14b", size=9 * GIB_)], gpu=dict(_P2_GPU))
+    got["no suitable model"] = pick() is None
+    _so_seen(ns, ents["Desk"], models, gpu=None)
+    got["no card figure"] = pick() is None
+    return all(got.values()), got
+
+
+def _p6c_merge(src):
+    """6b344: in a mode (srv_merge) the server writes the merge: the same first-word deadline and marked-down rules as a
+    draft; before its first word a failure falls to this computer's pen (or the best draft), said in the status line,
+    with the frames that name where; after one there is ONE answer, cut there and said. A cloud pen still comes first; an
+    Advanced council, a named pen and a machine with no server are as they were."""
+    def rm(label, msgs, emit, thinking=False):
+        emit("answer from " + label + " " * 3)
+    box, asked = {}, []
+    CHOSEN = {"label": "Desk · b", "name": "b", "server": "Desk"}
+
+    def comp(ctx, drafted=()):
+        asked.append(list(drafted))
+        return CHOSEN
+    info = {"Gemma 4 26B": {"ollama": "gemma4:26b", "size": "26B"}}
+    kw = dict(merge_pref_label=lambda: "Gemma 4 26B", MODEL_ROUTES={"Gemma 4 26B": ("ollama", "gemma4:26b")},
+              MODEL_INFO=info, MERGE_RANK=["Gemma 4 26B"])
+
+    def go(srv_merge, labels=("Desk · a", "Desk · b", "Llama"), over_run=None, **over):
+        ns, calls = _p2_council(src, over_run or rm, **over)
+        box["ns"] = ns
+        out, fr, st = [], [], []
+        ns["run_council"](list(labels), [{"role": "user", "content": "q"}],
+                          lambda c: (fr if isinstance(c, _RcCtl) else out).append(c), st.append,
+                          srv_merge=srv_merge, srv_first_s=60.0, **over.pop("run_kw", {}))
+        return ns, calls, out, fr, st
+
+    def sg_factory(mode):
+        seen = []
+
+        def sg(label, msgs, emit, status, fb, note):
+            seen.append(label)
+            if label.startswith("Desk"):
+                if mode == "late":
+                    emit("partial ")
+                raise box["ns"]["ServerError"]("Desk didn’t answer.")
+            emit("LOCAL MERGE")
+            return True
+        return sg, seen
+    got = {}
+    # on the server, inside the mode's deadline, the card and the badge naming it; what drafted on the server was said
+    ns, calls, out, fr, st = go(True, server_compositor=comp, **kw)
+    got["on the server"] = (calls == [("merge", "Desk · b", 60.0)] and "MERGED" in out and asked == [["Desk · a", "Desk · b"]])
+    got["the card"] = any('"STEP:' in f or "STEP:" in f for f in fr) and any(
+        "STEP:" in f and "Writing the answer" in f and "Desk \\u00b7 b" in f and '"s": "run"' in f for f in fr) and any(
+        "STEP:" in f and "Answer written" in f for f in fr)
+    got["the badge"] = any("RUN:" in f and '"w": "mix"' in f and "Desk \\u00b7 a" in f and "Desk \\u00b7 b" in f
+                           and "Llama" in f for f in fr)
+    # no server: byte for byte what it was (the chooser said none)
+    a = go(True, server_compositor=lambda c, d=(): None, **kw)
+    b = go(False, **kw)
+    # (the drafts run in threads, so what is compared is the merge stage: its calls, its text, its status and its frames)
+    tail = lambda r: (r[1], r[2], [x for x in r[4] if not x.startswith("asking")],
+                      [f for f in r[3] if "STEP:" in f or "mix" in f or "RESET" in f])
+    got["no server: as before"] = (tail(a) == tail(b) and a[1][0][1] == "Gemma 4 26B" and tail(a)[3] == [])
+    # an Advanced council (no srv_merge) never asks the chooser
+    n_asked = len(asked)
+    c = go(False, server_compositor=comp, **kw)
+    got["advanced untouched"] = len(asked) == n_asked and c[1][0][1] == "Gemma 4 26B"
+    # a pen named in Advanced stays
+    d = go(True, server_compositor=comp, run_kw={"comp": "Gemma 4 26B"}, **kw)
+    got["named pen"] = [x[:2] for x in d[1]] == [("merge", "Gemma 4 26B")]
+    # a cloud pen comes first: the server isn't asked to write it
+    cl = go(True, server_compositor=comp, cloud_allowed=lambda: True, compositor_ladder=lambda: [{"model": "cloud-pen"}],
+            cloud_stream_conf=lambda c_, m_, e_: (e_("CLOUD " * 40), True)[1], **kw)
+    got["cloud first"] = cl[1] == [] and any("CLOUD" in x for x in cl[2])
+    # Pro: the server holds what it used LAST, the peer reviews after the drafts, so the chooser is told that order
+    def long_rm(label, msgs, emit, thinking=False):
+        emit("x " * 130)
+    n_ask = len(asked)
+    ns_p, calls_p = _p2_council(src, long_rm, server_compositor=comp, **kw)
+    ns_p["run_council"](["Desk · a", "Desk · b", "Desk · c"], [{"role": "user", "content": "q"}], lambda c: None,
+                        [].append, peer=True, srv_merge=True, srv_first_s=60.0)
+    got["resident after peer review"] = (len(asked) == n_ask + 1 and asked[-1] == ["Desk · a", "Desk · b", "Desk · c"] * 2)
+    # a draft that failed is not a model the server holds
+    def bad_rm(label, msgs, emit, thinking=False):
+        if label.startswith("Lab · bad"):
+            raise box["ns"]["ServerError"]("Lab didn’t answer.")
+        emit("answer from " + label + " " * 3)
+    n_ask = len(asked)
+    ns_b, calls_b = _p2_council(src, bad_rm, server_compositor=comp, **kw)
+    box["ns"] = ns_b
+    ns_b["run_council"](["Desk · a", "Lab · bad", "Lab2 · b"], [{"role": "user", "content": "q"}], lambda c: None,
+                        [].append, srv_merge=True, srv_first_s=60.0)
+    got["a failed draft is not held"] = len(asked) == n_ask + 1 and sorted(asked[-1]) == ["Desk · a", "Lab2 · b"]
+    # before its first word: this computer's pen, said, the server marked down, the frames name where
+    sg, seen = sg_factory("early")
+    f1 = go(True, server_compositor=comp, _stream_guarded=sg, **kw)
+    got["refused: this computer's pen"] = (
+        seen == ["Desk · b", "Gemma 4 26B"] and "LOCAL MERGE" in f1[2]
+        and "Desk didn’t write the merge, so Gemma 4 26B writes it here" in f1[4]
+        and f1[0]["_downs"] == [("Desk", "Desk didn’t answer.")]
+        and len([f for f in f1[3] if "RUN:" in f and '"w": "mix"' in f]) == 2
+        and any("RUN:" in f and '"w": "mix"' in f and "Gemma 4 26B" in f for f in f1[3])
+        and not any("RESET" in f for f in f1[3]))
+    # no pen of this computer's: the best draft ships, said
+    sg, seen = sg_factory("early")
+    f2 = go(True, server_compositor=comp, _stream_guarded=sg, model_cached=lambda l, p=None: l != "Gemma 4 26B", **kw)
+    got["refused: the best draft"] = (seen == ["Desk · b"] and "LOCAL MERGE" not in f2[2]
+                                      and any(x.startswith("answer from") for x in f2[2])
+                                      and "Desk didn’t write the merge, so the best single answer is shown" in f2[4])
+    # after its first word: one answer, cut there and said; no pen of this computer's, no second answer
+    sg, seen = sg_factory("late")
+    f3 = go(True, server_compositor=comp, _stream_guarded=sg, **kw)
+    got["cut after a word"] = (seen == ["Desk · b"] and f3[2][0] == "partial " and f3[2][-1].startswith("\n\n⚠️")
+                               and "LOCAL MERGE" not in f3[2] and f3[0]["_downs"] == [("Desk", "Desk didn’t answer.")]
+                               and not any("RESET" in f for f in f3[3]))
+    return all(got.values()), got
+
+
+def _p6c_page(src):
+    """6b344 on the page: the badge names where an answer was written (a RUN frame with the models that ran, "mix"), and the
+    handler asks for a server merge only for a mode."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    i0 = src.index("function whereBadge(lm,who){")
+    fn = src[i0:src.index("// what a click on a server's row does to its flyout")]
+    js = ('const SRV_SEP=" \\u00b7 ";' + fn + "const out={};"
+          "out.all=whereBadge('Ollama1 \\u00b7 a, Ollama1 \\u00b7 b','');"
+          "out.mixed=whereBadge('Ollama1 \\u00b7 a, Ollama1 \\u00b7 b, Gemma 4 26B','');"
+          "out.back=whereBadge('Ollama1 \\u00b7 a, Ollama1 \\u00b7 b, Gemma 4 26B','Ollama1');"
+          "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("p6c.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    got = {
+        "badge": o["all"] == "Ollama1" and o["mixed"] == "this Mac + Ollama1",
+        "frame read": '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
+        "modes only": "                            srv_merge=(tier in TIERS and not cloud_only))" in ch
+        and "    if srv_merge and comp not in MODEL_ROUTES and not cloud_only:\n" in src,
+        "cloud first": src.index("    elif cloud_allowed():\n        if _walk_ladder():\n            return\n    run_mark(compositor=merger)\n    if _merge_srv is not None:")
+        > 0,
+    }
+    return all(got.values()), [got, o]
+
+
 _P2_CHECKS = [
     ("your server first: which family a model is (whole words), who may take which seat, how the chooser ranks for "
      "the modes and for each funnel effort, the measured speed", _p2c_roles),
@@ -20290,6 +20473,13 @@ def _p3c_quiet(src):
 
 
 _P2_CHECKS += [
+    ("the merge's pen: the server's strongest suitable general model, preferring one it already holds, none when no "
+     "server qualifies (6b344)", _p6c_chooser),
+    ("the merge on the server in a mode: its deadline and marked-down rules, this computer's pen or the best draft before "
+     "its first word (said, with the frames), one answer after one, the cloud first, an Advanced council and no server as "
+     "before (6b344)", _p6c_merge),
+    ("the merge on the page: the badge names where an answer was written; the handler asks for it for a mode only (6b344)",
+     _p6c_page),
     ("the final review's page pieces (node): a quick click clears the hover timer, the switch refreshes the chip, the "
      "bubbles and the rows, Fast with the cloud first doesn't name the server, the bubble says when the cap bound, the "
      "switch says what the Code lane sends", _p5c_nodes),
@@ -20320,7 +20510,7 @@ _P2_MUT = [
     ("a coder on a general seat", '    if f["coder"]:\n        return False\n    if f["reason"]', '    if f["reason"]'),
     ("an embedding, picture reader or guard model seated", '    if f["embed"] or f["vision"] or f["guard"]:\n        return False',
      '    if False:\n        return False'),
-    ("a distill in a funnel", '    if f["reason"] and role in ("fast", "funnel"):', '    if False:'),
+    ("a distill in a funnel", '    if f["reason"] and role in ("fast", "funnel", "compose"):', '    if False:'),
     ("families by substring", '    return {k: bool(words & v) for k, v in _SRV_FAMILY.items()}',
      '    return {k: any(w in low for w in v) for k, v in _SRV_FAMILY.items()}'),
     ("fast wants any size", '            elif 7 <= p <= 15:', '            elif 7 <= p <= 99:'),
@@ -20348,7 +20538,7 @@ _P2_MUT = [
      '            threading.Thread(target=_draft_one, args=(_j, _lbl, _local_deadline, True), daemon=True).start()'),
     ("the merge not on the server", '        if _sc is not None:\n            _merge_fb, merger =', '        if False:\n            _merge_fb, merger ='),
     ("a server merge with no fallback", '            if _merge_fb:\n                # the server didn\'t write it', '            if False:\n                # the server didn\'t write it'),
-    ("a named pen overridden", '    if merger in MODEL_ROUTES and comp not in MODEL_ROUTES:', '    if merger in MODEL_ROUTES:'),
+    ("a named pen overridden", '    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES:', '    elif merger in MODEL_ROUTES:'),
     ("a funnel asking the cloud unticked", '    use_cloud = bool(cloud) and cloud_allowed()', '    use_cloud = cloud_allowed()'),
     ("a funnel never asking the cloud first", '    if use_cloud:\n        for _conf in (fast_cloud_ladder(utility=True) if effort == "fast"',
      '    if False:\n        for _conf in (fast_cloud_ladder(utility=True) if effort == "fast"'),
@@ -20441,7 +20631,27 @@ _P2_MUT = [
     ("Only running an agent", '        if agent_name and srv_only_tier(tier):', '        if False:'),
     ("Only's agent not cleared", '            agent_name = ""\n        ag_system, ag_research, ag_remote = "", False, False', '        ag_system, ag_research, ag_remote = "", False, False'),
     ("an agent leaving Only on", '  if(name&&isSrvMode(tier)){tier="Fast";po.tier="Fast";}\n', ''),
-    ("a fallback answer badged as the server", '                  else if(d.w==="local"){srvWho="";if(d.m)lastModels=String(d.m);}', ''),
+    ("the merge not on the server for a mode", '    if srv_merge and comp not in MODEL_ROUTES and not cloud_only:', '    if False:'),
+    ("the handler not asking for a server merge", 'srv_merge=(tier in TIERS and not cloud_only))', 'srv_merge=False)'),
+    ("a server merge over a pen named in Advanced", '    if srv_merge and comp not in MODEL_ROUTES and not cloud_only:', '    if srv_merge and not cloud_only:'),
+    ("a refused merge not marking its server down", '            server_mark_down(bound_ctx(), _name, str(_mex))', '            pass'),
+    ("a refused merge with no pen of this computer's", '                if _merge_fb:\n                    emit(Ctl(NUL + "RUN:"', '                if False:\n                    emit(Ctl(NUL + "RUN:"'),
+    ("a refused merge not said", '            status("%s didn\\u2019t write the merge, so %s" % (', '            (lambda *a: None)("%s didn\\u2019t write the merge, so %s" % ('),
+    ("a second answer after the merge's first word", '            if _said[0]:\n                try:\n                    emit("\\n\\n\\u26a0\\ufe0f " + _why)',
+     '            if False:\n                try:\n                    emit("\\n\\n\\u26a0\\ufe0f " + _why)'),
+    ("the merge with no first-word deadline", '            with server_first_deadline(srv_first_s):\n                _ok = _stream_guarded(', '            if True:\n                _ok = _stream_guarded('),
+    ("the badge not naming where the merge ran", '{"r": [merger], "w": "mix", "m": ", ".join(_mix)}', '{"r": [merger]}'),
+    ("the card not naming the merge's model", '        _srv_step("run", merger, emit)\n', ''),
+    ("a resident model ignored", '    resident = [m for m in ranked if m["label"] in last or m.get("loaded")]', '    resident = []'),
+    ("a much smaller resident pen", '        if p is not None and tp is not None and p >= 0.7 * tp:', '        if True:'),
+    ("a peer review not counted as the server's last use", '                if server_label(label):\n                    _srv_used.append(label)\n', ''),
+    ("a failed draft counted as held", '        if server_label(label) and not text.startswith("(no answer"):\n            _srv_used.append(label)', '        if server_label(label):\n            _srv_used.append(label)'),
+    ("every drafter counted resident",'    last = [l for l in drafted if server_label(l)][-2:]', '    last = [l for l in drafted if server_label(l)]'),
+    ("a distill writing the merge", '    if f["reason"] and role in ("fast", "funnel", "compose"):', '    if f["reason"] and role in ("fast", "funnel"):'),
+    ("a merge on a server that can't hold it", '    cands = server_mode_candidates(ctx)\n    if not cands:\n        return None\n    ranked = srv_rank(cands, "compose"',
+     '    cands = [m for m in server_mode_candidates(ctx)] or [{"name": "x", "label": "x"}]\n    ranked = srv_rank(cands, "compose"'),
+    ("the page ignoring the merge's frame", '                  else if(d.w==="local"||d.w==="mix"){', '                  else if(d.w==="local"){'),
+    ("a fallback answer badged as the server", '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}', ''),
 ]
 _p2m = []
 for _d39, _o39, _nw39 in _P2_MUT:
@@ -20712,6 +20922,9 @@ class Ctl(BaseHTTPRequestHandler):
             return self.reply({"ok": True})
         if p == "/ram":
             RAM["v"] = d
+            return self.reply({"ok": True})
+        if p == "/failmerge":
+            STUB.fail_marker = str(d.get("marker") or "")
             return self.reply({"ok": True})
         if p == "/unload":
             with STUB.lock:
@@ -21017,7 +21230,7 @@ def _mchat39(inst, body):
     except urllib.error.HTTPError as e_:
         s_, h_, b_ = e_.code, dict(e_.headers), e_.read()
     t_ = b_.decode("utf-8", "replace")
-    return s_, h_, re.sub("\0[^\0]*\0", "", t_)
+    return s_, h_, re.sub("\0[^\0]*\0", "", t_), re.findall("\0([A-Z0-9]+):?([^\0]*)\0", t_)
 
 
 def _loc39(inst):
@@ -21046,12 +21259,19 @@ def _modes_live39(inst, sid, svn, only=None):
         def run(tier, text):
             time.sleep(1.0)                              # what an earlier request left behind lands first
             n_loc, n_st = len(_loc39(inst)), len(_chats39())
-            s_, h_, t_ = _mchat39(inst, _page_body39(tier, text))
+            s_, h_, t_, fr_ = _mchat39(inst, _page_body39(tier, text))
             time.sleep(2.5)
             sc = [c for c in _chats39()[n_st:] if text in str(c[2]["messages"][-1]["content"])]
+            isme = lambda c: "Write ONE final answer" in str(c[2]["messages"][-1]["content"])[:200]
+            # what the server held when the merge came: the models used last before it (drafts, then a peer review)
+            cut = next((k for k, c in enumerate(sc) if isme(c)), len(sc))
+            order = [c[2]["model"] for c in sc[:cut] if not str(c[2]["messages"][-1]["content"]).startswith("You are reviewing")]
             return {"status": s_, "models": [x_.strip() for x_ in urllib.parse.unquote(h_.get("X-Models", "")).split(",")
                                              if x_.strip()], "text": t_, "loc": _loc39(inst)[n_loc:],
-                    "drafted": {c[2]["model"] for c in sc}}
+                    "drafted": {c[2]["model"] for c in sc}, "frames": fr_,
+                    "merged": [c[2]["model"] for c in sc if isme(c)],
+                    # the last two models that drafted are the ones the server still holds (two at a time)
+                    "resident": list(dict.fromkeys(reversed(order)))[:2]}
         srv = lambda t: [m for m in tiers[t]["models"] if m.startswith(lab)]
         tag = lambda l: l[len(lab):]
         if only in (None, "modes"):
@@ -21065,8 +21285,14 @@ def _modes_live39(inst, sid, svn, only=None):
             got["Thinking: the server's three seats draft"] = (
                 th["status"] == 200 and len(srv("Thinking")) == 3 and th["models"] == tiers["Thinking"]["models"]
                 and {tag(l) for l in srv("Thinking")} <= th["drafted"])
-            got["Thinking: no engine warmed or started here"] = (
-                [c for c in th["loc"] if c[0] == "ensure"] == [] and len({c[1] for c in th["loc"] if c[0] == "run"}) <= 1)
+            # (6b344) the merge is the server's too: nothing at all runs here, the merge request reaches the server, on
+            # a model it still holds from the drafts (a card of 16 GB holds two), and no local pen writes it
+            got["Thinking: no engine warmed or started, and nothing run here"] = th["loc"] == []
+            got["Thinking: the merge is written on the server, by a model it already holds"] = (
+                len(th["merged"]) == 1 and th["merged"][0] in th["resident"]
+                and any(f_[0] == "RUN" and '"w": "mix"' in f_[1] for f_ in th["frames"])
+                and any(f_[0] == "STEP" and "Writing the answer" in f_[1] and "\\u00b7 " + th["merged"][0] in f_[1]
+                        for f_ in th["frames"]))
             pr = run("Pro", "say hello in one word 339p")
             # (the council puts the merger last, so the line-up is compared by what is the server's)
             got["Pro: four server seats draft"] = (
@@ -21074,13 +21300,17 @@ def _modes_live39(inst, sid, svn, only=None):
                 and [m for m in pr["models"] if m.startswith(lab)] == srv("Pro")
                 and sorted(pr["models"]) == sorted(tiers["Pro"]["models"])
                 and {tag(l) for l in srv("Pro")} <= pr["drafted"])
+            got["Pro: the merge is written on the server, by a model it already holds, and no local pen writes it"] = (
+                len(pr["merged"]) == 1 and pr["merged"][0] in pr["resident"]
+                and not any(c[0] == "run" and len(c) > 2 and c[2] for c in pr["loc"]))
             got["Pro: the cap says so, and only where it binds"] = (
                 tiers["Pro"].get("srvcap") == {"seated": 4, "of": 6} and "srvcap" not in tiers["Thinking"]
                 and "srvcap" not in tiers["Fast"])
             # (Pro also seats this computer's own models, and warms the first of those: nothing else)
             got["Pro: no engine warmed here but a seat of its own"] = (
                 {c[1] for c in pr["loc"] if c[0] == "ensure"} <= {m for m in tiers["Pro"]["models"] if not m.startswith(lab)})
-            det["modes"] = [f["loc"], th["loc"], pr["loc"], f["models"], th["models"], pr["models"], tiers["Pro"].get("srvcap")]
+            det["modes"] = [f["loc"], th["loc"], pr["loc"], f["models"], th["models"], pr["models"], tiers["Pro"].get("srvcap"),
+                            th["merged"], th["resident"], pr["merged"], pr["resident"]]
             # the switch off: the same request runs on this computer, as before, and the server isn't asked
             q("/api/servers/prefer", "POST", {"id": sid, "on": False})
             off = run("Fast", "say hello in one word 339o")
@@ -21089,6 +21319,29 @@ def _modes_live39(inst, sid, svn, only=None):
                 off["status"] == 200 and off["drafted"] == set() and "LOCAL-ANSWER" in off["text"]
                 and any(c[0] == "run" for c in off["loc"]))
             det["off"] = [off["loc"], off["text"][:80], off["drafted"]]
+            # the switch off, Thinking: as before, the merge is this computer's when it seats two models to merge
+            q("/api/servers/prefer", "POST", {"id": sid, "on": False})
+            tiers_off = q("/api/tiers")[1]
+            offt = run("Thinking", "say hello in one word 339u")
+            q("/api/servers/prefer", "POST", {"id": sid, "on": True})
+            nloc = len([m for m in tiers_off["Thinking"]["models"] if not m.startswith(lab)])
+            got["switch off, Thinking: no merge request reaches the server, the merge runs here as before"] = (
+                offt["status"] == 200 and offt["merged"] == [] and offt["drafted"] == set()
+                and (nloc < 2 or any(c[0] == "run" and len(c) > 2 and c[2] for c in offt["loc"])))
+            det["offt"] = [offt["loc"], nloc]
+            # a merge the server refuses before its first word: this computer's pen (or the best draft) writes it, said in
+            # the status line, with the frames that name where; never a second server, and the server is marked down
+            _o1("/failmerge", {"marker": "Write ONE final answer"})
+            bad = run("Thinking", "say hello in one word 339m")
+            _o1("/failmerge", {"marker": ""})
+            q("/api/servers/test", "POST", {"id": sid})            # a check that succeeds clears the mark
+            stat = [f_[1] for f_ in bad["frames"] if f_[0] == "STATUS"]
+            got["a merge the server refuses: said, this computer's pen or the best draft writes it, never another server"] = (
+                bad["status"] == 200 and len(bad["merged"]) == 1 and "\u26a0" not in bad["text"]
+                and ("LOCAL-ANSWER" in bad["text"] or "ANSWER-" in bad["text"]) and bad["text"].strip() != ""
+                and any("write the merge" in x_ for x_ in stat)
+                and len([f_ for f_ in bad["frames"] if f_[0] == "RUN" and '"w": "mix"' in f_[1]]) >= 1)
+            det["bad"] = [bad["loc"], bad["text"][:80], stat[-2:], bad["merged"]]
         if only in (None, "funnel"):
             # a funnel stage in the page's shape: the server's model asks first, nothing runs here
             _o1("/reply", {"text": json.dumps({"q": "Which way should it lean?", "options": [
@@ -21113,6 +21366,7 @@ def _modes_live39(inst, sid, svn, only=None):
         _o1("/restore", {})
         _o1("/unload", {})
         _o1("/reply", {"text": ""})
+        _o1("/failmerge", {"marker": ""})
         q("/api/servers/prefer", "POST", {"id": sid, "on": True})
         q("/api/servers/test", "POST", {"id": sid})
     return got, det
@@ -21120,7 +21374,8 @@ def _modes_live39(inst, sid, svn, only=None):
 
 _mg39, _md39 = _modes_live39(_SV, _sid34, _SVN)
 check("modes (live, the page's own request): Fast, Thinking and Pro run on the server's models, with the stale hand pick "
-      "ignored: the server drafts, the answer carries its label, no engine is warmed or started on this computer; Pro seats "
+      "ignored: the server drafts, the answer carries its label, no engine is warmed or started on this computer; Thinking "
+      "and Pro merge on the server too (on a model it already holds), a refused merge falls back and says so; Pro seats "
       "four and says so; the switch off runs it here; a funnel stage asks the server first",
       bool(_mg39) and all(_mg39.values()), "%r %r" % (_mg39, _md39))
 # a plain server pick keeps this Mac quiet in the same terms: no engine warmed or started for it either
@@ -21132,6 +21387,7 @@ check("servers (live): a plain server pick starts no engine on this computer",
 
 # ---- the same checks on a MUTATED copy of the app must fail: put the stale model back, and warm an engine for a seat
 _MUT39 = [
+    ("the handler not asking for a server merge", 'srv_merge=(tier in TIERS and not cloud_only))', 'srv_merge=False)', "modes"),
     ("the page's stale model used for a mode",
      '            model_name = ""\n        elif srv_only_tier(tier):', '        elif srv_only_tier(tier):', "modes"),
     ("an engine warmed for a mode's server seat",

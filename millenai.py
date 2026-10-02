@@ -17546,7 +17546,9 @@ def _srv_flags(name: str) -> dict:
 def srv_role_ok(name: str, role: str) -> bool:
     """Whether a model may take a seat. role: "fast" (the Fast mode),
     "think" (Thinking), "all" (Pro), "funnel" (a funnel's stages and
-    verdict), "code" (the Code lane)."""
+    verdict), "compose" (the model that writes a council's merge, 6b344: a
+    funnel's rules, since the merge is prose that must not open with seconds
+    of hidden thinking), "code" (the Code lane)."""
     f = _srv_flags(name)
     if f["embed"] or f["vision"] or f["guard"]:
         return False
@@ -17554,7 +17556,7 @@ def srv_role_ok(name: str, role: str) -> bool:
         return True
     if f["coder"]:
         return False
-    if f["reason"] and role in ("fast", "funnel"):
+    if f["reason"] and role in ("fast", "funnel", "compose"):
         return False
     return True
 
@@ -17660,6 +17662,42 @@ def server_funnel_pick(ctx, effort: str = "normal"):
     top = srv_rank(cands, "funnel", "fast" if effort == "fast" else "normal",
                    server_speeds(ctx))
     return top[0] if top else None
+
+
+def server_compositor(ctx, drafted=()):
+    """The model of ctx's server that writes a mode's merge (6b344, per
+    Patrick: "it's still using my laptop's GPU here for compositing answers
+    ... versus the server when it is available"), or None when no server of
+    ctx qualifies (none paired, the switch off, not answering, nothing that
+    fits). The same chooser and filters as the seats (server_mode_candidates:
+    "gpu" placement, fitting a card whose size is reported, the per-server
+    switch on; srv_role_ok "compose": no coder, embedding, guard, picture
+    reader or reasoning distill): the strongest by size, then measured speed.
+    RESIDENT FIRST: a model the council just drafted with (`drafted`, in the
+    order they answered) is already loaded on the server, and a card of 16 GB
+    holds two models (OLLAMA_MAX_LOADED_MODELS is 2), so a merge on a third
+    would swap one out and pay a load before its first word. When the
+    strongest model is not resident, the strongest of the resident ones
+    (the last two drafts, or a row the server says is loaded) takes the pen
+    if it is within 70% of the strongest's size; a much smaller one doesn't
+    write the answer for the sake of a load."""
+    cands = server_mode_candidates(ctx)
+    if not cands:
+        return None
+    ranked = srv_rank(cands, "compose", "normal", server_speeds(ctx))
+    if not ranked:
+        return None
+    top = ranked[0]
+    last = [l for l in drafted if server_label(l)][-2:]
+    resident = [m for m in ranked if m["label"] in last or m.get("loaded")]
+    for m in resident:
+        if m is top:
+            return top
+        p, tp = m.get("params"), top.get("params")
+        if p is not None and tp is not None and p >= 0.7 * tp:
+            return m
+        break           # the strongest resident one is too small; the rest are smaller
+    return top
 
 
 def server_copy(tag: str, cands: list, speeds=None):
@@ -18782,7 +18820,9 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
         # a model on the person's own server (6b334), never a fallback
         return server_stream(label, messages, emit)
     if "local-record" in TEST_HOOKS:
-        _LOCAL_CALLS.append(("run", label))
+        # (a merge is told from a peer review by its own words)
+        _LOCAL_CALLS.append(("run", label, "Write ONE final answer" in str(
+            (messages[-1] or {}).get("content", ""))[:200] if messages else False))
         emit("LOCAL-ANSWER-" + label)
         return
     if label not in MODEL_ROUTES:
@@ -21315,7 +21355,7 @@ def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
                 cloud_only: bool = False,
                 bench_allow=None, comp: str = "",
-                hurry=None, srv_first_s=None) -> None:
+                hurry=None, srv_first_s=None, srv_merge=False) -> None:
     """Ask each selected model in turn, then stream a merged answer.
 
     Sequential on purpose: only one MLX engine can be resident at a time
@@ -21341,6 +21381,7 @@ def run_council(labels: list, messages: list, emit, status,
     labels = (usable or labels[:1])[:12]
 
     drafts = []
+    _srv_used = []           # the server models this council used, in order (6b344)
     _srv_errs = []           # your own servers' refusals (6b334)
     # ANSWER NOW (6b257): pressed mid-run, the button trades quality
     # for speed — skip what hasn't started, shorten every wait, hand
@@ -21375,6 +21416,8 @@ def run_council(labels: list, messages: list, emit, status,
         """Record a draft and show it. Blending is the whole point of these
         modes, and until now its only visible trace was a status line."""
         drafts.append((label, text))
+        if server_label(label) and not text.startswith("(no answer"):
+            _srv_used.append(label)
         try:
             emit(Ctl(NUL + "DRAFT:" +
                      json.dumps({"m": label, "t": text[:1200]}) + NUL))
@@ -21663,6 +21706,8 @@ def run_council(labels: list, messages: list, emit, status,
             text = strip_think("".join(parts))
             if text and not _looks_degenerate(text) and len(text) > 200:
                 reviews.append((label, text))
+                if server_label(label):
+                    _srv_used.append(label)
                 try:
                     emit(Ctl(NUL + "DRAFT:" + json.dumps(
                         {"m": label + " (rewrite)", "t": text[:1200]}) + NUL))
@@ -21693,7 +21738,25 @@ def run_council(labels: list, messages: list, emit, status,
     # there, this computer's copy behind it. A pen the person named in
     # Advanced stays as named.
     _merge_fb = ""
-    if merger in MODEL_ROUTES and comp not in MODEL_ROUTES:
+    # A MODE'S MERGE IS THE SERVER'S TOO (6b344, per Patrick: "it's still
+    # using my laptop's GPU here for compositing answers ... versus the
+    # server when it is available"): in Thinking and Pro (srv_merge, set by
+    # the handler for a mode, never for an Advanced council or a pick) the
+    # strongest suitable general model of the server writes it, preferring
+    # one the council just drafted with so the card swaps nothing
+    # (server_compositor). This computer's compositor stays behind it. A
+    # cloud compositor still comes first, below: only the local choice moves.
+    _merge_srv = None
+    if srv_merge and comp not in MODEL_ROUTES and not cloud_only:
+        try:
+            _merge_srv = server_compositor(bound_ctx(), _srv_used)
+        except Exception:
+            _merge_srv = None
+    if _merge_srv is not None:
+        _merge_fb = (merger if merger in MODEL_ROUTES and model_cached(merger)
+                     and model_fits_memory(merger) else "")
+        merger = _merge_srv["label"]
+    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES:
         try:
             _sc = server_copy((MODEL_INFO.get(merger) or {}).get("ollama"),
                               server_mode_candidates(bound_ctx()),
@@ -21852,6 +21915,79 @@ def run_council(labels: list, messages: list, emit, status,
         if _walk_ladder():
             return
     run_mark(compositor=merger)
+    if _merge_srv is not None:
+        # THE MERGE ON THE SERVER: the same first-word deadline and "marked
+        # down" rules as a draft. Before its first word a failure falls to
+        # this computer's compositor (or the best draft, when the mode has
+        # none), said in the status line; after one there is ONE answer,
+        # cut there and said, never a second printed over it.
+        _name = merger.split(SERVER_SEP, 1)[0]
+        _said = [0]
+
+        def _srv_step(state, lbl, emit):
+            """The progress card's line for a merge written by one model:
+            "Writing the answer" with the model that writes it, as the other
+            single-model paths say it. Never breaks an answer."""
+            try:
+                emit(Ctl(NUL + "STEP:" + json.dumps(
+                    {"id": "draft", "s": "run" if state == "run" else "done",
+                     "l": {"run": "Writing the answer", "done": "Answer written",
+                           "fail": "The merge fell back"}[state],
+                     "d": str(lbl)[:70]}) + NUL))
+            except Exception:
+                pass
+
+        def _memit(c):
+            if not isinstance(c, Ctl) and c:
+                _said[0] += 1
+            emit(c)
+        _srv_step("run", merger, emit)
+        # the badge names where the answer was written: the council's own
+        # models, and the server when it is not among them
+        _mix = list(dict.fromkeys(list(labels) + [merger]))
+        try:
+            emit(Ctl(NUL + "RUN:" + json.dumps(
+                {"r": [merger], "w": "mix", "m": ", ".join(_mix)}) + NUL))
+        except Exception:
+            pass
+        try:
+            with server_first_deadline(srv_first_s):
+                _ok = _stream_guarded(merger, synth, _memit, status, good[0][1],
+                                      "showing the best single answer")
+            _srv_step("done" if _ok else "fail", merger, emit)
+            return
+        except Exception as _mex:
+            _why = (str(_mex) if type(_mex).__name__ == "ServerError"
+                    else "%s stopped answering." % _name)
+            server_mark_down(bound_ctx(), _name, str(_mex))
+            if _said[0]:
+                try:
+                    emit("\n\n\u26a0\ufe0f " + _why)
+                except Exception:
+                    pass
+                return
+            status("%s didn\u2019t write the merge, so %s" % (
+                _name, "%s writes it here" % _merge_fb if _merge_fb
+                else "the best single answer is shown"))
+            try:
+                if _merge_fb:
+                    emit(Ctl(NUL + "RUN:" + json.dumps(
+                        {"r": [_merge_fb], "w": "mix", "m": ", ".join(
+                            list(dict.fromkeys(list(labels) + [_merge_fb])))}) + NUL))
+                    run_mark(compositor=_merge_fb)
+                    _srv_step("run", _merge_fb, emit)
+                    _stream_guarded(_merge_fb, synth, emit, status, good[0][1],
+                                    "showing the best single answer")
+                    _srv_step("done", _merge_fb, emit)
+                else:
+                    emit(good[0][1])
+            except Exception:
+                try:
+                    emit(Ctl(NUL + "RESET" + NUL))
+                    emit(good[0][1])
+                except Exception:
+                    pass
+            return
     try:
         with server_first_deadline(srv_first_s if server_label(merger)
                                    else None):
@@ -28546,7 +28682,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             peer=(tier == "Pro"),
                             bench_allow=req_cloud, comp=req_comp,
                             hurry=hurry_ev,
-                            srv_first_s=(60.0 if _seat_fb else None))
+                            srv_first_s=(60.0 if _seat_fb else None),
+                            srv_merge=(tier in TIERS and not cloud_only))
             else:
                 lbl = route_label or model_name
                 # cloud is a pref, not a tier (Best retired in 5.3).
@@ -36446,7 +36583,7 @@ async function send(){
                   if(d.w==="cloud"&&!/cloud/.test(lastModels))
                     lastModels=(lastModels+" cloud").trim();
                   if(d.w==="server")srvWho=String(d.s||"");
-                  else if(d.w==="local"){srvWho="";if(d.m)lastModels=String(d.m);}
+                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");

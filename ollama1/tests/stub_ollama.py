@@ -56,6 +56,7 @@ class Stub:
         self.tokens = 6
         self.delay = 0.0
         self.reply_text = ""        # when set, the whole answer (a test that wants JSON back)
+        self.fail_marker = ""       # when set, a chat whose last message holds it gets a 500
         # pulls: name -> [(digest, size, already on disk)], the digest the
         # model gets once pulled, and how many pulls fail before one works
         self.pull_layers = {}
@@ -150,6 +151,9 @@ class Stub:
                     caps = ["embedding"] if m.get("embedding") else ["completion"]
                     return self.js(200, {"model_info": m["info"], "capabilities": caps,
                                          "details": {"family": "x"}})
+                if (stub.fail_marker and self.path == "/api/chat" and stub.fail_marker in str(
+                        ((body.get("messages") or [{}])[-1] or {}).get("content", ""))):
+                    return self.js(500, {"error": "refused by the test"})
                 if body.get("keep_alive") == 0:
                     stub.loaded.pop(name, None)
                     return self.js(200, {"model": name, "done": True, "done_reason": "unload"})
