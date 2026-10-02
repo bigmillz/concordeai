@@ -21974,8 +21974,21 @@ o.start=findStep(-1,3,1)===0&&findStep(-1,3,-1)===2&&findStep(0,0,1)===-1&&findS
 // what the count says
 o.count=findCountText(0,7,"a")==="1 of 7"&&findCountText(6,7,"a")==="7 of 7"
        &&findCountText(-1,0,"a")==="No matches"&&findCountText(0,0,"")===""&&findCountText(2,3,"")==="";
+// review of 6b352: at most 500 marks, the count says "500+", and a short
+// query is not re-applied while an answer streams
+o.more=findCountText(2,500,"a",true)==="3 of 500+"&&findCountText(2,500,"a",false)==="3 of 500";
+const L=[[[0,1],[2,3]],[],[[0,1],[4,5],[8,9]],[[1,2]]];
+const c3=findCapHits(L,3),c6=findCapHits(L,6),c5=findCapHits(L,5);
+o.cap=FIND_CAP===500&&eq(c3.lists,[[[0,1],[2,3]],[],[[0,1]],[]])&&c3.more===true
+     &&c6.more===false&&eq(c6.lists,L)&&c5.more===true&&eq(c5.lists[3],[])
+     &&findCapHits([new Array(700).fill([0,1])],FIND_CAP).lists[0].length===500;
+o.capexact=findCapHits([[[0,1]],[[0,1]]],2).more===false&&findCapHits([[[0,1]],[],[[0,1]]],1).more===true
+     &&findCapHits([[[0,1]],[]],1).more===false;
+o.live=findLive("a",true)===false&&findLive("ab",true)===true&&findLive("a",false)===true
+      &&findLive("",true)===false&&findLive(null,false)===true;
 process.stdout.write(JSON.stringify(o));'''
-_FD_NAMES = ["case", "literal", "none", "overlap", "joined", "pieces", "next", "prev", "start", "count"]
+_FD_NAMES = ["case", "literal", "none", "overlap", "joined", "pieces", "next", "prev", "start", "count",
+             "more", "cap", "capexact", "live"]
 
 
 def _fd_run(pure):
@@ -21999,6 +22012,13 @@ _FD_MUT = [
     ("count", '"No matches"', '"0 of 0"'),
     ("count", '(cur+1)+" of "+n', 'cur+" of "+n'),
     ("case", "gi", "gu"),
+    ("more", '+(more?"+":"")', ""),
+    ("cap", "const FIND_CAP=500;", "const FIND_CAP=5000;"),
+    ("cap", "out.push(h.slice(0,left));", "out.push(h);"),
+    ("capexact", "if(h.length>left)more=true;", "if(h.length>=left)more=true;"),
+    ("capexact", "if(left<=0){if(h.length)more=true;", "if(left<=0){more=true;"),
+    ("live", "return !streaming||(q||\"\").length>=2;", "return !streaming||(q||\"\").length>=1;"),
+    ("live", "return !streaming||", "return true||"),
 ]
 _fd_bad = []
 for _nm, _a, _b in _FD_MUT:
@@ -22010,8 +22030,8 @@ for _nm, _a, _b in _FD_MUT:
         _fd_bad.append("%s survived %r" % (_nm, _a[:30]))
 check("find in chat: matching, splitting, next/previous wrap-around and the count text are right (node)",
       _FD_BASE.get("err") is None and all(_FD_BASE.get(_n) is True for _n in _FD_NAMES), "%r" % _FD_BASE)
-check("find in chat: every mutation of the pure part breaks the scenario aimed at it (node, 12 mutations)",
-      not _fd_bad and len(_FD_MUT) >= 12 and len({_m[0] for _m in _FD_MUT}) >= 10, "%r" % _fd_bad)
+check("find in chat: every mutation of the pure part breaks the scenario aimed at it (node, 19 mutations)",
+      not _fd_bad and len(_FD_MUT) >= 19 and len({_m[0] for _m in _FD_MUT}) >= 14, "%r" % _fd_bad)
 
 
 def _fd_pins(src):
@@ -22029,19 +22049,26 @@ def _fd_pins(src):
                  '  if(k!=="f"&&!(e.code==="KeyF"&&!/^[a-z]$/.test(k)))return;\n'
                  '  if(dictModal())return;' in src
                  and "e.preventDefault();                  // not the webview's own find\n  findOpen();\n},true);" in src)
-    _p["esc"] = ('if(e.key==="Escape"){e.preventDefault();e.stopPropagation();findClose();return;}' in src
+    _p["esc"] = ('  if(e.key!=="Escape"||fb.hidden||dictModal())return;\n'
+                 '  if(!fb.contains(e.target)&&e.target!==input)return;\n'
+                 '  e.preventDefault();e.stopPropagation();findClose();\n},true);' in src
                  and 'if(e.key==="Enter"){e.preventDefault();findGo(e.shiftKey?-1:1);}' in src)
+    # review of 6b352: the cap is applied and said; a short query waits out a stream
+    _p["cap"] = ("const capped=findCapHits(nodes.map(x=>x[1]),FIND_CAP);\n    findMore=capped.more;" in src
+                 and "findCountText(findCur,findHitEls.length,findQ,findMore)" in src
+                 and "if(!findLive(findQ,generating)){findWait=setTimeout(findLater,1000);return;}" in src)
+    _p["sweep"] = ('new Set([...findHitEls,...inner.querySelectorAll("mark.find-hit")]).forEach(m=>{' in src)
     _p["clear"] = ("p.replaceChild(document.createTextNode(m.textContent),m);" in src
                    and "parents.forEach(p=>p.normalize());" in src)
     _p["skip"] = ('const FIND_SKIP="button,script,style,textarea,input,select,svg,canvas,video,"\n'
-                  '  +"audio,.who,.mact,.codebar,[hidden]";' in src
+                  '  +"audio,.who,.mact,.codebar,.worktree,[hidden]";' in src
                   and "p.getClientRects().length>0" in src)
     _p["mark"] = ('m.className="find-hit";m.textContent=seg.t;' in src
                   and 'findHitEls.forEach((m,i)=>m.classList.toggle("cur",i===findCur));' in src)
     _p["live"] = ("findTimer=setTimeout(()=>{if(!fb.hidden)findRun(true);},120);" in src
                   and "new MutationObserver(" in src and "},250);" in src
                   and "if(findHitEls.some(m=>!m.isConnected)||inner.textContent!==findText\n"
-                      "         ||findChat!==curChat)findRun(false);" in src
+                      "     ||findChat!==curChat)findRun(false);" in src
                   and 'if(fq.value!==findQ)findCur=0;' in src)
     _p["close"] = ("if(findObs)findObs.disconnect();\n  clearTimeout(findTimer);" in src
                    and 'fq.value="";fcount.textContent="";\n  fb.hidden=true;\n  input.focus();' in src)
@@ -22059,13 +22086,16 @@ for _k, _a in [("markup", 'aria-live="polite"></span>'), ("css", "#findbar[hidde
                ("key", "if(dictModal())return;"), ("esc", "e.stopPropagation();findClose()"),
                ("clear", "parents.forEach(p=>p.normalize());"), ("skip", ".mact,.codebar"),
                ("mark", 'm.className="find-hit"'), ("live", "findChat!==curChat)findRun(false)"),
-               ("close", "fb.hidden=true;\n  input.focus();"), ("tip", 'IS_PC?"Ctrl+F"')]:
+               ("close", "fb.hidden=true;\n  input.focus();"), ("tip", 'IS_PC?"Ctrl+F"'),
+               ("esc", "fb.contains(e.target)&&e.target!==input"), ("skip", ".worktree,[hidden]"),
+               ("cap", "findMore=capped.more"), ("cap", "findLive(findQ,generating)"),
+               ("sweep", 'inner.querySelectorAll("mark.find-hit")')]:
     if _MILLENAI_SRC.count(_a) < 1:
         _fdp_bad.append("anchor " + _a)
         continue
     if _fd_pins(_MILLENAI_SRC.replace(_a, _a[:2] + "_" + _a[2:])).get(_k) is not False:
         _fdp_bad.append("pin %s survived" % _k)
-check("find in chat: each source pin fails when its line is changed (10 mutations)", not _fdp_bad, "%r" % _fdp_bad)
+check("find in chat: each source pin fails when its line is changed (15 mutations)", not _fdp_bad, "%r" % _fdp_bad)
 # Cmd+F must not collide with the page's other chords: no other handler
 # claims F with a modifier, and the dictation chord stays D
 check("find in chat: no other keydown handler takes the modifier+F chord",
