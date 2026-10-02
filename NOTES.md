@@ -9,6 +9,28 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b351 — the benchmark's "Compare with..." crosses this computer, servers and the cloud
+Patrick (2026-10-02), with a screenshot of the benchmark pane mid-run on This
+computer: "to make it so that for comparing results, you can compare between
+local models, servers, and cloud models."
+
+6b341 built a separate Compare dialog (any stored runs, any targets) but the
+pane's own "Compare with..." list only offered an EARLIER run of the SAME
+target, and the Compare button hides while a run is going, so in practice you
+could not compare across places. The list now offers every other run of the
+same test (b1), whatever it ran on, newest first, each labelled with its place
+("... · Desk", "... · cloud"). Rows match by model: the same model on the same
+engine first (as before), otherwise the same model as the other place spells it
+(`bmKey`: "gpt-oss:20b" on a server, "GPT-OSS 20B" here, "openai/gpt-oss-20b" at
+a provider; an empty name never matches, a 120B never matches a 20B, a failed
+row never matches). The change chip's tooltip says where the other figure ran
+("Was 75.0 tok/s on Desk"), and the note under the list says when the two runs
+are on different machines (and, with a cloud run, that cloud figures include the
+network), so a difference is read as the machine as much as the model. Estimated
+rows are still never compared. One gauntlet check runs `bmMatch` and `bmRow` in
+node on all three spellings and four mutations. Not seen in WKWebView; a real
+server or cloud run was not made here.
+
 ## 6b350 — Settings rail: one Models row that opens Local, Cloud and Servers
 Patrick (2026-10-02), with a screenshot of the rail's Cloud power, Models and
 Your servers rows: "Can we consolidate these three settings tabs under one that

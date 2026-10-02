@@ -8367,6 +8367,60 @@ check("settings rail: Models opens Local, Cloud and Servers; a pane under it ope
       _mg_ok(page) and not any(_mg_ok(m_) for m_ in _mg_mut) and all(m_ != page for m_ in _mg_mut),
       "%r" % ([_mg_ok(page), [_mg_ok(m_) for m_ in _mg_mut]],))
 
+# The benchmark pane's own "Compare with..." offers every other run of the same test, from any target,
+# and matches a model across targets (6b351, per Patrick: "for comparing results, you can compare between
+# local models, servers, and cloud models")
+def _xc_run(src):
+    js = src[src.index("/* -------------------------------- Settings \u203a Usage \u203a Benchmark (6b331)"):]
+    js = js[:js.index('(function(){\n  const go=$("#bm-go")')]
+    js += r"""
+const out=[];
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);}
+function uInt(n){return String(Math.round(+n||0));}
+function uWhen(t){return "T"+t;}
+function u2(n){return (n<10?"0":"")+n;}
+const loc={label:"GPT-OSS 20B",engine:"MLX",src:"measured",status:"done",gen_tps:60};
+const oldSrv={target:"server",target_name:"Desk",models:[
+  {label:"Desk \u00b7 llama3.2:3b",network:true,model:"llama3.2:3b",engine:"Ollama",status:"done",gen_tps:90},
+  {label:"Desk \u00b7 gpt-oss:20b",network:true,model:"gpt-oss:20b",engine:"Ollama",status:"done",gen_tps:75},
+  {label:"Desk \u00b7 gpt-oss:120b",network:true,model:"gpt-oss:120b",engine:"Ollama",status:"failed"}]};
+const oldCloud={target:"cloud",models:[{label:"Groq \u00b7 openai/gpt-oss-20b",provider:"groq",model:"openai/gpt-oss-20b",status:"done",gen_tps:300}]};
+out.push((bmMatch(oldSrv,loc)||{}).gen_tps);                       // 0: a server's spelling
+out.push((bmMatch(oldCloud,loc)||{}).gen_tps);                     // 1: a provider's spelling
+out.push(String(bmMatch(oldSrv,{label:"Qwen 3 8B",engine:"MLX",status:"done"})));   // 2: another model
+out.push(String(bmMatch(oldSrv,{label:"GPT-OSS 120B",engine:"MLX",status:"done"}))); // 3: 120B is not 20B, and that row failed
+out.push(String(bmMatch(null,loc)));                               // 4
+const same={models:[{label:"GPT-OSS 20B",engine:"MLX",src:"measured",status:"done",gen_tps:55},
+  {label:"gpt-oss:20b",engine:"Ollama",src:"engine",status:"done",gen_tps:70}]};
+out.push((bmMatch(same,loc)||{}).gen_tps);                         // 5: the same model on the same engine wins
+out.push(String(bmMatch({models:[{label:"",engine:"Ollama",status:"done",gen_tps:1}]},{label:"",engine:"MLX",status:"done"})));  // 6: no name, no match
+out.push(bmRow(Object.assign({},loc,{gen_tps:66}),false,oldSrv.models[1],256,"Desk"));              // 7: the delta says where
+console.log(JSON.stringify(out));
+"""
+    f = os.path.join(tempfile.mkdtemp(), "xc.js")
+    with open(f, "w", encoding="utf-8") as fh:
+        fh.write(js)
+    return json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=30).stdout or "null")
+def _xc_ok(src):
+    try:
+        o = _xc_run(src)
+    except Exception:
+        return False
+    return (isinstance(o, list) and len(o) == 8 and o[0] == 75 and o[1] == 300 and o[2] == "undefined"
+            and o[3] == "undefined" and o[4] in ("null", "undefined") and o[5] == 55 and o[6] == "undefined"
+            and 'title="Was 75.0 tok/s on Desk"' in o[7]
+            and "const same=runs.filter(x=>shown&&x.id!==shown.id&&x.test===shown.test);" in src
+            and "Compared with the run on " in src
+            and "mt&&old&&bmWhere(old,mt)!==bmWhere(shown,r)?bmWhere(old,mt):\"\"" in src)
+_xc_mut = [_MILLENAI_SRC.replace("||(nm(r)&&rows.find(o=>nm(o)===nm(r)))", "", 1),
+           _MILLENAI_SRC.replace("x.test===shown.test);", "x.test===shown.test&&x.t<shown.t&&(x.target||\"local\")===(shown.target||\"local\"));", 1),
+           _MILLENAI_SRC.replace("(nm(r)&&rows.find(o=>nm(o)===nm(r)))", "rows.find(o=>nm(o)===nm(r))", 1),
+           _MILLENAI_SRC.replace('(ow?" on "+ow:"")', '""', 1)]
+check("benchmark compare: any other run of the same test is offered, a model is matched across this computer, "
+      "a server and the cloud, and the figure says where it ran (node)",
+      _xc_ok(_MILLENAI_SRC) and all(m_ != _MILLENAI_SRC for m_ in _xc_mut) and not any(_xc_ok(m_) for m_ in _xc_mut),
+      "%r" % ([_xc_ok(_MILLENAI_SRC)] + [_xc_ok(m_) for m_ in _xc_mut],))
+
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
 _porig = open(_pf, "rb").read() if os.path.exists(_pf) else b"{}"

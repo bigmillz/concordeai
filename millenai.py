@@ -40665,14 +40665,21 @@ const BM_NOISE=3;
 function bmEst(r){return !!(r&&(r.capped||r.est));}
 // the row of an earlier run that measured the same thing: the same
 // model on the same engine, timed the same way
-function bmMatch(old,r){return old&&(old.models||[]).find(o=>o.label===r.label
-  &&o.engine===r.engine&&o.src===r.src&&o.status==="done");}
+// (6b351, per Patrick: compare "between local models, servers, and cloud models"): the same
+// model on the same engine first; failing that the same model as the other target spells it
+// (bmKey: "gpt-oss:20b" on a server, "GPT-OSS 20B" here, "openai/gpt-oss-20b" at a provider)
+function bmMatch(old,r){
+  if(!old)return old;
+  const rows=(old.models||[]).filter(o=>o.status==="done");
+  const nm=x=>bmKey(x.network&&x.model?x.model:x.provider&&x.model?x.model:x.label);
+  return rows.find(o=>o.label===r.label&&o.engine===r.engine&&o.src===r.src)
+    ||(nm(r)&&rows.find(o=>nm(o)===nm(r)))||undefined;}
 // "mlx_lm 0.31.3 · Ollama 0.12.1"
 function bmVer(v){v=v||{};return [v.mlx_lm?"mlx_lm "+v.mlx_lm:"",v.ollama?"Ollama "+v.ollama:""]
   .filter(Boolean).join(" · ");}
 // a figure a target didn't give: a server says so, the cloud has none
 function bmNM(r,v,fmt){return v!=null&&isFinite(+v)?fmt(v):r.provider?"-":r.network?"not measured":"—";}
-function bmRow(r,cur,old,max){
+function bmRow(r,cur,old,max,ow){
   const done=r.status==="done";
   let top='<span class="bm-n">'+esc(r.network&&r.model?r.model:r.label)+'</span>'
     +((r.provider||r.engine)?'<span class="bm-e">'+esc(r.provider||r.engine)+'</span>':"");
@@ -40685,7 +40692,7 @@ function bmRow(r,cur,old,max){
     else if(old&&!bmEst(old)&&old.gen_tps>0&&r.gen_tps>0){
       const p=(r.gen_tps-old.gen_tps)/old.gen_tps*100;
       top+='<span class="bm-d'+(p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":"")+'" title="'
-        +esc("Was "+bmGen(old.gen_tps)+" tok/s")+'">'+(p<0?"−":"+")
+        +esc("Was "+bmGen(old.gen_tps)+" tok/s"+(ow?" on "+ow:""))+'">'+(p<0?"−":"+")
         +Math.abs(p).toFixed(1)+"%</span>";}
   }
   let sub="",mem="";
@@ -40911,9 +40918,9 @@ function paintBench(d){
   if(going)bmShow=d.run.id;
   if(!runs.some(x=>x.id===bmShow))bmShow=runs.length?runs[0].id:"";
   const shown=runs.find(x=>x.id===bmShow)||null;
-  // an earlier run of the same test on the same machine, server or cloud
-  const same=runs.filter(x=>shown&&x.id!==shown.id&&x.test===shown.test&&x.t<shown.t
-    &&(x.target||"local")===(shown.target||"local")&&(x.target_name||"")===(shown.target_name||""));
+  // any other run of the same test, whatever it ran on: this computer, a server or the cloud
+  // (6b351, per Patrick). Rows match by model; the note says when the machines differ
+  const same=runs.filter(x=>shown&&x.id!==shown.id&&x.test===shown.test);
   if(!same.some(x=>x.id===bmCmp))bmCmp="";
   // two runs in one minute get their seconds (review of 6b331)
   const when=x=>{const w=uWhen(x.t);
@@ -40929,8 +40936,9 @@ function paintBench(d){
   const old=runs.find(x=>x.id===bmCmp);
   const list=$("#bm-list");
   if(shown&&(shown.models||[]).length){
-    list.innerHTML=shown.models.map((r,i)=>bmRow(r,going&&shown===d.run&&i===shown.cur,
-      bmMatch(old,r),max)).join("");
+    list.innerHTML=shown.models.map((r,i)=>{const mt=bmMatch(old,r);
+      return bmRow(r,going&&shown===d.run&&i===shown.cur,mt,max,
+        mt&&old&&bmWhere(old,mt)!==bmWhere(shown,r)?bmWhere(old,mt):"");}).join("");
     list.hidden=false;
   }else{list.innerHTML="";list.hidden=true;}
   const bits=[];
@@ -40941,7 +40949,11 @@ function paintBench(d){
     // what each run was measured on and with, when they differ
     const on=x=>[(x.hw&&x.hw.line)||"",bmVer(x.versions)].filter(Boolean).join(" · ");
     const cloud=shown.target==="cloud";
-    if(old&&on(old)!==on(shown))bits.push("This run: measured on "+on(shown)
+    const wh=x=>x.target==="cloud"?"the cloud":x.target==="server"?(x.target_name||"a server"):"this computer";
+    if(old&&(old.target||"local")!==(shown.target||"local")||old&&(old.target_name||"")!==(shown.target_name||""))
+      bits.push("Compared with the run on "+wh(old)+(bmHw(old)?" ("+bmHw(old)+")":"")+": "
+        +(old.target==="cloud"||shown.target==="cloud"?"a different place, and cloud figures include the network, so the difference is not only the model.":"a different machine, so the difference is the machine as much as the model."));
+    else if(old&&on(old)!==on(shown))bits.push("This run: measured on "+on(shown)
       +". The run compared: measured on "+on(old)+".");
     else if(shown.target==="server")bits.push("Ran on "+shown.target_name+(on(shown)?" ("+on(shown)+")":"")+".");
     else if(!cloud&&shown.hw&&shown.hw.line&&d&&shown.hw.line!==d.hw)bits.push("Measured on "+on(shown)+".");
