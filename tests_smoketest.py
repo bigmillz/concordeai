@@ -1203,6 +1203,362 @@ check("image generation: intent, engine ladder, settings box, wizard, arrow pill
       and 'class="genimg"' in page and "function paintStudios" in page
       and ">UPDATE<" not in page
       and '<div id="update-flag" hidden title="Install the update"><svg' in page)
+# 6b355, per Patrick: "I paste it in a map and ask the app to draw over it
+# showing good neighborhoods for an Airbnb, but it was unable to modify the
+# photo." The model says where, the page draws. Three layers here: the
+# server's word gate and its wiring (run for real), the page's parser,
+# renderer and geometry (run in node), and a mutation of each that the
+# checks must catch.
+def _ann_seg(src=None):
+    src = src or _MILLENAI_SRC
+    return src[src.index("# ==== image annotate: begin ===="):
+               src.index("# ==== image annotate: end ====")]
+
+
+def _ann_ns(src=None):
+    _ns = {"re": re, "base64": __import__("base64"), "time": time,
+           "secrets": __import__("secrets"), "os": os,
+           "EXPORT_DIRNAME": "exports", "NotLanded": OSError,
+           "StaleProfile": OSError, "stage_path": lambda s="": "",
+           "drop_run_file": lambda p: None}
+    exec(_ann_seg(src), _ns)
+    return _ns
+
+
+_ANN_POS = ["draw over it showing good neighborhoods for an Airbnb",
+            "Please draw over it showing the best neighborhoods",
+            "Can you highlight the good areas?", "Circle the park",
+            "mark the good neighborhoods on this map",
+            "I want you to mark the best areas for an Airbnb",
+            "Look at this map and mark the best areas", "Annotate this",
+            "label each room", "Put a red box around the entrance",
+            "draw a circle around the park",
+            "Where is the park? Circle it.",
+            "show me where the park is on the map",
+            "show the good neighborhoods on the map",
+            "I'd like the good neighborhoods highlighted",
+            "can you add arrows pointing to the exits",
+            "Draw boxes around the faces", "draw on it",
+            "highlight the cheap streets and label them",
+            "point out the exits", "Mark up this floor plan",
+            "Describe this map and highlight the best neighborhoods",
+            "could you please draw lines for the bus routes"]
+_ANN_NEG = ["what is this?", "describe this image",
+            "what is the mark on the wall?", "how to draw a circle in CSS",
+            "draw me a cat", "draw a cat",
+            "Which neighborhoods are good for an Airbnb?",
+            "is this a circle?", "what does the label say?",
+            "summarize this chart", "outline the key points of this chart",
+            "translate the text in this picture", "who is in this photo",
+            "mark my words", "Read the label on the bottle",
+            "explain the red circle", "where would you put a box?",
+            "how do I draw over a picture in Photoshop?", "thanks",
+            "Add a caption to this", "what color is this image?", "",
+            "Read the highlighted text in this picture",
+            "the marked items are hard to read", "draw me a circle",
+            "draw me a star", "How to draw a box in HTML"]
+_ANN_EDIT_POS = ["make the red box bigger", "also mark the park",
+                 "remove the blue circle", "change the color to green",
+                 "move it left", "add another area near the river"]
+_ANN_EDIT_NEG = ["what does the red box mean?", "thanks!",
+                 "why is that one red?", "describe this map", ""]
+
+
+def _ann_gate_ok(ns):
+    w, e = ns["annotate_wants"], ns["annotate_edit_wants"]
+    return (all(w(q) for q in _ANN_POS)
+            and not any(w(q) for q in _ANN_NEG)
+            and all(e(q) for q in _ANN_EDIT_POS)
+            and not any(e(q) for q in _ANN_EDIT_NEG))
+
+
+_ann_n = _ann_ns()
+check("draw on a picture: the gate fires on a request to mark it and on nothing else",
+      _ann_gate_ok(_ann_n), "")
+# four mutations of the gate, each must fail the corpus
+_ann_mut = [
+    ("a question opener no longer vetoes",
+     "r\"^\\s*(?:what|why|who|whose|which|how|is|are|was|were|does|do|did|\"", "r\"^\\s*(?:zzzz|\""),
+    ("'mark as' / 'mark my words' read as marking",
+     "(?!as\\b|down\\b|my\\s+words|me\\b|\"\n    r\"sure\\b|that\\b\\s*$)\\S", "\\S"),
+    ("'draw me a cat' reads as drawing on the picture",
+     "and not re.match(\n                            r\"\\s*me\\s+an?\\s+\\w+\\s*$\", rest, re.I)", ""),
+    ("a plain passive 'highlighted' needs no want-verb",
+     "r\"\\b(?:want|like|need|have|get|make|prefer)\\b[^.?!]{0,80}\\b\"",
+     "r\"\\b\""),
+    ("an edit word with a question opener still counts",
+     "return bool(s and not _ANN_QUESTION.match(s) and _ANN_EDIT.search(s))",
+     "return bool(s and _ANN_EDIT.search(s))"),
+    ("the gate fires on every picture",
+     "    return False\n\n\ndef annotate_edit_wants", "    return True\n\n\ndef annotate_edit_wants"),
+]
+_ann_caught = []
+for _lbl, _a, _b in _ann_mut:
+    _s = _MILLENAI_SRC
+    if _s.count(_a) != 1:
+        _ann_caught.append((_lbl, "ANCHOR"))
+        continue
+    try:
+        _ann_caught.append((_lbl, not _ann_gate_ok(_ann_ns(_s.replace(_a, _b)))))
+    except Exception:
+        _ann_caught.append((_lbl, True))
+check("draw on a picture: every gate mutation is caught by the corpus",
+      all(c is True for _l, c in _ann_caught),
+      str([x for x in _ann_caught if x[1] is not True]))
+
+# the wiring in the chat handler, run for real on stand-in requests
+_ann_hs = _MILLENAI_SRC[_MILLENAI_SRC.index("        _ann = _ann_grid = False\n"):
+                        _MILLENAI_SRC.index("        model_name = req_json.get(\"model\", \"\")\n")]
+import textwrap as _tw
+
+
+def _ann_wire(messages, images, req_json, ns=None):
+    ns = dict(ns or _ann_n)
+    ns.update(messages=messages, images=images, req_json=req_json)
+    exec(_tw.dedent(_ann_hs), ns)
+    return ns["images"], ns["_ann"], ns["_ann_grid"], ns["req_json"].get("images")
+
+
+_pic, _grid, _p2 = "data:image/jpeg;base64,ORIG", "data:image/jpeg;base64,GRID", "data:image/jpeg;base64,PREV"
+_fence = [{"role": "user", "content": "mark it"},
+          {"role": "assistant", "content": "ok\n```annotate\n{\"shapes\":[]}\n```"}]
+_w1 = _ann_wire([{"role": "user", "content": "draw over it showing good areas"}], [_pic],
+                {"grid_images": [_grid]})
+_w2 = _ann_wire([{"role": "user", "content": "what is this?"}], [_pic], {"grid_images": [_grid]})
+_w3 = _ann_wire([{"role": "user", "content": "circle the park"}], [_pic], {"grid_images": [_grid, _grid]})
+_w4 = _ann_wire(_fence + [{"role": "user", "content": "make the red box bigger"}], [],
+                {"prev_image": _pic, "prev_grid": _p2})
+_w5 = _ann_wire([{"role": "user", "content": "make the red box bigger"}], [], {"prev_image": _pic})
+_w6 = _ann_wire(_fence + [{"role": "user", "content": "what does the red box mean?"}], [],
+                {"prev_image": _pic, "prev_grid": _p2})
+_w7 = _ann_wire(_fence + [{"role": "user", "content": "also mark the park"}], [],
+                {"prev_image": 7, "prev_grid": ["x"]})
+_w8 = _ann_wire(_fence + [{"role": "user", "content": "mark the park"}], [_pic], {"grid_images": [_grid]})
+_w9 = _ann_wire(_fence + [{"role": "user", "content": "make it bigger"}], [], {"prev_image": _pic})
+check("draw on a picture: the model reads the gridded copy only when the words ask for marks",
+      _w1 == ([_grid], True, True, [_grid])             # swapped, flagged, written back
+      and _w2 == ([_pic], False, False, None)          # a plain question is untouched
+      and _w3 == ([_pic], True, False, [_pic])         # grids that don't pair up: the original
+      and _w4 == ([_p2], True, True, [_p2])            # a follow-up reuses the chat's picture
+      and _w5 == ([], False, False, None)              # ...but only after marks were drawn
+      and _w6 == ([], False, False, None)              # ...and not for a question about them
+      and _w7 == ([], False, False, None)              # junk in prev_image is ignored
+      and _w8 == ([_grid], True, True, [_grid])
+      and _w9 == ([_pic], True, False, [_pic]),        # no grid sent: the original
+      str([_w1, _w2, _w3, _w4, _w5, _w6, _w7, _w8, _w9]))
+_ai = _ann_n["annotate_instruction"]("circle the park", True)
+_ai2 = _ann_n["annotate_instruction"]("circle the park", False)
+check("draw on a picture: the model is told the shape format, the grid, and to reply with the full block",
+      _ai.startswith("circle the park") and "```" not in _ai.replace("three backticks", "")
+      and "annotate" in _ai and "0 to 1" in _ai and "TOP-LEFT" in _ai and "At most 30" in _ai
+      and "FULL updated block" in _ai and "columns A to J" in _ai and "C4" in _ai
+      and "columns A to J" not in _ai2 and "FULL updated block" in _ai2
+      and '                vm["content"] = annotate_instruction(vm["content"], _ann_grid)'
+      in _MILLENAI_SRC
+      and _MILLENAI_SRC.index("annotate_instruction(vm[") < _MILLENAI_SRC.index('vm["images"] = b64s'))
+# the order of the wiring matters: the gate runs before the agents and the
+# generators look at req_json["images"], and the picture still takes the
+# vision model by the app's own rule, with no new route
+check("draw on a picture: wired before the image rules, no new route to the cloud",
+      _MILLENAI_SRC.index("_ann = _ann_grid = False") < _MILLENAI_SRC.index("vid_subject = video_intent")
+      and _MILLENAI_SRC.index("_ann = _ann_grid = False") < _MILLENAI_SRC.index('if agent_name and not req_json.get("images")')
+      and 'req_json["images"] = images' in _MILLENAI_SRC
+      and "annotate" not in _MILLENAI_SRC[_MILLENAI_SRC.index("def cloud_role_model"):_MILLENAI_SRC.index("def _cloud_ladder")])
+
+# the save endpoint, live: a PNG lands in exports/ like an export and is
+# served back by id; anything else is refused
+_ann_png = ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+            "z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+_s1, _h1, _b1 = req("/api/annotate/save", "POST", {"png": "data:image/png;base64," + _ann_png})
+_j1 = json.loads(_b1 or b"{}") if _s1 == 200 else {}
+_s2, _h2, _b2 = req("/api/export/" + _j1.get("id", "x"))
+_s3, _, _ = req("/api/annotate/save", "POST", {"png": "data:image/png;base64," + __import__("base64").b64encode(b"<html>").decode()})
+_s4, _, _ = req("/api/annotate/save", "POST", {"png": "data:text/html;base64,PGI+"})
+_s5, _, _ = req("/api/annotate/save", "POST", {"png": 5})
+_s6, _, _ = req("/api/annotate/save", "POST", {"png": "data:image/png;base64," + _ann_png}, token=False)
+check("draw on a picture: Save puts a real PNG in exports and refuses anything else",
+      _s1 == 200 and _j1.get("ok") and re.fullmatch(r"[\w-]{16,48}\.png", _j1.get("id", ""))
+      and _j1.get("shown") is False        # no Finder window unless the page asks
+      and _s2 == 200 and _b2.startswith(b"\x89PNG") and "attachment" in _h2.get("Content-Disposition", "")
+      and "annotated-picture.png" in _h2.get("Content-Disposition", "")
+      and _s3 == 400 and _s4 == 400 and _s5 == 400 and _s6 == 403,
+      str((_s1, _j1, _s2, _s3, _s4, _s5, _s6)))
+
+# ---- the page: parser, renderer and geometry, in node
+def _ann_js_src(src):
+    def fn(nm):
+        i = src.index("function %s(" % nm)
+        return src[i:src.index("\n}\n", i) + 3]
+    a = src.index("const ANN_MAX=")
+    b = src.index("function annHydrate(")
+    return (re.search(r"function esc\(s\)\{.*?;\}\n", src, re.S).group(0)
+            + re.search(r"const HL_KW=.*?;\n", src, re.S).group(0)
+            + fn("hilite") + fn("dlBox") + fn("flowDiagram") + fn("photoRow")
+            + "let LMAP_SEQ=0;const mountPin=()=>0;\n" + fn("mapCard")
+            + "let curChat='c1';\n" + src[a:b] + fn("renderMD"))
+
+
+_ANN_DRIVER = r"""
+const mk=()=>{const calls=[],st={};const ctx=new Proxy(st,{get:(t,k)=>k==='measureText'?(s=>({width:String(s).length*7})):(k in t?t[k]:(...a)=>{calls.push([k,...a]);}),set:(t,k,v)=>{t[k]=v;calls.push(['set',k,v]);return true;}});return [ctx,calls];};
+const R={};
+const J=o=>JSON.stringify(o);
+const P=s=>{try{return annParse(s);}catch(e){return "THROW "+e;}};
+R.valid=P(J({shapes:[{type:"rect",x:.1,y:.2,w:.3,h:.4,text:"Park",color:"#22C55E",note:"why"}]}));
+R.clampA=P(J({shapes:[{type:"rect",x:-5,y:2,w:9,h:9}]}));
+R.clampB=P(J({shapes:[{type:"rect",x:.9,y:.9,w:5,h:5},{type:"ellipse",x:"0.5",y:"0.5",w:"0.2",h:"0.2"},{type:"rect",x:.1,y:.1,w:"1e999",h:.1}]}));
+R.many=P(J({shapes:Array.from({length:60},(_,i)=>({type:"label",x:i/100,y:.5,text:"n"+i}))}));
+R.junk=["not json","[]","null","42",'"x"',J({shapes:"x"}),J({shapes:[null,1,"a",[],{type:"rect"},{type:"__proto__"},{type:"constructor"},{type:"toString"},{type:"star",x:.5,y:.5,text:"hi"}]})].map(P);
+R.partial=['{"shapes":[{"type":"rect","x":0.1','{"shapes":[{"type":"rect","x":0.1,"y":0.1,"w":0.1,"h":0.1}','',' '].map(P);
+R.hostile=P(J({shapes:[{type:"RECT",x:.1,y:.1,w:.2,h:.2,text:"<img src=x onerror=alert(1)>\u202e\u0000evil"+"x".repeat(100),color:"red",note:"n".repeat(5000)},
+  {type:"rect",x:.1,y:.1,w:.2,h:.2,color:"#12345"},{type:"rect",x:.1,y:.1,w:.2,h:.2,color:"url(javascript:alert(1))"},{type:"rect",x:.1,y:.1,w:.2,h:.2,color:"#gggggg"},{type:"rect",x:.1,y:.1,w:.2,h:.2,color:"#abcdef\"onmouseover=\"x"}]}));
+R.poly=P(J({shapes:[{type:"polygon",points:[[0,0],[1,1]]},{type:"polygon",points:[[0,0],["a","b"],[1,1],[2,-3],[.5,.5]]},{type:"arrow",points:[[0,0],[1,1],[.5,.5]]},{type:"line",points:[[0,0]]},{type:"label",x:.5,y:.5},{type:"label",x:.5,y:.5,text:"  "}]}));
+// slot / renderMD
+const pic=annAdd("c1",0,"data:image/jpeg;base64,AAAA");
+const body=J({shapes:[{type:"rect",x:.1,y:.2,w:.3,h:.4,text:"Park",note:'a "quoted" **bold** [l](https://e.com) <b>x</b> `c`'}]});
+const full="Here you go.\n\n```annotate\n"+body+"\n```\n\nDone.";
+R.closed=renderMD(full);
+R.open=renderMD(full.slice(0,full.indexOf("```annotate")+30));
+R.bad=renderMD("x\n```annotate\n{not json}\n```\ny");
+R.json=renderMD("```json\n"+body+"\n```");
+R.empty=renderMD("```annotate\n"+J({shapes:[]})+"\n```");
+curChat="other";R.nopic=renderMD(full);curChat="c1";
+let thr=0,firstAt=-1;
+for(let i=0;i<=full.length;i++){try{const o=renderMD(full.slice(0,i));if(firstAt<0&&o.indexOf('class="annot"')>=0)firstAt=i;}catch(e){thr++;}}
+R.stream={thr,firstAt,closeAt:full.indexOf("```",full.indexOf("```annotate")+5)+3};
+R.attr=(()=>{const m=/data-a="([^"]*)"/.exec(R.closed);if(!m)return null;
+  const un=m[1].replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
+  try{return JSON.parse(un)[0].note;}catch(e){return "BAD";}})();
+// geometry
+const shapes=annParse(J({shapes:[{type:"rect",x:.1,y:.2,w:.3,h:.4,text:"Park",color:"#22c55e"},{type:"ellipse",x:.5,y:.5,w:.2,h:.2},{type:"arrow",points:[[.1,.9],[.4,.6]]},{type:"polygon",points:[[.6,.1],[.9,.1],[.9,.3]],text:"Zone"},{type:"label",x:.995,y:.995,text:"Edge"}]})).shapes;
+const geo=(W,H)=>{const [c,calls]=mk();annDraw(c,shapes,W,H);return calls;};
+const A=geo(1800,1200),B=geo(900,600);
+const pick=(cs,k)=>cs.filter(c=>c[0]===k);
+R.geo={fillRectA:pick(A,"fillRect")[0],fillRectB:pick(B,"fillRect")[0],
+  ellA:pick(A,"ellipse")[0],ellB:pick(B,"ellipse")[0],
+  lwA:pick(A,"set").filter(c=>c[1]==="lineWidth")[0][2],lwB:pick(B,"set").filter(c=>c[1]==="lineWidth")[0][2],
+  head:pick(A,"closePath").length>=2,texts:pick(A,"fillText").map(c=>[c[1],c[2],c[3]]),W:1800,H:1200,
+  moveA:pick(A,"moveTo").slice(0,3)};
+const [gc,gcalls]=mk();annGrid(gc,1280,800);
+R.grid={text:pick(gcalls,"fillText").map(c=>c[1]),lines:pick(gcalls,"lineTo").length};
+const [gc2,gcalls2]=mk();let big=[];for(let i=0;i<30;i++)big.push({type:"rect",x:.01*i,y:.02,w:.2,h:.2,text:"s"+i,color:"#ff0000"});
+try{annDraw(gc2,annParse(J({shapes:big})).shapes,640,480);R.big=pick(gcalls2,"fillText").length+pick(gcalls2,"fillRect").length;}catch(e){R.big="THROW "+e;}
+process.stdout.write(J(R));
+"""
+
+
+def _ann_js_run(src):
+    _f = os.path.join(tempfile.mkdtemp(), "ann.js")
+    open(_f, "w").write(_ann_js_src(src) + "\n" + _ANN_DRIVER)
+    _r = subprocess.run(["node", _f], capture_output=True, text=True, timeout=60)
+    try:
+        return json.loads(_r.stdout)
+    except ValueError:
+        return {"ERR": (_r.stderr or _r.stdout)[:400]}
+
+
+def _ann_js_ok(R):
+    try:
+        v = R["valid"]["shapes"]
+        ok = (len(v) == 1 and v[0]["color"] == "#22c55e" and v[0]["text"] == "Park"
+              and abs(v[0]["w"] - .3) < 1e-9)
+        a, b = R["clampA"]["shapes"], R["clampB"]["shapes"]
+        ok = ok and a == []                                  # nothing left inside the picture
+        ok = ok and len(b) == 2 and abs(b[0]["w"] - .1) < 1e-9 and abs(b[0]["h"] - .1) < 1e-9 \
+            and b[1]["type"] == "ellipse" and abs(b[1]["x"] - .5) < 1e-9
+        ok = ok and len(R["many"]["shapes"]) == 30 and R["many"]["shapes"][29]["text"] == "n29"
+        j = R["junk"]
+        ok = ok and j[0] is None and j[1] == {"shapes": []} and j[2] is None and j[3] is None \
+            and j[4] is None and j[5] is None and j[6] == {"shapes": []}
+        ok = ok and all(x is None for x in R["partial"])
+        h = R["hostile"]["shapes"]
+        ok = ok and len(h) == 5 and "\u202e" not in h[0]["text"] and "\x00" not in h[0]["text"] \
+            and len(h[0]["text"]) == 40 and len(h[0]["note"]) == 160
+        ok = ok and all(re.fullmatch(r"#[0-9a-f]{6}", s["color"]) for s in h)
+        ok = ok and h[0]["color"] != "red" and h[1]["color"] != "#12345" and "javascript" not in h[2]["color"] \
+            and h[4]["color"] != "#abcdef\"onmouseover=\"x"
+        p = R["poly"]["shapes"]
+        ok = ok and [s["type"] for s in p] == ["polygon", "arrow"] and len(p[0]["points"]) == 4 \
+            and p[0]["points"][2] == [1, 0] and len(p[1]["points"]) == 2
+        ok = ok and R["closed"].count('class="annot"') == 1 and 'data-pic="p1"' in R["closed"] \
+            and "Here you go." in R["closed"] and "Done." in R["closed"] and "codecard" not in R["closed"]
+        ok = ok and "annot" not in R["open"] and "codecard" not in R["open"] and "Here you go." in R["open"]
+        ok = ok and "codecard" in R["bad"] and "annot" not in R["bad"].replace("annotate", "")
+        ok = ok and "codecard" in R["json"] and 'class="annot"' not in R["json"]
+        ok = ok and "codecard" in R["empty"] and "codecard" in R["nopic"] and 'class="annot"' not in R["nopic"]
+        ok = ok and R["stream"]["thr"] == 0 and R["stream"]["firstAt"] == R["stream"]["closeAt"]
+        ok = ok and R["attr"] == 'a "quoted" **bold** [l](https://e.com) <b>x</b> `c`'
+        g = R["geo"]
+        fa, fb = g["fillRectA"], g["fillRectB"]
+        ok = ok and all(abs(fa[i] - 2 * fb[i]) < 1e-6 for i in range(1, 5)) \
+            and abs(fa[1] - 180) < 1e-6 and abs(fa[2] - 240) < 1e-6 and abs(fa[3] - 540) < 1e-6 and abs(fa[4] - 480) < 1e-6
+        ok = ok and all(abs(g["ellA"][i] - 2 * g["ellB"][i]) < 1e-6 for i in range(1, 5)) \
+            and abs(g["ellA"][1] - 1080) < 1e-6 and abs(g["ellA"][2] - 720) < 1e-6
+        ok = ok and abs(g["lwA"] - 2 * g["lwB"]) < 1e-9 and g["head"]
+        ok = ok and [t[0] for t in g["texts"]] == ["Park", "Zone", "Edge"]
+        ok = ok and all(0 <= t[1] <= g["W"] and 0 <= t[2] <= g["H"] for t in g["texts"])
+        gt = R["grid"]["text"]
+        ok = ok and len(gt) == 100 + 18 and {"A1", "J10", "C4", "0.1", "0.9"} <= set(gt) and R["grid"]["lines"] >= 9
+        ok = ok and isinstance(R["big"], int) and R["big"] == 60
+        return bool(ok)
+    except Exception as _e:
+        return False
+
+
+_ANN_R = _ann_js_run(_MILLENAI_SRC)
+check("draw on a picture: the page parses the model's shapes strictly, never throws, draws to scale (node)",
+      _ann_js_ok(_ANN_R), str(_ANN_R)[:300])
+_ann_js_mut = [
+    ("no cap of 30 shapes", "    if(out.length>=ANN_MAX)break;\n", ""),
+    ("any colour string is taken", "/^#[0-9a-fA-F]{6}$/.test(col)?col.toLowerCase()", "col!==\"\"?col"),
+    ("numbers not clamped", "return isFinite(n)?Math.min(hi,Math.max(lo,n)):null;}", "return isFinite(n)?n:null;}"),
+    ("control and bidi characters kept", "\\u0000-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\u2066-\\u2069", "\\u0001-\\u0002"),
+    ("a half-streamed fence is drawn or dumped", "  if(!close)return \"\";\n", ""),
+    ("the card is not stashed from the inline rules", "return ah?(ans.push(ah),\"\\u0000AN\"+(ans.length-1)+\"\\u0000\"):\"\";", "return ah;"),
+    ("a card with no picture", "if(!p||!p.shapes.length||!e)return null;", "if(!p||!p.shapes.length)return null;"),
+    ("sizes not scaled with the canvas", "const u=Math.max(W,H)/900,lw=Math.max(2,2.5*u),chips=[];", "const u=1,lw=Math.max(2,2.5*u),chips=[];"),
+    ("a shape may spill past the picture", "w=Math.min(w,1-x);h=Math.min(h,1-y);", ""),
+    ("the grid has no cell names", "tag(\"ABCDEFGHIJ\"[c]+(r+1),W*c/10+3*u,H*r/10+3*u);", ";"),
+    ("any type name is accepted", "if(!ANN_TYPES.has(t))return null;", ""),
+]
+_ann_jc = []
+for _lbl, _a, _b in _ann_js_mut:
+    if _MILLENAI_SRC.count(_a) != 1:
+        _ann_jc.append((_lbl, "ANCHOR"))
+        continue
+    _ann_jc.append((_lbl, not _ann_js_ok(_ann_js_run(_MILLENAI_SRC.replace(_a, _b)))))
+check("draw on a picture: every page mutation is caught",
+      all(c is True for _l, c in _ann_jc), str([x for x in _ann_jc if x[1] is not True]))
+
+# the wiring on the page, and the mutations of it
+def _ann_page_ok(p):
+    return all(x in p for x in [
+        "function annGrid(", "annGrid(cx,c.width,c.height)", "annGridOf.set(orig,", "body:JSON.stringify({png:url,reveal:true})",
+        "annExtra={grid_images:g}", "annExtra={prev_image:b.img,prev_grid:b.grid||undefined}",
+        "Object.assign(annExtra,advUse", "if(sentImages.length)annAdd(myChat,inner.children.length-1,sentImages[0])",
+        "annIn(myChat,()=>renderMD(", 'lang.toLowerCase()==="annotate"',
+        'save.textContent="Save image"', 'copy.textContent="Copy"', '"/api/annotate/save"',
+        "new ClipboardItem({\"image/png\":annFlat(e,shapes)})", "annBlobSave(blob)",
+        ".anncv{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}",
+        ".annstage{position:relative;display:inline-block", "new ResizeObserver(redraw).observe(stage)",
+        'if(n.matches(".annot[data-a]"))annHydrate(n);', "annCtx.pos=inner.children.length",
+    ]) and "innerHTML" not in p[p.index("function annCard("):p.index("function annHydrate(")] \
+        and "src=\"http" not in p[p.index("const ANN_MAX="):p.index("function annHydrate(")]
+
+
+_ann_pm = [
+    ("the gridded copy is never made", "annGrid(cx,c.width,c.height);annGridOf.set", "annGridOf.set"),
+    ("the grid copy is not sent", "annExtra={grid_images:g};", ""),
+    ("the picture is not remembered for the answer", "if(sentImages.length)annAdd(myChat,", "if(false)annAdd(myChat,"),
+    ("the card is not hydrated", "if(n.matches(\".annot[data-a]\"))annHydrate(n);", ""),
+    ("no Save button", 'save.textContent="Save image";', ""),
+    ("the overlay no longer follows the picture", "new ResizeObserver(redraw).observe(stage)", "0"),
+    ("the card builds its legend with innerHTML", "const ul=document.createElement(\"ul\");", "const ul=document.createElement(\"ul\");ul.innerHTML=\"\";"),
+]
+_ann_pc = []
+for _lbl, _a, _b in _ann_pm:
+    _ann_pc.append((_lbl, "ANCHOR") if page.count(_a) < 1 else (_lbl, not _ann_page_ok(page.replace(_a, _b, 1))))
+check("draw on a picture: the served page wires the grid, the card, Save and Copy; no HTML from the model",
+      _ann_page_ok(page) and all(c is True for _l, c in _ann_pc), str([x for x in _ann_pc if x[1] is not True]))
 # 6b292, per Patrick: performance mode is now "Enable visual effects" in
 # About and touches ONLY the backdrop; the cog sits left of the pen;
 # automatic update checks are a switch (launch + daily) with the button

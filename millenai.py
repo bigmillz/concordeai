@@ -8170,6 +8170,185 @@ def reveal_in_finder(path: str) -> bool:
         return False
 
 
+# ==== image annotate: begin ====
+# DRAW ON A PICTURE (6b355, per Patrick: "I paste it in a map and ask the
+# app to draw over it showing good neighborhoods for an Airbnb, but it was
+# unable to modify the photo. It should be able to do this sort of
+# modification to images."). The model never edits pixels: it says WHERE,
+# as shapes in 0..1 coordinates inside an ```annotate fence, and the page
+# draws them over the picture the person attached. The gate below is a
+# small word pattern and FAILS CLOSED: a picture with a plain question
+# ("what is this?") goes the way it always did.
+_ANN_LEAD = re.compile(
+    r"^(?:(?:ok(?:ay)?|hey|hi|now|then|also|so|well|just|please|pls|kindly|"
+    r"thanks?|thank\s+you|great|good)\b[\s,.!:;-]*|"
+    r"(?:can|could|would|will)\s+you\b[\s,]*|"
+    r"i['’]?d\s+like\s+(?:you\s+)?to\b\s*|"
+    r"i\s+(?:want|need)\s+(?:you\s+)?to\b\s*|let['’]?s\b\s*|"
+    r"go\s+ahead\s+and\b\s*|try\s+to\b\s*|you\s+should\b\s*|"
+    r"i['’]?d\s+like\s+(?:it\s+)?if\s+you\b\s*|ask\s+(?:the\s+app|"
+    r"you)\s+to\b\s*|and\b\s*)+", re.I)
+_ANN_QUESTION = re.compile(
+    r"^\s*(?:what|why|who|whose|which|how|is|are|was|were|does|do|did|"
+    r"when|where|whats|what['’]s)\b", re.I)
+_ANN_SHAPE = (r"(?:box(?:es)?|circles?|lines?|arrows?|outlines?|borders?|"
+              r"boundar(?:y|ies)|routes?|paths?|rectangles?|ovals?|"
+              r"ellipses?|shapes?|polygons?|zones?|regions?|areas?|"
+              r"overlays?|marks?|markers?|pins?|dots?|labels?|stars?|"
+              r"highlights?|x['’]?s|crosses|numbers?|text|notes?)")
+_ANN_PREP = r"(?:on|over|onto|around|across|upon|atop|in|inside|along)"
+# the verbs that mean "mark the picture" wherever they stand
+_ANN_STRONG = re.compile(
+    r"^(?:annotate|highlight|circle|underline|ring|point\s+out|point\s+to|"
+    r"mark\s+up|colou?r\s+in|trace)\b", re.I)
+# "mark" and "label" are nouns as often as verbs: only an imperative one
+_ANN_MARK = re.compile(
+    r"^(?:mark|label|tag|pin)\b\s*(?!as\b|down\b|my\s+words|me\b|"
+    r"sure\b|that\b\s*$)\S", re.I)
+# draw / outline / shade / put / place / add need a place or a shape
+_ANN_PLACE = re.compile(
+    r"^(?:draw|sketch|outline|shade|overlay|put|place|add|insert)\b"
+    r"(?P<rest>.*)$", re.I)
+_ANN_SHOW = re.compile(
+    r"^show\b(?:\s+me)?\s+(?:on\b|where\b|(?:[^.?!]{0,80}\s)?on\s+"
+    r"(?:it|this|that|the\s+(?:map|image|picture|photo|screenshot|"
+    r"diagram|plan|chart|drawing|floor\s*plan)))", re.I)
+_ANN_PASSIVE = re.compile(
+    r"\b(?:want|like|need|have|get|make|prefer)\b[^.?!]{0,80}\b"
+    r"(?:highlighted|circled|marked(?:\s+up)?|outlined|labell?ed|"
+    r"annotated|shaded|underlined)\b", re.I)
+_ANN_EDIT = re.compile(
+    r"\b(?:bigger|larger|smaller|shrink|enlarge|expand|extend|widen|"
+    r"narrow|thicker|thinner|move|shift|nudge|remove|delete|erase|drop|"
+    r"clear|add|also|another|more|fewer|change|recolou?r|colou?r|rename|"
+    r"relabel|redo|adjust|fix|resize|instead|different|lighter|darker|"
+    r"red|blue|green|yellow|orange|purple|pink|black|white)\b", re.I)
+
+
+def _ann_clauses(text: str):
+    """The sentences of a request (a question opener drops its own) split
+    where an 'and' or a comma starts another instruction."""
+    for sent in re.split(r"[.!?\n;]+", text or ""):
+        sent = _ANN_LEAD.sub("", sent.strip())
+        if not sent or _ANN_QUESTION.match(sent):
+            continue
+        for cl in re.split(r"\b(?:and|then|but|so|to)\b|[,:&]", sent,
+                           flags=re.I):
+            cl = _ANN_LEAD.sub("", cl.strip())
+            if cl and not _ANN_QUESTION.match(cl):
+                yield cl
+
+
+def annotate_wants(text: str) -> bool:
+    """True when the request asks to mark, draw on, or label the attached
+    picture. Fail-closed: no match means the picture is read as before."""
+    t = str(text or "")[:2000]
+    if _ANN_PASSIVE.search(t):
+        return True
+    for cl in _ann_clauses(t):
+        if _ANN_STRONG.match(cl) or _ANN_MARK.match(cl) \
+                or _ANN_SHOW.match(cl):
+            return True
+        m = _ANN_PLACE.match(cl)
+        if m:
+            rest = m.group("rest")[:90]
+            head = cl.split(None, 1)[0].lower()
+            if re.match(r"\s*(?:\w+\s+){0,3}?" + _ANN_PREP + r"\s+"
+                        r"(?:it|this|that|them|the|my|a|an)\b", rest, re.I) \
+                    and head in ("draw", "sketch", "overlay"):
+                return True
+            if re.match(r"\s*(?:me\s+)?(?:an?|the|some|more|two|three|"
+                        r"\d+)?\s*(?:\w+\s+){0,2}?" + _ANN_SHAPE + r"\b",
+                        rest, re.I) and not re.match(
+                            r"\s*me\s+an?\s+\w+\s*$", rest, re.I):
+                return True
+    return False
+
+
+def annotate_edit_wants(text: str) -> bool:
+    """A follow-up to marks already drawn ('make the red box bigger',
+    'also mark the park'): the change words, never a question."""
+    t = str(text or "")[:2000]
+    if annotate_wants(t):
+        return True
+    s = _ANN_LEAD.sub("", t.strip())
+    return bool(s and not _ANN_QUESTION.match(s) and _ANN_EDIT.search(s))
+
+
+def annotate_prev(messages) -> bool:
+    """The last assistant turn before the question carries an annotate
+    fence, so there are marks to change."""
+    for m in reversed(messages[:-1] if messages else []):
+        if isinstance(m, dict) and m.get("role") == "assistant":
+            return "```annotate" in str(m.get("content") or "")
+    return False
+
+
+ANNOTATE_RULES = """
+HOW TO MARK THE PICTURE. The person wants marks drawn ON the attached picture. You cannot change pixels; you say where the marks go and the app draws them. Do two things:
+1. Answer in a few plain sentences: what you marked and why.
+2. End with ONE fenced block opened by three backticks and the word annotate, holding JSON only:
+{"shapes":[{"type":"rect","x":0.2,"y":0.3,"w":0.15,"h":0.1,"text":"Park","color":"#22c55e","note":"Quiet, near the train"}]}
+Rules:
+- Coordinates are fractions of the picture, 0 to 1, origin at the TOP-LEFT: x grows to the right, y grows downward.
+- Types: "rect" and "ellipse" (x, y = top-left corner, w, h = size); "polygon" ("points":[[x,y],[x,y],[x,y],...], at least 3); "arrow" and "line" ("points":[[from x,y],[to x,y]]); "label" (x, y = where the text goes, "text").
+- Each shape may have "text" (a label, at most 40 characters), "color" ("#rrggbb"; give different areas different colors) and "note" (one short sentence on why).
+- At most 30 shapes. Put only what the person asked for in the block.
+- If the person asks to change earlier marks (bigger, smaller, move, remove, add, recolor), reply with the FULL updated block, not just the change.
+"""
+ANNOTATE_GRID = """
+THE GRID. The picture you see has a thin grid drawn over it by the app: columns A to J from left to right and rows 1 to 10 from top to bottom, each cell 0.1 wide and 0.1 tall, with the numbers 0.1 to 0.9 along the bottom edge (for x) and the left edge (for y), in blue. Place every shape by that grid: cell C4 spans x 0.2 to 0.3 and y 0.3 to 0.4. Read coordinates off the grid; do not guess. The grid is not part of the picture and is never drawn in the answer.
+"""
+
+
+def annotate_instruction(request: str, grid: bool) -> str:
+    """The question as the model gets it: the person's words, then the
+    rules for answering with shapes."""
+    return (str(request or "").strip() + "\n" + ANNOTATE_RULES
+            + (ANNOTATE_GRID if grid else ""))
+
+
+ANNOTATE_SAVE_MAX = 16_000_000
+
+
+def save_annotated_png(ctx, data_url: str) -> dict:
+    """The flattened picture, saved the way an export is (an opaque name in
+    exports/, a .meta with the pretty one) so the desktop app can reveal it
+    in Finder and a plain browser can download it. Raises ValueError for
+    anything that is not a PNG data URL of a sane size."""
+    s = str(data_url or "")
+    if not s.startswith("data:image/png;base64,"):
+        raise ValueError("not a PNG")
+    raw = base64.b64decode(s.split(",", 1)[1], validate=False)
+    if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) > ANNOTATE_SAVE_MAX:
+        raise ValueError("not a PNG")
+    token = secrets.token_urlsafe(16)
+    path = stage_path(".png")
+    kept = False
+    try:
+        with open(path, "wb") as f:
+            f.write(raw)
+        try:
+            ctx.adopt(path, "%s/%s.png" % (EXPORT_DIRNAME, token))
+        except NotLanded:
+            kept = True
+            raise
+    finally:
+        if not kept:
+            drop_run_file(path)
+    name = "annotated-picture.png"
+    try:
+        ctx.write("%s/%s.meta" % (EXPORT_DIRNAME, token),
+                  {"name": name, "ext": "png", "ts": time.time(),
+                   "size": len(raw)})
+    except StaleProfile:
+        raise
+    except OSError:
+        pass
+    return {"id": token + ".png", "name": name, "size": len(raw)}
+# ==== image annotate: end ====
+
+
 VIDEO_SUB = "videos"      # a profile's videos (1a 5.5): video_dir(ctx)
 
 
@@ -26828,6 +27007,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _speak(req["text"])
             self._send_json({"ok": True})
             return
+        if self.path == "/api/annotate/save":
+            # the page's flattened picture (6b355): saved like an export,
+            # then shown in Finder; a browser downloads it by id instead
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if n <= 0 or n > ANNOTATE_SAVE_MAX * 4 // 3 + 4096:
+                self._send_json({"ok": False, "err": "too big"}, code=413)
+                return
+            try:
+                d = json.loads(self.rfile.read(n)) or {}
+                r = save_annotated_png(self.ctx, d.get("png"))
+            except (ValueError, json.JSONDecodeError, TypeError):
+                self._send_json({"ok": False, "err": "not a PNG"}, code=400)
+                return
+            except StaleProfile:
+                raise
+            except (NotLanded, OSError):
+                self._send_json({"ok": False, "err": "couldn't save"},
+                                code=500)
+                return
+            r["ok"] = True
+            # only when the page asks (the Save button does): a test or
+            # a script that saves must not open a Finder window
+            r["shown"] = bool(d.get("reveal")) and reveal_in_finder(
+                os.path.join(export_dir(self.ctx), r["id"]))
+            self._send_json(r)
+            return
         if self.path == "/api/export/reveal":
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
@@ -27022,6 +27227,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # LLaVA on Ollama (native /api/chat takes raw base64 per message)
         images = [i for i in (req_json.get("images") or [])
                   if isinstance(i, str) and len(i) < 8_000_000][:3]
+        # DRAW ON THE PICTURE (6b355): the gate is the request's words and
+        # nothing else. When it fires the model reads the page's gridded
+        # COPY (same size, same model, same route as the original would
+        # have taken) and is told to answer with shapes. A follow-up to
+        # marks already drawn ("make the red box bigger") has no picture
+        # of its own, so the page's newest one rides as prev_image and is
+        # used only if the gate fires; otherwise it is ignored
+        _ann = _ann_grid = False
+        _ann_q = (str(messages[-1].get("content") or "")
+                  if messages and isinstance(messages[-1], dict) else "")
+        if images and annotate_wants(_ann_q):
+            _ann = True
+            _gs = [g for g in (req_json.get("grid_images") or [])
+                   if isinstance(g, str) and len(g) < 8_000_000][:3]
+            if len(_gs) == len(images):
+                images, _ann_grid = _gs, True
+        elif (not images and annotate_prev(messages)
+              and annotate_edit_wants(_ann_q)):
+            _pg, _po = req_json.get("prev_grid"), req_json.get("prev_image")
+            _pi = (_pg if isinstance(_pg, str) and len(_pg) < 8_000_000
+                   else _po if isinstance(_po, str) and len(_po) < 8_000_000
+                   else "")
+            if _pi:
+                images, _ann, _ann_grid = [_pi], True, _pi is _pg
+        if _ann:
+            req_json["images"] = images
         model_name = req_json.get("model", "")
         auto_web = req_json.get("auto_web", True)
         # a tier resolves to its own line-up; otherwise honour explicit picks
@@ -27321,6 +27552,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                                       "content": ""}
             if not str(vm.get("content", "")).strip():
                 vm["content"] = "Describe this image in useful detail."
+            if _ann:
+                vm["content"] = annotate_instruction(vm["content"], _ann_grid)
             vm["images"] = b64s
             vm["image_urls"] = images     # media types, for the cloud (6b308)
             messages = messages[:-1] + [vm] if messages else [vm]
@@ -32337,6 +32570,22 @@ body.gen #chip-model{color:var(--accent)}
 .dlbox .dlgo svg{width:15px;height:15px}
 .dlbox.done .dlext{color:var(--text);border-color:var(--dim)}
 @media (max-width:520px){.dlbox{max-width:100%}}
+/* a picture with the model's marks drawn over it (6b355) */
+.annot{margin:6px 0 12px;max-width:min(100%,760px)}
+.annstage{position:relative;display:inline-block;max-width:100%;line-height:0;
+  border-radius:12px;overflow:hidden;box-shadow:0 12px 40px -18px rgba(0,0,0,.8)}
+.annstage img{display:block;max-width:100%;height:auto}
+.anncv{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.body .annleg{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;
+  gap:5px;font-size:12.5px;color:var(--dim)}
+.annleg li{display:flex;align-items:baseline;gap:8px;line-height:1.35}
+.annleg i{flex:0 0 auto;width:10px;height:10px;border-radius:3px;transform:translateY(1px)}
+.annleg b{font-weight:600;color:var(--text)}
+.annbar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.annbtn{font:inherit;font-size:12px;background:none;color:var(--dim);cursor:pointer;
+  border:1px solid var(--line);border-radius:8px;padding:5px 11px;
+  transition:color .15s,border-color .15s,background .15s}
+.annbtn:hover{color:var(--text);border-color:var(--dim);background:rgba(255,255,255,.05)}
 .genimg{display:block;max-width:min(100%,640px);border-radius:12px;
   margin:6px 0 10px;box-shadow:0 12px 40px -18px rgba(0,0,0,.8)}
 /* the extra under the presets (6b294): image generation */
@@ -35500,6 +35749,277 @@ document.addEventListener("click",async e=>{
   }catch(e2){dlDirect(a);}
   if(was)box.setAttribute("data-said",was);
 });
+/* ------------------------------------------------ drawing on a picture */
+// 6b355, per Patrick: "I paste it in a map and ask the app to draw over it
+// showing good neighborhoods for an Airbnb, but it was unable to modify the
+// photo." The model answers with an ```annotate fence of shapes in 0..1
+// coordinates; the page draws them over the picture the person attached.
+// The fence is UNTRUSTED model output: JSON.parse in a try, every number
+// clamped, every colour a strict #rrggbb, every string drawn with fillText
+// or textContent and never as HTML.
+const ANN_MAX=30,ANN_TYPES=new Set(["rect","ellipse","polygon","arrow","line","label"]);
+const ANN_PAL=["#ef4444","#3b82f6","#22c55e","#f59e0b","#a855f7","#14b8a6"];
+const annChats=new Map(),annPicById=new Map(),annCache=new Map(),annGridOf=new Map();
+const annCtx={chat:null,pos:null};
+let annSeq=0;
+function annNum(v,lo,hi){
+  const n=typeof v==="number"?v:(typeof v==="string"&&v.trim()!==""?Number(v):NaN);
+  return isFinite(n)?Math.min(hi,Math.max(lo,n)):null;}
+function annText(v,n){
+  return typeof v==="string"
+    ?v.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g," ")
+       .replace(/\s+/g," ").trim().slice(0,n):"";}
+function annPts(v,need){
+  if(!Array.isArray(v))return null;
+  const out=[];
+  for(const p of v.slice(0,60)){
+    if(!Array.isArray(p)||p.length<2)continue;
+    const x=annNum(p[0],0,1),y=annNum(p[1],0,1);
+    if(x!==null&&y!==null)out.push([x,y]);
+  }
+  return out.length>=need?out:null;}
+function annShape(s,i){
+  if(!s||typeof s!=="object"||Array.isArray(s))return null;
+  const t=typeof s.type==="string"?s.type.toLowerCase().trim():"";
+  if(!ANN_TYPES.has(t))return null;
+  const col=typeof s.color==="string"?s.color.trim():"";
+  const o={type:t,text:annText(s.text,40),note:annText(s.note,160),
+    color:/^#[0-9a-fA-F]{6}$/.test(col)?col.toLowerCase():ANN_PAL[i%ANN_PAL.length]};
+  if(t==="rect"||t==="ellipse"){
+    const x=annNum(s.x,0,1),y=annNum(s.y,0,1);
+    let w=annNum(s.w,0,1),h=annNum(s.h,0,1);
+    if(x===null||y===null||w===null||h===null)return null;
+    w=Math.min(w,1-x);h=Math.min(h,1-y);
+    if(w<.002||h<.002)return null;
+    o.x=x;o.y=y;o.w=w;o.h=h;
+  }else if(t==="polygon"){
+    const p=annPts(s.points,3);if(!p)return null;o.points=p;
+  }else if(t==="arrow"||t==="line"){
+    const p=annPts(s.points,2);if(!p)return null;o.points=p.slice(0,2);
+  }else{
+    const x=annNum(s.x,0,1),y=annNum(s.y,0,1);
+    if(x===null||y===null||!o.text)return null;
+    o.x=x;o.y=y;
+  }
+  return o;}
+// the fence body in, {shapes:[...]} out; null for anything that is not JSON
+// of the right shape. Junk shapes are dropped one by one, 30 at most.
+function annParse(src){
+  let d;
+  try{d=JSON.parse(String(src).trim());}catch(e){return null;}
+  const list=Array.isArray(d)?d:(d&&typeof d==="object"&&Array.isArray(d.shapes)?d.shapes:null);
+  if(!list)return null;
+  const out=[];
+  for(const s of list.slice(0,200)){
+    if(out.length>=ANN_MAX)break;
+    const v=annShape(s,out.length);if(v)out.push(v);
+  }
+  return {shapes:out};}
+function annRGB(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function annChip(ctx,text,ax,ay,color,centre,W,H,u){
+  const fs=Math.max(11,13*u),pad=fs*.42;
+  ctx.font="600 "+fs+"px -apple-system,BlinkMacSystemFont,system-ui,sans-serif";
+  ctx.textBaseline="middle";ctx.textAlign="left";
+  const bw=ctx.measureText(text).width+pad*2,bh=fs+pad*1.3;
+  let bx=centre?ax-bw/2:ax,by=centre?ay-bh/2:(ay-bh>=0?ay-bh:ay);
+  bx=Math.max(0,Math.min(W-bw,bx));by=Math.max(0,Math.min(H-bh,by));
+  const r=Math.min(bh/2,6*u);
+  ctx.beginPath();ctx.moveTo(bx+r,by);ctx.arcTo(bx+bw,by,bx+bw,by+bh,r);
+  ctx.arcTo(bx+bw,by+bh,bx,by+bh,r);ctx.arcTo(bx,by+bh,bx,by,r);
+  ctx.arcTo(bx,by,bx+bw,by,r);ctx.closePath();
+  ctx.fillStyle=color;ctx.fill();
+  const [R,G,B]=annRGB(color);
+  ctx.fillStyle=(R*.299+G*.587+B*.114)>150?"#111111":"#ffffff";
+  ctx.fillText(text,bx+pad,by+bh/2+fs*.04);}
+// every size is a function of the canvas (W,H) alone, so the picture on
+// screen and the saved file carry the same marks in the same proportions
+function annDraw(ctx,shapes,W,H){
+  const u=Math.max(W,H)/900,lw=Math.max(2,2.5*u),chips=[];
+  ctx.save();ctx.lineJoin="round";ctx.lineCap="round";
+  for(const s of shapes){
+    const [r,g,b]=annRGB(s.color);
+    ctx.strokeStyle=s.color;ctx.lineWidth=lw;
+    ctx.fillStyle="rgba("+r+","+g+","+b+",.24)";
+    let ax=0,ay=0,mid=false;
+    if(s.type==="rect"){
+      ctx.fillRect(s.x*W,s.y*H,s.w*W,s.h*H);ctx.strokeRect(s.x*W,s.y*H,s.w*W,s.h*H);
+      ax=s.x*W;ay=s.y*H;
+    }else if(s.type==="ellipse"){
+      ctx.beginPath();
+      ctx.ellipse((s.x+s.w/2)*W,(s.y+s.h/2)*H,s.w*W/2,s.h*H/2,0,0,Math.PI*2);
+      ctx.fill();ctx.stroke();ax=s.x*W;ay=s.y*H;
+    }else if(s.type==="polygon"){
+      ctx.beginPath();
+      s.points.forEach((p,k)=>k?ctx.lineTo(p[0]*W,p[1]*H):ctx.moveTo(p[0]*W,p[1]*H));
+      ctx.closePath();ctx.fill();ctx.stroke();
+      ax=s.points.reduce((a,p)=>a+p[0],0)/s.points.length*W;
+      ay=s.points.reduce((a,p)=>a+p[1],0)/s.points.length*H;mid=true;
+    }else if(s.type==="line"||s.type==="arrow"){
+      const [p,q]=s.points;
+      ctx.beginPath();ctx.moveTo(p[0]*W,p[1]*H);ctx.lineTo(q[0]*W,q[1]*H);ctx.stroke();
+      if(s.type==="arrow"){
+        const a=Math.atan2((q[1]-p[1])*H,(q[0]-p[0])*W),hl=Math.max(12,14*u);
+        ctx.beginPath();ctx.moveTo(q[0]*W,q[1]*H);
+        ctx.lineTo(q[0]*W-hl*Math.cos(a-.45),q[1]*H-hl*Math.sin(a-.45));
+        ctx.lineTo(q[0]*W-hl*Math.cos(a+.45),q[1]*H-hl*Math.sin(a+.45));
+        ctx.closePath();ctx.fillStyle=s.color;ctx.fill();
+      }
+      ax=p[0]*W;ay=p[1]*H;
+    }else{ax=s.x*W;ay=s.y*H;}
+    if(s.text)chips.push([s.text,ax,ay,s.color,mid]);
+  }
+  chips.forEach(c=>annChip(ctx,c[0],c[1],c[2],c[3],c[4],W,H,u));
+  ctx.restore();}
+// the copy the MODEL reads (small vision models cannot give pixel
+// coordinates, but they read a printed grid well): columns A-J, rows 1-10,
+// ticks 0.1-0.9 on the edges. Never shown, never saved; the shapes are
+// drawn on the original.
+function annGrid(ctx,W,H){
+  const u=Math.max(W,H)/900;
+  ctx.save();
+  for(let i=1;i<10;i++){
+    ctx.beginPath();ctx.moveTo(W*i/10,0);ctx.lineTo(W*i/10,H);
+    ctx.moveTo(0,H*i/10);ctx.lineTo(W,H*i/10);
+    ctx.strokeStyle="rgba(0,0,0,.4)";ctx.lineWidth=3*u;ctx.stroke();
+    ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=1.2*u;ctx.stroke();
+  }
+  const fs=Math.max(10,12*u);
+  ctx.font="700 "+fs+"px -apple-system,BlinkMacSystemFont,system-ui,sans-serif";
+  ctx.textBaseline="top";ctx.textAlign="left";ctx.lineJoin="round";
+  const tag=(t,x,y,col)=>{
+    ctx.strokeStyle="rgba(0,0,0,.85)";ctx.lineWidth=3*u;ctx.strokeText(t,x,y);
+    ctx.fillStyle=col||"#ffe66d";ctx.fillText(t,x,y);};
+  for(let c=0;c<10;c++)for(let r=0;r<10;r++)
+    tag("ABCDEFGHIJ"[c]+(r+1),W*c/10+3*u,H*r/10+3*u);
+  for(let i=1;i<10;i++){
+    tag((i/10).toFixed(1),W*i/10+3*u,H-fs-4*u,"#9be7ff");   // x, along the bottom
+    tag((i/10).toFixed(1),3*u,H*i/10-fs-2*u,"#9be7ff");     // y, along the left
+  }
+  ctx.restore();}
+function annAdd(chat,at,img){
+  const e={id:"p"+(++annSeq),at:at,img:img,grid:annGridOf.get(img)||""};
+  const l=annChats.get(chat)||[];l.push(e);
+  while(l.length>6)annPicById.delete(l.shift().id);
+  annChats.set(chat,l);annPicById.set(e.id,e);
+  while(annChats.size>5){const k=annChats.keys().next().value;
+    (annChats.get(k)||[]).forEach(x=>annPicById.delete(x.id));annChats.delete(k);}
+  return e;}
+function annPicFor(){
+  const l=annChats.get(annCtx.chat||curChat)||[],pos=annCtx.pos;
+  let best=null;
+  for(const e of l)if((pos==null||e.at<pos)&&(!best||e.at>=best.at))best=e;
+  return best;}
+function annIn(chat,fn){
+  const was=annCtx.chat;annCtx.chat=chat;
+  try{return fn();}finally{annCtx.chat=was;}}
+// a closed ```annotate fence on a chat that has a picture becomes a card;
+// an open one (still streaming) is nothing yet; anything else stays the
+// plain code block it always was (null)
+function annSlot(code,close){
+  if(!close)return "";
+  // renderMD escaped the text first: the JSON's own quotes come back here
+  code=code.replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,"<")
+    .replace(/&gt;/g,">").replace(/&amp;/g,"&");
+  const p=annParse(code),e=annPicFor();
+  if(!p||!p.shapes.length||!e)return null;
+  return '<div class="annot" data-pic="'+esc(e.id)+'" data-a="'
+    +esc(JSON.stringify(p.shapes))+'"></div>';}
+function annFlat(e,shapes){
+  return new Promise((ok,no)=>{
+    const im=new Image();
+    im.onload=()=>{try{
+      const c=document.createElement("canvas");
+      c.width=im.naturalWidth||1;c.height=im.naturalHeight||1;
+      const x=c.getContext("2d");x.drawImage(im,0,0);
+      annDraw(x,shapes,c.width,c.height);
+      c.toBlob(b=>b?ok(b):no(new Error("png")),"image/png");
+    }catch(err){no(err);}};
+    im.onerror=()=>no(new Error("image"));
+    im.src=e.img;});}
+function annBlobSave(blob){
+  const u=URL.createObjectURL(blob),t=document.createElement("a");
+  t.href=u;t.download="annotated-picture.png";
+  document.body.appendChild(t);t.click();t.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),60000);}
+function annCard(e,shapes){
+  const card=document.createElement("div");card.className="annot done";
+  const stage=document.createElement("div");stage.className="annstage";
+  const im=new Image();im.alt="the picture, marked up";im.src=e.img;
+  const cv=document.createElement("canvas");cv.className="anncv";
+  stage.append(im,cv);card.appendChild(stage);
+  const redraw=()=>{
+    try{
+      const r=stage.getBoundingClientRect(),d=window.devicePixelRatio||1;
+      const W=Math.max(1,Math.round(r.width*d)),H=Math.max(1,Math.round(r.height*d));
+      if(cv.width!==W)cv.width=W;if(cv.height!==H)cv.height=H;
+      const x=cv.getContext("2d");x.clearRect(0,0,W,H);annDraw(x,shapes,W,H);
+    }catch(err){}};
+  card._redraw=redraw;
+  im.addEventListener("load",redraw);
+  if(typeof ResizeObserver==="function")new ResizeObserver(redraw).observe(stage);
+  else addEventListener("resize",redraw);
+  const notes=shapes.filter(s=>s.note||s.text);
+  if(notes.length){
+    const ul=document.createElement("ul");ul.className="annleg";
+    notes.forEach(s=>{
+      const li=document.createElement("li"),sw=document.createElement("i");
+      sw.style.background=s.color;li.appendChild(sw);
+      if(s.text&&s.note){const b=document.createElement("b");b.textContent=s.text;
+        li.appendChild(b);li.appendChild(document.createTextNode(" — "+s.note));}
+      else li.appendChild(document.createTextNode(s.note||s.text));
+      ul.appendChild(li);});
+    card.appendChild(ul);
+  }
+  const bar=document.createElement("div");bar.className="annbar";
+  const save=document.createElement("button"),copy=document.createElement("button");
+  save.type=copy.type="button";save.className=copy.className="annbtn";
+  save.textContent="Save image";copy.textContent="Copy";
+  const say=(b,t,ms)=>{const w=b.textContent;b.textContent=t;
+    setTimeout(()=>{b.textContent=w;},ms||1800);};
+  save.addEventListener("click",async()=>{
+    try{
+      const blob=await annFlat(e,shapes);
+      let r=null;
+      try{
+        const url=await new Promise((ok,no)=>{const fr=new FileReader();
+          fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob);});
+        r=await(await api("/api/annotate/save",{method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({png:url,reveal:true})})).json();
+      }catch(e2){r=null;}
+      if(r&&r.ok&&r.shown){say(save,"Saved · shown in Finder",2600);return;}
+      if(r&&r.ok){await apiDownload("/api/export/"+encodeURIComponent(r.id),r.name);say(save,"Saved");return;}
+      annBlobSave(blob);say(save,"Saved");
+    }catch(err){say(save,"Couldn’t save");}});
+  copy.addEventListener("click",async()=>{
+    try{
+      await navigator.clipboard.write([new ClipboardItem({"image/png":annFlat(e,shapes)})]);
+      say(copy,"Copied");
+    }catch(err){say(copy,"Couldn’t copy — use Save");}});
+  bar.append(save,copy);card.appendChild(bar);
+  return card;}
+function annHydrate(ph){
+  if(ph.dataset.hyd)return;ph.dataset.hyd="1";
+  try{
+    const e=annPicById.get(ph.dataset.pic),p=annParse(ph.dataset.a||"");
+    if(!e||!p||!p.shapes.length)return;
+    const key=e.id+"|"+ph.dataset.a;
+    let card=annCache.get(key);
+    if(!card||card.isConnected){
+      card=annCard(e,p.shapes);annCache.set(key,card);
+      while(annCache.size>12)annCache.delete(annCache.keys().next().value);
+    }
+    ph.replaceWith(card);
+    if(card._redraw)card._redraw();
+  }catch(err){}}
+new MutationObserver(ms=>{
+  for(const m of ms)m.addedNodes.forEach(n=>{
+    if(n.nodeType!==1)return;
+    if(n.matches(".annot[data-a]"))annHydrate(n);
+    n.querySelectorAll(".annot[data-a]").forEach(annHydrate);
+  });
+}).observe(document.documentElement,{childList:true,subtree:true});
+
 function renderMD(raw){
   // pull out think blocks first (DeepSeek R1)
   let thinks=[];
@@ -35511,7 +36031,7 @@ function renderMD(raw){
   // the download box (6b295): stashed as a placeholder the instant the
   // text is escaped, so bold/italic/inline-code rules can never touch the
   // filename or the JSON, and restored next to the THINK restores below
-  const dls=[];
+  const dls=[],ans=[];
   s=s.replace(/\[\[dl:(\{.*?\})\]\]/g,(_,j)=>{
     try{dls.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&#39;/g,"'")
                              .replace(/&amp;/g,"&")));}
@@ -35534,6 +36054,11 @@ function renderMD(raw){
   s=s.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g,(_,lang,code,close)=>{
     code=code.replace(/\n$/,"");
     if(lang.toLowerCase()==="flow")return flowDiagram(code);
+    if(lang.toLowerCase()==="annotate"){
+      // stashed like the download box: no inline rule may reach the attribute
+      const ah=annSlot(code,close);
+      if(ah!==null)return ah?(ans.push(ah),"\u0000AN"+(ans.length-1)+"\u0000"):"";
+    }
     // a fence that is JUST a pipe table renders as the table it is —
     // models constantly wrap tables in fences (seen live: UberX costs
     // as mono soup with $7 highlighted as a number token)
@@ -35624,6 +36149,7 @@ function renderMD(raw){
   }).join("");
   // restore think blocks
   s=s.replace(/\u0000DL(\d+)\u0000/g,(_,i)=>dlBox(dls[+i]));
+  s=s.replace(/\u0000AN(\d+)\u0000/g,(_,i)=>ans[+i]||"");
   s=s.replace(/\u0000VD(\d+)\u0000/g,(_,i)=>{
     const v=vds[+i];
     if(!v||!v.id)return "";
@@ -36191,7 +36717,9 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
       else form=null;
     }
   }
+  annCtx.pos=inner.children.length;      // which picture this answer follows
   if(role==="user")body.textContent=text; else{body.innerHTML=srcBox(srcs)+renderMD(text)+photoRow(ph)+(places&&places.length?placesModule(places,loc,mapd):mapCard(mapd));requestAnimationFrame(()=>wireFlow(body));}
+  annCtx.pos=null;
   if(form)body.appendChild(formCard(form));
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
@@ -36251,8 +36779,13 @@ function addImageFile(f){
     const s=Math.min(1,1280/Math.max(img.width,img.height));
     const c=document.createElement("canvas");
     c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
-    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-    pendingImages.push(c.toDataURL("image/jpeg",.85));
+    const cx=c.getContext("2d");cx.drawImage(img,0,0,c.width,c.height);
+    const orig=c.toDataURL("image/jpeg",.85);
+    pendingImages.push(orig);
+    // the gridded copy rides beside it (6b355); the server uses it only
+    // when the request asks to draw on the picture
+    try{annGrid(cx,c.width,c.height);annGridOf.set(orig,c.toDataURL("image/jpeg",.85));
+      while(annGridOf.size>8)annGridOf.delete(annGridOf.keys().next().value);}catch(e){}
     URL.revokeObjectURL(img.src);
     paintChips();
   };
@@ -36406,6 +36939,9 @@ async function send(){
   if(!curChat)curChat=newChatId();
   let myChat=curChat;
   const myMessages=messages;
+  // the picture this question carries, for a later ```annotate answer to
+  // be drawn on (6b355): kept for this session only, never saved
+  if(sentImages.length)annAdd(myChat,inner.children.length-1,sentImages[0]);
   // the chat shows in the list at once; the server makes it with the
   // question (0b 5.4) and the page adopts the saved copy at the end
   const madeChat=!chats.some(x=>x.id===myChat);
@@ -36436,6 +36972,23 @@ async function send(){
   const advList=advOn&&adv?advSendList():[];
   const advGhostOnly=!!(advOn&&adv&&!advList.length&&(adv.local||[]).length);
   const advUse=!!(advOn&&adv)&&!advGhostOnly;
+  // DRAWING ON A PICTURE (6b355): a picture goes with its gridded copy; a
+  // follow-up to marks already drawn carries the chat's newest picture, which
+  // the server uses only if the words ask to change the marks
+  let annExtra={};
+  if(sentImages.length){
+    const g=sentImages.map(d=>annGridOf.get(d)||"");
+    if(g.every(Boolean))annExtra={grid_images:g};
+  }else{
+    let prevA="";
+    for(let k=myMessages.length-2;k>=0;k--)
+      if(myMessages[k].role==="assistant"){prevA=String(myMessages[k].content||"");break;}
+    if(prevA.indexOf("```annotate")>=0){
+      let b=null;
+      for(const e of annChats.get(myChat)||[])if(!b||e.at>=b.at)b=e;
+      if(b)annExtra={prev_image:b.img,prev_grid:b.grid||undefined};
+    }
+  }
   if(advGhostOnly){
     const g=adv.local[0],gs=srvList.find(x=>g.indexOf(x.name+SRV_SEP)===0);
     body.insertAdjacentHTML("beforebegin",'<div class="ghostnote" style="font-size:11px;'
@@ -36451,7 +37004,7 @@ async function send(){
     const resp=await api("/api/chat",{
       method:"POST",headers:{"Content-Type":"application/json"},
       signal:abortCtl.signal,
-      body:JSON.stringify(Object.assign(advUse
+      body:JSON.stringify(Object.assign(annExtra,advUse
         // the custom council (6b248): hand-picked minds, hand-picked pen
         ?{model:"",models:advList,tier:"",messages:askCtx(myMessages),
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
@@ -36486,6 +37039,7 @@ async function send(){
     if(landed&&landed!==myChat){
       chats=chats.filter(x=>!(x.id===myChat&&!(x.messages||[]).length));
       if(curChat===myChat)curChat=landed;
+      if(annChats.has(myChat)){annChats.set(landed,annChats.get(myChat));annChats.delete(myChat);}
       myChat=landed;
     }
     searched=resp.headers.get("X-Web-Search")==="1";
@@ -36518,7 +37072,7 @@ async function send(){
           ?'<span class="statusline"><i class="cspin"></i> '
            +esc(status)+'…</span>':"")
         +(searched&&sources&&sources.length?srcRow(sources):"")
-        +renderMD(txt.replace(/\n?\[\[PLACES\]\][\s\S]*$/,""))
+        +annIn(myChat,()=>renderMD(txt.replace(/\n?\[\[PLACES\]\][\s\S]*$/,"")))
         ;
       requestAnimationFrame(()=>wireFlow(body));
       if(curChat===myChat)autoScroll();
@@ -36655,9 +37209,9 @@ async function send(){
   // no loose srcRow here any more — collapseSteps() folded the chips
   // inside the disclosure, so a settled answer is prose (6b242)
   body.innerHTML=treeKeep
-    +renderMD(full||(wasAborted?"*(stopped)*":
+    +annIn(myChat,()=>renderMD(full||(wasAborted?"*(stopped)*":
     "That answer didn\u2019t come through \u2014 the model was still "
-    +"warming up. Try again and it usually lands."))
+    +"warming up. Try again and it usually lands.")))
     +(full&&!wasAborted?photoRow(photos)
       +(places&&places.length?placesModule(places,locCtx,mapd):mapCard(mapd)):"");
   const secs=((performance.now()-t0)/1000);
