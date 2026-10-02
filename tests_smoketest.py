@@ -23642,7 +23642,7 @@ _M42_MUT = [
     ("a \"+N more\" left in the second server's titles", "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"usage not reported (update the server kit)\":\"\");\n",
      "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"usage not reported (update the server kit)\":\"\");t.push(all.length>SRV_METER_MAX?\"+1 more\":\"\");\n"),
     ("an older kit shown as a reading", ':u.ok?"usage not reported (update the server kit)":"");', ':"");'),
-    ("a profile switch leaving the rows", "if(gone){srvUseDead=true;srvMetersSync();return;}", "if(gone){return;}"),
+    ("a profile switch leaving the rows", "if(gone){srvUseDead=true;srvAllClose();srvMetersSync();return;}", "if(gone){return;}"),
     ("the dead flag ignored when drawing", "const rows=srvUseDead?[]:srvMeterRows(srvList,srvUse);",
      "const rows=srvMeterRows(srvList,srvUse);"),
     ("a benchmark counted as a failure", "  if(d&&d.paused){u.due=Date.now()+3000;return;}     // a benchmark is running\n", ""),
@@ -23724,9 +23724,11 @@ const AR=srvAllRows(S,U);
 R.rows=AR.map(r=>[r.id,r.name,r.state,r.off,r.rows.map(x=>x.join("=")).join(" | ")]);
 R.rows0=srvAllRows(S.slice(0,2),{});
 R.undef=[srvAllRows(undefined,undefined).length,srvAllRows([],{}).length];
-// a server past the card's two is not polled: its figures are "not read", the first two wait as "reading"
+// every paired server is polled while the dialog is open: a figure with no reading yet is "reading..."
 const T=[1,2,3].map(i=>mkS('t'+i,'T'+i,'amd','C'+i));
 R.polled=srvAllRows(T,{}).map(r=>r.rows[1][1]+"/"+r.rows[3][1]);
+const S0=[mkS('q1','Q','amd','C')];
+R.notread=JSON.stringify(srvAllRows(T,{a:1}))+JSON.stringify(srvAllRows(S0,{}));
 // ---- the dialog
 const callsBefore=CALLS.length;
 srvList=S;srvUseDead=false;Object.keys(srvUse).forEach(k=>delete srvUse[k]);Object.assign(srvUse,U);
@@ -23749,11 +23751,50 @@ R.live=[sbox.children[0].children[2].children[1].textContent,sbox.children.lengt
 srvList=[];srvUseDead=false;srvMetersRefresh();
 R.emptied=[sbox.children.length,sbox.children[0]&&sbox.children[0].textContent,veil.hidden];
 srvList=S;srvMetersRefresh();
-R.noRequest=CALLS.length===callsBefore;
+R.noRequest=CALLS.length===callsBefore;     // opening and painting ask for nothing themselves
 // closing: Escape's own function, the button, a click outside; focus goes back
 R.close1=[srvAllClose(),veil.hidden,document.activeElement===lk,srvAllClose()];
 document.activeElement=lk;srvAllOpen();lk.remove();R.gone=[srvAllClose(),document.activeElement===inp];
 srvAllOpen();R.reopen=[veil.hidden,sbox.children.length];
+// ---- THE EXTRA POLLS: every paired server, only while the dialog is open (6b353, Pat's decision)
+const reset=()=>{if(veil.hidden===false)srvAllClose();TM.length=0;CALLS.length=0;Object.keys(srvUse).forEach(k=>delete srvUse[k]);
+  srvUseT=0;srvUseDead=false;document.hidden=false;veil.hidden=true;CARD.right=300;
+  REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10},ram:{used_bytes:1,total_bytes:2}}});
+  const b=document.getElementById("srv-meters");if(b)b.remove();const l2=document.getElementById("srv-more");if(l2)l2.remove();};
+const four=[1,2,3,4].map(i=>mkS('s'+i,'S'+i,'amd','C'+i)).concat([mkS('s5','Bare','amd','X',{gpu:null})]);
+const ids=a=>a.map(u=>u.split("id=")[1]);
+const uniq=a=>new Set(a).size===a.length;
+const P={};
+reset();srvList=four;
+P.list=[srvPollList(four).map(x=>x.id),srvPollList([]).length];
+srvMetersRefresh();await fire();P.closed=ids(CALLS);
+P.keys0=Object.keys(srvUse).sort();
+document.activeElement=lk;srvAllOpen();
+P.openNow=[pend(),TM.length];
+P.list2=srvPollList(four).map(x=>x.id);
+CALLS.length=0;await fire();P.open=ids(CALLS);
+P.keys1=Object.keys(srvUse).sort();
+P.rowsLive=[sbox.children.length,sbox.children.map(c=>c.children[2].children[1].textContent)];
+CALLS.length=0;await fire();P.again=ids(CALLS);P.againUniq=uniq(P.again);
+REPLY=u=>u.indexOf("id=s3")>=0?{status:200,ok:true,j:{ok:false}}:{status:200,ok:true,j:{ok:true,gpu:{busy_pct:10}}};
+const gaps=[];let last=0,nf=0;
+while(gaps.length<3&&nf++<40){await fire();if(srvUse.s3.fails!==last){last=srvUse.s3.fails;gaps.push([srvUse.s3.due-NOW,srvUse.s3.fails]);}}
+P.gaps=gaps;P.s4ok=[srvUse.s4.fails,srvUse.s4.ok];
+P.off=[sbox.children[2].className,sbox.children[2].children[0].children[1].textContent,sbox.children[2].children[2].children[1].textContent];
+P.noWake=CALLS.length>0&&CALLS.every(u=>/^\/api\/servers\/usage\?id=s[1-5]$/.test(u));
+srvAllClose();CALLS.length=0;P.keys2=Object.keys(srvUse).sort();
+for(let i=0;i<4;i++)await fire();
+P.afterClose=[...new Set(ids(CALLS))].sort();
+reset();srvList=four;srvMetersRefresh();document.activeElement=lk;srvAllOpen();
+REPLY=()=>({status:409,ok:false,j:{}});await fire();
+const dead=[srvUseDead,veil.hidden,TM.length];CALLS.length=0;srvMetersRefresh();await fire();P.p409=[dead,CALLS.length,TM.length];
+reset();srvList=four;srvMetersRefresh();document.activeElement=lk;srvAllOpen();
+document.hidden=true;VIS.forEach(f=>f());CALLS.length=0;
+const hd=[TM.length];await srvUseTick();hd.push(CALLS.length,TM.length);
+document.hidden=false;VIS.forEach(f=>f());hd.push(TM.length);R.hiddenOpen=hd;
+reset();srvList=[];document.activeElement=lk;srvAllOpen();P.none=[CALLS.length,TM.length,Object.keys(srvUse)];
+reset();
+R.poll=P;
 process.stdout.write(JSON.stringify(R));
 })();
 '''
@@ -23857,7 +23898,7 @@ def _m53c_rows(src):
     out["fresh"] = [x[1] for x in R["rows0"][0]["rows"]] == ["Radeon RX 6900 XT", "reading\u2026",
                                                             "16 GB \u00b7 reading\u2026", "reading\u2026"]
     out["undef"] = R["undef"] == [0, 0]
-    out["polled"] = R["polled"] == ["reading…/reading…", "reading…/reading…", "not read/not read"]
+    out["polled"] = R["polled"] == ["reading…/reading…"] * 3 and "not read" not in R["notread"]
     return all(out.values()), [out, err]
 
 
@@ -23878,6 +23919,25 @@ def _m53c_dialog(src):
     return all(out.values()), [out, err]
 
 
+def _m53c_poll(src):
+    R, err = _m53_node(src)
+    P = R["poll"]
+    out = {}
+    out["closed"] = P["closed"] == ["s1", "s2"] and P["keys0"] == ["s1", "s2"] and P["list"] == [["s1", "s2"], 0]
+    out["opens_now"] = P["openNow"] == [0, 1] and P["list2"] == ["s1", "s2", "s3", "s4", "s5"]
+    out["extras_only"] = P["open"] == ["s3", "s4", "s5"] and P["keys1"] == ["s1", "s2", "s3", "s4", "s5"]
+    out["no_double"] = P["againUniq"] is True and sorted(P["again"]) == ["s1", "s2", "s3", "s4", "s5"]
+    out["rows"] = P["rowsLive"] == [5, ["10%"] * 5]
+    out["backoff"] = P["gaps"] == [[10000, 1], [30000, 2], [30000, 3]] and P["s4ok"] == [0, True]
+    out["sleeping"] = P["off"] == ["srvall-s off", "not answering", "not answering"]
+    out["no_wake"] = P["noWake"] is True
+    out["stops"] = P["keys2"] == ["s1", "s2"] and P["afterClose"] == ["s1", "s2"]
+    out["profile"] = P["p409"] == [[True, True, 0], 0, 0]
+    out["hidden"] = R["hiddenOpen"] == [0, 0, 0, 1]
+    out["none"] = P["none"] == [0, 0, []]
+    return all(out.values()), [out, err]
+
+
 def _m53c_text(src):
     a = src.index("function srvMoreCount(list){")
     b = src.index("// how long after a read the next one waits")
@@ -23885,6 +23945,8 @@ def _m53c_text(src):
     out = {}
     out["noinner"] = "innerHTML" not in seg and "insertAdjacentHTML" not in seg and "outerHTML" not in seg
     out["norequest"] = "api(" not in seg and "fetch(" not in seg and "setTimeout" not in seg and "setInterval" not in seg
+    sv = src[src.index("def server_usage(ctx, sid: str) -> dict:"):src.index("# ---- sleep when idle and waking (6b346)")]
+    out["nowake"] = ("wake" not in sv.lower() and "/api/servers/wake" not in src[src.index("function srvPollList(list){"):b])
     out["aria"] = ('<div id="srvall-card" role="dialog" aria-modal="true" aria-labelledby="srvall-title" tabindex="-1">' in src
                    and '<div class="set-h" id="srvall-title">Your servers</div>' in src
                    and '<div id="srvall-veil" hidden>' in src
@@ -23935,6 +23997,9 @@ _M53_CHECKS = [
     ("servers more: the dialog opens, takes focus, repaints from the same readings with no request, shows a "
      "name like <img onerror> as text, closes on its button, Escape's function and a click outside, and gives "
      "focus back (node)", _m53c_dialog),
+    ("servers more: while the dialog is open every paired server is read through the same poll (the card's two "
+     "not twice), backing off 10 s then 30 s when one doesn't answer, nothing asks a server to wake; closing, a "
+     "profile change and a hidden window stop it (node)", _m53c_poll),
     ("servers more: the dialog's markup (role, aria-modal, aria-labelledby, hidden), Escape, click outside, "
      "Tab, the link and the CSS are in the page; no innerHTML, no request and no timer in its code", _m53c_text),
     ("cloud chip: shown only with a key and cloud power on, or on Cloud Only; hidden with no key, with the "
@@ -23975,13 +24040,13 @@ _M53_MUT = [
     ("only paired servers in the dialog dropped", "return (list||[]).filter(s=>s.paired).map(s=>{\n    const g=s.gpu||{},u=",
      "return (list||[]).map(s=>{\n    const g=s.gpu||{},u="),
     ("a server not answering said to answer", 'state:off?"not answering":"answering"', 'state:"answering"'),
-    ("an older kit said as a reading", 'u.ok?"usage not reported":polled', 'polled'),
+    ("an older kit said as a reading", 'u.ok?"usage not reported":"reading\\u2026"', '"reading\\u2026"'),
     ("memory in the wrong unit", 'srvGB(ru)+" of "+srvGB(rt)+" GB in use":none]]', 'srvGB(ru)+" of "+srvGB(rt)+" GB used":none]]'),
     ("VRAM not shown", 'srvGB(vu)+" of "+srvGB(vt)+" GB"', '"?"'),
     ("a server's name set as HTML", "nm.textContent=r.name;", "nm.innerHTML=r.name;"),
     ("a server's name taken from the wrong place", "nm.textContent=r.name;", "nm.textContent=r.id;"),
-    ("a request made by the dialog", "const polled=new Set(srvMeterServers(list).map(s=>s.id));",
-     'api("/api/servers/usage?id=x");const polled=new Set(srvMeterServers(list).map(s=>s.id));'),
+    ("a request made by the dialog's rows", "return (list||[]).filter(s=>s.paired).map(s=>{\n    const g=s.gpu||{},u=",
+     'api("/api/servers/usage?id=x");return (list||[]).filter(s=>s.paired).map(s=>{\n    const g=s.gpu||{},u='),
     ("no repaint while it is open", "  srvAllPaint();\n}\nasync function srvUsagePoll(s){", "}\nasync function srvUsagePoll(s){"),
     ("no repaint when the servers go", "    srvAllPaint();return;\n  }", "    return;\n  }"),
     ("focus not moved in", 'const c=document.getElementById("srvall-close");if(c)c.focus();', ""),
@@ -23993,6 +24058,20 @@ _M53_MUT = [
     ("the dialog not a dialog", 'role="dialog" aria-modal="true" aria-labelledby="srvall-title"', 'aria-labelledby="srvall-title"'),
     ("the dialog open from the start", '<div id="srvall-veil" hidden>', '<div id="srvall-veil">'),
     # the cloud chip
+    ("the extra polls running with the dialog shut", "if(!srvAllIsOpen())return gs;", "if(false)return gs;"),
+    ("the extra polls never starting", "return gs.concat((list||[]).filter(s=>s.paired&&!have.has(s.id)));", "return gs;"),
+    ("the card's two listed twice", "filter(s=>s.paired&&!have.has(s.id)));", "filter(s=>s.paired));"),
+    ("only card-named servers read in the dialog", "filter(s=>s.paired&&!have.has(s.id)));", "filter(s=>s.paired&&s.gpu&&!have.has(s.id)));"),
+    ("the extra readings kept after closing", "  srvMetersRefresh();      // the extra servers' readings and polls go with the dialog\n", ""),
+    ("the dialog kept open by a profile change", "srvUseDead=true;srvAllClose();", "srvUseDead=true;"),
+    ("no read the moment it opens", "  if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}\n  srvMetersRefresh();\n}", "  srvMetersRefresh();\n}"),
+    ("the dialog not waking the poll", "  if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}\n  srvMetersRefresh();\n}", "  if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}\n}"),
+    ("a wake asked for", 'const r=await api("/api/servers/usage?id="+encodeURIComponent(s.id));',
+     'await api("/api/servers/wake?id="+encodeURIComponent(s.id));const r=await api("/api/servers/usage?id="+encodeURIComponent(s.id));'),
+    ("no backing off for the extras", "u.due=Date.now()+srvUseWait(u.fails);", "u.due=Date.now()+3000;"),
+    ("the card's two read again at every tick", "const poll=o.ids.filter(id=>(o.due[id]||0)<=o.now);", "const poll=o.ids.slice();"),
+    ("a hidden window read with the dialog open", "if(!o.ids.length||!o.page)return {poll:[],next:null};", "if(!o.ids.length)return {poll:[],next:null};"),
+    ("\"not read\" back", 'u.ok?"usage not reported":"reading\\u2026"', 'u.ok?"usage not reported":"not read"'),
     ("shown without cloud power", '(!!cs.turbo||t==="Cloud Only")', "true"),
     ("Cloud Only not showing it", '(!!cs.turbo||t==="Cloud Only")', "!!cs.turbo"),
     ("a resting provider not counted", 'const has=!!cs.configured||Object.keys(pv).some(k=>(pv[k]||{}).status==="ok");',

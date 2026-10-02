@@ -40129,16 +40129,25 @@ function srvMeterRows(list,use){
   });
   return [].concat.apply([],rows);
 }
+// who is polled (6b353, per Patrick: "adding that so it checks the service would make sense... otherwise,
+// it's not going to provide any information"): the card's first two, as ever, and while the dialog is open
+// every other paired server too, through the same poll and its backoff. It stops when the dialog closes.
+function srvAllIsOpen(){const v=document.getElementById("srvall-veil");return !!(v&&!v.hidden);}
+function srvPollList(list){
+  const gs=srvMeterServers(list);
+  if(!srvAllIsOpen())return gs;
+  const have=new Set(gs.map(s=>s.id));
+  return gs.concat((list||[]).filter(s=>s.paired&&!have.has(s.id)));
+}
 // "+N servers more" (6b353, per Patrick): how many paired servers with a card the sidebar card can't show,
 // and what the link says. With one or two servers there is no link.
 function srvMoreCount(list){
   return Math.max(0,(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);
 }
 function srvMoreWord(n){return "+"+n+(n===1?" server more":" servers more");}
-// every paired server in full, from what the poll already holds (srvUse; nothing is asked for it). A server
-// past the card's two is not polled, so what it is using is "not read"; whether it answers is the last check's
+// every paired server in full, from what the poll holds (srvUse). While the dialog is open every paired server is
+// polled (srvPollList), so a figure with no reading yet says "reading\u2026"; the dialog itself asks for nothing
 function srvAllRows(list,use){
-  const polled=new Set(srvMeterServers(list).map(s=>s.id));
   return (list||[]).filter(s=>s.paired).map(s=>{
     const g=s.gpu||{},u=(use&&use[s.id])||{},st=s.status||{};
     const off=u.ok===false||(u.ok==null&&(st.reachable===false||!!st.err));
@@ -40148,7 +40157,7 @@ function srvAllRows(list,use){
     const rg=u.ram||null,ru=rg&&typeof rg.used_bytes==="number"?rg.used_bytes:null,
       rt=rg&&typeof rg.total_bytes==="number"&&rg.total_bytes>0?rg.total_bytes:null;
     // the word for a figure we have no number for
-    const none=off?"not answering":u.ok?"usage not reported":polled.has(s.id)?"reading\u2026":"not read";
+    const none=off?"not answering":u.ok?"usage not reported":"reading\u2026";
     return {id:s.id,name:s.name||"",off:off,state:off?"not answering":"answering",
       rows:[["GPU",g.name||SRV_GPU[g.vendor]||"no card named"],
         ["GPU load",off?none:busy!=null?busy+"%":none],
@@ -40187,12 +40196,16 @@ function srvAllOpen(){
   srvAllFrom=document.activeElement;
   v.hidden=false;srvAllPaint();
   const c=document.getElementById("srvall-close");if(c)c.focus();
+  // the other servers are read now, not at the next 3 s tick (a busy server is never asked twice)
+  if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}
+  srvMetersRefresh();
 }
 // true when it was open (Escape then has nothing more to close)
 function srvAllClose(){
   const v=document.getElementById("srvall-veil");
   if(!v||v.hidden)return false;
   v.hidden=true;
+  srvMetersRefresh();      // the extra servers' readings and polls go with the dialog
   const f=srvAllFrom;srvAllFrom=null;
   const back=f&&f.isConnected!==false&&f.focus?f:document.getElementById("input");
   if(back&&back.focus)back.focus();
@@ -40276,7 +40289,7 @@ async function srvUsagePoll(s){
     else if(r.ok)d=await r.json();
   }catch(e){}
   u.busy=false;
-  if(gone){srvUseDead=true;srvMetersSync();return;}
+  if(gone){srvUseDead=true;srvAllClose();srvMetersSync();return;}
   if(d&&d.paused){u.due=Date.now()+3000;return;}     // a benchmark is running
   if(d&&d.ok){u.ok=true;u.gpu=d.gpu||null;u.ram=d.ram||null;u.fails=0;}
   else{u.ok=false;u.gpu=null;u.ram=null;u.fails++;}
@@ -40285,9 +40298,9 @@ async function srvUsagePoll(s){
 async function srvUseTick(){
   srvUseT=0;
   if(srvUseDead)return;
-  const gs=srvMeterServers(srvList),ids=gs.map(s=>s.id);
+  const gs=srvPollList(srvList),ids=gs.map(s=>s.id);
   const plan=()=>srvUsagePlan({ids:ids,due:Object.fromEntries(ids.map(id=>[id,(srvUse[id]||{}).due||0])),
-    now:Date.now(),card:srvCardShown(),page:!document.hidden});
+    now:Date.now(),card:srvCardShown()||srvAllIsOpen(),page:!document.hidden});
   const p=plan();
   if(p.poll.length){
     await Promise.all(gs.filter(s=>p.poll.indexOf(s.id)>=0).map(srvUsagePoll));
@@ -40300,7 +40313,7 @@ async function srvUseTick(){
 // the servers (or what is known of them) changed: draw, forget what is gone,
 // and wake the poll if there is a server to read
 function srvMetersRefresh(){
-  const keep=new Set(srvMeterServers(srvList).map(s=>s.id));
+  const keep=new Set(srvPollList(srvList).map(s=>s.id));
   Object.keys(srvUse).forEach(k=>{if(!keep.has(k))delete srvUse[k];});
   srvMetersSync();
   if(!srvUseT&&keep.size&&!document.hidden&&!srvUseDead)srvUseT=setTimeout(srvUseTick,0);

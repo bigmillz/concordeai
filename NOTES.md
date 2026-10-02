@@ -29,20 +29,28 @@ GPU load %, VRAM used/total, memory in use/total, and whether it is answering ..
   Escape (the global handler, after the palette) and a click on the veil close it. Per server: the name and
   "answering" / "not answering", then GPU (name), GPU load (%), GPU memory ("8.5 of 16 GB"), Memory ("22 of 62
   GB in use"). It lists EVERY paired server, including one with no card named ("no card named").
-- NO NEW REQUESTS. It is drawn from `srvUse`, the poll's own readings (`srvAllRows`); opening it asks for
-  nothing, it adds no timer and stops none, and it repaints from the same data at the end of
-  `srvMetersSync` while it is open (readings arrive, servers come and go, a profile switch). THE CONSEQUENCE:
-  the poll still reads only the first two servers (6b342), so a third server's load and memory say "not read"
-  and its "answering" is the last full check's, not a live one; the first two say "reading..." until their
-  first reading. Making the dialog read all of them would be new polling, which the brief ruled out: a
-  decision for Patrick if he wants the figures live.
+- LIVE FIGURES FOR EVERY SERVER (Pat's decision, same day, on the first build's "not read" for a third server:
+  "adding that so it checks the service would make sense... otherwise, it's not going to provide any
+  information"). The first build drew only from `srvUse` and said "not read" for servers the card doesn't poll.
+  Now, WHILE `#srvall-veil` IS OPEN, `srvPollList` is the card's first two plus every other paired server (a
+  card-less one too), and `srvUseTick`/`srvMetersRefresh` use it: the same `/api/servers/usage` poll
+  (`srvUsagePoll`), the same 3 s / 10 s / 30 s backoff per server, the same hidden-window rule, the same 409
+  handling. Opening the dialog reads the extras at once (the pending timer is replaced by one tick; a server
+  already being read is never asked twice: its due time and `busy` flag stand). Closing it (button, Escape,
+  click outside) drops the extras' readings and they are never asked again; a profile 409 closes the dialog and
+  stops everything, as it stops the card. The card's own two are polled exactly as before. The usage route
+  never wakes a server (`server_usage` has no wake path, pinned) and neither does this: a sleeping server
+  just reads "not answering". A figure with no reading yet says "reading..."; "not read" is gone.
+  `srvAllRows` and the dialog's drawing still ask for nothing themselves; they repaint at the end of
+  `srvMetersSync`, which every reading ends with.
 - BUILT SAFELY. createElement and textContent only: a server named `<img src=x onerror=alert(1)>` shows as
   those characters (a gauntlet check counts `img` elements and `innerHTML` writes in the stand-in).
 - Not seen in the app's WKWebView: only the browser pane (Blink). Dialog, focus, Escape and click outside were
   driven there with stand-in servers; the real server rows with real readings were not.
 - Gauntlet: new `== the "+N servers more" link and the dialog of every server (6b353) ==` beside 6b342's: the
   link (counts 0 to 5, unpaired and card-less not counted, wording, gone again), the rows, the dialog in node
-  (open, focus, repaint, no request, the name as text, close three ways, focus back), the page's pins; 6b342's
+  (open, focus, repaint, the name as text, close three ways, focus back), the extra polls (only while open,
+  none for the card's two twice, backoff, no wake, stop on close, on a 409 and in a hidden window), the page's pins; 6b342's
   checks changed where the old title text went (the "+N more" mutation now plants one).
 
 ## 6b354 — a "cloud" chip beside MLX and AMD
