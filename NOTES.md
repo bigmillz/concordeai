@@ -84,6 +84,35 @@ a picture.
   image/png. NOT SEEN in WKWebView, the shipped renderer, and NOT SEEN with a
   real vision model: how well local models place shapes from the grid is
   unproven.
+- REVIEW FIXES. An independent review found the gate fired on ordinary
+  questions: "Add up the numbers on this receipt", "Put the text in a table",
+  "Add a line of explanation", "Trace the origin of this painting", "Pin the
+  date of this screenshot", "Show me where this was taken". That matters for
+  privacy: on a cloud vision route the picture went out on a message that was
+  not about drawing. add/put/insert had matched any "shape" word (numbers,
+  text, notes). Now an instruction must OPEN with a marking verb. circle,
+  highlight, annotate, underline and an imperative mark, label, box or shade
+  are enough on their own. draw, sketch, outline and point out also need a
+  shape or the picture as their target. add, put, place and insert need a
+  shape AND "on the map/picture", "around" or "pointing". trace, pin, tag and
+  "show me where" are gone. A sentence ending in "?" counts only if it opens
+  as a request ("can you ...?"), so "label the parts of this cell?" is a
+  question. The follow-up gate fired on "tell me more about the park",
+  "clear. now explain ...", "Recommend a different neighborhood". It now
+  needs a change verb (make, move, remove, add, recolor ...) aimed at a drawn
+  thing (box, circle, label, area, "the green one", the map), or "it/them"
+  with a size, direction or colour word. The server already ignored
+  prev_image unless that gate fires. A new check runs the handler on the
+  receipt and "tell me more" cases and proves the request comes out exactly
+  as it went in: the same picture list, nothing written into it, and no
+  assignment to the route or the search switch in the wiring. Pictures were
+  keyed by the DOM index, so after a Try again or Edit & resend a stale entry
+  could put marks on the wrong picture. They are keyed by the question's index
+  in the chat now, and a send drops every entry from its own index on
+  (annTrim). The corpus is 28 positive, 43 negative, 10 and 14 follow-up
+  phrasings, with nine gate mutations; the page has twelve mutations, the
+  pins eight. A regenerated question still goes out without its picture, as it
+  always has.
 
 ## 6b351 — the benchmark's "Compare with..." crosses this computer, servers and the cloud
 Patrick (2026-10-02), with a screenshot of the benchmark pane mid-run on This

@@ -1226,23 +1226,26 @@ def _ann_ns(src=None):
 
 
 _ANN_POS = ["draw over it showing good neighborhoods for an Airbnb",
+            "draw over this map showing good neighborhoods for an Airbnb",
             "Please draw over it showing the best neighborhoods",
             "Can you highlight the good areas?", "Circle the park",
+            "circle the best areas", "mark where the hotels are",
+            "highlight the safe neighborhoods on the map",
             "mark the good neighborhoods on this map",
             "I want you to mark the best areas for an Airbnb",
             "Look at this map and mark the best areas", "Annotate this",
             "label each room", "Put a red box around the entrance",
             "draw a circle around the park",
             "Where is the park? Circle it.",
-            "show me where the park is on the map",
-            "show the good neighborhoods on the map",
             "I'd like the good neighborhoods highlighted",
             "can you add arrows pointing to the exits",
             "Draw boxes around the faces", "draw on it",
             "highlight the cheap streets and label them",
-            "point out the exits", "Mark up this floor plan",
+            "point out the exits on the floor plan", "Mark up this floor plan",
             "Describe this map and highlight the best neighborhoods",
-            "could you please draw lines for the bus routes"]
+            "could you please draw lines for the bus routes",
+            "outline the park on the map", "shade the flood zones",
+            "Could you circle the cafes?"]
 _ANN_NEG = ["what is this?", "describe this image",
             "what is the mark on the wall?", "how to draw a circle in CSS",
             "draw me a cat", "draw a cat",
@@ -1256,12 +1259,31 @@ _ANN_NEG = ["what is this?", "describe this image",
             "Add a caption to this", "what color is this image?", "",
             "Read the highlighted text in this picture",
             "the marked items are hard to read", "draw me a circle",
-            "draw me a star", "How to draw a box in HTML"]
+            "draw me a star", "How to draw a box in HTML",
+            # the review of 6b355: ordinary questions about a picture
+            "Add up the numbers on this receipt", "Put the text in a table",
+            "Add a line of explanation", "Trace the origin of this painting",
+            "Pin the date of this screenshot", "Show me where this was taken",
+            "label the parts of this cell?", "Point out the mistakes in this essay",
+            "I need the marked items explained", "Insert the totals into a sheet",
+            "Place this in historical context", "Box up the answer in one line",
+            "mark this as done", "show me where the park is",
+            "Shade of blue in this photo?", "Draw conclusions from this chart"]
 _ANN_EDIT_POS = ["make the red box bigger", "also mark the park",
                  "remove the blue circle", "change the color to green",
-                 "move it left", "add another area near the river"]
+                 "move it left", "add another area near the river",
+                 "make the park area bigger", "Delete the arrows",
+                 "please make the green one smaller",
+                 "Can you make the box bigger?"]
 _ANN_EDIT_NEG = ["what does the red box mean?", "thanks!",
-                 "why is that one red?", "describe this map", ""]
+                 "why is that one red?", "describe this map", "",
+                 "thanks, tell me more about the park",
+                 "tell me more about Brooklyn",
+                 "clear. now explain why the green zone is good",
+                 "Recommend a different neighborhood",
+                 "Add more detail about the area", "make it shorter",
+                 "change the subject",
+                 "is the red box too big?", "Make a list of the hotels"]
 
 
 def _ann_gate_ok(ns):
@@ -1279,18 +1301,23 @@ check("draw on a picture: the gate fires on a request to mark it and on nothing 
 _ann_mut = [
     ("a question opener no longer vetoes",
      "r\"^\\s*(?:what|why|who|whose|which|how|is|are|was|were|does|do|did|\"", "r\"^\\s*(?:zzzz|\""),
+    ("a question that is not a request counts",
+     "if not sent or asks or _ANN_QUESTION.match(sent):", "if not sent or _ANN_QUESTION.match(sent):"),
     ("'mark as' / 'mark my words' read as marking",
-     "(?!as\\b|down\\b|my\\s+words|me\\b|\"\n    r\"sure\\b|that\\b\\s*$)\\S", "\\S"),
-    ("'draw me a cat' reads as drawing on the picture",
-     "and not re.match(\n                            r\"\\s*me\\s+an?\\s+\\w+\\s*$\", rest, re.I)", ""),
-    ("a plain passive 'highlighted' needs no want-verb",
-     "r\"\\b(?:want|like|need|have|get|make|prefer)\\b[^.?!]{0,80}\\b\"",
-     "r\"\\b\""),
-    ("an edit word with a question opener still counts",
-     "return bool(s and not _ANN_QUESTION.match(s) and _ANN_EDIT.search(s))",
-     "return bool(s and _ANN_EDIT.search(s))"),
+     "(?!as\\b|down\\b|off\\b|my\\s+words|me\\b|\"\n    r\"sure\\b|(?:it|this|that|them)\\s+as\\b|up\\b)\\S", "\\S"),
+    ("'draw me a circle' reads as drawing on the picture",
+     "if re.match(r\"\\s*me\\s+an?\\s+\\w+\\s*$\", rest, re.I):\n                continue", "if False:\n                continue"),
+    ("a participle anywhere is a passive request",
+     "r\"\\s*(?:please\\s*)?$\", re.I)", "r\"\", re.I)"),
+    ("add / put / insert need only a shape word",
+     "if re.search(r\"\\b\" + _ANN_SHAPE + r\"\\b\", rest, re.I) and (", "if re.search(r\"\\b\" + _ANN_SHAPE + r\"\\b\", rest, re.I) or ("),
+    ("outline, point out, trace, pin and show are marking verbs on their own",
+     "r\"^(?:annotate|highlight|circle|underline|mark\\s+up|colou?r\\s+in)\\b\"",
+     "r\"^(?:annotate|highlight|circle|underline|mark\\s+up|colou?r\\s+in|outline|point\\s+out|trace|pin|show|add|put)\\b\""),
+    ("a follow-up's change verb needs no drawn thing",
+     "if m and (_ANN_DRAWN.match(m.group(\"rest\"))", "if m and (True"),
     ("the gate fires on every picture",
-     "    return False\n\n\ndef annotate_edit_wants", "    return True\n\n\ndef annotate_edit_wants"),
+     "    return False\n\n\n# a FOLLOW-UP", "    return True\n\n\n# a FOLLOW-UP"),
 ]
 _ann_caught = []
 for _lbl, _a, _b in _ann_mut:
@@ -1346,6 +1373,36 @@ check("draw on a picture: the model reads the gridded copy only when the words a
       and _w8 == ([_grid], True, True, [_grid])
       and _w9 == ([_pic], True, False, [_pic]),        # no grid sent: the original
       str([_w1, _w2, _w3, _w4, _w5, _w6, _w7, _w8, _w9]))
+# the review of 6b355: a question that is not about drawing leaves the
+# request EXACTLY as it would be without the feature: the same picture
+# list, nothing written into the request (so the same route, and search is
+# decided the way it always was), and a non-edit follow-up after a drawn
+# answer never re-attaches the picture
+import copy as _ann_cp
+
+
+def _ann_same(messages, images, rj):
+    _rj0, _im0 = _ann_cp.deepcopy(rj), list(images)
+    ns = dict(_ann_n)
+    ns.update(messages=messages, images=images, req_json=rj)
+    exec(_tw.dedent(_ann_hs), ns)
+    return (ns["images"] is images and ns["images"] == _im0 and rj == _rj0
+            and ns["_ann"] is False)
+
+
+_ann_rq = {"images": [_pic], "grid_images": [_grid], "tier": "Fast", "auto_web": True}
+_ann_fq = {"prev_image": _pic, "prev_grid": _p2, "tier": "Fast", "auto_web": True}
+_ann_plain = [_ann_same([{"role": "user", "content": q}], [_pic], _ann_cp.deepcopy(_ann_rq))
+              for q in ("Add up the numbers on this receipt", "Put the text in a table",
+                        "Show me where this was taken", "label the parts of this cell?")]
+_ann_fu = [_ann_same(_fence + [{"role": "user", "content": q}], [], _ann_cp.deepcopy(_ann_fq))
+           for q in ("thanks, tell me more about the park", "tell me more about Brooklyn",
+                     "clear. now explain why the green zone is good",
+                     "Recommend a different neighborhood")]
+check("draw on a picture: a receipt question or a 'tell me more' leaves the request as it was",
+      all(_ann_plain) and all(_ann_fu)
+      and not re.search(r"\b(?:auto_web|tier|council|model_name|cloud_only)\s*=", _ann_hs),
+      str((_ann_plain, _ann_fu)))
 _ai = _ann_n["annotate_instruction"]("circle the park", True)
 _ai2 = _ann_n["annotate_instruction"]("circle the park", False)
 check("draw on a picture: the model is told the shape format, the grid, and to reply with the full block",
@@ -1442,6 +1499,9 @@ const [gc,gcalls]=mk();annGrid(gc,1280,800);
 R.grid={text:pick(gcalls,"fillText").map(c=>c[1]),lines:pick(gcalls,"lineTo").length};
 const [gc2,gcalls2]=mk();let big=[];for(let i=0;i<30;i++)big.push({type:"rect",x:.01*i,y:.02,w:.2,h:.2,text:"s"+i,color:"#ff0000"});
 try{annDraw(gc2,annParse(J({shapes:big})).shapes,640,480);R.big=pick(gcalls2,"fillText").length+pick(gcalls2,"fillRect").length;}catch(e){R.big="THROW "+e;}
+// a rewind takes the dropped questions' pictures with it
+annAdd("c2",2,"data:image/jpeg;base64,AA");annAdd("c2",4,"data:image/jpeg;base64,BB");
+annTrim("c2",4);annCtx.chat="c2";R.trim=[(annPicFor()||{}).img,annChats.get("c2").length];annCtx.chat=null;
 process.stdout.write(J(R));
 """
 
@@ -1499,6 +1559,7 @@ def _ann_js_ok(R):
         gt = R["grid"]["text"]
         ok = ok and len(gt) == 100 + 18 and {"A1", "J10", "C4", "0.1", "0.9"} <= set(gt) and R["grid"]["lines"] >= 9
         ok = ok and isinstance(R["big"], int) and R["big"] == 60
+        ok = ok and R["trim"] == ["data:image/jpeg;base64,AA", 1]
         return bool(ok)
     except Exception as _e:
         return False
@@ -1519,6 +1580,7 @@ _ann_js_mut = [
     ("a shape may spill past the picture", "w=Math.min(w,1-x);h=Math.min(h,1-y);", ""),
     ("the grid has no cell names", "tag(\"ABCDEFGHIJ\"[c]+(r+1),W*c/10+3*u,H*r/10+3*u);", ";"),
     ("any type name is accepted", "if(!ANN_TYPES.has(t))return null;", ""),
+    ("a rewind keeps the dropped questions' pictures", "if(l[k].at>=n){", "if(false){"),
 ]
 _ann_jc = []
 for _lbl, _a, _b in _ann_js_mut:
@@ -1534,7 +1596,8 @@ def _ann_page_ok(p):
     return all(x in p for x in [
         "function annGrid(", "annGrid(cx,c.width,c.height)", "annGridOf.set(orig,", "body:JSON.stringify({png:url,reveal:true})",
         "annExtra={grid_images:g}", "annExtra={prev_image:b.img,prev_grid:b.grid||undefined}",
-        "Object.assign(annExtra,advUse", "if(sentImages.length)annAdd(myChat,inner.children.length-1,sentImages[0])",
+        "Object.assign(annExtra,advUse", "if(sentImages.length)annAdd(myChat,myMessages.length-1,sentImages[0])",
+        "annTrim(myChat,myMessages.length-1);",
         "annIn(myChat,()=>renderMD(", 'lang.toLowerCase()==="annotate"',
         'save.textContent="Save image"', 'copy.textContent="Copy"', '"/api/annotate/save"',
         "new ClipboardItem({\"image/png\":annFlat(e,shapes)})", "annBlobSave(blob)",
@@ -1549,6 +1612,7 @@ _ann_pm = [
     ("the gridded copy is never made", "annGrid(cx,c.width,c.height);annGridOf.set", "annGridOf.set"),
     ("the grid copy is not sent", "annExtra={grid_images:g};", ""),
     ("the picture is not remembered for the answer", "if(sentImages.length)annAdd(myChat,", "if(false)annAdd(myChat,"),
+    ("a send does not drop a rewind's pictures", "  annTrim(myChat,myMessages.length-1);\n", "\n"),
     ("the card is not hydrated", "if(n.matches(\".annot[data-a]\"))annHydrate(n);", ""),
     ("no Save button", 'save.textContent="Save image";', ""),
     ("the overlay no longer follows the picture", "new ResizeObserver(redraw).observe(stage)", "0"),
