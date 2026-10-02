@@ -33,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
+import o1cpu  # noqa: E402
 import o1library  # noqa: E402
 import o1ollama  # noqa: E402
 import o1pair  # noqa: E402
@@ -62,6 +63,7 @@ TEMPLATE_UNITS = {
     "pull": "ollama1-pull@%s.service",
     "remove-model": "ollama1-rmmodel@%s.service",
 }
+HISTORY_COLS = 9      # t, tps, gpu busy, vram, gpu temp, gpu power, active, cpu temp, cpu GHz
 TERM_OVERRIDE = {"x-frame-options", "content-security-policy", "cache-control", "referrer-policy",
                  "x-content-type-options"}
 
@@ -108,11 +110,12 @@ class Panel:
         self.origin = "https://" + cfg["hostname_admin"].lower()
         self.cpu = o1stats.CPU()
         self.cpu.sample()
+        self.cpuprobe = o1cpu.CpuProbe()
         self.history = collections.deque(maxlen=24 * 360)
         h = read_json(Paths.history, {}) or {}
         for row in h.get("rows", []) if isinstance(h, dict) else []:
-            if isinstance(row, list) and len(row) == 7 and self.clock() - row[0] < 86400:
-                self.history.append(row)
+            if isinstance(row, list) and len(row) in (7, HISTORY_COLS) and self.clock() - row[0] < 86400:
+                self.history.append(row + [None] * (HISTORY_COLS - len(row)))   # older files have 7 columns
         self.state_cache = (0, None)
         self.power_cache = (0, None, None)
         self.busy = o1sleep.busy_reasons
@@ -159,6 +162,11 @@ class Panel:
             st["pairing_open"] = bool((st.get("gateway") or {}).get("pairing_open")) or \
                 bool(o1pair.read_public())
             st["lan_mode"] = bool(self.cfg.get("lan_mode"))
+            try:
+                st["cpu"] = self.cpuprobe.snapshot()
+            except Exception as e:           # a CPU reading never takes the panel's data down
+                log("cpu-probe-error", kind=type(e).__name__)
+                st["cpu"] = None
             self.state_cache = (now, st)
             return st
 
@@ -167,9 +175,12 @@ class Panel:
         g = st.get("gpu") or {}
         gw = st.get("gateway") or {}
         temps = g.get("temps") or {}
+        cpu = st.get("cpu") or {}
+        ghz = (cpu.get("freq") or {}).get("avg_mhz")
         row = [int(self.clock()), (gw.get("tps") or {}).get("current", 0), g.get("busy_pct"),
                round((g.get("vram_used") or 0) / 2**30, 2), temps.get("junction", temps.get("edge")),
-               g.get("power_w"), gw.get("active", 0)]
+               g.get("power_w"), gw.get("active", 0),
+               (cpu.get("temp") or {}).get("c"), round(ghz / 1000.0, 2) if ghz else None]
         self.history.append(row)
 
     def save_history(self):
@@ -360,7 +371,7 @@ def make_handler(panel):
             if path == "/api/history":
                 return self.send(200, {"rows": list(panel.history),
                                        "fields": ["t", "tps", "gpu_busy", "vram_gib", "gpu_temp",
-                                                  "power_w", "active"]})
+                                                  "power_w", "active", "cpu_temp", "cpu_ghz"]})
             if path == "/api/devices":
                 return self.send(200, {"devices": o1pair.devices_list()})
             if path == "/api/models":
@@ -558,6 +569,15 @@ padding:4px 8px;font-size:12px;display:none;white-space:nowrap}.tip b{font-size:
 .chip.bad{color:var(--bad);border-color:var(--bad)}.chip.warn{color:var(--warn);border-color:var(--warn)}.chip.ok{color:var(--good);border-color:var(--good)}
 .pgrid{display:grid;grid-template-columns:minmax(160px,1fr) 2fr;gap:12px;align-items:center}.pgrid svg{width:100%;height:90px;display:block}
 @media (max-width:600px){.pgrid{grid-template-columns:1fr}}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}
+.tile{border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0}.tile[hidden]{display:none}
+.tile .big{font-size:22px}.tile .sub{overflow-wrap:anywhere}
+.cpumodel{font-weight:600;overflow-wrap:anywhere}
+.strips{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}.strips[hidden],.strip[hidden]{display:none}
+.strip svg{width:100%;height:34px;display:block;background:var(--grid);border-radius:3px}
+.sparks{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}
+.spark svg{width:100%;height:46px;display:block}
+@media (max-width:600px){.strips,.sparks{grid-template-columns:1fr}}
 details summary{cursor:pointer;color:var(--ink2);font-weight:600}input,select{background:var(--btn);color:var(--ink);border:1px solid var(--btnline);border-radius:5px;padding:4px 6px;font:inherit}
 label{color:var(--ink2);font-size:13px}#pseasontabs button.on{border-color:var(--series);color:var(--series)}
 .filebtn{border:1px solid var(--btnline);border-radius:6px;padding:6px 11px;cursor:pointer;color:var(--ink);background:var(--btn)}.filebtn input{display:none}
@@ -571,6 +591,24 @@ label{color:var(--ink2);font-size:13px}#pseasontabs button.on{border-color:var(-
  <div class="card"><h2>Requests</h2><div class="big" id="req">-</div><div class="sub" id="reqsub"></div></div>
  <div class="card"><h2>GPU</h2><div class="big" id="gpu">-</div><div class="sub" id="gpusub"></div></div>
  <div class="card"><h2>Service</h2><dl class="kv" id="svc"></dl></div>
+</div>
+<div class="card" id="cpucard"><h2>CPU</h2>
+ <div class="cpumodel" id="cpumodel"></div><div class="sub" id="cpuline"></div>
+ <div class="sub warn" id="cpunote" hidden></div>
+ <div class="tiles">
+  <div class="tile"><div class="sub">Busy</div><div class="big" id="cpubusy">-</div><div class="sub" id="cpubusysub"></div></div>
+  <div class="tile" id="cpuspeedtile" hidden><div class="sub">Speed now</div><div class="big" id="cpuspeed">-</div><div class="sub" id="cpuspeedsub"></div></div>
+  <div class="tile" id="cputemptile" hidden><div class="sub">Temperature</div><div class="big" id="cputemp">-</div><div class="sub" id="cputempsub"></div></div>
+  <div class="tile" id="cpuwtile" hidden><div class="sub">Power</div><div class="big" id="cpuw">-</div><div class="sub" id="cpuwsub"></div></div>
+ </div>
+ <div class="strips">
+  <div class="strip" id="cstrip1" hidden><div class="note">Busy, each thread</div><svg id="cbars" preserveAspectRatio="none" role="img" aria-label="Busy per thread"></svg></div>
+  <div class="strip" id="cstrip2" hidden><div class="note">Speed, each thread (full height is the rated top speed)</div><svg id="cfreq" preserveAspectRatio="none" role="img" aria-label="Speed per thread"></svg></div>
+ </div>
+ <div class="sparks">
+  <div class="spark" id="cspark1" hidden><div class="note">Temperature, last 5 minutes</div><svg id="ctempspark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="CPU temperature, last 5 minutes"></svg></div>
+  <div class="spark" id="cspark2" hidden><div class="note">Speed, last 5 minutes</div><svg id="cspeedspark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="CPU speed, last 5 minutes"></svg></div>
+ </div>
 </div>
 <div class="card"><div class="row between"><h2>History</h2>
  <div class="row seg"><button data-range="3600" class="on">1 h</button><button data-range="86400">24 h</button></div></div>
@@ -651,6 +689,42 @@ document.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('cli
  if(a==='restart'&&!confirm('Restart Ollama, the gateway, the terminal and the tunnel? Running requests end.'))return;
  act(a);}));
 let lastState={};
+// --- CPU card: every figure goes in with textContent or an SVG attribute, never as markup ---
+const fnum=(v,d)=>typeof v==='number'&&isFinite(v)?v.toFixed(d):null;
+const ghz=m=>{const t=fnum(m==null?null:m/1000,2);return t==null?null:t+' GHz';};
+const deg=v=>{const t=fnum(v,0);return t==null?null:t+' °C';};
+function bars(id,vals,max,name,fmt){const svg=$(id),box=svg.parentNode;svg.replaceChildren();
+ const n=Math.min(vals.length,1024);if(!n||!vals.some(v=>v!=null)){box.hidden=true;return;}box.hidden=false;
+ svg.setAttribute('viewBox','0 0 '+n*4+' 24');
+ for(let i=0;i<n;i++){const v=vals[i],f=v==null||!(max>0)?0:Math.max(0,Math.min(1,v/max)),h=Math.max(f*24,v==null?0:1);
+  const r=sv('rect',{x:i*4,y:24-h,width:3,height:h,fill:'var(--series)'});
+  if(n<=128){const t=sv('title',{});t.textContent=name+' '+i+': '+(v==null?'no reading':fmt(v));r.append(t);}svg.append(r);}}
+function spark(id,boxId,ix,live,scale,minSpan){const svg=$(id),box=$(boxId);svg.replaceChildren();const now=Date.now()/1000;
+ const pts=((hist||{}).rows||[]).filter(r=>r[0]>=now-300&&typeof r[ix]==='number').map(r=>[r[0],r[ix]*scale]);
+ if(typeof live==='number')pts.push([now,live]);if(pts.length<2){box.hidden=true;return;}box.hidden=false;
+ let lo=Math.min(...pts.map(p=>p[1])),hi=Math.max(...pts.map(p=>p[1]));if(hi-lo<minSpan){const m=(hi+lo)/2;lo=m-minSpan/2;hi=m+minSpan/2;}
+ let d='';pts.forEach((p,i)=>{d+=(i?'L':'M')+((p[0]-(now-300))/300*200).toFixed(1)+' '+(42-(p[1]-lo)/(hi-lo)*38).toFixed(1);});
+ svg.append(sv('path',{d,fill:'none',stroke:'var(--series)','stroke-width':2,'stroke-linejoin':'round','vector-effect':'non-scaling-stroke'}));}
+function renderCpu(c,s){c=c||{};const f=c.freq||{},t=c.temp,th=c.thresholds||{},warn=th.warn_c||80,hot=th.hot_c||90;
+ $('cpumodel').textContent=c.model||'';
+ const lim=f.max_mhz&&f.rated_mhz&&f.max_mhz<f.rated_mhz*0.98;
+ $('cpuline').textContent=[c.cores?c.cores+' cores':null,c.threads?c.threads+' threads':null,c.driver,c.governor?'governor '+c.governor:null,
+  f.min_mhz&&(f.max_mhz||f.rated_mhz)?ghz(f.min_mhz)+' to '+ghz(f.max_mhz||f.rated_mhz)+(lim?' (limit set; rated '+ghz(f.rated_mhz)+')':' (rated)'):null].filter(Boolean).join('  ·  ');
+ const note=$('cpunote');note.hidden=!c.throttle;note.textContent=c.throttle?('Slower than it could be: '+c.throttle+'.'):'';
+ const util=typeof c.util_pct==='number'?c.util_pct:s.cpu_pct;$('cpubusy').textContent=fnum(util,0)==null?'-':Math.round(util)+'%';
+ $('cpubusysub').textContent=[(c.load||[]).length?'load '+c.load.map(x=>x.toFixed(2)).join(' '):null,c.running!=null&&c.tasks!=null?c.running+' running of '+c.tasks+' tasks':null].filter(Boolean).join('  ·  ');
+ const sp=$('cpuspeedtile');sp.hidden=f.avg_mhz==null;$('cpuspeed').textContent=ghz(f.avg_mhz)||'-';
+ $('cpuspeedsub').textContent=f.avg_mhz==null?'':'average  ·  highest '+(ghz(f.hi_mhz)||'?')+'  ·  lowest '+(ghz(f.lo_mhz)||'?');
+ const tt=$('cputemptile');tt.hidden=!t;$('cputemp').textContent=t?(deg(t.c)||'-'):'-';
+ $('cputemp').className='big'+(t&&t.c>=hot?' bad':t&&t.c>=warn?' warn':'');
+ const others=t?Object.entries(t.sensors||{}).filter(([k])=>k!==t.label).slice(0,3).map(([k,v])=>k+' '+deg(v)):[];
+ $('cputempsub').textContent=t?[t.label,'peak '+(deg(t.peak_c)||'?')+' since the panel started'].concat(others).join('  ·  '):'';
+ const live=pw&&pw.live,w=typeof c.power_w==='number'?c.power_w:(live&&typeof live.cpu_w==='number'?live.cpu_w:null);
+ $('cpuwtile').hidden=w==null;$('cpuw').textContent=w==null?'-':Math.round(w)+' W';$('cpuwsub').textContent=w==null?'':(typeof c.power_w==='number'?'package, measured':'package, from the power sampler');
+ bars('cbars',c.util_cores||[],100,'Thread',v=>Math.round(v)+'%');
+ bars('cfreq',f.cores||[],f.rated_mhz||f.max_mhz||Math.max(0,...(f.cores||[]).filter(v=>v!=null)),'Thread',v=>ghz(v));
+ spark('ctempspark','cspark1',7,t&&typeof t.c==='number'?t.c:null,1,10);
+ spark('cspeedspark','cspark2',8,typeof f.avg_mhz==='number'?f.avg_mhz/1000:null,1,0.5);}
 async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){return;}
  lastState=s;
  const gw=s.gateway||{},t=gw.tps||{},g=s.gpu||{},tun=s.tunnel||{},up=s.updates||{},ou=up.ollama||{};
@@ -676,7 +750,8 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){retur
   (net.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+p.speed_mbps+' Mb/s':''):'no link')]));}
  (s.disks||[]).forEach(d=>pairs.push([d.mount,d.mounted?tib(d.used)+' of '+tib(d.total)+' ('+Math.round(100*d.used/d.total)+'%)':'not mounted',d.mounted?'':'bad']));
  (s.raid||[]).forEach(a=>pairs.push([a.name,a.level+' ['+a.members+'] '+(a.healthy?'healthy':'DEGRADED')+(a.action?'  ·  '+a.action+' '+a.progress+'%'+(a.finish?' ('+a.finish+' left)':''):''),a.healthy?'ok':'bad']));
- if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn']);kv($('sys'),pairs);}
+ if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn']);kv($('sys'),pairs);
+ try{renderCpu(s.cpu,s);}catch(e){}}
 async function refreshSlow(){try{const d=await api('/api/devices');table($('devices'),['Name','Id','Paired',''],d.devices.map(x=>{
   const b=el('button','Remove','danger');b.addEventListener('click',()=>{if(confirm('Unpair '+x.name+'? It will need to pair again at the server.'))act('remove-device',x.id);});
   return [x.name,x.id,(x.paired_at||'').slice(0,16).replace('T',' '),b];}));}catch(e){}
@@ -798,7 +873,8 @@ refreshPower();setInterval(()=>{if(!$('pset').open)refreshPower();else api('/api
 // --- history charts: one series each, one axis each, crosshair + tooltip ---
 let range=3600,hist={rows:[]};
 const CH=[['Tokens per second',1,v=>v.toFixed(1)],['GPU busy (%)',2,v=>Math.round(v)+'%'],['VRAM used (GiB)',3,v=>v.toFixed(1)+' GiB'],
- ['GPU temperature (°C)',4,v=>Math.round(v)+'°C'],['GPU power (W)',5,v=>Math.round(v)+' W']];
+ ['GPU temperature (°C)',4,v=>Math.round(v)+'°C'],['GPU power (W)',5,v=>Math.round(v)+' W'],
+ ['CPU temperature (°C)',7,v=>Math.round(v)+'°C'],['CPU speed (GHz)',8,v=>v.toFixed(2)+' GHz']];
 const NS='http://www.w3.org/2000/svg';const sv=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
 function draw(){const box=$('charts');box.replaceChildren();const now=Date.now()/1000,rows=hist.rows.filter(r=>r[0]>=now-range);
  for(const [title,ix,fmt] of CH){const wrap=el('div',undefined,'chart');wrap.append(el('div',title,'sub'));

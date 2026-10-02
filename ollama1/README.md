@@ -599,6 +599,17 @@ around a little from time to time.
 - **Admin panel:** `https://<server-name>-admin.<your-domain>`. Access asks
   for your email and a one-time code. The panel has:
   - the same figures, plus 1 h / 24 h graphs;
+  - a **CPU** card: the model, cores and threads, the frequency driver and
+    governor, the speed now (average, highest and lowest across the
+    threads, and a strip for each thread), the temperature (the CPU's own
+    sensor, found by name: `k10temp` on AMD, `coretemp` on Intel; amber at
+    80 °C, red at 90 °C, with the highest since the panel started), how busy
+    it is (overall and per thread), the load averages, the package power
+    where the kernel lets the panel read it, and a plain note when the
+    CPU runs well under its top speed while busy. Two small graphs show the
+    last 5 minutes; the 1 h / 24 h graphs gain CPU temperature and speed. A
+    reading the machine doesn't give (a virtual machine has no temperature)
+    is simply left out;
   - buttons to apply updates, restart the services, reboot, back up, and
     turn LAN mode on or off;
   - pairing and devices;

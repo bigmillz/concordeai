@@ -9,6 +9,73 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b360 — more CPU figures in the web admin panel
+Patrick (2026-10-02): "can we add more cpu stats including frequency and temp
+into the web admin panel?"
+
+The server kit's panel (`ollama1/bin/ollama1-admin`, behind Cloudflare Access)
+had one line for the CPU ("12%, load 0.5 0.4 0.3"). It now has a **CPU card**
+under the top row of cards, and two more history charts. Read-only: no new
+route that writes, no new privilege, no unit change (the panel's unit keeps
+ProtectKernelTunables, which makes /sys read-only, not hidden).
+- **New module `ollama1/lib/o1cpu.py`** (`CpuProbe`), written so the console
+  dashboard can use it later instead of its own `o1metrics.cpu_temp()`; the
+  dashboard's files were not touched (another branch is rewriting it). Nothing
+  in `o1stats.py`/`o1metrics.py` changed.
+- Where each figure comes from: model, cores (distinct physical id + core id
+  pairs) and threads from `/proc/cpuinfo` (read every 5 minutes); driver,
+  governor, min/max/rated speed from `cpu*/cpufreq/` (`scaling_driver`,
+  `scaling_governor`, `scaling_min_freq`, `scaling_max_freq`,
+  `cpuinfo_max_freq`); speed now per thread from `scaling_cur_freq`, else
+  `cpu MHz` in `/proc/cpuinfo`; temperature from the hwmon whose NAME is
+  `k10temp`, `coretemp` or `zenpower` (never by number: they change from boot
+  to boot), preferring Tdie, then Tctl, then "Package id 0" (Tctl can carry a
+  vendor offset on some Ryzen models), with the other sensors (Tccd1...)
+  listed and the highest value seen since the panel started; busy % overall
+  and per thread from `/proc/stat` deltas; load and "running of tasks" from
+  `/proc/loadavg`; package power from RAPL `energy_uj` or the `amd_energy`
+  chip, else the card falls back to the power sampler's `cpu_w` that the
+  Power card already fetches, else the tile is hidden. RAPL's counter is
+  readable only by root on current kernels, so on the panel's own user this
+  is usually the sampler's figure, labelled that way.
+- The note ("Slower than it could be: ...") appears when Intel's
+  `thermal_throttle` counters rose in the last 5 minutes, or when the CPU is
+  at least 80% busy and averaging under half its rated top speed. Plain
+  words, amber text, no alarm. AMD has no throttle counter in sysfs, so only
+  the second rule can fire there.
+- Colours reuse the panel's thresholds for the temperature: amber at 80 C,
+  red at 90 C (the stability test aborts a phase at 95 C and says so itself).
+- **Every reading is optional.** One bounded reader (regular files only, never
+  a symlink as the last component, never a FIFO, at most 4 KiB, 4 MiB for
+  cpuinfo); numbers must be finite and in a sane range (temperature -30..150
+  C, a core 1..15000 MHz) or they are dropped to None; at most 1024 threads
+  are read and listed (the count is still right). A missing source is a blank
+  tile, not an error, and a probe that raises leaves `cpu: null` in the state
+  without touching the rest of it.
+- **The model name is text from the machine.** `clean_text` keeps printable
+  characters only, drops `< > & " ' ` \`, folds whitespace, and cuts at 80;
+  the page also puts every CPU figure in with `textContent` or an SVG
+  attribute, never markup (a test fails if `innerHTML` appears anywhere in the
+  page).
+- Wire and history: `/api/state` gains a `cpu` object (old fields unchanged);
+  history rows grow from 7 to 9 columns (`cpu_temp` in C, `cpu_ghz`), the
+  older 7-column file is still read and padded with nulls, the ring is the same
+  24 h at 10 s, no faster poll. The card's two 5-minute sparklines come from
+  those rows plus the latest 2-second reading.
+- Tests: `tests/test_cpu.py` (fixture /sys and /proc trees: AMD k10temp +
+  amd-pstate, Intel coretemp, no cpufreq, a virtual machine, a renumbered
+  hwmon, garbage, 1500 threads, symlink and FIFO, hostile model, the status
+  route, history, the page) and 10 mutants in `mutate.py` (hwmon by number, no
+  bounds, model not cleaned, divide by zero, symlink followed, two core caps
+  not applied, peak not kept, model as markup, old history dropped). Not run
+  on a real Ryzen: the fixture layout follows the kernel documentation
+  (k10temp, amd-pstate, cpufreq sysfs), and the card was looked at in the
+  browser pane at desktop and phone width with made-up data.
+- To get it on the server: `sudo bash ~/concordeai/ollama1/setup.sh` (it
+  installs `lib/*.py` and the panel), then `sudo systemctl restart
+  ollama1-admin`; or copy `lib/o1cpu.py` and `bin/ollama1-admin` into place
+  and restart the same unit.
+
 ## 6b352 — Find in chat (Cmd+F / Ctrl+F)
 Patrick (2026-10-02): "Command or Control F should open a find box for the
 current chat."
