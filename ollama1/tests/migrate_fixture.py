@@ -97,6 +97,7 @@ class Machine:
             fh.truncate(MIB)
         for n, body in (("a.gguf", "aaaa" * 10), ("b/c.gguf", "cc" * 7)):
             self.put(d + "/srv/models/" + n, body)
+        self.drop_caches_file = d + "/drop_caches"
         self.mdstat_file = d + "/mdstat"
         self.put(self.mdstat_file, MDSTAT_OK)
         self.cmdline_file = d + "/cmdline"
@@ -171,7 +172,8 @@ class Machine:
                  O1M_TEST="1", O1M_SYS=d + "/sys", O1M_DEV=d + "/dev", O1M_BYID=d + "/byid", O1M_DATA=self.data_dir,
                  O1M_MODELS=self.models_dir, O1M_MNT=d + "/run/o1migrate", O1M_SRC_ROOT=d + "/src",
                  O1M_TTY=self.tty, O1M_EFI_SYS=d + "/efi", O1M_ALLOW_NONROOT="1", O1M_CMDLINE=self.cmdline_file,
-                 O1M_COUNTDOWN_SECS="0", O1M_SUDOERS=self.sudoers, O1M_MDSTAT=self.mdstat_file)
+                 O1M_COUNTDOWN_SECS="0", O1M_SUDOERS=self.sudoers, O1M_MDSTAT=self.mdstat_file,
+                 O1M_DROP_CACHES=self.drop_caches_file)
         e.pop("TMUX", None)
         if not tmux:
             e["O1_NO_TMUX"] = "1"

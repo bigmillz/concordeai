@@ -124,6 +124,7 @@ class Cfg:
         self.bios_key = g("BIOS_KEY", "F11")
         self.cmdline = g("CMDLINE", "/proc/cmdline")
         self.mdstat = g("MDSTAT", "/proc/mdstat")
+        self.drop_caches = g("DROP_CACHES", "/proc/sys/vm/drop_caches")
         self.countdown = int(g("COUNTDOWN_SECS", "10"))
         self.status = g("STATUS", self.data + "/migrate-os.status")
         self.log = g("LOG", self.data + "/migrate-os.log")
@@ -1318,6 +1319,7 @@ class Migrator:
         if why:
             raise Abort(why + "; not erasing the drive")
         if any(m["target"] == c.models for m in self.mounts()):
+            self.drop_page_cache()
             self.verify_parked()
             files, nbytes = sample_compare(c.models, c.parked)
             print("  checked again before the wipe: %d files, %s compared by content" % (files, human(nbytes)))
@@ -1327,6 +1329,15 @@ class Migrator:
             if not want or abs(got - want) > max(MIB, want // 1000):
                 raise Abort("the parked copy is %s, not the size it had when it was verified; not going on" % human(got))
 
+    def drop_page_cache(self):
+        """So the final compare reads the disks, not the page cache the copy just filled."""
+        self.rn.run(["sync"])
+        try:
+            with open(self.cfg.drop_caches, "w") as fh:
+                fh.write("3\n")
+        except OSError as e:
+            raise Abort("cannot drop the page cache (%s); the compare would read cached data" % e.strerror)
+
     def freeze_models_dir(self):
         """chattr +i on the bare /srv/models while nothing is mounted there, so nothing can write models into the
         old root's folder. Refused while a filesystem is mounted on it (that would mark the models drive's own root)."""
@@ -1334,11 +1345,19 @@ class Migrator:
             raise Abort("%s is mounted; not marking it immutable" % self.cfg.models)
         self.rn.run(["chattr", "+i", self.cfg.models])
 
-    def thaw_models_dir(self):
-        if any(m["target"] == self.cfg.models for m in self.mounts()):
-            return
-        if os.path.isdir(self.cfg.models):
-            self.rn.run(["chattr", "-i", self.cfg.models], ok=(0, 1))
+    def thaw_old_models_dir(self, from_tree):
+        """--finish, with the new system confirmed as the running root: take the immutable mark off the bare
+        /srv/models folder of the OLD root, if that root is mounted somewhere to reach it. Normally it is not
+        (the old drive isn't used any more), and the mark stays: harmless, and it protects a fallback boot."""
+        mounts = {m["target"] for m in self.mounts()}
+        for t in sorted(tree_mounts(from_tree) - {"[SWAP]", "/"}):
+            p = t.rstrip("/") + self.cfg.models
+            if os.path.isdir(p) and p not in mounts:
+                self.rn.run(["chattr", "-i", p], ok=(0, 1))
+                print("The old root's bare %s (at %s) is writable again." % (self.cfg.models, p))
+                return
+        print("The old drive's bare /srv/models folder stays immutable (it protects a fallback boot); when the old drive is "
+              "reused, or booted, `sudo chattr -i /srv/models` there makes it writable.")
 
     def verify_parked_state(self):
         if not os.path.isdir(self.cfg.parked):
@@ -1581,7 +1600,6 @@ class Migrator:
         if diff:
             raise Abort("the models on the new partition differ from the parked copy (%d, first: %s)" % (len(diff), diff[0]))
         self.unmount_new()
-        self.thaw_models_dir()
         print("  models restored and checked; the new system is unmounted")
 
     # -- driving the stages ----------------------------------------------------------------------
@@ -1617,25 +1635,42 @@ class Migrator:
         missing = [s for s in STAGES[1:] if s not in done]
         if missing:
             raise Abort("stages not finished: %s" % ", ".join(missing))
-        efi = parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))
+        self.rearm_bootnext()
+        live = [m["target"] for m in self.mounts() if m["target"] == self.cfg.mnt or m["target"].startswith(self.cfg.mnt + "/")]
+        if live:
+            raise Abort("the new system is still mounted (%s)" % ", ".join(live))
+
+    def rearm_bootnext(self):
+        """BootNext is used up by any boot. If one happened since stage 6 (a power cut, or a first boot of the new
+        drive that failed and fell back to the old one) and the entries and the order are still right, set it
+        again; stop only if the entries themselves are wrong."""
         e = self.state.get("efi", {})
         new, old = e.get("new"), e.get("old")
-        if not new or efi["next"] != new or not efi["entries"].get(new, {}).get("active"):
-            raise Abort("the firmware's BootNext is not the new drive's entry")
+        if not new:
+            raise Abort("no firmware entry for the new drive was recorded")
+        efi = parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))
+        if not efi["entries"].get(new, {}).get("active"):
+            raise Abort("the new drive's firmware entry %s is missing or inactive; run --resume after checking efibootmgr" % new)
+        if old and old not in efi["entries"]:
+            raise Abort("the old drive's firmware entry %s is gone" % old)
         if old and efi["order"][:1] != [old]:
             raise Abort("the old drive's firmware entry is not first in the boot order (it must stay the default)")
         if efi["order"][:1] == [new]:
             raise Abort("the new drive's entry is first in the boot order; it must only be BootNext until --finish")
-        live = [m["target"] for m in self.mounts() if m["target"] == self.cfg.mnt or m["target"].startswith(self.cfg.mnt + "/")]
-        if live:
-            raise Abort("the new system is still mounted (%s)" % ", ".join(live))
+        if efi["next"] != new:
+            print("  BootNext was used up by a boot since the firmware stage; setting it again (entry %s)" % new)
+            self.rn.run(["efibootmgr", "-n", new])
+            if parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))["next"] != new:
+                raise Abort("could not set BootNext to %s" % new)
 
     def final_summary(self, rebooting):
         efi = self.state.get("efi", {})
         self.box("DONE. The copy is finished and checked; nothing has booted from it yet.", [
             "Done: models parked, TO drive partitioned, / and /boot copied, fstab, initramfs and GRUB made on the copy,",
-            "models restored, the firmware entry made (new %s first, old %s second)." % (efi.get("new", "?"), efi.get("old") or "?"),
-            "The old drive (serial %s) was not written to." % self.args.from_serial,
+            "models restored. Firmware: the new drive (entry %s) boots NEXT (BootNext), once; the old drive (entry %s) stays" % (
+                efi.get("new", "?"), efi.get("old") or "?"),
+            "first in the boot order until --finish, so a power cycle after a bad first boot returns to it.",
+            "The old drive (serial %s) was not written to (only its bare /srv/models folder is marked immutable)." % self.args.from_serial,
             "",
             ("Rebooting into the new drive in %d seconds (Ctrl-C cancels)." % self.cfg.countdown) if rebooting
             else "Reboot into the new drive:   sudo reboot",
@@ -1865,6 +1900,8 @@ class Migrator:
             self.mark("done", "preflight")
             self.hold_awake()
             self.stop_services()
+            if "firmware" in self.progress()[0]:
+                self.rearm_bootnext()
             self.run_stages()
             self.final_checks()
         except Abort as e:
@@ -1933,6 +1970,7 @@ class Migrator:
             self.state.get("cmdline_required", [])))
         fd = self.resolve(a.from_serial)
         self.promote_new_entry()
+        self.thaw_old_models_dir(self.lsblk(fd.dev) if fd else {})
         if a.delete_parked:
             self.delete_parked()
         if a.disable_old_entry:

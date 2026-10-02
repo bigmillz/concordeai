@@ -23,7 +23,7 @@ def read(path):
 def outcome(m):
     return {"parts": [(p["n"], p["type"], p["label"], p["size"]) for p in m.fs["disks"][m.names["to"]]["parts"]],
             "fstab": re.sub(r"UUID=\S+", "UUID=x", read(m.dir + "/run/o1migrate/root/etc/fstab")),
-            "order": m.fs["efi"]["order"], "next": m.fs["efi"]["next"], "immutable": m.fs.get("immutable", []),
+            "order": m.fs["efi"]["order"], "next": m.fs["efi"]["next"], "immutable": [x.replace(m.dir, "") for x in m.fs.get("immutable", [])],
             "done": sorted(m.state()["done"]),
             "models": read(m.dir + "/run/o1migrate/models/a.gguf"),
             "required": m.state()["cmdline_required"]}
@@ -126,6 +126,50 @@ class TestResume(unittest.TestCase):
                 mg.stage_partition()
         self.assertIn("degraded", str(cm.exception))
         self.assertEqual(m.log("wipefs"), [])
+
+    def test_bootnext_used_up_by_a_boot_is_set_again_on_resume(self):
+        """A power cut, or a first boot of the new drive that fell back to the old one, uses BootNext up."""
+        m = self.m
+        self.assertEqual(m.run("--run"), 0, m.out)
+        m.reload()
+        m.fs["efi"]["next"] = None
+        m.flush()
+        n = len([l for l in m.log("efibootmgr") if l == "efibootmgr -n 0002"])
+        self.assertEqual(m.run("--resume", "--reboot", O1M_COUNTDOWN_SECS="0"), 0, m.out)
+        self.assertEqual(m.fs["efi"]["next"], "0002")
+        self.assertEqual(len([l for l in m.log("efibootmgr") if l == "efibootmgr -n 0002"]), n + 1)
+        self.assertIn("BootNext was used up", m.out)
+        self.assertEqual(m.fs["efi"]["order"], ["0001", "0000", "0002"])
+        self.assertEqual([l for l in m.log("systemctl") if l == "systemctl reboot"], ["systemctl reboot"])
+        # still armed: nothing more to do
+        n = len(m.log("efibootmgr"))
+        self.assertEqual(m.run("--resume"), 0, m.out)
+        self.assertEqual([l for l in m.log("efibootmgr")[n:] if l.startswith("efibootmgr -n")], [])
+
+    def test_wrong_firmware_entries_are_still_refused_on_resume(self):
+        for what in ("new gone", "old gone", "old not first", "new first"):
+            m = Machine()
+            try:
+                self.assertEqual(m.run("--run"), 0, m.out)
+                m.reload()
+                e = m.fs["efi"]
+                e["next"] = None
+                if what == "new gone":
+                    del e["entries"]["0002"]
+                    e["order"] = ["0001", "0000"]
+                elif what == "old gone":
+                    del e["entries"]["0001"]
+                    e["order"] = ["0000", "0002"]
+                elif what == "old not first":
+                    e["order"] = ["0000", "0001", "0002"]
+                else:
+                    e["order"] = ["0002", "0001", "0000"]
+                m.flush()
+                self.assertEqual(m.run("--resume", "--reboot"), 1, what + m.out)
+                self.assertEqual([l for l in m.log("efibootmgr") if l.startswith("efibootmgr -n")][1:], [], what)
+                self.assertEqual([l for l in m.log("systemctl") if l == "systemctl reboot"], [], what)
+            finally:
+                m.close()
 
     def test_resume_errors(self):
         m = self.m

@@ -946,7 +946,11 @@ the model sync and update timers, and apt's timers), so the server is out of
 service until the reboot: plan for hours if the models are large. They start
 again by themselves at the next boot. While `/srv/models` is unmounted, its
 bare folder on the old root is marked immutable (`chattr +i`), so nothing can
-write models into it, and the mark is removed when the models are restored.
+write models into it. The mark stays on the old root (so a fallback boot of the
+old drive is protected too) and is never put on the new root's folder; `--finish`
+takes it off only if the old root happens to be mounted where it can reach it,
+otherwise `sudo chattr -i /srv/models` on the old drive does, if you ever boot or
+reuse it (mounting something on the folder works either way).
 While it runs it holds a logind block on sleep and the power button, so the
 kit's auto sleep can't suspend the server in the middle of a copy.
 
@@ -971,7 +975,7 @@ reason). A stage that is part-way through is picked up where it stopped.
 |---|---|
 | 0 checks | Both serials found (each by exactly one controller, native-multipath names understood) and different; `/` is on FROM and FROM has no mounted filesystem but `/`, `/boot`, `/boot/efi` and swap (`rsync -x` would silently skip another); `/srv/models` is mounted from a partition of TO, TO has exactly that one partition, no LVM/RAID, nothing else mounted; both drives report no critical warning (`nvme smart-log`); FROM is not dead right now (controller state, read-only `/`, the kernel log); UEFI boot; `/srv/data` is a mount point of the md mirror, read-write, `/proc/mdstat` showing `[UU]`, and it and the state folder belong to root and nobody else can write them; room on it for the models; the root and models fit; `apt` is idle. Anything wrong is listed and nothing is changed. Then the model services stop |
 | 1 park | `/srv/models` to `/srv/data/models-parked`; the `rsync -n --itemize-changes` dry run must find nothing left and the sizes must agree, or nothing is erased |
-| 2 partition | Refused unless stage 1 is verified. Immediately before the wipe it looks again: the RAID whole and read-write; the dry run and sizes again; and a content compare of every parked file up to 64 MiB and of 18 MiB spread over each larger one (not a full checksum: reading a terabyte or more twice over disks of 150 MB/s takes hours, and sizes and times of everything are already exact). Then `/srv/models` is unmounted and marked immutable, the TO drive is wiped (`wipefs`, `sgdisk --zap-all`), partitioned, **each new partition is wiped again** (an old filesystem's signature can sit exactly where a new partition starts: the old models partition and the new ESP both begin at 1 MiB), then always formatted and read back |
+| 2 partition | Refused unless stage 1 is verified. Immediately before the wipe it looks again: the RAID whole and read-write; the page cache is flushed and dropped (`sync`, `drop_caches`) so the compare reads the disks; the dry run and sizes again; and a content compare of every parked file up to 64 MiB and of 18 MiB spread over each larger one (not a full checksum: reading a terabyte or more twice over disks of 150 MB/s takes hours, and sizes and times of everything are already exact). Then `/srv/models` is unmounted and marked immutable, the TO drive is wiped (`wipefs`, `sgdisk --zap-all`), partitioned, **each new partition is wiped again** (an old filesystem's signature can sit exactly where a new partition starts: the old models partition and the new ESP both begin at 1 MiB), then always formatted and read back |
 | 3 copy | `/` (two passes: the second catches what changed) and `/boot`. Each destination is checked to be the new partition before anything is copied into it. `/swap.img` is made new, not copied |
 | 4 boot | `/etc/fstab` of the **copy** rewritten (`/`, `/boot`, `/boot/efi`, `/srv/models` by their new UUIDs; `/srv/data`, swap and every other line kept); `update-initramfs`, `grub-install --no-nvram`, `update-grub` in a chroot (`/dev`, `/sys`, `/run` bound as slaves so unmounting never reaches the host, and unmounted again even if a command fails). The copy gets `panic=10` (a drop-in, `98-ollama1-migrate.cfg`), so a kernel panic reboots into the default boot, the old drive. The copy's `grub.cfg` must carry every kernel option the running system has (the NVMe settings, and the GPU overdrive switch if the tuning is on) and `panic=10`, the kit's GRUB drop-ins must be on the copy, and `EFI/o1new/grub.cfg` must exist next to the loader |
 | 5 restore | The models are copied back to the new models partition and checked; the parked copy stays |
@@ -1013,15 +1017,20 @@ firmware entry inactive, not deleted; you type `yes`), `--remove-sudoers`.
   power cycle (or a kernel panic, `panic=10`) comes back to the old drive, which
   is still first in the boot order. Or press the boot-menu key (F11 on an MSI
   board) and pick a drive. Run `--finish` only after a boot you have checked.
+  BootNext is single use: any boot between stage 6 and the planned reboot (a
+  power cut, a failed first boot that fell back) consumes it. `--resume --reboot`
+  checks the entries and the order (new entry present, old first) and, if they
+  are right, sets BootNext again (`efibootmgr -n`) and goes on; it stops only if
+  the entries themselves are wrong.
 - **Rollback, after booting the old drive**: nothing on it was changed. Its
   `fstab` still has the line for `/srv/models` with the UUID of the *old*
   models partition, which was wiped and re-made, so that mount fails (it has
   `nofail`, so the boot goes on) and `/srv/models` is an empty folder, so Ollama
   sees no models. Either put them back by hand: `sudo mount LABEL=o1models
-  /srv/models` (the new models partition, once stage 5 finished; if the run stopped
-  before that, first `sudo chattr -i /srv/models`, or use `sudo mount --bind
-  /srv/data/models-parked /srv/models`), and, to make it stick, change that fstab
-  line to `LABEL=o1models` (the one change you may want on the old drive); or
+  /srv/models` (the new models partition, once stage 5 finished; before that, `sudo mount
+  --bind /srv/data/models-parked /srv/models`), and, to make it stick, change that fstab
+  line to `LABEL=o1models` (the one change you may want on the old drive; the
+  bare folder is immutable, which does not stop a mount, only writes into it); or
   just re-download the models, or point Ollama at `/srv/data/models-parked`. To
   drop the new entry from the firmware: `sudo efibootmgr` to see its number (label `ollama1-new`), then
   `sudo efibootmgr -B -b <number>`.
@@ -1149,7 +1158,7 @@ With a bridge, the firewall is set so it can't cut the other device off:
 cd ollama1/tests
 python3 -m unittest discover -s .      # ~20 s, plus ~3.5 min for the OS-move tests (test_migrate*.py); stub Ollama, fake Access certs, all on 127.0.0.1
 python3 mutate.py                      # ~25 min; breaks each of about 320 protections on purpose, expects a failing test
-python3 mutate.py migrate              # only the OS-move ones (about 70, each run against the test that must catch it)
+python3 mutate.py migrate              # only the OS-move ones (about 75, each run against the test that must catch it)
 python3 gen_vectors.py                 # regenerates PROTOCOL.md's test vectors
 ```
 

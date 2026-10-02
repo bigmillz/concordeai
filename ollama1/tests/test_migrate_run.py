@@ -180,6 +180,7 @@ class SharedRun(unittest.TestCase):
         self.assertEqual(e["order"], ["0001", "0000", "0002"])        # old first; the new entry last
         self.assertEqual(e["next"], "0002")                          # only the next boot tries the new drive
         self.assertIn("efibootmgr -n 0002", m.log("efibootmgr"))
+        self.assertNotIn("BootNext was used up", m.out)              # the firmware stage set it; nothing had to set it again
         self.assertIn("A power cycle after a bad first boot comes back to the old drive", m.out)
         self.assertEqual(e["entries"]["0002"]["label"], "ollama1-new")
         self.assertEqual(e["entries"]["0001"]["label"], "ubuntu")
@@ -206,18 +207,31 @@ class SharedRun(unittest.TestCase):
             self.assertLess(w[0], f[0])
         self.assertEqual(m.fs["disks"][m.names["to"]]["parts"][0]["type"], "vfat")
 
-    def test_models_dir_is_immutable_only_while_nothing_is_mounted_on_it(self):
+    def test_models_dir_stays_immutable_on_the_old_root_and_never_on_the_new(self):
         m = self.m
         log = m.log()
         um = [i for i, l in enumerate(log) if l == "umount " + m.models_dir]
         on = [i for i, l in enumerate(log) if l == "chattr +i " + m.models_dir]
-        off = [i for i, l in enumerate(log) if l == "chattr -i " + m.models_dir]
         wipe = min(i for i, l in enumerate(log) if l.startswith("wipefs"))
-        self.assertEqual((len(um), len(on), len(off)), (1, 1, 1))
+        self.assertEqual((len(um), len(on)), (1, 1))
         self.assertLess(um[0], on[0])
         self.assertLess(on[0], wipe)
-        self.assertLess(wipe, off[0])
-        self.assertEqual(m.fs.get("immutable", []), [])
+        self.assertEqual([l for l in log if l.startswith("chattr -i")], [])       # not removed at the end of the restore
+        self.assertEqual(m.fs.get("immutable", []), [m.models_dir])                # a fallback boot of the old drive stays protected
+        self.assertEqual([l for l in log if l.startswith("chattr") and "/run/o1migrate" in l], [])   # the new root's folder: never
+
+    def test_the_page_cache_is_dropped_before_the_final_compare(self):
+        m = self.m
+        self.assertEqual(read(m.drop_caches_file), "3\n")
+        log = m.log()
+        rs = [i for i, l in enumerate(log) if l.startswith("rsync")]
+        syncs = [i for i, l in enumerate(log) if l == "sync"]
+        self.assertTrue(any(rs[1] < i < rs[2] for i in syncs), (rs, syncs))         # between the park check and the pre-wipe check
+
+    def test_the_summary_says_the_new_drive_boots_next(self):
+        self.assertIn("boots NEXT (BootNext), once", self.m.out)
+        self.assertIn("first in the boot order until --finish", self.m.out)
+        self.assertNotIn("second)", self.m.out.split("DONE. The copy")[1])
 
     def test_the_admin_panel_and_pulls_are_stopped_too(self):
         stops = [l for l in self.m.log("systemctl") if l.startswith("systemctl stop ")]
@@ -692,6 +706,24 @@ class TestFinish(Base):
         n = len(m.log("efibootmgr"))
         self.assertEqual(m.run("--finish", serials=False), 0, m.out)
         self.assertEqual([l for l in m.log("efibootmgr")[n:] if l.startswith("efibootmgr -o")], [])
+
+    def test_finish_takes_the_immutable_mark_off_the_old_root_only_when_it_can_reach_it(self):
+        m = self.m
+        self.full_run()
+        m.reboot_into_new()
+        self.assertEqual(m.run("--finish", serials=False), 0, m.out)               # the old root is not mounted: the mark stays
+        self.assertEqual(m.fs["immutable"], [m.models_dir])
+        self.assertIn("stays immutable", m.out)
+        self.assertEqual([l for l in m.log("chattr") if l.startswith("chattr -i")], [])
+        old = m.dir + "/oldroot"                                                    # the old root, mounted for some reason
+        os.makedirs(old + m.models_dir)
+        m.reload()
+        m.fs["mounts"].append({"target": old, "source": "/dev/mapper/ubuntu--vg-ubuntu--lv", "fstype": "ext4", "options": "rw"})
+        m.fs["immutable"] = [old + m.models_dir]
+        m.flush()
+        self.assertEqual(m.run("--finish", serials=False), 0, m.out)
+        self.assertEqual(m.fs["immutable"], [])
+        self.assertIn("chattr -i " + old + m.models_dir, m.log("chattr"))
 
     def test_finish_stops_if_the_new_entry_is_gone(self):
         m = self.m
