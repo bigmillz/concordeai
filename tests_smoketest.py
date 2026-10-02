@@ -2463,6 +2463,7 @@ TextEncoder Uint8Array Int32Array crypto RegExp sessionStorage""".split())
 # api(); a bare one would be an undeclared name here as well
 # L is Leaflet, loaded from unpkg before any map mounts; the __X__ names
 # are placeholders the server fills in before the page is sent
+_PAGE_HOST |= {"ClipboardItem", "FileReader", "NodeFilter", "Number", "ResizeObserver"}   # browser globals the new features use
 _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
                "__DICT_TRACE__"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
@@ -16232,6 +16233,7 @@ globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,
   setItem:(k,v)=>{sets.push(k);store.set(k,String(v));}};
 const $=()=>({textContent:""}),$$=()=>[];let tier="";
 function tierLabel(){return tier||model;}
+function paintCloudChip(){}
 """ + _pmseg9 + r"""
 paintModels();console.log(JSON.stringify({model,council,sets}));
 """)
