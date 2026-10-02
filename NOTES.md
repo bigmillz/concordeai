@@ -649,6 +649,82 @@ while warm, a new recording starting empty, no cut of a recording or a
 start, "listening" only after the first chunk, the trace marks, the 503,
 and the failed starts. The 6b338 hold/tap scenarios run unchanged.
 
+## 6b344 — Thinking and Pro write the merge on your server too
+Patrick (2026-10-01), with a screenshot of a Thinking answer whose chip said
+"Thinking · Ollama1 ×3": "it's still using my laptop's GPU here for
+compositing answers, it looks like, versus the server when it is available."
+**This supersedes what 6b339 did and said about the merge** (its compositor
+paragraph, and its "not covered on purpose" report line: "Thinking and Pro may
+still merge on this Mac's compositor; the merge only moves to the server if the
+server has that merger model"). With his
+server-first ruling that was wrong: the three drafts ran on the server and the
+one model that wrote the final answer didn't.
+- **The rule** (`run_council(..., srv_merge=True)`, passed by the handler for a
+  mode only: `tier in TIERS and not cloud_only`; never for an Advanced council,
+  a pick, "<name> Only" or Cloud Only). When a server qualifies, the model that
+  writes the merge is `server_compositor(ctx, drafted)`: the same chooser and
+  filters as the seats (`server_mode_candidates`: a paired server of THIS
+  profile, the switch on, answering, "gpu" placement, fitting a card whose size
+  is reported; `srv_role_ok(..., "compose")`: no coder, embedding, guard, picture
+  reader or reasoning distill), the strongest by size, then measured speed.
+  Because a compositor is ranked by the seats' own rules, a server merge implies
+  at least one server seat in the council, so the title, memory pass and pins
+  (the 6b339 server-turn rules: `_seat_fb` non-empty) already follow the server.
+- **Resident first.** A model the council just drafted with is already loaded
+  on the server, and a 16 GB card holds two models (`OLLAMA_MAX_LOADED_MODELS`
+  is 2): a merge on a third would swap one out and pay a load before its first
+  word. So the last two server drafters (or a row the server says is loaded)
+  take the pen when one is within 70% of the strongest model's size; a much
+  smaller one doesn't write the answer for the sake of a load (the strongest
+  then writes it, and pays the load).
+- **Order, unchanged.** A cloud compositor (cloud power on, keys) still comes
+  first: the server merge is only the "local" choice at the end of the ladder.
+  A pen named in Advanced stays as named. With no server paired, the switch
+  off, or nothing that qualifies, `server_compositor` says none and the code
+  path is the one that ran before (a test compares the merge stage's calls,
+  text, status lines and frames with `srv_merge` off, and they are identical).
+  The older "server has this computer's merger model" copy (6b339) still serves
+  an Advanced council.
+- **Same rules as a draft.** The merge runs inside the mode's first-word
+  deadline (`server_first_deadline`, 60 s) and a failure marks the server down
+  (`server_mark_down`). Before its first word a failure falls to this computer's
+  compositor (the 6b339 fallback pen), or to the best single draft when the mode
+  has none, said in the status line ("<name> didn't write the merge, so <pen>
+  writes it here"); no other server and no cloud is tried. After the first
+  word there is ONE answer, cut there and said ("\n\n⚠️ ..."), never a second
+  one printed over it and never a RESET. The merge prompt is the same one as
+  before: the question and the drafts' text, nothing else.
+- **What the card and the badge say.** The progress card gets the line the other
+  single-model paths give ("Writing the answer", then "Answer written", with
+  the model in the detail: "Ollama1 · gpt-oss:20b"); a fallback names the pen
+  that wrote it. A RUN frame `{"w": "mix", "m": <models that ran>}` makes the
+  badge name where the answer was written: the server's name when it wrote
+  everything, "this Mac + Ollama1" when the merge fell back. No new thread-local
+  and no new per-profile container: the choice reads the thread's own profile
+  (`bound_ctx()`), nothing about a server (URL, key, token) is written anywhere.
+- **Tests.** In process: the chooser (families, strongest, resident, the
+  70% rule, "the server says it holds one", none for no server, the switch off,
+  down, only gpu+ram, no card figure), the merge (on the server and its deadline,
+  the card and badge frames, no server as before, an Advanced council untouched,
+  a named pen, the cloud first, a refusal before the first word with and without
+  a pen of this computer's, a cut after one) and 16 mutations. Live, in the
+  page's own request shape against the real gateway on its stub Ollama and the
+  `local-record` hook: Thinking and Pro send the merge request to the server, on
+  a model it already holds, and NOTHING runs on this computer (Thinking: no local
+  call at all); the switch off sends the merge nowhere near the server; a merge
+  the stub refuses (`/failmerge`) falls back, said, with the frames; the handler
+  mutation (no `srv_merge`) is run against a mutated copy of the app and fails
+  those checks. The hook now notes whether a local call is a merge.
+- **Not verified here.** Nothing was looked at on screen. Patrick's screenshot
+  said "Writing the answer — Qwen 3.5 Vision 9B": that line is written ONLY by
+  the single-model paths (a server pick, a mode's Fast seat, the handler's local
+  path), never by a council's merge, and Qwen 3.5 Vision 9B is what a picture
+  sent in a mode is handed to (the vision takeover, 6b339: a mode's server seat
+  doesn't read pictures). So that turn may have carried an image, in which case
+  this change does not touch it; a mode's picture still goes to the vision ladder,
+  not a server model. Left as it is, to be decided. Not measured: a real card's
+  swap time with a merge on a model it doesn't hold.
+
 ## 6b343 — Edit & resend works while an answer is being written
 Patrick (2026-10-01), with a screenshot of a question mid-answer ("Searched
 the web, Consulting models 3 of 3") and its edit icon: "the edit icon
@@ -1280,7 +1356,8 @@ so here falling back IS allowed.
   slow server is simply absent; a failed draft is absent (the straggler
   rule) and marks its server down. Peer review, reflection and a server
   merge carry the deadline too, and peer review and reflection on a
-  server's model run within the per-model cap (they were uncapped). The compositor: when the merger is a model
+  server's model run within the per-model cap (they were uncapped). The compositor (superseded for a mode by 6b344: its merge is the server's strongest suitable model, preferring one it
+  holds; what follows is still the rule for an Advanced council): when the merger is a model
   the server also has and it fits, the merge is written there, this Mac's
   copy behind it (a failed server merge is wiped and this Mac writes it;
   none: the best draft ships); a pen named in Advanced stays as named. The
