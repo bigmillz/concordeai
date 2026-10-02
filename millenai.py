@@ -17039,7 +17039,7 @@ def o1_pair_proof(key: bytes, device_id: str, pub: str, nonce: str) -> bytes:
 
 # ---- the profile's servers.json
 _SRV_PLAIN = ("id", "name", "url", "device_id", "public_key", "device_name",
-              "paired_at", "added_at", "models", "prefer", "wake", "sleep")
+              "paired_at", "added_at", "models", "prefer", "wake", "sleep", "gen")
 _SRV_SECRET = ("access_id", "access_secret", "seed")
 
 
@@ -17054,6 +17054,7 @@ def _srv_read(ctx) -> list:
         e = {k: s.get(k) for k in _SRV_PLAIN}
         e["name"], e["url"] = str(e["name"] or ""), str(e["url"] or "")
         e["wake"], e["sleep"] = _srv_clean_wake(e.get("wake")), _srv_clean_sleep(e.get("sleep"))
+        e["gen"] = _srv_clean_gen(e.get("gen"))          # what it can make (6b356)
         for k in _SRV_SECRET:
             e[k] = _Secret(s.get(k))
         out.append(e)
@@ -17309,6 +17310,8 @@ def _srv_fail(e, status: int, js: dict, model: str = "") -> ServerError:
     if code == "replay":
         return ServerError("replay", "%s refused a repeated request. Ask "
                            "again." % name, code)
+    if code == "unavailable":
+        return ServerError("server", "%s isn\u2019t set up to make that." % name, code)
     if code == "busy" or status in (409, 429) or (status == 503 and code):
         return ServerError("busy", "%s is busy with other requests. Try "
                            "again in a moment." % name, code or "busy")
@@ -18293,7 +18296,7 @@ def _srv_check(e, limit=None) -> dict:
         seen["err"], seen["kind"] = str(se), se.kind
         seen["reachable"] = se.kind not in ("offline", "tls", "crypto")
     prev = _srv_seen.get(e["id"]) or {}
-    for k in ("skew", "caps"):
+    for k in ("skew", "caps", "gen_at"):
         if k in prev:
             seen[k] = prev[k]
     _srv_seen[e["id"]] = seen
@@ -18348,6 +18351,8 @@ def _srv_public(e) -> dict:
             # sleep when idle (6b346): the last setting the server gave, and
             # whether it has a card to wake it with (the addresses stay here)
             "sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),
+            # what it can make (6b356): {image, video}, or None until asked
+            "gen": e.get("gen"),
             "models": list(s.get("models") or [])}
 
 
@@ -18355,10 +18360,284 @@ def servers_view(ctx, refresh=False) -> dict:
     entries = _srv_read(ctx)
     if refresh and entries:
         # side by side, each within its own deadline
+        def _chk(e):
+            server_check(e)
+            if (_srv_seen.get(e["id"]) or {}).get("auth"):
+                server_gen_refresh(e)        # what it can make (6b356)
         with ctx_executor(min(4, len(entries))) as pool:
-            list(pool.map(server_check, entries))
+            list(pool.map(_chk, entries))
     return {"servers": [_srv_public(e) for e in entries],
             "crypto": cai_crypto.available(), "max": SERVER_MAX}
+
+
+# ---- images and video on your server (6b356)
+# Patrick (2026-10-02): "Can we get image and video generation on the server?"
+# He chose images and video together. A server whose kit has ComfyUI says so
+# (GET /v1/generate/capabilities: {"image": bool, "video": bool}); a request
+# to make a picture or a video then goes there first, as a job the app polls
+# every two seconds (a silent response is dropped by the tunnel after about
+# 100 s, so nothing waits on the card). The app sends a kind, a prompt and a
+# few numbers and never a workflow: the gateway has the templates.
+SRV_GEN_POLL_S = 2.0            # how often a running job is asked about
+SRV_GEN_CAP_S = {"image": 300, "video": 1200}    # then it is stopped: pictures 5 minutes, video 20
+SRV_GEN_FRESH_S = 300           # what a server can make is asked again after this long
+SRV_GEN_FAILS = 5               # polls that fail in a row (a dropped tunnel) before the job is given up on
+SRV_GEN_MAX = {"image": 16 << 20, "video": 64 << 20}     # a result larger than this is refused
+SRV_GEN_SIDE = {"image": (256, 1536, 64), "video": (256, 832, 16)}   # smallest, largest, multiple of
+SRV_GEN_PIXELS = {"image": 1_700_000, "video": 400_000}
+SRV_GEN_DEFAULT = {"image": (1024, 1024), "video": (832, 480)}
+SRV_GEN_FRAMES = (17, 81)       # one more than a multiple of 4
+SRV_GEN_FRAMES_DEFAULT = 33     # two seconds at 16 a second
+_SRV_GEN_ID = re.compile(r"[A-Za-z0-9_-]{16,64}")
+_SRV_MD = re.compile(r"[\x00-\x1f\x7f*_`\[\]()<>#|\\!~&\"{}]")
+
+
+class ServerGenStopped(RuntimeError):
+    """The reader left while a job ran (Stop): the job was cancelled, and
+    there is no one to tell."""
+
+
+def _srv_plain(name) -> str:
+    """A server's name as plain words wherever it is shown in a sentence:
+    the name is the owner's to choose and is never markup or a frame."""
+    return " ".join(_SRV_MD.sub(" ", str(name or "")).split())[:40] or "Your server"
+
+
+def _srv_clean_gen(v):
+    """{image, video} as last learned, or None (never asked): two booleans,
+    nothing else is believed."""
+    if (isinstance(v, dict) and isinstance(v.get("image"), bool)
+            and isinstance(v.get("video"), bool)):
+        return {"image": v["image"], "video": v["video"]}
+    return None
+
+
+def server_gen_refresh(e):
+    """Ask paired server e what it can make (signed GET /v1/generate/capabilities)
+    and remember it with the server's row: {image, video}. A kit from before
+    this answers 404 (neither). A server that doesn't answer keeps what it
+    last said. Nothing is loaded or started by the question."""
+    if not _srv_paired(e) or not cai_crypto.available():
+        return e.get("gen")
+    try:
+        st, js = _srv_json(e, "GET", "/v1/generate/capabilities", timeout=SRV_CONNECT_S)
+    except ServerError:
+        return e.get("gen")
+    if st == 200:
+        v = _srv_clean_gen(js)
+    elif st == 404 and str(js.get("code") or "") == "not_found":
+        v = {"image": False, "video": False}
+    else:
+        v = None
+    if v is None:
+        return e.get("gen")
+    _srv_seen.setdefault(e["id"], {})["gen_at"] = time.time()
+    if e.get("gen") != v:
+        def fn(entries):
+            x = _srv_find(entries, e["id"])
+            if x is None:
+                return {"err": SRV_GONE}
+            x["gen"] = dict(v)
+            return {"ok": True}
+        try:
+            _srv_update(bound_ctx(), fn)
+        except (StoreReadError, NoProfile, OSError):
+            pass
+        e["gen"] = dict(v)
+    return v
+
+
+def server_gen_pick(ctx, kind: str):
+    """The paired server that makes `kind` ("image" or "video") for ctx's
+    profile, or None: one the profile has paired, that hasn't been switched
+    off under "Use for Fast, Thinking, Pro and the Code lane", whose kit says
+    it can, and that isn't marked down. Its capabilities are asked again when
+    they are over SRV_GEN_FRESH_S old. Never another profile's."""
+    try:
+        entries = _srv_read(ctx)
+    except (StoreReadError, NoProfile):
+        return None
+    if kind not in ("image", "video") or not cai_crypto.available():
+        return None
+    for e in entries:
+        if not _srv_paired(e) or e.get("prefer") is False:
+            continue
+        if server_label_down(ctx, e["name"] + SERVER_SEP):
+            continue
+        s = _srv_seen.get(e["id"]) or {}
+        if time.time() - float(s.get("gen_at") or 0) >= SRV_GEN_FRESH_S:
+            server_gen_refresh(e)
+        if (e.get("gen") or {}).get(kind) is True:
+            return e
+    return None
+
+
+def _srv_gen_side(v: int, kind: str) -> int:
+    lo, hi, step = SRV_GEN_SIDE[kind]
+    return max(lo, min(hi, int(round(v / step)) * step))
+
+
+def _srv_gen_size(kind: str, w, h):
+    """(width, height) inside what the server takes: the shape kept, each side
+    a multiple of the server's, the pixel count under its cap."""
+    lo, hi, step = SRV_GEN_SIDE[kind]
+    try:
+        w, h = float(w), float(h)
+    except (TypeError, ValueError):
+        return SRV_GEN_DEFAULT[kind]
+    if not (w > 0 and h > 0):
+        return SRV_GEN_DEFAULT[kind]
+    f = min(1.0, hi / max(w, h), (SRV_GEN_PIXELS[kind] / (w * h)) ** 0.5)
+    w, h = _srv_gen_side(w * f, kind), _srv_gen_side(h * f, kind)
+    while w * h > SRV_GEN_PIXELS[kind]:
+        if w >= h:
+            w -= step
+        else:
+            h -= step
+    return max(lo, w), max(lo, h)
+
+
+def srv_gen_opts(kind: str, use):
+    """What to ask the server for, from the override layer (the same words
+    that steer this computer's painter): {width, height, seed?, frames?}.
+    None when the ask names a format only this computer can write ("as a
+    gif", "as a jpg"): the server returns a PNG or an MP4."""
+    use = use if isinstance(use, dict) else {}
+    if str(use.get("fmt") or ("png" if kind == "image" else "mp4")) != ("png" if kind == "image" else "mp4"):
+        return None
+    w, h = _srv_gen_size(kind, use.get("w") or SRV_GEN_DEFAULT[kind][0], use.get("h") or SRV_GEN_DEFAULT[kind][1])
+    out = {"width": w, "height": h}
+    seed = use.get("seed")
+    if isinstance(seed, int) and not isinstance(seed, bool) and 0 < seed < 2 ** 53:
+        out["seed"] = seed
+    if kind == "video":
+        fr = use.get("frames")
+        fr = fr if isinstance(fr, int) and not isinstance(fr, bool) else SRV_GEN_FRAMES_DEFAULT
+        fr = min(SRV_GEN_FRAMES[1], max(SRV_GEN_FRAMES[0], fr))
+        out["frames"] = (fr - 1) // 4 * 4 + 1
+    return out
+
+
+def _srv_gen_sniff(kind: str, data: bytes):
+    """The content type of result bytes by their first bytes, as the gateway
+    checks them: a PNG or JPEG for a picture; an MP4 or an animated WebP for
+    a video. Anything else is refused whatever the server called it."""
+    if kind == "image":
+        return ("image/png" if data[:8] == b"\x89PNG\r\n\x1a\n"
+                else "image/jpeg" if data[:3] == b"\xff\xd8\xff" else None)
+    return ("video/mp4" if data[4:8] == b"ftyp"
+            else "image/webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP" else None)
+
+
+def _srv_gen_wait(s: float):
+    time.sleep(s)
+
+
+def _srv_gen_forget(e, jid: str):
+    """Tell the server to stop or drop the job: best effort, short, silent."""
+    try:
+        _srv_json(e, "DELETE", "/v1/generate/jobs/" + jid, timeout=SRV_USAGE_S)
+    except Exception:
+        pass
+
+
+def _srv_bytes(e, path: str, cap: int, timeout: float = 60.0) -> bytes:
+    """A signed GET whose answer is a file: at most `cap` bytes."""
+    skew = _srv_skew(e)
+    for attempt in (0, 1):
+        conn, resp = _srv_send(e, "GET", path, b"", True, timeout, skew)
+        try:
+            if resp.status != 200:
+                try:
+                    js = _srv_js(resp.read(1 << 20))
+                except OSError:
+                    js = {}
+                if attempt == 0 and resp.status == 401 and js.get("code") in ("clock_skew", "replay"):
+                    skew = _srv_note_skew(e, js)
+                    continue
+                raise _srv_fail(e, resp.status, js)
+            try:
+                data = resp.read(cap + 1)
+            except OSError:
+                raise ServerError("offline", "%s stopped answering partway through."
+                                  % e["name"]) from None
+            if len(data) > cap:
+                raise ServerError("server", "%s sent something larger than %d MB, so it was refused."
+                                  % (e["name"], cap >> 20))
+            return data
+        finally:
+            conn.close()
+    raise ServerError("server", "%s refused the request." % e["name"])
+
+
+def server_generate(e, kind: str, prompt: str, opts: dict, status, gone=None) -> tuple:
+    """Make one picture or video on server e: start a job, ask about it every
+    SRV_GEN_POLL_S seconds (status() gets "Making the picture on <name>... 40%"
+    whenever the words change), fetch the bytes, tell the server to forget them.
+    (bytes, content type, seconds). gone() true (the reader left) cancels the
+    job and raises ServerGenStopped. A job that runs past SRV_GEN_CAP_S[kind] is
+    cancelled. ServerError says why it couldn't, in one line."""
+    what = "picture" if kind == "image" else "video"
+    name = _srv_plain(e["name"])
+    body = dict(opts, kind=kind, prompt=str(prompt or "")[:1000])
+    t0 = time.monotonic()
+    st, js = _srv_json(e, "POST", "/v1/generate/jobs", body, timeout=SRV_CONNECT_S)
+    jid = js.get("id") if st == 202 else None
+    if not (isinstance(jid, str) and _SRV_GEN_ID.fullmatch(jid)):
+        raise _srv_fail(e, st if st != 202 else 502, js)
+    base = "/v1/generate/jobs/" + jid
+    shown, fails = [None], 0
+    try:
+        while True:
+            if gone is not None and gone():
+                _srv_gen_forget(e, jid)
+                raise ServerGenStopped("stopped")
+            if time.monotonic() - t0 > SRV_GEN_CAP_S[kind]:
+                raise ServerError("offline", "%s took more than %d minutes to make the %s, so it was "
+                                  "stopped." % (e["name"], SRV_GEN_CAP_S[kind] // 60, what))
+            _srv_gen_wait(SRV_GEN_POLL_S)
+            try:
+                st, js = _srv_json(e, "GET", base, timeout=SRV_CONNECT_S)
+                fails = 0
+            except ServerError:
+                fails += 1
+                if fails >= SRV_GEN_FAILS:
+                    raise
+                continue
+            if st == 404:
+                raise ServerError("server", "%s lost the %s partway." % (e["name"], what))
+            if st != 200:
+                raise _srv_fail(e, st, js)
+            state = js.get("state")
+            if state == "failed":
+                raise ServerError("server", "%s couldn\u2019t make the %s." % (e["name"], what))
+            if state == "done":
+                break
+            pct = js.get("progress")
+            pct = (int(round(pct * 100)) if isinstance(pct, (int, float)) and not isinstance(pct, bool)
+                   and 0 <= pct <= 1 else None)
+            text = "Making the %s on %s..." % (what, name) + ("" if pct is None else " %d%%" % pct)
+            if text != shown[0]:
+                shown[0] = text
+                try:
+                    status(text)
+                except (BrokenPipeError, ConnectionResetError):
+                    # the reader left between two polls: the first thing that
+                    # notices is the write; the job is cancelled, not abandoned
+                    _srv_gen_forget(e, jid)
+                    raise ServerGenStopped("stopped") from None
+        data = _srv_bytes(e, base + "/result", SRV_GEN_MAX[kind])
+        ctype = _srv_gen_sniff(kind, data)
+        if ctype is None or ctype != js.get("type"):
+            raise ServerError("server", "%s sent back something that isn\u2019t a %s."
+                              % (e["name"], what))
+    except ServerError:
+        # whatever went wrong, the server is asked to let go of it (the card, and
+        # the sleep timer that counts a job as use)
+        _srv_gen_forget(e, jid)
+        raise
+    _srv_gen_forget(e, jid)
+    return data, ctype, time.monotonic() - t0
 
 
 def server_add(ctx, d: dict) -> dict:
@@ -18796,6 +19075,94 @@ def server_wake_if_down(e, ctx=None):
 
 
 # ==== servers: end ====
+
+# ==== server pictures: begin ====
+# YOUR SERVER FIRST FOR A PICTURE OR A VIDEO (6b356). Called where the chat
+# handler would paint or film: when a paired server of this profile can make
+# it, it is made there, and this returns True (made and shown, or the reader
+# left). False: nothing was tried or the server couldn't, and the caller goes on
+# exactly as it did before, with a one-line status saying the server couldn't.
+_SRV_GEN_WHY = {"offline": "didn’t answer", "tls": "its certificate didn’t check out",
+                "busy": "was busy", "auth": "no longer accepts this computer",
+                "access": "was turned away", "clock": "the clocks differ",
+                "replay": "refused a repeated request", "crypto": "this computer can’t sign",
+                "gone": "isn’t in Settings any more", "unpaired": "isn’t paired"}
+
+
+def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status) -> bool:
+    what = "picture" if kind == "image" else "video"
+    try:
+        # a sleeping server is woken for a question a person asked, here and
+        # nowhere else (6b346); the sidebar's poll never does
+        server_refresh_modes(ctx)
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception:
+        pass
+    for _wn, _wok in server_take_wake_notes():
+        status(("Woke %s." if _wok else "%s didn’t wake.") % _srv_plain(_wn))
+    e = server_gen_pick(ctx, kind)
+    opts = srv_gen_opts(kind, use) if e is not None else None
+    if e is None or opts is None:
+        return False
+    name = _srv_plain(e["name"])
+    step("srvgen", "Making the %s on %s" % (what, name), "run", "")
+    status("Making the %s on %s..." % (what, name))
+    try:
+        data, ctype, secs = server_generate(e, kind, subject, opts, status,
+                                            lambda: _client_gone(sock))
+    except ServerGenStopped:
+        step("srvgen", "Stopped", "done", "")
+        return True
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception as exc:
+        k = getattr(exc, "kind", "")
+        why = _SRV_GEN_WHY.get(k, "couldn’t make it")
+        if k in ("offline", "tls", "crypto"):
+            server_mark_down(ctx, e["name"], "%s %s." % (name, why))
+        step("srvgen", "%s couldn’t make the %s" % (name, what), "done", why)
+        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))
+        return False
+    ext = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
+           "video/mp4": ".mp4"}[ctype]
+    sub = VIDEO_SUB if ctype == "video/mp4" else IMAGE_SUB
+    try:
+        out = stage_path(ext)
+        fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        used = {"w": opts["width"], "h": opts["height"]}
+        used.update({k: opts[k] for k in ("seed", "frames") if k in opts})
+        _render_note(out, used, secs)
+        path = _media_land(ctx, sub, out)
+    except StaleProfile:
+        raise
+    except OSError:
+        emit(AppText("⚠️ %s made the %s, but this computer couldn’t save it. Ask "
+                     "again." % (name, what)))
+        return True
+    step("srvgen", "Made the %s on %s" % (what, name), "done", "%d s" % round(secs))
+    extra = list(notes or [])
+    try:
+        _rw, _rh = float((use or {}).get("w") or 0), float((use or {}).get("h") or 0)
+    except (TypeError, ValueError):
+        _rw = _rh = 0.0
+    if (max(_rw, _rh) > SRV_GEN_SIDE[kind][1] or _rw * _rh > SRV_GEN_PIXELS[kind]):
+        extra.append("the size came out at %dx%d, the most this server takes"
+                     % (opts["width"], opts["height"]))
+    note = "" if not extra else " · " + "; ".join(extra)
+    cap = subject[:1].upper() + subject[1:]
+    if sub == IMAGE_SUB:
+        emit("![%s](/api/image/%s)\n\n*%s — made on %s%s*"
+             % (subject.replace("]", ""), os.path.basename(path), cap, name, note))
+    else:
+        emit("[[vid:%s]]\n\n*%s — made on %s%s*"
+             % (json.dumps({"id": os.path.basename(path), "t": subject[:80]},
+                           separators=(",", ":")), cap, name, note))
+    return True
+# ==== server pictures: end ====
+
 
 
 def stream_ollama(tag: str, messages: list, emit,
@@ -26378,6 +26745,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 out = {"err": SRV_GONE}
                 if _se is not None:
                     server_check(_se)
+                    if (_srv_seen.get(_se["id"]) or {}).get("auth"):
+                        server_gen_refresh(_se)
                     out = {"ok": True, "server": _srv_public(_se)}
             self._send_json(out)
             return
@@ -28832,6 +29201,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if vid_subject:
+            # YOUR SERVER FIRST (6b356, per Patrick: "Can we get image and video
+            # generation on the server?"): a paired server of this profile that
+            # can film it does, before this Mac or the cloud. Cloud Only never
+            # asks one. If it can't, one line says so and everything below runs
+            # as it always did
+            if not cloud_only:
+                try:
+                    _sg_use, _sg_n = resolve_overrides("video", _ovr, _pnote)
+                    if server_make(user_base, "video", vid_subject, _sg_use,
+                                   _onotes, self.connection, emit, step, status):
+                        hb_stop.set()
+                        return
+                except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                    raise
+                except Exception:
+                    pass
             # A SAVED GEMINI KEY IS PERMISSION TO USE IT (Patrick, 6b326):
             # Veo runs with a working key whatever Use cloud power says;
             # with neither that nor video on this Mac nothing is sent
@@ -28897,6 +29282,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if img_subject:
+            # YOUR SERVER FIRST (6b356): as for a video, above
+            if not cloud_only:
+                try:
+                    _sg_use, _sg_n = resolve_overrides("image", _ovr, _pnote)
+                    if server_make(user_base, "image", img_subject, _sg_use,
+                                   _onotes, self.connection, emit, step, status):
+                        hb_stop.set()
+                        return
+                except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                    raise
+                except Exception:
+                    pass
             # "in the cloud" only when a cloud painter exists (6b310): with
             # Pollinations gone, no local model and no Gemini key means
             # nothing is sent anywhere, and the label mustn't say it was.
@@ -33344,6 +33741,9 @@ body.gen #chip-model{color:var(--accent)}
 .srv.ok .srv-st{color:#9fd8b4}
 .srv.warn .srv-st{color:#d9c08a}
 .srv.bad .srv-st{color:#e8907e}
+.srv-caps{display:flex;gap:5px;margin-top:6px}
+.srv-cap{font-size:10.5px;line-height:1;padding:3px 8px;border-radius:999px;color:var(--dim);
+  border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.04)}
 .srv-ms{margin-top:7px;display:flex;flex-direction:column;gap:2px}
 .srv-m{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
 .srv-m i{font-style:normal;color:var(--faint)}
@@ -40902,6 +41302,10 @@ function srvCard(s){
     +esc(s.host)+'</span><span class="srv-tok">'
     +(s.access?"Access token saved":"no Access token")+'</span></div>'
     +'<div class="srv-st">'+esc(srvStatus(s))+'</div>'
+    // what the server can make (6b356): a small chip each, only for what it says it can
+    +((s.gen&&(s.gen.image||s.gen.video))?'<div class="srv-caps">'
+      +(s.gen.image?'<span class="srv-cap">Images</span>':"")
+      +(s.gen.video?'<span class="srv-cap">Video</span>':"")+'</div>':"")
     +(s.paired&&ms?'<div class="srv-ms">'+ms+'</div>'
       :s.paired&&st.at&&!st.err?'<div class="srv-ms"><div class="srv-m">'
         +'no chat models installed</div></div>':"")

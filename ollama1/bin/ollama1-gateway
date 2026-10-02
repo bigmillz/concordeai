@@ -24,6 +24,11 @@ Before the body: Access and the signature headers are checked before any
 body is read, at most 16 requests are handled at once, and every error
 closes the connection (cloudflared reuses connections).
 
+Image and video (optional, 6b356): when ComfyUI answers on this machine, signed
+paired devices can start a generation job, poll it and fetch the result. The
+gateway builds the ComfyUI graph itself from a fixed template (lib/o1gen.py);
+the card is the GPU slot's for the whole job.
+
 Pairing: the gateway never sees the code; it hands requests to a root step
 (ollama1-pair --commit) and relays its answer. Never on the LAN listener.
 
@@ -52,6 +57,7 @@ from o1common import (Paths, load_config, ram_models, read_json, safe_label,  # 
 from o1jwt import AccessVerifier, JWTError  # noqa: E402
 import o1ollama  # noqa: E402
 from o1pair import DeviceStore, read_public, spool_request, wait_result  # noqa: E402
+import o1gen  # noqa: E402
 import o1gpu  # noqa: E402
 import o1idle  # noqa: E402
 import o1stats  # noqa: E402
@@ -290,6 +296,44 @@ class Slot:
             self.cond.notify()
 
 
+# ---- image and video generation: what the gateway lends o1gen -------------------
+
+class GenHooks:
+    """The parts of a generation job that belong to the gateway: the one GPU slot,
+    Ollama's models (unloaded before a job so the card is free), and the VRAM reading."""
+
+    def __init__(self, gw):
+        self.gw = gw
+
+    def slot_acquire(self):
+        return self.gw.slot.acquire(0) == "ok"
+
+    def slot_release(self):
+        self.gw.slot.release()
+
+    def unload(self):
+        gw = self.gw
+        for _attempt in range(2):
+            try:
+                names = gw.loaded_names()
+            except (OSError, ValueError):
+                return          # Ollama isn't answering: none of it is on the card
+            if not names:
+                return
+            for name in names:
+                gw.unload(name, "unload: generation")
+        try:
+            left = gw.loaded_names()
+        except (OSError, ValueError):
+            return
+        if left:
+            raise o1gen.GenError(503, "busy", "the server could not unload its models first")
+
+    def vram(self):
+        u = o1gpu.usage((self.gw.gpu() or {}).get("vendor"))
+        return u.get("vram_used_bytes"), u.get("vram_total_bytes")
+
+
 # ---- the gateway -----------------------------------------------------------
 
 class Gateway:
@@ -315,6 +359,8 @@ class Gateway:
         # real work only (chat, generate, embeddings): what auto sleep waits on (6b346)
         self.activity = o1idle.Activity(clock)
         self.sleep_lock = threading.Lock()
+        # optional image and video generation through a local ComfyUI (6b356)
+        self.gen = o1gen.Generator(cfg.get("comfyui_url") or "", GenHooks(self), clock, self.activity, log)
         self.usage_lock = threading.Lock()
         self.usage_at = None
         self.usage_val = {}
@@ -717,6 +763,15 @@ def make_handler(gw, lan=False):
         def log_message(self, fmt, *args):  # the default logs request lines; we log our own
             pass
 
+        def send_bytes(self, ctype, data):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data)
+
         def send_json(self, status, obj, extra_headers=None):
             raw = json.dumps(obj).encode("utf-8")
             self.send_response(status)
@@ -863,6 +918,8 @@ def make_handler(gw, lan=False):
                 except OSError:
                     raise GatewayError(500, "internal", "couldn't save the setting")
                 return self.send_json(200, view)
+            if route.startswith("/v1/generate/"):
+                return self.generate(method, route, body, dev_id)
             if method == "GET" and route == "/v1/whoami":
                 return self.send_json(200, {"device_id": dev_id, "name": dev["name"],
                                             "server_time": int(gw.clock())})
@@ -902,6 +959,27 @@ def make_handler(gw, lan=False):
                     gw.activity.end()
             raise GatewayError(404, "not_found", "not available through the gateway")
 
+        def generate(self, method, route, body, dev_id):
+            """Image and video jobs (PROTOCOL.md 5): capabilities, start, poll, fetch, stop."""
+            try:
+                if route == "/v1/generate/capabilities" and method == "GET":
+                    return self.send_json(200, gw.gen.capabilities())
+                if route == "/v1/generate/jobs" and method == "POST":
+                    jid = gw.gen.create(self.json_body(body), dev_id)
+                    return self.send_json(202, {"id": jid})
+                m = re.match(r"^/v1/generate/jobs/([A-Za-z0-9_-]{1,80})(/result)?$", route)
+                if m and method == "GET" and not m.group(2):
+                    return self.send_json(200, gw.gen.status(m.group(1), dev_id))
+                if m and method == "GET":
+                    ctype, data = gw.gen.result(m.group(1), dev_id)
+                    return self.send_bytes(ctype, data)
+                if m and method == "DELETE" and not m.group(2):
+                    gw.gen.cancel(m.group(1), dev_id)
+                    return self.send_json(200, {"ok": True})
+            except o1gen.GenError as e:
+                raise GatewayError(e.status, e.code, str(e))
+            raise GatewayError(404, "not_found", "not available through the gateway")
+
         def json_body(self, body):
             try:
                 obj = json.loads(body.decode("utf-8"))
@@ -912,6 +990,9 @@ def make_handler(gw, lan=False):
             return obj
 
         def model_job(self, kind, obj, dev_id, dev, t0):
+            if gw.gen.running():
+                # the card belongs to a picture or video job until it ends (6b356)
+                raise GatewayError(503, "busy", "the server is making a picture or video; try again when it is done")
             name, entry = gw.local_model(obj.get("model"))
             ram = gw.is_ram_model(name)
             fwd, n_ctx, explicit = gw.shape(kind, obj, name, entry, ram)
@@ -1083,6 +1164,10 @@ def stats_loop(gw, stop):
     n = 0
     while not stop.is_set():
         gw.activity.write()            # every second: the file says what is running and that the gateway is alive
+        try:
+            gw.gen.sweep()             # results expire; a job nobody polls is stopped (6b356)
+        except Exception as e:
+            log("error", kind=type(e).__name__)
         if n % 5 == 0:
             try:
                 st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=5)

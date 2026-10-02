@@ -58,6 +58,7 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 | Admin panel | 127.0.0.1:8432, user `o1admin` |
 | Web terminal (ttyd + `login`) | a UNIX socket in `/run/ollama1/ttyd` (root and the panel's user only), reached only through the panel |
 | Dashboard | tty1 (the monitor), user `o1dash`. Also `ollama1-top` over SSH |
+| ComfyUI (optional) | 127.0.0.1:8188, only root and the gateway may connect. Not installed by `setup.sh`: `sudo bash tools/install-comfyui.sh` (images and video; see [docs/your-own-server.md](../docs/your-own-server.md)) |
 | Settings | `/etc/ollama1/`: `config.json` (root-only), `devices.json`, `models.allow` |
 | Setup log | `/var/log/ollama1-setup.log` |
 
@@ -848,4 +849,8 @@ Ed25519 (the server uses PyNaCl). They cover:
 - power and prices: DST, holidays, weekends, windows past midnight, season
   changes, minute-boundary splits, gaps as unknown, the RAPL wrap, the four
   plug types (fake plugs), LAN-only plugs;
+- image and video jobs against a stub ComfyUI: the caps, the fixed templates,
+  one job at a time, Ollama's models unloaded before and ComfyUI's freed after,
+  a running job counted as use for auto sleep, results kept ten minutes, the
+  signed and paired-only gate, and that no prompt reaches a log or a file;
 - that the repo holds no personal data and no utility's schedule.

@@ -245,12 +245,77 @@ always exactly these four keys:
   boolean, a string or a decimal is a 400; a number outside 5..1440 is
   brought to the nearest end). Any other key is a 400. An older kit answers
   404 `not_found`: treat that as "update the server kit".
-- Only chat, generate and embeddings count as work. `/v1/info`, `/v1/usage`,
-  `/v1/whoami`, the model list and this route never keep the server awake.
+- Only chat, generate and embeddings count as work, and so does a picture or
+  video job (see "Images and video" below) from its start until two minutes
+  after the last poll or fetch of it. `/v1/info`, `/v1/usage`, `/v1/whoami`,
+  the model list, `/v1/generate/capabilities` and this route never keep the
+  server awake.
 
 To wake it, send a magic packet: six `0xFF` bytes then the card's address
 sixteen times, as a UDP broadcast to port 9, and ask `/v1/info` every couple of
 seconds until it answers.
+
+### Images and video (optional)
+
+A server that also runs ComfyUI (`ollama1/tools/install-comfyui.sh`; nothing
+installs it unasked) can make pictures and short clips. Four routes, signed and
+paired-only like every other one. The app never sends a ComfyUI graph: it sends a
+kind, a prompt and a few numbers, and the gateway puts them into a fixed
+template (`lib/o1gen.py`: FLUX.1 schnell fp8 for pictures, Wan 2.1 1.3B for
+video). Anything not listed below is a 400.
+
+| Call | Notes |
+|---|---|
+| `GET /v1/generate/capabilities` | `{"image": bool, "video": bool}`, exactly those two keys. True only when ComfyUI answers on the server's own loopback address and the model files and nodes the template needs are there. A kit without the route answers 404 `not_found`: treat that as neither. Cached for 20 s on the server; never counts as work |
+| `POST /v1/generate/jobs` | Starts a job: **202** `{"id"}`, an unguessable 32-character id. Body below. Errors: 400 `bad_request` (a number or key outside the caps), 409 `busy` (a job is running, or a chat holds the card), 503 `unavailable` (that kind isn't set up) |
+| `GET /v1/generate/jobs/<id>` | `{"state": "queued" or "running" or "done" or "failed", "kind", "progress"}`. `progress` is 0 to 1 while running and `null` when the server can't say; a done job adds `"type"` (the result's content type) and `"bytes"`; a failed one adds `"error"`: always the same one message, `"generation failed"`, never the cause. Poll every 2 s |
+| `GET /v1/generate/jobs/<id>/result` | The bytes, with `Content-Type`, `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. 409 `not_ready` until the job is done |
+| `DELETE /v1/generate/jobs/<id>` | Stops a running job (the card is freed) or forgets a finished one: **200** `{"ok": true}` |
+
+A job belongs to the device that started it: another paired device gets 404 for
+its id. An id that isn't there (never made, expired, stopped, someone else's) is
+404 `not_found`.
+
+The job body (any other key is a 400):
+
+| Key | Image | Video |
+|---|---|---|
+| `kind` | `"image"` | `"video"` |
+| `prompt` | 1 to 1000 characters | the same |
+| `width`, `height` | multiples of 64, 256 to 1536, at most 1,700,000 pixels; default 1024 each | multiples of 16, 256 to 832, at most 400,000 pixels; default 832 by 480 |
+| `steps` | 1 to 12, default 4 | 10 to 30, default 20 |
+| `seed` | optional whole number, 0 to 2^53; random if left out | the same |
+| `seconds` / `frames` | n/a | `seconds` 1 to 5 (default 2) or `frames`, 17 to 81 and one more than a multiple of 4 (`frames` wins). 16 frames a second: 2 s is 33 frames |
+
+The result is a PNG (or JPEG) for a picture. For a video it is an MP4 with H.264
+(`video/mp4`, which WKWebView and Safari play) when the server's ComfyUI has the
+`CreateVideo` and `SaveVideo` nodes; a ComfyUI without them is made to write an
+animated WebP instead (`image/webp`, which a browser draws in an `<img>`). Read
+`type`, don't assume. The gateway checks the first bytes of the file and relays
+nothing that isn't a picture, an MP4 or a WebP of the right kind, at most 16 MiB
+for a picture and 64 MiB for a video.
+
+How a job shares the card with chats:
+
+- One job at a time, and not while a chat runs (409 `busy`). While a job runs, a
+  chat or embedding request is answered 503 `busy` straight away; lists, `/v1/info`
+  and polls still work.
+- Before a job the gateway asks Ollama to unload every model it has loaded, waits
+  (up to 30 s) until the card reads free, then starts. If the unload can't be
+  confirmed the job fails and ComfyUI is never asked. After the job, success or
+  not, it tells ComfyUI to unload its models and free its memory, so the next chat
+  can load.
+- A running job nobody has polled for 120 s is stopped. A job runs for at most 10
+  minutes (picture) or 30 (video), whatever the app does.
+- The job's state, and a finished job's bytes, are kept in the gateway's memory
+  only, for 10 minutes after it finished and for at most two finished jobs. Nothing
+  is written to disk by the gateway and the prompt is in no log. ComfyUI writes its
+  own result file (to `/run`, which is memory, swept every 10 minutes) and forgets
+  the prompt when the job ends.
+- Nothing is shared between devices: only the device that started a job reads it.
+
+The tunnel drops a response that stays silent for about 100 s, so none of these calls
+waits for a job: start it, then poll.
 
 Anything else is a 404: `pull`, `delete`, `create`, `copy`, `push` and `blobs`
 are never reachable from outside. Models are managed at the server only.

@@ -5,6 +5,9 @@
 #   11434 (Ollama)         root, ollama, the gateway, the admin panel
 #   8431, 8432 (gateway,   root, cloudflared
 #               panel)
+#   8188 (ComfyUI, the     root, the gateway (ComfyUI is optional, 6b356: the
+#         optional image   admin user that runs it gets no page of its own;
+#         and video maker) nothing but the gateway builds its jobs)
 # Everyone else (the admin user included, without sudo) gets a TCP reset. The web
 # terminal has no TCP port at all: ttyd listens on a UNIX socket in a folder
 # only root and the panel's user can open.
@@ -15,5 +18,6 @@ table inet ollama1 {
         type filter hook output priority filter; policy accept;
         tcp dport 11434 fib daddr type local meta skuid != { 0, @UID_OLLAMA@, @UID_O1GW@, @UID_O1ADMIN@ } counter reject with tcp reset
         tcp dport { 8431, 8432 } fib daddr type local meta skuid != { 0, @UID_CLOUDFLARED@ } counter reject with tcp reset
+        tcp dport 8188 fib daddr type local meta skuid != { 0, @UID_O1GW@ } counter reject with tcp reset
     }
 }

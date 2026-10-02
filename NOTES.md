@@ -331,6 +331,108 @@ a picture.
   pins eight. A regenerated question still goes out without its picture, as it
   always has.
 
+## 6b356 — images and video on your server (ComfyUI behind the gateway)
+Patrick (2026-10-02): "Can we get image and video generation on the server?" He
+chose images AND video together. ComfyUI was already installed by hand on the
+server (RX 6900 XT, 16 GB, ROCm; `comfyui.service` on 127.0.0.1:8188 only);
+this connects it to the kit and the app. Built on a Mac with no GPU, against a
+STUB ComfyUI: **what no run here can show is that a real ComfyUI accepts the two
+graph templates** (below).
+
+**Kit (`ollama1/`)**
+- `lib/o1gen.py` (new) holds everything: the whitelist and caps, the two FIXED
+  graph templates, the job table, a minimal WebSocket reader for progress, and the
+  ComfyUI client. `bin/ollama1-gateway` wires four routes into the signed,
+  paired-only, nonce-protected set: `GET /v1/generate/capabilities`
+  (`{"image","video"}`, two booleans, nothing else), `POST /v1/generate/jobs`
+  (202 `{id}`), `GET .../jobs/<id>` (state, progress, type/bytes, or the one
+  fixed error "generation failed"), `GET .../jobs/<id>/result` (the bytes),
+  `DELETE .../jobs/<id>` (stop or forget). PROTOCOL.md section "Images and
+  video (optional)" is the contract.
+- The app never sends a graph: kind, prompt (1000 characters), width/height,
+  steps, seed, seconds or frames, every one inside a cap (a picture: 256 to 1536
+  a side in 64s, 1.7 MP, 1 to 12 steps; a clip: 256 to 832 in 16s, 400,000
+  pixels, 17 to 81 frames at 16 a second, 10 to 30 steps). Any other key is a
+  400. The prompt is the `text` of one CLIPTextEncode node and nowhere else.
+- **Capabilities are true only when** ComfyUI answers on loopback AND
+  `/object_info` lists the model files the template names (both spellings of a
+  combo input are read) AND the nodes exist. A non-loopback `comfyui_url` turns
+  generation off rather than sending a prompt elsewhere.
+- **Video format, decided.** ComfyUI core can write an MP4 (CreateVideo +
+  SaveVideo, H.264) on a recent build, and WKWebView plays that. If those two
+  nodes are missing the template falls back to SaveAnimatedWEBP, which a browser
+  draws in an `<img>`. The result's `type` says which; the app puts an MP4 with
+  the videos and a WebP with the pictures. The gateway checks the first bytes of
+  every result and relays only a PNG or JPEG for a picture, an MP4 or WebP for a
+  video, at most 16 / 64 MiB.
+- **One card.** The gateway's GPU slot is taken without waiting at the start of a
+  job (a chat running: 409 `busy`) and held to the end. Before the graph goes in,
+  every model Ollama holds is unloaded and confirmed (else the job fails and
+  ComfyUI is never asked), then it waits up to 30 s for the card to read free. After
+  the job, win or lose, `/history` delete and `/free` (unload models, free memory).
+  While a job runs a chat or embedding request is answered 503 `busy` at once.
+- **Auto sleep (6b346).** The job holds the activity record (`inflight`) from its
+  start; every poll or fetch of it touches the time, and it lets go 120 s after the
+  last one (or when the job is dropped). Capabilities, usage and info still never
+  count. A running job nobody has polled for 120 s is stopped.
+- **Nothing kept.** State and result bytes live in the gateway's memory only (10
+  minutes after it finished, at most two finished jobs, the id 24 random bytes,
+  only the starting device can read it); the prompt is in no log and no file
+  (`test_stateless`'s scan and a marker test). ComfyUI itself writes to `/run`
+  (RAM) with `--disable-metadata`, and `comfyui-clean.timer` sweeps it.
+- `config/ollama1.nft.in` gains a guard line: only root and the gateway's user
+  reach port 8188 (so the admin user no longer reaches ComfyUI's own page, on
+  purpose). `tools/install-comfyui.sh` (opt-in, idempotent, `--print-unit`
+  shows its service files without root): uv, ComfyUI, Python 3.12 venv, torch
+  2.9.1 for ROCm 6.4, requirements, the four models with `curl -C -`, the units.
+  `setup.sh` prints one line saying whether ComfyUI answers and how to add it; it
+  never installs it.
+
+**App (`millenai.py`, the servers section and `server_make`)**
+- `servers.json` rows gain `gen` ({image, video}, two booleans, a hand-edited
+  value not believed), filled by a signed capabilities GET when the pane
+  refreshes, on Test, and at the first picture request after 5 minutes. Settings
+  > Your servers draws small "Images" and "Video" chips.
+- **Routing.** In the chat handler, before this Mac's painter or Veo, a picture or
+  video request tries a paired server of this profile whose row says it can and
+  that is switched on under "Use for Fast, Thinking, Pro and the Code lane" (that
+  switch also governs this; the label did not change) and isn't marked down.
+  Cloud Only never asks; "<name> Only" still refuses first; another profile has
+  its own rows. A sleeping server is woken by the request through the 6b346 path
+  (`server_refresh_modes`), never by a poll. A job the server can't make says one
+  line ("<name> couldn't make the picture (<why>). Trying another way.") and the
+  code below runs exactly as before; a server that didn't answer is marked down for
+  a minute so the next ask doesn't wait on it. A video asked as a gif, or a picture
+  as a jpg, is left to this Mac.
+- **Never blocks.** The app polls every 2 s inside the request's stream, writing
+  "Making the picture on <name>... 40%" when the words change (so the heartbeat
+  has something to repeat); five polls lost in a row end it; a picture is stopped
+  at 5 minutes and a video at 20; Stop (the reader leaves) is noticed at the next
+  poll or the next write and cancels the job at the gateway. The result is
+  checked again on this side, saved as any generated picture (`/api/image/`) or
+  video (`/api/video/`, Range), with its settings in the `.render.json` beside it.
+  A server's name is the owner's: in every line it is plain words.
+
+**Not verified (needs one real run on the server; send Patrick's output)**
+- That ComfyUI accepts the templates: node names and inputs (`CLIPLoader` type
+  "wan", `EmptyHunyuanLatentVideo`, `ModelSamplingSD3` shift 8, `CreateVideo`,
+  `SaveVideo` format/codec, `SaveAnimatedWEBP`), sampler and scheduler names
+  (euler/simple for FLUX; uni_pc/simple for Wan), that the history entry holds the
+  file under the save node's `images`, and `/object_info`'s shape on that build.
+  If a job fails, ComfyUI's journal (`journalctl -u comfyui -e`) says why; the app
+  and the gateway only say "failed".
+- That the four download addresses, the 2.9.1 torch pin and the sizes* are right
+  today; that a 16 GB card makes a 33-frame 832x480 clip in a time worth waiting
+  for (the app gives a clip 20 minutes); that WKWebView plays the MP4 (the app's
+  videos already use the same route); the progress WebSocket against real ComfyUI.
+  * Sizes and times are estimates.
+- Tests: kit `test_generate.py` (stub ComfyUI, 60+ tests) with 39 mutants in
+  `mutate.py`; gauntlet `== images and video on your server (6b356) ==` (9
+  checks in process, 50 mutations, and 11 live ones on the real gateway with a
+  stub ComfyUI, beside the servers checks). The live harness gained a stub ComfyUI
+  (pointed at a closed port until a check turns it on), DELETE through its front,
+  and `/comfy*` control routes.
+
 ## 6b351 — the benchmark's "Compare with..." crosses this computer, servers and the cloud
 Patrick (2026-10-02), with a screenshot of the benchmark pane mid-run on This
 computer: "to make it so that for comparing results, you can compare between

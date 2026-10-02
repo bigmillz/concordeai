@@ -17924,7 +17924,7 @@ def _svc_secrets(src):
                     and secret not in views and "id34.access" not in views
                     and set(ns["_srv_public"](e)) == {"id", "name", "url", "host", "access", "paired",
                                                      "paired_at", "device_name", "device_id",
-                                                     "status", "models", "gpu", "only", "prefer", "sleep", "wakeable"})
+                                                     "status", "models", "gpu", "only", "prefer", "sleep", "wakeable", "gen"})
     out["entry repr"] = seed not in repr(e) and secret not in repr(e)
     out["error text"] = all(secret not in str(ns["_srv_fail"](e, st, {"error": "x"}))
                             for st in (403, 401, 500, 530))
@@ -18243,7 +18243,7 @@ def _svc_pins(src):
                        "            if not bench_hold():\n                emit(AppText(BENCH_BUSY))" in ch
         and ch.index("and not self._bench_held:\n            if not bench_hold():")
         < ch.index('        if export_req and export_req["lane"] == "retro":')
-        < ch.index("        if vid_subject:\n            # A SAVED GEMINI KEY")
+        < ch.index("        if vid_subject:\n            # YOUR SERVER FIRST (6b356")
         and src.count('    if _mine and _bench["running"]:\n        _mine = False\n'
                       '        errs.append("local: " + BENCH_BUSY)') == 2,
         # before the Fast lane's cloud ladder and the council: not behind
@@ -21391,6 +21391,7 @@ import o1test_util as U  # noqa: E402  (sets OLLAMA1_PREFIX first)
 import o1pair  # noqa: E402
 from o1common import DEFAULTS  # noqa: E402
 from stub_ollama import Stub  # noqa: E402
+from stub_comfyui import StubComfy  # noqa: E402
 
 CTL, FRONT, CID, CSECRET = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4], sys.argv[5]
 loader = importlib.machinery.SourceFileLoader("o1gateway", os.path.join(KIT, "bin", "ollama1-gateway"))
@@ -21414,14 +21415,21 @@ CLONED = []
 KEY = U.RSAKey("kid-1")
 JWKS = U.FakeJWKS([KEY])
 STUB = Stub(U.free_port())
+# image and video (6b356): a stub ComfyUI exists, but the gateway is pointed at a closed
+# port until /comfy-on, so every other check sees a server without it
+COMFY = StubComfy(U.free_port())
+DEAD_COMFY = U.free_port()
 cfg = dict(DEFAULTS)
 cfg.update({"access_team_domain": U.TEAM, "gateway_aud": U.GW_AUD, "admin_aud": U.ADMIN_AUD,
             "admin_email": U.ADMIN_EMAIL, "service_token_client_id": U.CLIENT_ID,
             "gateway_port": U.free_port(), "ollama_url": "http://127.0.0.1:%d" % STUB.port,
+            "comfyui_url": "http://127.0.0.1:%d" % DEAD_COMFY,
             "certs_url": JWKS.url, "allow_insecure_certs_url": True,
             "vram_total_bytes": 16 * (1 << 30), "queue_wait_s": 20})
 U.write_devices([])
 GWO, GWS, GWSTOP = GW.serve(cfg)
+GWO.gen.poll_s = 0.1
+GWO.gen.hooks.vram = lambda: (1 << 30, 16 << 30)
 GPORT = cfg["gateway_port"]
 time.sleep(1.1)     # signatures must be dated after the gateway started
 
@@ -21516,7 +21524,7 @@ class Front(BaseHTTPRequestHandler):
                 self.wfile.flush()
         c.close()
 
-    do_GET = do_POST = _any
+    do_GET = do_POST = do_DELETE = _any       # DELETE: a job being let go (6b356)
 
 
 FRONT_SRV = {"s": None}
@@ -21631,6 +21639,22 @@ class Ctl(BaseHTTPRequestHandler):
             with STUB.lock:
                 STUB.loaded.clear()
             return self.reply({"ok": True})
+        if p in ("/comfy-on", "/comfy-off"):
+            GWO.gen.comfy.port = COMFY.port if p == "/comfy-on" else DEAD_COMFY
+            GWO.gen.caps_at = None
+            return self.reply({"ok": True})
+        if p == "/comfy-set":
+            for k_, v_ in d.items():
+                if k_ in ("run_s", "steps", "fail", "refuse", "outputs_missing", "no_ws"):
+                    setattr(COMFY, k_, v_)
+            return self.reply({"ok": True})
+        if p == "/comfy-reset":
+            COMFY.calls.clear()
+            COMFY.history.clear()
+            COMFY.interrupted.clear()
+            COMFY.run_s, COMFY.steps = 0.6, 4
+            COMFY.fail = COMFY.refuse = COMFY.outputs_missing = COMFY.no_ws = False
+            return self.reply({"ok": True})
         self.send_error(404)
 
     def do_GET(self):
@@ -21640,6 +21664,10 @@ class Ctl(BaseHTTPRequestHandler):
         if self.path == "/stub":
             with STUB.lock:
                 calls = [[m, pth, b] for m, pth, b in STUB.calls]
+            return self.reply({"calls": calls})
+        if self.path == "/comfy":
+            with COMFY.lock:
+                calls = [[m, pth, b] for m, pth, b in COMFY.calls]
             return self.reply({"calls": calls})
         if self.path == "/devices":
             return self.reply({"devices": [{"id": k, "name": v.get("name")}
@@ -22725,6 +22753,195 @@ check("auto sleep (live): behind the launch key, the token and the profile; anot
       and "02:00:5e:10:00:01" not in open(os.path.join(_SMOKE_TMP, "SRV.log"), errors="replace").read(),
       "%r" % [_z8, _z8h[0], _zB, _z_cfg])
 # ==== 6b346 auto sleep (live): end ====
+# ==== 6b356 server pictures (live): begin ====
+# The real gateway on a stub ComfyUI, through the app's own chat. Nothing here may send a wake-up call.
+import http.client as _hc56
+_svq("/api/servers/sleep", "POST", {"id": _sid34, "enabled": False})
+_o1("/comfy-off", {})
+_o1("/comfy-reset", {})
+_l56_img = lambda: [os.path.join(dp, f) for dp, _d, fs in os.walk(os.path.join(_SV.home, "images")) for f in fs
+                    if f.endswith((".png", ".webp", ".jpg"))] if os.path.isdir(os.path.join(_SV.home, "images")) else []
+_l56_vid_files = lambda: [os.path.join(dp, f) for dp, _d, fs in os.walk(os.path.join(_SV.home, "videos")) for f in fs
+                    if f.endswith(".mp4")] if os.path.isdir(os.path.join(_SV.home, "videos")) else []
+_l56_gen = lambda r_: [x for x in r_ if x["path"].startswith("/v1/generate/jobs")]
+_l56_srv = lambda: next((s for s in _svq("/api/servers")[1]["servers"] if s["id"] == _sid34), {})
+_l56_row = lambda: next((s for s in json.load(open(_sfile34))["servers"] if s["id"] == _sid34), {})
+
+# a server whose kit has no ComfyUI: neither, and a picture request goes the old way
+_l56_a = next((s for s in _svq("/api/servers?refresh=1")[1]["servers"] if s["id"] == _sid34), {})
+_l56_n = len(_o1("/log")["log"])
+_l56_c0 = _svchat(text="generate an image of a red balloon", tier="Fast")
+_l56_lg0 = _o1("/log")["log"][_l56_n:]
+check("server pictures (live): a server without ComfyUI says it can make neither, and a picture request makes no job and "
+      "goes the old way",
+      _l56_a.get("gen") == {"image": False, "video": False} and _l56_row().get("gen") == {"image": False, "video": False}
+      and not _l56_gen(_l56_lg0) and "Gemini key" in _l56_c0[1] and not _l56_img(),
+      "%r" % [_l56_a.get("gen"), _l56_row().get("gen"), _l56_c0[1][:120], len(_l56_gen(_l56_lg0))])
+
+# with ComfyUI: Images and Video, kept with the row, drawn on the card
+_o1("/comfy-on", {})
+_o1("/comfy-set", {"run_s": 7})
+_l56_n = len(_o1("/log")["log"])
+_l56_b = next((s for s in _svq("/api/servers?refresh=1")[1]["servers"] if s["id"] == _sid34), {})
+_l56_lg1 = _o1("/log")["log"][_l56_n:]
+_l56_caps = [r_ for r_ in _l56_lg1 if r_["path"] == "/v1/generate/capabilities"]
+_l56_html = _ireq(_SV, "/")[1].decode("utf-8", "replace")
+check("server pictures (live): with ComfyUI the check says Images and Video, kept with the server's row (0600) as two "
+      "booleans, asked with one signed GET, and the card draws a chip for each",
+      _l56_b.get("gen") == {"image": True, "video": True} and _l56_row().get("gen") == {"image": True, "video": True}
+      and _st34.S_IMODE(os.stat(_sfile34).st_mode) == 0o600
+      and len(_l56_caps) == 1 and _l56_caps[0]["access"] and _l56_caps[0]["body"] == ""
+      and {"X-O1-Device", "X-O1-Signature", "X-O1-Nonce"} <= set(_l56_caps[0]["headers"])
+      and '<span class="srv-cap">Images</span>' in _l56_html and '<span class="srv-cap">Video</span>' in _l56_html,
+      "%r" % [_l56_b.get("gen"), _l56_row().get("gen"), len(_l56_caps)])
+
+# a picture, made on the server
+_o1("/comfy-reset", {})
+_o1("/comfy-set", {"run_s": 7})
+_l56_n, _l56_nc = len(_o1("/log")["log"]), len(_o1("/comfy")["calls"])
+_l56_p = _svchat(text="generate an image of a red balloon", tier="Fast")
+_l56_lg2 = _o1("/log")["log"][_l56_n:]
+_l56_jobs = _l56_gen(_l56_lg2)
+_l56_st = [d_ for t_, d_ in _l56_p[2] if t_ == "STATUS"]
+_l56_m = re.search(r"!\[[^\]]*\]\(/api/image/([\w-]+\.png)\)\n\n\*[^*]*made on %s\*" % re.escape(_SVN), _l56_p[1])
+_l56_f = _l56_m.group(1) if _l56_m else ""
+_l56_served = _ireq(_SV, "/api/image/" + _l56_f) if _l56_f else (0, b"")
+_l56_cc = _o1("/comfy")["calls"][_l56_nc:]
+_l56_graph = next((c_[2]["prompt"] for c_ in _l56_cc if c_[1] == "/prompt"), {})
+_l56_post = next((json.loads(r_["body"]) for r_ in _l56_jobs if r_["method"] == "POST"), {})
+_l56_pcts = [int(m_.group(1)) for s_ in _l56_st for m_ in [re.fullmatch(r"Making the picture on %s\.\.\. (\d+)%%" % re.escape(_SVN), s_)] if m_]
+check("server pictures (live): a picture is made on the server with \"Making the picture on <name>... 40%\" lines, saved as "
+      "an ordinary generated picture (served, the same as any), and every call is signed and carries only the request",
+      _l56_m and _l56_f in [os.path.basename(x_) for x_ in _l56_img()]
+      and _l56_served[0] == 200 and _l56_served[1][:8] == b"\x89PNG\r\n\x1a\n"
+      and any("Making the picture on %s..." % _SVN == s_ for s_ in _l56_st) and _l56_pcts and _l56_pcts == sorted(_l56_pcts)
+      and max(_l56_pcts) > 20 and all(0 <= p_ <= 100 for p_ in _l56_pcts)
+      and [(r_["method"], re.sub(r"[\w-]{20,}", "ID", r_["path"])) for r_ in _l56_jobs][:1] == [("POST", "/v1/generate/jobs")]
+      and _l56_jobs[-1]["method"] == "DELETE" and _l56_jobs[-2]["path"].endswith("/result")
+      and all(r_["access"] and {"X-O1-Device", "X-O1-Signature"} <= set(r_["headers"]) for r_ in _l56_jobs)
+      and set(_l56_post) == {"kind", "prompt", "width", "height"} and _l56_post["kind"] == "image"
+      and "red balloon" in _l56_post["prompt"] and (_l56_post["width"], _l56_post["height"]) == (1024, 1024)
+      and [c_[1] for c_ in _l56_cc if c_[0] == "POST"][:1] == ["/prompt"]
+      and any(v_["class_type"] == "CLIPTextEncode" and "red balloon" in v_["inputs"]["text"] for v_ in _l56_graph.values())
+      and not [r_ for r_ in _l56_lg2 if r_["path"] == "/api/chat"],
+      "%r" % [_l56_p[1][:200], _l56_st[:6], [(r_["method"], r_["path"]) for r_ in _l56_jobs][:5], _l56_post])
+_l56_note = [os.path.join(dp_, f_) for dp_, _d, fs_ in os.walk(_SV.home) for f_ in fs_ if f_.endswith(".render.json")]
+_l56_rn = json.load(open(_l56_note[0])) if _l56_note else {}
+check("server pictures (live): the settings it was made with are kept beside the picture, so \"double the resolution\" "
+      "resolves against them", _l56_rn.get("w") == 1024 and _l56_rn.get("h") == 1024 and "secs" in _l56_rn, "%r" % [_l56_rn])
+
+# a video, played as any other (Range)
+_o1("/comfy-reset", {})
+_o1("/comfy-set", {"run_s": 7})
+_l56_n = len(_o1("/log")["log"])
+_l56_v = _svchat(text="make a video of a red balloon", tier="Fast")
+_l56_lg3 = _o1("/log")["log"][_l56_n:]
+_l56_jv = _l56_gen(_l56_lg3)
+_l56_vm = re.search(r"\[\[vid:(\{[^}]*\})\]\]\n\n\*[^*]*made on %s\*" % re.escape(_SVN), _l56_v[1])
+_l56_vid = (json.loads(_l56_vm.group(1)) if _l56_vm else {}).get("id", "")
+_l56_vs = _ireq(_SV, "/api/video/" + _l56_vid, headers={"Range": "bytes=4-7"}) if _l56_vid else (0, b"")
+_l56_vpost = next((json.loads(r_["body"]) for r_ in _l56_jv if r_["method"] == "POST"), {})
+_l56_vst = [d_ for t_, d_ in _l56_v[2] if t_ == "STATUS"]
+check("server pictures (live): a video is made on the server the same way: progress lines, an MP4 saved with the "
+      "app's videos and served with Range, only the request sent",
+      bool(_l56_vm) and _l56_vid.endswith(".mp4") and _l56_vid in [os.path.basename(x_) for x_ in _l56_vid_files()] and _l56_vs[0] == 206 and _l56_vs[1] == b"ftyp"
+      and set(_l56_vpost) == {"kind", "prompt", "width", "height", "frames"} and _l56_vpost["kind"] == "video"
+      and (_l56_vpost["width"], _l56_vpost["height"], _l56_vpost["frames"]) == (832, 480, 33)
+      and any(re.fullmatch(r"Making the video on %s\.\.\. \d+%%" % re.escape(_SVN), s_) for s_ in _l56_vst)
+      and _l56_jv[-1]["method"] == "DELETE" and all(r_["access"] for r_ in _l56_jv),
+      "%r" % [_l56_v[1][:200], _l56_vst[:5], _l56_vpost])
+
+# it can't: one line, and the old way runs unchanged
+_o1("/comfy-reset", {})
+_o1("/comfy-set", {"run_s": 0.2, "fail": True})
+_l56_n = len(_o1("/log")["log"])
+_l56_f1 = _svchat(text="generate an image of a red balloon", tier="Fast")
+_l56_lg4 = _o1("/log")["log"][_l56_n:]
+_l56_fs = [d_ for t_, d_ in _l56_f1[2] if t_ == "STATUS"]
+_l56_n2 = len(_o1("/log")["log"])
+_l56_f2 = _svchat(text="make a video of a red balloon", tier="Fast")
+_l56_fs2 = [d_ for t_, d_ in _l56_f2[2] if t_ == "STATUS"]
+check("server pictures (live): a job that fails says so in one line and the old way runs unchanged (no picture, the "
+      "same words as without a server), for a picture and a video; the failed job is let go",
+      any(s_ == "%s couldn’t make the picture (couldn’t make it). Trying another way." % _SVN for s_ in _l56_fs)
+      and "Gemini key" in _l56_f1[1] and "![" not in _l56_f1[1]
+      and any(s_ == "%s couldn’t make the video (couldn’t make it). Trying another way." % _SVN for s_ in _l56_fs2)
+      and "Gemini key" in _l56_f2[1] and "[[vid:" not in _l56_f2[1]
+      and _l56_gen(_l56_lg4)[-1]["method"] == "DELETE" and _l56_f1[1].strip() == _l56_c0[1].strip(),
+      "%r" % [_l56_fs[-2:], _l56_f1[1][:120], _l56_c0[1][:120]])
+
+# the server off: said once, then not asked for a minute
+_o1("/comfy-reset", {})
+_o1("/down", {})
+_l56_n = len(_o1("/log")["log"])
+_l56_o1 = _svchat(text="generate an image of a red balloon", tier="Fast")
+_o1("/up", {})
+_l56_n2 = len(_o1("/log")["log"])
+_l56_o2 = _svchat(text="generate an image of a red balloon", tier="Fast")
+_l56_lg5 = _o1("/log")["log"][_l56_n2:]
+_l56_os = [d_ for t_, d_ in _l56_o1[2] if t_ == "STATUS"]
+check("server pictures (live): a server that is off is said in one line, nothing is made anywhere else but the old way, and "
+      "the next ask within a minute doesn't wait on it",
+      any(s_ == "%s couldn’t make the picture (didn’t answer). Trying another way." % _SVN for s_ in _l56_os)
+      and "Gemini key" in _l56_o1[1] and "Gemini key" in _l56_o2[1] and not _l56_gen(_l56_lg5),
+      "%r" % [_l56_os[-2:], _l56_o2[1][:100], len(_l56_gen(_l56_lg5))])
+_svq("/api/servers/test", "POST", {"id": _sid34})          # a good check clears the mark
+
+# not asked: Cloud Only, a server switched off for modes, a gif
+_o1("/comfy-reset", {})
+_l56_n = len(_o1("/log")["log"])
+_l56_k1 = _svchat(text="generate an image of a red balloon", tier="Cloud Only")
+_l56_k2 = _svchat(text="make a video of a red balloon", tier="Cloud Only")
+_svq("/api/servers/prefer", "POST", {"id": _sid34, "on": False})
+_l56_k3 = _svchat(text="generate an image of a red balloon", tier="Fast")
+_svq("/api/servers/prefer", "POST", {"id": _sid34, "on": True})
+_l56_k4 = _svchat(text="make a video of a red balloon as a gif", tier="Fast")
+_l56_lg6 = _o1("/log")["log"][_l56_n:]
+check("server pictures (live): Cloud Only never asks the server, nor does a server switched off for modes, nor a video "
+      "asked as a gif; each goes the old way",
+      not _l56_gen(_l56_lg6) and not [c_ for c_ in _o1("/comfy")["calls"] if c_[1] == "/prompt"]
+      and all("Gemini key" in x_[1] for x_ in (_l56_k1, _l56_k2, _l56_k3, _l56_k4)),
+      "%r" % [len(_l56_gen(_l56_lg6)), [x_[1][:60] for x_ in (_l56_k1, _l56_k2, _l56_k3, _l56_k4)]])
+
+# another profile: its own servers (none), nothing leaves
+_svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
+_l56_n = len(_o1("/log")["log"])
+_l56_b1 = _svchat(text="generate an image of a red balloon", tier="Fast")
+_l56_bs = _svq("/api/servers")[1]
+_l56_lg7 = _o1("/log")["log"][_l56_n:]
+_svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
+check("server pictures (live): another profile has none of this one's servers: its picture request sends nothing to them",
+      _l56_bs.get("servers") == [] and not _l56_lg7 and "Gemini key" in _l56_b1[1], "%r" % [_l56_bs, len(_l56_lg7)])
+
+# Stop: the reader leaves while the job runs, and the gateway is told to cancel it
+_o1("/comfy-reset", {})
+_o1("/comfy-set", {"run_s": 60, "steps": 20})
+_l56_n = len(_o1("/log")["log"])
+_l56_body = json.dumps({"model": "", "models": [], "tier": "Fast", "auto_web": False,
+                        "messages": [{"role": "user", "content": "generate an image of a red balloon"}]}).encode()
+_l56_cn = _hc56.HTTPConnection("127.0.0.1", 9903, timeout=60)
+_l56_cn.request("POST", "/api/chat", body=_l56_body, headers=dict(_SV.headers, **{"Content-Type": "application/json"}))
+_l56_rs = _l56_cn.getresponse()
+_l56_buf = b""
+_l56_t0 = time.time()
+while b"Making the picture on" not in _l56_buf and time.time() - _l56_t0 < 40:
+    _l56_buf += _l56_rs.read1(4096)
+_l56_rs.close()        # the response holds the socket (a closing response is handed the connection)
+_l56_cn.close()
+_l56_t0 = time.time()
+while time.time() - _l56_t0 < 30 and not any(r_["method"] == "DELETE" for r_ in _l56_gen(_o1("/log")["log"][_l56_n:])):
+    time.sleep(0.5)
+time.sleep(1.5)
+_l56_lg8 = _o1("/log")["log"][_l56_n:]
+check("server pictures (live): Stop (the reader leaves) cancels the job at the gateway, which interrupts ComfyUI, and "
+      "nothing is saved",
+      b"Making the picture on" in _l56_buf and any(r_["method"] == "DELETE" for r_ in _l56_gen(_l56_lg8))
+      and not any(r_["path"].endswith("/result") for r_ in _l56_gen(_l56_lg8))
+      and any(c_[1] == "/interrupt" for c_ in _o1("/comfy")["calls"]) and len(_l56_img()) == 1,
+      "%r" % [_l56_buf[-120:], [(r_["method"], r_["path"][-12:]) for r_ in _l56_gen(_l56_lg8)], len(_l56_img())])
+_o1("/comfy-set", {"run_s": 0.6, "steps": 4})
+_o1("/comfy-off", {})
+# ==== 6b356 server pictures (live): end ====
 # the Access secret and the device key: in servers.json only
 _rowA = json.load(open(_sfile34))["servers"][0]
 _seed34 = _rowA.get("seed", "")
@@ -25730,6 +25947,704 @@ for _d46, _o46, _n46 in _W46_MUT:
 check("auto sleep: %d mutations, each caught by a check above" % len(_W46_MUT),
       all(isinstance(v, list) for _d, v in _w46m), "%r" % [x for x in _w46m if not isinstance(x[1], list)])
 # ==== 6b346 auto sleep: end ====
+
+
+# ==== 6b356 server pictures: begin ====
+print("== images and video on your server (6b356) ==")
+# Patrick (2026-10-02): "Can we get image and video generation on the server?"
+# He chose images and video together. In process: the servers section exec'd
+# alone with a stand-in transport (what the kit says it can make, the job's
+# whole life, every way it ends), the picture-landing function beside it on
+# fakes for the app's folders, the source pinned where it meets the chat
+# handler, and the Settings card's chips in node. Live (below, with the other
+# servers checks): the REAL gateway on a stub ComfyUI. Then each protection
+# mutated in the source and shown caught.
+_G56_ID = "Zq3" + "A" * 29
+_G56_PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 80
+_G56_MP4 = b"\0\0\0\x18ftypmp42" + b"\0" * 80
+_G56_WEBP = b"RIFF\x64\0\0\0WEBPVP8X" + b"\0" * 60
+
+
+def _g56_file(data):
+    r = _SvResp(200)
+    r.body = data
+    return r
+
+
+_real_time = time.time
+
+
+class _G56Time:
+    """A clock that moves only when the app waits: monotonic, and sleep."""
+    def __init__(self):
+        self.t = 1000.0
+        self.waits = []
+
+    def time(self):
+        return _real_time() + (self.t - 1000.0)
+
+    def monotonic(self):
+        return self.t
+
+    def sleep(self, s):
+        self.waits.append(s)
+        self.t += s
+
+
+def _g56_ns(src, name="Desktop"):
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx, name=name)
+    return ns, ctx, d
+
+
+def _g56_job(ns, kind="image", states=None, result=None, rtype="image/png", post=None, extra=None):
+    """Routes for one job: POST makes it, each GET gives the next state, the result
+    and the delete. The log of (method, path, body) is returned too."""
+    log = []
+    states = list(states or [{"state": "running", "progress": 0.4}, {"state": "done", "progress": 1.0,
+                                                                    "type": rtype, "bytes": 90}])
+    seq = {"get": list(states)}
+
+    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+        log.append((method, path, body, signed))
+        if method == "POST" and path == "/v1/generate/jobs":
+            r = post or _SvResp(202, {"id": _G56_ID})
+        elif method == "GET" and path == "/v1/generate/jobs/" + _G56_ID:
+            q = seq["get"]
+            r = q.pop(0) if len(q) > 1 else q[0]
+            r = _SvResp(200, r) if isinstance(r, dict) else r
+        elif method == "GET" and path == "/v1/generate/jobs/" + _G56_ID + "/result":
+            r = _g56_file(_G56_PNG if result is None else result)
+        elif method == "DELETE":
+            r = _SvResp(200, {"ok": True})
+        else:
+            r = _SvResp(404, {"error": "no", "code": "not_found"})
+        if callable(r):
+            r = r()
+        return _SvConn(), r
+    ns["_srv_send"] = send
+    return log
+
+
+def _g56_gen(ns, ctx, kind="image", prompt="a red balloon", opts=None, gone=None, **kw):
+    log = _g56_job(ns, kind, **kw)
+    clock = _G56Time()
+    ns["time"] = clock
+    said = []
+    e = ns["_srv_read"](ctx)[0]
+    try:
+        out = ns["server_generate"](e, kind, prompt, opts or {"width": 1024, "height": 1024}, said.append, gone)
+        err = None
+    except Exception as exc:
+        out, err = None, exc
+    ns["time"] = time
+    return out, err, log, said, clock
+
+
+def _g56c_caps(src):
+    out = {}
+    ns, ctx, d = _g56_ns(src)
+    e = ns["_srv_read"](ctx)[0]
+    out["start"] = e["gen"] is None and ns["_srv_public"](e)["gen"] is None
+    log = []
+    _w46_router(ns, {"/v1/generate/capabilities": [_SvResp(200, {"image": True, "video": False})]}, log)
+    v = ns["server_gen_refresh"](e)
+    row = ns["_srv_read"](ctx)[0]
+    fp = os.path.join(d, "servers.json")
+    out["asked"] = (v == {"image": True, "video": False} and row["gen"] == v
+                    and log == [("GET", "/v1/generate/capabilities", b"", True, ns["SRV_CONNECT_S"])]
+                    and ns["_srv_seen"][e["id"]]["gen_at"] > 0
+                    and json.load(open(fp))["servers"][0]["gen"] == {"image": True, "video": False}
+                    and _st34.S_IMODE(os.stat(fp).st_mode) == 0o600
+                    and ns["_srv_public"](row)["gen"] == {"image": True, "video": False})
+    for name, resp in (("old", _SvResp(404, {"error": "no", "code": "not_found"})),):
+        _w46_router(ns, {"/v1/generate/capabilities": [resp]}, [])
+        out[name] = (ns["server_gen_refresh"](ns["_srv_read"](ctx)[0]) == {"image": False, "video": False}
+                     and ns["_srv_read"](ctx)[0]["gen"] == {"image": False, "video": False})
+    # a server that is off, a refusal and nonsense change nothing
+    _w46_router(ns, {"/v1/generate/capabilities": [_SvResp(200, {"image": True, "video": True})]}, [])
+    ns["server_gen_refresh"](ns["_srv_read"](ctx)[0])
+    keep = {"image": True, "video": True}
+
+    def boom():
+        raise ns["ServerError"]("offline", "off")
+    bad = [boom, _SvResp(500, {"error": "x"}), _SvResp(404, {"error": "x"}),
+           _SvResp(200, {"image": "yes", "video": True}), _SvResp(200, {"image": 1, "video": 0}),
+           _SvResp(200, {"image": True}), _SvResp(200, [True, True]), _SvResp(403, {"code": "unpaired"})]
+    same = []
+    for b in bad:
+        _w46_router(ns, {"/v1/generate/capabilities": [b]}, [])
+        same.append(ns["server_gen_refresh"](ns["_srv_read"](ctx)[0]) == keep and ns["_srv_read"](ctx)[0]["gen"] == keep)
+    out["unchanged"] = all(same)
+    # a hand-edited file is not believed
+    raw = json.load(open(fp))
+    for junk in ({"image": 1, "video": True}, {"image": True}, "yes", [True, True], {"image": True, "video": True, "x": 1}):
+        raw["servers"][0]["gen"] = junk
+        open(fp, "w").write(json.dumps(raw))
+        got = ns["_srv_read"](ctx)[0]["gen"]
+        if junk == {"image": True, "video": True, "x": 1}:
+            out["extra"] = got == {"image": True, "video": True}
+        else:
+            same.append(got is None)
+    out["junk"] = all(same)
+    # the page gets two booleans and nothing about the machine
+    raw["servers"][0]["gen"] = {"image": True, "video": False}
+    open(fp, "w").write(json.dumps(raw))
+    pub = ns["_srv_public"](ns["_srv_read"](ctx)[0])
+    out["public"] = pub["gen"] == {"image": True, "video": False}
+    # an unpaired server is not asked
+    a2 = ns["server_add"](ctx, {"url": "https://other.example.com", "name": "Other", "access_id": "id.access",
+                                "access_secret": "SECRET-" + "y" * 20})
+    lg = []
+    _w46_router(ns, {"/v1/generate/capabilities": [_SvResp(200, {"image": True, "video": True})]}, lg)
+    out["unpaired"] = (ns["server_gen_refresh"](ns["_srv_find"](ns["_srv_read"](ctx), a2["id"])) is None and not lg)
+    return all(out.values()), out
+
+
+def _g56c_pick(src):
+    out = {}
+    ns, ctx, d = _g56_ns(src)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    lg = []
+    _w46_router(ns, {"/v1/generate/capabilities": [_SvResp(200, {"image": True, "video": False})]}, lg)
+
+    def row(**kw):
+        def fn(entries):
+            x = ns["_srv_find"](entries, sid)
+            x.update(kw)
+            return {"ok": True}
+        ns["_srv_update"](ctx, fn)
+    # never asked: asked now, and then used
+    p1 = ns["server_gen_pick"](ctx, "image")
+    out["asks_then_picks"] = p1 is not None and p1["name"] == "Desktop" and len(lg) == 1
+    # fresh: not asked again
+    p2, p3 = ns["server_gen_pick"](ctx, "video"), ns["server_gen_pick"](ctx, "image")
+    out["kinds"] = p2 is None and p3 is not None and len(lg) == 1
+    # stale: asked again, and the new answer rules
+    ns["_srv_seen"][sid]["gen_at"] = time.time() - ns["SRV_GEN_FRESH_S"] - 1
+    _w46_router(ns, {"/v1/generate/capabilities": [_SvResp(200, {"image": False, "video": True})]}, lg)
+    out["stale"] = (ns["server_gen_pick"](ctx, "image") is None and ns["server_gen_pick"](ctx, "video") is not None
+                    and len(lg) == 2)
+    # switched off under "Use for Fast, Thinking, Pro and the Code lane"
+    row(prefer=False)
+    out["prefer_off"] = ns["server_gen_pick"](ctx, "video") is None
+    row(prefer=True)
+    out["prefer_on"] = ns["server_gen_pick"](ctx, "video") is not None
+    # marked down (a failed request lately)
+    ns["server_mark_down"](ctx, "Desktop", "off")
+    out["down"] = ns["server_gen_pick"](ctx, "video") is None
+    ns["_srv_seen"][sid].pop("err", None)
+    ns["_srv_seen"][sid]["at"] = time.time()
+    ns["_srv_seen"][sid]["reachable"] = True
+    # other kinds, never paired, no crypto
+    out["kind"] = all(ns["server_gen_pick"](ctx, k) is None for k in ("audio", "", None, "IMAGE"))
+    saved = ns["cai_crypto"].available
+    ns["cai_crypto"].available = lambda: False
+    out["crypto"] = ns["server_gen_pick"](ctx, "video") is None
+    ns["cai_crypto"].available = saved
+    # another profile: its own list, which has no such server
+    d2 = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    ctx2 = ns["ProfileCtx"]("other", d2)
+    n0 = len(lg)
+    out["profile"] = ns["server_gen_pick"](ctx2, "video") is None and len(lg) == n0
+    # two servers: the first that can
+    a2 = ns["server_add"](ctx, {"url": "https://two.example.com", "name": "Second", "access_id": "id.access",
+                                "access_secret": "SECRET-" + "z" * 20})
+    out["unpaired_skipped"] = ns["server_gen_pick"](ctx, "video")["name"] == "Desktop"
+    return all(out.values()), out
+
+
+def _g56c_opts(src):
+    ns, ctx, d = _sv_ns(src)
+    O = ns["srv_gen_opts"]
+    out = {}
+    out["defaults"] = (O("image", {}) == {"width": 1024, "height": 1024}
+                       and O("video", None) == {"width": 832, "height": 480, "frames": 33}
+                       and O("image", {"fmt": "png"}) == {"width": 1024, "height": 1024})
+    out["fit"] = (O("image", {"w": 3000, "h": 2000}) == {"width": 1536, "height": 1024}
+                  and O("image", {"w": 2048, "h": 2048}) == {"width": 1280, "height": 1280}
+                  and O("image", {"w": 1000, "h": 700}) == {"width": 1024, "height": 704}
+                  and O("image", {"w": 100, "h": 100}) == {"width": 256, "height": 256}
+                  and O("video", {"w": 1920, "h": 1080})["width"] == 832 and O("video", {"w": 1920, "h": 1080})["height"] == 464
+                  and O("video", {"w": 100, "h": 100})["width"] == 256)
+    out["bounds"] = all(256 <= o["width"] <= SRV_MAXS[k] and 256 <= o["height"] <= SRV_MAXS[k]
+                        and o["width"] % ({"image": 64, "video": 16}[k]) == 0
+                        and o["height"] % ({"image": 64, "video": 16}[k]) == 0
+                        and o["width"] * o["height"] <= {"image": 1_700_000, "video": 400_000}[k]
+                        for k in ("image", "video")
+                        for o in (O(k, {"w": w, "h": h}) for w in (50, 300, 777, 1500, 4000, 9999)
+                                  for h in (50, 300, 777, 1500, 4000, 9999)))
+    out["junk"] = (O("image", {"w": "abc", "h": 5}) == {"width": 1024, "height": 1024}
+                   and O("image", {"w": -5, "h": 500}) == {"width": 1024, "height": 1024}
+                   and O("image", {"w": None, "h": None}) == {"width": 1024, "height": 1024}
+                   and O("image", {"w": 0, "h": 0}) == {"width": 1024, "height": 1024})
+    out["seed"] = (O("image", {"seed": 42})["seed"] == 42 and "seed" not in O("image", {"seed": 0})
+                   and "seed" not in O("image", {"seed": True}) and "seed" not in O("image", {"seed": 2 ** 60})
+                   and "seed" not in O("image", {"seed": "7"}))
+    out["frames"] = (O("video", {"frames": 49})["frames"] == 49 and O("video", {"frames": 50})["frames"] == 49
+                     and O("video", {"frames": 5})["frames"] == 17 and O("video", {"frames": 500})["frames"] == 81
+                     and O("video", {"frames": True})["frames"] == 33 and "frames" not in O("image", {"frames": 49}))
+    out["formats"] = (O("video", {"fmt": "gif"}) is None and O("video", {"fmt": "webm"}) is None
+                      and O("image", {"fmt": "jpg"}) is None and O("image", {"fmt": "webp"}) is None
+                      and O("video", {"fmt": "mp4"}) is not None)
+    out["only_these_keys"] = set(O("video", {"seed": 5, "frames": 33, "neg": "x", "steps": 99, "model": "y"})) \
+        == {"width", "height", "frames", "seed"}
+    return all(out.values()), out
+
+
+SRV_MAXS = {"image": 1536, "video": 832}
+
+
+def _g56c_job(src):
+    out = {}
+    ns, ctx, d = _g56_ns(src)
+    # a picture: made, polled every 2 s, fetched, the server told to let go
+    r, err, log, said, clock = _g56_gen(ns, ctx, prompt="a red balloon")
+    out["ok"] = (err is None and r[0] == _G56_PNG and r[1] == "image/png"
+                 and [(m, p) for m, p, _b, _s in log] == [
+                     ("POST", "/v1/generate/jobs"), ("GET", "/v1/generate/jobs/" + _G56_ID),
+                     ("GET", "/v1/generate/jobs/" + _G56_ID), ("GET", "/v1/generate/jobs/" + _G56_ID + "/result"),
+                     ("DELETE", "/v1/generate/jobs/" + _G56_ID)]
+                 and all(s for _m, _p, _b, s in log))
+    out["signed_polls"] = clock.waits == [ns["SRV_GEN_POLL_S"]] * 2 and ns["SRV_GEN_POLL_S"] == 2.0
+    out["progress"] = said == ["Making the picture on Desktop... 40%"]
+    # only the request goes: a kind, a prompt, the numbers; never a graph, a model or a path
+    body = json.loads(log[0][2])
+    out["body"] = body == {"width": 1024, "height": 1024, "kind": "image", "prompt": "a red balloon"}
+    out["prompt_cap"] = len(json.loads(_g56_gen(ns, ctx, prompt="x" * 5000)[2][0][2])["prompt"]) == 1000
+    # no number: the words stay the same, once
+    r2 = _g56_gen(ns, ctx, states=[{"state": "running", "progress": None}, {"state": "running"},
+                                   {"state": "running", "progress": "half"}, {"state": "running", "progress": True},
+                                   {"state": "running", "progress": 7}, {"state": "queued", "progress": None},
+                                   {"state": "done", "type": "image/png"}])
+    out["no_number"] = r2[1] is None and r2[3] == ["Making the picture on Desktop..."]
+    # many steps: a line per change, never repeated
+    r3 = _g56_gen(ns, ctx, states=[{"state": "running", "progress": p} for p in (0.05, 0.05, 0.25, 0.25, 0.55, 0.9)]
+                  + [{"state": "done", "type": "image/png"}])
+    out["lines"] = r3[3] == ["Making the picture on Desktop... %d%%" % x for x in (5, 25, 55, 90)]
+    # a video: an MP4; or the server's animated WebP
+    v1 = _g56_gen(ns, ctx, "video", "waves", {"width": 832, "height": 480, "frames": 33},
+                  states=[{"state": "done", "type": "video/mp4"}], result=_G56_MP4)
+    v2 = _g56_gen(ns, ctx, "video", "waves", {"width": 832, "height": 480, "frames": 33},
+                  states=[{"state": "done", "type": "image/webp"}], result=_G56_WEBP)
+    out["video"] = (v1[1] is None and v1[0][1] == "video/mp4" and v2[1] is None and v2[0][1] == "image/webp"
+                    and json.loads(v1[2][0][2])["kind"] == "video" and json.loads(v1[2][0][2])["frames"] == 33
+                    and v1[3] == [])
+    out["video_words"] = _g56_gen(ns, ctx, "video", "w", {}, states=[{"state": "running", "progress": 0.5},
+                                                                   {"state": "done", "type": "video/mp4"}],
+                                  result=_G56_MP4)[3] == ["Making the video on Desktop... 50%"]
+    # every way it ends badly says one line, lets go of the job, and gives no bytes
+    def ended(**kw):
+        o, e_, lg, sd, ck = _g56_gen(ns, ctx, **kw)
+        return o, e_, lg, sd
+    o, e1, lg, _s = ended(states=[{"state": "running", "progress": 0.1}, {"state": "failed", "error": "generation failed"}])
+    out["failed"] = (o is None and str(e1) == "Desktop couldn’t make the picture." and e1.kind == "server"
+                     and lg[-1][0] == "DELETE" and not any(p.endswith("/result") for _m, p, _b, _s in lg))
+    o, e2, lg, _s = ended(states=[_SvResp(404, {"error": "no job", "code": "not_found"})])
+    out["vanished"] = "lost the picture" in str(e2) and lg[-1][0] == "DELETE"
+    o, e3, lg, _s = ended(post=_SvResp(409, {"error": "busy", "code": "busy"}))
+    out["busy"] = e3.kind == "busy" and len(lg) == 1
+    o, e4, lg, _s = ended(post=_SvResp(503, {"error": "x", "code": "unavailable"}))
+    out["unavailable"] = "isn’t set up to make that" in str(e4) and e4.kind == "server" and len(lg) == 1
+    o, e5, lg, _s = ended(post=_SvResp(400, {"error": "width must be", "code": "bad_request"}))
+    out["refused"] = e5.kind == "server" and len(lg) == 1
+    for name, post in (("noid", _SvResp(202, {})), ("shortid", _SvResp(202, {"id": "abc"})),
+                       ("evilid", _SvResp(202, {"id": "../../etc/passwd" + "a" * 20})),
+                       ("intid", _SvResp(202, {"id": 7})), ("junk", _SvResp(202))):
+        o, ee, lg, _s = ended(post=post)
+        out[name] = ee is not None and len(lg) == 1
+    o, e6, lg, _s = ended(post=_SvResp(401, {"error": "x", "code": "unpaired"}))
+    out["unpaired"] = e6.kind == "auth"
+    # a result that isn't what it says, or too large
+    o, e7, lg, _s = ended(states=[{"state": "done", "type": "image/png"}], result=b"<html>no</html>" * 20)
+    o8, e8, lg8, _s8 = ended(states=[{"state": "done", "type": "video/mp4"}], result=_G56_PNG)
+    o9, e9, lg9, _s9 = ended(states=[{"state": "done", "type": "image/png"}], result=_G56_MP4)
+    o10, e10, lg10, _s10 = ended(states=[{"state": "done", "type": "image/webp"}], result=_G56_PNG)
+    out["checked"] = (all(x is not None for x in (e7, e8, e9, e10)) and "isn’t a picture" in str(e7)
+                      and lg[-1][0] == "DELETE" and all(l[-1][0] == "DELETE" for l in (lg8, lg9, lg10)))
+    ns["SRV_GEN_MAX"] = {"image": 100, "video": 100}
+    o11, e11, lg11, _s11 = ended(states=[{"state": "done", "type": "image/png"}], result=_G56_PNG + b"\0" * 30)
+    o12, e12, lg12, _s12 = ended(states=[{"state": "done", "type": "image/png"}], result=_G56_PNG[:8] + b"\0" * 92)
+    ns["SRV_GEN_MAX"] = {"image": 16 << 20, "video": 64 << 20}
+    out["too_large"] = "larger than" in str(e11) and o12 is not None and o12[1] == "image/png"
+    # a dropped tunnel: four polls lost in a row are carried over, five end it
+    def off():
+        raise ns["ServerError"]("offline", "Desktop didn’t answer.")
+    ok4 = _g56_gen(ns, ctx, states=[off] * 4 + [{"state": "done", "type": "image/png"}])
+    bad5 = _g56_gen(ns, ctx, states=[off] * 5 + [{"state": "done", "type": "image/png"}])
+    out["tunnel"] = (ok4[1] is None and ok4[0][1] == "image/png" and bad5[1] is not None and bad5[1].kind == "offline"
+                     and bad5[2][-1][0] == "DELETE")
+    spaced = _g56_gen(ns, ctx, states=[off, off, {"state": "running", "progress": 0.1}, off, off,
+                                       {"state": "done", "type": "image/png"}])
+    out["tunnel_resets"] = spaced[1] is None
+    # Stop: the reader left: the job is cancelled at once and nothing is fetched
+    seen = []
+    def gone():
+        seen.append(1)
+        return len(seen) > 2
+    o, e13, lg, sd, ck = _g56_gen(ns, ctx, states=[{"state": "running", "progress": 0.2}] * 9, gone=gone)
+    out["stop"] = (isinstance(e13, ns["ServerGenStopped"]) and lg[-1][0] == "DELETE"
+                   and not any(p.endswith("/result") for _m, p, _b, _s in lg)
+                   and len([1 for m, _p, _b, _s in lg if m == "GET"]) == 2)
+    # the clock: pictures stop at 5 minutes, video at 20, the server told to let go
+    o, e14, lg, sd, ck = _g56_gen(ns, ctx, states=[{"state": "running", "progress": 0.1}] * 2)
+    o2_, e15, lg2, sd2, ck2 = _g56_gen(ns, ctx, "video", "w", {}, states=[{"state": "running", "progress": 0.1}] * 2)
+    out["cap"] = (e14 is not None and "more than 5 minutes" in str(e14) and 300 <= ck.t - 1000 <= 304
+                  and lg[-1][0] == "DELETE" and e15 is not None and "more than 20 minutes" in str(e15)
+                  and 1200 <= ck2.t - 1000 <= 1204 and ns["SRV_GEN_CAP_S"] == {"image": 300, "video": 1200})
+    # a clock-skew refusal on the result is signed again once
+    log2 = _g56_job(ns)
+    inner = ns["_srv_send"]
+    n = [0]
+    def send2(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+        if path.endswith("/result") and n[0] == 0:
+            n[0] += 1
+            return _SvConn(), _SvResp(401, {"error": "skew", "code": "clock_skew", "server_time": int(time.time())})
+        return inner(e, method, path, body, signed, timeout, skew)
+    ns["_srv_send"] = send2
+    ns["time"] = _G56Time()
+    r_ = ns["server_generate"](ns["_srv_read"](ctx)[0], "image", "x", {"width": 1024, "height": 1024}, lambda s: None)
+    ns["time"] = time
+    out["skew"] = r_[1] == "image/png" and n[0] == 1
+    return all(out.values()), out
+
+
+def _g56c_name(src):
+    """A server's name is the owner's to choose: in a sentence it is words, never markup, a link,
+    a frame or a line break."""
+    out = {}
+    bad = "*Bold* [here](http://evil.example) <img src=x onerror=1> `x` \u0000 &amp; \"q\" {x} | # ~ \\ !"
+    ns, ctx, d = _g56_ns(src, name=bad)
+    e = ns["_srv_read"](ctx)[0]
+    plain = ns["_srv_plain"](e["name"])
+    out["plain"] = (not re.search(r"[*\[\]()<>`&\"{}|#~\\!\x00-\x1f]", plain) and "Bold" in plain and "evil.example" in plain
+                    and len(plain) <= 40 and ns["_srv_plain"]("") == "Your server" and ns["_srv_plain"]("***") == "Your server"
+                    and ns["_srv_plain"]("Pat’s Desk – デスク") == "Pat’s Desk – デスク"
+                    and "\n" not in ns["_srv_plain"]("a\nb\r\nc"))
+    r, err, log, said, clock = _g56_gen(ns, ctx)
+    out["said"] = err is None and said and all(plain in s and not re.search(r"[*\[\]<>`]", s) for s in said)
+    return all(out.values()), out
+
+
+def _g56_make_ns(src, name="Desktop"):
+    ns, ctx, d = _g56_ns(src, name)
+    ns["server_gen_refresh"].__globals__  # (the section's own)
+    imgs, vids = os.path.join(d, "images"), os.path.join(d, "videos")
+    os.makedirs(imgs, exist_ok=True)
+    os.makedirs(vids, exist_ok=True)
+    notes = {}
+    n = [0]
+
+    def stage(suffix=""):
+        n[0] += 1
+        return os.path.join(d, "stage-%d%s" % (n[0], suffix))
+
+    def land(c, sub, path):
+        final = os.path.join(d, sub, "m%d%s" % (n[0], os.path.splitext(path)[1]))
+        os.replace(path, final)
+        return final
+
+    def note(path, opts, secs=0.0):
+        notes[path] = (dict(opts), secs)
+    ns.update(IMAGE_SUB="images", VIDEO_SUB="videos", stage_path=stage, _media_land=land, _render_note=note,
+              _client_gone=lambda sock: False, StaleProfile=type("StaleProfile", (RuntimeError,), {}))
+    exec(_sv_sect(src, "server pictures"), ns)
+    return ns, ctx, d, notes
+
+
+def _g56_run_make(ns, ctx, kind="image", subject="a red balloon", use=None, notes_in=(), gone=None, **jobkw):
+    log = _g56_job(ns, kind, **jobkw)
+    ns["time"] = _G56Time()
+    if gone is not None:
+        ns["_client_gone"] = gone
+    emitted, steps, statuses = [], [], []
+    try:
+        r = ns["server_make"](ctx, kind, subject, use or {}, list(notes_in), None, emitted.append,
+                              lambda *a: steps.append(a), statuses.append)
+        err = None
+    except Exception as exc:
+        r, err = None, exc
+    ns["time"] = time
+    return r, err, log, emitted, steps, statuses
+
+
+def _g56c_make(src):
+    out = {}
+    ns, ctx, d, notes = _g56_make_ns(src)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    ns["_srv_update"](ctx, lambda es: (ns["_srv_find"](es, sid).update(gen={"image": True, "video": True}), {"ok": True})[1])
+    ns["_srv_seen"][sid]["gen_at"] = time.time()
+    # a picture
+    r, err, log, em, steps, sts = _g56_run_make(ns, ctx)
+    files = os.listdir(os.path.join(d, "images"))
+    out["image"] = (r is True and err is None and len(files) == 1 and files[0].endswith(".png")
+                    and open(os.path.join(d, "images", files[0]), "rb").read() == _G56_PNG
+                    and em == ["![a red balloon](/api/image/%s)\n\n*A red balloon — made on Desktop*" % files[0]]
+                    and sts[0] == "Making the picture on Desktop..." and "Making the picture on Desktop... 40%" in sts
+                    and [s[2] for s in steps] == ["run", "done"] and steps[0][1] == "Making the picture on Desktop"
+                    and steps[1][1] == "Made the picture on Desktop")
+    pth = os.path.join(d, "images", files[0])
+    nt = [v for k, v in notes.items()]
+    out["note"] = len(nt) == 1 and nt[0][0] == {"w": 1024, "h": 1024} and nt[0][1] >= 0
+    # the picture's words are the person's, "]" removed, as always
+    r2 = _g56_run_make(ns, ctx, subject="a cat ] [x](y)")
+    out["alt"] = r2[3][0].startswith("![a cat  [x(y)](/api/image/") and "*A cat ] [x](y) — made on Desktop*" in r2[3][0]
+    # a video: an MP4 in videos, the token the page plays
+    r3 = _g56_run_make(ns, ctx, "video", "waves", {"w": 640, "h": 360, "frames": 49, "seed": 7},
+                       states=[{"state": "done", "type": "video/mp4"}], result=_G56_MP4)
+    vfiles = os.listdir(os.path.join(d, "videos"))
+    tok = re.match(r"\[\[vid:(\{.*?\})\]\]\n\n\*Waves — made on Desktop\*$", r3[3][0] if r3[3] else "")
+    out["video"] = (r3[0] is True and len(vfiles) == 1 and vfiles[0].endswith(".mp4") and tok
+                    and json.loads(tok.group(1)) == {"id": vfiles[0], "t": "waves"}
+                    and json.loads(r3[2][0][2]) == {"width": 640, "height": 352, "frames": 49, "seed": 7,
+                                                    "kind": "video", "prompt": "waves"}
+                    and [v[0] for v in notes.values()][-1] == {"w": 640, "h": 352, "seed": 7, "frames": 49})
+    # a video the server wrote as animated WebP is drawn as a picture
+    r4 = _g56_run_make(ns, ctx, "video", "waves", states=[{"state": "done", "type": "image/webp"}], result=_G56_WEBP)
+    out["webp"] = r4[0] is True and r4[3][0].startswith("![waves](/api/image/") and r4[3][0].count(".webp") == 1
+    # a size the server can't take is said
+    r5 = _g56_run_make(ns, ctx, use={"w": 3000, "h": 3000})
+    out["size_note"] = "the size came out at 1280x1280, the most this server takes" in r5[3][0]
+    r5b = _g56_run_make(ns, ctx, notes_in=["twice as large"])
+    out["notes"] = r5b[3][0].endswith("made on Desktop · twice as large*")
+    # a gif, a jpg: not the server's to make
+    n0 = len(log)
+    out["format"] = (_g56_run_make(ns, ctx, "video", use={"fmt": "gif"})[0] is False
+                     and _g56_run_make(ns, ctx, "image", use={"fmt": "jpg"})[0] is False)
+    # it can't: one line, nothing emitted, the old way goes on; the server is marked down
+    r6 = _g56_run_make(ns, ctx, states=[{"state": "failed"}])
+    out["failed"] = (r6[0] is False and r6[3] == [] and r6[5][-1] == "Desktop couldn’t make the picture "
+                     "(couldn’t make it). Trying another way." and r6[4][-1][2] == "done"
+                     and r6[4][-1][1] == "Desktop couldn’t make the picture")
+    def off():
+        raise ns["ServerError"]("offline", "Desktop didn’t answer.")
+    ns["_srv_seen"][sid]["gen_at"] = time.time()
+    r7 = _g56_run_make(ns, ctx, post=off)
+    out["offline"] = (r7[0] is False and r7[5][-1] == "Desktop couldn’t make the picture (didn’t answer). "
+                      "Trying another way." and ns["server_label_down"](ctx, "Desktop · x") is True)
+    # marked down, the next ask doesn't wait on it
+    r8 = _g56_run_make(ns, ctx)
+    out["skipped_while_down"] = r8[0] is False and r8[2] == [] and r8[3] == [] and r8[4] == [] and r8[5] == []
+    ns["_srv_seen"][sid].update(err="", reachable=True, at=time.time())
+    ns["_srv_seen"][sid].pop("err", None)
+    # no server that can: nothing at all, no line, no request
+    ns["_srv_update"](ctx, lambda es: (ns["_srv_find"](es, sid).update(gen={"image": False, "video": False}), {"ok": True})[1])
+    ns["_srv_seen"][sid]["gen_at"] = time.time()
+    r9 = _g56_run_make(ns, ctx)
+    out["none"] = r9[0] is False and r9[2] == [] and r9[3] == [] and r9[4] == [] and r9[5] == []
+    ns["_srv_update"](ctx, lambda es: (ns["_srv_find"](es, sid).update(gen={"image": True, "video": True}), {"ok": True})[1])
+    # Stop: the reader left: cancelled, nothing shown, nothing saved
+    cnt = [0]
+    def gone(sock):
+        cnt[0] += 1
+        return cnt[0] > 1
+    nfiles = len(os.listdir(os.path.join(d, "images")))
+    r10 = _g56_run_make(ns, ctx, gone=gone, states=[{"state": "running", "progress": 0.3}] * 6)
+    out["stop"] = (r10[0] is True and r10[3] == [] and r10[2][-1][0] == "DELETE"
+                   and len(os.listdir(os.path.join(d, "images"))) == nfiles and r10[4][-1][1] == "Stopped")
+    ns["_client_gone"] = lambda sock: False
+    # a server woken for this question is said first
+    ns["_srv_wake_tl"].notes = [("Desktop", True), ("Other", False)]
+    r11 = _g56_run_make(ns, ctx)
+    out["woke"] = r11[5][:2] == ["Woke Desktop.", "Other didn’t wake."] and ns["server_take_wake_notes"]() == []
+    # the folder can't take it: said, not made again elsewhere
+    ns["_media_land"] = lambda c, sub, path: (_ for _ in ()).throw(OSError("full"))
+    r12 = _g56_run_make(ns, ctx)
+    out["unsaved"] = (r12[0] is True and len(r12[3]) == 1 and "couldn’t save it" in r12[3][0]
+                      and isinstance(r12[3][0], ns["AppText"]))
+    # a stale profile is not covered up
+    ns["_media_land"] = lambda c, sub, path: (_ for _ in ()).throw(ns["StaleProfile"]("changed"))
+    r13 = _g56_run_make(ns, ctx)
+    out["stale"] = isinstance(r13[1], ns["StaleProfile"])
+    return all(out.values()), out
+
+
+def _g56c_name_make(src):
+    """The hostile name, through the whole function: it is in every line, as words."""
+    out = {}
+    bad = "*Bold* [here](http://evil.example) <b>x</b> `c`"
+    ns, ctx, d, notes = _g56_make_ns(src, name=bad)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    ns["_srv_update"](ctx, lambda es: (ns["_srv_find"](es, sid).update(gen={"image": True, "video": True}), {"ok": True})[1])
+    ns["_srv_seen"][sid]["gen_at"] = time.time()
+    r = _g56_run_make(ns, ctx)
+    lines = r[3] + r[5] + [x for st in r[4] for x in st[1:]]
+    plain = ns["_srv_plain"](ns["_srv_read"](ctx)[0]["name"])
+    fname = re.search(r"/api/image/([\w.-]+)\)", r[3][0]).group(1)
+    out["caption"] = (r[0] is True and r[3] == ["![a red balloon](/api/image/%s)\n\n*A red balloon \u2014 made on %s*" % (fname, plain)]
+                      and r[3][0].count("*") == 2)
+    out["lines"] = (all(plain in x for x in r[5]) and all(plain in x[1] for x in r[4])
+                    and not re.search(r"[*\[\]<>`]", "".join(r[5]) + "".join(x[1] + x[3] for x in r[4])))
+    return all(out.values()), out
+
+
+def _g56c_pins(src):
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    out = {}
+    v = ch.index("        if vid_subject:\n            # YOUR SERVER FIRST")
+    g = ch.index("            # A SAVED GEMINI KEY IS PERMISSION TO USE IT (Patrick, 6b326):", v)
+    i = ch.index('        if img_subject:\n            # YOUR SERVER FIRST')
+    g2 = ch.index('            # "in the cloud" only when a cloud painter exists (6b310)', i)
+    for k, a, b in (("video", v, g), ("image", i, g2)):
+        seg = ch[a:b]
+        out[k] = ("            if not cloud_only:\n                try:\n" in seg and "server_make(user_base, \"%s\"" % k in seg
+                  and "                        hb_stop.set()\n                        return" in seg
+                  and "except (StaleProfile, BrokenPipeError, ConnectionResetError):\n                    raise" in seg)
+    out["only_two"] = src.count("server_make(user_base,") == 2 and src.count("def server_make(") == 1
+    # "<name> Only" refuses before either branch, and Cloud Only is the gate
+    out["refuse_first"] = ch.index("makes no picture or video (6b339)") < v < i
+    sect = _sv_sect(src, "server pictures")
+    out["no_cloud"] = not re.search(r"cloud_allowed|gate_ladder|_cloud_all|gemini|GEMINI|_render_lock|bench_hold", sect)
+    out["wakes_only_here"] = "server_refresh_modes(ctx)" in sect and "server_wake_if_down(" not in sect
+    gen = src[src.index("# ---- images and video on your server (6b356)"):src.index("def server_add(ctx, d: dict)")]
+    out["nolog"] = not re.search(r"\bprint\(|logging|usage_note", gen + sect)
+    out["no_workflow"] = not re.search(r"class_type|CheckpointLoader|KSampler|UNETLoader|ckpt_name|safetensors", gen + sect)
+    out["public"] = '"gen": e.get("gen"),' in src and '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),' in src
+    out["refresh_points"] = (src.count("server_gen_refresh(") == 4 and "                server_gen_refresh(e)        # what it can make (6b356)" in src
+                             and "                        server_gen_refresh(_se)" in src and "            server_gen_refresh(e)\n" in src)
+    out["pool"] = '    if e.get("gen") is not None and False' not in src
+    return all(out.values()), out
+
+
+def _g56c_ui(src):
+    a = src.index("function esc(s){")
+    esc = src[a:src.index(";}\n", a) + 3]
+    card = src[src.index("function srvCard(s){"):src.index("function paintServers(){")]
+    js = esc + r'''
+const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvSleep={};
+function srvSleepHtml(){return "";}
+''' + card + r'''
+const base={id:"a1",name:"Desk",host:"h",paired:true,status:{at:1},models:[]};
+const R=[undefined,null,{image:true,video:true},{image:true,video:false},{image:false,video:true},{image:false,video:false},{}]
+  .map(g=>srvCard(Object.assign({},base,{gen:g})));
+R.push(srvCard(Object.assign({},base,{name:"<b>x</b>",gen:{image:true,video:true}})));
+process.stdout.write(JSON.stringify(R));
+'''
+    pth = os.path.join(_si_dir, "gen56.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    R = json.loads(p.stdout)
+    chip = lambda h, t: ('<span class="srv-cap">%s</span>' % t) in h
+    out = {}
+    out["none"] = all("srv-caps" not in h for h in R[:2] + R[5:7])
+    out["both"] = chip(R[2], "Images") and chip(R[2], "Video") and R[2].count("srv-cap\"") == 2
+    out["one"] = (chip(R[3], "Images") and not chip(R[3], "Video") and chip(R[4], "Video") and not chip(R[4], "Images"))
+    out["after_status"] = R[2].index('class="srv-st"') < R[2].index("srv-caps") < R[2].index("srv-acts")
+    out["text"] = "<b>x</b>" not in R[7]
+    css = src[src.index(".srv-caps{"):src.index(".srv-ms{")]
+    out["css"] = ".srv-cap{" in css and "border-radius:999px" in css
+    return all(out.values()), (out, p.stderr[:300])
+
+
+_G56_CHECKS = [
+    ("what a server can make: asked with one signed GET, kept with its row (0600) as two booleans, an older kit "
+     "says neither, an answer that can't be believed changes nothing, a hand-edited file isn't believed, and an "
+     "unpaired server isn't asked", _g56c_caps),
+    ("which server makes it: one this profile paired that can, that is switched on and not down, asked again after "
+     "5 minutes, never another profile's", _g56c_pick),
+    ("what is asked for: the shape kept, sides a multiple of the server's, inside its caps, a seed and a length only "
+     "when given, nothing but those four keys, and a gif or a jpg is left to this computer", _g56c_opts),
+    ("a job: started, asked about every 2 s with the words \"Making the picture on <name>... 40%\" only when they "
+     "change, fetched, checked and let go; every way it ends badly says one line and lets go; Stop cancels it; "
+     "picture 5 minutes, video 20; five lost polls in a row end it; only the request goes, never a graph", _g56c_job),
+    ("a server's name in a sentence is words, never markup, a link or a frame", _g56c_name),
+    ("making it: saved as an ordinary generated picture or video (a WebP clip as a picture) with its settings beside "
+     "it, the caption and the step say where; a failure is one line and nothing else changes; down means not asked "
+     "again for a minute; Stop leaves nothing; a wake is said first; a full disk is said, not covered", _g56c_make),
+    ("making it: a hostile server name is words in the caption, the status and the steps", _g56c_name_make),
+    ("the chat handler: Cloud Only and \"<name> Only\" never reach it, both branches try the server before any local or "
+     "cloud path and go on unchanged when it can't, nothing in the section touches the cloud, the log or a graph",
+     _g56c_pins),
+    ("the Settings card draws Images and Video chips only for what the server says it can make (node)", _g56c_ui),
+]
+
+
+def _g56_run(src):
+    out = []
+    for name, fn in _G56_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as exc:
+            ok, det = False, "%s: %s" % (type(exc).__name__, exc)
+        out.append((name, ok, det))
+    return out
+
+
+for _n56, _o56, _d56 in _g56_run(_MILLENAI_SRC):
+    check("server pictures: " + _n56, _o56, "%r" % (_d56,))
+
+
+_G56_MUT = [
+    ("a capability answer believed unchecked", '            and isinstance(v.get("video"), bool)):\n        return {"image": v["image"]', '            ):\n        return {"image": v["image"]'),
+    ("an older kit not read as neither", '    elif st == 404 and str(js.get("code") or "") == "not_found":\n        v = {"image": False, "video": False}',
+     '    elif False:\n        v = {"image": False, "video": False}'),
+    ("an answer that can't be read forgets what was known", '    if v is None:\n        return e.get("gen")', '    if v is None:\n        v = {"image": False, "video": False}'),
+    ("a server that is off forgets what it could make", '    except ServerError:\n        return e.get("gen")\n    if st == 200:',
+     '    except ServerError:\n        return {"image": False, "video": False}\n    if st == 200:'),
+    ("what it can make not kept", '            x["gen"] = dict(v)\n', '            pass\n'),
+    ("the file's gen believed unchecked", '        e["gen"] = _srv_clean_gen(e.get("gen"))          # what it can make (6b356)\n',
+     '        e["gen"] = e.get("gen")\n'),
+    ("the page not told", '            "gen": e.get("gen"),\n', ''),
+    ("an unpaired server asked", '    if not _srv_paired(e) or not cai_crypto.available():\n        return e.get("gen")',
+     '    if False:\n        return e.get("gen")'),
+    ("a switched-off server used", '        if not _srv_paired(e) or e.get("prefer") is False:\n            continue\n        if server_label_down(ctx, e["name"] + SERVER_SEP):',
+     '        if not _srv_paired(e):\n            continue\n        if server_label_down(ctx, e["name"] + SERVER_SEP):'),
+    ("a server marked down used", '        if server_label_down(ctx, e["name"] + SERVER_SEP):\n            continue\n        s = _srv_seen',
+     '        if False:\n            continue\n        s = _srv_seen'),
+    ("what it can make never asked again", '        if time.time() - float(s.get("gen_at") or 0) >= SRV_GEN_FRESH_S:', '        if False:'),
+    ("any kind accepted", '    if kind not in ("image", "video") or not cai_crypto.available():', '    if not cai_crypto.available():'),
+    ("the size not fitted", '    f = min(1.0, hi / max(w, h), (SRV_GEN_PIXELS[kind] / (w * h)) ** 0.5)', '    f = 1.0'),
+    ("the pixel cap not enforced", '    while w * h > SRV_GEN_PIXELS[kind]:', '    while False:'),
+    ("sides not a multiple", '    return max(lo, min(hi, int(round(v / step)) * step))', '    return max(lo, min(hi, int(v)))'),
+    ("a length not snapped", '        out["frames"] = (fr - 1) // 4 * 4 + 1', '        out["frames"] = fr'),
+    ("a gif asked of the server", 'if str(use.get("fmt") or ("png" if kind == "image" else "mp4")) != ("png" if kind == "image" else "mp4"):\n        return None',
+     'if False:\n        return None'),
+    ("a seed believed unchecked", 'if isinstance(seed, int) and not isinstance(seed, bool) and 0 < seed < 2 ** 53:', 'if seed:'),
+    ("a result believed unchecked", '        if ctype is None or ctype != js.get("type"):', '        if False:'),
+    ("a result not capped", '            if len(data) > cap:', '            if False:'),
+    ("the job not let go after a result", '    _srv_gen_forget(e, jid)\n    return data, ctype, time.monotonic() - t0', '    return data, ctype, time.monotonic() - t0'),
+    ("a failed job not let go", '        # the sleep timer that counts a job as use)\n        _srv_gen_forget(e, jid)\n        raise', '        # the sleep timer that counts a job as use)\n        raise'),
+    ("Stop not cancelling the job", '            if gone is not None and gone():\n                _srv_gen_forget(e, jid)\n                raise ServerGenStopped("stopped")',
+     '            if gone is not None and gone():\n                raise ServerGenStopped("stopped")'),
+    ("no hard cap", '            if time.monotonic() - t0 > SRV_GEN_CAP_S[kind]:', '            if False:'),
+    ("video capped like a picture", 'SRV_GEN_CAP_S = {"image": 300, "video": 1200}', 'SRV_GEN_CAP_S = {"image": 300, "video": 300}'),
+    ("one lost poll ends it", '                if fails >= SRV_GEN_FAILS:\n                    raise', '                if True:\n                    raise'),
+    ("lost polls never forgiven", '                st, js = _srv_json(e, "GET", base, timeout=SRV_CONNECT_S)\n                fails = 0', '                st, js = _srv_json(e, "GET", base, timeout=SRV_CONNECT_S)'),
+    ("polling every half second", 'SRV_GEN_POLL_S = 2.0 ', 'SRV_GEN_POLL_S = 0.5 '),
+    ("the same words said again", '            if text != shown[0]:', '            if True:'),
+    ("a server's name as markup", '    return " ".join(_SRV_MD.sub(" ", str(name or "")).split())[:40] or "Your server"', '    return str(name or "")[:40] or "Your server"'),
+    ("a prompt not capped", 'prompt=str(prompt or "")[:1000])', 'prompt=str(prompt or ""))'),
+    ("a graph can ride along", 'body = dict(opts, kind=kind, prompt=str(prompt or "")[:1000])', 'body = dict(opts, kind=kind, prompt=str(prompt or "")[:1000], workflow={"1": {}})'),
+    ("a job id believed unchecked", '    if not (isinstance(jid, str) and _SRV_GEN_ID.fullmatch(jid)):', '    if not isinstance(jid, str):'),
+    ("a failure answered with nothing", '        status("%s couldn\\u2019t make the %s (%s). Trying another way." % (name, what, why))\n        return False',
+     '        status("%s couldn\\u2019t make the %s (%s). Trying another way." % (name, what, why))\n        return True'),
+    ("a server that failed not marked down", '        if k in ("offline", "tls", "crypto"):\n            server_mark_down(', '        if False:\n            server_mark_down('),
+    ("a WebP clip saved as a video", '    sub = VIDEO_SUB if ctype == "video/mp4" else IMAGE_SUB', '    sub = VIDEO_SUB if kind == "video" else IMAGE_SUB'),
+    ("Stop going on to another way", '        step("srvgen", "Stopped", "done", "")\n        return True', '        step("srvgen", "Stopped", "done", "")\n        return False'),
+    ("a wake not said", '    for _wn, _wok in server_take_wake_notes():\n        status(', '    for _wn, _wok in []:\n        status('),
+    ("a full disk covered by another way", '    except OSError:\n        emit(AppText("\\u26a0\\ufe0f %s made the %s, but', '    except ZeroDivisionError:\n        emit(AppText("\\u26a0\\ufe0f %s made the %s, but'),
+    ("a stale profile covered up", '    except StaleProfile:\n        raise\n    except OSError:\n        emit(AppText(', '    except (StaleProfile, OSError):\n        emit(AppText('),
+    ("the settings not kept beside the file", '        _render_note(out, used, secs)', '        pass'),
+    ("a size note always", '    if (max(_rw, _rh) > SRV_GEN_SIDE[kind][1] or _rw * _rh > SRV_GEN_PIXELS[kind]):', '    if True:'),
+    ("Cloud Only asking the server for a video", '            if not cloud_only:\n                try:\n                    _sg_use, _sg_n = resolve_overrides("video"',
+     '            if True:\n                try:\n                    _sg_use, _sg_n = resolve_overrides("video"'),
+    ("Cloud Only asking the server for a picture", '            if not cloud_only:\n                try:\n                    _sg_use, _sg_n = resolve_overrides("image"',
+     '            if True:\n                try:\n                    _sg_use, _sg_n = resolve_overrides("image"'),
+    ("the Test button not asking what it can make", '                    if (_srv_seen.get(_se["id"]) or {}).get("auth"):\n                        server_gen_refresh(_se)\n', ''),
+    ("the pane not asking what it can make", '            if (_srv_seen.get(e["id"]) or {}).get("auth"):\n                server_gen_refresh(e)        # what it can make (6b356)\n', ''),
+    ("the Images chip always", "      +(s.gen.image?'<span class=\"srv-cap\">Images</span>':\"\")", "      +'<span class=\"srv-cap\">Images</span>'"),
+    ("the chips without the answer", "+((s.gen&&(s.gen.image||s.gen.video))?'<div class=\"srv-caps\">'", "+((true)?'<div class=\"srv-caps\">'"),
+]
+_g56m = []
+for _d56, _o56, _n56 in _G56_MUT:
+    if _MILLENAI_SRC.count(_o56) != 1:
+        _g56m.append((_d56, "anchor missing %d" % _MILLENAI_SRC.count(_o56)))
+        continue
+    _r56 = _g56_run(_MILLENAI_SRC.replace(_o56, _n56, 1))
+    _g56m.append((_d56, [n for n, o, _x in _r56 if not o][:1] or "MISSED"))
+check("server pictures: %d mutations, each caught by a check above" % len(_G56_MUT),
+      all(isinstance(v, list) for _d, v in _g56m), "%r" % [x for x in _g56m if not isinstance(x[1], list)])
+# ==== 6b356 server pictures: end ====
 
 
 # ==== 6b341 benchmark targets: begin ====

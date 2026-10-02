@@ -122,6 +122,12 @@ class Activity:
             self.inflight = max(0, self.inflight - 1)
             self.last = self.clock()
 
+    def touch(self):
+        """Something that counts as work just happened without a request of its own
+        (the app polling a running or just-finished generation job, 6b356)."""
+        with self.lock:
+            self.last = self.clock()
+
     def snapshot(self):
         with self.lock:
             return {"last": self.last, "inflight": self.inflight, "at": self.clock()}
