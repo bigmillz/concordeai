@@ -3,136 +3,126 @@
 
   ollama1-dash --console        on the server's monitor (tty1), as the no-shell
                                 user o1dash; systemd restarts it if it exits.
-                                Keys only change the view: t (5 min / 1 h), p (page)
+                                Keys only change the view: t (chart range 5 min / 1 h)
   ollama1-top                   the same over SSH; q quits
   ollama1-top --ascii           plain ASCII (any terminal)
   ollama1-top --once [--size 120x40]   one text frame, then exit
   ollama1-dash --set-font TTY   (root, from the unit) pick a console font for the screen
 
-It shows counts, sizes, timings and names: tokens per second, requests,
-the GPU, loaded models and model events, CPU, memory, disks, network,
-health and paired devices, with charts over 5 minutes or an hour. It
+It shows counts, sizes, timings and names in a few fixed boxes: the GPU,
+CPU and memory, requests, loaded models, storage, network and health, each a
+label, a value and one bar or trend line (6b359: no chart walls; the drawing
+is in lib/o1dashui.py, the terminal output in lib/o1dashterm.py). It
 never shows a prompt or an answer: the gateway keeps none, and nothing
 else it reads has any. The pairing code fills the screen while a pairing
 window is open (on the console; ollama1-top shows it only to root).
 """
-import curses
 import locale
 import os
+import select
 import signal
 import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
+import o1dashterm  # noqa: E402
 import o1dashui  # noqa: E402
 import o1metrics  # noqa: E402
 
-STYLES = {
-    # name: (foreground, background, bold)
-    "header": (curses.COLOR_BLACK, curses.COLOR_CYAN, True),
-    "footer": (curses.COLOR_CYAN, -1, False),
-    "border": (curses.COLOR_BLUE, -1, False),
-    "title": (curses.COLOR_WHITE, -1, True),
-    "text": (-1, -1, False),
-    "dim": (curses.COLOR_CYAN, -1, False),
-    "value": (curses.COLOR_WHITE, -1, True),
-    "ok": (curses.COLOR_GREEN, -1, True),
-    "warn": (curses.COLOR_YELLOW, -1, True),
-    "bad": (curses.COLOR_RED, -1, True),
-    "c_tps": (curses.COLOR_GREEN, -1, True),
-    "c_req": (curses.COLOR_CYAN, -1, True),
-    "c_gpu": (curses.COLOR_MAGENTA, -1, True),
-    "c_mem": (curses.COLOR_BLUE, -1, True),
-    "c_cpu": (curses.COLOR_YELLOW, -1, True),
-    "c_pow": (curses.COLOR_YELLOW, -1, True),
-    "c_io": (curses.COLOR_CYAN, -1, True),
-    "c_io2": (curses.COLOR_MAGENTA, -1, True),
-    "c_net": (curses.COLOR_GREEN, -1, True),
-    "overlay": (curses.COLOR_BLACK, curses.COLOR_WHITE, False),
-    "overlay_code": (curses.COLOR_BLACK, curses.COLOR_WHITE, True),
-}
+try:
+    import termios
+except ImportError:           # not a Unix (the tests import this on a Mac: fine)
+    termios = None
+
+TICK_S = 1.0     # new numbers once a second
+POLL_S = 0.25    # the size and the keys are looked at four times a second
+
+winch = [False]
 
 
 def pick_glyphs(console, force_ascii):
+    """blocks or ascii. On the console only what the picked font has (the
+    font file says so); anywhere else blocks when the locale is UTF-8."""
     if force_ascii:
         return "ascii"
     font = o1metrics.font_state()
     if console or os.environ.get("TERM", "") == "linux":
-        return font.get("glyphs") or "ascii"
+        return "blocks" if font.get("glyphs") in ("blocks", "braille") else "ascii"
     enc = (locale.getpreferredencoding(False) or "").lower().replace("-", "")
-    return "braille" if enc == "utf8" else "ascii"
+    return "blocks" if enc == "utf8" else "ascii"
 
 
-def setup_colors():
-    attrs = {}
-    curses.start_color()
+def write(text):
+    data = text.encode("utf-8", "replace")
+    fd = sys.stdout.fileno()
+    while data:
+        data = data[os.write(fd, data):]
+
+
+def raw_input_mode():
+    """No echo, no line editing, no signal keys: bytes arrive as typed."""
+    if termios is None or not sys.stdin.isatty():
+        return None
+    old = termios.tcgetattr(0)
+    new = termios.tcgetattr(0)
+    new[3] &= ~(termios.ECHO | termios.ICANON | termios.ISIG | termios.IEXTEN)
+    new[6][termios.VMIN] = 0
+    new[6][termios.VTIME] = 0
+    termios.tcsetattr(0, termios.TCSANOW, new)
+    return old
+
+
+def read_keys():
+    if not sys.stdin.isatty():
+        return b""
     try:
-        curses.use_default_colors()
-        default_bg = -1
-    except curses.error:
-        default_bg = curses.COLOR_BLACK
-    for i, (name, (fg, bg, bold)) in enumerate(STYLES.items(), 1):
-        try:
-            curses.init_pair(i, fg if fg != -1 or default_bg == -1 else curses.COLOR_WHITE,
-                             bg if bg != -1 else default_bg)
-            attrs[name] = curses.color_pair(i) | (curses.A_BOLD if bold else 0)
-        except curses.error:
-            attrs[name] = curses.A_BOLD if bold else 0
-    return attrs
+        if select.select([0], [], [], POLL_S)[0]:
+            return os.read(0, 64)
+    except (OSError, ValueError, InterruptedError):
+        pass
+    return b""
 
 
-def paint(scr, canvas, attrs):
-    """Draw the canvas in runs of one style (few curses calls per row)."""
-    for y in range(canvas.h):
-        row, styles = canvas.chars[y], canvas.styles[y]
-        x = 0
-        while x < canvas.w:
-            st = styles[x]
-            x2 = x + 1
-            while x2 < canvas.w and styles[x2] == st:
-                x2 += 1
-            try:
-                scr.addstr(y, x, "".join(row[x:x2]), attrs.get(st, 0))
-            except curses.error:
-                pass  # the bottom-right cell
-            x = x2
-    scr.noutrefresh()
-    curses.doupdate()
-
-
-def run(scr, console, force_ascii):
-    curses.curs_set(0)
-    attrs = setup_colors()
-    if console:
-        curses.raw()  # Ctrl+C / Ctrl+Z / Ctrl+\ arrive as plain keys and are ignored
-    scr.timeout(250)
+def run(console, force_ascii):
     glyphs = pick_glyphs(console, force_ascii)
     sampler = o1metrics.Sampler()
-    range_s, page = 300, 0
-    next_tick = 0.0
-    st = None
-    while True:
-        now = time.time()
-        if now >= next_tick or st is None:
-            st = sampler.tick()
-            if not console and os.geteuid() != 0:
-                st["pairing"] = None
-            next_tick = now + 1.0
-            h, w = scr.getmaxyx()
-            scr.erase()
-            paint(scr, o1dashui.render(st, w, h, glyphs, range_s, page), attrs)
-        ch = scr.getch()
-        if ch in (ord("t"), ord("T")):
-            range_s = 3600 if range_s == 300 else 300
-            next_tick = 0
-        elif ch in (ord("p"), ord("P"), ord(" ")):
-            page += 1
-            next_tick = 0
-        elif ch == curses.KEY_RESIZE:
-            next_tick = 0
-        elif not console and ch in (ord("q"), ord("Q"), 27):
-            return
+    screen = o1dashterm.Screen()
+    signal.signal(signal.SIGWINCH, lambda *_: winch.__setitem__(0, True))
+    old = raw_input_mode()
+    if console and glyphs != "ascii":
+        write("\x1b%G")            # the console reads UTF-8 (the blocks are multi-byte)
+    range_s = 300
+    st, next_tick, last_size, dirty = None, 0.0, None, True
+    try:
+        while True:
+            now = time.time()
+            if st is None or now >= next_tick:
+                st = sampler.tick()
+                if not console and os.geteuid() != 0:
+                    st["pairing"] = None
+                next_tick, dirty = now + TICK_S, True
+            size = o1dashterm.term_size()          # asked every time: it is never cached
+            if size != last_size or winch[0]:
+                winch[0] = False
+                last_size, dirty = size, True
+            if dirty:
+                dirty = False
+                write(screen.frame(o1dashui.render(st, size[0], size[1], glyphs, range_s, console=console), now))
+            keys = read_keys()
+            if not keys:
+                if not sys.stdin.isatty():
+                    time.sleep(POLL_S)
+                continue
+            if b"t" in keys or b"T" in keys:
+                range_s = 3600 if range_s == 300 else 300
+                dirty = True
+            if not console and (b"q" in keys or b"Q" in keys or b"\x03" in keys):
+                return
+    finally:
+        if old is not None:
+            termios.tcsetattr(0, termios.TCSANOW, old)
+        write(o1dashterm.RESTORE + (o1dashterm.CLEAR if not console else ""))
 
 
 def once(size, force_ascii):
@@ -167,8 +157,7 @@ def main():
         # Linux console: never blank the screen, never power it down.
         sys.stdout.write("\033[9;0]\033[14;0]")
         sys.stdout.flush()
-    os.environ.setdefault("ESCDELAY", "25")
-    curses.wrapper(run, console, force_ascii)
+    run(console, force_ascii)
 
 
 if __name__ == "__main__":

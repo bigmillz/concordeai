@@ -3,12 +3,15 @@
 The Linux console shows only the glyphs its font has (at most 512). This
 reads the fonts installed in /usr/share/consolefonts (PSF1/PSF2, gzipped
 or not), checks which of the dashboard's glyphs each one has, and picks
-one sized for the screen (about 200-240 columns: dense but readable on a
-1080p or 1440p monitor). The dashboard then draws with braille dots, with
-block characters, or in plain ASCII, whatever that font can show.
+one sized for the screen: about 120 columns, which is a 16x32 font on a
+1080p monitor (6b359: the old pick of about 220 columns was an 8x16 font,
+too small to read from across a room). The dashboard then draws with block
+characters or in plain ASCII, whichever that font can show.
 
 Run as root before the dashboard starts (ollama1-dash --set-font /dev/tty1,
 from the unit's ExecStartPre=+). It writes /run/ollama1/dash-font.json.
+Setup can switch this off: the file /etc/ollama1/dash-font.off leaves the
+console font as it is.
 """
 import glob
 import gzip
@@ -20,7 +23,8 @@ from o1dashui import NEEDED
 
 FONT_DIRS = ("/usr/share/consolefonts", "/usr/share/kbd/consolefonts")
 STATE = "/run/ollama1/dash-font.json"
-TARGET_COLS = 220
+OFF_FLAG = "/etc/ollama1/dash-font.off"
+TARGET_COLS = 120
 
 
 def _open(path):
@@ -78,10 +82,7 @@ def glyph_mode(cps):
     ascii_ok = all(c in cps for c in range(0x20, 0x7f))
     if not ascii_ok:
         return None
-    blocks = all(ord(c) in cps for c in NEEDED["blocks"])
-    if blocks and all(ord(c) in cps for c in NEEDED["braille"]):
-        return "braille"
-    return "blocks" if blocks else "ascii"
+    return "blocks" if all(ord(c) in cps for c in NEEDED["blocks"]) else "ascii"
 
 
 def screen_pixels(sys_root="/sys"):
@@ -100,18 +101,17 @@ def screen_pixels(sys_root="/sys"):
 
 def pick(fonts, screen):
     """fonts: [(path, width, height, mode)]; screen: (px w, px h) or None.
-    Prefers braille over blocks over ascii, then the size closest to
-    TARGET_COLS columns (and at least 160), then Terminus."""
-    rank = {"braille": 2, "blocks": 1, "ascii": 0}
+    The size closest to TARGET_COLS columns wins (within 15 columns counts as
+    the same size); then blocks over ascii; then Terminus."""
+    rank = {"blocks": 1, "ascii": 0}
     best = None
     for path, w, h, mode in fonts:
         if mode is None:
             continue
         cols = screen[0] // w if screen else 80
         rows = screen[1] // h if screen else 25
-        if screen and cols < 160 and screen[0] >= 1600:
-            continue
-        key = (rank[mode], -abs(cols - TARGET_COLS), "Terminus" in os.path.basename(path), -w)
+        off = abs(cols - TARGET_COLS)
+        key = (-(off // 15), rank[mode], -off, "Terminus" in os.path.basename(path), -w)
         if best is None or key > best[0]:
             best = (key, {"font": path, "cell": [w, h], "cols": cols, "rows": rows, "glyphs": mode})
     return best[1] if best else None
@@ -130,10 +130,12 @@ def survey(dirs=FONT_DIRS):
     return out
 
 
-def set_font(tty, sys_root="/sys", state=STATE):
+def set_font(tty, sys_root="/sys", state=STATE, off_flag=OFF_FLAG):
     """Pick and load a font on `tty`; record what the dashboard can draw."""
-    choice = pick(survey(), screen_pixels(sys_root))
+    choice = None if os.path.exists(off_flag) else pick(survey(), screen_pixels(sys_root))
     result = {"glyphs": "ascii", "font": None}
+    if os.path.exists(off_flag):
+        result["disabled"] = True
     if choice:
         r = subprocess.run(["setfont", "-C", tty, choice["font"]], capture_output=True, text=True)
         if r.returncode == 0:

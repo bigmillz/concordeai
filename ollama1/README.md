@@ -560,39 +560,57 @@ around a little from time to time.
       removes the volume only if `on` made it.
 - **Dashboard:** it fills the server's monitor (tty1), and `ollama1-top` shows
   it over SSH (`q` quits, `--ascii` for plain terminals, `--once` for one
-  text frame). It updates every second, and its charts cover the last 5
-  minutes, or an hour after pressing `t`.
-  - **Tokens:** a live chart of tokens per second, with now, 1 h, 24 h and
-    the peak; prompt tokens/s and the recent time to first token.
-  - **Requests:** active, queued, today and per minute (chart); errors by
-    kind (busy, fit, spill, ram, oom, Ollama, auth).
-  - **Loaded models:** GPU share, VRAM and system memory, time until
-    unload; "rest in RAM" for `ram` models.
-  - **Model events:** the last loads, unloads (device switch, make room)
-    and refusals, as model names and times only.
-  - **GPU:** busy %, VRAM, power against its cap (three charts); edge,
-    junction and memory temperatures, fan, sclk and mclk.
-  - **CPU:** a bar per thread (32 on the 5950X), package temperature, load,
-    and a total chart.
-  - **Memory:** RAM (chart), swap, and Ollama's memory against its cap.
-  - **Disks:** free space on /, /srv/models and /srv/data; read and write
-    throughput (chart); RAID state with resync % and time left.
-  - **Network:** br0's address and throughput in and out (chart), the
-    tunnel and its round-trip time, and each port's link (the Pi's
-    included).
-  - **Health:** uptime, updates, reboot needed, the next Ollama check, the
-    last sleep and wake. **Paired devices:** connected now, or last seen.
+  text frame). It updates every second. It is made to be read from a few
+  feet away: a few boxes, each a label, a value and one bar or trend line
+  (the trend covers the last 5 minutes, or an hour after pressing `t`).
+  - **GPU:** busy %, VRAM and power against their limits (bars), temperature
+    and fan, and a trend of busy %.
+  - **CPU and memory:** CPU %, temperature and load; RAM, and Ollama's
+    memory against its cap (or swap when there is no cap).
+  - **Requests:** active, queued, today; tokens per second and time to
+    first token; errors by kind (busy, fit, spill, ram, oom, Ollama).
+  - **Loaded models:** each model's GPU share, VRAM and time until unload,
+    and the last load, unload or refusal.
+  - **Storage:** free space on /, /srv/models and /srv/data; RAID state with
+    resync %; read and write throughput.
+  - **Network:** throughput in and out, each port's link, the tunnel and its
+    round-trip time.
+  - **Health:** the problems, worst first, or "All clear"; uptime, updates,
+    power and cost. The header's badge (ALL CLEAR, N TO CHECK, N PROBLEMS)
+    shows the same count on any size of screen.
   - While a pairing window is open, the code fills the whole screen.
 
   How it looks and works:
-  - It picks its layout by size: three columns on a monitor, two pages
-    around 120 columns, three pages at 80x25 (`p` flips).
-  - Before it starts on tty1, it chooses a console font for the screen from
-    those installed: about 200-240 columns, and the most of its glyphs the
-    font has. It draws charts with braille dots or block characters, or in
-    ASCII if the font has neither.
-  - Keys only change the view (`t`, `p`). On tty1 nothing quits it or opens
-    a shell.
+  - The screen is a fixed grid of boxes (two columns from 76 wide, one
+    below; about 100x30 is what it is made for). A box can never be written
+    outside of: each is drawn on its own small buffer, cut to the box, and
+    every text is cut to its width (counting wide characters as two cells
+    and ANSI codes as none) with "...". A short or narrow screen drops the
+    lowest-priority boxes (Health first, then Network and Storage, ...), and
+    never overlaps. Wider than 120 columns, the layout is centred, not
+    stretched; 80x24 shows six of the seven boxes, and the problem count is
+    in the header.
+  - The whole frame is built in memory and written with absolute cursor
+    positions: changed lines only, everything every 30 seconds, and a full
+    clear whenever the screen size changes (the size is read every time,
+    and when the window changes). There is no curses, so no stale
+    fragments.
+  - **A big font on the monitor.** The console's own font is 8x16, which
+    makes a 1080p screen 240x67 characters, too small to read from a chair.
+    Setup installs the console fonts (`console-setup-linux`, and
+    `console-terminus` where the distribution has it) and, each time the
+    dashboard starts on tty1, it loads the one nearest 120 columns (a 16x32
+    font on a 1080p monitor: about 120x33). It draws with block characters
+    if that font has them (it checks), else in plain ASCII. To get it on a
+    server that is already set up, pull the kit and run setup again
+    (`sudo ./setup.sh`; every step skips what is done). To keep the console
+    font as it is: `sudo ./setup.sh --no-console-font` (or
+    `OLLAMA1_DASH_FONT=off`); running setup again without it brings the big
+    font back. The font is only ever loaded by the dashboard service;
+    nothing about the video mode or the kernel command line changes, so the
+    display can't be lost.
+  - Keys only change the view (`t`). On tty1 nothing quits it or opens a
+    shell.
   - It never shows a prompt or an answer: only counts, sizes, times and
     names.
   - A frame takes a few milliseconds.

@@ -9,6 +9,99 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b359 — the server's screen: boxes that can't overlap, and a bigger font
+Patrick (2026-10-02), with two photos of the monitor: "Clean up the panel
+that shows on the display connected to the server because it has charts
+overrunning text and stuff shifting around and everything. Like, it's
+impossible to read it if you look at the screenshots. It also doesn't have to
+be so high resolution."
+
+What the photos show (a 240x67 console, ASCII glyphs): wide walls of `#` from
+charts, labels overwritten by other text on the same row (a network line
+read "ports ... link 1000 M6.4K/s out 5.7K/s 00 Mb/s": two lines drawn into
+one row), bars far from their panel, text fragments left behind.
+
+Found in the code (the real console was not available to look at; each is
+a way to produce what the photos show):
+- `Canvas.put` clipped to the **screen**, never to a panel. A panel's text
+  and charts were placed with offsets taken from the panel's own width
+  (`ix + iw - 22`, a bar `iw - 36` wide at `ix + 13`), and in a narrow or
+  short box those landed on each other and past the border.
+- Widths were `len()`: the degree sign, wide characters in a model or device
+  name, and (in `_lines`) text cut *before* the ASCII mapping.
+- A name containing an escape sequence reached the screen as it was.
+- Charts were area charts filling every row left over, up to 19 rows high:
+  at 100% CPU in ASCII mode that is a solid block of `#` (the yellow wall),
+  and a chart's rows were computed from the panel's share of the screen, not
+  from what the text above it used.
+- Output went through curses, which keeps its own picture of the screen and
+  updates it with relative moves and insert/delete/repeat sequences it picks
+  from terminfo. On the Linux console, after the font change at start (the
+  unit runs `setfont` just before) or a resize, that picture and the glass
+  disagree, which is how rows end up shifted and old fragments stay.
+- The picked font was 8x16 (about 220-240 columns on 1080p), too small to
+  read at a distance.
+
+What changed (`lib/o1dashui.py` rewritten, new `lib/o1dashterm.py`,
+`bin/ollama1-dash`, `lib/o1font.py`):
+- One layout engine, `plan(w, h)`: the screen is a fixed grid of boxes, two
+  columns from 76 wide (one below), 120 columns at most and centred above
+  that, and the lowest-priority boxes are dropped when the screen is short
+  (Health, Network, Storage, ...). Seven boxes: GPU, CPU and memory,
+  Requests, Loaded models, Storage, Network, Health. Each is a label, a
+  value and one bar or one trend line (a sparkline of eighth blocks, or
+  `_.:-=+*#`), no chart walls. Built for about 100x30; 80x24 shows six boxes
+  and the header carries the problem count (ALL CLEAR / N TO CHECK /
+  N PROBLEMS); 240x67 is the same layout, centred.
+- Every box is drawn on its **own bounded `Cells` buffer**, cut at its
+  edges, and blitted (cut again) into the frame, so a widget cannot write a
+  cell outside its box (tested with a widget that writes everywhere). Rows
+  of a panel are columns with fixed widths, each cut with "..." to its own
+  width, so one cannot run into the next.
+- Text is `clean()`ed (escape sequences and control characters out) and
+  measured with the true display width (`cw`: wide = 2, combining = 0).
+  On the console only ASCII and the glyphs the font was checked for are
+  drawn; anything else is `?`. No more braille.
+- No curses. `o1dashterm.Screen` writes the frame composed in memory with
+  an absolute cursor position per row, only changed rows, every row every
+  30 s (heals a glitch), and a **clear whenever the size is not the one it
+  last drew**; line wrap and the cursor are off. The size is read every
+  time (`os.get_terminal_size` on stdout, stdin, stderr, then COLUMNS and
+  LINES) and SIGWINCH makes a redraw at once. Keys: `t` (chart range), `q`
+  off the console. `p` (pages) is gone: nothing is paged.
+- A widget that raises shows "no data" in its own box (`ERRORS` records it
+  for the tests) rather than blanking the screen.
+- **Font.** `o1font.pick` now aims at 120 columns (16x32 on 1080p is about
+  120x33), within 15 columns counts as the same size, then blocks over
+  ASCII, then Terminus. `setup.sh` runs `dash_font_step` (in `setuplib.sh`)
+  just before the dashboard restarts: `apt-get install console-setup-linux`
+  and, if the distribution has it, `console-terminus`, then
+  `ollama1-dash --set-font /dev/tty1`. Never fatal. Opt out with
+  `--no-console-font` or `OLLAMA1_DASH_FONT=off` (a flag file,
+  `/etc/ollama1/dash-font.off`, makes the unit's `--set-font` load nothing;
+  setup without the opt-out removes it). Not done on purpose: a kernel
+  `video=` parameter, which can leave a server with no display. The unit
+  is unchanged (user `o1dash`, tty1, `ExecStartPre` set-font).
+- Tests (`tests/test_dash.py`): every size 80x24, 100x30, 120x40, 160x50,
+  240x67 and nine small or odd ones (down to 1x1 and up to 300x90), with
+  sample, empty, None-filled and hostile data (long names, wide
+  characters, escape sequences, infinity, NaN, 10**40): every row exactly
+  `cols` cells, nothing outside a box but blanks, each box equal to its
+  panel drawn alone, no overlap in `plan` for a sweep of sizes, the right
+  panels at each size, identical on a second render, a virtual terminal
+  that follows the output shows the canvas exactly after a resize over
+  garbage, and a real pty run of `ollama1-dash` that is resized. Setup:
+  `TestDashFont`. 27 mutants in `mutate.py` for it (clipping, resize,
+  ANSI in width, truncation, wide characters, overlap, wrap, refresh,
+  font target, opt-out).
+- Not verified: a real Linux console. The font names (which package has
+  which `.psf`), the glyphs they hold, and how the console behaves with
+  the output were not tried on the server; the picker reads what is there
+  and falls back to ASCII. Run `sudo ./setup.sh` on the server again
+  (or just restart the dashboard after installing a font:
+  `sudo systemctl restart ollama1-dash`), and `cat /run/ollama1/dash-font.json`
+  says which font and glyphs it chose.
+
 ## 6b352 — Find in chat (Cmd+F / Ctrl+F)
 Patrick (2026-10-02): "Command or Control F should open a find box for the
 current chat."
