@@ -9,6 +9,20 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b348 — a server's action chips on one line, Remove as a red cross
+Patrick (2026-10-02), with a screenshot of a server card in Settings > Your
+servers where Remove wrapped to a second line: "find a way to put these
+chips all on one line, meaning that you could turn remove into a red X chip
+too." Test, Pair again and Change Access token stay as they were; Remove is
+now a small red cross chip (U+2715, `aria-label` and title "Remove this
+server") pushed to the end of the same row (`.srv-rm`, `margin-left:auto`).
+Chips never wrap their own words (`white-space:nowrap`). The two-click
+confirm is unchanged: armed, the chip spells out "Remove it and its key?
+Click again" and may wrap to its own line, which is the one time it needs the
+room. Widths by arithmetic from the screenshot (about 52 + 85 + 135 + 34 px
+plus gaps against roughly 380 px of card), not measured in WKWebView.
+One gauntlet check pins the markup and CSS, with four mutations.
+
 ## 6b347 — the server kit and docs carry nobody's name; the server's name is yours
 Patrick (2026-10-01): "Looking at the instructions to set up a server, I see
 references to my name as in PMiller, Bigmillz, and my IP addresses. replace

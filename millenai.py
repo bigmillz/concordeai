@@ -32653,7 +32653,13 @@ body.gen #chip-model{color:var(--accent)}
 .srv-pair .about-btn.slim,.srv-acts .about-btn.slim{margin-top:0}
 .srv .about-btn.slim,#srv-add .about-btn.slim{width:auto;flex:none}
 .srv-hint{font-size:11px;color:var(--faint);margin-top:5px;line-height:1.45}
-.srv-acts{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.srv-acts{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;align-items:center}
+.srv-acts .about-btn.slim{white-space:nowrap}
+/* Remove is a red cross chip at the end of the same line (per Patrick, 2026-10-02);
+   armed, it spells out the question and may wrap to its own line */
+.srv-acts .srv-rm{margin-left:auto;color:#e8907e;border-color:rgba(226,109,90,.4);
+  padding:7px 11px;line-height:1}
+.srv-acts .srv-rm.armed{white-space:normal;padding:7px 14px;line-height:1.3}
 .srv-pref{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:11.5px;
   color:var(--dim);cursor:pointer}
 .srv-pref input{margin:0;flex:none}
@@ -39658,8 +39664,9 @@ function srvCard(s){
     +(s.paired&&!srvPairOpen[s.id]
       ?'<button class="about-btn slim" data-a="repair">Pair again</button>':"")
     +(srvTokOpen[s.id]?"":'<button class="about-btn slim" data-a="tok">Change Access token</button>')
-    +'<button class="about-btn slim danger" data-a="rm">'
-    +(armed?"Remove it and its key? Click again":"Remove")+'</button></div>'
+    +'<button class="about-btn slim danger srv-rm'+(armed?' armed':'')+'" data-a="rm" '
+    +'aria-label="Remove this server" title="Remove this server">'
+    +(armed?"Remove it and its key? Click again":"\u2715")+'</button></div>'
     +(srvTokOpen[s.id]?'<div class="srv-tokf"><input type="password" data-k="aid" '
       +'autocomplete="off" placeholder="Access Client ID" aria-label="Access Client ID">'
       +'<input type="password" data-k="asec" autocomplete="off" '

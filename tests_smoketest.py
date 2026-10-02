@@ -8270,6 +8270,26 @@ check("review: Edit & resend while an answer is being written stops it, waits fo
       and not _gc_ok(page.replace("abortCtl=null;genChat=null;", "abortCtl=null;", 1)),
       "%r" % [k for k, m in _edit_mut.items() if _edit_ok(*m)])
 
+# A server's action chips sit on ONE line and Remove is a red cross chip at its end (6b348, per
+# Patrick: "find a way to put these chips all on one line ... turn remove into a red X chip")
+def _chips_ok(p):
+    acts = p[p.index("+'<div class=\"srv-acts\">"):][:900]
+    return ('data-a="test">Test</button>' in acts and 'data-a="repair">Pair again</button>' in acts
+            and 'data-a="tok">Change Access token</button>' in acts
+            and acts.index('data-a="tok"') < acts.index('data-a="rm"')
+            and 'aria-label="Remove this server" title="Remove this server">' in acts
+            and '"\\u2715"' in acts and 'Remove it and its key? Click again' in acts
+            and ".srv-acts .about-btn.slim{white-space:nowrap}" in p
+            and ".srv-acts .srv-rm{margin-left:auto;color:#e8907e;" in p
+            and ".srv-acts .srv-rm.armed{white-space:normal;" in p)
+_chips_mut = [page.replace('"\\u2715"', '"Remove"', 1),
+              page.replace(".srv-acts .about-btn.slim{white-space:nowrap}", "", 1),
+              page.replace("margin-left:auto;color:#e8907e;", "color:#e8907e;", 1),
+              page.replace('aria-label="Remove this server" ', "", 1)]
+check("server action chips: Test, Pair again, Change Access token and a red cross Remove on one line",
+      _chips_ok(page) and not any(_chips_ok(m_) for m_ in _chips_mut),
+      "%r" % [_chips_ok(page)] + "%r" % [_chips_ok(m_) for m_ in _chips_mut])
+
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
 _porig = open(_pf, "rb").read() if os.path.exists(_pf) else b"{}"
