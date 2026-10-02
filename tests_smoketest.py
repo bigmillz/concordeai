@@ -23366,6 +23366,8 @@ class El{
     if(i>=0)this.parent.children.splice(i,1);this.parent=null;}}
   closest(sel){let e=this;const c=sel.slice(1);while(e){if(e.className.split(" ").indexOf(c)>=0)return e;e=e.parent;}return null;}
   getBoundingClientRect(){return CARD;}
+  addEventListener(ev,fn){(this.ls=this.ls||{})[ev]=fn;}
+  click(){if(this.ls&&this.ls.click)this.ls.click({target:this});}
 }
 const root=new El("div");
 const tel=new El("div","telemetry");root.appendChild(tel);
@@ -23617,9 +23619,7 @@ def _m42c_rows(src):
     out["names"] = R["names"] == ["GEFORCE RTX 4090", "NVIDIA", "RADEON RX 7600/7600 XT/76…", "ARC B580",
                                   "INSTINCT MI300X"]
     out["many"] = (R["many"][0] == ["s1", "s1:m", "s2", "s2:m"] and R["many"][2] == ["s1", "s2"]
-                   and R["many"][1][2].endswith("+3 more") and R["many"][1][3].endswith("+3 more")
-                   and not R["many"][1][0].endswith("more") and not R["many"][1][1].endswith("more")
-                   and not R["many"][3].endswith("more")
+                   and not any(t_.endswith("more") for t_ in R["many"][1]) and not R["many"][3].endswith("more")
                    and R["many"][1][1] == "Srv1 \u00b7 memory" and R["many"][3] == "Srv2 \u00b7 memory")
     nk = "Desk \u00b7 memory \u00b7 usage not reported (update the server kit)"
     mem = R["mem"]
@@ -23758,7 +23758,7 @@ _M42_MUT = [
     ("the memory bar not a share", "Math.round(ru/rt*100)", "Math.round(ru/rt)"),
     ("memory in the wrong unit", "const srvGB=b=>String(Math.round(b/1073741824*10)/10);", "const srvGB=b=>String(Math.round(b/1000000000*10)/10);"),
     ("the memory row named for the card", "name:srvMemName(s.name),", "name:srvMeterName(g),"),
-    ("an older kit's memory shown as a reading", ':u.ok?"usage not reported (update the server kit)":"",more];', ':"",more];'),
+    ("an older kit's memory shown as a reading", ':u.ok?"usage not reported (update the server kit)":""];', ':""];'),
     ("the memory reading not kept", "u.ram=d.ram||null;u.fails=0;", "u.ram=null;u.fails=0;"),
     ("memory kept through a miss", "u.gpu=null;u.ram=null;u.fails++;", "u.gpu=null;u.fails++;"),
     ("no backing off", "return fails<=0?3000:fails===1?10000:30000;", "return 3000;"),
@@ -23767,12 +23767,13 @@ _M42_MUT = [
     ("a card out of sight asked", "if(!o.card)return {poll:[],next:3000};", "if(false)return {poll:[],next:3000};"),
     ("the hidden window's timer kept", "if(document.hidden){clearTimeout(srvUseT);srvUseT=0;}", "if(document.hidden){}"),
     ("woken while hidden", "if(!srvUseT&&keep.size&&!document.hidden&&!srvUseDead)", "if(!srvUseT&&keep.size&&!srvUseDead)"),
-    ("more than two servers' rows", "const rows=all.slice(0,SRV_METER_MAX).map((s,i)=>{", "const rows=all.map((s,i)=>{"),
+    ("more than two servers' rows", "const rows=all.slice(0,SRV_METER_MAX).map(s=>{", "const rows=all.map(s=>{"),
     ("more than two servers read", "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);\n}",
      "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);\n}"),
-    ("no \"+N more\"", "const more=i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX?", "const more=false?"),
+    ("a \"+N more\" left in the second server's titles", "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"usage not reported (update the server kit)\":\"\");\n",
+     "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"usage not reported (update the server kit)\":\"\");t.push(all.length>SRV_METER_MAX?\"+1 more\":\"\");\n"),
     ("an older kit shown as a reading", ':u.ok?"usage not reported (update the server kit)":"");', ':"");'),
-    ("a profile switch leaving the rows", "if(gone){srvUseDead=true;srvMetersSync();return;}", "if(gone){return;}"),
+    ("a profile switch leaving the rows", "if(gone){srvUseDead=true;srvAllClose();srvMetersSync();return;}", "if(gone){return;}"),
     ("the dead flag ignored when drawing", "const rows=srvUseDead?[]:srvMeterRows(srvList,srvUse);",
      "const rows=srvMeterRows(srvList,srvUse);"),
     ("a benchmark counted as a failure", "  if(d&&d.paused){u.due=Date.now()+3000;return;}     // a benchmark is running\n", ""),
@@ -23804,6 +23805,431 @@ for _d42, _o42, _n42 in _M42_MUT:
 check("server meters: %d mutations, each caught by a check above" % len(_M42_MUT),
       all(isinstance(v, list) for _d, v in _m42m), "%r" % [x for x in _m42m if not isinstance(x[1], list)])
 # ==== 6b342 server meters: end ====
+
+# ==== 6b353 servers more link: begin ====
+print("== the \"+N servers more\" link and the dialog of every server (6b353) ==")
+# Patrick (2026-10-01): "a visible LINK in the card reading '+N servers more' ... that opens a simple dialog
+# listing EVERY paired server's details in full". The page's functions in node on the same stand-in as the
+# meters above; the dialog is built from the poll's own data, so the stand-in counts every request.
+_M53_TESTS = r'''
+const mkS=(id,name,v,gn,x)=>Object.assign({id:id,name:name,paired:true,status:{at:1,reachable:true},
+  gpu:{vendor:v,name:gn,vram_bytes:17163091968}},x||{});
+const mkEl=(id,tag)=>{const e=new El(tag||"div",id);root.appendChild(e);return e;};
+const veil=mkEl("srvall-veil");veil.hidden=true;
+const sbox=mkEl("srvall-list");const sclose=mkEl("srvall-close","button");const inp=mkEl("input","textarea");
+const focusLog=[];
+Object.defineProperty(El.prototype,"isConnected",{get(){let e=this;while(e.parent)e=e.parent;return e===root;}});
+El.prototype.focus=function(){document.activeElement=this;focusLog.push(this.id||this.className);};
+document.activeElement=null;
+const NAME="<img src=x onerror=alert(1)>";
+const walk=(e,f)=>{f(e);e.children.forEach(c=>walk(c,f));};
+(async()=>{
+const R={};
+const five=[1,2,3,4,5].map(i=>mkS('s'+i,'Srv'+i,'amd','Card '+i));
+R.count=[0,1,2,3,4,5].map(n=>srvMoreCount(five.slice(0,n)));
+R.countKinds=[srvMoreCount([mkS('a','A','amd','X'),mkS('b','B','amd','X'),mkS('c','C','amd','X',{paired:false})]),
+  srvMoreCount([mkS('a','A','amd','X'),mkS('b','B','amd','X'),mkS('c','C','amd','X',{gpu:null})]),
+  srvMoreCount(undefined),srvMoreCount([])];
+R.word=[1,2,3,12].map(srvMoreWord);
+// ---- the card: no link with one or two servers, the link with a third, gone again
+const kids=()=>tel.children.map(c=>c.id||c.className);
+srvList=[five[0]];srvMetersSync();R.k1=kids();
+srvList=five.slice(0,2);srvMetersSync();R.k2=kids();
+srvList=five.slice(0,3);srvMetersSync();R.k3=kids();
+const link=document.getElementById("srv-more");
+R.link=[link.textContent,link.className,link.type,tel.lastChild===link,tel.children.length];
+srvList=five;srvMetersSync();R.link5=[link.textContent,document.getElementById("srv-more")===link,
+  kids().filter(k=>k==="srv-more").length];
+R.titles=document.getElementById("srv-meters").children.map(c=>c.title);
+srvList=five.slice(0,2);srvMetersSync();R.back2=kids();
+srvList=five;srvMetersSync();srvList=[];srvMetersRefresh();R.none=kids();
+// ---- the rows of the dialog: every paired server, from what the poll holds
+const S=[mkS('a1','Desk','amd','Radeon RX 6900 XT'),mkS('b2','Rack','nvidia','',{gpu:{vendor:'nvidia',name:'',vram_bytes:null}}),
+  mkS('c3',NAME,'intel','Arc B580'),mkS('d4','Old','amd','Radeon VII',{status:{err:'x',reachable:false}}),
+  mkS('e5','Bare','amd','X',{gpu:null}),mkS('f6','Unpaired','amd','X',{paired:false})];
+const U={a1:{ok:true,gpu:{busy_pct:37,vram_used_bytes:9126805504,vram_total_bytes:17163091968},
+    ram:{used_bytes:23622320128,total_bytes:66571993088}},
+  b2:{ok:true,gpu:{busy_pct:null,vram_used_bytes:null,vram_total_bytes:null},ram:null},
+  c3:{ok:false,gpu:null,ram:null}};
+const AR=srvAllRows(S,U);
+R.rows=AR.map(r=>[r.id,r.name,r.state,r.off,r.rows.map(x=>x.join("=")).join(" | ")]);
+R.rows0=srvAllRows(S.slice(0,2),{});
+R.undef=[srvAllRows(undefined,undefined).length,srvAllRows([],{}).length];
+// every paired server is polled while the dialog is open: a figure with no reading yet is "reading..."
+const T=[1,2,3].map(i=>mkS('t'+i,'T'+i,'amd','C'+i));
+R.polled=srvAllRows(T,{}).map(r=>r.rows[1][1]+"/"+r.rows[3][1]);
+const S0=[mkS('q1','Q','amd','C')];
+R.notread=JSON.stringify(srvAllRows(T,{a:1}))+JSON.stringify(srvAllRows(S0,{}));
+// ---- the dialog
+const callsBefore=CALLS.length;
+srvList=S;srvUseDead=false;Object.keys(srvUse).forEach(k=>delete srvUse[k]);Object.assign(srvUse,U);
+let imgs=0,inner=0;
+Object.defineProperty(El.prototype,"innerHTML",{set(v){inner++;},get(){return "";},configurable:true});
+sclose.dataset.x="1";inp.dataset.x="1";
+const lk=mkEl("trigger","button");document.activeElement=lk;
+R.closedFirst=srvAllClose();
+srvAllOpen();
+R.open=[veil.hidden,document.activeElement===sclose];
+const secs=sbox.children;
+R.secs=[secs.length,secs.map(c=>c.dataset.sid),secs.map(c=>c.className)];
+const names=[];walk(sbox,e=>{if(e.tag==="img")imgs++;if(e.className==="srvall-h")names.push(e.children[0].textContent);});
+R.names=names;R.safe=[imgs,inner,names[2]===NAME];
+R.rowsText=secs[0].children.slice(1).map(r=>r.children.map(c=>c.textContent).join("="));
+// readings change while it is open: it repaints from the same data, with no request
+srvUse.a1={ok:true,gpu:{busy_pct:88,vram_used_bytes:1073741824,vram_total_bytes:17163091968},ram:{used_bytes:1,total_bytes:2}};
+srvMetersSync();
+R.live=[sbox.children[0].children[2].children[1].textContent,sbox.children.length];
+srvList=[];srvUseDead=false;srvMetersRefresh();
+R.emptied=[sbox.children.length,sbox.children[0]&&sbox.children[0].textContent,veil.hidden];
+srvList=S;srvMetersRefresh();
+R.noRequest=CALLS.length===callsBefore;     // opening and painting ask for nothing themselves
+// closing: Escape's own function, the button, a click outside; focus goes back
+R.close1=[srvAllClose(),veil.hidden,document.activeElement===lk,srvAllClose()];
+document.activeElement=lk;srvAllOpen();lk.remove();R.gone=[srvAllClose(),document.activeElement===inp];
+srvAllOpen();R.reopen=[veil.hidden,sbox.children.length];
+// ---- THE EXTRA POLLS: every paired server, only while the dialog is open (6b353, Pat's decision)
+const reset=()=>{if(veil.hidden===false)srvAllClose();TM.length=0;CALLS.length=0;Object.keys(srvUse).forEach(k=>delete srvUse[k]);
+  srvUseT=0;srvUseDead=false;document.hidden=false;veil.hidden=true;CARD.right=300;
+  REPLY=()=>({status:200,ok:true,j:{ok:true,gpu:{busy_pct:10},ram:{used_bytes:1,total_bytes:2}}});
+  const b=document.getElementById("srv-meters");if(b)b.remove();const l2=document.getElementById("srv-more");if(l2)l2.remove();};
+const four=[1,2,3,4].map(i=>mkS('s'+i,'S'+i,'amd','C'+i)).concat([mkS('s5','Bare','amd','X',{gpu:null})]);
+const ids=a=>a.map(u=>u.split("id=")[1]);
+const uniq=a=>new Set(a).size===a.length;
+const P={};
+reset();srvList=four;
+P.list=[srvPollList(four).map(x=>x.id),srvPollList([]).length];
+srvMetersRefresh();await fire();P.closed=ids(CALLS);
+P.keys0=Object.keys(srvUse).sort();
+document.activeElement=lk;srvAllOpen();
+P.openNow=[pend(),TM.length];
+P.list2=srvPollList(four).map(x=>x.id);
+CALLS.length=0;await fire();P.open=ids(CALLS);
+P.keys1=Object.keys(srvUse).sort();
+P.rowsLive=[sbox.children.length,sbox.children.map(c=>c.children[2].children[1].textContent)];
+CALLS.length=0;await fire();P.again=ids(CALLS);P.againUniq=uniq(P.again);
+REPLY=u=>u.indexOf("id=s3")>=0?{status:200,ok:true,j:{ok:false}}:{status:200,ok:true,j:{ok:true,gpu:{busy_pct:10}}};
+const gaps=[];let last=0,nf=0;
+while(gaps.length<3&&nf++<40){await fire();if(srvUse.s3.fails!==last){last=srvUse.s3.fails;gaps.push([srvUse.s3.due-NOW,srvUse.s3.fails]);}}
+P.gaps=gaps;P.s4ok=[srvUse.s4.fails,srvUse.s4.ok];
+P.off=[sbox.children[2].className,sbox.children[2].children[0].children[1].textContent,sbox.children[2].children[2].children[1].textContent];
+P.noWake=CALLS.length>0&&CALLS.every(u=>/^\/api\/servers\/usage\?id=s[1-5]$/.test(u));
+srvAllClose();CALLS.length=0;P.keys2=Object.keys(srvUse).sort();
+for(let i=0;i<4;i++)await fire();
+P.afterClose=[...new Set(ids(CALLS))].sort();
+reset();srvList=four;srvMetersRefresh();document.activeElement=lk;srvAllOpen();
+REPLY=()=>({status:409,ok:false,j:{}});await fire();
+const dead=[srvUseDead,veil.hidden,TM.length];CALLS.length=0;srvMetersRefresh();await fire();P.p409=[dead,CALLS.length,TM.length];
+reset();srvList=four;srvMetersRefresh();document.activeElement=lk;srvAllOpen();
+document.hidden=true;VIS.forEach(f=>f());CALLS.length=0;
+const hd=[TM.length];await srvUseTick();hd.push(CALLS.length,TM.length);
+document.hidden=false;VIS.forEach(f=>f());hd.push(TM.length);R.hiddenOpen=hd;
+reset();srvList=[];document.activeElement=lk;srvAllOpen();P.none=[CALLS.length,TM.length,Object.keys(srvUse)];
+reset();
+R.poll=P;
+process.stdout.write(JSON.stringify(R));
+})();
+'''
+
+_M53_CHIP = r'''
+let tier="Fast",cloudSt=null;
+const chipEl={hidden:true,title:"Cloud models are on"};
+const document={getElementById:id=>id==="cloud-chip"?chipEl:null};
+const CALLS=[];let REPLY={configured:true,turbo:true,providers:{}};let THROW=false;
+async function api(u){CALLS.push(u);if(THROW)throw new Error("x");return {json:async()=>REPLY};}
+'''
+
+_M53_CHIP_T = r'''
+const shown=(cs,t)=>{tier=t;cloudChipSet(cs);return !chipEl.hidden;};
+const ok={status:"ok"},rest={status:"ok",cool:900},bad={status:"fail"};
+(async()=>{
+const R={};
+R.combos={nokey:shown({configured:false,turbo:true,providers:{}},"Fast"),
+  nokeyOff:shown({configured:false,turbo:false,providers:{}},"Fast"),
+  keyOff:shown({configured:true,turbo:false,providers:{g:ok}},"Fast"),
+  keyOn:shown({configured:true,turbo:true,providers:{g:ok}},"Fast"),
+  resting:shown({configured:false,turbo:true,providers:{g:rest}},"Thinking"),
+  allResting:shown({configured:false,turbo:true,providers:{g:rest,k:rest}},"Pro"),
+  restingOff:shown({configured:false,turbo:false,providers:{g:rest}},"Fast"),
+  failedOnly:shown({configured:false,turbo:true,providers:{g:bad}},"Fast"),
+  failedPlusOk:shown({configured:false,turbo:true,providers:{g:bad,k:ok}},"Fast"),
+  cloudOnly:shown({configured:true,turbo:false,providers:{g:ok}},"Cloud Only"),
+  cloudOnlyResting:shown({configured:false,turbo:false,providers:{g:rest}},"Cloud Only"),
+  cloudOnlyNoKey:shown({configured:false,turbo:false,providers:{}},"Cloud Only"),
+  none:shown(null,"Fast"),noneCO:shown(undefined,"Cloud Only"),noProviders:shown({configured:true,turbo:true},"Fast")};
+// the tier changes with the same answer held: the chip follows it with no new request
+cloudChipSet({configured:true,turbo:false,providers:{g:ok}});tier="Fast";paintCloudChip();const a=!chipEl.hidden;
+tier="Cloud Only";paintCloudChip();const b=!chipEl.hidden;tier="Fast";paintCloudChip();const c=!chipEl.hidden;
+R.tier=[a,b,c,CALLS.length];
+REPLY={configured:true,turbo:true,providers:{g:ok}};tier="Fast";await cloudChipLoad();R.load=[!chipEl.hidden,CALLS.slice()];
+THROW=true;REPLY={configured:false,turbo:false,providers:{}};await cloudChipLoad();R.thrown=!chipEl.hidden;
+process.stdout.write(JSON.stringify(R));
+})();
+'''
+
+
+def _m53_node(src):
+    gl = src.index("const SRV_GPU=")
+    gpu = src[gl:src.index("\n", gl) + 1]
+    sl = src.index("const SRV_SEP=")
+    sep = src[sl:src.index("\n", sl) + 1]
+    st = src.index("const srvUse={};")
+    state = src[st:src.index("let srvAllFrom=null,cloudSt=null;", st) + len("let srvAllFrom=null,cloudSt=null;\n")]
+    a = src.index("const SRV_METER_MAX=2;")
+    b = src.index("function pickServerModel(label){")
+    mt = src.index("function buildMeter(el){")
+    pm = src.index("function paintMeter(el,pct){")
+    meter = src[mt:src.index("buildMeter($(", mt)] + src[pm:src.index("let simGpu=", pm)]
+    js = _M42_ENV + gpu + sep + state.replace("let srvAllFrom=null,cloudSt=null;", "let srvAllFrom=null;") + meter + src[a:b] + _M53_TESTS
+    pth = os.path.join(_si_dir, "servers53.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    return json.loads(p.stdout), p.stderr[:600]
+
+
+def _m53_chip_node(src):
+    a = src.index("function cloudChipOn(cs,t){")
+    b = src.index("(async function paintAccel(){")
+    pth = os.path.join(_si_dir, "cloudchip54.js")
+    open(pth, "w").write(_M53_CHIP + src[a:b] + _M53_CHIP_T)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    return json.loads(p.stdout), p.stderr[:600]
+
+
+def _m53c_link(src):
+    R, err = _m53_node(src)
+    out = {}
+    out["count"] = R["count"] == [0, 0, 0, 1, 2, 3] and R["countKinds"] == [0, 0, 0, 0]
+    out["word"] = R["word"] == ["+1 server more", "+2 servers more", "+3 servers more", "+12 servers more"]
+    out["none_to_two"] = (R["k1"] == ["t-head", "meter-row", "meter-row", "srv-meters"]
+                          and R["k2"] == ["t-head", "meter-row", "meter-row", "srv-meters"]
+                          and R["back2"] == R["k2"])
+    out["third"] = (R["k3"] == ["t-head", "meter-row", "meter-row", "srv-meters", "srv-more"]
+                    and R["link"] == ["+1 server more", "srv-more", "button", True, 5]
+                    and R["link5"] == ["+3 servers more", True, 1])
+    out["titles"] = (len(R["titles"]) == 4 and not any(t.endswith("more") for t in R["titles"]))
+    out["gone"] = R["none"] == ["t-head", "meter-row", "meter-row"]
+    return all(out.values()), [out, err]
+
+
+def _m53c_rows(src):
+    R, err = _m53_node(src)
+    out = {}
+    rows = R["rows"]
+    out["every"] = [r[0] for r in rows] == ["a1", "b2", "c3", "d4", "e5"]
+    out["answering"] = (rows[0][2:4] == ["answering", False] and rows[1][2:4] == ["answering", False]
+                        and rows[2][2:4] == ["not answering", True] and rows[3][2:4] == ["not answering", True]
+                        and rows[4][2:4] == ["answering", False])
+    out["full"] = rows[0][4] == ("GPU=Radeon RX 6900 XT | GPU load=37% | GPU memory=8.5 of 16 GB | "
+                                 "Memory=22 of 62 GB in use")
+    out["oldkit"] = rows[1][4] == ("GPU=NVIDIA | GPU load=usage not reported | GPU memory=usage not reported | "
+                                   "Memory=usage not reported")
+    out["off"] = (rows[2][4] == "GPU=Arc B580 | GPU load=not answering | GPU memory=not answering | Memory=not answering"
+                  and rows[3][4].startswith("GPU=Radeon VII | GPU load=not answering"))
+    out["nocard"] = rows[4][4].startswith("GPU=no card named | ")
+    out["fresh"] = [x[1] for x in R["rows0"][0]["rows"]] == ["Radeon RX 6900 XT", "reading\u2026",
+                                                            "16 GB \u00b7 reading\u2026", "reading\u2026"]
+    out["undef"] = R["undef"] == [0, 0]
+    out["polled"] = R["polled"] == ["reading…/reading…"] * 3 and "not read" not in R["notread"]
+    return all(out.values()), [out, err]
+
+
+def _m53c_dialog(src):
+    R, err = _m53_node(src)
+    out = {}
+    out["open"] = R["closedFirst"] is False and R["open"] == [False, True]
+    out["sections"] = (R["secs"][0] == 5 and R["secs"][1] == ["a1", "b2", "c3", "d4", "e5"]
+                       and R["secs"][2] == ["srvall-s", "srvall-s", "srvall-s off", "srvall-s off", "srvall-s"])
+    out["text"] = R["rowsText"] == ["GPU=Radeon RX 6900 XT", "GPU load=37%", "GPU memory=8.5 of 16 GB",
+                                    "Memory=22 of 62 GB in use"]
+    out["safe"] = R["safe"] == [0, 0, True] and R["names"][2] == "<img src=x onerror=alert(1)>"
+    out["live"] = R["live"] == ["88%", 5]
+    out["emptied"] = R["emptied"] == [1, "No servers paired.", False]
+    out["norequest"] = R["noRequest"] is True
+    out["close"] = R["close1"] == [True, True, True, False] and R["gone"] == [True, True]
+    out["reopen"] = R["reopen"] == [False, 5]
+    return all(out.values()), [out, err]
+
+
+def _m53c_poll(src):
+    R, err = _m53_node(src)
+    P = R["poll"]
+    out = {}
+    out["closed"] = P["closed"] == ["s1", "s2"] and P["keys0"] == ["s1", "s2"] and P["list"] == [["s1", "s2"], 0]
+    out["opens_now"] = P["openNow"] == [0, 1] and P["list2"] == ["s1", "s2", "s3", "s4", "s5"]
+    out["extras_only"] = P["open"] == ["s3", "s4", "s5"] and P["keys1"] == ["s1", "s2", "s3", "s4", "s5"]
+    out["no_double"] = P["againUniq"] is True and sorted(P["again"]) == ["s1", "s2", "s3", "s4", "s5"]
+    out["rows"] = P["rowsLive"] == [5, ["10%"] * 5]
+    out["backoff"] = P["gaps"] == [[10000, 1], [30000, 2], [30000, 3]] and P["s4ok"] == [0, True]
+    out["sleeping"] = P["off"] == ["srvall-s off", "not answering", "not answering"]
+    out["no_wake"] = P["noWake"] is True
+    out["stops"] = P["keys2"] == ["s1", "s2"] and P["afterClose"] == ["s1", "s2"]
+    out["profile"] = P["p409"] == [[True, True, 0], 0, 0]
+    out["hidden"] = R["hiddenOpen"] == [0, 0, 0, 1]
+    out["none"] = P["none"] == [0, 0, []]
+    return all(out.values()), [out, err]
+
+
+def _m53c_text(src):
+    a = src.index("function srvMoreCount(list){")
+    b = src.index("// how long after a read the next one waits")
+    seg = src[a:b]
+    out = {}
+    out["noinner"] = "innerHTML" not in seg and "insertAdjacentHTML" not in seg and "outerHTML" not in seg
+    out["norequest"] = "api(" not in seg and "fetch(" not in seg and "setTimeout" not in seg and "setInterval" not in seg
+    sv = src[src.index("def server_usage(ctx, sid: str) -> dict:"):src.index("# ---- sleep when idle and waking (6b346)")]
+    out["nowake"] = ("wake" not in sv.lower() and "/api/servers/wake" not in src[src.index("function srvPollList(list){"):b])
+    out["aria"] = ('<div id="srvall-card" role="dialog" aria-modal="true" aria-labelledby="srvall-title" tabindex="-1">' in src
+                   and '<div class="set-h" id="srvall-title">Your servers</div>' in src
+                   and '<div id="srvall-veil" hidden>' in src
+                   and '<button id="srvall-close" class="about-btn slim">Close</button>' in src)
+    out["escape"] = ("    if(!palette.hidden){palClose();return;}\n    if(srvAllClose()){e.preventDefault();return;}\n"
+                     "    if(engMenuEsc())" in src)
+    out["outside"] = 'v.addEventListener("click",e=>{if(e.target===v)srvAllClose();});' in src
+    out["tab"] = 'if(e.key==="Tab"){e.preventDefault();$("#srvall-close").focus();}' in src
+    out["link"] = ('link.id="srv-more";link.className="srv-more";link.type="button";' in src
+                   and 'link.addEventListener("click",srvAllOpen);' in src)
+    out["css"] = ("#srvall-veil[hidden]{display:none}" in src and "#telemetry .srv-more{display:block;margin:7px 0 0;" in src
+                  and "#telemetry .srv-more:focus-visible{" in src)
+    out["words"] = not re.search(r"(?i)ollama1|secret|seed|device_key|access_id|console\.", seg)
+    return all(out.values()), out
+
+
+def _m54c_chip(src):
+    R, err = _m53_chip_node(src)
+    c = R["combos"]
+    out = {}
+    out["off"] = not any(c[k] for k in ("nokey", "nokeyOff", "keyOff", "restingOff", "failedOnly", "cloudOnlyNoKey",
+                                        "none", "noneCO"))
+    out["configured"] = c["noProviders"] is True        # /api/cloud's own "configured" is enough with the power on
+    out["on"] = all(c[k] for k in ("keyOn", "resting", "allResting", "failedPlusOk", "cloudOnly", "cloudOnlyResting"))
+    out["tier"] = R["tier"] == [False, True, False, 0]
+    out["load"] = R["load"] == [True, ["/api/cloud"]] and R["thrown"] is True
+    return all(out.values()), [out, err]
+
+
+def _m54c_text(src):
+    out = {}
+    out["markup"] = ('<div id="srv-chips"></div>\n      <!-- cloud models are on (6b354): a light blue dot and "cloud", hidden otherwise -->\n'
+                     '      <div id="cloud-chip" class="srv-chip cloud" title="Cloud models are on" hidden><i></i><b>cloud</b></div>' in src)
+    out["css"] = (".srv-chip.cloud{--ac:#7cc4ff}" in src and "#cloud-chip[hidden]{display:none}" in src
+                  and "#accel-chip,.srv-chip{" in src)
+    out["hooks"] = ('  $("#chip-model").textContent=tierLabel();\n  paintCloudChip();\n}' in src
+                    and "  cloudChipSet(cs);      // the composer's chip reads the same answer (6b354)\n" in src
+                    and "  if(ok)cloudChipLoad();\n" in src)
+    out["call"] = 'c.hidden=!cloudChipOn(cloudSt,tier);' in src
+    return all(out.values()), out
+
+
+_M53_CHECKS = [
+    ("servers more: no link with one or two servers (the card as it is), \"+N servers more\" from a third "
+     "(\"+1 server more\" singular), gone again, and the old \"+N more\" title text is gone (node)", _m53c_link),
+    ("servers more: the dialog's rows hold every paired server: answering, not answering, an older kit's "
+     "\"usage not reported\", \"not read\" past the card's two, no card named (node)", _m53c_rows),
+    ("servers more: the dialog opens, takes focus, repaints from the same readings with no request, shows a "
+     "name like <img onerror> as text, closes on its button, Escape's function and a click outside, and gives "
+     "focus back (node)", _m53c_dialog),
+    ("servers more: while the dialog is open every paired server is read through the same poll (the card's two "
+     "not twice), backing off 10 s then 30 s when one doesn't answer, nothing asks a server to wake; closing, a "
+     "profile change and a hidden window stop it (node)", _m53c_poll),
+    ("servers more: the dialog's markup (role, aria-modal, aria-labelledby, hidden), Escape, click outside, "
+     "Tab, the link and the CSS are in the page; no innerHTML, no request and no timer in its code", _m53c_text),
+    ("cloud chip: shown only with a key and cloud power on, or on Cloud Only; hidden with no key, with the "
+     "power off, or with only failed keys; a resting provider counts; follows the tier with no request (node)",
+     _m54c_chip),
+    ("cloud chip: the markup (light blue dot, \"cloud\", tooltip, hidden), the CSS and the hooks (the model "
+     "chip's repaint, the cloud read, the power switch)", _m54c_text),
+]
+
+
+def _m53_run(src):
+    out = []
+    for name, fn in _M53_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n53, _o53, _d53 in _m53_run(_MILLENAI_SRC):
+    check(_n53, _o53, "%r" % (_d53,))
+check("servers more: the served page holds the dialog, the link's style, the cloud chip (hidden) and no unreplaced token for them",
+      '<div id="srvall-veil" hidden>' in page and '<div id="cloud-chip" class="srv-chip cloud" title="Cloud models are on" hidden>' in page
+      and "function srvAllOpen(){" in page and "function cloudChipOn(cs,t){" in page, "")
+
+_M53_MUT = [
+    ("the link with two servers", 'filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);',
+     'filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX+1);'),
+    ("an unpaired server counted", '(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);',
+     '(list||[]).filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);'),
+    ("the singular wrong", 'n===1?" server more":" servers more"', 'n===1?" servers more":" servers more"'),
+    ("a count that is not the number left", 'return "+"+n+(n===1', 'return "+"+(n+1)+(n===1'),
+    ("the link kept when a server goes", "if(!more){if(link)link.remove();}", "if(!more){}"),
+    ("the link left when the rows go", 'const gl=document.getElementById("srv-more");if(gl)gl.remove();', ""),
+    ("the link before the rows", "if(tel.lastChild!==link)tel.appendChild(link);", "if(!link.parent)tel.insertBefore(link,box);"),
+    ("only paired servers in the dialog dropped", "return (list||[]).filter(s=>s.paired).map(s=>{\n    const g=s.gpu||{},u=",
+     "return (list||[]).map(s=>{\n    const g=s.gpu||{},u="),
+    ("a server not answering said to answer", 'state:off?"not answering":"answering"', 'state:"answering"'),
+    ("an older kit said as a reading", 'u.ok?"usage not reported":"reading\\u2026"', '"reading\\u2026"'),
+    ("memory in the wrong unit", 'srvGB(ru)+" of "+srvGB(rt)+" GB in use":none]]', 'srvGB(ru)+" of "+srvGB(rt)+" GB used":none]]'),
+    ("VRAM not shown", 'srvGB(vu)+" of "+srvGB(vt)+" GB"', '"?"'),
+    ("a server's name set as HTML", "nm.textContent=r.name;", "nm.innerHTML=r.name;"),
+    ("a server's name taken from the wrong place", "nm.textContent=r.name;", "nm.textContent=r.id;"),
+    ("a request made by the dialog's rows", "return (list||[]).filter(s=>s.paired).map(s=>{\n    const g=s.gpu||{},u=",
+     'api("/api/servers/usage?id=x");return (list||[]).filter(s=>s.paired).map(s=>{\n    const g=s.gpu||{},u='),
+    ("no repaint while it is open", "  srvAllPaint();\n}\nasync function srvUsagePoll(s){", "}\nasync function srvUsagePoll(s){"),
+    ("no repaint when the servers go", "    srvAllPaint();return;\n  }", "    return;\n  }"),
+    ("focus not moved in", 'const c=document.getElementById("srvall-close");if(c)c.focus();', ""),
+    ("focus not given back", "if(back&&back.focus)back.focus();", ""),
+    ("close that says it closed when it wasn't open", 'if(!v||v.hidden)return false;', 'if(!v)return false;'),
+    ("Escape not closing it", "    if(srvAllClose()){e.preventDefault();return;}\n", ""),
+    ("a click outside not closing it", 'v.addEventListener("click",e=>{if(e.target===v)srvAllClose();});', ""),
+    ("Tab free to leave", 'if(e.key==="Tab"){e.preventDefault();$("#srvall-close").focus();}', ""),
+    ("the dialog not a dialog", 'role="dialog" aria-modal="true" aria-labelledby="srvall-title"', 'aria-labelledby="srvall-title"'),
+    ("the dialog open from the start", '<div id="srvall-veil" hidden>', '<div id="srvall-veil">'),
+    # the cloud chip
+    ("the extra polls running with the dialog shut", "if(!srvAllIsOpen())return gs;", "if(false)return gs;"),
+    ("the extra polls never starting", "return gs.concat((list||[]).filter(s=>s.paired&&!have.has(s.id)));", "return gs;"),
+    ("the card's two listed twice", "filter(s=>s.paired&&!have.has(s.id)));", "filter(s=>s.paired));"),
+    ("only card-named servers read in the dialog", "filter(s=>s.paired&&!have.has(s.id)));", "filter(s=>s.paired&&s.gpu&&!have.has(s.id)));"),
+    ("the extra readings kept after closing", "  srvMetersRefresh();      // the extra servers' readings and polls go with the dialog\n", ""),
+    ("the dialog kept open by a profile change", "srvUseDead=true;srvAllClose();", "srvUseDead=true;"),
+    ("no read the moment it opens", "  if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}\n  srvMetersRefresh();\n}", "  srvMetersRefresh();\n}"),
+    ("the dialog not waking the poll", "  if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}\n  srvMetersRefresh();\n}", "  if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}\n}"),
+    ("a wake asked for", 'const r=await api("/api/servers/usage?id="+encodeURIComponent(s.id));',
+     'await api("/api/servers/wake?id="+encodeURIComponent(s.id));const r=await api("/api/servers/usage?id="+encodeURIComponent(s.id));'),
+    ("no backing off for the extras", "u.due=Date.now()+srvUseWait(u.fails);", "u.due=Date.now()+3000;"),
+    ("the card's two read again at every tick", "const poll=o.ids.filter(id=>(o.due[id]||0)<=o.now);", "const poll=o.ids.slice();"),
+    ("a hidden window read with the dialog open", "if(!o.ids.length||!o.page)return {poll:[],next:null};", "if(!o.ids.length)return {poll:[],next:null};"),
+    ("\"not read\" back", 'u.ok?"usage not reported":"reading\\u2026"', 'u.ok?"usage not reported":"not read"'),
+    ("shown without cloud power", '(!!cs.turbo||t==="Cloud Only")', "true"),
+    ("Cloud Only not showing it", '(!!cs.turbo||t==="Cloud Only")', "!!cs.turbo"),
+    ("a resting provider not counted", 'const has=!!cs.configured||Object.keys(pv).some(k=>(pv[k]||{}).status==="ok");',
+     "const has=!!cs.configured;"),
+    ("a failed key counted", '(pv[k]||{}).status==="ok");', '(pv[k]||{}).status!=="");'),
+    ("shown with no key", "const has=!!cs.configured||", "const has=true||"),
+    ("the chip never hidden", "c.hidden=!cloudChipOn(cloudSt,tier);", "c.hidden=false;"),
+    ("a null answer shown", "if(!cs)return false;\n  const pv", "if(!cs)return true;\n  const pv"),
+    ("the model chip's repaint not moving it", '  $("#chip-model").textContent=tierLabel();\n  paintCloudChip();\n}',
+     '  $("#chip-model").textContent=tierLabel();\n}'),
+    ("the cloud read not moving it", "  cloudChipSet(cs);      // the composer's chip reads the same answer (6b354)\n", ""),
+    ("the power switch not moving it", "  if(ok)cloudChipLoad();\n", ""),
+    ("the chip shown from the start", 'title="Cloud models are on" hidden><i></i><b>cloud</b>', 'title="Cloud models are on"><i></i><b>cloud</b>'),
+    ("another tooltip", 'title="Cloud models are on" hidden>', 'title="Cloud is on" hidden>'),
+    ("a colour that isn't blue", ".srv-chip.cloud{--ac:#7cc4ff}", ".srv-chip.cloud{--ac:#ed1c24}"),
+]
+_m53m = []
+for _d53, _o53, _n53 in _M53_MUT:
+    if _MILLENAI_SRC.count(_o53) != 1:
+        _m53m.append((_d53, "anchor missing"))
+        continue
+    _r53 = _m53_run(_MILLENAI_SRC.replace(_o53, _n53, 1))
+    _m53m.append((_d53, [n for n, o, _x in _r53 if not o][:1] or "MISSED"))
+check("servers more and the cloud chip: %d mutations, each caught by a check above" % len(_M53_MUT),
+      all(isinstance(v, list) for _d, v in _m53m), "%r" % [x for x in _m53m if not isinstance(x[1], list)])
+# ==== 6b353 servers more link: end ====
+
 
 # ==== 6b346 auto sleep: begin ====
 print("== auto sleep for your server, and waking it (6b346) ==")
