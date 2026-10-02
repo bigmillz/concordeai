@@ -8309,7 +8309,7 @@ _lab_mut = [page.replace(".meter-label{\n  display:flex;justify-content:space-be
                          "#telemetry .t-head{\n  font-size:11px;letter-spacing:.08em;", 1)]
 check("sidebar meters: the chip, memory and server labels share one size, tracking, line and gap",
       _lab_ok(page) and not any(_lab_ok(m_) for m_ in _lab_mut) and all(m_ != page for m_ in _lab_mut),
-      "%r %r" % [_lab_ok(page), [_lab_ok(m_) for m_ in _lab_mut]])
+      "%r %r" % (_lab_ok(page), [_lab_ok(m_) for m_ in _lab_mut]))
 
 # A pipe table with a header and no rows is a line of its cells, not an empty grid (6b349, per
 # Patrick: "why does it, for a lot of answers, keep showing that grid along the bottom?")
