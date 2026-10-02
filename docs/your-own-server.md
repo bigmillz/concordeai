@@ -347,6 +347,25 @@ wheel address from pytorch.org (for example `TORCH_INDEX=https://download.pytorc
 
 The wire format is in [PROTOCOL.md](../ollama1/PROTOCOL.md) ("Images and video").
 
+## Graphics card tuning
+
+Off unless you ask. With an AMD Navi 21 card (RX 6800, 6800 XT, 6900 XT,
+6950 XT), `sudo ./setup.sh --gpu-tune` turns on a small tune (setup saves the
+choice, so running it again without the flag keeps it): the card's highest power limit (the most the driver allows it)
+and its memory clock +100 in the driver's units (GDDR6 runs at twice that),
+never past the range the card reports. Core clocks and voltages are left
+alone. The aim is about 5% faster token generation on models that fit the
+card; only a measurement on your card proves it, and `sudo ollama1-gpu-tune
+status` shows the stock and tuned speeds it measured. Expect more power drawn,
+more heat and more fan noise under load. The memory clock needs the kernel's
+overdrive switch (only that bit is added to `amdgpu.ppfeaturemask`), so it
+starts after a reboot. A 60-second check under load follows; an amdgpu error
+in the kernel log, the junction at 105 C, the memory at 100 C or slower answers
+put the card back to stock, where it stays until `sudo ollama1-gpu-tune on`.
+`sudo ollama1-gpu-tune off` puts it back to stock yourself; `setup.sh
+--no-gpu-tune` is the explicit off. Any other card is left alone. The
+details are in the kit's README, "Graphics card tuning".
+
 ## Choosing models
 
 Nothing is installed at first. Put the models you want in

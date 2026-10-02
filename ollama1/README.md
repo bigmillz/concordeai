@@ -110,6 +110,7 @@ it asks for any it can't find, at the terminal):
 | `--owner <your-name>` | Your name, used only in the Access policy's name. Default: from your admin email |
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial`, `--hdd1-serial`, `--hdd2-serial` | The four disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything |
+| `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
 server's name and domain in `/etc/ollama1/config.json`, so a re-run needs
@@ -203,11 +204,19 @@ Every step skips what is already done, so it is safe to run again.
     weekly Ollama update.
 13. It starts the services: the gateway, the panel, the terminal and the
     dashboard on the monitor.
-14. It sets up Cloudflare with the API token you paste: the tunnel, the DNS
+14. Only if you give `--gpu-tune` (or saved it on an earlier run): it tunes
+    the graphics card, if it is an AMD Navi 21 (RX 6800, 6800 XT,
+    6900 XT, 6950 XT): the card's highest
+    power limit and a small memory-clock bump, checked under load (see
+    "Graphics card tuning" below). The memory clock needs the kernel's
+    overdrive switch, `/etc/default/grub.d/97-amdgpu-overdrive.cfg`, so it
+    starts after a reboot; setup lists that under "Still to do". Without
+    `--gpu-tune` it only prints that the option exists.
+15. It sets up Cloudflare with the API token you paste: the tunnel, the DNS
     records and Access (see below).
-15. It checks what listens on the network: nothing but sshd may listen
+16. It checks what listens on the network: nothing but sshd may listen
     beyond loopback (plus the gateway on br0, in LAN mode).
-16. It asks whether to remove the setup key `claude-setup@concordeai`. It only
+17. It asks whether to remove the setup key `claude-setup@concordeai`. It only
     asks if a key of your own is present, and it removes nothing unless you
     type `yes`. You can also pass `--remove-setup-key`. Your own key(s) always
     stay.
@@ -663,6 +672,67 @@ around a little from time to time.
   are still required, and traffic on the LAN is unencrypted. To change it:
   `sudo ollama1-lan on|off`, or use the panel.
 
+## Graphics card tuning
+
+**Off unless you ask**: `sudo ./setup.sh --gpu-tune` (or `OLLAMA1_GPU_TUNE=1`)
+turns it on, and the choice is saved in `/etc/ollama1/setup.env`, so a later
+run of setup without the flag keeps it. It is for an AMD Navi 21 card
+(RX 6800, 6800 XT, 6900 XT, 6950 XT); any other card is left alone, with a
+one-line note. It runs a card past its stock limits, which is the owner's call
+to make: read this section first. Writing an answer reads
+the whole model from the card's memory for every word, so the memory clock
+sets the pace; the power limit keeps the clocks up under load. **The aim is
+about 5% faster token generation on models that fit the card. Only a
+measurement on your card proves it**: `sudo ollama1-gpu-tune status` shows
+the stock and tuned speeds it measured. Back to stock at any time:
+`sudo ollama1-gpu-tune off`.
+
+What it sets (`ollama1-gpu-tune`, `lib/o1gputune.py`), always within what the
+driver reports for the card, which it finds by its PCI ids (not by `cardN`):
+
+- **Power limit:** `power1_cap` = `power1_cap_max`, the most the driver
+  allows this card (never more). On an RX 6900 XT that is roughly 15% above
+  stock, up to about 330 W depending on the board. That means more power
+  drawn, more heat and more fan noise under load; check that your power
+  supply has the headroom.
+- **Memory clock:** the top state in `pp_od_clk_voltage` raised by 100 in the
+  driver's units (GDDR6 runs at twice that: a 6900 XT's stock 1000 is 2000 MHz
+  effective), and never past the `OD_RANGE` limit the card reports (on many
+  6900 XTs 1075, so 2150 MHz effective: +7.5%).
+- Core clocks and voltages: untouched.
+
+The memory clock needs the kernel's overdrive switch: setup adds only the
+overdrive bit (`0x4000`) to the `amdgpu.ppfeaturemask` the driver runs with
+now, in `/etc/default/grub.d/97-amdgpu-overdrive.cfg` (the recovery entry in
+the boot menu boots without it). It takes a reboot, and on most Navi 21 cards
+the higher power limit waits for it too (until then the driver allows no more
+than stock). With overdrive on, the kernel says so in its log and marks
+itself tainted; that is expected.
+
+**Safety.** After the values are set, a check runs 60 seconds of answers on
+the card with a model already installed, while it watches the kernel log for
+amdgpu errors (a ring timeout, a GPU reset, a page fault) and the card's
+temperatures. Any error, the junction at 105 C or the memory at 100 C, or
+answers more than 5% slower than stock (measured when it was turned on, with
+the same model) puts
+the card back to stock at once. It then stays at stock, across reboots, until
+you run `sudo ollama1-gpu-tune on`; `status` says why. Every boot also reads
+the kernel log of the boot the tuning last ran in, and an amdgpu error there
+does the same. With no model installed yet the check runs once one is
+(`ollama1-gpu-tune-check.service`, after Ollama starts).
+
+- `sudo ollama1-gpu-tune status`: stock and current values, temperatures,
+  the last check.
+- `sudo ollama1-gpu-tune on`: turn it on (or on again after a revert):
+  measures stock, sets the values, runs the check.
+- `sudo ollama1-gpu-tune off`: back to stock, and kept there. A re-run of
+  setup keeps it off; `setup.sh --gpu-tune` turns it on.
+- `sudo setup.sh --no-gpu-tune`: off, saved as off, and the GRUB drop-in
+  removed (a reboot turns overdrive off).
+- At boot `ollama1-gpu-tune.service` sets it before Ollama starts, and after
+  a wake the sleep hook runs it again (amdgpu should keep the values across
+  a suspend; it writes only what differs).
+
 ## Power and electricity cost
 
 The panel's **Power and cost** card shows what the server draws now (with
@@ -843,6 +913,7 @@ With a bridge, the firewall is set so it can't cut the other device off:
 | GPU seen by Ollama | `journalctl -u ollama \| grep -i "inference compute"` should say ROCm, gfx1030. The RX 6900 XT is supported as is, so `HSA_OVERRIDE_GFX_VERSION` is not set. If Ollama ever reports no GPU, the gateway refuses every model instead of running it on the CPU |
 | Mirror | `cat /proc/mdstat`, `sudo mdadm --detail /dev/md/o1data` |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
+| Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
 | SSH | `sudo sshd -T -C user=<your-user>,host=x,addr=<a-lan-address> \| grep -E 'password\|permitroot'` |
 
 ## Tests (on the Mac)
@@ -882,4 +953,9 @@ Ed25519 (the server uses PyNaCl). They cover:
   one job at a time, Ollama's models unloaded before and ComfyUI's freed after,
   a running job counted as use for auto sleep, results kept ten minutes, the
   signed and paired-only gate, and that no prompt reaches a log or a file;
+
+- graphics card tuning against fixture sysfs trees and a stand-in driver:
+  the card found by its ids, values clamped to what the card reports, only
+  the overdrive bit added to the feature mask, back to stock on a kernel
+  error, heat or a slower answer, and a revert never re-applied;
 - that the repo holds no personal data and no utility's schedule.

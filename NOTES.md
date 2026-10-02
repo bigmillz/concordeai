@@ -245,6 +245,140 @@ What changed (`lib/o1dashui.py` rewritten, new `lib/o1dashterm.py`,
   `sudo systemctl restart ollama1-dash`), and `cat /run/ollama1/dash-font.json`
   says which font and glyphs it chose.
 
+## 6b361 — the server's graphics card: its highest power limit and a memory-clock bump
+Patrick (2026-10-02) asked for "a bit more power limit and a modest VRAM clock
+bump on the RX 6900 XT, about 5% faster replies", and chose "Yes, and turn it
+on" (applied when he next runs setup). Then, same day: "Let the GPU use as much
+power as it wants." So the power limit is the card's own maximum, not +10%.
+THEN (same day, the coordinator): the kit is public, so it is OFF by default
+and opt-in (`--gpu-tune`, `OLLAMA1_GPU_TUNE=1`), the choice saved in setup.env
+so a re-run without the flag keeps it (Pat's own server is set up with
+`--gpu-tune`). AND, nothing about tuning is to be applied to Pat's server until
+he says the machine is stable (a separate drive drop-out problem is being
+chased): the code is merged-ready, the server run is on hold.
+Token generation reads every weight once per token, so it is bound by the
+card's memory bandwidth: the memory clock is the lever, and the power limit
+keeps the clocks up under load.
+
+WHAT IS SET (`ollama1-gpu-tune`, `lib/o1gputune.py`; kit only, no app change)
+- The card: the first AMD display controller under `/sys/bus/pci/devices`
+  whose device id is a Navi 21 one (SIENNA_CICHLID: 73a0-73a3, 73a5, 73a8-73a9,
+  73ab-73af, 73bf), never `cardN`, which can renumber. Any other card (NVIDIA,
+  Intel, RDNA3, an older AMD) is a quiet no-op with one line: the +100 step and
+  the table's shape are this generation's.
+- Power: hwmon `power1_cap` = `power1_cap_max` (microwatts), the driver's own
+  maximum, never above it (the driver would refuse it anyway). Stock is
+  `power1_cap_default`. None when max <= default.
+- Memory: `pp_od_clk_voltage`: `r`, `c` (to read the true stock), then
+  `m 1 <min(stock + 100, OD_RANGE MCLK max)>`, `c`. In the driver's units,
+  which are the memory controller's clock: GDDR6's effective rate is twice it,
+  so the 6900 XT's stock 1000 is 2000 MHz. On many 6900 XTs OD_RANGE ends at
+  1075, so the real step is +75 (2150 effective, +7.5%), not +100. Read back
+  after the commit. If the driver refuses a write in `auto`, it tries once in
+  `manual` and always puts `power_dpm_force_performance_level` back to `auto`.
+  Core clocks and voltages are never written (no undervolt here). Note that
+  `r` also clears any overdrive values someone set by hand.
+- Overdrive: `pp_od_clk_voltage` exists only with PP_OVERDRIVE_MASK (0x4000)
+  in `amdgpu.ppfeaturemask`. setup.sh writes
+  `/etc/default/grub.d/97-amdgpu-overdrive.cfg` with the RUNNING mask
+  (`/sys/module/amdgpu/parameters/ppfeaturemask`, hex or decimal) OR 0x4000,
+  never 0xffffffff, appended to `GRUB_CMDLINE_LINUX_DEFAULT` (recovery entries
+  boot without it), runs `update-grub`, checks grub.cfg carries it, and lists
+  the reboot under "Still to do". The kernel logs "Overdrive is enabled" and
+  taints itself with it on: expected.
+
+SAFETY
+- The check (`self_check`): 60 s of answers from an installed model (the one
+  stock was measured with, else one already resident on the card, else the
+  smallest that fits in 75% of VRAM; never an embedding model), straight to
+  Ollama on 127.0.0.1 like the stability test. After every answer: hwmon
+  temperatures (junction >= 105 C, the stability test's limit, or memory
+  >= 100 C) and `journalctl -k --since @<applied>` for amdgpu ring timeouts,
+  GPU resets, GPU hangs, VM/page faults (not "GPU mode1 reset" or the
+  overdrive warning). Any of them puts the card back to stock at once (`r`,
+  `c`, `power1_cap` = default) and records `reverted: <reason>`.
+- ADDED beyond the brief, flag for Pat: (1) answers more than 5% slower than
+  the stock speed measured when it was turned on (same model) also revert:
+  GDDR6 retries failed transfers (EDC), so a memory clock past what the chips
+  hold usually shows up as SLOWER answers, not a kernel error, and the kernel
+  check alone would keep it; (2) the check writes "running" before the load,
+  and a boot that finds a "running" check from an earlier boot reverts (a hard
+  hang during the load may log nothing); (3) Ctrl-C during the check reverts.
+- A revert sticks: `restore` (boot, wake), `apply`, `check-pending` and a
+  setup re-run all skip it; only `sudo ollama1-gpu-tune on` (or `setup.sh
+  --gpu-tune`) tries again. An admin's `off` is kept by a setup re-run too.
+- Every boot (`restore`, before Ollama): the kernel log of the boot it last
+  ran in (`journalctl -k -b <that boot id>`), read once; an amdgpu error there
+  reverts. After a wake: this boot's log since it was applied.
+- No model installed yet (a fresh setup): the values are set, the check runs
+  without a load and stays pending; `ollama1-gpu-tune-check.service` (after
+  Ollama, every boot, exits at once when nothing is pending) runs it once there
+  is a model.
+
+UNITS, SETUP, SLEEP
+- `ollama1-gpu-tune.service` (oneshot, root, enabled): `ExecStartPre=` the
+  same `ollama1-wait-gpu` Ollama uses, then `restore`; `Before=ollama.service`.
+  No `ProtectKernelTunables` (it writes sysfs), no network.
+  `ollama1-gpu-tune-check.service`: `After=ollama.service`, localhost only.
+- setup.sh step 14 "Graphics card tuning", after the services (so the check
+  can load a model). OFF unless asked: `--gpu-tune` / `OLLAMA1_GPU_TUNE=1`
+  (flag > environment > `GPU_TUNE` in setup.env > nothing asked, which
+  changes nothing and prints one plain line that the option exists; only a
+  choice made is written to setup.env). `--no-gpu-tune` / `OLLAMA1_GPU_TUNE=0`
+  puts the card back, disables the units and removes the drop-in, saved as
+  off. First `on`: `on`; later runs: the saved choice (`apply`), keeping a
+  revert or an admin's off; an explicit `--gpu-tune` flag forces `on`. `sudo ollama1-gpu-tune` is linked in
+  /usr/local/sbin.
+- Suspend: amdgpu restores the user's power limit and overdrive table on
+  resume (`smu_restore_dpm_user_profile`, as I read the driver), but the sleep
+  hook starts `ollama1-gpu-tune.service` after every wake anyway; it writes
+  only what differs. The idle service and the gateway are unchanged (a check's
+  load keeps the card busy, which already blocks auto sleep).
+
+HONEST NUMBERS (README "Graphics card tuning", the guide, setup's line): the
+aim is about 5% faster token generation on models that fit the card, and only
+a measurement on that card proves it (`status` shows stock and tuned
+tokens/s). The power maximum is roughly 15% over stock, up to about 330 W on
+a 6900 XT depending on the board: more draw, heat and fan noise under load.
+Pat's 1300 W supply has the headroom.
+
+FLAGGED, NOT CHANGED
+- The power part probably waits for the reboot too: on sienna_cichlid the
+  driver reports `power1_cap_max` = default when overdrive is off (the upper
+  OD percentage is only counted with `od_enabled`), so before the reboot
+  nothing changes. The code handles both.
+- The drop-in pins the mask computed at setup time. If a later kernel changes
+  the driver's default mask, it isn't picked up (re-running setup reads the
+  pinned value back). To refresh: `--no-gpu-tune`, reboot, setup again.
+- A hard hang outside the check that logs nothing is not caught (only the
+  log of the boot it last ran in is read).
+
+TESTS: `tests/test_gputune.py` (53): fixture sysfs trees (Navi 21's table
+with OD_MCLK and OD_RANGE, an older card's mV table, no table, no power
+limits, NVIDIA, RDNA3, the HDMI audio function, the card renumbered between
+card0 and card1), a stand-in driver that refuses a power limit above max and a
+clock outside OD_RANGE (and, optionally, anything outside manual), a fake
+Ollama, kernel log and clock: max power, the clamp, the mask keeping every
+other bit, each revert (kernel error mid-load, junction, memory, slower, the
+earlier boot, a wake, a check that never ended, Ctrl-C), a revert never
+re-applied, no model then the pending check, setup's choice, status, the
+command, the units, the sleep hook, setup.sh's flags (off by default, flag,
+environment, a saved on kept by a re-run, the explicit off, the flag beating the
+environment). mutate.py: 20 new
+mutants (no clamp, card by number, mask 0xffffffff, power not max or above
+max, no revert, the check running on, the earlier boot unread or ignored, the
+never-ended check, re-apply after a revert at boot and in apply, both
+temperature limits, slower kept, level left manual, no re-set after a wake,
+setup's opt-out ignored, on by default again, a saved on not kept), all killed. Kit suite green.
+
+NOT VERIFIED (no card here): the OD_RANGE text on kernel 7.0 (parsed as
+sienna_cichlid prints it, case-insensitive "Mhz"/"MHz"); whether writes need
+`manual`; whether 2150 MHz and the maximum power are stable on this card;
+`journalctl --since @<epoch>` and `-b <id>` inside the unit's sandbox; a real
+suspend and resume with the values set; the real speed-up. When Pat says the machine is
+stable: `sudo bash ~/concordeai/ollama1/setup.sh ... --gpu-tune`, reboot,
+`sudo ollama1-gpu-tune status`. NOT before.
+
 ## 6b352 — Find in chat (Cmd+F / Ctrl+F)
 Patrick (2026-10-02): "Command or Control F should open a find box for the
 current chat."

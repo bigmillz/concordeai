@@ -1,0 +1,40 @@
+# Graphics-card tuning (6b361; ollama1-gpu-tune, lib/o1gputune.py): at boot,
+# once the card's driver is ready and before Ollama starts, and again after
+# every wake (the sleep hook starts it). It first reads the kernel log of the
+# boot the tuning last ran in (after a wake: this boot since it was set), and
+# an amdgpu error there puts the card back to stock for good. Otherwise it
+# sets the saved choice: the card's highest power limit and the memory-clock
+# bump, clamped to what the driver reports. Root, because it writes the
+# card's sysfs files; no network.
+[Unit]
+Description=ollama1: graphics card tuning (power limit, memory clock)
+Before=ollama.service
+
+[Service]
+Type=oneshot
+# the same wait Ollama does: the card's driver ready (at most 90 s)
+ExecStartPre=/usr/local/lib/ollama1/bin/ollama1-wait-gpu
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-gpu-tune restore
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=150
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/ollama1
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

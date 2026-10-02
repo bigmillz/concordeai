@@ -1,0 +1,79 @@
+#!/usr/bin/python3
+"""ollama1-gpu-tune: the graphics card's highest power limit and a small
+memory-clock bump on an AMD Navi 21 card (RX 6800/6900 series), for faster
+token generation (6b361). setup.sh turns it on; see lib/o1gputune.py.
+
+  sudo ollama1-gpu-tune status   stock and current values, the last check
+  sudo ollama1-gpu-tune on       turn on: stock speed measured, the values set, a
+                                 60 s check under load (back to stock on any error)
+  sudo ollama1-gpu-tune off      turn off: the card back to stock, and kept there
+  sudo ollama1-gpu-tune apply    the saved choice, now (and its check, if due)
+
+Used by the system:
+  restore         ollama1-gpu-tune.service: at boot (before Ollama) and after a wake
+  check-pending   ollama1-gpu-tune-check.service: the load check once Ollama is up
+  setup on|off|force-on   setup.sh's step
+  grub-cfg        prints the GRUB drop-in setup.sh installs (exit 1: no card for it)
+"""
+import fcntl
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1gputune  # noqa: E402
+
+
+def grub_cfg():
+    card, why = o1gputune.find_card()
+    if not card:
+        print(why, file=sys.stderr)
+        return 1
+    mask = o1gputune.feature_mask(o1gputune.running_mask())
+    if mask is None:
+        print("amdgpu's feature mask can't be read", file=sys.stderr)
+        return 1
+    sys.stdout.write(o1gputune.grub_dropin(mask))
+    return 0
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if cmd == "grub-cfg":
+        return grub_cfg()
+    if cmd not in ("status", "on", "off", "apply", "restore", "check-pending", "setup"):
+        print("usage: ollama1-gpu-tune status|on|off|apply", file=sys.stderr)
+        return 2
+    if cmd != "status" and os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("Run it with sudo: sudo ollama1-gpu-tune " + cmd, file=sys.stderr)
+        return 1
+    if cmd == "status":
+        return o1gputune.Tuner().cmd_status()
+    # one at a time (the boot unit, a wake, the check, an admin), each reading the state afresh
+    os.makedirs(os.path.dirname(o1gputune.state_path()), exist_ok=True)
+    lock = os.open(o1gputune.state_path() + ".lock", os.O_WRONLY | os.O_CREAT, 0o600)
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    t = o1gputune.Tuner()
+    if cmd == "on":
+        return t.cmd_on()
+    if cmd == "off":
+        return t.cmd_off()
+    if cmd == "apply":
+        return t.cmd_apply()
+    if cmd == "restore":
+        return t.cmd_restore()
+    if cmd == "check-pending":
+        return t.cmd_check_pending()
+    choice = argv[2] if len(argv) > 2 else ""
+    if choice not in ("on", "off", "force-on"):
+        print("usage: ollama1-gpu-tune setup on|off|force-on", file=sys.stderr)
+        return 2
+    return t.cmd_setup(choice)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
