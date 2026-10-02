@@ -39933,22 +39933,42 @@ function findStep(cur,n,dir){
   if(!(cur>=0))return dir<0?n-1:0;
   return (cur+dir+n)%n;
 }
-function findCountText(cur,n,q){
+function findCountText(cur,n,q,more){
   if(!q)return "";
   if(!(n>0))return "No matches";
-  return (cur+1)+" of "+n;
+  return (cur+1)+" of "+n+(more?"+":"");
 }
+// at most `cap` hits are marked (review of 6b352: one letter in a long chat
+// made tens of thousands of marks): lists is one hit list per text node, in
+// order; more says some were left out
+const FIND_CAP=500;
+function findCapHits(lists,cap){
+  const out=[];let left=cap,more=false;
+  for(const h of lists){
+    if(left<=0){if(h.length)more=true;out.push([]);continue;}
+    if(h.length>left)more=true;
+    out.push(h.slice(0,left));left-=Math.min(h.length,left);
+  }
+  return {lists:out,more};
+}
+// while an answer streams, a one-letter search is not re-applied on every
+// paint (it waits for the answer to land)
+function findLive(q,streaming){return !streaming||(q||"").length>=2;}
 /*@find-pure-end*/
 const FIND_SKIP="button,script,style,textarea,input,select,svg,canvas,video,"
-  +"audio,.who,.mact,.codebar,[hidden]";
+  +"audio,.who,.mact,.codebar,.worktree,[hidden]";
+// .worktree: send() re-serialises the step card from its outerHTML on every
+// paint and when the answer settles, so a mark inside it would come back as
+// an untracked copy (review of 6b352)
 const fb=$("#findbar"),fq=$("#find-q"),fcount=$("#find-count");
 const FIND_KEY=IS_PC?"Ctrl+F":"\u2318F";
 fq.placeholder="Find in this chat ("+FIND_KEY+")";
 let findHitEls=[],findCur=-1,findQ="",findText="",findChat=null,
-    findTimer=null,findWait=null,findObs=null;
+    findTimer=null,findWait=null,findObs=null,findMore=false;
 function findClear(){
   const parents=new Set();
-  findHitEls.forEach(m=>{
+  // the ones we made, and any stray copy in the chat column
+  new Set([...findHitEls,...inner.querySelectorAll("mark.find-hit")]).forEach(m=>{
     const p=m.parentNode;if(!p)return;
     p.replaceChild(document.createTextNode(m.textContent),m);
     parents.add(p);
@@ -39958,7 +39978,7 @@ function findClear(){
 }
 function findPaint(){
   findHitEls.forEach((m,i)=>m.classList.toggle("cur",i===findCur));
-  const t=findCountText(findCur,findHitEls.length,findQ);
+  const t=findCountText(findCur,findHitEls.length,findQ,findMore);
   if(fcount.textContent!==t)fcount.textContent=t;
 }
 function findRun(scroll){
@@ -39970,6 +39990,7 @@ function findRun(scroll){
   findQ=fq.value;
   const switched=findChat!==curChat;findChat=curChat;
   if(switched)findCur=0;
+  findMore=false;
   if(findQ){
     const tw=document.createTreeWalker(inner,NodeFilter.SHOW_TEXT,null);
     const seen=new Map(),nodes=[];
@@ -39985,7 +40006,10 @@ function findRun(scroll){
       const h=findHits(n.data,findQ);
       if(h.length)nodes.push([n,h]);
     }
-    nodes.forEach(([n,h])=>{
+    const capped=findCapHits(nodes.map(x=>x[1]),FIND_CAP);
+    findMore=capped.more;
+    nodes.forEach(([n],i)=>{
+      const h=capped.lists[i];if(!h||!h.length)return;
       const fr=document.createDocumentFragment();
       findSplit(n.data,h).forEach(seg=>{
         if(!seg.hit){fr.appendChild(document.createTextNode(seg.t));return;}
@@ -40009,6 +40033,14 @@ function findGo(dir){
   findPaint();
   findHitEls[findCur].scrollIntoView({block:"center"});
 }
+function findLater(){
+  findWait=null;
+  if(fb.hidden)return;
+  // a short query mid-stream waits, and looks again once the answer lands
+  if(!findLive(findQ,generating)){findWait=setTimeout(findLater,1000);return;}
+  if(findHitEls.some(m=>!m.isConnected)||inner.textContent!==findText
+     ||findChat!==curChat)findRun(false);
+}
 function findOpen(){
   const again=!fb.hidden;
   fb.hidden=false;
@@ -40018,12 +40050,7 @@ function findOpen(){
     // a streamed answer (or a chat switch) rewrote the DOM: look again, at
     // most four times a second, and only when it really changed
     if(findWait)return;
-    findWait=setTimeout(()=>{
-      findWait=null;
-      if(fb.hidden)return;
-      if(findHitEls.some(m=>!m.isConnected)||inner.textContent!==findText
-         ||findChat!==curChat)findRun(false);
-    },250);
+    findWait=setTimeout(findLater,250);
   });
   findRun(true);
 }
@@ -40040,9 +40067,16 @@ fq.addEventListener("input",()=>{
   findTimer=setTimeout(()=>{if(!fb.hidden)findRun(true);},120);
 });
 fq.addEventListener("keydown",e=>{
-  if(e.key==="Escape"){e.preventDefault();e.stopPropagation();findClose();return;}
   if(e.key==="Enter"){e.preventDefault();findGo(e.shiftKey?-1:1);}
 });
+// Esc from anywhere in the bar, or from the composer while the bar is open,
+// closes find and goes no further: the page's own Escape would stop a
+// streaming answer (review of 6b352)
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape"||fb.hidden||dictModal())return;
+  if(!fb.contains(e.target)&&e.target!==input)return;
+  e.preventDefault();e.stopPropagation();findClose();
+},true);
 $("#find-next").addEventListener("click",()=>findGo(1));
 $("#find-prev").addEventListener("click",()=>findGo(-1));
 $("#find-close").addEventListener("click",findClose);

@@ -65,6 +65,31 @@ watched. Gauntlet: five checks (the pure part with 12 mutations over ten
 scenarios in node; the page pins on source and served page; the pins' own 10
 mutations; no other handler on the chord).
 
+Review fixes (independent review, three low findings):
+- Marks leaked through the step card: send() re-serialises `.worktree` from
+  its outerHTML on every paint and when the answer settles, so a mark inside
+  it came back as an untracked copy (stayed after Esc, counted twice). The
+  card is no longer searched (`.worktree` in FIND_SKIP; it is the only
+  outerHTML read in the page), and closing also sweeps any stray
+  `mark.find-hit` left in the chat column.
+- Esc was only caught in the find box: from the bar's buttons, or the
+  composer with the bar open, it reached the page's Escape and stopped a
+  streaming answer. A capture handler now closes find first for any Esc from
+  inside the bar or from the composer while the bar is open (not while a
+  dialog is up); with the bar closed, Esc in the composer still stops.
+- No cap: one letter in a long chat made tens of thousands of marks. At most
+  500 are marked (`findCapHits`; the count reads "3 of 500+", next/previous
+  move within them), and a one-letter query is not re-applied while an
+  answer streams (`findLive`): it waits, checking every second, and catches
+  up once the answer lands.
+Checked in the Blink pane: a step card's "apple" not marked; a planted stray
+mark swept; "a" over ~700 a's gave "1 of 500+" with 500 marks; Esc from Next
+and from the composer closed find without calling abort, and the composer's
+Esc aborted again once find was closed; a one-letter query held its count
+during a fake stream and caught up (1 to 4) within a second of it ending.
+Gauntlet: the node check now has 14 scenarios and 19 mutations, the pins 15
+mutations.
+
 ## 6b353 — "+N servers more": a link in the sidebar card and a dialog of every server
 Patrick (2026-10-01): "a visible LINK in the card reading '+N servers more' (N = how many are not shown;
 '+1 server more' singular) that opens a simple dialog listing EVERY paired server's details in full: name, GPU name,
