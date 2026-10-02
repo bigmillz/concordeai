@@ -3,12 +3,19 @@
 # systemd-sleep runs it with "pre" before sleeping and "post" after waking.
 # It records the times (shown on the dashboard and the admin panel) and,
 # after waking, starts the health check without holding up the resume:
-# Ollama and the GPU must answer, else Ollama and the tunnel restart.
+# Ollama and the GPU must answer, else Ollama and the tunnel restart. With
+# graphics-card tuning on (6b361), it is set again after waking: amdgpu
+# should keep the power limit and the memory clock across a suspend, and
+# ollama1-gpu-tune restore writes only what differs (and first reads this
+# boot's kernel log since it was set: an amdgpu error puts it back to stock).
 HELPER=${OLLAMA1_HELPER:-/usr/local/lib/ollama1/bin/ollama1-helper}
 case "$1" in
   pre) "$HELPER" stamp sleep ;;
   post)
     "$HELPER" stamp wake
-    systemctl start --no-block ollama1-resume-check.service ;;
+    systemctl start --no-block ollama1-resume-check.service
+    if systemctl is-enabled --quiet ollama1-gpu-tune.service 2>/dev/null; then
+      systemctl start --no-block ollama1-gpu-tune.service
+    fi ;;
 esac
 exit 0

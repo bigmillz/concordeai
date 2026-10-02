@@ -287,6 +287,24 @@ check` (what it would do right now), the gateway's activity file
 either), and `/run/ollama1/idle.json` (the cards that can wake it). Deep sleep
 must be what suspend uses: `cat /sys/power/mem_sleep` shows `[deep]`.
 
+## Graphics card tuning
+
+With an AMD Navi 21 card (RX 6800, 6800 XT, 6900 XT, 6950 XT), setup turns on
+a small tune: the card's highest power limit (the most the driver allows it)
+and its memory clock +100 in the driver's units (GDDR6 runs at twice that),
+never past the range the card reports. Core clocks and voltages are left
+alone. The aim is about 5% faster token generation on models that fit the
+card; only a measurement on your card proves it, and `sudo ollama1-gpu-tune
+status` shows the stock and tuned speeds it measured. Expect more power drawn,
+more heat and more fan noise under load. The memory clock needs the kernel's
+overdrive switch (only that bit is added to `amdgpu.ppfeaturemask`), so it
+starts after a reboot. A 60-second check under load follows; an amdgpu error
+in the kernel log, the junction at 105 C, the memory at 100 C or slower answers
+put the card back to stock, where it stays until `sudo ollama1-gpu-tune on`.
+`sudo ollama1-gpu-tune off` puts it back to stock yourself; `setup.sh
+--no-gpu-tune` leaves it off for good. Any other card is left alone. The
+details are in the kit's README, "Graphics card tuning".
+
 ## Choosing models
 
 Nothing is installed at first. Put the models you want in

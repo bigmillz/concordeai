@@ -16,6 +16,11 @@
 #   sudo ./setup.sh --remove-encrypted-swap  undo that
 #   sudo ./setup.sh --vg-reserve 64G  when growing / the first time, leave 64G free
 #                                    in ubuntu-vg (e.g. for --encrypted-swap); default 0
+#   sudo ./setup.sh --no-gpu-tune    leave the graphics card at stock (also: OLLAMA1_GPU_TUNE=0);
+#                                    the default tunes an AMD Navi 21 card (ollama1-gpu-tune):
+#                                    its highest power limit and a small memory-clock bump.
+#                                    Saved; --gpu-tune turns it back on (and tries again after
+#                                    a safety revert)
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # Settings (each is asked for if it is not given and cannot be found):
@@ -91,6 +96,7 @@ NO_TMUX=0
 SWAP_ACTION=""
 SWAP_SIZE=""
 VG_RESERVE_GIB=0
+A_GPU_TUNE=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
 A_OS=""; A_MODELS=""; A_HDD1=""; A_HDD2=""
 prev=""
@@ -114,6 +120,10 @@ for a in "$@"; do
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
     --no-tmux) NO_TMUX=1 ;;
     --lan-public-ok) LAN_PUBLIC_OK=1 ;;
+    --gpu-tune|--no-gpu-tune)
+      want=on; [ "$a" = --gpu-tune ] || want=off
+      [ -z "$A_GPU_TUNE" ] || [ "$A_GPU_TUNE" = "$want" ] || { echo "--gpu-tune and --no-gpu-tune: give one"; exit 2; }
+      A_GPU_TUNE=$want ;;
     -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
@@ -122,6 +132,7 @@ done
 if [ -n "$A_LAN" ] && ! valid_lan "$A_LAN"; then
   bad_option --lan "a private network of /16 or narrower, like 10.0.0.0/24 (SSH is let in from it, and from nowhere else); add --lan-public-ok only if a larger or public network is really meant"
 fi
+gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_TUNE takes 1 or 0 (on or off)"; exit 2; }
 # a flag left waiting for its value (the size forgotten) must not mean "no reserve"
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
 case "$prev" in --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
@@ -200,6 +211,8 @@ resolve_settings() {
   pick MODELS_SERIAL "$A_MODELS" MODELS_SERIAL "" valid_serial
   pick HDD1_SERIAL "$A_HDD1" HDD1_SERIAL "" valid_serial
   pick HDD2_SERIAL "$A_HDD2" HDD2_SERIAL "" valid_serial
+  GPU_TUNE=$(gpu_tune_choice "$A_GPU_TUNE" "${OLLAMA1_GPU_TUNE:-}" "$(saved GPU_TUNE)") \
+    || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"
 }
 
 # After the relaunch in tmux (a prompt needs the terminal): ask for what is
@@ -234,6 +247,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
         "$SERVER_NAME" "$ADMIN_USER" "$HOME_LAN" "$CF_ZONE" "$OWNER" "$TIMEZONE"
       printf 'OS_SERIAL=%s\nMODELS_SERIAL=%s\nHDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' \
         "$OS_SERIAL" "$MODELS_SERIAL" "$HDD1_SERIAL" "$HDD2_SERIAL"
+      printf 'GPU_TUNE=%s\n' "$GPU_TUNE"
     } >"$t" )
   chown root:root "$t"; chmod 0600 "$t"; mv "$t" "$SAVED"
 }
@@ -278,6 +292,14 @@ policy_line() { # which Access policy name the admin panel's access uses, and wh
   printf "Cloudflare Access policy for the admin panel: '%s'. Running setup again with a different --owner makes a second policy (the first stays); the app and panel use the one named policy_admin_name in config.json, else this name." "$p"
 }
 
+gpu_tune_plan() { # the plan's line for the graphics card (6b361)
+  if [ "$GPU_TUNE" = on ]; then
+    printf 'Graphics card tuning ON (AMD Navi 21 only): its highest power limit, memory clock +100 (within its range), a 60 s check; kernel overdrive switch, so a reboot. Off: --no-gpu-tune'
+  else
+    printf 'Graphics card tuning OFF (--no-gpu-tune): the card stays at stock. On: --gpu-tune'
+  fi
+}
+
 print_plan() {
   printf '%sollama1 setup: the plan%s\n' "$B" "$N"
   printf '\n   Server name %s, SSH user %s, LAN %s (%s), domain %s, time zone %s\n' \
@@ -298,8 +320,9 @@ print_plan() {
    $(state '[ -L /opt/ollama/current ]') 11. Ollama (ROCm build) from GitHub, checksums verified; GPU only; local only
    $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 04:00 when needed; weekly Ollama update
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen, timers
-   $(state 'systemctl is-active ollama1-tunnel') 14. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
-         15. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
+   $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
+   $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
+         16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
    Not touched: the network settings (netplan, br0), anything in /home besides the move.
    No models are installed.
@@ -650,6 +673,7 @@ ln -sfn "$LIBDIR/bin/ollama1-cf-access" /usr/local/sbin/ollama1-cf-access
 ln -sfn "$LIBDIR/bin/ollama1-lan" /usr/local/sbin/ollama1-lan
 ln -sfn "$LIBDIR/bin/ollama1-models" /usr/local/sbin/ollama1-models
 ln -sfn "$LIBDIR/bin/ollama1-power" /usr/local/sbin/ollama1-power
+ln -sfn "$LIBDIR/bin/ollama1-gpu-tune" /usr/local/sbin/ollama1-gpu-tune
 ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
@@ -934,7 +958,53 @@ if id -nG o1gw | tr ' ' '\n' | grep -qx o1pair; then
 fi
 ok "the gateway's user can't read the pairing window (o1gw: $(id -nG o1gw))"
 
-# ---- 14. Cloudflare -------------------------------------------------------------------------
+# ---- 14. graphics card tuning (6b361) ---------------------------------------------------------
+# On by default for an AMD Navi 21 card (RX 6800/6900 series): its highest power limit and the
+# memory clock +100 in the driver's units, clamped to what the card reports, checked under load
+# (lib/o1gputune.py). The memory clock needs the kernel's overdrive switch: only the overdrive
+# bit (0x4000) is added to the amdgpu feature mask the driver runs with now, in a GRUB drop-in,
+# so it takes a reboot. --no-gpu-tune (or OLLAMA1_GPU_TUNE=0) puts the card back to stock and
+# takes the drop-in out. A safety revert or an admin's "ollama1-gpu-tune off" is kept on a
+# re-run; --gpu-tune tries again.
+step "Graphics card tuning"
+GPU_DROPIN=/etc/default/grub.d/97-amdgpu-overdrive.cfg
+TUNE=$LIBDIR/bin/ollama1-gpu-tune
+if [ "$GPU_TUNE" = on ]; then
+  if od_cfg=$("$TUNE" grub-cfg 2>/dev/null); then
+    od_mask=$(printf '%s\n' "$od_cfg" | sed -n 's/.*amdgpu\.ppfeaturemask=\(0x[0-9a-f]*\).*/\1/p')
+    if [ "$(cat "$GPU_DROPIN" 2>/dev/null)" != "$od_cfg" ]; then
+      printf '%s\n' "$od_cfg" >"$GPU_DROPIN"
+      chmod 0644 "$GPU_DROPIN"
+      run update-grub
+    fi
+    grep -q "amdgpu.ppfeaturemask=$od_mask" /boot/grub/grub.cfg \
+      || die "/boot/grub/grub.cfg doesn't carry amdgpu.ppfeaturemask=$od_mask after update-grub (see $GPU_DROPIN)"
+    ok "kernel overdrive switch: amdgpu.ppfeaturemask=$od_mask (the running mask plus the overdrive bit only)"
+    run systemctl enable ollama1-gpu-tune.service ollama1-gpu-tune-check.service
+    if [ "$A_GPU_TUNE" = on ]; then tune_how=force-on; else tune_how=on; fi
+    "$TUNE" setup "$tune_how" || note "ollama1-gpu-tune stopped (see above); the card is left as it was"
+    if ! grep -q "amdgpu.ppfeaturemask=$od_mask" /proc/cmdline; then
+      note "the memory clock (and, on most Navi 21 cards, the higher power limit) start after a reboot: the kernel's overdrive switch. The check under load then runs by itself"
+      later "Reboot for the graphics card tuning (sudo reboot), then: sudo ollama1-gpu-tune status"
+    fi
+    ok "the aim is about 5% faster token generation on models that fit the card; only a measurement on your card proves it (sudo ollama1-gpu-tune status). Back to stock: sudo ollama1-gpu-tune off"
+  else
+    note "$("$TUNE" grub-cfg 2>&1 >/dev/null || true)"
+  fi
+else
+  if systemctl is-enabled --quiet ollama1-gpu-tune.service 2>/dev/null; then
+    "$TUNE" setup off || note "ollama1-gpu-tune couldn't put the card back to stock (see above)"
+  fi
+  systemctl disable ollama1-gpu-tune.service ollama1-gpu-tune-check.service >/dev/null 2>&1 || true
+  if [ -f "$GPU_DROPIN" ]; then
+    rm -f "$GPU_DROPIN"
+    run update-grub
+    later "Reboot to switch the kernel's graphics-card overdrive off again (sudo reboot)"
+  fi
+  ok "off (--no-gpu-tune): the graphics card runs at stock"
+fi
+
+# ---- 15. Cloudflare -------------------------------------------------------------------------
 step "Cloudflare Tunnel and Access"
 cfg_has() { python3 -c 'import json,sys; c=json.load(open("/etc/ollama1/config.json")); sys.exit(0 if all(c.get(k) for k in sys.argv[1:]) else 1)' "$@"; }
 cfg_set() { # key value
@@ -1122,7 +1192,7 @@ else
   later "Look at the listeners setup listed under 'What listens on the network'"
 fi
 
-# ---- 15. the setup key (only when asked) ----------------------------------------------------
+# ---- 16. the setup key (only when asked) ----------------------------------------------------
 remove_setup_key() {
   local n own tmp
   n=$(grep -cF "$CLAUDE_KEY" "$KEYS" 2>/dev/null || true)

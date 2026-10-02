@@ -1,0 +1,38 @@
+# Graphics-card tuning's load check (6b361): once Ollama is up, when the
+# values set now haven't passed it yet (after the reboot that turns the
+# memory clock on, say). 60 s of answers from a model already installed,
+# watching the kernel log for amdgpu errors and the card's junction and
+# memory temperatures; any error, 105 C junction or 100 C memory, or answers
+# slower than stock puts the card back to stock for good. Nothing to do
+# otherwise, so most boots it exits at once.
+[Unit]
+Description=ollama1: graphics card tuning check under load
+After=ollama.service ollama1-gpu-tune.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-gpu-tune check-pending
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=10min
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/ollama1
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressAllow=localhost
+IPAddressDeny=any
+
+[Install]
+WantedBy=multi-user.target
