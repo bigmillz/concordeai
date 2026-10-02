@@ -39,9 +39,36 @@ LEGACY_SERVER_NAME=ollama1
 
 valid_name() { [[ "$1" =~ ^[a-z][a-z0-9-]{0,31}$ ]] && [[ "$1" != *- ]]; }
 valid_user() { [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; }
-valid_lan() {
+valid_lan_shape() { # a network written as its first address and a length, like 10.0.0.0/24
   [[ "$1" =~ ^[0-9.]{7,15}/[0-9]{1,2}$ ]] || return 1
   python3 -c 'import ipaddress,sys; ipaddress.IPv4Network(sys.argv[1], strict=True)' "$1" 2>/dev/null
+}
+# The LAN is the only place SSH is let in from (the firewall, and AllowUsers): a /8, or a
+# network that isn't a private one, would open it to far more than a home or office. Both
+# are refused unless --lan-public-ok (LAN_PUBLIC_OK=1) says it is meant.
+lan_private() { # a private (RFC 1918) network, /16 or narrower
+  python3 -c 'import ipaddress,sys
+n = ipaddress.IPv4Network(sys.argv[1], strict=True)
+priv = [ipaddress.ip_network(p) for p in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+sys.exit(0 if n.prefixlen >= 16 and any(n.subnet_of(p) for p in priv) else 1)' "$1" 2>/dev/null
+}
+valid_lan() {
+  valid_lan_shape "$1" || return 1
+  [ "${LAN_PUBLIC_OK:-0}" = 1 ] && return 0
+  lan_private "$1"
+}
+ssh_client_ip() { # the address this SSH session comes from, if it is one (sudo may hide the variables)
+  local ip=""
+  if [ -n "${SSH_CONNECTION:-}" ]; then ip=${SSH_CONNECTION%% *}
+  elif [ -n "${SSH_CLIENT:-}" ]; then ip=${SSH_CLIENT%% *}
+  elif command -v who >/dev/null 2>&1; then ip=$(who am i 2>/dev/null | sed -n 's/.*(\([0-9.]*\)).*/\1/p' | head -n1); fi
+  [[ "$ip" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] && printf '%s' "$ip"
+  return 0
+}
+ssh_outside_lan() { # CLIENT-IP LAN: true if the client is not inside the LAN
+  [ -n "$1" ] || return 1
+  python3 -c 'import ipaddress,sys
+sys.exit(1 if ipaddress.ip_address(sys.argv[1]) in ipaddress.ip_network(sys.argv[2]) else 0)' "$1" "$2" 2>/dev/null
 }
 valid_zone() { [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; }
 valid_owner() { local rx='^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$'; [[ "$1" =~ $rx ]]; }

@@ -104,7 +104,7 @@ it asks for any it can't find, at the terminal):
 |---|---|
 | `--name <server-name>` | Your server's name: lowercase letters, digits and hyphens, 1 to 32 characters, starting with a letter (`gpu-2`, `workshop`, `srv01`). It becomes the host name, the gateway `<server-name>.<your-domain>`, the panel `<server-name>-admin.<your-domain>`, and the names of the tunnel (`<server-name>`), the service token (`<server-name>-app`) and the Access policies and applications (`<server-name> admin - <your-name> only`, `<server-name> app - service token`, `<server-name> admin`, `<server-name> app`). Run several servers by giving each its own name |
 | `--user <your-user>` | The one Linux user who may log in over SSH. Default: the user who ran `sudo` |
-| `--lan <lan-cidr>` | The network SSH is allowed from, like `10.0.0.0/24`. Default: the network of the machine's LAN port (detected, and shown in the plan: check it before you type `yes`) |
+| `--lan <lan-cidr>` | The network SSH is allowed from, like `10.0.0.0/24`. Default: the network of the machine's LAN port (detected, and shown in the plan: check it before you type `yes`). Must be a private network of /16 or narrower; `--lan-public-ok` allows another one. SSH from outside it is cut off, and setup says so (and asks for `yes`) if your session is outside it |
 | `--zone <your-domain>` | Your domain on Cloudflare. Not needed with `--skip-cloudflare` |
 | `--owner <your-name>` | Your name, used only in the Access policy's name. Default: from your admin email |
 | `--timezone <Area/City>` | Default: the time zone the machine already has |

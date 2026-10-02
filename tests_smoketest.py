@@ -23628,7 +23628,7 @@ def _w46c_wake(src):
     log.clear()
     routes["/v1/info"] = [off, off, _SvResp(200, {"gpu": {}})]
     routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
-    r1 = ns["server_wake_if_down"](e)
+    r1 = ns["server_wake_if_down"](e, ctx)
     notes = ns["server_take_wake_notes"]()
     infos = [x for x in log if x[1] == "/v1/info"]
     out["woke"] = (sorted(packets) == sorted([(ns["srv_magic_packet"](m), (a, 9)) for m in (_W46_MAC, _W46_MAC2)
@@ -23640,23 +23640,32 @@ def _w46c_wake(src):
     n0 = len(packets)
     down()
     t[0] += 30
-    ns["server_wake_if_down"](e)
+    ns["server_wake_if_down"](e, ctx)
     out["rate"] = (len(packets) == n0 and ns["server_take_wake_notes"]() == [])
-    # a minute later it may ask again; with no answer it gives up after 60 s and says so
-    t[0] += 31
+    # five minutes on it may ask again; with no answer it gives up after 60 s, says so and marks the server down
+    t[0] += 271
     routes["/v1/info"] = [off]
     routes["/v1/whoami"] = [off]
     ta = t[0]
-    ns["server_wake_if_down"](e)
+    ns["server_wake_if_down"](e, ctx)
     out["timeout"] = (len(packets) == n0 + 4 and 60 <= t[0] - ta <= 62
                       and ns["server_take_wake_notes"]() == [("Desktop", False)]
                       and ns["_srv_seen"][sid]["reachable"] is False)
+    out["marked"] = (ns["server_label_down"](ctx, e["name"] + " \u00b7 small:8b")
+                     and "didn\u2019t wake" in ns["_srv_seen"][sid]["err"])
+    # the next question inside the five minutes neither sends nor waits
+    n1, t1 = len(packets), t[0]
+    down()
+    t[0] += 90
+    ns["server_wake_if_down"](e, ctx)
+    out["no second wait"] = (len(packets) == n1 and t[0] == t1 + 90 and ns["server_take_wake_notes"]() == [])
+    out["gap"] = ns["SRV_WAKE_GAP_S"] >= 4 * ns["SRV_WAKE_WAIT_S"] and ns["SRV_WAKE_WAIT_S"] <= 60
     # an answer that isn't a 200 is not the server waking
     down()
     ns["_srv_wake_at"].clear()
     routes["/v1/info"] = [_SvResp(503, {"error": "busy", "code": "busy"})]
     ta = t[0]
-    ns["server_wake_if_down"](e)
+    ns["server_wake_if_down"](e, ctx)
     out["refused"] = (ns["server_take_wake_notes"]() == [("Desktop", False)] and t[0] - ta >= 60)
     routes["/v1/info"] = [_SvResp(200, {"gpu": {}})]
     # nothing to wake: not known to sleep, no cards, not paired, answering, or failing another way
@@ -23664,7 +23673,7 @@ def _w46c_wake(src):
         before = len(packets)
         ns["_srv_wake_at"].clear()
         ns["_srv_seen"][row["id"]] = seen or {"at": 1, "reachable": False, "kind": "offline", "err": "x"}
-        ns["server_wake_if_down"](row)
+        ns["server_wake_if_down"](row, ctx)
         return len(packets) == before and ns["server_take_wake_notes"]() == []
     r_ = dict(e)
     out["quiet"] = (quiet(dict(r_, sleep={"enabled": False, "minutes": 30})) and quiet(dict(r_, sleep=None))
@@ -23709,7 +23718,18 @@ def _w46c_wake(src):
     out["handler"] = (h0 < h1 < h2 and src.index("def status(text: str):", h1) < h2
                       and 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)' in src[h2:h2 + 200])
     # first-token deadlines start after the wake: the wake is in the refresh, before any deadline is set
-    out["deadline"] = (src.index("server_wake_if_down(e)") < src.index("def server_first_answer(")
+    # only real, private networks get a broadcast of their own
+    ifs = [("en0", "192.168.1.20", "255.255.255.0"), ("docker0", "172.17.0.1", "255.255.0.0"),
+           ("utun3", "10.8.0.2", "255.255.255.0"), ("en1", "8.8.8.8", "255.255.255.0"),
+           ("en2", "10.0.0.5", "255.255.255.255"), ("en3", "169.254.1.2", "255.255.0.0"),
+           ("lo0", "127.0.0.1", "255.0.0.0"), ("en4", "10.1.2.3", "255.0.0.0"),
+           ("en5", "172.16.5.4", "255.255.252.0"), ("en6", "192.168.1.21", "255.255.255.0"),
+           ("br-abc", "192.168.9.1", "255.255.255.0"), ("vboxnet0", "192.168.56.1", "255.255.255.0"),
+           ("eth0", "192.168.2.5", "255.255.255.254"), ("eth9", "bad", "x"), ("tailscale0", "100.64.0.1", "255.192.0.0"),
+           ("en7", "172.32.0.1", "255.255.255.0")]
+    out["bcast"] = (ns["srv_bcast_for"](ifs) == ["192.168.1.255", "172.16.7.255"]
+                    and ns["srv_bcast_for"]([]) == [] and ns["_srv_bcast_addrs"]()[0] == "255.255.255.255")
+    out["deadline"] = (src.index("server_wake_if_down(e, ctx)") < src.index("def server_first_answer(")
                        and "with server_first_deadline" not in src[src.index("def server_wake("):src.index("def server_wake_if_down(")])
     return all(out.values()), out
 
@@ -23814,7 +23834,8 @@ def _w46c_text(src):
     out["ctx"] = ("def _srv_sleep_call(ctx, sid: str, method: str, obj=None) -> dict:" in seg
                   and "_srv_find(_srv_read(ctx), sid)" in seg and "_srv_update(ctx, fn)" in seg)
     out["public"] = '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),' in src
-    out["gap"] = ("SRV_WAKE_GAP_S = 60" in src and "SRV_WAKE_WAIT_S = 60" in src and "SRV_WAKE_POLL_S = 2" in src)
+    out["gap"] = ("SRV_WAKE_GAP_S = 300 " in src and "SRV_WAKE_WAIT_S = 60 " in src and "SRV_WAKE_POLL_S = 2" in src)
+    out["lock"] = "    with _srv_lock:          # two questions at once send one wake-up call, not two" in src
     out["port"] = "_srv_udp(pkt, (tgt, 9))" in seg
     return all(out.values()), out
 
@@ -23865,8 +23886,8 @@ _W46_MUT = [
      '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")), "wake": e.get("wake"),'),
     ("the packet's address once", 'return b"\\xff" * 6 + bytes.fromhex(mac.replace(":", "")) * 16',
      'return b"\\xff" * 6 + bytes.fromhex(mac.replace(":", ""))'),
-    ("no rate limit", "if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:\n        return \"\"",
-     "if False:\n        return \"\""),
+    ("no rate limit", "        if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:\n            return \"\"",
+     "        if False:\n            return \"\""),
     ("woken without the setting known", '(e.get("sleep") or {}).get("enabled") is True', "True"),
     ("woken with no card", 'if not (_srv_paired(e) and e.get("wake") and (e.get("sleep")', "if not (_srv_paired(e) and (e.get(\"sleep\")"),
     ("woken for any failure", 'if s.get("reachable") or s.get("kind") != "offline":\n        return', 'if s.get("reachable"):\n        return'),
@@ -23875,8 +23896,17 @@ _W46_MUT = [
     ("the answer not checked", "            if st == 200:\n                server_check(e)\n                return \"woke\"",
      "            if True:\n                server_check(e)\n                return \"woke\""),
     ("a wake that isn't said", "    if r:\n        _srv_wake_tl.notes", "    if False:\n        _srv_wake_tl.notes"),
-    ("woken by the refresh of a server not due", "        for e in due:\n            server_wake_if_down(e)\n",
-     "    for e in _srv_read(ctx):\n        server_wake_if_down(e)\n"),
+    ("woken by the refresh of a server not due", "        for e in due:\n            server_wake_if_down(e, ctx)\n",
+     "    for e in _srv_read(ctx):\n        server_wake_if_down(e, ctx)\n"),
+    ("a wake that fails marks nothing down", 'if r == "tried" and ctx is not None:', "if False:"),
+    ("a wake call every minute", "SRV_WAKE_GAP_S = 300 ", "SRV_WAKE_GAP_S = 60 "),
+    ("the wake check unlocked", "    with _srv_lock:          # two questions at once send one wake-up call, not two\n        last =",
+     "    if True:\n        last ="),
+    ("a public network broadcast to", "if not 16 <= net.prefixlen <= 30 or not any(_ipa.ip_address(addr) in p for p in private):",
+     "if not 16 <= net.prefixlen <= 30:"),
+    ("a /32 or a /31 broadcast to", "if not 16 <= net.prefixlen <= 30 or", "if not 16 <= net.prefixlen <= 32 or"),
+    ("a tunnel, container or VM broadcast to", "if _SRV_VIRT_NIC.match(str(name)):", "if False:"),
+    ("a huge network broadcast to", "if not 16 <= net.prefixlen <= 30 or", "if not 8 <= net.prefixlen <= 30 or"),
     ("woken by the usage poll", '    if st == 200:\n        return {"ok": True, "gpu": _srv_usage_gpu(js)',
      '    server_wake_if_down(e)\n    if st == 200:\n        return {"ok": True, "gpu": _srv_usage_gpu(js)'),
     ("woken by reading the setting", '    try:\n        st, js = _srv_json(e, method, "/v1/sleep-config"',

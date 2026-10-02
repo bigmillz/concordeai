@@ -38,11 +38,19 @@ class Gpu:
         self.vendor = None
         self.at = -1e9
 
-    def busy(self):
+    def _find(self):
         if not self.vendor and time.monotonic() - self.at > 60:
             self.at = time.monotonic()
             self.vendor = o1gpu.detect().get("vendor")
-        return o1gpu.usage(self.vendor)["busy_pct"] if self.vendor else None
+        return self.vendor
+
+    def busy(self):
+        return o1gpu.usage(self._find())["busy_pct"] if self._find() else None
+
+    def present(self):
+        """True when a graphics card is found; False only when none is (a card with no
+        reading then blocks sleep, a machine with no card isn't held up by it)."""
+        return bool(self._find())
 
 
 def suspend():
@@ -52,7 +60,7 @@ def suspend():
 def probes():
     gpu = Gpu()
     return {"supported": o1idle.deep_sleep_supported, "wake": o1idle.wake_list, "sessions": o1idle.sessions_count,
-            "inhibitors": o1idle.inhibitors_blocking, "tools": o1idle.tools_running, "gpu_busy": gpu.busy,
+            "inhibitors": o1idle.inhibitors_blocking, "tools": o1idle.tools_running, "gpu_busy": gpu.busy, "gpu_present": gpu.present, "loadavg": o1idle.loadavg1,
             "busy": o1sleep.busy_reasons, "boot_time": o1idle.boot_time}
 
 

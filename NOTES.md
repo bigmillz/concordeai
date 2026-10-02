@@ -207,6 +207,57 @@ APP
   socket, the pane's functions in node, source pins, 33 mutations) and live
   checks of the routes on the real gateway. Not run in full here.
 
+
+REVIEW FIXES (an independent review of auto sleep and setup):
+- WAKE FILE. `50-wol-<card>.link` now also says `NamePolicy=keep kernel database
+  onboard slot path` and `MACAddressPolicy=persistent` (what 99-default.link says):
+  the first matching .link wins, so a file with only the wake line could leave a
+  card named eth0 after a reboot and break netplan and the bridge. `wol-setup`
+  brings any `50-wol*.link` that names the card's address (by hand, any file
+  name, any case) to that shape in place, and writes nothing when it is right.
+- THE IDLE SERVICE. A gateway that has just restarted starts "active" (`last`
+  is seeded with the clock, not 0), so a panel restart, update or crash can't
+  look like "idle since boot". An activity file that is stale, missing or
+  garbled means the requests in flight are UNKNOWN (None) and block sleep until
+  the gateway writes again; it no longer reads as "none". A sleep, however it
+  ends (a wake of a few seconds, or one the helper refused), starts the idle
+  clock again (`last_resume = now`), which also ended the resleep loop every
+  30 s, so the separate 5-minute retry pause went. A card with no reading blocks
+  sleep (only a machine with no card at all is excused); an unknown boot time
+  blocks (it was 0); a failed load-average read blocks. New gate: the 1-minute
+  load average above 1.5 blocks (a detached build or test after logout).
+  Tools are matched by name anywhere in a command for our scripts
+  (`python3 -u ram_model_test.py`) and as the program itself for apt, dpkg and
+  unattended-upgrade (a word in vim's arguments no longer counts).
+  The root service reads the two files the gateway's user can write
+  (sleep.json, activity.json), and idle.json for the gateway, with
+  `read_json_safe` (no symlink, regular file, no blocking on a FIFO, at most a
+  few KB).
+- WAKING FROM THE APP. The gap between wake-up calls is 300 s (the wait is
+  60 s), so a server that is simply off costs one wait, not one per question.
+  A wake that got no answer calls `server_mark_down` (as any failed request
+  does), so the next questions skip the server. The check-then-set of the
+  per-server time is under `_srv_lock`. Magic packets go only to the networks of
+  real interfaces: private (RFC 1918) addresses, /16 to /30, nothing from a
+  tunnel, container or VM interface (`srv_bcast_for`), plus the limited
+  broadcast out of the default interface.
+- SETUP. `--lan` must be a private network of /16 or narrower; anything else
+  needs `--lan-public-ok` (checked after every flag is read, so the order
+  doesn't matter). A LAN detected from the LAN port that isn't private is not
+  used silently: it is said and then asked for. An SSH session (from
+  `SSH_CONNECTION`, `SSH_CLIENT` or `who am i`, since sudo hides the first two)
+  from outside the LAN gets a loud warning and needs an explicit `yes` before
+  anything changes. The effective-sshd check now also requires `allowusers
+  <user>@<LAN>`. The plan prints one line naming the admin Access policy and
+  saying that a different `--owner` makes a second one and which one the app
+  uses (`policy_admin_name` in config.json, else that name); no other change.
+- Tests: kit `test_idle` (the file shapes, rewriting, unknown states, the
+  seeded start, the short wake, the load gate, tools, safe reads) and
+  `test_setuplib` (the LAN policy and flag, the SSH address, the plan line, the
+  setup.sh pins); mutate.py gained mutants for each (and lost the 5-minute retry
+  one with the retry); the gauntlet's wake checks cover the gap, the mark-down,
+  the lock pin and the broadcast list, with 7 more mutants.
+
 ## 6b345 — dictation starts at once
 (Independent review, same build: the warm microphone defaulted ON and now
 defaults OFF; a blur while a start is in flight is NOT cancelled on purpose,

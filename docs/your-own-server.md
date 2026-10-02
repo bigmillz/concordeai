@@ -254,14 +254,22 @@ the minutes with no questions before it sleeps (5 to 1440, 30 to start). It is
 off until you turn it on. The server suspends itself to memory after that long
 if, and only if, all of these hold: nothing is being answered, nobody is logged
 in (an open SSH or terminal session keeps it awake), the graphics card is under
-10% busy, no download, update, setup or stability test is running, and nothing
-holds a sleep inhibitor lock. Only questions count as use: the app's sidebar
-meters and Settings never keep it awake. Whatever the setting, the time since
-the server last started, or last woke, counts as use too.
+10% busy (a card it can't read blocks sleep; a machine with no card is not held
+up by it), no download, update, setup or stability test is running (named
+anywhere in a command, so `python3 -u ram_model_test.py` counts), nothing holds
+a sleep inhibitor lock, and the 1-minute load average is 1.5 or less (so a
+build or test left running after you log out keeps it up). Only questions count
+as use: the app's sidebar meters and Settings never keep it awake. Whatever the
+setting, the time since the server last started, last woke or the gateway last
+restarted counts as use too, and anything it can't find out (the gateway's
+activity, the boot time, the load) keeps it awake rather than being guessed.
 
 Waking is a magic packet. `setup.sh` switches it on for every real network card
-that supports it (a `/etc/systemd/network/50-wol-<card>.link` file and `ethtool
--s <card> wol g`) and prints one line if it did. Your BIOS must allow it too:
+that supports it (a `/etc/systemd/network/50-wol-<card>.link` file, which also
+carries the system's own naming and MAC rules from `99-default.link` because the
+first matching `.link` wins, and `ethtool -s <card> wol g`) and prints one line
+if it did. A wake-on-LAN file you made by hand for the same card is brought to
+that shape in place. Your BIOS must allow it too:
 "Wake on PCI-E" or "Resume by PCI-E device" (MSI: Settings > Advanced > Wake Up
 Event Setup). When you ask a question that would use a sleeping server, the app
 sends the packet, says "Woke <name>." in the chat once it answers (up to a

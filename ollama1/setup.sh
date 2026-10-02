@@ -27,7 +27,9 @@
 #   --user <your-user>         the one Linux user who may log in over SSH
 #                              (default: the user who ran sudo)
 #   --lan <lan-cidr>           the network SSH is allowed from, like 10.0.0.0/24
-#                              (default: the network of this machine's LAN port)
+#                              (default: the network of this machine's LAN port, if it is a private one)
+#                              Only a private network of /16 or narrower is accepted;
+#                              --lan-public-ok allows another one (SSH is let in from it)
 #   --zone <your-domain>       your domain on Cloudflare (not needed with --skip-cloudflare)
 #   --owner <your-name>        your name, only in the Access policy's name
 #   --timezone <Area/City>     default: the time zone the machine already has
@@ -70,7 +72,7 @@ set_option() { # --flag value: checked here, so a typo stops before anything run
   case "$1" in
     --name) valid_name "$v" || bad_option --name "lowercase letters, digits and hyphens, 1-32 characters, starting with a letter"; A_NAME=$v ;;
     --user) valid_user "$v" || bad_option --user "a Linux user name, like alice"; A_USER=$v ;;
-    --lan) valid_lan "$v" || bad_option --lan "a network like 10.0.0.0/24 (the address part must be the network's first address)"; A_LAN=$v ;;
+    --lan) valid_lan_shape "$v" || bad_option --lan "a network like 10.0.0.0/24 (the address part must be the network's first address)"; A_LAN=$v ;;
     --zone) v=$(printf '%s' "$v" | tr 'A-Z' 'a-z'); valid_zone "$v" || bad_option --zone "a domain like example.com"; A_ZONE=$v ;;
     --owner) valid_owner "$v" || bad_option --owner "your name: letters, digits, spaces, . _ - (1-40)"; A_OWNER=$v ;;
     --timezone) valid_tz "$v" || bad_option --timezone "like America/New_York"; A_TZ=$v ;;
@@ -82,6 +84,7 @@ set_option() { # --flag value: checked here, so a typo stops before anything run
 }
 
 PLAN_ONLY=0
+LAN_PUBLIC_OK=0
 SKIP_CF=0
 REMOVE_SETUP_KEY=0
 NO_TMUX=0
@@ -110,10 +113,15 @@ for a in "$@"; do
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
     --no-tmux) NO_TMUX=1 ;;
+    --lan-public-ok) LAN_PUBLIC_OK=1 ;;
     -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
+# the LAN is checked once every flag is read (so --lan-public-ok may come after it)
+if [ -n "$A_LAN" ] && ! valid_lan "$A_LAN"; then
+  bad_option --lan "a private network of /16 or narrower, like 10.0.0.0/24 (SSH is let in from it, and from nowhere else); add --lan-public-ok only if a larger or public network is really meant"
+fi
 # a flag left waiting for its value (the size forgotten) must not mean "no reserve"
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
 case "$prev" in --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
@@ -174,6 +182,11 @@ resolve_settings() {
   if [ -z "$HOME_LAN" ]; then
     HOME_LAN=$(detect_lan)
     LAN_SOURCE="detected from this machine's LAN port"
+    # a network that isn't a private one (or is wider than /16) is never used unasked
+    if [ -n "$HOME_LAN" ] && ! valid_lan "$HOME_LAN"; then
+      note "this machine's LAN port is on $HOME_LAN, which isn't a private network of /16 or narrower, so it is not used for SSH: give --lan (and --lan-public-ok if it is meant)"
+      HOME_LAN=""
+    fi
   fi
   pick CF_ZONE "$A_ZONE" CF_ZONE cf_zone valid_zone
   if [ -z "$CF_ZONE" ]; then
@@ -257,6 +270,14 @@ show_disks() {
 
 state() { if eval "$1" >/dev/null 2>&1; then printf '%sdone%s ' "$G" "$N"; else printf 'to do'; fi; }
 
+policy_line() { # which Access policy name the admin panel's access uses, and what another --owner does
+  local p; p=$(cfg_str policy_admin_name)
+  if [ -z "$p" ]; then
+    if [ -n "$OWNER" ]; then p="$SERVER_NAME admin - $OWNER only"; else p="$SERVER_NAME admin only"; fi
+  fi
+  printf "Cloudflare Access policy for the admin panel: '%s'. Running setup again with a different --owner makes a second policy (the first stays); the app and panel use the one named policy_admin_name in config.json, else this name." "$p"
+}
+
 print_plan() {
   printf '%sollama1 setup: the plan%s\n' "$B" "$N"
   printf '\n   Server name %s, SSH user %s, LAN %s (%s), domain %s, time zone %s\n' \
@@ -282,6 +303,7 @@ print_plan() {
 
    Not touched: the network settings (netplan, br0), anything in /home besides the move.
    No models are installed.
+   $(policy_line)
 EOF
 }
 
@@ -410,6 +432,15 @@ if [ "${#WIPES[@]}" -gt 0 ]; then
   for w in "${WIPES[@]}"; do printf '   %s\n' "$w"; done
   printf '(/home is copied off %s first, and the copy is checked before that disk is touched.\n' "$HDD1"
   printf ' A mirror already on the mirror disks is reassembled, never wiped.)\n'
+fi
+# Setup locks SSH to the LAN. A session that comes from outside it is cut off, and so is
+# every other connection from there: say so, and go on only on an explicit yes
+CLIENT_IP=$(ssh_client_ip)
+if ssh_outside_lan "$CLIENT_IP" "$HOME_LAN"; then
+  printf '\n%sThis SSH session comes from %s, which is OUTSIDE %s.%s\n' "$R$B" "$CLIENT_IP" "$HOME_LAN" "$N"
+  printf 'Setup lets SSH in from %s only (the firewall and sshd). When it reaches that step this\n' "$HOME_LAN"
+  printf 'session, and any login from where you are now, stops working. Use the console or a machine on %s afterwards.\n' "$HOME_LAN"
+  ask_yes "Type yes to continue anyway: " || { echo "Nothing changed."; exit 1; }
 fi
 ask_yes "Type yes to go ahead: " || { echo "Nothing changed."; exit 1; }
 save_settings
@@ -797,6 +828,7 @@ n = ipaddress.ip_network(sys.argv[1]); print(n[min(20, n.num_addresses - 1)])' "
 eff=$(sshd -T -C "user=$ADMIN_USER,host=client.lan,addr=$LAN_PROBE,laddr=${LANIP:-$LAN_PROBE},lport=22" 2>/dev/null || true)
 want_pw=yes; [ "$PW_OFF" = 1 ] && want_pw=no
 if ! echo "$eff" | grep -qx "permitrootlogin no" || ! echo "$eff" | grep -qx "passwordauthentication $want_pw" \
+   || ! echo "$eff" | grep -qix "allowusers $ADMIN_USER@$HOME_LAN" \
    || { [ "$want_pw" = no ] && ! echo "$eff" | grep -qx "kbdinteractiveauthentication no"; }; then
   restore_ssh; rm -rf "$bak"
   die "sshd's effective settings are not what they should be (sshd -T); the previous ones are back"

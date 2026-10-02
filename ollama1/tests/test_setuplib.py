@@ -414,6 +414,37 @@ class TestSetupArgs(unittest.TestCase):
             self.assertEqual(code, 2, "%s %r: %s" % (flag, bad, out))
             self.assertIn(flag, out)
 
+    def test_the_lan_must_be_private_and_not_wider_than_a_16_unless_it_is_meant(self):
+        for lan in ("8.8.8.0/24", "10.0.0.0/8", "192.0.2.0/24", "0.0.0.0/0", "172.16.0.0/12"):
+            code, out = self.run_setup("--plan", "--lan", lan)
+            self.assertEqual(code, 2, "%s: %s" % (lan, out))
+            self.assertIn("--lan-public-ok", out)
+        for args in (("--lan", "8.8.8.0/24", "--lan-public-ok"), ("--lan-public-ok", "--lan", "10.0.0.0/8")):
+            code, out = self.run_setup("--plan", *args)
+            self.assertEqual(code, 0, "%s: %s" % (args, out))
+        code, out = self.run_setup("--plan", "--lan", "10.0.0.0/16")
+        self.assertEqual(code, 0, out)
+
+    def test_the_plan_names_the_access_policy_and_what_another_owner_does(self):
+        code, out = self.run_setup("--plan", "--name", "testsrv", "--owner", "Alice")
+        self.assertEqual(code, 0, out)
+        self.assertIn("'testsrv admin - Alice only'", out)
+        self.assertIn("different --owner makes a second policy", out)
+        self.assertIn("policy_admin_name", out)
+
+    def test_ssh_from_outside_the_lan_needs_an_explicit_yes_and_sshd_must_say_allowusers(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        a = setup.index('CLIENT_IP=$(ssh_client_ip)')
+        b = setup.index('ask_yes "Type yes to go ahead: "')
+        self.assertLess(a, b)
+        self.assertIn('if ssh_outside_lan "$CLIENT_IP" "$HOME_LAN"; then', setup[a:b])
+        self.assertIn('ask_yes "Type yes to continue anyway: " || { echo "Nothing changed."; exit 1; }', setup[a:b])
+        self.assertIn('grep -qix "allowusers $ADMIN_USER@$HOME_LAN"', setup)
+        self.assertIn('valid_lan_shape "$v"', setup)                       # --lan: the shape now, the policy after every flag
+        self.assertIn('if [ -n "$A_LAN" ] && ! valid_lan "$A_LAN"; then', setup)
+        self.assertIn("--lan-public-ok) LAN_PUBLIC_OK=1 ;;", setup)
+        self.assertIn('if [ -n "$HOME_LAN" ] && ! valid_lan "$HOME_LAN"; then', setup)   # a detected LAN is not used unasked
+
     def test_a_setting_without_its_value_is_refused(self):
         for flag in ("--name", "--user", "--lan", "--zone", "--owner", "--timezone", "--os-serial",
                      "--models-serial", "--hdd1-serial", "--hdd2-serial"):
@@ -462,13 +493,35 @@ class TestSettingsFromTheLibrary(unittest.TestCase):
         with open(self.cfg, "w") as f:
             json.dump(data, f)
 
+    def test_a_wide_or_public_lan_is_valid_only_when_it_is_meant(self):
+        for v in ("10.0.0.0/8", "192.0.2.0/24", "8.8.8.0/24", "0.0.0.0/0", "172.16.0.0/12"):
+            self.assertEqual(self.sh('LAN_PUBLIC_OK=1; valid_lan "%s"' % v)[0], 0, v)
+            self.assertNotEqual(self.sh('valid_lan "%s"' % v)[0], 0, v)
+            self.assertNotEqual(self.sh('LAN_PUBLIC_OK=0; valid_lan "%s"' % v)[0], 0, v)
+        for v in ("10.0.0.5/24", "x", "10.0.0.0/33"):                       # the flag doesn't excuse a malformed one
+            self.assertNotEqual(self.sh('LAN_PUBLIC_OK=1; valid_lan "%s"' % v)[0], 0, v)
+
+    def test_the_ssh_session_s_address(self):
+        r = lambda env: self.sh("%s; ssh_client_ip" % env)[1]
+        self.assertEqual(r("SSH_CONNECTION='203.0.113.9 5555 10.0.0.2 22'; export SSH_CONNECTION"), "203.0.113.9")
+        self.assertEqual(r("unset SSH_CONNECTION; SSH_CLIENT='198.51.100.7 5 22'; export SSH_CLIENT"), "198.51.100.7")
+        self.assertEqual(r("SSH_CONNECTION='not-an-address 1 2 22'; export SSH_CONNECTION"), "")
+        out = lambda ip, lan: self.sh('ssh_outside_lan "%s" "%s"' % (ip, lan))[0]
+        self.assertEqual(out("203.0.113.9", "10.0.0.0/24"), 0)               # outside: warn
+        self.assertEqual(out("10.0.0.77", "10.0.0.0/24"), 1)                 # inside: no warning
+        self.assertEqual(out("", "10.0.0.0/24"), 1)                          # no SSH session: nothing to say
+        self.assertEqual(out("10.0.1.1", "10.0.0.0/24"), 0)
+
     def test_validators(self):
         good = {"valid_name": ["a", "testsrv", "gpu-2", "a" * 32], "valid_user": ["alice", "_svc", "a-b_c"],
-                "valid_lan": ["10.0.0.0/24", "172.16.0.0/16", "192.0.2.0/25"],
+                "valid_lan": ["10.0.0.0/24", "172.16.0.0/16", "192.168.1.0/25", "10.0.0.0/16", "172.31.255.0/24"],
                 "valid_zone": ["example.test", "sub.example.co"], "valid_owner": ["Alice", "Alice B. Smith"],
                 "valid_tz": ["America/New_York", "UTC"], "valid_serial": ["SERIAL-1", "ab12.cd_3"]}
         bad = {"valid_name": ["", "1a", "A", "a-", "a" * 33, "a_b"], "valid_user": ["", "Alice", "a b", "1a"],
-               "valid_lan": ["", "10.0.0.5/24", "10.0.0.0", "10.0.0.0/33", "a.b.c.d/8"],
+               "valid_lan": ["", "10.0.0.5/24", "10.0.0.0", "10.0.0.0/33", "a.b.c.d/8",
+                       # a /8 or a network that isn't private opens SSH to far more than a home or office
+                       "10.0.0.0/8", "172.16.0.0/12", "0.0.0.0/0", "192.0.2.0/24", "8.8.8.0/24", "172.15.0.0/16",
+                       "172.32.0.0/16", "100.64.0.0/16", "169.254.0.0/16", "11.0.0.0/24"],
                "valid_zone": ["", "example", "Example.test", "-a.test"], "valid_owner": ["", "a;b", "$(x)", " a"],
                "valid_tz": ["", "a b"], "valid_serial": ["", "abc", "a b c d"]}
         for fn, vals in good.items():

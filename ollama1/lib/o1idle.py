@@ -18,20 +18,20 @@ import re
 import subprocess
 import time
 
-from o1common import Paths, read_json, write_json_atomic
+from o1common import Paths, read_json_safe, write_json_atomic
 
 MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES = 5, 1440, 30
 GPU_IDLE_PCT = 10            # busy below this counts as idle
 ACTIVITY_STALE_S = 120       # a gateway that hasn't written this recently isn't running
 RESUME_JUMP_S = 15           # wall clock ahead of the monotonic one by this: we slept
 TICK_S = 30
-RETRY_AFTER_REFUSED_S = 300
+LOAD_BUSY = 1.5              # a 1-minute load average above this means something is running (a detached build or test)
 WAKE_REFRESH_S = 300
 MAX_WAKE = 8
 MAC_RX = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
 VIRTUAL_NICS = re.compile(r"^(lo|veth|docker|br-|virbr|vnet|tap|tun|dummy|ifb|bond|wg|tailscale|zt|cni|flannel|vmnet)")
-TOOLS = ("stability-test.sh", "ram_model_test.py", "ram-model-test.sh", "setup.sh", "apt", "apt-get", "dpkg",
-         "unattended-upgrade", "unattended-upgrades")
+TOOL_SCRIPTS = ("stability-test.sh", "ram_model_test.py", "ram-model-test.sh", "setup.sh")   # named anywhere in the command
+TOOL_PROGRAMS = ("apt", "apt-get", "dpkg", "unattended-upgrade", "unattended-upgrades")      # the program itself
 
 
 def config_file():
@@ -65,7 +65,7 @@ def clean_config(obj):
 
 
 def read_config(path=None):
-    return clean_config(read_json(path or config_file(), {}))
+    return clean_config(read_json_safe(path or config_file(), {}, max_bytes=4096))
 
 
 def parse_config_update(obj):
@@ -107,7 +107,7 @@ class Activity:
         self.path = path
         self.lock = threading.Lock()
         self.inflight = 0
-        self.last = 0.0
+        self.last = clock()          # a gateway that has just (re)started has not been idle for ever
 
     def begin(self):
         with self.lock:
@@ -135,17 +135,18 @@ class Activity:
 
 def read_activity(now, path=None):
     """{"last": epoch, "inflight": int, "fresh": bool}: never trusts the file.
-    A file the gateway hasn't refreshed lately says nothing is running."""
-    d = read_json(path or activity_file(), {})
+    A file the gateway hasn't refreshed lately says nothing: the requests in
+    flight are then unknown (None), not none."""
+    d = read_json_safe(path or activity_file(), {}, max_bytes=4096)
     d = d if isinstance(d, dict) else {}
 
     def num(v):
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v < 1e11 else None
     last, at = num(d.get("last")), num(d.get("at"))
     inflight = d.get("inflight")
-    inflight = inflight if _int(inflight) and 0 <= inflight < 100000 else 0
+    inflight = inflight if _int(inflight) and 0 <= inflight < 100000 else None
     fresh = at is not None and -5 <= now - at <= ACTIVITY_STALE_S
-    return {"last": last or 0.0, "inflight": inflight if fresh else 0, "fresh": fresh}
+    return {"last": last or 0.0, "inflight": inflight if fresh else None, "fresh": fresh}
 
 
 # ---- the decision ----------------------------------------------------------------
@@ -156,9 +157,10 @@ def decide(i):
 
     Inputs: enabled, supported, minutes, now, last_activity, boot_time,
     last_resume (epoch seconds, or None), inflight, sessions (count),
-    gpu_busy (percent, None when there is no reading), busy (reasons from
-    o1sleep.busy_reasons), tools (names running), inhibitors (blocking
-    locks)."""
+    gpu_busy (percent) and gpu_present (False only on a machine with no
+    graphics card: a card with no reading blocks), loadavg (1-minute; above
+    LOAD_BUSY something is running), busy (reasons from o1sleep.busy_reasons),
+    tools (names running), inhibitors (blocking locks)."""
     try:
         if i.get("enabled") is not True:
             return False, "auto sleep is off"
@@ -173,7 +175,9 @@ def decide(i):
             return False, "couldn't ask who is logged in"
         if i["sessions"] > 0:
             return False, "someone is logged in"
-        if i.get("inflight") is None or i["inflight"] > 0:
+        if i.get("inflight") is None:
+            return False, "couldn't tell whether a request is running"
+        if i["inflight"] > 0:
             return False, "a request is running"
         if i.get("busy") is None:
             return False, "couldn't ask what is running"
@@ -187,11 +191,20 @@ def decide(i):
             return False, "couldn't ask what blocks sleep"
         if i["inhibitors"]:
             return False, "something blocks sleep: " + "; ".join(str(x) for x in i["inhibitors"])[:120]
+        la = i.get("loadavg")
+        if la is None:
+            return False, "couldn't read the load average"
+        if la > LOAD_BUSY:
+            return False, "the machine is busy (load %.1f)" % la
         g = i.get("gpu_busy")
+        if g is None and i.get("gpu_present") is not False:
+            return False, "no reading from the graphics card"
         if g is not None and g >= GPU_IDLE_PCT:
             return False, "the graphics card is busy (%d%%)" % g
+        if i.get("boot_time") is None:
+            return False, "couldn't tell when it started"
         last = min(float(i.get("last_activity") or 0), now)
-        since = max(last, float(i.get("boot_time") or 0), float(i.get("last_resume") or 0))
+        since = max(last, float(i["boot_time"]), float(i.get("last_resume") or 0))
         idle = now - since
         if idle < minutes * 60:
             return False, "idle %d of %d minutes" % (idle // 60, minutes)
@@ -222,13 +235,15 @@ def parse_inhibitors(text):
 
 
 def scan_tools(argvs):
-    """Names of the long jobs running, from the processes' argument lists:
-    only the program or the script it runs (the first two arguments)."""
+    """Names of the long jobs running, from the processes' argument lists: a
+    script of ours named anywhere in the command (python3 -u ram_model_test.py),
+    apt, dpkg and the like only as the program itself (not as a word in vim's
+    arguments)."""
     found = set()
     for argv in argvs:
-        for a in argv[:2]:
+        for i, a in enumerate(argv):
             b = os.path.basename(a)
-            if b in TOOLS:
+            if b in TOOL_SCRIPTS or (i < 2 and b in TOOL_PROGRAMS):
                 found.add(b)
     return sorted(found)
 
@@ -267,13 +282,21 @@ def tools_running(proc="/proc"):
 
 
 def boot_time(stat="/proc/stat"):
+    """When the machine started, or None (unknown: never sleep on a guess)."""
     try:
         for line in open(stat):
             if line.startswith("btime "):
                 return float(line.split()[1])
     except (OSError, ValueError, IndexError):
         pass
-    return 0.0
+    return None
+
+
+def loadavg1():
+    try:
+        return float(os.getloadavg()[0])
+    except (OSError, AttributeError):
+        return None
 
 
 def deep_sleep_supported(path=None):
@@ -358,8 +381,32 @@ def wake_list(nics=None, wol=read_wol):
 
 
 def link_text(mac):
-    return ("# ollama1: wake this computer with a magic packet\n[Match]\nMACAddress=%s\n\n[Link]\nWakeOnLan=magic\n"
+    """The card's .link file. The first .link that matches a card wins, so this
+    one has to say what 99-default.link says (the names and MAC policy), not
+    just the wake setting, or the card could come back as eth0 after a reboot."""
+    return ("# ollama1: wake this computer with a magic packet\n[Match]\nMACAddress=%s\n\n[Link]\n"
+            "NamePolicy=keep kernel database onboard slot path\nMACAddressPolicy=persistent\nWakeOnLan=magic\n"
             % mac)
+
+
+def existing_links(link_dir, mac):
+    """The 50-wol*.link files already there for this card's address (by hand
+    or from an earlier setup), whatever they're called."""
+    out = []
+    try:
+        names = sorted(os.listdir(link_dir))
+    except OSError:
+        return out
+    rx = re.compile(r"(?im)^\s*MACAddress\s*=\s*%s\s*$" % re.escape(mac))
+    for n in names:
+        if n.startswith("50-wol") and n.endswith(".link"):
+            try:
+                with open(os.path.join(link_dir, n)) as f:
+                    if rx.search(f.read()):
+                        out.append(os.path.join(link_dir, n))
+            except OSError:
+                pass
+    return out
 
 
 def wol_setup(nics=None, wol=read_wol, link_dir="/etc/systemd/network", ethtool=None, log=print):
@@ -372,20 +419,24 @@ def wol_setup(nics=None, wol=read_wol, link_dir="/etc/systemd/network", ethtool=
         w = wol(name)
         if not w or not w[0]:
             continue
-        path = os.path.join(link_dir, "50-wol-%s.link" % re.sub(r"[^a-z0-9_-]", "", name.lower()))
         want = link_text(mac)
-        try:
-            have = open(path).read()
-        except OSError:
-            have = None
-        if have != want:
-            os.makedirs(link_dir, exist_ok=True)
-            tmp = path + ".tmp"
-            with open(tmp, "w") as f:
-                f.write(want)
-            os.chmod(tmp, 0o644)
-            os.replace(tmp, path)
-            log("wake on a magic packet: %s" % path)
+        # a file for this card is brought to the current shape where it is (the old one had only
+        # the wake line); none yet: ours
+        for path in existing_links(link_dir, mac) or [
+                os.path.join(link_dir, "50-wol-%s.link" % re.sub(r"[^a-z0-9_-]", "", name.lower()))]:
+            try:
+                with open(path) as f:
+                    have = f.read()
+            except OSError:
+                have = None
+            if have != want:
+                os.makedirs(link_dir, exist_ok=True)
+                tmp = path + ".tmp"
+                with open(tmp, "w") as f:
+                    f.write(want)
+                os.chmod(tmp, 0o644)
+                os.replace(tmp, path)
+                log("wake on a magic packet: %s" % path)
         if ethtool:
             ethtool(name)
         done.append(mac)
@@ -398,7 +449,7 @@ def ethtool_set(nic):
 
 def published_wake(path=None):
     """The card list the root service last wrote, MAC addresses only."""
-    d = read_json(path or idle_file(), {})
+    d = read_json_safe(path or idle_file(), {}, max_bytes=8192)
     w = d.get("wake") if isinstance(d, dict) else None
     return [m for m in (w if isinstance(w, list) else []) if isinstance(m, str) and MAC_RX.match(m)][:MAX_WAKE]
 
@@ -415,7 +466,6 @@ class Idle:
         self.prev = None
         self.last_resume = None
         self.last_reason = None
-        self.retry_at = 0.0
         self.wake = []
         self.wake_at = -1e9
 
@@ -444,19 +494,19 @@ class Idle:
         act = read_activity(now)
         sleep, why = decide({
             "enabled": cfg["enabled"], "supported": supported, "minutes": cfg["minutes"], "now": now,
-            "last_activity": act["last"], "boot_time": self._probe("boot_time") or 0.0,
+            "last_activity": act["last"], "boot_time": self._probe("boot_time"),
+            "loadavg": self._probe("loadavg"), "gpu_present": self._probe("gpu_present"),
             "last_resume": self.last_resume, "inflight": act["inflight"],
             "sessions": self._probe("sessions"), "gpu_busy": self._probe("gpu_busy"),
             "busy": self._probe("busy"), "tools": self._probe("tools"),
             "inhibitors": self._probe("inhibitors")})
-        if sleep and mono < self.retry_at:
-            sleep, why = False, "waiting after a refused sleep"
         if why != self.last_reason:
             self.log("%s: %s" % ("sleeping" if sleep else "not sleeping", why))
             self.last_reason = why
         if sleep:
             rc = self.suspend()
-            if rc:
-                self.retry_at = self.mono() + RETRY_AFTER_REFUSED_S
+            # however it ended (slept and woke, even a few seconds later, or was refused) the idle
+            # clock starts again: a refused sleep isn't asked for again before a whole idle period
+            self.last_resume = self.clock()
             self.last_reason = None
         return sleep, why

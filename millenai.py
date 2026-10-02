@@ -16650,7 +16650,8 @@ SRV_FIRST_S = 600               # to the first line: its turn in the queue and a
 SRV_IDLE_S = 120                # then: this long with no byte ends the answer
 SRV_CHECK_S = 15                # a whole status check (whoami, tags, ps, version)
 SRV_SLEEP_MIN, SRV_SLEEP_MAX, SRV_SLEEP_DEFAULT = 5, 1440, 30   # minutes idle before it sleeps
-SRV_WAKE_GAP_S = 60             # one wake-up call a minute per server (6b346)
+SRV_WAKE_GAP_S = 300            # one wake-up call in five minutes per server (6b346): longer than the wait,
+                                # so a server that is simply off costs one wait, not one a question
 SRV_WAKE_WAIT_S = 60            # then up to this long for it to answer
 SRV_WAKE_POLL_S = 2
 _SRV_MAC_RX = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}")
@@ -17491,7 +17492,7 @@ def server_only_resolve(sid: str, ctx):
         if not (s.get("models") and s.get("reachable") and not s.get("err")
                 and time.time() - float(s.get("at") or 0) < SRV_ONLY_FRESH_S):
             server_check(e)
-            server_wake_if_down(e)
+            server_wake_if_down(e, ctx)
     st = server_only_state(e)
     return st["label"], e["name"], st["why"]
 
@@ -17701,7 +17702,7 @@ def server_refresh_modes(ctx, limit: float = 5.0):
         # a server that sleeps is woken for this question (6b346), and only
         # here: the sidebar's poll, Settings and background passes never do
         for e in due:
-            server_wake_if_down(e)
+            server_wake_if_down(e, ctx)
 
 
 def server_mark_down(ctx, name: str, why: str):
@@ -18332,21 +18333,42 @@ def srv_magic_packet(mac: str) -> bytes:
     return b"\xff" * 6 + bytes.fromhex(mac.replace(":", "")) * 16
 
 
+_SRV_VIRT_NIC = re.compile(r"^(lo|docker|veth|br-|virbr|vmnet|vboxnet|vnet|utun|tun|tap|awdl|llw|gif|stf|ppp|wg|"
+                           r"tailscale|zt|cni|flannel|bridge\d)", re.I)
+
+
+def srv_bcast_for(ifaces) -> list:
+    """The broadcast address of each real home or office network among
+    ifaces ([(name, address, netmask)]): private (RFC 1918) addresses only,
+    nothing from a tunnel, container or virtual machine's interface, no /32
+    and no network wider than /16 or narrower than /30."""
+    import ipaddress as _ipa
+    private = [_ipa.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+    out = []
+    for name, addr, mask in ifaces:
+        try:
+            if _SRV_VIRT_NIC.match(str(name)):
+                continue
+            net = _ipa.IPv4Network("%s/%s" % (addr, mask), strict=False)
+            if not 16 <= net.prefixlen <= 30 or not any(_ipa.ip_address(addr) in p for p in private):
+                continue
+            b = str(net.broadcast_address)
+        except ValueError:
+            continue
+        if b not in out:
+            out.append(b)
+    return out
+
+
 def _srv_bcast_addrs() -> list:
-    """Where a magic packet goes: the whole-network broadcast and each local
-    network's own broadcast address."""
+    """Where a magic packet goes: the whole-network broadcast (out of the
+    default interface) and each real private network's own broadcast address."""
     out = ["255.255.255.255"]
     try:
-        import ipaddress as _ipa
         import psutil as _ps
         import socket as _so
-        for addrs in _ps.net_if_addrs().values():
-            for a in addrs:
-                if a.family == _so.AF_INET and a.address and a.netmask \
-                        and not a.address.startswith(("127.", "169.254.")):
-                    b = str(_ipa.IPv4Network("%s/%s" % (a.address, a.netmask), strict=False).broadcast_address)
-                    if b not in out:
-                        out.append(b)
+        out += srv_bcast_for([(n, a.address, a.netmask) for n, addrs in _ps.net_if_addrs().items() for a in addrs
+                              if a.family == _so.AF_INET and a.address and a.netmask])
     except Exception:
         pass
     return out[:8]
@@ -18374,15 +18396,16 @@ def server_wake(e) -> str:
     """Wake server e with a magic packet and wait for it to answer. "woke",
     "tried" (no answer in SRV_WAKE_WAIT_S), or "" (nothing asked: it has no
     card to wake it, it wasn't known to sleep, or a call went out within the
-    last SRV_WAKE_GAP_S). The packet carries nothing but the card's address;
+    last SRV_WAKE_GAP_S, five minutes). The packet carries nothing but the card's address;
     the answer is waited for with the server's own signed /v1/info."""
     if not (_srv_paired(e) and e.get("wake") and (e.get("sleep") or {}).get("enabled") is True):
         return ""
     t0 = _srv_wake_clock()
-    last = _srv_wake_at.get(e["id"])
-    if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:
-        return ""
-    _srv_wake_at[e["id"]] = t0
+    with _srv_lock:          # two questions at once send one wake-up call, not two
+        last = _srv_wake_at.get(e["id"])
+        if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:
+            return ""
+        _srv_wake_at[e["id"]] = t0
     for mac in e["wake"]:
         pkt = srv_magic_packet(mac)
         for tgt in _srv_bcast_addrs():
@@ -18403,15 +18426,22 @@ def server_wake(e) -> str:
             return "tried"
 
 
-def server_wake_if_down(e):
+def server_wake_if_down(e, ctx=None):
     """After a check that found e not answering: wake it for the question
-    being asked. Only the request paths call this."""
+    being asked. Only the request paths call this. A wake that got no answer
+    marks the server down (as any failed request does), so the questions of
+    the next minute skip it instead of each waiting for it."""
     s = _srv_seen.get(e["id"]) or {}
     if s.get("reachable") or s.get("kind") != "offline":
         return
     r = server_wake(e)
     if r:
         _srv_wake_tl.notes = (getattr(_srv_wake_tl, "notes", None) or []) + [(e["name"], r == "woke")]
+    if r == "tried" and ctx is not None:
+        try:
+            server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
+        except (StoreReadError, NoProfile):
+            pass
 
 
 # ==== servers: end ====

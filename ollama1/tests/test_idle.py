@@ -12,7 +12,8 @@ import o1idle
 
 NOW = 1_800_000_000.0
 BASE = dict(enabled=True, supported=True, minutes=30, now=NOW, last_activity=NOW - 3600, boot_time=NOW - 7200,
-            last_resume=None, inflight=0, sessions=0, gpu_busy=2, busy=[], tools=[], inhibitors=[])
+            last_resume=None, inflight=0, sessions=0, gpu_busy=2, gpu_present=True, loadavg=0.1, busy=[], tools=[],
+            inhibitors=[])
 
 
 def d(**kw):
@@ -30,7 +31,11 @@ class TestDecide(unittest.TestCase):
             (dict(enabled=False), "off"), (dict(enabled=None), "off"), (dict(enabled=1), "off"),
             (dict(supported=False), "no deep sleep"), (dict(supported=None), "no deep sleep"),
             (dict(sessions=1), "logged in"), (dict(sessions=None), "who is logged in"),
-            (dict(inflight=1), "request is running"), (dict(inflight=None), "request is running"),
+            (dict(inflight=1), "request is running"), (dict(inflight=None), "whether a request is running"),
+            (dict(loadavg=None), "load average"), (dict(loadavg=1.6), "busy (load 1.6)"), (dict(loadavg=9), "busy (load"),
+            (dict(boot_time=None), "when it started"),
+            (dict(gpu_busy=None), "no reading from the graphics card"),
+            (dict(gpu_busy=None, gpu_present=None), "no reading from the graphics card"),
             (dict(busy=["a model is being downloaded"]), "downloaded"), (dict(busy=None), "what is running"),
             (dict(tools=["stability-test.sh"]), "stability-test.sh"), (dict(tools=None), "tools"),
             (dict(inhibitors=["backup block"]), "blocks sleep"), (dict(inhibitors=None), "blocks sleep"),
@@ -43,10 +48,16 @@ class TestDecide(unittest.TestCase):
             self.assertFalse(sleep, kw)
             self.assertIn(word, why, kw)
 
-    def test_gpu_reading_missing_or_low_does_not_block(self):
-        self.assertTrue(d(gpu_busy=None)[0])
+    def test_gpu_reading_missing_blocks_only_where_there_is_a_card(self):
+        self.assertFalse(d(gpu_busy=None)[0])                       # a card, no reading: don't guess
+        self.assertTrue(d(gpu_busy=None, gpu_present=False)[0])     # no card at all
         self.assertTrue(d(gpu_busy=9)[0])
         self.assertTrue(d(gpu_busy=0)[0])
+        self.assertFalse(d(gpu_busy=95, gpu_present=False)[0])      # a reading is a reading
+
+    def test_load_gate_edge(self):
+        self.assertTrue(d(loadavg=1.5)[0])
+        self.assertFalse(d(loadavg=1.51)[0])
 
     def test_the_idle_clock(self):
         self.assertEqual(d(last_activity=NOW - 30 * 60)[0], True)          # exactly the minutes
@@ -61,6 +72,7 @@ class TestDecide(unittest.TestCase):
         self.assertFalse(d(last_activity=NOW + 99999)[0])
         # never any activity: the boot time is what counts
         self.assertTrue(d(last_activity=0, boot_time=NOW - 3600)[0])
+        self.assertFalse(d(last_activity=0, boot_time=None)[0])           # and an unknown boot time blocks
 
     def test_minutes_are_clamped(self):
         self.assertFalse(d(minutes=1, last_activity=NOW - 3 * 60)[0])      # 1 acts as 5
@@ -147,18 +159,50 @@ class TestActivity(unittest.TestCase):
         w = lambda obj: open(self.path, "w").write(json.dumps(obj))
         w({"last": NOW - 10, "inflight": 2, "at": NOW - 3})
         self.assertEqual(R(NOW, self.path), {"last": NOW - 10, "inflight": 2, "fresh": True})
-        w({"last": NOW - 10, "inflight": 2, "at": NOW - 500})        # the gateway isn't writing: nothing is running
-        self.assertEqual(R(NOW, self.path), {"last": NOW - 10, "inflight": 0, "fresh": False})
+        w({"last": NOW - 10, "inflight": 2, "at": NOW - 500})        # the gateway isn't writing: unknown, not none
+        self.assertEqual(R(NOW, self.path), {"last": NOW - 10, "inflight": None, "fresh": False})
         w({"last": NOW - 10, "inflight": 2, "at": NOW + 500})        # from the future
         self.assertFalse(R(NOW, self.path)["fresh"])
         w({"last": "x", "inflight": True, "at": NOW})
-        self.assertEqual(R(NOW, self.path), {"last": 0.0, "inflight": 0, "fresh": True})
+        self.assertEqual(R(NOW, self.path), {"last": 0.0, "inflight": None, "fresh": True})
         w({"last": -5, "inflight": -1, "at": NOW})
-        self.assertEqual(R(NOW, self.path)["inflight"], 0)
+        self.assertIsNone(R(NOW, self.path)["inflight"])
         open(self.path, "w").write("nope")
-        self.assertEqual(R(NOW, self.path), {"last": 0.0, "inflight": 0, "fresh": False})
+        self.assertEqual(R(NOW, self.path), {"last": 0.0, "inflight": None, "fresh": False})
         os.unlink(self.path)
-        self.assertEqual(R(NOW, self.path)["inflight"], 0)
+        self.assertIsNone(R(NOW, self.path)["inflight"])
+
+    def test_a_new_gateway_starts_awake(self):
+        a = o1idle.Activity(clock=lambda: NOW, path=self.path)
+        self.assertEqual(a.last, NOW)
+        a.write()
+        self.assertEqual(o1idle.read_activity(NOW + 1, self.path)["last"], NOW)
+
+    def test_the_files_are_read_safely(self):
+        """The root service reads what the gateway's user can write: a symlink, a FIFO or a big file
+        is nothing."""
+        good = os.path.join(self.dir, "real.json")
+        with open(good, "w") as f:
+            json.dump({"last": NOW, "inflight": 0, "at": NOW}, f)
+        link = os.path.join(self.dir, "link.json")
+        os.symlink(good, link)
+        self.assertFalse(o1idle.read_activity(NOW, link)["fresh"])
+        fifo = os.path.join(self.dir, "fifo.json")
+        os.mkfifo(fifo)
+        self.assertFalse(o1idle.read_activity(NOW, fifo)["fresh"])               # and doesn't block
+        big = os.path.join(self.dir, "big.json")
+        with open(big, "w") as f:
+            f.write('{"last": 1, "pad": "' + "x" * 10000 + '"}')
+        self.assertFalse(o1idle.read_activity(NOW, big)["fresh"])
+        cfg_link = os.path.join(self.dir, "cfg.json")
+        with open(good + ".cfg", "w") as f:
+            json.dump({"enabled": True, "minutes": 40}, f)
+        os.symlink(good + ".cfg", cfg_link)
+        self.assertEqual(o1idle.read_config(cfg_link), {"enabled": False, "minutes": 30})
+        self.assertEqual(o1idle.read_config(good + ".cfg"), {"enabled": True, "minutes": 40})
+        cfifo = os.path.join(self.dir, "cfifo.json")
+        os.mkfifo(cfifo)
+        self.assertEqual(o1idle.read_config(cfifo), {"enabled": False, "minutes": 30})
 
 
 INHIBIT = """\
@@ -188,6 +232,14 @@ class TestProbes(unittest.TestCase):
         # (grep setup.sh counts too: a false alarm only keeps the box awake; an argument past the
         # second never counts)
         self.assertEqual(o1idle.scan_tools(argvs), ["apt-get", "ram_model_test.py", "setup.sh", "stability-test.sh"])
+
+    def test_tools_named_anywhere_programs_only_as_programs(self):
+        S = o1idle.scan_tools
+        self.assertEqual(S([["python3", "-u", "-W", "ignore", "/x/ram_model_test.py", "--cfg", "a"]]), ["ram_model_test.py"])
+        self.assertEqual(S([["/bin/bash", "-x", "-e", "/opt/stability-test.sh"]]), ["stability-test.sh"])
+        self.assertEqual(S([["sudo", "-n", "bash", "-c", "x", "setup.sh"]]), ["setup.sh"])
+        self.assertEqual(S([["vim", "notes.txt", "apt"], ["tool", "--x", "/usr/bin/dpkg"], ["less", "-N", "apt-get"]]), [])
+        self.assertEqual(S([["sudo", "apt", "upgrade"], ["/usr/bin/dpkg", "-i", "x"]]), ["apt", "dpkg"])
 
     def test_tools_from_a_proc_tree(self):
         d_ = tempfile.mkdtemp(prefix="o1proc-")
@@ -219,7 +271,10 @@ class TestProbes(unittest.TestCase):
             p = os.path.join(d_, "stat")
             open(p, "w").write("cpu  1 2 3\nbtime 1790000000\nprocesses 5\n")
             self.assertEqual(o1idle.boot_time(p), 1790000000.0)
-            self.assertEqual(o1idle.boot_time(os.path.join(d_, "none")), 0.0)
+            self.assertIsNone(o1idle.boot_time(os.path.join(d_, "none")))
+            open(p, "w").write("cpu 1\nbtime nope\n")
+            self.assertIsNone(o1idle.boot_time(p))
+            self.assertGreaterEqual(o1idle.loadavg1(), 0.0)
         finally:
             shutil.rmtree(d_, ignore_errors=True)
 
@@ -316,7 +371,11 @@ class TestWake(NetFixture):
         self.assertEqual(sets, ["enp5s0", "enp6s0"])
         t = open(os.path.join(links, "50-wol-enp5s0.link")).read()
         self.assertEqual(t, "# ollama1: wake this computer with a magic packet\n[Match]\nMACAddress=02:00:5e:10:00:01\n\n"
-                            "[Link]\nWakeOnLan=magic\n")
+                            "[Link]\nNamePolicy=keep kernel database onboard slot path\nMACAddressPolicy=persistent\n"
+                            "WakeOnLan=magic\n")
+        # it says what 99-default.link says, so a card keeps its name and its MAC after a reboot
+        self.assertIn("NamePolicy=keep kernel database onboard slot path", t)
+        self.assertIn("MACAddressPolicy=persistent", t)
         self.assertEqual(len(lines), 2)
         m = os.stat(os.path.join(links, "50-wol-enp5s0.link")).st_mtime_ns
         lines.clear()
@@ -324,6 +383,32 @@ class TestWake(NetFixture):
         self.assertEqual(lines, [])
         self.assertEqual(os.stat(os.path.join(links, "50-wol-enp5s0.link")).st_mtime_ns, m)
         self.assertEqual(len(sets), 4)                                            # the setting itself is re-applied
+
+    def test_setup_rewrites_a_link_file_of_the_old_shape_where_it_is(self):
+        links = os.path.join(self.dir, "network")
+        os.makedirs(links)
+        old = "[Match]\nMACAddress=%s\n\n[Link]\nWakeOnLan=magic\n"
+        hand = os.path.join(links, "50-wol.link")                      # by hand: any name, the old shape
+        ours = os.path.join(links, "50-wol-enp6s0.link")
+        other = os.path.join(links, "50-wol-other.link")
+        with open(hand, "w") as f:
+            f.write(old % "02:00:5E:10:00:01")                         # (an upper-case address)
+        with open(ours, "w") as f:
+            f.write(old % "02:00:5e:10:00:02")
+        with open(other, "w") as f:
+            f.write(old % "aa:bb:cc:dd:ee:ff")                          # another card's: not ours to touch
+        nics = o1idle.physical_nics(self.net)
+        lines = []
+        o1idle.wol_setup(nics, lambda n: (True, True), links, None, lines.append)
+        self.assertEqual(open(hand).read(), o1idle.link_text("02:00:5e:10:00:01"))
+        self.assertEqual(open(ours).read(), o1idle.link_text("02:00:5e:10:00:02"))
+        self.assertEqual(open(other).read(), old % "aa:bb:cc:dd:ee:ff")
+        self.assertFalse(os.path.exists(os.path.join(links, "50-wol-enp5s0.link")))   # the hand one is the card's file
+        self.assertEqual(len(lines), 2)
+        lines.clear()
+        o1idle.wol_setup(nics, lambda n: (True, True), links, None, lines.append)       # again: nothing more
+        self.assertEqual(lines, [])
+        self.assertEqual(sorted(os.listdir(links)), ["50-wol-enp6s0.link", "50-wol-other.link", "50-wol.link"])
 
     def test_setup_skips_cards_that_cannot_and_says_nothing_when_none(self):
         links = os.path.join(self.dir, "network")
@@ -351,8 +436,8 @@ class FakeBox:
         self.wall, self.mono = NOW, 1000.0
         self.slept, self.logs, self.rc = 0, [], 0
         self.p = dict(supported=lambda: True, wake=lambda: ["02:00:5e:10:00:01"], sessions=lambda: 0,
-                      inhibitors=lambda: [], tools=lambda: [], gpu_busy=lambda: 1, busy=lambda: [],
-                      boot_time=lambda: NOW - 7200)
+                      inhibitors=lambda: [], tools=lambda: [], gpu_busy=lambda: 1, gpu_present=lambda: True,
+                      loadavg=lambda: 0.1, busy=lambda: [], boot_time=lambda: NOW - 7200)
         self.idle = o1idle.Idle(self.p, self.suspend, log=self.logs.append, clock=lambda: self.wall,
                                 mono=lambda: self.mono)
 
@@ -404,12 +489,36 @@ class TestTick(unittest.TestCase):
         self.assertFalse(self.box.idle.tick()[0])
         self.assertEqual(self.box.slept, 0)
 
-    def test_a_stale_activity_file_does_not_hold_it_awake_forever(self):
-        self.act(NOW - 3600, inflight=3, at=NOW - 1000)           # the gateway stopped with 3 running
+    def test_a_stale_or_missing_activity_file_is_unknown_and_blocks(self):
+        self.act(NOW - 3600, inflight=3, at=NOW - 1000)           # the gateway stopped (or is restarting)
+        sleep, why = self.box.idle.tick()
+        self.assertFalse(sleep)
+        self.assertIn("whether a request is running", why)
+        self.assertEqual(self.box.slept, 0)
+        self.box.advance(30)
+        self.act(NOW - 3600)                                       # it writes again: asleep-able
         self.assertTrue(self.box.idle.tick()[0])
 
-    def test_no_activity_file_at_all(self):
-        self.assertTrue(self.box.idle.tick()[0])                  # idle since boot
+    def test_no_activity_file_at_all_blocks(self):
+        self.assertFalse(self.box.idle.tick()[0])
+        self.assertEqual(self.box.slept, 0)
+
+    def test_a_wake_of_a_few_seconds_is_a_resume_too(self):
+        self.act(NOW - 3600)
+        self.assertTrue(self.box.idle.tick()[0])                   # it slept, and woke at once (under the jump threshold)
+        self.assertEqual(self.box.slept, 1)
+        self.box.advance(30, slept=25)
+        self.act(NOW - 3600, at=self.box.wall)
+        sleep, why = self.box.idle.tick()
+        self.assertFalse(sleep)
+        self.assertIn("idle 0 of 30", why)
+        self.assertEqual(self.box.slept, 1)                        # no sleep loop every 30 s
+
+    def test_a_refused_sleep_also_waits_out_the_minutes(self):
+        self.box.rc = 1
+        self.act(NOW - 3600)
+        self.box.idle.tick()
+        self.assertEqual(self.box.idle.last_resume, NOW)
 
     def test_a_resume_counts_as_activity(self):
         self.act(NOW - 7200)
@@ -427,29 +536,42 @@ class TestTick(unittest.TestCase):
         self.assertTrue(self.box.idle.tick()[0])
 
     def test_a_small_clock_difference_is_not_a_resume(self):
-        self.act(NOW - 3600)
-        self.box.rc = 0
+        self.act(NOW - 60)
         self.box.idle.tick()
         self.box.advance(30, slept=5)                              # under the jump threshold
         self.assertIsNone(self.box.idle.last_resume)
 
     def test_each_probe_failing_blocks(self):
         self.act(NOW - 3600)
-        for name in ("sessions", "inhibitors", "tools", "busy"):
+        for name in ("sessions", "inhibitors", "tools", "busy", "boot_time", "loadavg"):
             box = FakeBox()
             box.p[name] = lambda: (_ for _ in ()).throw(OSError("x"))
             self.assertFalse(box.idle.tick()[0], name)
             self.assertEqual(box.slept, 0, name)
 
-    def test_a_refused_sleep_waits_before_trying_again(self):
+    def test_a_card_whose_probe_fails_blocks_without_a_reading(self):
+        self.act(NOW - 3600)
+        box = FakeBox()
+        box.p["gpu_busy"] = lambda: None
+        box.p["gpu_present"] = lambda: (_ for _ in ()).throw(OSError("x"))
+        self.assertFalse(box.idle.tick()[0])
+        box = FakeBox()
+        box.p["gpu_busy"] = lambda: None
+        box.p["gpu_present"] = lambda: False
+        self.act(NOW - 3600)
+        self.assertTrue(box.idle.tick()[0])
+
+    def test_a_refused_sleep_waits_a_whole_idle_period(self):
         self.act(NOW - 3600)
         self.box.rc = 1
         self.assertTrue(self.box.idle.tick()[0])
-        self.box.advance(30)
-        self.act(NOW - 3600, at=self.box.wall)
-        self.assertFalse(self.box.idle.tick()[0])
         self.assertEqual(self.box.slept, 1)
-        self.box.advance(o1idle.RETRY_AFTER_REFUSED_S)
+        for _ in range(5):
+            self.box.advance(300)
+            self.act(NOW - 3600, at=self.box.wall)
+            self.assertFalse(self.box.idle.tick()[0] and self.box.wall - NOW < 1800)
+        self.assertEqual(self.box.slept, 1)                        # not tried again inside the 30 minutes
+        self.box.advance(301)
         self.act(NOW - 3600, at=self.box.wall)
         self.assertTrue(self.box.idle.tick()[0])
         self.assertEqual(self.box.slept, 2)
