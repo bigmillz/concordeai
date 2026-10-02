@@ -11,7 +11,7 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ## 6b353 — "+N servers more": a link in the sidebar card and a dialog of every server
 Patrick (2026-10-01): "a visible LINK in the card reading '+N servers more' (N = how many are not shown;
-'+1 server' singular) that opens a simple dialog listing EVERY paired server's details in full: name, GPU name,
+'+1 server more' singular) that opens a simple dialog listing EVERY paired server's details in full: name, GPU name,
 GPU load %, VRAM used/total, memory in use/total, and whether it is answering ... a server not answering shows
 'not answering'; an old kit shows 'usage not reported'." This is the link 6b342 parked.
 
