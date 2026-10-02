@@ -9,6 +9,54 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b352 — Find in chat (Cmd+F / Ctrl+F)
+Patrick (2026-10-02): "Command or Control F should open a find box for the
+current chat."
+
+A small bar at the top of the chat column (`#findbar`, inside `#main`, not a
+modal): a text box, "n of m", previous / next buttons and a close button.
+- Opens on Cmd+F (Mac) or Ctrl+F (Windows), by the same platform test as the
+  dictation chord (6b338: `IS_PC`, no Alt or Shift, the other modifier not
+  held), also from the composer. It does nothing while a dialog, the palette
+  or the ZITO board is up (`dictModal()`), and it takes the event
+  (`preventDefault`) otherwise so the webview's own find never fires. Opened
+  again, it selects the text. Enter is next, Shift+Enter previous (both wrap),
+  Esc closes and clears. Esc is stopped at the box so it never reaches the
+  page's Escape handler, which would abort a streaming answer.
+- Case-insensitive plain text (a RegExp with the `i` flag and an escaped
+  query, so `.` or `(` mean themselves and an odd capital never shifts the
+  offsets). Every hit in the chat's rendered text is wrapped in
+  `<mark class="find-hit">`, the current one also `.cur` and scrolled to the
+  middle. Skipped: the composer (outside the chat), buttons, the copy bar on
+  code blocks, the `you` / `MillenAI` labels, the message action row,
+  `[hidden]` and display:none parents. Copy buttons copy the saved text, not
+  the DOM, so they never see the marks; closing puts every text node back
+  (`replaceChild` + `normalize`).
+- Live: typing re-runs after 120 ms. While the bar is open a
+  MutationObserver on the chat notices the DOM being rewritten (streaming
+  replaces `innerHTML`, a chat switch or a new chat empties it) and looks
+  again, at most four times a second, and only if a mark was dropped or the
+  chat's text changed; the current index is kept (it restarts at 1 on a new
+  query or another chat) and the view is not scrolled by these runs, so the
+  stream's own scrolling is left alone. The observer exists only while the bar
+  is open; closed, the page pays nothing.
+- A match that spans two elements ("wor" in bold + "ld") is not found: the
+  search is per text node. Left on purpose.
+- Accessibility: the box and buttons carry aria-labels, the count is an
+  `aria-live="polite"` region (rewritten only when it changes).
+Checked in a real page (Blink pane, 1320x860): Cmd+F opened and focused it;
+"apple" found 7 in a stub chat (case, inside a bold, inside a code block, in
+"pineapple"), Enter / Shift+Enter moved and wrapped, a rewritten last answer
+(5 stream steps) raised the count to 11 with the index kept, closing left the
+chat's text-node structure byte-for-byte as before, a new chat with the bar
+open dropped to "No matches", Cmd+F did nothing with a dialog open and Ctrl+F
+did nothing on the Mac layout. NOT seen in WKWebView (the shipped renderer)
+or on Windows (Ctrl+F). The pane is a hidden document, so the scroll-into-view
+and the look were measured (bar 440 x 40 centred on the chat column), not
+watched. Gauntlet: five checks (the pure part with 12 mutations over ten
+scenarios in node; the page pins on source and served page; the pins' own 10
+mutations; no other handler on the chord).
+
 ## 6b351 — the benchmark's "Compare with..." crosses this computer, servers and the cloud
 Patrick (2026-10-02), with a screenshot of the benchmark pane mid-run on This
 computer: "to make it so that for comparing results, you can compare between

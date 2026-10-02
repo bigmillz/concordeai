@@ -30604,6 +30604,30 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
   font-size:13px;color:var(--text);
   animation:rise .22s ease both}
 #undobar[hidden]{display:none}
+
+/* FIND IN CHAT (6b352, per Patrick: "Command or Control F should open a find
+   box for the current chat"). A bar at the top of the chat column, not a
+   modal. Its own [hidden] rule, because it declares display. */
+#findbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  z-index:6;display:flex;align-items:center;gap:6px;
+  width:min(440px,calc(100% - 32px));box-sizing:border-box;
+  background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+  padding:6px 6px 6px 12px;color:var(--text);
+  box-shadow:0 14px 40px -18px rgba(0,0,0,.9)}
+#findbar[hidden]{display:none}
+#findbar input{flex:1;min-width:0;background:none;border:none;outline:none;
+  color:var(--text);font:inherit;font-size:14px;padding:4px 0}
+#findbar input::placeholder{color:var(--faint)}
+#findbar .fcount{font-size:12px;color:var(--dim);white-space:nowrap;
+  min-width:58px;text-align:right;font-variant-numeric:tabular-nums}
+#findbar button{width:26px;height:26px;border-radius:7px;border:none;
+  cursor:pointer;background:none;color:var(--dim);display:flex;
+  align-items:center;justify-content:center;font-size:15px;line-height:1}
+#findbar button:hover{background:rgba(255,255,255,.09);color:var(--text)}
+#findbar button:focus-visible{outline:2px solid var(--faint);outline-offset:1px}
+mark.find-hit{background:rgba(255,214,10,.32);color:inherit;border-radius:2px;
+  padding:0}
+mark.find-hit.cur{background:#ffd60a;color:#101013}
 /* no API token (6b321): the page can't reach its server, and says so */
 #apistuck,#profstuck{position:fixed;left:50%;top:26px;transform:translateX(-50%);
   z-index:90;background:rgba(15,17,23,.92);border:1px solid rgba(255,255,255,.15);
@@ -33351,6 +33375,18 @@ __CODE_ROWS__
       <p class="greet">What's going on today?</p>
     </div>
   </div></div>
+  <div id="findbar" role="search" hidden>
+    <input id="find-q" type="text" aria-label="Find in this chat"
+           placeholder="Find in this chat" autocomplete="off"
+           spellcheck="false">
+    <span class="fcount" id="find-count" aria-live="polite"></span>
+    <button id="find-prev" type="button" aria-label="Previous match"
+            title="Previous match (Shift+Enter)">&#8593;</button>
+    <button id="find-next" type="button" aria-label="Next match"
+            title="Next match (Enter)">&#8595;</button>
+    <button id="find-close" type="button" aria-label="Close find"
+            title="Close (Esc)">&#10005;</button>
+  </div>
 
   <div id="composer-wrap">
     <!-- starter prompts: inside composer-wrap so the row is EXACTLY the
@@ -39104,6 +39140,161 @@ function setMicWarm(on){
   if(IS_PC)$("#micwarm-note").textContent="The next hold starts at once. "
     +"Windows shows its microphone icon while it\u2019s ready.";
 })();
+
+/* ------------------------------------------------------ find in chat */
+// 6b352, per Patrick: "Command or Control F should open a find box for the
+// current chat." The pure part (what matches, where the pieces fall, which
+// match is next, what the count says) is tested alone in node; the glue
+// below walks the chat's rendered text, wraps each hit in a <mark>, and
+// takes every mark back out (normalize) when the box closes.
+function findHits(text,q){
+  // case-insensitive plain text: a RegExp with the i flag, so no
+  // toLowerCase() that could change the text's length (a dotted capital I)
+  if(!q||!text)return [];
+  const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi");
+  const out=[];let m;
+  while((m=re.exec(text))){out.push([m.index,m.index+m[0].length]);
+    if(m[0].length===0)re.lastIndex++;}
+  return out;
+}
+function findSplit(text,hits){
+  // the text as pieces, in order; joined they are the text again
+  const out=[];let at=0;
+  hits.forEach(h=>{
+    if(h[0]>at)out.push({t:text.slice(at,h[0]),hit:false});
+    out.push({t:text.slice(h[0],h[1]),hit:true});at=h[1];
+  });
+  if(at<text.length)out.push({t:text.slice(at),hit:false});
+  return out;
+}
+function findStep(cur,n,dir){
+  // the next (dir 1) or previous (-1) match, wrapping round both ends
+  if(!(n>0))return -1;
+  if(!(cur>=0))return dir<0?n-1:0;
+  return (cur+dir+n)%n;
+}
+function findCountText(cur,n,q){
+  if(!q)return "";
+  if(!(n>0))return "No matches";
+  return (cur+1)+" of "+n;
+}
+/*@find-pure-end*/
+const FIND_SKIP="button,script,style,textarea,input,select,svg,canvas,video,"
+  +"audio,.who,.mact,.codebar,[hidden]";
+const fb=$("#findbar"),fq=$("#find-q"),fcount=$("#find-count");
+const FIND_KEY=IS_PC?"Ctrl+F":"\u2318F";
+fq.placeholder="Find in this chat ("+FIND_KEY+")";
+let findHitEls=[],findCur=-1,findQ="",findText="",findChat=null,
+    findTimer=null,findWait=null,findObs=null;
+function findClear(){
+  const parents=new Set();
+  findHitEls.forEach(m=>{
+    const p=m.parentNode;if(!p)return;
+    p.replaceChild(document.createTextNode(m.textContent),m);
+    parents.add(p);
+  });
+  parents.forEach(p=>p.normalize());   // the text nodes whole again
+  findHitEls=[];
+}
+function findPaint(){
+  findHitEls.forEach((m,i)=>m.classList.toggle("cur",i===findCur));
+  const t=findCountText(findCur,findHitEls.length,findQ);
+  if(fcount.textContent!==t)fcount.textContent=t;
+}
+function findRun(scroll){
+  // streaming and chat switches replace the chat's DOM under the marks, so
+  // every run starts from a clean slate and keeps only the index
+  if(findObs)findObs.disconnect();
+  findClear();
+  if(fq.value!==findQ)findCur=0;       // a new query starts at its first match
+  findQ=fq.value;
+  const switched=findChat!==curChat;findChat=curChat;
+  if(switched)findCur=0;
+  if(findQ){
+    const tw=document.createTreeWalker(inner,NodeFilter.SHOW_TEXT,null);
+    const seen=new Map(),nodes=[];
+    for(let n=tw.nextNode();n;n=tw.nextNode()){
+      const p=n.parentElement;
+      if(!p||!n.data||!n.data.trim())continue;
+      let ok=seen.get(p);
+      if(ok===undefined){
+        ok=!p.closest(FIND_SKIP)&&p.getClientRects().length>0;
+        seen.set(p,ok);
+      }
+      if(!ok)continue;
+      const h=findHits(n.data,findQ);
+      if(h.length)nodes.push([n,h]);
+    }
+    nodes.forEach(([n,h])=>{
+      const fr=document.createDocumentFragment();
+      findSplit(n.data,h).forEach(seg=>{
+        if(!seg.hit){fr.appendChild(document.createTextNode(seg.t));return;}
+        const m=document.createElement("mark");
+        m.className="find-hit";m.textContent=seg.t;
+        fr.appendChild(m);findHitEls.push(m);
+      });
+      n.parentNode.replaceChild(fr,n);
+    });
+  }
+  findText=inner.textContent;
+  findCur=findHitEls.length?Math.min(Math.max(findCur,0),findHitEls.length-1):-1;
+  findPaint();
+  if(scroll&&findCur>=0)findHitEls[findCur].scrollIntoView({block:"center"});
+  if(!fb.hidden&&findObs)findObs.observe(inner,{childList:true,subtree:true,characterData:true});
+}
+function findGo(dir){
+  if(fq.value!==findQ)findRun(false);   // a pending keystroke counts first
+  if(!findHitEls.length)return;
+  findCur=findStep(findCur,findHitEls.length,dir);
+  findPaint();
+  findHitEls[findCur].scrollIntoView({block:"center"});
+}
+function findOpen(){
+  const again=!fb.hidden;
+  fb.hidden=false;
+  fq.focus();fq.select();
+  if(again)return;
+  if(!findObs)findObs=new MutationObserver(()=>{
+    // a streamed answer (or a chat switch) rewrote the DOM: look again, at
+    // most four times a second, and only when it really changed
+    if(findWait)return;
+    findWait=setTimeout(()=>{
+      findWait=null;
+      if(fb.hidden)return;
+      if(findHitEls.some(m=>!m.isConnected)||inner.textContent!==findText
+         ||findChat!==curChat)findRun(false);
+    },250);
+  });
+  findRun(true);
+}
+function findClose(){
+  if(findObs)findObs.disconnect();
+  clearTimeout(findTimer);clearTimeout(findWait);findWait=null;
+  findClear();findCur=-1;findQ="";findChat=null;
+  fq.value="";fcount.textContent="";
+  fb.hidden=true;
+  input.focus();
+}
+fq.addEventListener("input",()=>{
+  clearTimeout(findTimer);
+  findTimer=setTimeout(()=>{if(!fb.hidden)findRun(true);},120);
+});
+fq.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){e.preventDefault();e.stopPropagation();findClose();return;}
+  if(e.key==="Enter"){e.preventDefault();findGo(e.shiftKey?-1:1);}
+});
+$("#find-next").addEventListener("click",()=>findGo(1));
+$("#find-prev").addEventListener("click",()=>findGo(-1));
+$("#find-close").addEventListener("click",findClose);
+document.addEventListener("keydown",e=>{
+  const mod=IS_PC?(e.ctrlKey&&!e.metaKey):(e.metaKey&&!e.ctrlKey);
+  if(!mod||e.altKey||e.shiftKey)return;
+  const k=(e.key||"").toLowerCase();
+  if(k!=="f"&&!(e.code==="KeyF"&&!/^[a-z]$/.test(k)))return;
+  if(dictModal())return;               // a dialog owns the keyboard
+  e.preventDefault();                  // not the webview's own find
+  findOpen();
+},true);
 
 input.focus();
 

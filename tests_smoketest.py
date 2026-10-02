@@ -21943,6 +21943,137 @@ check("dictation hotkey: every dialog veil in the page hides by the hidden attri
       "%r" % [_n2 for _n2, _a2 in _veils if " hidden" not in (" " + _a2)])
 # ==== 6b338 dictation hotkey: end ====
 
+# ==== 6b352 find in chat: begin ====
+# 6b352, per Patrick: "Command or Control F should open a find box for the
+# current chat." The pure part (findHits, findSplit, findStep, findCountText)
+# runs here in node; each scenario is then run against mutated copies, and
+# each mutation must break the scenario aimed at it. The page's wiring is
+# pinned as source text, on real text and on mutated copies.
+_FD_PURE = _MILLENAI_SRC[_MILLENAI_SRC.index("function findHits(text,q){"):
+                         _MILLENAI_SRC.index("/*@find-pure-end*/")]
+_FD_SCEN = r'''
+const o={},eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+// every case, plain text only
+o.case=eq(findHits("Apple apple APPLE pineapple","apple"),[[0,5],[6,11],[12,17],[22,27]]);
+o.literal=eq(findHits("a.b axb (x) a+b","a.b"),[[0,3]])&&eq(findHits("f(x) [y] $5 \\ ^","(x)"),[[1,4]])
+        &&eq(findHits("cost $5 or [y]","[y]"),[[11,14]])&&eq(findHits("a+b aab","a+b"),[[0,3]]);
+o.none=eq(findHits("hello",""),[])&&eq(findHits("","a"),[])&&eq(findHits("hello","zzz"),[]);
+// matches do not overlap, and a dotted capital I does not shift the offsets
+o.overlap=eq(findHits("aaaa","aa"),[[0,2],[2,4]])&&eq(findHits("\u0130stanbul","stan"),[[1,5]]);
+// the pieces, joined, are the text again (clearing restores the original)
+const T=["Apple apple APPLE pineapple","apple","xapplex","no hit here","aaaa"];
+o.joined=T.every(t=>{const q=t.startsWith("a")?"a":"apple",s=findSplit(t,findHits(t,q));return s.map(p=>p.t).join("")===t;});
+o.pieces=eq(findSplit("xAppleyApplez",findHits("xAppleyApplez","apple")),
+  [{t:"x",hit:false},{t:"Apple",hit:true},{t:"y",hit:false},{t:"Apple",hit:true},{t:"z",hit:false}])
+  &&eq(findSplit("appleApple",findHits("appleApple","apple")),[{t:"apple",hit:true},{t:"Apple",hit:true}])
+  &&eq(findSplit("abc",[]),[{t:"abc",hit:false}])&&eq(findSplit("",[]),[]);
+// next / previous wrap round both ends
+o.next=findStep(0,3,1)===1&&findStep(1,3,1)===2&&findStep(2,3,1)===0&&findStep(0,1,1)===0;
+o.prev=findStep(2,3,-1)===1&&findStep(0,3,-1)===2&&findStep(0,1,-1)===0;
+o.start=findStep(-1,3,1)===0&&findStep(-1,3,-1)===2&&findStep(0,0,1)===-1&&findStep(-1,0,-1)===-1;
+// what the count says
+o.count=findCountText(0,7,"a")==="1 of 7"&&findCountText(6,7,"a")==="7 of 7"
+       &&findCountText(-1,0,"a")==="No matches"&&findCountText(0,0,"")===""&&findCountText(2,3,"")==="";
+process.stdout.write(JSON.stringify(o));'''
+_FD_NAMES = ["case", "literal", "none", "overlap", "joined", "pieces", "next", "prev", "start", "count"]
+
+
+def _fd_run(pure):
+    try:
+        return _node_json(pure + _FD_SCEN, "findchat.js")
+    except Exception as _e:
+        return {"err": str(_e)}
+
+
+_FD_BASE = _fd_run(_FD_PURE)
+_FD_MUT = [
+    ("case", 'q.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&"),"gi")', 'q.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&"),"g")'),
+    ("literal", 'q.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&")', 'q'),
+    ("none", "if(!q||!text)return [];", "if(!text)return [];"),
+    ("overlap", "m.index+m[0].length", "m.index+m[0].length-1"),
+    ("joined", "if(at<text.length)out.push({t:text.slice(at),hit:false});", ""),
+    ("pieces", "if(h[0]>at)out.push", "if(h[0]>=at)out.push"),
+    ("next", "return (cur+dir+n)%n;", "return Math.min(cur+dir,n-1);"),
+    ("prev", "return (cur+dir+n)%n;", "return Math.max(cur+dir,0);"),
+    ("start", "return dir<0?n-1:0;", "return 0;"),
+    ("count", '"No matches"', '"0 of 0"'),
+    ("count", '(cur+1)+" of "+n', 'cur+" of "+n'),
+    ("case", "gi", "gu"),
+]
+_fd_bad = []
+for _nm, _a, _b in _FD_MUT:
+    if _FD_PURE.count(_a) < 1:
+        _fd_bad.append("anchor " + _nm)
+        continue
+    _mr = _fd_run(_FD_PURE.replace(_a, _b))
+    if _mr.get(_nm) is not False:
+        _fd_bad.append("%s survived %r" % (_nm, _a[:30]))
+check("find in chat: matching, splitting, next/previous wrap-around and the count text are right (node)",
+      _FD_BASE.get("err") is None and all(_FD_BASE.get(_n) is True for _n in _FD_NAMES), "%r" % _FD_BASE)
+check("find in chat: every mutation of the pure part breaks the scenario aimed at it (node, 12 mutations)",
+      not _fd_bad and len(_FD_MUT) >= 12 and len({_m[0] for _m in _FD_MUT}) >= 10, "%r" % _fd_bad)
+
+
+def _fd_pins(src):
+    _p = {}
+    _p["markup"] = ('<div id="findbar" role="search" hidden>' in src
+                    and 'aria-label="Find in this chat"' in src
+                    and '<span class="fcount" id="find-count" aria-live="polite"></span>' in src
+                    and 'aria-label="Previous match"' in src and 'aria-label="Next match"' in src
+                    and 'aria-label="Close find"' in src)
+    _p["css"] = ("#findbar[hidden]{display:none}" in src and "mark.find-hit.cur{" in src
+                 and "background:var(--panel2)" in src and "border:1px solid var(--line)" in src)
+    _p["key"] = ('const mod=IS_PC?(e.ctrlKey&&!e.metaKey):(e.metaKey&&!e.ctrlKey);\n'
+                 '  if(!mod||e.altKey||e.shiftKey)return;\n'
+                 '  const k=(e.key||"").toLowerCase();\n'
+                 '  if(k!=="f"&&!(e.code==="KeyF"&&!/^[a-z]$/.test(k)))return;\n'
+                 '  if(dictModal())return;' in src
+                 and "e.preventDefault();                  // not the webview's own find\n  findOpen();\n},true);" in src)
+    _p["esc"] = ('if(e.key==="Escape"){e.preventDefault();e.stopPropagation();findClose();return;}' in src
+                 and 'if(e.key==="Enter"){e.preventDefault();findGo(e.shiftKey?-1:1);}' in src)
+    _p["clear"] = ("p.replaceChild(document.createTextNode(m.textContent),m);" in src
+                   and "parents.forEach(p=>p.normalize());" in src)
+    _p["skip"] = ('const FIND_SKIP="button,script,style,textarea,input,select,svg,canvas,video,"\n'
+                  '  +"audio,.who,.mact,.codebar,[hidden]";' in src
+                  and "p.getClientRects().length>0" in src)
+    _p["mark"] = ('m.className="find-hit";m.textContent=seg.t;' in src
+                  and 'findHitEls.forEach((m,i)=>m.classList.toggle("cur",i===findCur));' in src)
+    _p["live"] = ("findTimer=setTimeout(()=>{if(!fb.hidden)findRun(true);},120);" in src
+                  and "new MutationObserver(" in src and "},250);" in src
+                  and "if(findHitEls.some(m=>!m.isConnected)||inner.textContent!==findText\n"
+                      "         ||findChat!==curChat)findRun(false);" in src
+                  and 'if(fq.value!==findQ)findCur=0;' in src)
+    _p["close"] = ("if(findObs)findObs.disconnect();\n  clearTimeout(findTimer);" in src
+                   and 'fq.value="";fcount.textContent="";\n  fb.hidden=true;\n  input.focus();' in src)
+    _p["tip"] = ('const FIND_KEY=IS_PC?"Ctrl+F":"\\u2318F";' in src)
+    return _p
+
+
+_FDP = _fd_pins(_MILLENAI_SRC)
+_FDP_PAGE = _fd_pins(page)
+check("find in chat: the bar, its styles, the hotkey, Esc, the clean-up and the live re-apply are in the "
+      "source and in the served page",
+      all(_FDP.values()) and all(_FDP_PAGE.values()), "%r %r" % (_FDP, _FDP_PAGE))
+_fdp_bad = []
+for _k, _a in [("markup", 'aria-live="polite"></span>'), ("css", "#findbar[hidden]{display:none}"),
+               ("key", "if(dictModal())return;"), ("esc", "e.stopPropagation();findClose()"),
+               ("clear", "parents.forEach(p=>p.normalize());"), ("skip", ".mact,.codebar"),
+               ("mark", 'm.className="find-hit"'), ("live", "findChat!==curChat)findRun(false)"),
+               ("close", "fb.hidden=true;\n  input.focus();"), ("tip", 'IS_PC?"Ctrl+F"')]:
+    if _MILLENAI_SRC.count(_a) < 1:
+        _fdp_bad.append("anchor " + _a)
+        continue
+    if _fd_pins(_MILLENAI_SRC.replace(_a, _a[:2] + "_" + _a[2:])).get(_k) is not False:
+        _fdp_bad.append("pin %s survived" % _k)
+check("find in chat: each source pin fails when its line is changed (10 mutations)", not _fdp_bad, "%r" % _fdp_bad)
+# Cmd+F must not collide with the page's other chords: no other handler
+# claims F with a modifier, and the dictation chord stays D
+check("find in chat: no other keydown handler takes the modifier+F chord",
+      len(re.findall(r'key\.toLowerCase\(\)===\"f\"', _MILLENAI_SRC)) == 0
+      and _MILLENAI_SRC.count('k!=="f"&&!(e.code==="KeyF"') == 1,
+      "")
+# ==== 6b352 find in chat: end ====
+
 # ==== 6b345 dictation fast: begin ====
 # 6b345, per Patrick: "can we reduce the delay when I hold Command D to
 # dictate? Because it takes about a, two seconds each time for it to switch
