@@ -9,6 +9,66 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b353 — "+N servers more": a link in the sidebar card and a dialog of every server
+Patrick (2026-10-01): "a visible LINK in the card reading '+N servers more' (N = how many are not shown;
+'+1 server' singular) that opens a simple dialog listing EVERY paired server's details in full: name, GPU name,
+GPU load %, VRAM used/total, memory in use/total, and whether it is answering ... a server not answering shows
+'not answering'; an old kit shows 'usage not reported'." This is the link 6b342 parked.
+
+- THE LINK. With one or two servers nothing changes (the card is as 6b342 left it). With a third (counted as
+  the paired servers whose gateway names a card, the ones the card can draw) a `#srv-more` button sits under
+  the rows, last in `#telemetry`: "+1 server more", "+2 servers more" (`srvMoreCount`, `srvMoreWord`). It is
+  made and removed in `srvMetersSync`, so the rows and the link move together. The old "+N more" at the end of
+  the second server's row titles is gone: the link replaces it. 10 px mono, faint, dotted underline, dim
+  to text on hover, a focus ring. Card height: 22 px more (7 margin + 15 line) with a third server; with one
+  or two it is exactly what it was (measured 202 px for two in the pane's 768 px window, 224 with the link; the
+  198.5 in 6b342's layout note is that build's window). The sidebar still does not scroll.
+- THE DIALOG. `#srvall-veil` / `#srvall-card`, the benchmark dialogs' look (veil, panel, `doorPop`),
+  `role="dialog" aria-modal="true" aria-labelledby="srvall-title"`, "Your servers", one Close button. Focus
+  moves to Close on open and back to the link on close (the composer if the link is gone); Tab stays on Close;
+  Escape (the global handler, after the palette) and a click on the veil close it. Per server: the name and
+  "answering" / "not answering", then GPU (name), GPU load (%), GPU memory ("8.5 of 16 GB"), Memory ("22 of 62
+  GB in use"). It lists EVERY paired server, including one with no card named ("no card named").
+- NO NEW REQUESTS. It is drawn from `srvUse`, the poll's own readings (`srvAllRows`); opening it asks for
+  nothing, it adds no timer and stops none, and it repaints from the same data at the end of
+  `srvMetersSync` while it is open (readings arrive, servers come and go, a profile switch). THE CONSEQUENCE:
+  the poll still reads only the first two servers (6b342), so a third server's load and memory say "not read"
+  and its "answering" is the last full check's, not a live one; the first two say "reading..." until their
+  first reading. Making the dialog read all of them would be new polling, which the brief ruled out: a
+  decision for Patrick if he wants the figures live.
+- BUILT SAFELY. createElement and textContent only: a server named `<img src=x onerror=alert(1)>` shows as
+  those characters (a gauntlet check counts `img` elements and `innerHTML` writes in the stand-in).
+- Not seen in the app's WKWebView: only the browser pane (Blink). Dialog, focus, Escape and click outside were
+  driven there with stand-in servers; the real server rows with real readings were not.
+- Gauntlet: new `== the "+N servers more" link and the dialog of every server (6b353) ==` beside 6b342's: the
+  link (counts 0 to 5, unpaired and card-less not counted, wording, gone again), the rows, the dialog in node
+  (open, focus, repaint, no request, the name as text, close three ways, focus back), the page's pins; 6b342's
+  checks changed where the old title text went (the "+N more" mutation now plants one).
+
+## 6b354 — a "cloud" chip beside MLX and AMD
+Patrick (2026-10-01): "a third engine chip next to the existing 'MLX' and 'AMD' chips: a CLOUD chip: a light-blue
+dot ... and the word 'cloud', shown ONLY when cloud models are enabled, i.e. at least one provider key is added
+and cloud models are switched on ... hidden when none are added or they are disabled. A provider resting on a
+cooldown still counts as enabled (it is healthy, not broken). In Cloud Only mode it shows."
+
+- `#cloud-chip` in the composer's chip row after `#srv-chips`, in the server chips' style (`.srv-chip.cloud`,
+  `--ac:#7cc4ff`, the same 5 px dot with its glow); tooltip "Cloud models are on". The app is dark only, so
+  one blue serves; `#7cc4ff` reads on the panel and is distinct from the Intel chip's `#3d8fe0`.
+- THE RULE (`cloudChipOn`, pure): a key that is not failed AND (cloud power on OR the Cloud Only tier). The
+  facts are the model menu's own (`/api/cloud`: `configured`, `turbo`; Cloud Only forces the bench on, so it
+  needs no power switch), with one difference: `configured` is false while EVERY provider rests on a cooldown
+  (`cloud_conf` honours the cooldown), which would hide the chip for a healthy key; so a provider with status
+  "ok", resting or not, counts too. A "fail" key does not.
+- REPAINTS without a reload: `paintModels` (every tier change goes through it) repaints from the held answer
+  with no request; `fnCloudPaint` (the one `/api/cloud` read `paintTierAvail` makes after a key is saved,
+  Settings repaints or the wizard) updates the answer; the cloud power switch re-reads on a successful save.
+  A failed read leaves the chip as it was.
+- Not seen in the app's WKWebView (browser pane only). Not covered: a key that goes bad or a cooldown that
+  ends with Settings closed is picked up at the next repaint, not on a timer.
+- Gauntlet: in the same new section: the show/hide rule over no key, key with power off, key on, resting,
+  all resting, failed only, failed plus ok, Cloud Only (with key, resting, no key), no answer; the tier
+  following without a request; the markup, CSS and hooks.
+
 ## 6b351 — the benchmark's "Compare with..." crosses this computer, servers and the cloud
 Patrick (2026-10-02), with a screenshot of the benchmark pane mid-run on This
 computer: "to make it so that for comparing results, you can compare between

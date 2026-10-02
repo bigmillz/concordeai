@@ -30831,6 +30831,13 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
 #telemetry .srv-mrow{transition:opacity .3s}
 #telemetry .srv-mrow.off{opacity:.45}
 #telemetry .srv-mrow .t-head span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* "+N servers more" (6b353): a third server and on live in a dialog; this is the way in */
+#telemetry .srv-more{display:block;margin:7px 0 0;padding:0;background:none;border:0;
+  font:inherit;font-size:10px;line-height:15px;letter-spacing:.06em;color:var(--faint);
+  cursor:pointer;text-align:left;text-decoration:underline;text-decoration-style:dotted;
+  text-underline-offset:3px}
+#telemetry .srv-more:hover{color:var(--text)}
+#telemetry .srv-more:focus-visible{outline:1px solid var(--dim);outline-offset:3px;border-radius:3px}
 .meter-row:last-child{margin-bottom:0}
 /* one look for all four labels (6b348, per Patrick: "make all the font sizes here the
    same and the spacing"): the chip's, the memory's and each server's share size,
@@ -31787,6 +31794,10 @@ body.gen #chip-model{color:var(--accent)}
 #accel-chip.amd,.srv-chip.amd{--ac:#ed1c24}         /* AMD red */
 .srv-chip.intel{--ac:#3d8fe0}           /* Intel blue, softened for the dark */
 .srv-chip.off{opacity:.45}              /* the server isn't answering */
+/* the cloud chip (6b354, per Patrick: "a light blue dot ... and the word cloud"): in the server chips'
+   look; a light blue that reads on the app's dark panel; shown only while cloud models are on */
+.srv-chip.cloud{--ac:#7cc4ff}
+#cloud-chip[hidden]{display:none}
 #accel-chip.mlx{--ac:#c9ccd2}           /* Apple silver */
 #accel-chip.cpu{--ac:#6b6f77}
 
@@ -32146,6 +32157,30 @@ body.gen #chip-model{color:var(--accent)}
   border-radius:var(--radius);max-height:min(86vh,720px);
   overflow:hidden auto;animation:doorPop .4s cubic-bezier(.16,1,.3,1) both}
 #bmv-card{width:min(720px,calc(100vw - 48px))}
+/* every paired server in full (6b353): the card's own look */
+#srvall-veil{position:fixed;inset:0;z-index:66;display:flex;
+  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#srvall-veil[hidden]{display:none}
+#srvall-card{width:min(460px,calc(100vw - 48px));padding:22px 24px 16px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);max-height:min(86vh,720px);
+  overflow:hidden auto;animation:doorPop .4s cubic-bezier(.16,1,.3,1) both;outline:none}
+#srvall-card .set-h{margin-bottom:4px}
+#srvall-card .sh-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+#srvall-card .sh-foot .about-btn{width:auto;margin-top:0;padding:7px 20px}
+.srvall-s{padding:10px 0;border-top:1px solid var(--line-soft);transition:opacity .3s}
+.srvall-s:first-child{border-top:none}
+.srvall-s.off{opacity:.55}
+.srvall-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;
+  font-size:12.5px;color:var(--text)}
+.srvall-h b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.srvall-h span{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--faint);
+  white-space:nowrap}
+.srvall-r{display:flex;justify-content:space-between;gap:12px;font-size:12px;
+  line-height:1.7;color:var(--dim)}
+.srvall-r span:last-child{color:var(--text);text-align:right;min-width:0;overflow-wrap:anywhere}
+.srvall-e{font-size:12.5px;color:var(--dim);padding:8px 0}
 #bmc-card .set-h,#bmv-card .set-h{margin-bottom:4px}
 #bmc-list{list-style:none;margin:8px 0;padding:0;font-size:12.5px;
   color:var(--text)}
@@ -33370,6 +33405,8 @@ __CODE_ROWS__
       <!-- your servers' cards (6b334): one chip per paired server whose
            card the server names, in the MLX chip's style -->
       <div id="srv-chips"></div>
+      <!-- cloud models are on (6b354): a light blue dot and "cloud", hidden otherwise -->
+      <div id="cloud-chip" class="srv-chip cloud" title="Cloud models are on" hidden><i></i><b>cloud</b></div>
       <div id="cbtns">
       <button class="cbtn" id="attach" title="Attach a file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -33788,6 +33825,14 @@ __CODE_ROWS__
       <button id="bmc-cancel" class="about-btn slim ghost">Cancel</button>
       <button id="bmc-go" class="about-btn slim" disabled>Call these models</button>
     </div>
+  </div>
+</div>
+<!-- "+N servers more" (6b353): every paired server in full; built by script, text only -->
+<div id="srvall-veil" hidden>
+  <div id="srvall-card" role="dialog" aria-modal="true" aria-labelledby="srvall-title" tabindex="-1">
+    <div class="set-h" id="srvall-title">Your servers</div>
+    <div id="srvall-list"></div>
+    <div class="sh-foot"><button id="srvall-close" class="about-btn slim">Close</button></div>
   </div>
 </div>
 <div id="bmv-veil" hidden>
@@ -34296,6 +34341,9 @@ let srvList=[],srvAt=0,srvLoaded=false;
 // the sidebar meters' server rows (6b342): each paired server's last read of its
 // card {ok, gpu, ram, fails, due, busy}; a timer; and a flag a profile switch sets
 const srvUse={};let srvUseT=0,srvUseDead=false;
+// the "+N servers more" dialog (6b353): where focus came from; and the cloud chip (6b354):
+// the last /api/cloud the page read
+let srvAllFrom=null,cloudSt=null;
 // each server's auto sleep setting as the pane shows it (6b346): {st: load|ok|old|off|err, enabled,
 // minutes, supported, wakeable, msg}
 const srvSleep={};
@@ -34328,6 +34376,7 @@ function paintModels(){
     const old=el.querySelector(".rank"); if(old)old.remove();
   });
   $("#chip-model").textContent=tierLabel();
+  paintCloudChip();
 }
 function selectModel(name){
   if(!name)return;  // rows without a model (Power Mode) don't select
@@ -34847,6 +34896,24 @@ advChip();     // a custom council survives the restart (6b248)
 
 // the acceleration lockup next to the engine chip. One fetch at boot —
 // the silicon doesn't change while the app is open.
+// THE CLOUD CHIP (6b354, per Patrick: "a third engine chip ... a light blue dot and the word cloud"): shown
+// only while cloud models are on: a provider key that isn't failed (a provider resting on a cooldown is healthy,
+// so it counts) with cloud power on, or the Cloud Only tier. The same two facts the model menu reads
+// (/api/cloud: configured, turbo), plus the resting ones /api/cloud's "configured" leaves out.
+function cloudChipOn(cs,t){
+  if(!cs)return false;
+  const pv=cs.providers||{};
+  const has=!!cs.configured||Object.keys(pv).some(k=>(pv[k]||{}).status==="ok");
+  return has&&(!!cs.turbo||t==="Cloud Only");
+}
+function paintCloudChip(){
+  const c=document.getElementById("cloud-chip");if(!c)return;
+  c.hidden=!cloudChipOn(cloudSt,tier);
+}
+function cloudChipSet(cs){cloudSt=cs||null;paintCloudChip();}
+async function cloudChipLoad(){
+  try{cloudChipSet(await(await api("/api/cloud")).json());}catch(e){}
+}
 (async function paintAccel(){
   const chip=$("#accel-chip");if(!chip)return;
   let a="";
@@ -37823,6 +37890,7 @@ $("#fn-go").addEventListener("click",()=>{
    include (no key saved, or cloud power off); the saved choice is kept */
 let fnCloudOn=true,fnCloudLoaded=false,fnCloudTouched=false;
 function fnCloudPaint(cs){
+  cloudChipSet(cs);      // the composer's chip reads the same answer (6b354)
   const cb=$("#fn-cloud"),row=$("#fn-cloud-row");if(!cb||!row)return;
   const ok=!!(cs&&cs.configured&&cs.turbo);
   cb.disabled=!ok;row.classList.toggle("off",!ok);
@@ -37974,6 +38042,7 @@ document.addEventListener("keydown",e=>{
     // the ZITO board owns Escape while it is up: terminal first, then it
     if(window.zitoEsc&&window.zitoEsc()){e.preventDefault();return;}
     if(!palette.hidden){palClose();return;}
+    if(srvAllClose()){e.preventDefault();return;}
     if(engMenuEsc()){e.preventDefault();return;}
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
@@ -40039,7 +40108,7 @@ function srvMemName(n){
 const srvGB=b=>String(Math.round(b/1073741824*10)/10);
 function srvMeterRows(list,use){
   const all=(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);
-  const rows=all.slice(0,SRV_METER_MAX).map((s,i)=>{
+  const rows=all.slice(0,SRV_METER_MAX).map(s=>{
     const g=s.gpu,u=(use&&use[s.id])||{},st=s.status||{};
     // the poll's own answer wins over the last full check, which can be old
     const off=u.ok===false||(u.ok==null&&(st.reachable===false||!!st.err));
@@ -40048,19 +40117,86 @@ function srvMeterRows(list,use){
     const t=[s.name,g.name||"",vb?Math.round(vb/1073741824)+" GB":""];
     t.push(off?"not answering":busy!=null?busy+"% busy"
       :u.ok?"usage not reported (update the server kit)":"");
-    const more=i===SRV_METER_MAX-1&&all.length>SRV_METER_MAX?"+"+(all.length-SRV_METER_MAX)+" more":"";
-    t.push(more);
     // the server's memory, under its card: the same bar, from the same reading
     const rg=u.ram||null,ru=rg&&typeof rg.used_bytes==="number"?rg.used_bytes:null,
       rt=rg&&typeof rg.total_bytes==="number"&&rg.total_bytes>0?rg.total_bytes:null,have=ru!=null&&rt!=null;
     const m=[s.name,"memory",off?"not answering":have?srvGB(ru)+" of "+srvGB(rt)+" GB in use"
-      :u.ok?"usage not reported (update the server kit)":"",more];
+      :u.ok?"usage not reported (update the server kit)":""];
     return [{id:s.id,name:srvMeterName(g),title:t.filter(Boolean).join(" \u00b7 "),
       pct:off?null:busy,off:off},
       {id:s.id+":m",name:srvMemName(s.name),title:m.filter(Boolean).join(" \u00b7 "),
       pct:off||!have?null:Math.round(ru/rt*100),off:off}];
   });
   return [].concat.apply([],rows);
+}
+// "+N servers more" (6b353, per Patrick): how many paired servers with a card the sidebar card can't show,
+// and what the link says. With one or two servers there is no link.
+function srvMoreCount(list){
+  return Math.max(0,(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);
+}
+function srvMoreWord(n){return "+"+n+(n===1?" server more":" servers more");}
+// every paired server in full, from what the poll already holds (srvUse; nothing is asked for it). A server
+// past the card's two is not polled, so what it is using is "not read"; whether it answers is the last check's
+function srvAllRows(list,use){
+  const polled=new Set(srvMeterServers(list).map(s=>s.id));
+  return (list||[]).filter(s=>s.paired).map(s=>{
+    const g=s.gpu||{},u=(use&&use[s.id])||{},st=s.status||{};
+    const off=u.ok===false||(u.ok==null&&(st.reachable===false||!!st.err));
+    const ug=u.gpu||null,busy=ug&&typeof ug.busy_pct==="number"?ug.busy_pct:null;
+    const vt=(ug&&ug.vram_total_bytes)||g.vram_bytes||null;
+    const vu=ug&&typeof ug.vram_used_bytes==="number"?ug.vram_used_bytes:null;
+    const rg=u.ram||null,ru=rg&&typeof rg.used_bytes==="number"?rg.used_bytes:null,
+      rt=rg&&typeof rg.total_bytes==="number"&&rg.total_bytes>0?rg.total_bytes:null;
+    // the word for a figure we have no number for
+    const none=off?"not answering":u.ok?"usage not reported":polled.has(s.id)?"reading\u2026":"not read";
+    return {id:s.id,name:s.name||"",off:off,state:off?"not answering":"answering",
+      rows:[["GPU",g.name||SRV_GPU[g.vendor]||"no card named"],
+        ["GPU load",off?none:busy!=null?busy+"%":none],
+        ["GPU memory",off?none:vu!=null&&vt?srvGB(vu)+" of "+srvGB(vt)+" GB"
+          :vt?srvGB(vt)+" GB"+SRV_SEP+none:none],
+        ["Memory",off?none:ru!=null&&rt!=null?srvGB(ru)+" of "+srvGB(rt)+" GB in use":none]]};
+  });
+}
+// the dialog is made of createElement and textContent only: a server's name is typed by its owner
+function srvAllPaint(){
+  const v=document.getElementById("srvall-veil"),box=document.getElementById("srvall-list");
+  if(!v||v.hidden||!box)return;
+  const rows=srvAllRows(srvList,srvUseDead?{}:srvUse),keep=box.scrollTop;
+  while(box.firstChild)box.firstChild.remove();
+  if(!rows.length){
+    const e=document.createElement("div");e.className="srvall-e";e.textContent="No servers paired.";
+    box.appendChild(e);return;
+  }
+  rows.forEach(r=>{
+    const sec=document.createElement("div"),hd=document.createElement("div"),
+      nm=document.createElement("b"),stt=document.createElement("span");
+    sec.className="srvall-s"+(r.off?" off":"");sec.dataset.sid=r.id;
+    hd.className="srvall-h";nm.textContent=r.name;stt.textContent=r.state;
+    hd.appendChild(nm);hd.appendChild(stt);sec.appendChild(hd);
+    r.rows.forEach(kv=>{
+      const row=document.createElement("div"),a=document.createElement("span"),b=document.createElement("span");
+      row.className="srvall-r";a.textContent=kv[0];b.textContent=kv[1];
+      row.appendChild(a);row.appendChild(b);sec.appendChild(row);
+    });
+    box.appendChild(sec);
+  });
+  box.scrollTop=keep;
+}
+function srvAllOpen(){
+  const v=document.getElementById("srvall-veil");if(!v)return;
+  srvAllFrom=document.activeElement;
+  v.hidden=false;srvAllPaint();
+  const c=document.getElementById("srvall-close");if(c)c.focus();
+}
+// true when it was open (Escape then has nothing more to close)
+function srvAllClose(){
+  const v=document.getElementById("srvall-veil");
+  if(!v||v.hidden)return false;
+  v.hidden=true;
+  const f=srvAllFrom;srvAllFrom=null;
+  const back=f&&f.isConnected!==false&&f.focus?f:document.getElementById("input");
+  if(back&&back.focus)back.focus();
+  return true;
 }
 // how long after a read the next one waits: 3 s while it answers, then 10 s,
 // then 30 s while it doesn't
@@ -40087,7 +40223,11 @@ function srvMetersSync(){
   const tel=document.getElementById("telemetry");if(!tel)return;
   const rows=srvUseDead?[]:srvMeterRows(srvList,srvUse);
   let box=document.getElementById("srv-meters");
-  if(!rows.length){if(box)box.remove();return;}
+  if(!rows.length){
+    if(box)box.remove();
+    const gl=document.getElementById("srv-more");if(gl)gl.remove();
+    srvAllPaint();return;
+  }
   if(!box){
     box=document.createElement("div");box.id="srv-meters";
     tel.appendChild(box);
@@ -40110,6 +40250,18 @@ function srvMetersSync(){
     paintMeter(el.lastChild,r.pct==null?0:r.pct);
   });
   Object.keys(have).forEach(k=>have[k].remove());
+  // the way in to every server (6b353): only with a third one
+  const more=srvMoreCount(srvList);let link=document.getElementById("srv-more");
+  if(!more){if(link)link.remove();}
+  else{
+    if(!link){
+      link=document.createElement("button");link.id="srv-more";link.className="srv-more";link.type="button";
+      link.addEventListener("click",srvAllOpen);
+    }
+    link.textContent=srvMoreWord(more);
+    if(tel.lastChild!==link)tel.appendChild(link);
+  }
+  srvAllPaint();
 }
 async function srvUsagePoll(s){
   const u=srvUse[s.id]||(srvUse[s.id]={ok:null,gpu:null,fails:0,due:0,busy:false});
@@ -40165,6 +40317,14 @@ function pickServerModel(label){
   if(typeof modeShow==="function")modeShow("ai");
   paintModels();
 }
+(function(){
+  const v=$("#srvall-veil");if(!v)return;
+  v.addEventListener("click",e=>{if(e.target===v)srvAllClose();});
+  $("#srvall-close").addEventListener("click",srvAllClose);
+  // one control inside: Tab stays on it
+  $("#srvall-card").addEventListener("keydown",e=>{
+    if(e.key==="Tab"){e.preventDefault();$("#srvall-close").focus();}});
+})();
 loadServers(false).then(()=>{if(srvList.some(s=>s.paired))loadServers(true);});
 $("#ck-save").addEventListener("click",async()=>{
   const note=$("#ck-note"),key=$("#ck-key").value.trim();
@@ -42167,6 +42327,7 @@ $("#turbo").addEventListener("change",async()=>{
       body:JSON.stringify({turbo:on})});
     ok=r.ok&&!!(await r.json()).ok;
   }catch(e){}
+  if(ok)cloudChipLoad();
   if(!ok){
     $("#turbo").checked=!on;
     note.textContent="Couldn\u2019t save that. Cloud power is still "+(on?"off":"on")+".";
