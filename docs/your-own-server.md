@@ -287,6 +287,66 @@ check` (what it would do right now), the gateway's activity file
 either), and `/run/ollama1/idle.json` (the cards that can wake it). Deep sleep
 must be what suspend uses: `cat /sys/power/mem_sleep` shows `[deep]`.
 
+## Images and video (optional)
+
+The server can also make pictures and short clips, with ComfyUI. It is not part
+of `setup.sh`: it is about 27 GB* of downloads and its own Python environment, so
+you ask for it. On the server, from the kit:
+
+```bash
+sudo ./setup.sh                                      # first, if it hasn't run since this version of the kit: the gateway and the port guard
+sudo bash ollama1/tools/install-comfyui.sh          # then this, as the user who ran sudo; --help lists the options
+```
+
+The script does the steps you would do by hand, each skipped when it is done, so
+it can be run again: `uv`, ComfyUI cloned into `~/comfyui`, a Python 3.12
+environment with PyTorch for ROCm 6.4 (an AMD card), ComfyUI's requirements, the
+four model files below (downloaded with `curl -C -`, so a cut-off download carries
+on), and a service. For an NVIDIA card, run it with `TORCH_INDEX` set to the CUDA
+wheel address from pytorch.org (for example `TORCH_INDEX=https://download.pytorch.org/whl/cu128`).
+
+| File | Folder under `~/comfyui/models` | Used for | Size* |
+|---|---|---|---|
+| `flux1-schnell-fp8.safetensors` | `checkpoints` | pictures (FLUX.1 schnell, fp8) | about 17 GB |
+| `wan2.1_t2v_1.3B_fp16.safetensors` | `diffusion_models` | video (Wan 2.1, 1.3B) | about 2.8 GB |
+| `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | `text_encoders` | video's text encoder | about 6.7 GB |
+| `wan_2.1_vae.safetensors` | `vae` | video's decoder | about 0.25 GB |
+
+\* Estimates: check them against what the download shows.
+
+- **Only the gateway talks to it.** ComfyUI listens on `127.0.0.1:8188` and
+  nowhere else, and the local port guard (`config/ollama1.nft.in`, installed by
+  `setup.sh`) lets only root and the gateway's user connect to that port. ComfyUI's
+  own web page is therefore not reachable, from the admin user either, on purpose.
+  The app never sends ComfyUI a graph: the gateway builds each one from a fixed
+  template and puts only a few checked numbers and the prompt into it.
+- **One card, shared.** Before a job the gateway unloads Ollama's models; after
+  it, ComfyUI's. A chat that arrives during a job is told the server is busy and
+  can try again when it ends; a job that arrives during a chat is refused the same
+  way. Expect a model reload on the first chat after a picture or video.
+- **From the app.** Settings, Your servers shows small "Images" and "Video" chips on
+  a server that can make them. Asking the app for a picture or a video then makes it
+  on that server first. A job runs as a job the app polls every 2 seconds, so it
+  works through the Cloudflare tunnel, which drops a silent response after 100 s.
+  If the server can't make it (off, busy, a model missing), the app says so in one
+  line and does what it did before.
+- **Waking.** Asking for a picture wakes a sleeping server, as a question does
+  (see Sleep when idle). A running job, and for two minutes after the app last asked
+  about one, counts as use: the server won't sleep in the middle of one.
+- **Nothing kept.** The gateway holds a job and its result in memory only: a
+  finished result for 10 minutes, then it is gone. Results are written by ComfyUI to
+  `/run/comfyui`, which is memory, and swept every 10 minutes; prompts are in no
+  log. Extra ComfyUI options (for example `--lowvram`) go in
+  `/etc/default/comfyui` as `COMFYUI_EXTRA_ARGS="..."`.
+- **Limits** (the gateway's, whatever the app asks): pictures 256 to 1536 pixels a
+  side, up to 1,700,000 pixels, 1 to 12 steps; clips 256 to 832 pixels a side, up
+  to 400,000 pixels a frame, 1 to 5 seconds at 16 frames a second, 10 to 30 steps; a
+  prompt up to 1000 characters; one job at a time. A picture takes seconds* to a
+  minute*; a clip a few minutes* to tens of minutes* on a 16 GB card: measure it on
+  yours.
+
+The wire format is in [PROTOCOL.md](../ollama1/PROTOCOL.md) ("Images and video").
+
 ## Choosing models
 
 Nothing is installed at first. Put the models you want in
@@ -461,6 +521,8 @@ first: pairing is refused on this listener.
 | `ram_oom` | the load ran out of Ollama's memory cap and was stopped (the machine is fine); use a smaller context or model |
 | Every model refused | Ollama didn't find the GPU: `journalctl -u ollama \| grep -i -E "inference compute\|cuda\|rocm"` |
 | `ollama list` says connection refused | expected without sudo: the port guard lets only root and the services reach Ollama |
+| The app's card shows no Images or Video chip | `curl -s http://127.0.0.1:8188/system_stats` should answer (as root); `journalctl -u comfyui -e`; re-run `install-comfyui.sh` for a missing model file |
+| A picture or clip fails | ComfyUI's own log has the reason, the app only says it failed: `journalctl -u comfyui -e` |
 | Pairing says no window | `sudo ollama1-pair` must be running at the server (5 minutes) |
 | The whole picture | `ollama1-top` |
 

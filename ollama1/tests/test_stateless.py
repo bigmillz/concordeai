@@ -20,7 +20,7 @@ import test_gateway as TG
 
 GATEWAY_FILES = [os.path.join(U.BIN, "ollama1-gateway")] + [
     os.path.join(U.LIB, m) for m in ("o1auth.py", "o1pair.py", "o1ollama.py", "o1common.py",
-                                     "o1jwt.py", "o1crypto.py", "o1stats.py")]
+                                     "o1jwt.py", "o1crypto.py", "o1stats.py", "o1gen.py")]
 
 # Functions allowed to open a file for writing, and why.
 WRITERS = {

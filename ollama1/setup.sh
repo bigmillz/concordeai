@@ -929,6 +929,13 @@ sleep 2
 for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power ollama1-idle; do
   if systemctl is-active --quiet "$s"; then ok "$s running"; else note "$s is not running: journalctl -u $s"; later "$s did not start: journalctl -u $s"; fi
 done
+# image and video generation is optional and never installed here (6b356): one line says
+# whether the gateway has it, and how to add it
+if curl -fsS -m 3 http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then
+  ok "ComfyUI answers on this machine: the gateway offers image and video generation"
+else
+  note "image and video generation isn't installed (optional): sudo bash $KIT/tools/install-comfyui.sh"
+fi
 if id -nG o1gw | tr ' ' '\n' | grep -qx o1pair; then
   die "the gateway's user o1gw is in the o1pair group, so it could read the pairing code; remove it (gpasswd -d o1gw o1pair) and run setup again"
 fi
