@@ -74,14 +74,18 @@ MIN_ROOT_GIB = 30
 BOOT_ID = "o1new"                       # the folder in the ESP and the label base
 BOOT_LABEL = "ollama1-new"
 SERVICES = ["ollama1-update-ollama.timer", "ollama1-update-ollama.service", "ollama1-models-sync.service",
-            "ollama1-gateway.service", "comfyui.service", "ollama.service",
+            "ollama1-gateway.service", "ollama1-admin.service", "ollama1-restart.timer", "ollama1-restart.service",
+            "ollama1-reboot.timer", "ollama1-reboot.service", "comfyui.service", "ollama.service",
             "apt-daily.timer", "apt-daily-upgrade.timer", "unattended-upgrades.service"]
+PULL_UNITS = "ollama1-pull@*.service"
+PANIC_DROPIN = "etc/default/grub.d/98-ollama1-migrate.cfg"
+PANIC_OPTION = "panic=10"
 TOOLS = {"lsblk": "util-linux", "blkid": "util-linux", "findmnt": "util-linux", "mount": "util-linux",
          "umount": "util-linux", "partprobe": "parted", "sgdisk": "gdisk", "wipefs": "util-linux",
          "mkfs.ext4": "e2fsprogs", "mkfs.vfat": "dosfstools", "mkswap": "util-linux", "fallocate": "util-linux",
          "rsync": "rsync", "nvme": "nvme-cli", "efibootmgr": "efibootmgr", "chroot": "coreutils",
          "df": "coreutils", "journalctl": "systemd", "systemctl": "systemd", "fuser": "psmisc",
-         "udevadm": "udev", "sync": "coreutils"}
+         "udevadm": "udev", "sync": "coreutils", "chattr": "e2fsprogs"}
 READ_ONLY = {"lsblk", "blkid", "findmnt", "df", "nvme", "journalctl", "fuser", "du"}
 RSYNC_OK = (0, 24)                      # 24: a file vanished while it was read (a log); fine
 DEAD_RX = re.compile(r"controller is down|CSTS=0xffffffff|Disabling device after reset failure|"
@@ -96,11 +100,13 @@ class Abort(Exception):
 # ---- settings (environment overrides are for the tests) --------------------------------
 
 class Cfg:
-    def __init__(self, env=None):
+    def __init__(self, env=None, euid=None):
         env = os.environ if env is None else env
-        # The test overrides below are honoured only for a user who is not root, or when O1M_TEST=1:
-        # a root-owned copy run through sudo never takes its folders from the environment.
-        honour = env.get("O1M_TEST") == "1" or os.geteuid() != 0
+        euid = os.geteuid() if euid is None else euid
+        # The test overrides below are honoured only for a user who is not root: a run as root (a copy run
+        # through sudo) never takes a folder or a program from the environment.
+        honour = euid != 0
+        self.honour = honour
 
         def g(k, d):
             return env.get("O1M_" + k, d) if honour else d
@@ -117,6 +123,7 @@ class Cfg:
         self.efi_sys = g("EFI_SYS", "/sys/firmware/efi")
         self.bios_key = g("BIOS_KEY", "F11")
         self.cmdline = g("CMDLINE", "/proc/cmdline")
+        self.mdstat = g("MDSTAT", "/proc/mdstat")
         self.countdown = int(g("COUNTDOWN_SECS", "10"))
         self.status = g("STATUS", self.data + "/migrate-os.status")
         self.log = g("LOG", self.data + "/migrate-os.log")
@@ -191,6 +198,9 @@ def rewrite_fstab(text, uuids):
     partitions by UUID; every other line (/srv/data, swap, comments) is kept as
     it is. Returns (new text, [what changed]). Raises Abort on a fstab it can't
     rewrite safely."""
+    for k in ("root", "boot", "esp", "models"):
+        if not valid_uuid(uuids.get(k)):
+            raise Abort("the %s filesystem UUID is not a UUID; not writing an fstab line from it" % k)
     want = {"/": uuids["root"], "/boot": uuids["boot"], "/boot/efi": uuids["esp"], "/srv/models": uuids["models"]}
     out, seen, changes = [], set(), []
     for line in text.splitlines():
@@ -229,8 +239,12 @@ def chroot_commands(root):
 
 def parse_efi(text):
     """efibootmgr -v -> {'order': [...], 'entries': {num: {'label','partuuid','active','loader'}}}"""
-    order, entries = [], {}
+    order, entries, nxt = [], {}, None
     for line in text.splitlines():
+        m = re.match(r"BootNext:\s*([0-9A-Fa-f]{4})\s*$", line)
+        if m:
+            nxt = m.group(1).upper()
+            continue
         m = re.match(r"BootOrder:\s*(\S+)", line)
         if m:
             order = [x for x in m.group(1).split(",") if x]
@@ -244,7 +258,7 @@ def parse_efi(text):
             entries[m.group(1).upper()] = {"label": label.strip(), "active": m.group(2) == "*",
                                            "partuuid": pu.group(1).lower() if pu else "",
                                            "loader": ld.group(1) if ld else ""}
-    return {"order": [o.upper() for o in order], "entries": entries}
+    return {"order": [o.upper() for o in order], "entries": entries, "next": nxt}
 
 
 def find_old_entry(efi, from_esp_partuuid):
@@ -265,6 +279,13 @@ def boot_order(new, old, previous):
         if n not in order:
             order.append(n)
     return order
+
+
+def boot_order_old_first(new, old, previous):
+    """The order that keeps the old drive the default: the old entry first, the new one last, so only a
+    BootNext (one boot) tries the new drive."""
+    rest = [n for n in previous if n not in (new, old)]
+    return ([old] if old else []) + rest + [new]
 
 
 def new_entry_number(efi, partuuid):
@@ -319,6 +340,117 @@ def overdrive_token(dropin_text):
     return m.group(0) if m else ""
 
 
+UUID_RX = re.compile(r"[0-9A-Fa-f]{4,8}(-[0-9A-Fa-f]{4,12})+")
+LOADER_RX = re.compile(r"[A-Za-z0-9._-]{1,40}\.efi")
+ENTRY_RX = re.compile(r"[0-9A-Fa-f]{4}")
+
+
+def valid_uuid(v):
+    return isinstance(v, str) and bool(UUID_RX.fullmatch(v))
+
+
+def validate_state(st):
+    """Every value of the state file that later reaches fstab, efibootmgr or a command line, checked
+    against what it can be. The state file is root's, but a damaged or edited one must not become a command."""
+    def need(ok, what):
+        if not ok:
+            raise Abort("the state file has a bad %s; not using it" % what)
+    need(valid_serial(st.get("from_serial")) and valid_serial(st.get("to_serial")), "serial")
+    need(isinstance(st.get("root_gib"), int) and 1 <= st["root_gib"] <= 100000, "root size")
+    for k, v in (st.get("uuids") or {}).items():
+        need(k in ("esp", "boot", "root", "models") and valid_uuid(v), "filesystem UUID")
+    for k in ("esp_partuuid", "old_esp_partuuid"):
+        need(st.get(k, "") == "" or valid_uuid(st.get(k)), k)
+    need(st.get("loader") is None or bool(LOADER_RX.fullmatch(str(st.get("loader")))), "boot loader name")
+    e = st.get("efi") or {}
+    for k in ("new", "old"):
+        need(e.get(k) is None or bool(ENTRY_RX.fullmatch(str(e.get(k)))), "firmware entry number")
+    for k in ("order", "previous_order"):
+        need(all(isinstance(n, str) and ENTRY_RX.fullmatch(n) for n in e.get(k) or []), "firmware boot order")
+    need(all(isinstance(t, str) and re.fullmatch(r"[A-Za-z0-9_.:=,/+@-]+", t) for t in st.get("cmdline_required") or []),
+         "kernel option")
+    return st
+
+
+def raid_ok(mdstat, name):
+    """'' if the md array is in mdstat with every member up ([UU]), else why not."""
+    block, found = [], False
+    for line in (mdstat or "").splitlines():
+        if re.match(r"^%s\s*:" % re.escape(name), line):
+            found, block = True, [line]
+        elif found and line.strip() and not re.match(r"^md\d+\s*:", line):
+            block.append(line)
+        elif found:
+            break
+    if not found:
+        return "%s is not in /proc/mdstat" % name
+    m = re.search(r"\[(\d+)/(\d+)\]\s+\[([U_]+)\]", "\n".join(block))
+    if not m:
+        return "cannot read the state of %s in /proc/mdstat" % name
+    if m.group(3) != "U" * len(m.group(3)) or m.group(1) != m.group(2):
+        return "the RAID %s is degraded [%s]: the parked models would be on one disk only" % (name, m.group(3))
+    return ""
+
+
+def dir_perm_problem(path, uid):
+    """Why this folder can't hold files a root program trusts, or ''."""
+    try:
+        st = os.lstat(path)
+    except OSError as e:
+        return "cannot look at %s (%s)" % (path, e.strerror)
+    import stat as _stat
+    if _stat.S_ISLNK(st.st_mode) or not _stat.S_ISDIR(st.st_mode):
+        return "%s is not a plain folder" % path
+    if st.st_uid != uid:
+        return "%s is not owned by root" % path
+    if st.st_mode & 0o022:
+        return "%s is writable by group or others" % path
+    return ""
+
+
+def open_nofollow(path, flags, mode=0o600):
+    """os.open that never follows a symlink at the last component."""
+    try:
+        return os.open(path, flags | os.O_NOFOLLOW | os.O_CLOEXEC, mode)
+    except OSError as e:
+        raise Abort("cannot open %s safely (%s)" % (path, e.strerror))
+
+
+def sample_compare(src, dst, small=64 * MIB, chunk=MIB, samples=16):
+    """Compare two trees by content without reading them twice in full: every file up to 64 MiB whole, a
+    larger one by its first and last MiB and 16 more MiB at places picked from its name. Sizes are compared
+    for all. -> (files, bytes compared); raises Abort on the first difference."""
+    import random
+    files = compared = 0
+    for root, _, names in os.walk(src):
+        for n in sorted(names):
+            a = os.path.join(root, n)
+            b = os.path.join(dst, os.path.relpath(a, src))
+            if os.path.islink(a):
+                continue
+            try:
+                sa, sb = os.path.getsize(a), os.path.getsize(b)
+            except OSError:
+                raise Abort("%s is missing from the parked copy" % os.path.relpath(a, src))
+            if sa != sb:
+                raise Abort("%s differs in size from the parked copy" % os.path.relpath(a, src))
+            if sa <= small:
+                spots = [(0, sa)]
+            else:
+                rnd = random.Random(os.path.relpath(a, src))
+                spots = [(0, chunk), (sa - chunk, chunk)] + [(rnd.randrange(0, sa - chunk), chunk) for _ in range(samples)]
+            with open(a, "rb") as fa, open(b, "rb") as fb:
+                for off, ln in spots:
+                    fa.seek(off)
+                    fb.seek(off)
+                    x, y = fa.read(ln), fb.read(ln)
+                    compared += len(x)
+                    if x != y:
+                        raise Abort("%s differs from the parked copy (content)" % os.path.relpath(a, src))
+            files += 1
+    return files, compared
+
+
 def critical_warning(text):
     m = re.search(r"^critical_warning\s*:\s*(\S+)", text or "", re.M)
     if not m:
@@ -359,6 +491,16 @@ def check_facts(f):
     if why:
         p.append("the FROM drive is dead right now: %s. Power-cycle the server (off at the switch for a minute), "
                  "then run --resume (or --run)" % why)
+    extra_from = sorted(m for m in tree_mounts(ft) if m not in ("/", "/boot", "/boot/efi", "[SWAP]"))
+    if extra_from:
+        p.append("the FROM drive has other mounted filesystems (%s): the copy keeps to one filesystem per mount "
+                 "(rsync -x) and would silently leave them out. Unmount them or copy them by hand first" % ", ".join(extra_from))
+    if f["fresh"]:
+        if not f["models_from_to"]:
+            p.append("%s is not mounted from a partition of the TO drive (serial %s). The models are what gets parked "
+                     "and the drive is erased: this tool will not guess" % (f["models_path"], f["to_serial"]))
+        if f["to_parts"] != 1:
+            p.append("the TO drive has %d partitions; it must have exactly one (the models one) before it is erased" % f["to_parts"])
     allowed = f["to_allowed_mounts"]
     extra = sorted(m for m in tree_mounts(tt) if m not in allowed and not any(
         m.startswith(a.rstrip("/") + "/") for a in f["to_allowed_prefixes"]))
@@ -380,6 +522,10 @@ def check_facts(f):
                  % f["efi_path"])
     if f["state_mount_bad"]:
         p.append(f["state_mount_bad"])
+    if f["perm_bad"]:
+        p.append(f["perm_bad"])
+    if f["raid_bad"]:
+        p.append(f["raid_bad"])
     if f["dpkg_busy"]:
         p.append("apt/dpkg is running; wait for it, because the copy would catch it half way")
     root_gib = f["root_gib"]
@@ -444,7 +590,7 @@ def render_status(f):
              "state:      %s" % f["state"],
              "stage:      %s" % f["stage"],
              "progress:   %s" % (f["percent"] if f["percent"] else "-"),
-             "last line:  %s" % f["last"],
+             "doing:      %s" % f["doing"],
              "started:    %s" % f["started"],
              "updated:    %s" % f["updated"],
              "boot id:    %s" % f["boot_id"],
@@ -468,7 +614,7 @@ class Status:
         self.enabled = False
         self.lock = threading.RLock()
         self.buf = ""
-        self.f = {"state": "RUNNING", "stage": "starting", "percent": "", "last": "", "started": self.stamp(),
+        self.f = {"state": "RUNNING", "stage": "starting", "percent": "", "doing": "starting", "started": self.stamp(),
                   "updated": self.stamp(), "boot_id": self.boot_id(),
                   "next": "nothing to do; it runs by itself. Watch this file."}
         self.stop = threading.Event()
@@ -493,8 +639,7 @@ class Status:
         return text
 
     def enable(self):
-        os.makedirs(os.path.dirname(self.cfg.log), exist_ok=True)
-        fd = os.open(self.cfg.log, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        fd = open_nofollow(self.cfg.log, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         os.fchmod(fd, 0o600)
         self.logfh = os.fdopen(fd, "a")
         self.enabled = True
@@ -507,7 +652,7 @@ class Status:
             self.f["updated"] = self.stamp()
             text = self.clean(render_status(self.f))
             tmp = self.cfg.status + ".new"
-            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+            fd = open_nofollow(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
             os.fchmod(fd, 0o644)
             with os.fdopen(fd, "w") as fh:
                 fh.write(text)
@@ -520,10 +665,10 @@ class Status:
 
     def stage(self, name):
         n = STAGES.index(name)
-        self.set(stage="%d of %d (%s)" % (n, len(STAGES) - 1, STAGE_TEXT[name]), percent="")
+        self.set(stage="%d of %d (%s)" % (n, len(STAGES) - 1, STAGE_TEXT[name]), percent="", doing=STAGE_TEXT[name])
 
     def feed(self, text):
-        """Output of the run: the log gets all of it, the status its last line and the copy's percentage."""
+        """Output of the run: the log gets all of it; the status file only the copy's percentage (a number)."""
         if self.logfh:
             try:
                 self.logfh.write(text)
@@ -538,10 +683,9 @@ class Status:
             if not piece:
                 continue
             m = self.PROGRESS_RX.search(piece)
-            with self.lock:
-                self.f["last"] = piece[:200]
-                if m:
-                    self.f["percent"] = "%s%% of the current copy" % m.group(1)
+            if m:                    # only the number is taken from a command's output, never its words
+                with self.lock:
+                    self.f["percent"] = "%s%% of the current copy" % int(m.group(1))
         if pieces:
             self.write()
 
@@ -673,6 +817,7 @@ class Migrator:
         self.st = None
         self.tty_fh = None
         self.inhibitor = None
+        self.cur_stage = None
 
     # -- finding drives (by serial, every time) ------------------------------------------------
 
@@ -697,14 +842,23 @@ class Migrator:
 
     def resolve(self, serial):
         """Drive for this serial, read fresh from sysfs and by-id. None if not there."""
-        for d in sorted(self.glob(os.path.join(self.cfg.sys, "class/nvme/nvme*"))):
-            if self.read(os.path.join(d, "serial")) != serial:
-                continue
+        hits = [d for d in sorted(self.glob(os.path.join(self.cfg.sys, "class/nvme/nvme*")))
+                if self.read(os.path.join(d, "serial")) == serial]
+        if len(hits) > 1:
+            raise Abort("%d NVMe controllers report the serial %s; refusing to guess which one is meant" % (len(hits), serial))
+        for d in hits:
             ctrl = os.path.basename(d)
-            blocks = sorted(n for n in os.listdir(d) if re.fullmatch(r"nvme\d+n\d+", n))
+            blocks = []
+            for n in sorted(os.listdir(d)):
+                if re.fullmatch(r"nvme\d+n\d+", n):
+                    blocks.append(n)
+                else:                                     # native multipath: nvme<subsystem>c<ctrl>n<ns> is a path to nvme<subsystem>n<ns>
+                    m = re.fullmatch(r"nvme(\d+)c\d+n(\d+)", n)
+                    if m:
+                        blocks.append("nvme%sn%s" % (m.group(1), m.group(2)))
             if not blocks:
                 return None
-            block = blocks[0]
+            block = sorted(set(blocks))[0]
             dev = os.path.join(self.cfg.dev, block)
             byid = None
             for n in sorted(os.listdir(self.cfg.byid)) if os.path.isdir(self.cfg.byid) else []:
@@ -781,7 +935,7 @@ class Migrator:
 
     def gather(self):
         a = self.args
-        done, _ = self.progress()
+        done, started = self.progress()
         fd, td = self.resolve(a.from_serial), self.resolve(a.to_serial)
         mounts = self.mounts()
         f = {"from_serial": a.from_serial, "to_serial": a.to_serial, "from_drive": fd, "to_drive": td,
@@ -790,15 +944,23 @@ class Migrator:
              "root_used": None, "data_avail": None, "data_path": self.cfg.data, "need_space": "park" not in done,
              "efi_path": self.cfg.efi_sys, "efi_boot": os.path.isdir(self.cfg.efi_sys), "state_mount_bad": "",
              "dpkg_busy": False, "missing_tools": {t: pkg for t, pkg in TOOLS.items() if not shutil.which(t)},
-             "mounts": mounts, "data_ok": False}
+             "mounts": mounts, "data_ok": False, "fresh": "partition" not in started, "models_from_to": False,
+             "models_path": self.cfg.models, "to_parts": 0, "raid_bad": "", "perm_bad": ""}
         dm = [m for m in mounts if m["target"] == self.cfg.data]
         f["data_ok"] = bool(dm) and not re.search(r"nvme|ubuntu--vg", dm[-1]["source"])
+        f["raid_bad"] = self.check_data_raid(mounts)
+        uid = os.geteuid()
+        f["perm_bad"] = dir_perm_problem(self.cfg.data, uid) if dm else ""
+        if not f["perm_bad"] and os.path.lexists(self.cfg.state_dir):
+            f["perm_bad"] = dir_perm_problem(self.cfg.state_dir, uid)
         # what the TO drive may have mounted: /srv/models (until it is wiped) and our own mount points
         f["to_allowed_mounts"] = {self.cfg.models}
         f["to_allowed_prefixes"] = [self.cfg.mnt]
         if not f["missing_tools"] and fd and td:
             f["from_tree"], f["to_tree"] = self.lsblk(fd.dev), self.lsblk(td.dev)
             f["to_size"] = int(f["to_tree"].get("size") or 0)
+            f["models_from_to"] = self.cfg.models in tree_mounts(f["to_tree"])
+            f["to_parts"] = len([n for n in f["to_tree"].get("children") or [] if n.get("type") == "part"])
             root = self.mount_of(mounts, "/")
             klog = self.rn.run(["journalctl", "-k", "-b", "0", "--no-pager", "-q"], ro=True, ok=(0, 1))
             f["from_dead"] = drive_dead(fd.ctrl, self.read(os.path.join(self.cfg.sys, "class/nvme", fd.ctrl, "state")),
@@ -820,8 +982,26 @@ class Migrator:
             elif sm["target"] != self.cfg.data:
                 f["state_mount_bad"] = "%s is not on %s as expected (it is on %s)" % (self.cfg.state_dir, self.cfg.data, sm["target"])
             f["dpkg_busy"] = self.rn.rc(["fuser", "-s", "/var/lib/dpkg/lock-frontend"]) == 0
-        f["data_ok"] = f["data_ok"] and not f["state_mount_bad"]
+        f["data_ok"] = f["data_ok"] and not f["state_mount_bad"] and not f["perm_bad"]
         return f
+
+    def check_data_raid(self, mounts):
+        """'' if /srv/data is a mount point of a read-write md array with every member up, else why not.
+        The parked models are on it, and a degraded mirror would leave them on one disk."""
+        dm = [m for m in mounts if m["target"] == self.cfg.data]
+        if not dm:
+            return "%s is not a mount point; the models would be parked on the root filesystem" % self.cfg.data
+        base = os.path.basename(os.path.realpath(dm[-1]["source"]))
+        if not re.fullmatch(r"md\d+", base):
+            return "%s is mounted from %s, not from the md mirror" % (self.cfg.data, dm[-1]["source"])
+        if "rw" not in dm[-1]["options"].split(","):
+            return "%s is not mounted read-write" % self.cfg.data
+        try:
+            with open(self.cfg.mdstat) as fh:
+                text = fh.read()
+        except OSError:
+            return "cannot read /proc/mdstat"
+        return raid_ok(text, base)
 
     # -- state file ---------------------------------------------------------------------------
 
@@ -830,18 +1010,37 @@ class Migrator:
         return os.path.join(self.cfg.state_dir, "state.json")
 
     def load_state(self):
-        try:
-            with open(self.state_path) as fh:
-                return json.load(fh)
-        except FileNotFoundError:
+        if not os.path.lexists(self.state_path):
             return None
+        fd = open_nofollow(self.state_path, os.O_RDONLY)
+        try:
+            with os.fdopen(fd) as fh:
+                st = json.load(fh)
         except ValueError:
             raise Abort("%s is not readable JSON; not guessing. Look at it before doing anything else" % self.state_path)
+        return validate_state(st)
+
+    def ensure_state_dir(self):
+        """The state folder, made only if /srv/data is a mount point (never silently on the root filesystem),
+        and only if it and /srv/data belong to root and nobody else can write them."""
+        c, uid = self.cfg, os.geteuid()
+        if not os.path.lexists(c.state_dir):
+            if not any(m["target"] == c.data for m in self.mounts()):
+                raise Abort("refusing to create %s: %s is not a mount point, so it would land on the root filesystem"
+                            % (c.state_dir, c.data))
+            why = dir_perm_problem(c.data, uid)
+            if why:
+                raise Abort("refusing to create %s: %s" % (c.state_dir, why))
+            os.mkdir(c.state_dir, 0o700)
+        why = dir_perm_problem(c.state_dir, uid)
+        if why:
+            raise Abort("refusing to use the state folder: " + why)
 
     def save_state(self):
-        os.makedirs(self.cfg.state_dir, exist_ok=True)
+        self.ensure_state_dir()
         tmp = self.state_path + ".new"
-        with open(tmp, "w") as fh:
+        fd = open_nofollow(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
             json.dump(self.state, fh, indent=1)
             fh.flush()
             os.fsync(fh.fileno())
@@ -855,8 +1054,8 @@ class Migrator:
         self.save_state()
 
     def take_lock(self):
-        os.makedirs(self.cfg.state_dir, exist_ok=True)
-        self.lock_fd = open(os.path.join(self.cfg.state_dir, "lock"), "w")
+        self.ensure_state_dir()
+        self.lock_fd = os.fdopen(open_nofollow(os.path.join(self.cfg.state_dir, "lock"), os.O_WRONLY | os.O_CREAT, 0o600), "w")
         try:
             fcntl.flock(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
@@ -910,11 +1109,13 @@ class Migrator:
             L.append("   4  models %s ext4 (label o1models)" % human(lay["models_bytes"]))
         L.append("WRITTEN: a copy of / and /boot on the new partitions (a fresh /swap.img of the same size, not a copy);")
         L.append("   the copy's /etc/fstab (new UUIDs; the old fstab is not touched); its initramfs and GRUB;")
-        L.append("   one firmware boot entry (%s), made last, first in the boot order, the old drive's entry second;" % BOOT_LABEL)
+        L.append("   one firmware boot entry (%s), made last, used only for the NEXT boot (BootNext); the old drive stays the" % BOOT_LABEL)
+        L.append("   default until --finish, so a power cycle after a bad first boot comes back to it; the new system has panic=10;")
         L.append("   the models copied back to the new models partition.")
         L.append("NEVER TOUCHED: the FROM drive: its partitions, LVM, fstab, boot loader and boot entry. If the new")
         L.append("   system doesn't boot, the firmware falls back to it, or pick it in the BIOS boot menu (%s)." % self.cfg.bios_key)
-        L.append("STOPPED meanwhile: " + ", ".join(s.replace(".service", "") for s in SERVICES[:6]) + ", apt's timers (they start again at the next boot).")
+        L.append("STOPPED meanwhile: ollama, the gateway, the admin panel, model pulls, syncs and updates, the restart and reboot")
+        L.append("   units, comfyui, apt's timers (they start again at the next boot). /srv/models is marked immutable while it is unmounted.")
         L.append("State file (on the RAID, not on either NVMe): %s" % self.state_path)
         L.append("Status (readable by everyone) and log: %s, %s" % (self.cfg.status, self.cfg.log))
         L.append("")
@@ -935,7 +1136,9 @@ class Migrator:
 
     def stop_services(self):
         stopped = self.state.setdefault("stopped", [])
-        for u in SERVICES:
+        pulls = [l.split()[0] for l in self.rn.run(["systemctl", "list-units", "--plain", "--no-legend", "--state=active,activating",
+                                                    PULL_UNITS], ro=True, ok=(0, 1)).splitlines() if l.split()]
+        for u in SERVICES + pulls:
             if self.rn.rc(["systemctl", "is-active", "-q", u]) == 0:
                 self.rn.run(["systemctl", "stop", u])
                 if u not in stopped:
@@ -1029,6 +1232,7 @@ class Migrator:
         self.verify_parked()
         used = self.df(c.models, "used")
         self.state["parked_bytes"] = used
+        self.state["parked_du"] = int(self.rn.run(["du", "-sb", "--apparent-size", c.parked], ro=True).split()[0])
         print("  parked: %s of models, the dry run finds nothing left to copy" % human(used or 0))
 
     def verify_parked(self):
@@ -1055,12 +1259,14 @@ class Migrator:
         if "park" not in done:
             raise Abort("the models are not parked and verified; not erasing the drive")
         self.verify_parked_state()
+        self.verify_before_wipe()
         self.mark("started", "partition")
         d = self.drive_to()
         # the models filesystem goes away: nothing may hold it
         for m in self.mounts():
             if m["target"] == c.models:
                 self.rn.run(["umount", c.models])
+        self.freeze_models_dir()
         tt = self.lsblk(d.dev)
         busy = sorted(tree_mounts(tt))
         if busy:
@@ -1075,17 +1281,22 @@ class Migrator:
         self.rn.run(["udevadm", "settle"])
         for n in (1, 2, 3, 4):
             self.wait_for_part(d, n)
+        for n in (1, 2, 3, 4):
+            # an old filesystem's signature can sit exactly where a new partition starts (the old models
+            # partition and the new ESP both begin at 1 MiB): clear each new partition before formatting it
+            self.w("to", ["wipefs", "-a", d.part(n)], d.part(n))
+        self.rn.run(["udevadm", "settle"])
         fmt = {1: ["mkfs.vfat", "-F", "32", "-n", "O1ESP"], 2: ["mkfs.ext4", "-F", "-q", "-L", "o1boot"],
                3: ["mkfs.ext4", "-F", "-q", "-L", "o1root", "-m", "1"],
                4: ["mkfs.ext4", "-F", "-q", "-L", "o1models", "-m", "1"]}
         for n in (1, 2, 3, 4):
-            cur = self.probe(d.part(n), "TYPE")
-            want = "vfat" if n == 1 else "ext4"
-            if cur and cur != want:
-                raise Abort("%s holds '%s' where a new %s was expected; stopped" % (d.part(n), cur, want))
-            if not cur:
-                self.w("to", fmt[n] + [d.part(n)], d.part(n))
+            self.w("to", fmt[n] + [d.part(n)], d.part(n))
         self.rn.run(["udevadm", "settle"])
+        for n in (1, 2, 3, 4):
+            want = "vfat" if n == 1 else "ext4"
+            cur = self.probe(d.part(n), "TYPE")
+            if cur != want:
+                raise Abort("partition %d reads as '%s' after formatting it %s; stopped" % (n, cur or "nothing", want))
         uu = {}
         for n, k in ((1, "esp"), (2, "boot"), (3, "root"), (4, "models")):
             uu[k] = self.probe(d.part(n), "UUID")
@@ -1094,6 +1305,40 @@ class Migrator:
         self.state["uuids"] = uu
         self.state["esp_partuuid"] = self.probe(d.part(1), "PARTUUID")
         print("  partitions made and formatted: " + ", ".join("%s %s" % (k, v) for k, v in uu.items()))
+
+    def verify_before_wipe(self):
+        """The last look before the TO drive is erased: the RAID is whole and mounted read-write, and the parked
+        copy is the models. With /srv/models still mounted, a rsync dry run and sizes again, then a content
+        compare of every file up to 64 MiB and of 18 MiB spread over each larger one (a full checksum of a
+        models store of a terabyte or more would read it twice over disks of 150 MB/s, hours; the sizes and
+        times of everything are already exact). Resumed after the unmount, the parked folder is compared with
+        the size recorded when it was verified."""
+        c = self.cfg
+        why = self.check_data_raid(self.mounts())
+        if why:
+            raise Abort(why + "; not erasing the drive")
+        if any(m["target"] == c.models for m in self.mounts()):
+            self.verify_parked()
+            files, nbytes = sample_compare(c.models, c.parked)
+            print("  checked again before the wipe: %d files, %s compared by content" % (files, human(nbytes)))
+        else:
+            want = self.state.get("parked_du")
+            got = int(self.rn.run(["du", "-sb", "--apparent-size", c.parked], ro=True).split()[0])
+            if not want or abs(got - want) > max(MIB, want // 1000):
+                raise Abort("the parked copy is %s, not the size it had when it was verified; not going on" % human(got))
+
+    def freeze_models_dir(self):
+        """chattr +i on the bare /srv/models while nothing is mounted there, so nothing can write models into the
+        old root's folder. Refused while a filesystem is mounted on it (that would mark the models drive's own root)."""
+        if any(m["target"] == self.cfg.models for m in self.mounts()):
+            raise Abort("%s is mounted; not marking it immutable" % self.cfg.models)
+        self.rn.run(["chattr", "+i", self.cfg.models])
+
+    def thaw_models_dir(self):
+        if any(m["target"] == self.cfg.models for m in self.mounts()):
+            return
+        if os.path.isdir(self.cfg.models):
+            self.rn.run(["chattr", "-i", self.cfg.models], ok=(0, 1))
 
     def verify_parked_state(self):
         if not os.path.isdir(self.cfg.parked):
@@ -1205,11 +1450,18 @@ class Migrator:
                 print("  NOTE: /%s mentions ubuntu-vg (an LVM volume on the old drive, such as the encrypted swap). "
                       "It has nofail, so the boot goes on; re-make that on the new system with setup.sh --encrypted-swap" % f)
         required = self.required_cmdline()
+        if PANIC_OPTION in required:                      # a kernel panic reboots (into the default boot: the old drive)
+            drop = os.path.join(c.new_root, PANIC_DROPIN)
+            os.makedirs(os.path.dirname(drop), exist_ok=True)
+            with open(drop, "w") as fh:
+                fh.write('GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT %s"\n' % PANIC_OPTION)
         self.bind_mounts()
-        for argv in chroot_commands(c.new_root):
-            self.verify_mounted(d.part(3), c.new_root)
-            self.rn.run(argv, stream=True)
-        self.unbind_mounts()
+        try:
+            for argv in chroot_commands(c.new_root):
+                self.verify_mounted(d.part(3), c.new_root)
+                self.rn.run(argv, stream=True)
+        finally:
+            self.unbind_mounts()
         self.verify_grub(required)
         self.state["cmdline_required"] = required
         esp = c.new_root + "/boot/efi/EFI"
@@ -1220,6 +1472,8 @@ class Migrator:
                 break
         if not loader:
             raise Abort("grub-install left no boot loader in the new ESP (EFI/%s)" % BOOT_ID)
+        if not os.path.isfile("%s/%s/grub.cfg" % (esp, BOOT_ID)):
+            raise Abort("grub-install left no grub.cfg stub next to the boot loader (EFI/%s/grub.cfg)" % BOOT_ID)
         # the removable path, for a firmware that forgets its entries
         fb = esp + "/BOOT"
         os.makedirs(fb, exist_ok=True)
@@ -1245,6 +1499,8 @@ class Migrator:
                 tok = overdrive_token(fh.read())
             if tok and tok not in running:
                 running.append(tok)
+        if not any(t.startswith("panic=") for t in running):
+            running.append(PANIC_OPTION)
         return running
 
     def verify_grub(self, required):
@@ -1299,14 +1555,16 @@ class Migrator:
             new = new_entry_number(efi2, pu)
             if not new:
                 raise Abort("efibootmgr made no entry labelled %s; stopped" % BOOT_LABEL)
-        order = boot_order(new, old, [n for n in previous if n != new])
+        order = boot_order_old_first(new, old, [n for n in previous if n != new])
         self.rn.run(["efibootmgr", "-o", ",".join(order)])
+        self.rn.run(["efibootmgr", "-n", new])            # BootNext: only the next boot tries the new drive
         self.state["efi"] = {"new": new, "old": old, "previous_order": previous, "order": order}
         self.save_state()
-        print("  firmware boot order: %s  (new %s first, old %s second)" % (
-            ",".join(order), new, old or "NOT FOUND"))
+        print("  firmware: the old entry %s stays first in the boot order (%s); BootNext sends the next boot, once, to the "
+              "new drive (entry %s). A power cycle after a bad first boot comes back to the old drive; --finish makes the new "
+              "drive the default once it has booted and been checked" % (old or "NOT FOUND", ",".join(order), new))
         if not old:
-            print("  NOTE: this tool could not tell which entry boots the old drive; the old entries still follow the new one")
+            print("  NOTE: this tool could not tell which entry boots the old drive; the order it had is kept, with the new entry last")
 
     # -- stage 5: models back ------------------------------------------------------------------
 
@@ -1323,6 +1581,7 @@ class Migrator:
         if diff:
             raise Abort("the models on the new partition differ from the parked copy (%d, first: %s)" % (len(diff), diff[0]))
         self.unmount_new()
+        self.thaw_models_dir()
         print("  models restored and checked; the new system is unmounted")
 
     # -- driving the stages ----------------------------------------------------------------------
@@ -1337,6 +1596,7 @@ class Migrator:
             if s in done:
                 print("stage %s: done earlier, skipped" % s)
                 continue
+            self.cur_stage = s
             print("\n== stage %s (%d of %d: %s) ==" % (s, STAGES.index(s), len(STAGES) - 1, STAGE_TEXT[s]))
             self.check_alive()
             fns[s]()
@@ -1360,10 +1620,12 @@ class Migrator:
         efi = parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))
         e = self.state.get("efi", {})
         new, old = e.get("new"), e.get("old")
-        if not new or efi["order"][:1] != [new] or not efi["entries"].get(new, {}).get("active"):
-            raise Abort("the new drive's firmware entry is not first in the boot order")
-        if old and efi["order"][1:2] != [old]:
-            raise Abort("the old drive's firmware entry is not second in the boot order")
+        if not new or efi["next"] != new or not efi["entries"].get(new, {}).get("active"):
+            raise Abort("the firmware's BootNext is not the new drive's entry")
+        if old and efi["order"][:1] != [old]:
+            raise Abort("the old drive's firmware entry is not first in the boot order (it must stay the default)")
+        if efi["order"][:1] == [new]:
+            raise Abort("the new drive's entry is first in the boot order; it must only be BootNext until --finish")
         live = [m["target"] for m in self.mounts() if m["target"] == self.cfg.mnt or m["target"].startswith(self.cfg.mnt + "/")]
         if live:
             raise Abort("the new system is still mounted (%s)" % ", ".join(live))
@@ -1396,10 +1658,20 @@ class Migrator:
         return ("the old drive is untouched and nothing was rebooted. If the drive dropped off the bus, "
                 "power-cycle the server first. Then: %s --reboot" % self.cmdline("resume"))
 
-    def fail(self, why):
+    def failure_phrase(self, exc=None):
+        """What the world-readable status says about a failure: fixed words, a stage name, a program name from
+        a fixed list and an exit number. The reason itself (paths, output) is in the terminal and the root-only log."""
+        stage = self.cur_stage or "before the first stage"
+        if isinstance(exc, CommandFailed):
+            prog = os.path.basename(exc.argv[0])
+            prog = prog if prog in TOOLS or prog in ("tmux", "systemd-inhibit", "update-initramfs", "grub-install", "update-grub") else "a program"
+            return "FAILED in stage %s: %s stopped with exit %d (details in the log, root only)" % (stage, prog, exc.rc)
+        return "FAILED in stage %s: a safety check stopped it (details in the log, root only)" % stage
+
+    def fail(self, why, exc=None):
         self.failure_summary(why)
         if self.st:
-            self.st.finish("FAILED: " + why.splitlines()[0][:300], self.next_after_failure())
+            self.st.finish(self.failure_phrase(exc), self.next_after_failure())
 
     # -- reboot -------------------------------------------------------------------------------------
 
@@ -1447,7 +1719,7 @@ class Migrator:
             raise Abort("give both --from-serial and --to-serial (lsblk -d -o NAME,SIZE,MODEL,SERIAL lists them)")
         if a.confirm_serial is not None and a.confirm_serial != a.to_serial:
             raise Abort("--confirm-serial is not the serial of the drive to be erased (--to-serial); nothing was changed")
-        if os.geteuid() != 0 and not os.environ.get("O1M_ALLOW_NONROOT"):
+        if os.geteuid() != 0 and not (self.cfg.honour and os.environ.get("O1M_ALLOW_NONROOT")):
             raise Abort("run it with sudo")
 
     def mode_plan(self):
@@ -1516,7 +1788,7 @@ class Migrator:
                     print("  - " + p)
                 print("\nNothing was changed.")
                 if self.st:
-                    self.st.finish("FAILED: refused to start: " + problems[0][:200], self.next_after_failure())
+                    self.st.finish("FAILED: refused to start (a preflight check failed; the terminal says which)", self.next_after_failure())
                 return 1
             if not self.st:
                 raise Abort("cannot place the status file safely; stopped")
@@ -1525,7 +1797,7 @@ class Migrator:
             self.confirm(f)
         except Abort as e:
             if self.st:
-                self.st.finish("FAILED: " + str(e).splitlines()[0][:300], self.next_after_failure())
+                self.st.finish("FAILED: stopped before the first stage (not confirmed, or a check failed)", self.next_after_failure())
             raise
         if mode == "run":
             self.save_state()
@@ -1560,7 +1832,7 @@ class Migrator:
             self.rn.run([c.tmux, "new-session", "-d", "-s", SESSION, "-c", "/", shlex.join(child)])
         except Abort as e:
             self.st.enabled = True
-            self.st.finish("FAILED: could not start the tmux session: " + str(e)[:200], self.next_after_failure())
+            self.st.finish("FAILED: could not start the tmux session", self.next_after_failure())
             raise
         self.box("STARTED in the background (tmux session %s)" % SESSION, [
             "It runs by itself from here, whatever happens to this connection; nothing more is asked.",
@@ -1575,7 +1847,7 @@ class Migrator:
         """No sleep and no power-button suspend while the run goes on (the kit's auto sleep honours a logind
         block). It ends with this process, however it ends (the holder reads a pipe only we write)."""
         exe = shutil.which("systemd-inhibit")
-        if not exe or not (os.geteuid() == 0 or os.environ.get("O1M_TEST") == "1"):
+        if not exe or not (os.geteuid() == 0 or self.cfg.honour):
             return
         try:
             self.inhibitor = subprocess.Popen(
@@ -1596,7 +1868,7 @@ class Migrator:
             self.run_stages()
             self.final_checks()
         except Abort as e:
-            self.fail(str(e))
+            self.fail(str(e), e)
             raise
         except KeyboardInterrupt:
             self.fail("interrupted")
@@ -1660,6 +1932,7 @@ class Migrator:
         print("Verified: the kernel command line has the options the old system ran with: %s" % " ".join(
             self.state.get("cmdline_required", [])))
         fd = self.resolve(a.from_serial)
+        self.promote_new_entry()
         if a.delete_parked:
             self.delete_parked()
         if a.disable_old_entry:
@@ -1678,6 +1951,7 @@ class Migrator:
             "The parked models copy %s%s" % (
                 "was deleted." if a.delete_parked else "is still at %s;" % c.parked,
                 "" if a.delete_parked else " --finish --delete-parked frees the space (it checks the live copy first)."),
+            "The new drive is now the default boot; a kernel panic reboots (panic=10) into it, and the old drive stays second.",
             "The kit's setup.sh still thinks / is an LVM volume on the old drive; see ollama1/README.md before re-running it."]
         if os.path.exists(c.sudoers):
             if a.remove_sudoers or self.offer_remove_sudoers():
@@ -1687,6 +1961,24 @@ class Migrator:
                 lines.append("REMINDER: remove the temporary sudo permission now:  sudo rm %s" % c.sudoers)
         self.box("FINISHED. The system runs from the new drive.", lines)
         return 0
+
+    def promote_new_entry(self):
+        """The new system has booted and been checked: only now does it become the default boot (new first, the
+        old drive's entry second)."""
+        e = self.state.get("efi", {})
+        new, old = e.get("new"), e.get("old")
+        if not new:
+            raise Abort("no firmware entry for the new drive was recorded; set the boot order by hand with efibootmgr")
+        efi = parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))
+        if new not in efi["entries"]:
+            raise Abort("the new drive's firmware entry %s is gone; set the boot order by hand with efibootmgr" % new)
+        order = boot_order(new, old, efi["order"])
+        if efi["order"] != order:
+            self.rn.run(["efibootmgr", "-o", ",".join(order)])
+        e["order"] = order
+        e["promoted"] = self.now()
+        self.state["efi"] = e
+        print("Firmware boot order is now: %s (new drive first, old drive second)" % ",".join(order))
 
     def offer_remove_sudoers(self):
         if self.args.confirm_serial is not None:

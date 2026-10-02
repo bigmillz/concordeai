@@ -6,7 +6,11 @@ import re
 import signal
 import unittest
 
-from migrate_fixture import FROM, FSTAB, TO, WRITES_TO_DRIVE, Machine, load_lib
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))   # so `python3 -m unittest tests.test_migrate` works from ollama1/
+
+from migrate_fixture import FROM, FSTAB, MDSTAT_DEGRADED, TO, WRITES_TO_DRIVE, Machine, load_lib
 
 L = load_lib()
 
@@ -19,7 +23,8 @@ def read(path):
 def outcome(m):
     return {"parts": [(p["n"], p["type"], p["label"], p["size"]) for p in m.fs["disks"][m.names["to"]]["parts"]],
             "fstab": re.sub(r"UUID=\S+", "UUID=x", read(m.dir + "/run/o1migrate/root/etc/fstab")),
-            "order": m.fs["efi"]["order"], "done": sorted(m.state()["done"]),
+            "order": m.fs["efi"]["order"], "next": m.fs["efi"]["next"], "immutable": m.fs.get("immutable", []),
+            "done": sorted(m.state()["done"]),
             "models": read(m.dir + "/run/o1migrate/models/a.gguf"),
             "required": m.state()["cmdline_required"]}
 
@@ -34,9 +39,9 @@ class TestResume(unittest.TestCase):
     # (program, nth call, when): the first destructive thing of each stage, the last of some, and the points between
     POINTS = [("rsync", 1, "before"), ("rsync", 1, "after"), ("rsync", 2, "after"), ("umount", 1, "after"),
               ("wipefs", 1, "before"), ("sgdisk", 2, "after"), ("mkfs.vfat", 1, "after"), ("mkfs.ext4", 3, "after"),
-              ("mount", 1, "before"), ("rsync", 3, "after"), ("rsync", 5, "after"), ("fallocate", 1, "after"),
-              ("chroot", 1, "after"), ("chroot", 3, "after"), ("rsync", 6, "after"), ("efibootmgr", 2, "after"),
-              ("efibootmgr", 4, "after")]
+              ("mount", 1, "before"), ("rsync", 3, "after"), ("rsync", 4, "after"), ("rsync", 6, "after"), ("fallocate", 1, "after"),
+              ("chroot", 1, "after"), ("chroot", 3, "after"), ("rsync", 7, "after"), ("efibootmgr", 2, "after"),
+              ("efibootmgr", 4, "after"), ("efibootmgr", 5, "after"), ("chattr", 1, "after"), ("wipefs", 3, "after")]
 
     def test_killed_at_every_stage_boundary_then_resumed(self):
         base = Machine()
@@ -93,8 +98,34 @@ class TestResume(unittest.TestCase):
         self.assertNotIn("partition", m.state()["done"])
         m.set_state(kill=[])
         self.assertEqual(m.run("--resume"), 0, m.out)
-        self.assertEqual(len(m.log("wipefs")), 2)              # wiped again; the parked copy was checked first
+        disk_wipes = [l for l in m.log("wipefs") if "-part" not in l]
+        self.assertEqual(len(disk_wipes), 2)                   # wiped again; the parked copy was checked first
         self.assertEqual(m.run("--finish"), 1)                 # (not rebooted yet)
+
+    def test_a_raid_that_degrades_before_the_wipe_stops_it(self):
+        m = self.m
+        m.set_state(kill=[{"cmd": "rsync", "nth": 2, "when": "after"}])        # parked and checked, not yet wiped
+        self.assertEqual(m.run("--run"), -signal.SIGKILL, m.out)
+        m.set_state(kill=[])
+        m.put(m.mdstat_file, MDSTAT_DEGRADED)
+        self.assertEqual(m.run("--resume"), 1, m.out)                          # the preflight refuses
+        self.assertIn("is degraded [U_]", m.out)
+        self.assertEqual(m.log("wipefs"), [])
+        self.assertEqual(m.log("umount"), [])
+
+    def test_the_raid_is_looked_at_again_inside_the_partition_stage(self):
+        import os
+        from unittest import mock
+        m = self.m
+        mg = L.Migrator(L.Cfg(m.env()), L.parse_args(["--from-serial", FROM, "--to-serial", TO, "--run"]))
+        os.makedirs(m.data_dir + "/models-parked")
+        mg.state = {"done": {"park": "x"}, "started": {}}
+        m.put(m.mdstat_file, MDSTAT_DEGRADED)
+        with mock.patch.dict(os.environ, m.env()):
+            with self.assertRaises(L.Abort) as cm:
+                mg.stage_partition()
+        self.assertIn("degraded", str(cm.exception))
+        self.assertEqual(m.log("wipefs"), [])
 
     def test_resume_errors(self):
         m = self.m
@@ -129,15 +160,15 @@ class TestResume(unittest.TestCase):
 
     def test_a_dead_from_drive_mid_run_says_power_cycle_then_resume(self):
         m = self.m
-        m.set_state(kill=[{"cmd": "rsync", "nth": 3, "when": "before"}])
+        m.set_state(kill=[{"cmd": "rsync", "nth": 4, "when": "before"}])      # the first pass over /
         self.assertEqual(m.run("--run"), -signal.SIGKILL)
         m.set_state(kill=[])
         m.put(m.dir + "/sys/class/nvme/" + m.ctrl["from"] + "/state", "dead\n")
         self.assertEqual(m.run("--resume"), 1)
         self.assertIn("the FROM drive is dead right now", m.out)
         self.assertIn("--resume", m.out)
-        self.assertEqual(len(m.log("rsync")), 3)               # nothing was copied after it died
-        self.assertIn("state:      FAILED:", read(m.status_file))
+        self.assertEqual(len(m.log("rsync")), 4)               # nothing was copied after it died
+        self.assertIn("state:      FAILED", read(m.status_file))
         self.assertEqual([l for l in m.log("systemctl") if l == "systemctl reboot"], [])
 
 

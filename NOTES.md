@@ -73,6 +73,23 @@ DESIGN
   -I`, and ignores `O1M_*` overrides unless a test sets `O1M_TEST=1`. The rule is
   temporary; `--finish` reminds and offers to remove it.
 
+SAFETY REVIEW, same day (second commit). An independent review found the tool not
+safe unattended; fixed: (1) the old models partition's ext4 superblock sits where
+the new ESP starts, so a probe after the wipe aborted the run: each new partition
+is now wiped, always formatted and read back; (2) the firmware entry is BootNext
+only, the old drive stays first until `--finish`, and the copy boots with
+`panic=10`; (3) a final content compare (all files up to 64 MiB, 18 MiB spread
+over larger ones; not a full checksum, which would take hours on a terabyte),
+RAID `[UU]`/rw/md checks and a refusal to create the state folder off /srv/data
+right before the wipe; (4) admin panel, pulls, restart and reboot units stop,
+and the bare `/srv/models` is `chattr +i` while unmounted; (5) TO must hold
+`/srv/models` and exactly one partition, duplicate serials refused, multipath
+names resolved; (6) O_NOFOLLOW everywhere, root-owned and not-writable
+`/srv/data` and state folder, state values validated, no `O1M_*` override as
+root; (7) FROM may have no other mounts; (10) the ESP's grub.cfg stub is
+checked; (12) the status file holds fixed phrases and numbers only; chroot binds
+are unmounted in a `finally`. Tests and mutants for each.
+
 NOT VERIFIED ON REAL HARDWARE: partitioning, the chroot's grub-install and
 update-initramfs, the EFI entry, a firmware that ignores `BootOrder`, a real
 drop-out during the copy, the shim path on this board's Secure Boot setting.

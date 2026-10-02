@@ -157,7 +157,8 @@ def rsync(s, args):
 
 def efi_text(s):
     e = s["efi"]
-    lines = ["BootCurrent: 0001", "Timeout: 1 seconds", "BootOrder: " + ",".join(e["order"])]
+    lines = ["BootCurrent: 0001", "Timeout: 1 seconds"] + (["BootNext: " + e["next"]] if e.get("next") else []) + [
+        "BootOrder: " + ",".join(e["order"])]
     for n in sorted(e["entries"]):
         x = e["entries"][n]
         lines.append("Boot%s%s %s\t%s" % (n, "*" if x.get("active", True) else "", x["label"], x["path"]))
@@ -213,8 +214,16 @@ def main():
             ctrl, s["smart"].get(ctrl, 0))
     elif cmd == "journalctl":
         out = s.get("klog", "")
+    elif cmd == "chattr":
+        im = s.setdefault("immutable", [])
+        if args[0] == "+i" and args[-1] not in im:
+            im.append(args[-1])
+        elif args[0] == "-i" and args[-1] in im:
+            im.remove(args[-1])
     elif cmd == "systemctl":
-        if args[0] == "is-active":
+        if args[0] == "list-units":
+            out = "\n".join("%s loaded active running x" % u for u in s["services_active"] if u.startswith("ollama1-pull@"))
+        elif args[0] == "is-active":
             rc = 0 if args[-1] in s["services_active"] else 3
         elif args[0] == "stop" and args[1] in s["services_active"]:
             s["services_active"].remove(args[1])
@@ -239,8 +248,9 @@ def main():
                 sp = specs[n]
                 start, end = sp["n"].split(":")
                 size = size_arg(end, d["size"] - used)
-                part = {"n": n, "size": size, "type": None, "uuid": None, "partuuid": new_uuid(s), "label": None,
-                        "gpt_name": sp.get("c"), "gpt_type": sp.get("t")}
+                stale = d.get("stale", {}).get(str(n))      # an old filesystem's superblock where this partition starts
+                part = {"n": n, "size": size, "type": stale, "uuid": None, "partuuid": new_uuid(s), "label": None,
+                        "gpt_name": sp.get("c"), "gpt_type": sp.get("t"), "stale": bool(stale)}
                 used += size
                 d["parts"].append(part)
                 f = os.path.join(dr, "%sp%d" % (block, n))
@@ -253,13 +263,18 @@ def main():
         block, n = block_of(s, args[-1])
         if block is not None and n is None:
             drop_parts(s, block, dr)
+        elif block is not None:
+            pt = part_of(s, args[-1])
+            if pt is not None:
+                pt["type"], pt["uuid"], pt["stale"] = None, None, False
     elif cmd in ("mkfs.ext4", "mkfs.vfat"):
         p = part_of(s, args[-1])
         if p is None:
             rc = 1
         else:
-            p["type"] = "ext4" if cmd == "mkfs.ext4" else "vfat"
-            p["uuid"] = new_uuid(s)
+            if not p.get("stale") or cmd == "mkfs.ext4":
+                p["type"] = "ext4" if cmd == "mkfs.ext4" else "vfat"
+            p["uuid"] = new_uuid(s)                 # (an unwiped old signature stays: the probe then reads the old type)
             for flag in ("-L", "-n"):
                 if flag in args:
                     p["label"] = args[args.index(flag) + 1]
@@ -310,6 +325,8 @@ def main():
                 d = os.path.join(root, "boot/efi/EFI", eid)
                 os.makedirs(d, exist_ok=True)
                 for n in ("shimx64.efi", "grubx64.efi", "mmx64.efi", "grub.cfg"):
+                    if n == "grub.cfg" and s.get("no_grub_cfg"):
+                        continue
                     with open(os.path.join(d, n), "w") as fh:
                         fh.write(n)
     elif cmd == "efibootmgr":
@@ -327,6 +344,10 @@ def main():
             out = efi_text(s)
         elif args[0] == "-o":
             e["order"] = args[1].split(",")
+        elif args[0] == "-n":
+            e["next"] = args[1]
+        elif args[0] == "-N":
+            e["next"] = None
         elif args[0] in ("-A", "-a"):
             e["entries"][args[-1]]["active"] = args[0] == "-a"
     elif cmd == "rm":
@@ -359,6 +380,14 @@ def main():
             if h.get("dst_remove") and cmd == "rsync" and not any(a.startswith("-") and "n" in a and not a.startswith("--")
                                                                   for a in args):
                 os.remove(os.path.join(args[-1], h["dst_remove"]))   # a copy that lost a file
+            if h.get("dst_corrupt") and cmd == "rsync" and not any(a.startswith("-") and "n" in a and not a.startswith("--")
+                                                                   for a in args):
+                fn = os.path.join(args[-1], h["dst_corrupt"])
+                with open(fn, "rb") as fh:
+                    data = bytearray(fh.read())
+                data[0] ^= 0x01                                    # the same size, one bit different
+                with open(fn, "wb") as fh:
+                    fh.write(bytes(data))
     save(s)
     if any(k["when"] == "after" for k in kills):
         import signal

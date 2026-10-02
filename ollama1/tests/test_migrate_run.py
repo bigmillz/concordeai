@@ -12,9 +12,13 @@ import subprocess
 import time
 import unittest
 
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))   # so `python3 -m unittest tests.test_migrate` works from ollama1/
+
 import o1test_util as U
 from fakecmd import fu
-from migrate_fixture import (FROM, FSTAB, GIB, LIBPY, MIB, NEW_CMDLINE, NVME_OPTS, OLD_CMDLINE, OVERDRIVE, TO,
+from migrate_fixture import (FROM, FSTAB, GIB, LIBPY, MIB, NEW_CMDLINE, NVME_OPTS, OLD_CMDLINE, OVERDRIVE, SERVICES_ACTIVE, TO,
                              WRITES_TO_DRIVE, Machine, load_lib)
 
 L = load_lib()
@@ -65,7 +69,7 @@ class SharedRun(unittest.TestCase):
         self.assertEqual(st["to_serial"], TO)
         self.assertIn("DONE. The copy is finished and checked", m.out)
         self.assertIn("--finish", m.out)
-        self.assertEqual(m.fs["services_active"], [])       # the model services were stopped
+        self.assertEqual(m.fs["services_active"], [])       # the model services, the admin panel and the pulls were stopped
         # the models are parked, kept, and restored on the new models partition
         self.assertTrue(os.path.isfile(m.data_dir + "/models-parked/a.gguf"))
         self.assertTrue(os.path.isfile(m.dir + "/run/o1migrate/models/b/c.gguf"))
@@ -163,13 +167,20 @@ class SharedRun(unittest.TestCase):
         grub = read(root + "/boot/grub/grub.cfg")
         for t in NVME_OPTS + [OVERDRIVE]:
             self.assertIn(t, grub.split(), t)
-        self.assertEqual(m.state()["cmdline_required"], ["quiet", "splash"] + NVME_OPTS + [OVERDRIVE])
+        self.assertEqual(m.state()["cmdline_required"], ["quiet", "splash"] + NVME_OPTS + [OVERDRIVE, "panic=10"])
+        self.assertIn("panic=10", grub.split())                      # a kernel panic reboots, into the default boot
+        self.assertEqual(read(root + "/etc/default/grub.d/98-ollama1-migrate.cfg"),
+                         'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT panic=10"\n')
+        self.assertFalse(os.path.exists(m.dir + "/src/etc/default/grub.d/98-ollama1-migrate.cfg"))   # the running system's not touched
         self.assertIn("GRUB on the copy carries", m.out)
 
-    def test_firmware_entry_new_first_old_second(self):
+    def test_firmware_the_old_drive_stays_the_default_and_the_new_is_bootnext(self):
         m = self.m
         e = m.fs["efi"]
-        self.assertEqual(e["order"][:3], ["0002", "0001", "0000"])
+        self.assertEqual(e["order"], ["0001", "0000", "0002"])        # old first; the new entry last
+        self.assertEqual(e["next"], "0002")                          # only the next boot tries the new drive
+        self.assertIn("efibootmgr -n 0002", m.log("efibootmgr"))
+        self.assertIn("A power cycle after a bad first boot comes back to the old drive", m.out)
         self.assertEqual(e["entries"]["0002"]["label"], "ollama1-new")
         self.assertEqual(e["entries"]["0001"]["label"], "ubuntu")
         self.assertEqual(e["entries"]["0001"].get("active", True), True)
@@ -180,6 +191,38 @@ class SharedRun(unittest.TestCase):
         self.assertIn("F11", m.out)
         st = m.state()["efi"]
         self.assertEqual((st["new"], st["old"]), ("0002", "0001"))
+        self.assertNotIn("promoted", st)                             # --finish does that
+
+    def test_the_stale_signature_where_the_new_esp_starts_is_wiped_before_formatting(self):
+        """The old models partition's ext4 superblock sits where the new ESP starts: each new partition is
+        wiped, then always formatted; without the wipe the ESP would still read as ext4."""
+        m = self.m
+        self.assertEqual(self.rc, 0, m.out)
+        log = m.log()
+        for n in (1, 2, 3, 4):
+            w = [i for i, l in enumerate(log) if l.startswith("wipefs -a ") and l.endswith("-part%d" % n)]
+            f = [i for i, l in enumerate(log) if l.split()[0] in ("mkfs.vfat", "mkfs.ext4") and l.endswith("-part%d" % n)]
+            self.assertEqual((len(w), len(f)), (1, 1), n)
+            self.assertLess(w[0], f[0])
+        self.assertEqual(m.fs["disks"][m.names["to"]]["parts"][0]["type"], "vfat")
+
+    def test_models_dir_is_immutable_only_while_nothing_is_mounted_on_it(self):
+        m = self.m
+        log = m.log()
+        um = [i for i, l in enumerate(log) if l == "umount " + m.models_dir]
+        on = [i for i, l in enumerate(log) if l == "chattr +i " + m.models_dir]
+        off = [i for i, l in enumerate(log) if l == "chattr -i " + m.models_dir]
+        wipe = min(i for i, l in enumerate(log) if l.startswith("wipefs"))
+        self.assertEqual((len(um), len(on), len(off)), (1, 1, 1))
+        self.assertLess(um[0], on[0])
+        self.assertLess(on[0], wipe)
+        self.assertLess(wipe, off[0])
+        self.assertEqual(m.fs.get("immutable", []), [])
+
+    def test_the_admin_panel_and_pulls_are_stopped_too(self):
+        stops = [l for l in self.m.log("systemctl") if l.startswith("systemctl stop ")]
+        for u in ("ollama.service", "ollama1-gateway.service", "ollama1-admin.service", "ollama1-pull@llama.service"):
+            self.assertIn("systemctl stop " + u, stops)
 
     def test_the_swap_file_is_made_new_not_copied(self):
         rs = [l for l in self.m.log("rsync") if "/run/o1migrate/root/" in l and "--delete" in l]
@@ -209,7 +252,7 @@ class SharedRun(unittest.TestCase):
         self.assertIn("--finish", text.split("next step:")[1])
         for must_not in (FROM, TO, "TESTFROM", "TESTTO"):
             self.assertNotIn(must_not, text)
-        for field in ("started:", "updated:", "boot id:", "last line:", "progress:"):
+        for field in ("started:", "updated:", "boot id:", "doing:", "progress:"):
             self.assertIn(field, text)
         self.assertIn("serial %s" % TO, read(m.log_file))                       # the log keeps everything
         self.assertTrue(m.status_file.startswith(m.data_dir + "/"))
@@ -274,7 +317,7 @@ class TestRun(Base):
 
     def test_a_grub_dropin_missing_on_the_copy_stops_the_boot_stage(self):
         m = self.m
-        m.set_state(hook=[{"cmd": "rsync", "nth": 4, "dst_remove": "etc/default/grub.d/97-amdgpu-overdrive.cfg"}])
+        m.set_state(hook=[{"cmd": "rsync", "nth": 5, "dst_remove": "etc/default/grub.d/97-amdgpu-overdrive.cfg"}])
         self.assertEqual(m.run("--run"), 1, m.out)
         self.assertIn("97-amdgpu-overdrive.cfg is not on the copy", m.out)
 
@@ -285,7 +328,8 @@ class TestRun(Base):
             "0003": {"label": "network", "path": "PciRoot(0x0)/Pci(0x1,0x0)"},
             "0001": {"label": "ubuntu", "path": "HD(1,GPT,%s,0x800,0x219800)/File(\\EFI\\ubuntu\\shimx64.efi)" % fu("a")}}})
         self.full_run()
-        self.assertEqual(m.fs["efi"]["order"], ["0004", "0001", "0000", "0003"])
+        self.assertEqual(m.fs["efi"]["order"], ["0001", "0000", "0003", "0004"])
+        self.assertEqual(m.fs["efi"]["next"], "0004")
 
     def test_the_old_drive_stays_the_default_boot_until_the_firmware_stage(self):
         m = self.m
@@ -308,13 +352,46 @@ class TestRun(Base):
 
     def test_a_copy_that_fails_leaves_the_resume_hint(self):
         m = self.m
-        m.set_state(fail=[{"cmd": "rsync", "nth": 3, "rc": 23}])
+        m.set_state(fail=[{"cmd": "rsync", "nth": 4, "rc": 23}])             # the first pass over /
         self.assertEqual(m.run("--run"), 1)
         self.assertIn("STOPPED", m.out)
         self.assertIn("sudo bash migrate-os.sh --resume", m.out)
         self.assertIn("The old drive (serial %s) has not been written to" % FROM, m.out)
         self.assertIn("park", m.state()["done"])
         self.assertNotIn("copy", m.state()["done"])
+
+    def test_the_parked_copy_is_compared_by_content_just_before_the_wipe(self):
+        """Same size, one bit different: the dry run can't see it, the content compare does, before anything is erased."""
+        m = self.m
+        m.set_state(hook=[{"cmd": "rsync", "nth": 1, "dst_corrupt": "a.gguf"}])
+        self.assertEqual(m.run("--run"), 1, m.out)
+        self.assertIn("a.gguf differs from the parked copy (content)", m.out)
+        for c in ("wipefs", "sgdisk", "umount", "chattr"):
+            self.assertEqual(m.log(c), [], c)
+        self.assertIn("park", m.state()["done"])
+        self.assertNotIn("partition", m.state()["done"])
+
+    def test_the_chroot_binds_are_undone_when_a_chroot_command_fails(self):
+        m = self.m
+        m.set_state(fail=[{"cmd": "chroot", "nth": 2, "rc": 1}])
+        self.assertEqual(m.run("--run"), 1, m.out)
+        left = [x["target"] for x in m.fs["mounts"] if x["target"].startswith(m.dir + "/run/o1migrate/root/")
+                and x["target"].rsplit("/", 1)[1] in ("dev", "sys", "proc", "run")]
+        self.assertEqual(left, [])
+
+    def test_a_format_that_did_nothing_is_noticed(self):
+        m = self.m
+        m.set_state(fail=[{"cmd": "mkfs.vfat", "nth": 1, "rc": 0}])        # "succeeds" and writes nothing
+        self.assertEqual(m.run("--run"), 1, m.out)
+        self.assertIn("partition 1 reads as 'nothing' after formatting it vfat", m.out)
+        self.assertNotIn("partition", m.state()["done"])
+
+    def test_a_missing_grub_cfg_stub_stops_the_boot_stage(self):
+        m = self.m
+        m.set_state(no_grub_cfg=True)
+        self.assertEqual(m.run("--run"), 1, m.out)
+        self.assertIn("left no grub.cfg stub next to the boot loader", m.out)
+        self.assertNotIn("boot", m.state()["done"])
 
     def test_parked_copy_that_differs_stops_before_the_wipe(self):
         self.m.set_state(hook=[{"cmd": "rsync", "nth": 1, "dst_remove": "a.gguf"}])
@@ -334,11 +411,13 @@ class TestStatusFile(Base):
                 self.assertEqual(rc, 1, "%s#%d\n%s" % (kill_cmd, nth, m.out))
                 self.assertEqual([l for l in m.log("systemctl") if l == "systemctl reboot"], [], kill_cmd)
                 text = read(m.status_file)
-                self.assertIn("state:      FAILED:", text)
+                self.assertIn("state:      FAILED", text)
                 self.assertIn("nothing was rebooted", text)
                 self.assertIn("--resume --reboot", text)
                 self.assertNotIn(TO, text)
                 self.assertNotIn(FROM, text)
+                self.assertNotIn(m.dir, text)                          # no path, no command's words
+                self.assertRegex(text, r"state:      FAILED in stage \w+: (\S+ stopped with exit 5|a safety check stopped it)")
                 self.assertIn("The old drive", m.out)
             finally:
                 m.close()
@@ -353,7 +432,7 @@ class TestStatusFile(Base):
 
     def test_a_wrong_serial_is_in_the_status(self):
         self.assertEqual(self.m.run("--run", answers=["nope"]), 1)
-        self.assertIn("state:      FAILED: that is not the serial", read(self.m.status_file))
+        self.assertIn("state:      FAILED: stopped before the first stage", read(self.m.status_file))
 
     def test_the_stage_and_the_percentage_while_it_runs(self):
         """The copy's progress lines (rsync --info=progress2) reach the status file as they arrive."""
@@ -528,7 +607,7 @@ class TestTmux(Base):
         self.assertEqual(rc, 0)                         # the launcher's own job was done
         m.reload()
         self.assertEqual(m.fs["tmux_child"]["rc"], 1)
-        self.assertIn("state:      FAILED:", read(m.status_file))
+        self.assertIn("state:      FAILED in stage partition: mkfs.ext4 stopped with exit 1", read(m.status_file))
         self.assertEqual([l for l in m.log("systemctl") if l == "systemctl reboot"], [])
         self.assertNotIn("partition", m.state()["done"])
 
@@ -597,6 +676,34 @@ class TestFinish(Base):
         self.assertEqual([l for l in self.m.log("efibootmgr") if " -A " in l], [])
         self.assertIn("sudo blkdiscard " + self.m.byid("from")[:-2], self.m.out)
         self.assertIn("--finish --delete-parked", self.m.out)
+
+    def test_finish_makes_the_new_drive_the_default_boot(self):
+        m = self.m
+        self.full_run()
+        self.assertEqual(m.fs["efi"]["order"], ["0001", "0000", "0002"])
+        m.reboot_into_new()
+        self.assertEqual(m.run("--finish", serials=False), 0, m.out)
+        self.assertEqual(m.fs["efi"]["order"], ["0002", "0001", "0000"])              # new first, old second
+        self.assertIn("efibootmgr -o 0002,0001,0000", m.log("efibootmgr"))
+        self.assertIn("Firmware boot order is now: 0002,0001,0000", m.out)
+        self.assertIn("promoted", m.state()["efi"])
+        self.assertIn("panic=10", m.out)
+        # and again: nothing more to do
+        n = len(m.log("efibootmgr"))
+        self.assertEqual(m.run("--finish", serials=False), 0, m.out)
+        self.assertEqual([l for l in m.log("efibootmgr")[n:] if l.startswith("efibootmgr -o")], [])
+
+    def test_finish_stops_if_the_new_entry_is_gone(self):
+        m = self.m
+        self.full_run()
+        m.reboot_into_new()
+        m.reload()
+        del m.fs["efi"]["entries"]["0002"]
+        m.fs["efi"]["order"] = ["0001", "0000"]
+        m.flush()
+        self.assertEqual(m.run("--finish", serials=False), 1)
+        self.assertIn("firmware entry 0002 is gone", m.out)
+        self.assertNotIn("finished", m.state())
 
     def test_finish_with_the_serials_swapped_is_refused(self):
         self.full_run()

@@ -4,6 +4,7 @@
 after a fresh serial check, the status file, and the root-owned install with
 its one sudoers rule. (The runs themselves are in test_migrate_run.py, the
 crash-and-resume sweep in test_migrate_resume.py.) No real disk is touched."""
+import json
 import os
 import re
 import shutil
@@ -14,9 +15,14 @@ import time
 import unittest
 from unittest import mock
 
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))   # so `python3 -m unittest tests.test_migrate` works from ollama1/
+
 import o1test_util as U
 from fakecmd import fu
-from migrate_fixture import (DESTRUCTIVE, DISK, FROM, FSTAB, GIB, LIBPY, MIB, TO, WRAPPER, Machine, load_lib)
+from migrate_fixture import (DESTRUCTIVE, DISK, FROM, FSTAB, GIB, LIBPY, MDSTAT_DEGRADED, MIB, SERVICES_ACTIVE, TO, WRAPPER,
+                             Machine, load_lib)
 
 L = load_lib()
 
@@ -141,7 +147,7 @@ class TestPure(unittest.TestCase):
         progs |= set(re.findall(r'\["(mount|umount)"\]', src))
         allowed = {"lsblk", "blkid", "findmnt", "df", "du", "nvme", "journalctl", "systemctl", "fuser", "sgdisk",
                    "wipefs", "mkfs.ext4", "mkfs.vfat", "mkswap", "fallocate", "mount", "umount", "rsync", "chroot",
-                   "efibootmgr", "partprobe", "udevadm", "sync", "rm"}
+                   "efibootmgr", "partprobe", "udevadm", "sync", "rm", "chattr"}
         stray = {p for p in progs if p not in allowed and not p.startswith(("update-", "grub-"))}
         self.assertEqual(stray, set())
         code = src.split('"""', 2)[2]                          # the docstring may explain why not pvmove
@@ -150,7 +156,7 @@ class TestPure(unittest.TestCase):
         self.assertEqual(src.count('"rm"'), 1)                 # one rm -rf: the parked folder, in --finish
         self.assertIn('"rm", "-rf", "--one-file-system"', src)
         self.assertEqual(src.count('"reboot"'), 1)             # one reboot, in reboot()
-        self.assertEqual(src.count('["wipefs"'), 1)
+        self.assertEqual(src.count('["wipefs"'), 2)            # the whole drive, and each new partition
 
     def test_partition_names_by_id_in_either_family(self):
         d = os.path.realpath(tempfile.mkdtemp(prefix="o1part-"))
@@ -342,8 +348,127 @@ class TestRefusals(Base):
         for f in (self.m.status_file, self.m.log_file, self.m.cfg_state):
             self.assertFalse(os.path.exists(f), f)
 
+    def test_the_models_must_be_on_the_drive_to_be_erased(self):
+        self.m.reload()
+        for mt in self.m.fs["mounts"]:
+            if mt["target"] == self.m.models_dir:
+                mt["source"] = "/dev/sdz1"                      # /srv/models on some other disk
+        self.m.flush()
+        self.refused("is not mounted from a partition of the TO drive", "--run")
+        self.m.reload()
+        self.m.fs["mounts"] = [x for x in self.m.fs["mounts"] if x["target"] != self.m.models_dir]
+        self.m.flush()
+        self.refused("is not mounted from a partition of the TO drive", "--run")
+
+    def test_the_drive_to_be_erased_has_exactly_one_partition(self):
+        self.m.reload()
+        self.m.fs["disks"][self.m.names["to"]]["parts"].append(
+            {"n": 2, "size": GIB, "type": "ext4", "uuid": "x", "partuuid": "y", "label": None})
+        self.m.flush()
+        self.refused("has 2 partitions; it must have exactly one", "--run")
+
+    def test_from_drive_with_another_mounted_filesystem(self):
+        self.m.reload()
+        self.m.fs["mounts"].append({"target": "/var/lib/other", "source": "/dev/mapper/ubuntu--vg-ubuntu--lv",
+                                    "fstype": "ext4", "options": "rw"})
+        self.m.flush()
+        self.refused("the FROM drive has other mounted filesystems (/var/lib/other)", "--run")
+
+    def test_a_degraded_raid_refuses(self):
+        self.m.put(self.m.mdstat_file, MDSTAT_DEGRADED)
+        self.refused("is degraded [U_]", "--run")
+        self.m.put(self.m.mdstat_file, "Personalities :\nunused devices: <none>\n")
+        self.refused("is not in /proc/mdstat", "--run")
+        self.m.put(self.m.mdstat_file, MDSTAT_DEGRADED.replace("[2/1] [U_]", "[2/2] [UU]"))
+        self.assertEqual(self.m.run("--plan"), 0, self.m.out)
+
+    def test_data_that_is_not_a_mirror_or_not_writable_refuses(self):
+        self.m.reload()
+        for mt in self.m.fs["mounts"]:
+            if mt["target"] == self.m.data_dir:
+                mt["source"] = "/dev/sdb1"
+        self.m.flush()
+        self.refused("not from the md mirror", "--run")
+        self.m.reload()
+        for mt in self.m.fs["mounts"]:
+            if mt["target"] == self.m.data_dir:
+                mt["source"], mt["options"] = "/dev/md127", "ro,noatime"
+        self.m.flush()
+        self.refused("is not mounted read-write", "--run")
+
+    def test_data_and_state_folders_must_belong_to_root_alone(self):
+        os.chmod(self.m.data_dir, 0o777)
+        self.refused("is writable by group or others", "--run")
+        self.assertFalse(os.path.exists(self.m.status_file))
+        os.chmod(self.m.data_dir, 0o755)
+        os.makedirs(self.m.data_dir + "/o1migrate")
+        os.chmod(self.m.data_dir + "/o1migrate", 0o775)
+        self.refused("is writable by group or others", "--run")
+        os.chmod(self.m.data_dir + "/o1migrate", 0o700)
+        shutil.rmtree(self.m.data_dir + "/o1migrate")
+        os.symlink(self.m.dir + "/state-elsewhere", self.m.data_dir + "/o1migrate")
+        self.refused("is not a plain folder", "--run")
+
+    def test_the_state_folder_is_never_made_on_the_root_filesystem(self):
+        self.m.reload()
+        self.m.fs["mounts"] = [x for x in self.m.fs["mounts"] if x["target"] != self.m.data_dir]
+        self.m.flush()
+        with mock.patch.dict(os.environ, self.m.env()):
+            mg = L.Migrator(L.Cfg(self.m.env()), L.parse_args(["--from-serial", FROM, "--to-serial", TO, "--run"]))
+            mg.state = {"done": {}}
+            with self.assertRaises(L.Abort):
+                mg.save_state()
+            with self.assertRaises(L.Abort):
+                mg.take_lock()
+        self.assertFalse(os.path.exists(self.m.data_dir + "/o1migrate"))
+
+    def test_two_controllers_with_one_serial_are_refused(self):
+        c = os.path.join(self.m.dir, "sys/class/nvme/nvme7")
+        os.makedirs(c + "/nvme7n1")
+        self.m.put(c + "/serial", TO + "\n")
+        got = self.m.run("--run")
+        self.assertEqual(got, 1)
+        self.assertIn("2 NVMe controllers report the serial", self.m.out)
+        self.assertEqual({l.split()[0] for l in self.m.log()} & {"sgdisk", "wipefs", "rsync"}, set())
+
+    def test_native_multipath_names_are_resolved(self):
+        m = Machine(multipath=True)
+        try:
+            mg = L.Migrator(L.Cfg(m.env()), L.parse_args(["--from-serial", FROM, "--to-serial", TO]))
+            self.assertEqual(mg.resolve(TO).block, m.names["to"])
+            self.assertEqual(mg.resolve(FROM).dev, m.dir + "/dev/" + m.names["from"])
+            self.assertEqual(m.run("--plan"), 0, m.out)
+        finally:
+            m.close()
+
+    def test_a_damaged_state_file_is_not_used(self):
+        with self.assertRaises(L.Abort):
+            L.validate_state({"from_serial": FROM, "to_serial": TO, "root_gib": 300, "uuids": {"root": "x; rm -rf /"}})
+        for bad in ({"loader": "../../x"}, {"loader": "a b.efi"}, {"efi": {"new": "00 02"}}, {"efi": {"order": ["0001", "x"]}},
+                    {"esp_partuuid": "$(id)"}, {"root_gib": "300"}, {"cmdline_required": ["a b"]}, {"from_serial": "x y"}):
+            st = {"from_serial": FROM, "to_serial": TO, "root_gib": 300}
+            st.update(bad)
+            with self.assertRaises(L.Abort, msg=str(bad)):
+                L.validate_state(st)
+        L.validate_state({"from_serial": FROM, "to_serial": TO, "root_gib": 300, "loader": "shimx64.efi",
+                          "uuids": {"esp": "1A2B-3C4D", "root": fu("5")}, "efi": {"new": "0002", "old": None, "order": ["0001", "0002"]},
+                          "cmdline_required": ["quiet", "amdgpu.ppfeaturemask=0xfffd7fff", "panic=10"]})
+        m = self.m
+        self.assertEqual(m.run("--run"), 0, m.out)
+        st = m.state()
+        st["uuids"]["root"] = "x; rm -rf /"
+        m.put(m.cfg_state, json.dumps(st))
+        self.assertEqual(m.run("--finish", serials=False), 1)
+        self.assertIn("bad filesystem UUID", m.out)
+
+    def test_rewrite_fstab_will_not_write_a_non_uuid(self):
+        uu = {"root": fu("5"), "boot": fu("6"), "esp": fu("7"), "models": fu("8")}
+        for k in uu:
+            with self.assertRaises(L.Abort):
+                L.rewrite_fstab("a / ext4 d 0 1\n", dict(uu, **{k: "0 /evil ext4"}))
+
     def test_wiping_needs_the_parked_models(self):
-        os.makedirs(self.m.data_dir + "/models-parked")           # the folder is there, but the stage never finished
+        shutil.copytree(self.m.models_dir, self.m.data_dir + "/models-parked")    # a good copy, but the stage never finished
         with mock.patch.dict(os.environ, self.m.env()):           # so the stand-ins would answer if it went on
             mg = L.Migrator(L.Cfg(self.m.env()), L.parse_args(["--from-serial", FROM, "--to-serial", TO, "--run"]))
             mg.state = {"done": {}, "started": {}}
@@ -368,7 +493,7 @@ class TestPlan(Base):
         self.assertFalse(os.path.exists(self.m.cfg_state))
         for f in (self.m.status_file, self.m.log_file):
             self.assertFalse(os.path.exists(f))
-        self.assertEqual(self.m.fs["services_active"], ["ollama.service", "ollama1-gateway.service"])
+        self.assertEqual(self.m.fs["services_active"], SERVICES_ACTIVE)
 
     def test_plan_says_what_is_read_backed_up_wiped_and_written(self):
         self.assertEqual(self.m.run("--plan"), 0, self.m.out)
@@ -419,7 +544,7 @@ class TestConfirmation(Base):
             self.assertIn("that is not the serial of the drive to be erased", self.m.out)
         self.assertEqual(self.calls() & DESTRUCTIVE, set())
         self.assertFalse(os.path.exists(self.m.cfg_state))
-        self.assertEqual(self.m.fs["services_active"], ["ollama.service", "ollama1-gateway.service"])
+        self.assertEqual(self.m.fs["services_active"], SERVICES_ACTIVE)
 
     def test_no_terminal_stops(self):
         self.assertEqual(self.m.run("--run", tty=False), 1)
@@ -630,12 +755,12 @@ class TestRemote(unittest.TestCase):
 
     def test_overrides_are_not_taken_from_the_environment_by_root(self):
         """O1M_* folders are honoured for a test user, never for root (a sudo-run copy) unless O1M_TEST=1."""
-        e = {"O1M_DATA": "/tmp/elsewhere", "O1M_MNT": "/tmp/x"}
-        if os.geteuid() != 0:
-            self.assertEqual(L.Cfg(e).data, "/tmp/elsewhere")
-        else:
-            self.assertEqual(L.Cfg(e).data, "/srv/data")
-        self.assertEqual(L.Cfg(dict(e, O1M_TEST="1")).data, "/tmp/elsewhere")
+        e = {"O1M_DATA": "/tmp/elsewhere", "O1M_MNT": "/tmp/x", "O1M_TEST": "1", "O1M_TTY": "/tmp/tty", "O1M_SRC_ROOT": "/tmp/r"}
+        root = L.Cfg(e, euid=0)                                    # as root: every override is ignored, O1M_TEST or not
+        self.assertEqual((root.data, root.mnt, root.tty, root.src_root), ("/srv/data", "/run/o1migrate", "/dev/tty", "/"))
+        self.assertFalse(root.honour)
+        user = L.Cfg(e, euid=1000)
+        self.assertEqual((user.data, user.mnt), ("/tmp/elsewhere", "/tmp/x"))
 
 
 class TestStatusUnit(unittest.TestCase):
@@ -666,15 +791,36 @@ class TestStatusUnit(unittest.TestCase):
         self.assertIn("SERIAL-A", read(self.cfg.log))             # the log (root only) has everything
         self.assertEqual(os.listdir(self.d).count("migrate-os.status.new"), 0)
 
-    def test_progress_and_last_line(self):
+    def test_progress_and_fixed_phrases(self):
         st = L.Status(self.cfg)
         st.enable()
-        st.feed("sending incremental file list\n      1,073,741,824  42%   95.12MB/s    0:05:22 (xfr#1)\r")
+        st.feed("sending incremental file list /secret/path/model.gguf\n      1,073,741,824  42%   95.12MB/s    0:05:22 (xfr#1)\r")
         text = read(self.cfg.status)
         self.assertIn("progress:   42% of the current copy", text)
-        self.assertIn("last line:  1,073,741,824  42%", text)
-        st.stage("restore")                                         # a new stage forgets the old percentage
-        self.assertIn("progress:   -", read(self.cfg.status))
+        self.assertNotIn("secret", text)                         # a command's words never reach the status file
+        self.assertNotIn("sending", text)
+        self.assertNotIn("1,073", text)
+        self.assertIn("/secret/path", read(self.cfg.log))        # the root-only log has them
+        st.stage("restore")                                       # a new stage forgets the old percentage
+        t = read(self.cfg.status)
+        self.assertIn("progress:   -", t)
+        self.assertIn("doing:      copy the models back", t)
+
+    def test_the_files_are_never_opened_through_a_symlink(self):
+        os.symlink("/nonexistent/elsewhere", self.cfg.log)
+        with self.assertRaises(L.Abort):
+            L.Status(self.cfg).enable()
+        os.remove(self.cfg.log)
+        st = L.Status(self.cfg)
+        st.enable()
+        os.symlink("/nonexistent/elsewhere", self.cfg.status + ".new")
+        with self.assertRaises(L.Abort):
+            st.write()
+        os.remove(self.cfg.status + ".new")
+        st.write()                                                 # and it carries on once the symlink is gone
+        os.symlink(self.cfg.log, self.cfg.log + ".lnk")
+        with self.assertRaises(L.Abort):
+            L.open_nofollow(self.cfg.log + ".lnk", os.O_WRONLY | os.O_CREAT)
 
     def test_the_heartbeat_moves_updated_without_any_output(self):
         st = L.Status(self.cfg)
@@ -692,7 +838,7 @@ class TestStatusUnit(unittest.TestCase):
         now = time.time()
         stamp = lambda age: time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(now - age))
         text = lambda state, age, boot: L.render_status({"state": state, "stage": "3 of 6 (copy)", "percent": "",
-                                                          "last": "x", "started": stamp(age), "updated": stamp(age),
+                                                          "doing": "x", "started": stamp(age), "updated": stamp(age),
                                                           "boot_id": boot, "next": "n"})
         self.assertIn("INTERRUPTED", L.diagnose_status(text("RUNNING", 5, "old-boot"), "new-boot", now))
         self.assertIn("--resume", L.diagnose_status(text("RUNNING", 5, "old-boot"), "new-boot", now))
@@ -706,7 +852,7 @@ class TestStatusUnit(unittest.TestCase):
         try:
             self.assertEqual(m.run("--status", serials=False), 1)
             self.assertIn("No migration status", m.out)
-            m.put(m.status_file, L.render_status({"state": "RUNNING", "stage": "1 of 6 (park)", "percent": "", "last": "x",
+            m.put(m.status_file, L.render_status({"state": "RUNNING", "stage": "1 of 6 (park)", "percent": "", "doing": "x",
                                                   "started": "2026-01-01T00:00:00+00:00", "updated": "2026-01-01T00:00:00+00:00",
                                                   "boot_id": "some-other-boot", "next": "n"}))
             self.assertEqual(m.run("--status", serials=False), 0)
