@@ -30811,7 +30811,7 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
 /* compact meters (5.3, per Patrick: "smaller… alignment is off") —
    labels centered against the ↑ chip instead of hanging off baseline */
 #telemetry .t-head{
-  font-size:11px;letter-spacing:.08em;color:var(--dim);
+  font-size:11px;letter-spacing:.08em;line-height:15px;color:var(--dim);
   display:flex;justify-content:space-between;align-items:center;
   margin-bottom:7px;gap:10px;
 }
@@ -30832,9 +30832,13 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
 #telemetry .srv-mrow.off{opacity:.45}
 #telemetry .srv-mrow .t-head span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .meter-row:last-child{margin-bottom:0}
+/* one look for all four labels (6b348, per Patrick: "make all the font sizes here the
+   same and the spacing"): the chip's, the memory's and each server's share size,
+   tracking, line and the gap to their bar (the memory label had 10.5px, no tracking
+   and 18px of height) */
 .meter-label{
   display:flex;justify-content:space-between;align-items:center;
-  font-size:10.5px;color:var(--dim);margin-bottom:3px;min-height:18px;
+  font-size:11px;letter-spacing:.08em;line-height:15px;color:var(--dim);margin-bottom:7px;
 }
 .meter-label b{color:var(--text);font-weight:500}
 /* THE PROGRESS AESTHETIC (6b253, per Patrick — Claude's compacting bar):

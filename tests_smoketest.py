@@ -8290,6 +8290,27 @@ check("server action chips: Test, Pair again, Change Access token and a red cros
       _chips_ok(page) and not any(_chips_ok(m_) for m_ in _chips_mut),
       "%r" % [_chips_ok(page)] + "%r" % [_chips_ok(m_) for m_ in _chips_mut])
 
+# the sidebar meters' four labels look the same (6b348, per Patrick: "make all the font sizes here the
+# same and the spacing"): the chip's, the memory's and the servers' share size, tracking, line and the
+# gap to their bar
+def _lab_ok(p):
+    th = p[p.index("#telemetry .t-head{"):][:260]
+    ml = p[p.index(".meter-label{"):][:260]
+    same = "font-size:11px;letter-spacing:.08em;line-height:15px;color:var(--dim)"
+    return (same in th and same in ml and th.count("margin-bottom:7px") == 1
+            and ml.count("margin-bottom:7px") == 1 and "min-height" not in ml)
+_lab_mut = [page.replace(".meter-label{\n  display:flex;justify-content:space-between;align-items:center;\n  font-size:11px;",
+                         ".meter-label{\n  display:flex;justify-content:space-between;align-items:center;\n  font-size:10.5px;", 1),
+            page.replace("letter-spacing:.08em;line-height:15px;color:var(--dim);margin-bottom:7px;\n}",
+                         "line-height:15px;color:var(--dim);margin-bottom:7px;\n}", 1),
+            page.replace("line-height:15px;color:var(--dim);margin-bottom:7px;\n}",
+                         "line-height:15px;color:var(--dim);margin-bottom:3px;min-height:18px;\n}", 1),
+            page.replace("#telemetry .t-head{\n  font-size:11px;letter-spacing:.08em;line-height:15px;",
+                         "#telemetry .t-head{\n  font-size:11px;letter-spacing:.08em;", 1)]
+check("sidebar meters: the chip, memory and server labels share one size, tracking, line and gap",
+      _lab_ok(page) and not any(_lab_ok(m_) for m_ in _lab_mut) and all(m_ != page for m_ in _lab_mut),
+      "%r %r" % [_lab_ok(page), [_lab_ok(m_) for m_ in _lab_mut]])
+
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
 _porig = open(_pf, "rb").read() if os.path.exists(_pf) else b"{}"

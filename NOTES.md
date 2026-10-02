@@ -23,6 +23,15 @@ room. Widths by arithmetic from the screenshot (about 52 + 85 + 135 + 34 px
 plus gaps against roughly 380 px of card), not measured in WKWebView.
 One gauntlet check pins the markup and CSS, with four mutations.
 
+Same build, the sidebar meters (Patrick, 2026-10-02, screenshot of the card
+with the server's rows: "make all the font sizes here the same and the
+spacing because these look kind of jacked up"): the memory label was
+`.meter-label` (10.5px, no letter-spacing, 18px min-height, 3px gap to its
+bar) while the chip's and the servers' were `.t-head` (11px, .08em, 7px gap).
+All four now share 11px, .08em, a 15px line and a 7px gap to the bar, so the
+rhythm is label, bar, 7px, label, bar... One gauntlet check pins it, with four
+mutations. Measured by reading the CSS, not seen in WKWebView.
+
 ## 6b347 — the server kit and docs carry nobody's name; the server's name is yours
 Patrick (2026-10-01): "Looking at the instructions to set up a server, I see
 references to my name as in PMiller, Bigmillz, and my IP addresses. replace
