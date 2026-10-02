@@ -1,142 +1,242 @@
 """The dashboard's renderer: state in, a grid of characters and styles out.
 
-Pure Python, no curses: ollama1-dash paints the grid with curses, and the
-tests render it to text at any size. It only ever draws counts, sizes,
-timings and names from the fields it asks for by name; there is no field
-it could print a prompt or an answer from.
+Pure Python, no curses and no terminal: ollama1-dash writes the grid with
+o1dashterm, and the tests render it to text at any size. It only ever
+draws counts, sizes, timings and names from the fields it asks for by
+name; there is no field it could print a prompt or an answer from.
 
-Glyph sets:
-  braille  charts in U+2800 dots (2 x 4 per cell), block bars, box lines
-  blocks   charts in lower eighth blocks (U+2581..2588), block bars, box lines
-  ascii    charts in ' .:-=+*#', bars in '#', boxes in + - |
+Built so that nothing can overlap (6b359):
+
+  * The screen is split into a fixed grid of boxes by plan(). Each box is
+    drawn into its own bounded Cells buffer, and Cells.put CLIPS to that
+    buffer, so a widget cannot write a cell outside its box. The buffers are
+    then blitted (again clipped) into the one frame.
+  * Every string is cleaned (escape sequences and control characters out) and
+    cut to its width with "..." by its true display width (wide characters
+    are 2 cells, combining marks 0, ANSI codes none), never by len().
+  * The size is whatever the caller says it is now; nothing here keeps a
+    size. Too small to fit a panel: the lowest-priority panels are dropped.
+
+Glyph modes:
+  blocks   bars in full blocks, sparklines in lower eighth blocks, box lines
+  ascii    bars in '#', sparklines in '_.:-=+*#', boxes in + - |
 """
 import datetime
-import math
+import re
+import unicodedata
 
 # ---- glyphs ------------------------------------------------------------------
 
 EIGHTHS_V = " ▁▂▃▄▅▆▇█"      # lower blocks
-EIGHTHS_H = " ▏▎▍▌▋▊▉█"      # left blocks
-ASCII_V = " .:-=+*#"
+ASCII_V = " _.:-=+*#"
 BOX = {"h": "─", "v": "│", "tl": "┌", "tr": "┐", "bl": "└", "br": "┘"}
 BOX_ASCII = {"h": "-", "v": "|", "tl": "+", "tr": "+", "bl": "+", "br": "+"}
-# braille: dot bit for (column 0/1, row 0..3 from the top)
-BRAILLE_BITS = ((0x01, 0x02, 0x04, 0x40), (0x08, 0x10, 0x20, 0x80))
+ELLIPSIS = "..."
 
-ASCII_MAP = {"°": "", "·": ".", "•": "*", "█": "#"}
-# every glyph each mode may draw beyond ASCII (the font picker checks these)
+ASCII_MAP = {"°": "", "·": ".", "•": "*", "█": "#", "─": "-", "│": "|"}
+# every glyph the blocks mode may draw beyond ASCII (the font picker checks
+# these, and the console never shows anything else)
 NEEDED = {
-    "blocks": set(EIGHTHS_V + EIGHTHS_H + "".join(BOX.values()) + "·•°") - {" "},
-    "braille": set(chr(0x2800 + i) for i in range(256)),
+    "blocks": set(EIGHTHS_V + "".join(BOX.values()) + "·°") - {" "},
 }
+CONSOLE_OK = NEEDED["blocks"]
+
+# ---- widths ------------------------------------------------------------------
+
+ANSI_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()%#][ -~]|[@-Z\\-_])")
+CTRL_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 
-# ---- canvas ------------------------------------------------------------------
+def strip_ansi(s):
+    return ANSI_RE.sub("", s)
 
-class Canvas:
-    def __init__(self, width, height, glyphs="blocks"):
-        self.w, self.h = max(1, width), max(1, height)
-        self.glyphs = glyphs
+
+def clean(s):
+    """Text safe to put in a cell: no escape sequences, no control characters."""
+    s = strip_ansi(str(s)).replace("\t", " ")
+    return CTRL_RE.sub("", s)
+
+
+def cw(ch):
+    """Display width of one character: 0 (combining, zero-width), 1 or 2."""
+    o = ord(ch)
+    if o < 32 or 0x7f <= o < 0xa0:
+        return 0
+    if o < 0x300:
+        return 1
+    if unicodedata.combining(ch) or unicodedata.category(ch) in ("Mn", "Me", "Cf"):
+        return 0
+    return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+
+
+def swidth(s):
+    """Display width of a string; ANSI sequences take no room."""
+    return sum(cw(c) for c in strip_ansi(str(s)))
+
+
+def _fit(s, w):
+    out, used = [], 0
+    for ch in s:
+        n = cw(ch)
+        if used + n > w:
+            break
+        out.append(ch)
+        used += n
+    return "".join(out), used
+
+
+def trunc(s, w):
+    """s cut to at most w display cells, with '...' where it was cut."""
+    s = clean(s)
+    if w <= 0:
+        return ""
+    if swidth(s) <= w:
+        return s
+    if w <= len(ELLIPSIS):
+        return _fit(s, w)[0]
+    return _fit(s, w - len(ELLIPSIS))[0] + ELLIPSIS
+
+
+def fold(text, glyphs, console):
+    """Text as the glyph mode allows: ASCII only in ascii mode; on the Linux
+    console (whose font has only what the picker checked) '?' for any other."""
+    text = clean(text)
+    if glyphs == "ascii":
+        return "".join(ASCII_MAP.get(c, c) if 32 <= ord(c) < 127 or c in ASCII_MAP else "?" for c in text)
+    if console:
+        return "".join(c if 32 <= ord(c) < 127 or c in CONSOLE_OK else "?" for c in text)
+    return text
+
+
+# ---- cells -------------------------------------------------------------------
+
+class Cells:
+    """A bounded w x h buffer of cells. put() clips to it. A wide character
+    takes its cell and a "" continuation cell."""
+
+    def __init__(self, width, height, glyphs="blocks", console=False):
+        self.w, self.h = max(1, int(width)), max(1, int(height))
+        self.glyphs = "ascii" if glyphs == "ascii" else "blocks"
+        self.console = bool(console)
         self.chars = [[" "] * self.w for _ in range(self.h)]
         self.styles = [[""] * self.w for _ in range(self.h)]
 
-    def put(self, x, y, text, style=""):
+    def _set(self, x, y, ch, style):
+        row = self.chars[y]
+        if row[x] == "" and x > 0:                      # on a wide char's second cell: blank its first
+            row[x - 1] = " "
+        if x + 1 < self.w and row[x + 1] == "" and row[x] and cw(row[x]) == 2:
+            row[x + 1] = " "                            # on a wide char's first cell: blank its second
+        row[x] = ch
+        self.styles[y][x] = style
+
+    def put(self, x, y, text, style="", maxw=None):
+        """Write text at (x, y), cut to maxw cells (with '...'), clipped to the buffer."""
         if y < 0 or y >= self.h:
             return
-        if self.glyphs == "ascii":
-            text = "".join(ASCII_MAP.get(c, c) if 32 <= ord(c) < 127 or c in ASCII_MAP else "?"
-                           for c in str(text))
-        for i, ch in enumerate(str(text)):
-            xi = x + i
-            if 0 <= xi < self.w:
-                self.chars[y][xi] = ch
-                self.styles[y][xi] = style
+        text = fold(text, self.glyphs, self.console)
+        if maxw is not None:
+            text = trunc(text, maxw)
+        for ch in text:
+            n = cw(ch)
+            if n == 0:
+                continue
+            if n == 2:
+                if 0 <= x and x + 1 < self.w:
+                    self._set(x, y, ch, style)
+                    self._set(x + 1, y, "", style)
+                else:                                   # half outside: nothing of it shows
+                    for xi in (x, x + 1):
+                        if 0 <= xi < self.w:
+                            self._set(xi, y, " ", style)
+            elif 0 <= x < self.w:
+                self._set(x, y, ch, style)
+            x += n
 
     def text(self):
         return "\n".join("".join(r) for r in self.chars)
 
-    def box(self, x, y, w, h, title="", style="border"):
+    def fill(self, x, y, w, h, ch=" ", style=""):
+        for yy in range(y, y + h):
+            for xx in range(x, x + w):
+                if 0 <= yy < self.h and 0 <= xx < self.w:
+                    self._set(xx, yy, ch, style)
+
+    def blit(self, other, x, y):
+        """Copy another buffer in at (x, y), clipped to this one."""
+        for yy in range(other.h):
+            ty = y + yy
+            if not 0 <= ty < self.h:
+                continue
+            for xx in range(other.w):
+                tx = x + xx
+                if not 0 <= tx < self.w:
+                    continue
+                ch, st = other.chars[yy][xx], other.styles[yy][xx]
+                if ch == "":                            # a wide character's second cell: its first one placed it
+                    if tx == 0:                         # ... unless that one was clipped away
+                        self._set(tx, ty, " ", st)
+                elif cw(ch) == 2:
+                    if tx + 1 < self.w:
+                        self._set(tx, ty, ch, st)
+                        self._set(tx + 1, ty, "", st)
+                    else:
+                        self._set(tx, ty, " ", st)
+                else:
+                    self._set(tx, ty, ch, st)
+
+    def box(self, title="", style="border"):
+        """A frame around the whole buffer, with a title in the top edge."""
+        w, h = self.w, self.h
         if w < 2 or h < 2:
             return
         b = BOX_ASCII if self.glyphs == "ascii" else BOX
-        self.put(x, y, b["tl"] + b["h"] * (w - 2) + b["tr"], style)
-        for yy in range(y + 1, y + h - 1):
-            self.put(x, yy, b["v"], style)
-            self.put(x + w - 1, yy, b["v"], style)
-        self.put(x, y + h - 1, b["bl"] + b["h"] * (w - 2) + b["br"], style)
-        if title and w > 6:
-            self.put(x + 2, y, " %s " % title[: w - 6], "title")
+        self.put(0, 0, b["tl"] + b["h"] * (w - 2) + b["tr"], style)
+        for yy in range(1, h - 1):
+            self.put(0, yy, b["v"], style)
+            self.put(w - 1, yy, b["v"], style)
+        self.put(0, h - 1, b["bl"] + b["h"] * (w - 2) + b["br"], style)
+        if title and w > 8:
+            self.put(2, 0, " %s " % trunc(title, w - 6), "title")
 
     def hbar(self, x, y, w, frac, style=""):
-        """A horizontal bar w cells wide, filled to frac (0..1)."""
+        """A bar w cells wide, filled to frac (0..1)."""
         if w <= 0:
             return
-        frac = 0.0 if frac is None or frac != frac else max(0.0, min(1.0, frac))
-        if self.glyphs == "ascii":
-            n = int(round(frac * w))
-            self.put(x, y, "#" * n, style)
-            self.put(x + n, y, "." * (w - n), "dim")
-            return
-        eighths = int(round(frac * w * 8))
-        full, part = divmod(eighths, 8)
-        s = "█" * full + (EIGHTHS_H[part] if part and full < w else "")
-        self.put(x, y, s, style)
-        rest = w - len(s)
-        if rest > 0:
-            self.put(x + len(s), y, "·" * rest, "dim")
+        f = _f(frac)
+        frac = 0.0 if f is None else max(0.0, min(1.0, f))
+        n = int(round(frac * w))
+        full = "#" if self.glyphs == "ascii" else "█"
+        rest = "." if self.glyphs == "ascii" else "·"
+        self.put(x, y, full * n, style)
+        self.put(x + n, y, rest * (w - n), "dim")
 
-    def chart(self, x, y, w, h, values, vmax=None, style="", floor=0.0):
-        """An area chart of `values` (oldest first) in a w x h cell box."""
-        if w <= 0 or h <= 0:
+    def spark(self, x, y, w, values, vmax=None, style="", floor=0.0):
+        """One row of a trend: `values` (oldest first) as eighth blocks."""
+        if w <= 0:
             return
-        per_cell = 2 if self.glyphs == "braille" else 1
-        vals = resample(values, w * per_cell)
-        top = vmax if vmax else max([v for v in vals if v is not None] + [floor, 1e-9])
-        if self.glyphs == "braille":
-            levels = h * 4
-            for cx in range(w):
-                for row in range(h):
-                    bits = 0
-                    for side in (0, 1):
-                        v = vals[cx * 2 + side]
-                        if v is None:
-                            continue
-                        n = int(round(max(0.0, min(1.0, v / top)) * levels))
-                        if v > 0 and n == 0:
-                            n = 1
-                        # dots filled in this row (rows counted from the bottom)
-                        start = (h - 1 - row) * 4
-                        fill = max(0, min(4, n - start))
-                        for d in range(fill):
-                            bits |= BRAILLE_BITS[side][3 - d]
-                    if bits:
-                        self.put(x + cx, y + row, chr(0x2800 + bits), style)
-            return
-        levels = h * 8
-        glyph = EIGHTHS_V if self.glyphs == "blocks" else None
-        for cx in range(w):
-            v = vals[cx]
+        vals = resample([_f(v) for v in values], w)
+        seen = [v for v in vals if v is not None]
+        top = vmax if _f(vmax) else max(seen + [floor, 1e-9])
+        glyphs = ASCII_V if self.glyphs == "ascii" else EIGHTHS_V
+        out = []
+        for v in vals:
             if v is None:
+                out.append(" ")
                 continue
-            n = int(round(max(0.0, min(1.0, v / top)) * levels))
-            if v > 0 and n == 0:
-                n = 1
-            for row in range(h):
-                start = (h - 1 - row) * 8
-                fill = max(0, min(8, n - start))
-                if not fill:
-                    continue
-                if glyph:
-                    ch = glyph[fill]
-                else:
-                    ch = "#" if fill == 8 else ASCII_V[min(7, fill)]
-                self.put(x + cx, y + row, ch, style)
+            n = int(round(max(0.0, min(1.0, v / top)) * 8))
+            out.append(glyphs[max(1, n)])
+        self.put(x, y, "".join(out), style)
+
+
+class Canvas(Cells):
+    """The whole frame."""
 
 
 def resample(values, n):
     """values -> exactly n points (average of buckets; None if a bucket is
     empty). Short series are right-aligned, with None on the left."""
-    vals = [v for v in values]
+    vals = list(values)
     if n <= 0:
         return []
     if len(vals) <= n:
@@ -152,14 +252,31 @@ def resample(values, n):
 
 # ---- formatting ----------------------------------------------------------------
 
+def _f(v):
+    """v as a finite float, else None (None, text, NaN and infinity all mean 'no reading')."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    v = float(v)
+    return v if v == v and v not in (float("inf"), float("-inf")) else None
+
+
+def dig(d, *keys):
+    """d[k1][k2]... or None if any step is missing or not a dict."""
+    for k in keys:
+        if not isinstance(d, dict):
+            return None
+        d = d.get(k)
+    return d
+
+
 def gib(b):
-    return "%.1f" % ((b or 0) / 2**30)
+    return "%.1f" % ((_f(b) or 0) / 2**30)
 
 
 def human_bytes(b):
-    b = float(b or 0)
+    b = _f(b) or 0.0
     for unit in ("B", "K", "M", "G", "T"):
-        if b < 1024 or unit == "T":
+        if abs(b) < 1024 or unit == "T":
             return ("%.0f%s" if unit == "B" else "%.1f%s") % (b, unit)
         b /= 1024
     return "%.1fT" % b
@@ -170,6 +287,7 @@ def rate(bps):
 
 
 def dur(s):
+    s = _f(s)
     if s is None:
         return "-"
     s = int(max(0, s))
@@ -186,336 +304,125 @@ def dur(s):
 
 
 def ago(t, now):
-    return "never" if not t else dur(now - t) + " ago"
+    t = _f(t)
+    return "never" if not t else dur((_f(now) or 0) - t) + " ago"
 
 
 def pct_style(p, warn=75, bad=90):
+    p = _f(p)
     if p is None:
         return "dim"
     return "bad" if p >= bad else ("warn" if p >= warn else "ok")
 
 
 def num(v, fmt="%.1f"):
+    v = _f(v)
     return "-" if v is None else fmt % v
 
 
-# ---- panels ------------------------------------------------------------------
-# Each panel draws inside (x, y, w, h), border included, and adapts: charts
-# get the rows left after the text, and vanish when there are none.
-
-def _inner(c, x, y, w, h, title):
-    c.box(x, y, w, h, title)
-    return x + 2, y + 1, w - 4, h - 2
+def frac(a, b):
+    a, b = _f(a), _f(b)
+    return None if a is None or not b else a / b
 
 
 def _series(st, name, range_s):
-    s = (st.get("series") or {}).get(name) or []
-    return s[-range_s:]
+    s = (st.get("series") or {}).get(name) if isinstance(st.get("series"), dict) else None
+    return list(s)[-range_s:] if isinstance(s, (list, tuple)) else []
 
 
-def panel_tokens(c, x, y, w, h, st, range_s):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Tokens per second")
-    gw = st.get("gw") or {}
-    tps = gw.get("tps") or {}
-    series = _series(st, "tps", range_s)
-    peak = max([v for v in series if v is not None] + [0])
-    lines = [
-        [("now ", "dim"), ("%-7s" % num(tps.get("current")), "value"), (" 1 h ", "dim"),
-         ("%-7s" % num(tps.get("1h")), "value"), (" 24 h ", "dim"), ("%-7s" % num(tps.get("24h")), "value"),
-         (" peak ", "dim"), (num(peak), "value")],
-        [("prompt ", "dim"), ("%s tok/s" % num(gw.get("prompt_tps")), "value"),
-         ("   first token ", "dim"), (("%.2f s" % (gw["ttft_ms"] / 1000.0)) if gw.get("ttft_ms") else "-", "value")],
-    ]
-    _lines(c, ix, iy, iw, lines[: max(0, ih)])
-    ch = ih - len(lines)
-    if ch >= 1:
-        c.chart(ix, iy + len(lines), iw, ch, series, style="c_tps", floor=10)
+# ---- widgets: they draw into a Cells of their own and nothing else -------------
+
+LW = 7   # the label column of a meter row
 
 
-def panel_requests(c, x, y, w, h, st, range_s):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Requests")
-    gw = st.get("gw") or {}
-    err = gw.get("errors") or {}
+def put_parts(c, y, parts, x=0):
+    """Pieces of one line, one after another, each cut to what is left of the row."""
+    for text, style in parts:
+        left = c.w - x
+        if left <= 0:
+            return
+        text = fold(text, c.glyphs, c.console)
+        c.put(x, y, text, style, maxw=left)
+        x += min(swidth(text), left)
+
+
+def meter(c, y, label, value, f, style, lw=LW, vw=16):
+    """LABEL  value  [bar]. The columns are fixed, each cut to its own width,
+    and the bar takes what is left (and goes, below 6 cells)."""
+    vw = max(0, min(vw, c.w - lw))
+    c.put(0, y, label, "dim", maxw=lw - 1)
+    c.put(lw, y, value, style, maxw=vw)
+    bx = lw + vw + 1
+    if c.w - bx >= 6:
+        c.hbar(bx, y, c.w - bx, f, style)
+
+
+def trend(c, y, label, series, range_s, vmax=None, style="", floor=0.0):
+    c.put(0, y, label, "dim", maxw=LW)
+    c.spark(LW, y, c.w - LW, series, vmax=vmax, style=style, floor=floor)
+
+
+def w_gpu(c, st, ctx):
+    g = st.get("gpu")
+    if not isinstance(g, dict):
+        c.put(0, 0, "no GPU found", "bad")
+        return
+    busy = _f(g.get("busy_pct"))
+    vu, vt = _f(g.get("vram_used")), _f(g.get("vram_total"))
+    pw, cap = _f(g.get("power_w")), _f(g.get("power_cap_w"))
+    temps = [t for t in (_f(v) for v in (g.get("temps") or {}).values()) if t is not None] \
+        if isinstance(g.get("temps"), dict) else []
+    hot = (_f(dig(g, "temps", "junction")) or (max(temps) if temps else None))
+    fan = _f(g.get("fan_pct"))
+    meter(c, 0, "Busy", "%s%%" % num(busy, "%.0f"), frac(busy, 100), pct_style(busy, 101, 101))
+    meter(c, 1, "VRAM", "%s/%s GiB" % (gib(vu), gib(vt)), frac(vu, vt), pct_style(100 * (frac(vu, vt) or 0) if vt else None))
+    meter(c, 2, "Power", "%s/%s W" % (num(pw, "%.0f"), num(cap, "%.0f")), frac(pw, cap), "value")
+    put_parts(c, 3, [("Temp   ", "dim"), ("%s°C" % num(hot, "%.0f"), pct_style(hot, 80, 95)),
+                     ("   Fan ", "dim"), ("%s%%" % num(fan, "%.0f"), "value")])
+    trend(c, 4, ctx["rng"], _series(st, "gpu_busy", ctx["range_s"]), ctx["range_s"], vmax=100, style="c_gpu")
+
+
+def w_system(c, st, ctx):
+    cpu = st.get("cpu") if isinstance(st.get("cpu"), dict) else {}
+    m = st.get("mem") if isinstance(st.get("mem"), dict) else {}
+    cg = st.get("ollama_cg") if isinstance(st.get("ollama_cg"), dict) else {}
+    total_cpu = _f(cpu.get("total"))
+    load = [x for x in (cpu.get("load") or []) if _f(x) is not None] if isinstance(cpu.get("load"), list) else []
+    meter(c, 0, "CPU", "%s%%" % num(total_cpu, "%.0f"), frac(total_cpu, 100), pct_style(total_cpu))
+    put_parts(c, 1, [("Temp   ", "dim"), ("%s°C" % num(cpu.get("temp"), "%.0f"), pct_style(cpu.get("temp"), 80, 90)),
+                     ("   Load ", "dim"), (" ".join("%.2f" % x for x in load) or "-", "value")])
+    total = _f(m.get("total")) or 0.0
+    used = total - (_f(m.get("available")) or 0.0) if total else None
+    meter(c, 2, "RAM", "%s/%s GiB" % (gib(used), gib(total)), frac(used, total), pct_style(100 * (frac(used, total) or 0) if total else None))
+    cmax = _f(cg.get("max"))
+    if cmax:
+        meter(c, 3, "Ollama", "%s/%s GiB" % (gib(cg.get("current")), gib(cmax)), frac(cg.get("current"), cmax),
+              pct_style(100 * (frac(cg.get("current"), cmax) or 0), 80, 92))
+    else:
+        swap_t = _f(m.get("swap_total")) or 0.0
+        swap_u = swap_t - (_f(m.get("swap_free")) or 0.0)
+        meter(c, 3, "Swap", "%s/%s GiB" % (gib(swap_u), gib(swap_t)), frac(swap_u, swap_t),
+              "warn" if swap_u > 2**28 else "value")
+    trend(c, 4, ctx["rng"], _series(st, "cpu_total", ctx["range_s"]), ctx["range_s"], vmax=100, style="c_cpu")
+
+
+def w_requests(c, st, ctx):
+    gw = st.get("gw") if isinstance(st.get("gw"), dict) else {}
+    err = gw.get("errors") if isinstance(gw.get("errors"), dict) else {}
+    queued = _f(gw.get("queued")) or 0
+    put_parts(c, 0, [("Active ", "dim"), ("%d" % (_f(gw.get("active")) or 0), "value"),
+                     ("   Queued ", "dim"), ("%d" % queued, "warn" if queued else "value"),
+                     ("   Today ", "dim"), ("%d" % (_f(gw.get("requests_today")) or 0), "value")])
+    ttft = _f(gw.get("ttft_ms"))
+    put_parts(c, 1, [("Speed  ", "dim"), ("%s tok/s" % num(dig(gw, "tps", "current")), "value"),
+                     ("   First token " if c.w >= 44 else "   First ", "dim"), (("%.2f s" % (ttft / 1000.0)) if ttft else "-", "value")])
     kinds = [("busy", "busy"), ("gpu_fit", "fit"), ("gpu_spill", "spill"), ("ram_pressure", "ram"),
              ("ram_oom", "oom"), ("ollama", "ollama")]
-    e_line = [("errors ", "dim")]
-    for k, label in kinds:
-        e_line += [("%s " % label, "dim"), ("%d  " % err.get(k, 0), "bad" if err.get(k) else "value")]
-    e_line += [("auth ", "dim"), ("%d" % ((gw.get("totals") or {}).get("auth_failures", 0)), "value")]
-    lines = [
-        [("active ", "dim"), ("%d" % gw.get("active", 0), "value"), ("  queued ", "dim"),
-         ("%d" % gw.get("queued", 0), "warn" if gw.get("queued") else "value"), ("  today ", "dim"),
-         ("%d" % gw.get("requests_today", 0), "value")],
-        e_line,
-    ]
-    _lines(c, ix, iy, iw, lines[: max(0, ih)])
-    ch = ih - len(lines)
-    if ch >= 1:
-        minutes = 5 if range_s <= 300 else 60
-        per_min = [m[3] for m in (gw.get("per_minute") or [])][-minutes:]
-        c.put(ix, iy + len(lines), "per minute, last %d min" % minutes, "dim")
-        if ch >= 2:
-            c.chart(ix, iy + len(lines) + 1, iw, ch - 1, per_min, style="c_req", floor=1)
-
-
-def panel_models(c, x, y, w, h, st, now):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Loaded models")
-    gw = st.get("gw") or {}
-    loaded = gw.get("loaded") or []
-    if not loaded:
-        c.put(ix, iy, "no model in memory", "dim")
-        return
-    row = 0
-    for m in loaded:
-        if row >= ih:
-            break
-        size, vram = int(m.get("size") or 0), int(m.get("size_vram") or 0)
-        share = int(100 * vram / size) if size else 0
-        left = _until(m.get("expires_at"), now)
-        detail = "%3d%% GPU  %s GiB VRAM  %s GiB RAM  unload in %s" % (share, gib(vram), gib(size - vram), left)
-        if len(detail) + 10 > iw:
-            detail = "%3d%% GPU  %s/%s GiB  %s" % (share, gib(vram), gib(size - vram), left)
-        name = str(m.get("name") or "?")[: max(6, iw - len(detail) - 1)]
-        c.put(ix, iy + row, name, "value")
-        c.put(ix + iw - len(detail), iy + row, detail[:iw],
-              "text" if share >= 100 or m.get("ram_allowed") else "bad")
-        row += 1
-        if share < 100 and row < ih:
-            c.put(ix + 2, iy + row, "rest in RAM" if m.get("ram_allowed") else "PARTLY ON CPU (not allowed)",
-                  "warn" if m.get("ram_allowed") else "bad")
-            row += 1
-
-
-def panel_events(c, x, y, w, h, st, now):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Model events")
-    events = ((st.get("gw") or {}).get("events") or [])[-ih:]
-    if not events:
-        c.put(ix, iy, "none yet", "dim")
-    for i, e in enumerate(reversed(events)):
-        t = datetime.datetime.fromtimestamp(e.get("t", 0)).strftime("%H:%M:%S")
-        kind = str(e.get("kind", ""))
-        style = "bad" if kind.startswith("refused") else ("warn" if "unload" in kind or "switch" in kind else "ok")
-        c.put(ix, iy + i, t, "dim")
-        c.put(ix + 9, iy + i, ("%-16s %s" % (kind, e.get("model", "")))[: iw - 9], style)
-
-
-def panel_gpu(c, x, y, w, h, st, range_s):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "GPU")
-    g = st.get("gpu")
-    if not g:
-        c.put(ix, iy, "no GPU found", "bad")
-        return
-    temps = g.get("temps") or {}
-    vt, vu = g.get("vram_total") or 0, g.get("vram_used") or 0
-    lines = [
-        [("busy ", "dim"), ("%3s%%" % num(g.get("busy_pct"), "%d"), pct_style(g.get("busy_pct"), 101, 101)),
-         ("  VRAM ", "dim"), ("%s/%s GiB" % (gib(vu), gib(vt)), pct_style(100 * vu / vt if vt else None)),
-         ("  power ", "dim"), ("%s/%s W" % (num(g.get("power_w"), "%.0f"), num(g.get("power_cap_w"), "%.0f")), "value")],
-        [("temp ", "dim")] + sum([[("%s " % k, "dim"), ("%d°C  " % v, pct_style(v, 80, 95))]
-                                  for k, v in sorted(temps.items())], []) +
-        [("fan ", "dim"), ("%s rpm" % num(g.get("fan_rpm"), "%d"), "value"),
-         (" (%s%%)" % num(g.get("fan_pct"), "%d"), "dim")],
-        [("clocks ", "dim"), ("sclk %s MHz  mclk %s MHz" % (num(g.get("sclk_mhz"), "%d"), num(g.get("mclk_mhz"), "%d")),
-                              "value")],
-    ]
-    _lines(c, ix, iy, iw, lines[: max(0, ih)])
-    rows = ih - len(lines)
-    charts = [("busy %", "gpu_busy", 100, "c_gpu"), ("VRAM", "vram_used", vt or None, "c_mem"),
-              ("power", "gpu_power", g.get("power_cap_w") or None, "c_pow")]
-    _stacked_charts(c, ix, iy + len(lines), iw, rows, st, charts, range_s)
-
-
-def _stacked_charts(c, x, y, w, rows, st, charts, range_s):
-    """Several labelled charts sharing `rows`; fewer if it's tight."""
-    if rows < 1:
-        return
-    n = min(len(charts), max(1, rows // 3)) if rows >= 3 else 1
-    per = rows // n
-    for i, (label, name, vmax, style) in enumerate(charts[:n]):
-        top = y + i * per
-        c.put(x, top, label, "dim")
-        lw = len(label) + 1
-        if per == 1:
-            c.chart(x + lw, top, w - lw, 1, _series(st, name, range_s), vmax=vmax, style=style)
-        else:
-            c.chart(x, top + 1, w, per - 1, _series(st, name, range_s), vmax=vmax, style=style)
-
-
-def panel_cpu(c, x, y, w, h, st, range_s):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "CPU")
-    cpu = st.get("cpu") or {}
-    cores = cpu.get("cores") or []
-    load = cpu.get("load") or []
-    head = [("total ", "dim"), ("%s%%" % num(cpu.get("total"), "%.0f"), pct_style(cpu.get("total"))),
-            ("  temp ", "dim"), ("%s°C" % num(cpu.get("temp"), "%.0f"), pct_style(cpu.get("temp"), 80, 90)),
-            ("  load ", "dim"), (" ".join("%.2f" % l for l in load), "value")]
-    _lines(c, ix, iy, iw, [head])
-    rows = ih - 1
-    if rows < 1 or not cores:
-        return
-    # a grid of per-core bars: as many columns as fit, rows as needed
-    cell = 14 if iw >= 60 else 10
-    cols = max(1, iw // cell)
-    need_rows = int(math.ceil(len(cores) / float(cols)))
-    if need_rows > rows:
-        cols = int(math.ceil(len(cores) / float(rows)))
-        cell = max(6, iw // cols)
-        need_rows = rows
-    for i, p in enumerate(cores):
-        r, col = i % need_rows, i // need_rows
-        cx = ix + col * cell
-        if r >= rows or cx + cell > ix + iw + 1:
-            continue
-        label = "%2d" % i
-        c.put(cx, iy + 1 + r, label, "dim")
-        c.hbar(cx + 3, iy + 1 + r, cell - 4, (p or 0) / 100.0, pct_style(p))
-    left = rows - need_rows
-    if left >= 3:
-        c.put(ix, iy + 1 + need_rows, "total %", "dim")
-        c.chart(ix, iy + 2 + need_rows, iw, left - 1, _series(st, "cpu_total", range_s), vmax=100, style="c_cpu")
-
-
-def panel_memory(c, x, y, w, h, st, range_s):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Memory")
-    m = st.get("mem") or {}
-    cg = st.get("ollama_cg") or {}
-    total = m.get("total") or 0
-    used = total - (m.get("available") or 0)
-    swap_used = (m.get("swap_total") or 0) - (m.get("swap_free") or 0)
-    lines = [
-        [("RAM ", "dim"), ("%s/%s GiB" % (gib(used), gib(total)), pct_style(100 * used / total if total else None)),
-         ("  avail ", "dim"), ("%s GiB" % gib(m.get("available")), "value"),
-         ("  swap ", "dim"), ("%s/%s GiB" % (gib(swap_used), gib(m.get("swap_total"))), "warn" if swap_used > 2**28 else "value")],
-        [("Ollama ", "dim"), ("%s GiB" % gib(cg.get("current")), "value"),
-         (" of cap %s GiB" % (gib(cg.get("max")) if cg.get("max") else "none"), "dim")],
-    ]
-    _lines(c, ix, iy, iw, lines[: max(0, ih)])
-    if ih > 2 and cg.get("max"):
-        c.hbar(ix, iy + 2, iw, (cg.get("current") or 0) / float(cg["max"]), pct_style(100 * (cg.get("current") or 0) / cg["max"], 80, 92))
-        start = 3
-    else:
-        start = 2
-    rows = ih - start
-    if rows >= 1:
-        c.chart(ix, iy + start, iw, rows, _series(st, "ram_used", range_s), vmax=total or None, style="c_mem")
-
-
-def panel_disks(c, x, y, w, h, st, range_s):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Disks")
-    row = 0
-    for d in st.get("disks") or []:
-        if row >= ih:
-            return
-        label = "%-12s" % d.get("mount", "?")[:12]
-        c.put(ix, iy + row, label, "dim")
-        if d.get("mounted") and d.get("total"):
-            frac = d["used"] / float(d["total"])
-            c.hbar(ix + 13, iy + row, max(4, iw - 36), frac, pct_style(100 * frac, 80, 92))
-            c.put(ix + iw - 22, iy + row, "%s free of %s" % (human_bytes(d.get("free")), human_bytes(d["total"])), "value")
-        else:
-            c.put(ix + 13, iy + row, "not mounted", "bad")
-        row += 1
-    for a in st.get("raid") or []:
-        if row >= ih:
-            return
-        s = "%s %s [%s] %s" % (a.get("name"), a.get("level"), a.get("members"), "healthy" if a.get("healthy") else "DEGRADED")
-        if a.get("action"):
-            s += "  %s %s%%  about %s left" % (a["action"], a.get("progress"), a.get("finish") or "?")
-        c.put(ix, iy + row, s[:iw], "ok" if a.get("healthy") else "bad")
-        row += 1
-    io = st.get("io") or {}
-    if row < ih:
-        c.put(ix, iy + row, "I/O  read %s  write %s" % (rate(io.get("read_bps")), rate(io.get("write_bps"))), "value")
-        row += 1
-    rows = ih - row
-    if rows >= 1:
-        _pair_chart(c, ix, iy + row, iw, rows, _series(st, "io_read", range_s), _series(st, "io_write", range_s), "c_io")
-
-
-def _pair_chart(c, x, y, w, rows, a, b, style):
-    """Two series side by side (read|write, in|out) on one shared scale."""
-    half = (w - 1) // 2
-    top = max([v for v in a + b if v is not None] + [1.0])
-    c.chart(x, y, half, rows, a, vmax=top, style=style)
-    c.chart(x + half + 1, y, w - half - 1, rows, b, vmax=top, style="c_io2")
-
-
-def panel_network(c, x, y, w, h, st, range_s):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Network")
-    n = st.get("net") or {}
-    t = st.get("tunnel") or {}
-    lines = [
-        [(n.get("name", "br0") + " ", "dim"), (n.get("address") or "no address", "value"),
-         ("  in ", "dim"), (rate(n.get("rx_bps")), "value"), ("  out ", "dim"), (rate(n.get("tx_bps")), "value")],
-        [("tunnel ", "dim"), ("connected (%d)" % t.get("connections", 0) if t.get("up") else "DOWN", "ok" if t.get("up") else "bad"),
-         ("  rtt ", "dim"), (("%.0f ms" % t["rtt_ms"]) if t.get("rtt_ms") is not None else "-", "value")],
-        [("ports ", "dim")] + sum([[("%s " % p.get("name"), "dim"),
-                                    ("%s  " % (("link %s" % (("%d Mb/s" % p["speed_mbps"]) if p.get("speed_mbps") else ""))
-                                               if p.get("carrier") else "no link"), "ok" if p.get("carrier") else "warn")]
-                                   for p in n.get("ports") or []], []),
-    ]
-    _lines(c, ix, iy, iw, lines[: max(0, ih)])
-    rows = ih - len(lines)
-    if rows >= 1:
-        _pair_chart(c, ix, iy + len(lines), iw, rows, _series(st, "net_rx", range_s), _series(st, "net_tx", range_s), "c_net")
-
-
-def panel_health(c, x, y, w, h, st, now):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Health")
-    up = st.get("updates") or {}
-    oll = up.get("ollama") or {}
-    lines = [
-        [("uptime ", "dim"), (dur(st.get("uptime")), "value"), ("  reboot needed ", "dim"),
-         ("yes" if up.get("reboot_required") else "no", "warn" if up.get("reboot_required") else "ok")],
-        [("security updates ", "dim"), (ago(up.get("last_unattended"), now), "value")],
-        [("Ollama ", "dim"), ("%s %s" % (oll.get("result", "not run"), oll.get("version", "")), "bad" if oll.get("result") == "failed" else "value"),
-         ("  next check ", "dim"), (str(up.get("next_ollama_update") or "-"), "value")],
-        [("last sleep ", "dim"), (ago((up.get("sleep") or {}).get("last_sleep"), now), "value"),
-         ("  wake ", "dim"), (ago((up.get("sleep") or {}).get("last_wake"), now), "value")]
-        + ([("  after waking ", "dim"),
-            ("ok" if ((up.get("sleep") or {}).get("resume_check") or {}).get("ok") else "PROBLEM",
-             "ok" if ((up.get("sleep") or {}).get("resume_check") or {}).get("ok") else "bad")]
-           if (up.get("sleep") or {}).get("resume_check") else []),
-    ]
-    pw = st.get("power")
-    if pw:
-        badge = pw.get("badge") or ""
-        line = [("power ", "dim"),
-                ("%s W" % num(pw.get("watts"), "%.0f") if pw.get("watts") is not None else "no reading",
-                 "value" if pw.get("watts") is not None else "warn"),
-                (" (plug)" if pw.get("src") == "plug" else " (estimate)" if pw.get("src") else "", "dim"),
-                ("  24 h ", "dim"), ("%s kWh" % num(pw.get("kwh_24h"), "%.2f"), "value")]
-        if pw.get("cost_24h") is not None:
-            line.append(("  %s%.2f" % (pw.get("symbol") or "$", pw["cost_24h"]), "value"))
-        if badge:
-            line.append(("  " + badge, "bad" if badge.startswith("on-peak") else
-                         "warn" if badge.startswith("mid-peak") else "ok"))
-        lines.insert(0, line)
-    _lines(c, ix, iy, iw, lines[: max(0, ih)])
-
-
-def panel_devices(c, x, y, w, h, st, now):
-    ix, iy, iw, ih = _inner(c, x, y, w, h, "Paired devices")
-    devs = sorted((st.get("gw") or {}).get("devices") or [], key=lambda d: -(d.get("last_seen") or 0))
-    if not devs:
-        c.put(ix, iy, "none seen since the gateway started", "dim")
-    for i, d in enumerate(devs[:ih]):
-        name = str(d.get("name", "?"))[: iw - 24]
-        c.put(ix, iy + i, name, "value")
-        state = "connected" if d.get("connected") else ago(d.get("last_seen"), now)
-        if d.get("active"):
-            state += ", %d active" % d["active"]
-        c.put(ix + iw - 22, iy + i, state[:22], "ok" if d.get("connected") else "dim")
-
-
-def _lines(c, x, y, w, lines):
-    for i, parts in enumerate(lines):
-        cx = x
-        for text, style in parts:
-            if cx >= x + w:
-                break
-            c.put(cx, y + i, text[: x + w - cx], style)
-            cx += len(text)
+    bad = [(label, int(_f(err.get(k)) or 0)) for k, label in kinds if _f(err.get(k))]
+    n = sum(v for _, v in bad)
+    put_parts(c, 2, [("Errors ", "dim"), ("%d" % n, "bad" if n else "ok")] +
+              ([("   " + "  ".join("%s %d" % kv for kv in bad), "dim")] if bad else []))
+    trend(c, 3, ctx["rng"], _series(st, "tps", ctx["range_s"]), ctx["range_s"], style="c_tps", floor=10)
 
 
 def _until(expires, now):
@@ -528,104 +435,345 @@ def _until(expires, now):
             digits = "".join(ch for ch in tail if ch.isdigit())
             s = head + "." + digits[:6] + tail[len(digits):]
         t = datetime.datetime.fromisoformat(s).timestamp()
-    except ValueError:
+    except (ValueError, OverflowError, OSError):
         return "-"
     return dur(t - now) if t > now else "now"
 
 
-# ---- the screen ----------------------------------------------------------------
+def w_models(c, st, ctx):
+    gw = st.get("gw") if isinstance(st.get("gw"), dict) else {}
+    loaded = [m for m in (gw.get("loaded") or []) if isinstance(m, dict)] if isinstance(gw.get("loaded"), list) else []
+    events = [e for e in (gw.get("events") or []) if isinstance(e, dict)] if isinstance(gw.get("events"), list) else []
+    now = ctx["now"]
+    last = events[-1] if events else None
+    room = c.h - (1 if last else 0)
+    if not loaded:
+        c.put(0, 0, "No model in memory", "dim")
+    shown = loaded if len(loaded) <= room else loaded[:max(0, room - 1)]
+    for i, m in enumerate(shown):
+        size, vram = int(_f(m.get("size")) or 0), int(_f(m.get("size_vram")) or 0)
+        share = int(100 * vram / size) if size else 0
+        left = _until(m.get("expires_at"), now)
+        dw = 27 if c.w >= 48 else 19
+        detail = ("%d%% GPU  %s GiB  %s" % (share, gib(vram), left)) if dw == 27 else ("%d%% %sG %s" % (share, gib(vram), left))
+        ok = share >= 100 or m.get("ram_allowed")
+        nw = max(1, c.w - dw - 1)
+        c.put(0, i, m.get("name") or "?", "value", maxw=nw)
+        c.put(c.w - dw, i, detail, "text" if ok else "bad", maxw=dw)
+    if len(loaded) > len(shown):
+        c.put(0, len(shown), "+%d more" % (len(loaded) - len(shown)), "dim")
+    if last:
+        kind = str(last.get("kind", ""))
+        style = "bad" if kind.startswith("refused") else ("warn" if "unload" in kind else "ok")
+        try:
+            t = datetime.datetime.fromtimestamp(_f(last.get("t")) or 0).strftime("%H:%M")
+        except (ValueError, OverflowError, OSError):
+            t = "-"
+        put_parts(c, c.h - 1, [("Last ", "dim"), (t + " ", "dim"), ("%s %s" % (kind, last.get("model", "")), style)])
 
-def render(st, width, height, glyphs="blocks", range_s=300, page=0):
-    """The whole dashboard as a Canvas. `page` matters only when the
-    screen is too small to show everything at once."""
-    c = Canvas(width, height, glyphs)
-    now = st.get("time") or 0
-    clock = datetime.datetime.fromtimestamp(now).astimezone().strftime("%a %d %b %H:%M:%S %Z") if now else ""
+
+def w_storage(c, st, ctx):
+    disks = [d for d in (st.get("disks") or []) if isinstance(d, dict)] if isinstance(st.get("disks"), list) else []
+    raid = [a for a in (st.get("raid") or []) if isinstance(a, dict)] if isinstance(st.get("raid"), list) else []
+    io = st.get("io") if isinstance(st.get("io"), dict) else {}
+    budget = c.h - (1 if raid else 0) - 1
+    shown = disks if len(disks) <= budget else disks[:max(0, budget - 1)]
+    y = 0
+    for d in shown:
+        lw = 13 if c.w >= 36 else 9
+        label = str(d.get("mount") or "?")
+        total, used = _f(d.get("total")), _f(d.get("used"))
+        if d.get("mounted") and total:
+            f = (used or 0) / total
+            meter(c, y, label, "%s free" % human_bytes(d.get("free")), f, pct_style(100 * f, 80, 92), lw=lw, vw=12)
+        else:
+            c.put(0, y, label, "dim", maxw=lw - 1)
+            c.put(lw, y, "not mounted", "bad")
+        y += 1
+    if len(disks) > len(shown):
+        c.put(0, y, "+%d more disks" % (len(disks) - len(shown)), "dim")
+        y += 1
+    for a in raid[:1]:
+        s = ("RAID %s %s [%s] %s" % (a.get("name"), a.get("level"), a.get("members"),
+                                     "healthy" if a.get("healthy") else "DEGRADED")) if c.w >= 46 else \
+            ("RAID %s %s" % (a.get("name"), "healthy" if a.get("healthy") else "DEGRADED"))
+        if a.get("action"):
+            s += "  %s %s%%" % (a["action"], num(a.get("progress"), "%.0f"))
+        c.put(0, y, s, "ok" if a.get("healthy") else "bad")
+        y += 1
+    put_parts(c, y, [("Disk IO ", "dim"), ("read ", "dim"), (rate(io.get("read_bps")), "value"),
+                                             ("  write ", "dim"), (rate(io.get("write_bps")), "value")])
+
+
+def w_network(c, st, ctx):
+    n = st.get("net") if isinstance(st.get("net"), dict) else {}
+    t = st.get("tunnel") if isinstance(st.get("tunnel"), dict) else {}
+    put_parts(c, 0, [("Down   ", "dim"), (rate(n.get("rx_bps")), "value"), ("   Up ", "dim"), (rate(n.get("tx_bps")), "value")])
+    ports = [p for p in (n.get("ports") or []) if isinstance(p, dict)] if isinstance(n.get("ports"), list) else []
+    parts = [("Link   ", "dim")]
+    if not ports:
+        parts.append(("no ports found", "warn"))
+    speeds = {_f(p.get("speed_mbps")) for p in ports}
+    if c.w < 48 and len(ports) > 1 and all(p.get("carrier") for p in ports) and len(speeds) == 1 and None not in speeds:
+        parts.append(("%d ports, %d Mb/s" % (len(ports), speeds.pop()), "ok"))
+        ports = []
+    for p in ports:
+        if p.get("carrier"):
+            sp = _f(p.get("speed_mbps"))
+            parts.append(("%s %s  " % (p.get("name"), ("%d Mb/s" % sp) if sp else "up"), "ok"))
+        else:
+            parts.append(("%s no link  " % p.get("name"), "warn"))
+    put_parts(c, 1, parts)
+    up = bool(t.get("up"))
+    rtt = _f(t.get("rtt_ms"))
+    put_parts(c, 2, [("Tunnel ", "dim"), ("connected (%d)" % (_f(t.get("connections")) or 0) if up else "DOWN", "ok" if up else "bad"),
+                     ("   rtt ", "dim"), (("%.0f ms" % rtt) if rtt is not None else "-", "value")])
+    trend(c, 3, ctx["rng"], _series(st, "net_rx", ctx["range_s"]), ctx["range_s"], style="c_net")
+
+
+def warnings(st, now=0):
+    """What needs a look, worst first: [(text, 'bad'|'warn')]."""
+    out = []
     gw = st.get("gw")
-    status = "gateway running" if gw and not gw.get("stale") else "GATEWAY NOT RUNNING"
-    head = " %s  %s  up %s  %s " % (st.get("host", "server"), clock, dur(st.get("uptime")), status)
-    c.put(0, 0, head.ljust(width)[:width], "header")
-    rng = "5 min" if range_s <= 300 else "1 h"
-    W, H = width, height - 2
-    y0 = 1
-    if W >= 180 and H >= 44:
-        cols = [W // 3, W // 3, W - 2 * (W // 3)]
-        xs = [0, cols[0], cols[0] + cols[1]]
-        _column(c, xs[0], y0, cols[0], H, [(panel_tokens, 0.26, "r"), (panel_requests, 0.2, "r"),
-                                           (panel_models, 0.16, "n"), (panel_events, 0.2, "n"),
-                                           (panel_devices, 0.18, "n")], st, range_s, now)
-        _column(c, xs[1], y0, cols[1], H, [(panel_gpu, 0.55, "r"), (panel_memory, 0.45, "r")], st, range_s, now)
-        _column(c, xs[2], y0, cols[2], H, [(panel_cpu, 0.3, "r"), (panel_disks, 0.3, "r"),
-                                           (panel_network, 0.24, "r"), (panel_health, 0.16, "n")], st, range_s, now)
-        pages = 1
-    elif W >= 100 and H >= 28:
-        half = W // 2
-        if page % 2 == 0:
-            _column(c, 0, y0, half, H, [(panel_tokens, 0.4, "r"), (panel_requests, 0.3, "r"), (panel_devices, 0.3, "n")],
-                    st, range_s, now)
-            _column(c, half, y0, W - half, H, [(panel_gpu, 0.5, "r"), (panel_models, 0.25, "n"), (panel_events, 0.25, "n")],
-                    st, range_s, now)
-        else:
-            _column(c, 0, y0, half, H, [(panel_cpu, 0.45, "r"), (panel_memory, 0.55, "r")], st, range_s, now)
-            _column(c, half, y0, W - half, H, [(panel_disks, 0.4, "r"), (panel_network, 0.35, "r"), (panel_health, 0.25, "n")],
-                    st, range_s, now)
-        pages = 2
+    if not isinstance(gw, dict) or gw.get("stale"):
+        out.append(("Gateway is not running", "bad"))
+    g = st.get("gpu")
+    if not isinstance(g, dict):
+        out.append(("No GPU found", "bad"))
     else:
-        pages = 3
-        p = page % 3
-        if p == 0:
-            _column(c, 0, y0, W, H, [(panel_tokens, 0.34, "r"), (panel_requests, 0.3, "r"), (panel_models, 0.36, "n")],
-                    st, range_s, now)
-        elif p == 1:
-            _column(c, 0, y0, W, H, [(panel_gpu, 0.55, "r"), (panel_memory, 0.45, "r")], st, range_s, now)
+        hot = _f(dig(g, "temps", "junction"))
+        if hot is not None and hot >= 95:
+            out.append(("GPU very hot: %.0f C" % hot, "bad"))
+        elif hot is not None and hot >= 85:
+            out.append(("GPU hot: %.0f C" % hot, "warn"))
+    cpu_t = _f(dig(st, "cpu", "temp"))
+    if cpu_t is not None and cpu_t >= 90:
+        out.append(("CPU hot: %.0f C" % cpu_t, "warn"))
+    m = st.get("mem") if isinstance(st.get("mem"), dict) else {}
+    total, avail = _f(m.get("total")), _f(m.get("available"))
+    if total and avail is not None and avail / total < 0.08:
+        out.append(("Memory nearly full: %s GiB free" % gib(avail), "warn"))
+    swap_u = (_f(m.get("swap_total")) or 0) - (_f(m.get("swap_free")) or 0)
+    if swap_u > 2**28:
+        out.append(("Swap in use: %s GiB" % gib(swap_u), "warn"))
+    for d in st.get("disks") or [] if isinstance(st.get("disks"), list) else []:
+        if not isinstance(d, dict):
+            continue
+        if not d.get("mounted"):
+            out.append(("%s is not mounted" % (d.get("mount") or "?"), "bad"))
+        elif _f(d.get("total")) and (_f(d.get("free")) or 0) / d["total"] < 0.05:
+            out.append(("%s almost full" % d.get("mount"), "bad"))
+        elif _f(d.get("total")) and (_f(d.get("free")) or 0) / d["total"] < 0.10:
+            out.append(("%s low on space" % d.get("mount"), "warn"))
+    for a in st.get("raid") or [] if isinstance(st.get("raid"), list) else []:
+        if not isinstance(a, dict):
+            continue
+        if not a.get("healthy"):
+            out.append(("RAID %s degraded" % a.get("name"), "bad"))
+        elif a.get("action"):
+            out.append(("RAID %s: %s %s%%" % (a.get("name"), a["action"], num(a.get("progress"), "%.0f")), "warn"))
+    t = st.get("tunnel")
+    if isinstance(t, dict) and not t.get("up"):
+        out.append(("Tunnel is down", "bad"))
+    up = st.get("updates") if isinstance(st.get("updates"), dict) else {}
+    if dig(up, "ollama", "result") == "failed":
+        out.append(("Ollama update failed", "bad"))
+    if dig(up, "sleep", "resume_check") and not dig(up, "sleep", "resume_check", "ok"):
+        out.append(("Problem after waking up", "bad"))
+    if up.get("reboot_required"):
+        out.append(("Reboot needed", "warn"))
+    q = _f(dig(gw, "queued")) or 0
+    if q >= 3:
+        out.append(("%d requests waiting" % q, "warn"))
+    out.sort(key=lambda w: 0 if w[1] == "bad" else 1)
+    return out
+
+
+def w_health(c, st, ctx):
+    now = ctx["now"]
+    warns = ctx["warns"]
+    up = st.get("updates") if isinstance(st.get("updates"), dict) else {}
+    info = [[("Uptime ", "dim"), (dur(st.get("uptime")), "value"), ("   Security updates ", "dim"),
+             (ago(up.get("last_unattended"), now), "value"), ("   Ollama ", "dim"),
+             ("%s %s" % (dig(up, "ollama", "result") or "-", dig(up, "ollama", "version") or ""), "value")]]
+    pw = st.get("power") if isinstance(st.get("power"), dict) else None
+    if pw:
+        watts = _f(pw.get("watts"))
+        line = [("Power  ", "dim"), ("%s W" % num(watts, "%.0f") if watts is not None else "no reading",
+                                     "value" if watts is not None else "warn"),
+                (" (plug)" if pw.get("src") == "plug" else " (estimate)" if pw.get("src") else "", "dim"),
+                ("   24 h ", "dim"), ("%s kWh" % num(pw.get("kwh_24h"), "%.2f"), "value")]
+        if _f(pw.get("cost_24h")) is not None:
+            line.append(("  %s%.2f" % (pw.get("symbol") or "$", pw["cost_24h"]), "value"))
+        if pw.get("badge"):
+            line.append(("  " + str(pw["badge"]), "dim"))
+        info.append(line)
+    y = 0
+    needed = min(len(warns), 2) or 1
+    while info and c.h - len(info) < needed:        # the problems come before the figures
+        info.pop()
+    if not warns:
+        c.put(0, y, "All clear", "ok")
+        y += 1
+    else:
+        room = max(1, c.h - len(info))
+        show = warns if len(warns) <= room else warns[:max(1, room - 1)]
+        for text, style in show:
+            c.put(0, y, ("! " if style == "bad" else "* ") + text, style)
+            y += 1
+        if len(show) < len(warns):
+            c.put(0, y, "+%d more to check" % (len(warns) - len(show)), "warn")
+            y += 1
+    for line in info:
+        if y >= c.h:
+            break
+        put_parts(c, y, line)
+        y += 1
+
+
+# ---- the layout ----------------------------------------------------------------
+
+# name: (title, widget, content rows). The GRID is in priority order: the
+# last rows go first when the screen is short.
+PANELS = {
+    "gpu": ("GPU", w_gpu, 5),
+    "cpumem": ("CPU and memory", w_system, 5),
+    "requests": ("Requests", w_requests, 4),
+    "models": ("Loaded models", w_models, 4),
+    "storage": ("Storage", w_storage, 5),
+    "network": ("Network", w_network, 4),
+    "health": ("Health", w_health, 3),
+}
+GRID = [("gpu", "cpumem"), ("requests", "models"), ("storage", "network"), ("health",)]
+MAX_W = 120          # wider screens centre a layout this wide
+TWO_COLS_AT = 76     # below this width the panels stack in one column
+MIN_W = 36
+
+
+def plan(w, h):
+    """The boxes for a w x h screen: [(name, x, y, width, height)], each
+    inside the body (rows 1..h-2) and none overlapping another."""
+    body = h - 2
+    if w < MIN_W or body < 7:
+        return []
+    cw_ = min(w, MAX_W)
+    x0 = (w - cw_) // 2
+    two = w >= TWO_COLS_AT
+    rows = [list(r) for r in GRID] if two else [[n] for r in GRID for n in r]
+    rows = [[(n, PANELS[n][2] + 2) for n in r] for r in rows]
+    chosen, used = [], 0
+    for r in rows:
+        rh = max(p[1] for p in r)
+        if used + rh > body:
+            break
+        chosen.append((r, rh))
+        used += rh
+    if not chosen:
+        return []
+    spare = body - used
+    gap = 1 if spare >= len(chosen) - 1 else 0
+    spare -= gap * (len(chosen) - 1)
+    extra = min(3, spare // len(chosen))
+    spare -= extra * len(chosen)
+    y = 1 + spare // 2
+    colgap = 1 if cw_ >= 100 else 0
+    out = []
+    for r, rh in chosen:
+        rh += extra
+        if len(r) == 2:
+            lw_ = (cw_ - colgap) // 2
+            out.append((r[0][0], x0, y, lw_, rh))
+            out.append((r[1][0], x0 + lw_ + colgap, y, cw_ - colgap - lw_, rh))
         else:
-            _column(c, 0, y0, W, H, [(panel_cpu, 0.34, "r"), (panel_disks, 0.22, "r"), (panel_network, 0.22, "r"),
-                                     (panel_health, 0.22, "n")], st, range_s, now)
-    keys = " t range: %s" % rng + ("   p page %d/%d" % (page % pages + 1, pages) if pages > 1 else "")
-    keys += "   counts, sizes and times only" if width >= 80 else ""
-    c.put(0, height - 1, keys.ljust(width)[:width], "footer")
+            out.append((r[0][0], x0, y, cw_, rh))
+        y += rh + gap
+    return out
+
+
+def draw_panel(name, pw, ph, st, ctx, glyphs, console):
+    """One panel into its own buffer: the frame, then the widget in the
+    inside. Whatever the widget does, it cannot leave this buffer."""
+    title, fn, _rows = PANELS[name]
+    box = Cells(pw, ph, glyphs, console)
+    box.box(title)
+    iw, ih = pw - 4, ph - 2
+    if iw >= 1 and ih >= 1:
+        inner = Cells(iw, ih, glyphs, console)
+        try:
+            fn(inner, st, ctx)
+        except Exception as e:                       # one bad reading must not blank the screen
+            ERRORS.append("%s: %r" % (name, e))
+            inner = Cells(iw, ih, glyphs, console)
+            inner.put(0, 0, "no data", "dim")
+        box.blit(inner, 2, 1)
+    return box
+
+
+ERRORS = []   # widget exceptions (the tests assert this stays empty)
+
+
+def render(st, width, height, glyphs="blocks", range_s=300, page=0, console=False):
+    """The whole dashboard as a Canvas of exactly width x height cells.
+    (`page` is accepted and ignored: nothing is paged any more.)"""
+    c = Canvas(width, height, glyphs, console)
+    width, height = c.w, c.h
+    st = st if isinstance(st, dict) else {}
+    now = _f(st.get("time")) or 0
+    try:
+        clock = datetime.datetime.fromtimestamp(now).astimezone().strftime("%a %d %b %H:%M:%S %Z") if now else ""
+    except (ValueError, OverflowError, OSError):
+        clock = ""
+    warns = warnings(st, now)
+    if any(s == "bad" for _, s in warns):
+        badge, bstyle = " %d PROBLEM%s " % (len(warns), "" if len(warns) == 1 else "S"), "header_bad"
+    elif warns:
+        badge, bstyle = " %d TO CHECK " % len(warns), "header_warn"
+    else:
+        badge, bstyle = " ALL CLEAR ", "header_ok"
+    c.fill(0, 0, width, 1, " ", "header")
+    bw = min(swidth(badge), max(0, width - 4))
+    c.put(0, 0, " %s   %s   up %s" % (st.get("host") or "server", clock, dur(st.get("uptime"))), "header",
+          maxw=max(0, width - bw))
+    c.put(width - bw, 0, badge, bstyle, maxw=bw)
+    rng = "5 min" if range_s <= 300 else "1 h"
+    ctx = {"now": now, "range_s": range_s, "rng": rng, "warns": warns}
+    placed = plan(width, height)
+    for name, x, y, pw, ph in placed:
+        c.blit(draw_panel(name, pw, ph, st, ctx, glyphs, console), x, y)
+    if not placed:
+        c.put(0, 1, "Screen too small: needs 80x24", "warn", maxw=width)
+    shown = {p[0] for p in placed}
+    keys = " t: chart range %s" % rng
+    if placed and "health" not in shown and warns:
+        keys += "   %d to check" % len(warns)
+    keys += "   counts, sizes and times only"
+    c.fill(0, height - 1, width, 1, " ", "footer")
+    c.put(0, height - 1, keys, "footer", maxw=width)
     if st.get("pairing"):
         overlay_pairing(c, st["pairing"], now)
     return c
-
-
-def _column(c, x, y, w, h, panels, st, range_s, now):
-    heights = [max(3, int(round(h * share))) for _, share, _ in panels]
-    heights[-1] = max(3, h - sum(heights[:-1]))
-    while sum(heights) > h and len(heights) > 1:
-        # too little room: drop the last panel
-        panels, heights = panels[:-1], heights[:-1]
-        heights[-1] = max(3, h - sum(heights[:-1]))
-    yy = y
-    for (fn, _share, kind), ph in zip(panels, heights):
-        ph = min(ph, y + h - yy)
-        if ph < 3:
-            break
-        if kind == "r":
-            fn(c, x, yy, w, ph, st, range_s)
-        else:
-            fn(c, x, yy, w, ph, st, now)
-        yy += ph
 
 
 def overlay_pairing(c, window, now):
     """The pairing code, as large as the screen allows, over everything."""
     from o1auth import format_code
     import o1big
+    window = window if isinstance(window, dict) else {}
     code = format_code(window.get("code", ""))
     on = "#" if c.glyphs == "ascii" else "█"
     rows = o1big.render_code(code, c.w - 4, on=on, height=max(5, c.h - 8))
-    left = max(0, int(window.get("expires_at", now) - now))
-    for yy in range(c.h):
-        c.put(0, yy, " " * c.w, "overlay")
+    if len(rows) + 6 > c.h:                          # too small for the big letters: the code as text
+        rows = []
+    left = max(0, int((_f(window.get("expires_at")) or now) - now))
+    c.fill(0, 0, c.w, c.h, " ", "overlay")
     lines = ["PAIRING WINDOW OPEN", ""] + rows + ["", "%s    closes in %d:%02d" % (code, left // 60, left % 60),
                                                   "Type this code in ConcordeAI on the device you are pairing."]
     top = max(0, (c.h - len(lines)) // 2)
-    width = max(len(r) for r in rows)
+    width = max(swidth(r) for r in rows) if rows else 0
     for i, text in enumerate(lines):
         if top + i >= c.h:
             break
         if 2 <= i < 2 + len(rows):
-            c.put((c.w - width) // 2, top + i, text, "overlay_code")
+            c.put(max(0, (c.w - width) // 2), top + i, text, "overlay_code", maxw=c.w)
         else:
-            c.put(max(0, (c.w - len(text)) // 2), top + i, text[: c.w], "overlay")
+            c.put(max(0, (c.w - swidth(text)) // 2), top + i, text, "overlay", maxw=c.w)

@@ -571,3 +571,99 @@ class TestSettingsFromTheLibrary(unittest.TestCase):
         env = 'PATH="%s:$PATH" SYS_BLOCK="%s"' % (stub, blk)
         self.assertEqual(self.sh('%s disk_by_serial ""' % env)[:2], (0, ""))
         self.assertEqual(self.sh('%s disk_by_serial "SERIAL-A"' % env)[:2], (0, ""))
+
+
+class TestDashFont(unittest.TestCase):
+    """dash_font_step (6b359): a big console font for the server's monitor,
+    with an opt-out, and never fatal. apt-get and the dashboard are stubs."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="o1dashfont-")
+        self.addCleanup(shutil.rmtree, self.d, ignore_errors=True)
+        self.bin = os.path.join(self.d, "bin")
+        os.makedirs(self.bin)
+        self.log = os.path.join(self.d, "calls.log")
+        self.flag = os.path.join(self.d, "etc", "dash-font.off")
+        self.stub("apt-get", 'echo "apt-get $*" >>"$LOG"\n[ "${APT_FAIL:-}" = "$4" ] && exit 100\nexit 0')
+        self.stub("dash", 'echo "dash $*" >>"$LOG"\n[ -z "${DASH_FAIL:-}" ] || { echo "setfont: no such font"; exit 1; }\n'
+                          'echo \'{"font": "/f/ter-v32n.psf.gz", "cols": 120}\'')
+
+    def stub(self, name, body):
+        path = os.path.join(self.bin, name)
+        with open(path, "w") as f:
+            f.write("#!/bin/sh\n" + body + "\n")
+        os.chmod(path, 0o755)
+
+    def step(self, env=None, setup=""):
+        script = r'''
+set -euo pipefail
+run() { "$@"; }
+ok() { echo "OK: $*"; }
+note() { echo "NOTE: $*"; }
+die() { echo "DIE: $*"; exit 1; }
+source "$LIBSH"
+%s
+dash_font_step "%s" /dev/tty1
+echo DONE
+''' % (setup, os.path.join(self.bin, "dash"))
+        e = dict(os.environ, PATH=self.bin + ":" + os.environ["PATH"], LIBSH=LIBSH, LOG=self.log, DASH_FONT_OFF=self.flag)
+        e.pop("OLLAMA1_DASH_FONT", None)
+        e.update(env or {})
+        r = subprocess.run(["bash", "-c", script], env=e, capture_output=True, text=True, timeout=30)
+        calls = open(self.log).read().splitlines() if os.path.exists(self.log) else []
+        if os.path.exists(self.log):
+            os.unlink(self.log)
+        return r.returncode, r.stdout + r.stderr, calls
+
+    def test_installs_the_fonts_and_loads_one(self):
+        rc, out, calls = self.step()
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(calls, ["apt-get install -y -q console-setup-linux", "apt-get install -y -q console-terminus",
+                                 "dash --set-font /dev/tty1"])
+        self.assertIn("OK: console font:", out)
+        self.assertIn("DONE", out)
+        self.assertFalse(os.path.exists(self.flag))
+
+    def test_opt_out_changes_nothing_on_the_screen(self):
+        rc, out, calls = self.step({"OLLAMA1_DASH_FONT": "off"})
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(calls, [])                      # no package, no font loaded
+        self.assertTrue(os.path.exists(self.flag))       # and o1font will load none at the next start
+        self.assertIn("left as it is", out)
+
+    def test_running_setup_again_without_the_opt_out_brings_it_back(self):
+        self.step({"OLLAMA1_DASH_FONT": "off"})
+        rc, out, calls = self.step()
+        self.assertEqual(rc, 0, out)
+        self.assertFalse(os.path.exists(self.flag))
+        self.assertIn("dash --set-font /dev/tty1", calls)
+
+    def test_running_twice_is_the_same(self):
+        a = self.step()
+        b = self.step()
+        self.assertEqual((a[0], a[2]), (b[0], b[2]))
+
+    def test_a_missing_package_or_font_never_stops_setup(self):
+        rc, out, calls = self.step({"APT_FAIL": "console-terminus"})
+        self.assertEqual(rc, 0, out)
+        self.assertIn("NOTE: console-terminus isn't available", out)
+        self.assertIn("dash --set-font /dev/tty1", calls)
+        rc, out, _ = self.step({"APT_FAIL": "console-setup-linux"})
+        self.assertEqual(rc, 0, out)
+        self.assertIn("NOTE: console-setup-linux did not install", out)
+        rc, out, _ = self.step({"DASH_FAIL": "1"})
+        self.assertEqual(rc, 0, out)
+        self.assertIn("NOTE: couldn't load a console font", out)
+        self.assertIn("DONE", out)
+
+    def test_setup_calls_it_before_the_dashboard_restarts(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        a = setup.index('dash_font_step "$LIBDIR/bin/ollama1-dash" /dev/tty1')
+        self.assertLess(a, setup.index("run systemctl restart ollama1-dash.service"))
+        self.assertGreater(a, setup.index("run systemctl enable ollama1-dash.service"))
+        self.assertIn("--no-console-font) export OLLAMA1_DASH_FONT=off", setup)
+        self.assertIn("OLLAMA1_DASH_FONT=$(printf '%q' \"$OLLAMA1_DASH_FONT\")", setup)    # survives the tmux relaunch
+        unit = open(os.path.join(U.KIT, "systemd", "ollama1-dash.service")).read()
+        self.assertIn("ExecStartPre=-+/usr/local/lib/ollama1/bin/ollama1-dash --set-font /dev/tty1", unit)
+        self.assertIn("User=o1dash", unit)
+        self.assertIn("TTYPath=/dev/tty1", unit)
