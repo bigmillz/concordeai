@@ -9,6 +9,82 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b355 — draw on a picture you attached
+Patrick (2026-10-01): "I paste it in a map and ask the app to draw over it
+showing good neighborhoods for an Airbnb, but it was unable to modify the
+photo. It should be able to do this sort of modification to images." He chose
+(2026-10-02) to have the APP draw, not a cloud image-edit model: the model says
+where, the app paints. Free, private, and it works with any model that can read
+a picture.
+
+- THE GATE. `annotate_wants()` (server, in the `image annotate` block) reads the
+  request: an imperative mark/draw/highlight/circle/label/outline/point-out
+  clause, "show me where ... on the map", or a passive "I'd like the good areas
+  highlighted". It splits a message into sentences and clauses and only looks at
+  the START of each, after "can you / I want you to / please", so a noun use
+  ("what does the label say?"), a question ("how to draw a circle in CSS"),
+  "draw me a cat" and "outline the key points of this chart" all pass through
+  unchanged. It FAILS CLOSED: no match, and the picture goes the way it always
+  did. A follow-up gate (`annotate_edit_wants`) adds the change words (bigger,
+  move, remove, also, recolor ...) but only when the last assistant turn holds
+  an annotate fence and the message is not a question.
+- THE GRID COPY. Small vision models cannot give pixel coordinates, but they
+  read a printed grid. No image library is imported by the app (PIL exists in the
+  venv but not on every install), so the PAGE makes it: when a picture is
+  attached, `addImageFile` also draws columns A-J, rows 1-10, and 0.1-0.9 ticks
+  on a copy (`annGrid`) and rides it beside the original as `grid_images`. The
+  server uses the copy only when the gate fires, in place of the original, on the
+  same route the original would have taken (the vision-model rule is untouched,
+  no new route to the cloud). The copy is never shown or saved; the shapes are
+  drawn on the original. Both go over localhost only.
+- THE ANSWER. The prompt (`annotate_instruction`) asks for prose plus ONE fenced
+  block, ```annotate, of `{"shapes":[...]}` in 0..1 coordinates from the
+  top-left: rect/ellipse (x, y, w, h), polygon, arrow/line (points), label; text
+  at most 40 characters, a "#rrggbb" colour, a "note" for the legend, 30 shapes
+  at most, and the FULL block again on a change.
+- ITERATING. The previous annotate JSON is already in the assistant message the
+  page sends back. The follow-up has no picture of its own, so the page sends the
+  chat's newest one as `prev_image`/`prev_grid`; the server takes it only when
+  the follow-up gate fires, and ignores it otherwise.
+- THE RENDERER. A closed ```annotate fence in a chat that has a picture becomes a
+  card: the ORIGINAL (from this session's memory of what was attached, never a
+  URL) with a canvas over it, a legend of the notes, and Save image / Copy.
+  `annParse` is the only reader of the JSON: JSON.parse in a try, every number
+  clamped to 0..1, a shape may not spill past the edge, colour a strict
+  #rrggbb or a palette default, text stripped of control and bidi characters and
+  cut, anything else dropped, 30 shapes. Text only ever reaches the page through
+  canvas fillText and textContent. The card is stashed behind a placeholder while
+  renderMD's inline rules run (the same trick as the download box), so a note
+  that says `**x**` or `[a](http://...)` cannot reach its attribute. An open
+  (still streaming) fence draws nothing, and an invalid or empty closed one, or a
+  chat with no picture, stays the plain code card it was. Sizes are a function of
+  the canvas alone, so the screen and the saved file carry the same marks. The
+  overlay follows the picture with a ResizeObserver.
+- SAVE. The desktop app cannot download through WKWebView, so Save follows the
+  export boxes: the page flattens original+shapes to a PNG on a canvas, POSTs it to
+  `/api/annotate/save`, which writes it into exports/ as an opaque id (PNG
+  signature checked, 16 MB cap, the page's own .meta) and, when asked
+  (`reveal`), shows it in Finder. A browser, or a failed reveal, downloads it by
+  id through `apiDownload`, and a failed POST falls back to a blob download.
+  Copy puts the same PNG on the clipboard (`ClipboardItem` given a promise, so
+  Safari's gesture rule holds).
+- NOT KEPT. The picture is in this window's memory, not in the saved chat, so a
+  restart shows an old annotate block as a plain code card. Save image is the way
+  to keep one. With several pictures attached the marks go on the first.
+- VERIFIED. Nine gauntlet checks: the gate against a corpus (23 positive, 27
+  negative, edit phrasings) with five source mutations; the handler's wiring run
+  for real on nine stand-in requests; the instruction text; the save endpoint
+  live (real PNG in, bytes out, refusals); the page's parser, renderer and
+  geometry in node (valid, clamped, 60 shapes, junk, hostile strings, partial
+  JSON at every prefix, two scales, grid labels) with eleven mutations; and the
+  served-page pins with seven. Seen in the Browser pane (Blink) with a stubbed
+  picture and a written block at 1000 and 420 px wide: the marks land on the same
+  features at both, a streamed answer draws nothing until the fence closes, Save
+  wrote a 1280x800 PNG whose stroke pixel is the right colour, Copy delivered an
+  image/png. NOT SEEN in WKWebView, the shipped renderer, and NOT SEEN with a
+  real vision model: how well local models place shapes from the grid is
+  unproven.
+
 ## 6b351 — the benchmark's "Compare with..." crosses this computer, servers and the cloud
 Patrick (2026-10-02), with a screenshot of the benchmark pane mid-run on This
 computer: "to make it so that for comparing results, you can compare between
