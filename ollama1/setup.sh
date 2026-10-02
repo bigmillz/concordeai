@@ -16,11 +16,13 @@
 #   sudo ./setup.sh --remove-encrypted-swap  undo that
 #   sudo ./setup.sh --vg-reserve 64G  when growing / the first time, leave 64G free
 #                                    in ubuntu-vg (e.g. for --encrypted-swap); default 0
-#   sudo ./setup.sh --no-gpu-tune    leave the graphics card at stock (also: OLLAMA1_GPU_TUNE=0);
-#                                    the default tunes an AMD Navi 21 card (ollama1-gpu-tune):
-#                                    its highest power limit and a small memory-clock bump.
-#                                    Saved; --gpu-tune turns it back on (and tries again after
-#                                    a safety revert)
+#   sudo ./setup.sh --gpu-tune       opt in (also: OLLAMA1_GPU_TUNE=1): tune an AMD Navi 21
+#                                    card (ollama1-gpu-tune): its highest power limit and a
+#                                    small memory-clock bump. OFF unless asked. Saved in
+#                                    setup.env, so a re-run keeps it; --gpu-tune also tries
+#                                    again after a safety revert
+#   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
+#                                    to stock, and the setting saved as off
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # Settings (each is asked for if it is not given and cannot be found):
@@ -212,7 +214,7 @@ resolve_settings() {
   pick HDD1_SERIAL "$A_HDD1" HDD1_SERIAL "" valid_serial
   pick HDD2_SERIAL "$A_HDD2" HDD2_SERIAL "" valid_serial
   GPU_TUNE=$(gpu_tune_choice "$A_GPU_TUNE" "${OLLAMA1_GPU_TUNE:-}" "$(saved GPU_TUNE)") \
-    || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"
+    || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
 }
 
 # After the relaunch in tmux (a prompt needs the terminal): ask for what is
@@ -247,7 +249,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
         "$SERVER_NAME" "$ADMIN_USER" "$HOME_LAN" "$CF_ZONE" "$OWNER" "$TIMEZONE"
       printf 'OS_SERIAL=%s\nMODELS_SERIAL=%s\nHDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' \
         "$OS_SERIAL" "$MODELS_SERIAL" "$HDD1_SERIAL" "$HDD2_SERIAL"
-      printf 'GPU_TUNE=%s\n' "$GPU_TUNE"
+      if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
     } >"$t" )
   chown root:root "$t"; chmod 0600 "$t"; mv "$t" "$SAVED"
 }
@@ -295,8 +297,10 @@ policy_line() { # which Access policy name the admin panel's access uses, and wh
 gpu_tune_plan() { # the plan's line for the graphics card (6b361)
   if [ "$GPU_TUNE" = on ]; then
     printf 'Graphics card tuning ON (AMD Navi 21 only): its highest power limit, memory clock +100 (within its range), a 60 s check; kernel overdrive switch, so a reboot. Off: --no-gpu-tune'
-  else
+  elif [ "$GPU_TUNE" = off ]; then
     printf 'Graphics card tuning OFF (--no-gpu-tune): the card stays at stock. On: --gpu-tune'
+  else
+    printf 'Graphics card tuning: off unless you ask (--gpu-tune; AMD Navi 21 only; see the README). Nothing changes'
   fi
 }
 
@@ -959,12 +963,13 @@ fi
 ok "the gateway's user can't read the pairing window (o1gw: $(id -nG o1gw))"
 
 # ---- 14. graphics card tuning (6b361) ---------------------------------------------------------
-# On by default for an AMD Navi 21 card (RX 6800/6900 series): its highest power limit and the
+# OFF unless asked (--gpu-tune or OLLAMA1_GPU_TUNE=1; the choice is saved in setup.env, so a re-run
+# keeps it). For an AMD Navi 21 card (RX 6800/6900 series): its highest power limit and the
 # memory clock +100 in the driver's units, clamped to what the card reports, checked under load
 # (lib/o1gputune.py). The memory clock needs the kernel's overdrive switch: only the overdrive
 # bit (0x4000) is added to the amdgpu feature mask the driver runs with now, in a GRUB drop-in,
 # so it takes a reboot. --no-gpu-tune (or OLLAMA1_GPU_TUNE=0) puts the card back to stock and
-# takes the drop-in out. A safety revert or an admin's "ollama1-gpu-tune off" is kept on a
+# takes the drop-in out; with neither asked, nothing here changes anything. A safety revert or an admin's "ollama1-gpu-tune off" is kept on a
 # re-run; --gpu-tune tries again.
 step "Graphics card tuning"
 GPU_DROPIN=/etc/default/grub.d/97-amdgpu-overdrive.cfg
@@ -991,6 +996,8 @@ if [ "$GPU_TUNE" = on ]; then
   else
     note "$("$TUNE" grub-cfg 2>&1 >/dev/null || true)"
   fi
+elif [ "$GPU_TUNE" = default ]; then
+  ok "graphics card tuning is off (it is opt-in): for an AMD Navi 21 card, run setup again with --gpu-tune (what it does: the README's \"Graphics card tuning\")"
 else
   if systemctl is-enabled --quiet ollama1-gpu-tune.service 2>/dev/null; then
     "$TUNE" setup off || note "ollama1-gpu-tune couldn't put the card back to stock (see above)"

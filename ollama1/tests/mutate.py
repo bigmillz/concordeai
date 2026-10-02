@@ -833,6 +833,9 @@ MUTANTS = [
      ["test_gputune"]),
     ("gpu-tune: not set again after a wake", "config/ollama1-sleep-hook",
      "      systemctl start --no-block ollama1-gpu-tune.service", "      true", ["test_gputune"]),
+    ("gpu-tune: on by default again", "lib/setuplib.sh", "  echo default\n}", "  echo on\n}", ["test_gputune"]),
+    ("gpu-tune: a saved on is not kept by a re-run", "lib/setuplib.sh", 'for v in "$1" "$2" "$3"; do',
+     'for v in "$1" "$2"; do', ["test_gputune"]),
     ("gpu-tune: setup's opt-out ignored", "lib/setuplib.sh",
      "off|0|no|false) echo off; return 0 ;;", "off|0|no|false) echo on; return 0 ;;", ["test_gputune"]),
 ]

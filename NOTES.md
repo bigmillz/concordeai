@@ -14,6 +14,12 @@ Patrick (2026-10-02) asked for "a bit more power limit and a modest VRAM clock
 bump on the RX 6900 XT, about 5% faster replies", and chose "Yes, and turn it
 on" (applied when he next runs setup). Then, same day: "Let the GPU use as much
 power as it wants." So the power limit is the card's own maximum, not +10%.
+THEN (same day, the coordinator): the kit is public, so it is OFF by default
+and opt-in (`--gpu-tune`, `OLLAMA1_GPU_TUNE=1`), the choice saved in setup.env
+so a re-run without the flag keeps it (Pat's own server is set up with
+`--gpu-tune`). AND, nothing about tuning is to be applied to Pat's server until
+he says the machine is stable (a separate drive drop-out problem is being
+chased): the code is merged-ready, the server run is on hold.
 Token generation reads every weight once per token, so it is bound by the
 card's memory bandwidth: the memory clock is the lever, and the power limit
 keeps the clocks up under load.
@@ -79,11 +85,13 @@ UNITS, SETUP, SLEEP
   No `ProtectKernelTunables` (it writes sysfs), no network.
   `ollama1-gpu-tune-check.service`: `After=ollama.service`, localhost only.
 - setup.sh step 14 "Graphics card tuning", after the services (so the check
-  can load a model). On by default; `--no-gpu-tune` / `OLLAMA1_GPU_TUNE=0`
-  (flag > environment > `GPU_TUNE` in setup.env > on) puts the card back,
-  disables the units and removes the drop-in. First run: `on`; later runs:
-  the saved choice (`apply`), keeping a revert or an admin's off; an explicit
-  `--gpu-tune` forces `on`. `sudo ollama1-gpu-tune` is linked in
+  can load a model). OFF unless asked: `--gpu-tune` / `OLLAMA1_GPU_TUNE=1`
+  (flag > environment > `GPU_TUNE` in setup.env > nothing asked, which
+  changes nothing and prints one plain line that the option exists; only a
+  choice made is written to setup.env). `--no-gpu-tune` / `OLLAMA1_GPU_TUNE=0`
+  puts the card back, disables the units and removes the drop-in, saved as
+  off. First `on`: `on`; later runs: the saved choice (`apply`), keeping a
+  revert or an admin's off; an explicit `--gpu-tune` flag forces `on`. `sudo ollama1-gpu-tune` is linked in
   /usr/local/sbin.
 - Suspend: amdgpu restores the user's power limit and overdrive table on
   resume (`smu_restore_dpm_user_profile`, as I read the driver), but the sleep
@@ -109,7 +117,7 @@ FLAGGED, NOT CHANGED
 - A hard hang outside the check that logs nothing is not caught (only the
   log of the boot it last ran in is read).
 
-TESTS: `tests/test_gputune.py` (51): fixture sysfs trees (Navi 21's table
+TESTS: `tests/test_gputune.py` (53): fixture sysfs trees (Navi 21's table
 with OD_MCLK and OD_RANGE, an older card's mV table, no table, no power
 limits, NVIDIA, RDNA3, the HDMI audio function, the card renumbered between
 card0 and card1), a stand-in driver that refuses a power limit above max and a
@@ -118,19 +126,22 @@ Ollama, kernel log and clock: max power, the clamp, the mask keeping every
 other bit, each revert (kernel error mid-load, junction, memory, slower, the
 earlier boot, a wake, a check that never ended, Ctrl-C), a revert never
 re-applied, no model then the pending check, setup's choice, status, the
-command, the units, the sleep hook, setup.sh's flags. mutate.py: 18 new
+command, the units, the sleep hook, setup.sh's flags (off by default, flag,
+environment, a saved on kept by a re-run, the explicit off, the flag beating the
+environment). mutate.py: 20 new
 mutants (no clamp, card by number, mask 0xffffffff, power not max or above
 max, no revert, the check running on, the earlier boot unread or ignored, the
 never-ended check, re-apply after a revert at boot and in apply, both
 temperature limits, slower kept, level left manual, no re-set after a wake,
-setup's opt-out ignored), all killed. Kit suite green.
+setup's opt-out ignored, on by default again, a saved on not kept), all killed. Kit suite green.
 
 NOT VERIFIED (no card here): the OD_RANGE text on kernel 7.0 (parsed as
 sienna_cichlid prints it, case-insensitive "Mhz"/"MHz"); whether writes need
 `manual`; whether 2150 MHz and the maximum power are stable on this card;
 `journalctl --since @<epoch>` and `-b <id>` inside the unit's sandbox; a real
-suspend and resume with the values set; the real speed-up. Pat: re-run setup,
-reboot, `sudo ollama1-gpu-tune status`.
+suspend and resume with the values set; the real speed-up. When Pat says the machine is
+stable: `sudo bash ~/concordeai/ollama1/setup.sh ... --gpu-tune`, reboot,
+`sudo ollama1-gpu-tune status`. NOT before.
 
 ## 6b352 — Find in chat (Cmd+F / Ctrl+F)
 Patrick (2026-10-02): "Command or Control F should open a find box for the

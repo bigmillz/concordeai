@@ -75,8 +75,9 @@ valid_owner() { local rx='^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$'; [[ "$1" =~ $rx ]]
 valid_tz() { [[ "$1" =~ ^[A-Za-z0-9_+/-]{1,40}$ ]]; }
 valid_serial() { [[ "$1" =~ ^[A-Za-z0-9_.-]{4,40}$ ]]; }
 
-gpu_tune_choice() { # FLAG ENV SAVED -> "on" or "off" (6b361): the flag, else the environment
-  # (OLLAMA1_GPU_TUNE), else what an earlier run saved, else on. Fails on a value it doesn't know.
+gpu_tune_choice() { # FLAG ENV SAVED -> "on", "off" or "default" (6b361): the flag, else the environment
+  # (OLLAMA1_GPU_TUNE), else what an earlier run saved, else "default" = nothing was asked: OFF, and
+  # setup says the option exists. Fails on a value it doesn't know.
   local v
   for v in "$1" "$2" "$3"; do
     case "$v" in
@@ -86,7 +87,7 @@ gpu_tune_choice() { # FLAG ENV SAVED -> "on" or "off" (6b361): the flag, else th
       *) return 1 ;;
     esac
   done
-  echo on
+  echo default
 }
 
 saved() { # KEY -> its value from the file an earlier run wrote, if any

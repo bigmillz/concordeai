@@ -701,41 +701,63 @@ class TestSystemPieces(unittest.TestCase):
         return r.returncode, r.stdout.strip()
 
     def test_choice(self):
-        for args, want in ((('""', '""', '""'), "on"), (("off", '""', '""'), "off"), (('""', "0", '""'), "off"),
+        for args, want in ((('""', '""', '""'), "default"), (("off", '""', '""'), "off"), (('""', "0", '""'), "off"),
                            (('""', '""', "off"), "off"), (("on", '""', "off"), "on"), (('""', "1", "off"), "on"),
-                           (('""', '""', "on"), "on")):
+                           (('""', '""', "on"), "on"), (('""', "0", "on"), "off"), (("on", "0", '""'), "on"),
+                           (('""', "1", '""'), "on")):
             self.assertEqual(self.bash("gpu_tune_choice " + " ".join(args)), (0, want), args)
         self.assertEqual(self.bash('gpu_tune_choice "" "" maybe')[0], 1)
 
 
 class TestSetupFlags(unittest.TestCase):
     def plan(self, *args, **env):
+        base = {k: v for k, v in os.environ.items() if k not in ("OLLAMA1_GPU_TUNE", "SAVED")}
+        env = dict(base, **env)
         r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh"), "--plan"] + list(args), capture_output=True,
-                           text=True, stdin=subprocess.DEVNULL, timeout=30, env=dict(os.environ, **env))
+                           text=True, stdin=subprocess.DEVNULL, timeout=30, env=env)
         return r.returncode, r.stdout + r.stderr
 
-    def test_on_by_default(self):
+    def saved_file(self, text):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        path = os.path.join(d, "setup.env")
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+
+    def test_off_unless_asked_and_says_so(self):
         code, out = self.plan()
         self.assertEqual(code, 0, out)
-        self.assertIn("Graphics card tuning ON", out)
+        self.assertIn("Graphics card tuning: off unless you ask (--gpu-tune", out)
+        self.assertNotIn("tuning ON", out)
 
-    def test_opt_out(self):
+    def test_opt_in_by_flag_or_environment(self):
+        for args, env in ((("--gpu-tune",), {}), ((), {"OLLAMA1_GPU_TUNE": "1"})):
+            code, out = self.plan(*args, **env)
+            self.assertEqual(code, 0, out)
+            self.assertIn("Graphics card tuning ON", out)
+
+    def test_explicit_off(self):
         for args, env in ((("--no-gpu-tune",), {}), ((), {"OLLAMA1_GPU_TUNE": "0"})):
             code, out = self.plan(*args, **env)
             self.assertEqual(code, 0, out)
             self.assertIn("Graphics card tuning OFF", out)
 
-    def test_flag_beats_environment_and_saved(self):
-        d = tempfile.mkdtemp()
-        try:
-            saved = os.path.join(d, "setup.env")
-            with open(saved, "w") as f:
-                f.write("GPU_TUNE=off\n")
-            self.assertIn("tuning OFF", self.plan(SAVED=saved)[1])
-            self.assertIn("tuning ON", self.plan("--gpu-tune", SAVED=saved)[1])
-            self.assertIn("tuning ON", self.plan("--gpu-tune", OLLAMA1_GPU_TUNE="0")[1])
-        finally:
-            shutil.rmtree(d)
+    def test_a_saved_on_is_kept_by_a_rerun_without_the_flag(self):
+        saved = self.saved_file("GPU_TUNE=on\n")
+        self.assertIn("tuning ON", self.plan(SAVED=saved)[1])
+        self.assertIn("tuning OFF", self.plan("--no-gpu-tune", SAVED=saved)[1])
+        self.assertIn("tuning OFF", self.plan(SAVED=saved, OLLAMA1_GPU_TUNE="0")[1])
+        off = self.saved_file("GPU_TUNE=off\n")
+        self.assertIn("tuning OFF", self.plan(SAVED=off)[1])
+        self.assertIn("tuning ON", self.plan("--gpu-tune", SAVED=off)[1])
+        self.assertIn("tuning ON", self.plan("--gpu-tune", OLLAMA1_GPU_TUNE="0")[1])
+        self.assertIn("off unless you ask", self.plan(SAVED=self.saved_file("OWNER=x\n"))[1])
+
+    def test_the_choice_is_saved_only_when_asked(self):
+        s = open(os.path.join(U.KIT, "setup.sh")).read()
+        self.assertIn('if [ "$GPU_TUNE" != default ]; then printf \'GPU_TUNE=%s\\n\' "$GPU_TUNE"; fi', s)
+        self.assertIn('elif [ "$GPU_TUNE" = default ]; then', s)       # the step: a plain line, no change
 
     def test_bad_values_are_refused(self):
         code, out = self.plan(OLLAMA1_GPU_TUNE="maybe")

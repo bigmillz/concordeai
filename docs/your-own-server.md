@@ -289,8 +289,9 @@ must be what suspend uses: `cat /sys/power/mem_sleep` shows `[deep]`.
 
 ## Graphics card tuning
 
-With an AMD Navi 21 card (RX 6800, 6800 XT, 6900 XT, 6950 XT), setup turns on
-a small tune: the card's highest power limit (the most the driver allows it)
+Off unless you ask. With an AMD Navi 21 card (RX 6800, 6800 XT, 6900 XT,
+6950 XT), `sudo ./setup.sh --gpu-tune` turns on a small tune (setup saves the
+choice, so running it again without the flag keeps it): the card's highest power limit (the most the driver allows it)
 and its memory clock +100 in the driver's units (GDDR6 runs at twice that),
 never past the range the card reports. Core clocks and voltages are left
 alone. The aim is about 5% faster token generation on models that fit the
@@ -302,7 +303,7 @@ starts after a reboot. A 60-second check under load follows; an amdgpu error
 in the kernel log, the junction at 105 C, the memory at 100 C or slower answers
 put the card back to stock, where it stays until `sudo ollama1-gpu-tune on`.
 `sudo ollama1-gpu-tune off` puts it back to stock yourself; `setup.sh
---no-gpu-tune` leaves it off for good. Any other card is left alone. The
+--no-gpu-tune` is the explicit off. Any other card is left alone. The
 details are in the kit's README, "Graphics card tuning".
 
 ## Choosing models
