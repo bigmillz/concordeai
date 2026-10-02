@@ -18231,7 +18231,7 @@ def server_add(ctx, d: dict) -> dict:
     url, why = _srv_url(d.get("url"))
     if why:
         return {"err": why}
-    name = _srv_name(d.get("name")) or "Desktop"
+    name = _srv_name(d.get("name")) or "My server"   # a blank name (6b358, per Patrick)
     aid, asec, why = _srv_token(d.get("access_id"), d.get("access_secret"))
     if why:
         return {"err": why}

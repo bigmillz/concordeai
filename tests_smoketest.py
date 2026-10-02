@@ -18070,7 +18070,7 @@ def _svc_input(src):
     a1 = ns2["server_add"](ctx2, {"url": "https://a.example.com"})
     a2 = ns2["server_add"](ctx2, {"url": "https://b.example.com"})
     a3 = ns2["server_add"](ctx2, {"url": "https://a.example.com", "name": "Other"})
-    got["names"] = (a1["server"]["name"] == "Desktop" and a2["server"]["name"] == "Desktop 2"
+    got["names"] = (a1["server"]["name"] == "My server" and a2["server"]["name"] == "My server 2"
                     and "already" in a3.get("err", ""))
     return all(got.values()), got
 

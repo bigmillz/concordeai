@@ -9,6 +9,14 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b358 — a server added with no name is "My server"
+Patrick (2026-10-02), asked whether to change the blank-name fallback for a new
+server from "Desktop": "Call it \"My server\"". `server_add` now names it "My
+server" (then "My server 2" and so on, the existing uniqueness rule), matching
+the add form's placeholder ("Name: My server") and the "server, not desktop"
+wording (6b347). Existing servers keep the names they have. The servers check's
+names case now expects "My server" / "My server 2".
+
 ## 6b352 — Find in chat (Cmd+F / Ctrl+F)
 Patrick (2026-10-02): "Command or Control F should open a find box for the
 current chat."
