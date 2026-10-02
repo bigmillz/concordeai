@@ -9,6 +9,27 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b350 — Settings rail: one Models row that opens Local, Cloud and Servers
+Patrick (2026-10-02), with a screenshot of the rail's Cloud power, Models and
+Your servers rows: "Can we consolidate these three settings tabs under one that
+says models and has an arrow next to it to the left of it to expand it into
+local, cloud, and servers."
+
+The rail now has one row, Models, with an arrow at its left (a small triangle
+that turns down when it is open). It opens three rows set in under it: Local
+(the old Models pane), Cloud (the old Cloud power pane) and Servers (the old
+Your servers pane). The panes and their ids are unchanged, so every link into
+them still works, and any pane under Models opens the group and marks the row
+(`modelsGroup`, `.has-on`), including when the pane is opened from elsewhere in
+the app. Closed by default, which also gives the rail back two rows (6b325 had
+squeezed six rows into the height of five). The rail's click wiring is now on
+`.snav[data-pane]`, since the Models row opens a group and has no pane. Messages
+elsewhere still say "Settings \u203a Cloud power" and "Settings \u203a Your servers";
+they are left as they are (many tests pin them), so a follow-up pass should
+reword them to "Models \u203a Cloud" and "Models \u203a Servers". One gauntlet
+check pins the markup, the wiring and the CSS, with five mutations; the nav
+order test now expects Local, Cloud, Servers. Not seen in WKWebView.
+
 ## 6b349 — a table with a header and no rows is a line, not an empty grid
 Patrick (2026-10-02), with a screenshot of a retirement-visa answer from the
 server's model that ended in a four-cell grid with headings and nothing under

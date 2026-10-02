@@ -4509,6 +4509,8 @@ check("settings: descriptions + Account pane + scoped forget",
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
 _want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models", "p-servers", "p-usage"]
+# the nav lists Models' three panes as Local, Cloud, Servers (6b350); the panes keep their own order
+_want_nav = ["p-about", "p-account", "p-persona", "p-models", "p-cloud", "p-servers", "p-usage"]
 _gtip = page.split('id="giants-row"')[1].split('</label>')[0]
 check("the served page names the giants' real need",
       "Include models for 512 GB+ systems" in page and "128 GB+" not in page
@@ -5186,7 +5188,7 @@ check("the card's lifecycle: a model ready with the bar at 0 ends the card (Patr
       and '<button class="about-btn" id="new-bg" hidden>Run in background</button>' in page
       and '$("#new-bg").onclick=()=>{stopPoll();veil.hidden=true;};' in page, "%r" % _lc)
 check("About leads the rail, Account right under it",
-      _nav == _want and _panes == _want
+      _nav == _want_nav and _panes == _want
       and '<button class="snav on" data-pane="p-about">About</button>' in page
       and '<section class="spane on" id="p-about">' in page
       and "p-updates" not in page
@@ -8333,6 +8335,37 @@ def _pt_ok(r):
 _pt_mut = page[_pt0:_pt1].replace('if(rows.length<3)return', 'if(false)return', 1)
 check("a header-only pipe table is a line of its cells; a table with rows still renders (node)",
       _pt_ok(_pt) and _pt_mut != page[_pt0:_pt1] and not _pt_ok(_pt_run(_pt_mut)), "%r" % _pt)
+
+# Settings rail (6b350, per Patrick: "consolidate these three settings tabs under one that says models and has
+# an arrow next to it to the left of it to expand it into local, cloud, and servers")
+def _mg_ok(p):
+    try:
+        return _mg_ok1(p)
+    except ValueError:                   # a mutation that removes an anchor fails the check
+        return False
+def _mg_ok1(p):
+    rail = p[p.index('<div id="set-nav">'):][:2200]
+    return ('id="snav-models" type="button"' in rail and 'aria-expanded="false" aria-controls="snav-models-kids"' in rail
+            and 'class="snav-chev" aria-hidden="true">&#9656;</span>Models</button>' in rail
+            and '<div id="snav-models-kids" hidden>' in rail
+            and rail.index('data-pane="p-models">Local<') < rail.index('data-pane="p-cloud">Cloud<')
+            < rail.index('data-pane="p-servers">Servers<') < rail.index('data-pane="p-usage">Usage<')
+            and 'Cloud power</button>' not in rail and 'Your servers</button>' not in rail
+            and 'function modelsGroup(open){' in p and "if(kid)modelsGroup(true);" in p
+            and 'g.setAttribute("aria-expanded",open?"true":"false");k.hidden=!open;' in p
+            and '$$(".snav[data-pane]").forEach(b=>b.addEventListener("click",()=>settingsPane(b.dataset.pane)));' in p
+            and '$("#snav-models").addEventListener("click",()=>' in p
+            and '.snav-grp[aria-expanded="true"] .snav-chev{transform:rotate(90deg)}' in p
+            and ".snav-kid{padding-left:34px}" in p)
+_mg_mut = [page.replace('<div id="snav-models-kids" hidden>', '<div id="snav-models-kids">', 1),
+           page.replace("if(kid)modelsGroup(true);", "", 1),
+           page.replace('$$(".snav[data-pane]")', '$$(".snav")', 1),
+           page.replace('data-pane="p-cloud">Cloud<', 'data-pane="p-cloud">Cloud power<', 1),
+           page.replace('.snav-grp[aria-expanded="true"] .snav-chev{transform:rotate(90deg)}',
+                        '.snav-grp[aria-expanded="true"] .snav-chev{transform:none}', 1)]
+check("settings rail: Models opens Local, Cloud and Servers; a pane under it opens the group",
+      _mg_ok(page) and not any(_mg_ok(m_) for m_ in _mg_mut) and all(m_ != page for m_ in _mg_mut),
+      "%r" % ([_mg_ok(page), [_mg_ok(m_) for m_ in _mg_mut]],))
 
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
@@ -17779,7 +17812,7 @@ def _svc_page(src):
         and "      if(k[i.dataset.k]!=null)i.value=k[i.dataset.k];});" in src
         and "    if(i){i.focus();try{i.setSelectionRange(foc[2],foc[3]);}catch(e){}}" in src
         and "  srvMsgs[id]=t||\"\";" in src,
-        "pane": 'data-pane="p-servers">Your servers</button>' in src
+        "pane": 'data-pane="p-servers">Servers</button>' in src
         and 'if(id==="p-servers")loadServers(true).then(srvSleepLoadAll);' in src and 'api("/api/servers' in src
         and 'fetch("/api/servers' not in src,
     }

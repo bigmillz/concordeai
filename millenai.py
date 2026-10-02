@@ -31928,6 +31928,14 @@ body.gen #chip-model{color:var(--accent)}
   border-left-color:#ececec}
 .snav:focus-visible{outline:2px solid rgba(255,255,255,.35);
   outline-offset:-2px}
+/* the Models group (6b350): an arrow at the left that turns down when it is open,
+   and its three panes set in under it */
+.snav-grp{display:flex;align-items:center;gap:7px}
+.snav-chev{display:inline-block;width:9px;font-size:9px;line-height:1;
+  transition:transform .15s}
+.snav-grp[aria-expanded="true"] .snav-chev{transform:rotate(90deg)}
+.snav-grp.has-on{color:var(--text)}
+.snav-kid{padding-left:34px}
 #set-main{display:flex;flex-direction:column;min-width:0;min-height:0;
   overflow:hidden auto}
 /* the card is a GRID: without a bounded row track its items grow to
@@ -33492,9 +33500,18 @@ __CODE_ROWS__
         <button class="snav on" data-pane="p-about">About</button>
         <button class="snav" data-pane="p-account">Account</button>
         <button class="snav" data-pane="p-persona">Personality</button>
-        <button class="snav" data-pane="p-cloud">Cloud power</button>
-        <button class="snav" data-pane="p-models">Models</button>
-        <button class="snav" data-pane="p-servers">Your servers</button>
+        <!-- Models (6b350, per Patrick: "consolidate these three settings tabs
+             under one that says models and has an arrow next to it to the left
+             of it to expand it into local, cloud, and servers"): one row that
+             opens its three panes. The panes keep their ids. -->
+        <button class="snav snav-grp" id="snav-models" type="button"
+          aria-expanded="false" aria-controls="snav-models-kids"><span
+          class="snav-chev" aria-hidden="true">&#9656;</span>Models</button>
+        <div id="snav-models-kids" hidden>
+          <button class="snav snav-kid" data-pane="p-models">Local</button>
+          <button class="snav snav-kid" data-pane="p-cloud">Cloud</button>
+          <button class="snav snav-kid" data-pane="p-servers">Servers</button>
+        </div>
         <button class="snav" data-pane="p-usage">Usage</button>
       </div>
     </nav>
@@ -40469,8 +40486,16 @@ $("#sb-resize").addEventListener("dblclick",()=>setSidebar(300));
 /* ---------------------------------------------------------------- about */
 const aboutVeil=$("#about-veil");
 // settings rail: one pane at a time
+function modelsGroup(open){
+  const g=$("#snav-models"),k=$("#snav-models-kids");if(!g||!k)return;
+  g.setAttribute("aria-expanded",open?"true":"false");k.hidden=!open;
+}
 function settingsPane(id){
   $$(".snav").forEach(x=>x.classList.toggle("on",x.dataset.pane===id));
+  // a pane under Models opens the group and marks it (6b350)
+  const kid=!!$('#snav-models-kids .snav[data-pane="'+id+'"]');
+  if(kid)modelsGroup(true);
+  const mg=$("#snav-models");if(mg)mg.classList.toggle("has-on",kid);
   $$(".spane").forEach(p=>p.classList.toggle("on",p.id===id));
   const bd=$("#about-body"); if(bd)bd.scrollTop=0;
   if(id==="p-usage")loadUsage();      // fresh numbers on every visit (6b325)
@@ -42228,7 +42253,9 @@ upGo.addEventListener("click",async()=>{
     }
   },700);
 });
-$$(".snav").forEach(b=>b.addEventListener("click",()=>settingsPane(b.dataset.pane)));
+$$(".snav[data-pane]").forEach(b=>b.addEventListener("click",()=>settingsPane(b.dataset.pane)));
+$("#snav-models").addEventListener("click",()=>
+  modelsGroup($("#snav-models").getAttribute("aria-expanded")!=="true"));
 
 syncSuggest();                      // starter prompts, if the hero is up
 addEventListener("resize",()=>{     // a narrower window fits fewer chips
