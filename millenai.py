@@ -5716,7 +5716,7 @@ def _clean_title(raw: str) -> str:
         else ""
 
 
-def make_title(text: str, conf=None, server=None) -> str:
+def make_title(text: str, conf=None, server=None, local: bool = True) -> str:
     """Name a chat with a small model — reusing whatever engine is already
     loaded, so it costs almost nothing. A chat the cloud answered is
     named by that provider's quick model instead (6b308): a keys-only
@@ -5746,6 +5746,13 @@ def make_title(text: str, conf=None, server=None) -> str:
                 timeout=15, max_tokens=300, quiet=True))
             if t:
                 return t
+    # the person's server before this computer (6b357); one that answered
+    # with no usable title is not asked again on this computer
+    t = server_side_text([{"role": "user", "content": TITLE_PROMPT + text[:600]}])
+    if t is not None:
+        return _clean_title(t)
+    if not local:
+        return ""
     pulled = ollama_pulled_tags() or set()
     usable = [l for l in MODEL_ROUTES
               if model_cached(l, pulled) and model_fits_memory(l)
@@ -6709,18 +6716,22 @@ def _refine_with_model(prev_subject: str, said: str) -> str:
     same rule). Returns "" when there is nothing suitable or the answer
     does not look like a prompt."""
     try:
-        pulled = ollama_pulled_tags() or set()
-        live = [l for l in MODEL_ROUTES
-                if MODEL_ROUTES[l][0] == "mlx" and model_cached(l, pulled)
-                and _engine_up(MODEL_ROUTES[l][1])]
-        if not live:
-            return ""
-        parts = []
-        run_model(live[0], [{"role": "user",
-                             "content": _REFINE_PROMPT % (prev_subject,
-                                                          said)}],
-                  parts.append)
-        out = " ".join(strip_think(strip_special("".join(parts))).split())
+        # the person's server first (6b357), then a model already resident here
+        out = server_side_text([{"role": "user", "content": _REFINE_PROMPT % (prev_subject, said)}])
+        if out is None:
+            pulled = ollama_pulled_tags() or set()
+            live = [l for l in MODEL_ROUTES
+                    if MODEL_ROUTES[l][0] == "mlx" and model_cached(l, pulled)
+                    and _engine_up(MODEL_ROUTES[l][1])]
+            if not live:
+                return ""
+            parts = []
+            run_model(live[0], [{"role": "user",
+                                 "content": _REFINE_PROMPT % (prev_subject,
+                                                              said)}],
+                      parts.append)
+            out = "".join(parts)
+        out = " ".join(strip_think(strip_special(out)).split())
         out = out.split("\n")[0].strip().strip('"\u201c\u201d\'*`')
         out = re.sub(r"^(?:prompt|new prompt|here(?:'s| is)[^:]*)\s*:\s*",
                      "", out, flags=re.I).strip()
@@ -12814,9 +12825,12 @@ def _extract_memory(label: str, user_msg: str, base, conf=None,
         else:
             if not label:
                 return
-            parts = []
-            run_model(label, ask, parts.append)
-            out = "".join(parts)
+            # a model of this computer's: the person's server first (6b357)
+            out = None if server_label(label) else server_side_text(ask, base)
+            if out is None:
+                parts = []
+                run_model(label, ask, parts.append)
+                out = "".join(parts)
         facts = [ln.strip()[2:].strip() for ln in out.splitlines()
                  if ln.strip().startswith("- ")]
         facts = [f for f in facts
@@ -17922,6 +17936,83 @@ def server_compositor(ctx, drafted=()):
     return top
 
 
+# THE SERVER TRUMPS THIS COMPUTER (6b357, Patrick, 2026-10-02: "only send it
+# to the Mac if the server doesn't have a model that can handle it.
+# Otherwise, for any user in any server, the server trumps anything run on
+# the local machine."). The side passes (a chat's title, the memory pass,
+# the place pins, an image prompt's rewrite, an export's title, a rescue)
+# and the Remote agent's planner ask the person's server first, under the
+# seats' rules (server_mode_candidates: this profile's paired servers with
+# the switch on, answering, "gpu" models that fit a reported card), inside
+# a first-word deadline; a failure marks the server down and the caller
+# runs what it ran before, on this computer.
+SRV_SIDE_FIRST_S = 30.0         # a side pass is small: a slow server is left for this computer
+
+
+def server_side_pick(ctx, role: str = "fast", effort: str = "fast"):
+    """The server model a side pass runs on, or None (no server qualifies).
+    "fast" wants a quick, competent instruction model (srv_rank)."""
+    cands = server_mode_candidates(ctx)
+    if not cands:
+        return None
+    top = srv_rank(cands, role, effort, server_speeds(ctx))
+    return top[0] if top else None
+
+
+def server_side_text(messages: list, ctx=None, role: str = "fast"):
+    """A side pass on ctx's server first (6b357): the text it wrote, or
+    None when no server qualifies or the one asked failed (marked down),
+    and the caller runs its own model as before."""
+    ctx = ctx if ctx is not None else bound_ctx()
+    m = server_side_pick(ctx, role)
+    if m is None:
+        return None
+    parts = []
+    try:
+        with server_first_deadline(SRV_SIDE_FIRST_S):
+            server_stream(m["label"], messages, parts.append)
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception as exc:
+        server_mark_down(ctx, m["server"], str(exc))
+        return None
+    return strip_think("".join(parts))
+
+
+def server_vision_pick(ctx):
+    """The model of ctx's server that reads a picture sent in a mode
+    (6b357), or None: a model that fits the card under the seats' rules and
+    that the server says reads pictures (Ollama's /api/show "capabilities"
+    holds "vision", asked through the gateway and remembered with the
+    server's last check). A coder, an embedding or a guard model never; the
+    strongest by size first; at most six asked a turn."""
+    cands = []
+    for m in server_mode_candidates(ctx):
+        f = _srv_flags(m["name"])
+        if not (f["embed"] or f["guard"] or f["coder"]):
+            cands.append(m)
+    if not cands:
+        return None
+    try:
+        ents = {e["id"]: e for e in _srv_read(ctx)}
+    except (StoreReadError, NoProfile):
+        return None
+    ranked = sorted(cands, key=lambda m: (m.get("params") is None, -(m.get("params") or 0.0),
+                                          m["label"]))
+    for m in ranked[:6]:
+        e = ents.get(m.get("sid"))
+        if e is None:
+            continue
+        try:
+            if _srv_reads_pictures(e, m["name"]):
+                return m
+        except (StaleProfile, BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception:
+            return None           # the server didn't answer: this computer reads it
+    return None
+
+
 def server_copy(tag: str, cands: list, speeds=None):
     """The server's copy of the model whose Ollama tag is `tag`, or None:
     an exact tag match ("gpt-oss:20b"; ":latest" is the bare name), so the
@@ -19043,8 +19134,8 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
         return server_stream(label, messages, emit)
     if "local-record" in TEST_HOOKS:
         # (a merge is told from a peer review by its own words)
-        _LOCAL_CALLS.append(("run", label, "Write ONE final answer" in str(
-            (messages[-1] or {}).get("content", ""))[:200] if messages else False))
+        _hc = str((messages[-1] or {}).get("content", "")) if messages else ""
+        _LOCAL_CALLS.append(("run", label, "Write ONE final answer" in _hc[:200], _hc[:40]))
         emit("LOCAL-ANSWER-" + label)
         return
     if label not in MODEL_ROUTES:
@@ -22178,6 +22269,10 @@ def run_council(labels: list, messages: list, emit, status,
                                       "showing the best single answer")
             _srv_step("done" if _ok else "fail", merger, emit)
             return
+        except (StaleProfile, BrokenPipeError, ConnectionResetError):
+            # the person stopped, closed the window or switched profiles:
+            # the server did nothing wrong, and nobody waits for a fallback
+            raise
         except Exception as _mex:
             _why = (str(_mex) if type(_mex).__name__ == "ServerError"
                     else "%s stopped answering." % _name)
@@ -22293,10 +22388,17 @@ def run_research(labels: list, messages: list, emit, status) -> None:
     question = messages[-1]["content"] if messages else ""
     usable = [l for l in labels
               if model_cached(l) and model_fits_memory(l)]
-    if not usable:
+    # the person's server plans and writes it first (6b357): its strongest
+    # general model, this computer's writer behind it
+    try:
+        _rs = server_compositor(bound_ctx(), ())
+    except NoProfile:
+        _rs = None
+    if not usable and _rs is None:
         raise RuntimeError("no model is available to research with")
     rank = {l: i for i, l in enumerate(MERGE_RANK)}
-    writer = min(usable, key=lambda l: rank.get(l, 99))
+    local_writer = min(usable, key=lambda l: rank.get(l, 99)) if usable else ""
+    writer = _rs["label"] if _rs is not None else local_writer
 
     # The user's own words always go first. A local model's knowledge stops
     # years before the question often does — asked about "macOS 26 Tahoe" it
@@ -22304,7 +22406,9 @@ def run_research(labels: list, messages: list, emit, status) -> None:
     # researched the wrong OS end to end. Searching verbatim first means the
     # planner can only ever add angles, never quietly replace the subject.
     queries = [question[:120]]
-    for q in _plan_queries(writer, question, status):
+    with server_first_deadline(SRV_SIDE_FIRST_S if server_label(writer) else None):
+        _planned = _plan_queries(writer, question, status)
+    for q in _planned:
         if q.lower() not in (x.lower() for x in queries):
             queries.append(q)
 
@@ -22348,8 +22452,34 @@ def run_research(labels: list, messages: list, emit, status) -> None:
     # nothing — they are what the answer would have been drawn from
     plain = "\n".join(f"- **{s['title'][:90]}** — {s['body'][:220]}"
                       for s in sources[:5])
-    _stream_guarded(writer, brief, emit, status, plain,
-                    "showing the raw findings instead")
+    if server_label(writer):
+        _name, _said = writer.split(SERVER_SEP, 1)[0], [0]
+
+        def _rem(c):
+            if not isinstance(c, Ctl) and c:
+                _said[0] += 1
+            emit(c)
+        try:
+            with server_first_deadline(60.0):
+                _stream_guarded(writer, brief, _rem, status, plain,
+                                "showing the raw findings instead")
+        except (StaleProfile, BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception as _wx:
+            server_mark_down(bound_ctx(), _name, str(_wx))
+            if _said[0]:
+                emit("\n\n\u26a0\ufe0f " + (str(_wx) if type(_wx).__name__ == "ServerError"
+                                             else "%s stopped answering." % _name))
+            elif local_writer:
+                status("%s didn\u2019t answer, so %s writes it here" % (_name, local_writer))
+                _stream_guarded(local_writer, brief, emit, status, plain,
+                                "showing the raw findings instead")
+            else:
+                status("%s didn\u2019t answer, so here is what was found" % _name)
+                emit(plain)
+    else:
+        _stream_guarded(writer, brief, emit, status, plain,
+                        "showing the raw findings instead")
 
     emit("\n\n**Sources**\n" + "\n".join(
         f"{n}. [{(s['title'] or s['url'])[:90]}]({s['url']})"
@@ -23312,6 +23442,14 @@ def remote_driver():
         ladder = work_ladder("work")
         if ladder:
             return ("cloud", ladder[0])
+    # the person's server before this computer (6b357): its coder first. A
+    # turn it fails marks it down, and the next resolve lands here below
+    try:
+        _sd = server_side_pick(bound_ctx(), "code", "normal")
+    except NoProfile:
+        _sd = None
+    if _sd is not None:
+        return ("server", _sd["label"])
     pulled = ollama_pulled_tags() or set()
     for l in ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B"):
         if l in MODEL_ROUTES and model_cached(l, pulled) \
@@ -23328,6 +23466,17 @@ def _agent_turn(driver, convo, budget: int = 8000) -> str:
     if kind == "cloud":
         return strip_think(cloud_text(who, convo, timeout=150,
                                       max_tokens=budget))
+    if kind == "server":
+        parts = []
+        try:
+            with server_first_deadline(60.0):
+                run_model(who, convo, parts.append)
+        except (StaleProfile, BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception as exc:
+            server_mark_down(bound_ctx(), who.split(SERVER_SEP, 1)[0], str(exc))
+            return ""
+        return strip_think("".join(parts))
     parts = []
     try:
         run_model(who, convo, parts.append)
@@ -27720,9 +27869,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             messages = messages[:-1] + [vm] if messages else [vm]
             prompt = base
 
+        # a picture in a mode, read by the person's server (6b357)
+        _vis_srv = None
         if images:
             # vision answers come from the pixels: no web search, no tier
             # council — LLaVA takes the whole request
+            _mode_pic = tier in TIERS and not cloud_only
             auto_web = False
             tier = ""
             b64s = [u.split(",", 1)[1] if u.startswith("data:") else u
@@ -27736,7 +27888,28 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             vm["images"] = b64s
             vm["image_urls"] = images     # media types, for the cloud (6b308)
             messages = messages[:-1] + [vm] if messages else [vm]
-            if _seat_fb:
+            # A PICTURE IN A MODE GOES TO THE SERVER (6b357, Patrick: "only
+            # send it to the Mac if the server doesn't have a model that can
+            # handle it"): a model of the person's server that fits its card
+            # and says it reads pictures takes it as a mode's seat, this
+            # computer's vision model behind it until its first word. The
+            # cloud still reads it first when cloud power is on, as before;
+            # Cloud Only, a pick of the person's and an Advanced council are
+            # untouched. The annotate grid (6b355) is already in `images`.
+            if _mode_pic:
+                try:
+                    _vis_srv = server_vision_pick(self.ctx)
+                except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                    raise
+                except Exception:
+                    _vis_srv = None
+            if _vis_srv is not None:
+                _vfb = ("Qwen 3.5 Vision 9B" if model_cached(
+                    "Qwen 3.5 Vision 9B", ollama_pulled_tags() or set()) else "")
+                council = [_vis_srv["label"]]
+                model_name = _vis_srv["label"]
+                _seat_fb = {_vis_srv["label"]: _vfb}
+            elif _seat_fb:
                 # a mode's server seat doesn't read it (6b339): the vision
                 # takeover below does, as it always did
                 council, model_name, _seat_fb = (
@@ -28632,10 +28805,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if export_req.get("shape") and ext == "txt":
                 blks = x_code_blocks(src)
                 ext = blks[0][0] if blks else "md"
+            # a server's turn is titled by that server or none; any other
+            # by the person's server first, then this computer (6b357)
             ttl = next((b[2] for b in x_blocks(src) if b[0] == "h"), "") \
-                or (make_title(src[:600])
-                    if len(src) > 200
-                    and not (_srv_only or _srv_lbl or _seat_fb) else "")
+                or ((make_title(src[:600], server=_srv_lbl)
+                     if (_srv_only or _srv_lbl) else
+                     make_title(src[:600], local=not _seat_fb))
+                    if len(src) > 200 else "")
             step("export", "Writing the file", "run",
                  EXPORT_KIND.get(ext, ("", ext))[1])
             status("writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
@@ -28857,17 +29033,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _rc = claude_refusal_conf(_vc)
                 if _rc and cloud_stream_conf(_rc, full_messages, memit):
                     return True
-            if cloud_only or not _vis_local:
+            # (6b357) the person's server reads it next when it can
+            if cloud_only or (not _vis_local and _vis_srv is None):
                 emit("The cloud couldn\u2019t read that image just now"
                      + ("" if cloud_only else
                         ", and the local vision engine isn\u2019t installed "
                         "yet (it downloads from **Settings \u203a Models**)")
                      + ". Try again in a moment.")
-            return cloud_only or not _vis_local
+            return cloud_only or (not _vis_local and _vis_srv is None)
         # first image before the vision engine exists: kick the download
         # and say so, instead of a cryptic connection error
         if (images and not cloud_only and not _vis_cloud and not _vis_local
-                and not _srv_lbl):
+                and not _srv_lbl and _vis_srv is None):
             try:
                 start_model_downloads(["Qwen 3.5 Vision 9B"])
                 # a Claude or Gemini key would read it with the switch on
@@ -29130,16 +29307,30 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # local rescue is exactly what the user ruled out. So does
                 # a pick of your own server, "<server> Only" included
                 # (6b337): its failure is said, never covered.
-                try:
-                    pulled = ollama_pulled_tags() or set()
-                    alt = next((l for l in reversed(MERGE_RANK)
-                                if model_cached(l, pulled)
-                                and l != (route_label or model_name)), None)
-                    if alt:
-                        status(f"retrying on {alt}")
-                        run_model(alt, full_messages, memit)
-                except Exception:
-                    pass
+                # the person's server first (6b357), when it isn't the one
+                # that just failed and the turn carries no picture
+                _rs = (server_side_pick(user_base, "fast", "normal")
+                       if not images else None)
+                if _rs is not None and _rs["label"] != (route_label or model_name):
+                    try:
+                        status(f"retrying on {_rs['label']}")
+                        with server_first_deadline(SRV_SIDE_FIRST_S):
+                            run_model(_rs["label"], full_messages, memit)
+                    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                        raise
+                    except Exception as _rx:
+                        server_mark_down(user_base, _rs["server"], str(_rx))
+                if not sent[0]:
+                    try:
+                        pulled = ollama_pulled_tags() or set()
+                        alt = next((l for l in reversed(MERGE_RANK)
+                                    if model_cached(l, pulled)
+                                    and l != (route_label or model_name)), None)
+                        if alt:
+                            status(f"retrying on {alt}")
+                            run_model(alt, full_messages, memit)
+                    except Exception:
+                        pass
             if not sent[0]:
                 emit("That engine stopped responding and the backup "
                      "didn't answer either. Ask again — it usually "
@@ -29261,7 +29452,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                     _pin_ask, timeout=20, max_tokens=400,
                                     quiet=True))
                             elif not cloud_only:
-                                run_model(small, _pin_ask, got2.append)
+                                # an answer of this computer's: the person's
+                                # server pins it first (6b357)
+                                _ps = (None if server_label(small)
+                                       else server_side_text(_pin_ask, user_base))
+                                if _ps is not None:
+                                    got2.append(_ps)
+                                else:
+                                    run_model(small, _pin_ask, got2.append)
                             raw2 = strip_think("".join(got2))
                             m2 = re.search(r"\[[^\[\]]*\]", raw2, re.S)
                             names = []
