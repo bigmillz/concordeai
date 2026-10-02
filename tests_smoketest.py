@@ -2456,7 +2456,13 @@ encodeURIComponent getComputedStyle innerHeight innerWidth isFinite
 localStorage location matchMedia navigator parseFloat parseInt performance
 requestAnimationFrame setInterval setTimeout window
 DOMException Headers IntersectionObserver MutationObserver
-TextEncoder Uint8Array Int32Array crypto RegExp sessionStorage""".split())
+TextEncoder Uint8Array Int32Array crypto RegExp sessionStorage
+Number""".split())
+# 6b355, drawing on a picture: Copy puts a PNG on the clipboard
+# (ClipboardItem), Save reads the flattened PNG as a data URL (FileReader)
+# and the overlay follows the picture's box (ResizeObserver); all three
+# exist on window in WKWebView (Safari 13.1+), WebView2 and Qt
+_PAGE_HOST |= {"ClipboardItem", "FileReader", "ResizeObserver"}
 # (6b322) the chat store's prefix hash and random chat ids use the four
 # on the last line; each exists on window in WKWebView, WebView2 and Qt
 # no bare fetch (6b321): the page's one fetch is window.fetch, saved by
@@ -14194,6 +14200,54 @@ for _d8, _o8, _n8 in _RVM8:
         _rvm8.append((_d8, True))
 check("profiles, the reviews' cases: each fix bites (%d mutations, each caught)" % len(_RVM8),
       all(ok is True for _d, ok in _rvm8), "%r" % [x for x in _rvm8 if x[1] is not True])
+
+# the save goes through the PROFILE's writer (review: a bare open() was a
+# write outside the profile rules): under A it lands in A's exports/ and
+# nowhere else; after a switch A's ctx is refused and writes nothing; B's
+# save lands in B's own folder, which A can't see
+def _ann_profiles(seg_src):
+    _pn, _pd, _root = _pm8(None, hooks=frozenset({"profiles"}))
+    _pn.update(base64=__import__("base64"), EXPORT_DIRNAME="exports", NotLanded=_pn["StaleProfile"],
+               stage_path=None, drop_run_file=None)
+    exec(seg_src, _pn)
+    _png = "data:image/png;base64," + _ann_png
+    _ra = _pn["save_annotated_png"](_root, _png)
+    _pa = os.path.join(_root.path("exports"), _ra["id"])
+    _okA = os.path.isfile(_pa) and open(_pa, "rb").read(4) == b"\x89PNG" \
+        and os.path.isfile(os.path.join(_root.path("exports"), _ra["id"][:-4] + ".meta")) \
+        and oct(os.stat(_pa).st_mode)[-3:] == "600"
+    _B = _pn["test_profile_create"]()
+    _pn["profile_switch"](_B)
+    _before = sorted(os.listdir(_root.path("exports")))
+    try:
+        _pn["save_annotated_png"](_root, _png)
+        _stale = False
+    except _pn["StaleProfile"]:
+        _stale = True
+    _rb = _pn["save_annotated_png"](_B, _png)
+    _pb = os.path.join(_B.path("exports"), _rb["id"])
+    return (_okA and _stale and os.path.isfile(_pb)
+            and sorted(os.listdir(_root.path("exports"))) == _before   # the stale save wrote nothing
+            and not os.path.exists(os.path.join(_root.path("exports"), _rb["id"]))
+            and not os.path.exists(os.path.join(_B.path("exports"), _ra["id"])))
+
+
+_ann_seg_src = _ann_seg()
+
+
+def _ann_try_false(fn):
+    try:
+        return bool(fn())
+    except Exception:
+        return False
+
+
+check("draw on a picture: a save under profile A lands in A's folder, is refused after a switch, and B can't see it",
+      _ann_profiles(_ann_seg_src) and "stage_path(" not in _ann_seg_src and "open(" not in _ann_seg_src
+      and not _ann_try_false(lambda: _ann_profiles(_ann_seg_src.replace('ctx.write_bytes("%s/%s.png" % (EXPORT_DIRNAME, token), raw, mode=0o600)',
+                                                 'open(os.path.join(ctx.path("exports"), "x.png"), "wb").write(raw)')
+                            .replace("return {\"id\": token + \".png\"", "return {\"id\": \"x.png\""))))
+
 
 # ---- live, no-server form: "This computer" (A) and a local test profile (B)
 _P8 = Instance(9903, "P8", env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
