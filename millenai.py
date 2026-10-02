@@ -112,6 +112,10 @@ MACHINE_STATE = frozenset((
     # (6b339, per Patrick: server first) the first-word deadline of the
     # call in flight on this thread: a number of seconds, nothing personal
     "_srv_first",
+    # (6b346) the wakes this thread did for the question in hand: (server name,
+    # woke?), taken (and so emptied) before each chat resolves and again
+    # right after the headers, so none outlives its request or its profile
+    "_srv_wake_tl",
     # read-aloud's process and file: _stop_speaking empties them at every
     # switch, before the epoch moves; the quit's own turn flush
     "_say_feeds", "_say_file", "_turns_flushing",
@@ -25815,7 +25819,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             sid, op = str(d.get("id") or ""), self.path[len("/api/servers/"):]
             if op == "add":
                 out = server_add(self.ctx, d)
-            elif op not in ("pair", "test", "access", "remove", "prefer", "sleep"):
+            elif op == "sleep":
+                # auto sleep (6b346): this server's setting, in the active profile
+                out = (server_sleep_set(self.ctx, sid, {k: d[k] for k in ("enabled", "minutes") if k in d})
+                       if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+            elif op not in ("pair", "test", "access", "remove", "prefer"):
                 self.send_error(404)
                 return
             elif not _SRV_ID_RX.fullmatch(sid):
@@ -25828,8 +25836,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 out = server_remove(self.ctx, sid)
             elif op == "prefer":
                 out = server_set_prefer(self.ctx, sid, d.get("on"))
-            elif op == "sleep":
-                out = server_sleep_set(self.ctx, sid, {k: d[k] for k in ("enabled", "minutes") if k in d})
             else:
                 _se = _srv_find(_srv_read(self.ctx), sid)
                 out = {"err": SRV_GONE}
@@ -39694,6 +39700,11 @@ $("#srv-list").addEventListener("change",async ev=>{
   paintEngMenuServers();
   if(d.err)srvMsg(id,d.err);
 });
+$("#srv-list").addEventListener("keydown",ev=>{
+  if(ev.key!=="Enter"||!ev.target.classList.contains("srv-code"))return;
+  const b=ev.target.closest(".srv").querySelector('button[data-a="pair"]');
+  if(b)b.click();
+});
 // the switch and the minutes box (6b346): saved on change, shown as the server holds them
 async function srvSleepLoad(s){
   if(!s.paired)return;
@@ -39732,11 +39743,6 @@ $("#srv-list").addEventListener("change",async ev=>{
   srvSleep[id]=srvSleepNext(z,d);
   srvMsgs[id]=d.ok?"Saved.":(d.err||"");
   paintServers();
-});
-$("#srv-list").addEventListener("keydown",ev=>{
-  if(ev.key!=="Enter"||!ev.target.classList.contains("srv-code"))return;
-  const b=ev.target.closest(".srv").querySelector('button[data-a="pair"]');
-  if(b)b.click();
 });
 $("#srv-list").addEventListener("click",async ev=>{
   const b=ev.target.closest("button[data-a]");if(!b)return;

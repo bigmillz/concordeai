@@ -21506,12 +21506,13 @@ _z8h = _ireq(_SV, "/api/servers/sleep?id=" + _sid34, headers={"X-Profile": "not-
 _svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
 _nl_b = len(_o1("/log")["log"])
 _zB = [_svq("/api/servers/sleep?id=" + _sid34)[1], _svq("/api/servers/sleep", "POST", {"id": _sid34, "enabled": False})[1]]
+_z_nlb2 = len(_o1("/log")["log"])
 _svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
 _z_cfg = _svq("/api/servers/sleep?id=" + _sid34)[1]
 check("auto sleep (live): behind the launch key, the token and the profile; another profile can't read or change this "
       "one's server and nothing leaves; the cards aren't in the app's log",
       _z8 == [403, 403, 403] and _z8h[0] == 409
-      and all(z_.get("ok") is False and z_.get("kind") == "gone" for z_ in _zB) and len(_o1("/log")["log"]) == _nl_b
+      and all(z_.get("ok") is False and z_.get("kind") == "gone" for z_ in _zB) and _z_nlb2 == _nl_b
       and _z_cfg["sleep"]["enabled"] is True
       and "02:00:5e:10:00:01" not in open(os.path.join(_SMOKE_TMP, "SRV.log"), errors="replace").read(),
       "%r" % [_z8, _z8h[0], _zB, _z_cfg])
@@ -23786,7 +23787,7 @@ def _w46c_ui(src):
     a = src.index("function srvSleepParse(raw){")
     b = src.index("function srvCard(s){")
     c = src.index("// the switch and the minutes box (6b346)")
-    dd = src.index('$("#srv-list").addEventListener("keydown"', c)
+    dd = src.index('$("#srv-list").addEventListener("click"', c)
     seg = src[a:b] + src[c:dd]
     out["wiring"] = ("    +srvSleepHtml(s,srvSleep[s.id])" in src and "loadServers(true).then(srvSleepLoadAll);" in src
                      and 'srvPost("sleep",body)' in seg and 'api("/api/servers/sleep?id="+encodeURIComponent(s.id))' in seg
@@ -23809,7 +23810,7 @@ def _w46c_text(src):
     out["callers"] = len(callers) == 3                      # its definition, the refresh and "<name> Only"
     out["routes"] = ('urllib.parse.urlparse(self.path).path == "/api/servers/sleep"' in src
                      and "server_sleep_get(self.ctx, _sid)" in src and "server_sleep_set(self.ctx, sid," in src
-                     and '"prefer", "sleep")' in src)
+                     and 'elif op == "sleep":' in src)
     out["ctx"] = ("def _srv_sleep_call(ctx, sid: str, method: str, obj=None) -> dict:" in seg
                   and "_srv_find(_srv_read(ctx), sid)" in seg and "_srv_update(ctx, fn)" in seg)
     out["public"] = '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),' in src
@@ -25302,7 +25303,7 @@ _B41_MUT = [
      "            if self._bench_srv_held:\n                self._bench_srv_held = False\n", [14]),
     ("the profile's file not personal", "\"remote_known_hosts\", \"bench_targets.jsonl\", \"images\"", "\"remote_known_hosts\", \"images\"", [14]),
     ("a provider rested by a benchmark call", "    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", "    cloud_glitch({}, '')\n    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", [14]),
-    ("the passage changed", "\"Using only the passage above, explain step by step how a tide mill \"", "\"Using only the passage above, explain how a tide mill \"", [13]),
+    ("the passage changed", "\"Using only the passage above, explain step by step how a tide mill \"", "\"Using only the passage above, explain how a tide mill \"", [13, 14]),
     # stored runs from other builds, hand-edited or damaged (12, 13)
     ("a stored run shown as it is", "            runs.append(_bench_clean_run(r))", "            runs.append(r)", [12]),
     ("an address left in a note", "    v = _BENCH_URL.sub(\"(address)\", v)\n", "", [12]),
