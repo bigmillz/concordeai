@@ -22878,21 +22878,22 @@ _l56_cc = _o1("/comfy")["calls"][_l56_nc:]
 _l56_graph = next((c_[2]["prompt"] for c_ in _l56_cc if c_[1] == "/prompt"), {})
 _l56_post = next((json.loads(r_["body"]) for r_ in _l56_jobs if r_["method"] == "POST"), {})
 _l56_pcts = [int(m_.group(1)) for s_ in _l56_st for m_ in [re.fullmatch(r"Making the picture on %s\.\.\. (\d+)%%" % re.escape(_SVN), s_)] if m_]
+_l56_parts = {
+    "text": bool(_l56_m), "saved": _l56_f in [os.path.basename(x_) for x_ in _l56_img()],
+    "served": _l56_served[0] == 200 and _l56_served[1][:8] == b"\x89PNG\r\n\x1a\n",
+    "lines": any("Making the picture on %s..." % _SVN == s_ for s_ in _l56_st) and bool(_l56_pcts)
+    and _l56_pcts == sorted(_l56_pcts) and max(_l56_pcts or [0]) > 20 and all(0 <= p_ <= 100 for p_ in _l56_pcts),
+    "order": [(r_["method"], re.sub(r"[\w-]{20,}", "ID", r_["path"])) for r_ in _l56_jobs][:1] == [("POST", "/v1/generate/jobs")]
+    and _l56_jobs[-1]["method"] == "DELETE" and _l56_jobs[-2]["path"].endswith("/result"),
+    "signed": all(r_["access"] and {"X-O1-Device", "X-O1-Signature"} <= set(r_["headers"]) for r_ in _l56_jobs),
+    "body": set(_l56_post) == {"kind", "prompt", "width", "height"} and _l56_post.get("kind") == "image"
+    and "red balloon" in _l56_post.get("prompt", "") and (_l56_post.get("width"), _l56_post.get("height")) == (1024, 1024),
+    "graph": [c_[1] for c_ in _l56_cc if c_[0] == "POST"][:1] == ["/prompt"]
+    and any(v_["class_type"] == "CLIPTextEncode" and "red balloon" in v_["inputs"]["text"] for v_ in _l56_graph.values()),
+    "no chat": not [r_ for r_ in _l56_lg2 if r_["path"] == "/api/chat"]}
 check("server pictures (live): a picture is made on the server with \"Making the picture on <name>... 40%\" lines, saved as "
       "an ordinary generated picture (served, the same as any), and every call is signed and carries only the request",
-      _l56_m and _l56_f in [os.path.basename(x_) for x_ in _l56_img()]
-      and _l56_served[0] == 200 and _l56_served[1][:8] == b"\x89PNG\r\n\x1a\n"
-      and any("Making the picture on %s..." % _SVN == s_ for s_ in _l56_st) and _l56_pcts and _l56_pcts == sorted(_l56_pcts)
-      and max(_l56_pcts) > 20 and all(0 <= p_ <= 100 for p_ in _l56_pcts)
-      and [(r_["method"], re.sub(r"[\w-]{20,}", "ID", r_["path"])) for r_ in _l56_jobs][:1] == [("POST", "/v1/generate/jobs")]
-      and _l56_jobs[-1]["method"] == "DELETE" and _l56_jobs[-2]["path"].endswith("/result")
-      and all(r_["access"] and {"X-O1-Device", "X-O1-Signature"} <= set(r_["headers"]) for r_ in _l56_jobs)
-      and set(_l56_post) == {"kind", "prompt", "width", "height"} and _l56_post["kind"] == "image"
-      and "red balloon" in _l56_post["prompt"] and (_l56_post["width"], _l56_post["height"]) == (1024, 1024)
-      and [c_[1] for c_ in _l56_cc if c_[0] == "POST"][:1] == ["/prompt"]
-      and any(v_["class_type"] == "CLIPTextEncode" and "red balloon" in v_["inputs"]["text"] for v_ in _l56_graph.values())
-      and not [r_ for r_ in _l56_lg2 if r_["path"] == "/api/chat"],
-      "%r" % [_l56_p[1][:200], _l56_st[:6], [(r_["method"], r_["path"]) for r_ in _l56_jobs][:5], _l56_post])
+      all(_l56_parts.values()), "%r" % [_l56_parts, _l56_p[1][:200], _l56_st[:6], _l56_post])
 _l56_note = [os.path.join(dp_, f_) for dp_, _d, fs_ in os.walk(_SV.home) for f_ in fs_ if f_.endswith(".render.json")]
 _l56_rn = json.load(open(_l56_note[0])) if _l56_note else {}
 check("server pictures (live): the settings it was made with are kept beside the picture, so \"double the resolution\" "
@@ -22910,14 +22911,16 @@ _l56_vid = (json.loads(_l56_vm.group(1)) if _l56_vm else {}).get("id", "")
 _l56_vs = _ireq(_SV, "/api/video/" + _l56_vid, headers={"Range": "bytes=4-7"}) if _l56_vid else (0, b"")
 _l56_vpost = next((json.loads(r_["body"]) for r_ in _l56_jv if r_["method"] == "POST"), {})
 _l56_vst = [d_ for t_, d_ in _l56_v[2] if t_ == "STATUS"]
+_l56_vparts = {
+    "text": bool(_l56_vm), "saved": _l56_vid.endswith(".mp4") and _l56_vid in [os.path.basename(x_) for x_ in _l56_vid_files()],
+    "range": _l56_vs[0] == 206 and _l56_vs[1] == b"ftyp",
+    "body": set(_l56_vpost) == {"kind", "prompt", "width", "height", "frames"} and _l56_vpost.get("kind") == "video"
+    and (_l56_vpost.get("width"), _l56_vpost.get("height"), _l56_vpost.get("frames")) == (832, 480, 33),
+    "lines": any(re.fullmatch(r"Making the video on %s\.\.\. \d+%%" % re.escape(_SVN), s_) for s_ in _l56_vst),
+    "let go": _l56_jv[-1]["method"] == "DELETE" and all(r_["access"] for r_ in _l56_jv)}
 check("server pictures (live): a video is made on the server the same way: progress lines, an MP4 saved with the "
       "app's videos and served with Range, only the request sent",
-      bool(_l56_vm) and _l56_vid.endswith(".mp4") and _l56_vid in [os.path.basename(x_) for x_ in _l56_vid_files()] and _l56_vs[0] == 206 and _l56_vs[1] == b"ftyp"
-      and set(_l56_vpost) == {"kind", "prompt", "width", "height", "frames"} and _l56_vpost["kind"] == "video"
-      and (_l56_vpost["width"], _l56_vpost["height"], _l56_vpost["frames"]) == (832, 480, 33)
-      and any(re.fullmatch(r"Making the video on %s\.\.\. \d+%%" % re.escape(_SVN), s_) for s_ in _l56_vst)
-      and _l56_jv[-1]["method"] == "DELETE" and all(r_["access"] for r_ in _l56_jv),
-      "%r" % [_l56_v[1][:200], _l56_vst[:5], _l56_vpost])
+      all(_l56_vparts.values()), "%r" % [_l56_vparts, _l56_v[1][:200], _l56_vst[:5], _l56_vpost, _l56_vs[0]])
 
 # it can't: one line, and the old way runs unchanged
 _o1("/comfy-reset", {})
@@ -22929,14 +22932,15 @@ _l56_fs = [d_ for t_, d_ in _l56_f1[2] if t_ == "STATUS"]
 _l56_n2 = len(_o1("/log")["log"])
 _l56_f2 = _svchat(text="make a video of a red balloon", tier="Fast")
 _l56_fs2 = [d_ for t_, d_ in _l56_f2[2] if t_ == "STATUS"]
+_l56_fparts = {
+    "picture line": any(s_ == "%s couldn\u2019t make the picture (couldn\u2019t make it). Trying another way." % _SVN for s_ in _l56_fs),
+    "picture old way": "Gemini key" in _l56_f1[1] and "![" not in _l56_f1[1] and _l56_f1[1].strip() == _l56_c0[1].strip(),
+    "video line": any(s_ == "%s couldn\u2019t make the video (couldn\u2019t make it). Trying another way." % _SVN for s_ in _l56_fs2),
+    "video old way": "Gemini key" in _l56_f2[1] and "[[vid:" not in _l56_f2[1],
+    "let go": bool(_l56_gen(_l56_lg4)) and _l56_gen(_l56_lg4)[-1]["method"] == "DELETE"}
 check("server pictures (live): a job that fails says so in one line and the old way runs unchanged (no picture, the "
       "same words as without a server), for a picture and a video; the failed job is let go",
-      any(s_ == "%s couldn’t make the picture (couldn’t make it). Trying another way." % _SVN for s_ in _l56_fs)
-      and "Gemini key" in _l56_f1[1] and "![" not in _l56_f1[1]
-      and any(s_ == "%s couldn’t make the video (couldn’t make it). Trying another way." % _SVN for s_ in _l56_fs2)
-      and "Gemini key" in _l56_f2[1] and "[[vid:" not in _l56_f2[1]
-      and _l56_gen(_l56_lg4)[-1]["method"] == "DELETE" and _l56_f1[1].strip() == _l56_c0[1].strip(),
-      "%r" % [_l56_fs[-2:], _l56_f1[1][:120], _l56_c0[1][:120]])
+      all(_l56_fparts.values()), "%r" % [_l56_fparts, _l56_fs[-2:], _l56_fs2[-2:], _l56_f2[1][:100]])
 
 # the server off: said once, then not asked for a minute
 _o1("/comfy-reset", {})
@@ -22955,7 +22959,16 @@ check("server pictures (live): a server that is off is said in one line, nothing
       "%r" % [_l56_os[-2:], _l56_o2[1][:100], len(_l56_gen(_l56_lg5))])
 _svq("/api/servers/test", "POST", {"id": _sid34})          # a good check clears the mark
 
-# not asked: Cloud Only, a server switched off for modes, a gif
+# not asked: Cloud Only, a server switched off for modes, a video asked as a gif
+def _l56_chat(messages, tier="Fast"):
+    body_ = json.dumps({"model": "", "models": [], "tier": tier, "auto_web": False, "messages": messages}).encode()
+    r_ = urllib.request.Request(_SV.base + "/api/chat", data=body_,
+                                headers=dict(_SV.headers, **{"Content-Type": "application/json"}), method="POST")
+    with urllib.request.urlopen(r_, timeout=180) as resp_:
+        t_ = resp_.read().decode("utf-8", "replace")
+    return re.sub("\0[^\0]*\0", "", t_), re.findall("\0([A-Z0-9]+):?([^\0]*)\0", t_)
+
+
 _o1("/comfy-reset", {})
 _l56_n = len(_o1("/log")["log"])
 _l56_k1 = _svchat(text="generate an image of a red balloon", tier="Cloud Only")
@@ -22963,13 +22976,20 @@ _l56_k2 = _svchat(text="make a video of a red balloon", tier="Cloud Only")
 _svq("/api/servers/prefer", "POST", {"id": _sid34, "on": False})
 _l56_k3 = _svchat(text="generate an image of a red balloon", tier="Fast")
 _svq("/api/servers/prefer", "POST", {"id": _sid34, "on": True})
-_l56_k4 = _svchat(text="make a video of a red balloon as a gif", tier="Fast")
 _l56_lg6 = _o1("/log")["log"][_l56_n:]
-check("server pictures (live): Cloud Only never asks the server, nor does a server switched off for modes, nor a video "
-      "asked as a gif; each goes the old way",
+_l56_prev = '[[vid:{"id":"%s","t":"a red balloon"}]]\n\n*A red balloon \u2014 made on %s*' % (_l56_vid, _SVN)
+_l56_n2 = len(_o1("/log")["log"])
+_l56_k4 = _l56_chat([{"role": "user", "content": "make a video of a red balloon"},
+                     {"role": "assistant", "content": _l56_prev}, {"role": "user", "content": "as a gif"}])
+_l56_lg6b = _o1("/log")["log"][_l56_n2:]
+check("server pictures (live): Cloud Only never asks the server, nor does a server switched off for modes; each goes the old "
+      "way",
       not _l56_gen(_l56_lg6) and not [c_ for c_ in _o1("/comfy")["calls"] if c_[1] == "/prompt"]
-      and all("Gemini key" in x_[1] for x_ in (_l56_k1, _l56_k2, _l56_k3, _l56_k4)),
-      "%r" % [len(_l56_gen(_l56_lg6)), [x_[1][:60] for x_ in (_l56_k1, _l56_k2, _l56_k3, _l56_k4)]])
+      and all("Gemini key" in x_[1] for x_ in (_l56_k1, _l56_k2, _l56_k3)),
+      "%r" % [len(_l56_gen(_l56_lg6)), [x_[1][:60] for x_ in (_l56_k1, _l56_k2, _l56_k3)]])
+check("server pictures (live): a video asked as a gif is left to this computer, which only the old way can write",
+      not _l56_gen(_l56_lg6b) and "Gemini key" in _l56_k4[0] and "[[vid:" not in _l56_k4[0],
+      "%r" % [len(_l56_gen(_l56_lg6b)), _l56_k4[0][:120]])
 
 # another profile: its own servers (none), nothing leaves
 _svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
@@ -26057,6 +26077,8 @@ class _G56Time:
     def sleep(self, s):
         self.waits.append(s)
         self.t += s
+        if len(self.waits) > 1500:        # a loop that never ends is a failure, not a hang
+            raise RuntimeError("the wait never ended")
 
 
 def _g56_ns(src, name="Desktop"):
@@ -26094,14 +26116,14 @@ def _g56_job(ns, kind="image", states=None, result=None, rtype="image/png", post
     return log
 
 
-def _g56_gen(ns, ctx, kind="image", prompt="a red balloon", opts=None, gone=None, **kw):
+def _g56_gen(ns, ctx, kind="image", prompt="a red balloon", opts=None, gone=None, status=None, **kw):
     log = _g56_job(ns, kind, **kw)
     clock = _G56Time()
     ns["time"] = clock
     said = []
     e = ns["_srv_read"](ctx)[0]
     try:
-        out = ns["server_generate"](e, kind, prompt, opts or {"width": 1024, "height": 1024}, said.append, gone)
+        out = ns["server_generate"](e, kind, prompt, opts or {"width": 1024, "height": 1024}, status or said.append, gone)
         err = None
     except Exception as exc:
         out, err = None, exc
@@ -26205,7 +26227,11 @@ def _g56c_pick(src):
     ns["_srv_seen"][sid]["at"] = time.time()
     ns["_srv_seen"][sid]["reachable"] = True
     # other kinds, never paired, no crypto
-    out["kind"] = all(ns["server_gen_pick"](ctx, k) is None for k in ("audio", "", None, "IMAGE"))
+    ns["_srv_seen"][sid]["gen_at"] = 0
+    n_asked = len(lg)
+    out["kind"] = (all(ns["server_gen_pick"](ctx, k) is None for k in ("audio", "", None, "IMAGE"))
+                   and len(lg) == n_asked)                       # and none of them cost a question to the server
+    ns["_srv_seen"][sid]["gen_at"] = time.time()
     saved = ns["cai_crypto"].available
     ns["cai_crypto"].available = lambda: False
     out["crypto"] = ns["server_gen_pick"](ctx, "video") is None
@@ -26342,8 +26368,8 @@ def _g56c_job(src):
     bad5 = _g56_gen(ns, ctx, states=[off] * 5 + [{"state": "done", "type": "image/png"}])
     out["tunnel"] = (ok4[1] is None and ok4[0][1] == "image/png" and bad5[1] is not None and bad5[1].kind == "offline"
                      and bad5[2][-1][0] == "DELETE")
-    spaced = _g56_gen(ns, ctx, states=[off, off, {"state": "running", "progress": 0.1}, off, off,
-                                       {"state": "done", "type": "image/png"}])
+    spaced = _g56_gen(ns, ctx, states=[off] * 3 + [{"state": "running", "progress": 0.1}] + [off] * 3
+                      + [{"state": "done", "type": "image/png"}])
     out["tunnel_resets"] = spaced[1] is None
     # Stop: the reader left: the job is cancelled at once and nothing is fetched
     seen = []
@@ -26354,6 +26380,16 @@ def _g56c_job(src):
     out["stop"] = (isinstance(e13, ns["ServerGenStopped"]) and lg[-1][0] == "DELETE"
                    and not any(p.endswith("/result") for _m, p, _b, _s in lg)
                    and len([1 for m, _p, _b, _s in lg if m == "GET"]) == 2)
+    # the reader left between two polls: the first thing to notice is the write of a new line
+    wrote = []
+    def dies(text):
+        wrote.append(text)
+        if len(wrote) > 1:
+            raise BrokenPipeError("gone")
+    o, e16, lg16, sd16, ck16 = _g56_gen(ns, ctx, states=[{"state": "running", "progress": 0.1}, {"state": "running", "progress": 0.3}]
+                                        + [{"state": "running", "progress": 0.5}] * 5, status=dies)
+    out["stop_by_write"] = (isinstance(e16, ns["ServerGenStopped"]) and lg16[-1][0] == "DELETE" and len(wrote) == 2
+                            and not any(p.endswith("/result") for _m, p, _b, _s in lg16))
     # the clock: pictures stop at 5 minutes, video at 20, the server told to let go
     o, e14, lg, sd, ck = _g56_gen(ns, ctx, states=[{"state": "running", "progress": 0.1}] * 2)
     o2_, e15, lg2, sd2, ck2 = _g56_gen(ns, ctx, "video", "w", {}, states=[{"state": "running", "progress": 0.1}] * 2)
@@ -26395,27 +26431,25 @@ def _g56c_name(src):
 
 
 def _g56_make_ns(src, name="Desktop"):
+    """server_make on a real profile ctx: the file is written through the profile's own
+    writer, so what lands in the folder is what the check reads."""
     ns, ctx, d = _g56_ns(src, name)
-    ns["server_gen_refresh"].__globals__  # (the section's own)
-    imgs, vids = os.path.join(d, "images"), os.path.join(d, "videos")
-    os.makedirs(imgs, exist_ok=True)
-    os.makedirs(vids, exist_ok=True)
-    notes = {}
     n = [0]
 
-    def stage(suffix=""):
+    def notes():
+        out = []
+        for sub in ("images", "videos"):
+            for fn in os.listdir(os.path.join(d, sub)) if os.path.isdir(os.path.join(d, sub)) else []:
+                if fn.endswith(".render.json"):
+                    fp = os.path.join(d, sub, fn)
+                    j = json.load(open(fp))
+                    out.append((os.stat(fp).st_mtime_ns, {k: v for k, v in j.items() if k != "secs"}, j.get("secs")))
+        return [(o, sc) for _t, o, sc in sorted(out, key=lambda x: x[0])]
+
+    def mid():
         n[0] += 1
-        return os.path.join(d, "stage-%d%s" % (n[0], suffix))
-
-    def land(c, sub, path):
-        final = os.path.join(d, sub, "m%d%s" % (n[0], os.path.splitext(path)[1]))
-        os.replace(path, final)
-        return final
-
-    def note(path, opts, secs=0.0):
-        notes[path] = (dict(opts), secs)
-    ns.update(IMAGE_SUB="images", VIDEO_SUB="videos", stage_path=stage, _media_land=land, _render_note=note,
-              _client_gone=lambda sock: False, StaleProfile=type("StaleProfile", (RuntimeError,), {}))
+        return "m%d" % n[0]
+    ns.update(IMAGE_SUB="images", VIDEO_SUB="videos", _media_id=mid, _client_gone=lambda sock: False)
     exec(_sv_sect(src, "server pictures"), ns)
     return ns, ctx, d, notes
 
@@ -26444,7 +26478,7 @@ def _g56c_make(src):
     ns["_srv_seen"][sid]["gen_at"] = time.time()
     # a picture
     r, err, log, em, steps, sts = _g56_run_make(ns, ctx)
-    files = os.listdir(os.path.join(d, "images"))
+    files = [f for f in os.listdir(os.path.join(d, "images")) if not f.endswith(".render.json")]
     out["image"] = (r is True and err is None and len(files) == 1 and files[0].endswith(".png")
                     and open(os.path.join(d, "images", files[0]), "rb").read() == _G56_PNG
                     and em == ["![a red balloon](/api/image/%s)\n\n*A red balloon — made on Desktop*" % files[0]]
@@ -26452,7 +26486,7 @@ def _g56c_make(src):
                     and [s[2] for s in steps] == ["run", "done"] and steps[0][1] == "Making the picture on Desktop"
                     and steps[1][1] == "Made the picture on Desktop")
     pth = os.path.join(d, "images", files[0])
-    nt = [v for k, v in notes.items()]
+    nt = notes()
     out["note"] = len(nt) == 1 and nt[0][0] == {"w": 1024, "h": 1024} and nt[0][1] >= 0
     # the picture's words are the person's, "]" removed, as always
     r2 = _g56_run_make(ns, ctx, subject="a cat ] [x](y)")
@@ -26460,13 +26494,13 @@ def _g56c_make(src):
     # a video: an MP4 in videos, the token the page plays
     r3 = _g56_run_make(ns, ctx, "video", "waves", {"w": 640, "h": 360, "frames": 49, "seed": 7},
                        states=[{"state": "done", "type": "video/mp4"}], result=_G56_MP4)
-    vfiles = os.listdir(os.path.join(d, "videos"))
+    vfiles = [f for f in os.listdir(os.path.join(d, "videos")) if not f.endswith(".render.json")]
     tok = re.match(r"\[\[vid:(\{.*?\})\]\]\n\n\*Waves — made on Desktop\*$", r3[3][0] if r3[3] else "")
     out["video"] = (r3[0] is True and len(vfiles) == 1 and vfiles[0].endswith(".mp4") and tok
                     and json.loads(tok.group(1)) == {"id": vfiles[0], "t": "waves"}
                     and json.loads(r3[2][0][2]) == {"width": 640, "height": 352, "frames": 49, "seed": 7,
                                                     "kind": "video", "prompt": "waves"}
-                    and [v[0] for v in notes.values()][-1] == {"w": 640, "h": 352, "seed": 7, "frames": 49})
+                    and notes()[-1][0] == {"w": 640, "h": 352, "seed": 7, "frames": 49})
     # a video the server wrote as animated WebP is drawn as a picture
     r4 = _g56_run_make(ns, ctx, "video", "waves", states=[{"state": "done", "type": "image/webp"}], result=_G56_WEBP)
     out["webp"] = r4[0] is True and r4[3][0].startswith("![waves](/api/image/") and r4[3][0].count(".webp") == 1
@@ -26516,13 +26550,30 @@ def _g56c_make(src):
     r11 = _g56_run_make(ns, ctx)
     out["woke"] = r11[5][:2] == ["Woke Desktop.", "Other didn’t wake."] and ns["server_take_wake_notes"]() == []
     # the folder can't take it: said, not made again elsewhere
-    ns["_media_land"] = lambda c, sub, path: (_ for _ in ()).throw(OSError("full"))
+    real_write = ns["_write_raw"]
+    ns["_write_raw"] = lambda *a, **k: (_ for _ in ()).throw(OSError("full"))
     r12 = _g56_run_make(ns, ctx)
     out["unsaved"] = (r12[0] is True and len(r12[3]) == 1 and "couldn’t save it" in r12[3][0]
                       and isinstance(r12[3][0], ns["AppText"]))
     # a stale profile is not covered up
-    ns["_media_land"] = lambda c, sub, path: (_ for _ in ()).throw(ns["StaleProfile"]("changed"))
+    ns["_write_raw"] = real_write
+    # a profile switch while the server is still making it: the file arrives after the switch, the make
+    # under A is refused (StaleProfile) and nothing is written to A's folder, B's or anywhere else
+    d2 = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    ctx_b = ns["ProfileCtx"]("other", d2)
+    before = sorted(os.listdir(os.path.join(d, "images"))) + sorted(os.listdir(os.path.join(d, "videos")))
+    real_bytes = ns["_srv_bytes"]
+
+    def switching(*a, **k):
+        ns["_PROFILE"]["ctx"] = ctx_b            # (profile_switch)
+        return real_bytes(*a, **k)
+    ns["_srv_bytes"] = switching
     r13 = _g56_run_make(ns, ctx)
+    ns["_srv_bytes"] = real_bytes
+    ns["_PROFILE"]["ctx"] = ctx
+    after = sorted(os.listdir(os.path.join(d, "images"))) + sorted(os.listdir(os.path.join(d, "videos")))
+    out["switch"] = (after == before and r13[3] == [] and not [f for _r, _ds, fs in os.walk(d2) for f in fs]
+                     and not [f for f in os.listdir(d) if f.startswith("stage-")])
     out["stale"] = isinstance(r13[1], ns["StaleProfile"])
     return all(out.values()), out
 
@@ -26566,6 +26617,7 @@ def _g56c_pins(src):
     out["wakes_only_here"] = "server_refresh_modes(ctx)" in sect and "server_wake_if_down(" not in sect
     gen = src[src.index("# ---- images and video on your server (6b356)"):src.index("def server_add(ctx, d: dict)")]
     out["nolog"] = not re.search(r"\bprint\(|logging|usage_note", gen + sect)
+    out["profile_writer"] = ("ctx.write_bytes(" in sect and not re.search(r"\bopen\(|os\.open\(|fdopen|stage_path|_media_land|write_text|write_bytes\(b", sect))
     out["no_workflow"] = not re.search(r"class_type|CheckpointLoader|KSampler|UNETLoader|ckpt_name|safetensors", gen + sect)
     out["public"] = '"gen": e.get("gen"),' in src and '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),' in src
     out["refresh_points"] = (src.count("server_gen_refresh(") == 4 and "                server_gen_refresh(e)        # what it can make (6b356)" in src
@@ -26684,15 +26736,18 @@ _G56_MUT = [
     ("a prompt not capped", 'prompt=str(prompt or "")[:1000])', 'prompt=str(prompt or ""))'),
     ("a graph can ride along", 'body = dict(opts, kind=kind, prompt=str(prompt or "")[:1000])', 'body = dict(opts, kind=kind, prompt=str(prompt or "")[:1000], workflow={"1": {}})'),
     ("a job id believed unchecked", '    if not (isinstance(jid, str) and _SRV_GEN_ID.fullmatch(jid)):', '    if not isinstance(jid, str):'),
-    ("a failure answered with nothing", '        status("%s couldn\\u2019t make the %s (%s). Trying another way." % (name, what, why))\n        return False',
-     '        status("%s couldn\\u2019t make the %s (%s). Trying another way." % (name, what, why))\n        return True'),
+    ("a job abandoned when the reader's pipe breaks", '                except (BrokenPipeError, ConnectionResetError):\n                    # the reader left between two polls', '                except ZeroDivisionError:\n                    # the reader left between two polls'),
+    ("a failure answered with nothing", '        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))\n        return False',
+     '        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))\n        return True'),
     ("a server that failed not marked down", '        if k in ("offline", "tls", "crypto"):\n            server_mark_down(', '        if False:\n            server_mark_down('),
     ("a WebP clip saved as a video", '    sub = VIDEO_SUB if ctype == "video/mp4" else IMAGE_SUB', '    sub = VIDEO_SUB if kind == "video" else IMAGE_SUB'),
     ("Stop going on to another way", '        step("srvgen", "Stopped", "done", "")\n        return True', '        step("srvgen", "Stopped", "done", "")\n        return False'),
     ("a wake not said", '    for _wn, _wok in server_take_wake_notes():\n        status(', '    for _wn, _wok in []:\n        status('),
-    ("a full disk covered by another way", '    except OSError:\n        emit(AppText("\\u26a0\\ufe0f %s made the %s, but', '    except ZeroDivisionError:\n        emit(AppText("\\u26a0\\ufe0f %s made the %s, but'),
+    ("a full disk covered by another way", '    except OSError:\n        emit(AppText("⚠️ %s made the %s, but', '    except ZeroDivisionError:\n        emit(AppText("⚠️ %s made the %s, but'),
     ("a stale profile covered up", '    except StaleProfile:\n        raise\n    except OSError:\n        emit(AppText(', '    except (StaleProfile, OSError):\n        emit(AppText('),
-    ("the settings not kept beside the file", '        _render_note(out, used, secs)', '        pass'),
+    ("the settings not kept beside the file", '            ctx.write("%s/%s.render.json" % (sub, iid), used)', '            pass'),
+    ("a write outside the profile's writer", '        ctx.write_bytes("%s/%s%s" % (sub, iid, ext), data, mode=0o600)',
+     '        path = ctx.path("%s/%s%s" % (sub, iid, ext))\n        os.makedirs(os.path.dirname(path), exist_ok=True)\n        open(path, "wb").write(data)'),
     ("a size note always", '    if (max(_rw, _rh) > SRV_GEN_SIDE[kind][1] or _rw * _rh > SRV_GEN_PIXELS[kind]):', '    if True:'),
     ("Cloud Only asking the server for a video", '            if not cloud_only:\n                try:\n                    _sg_use, _sg_n = resolve_overrides("video"',
      '            if True:\n                try:\n                    _sg_use, _sg_n = resolve_overrides("video"'),
