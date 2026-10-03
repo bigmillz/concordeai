@@ -19119,14 +19119,18 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
            "video/mp4": ".mp4"}[ctype]
     sub = VIDEO_SUB if ctype == "video/mp4" else IMAGE_SUB
     try:
-        out = stage_path(ext)
-        fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
+        # through the profile's own writer, checked against the active profile at
+        # the moment of writing: after a switch nothing lands (StaleProfile)
+        iid = _media_id()
         used = {"w": opts["width"], "h": opts["height"]}
         used.update({k: opts[k] for k in ("seed", "frames") if k in opts})
-        _render_note(out, used, secs)
-        path = _media_land(ctx, sub, out)
+        used["secs"] = round(secs, 1)
+        ctx.write_bytes("%s/%s%s" % (sub, iid, ext), data, mode=0o600)
+        path = ctx.path("%s/%s%s" % (sub, iid, ext))
+        try:
+            ctx.write("%s/%s.render.json" % (sub, iid), used)
+        except OSError:
+            pass
     except StaleProfile:
         raise
     except OSError:
