@@ -9,6 +9,15 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b365 — the stability test runs one load at a time by default (per Patrick)
+
+- `stability-test.sh` with no options ran "all" (cpu, memory and the card at
+  once), so a crash could not name its cause. The default is now
+  `cpu,gpu,memory`, 10 minutes each, and each phase is announced with a
+  "NEXT: gpu for 10 min ... if the server crashes now, gpu is the one" line
+  before it starts. `--phases ...,all` still adds the combined run.
+  Test: `test_the_default_is_one_load_at_a_time`.
+
 ## 6b364 — the server sleeps with people logged in (per Patrick)
 
 - Auto sleep never fired on a server with an open SSH tab or console login:

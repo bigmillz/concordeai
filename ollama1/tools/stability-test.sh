@@ -12,9 +12,9 @@
 #            nonstop (Ollama), which loads its compute and its memory both
 #   all      all three at once (the combination that crashed it)
 #
-#   sudo bash stability-test.sh                 all three at once, 10 minutes
+#   sudo bash stability-test.sh                 one load at a time: cpu, then gpu, then memory, 10 minutes each
 #   sudo bash stability-test.sh --minutes 30    a longer soak
-#   sudo bash stability-test.sh --phases cpu,memory,gpu,all   each alone first, then all at once
+#   sudo bash stability-test.sh --phases cpu,gpu,memory,all   each alone first, then all at once
 #   sudo bash stability-test.sh --model gemma4:12b   the model for the gpu load
 #   bash stability-test.sh status               the last run, and any hardware
 #                                               errors logged since this boot
@@ -40,7 +40,7 @@ GPU_ABORT_C=105
 MODEL=gemma4:12b
 MINUTES=10
 SECS_OVERRIDE=""
-PHASES=all
+PHASES=cpu,gpu,memory
 
 usage() { awk 'NR > 1 && /^#/ {sub(/^# ?/, ""); print; next} NR > 1 {exit}' "$0"; }
 say() { printf '%s\n' "$*" | tee -a "$LOG"; }
@@ -186,6 +186,7 @@ any_alive() { local p; for p in "$@"; do kill -0 "$p" 2>/dev/null && return 0; d
 run_phase() {
   local name=$1 secs=$2 errs0 errs1 maxc='' maxg='' c g verdict="OK" why="" p rc n=0
   say ""
+  say "NEXT: $name for $((secs / 60)) min ($secs s). If the server crashes now, $name is the one."
   say "== $name, $secs s   ($(date '+%H:%M:%S'))"
   state "status=running" "phase=$name" "started=$(date '+%Y-%m-%dT%H:%M:%S%z')" "minutes=$MINUTES"
   GPU_OK=$(mktemp)

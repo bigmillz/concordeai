@@ -318,16 +318,21 @@ class TestStabilityTest(unittest.TestCase):
         self.assertRegex(src, r'num_ctx\\":8192,\\"num_predict\\":8\}')    # read a lot, say little
         self.assertRegex(src, r'num_ctx\\":8192,\\"num_predict\\":500\}')  # say a lot
 
-    def test_the_default_is_everything_at_once(self):
-        """No options: one phase, 'all' (CPU, memory and GPU together), not the
-        four separate ones."""
+    def test_the_default_is_one_load_at_a_time(self):
+        """No options: cpu, then gpu, then memory, each alone and announced
+        before it starts; never 'all' (a crash must name one load)."""
         code, out = self.run_script("--seconds", "3")
         self.assertEqual(code, 0, out)
         rec = self.record()
-        self.assertIn("result all OK", rec)
-        for other in ("result cpu", "result memory", "result gpu"):
-            self.assertNotIn(other, rec)
-        self.assertIn("phases all, 10 min each", out)
+        for ok in ("result cpu OK", "result gpu OK", "result memory OK"):
+            self.assertIn(ok, rec)
+        self.assertNotIn("result all", rec)
+        self.assertLess(rec.index("result cpu"), rec.index("result gpu"))
+        self.assertLess(rec.index("result gpu"), rec.index("result memory"))
+        self.assertIn("phases cpu,gpu,memory, 10 min each", out)
+        for name in ("cpu", "gpu", "memory"):
+            self.assertIn("NEXT: %s for" % name, out)
+        self.assertLess(out.index("NEXT: gpu"), out.index("== gpu"))
 
     def test_a_gpu_phase_with_no_answers_fails(self):
         code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_NO_ANSWER": "1"})
