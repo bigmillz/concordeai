@@ -28104,6 +28104,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _ovr, _pclean, _onotes = gen_overrides(prompt, _skey, _loose, _pnote)
         _ptext = _pclean if _ovr else prompt
         vid_subject = video_intent(_ptext) if not images else None
+        # A FRESH VIDEO ASKED "AS A GIF" (6b356 gauntlet): the overrides above were
+        # read for a picture (nothing earlier to say otherwise), and a picture has
+        # no GIF, so the format was dropped and the server filmed an MP4 the person
+        # hadn't asked for. A video's own words are read for a video, as the
+        # follow-up branch below does
+        if vid_subject and _skey != "video":
+            _skey = "video"
+            _ovr, _pclean, _onotes = gen_overrides(prompt, "video", _loose, {})
+            _pnote = {}
         img_subject = (image_intent(_ptext)
                        if not images and not vid_subject else None)
         # a picture that already exists is a search, not a commission

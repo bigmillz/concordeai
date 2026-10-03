@@ -4433,7 +4433,7 @@ check("per-task wiring: lanes, vision first, refusals, titles/memory/pins, funne
       '_fl = work_ladder("code")' in _MILLENAI_SRC
       and "if images and _vis_cloud and _cloud_vision():" in _MILLENAI_SRC
       # (6b334) and not for a pick of your own server's model
-      and "and not _vis_cloud and not _vis_local\n                and not _srv_lbl):" in _MILLENAI_SRC
+      and "and not _vis_cloud and not _vis_local\n                and not _srv_lbl and _vis_srv is None):" in _MILLENAI_SRC
       and "def _walk_ladder() -> bool:" in _MILLENAI_SRC
       and "kwargs={\"conf\": _ans_conf, \"cloud_only\": cloud_only}" in _MILLENAI_SRC
       and "make_title(txt, conf=_conf)" in _MILLENAI_SRC
@@ -4542,10 +4542,12 @@ check("per-task review fixes: titles per request, badge, sweeps",
       and 'json.dumps({"w": "cloud"})' in _MILLENAI_SRC
       and 'd.w==="cloud"' in page
       and ("if (images and not cloud_only and not _vis_cloud and not _vis_local\n"
-           "                and not _srv_lbl):") in _MILLENAI_SRC
+           "                and not _srv_lbl and _vis_srv is None):") in _MILLENAI_SRC
       and "if not quiet:        # a title that merely mentions billing" in _MILLENAI_SRC
       and "repos.update(r[0] for r in RETIRED_MODELS.values() if r[0])" in _MILLENAI_SRC
-      and "elif not cloud_only:\n                                run_model(small" in _MILLENAI_SRC
+      and "elif not cloud_only:\n                                # an answer of this computer's: the person's\n"
+          "                                # server pins it first (6b357)" in _MILLENAI_SRC
+      and "                                else:\n                                    run_model(small, _pin_ask, got2.append)" in _MILLENAI_SRC
       and "Cloud power is off, so your cloud key can't drive" in _MILLENAI_SRC)
 # 6b308, per Patrick: the MODELS AVAILABLE chip ran 50 px past the
 # sidebar and squeezed the wordmark to nothing (its full-width rule was
@@ -21112,6 +21114,11 @@ def _p7c_pins(src):
         "memory": "            out = None if server_label(label) else server_side_text(ask, base)\n" in src,
         "pins": "                                _ps = (None if server_label(small)\n"
                 "                                       else server_side_text(_pin_ask, user_base))\n" in ch,
+        "a video's own overrides": "        if vid_subject and _skey != \"video\":\n            _skey = \"video\"\n"
+                                   "            _ovr, _pclean, _onotes = gen_overrides(prompt, \"video\", _loose, {})\n" in ch,
+        "no wake from a side pass": not any(
+            w in _p2_fn(src, f) for f in ("server_side_pick", "server_side_text", "server_vision_pick", "server_compositor")
+            for w in ("server_wake", "server_refresh_modes", "server_check(")),
         "rescue": "                _rs = (server_side_pick(user_base, \"fast\", \"normal\")\n                       if not images else None)\n" in ch
         and "                if not sent[0]:\n                    try:\n                        pulled = ollama_pulled_tags() or set()" in ch,
     }
@@ -21404,6 +21411,7 @@ _P2_MUT = [
     ("the place pins on this computer", '                                _ps = (None if server_label(small)\n                                       else server_side_text(_pin_ask, user_base))\n',
      '                                _ps = None\n'),
     ("the rescue never on the server", '                _rs = (server_side_pick(user_base, "fast", "normal")\n                       if not images else None)\n', '                _rs = None\n'),
+    ("a fresh video's overrides read for a picture", '        if vid_subject and _skey != "video":\n            _skey = "video"\n', '        if False:\n            _skey = "video"\n'),
     ("a fallback answer badged as the server", '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}', ''),
 ]
 _p2m = []
@@ -22140,12 +22148,16 @@ def _modes_live39(inst, sid, svn, only=None):
                 withpic = [c for c in _chats39()[n_st:] if (c[2]["messages"][-1] or {}).get("images")]
                 return {"status": s_, "text": t_, "frames": fr_, "loc": _loc39(inst)[n_loc:],
                         "pic": [c[2]["model"] for c in withpic]}
-            # no reader on the server first: this computer's vision model, as before (what it asked is remembered:
-            # a model's capabilities don't change under one tag, so the reader comes as a model of its own)
+            # no reader on the server first: this computer's vision model, as before. What the app asks the server about a
+            # model is remembered for as long as the app runs (a tag's capabilities don't change), so this group asks
+            # about models of its own: small:8b is set aside (the later checks of the real gateway ask about it afresh,
+            # and the finally below puts it back) and the reader arrives as a model that was never asked about
+            _o1("/drop", {"name": "small:8b"})
+            q("/api/servers/test", "POST", {"id": sid})
             v6 = prun(_page_body39("Fast", "what is in this picture 357f", images=PIC), "357f")
             got["no reader on the server: this computer, as before"] = (
                 v6["pic"] == [] and ("LOCAL-ANSWER-Qwen 3.5 Vision 9B" in v6["text"] or "vision engine" in v6["text"]))
-            _o1("/clone", {"name": "aaa-vl:8b", "from": "small:8b"})
+            _o1("/clone", {"name": "aaa-vl:8b", "from": "alpha:8b"})
             _o1("/vision", {"name": "aaa-vl:8b"})
             q("/api/servers/test", "POST", {"id": sid})
             v1 = prun(_page_body39("Fast", "what is in this picture 357a", images=PIC), "357a")
@@ -25782,7 +25794,7 @@ def _w46c_wake(src):
     # the chat's page: told after the headers, notes cleared before a request
     h0 = src.index("server_take_wake_notes()           # none left from an earlier request")
     h1 = src.index("server_refresh_modes(self.ctx)", h0)
-    h2 = src.index("for _wn, _wok in server_take_wake_notes():")
+    h2 = src.index("for _wn, _wok in server_take_wake_notes():", h1)
     out["handler"] = (h0 < h1 < h2 and src.index("def status(text: str):", h1) < h2
                       and 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)' in src[h2:h2 + 200])
     # first-token deadlines start after the wake: the wake is in the refresh, before any deadline is set
