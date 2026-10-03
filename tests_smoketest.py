@@ -9920,7 +9920,7 @@ check("ISO-14: new pictures and videos get a 32-hex random name",
       and 'unit = "concorde-job-%s" % secrets.token_hex(3)' in _MILLENAI_SRC
       # (6b329) the four: a cloud picture, a render landing, a Veo clip, the def;
       # (6b330) and the profiles hook's stand-in for the Veo landing
-      and _MILLENAI_SRC.count("_media_id()") == 5
+      and _MILLENAI_SRC.count("_media_id()") == 6          # (6b356) + the server's picture or clip
       and "    iid = _media_id()\n" in _MILLENAI_SRC
       and '    name = IMAGE_SUB + "/" + _media_id() + ext\n' in _MILLENAI_SRC
       and 'name = VIDEO_SUB + "/" + _media_id() + ".mp4"\n' in _MILLENAI_SRC

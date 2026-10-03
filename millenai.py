@@ -19129,6 +19129,8 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
         path = ctx.path("%s/%s%s" % (sub, iid, ext))
         try:
             ctx.write("%s/%s.render.json" % (sub, iid), used)
+        except StaleProfile:
+            raise                  # a switch mid-save is never "just a note that didn't save"
         except OSError:
             pass
     except StaleProfile:
