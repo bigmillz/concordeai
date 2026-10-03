@@ -4436,7 +4436,7 @@ check("per-task wiring: lanes, vision first, refusals, titles/memory/pins, funne
       and "and not _vis_cloud and not _vis_local\n                and not _srv_lbl and _vis_srv is None):" in _MILLENAI_SRC
       and "def _walk_ladder() -> bool:" in _MILLENAI_SRC
       and "kwargs={\"conf\": _ans_conf, \"cloud_only\": cloud_only}" in _MILLENAI_SRC
-      and "make_title(txt, conf=_conf)" in _MILLENAI_SRC
+      and "make_title(txt, conf=_conf, ask_server=not _co)" in _MILLENAI_SRC
       and "fast_cloud_ladder(utility=True) if effort == \"fast\"" in _MILLENAI_SRC
       and "[cloud_conf()]" not in _MILLENAI_SRC
       and "ladder = work_ladder(\"work\")" in _MILLENAI_SRC
@@ -19199,13 +19199,14 @@ def _soc_pins(src):
         in ch,
         "export title": "                or ((make_title(src[:600], server=_srv_lbl)\n"
                         "                     if (_srv_only or _srv_lbl) else\n"
-                        "                     make_title(src[:600], local=not _seat_fb))" in ch,
+                        "                     make_title(src[:600], local=not _seat_fb,\n"
+                        "                                ask_server=not cloud_only))" in ch,
         "title ticket": "            if (_srv_only or _srv_lbl) and _title_cid and not _gone:\n"
                         "                _srv_only_chats[(user_base.name, _title_cid)] = (\n"
                         "                    _srv_lbl if _model_said[0] and not _so_fail else \"\",\n"
                         "                    time.time())" in ch
         and "        _srv_only_chats.pop((self.ctx.name, _title_cid), None)   # 6b337" in ch,
-        "title by the server": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf)")
+        "title by the server": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf, ask_server=not _co)")
         and "_so = (_srv_only_chats.get((self.ctx.name, _tcid))" in tit,
         "tiers rows": "                out.update(server_only_tiers(self.ctx))" in src,
         "no benchmark hold": '    if srv_only_tier(req.get("tier")) and not req.get("agent"):' in src,
@@ -19640,12 +19641,12 @@ _SO_MUT = [
     ("a local rescue for a server pick", '            if not sent[0] and not cloud_only and not _srv_lbl:',
      '            if not sent[0] and not cloud_only:'),
     ("a memory pass after a refusal", '                    and not _gone and not _so_fail\n', '                    and not _gone\n'),
-    ("a title by a local model", 'make_title(txt, server=_so[0])', 'make_title(txt, conf=_conf)'),
+    ("a title by a local model", 'make_title(txt, server=_so[0])', 'make_title(txt, conf=_conf, ask_server=not _co)'),
     ("no title ticket", '            if (_srv_only or _srv_lbl) and _title_cid and not _gone:', '            if False:'),
     ("a title that falls to a local model", '            return _clean_title("".join(parts))\n        except Exception:\n            return ""',
      '            return _clean_title("".join(parts))\n        except Exception:\n            pass'),
     ("an export titled by a local model", 'make_title(src[:600], server=_srv_lbl)', 'make_title(src[:600])'),
-    ("a seat's export titled by a local model", 'make_title(src[:600], local=not _seat_fb))', 'make_title(src[:600]))'),
+    ("a seat's export titled by a local model", 'make_title(src[:600], local=not _seat_fb,', 'make_title(src[:600], local=True,'),
     ("no tiers row", 'out.update(server_only_tiers(self.ctx))', 'pass'),
     ("web search touched", '        bookish = False\n        placey = False\n',
      '        bookish = False\n        placey = _srv_only and False\n'),
@@ -20573,7 +20574,7 @@ def _p2c_pins(src):
         "seat title": "            elif _seat_fb and _title_cid and not _gone:\n" in ch
         and "                _seat_t = server_seat_title(\n                    council, _seat_fb, _seat_res[0], _model_said[0],\n"
             "                    bool(_ans_conf), lambda l: server_label_down(user_base, l))\n                if _seat_t is not None:\n" in ch
-        and "                     make_title(src[:600], local=not _seat_fb))" in ch,
+        and "                     make_title(src[:600], local=not _seat_fb,\n                                ask_server=not cloud_only))" in ch,
         "funnel refresh": "        server_refresh_modes(bound_ctx())\n        srv = server_funnel_pick(bound_ctx(), effort)" in src
         and "            with server_first_deadline(30 if effort == \"fast\" else 60):\n                run_model(srv[\"label\"], msgs, parts.append)" in src
         and "            server_mark_down(bound_ctx(), srv[\"server\"], str(exc))" in src
@@ -20591,7 +20592,7 @@ def _p4c_rules(src):
     asked = []
     fns = {"re": re, "_IMG_NEWTOPIC": re.compile(r"^\\b$"), "image_intent": lambda t: None, "video_intent": lambda t: None,
            "export_intent": lambda *a: None, "_IMG_CHANGE": re.compile(r"(?P<rest>.*)"), "_subject_words": lambda s_: set(),
-           "_IMG_LEADIN": re.compile(r"^$"), "_refine_with_model": lambda prev, said: asked.append(said) or "a bluer cat"}
+           "_IMG_LEADIN": re.compile(r"^$"), "_refine_with_model": lambda prev, said, server=True: asked.append(said) or "a bluer cat"}
     exec(_p2_fn(src, "image_followup"), fns)
     r1 = fns["image_followup"]("make it bluer", "a red cat", refine=False)
     n1 = len(asked)
@@ -20601,8 +20602,8 @@ def _p4c_rules(src):
     S = {"A · x": "L", "B · y": "L"}
     got = {
         "no refine for Only": n1 == 0 and r1 != "a bluer cat" and len(asked) == 1 and r2 == "a bluer cat"
-        and "    said = _refine_with_model(prev_subject, t) if refine else \"\"" in src
-        and "refine=not srv_only_tier(tier))" in ch,
+        and "    said = _refine_with_model(prev_subject, t, server) if refine else \"\"" in src
+        and "refine=not srv_only_tier(tier),\n                                          server=not cloud_only)" in ch,
         # "<name> Only" makes no picture or video (said, one line, nothing made, before the benchmark hold)
         "no pictures": "        if _srv_only and (img_subject or vid_subject):\n" in ch
         and "            emit(AppText(\"\\u26a0\\ufe0f %s Only can\\u2019t make pictures or \"\n                         \"videos, and nothing was made.\"" in ch
@@ -20983,6 +20984,13 @@ def _p7c_side(src):
                                            and ns["server_label_down"](ctx, "Desk · qwen3:14b"))
     calls.clear()
     got["down: not asked"] = ns["server_side_text"](ask, ctx) is None and calls == []
+    # a first word that took too long (a cold load of the title model) leaves the server for this pass: it is NOT down
+    ns["server_check"] = lambda e, limit=None: None
+    _so_seen(ns, ents["Desk"], models, gpu=dict(_P2_GPU))
+    mode["x"] = ns["ServerSlow"]("offline", "Desk sent nothing for 30 seconds, so the answer stopped there.")
+    got["too slow: None, not down"] = (ns["server_side_text"](ask, ctx) is None
+                                       and not ns["server_label_down"](ctx, "Desk \u00b7 qwen3:14b")
+                                       and ns["ServerSlow"].slow is True and ns["ServerError"].slow is False)
     n0, c0, e0 = _p2_ns(src, [])
     got["no server"] = n0["server_side_text"](ask, c0) is None
     return all(got.values()), got
@@ -21111,7 +21119,7 @@ def _p7c_pins(src):
         "cloud, then the server": "            if cloud_only or (not _vis_local and _vis_srv is None):\n" in ch
         and "            return cloud_only or (not _vis_local and _vis_srv is None)" in ch,
         "no download": "                and not _srv_lbl and _vis_srv is None):\n            try:\n                start_model_downloads" in ch,
-        "memory": "            out = None if server_label(label) else server_side_text(ask, base)\n" in src,
+        "memory": "            out = (None if server_label(label) or cloud_only\n                   else server_side_text(ask, base))\n" in src,
         "pins": "                                _ps = (None if server_label(small)\n"
                 "                                       else server_side_text(_pin_ask, user_base))\n" in ch,
         "a video's own overrides": "        if vid_subject and _skey != \"video\":\n            _skey = \"video\"\n"
@@ -21121,6 +21129,90 @@ def _p7c_pins(src):
             for w in ("server_wake", "server_refresh_modes", "server_check(")),
         "rescue": "                _rs = (server_side_pick(user_base, \"fast\", \"normal\")\n                       if not images else None)\n" in ch
         and "                if not sent[0]:\n                    try:\n                        pulled = ollama_pulled_tags() or set()" in ch,
+    }
+    return all(got.values()), got
+
+
+def _p8c_cloud_only(src):
+    """6b357 (review): Cloud Only never sends text to a server. The title (and an export's title), an image prompt's rewrite
+    and the memory pass skip the server when asked to (the handler passes cloud_only), and /api/title knows a Cloud Only
+    chat from the ticket its last turn left; the same calls without it still ask the server."""
+    ran, srv = [], []
+    base = {"TITLE_PROMPT": "NAME IT: ", "_clean_title": lambda x: " ".join(str(x).split())[:40],
+            "server_side_text": lambda msgs, ctx=None, role="fast": (srv.append(msgs[-1]["content"][:8]), "Server title")[1],
+            "_ticket_conf": lambda c: None, "cloud_role_model": lambda *a: "", "cloud_text": lambda *a, **k: "",
+            "ollama_pulled_tags": lambda: set(), "model_cached": lambda l, p=None: True, "model_fits_memory": lambda l: True,
+            "slow_giant": lambda l: False, "MODEL_ROUTES": {"Llama 3.2 3B": ("mlx", 1)}, "MODEL_MEM_BYTES": {"Llama 3.2 3B": 3e9},
+            "_engine_up": lambda p: True, "strip_think": lambda x: x, "strip_special": lambda x: x,
+            "_looks_degenerate": lambda x: False, "re": re,
+            "run_model": lambda l, m, cb, **k: (ran.append(l), cb("Local title"))[1], "server_stream": lambda *a, **k: None}
+    ns = dict(base)
+    exec(_p2_fn(src, "make_title"), ns)
+    got = {"title: asked the server": ns["make_title"]("hello there") == "Server title" and len(srv) == 1,
+           "title: Cloud Only skips it": (ns["make_title"]("hello there", ask_server=False) == "Local title"
+                                          and len(srv) == 1 and ran == ["Llama 3.2 3B"])}
+    ns = dict(base)
+    ns["_REFINE_PROMPT"] = "%s / %s"
+    exec(_p2_fn(src, "_refine_with_model"), ns)
+    srv.clear(), ran.clear()
+    ns["run_model"] = lambda l, m, cb, **k: (ran.append(l), cb("a blue bicycle by the sea"))[1]
+    ns["server_side_text"] = lambda msgs, ctx=None, role="fast": (srv.append(1), "a red bicycle by the sea at dusk")[1]
+    r_srv = ns["_refine_with_model"]("a red bicycle", "at dusk")
+    r_co = ns["_refine_with_model"]("a red bicycle", "make it blue", False)
+    got["rewrite: the server's, and Cloud Only's never"] = (r_srv == "a red bicycle by the sea at dusk" and len(srv) == 1
+                                                           and r_co == "a blue bicycle by the sea" and ran == ["Llama 3.2 3B"])
+    return all(got.values()), got
+
+
+def _p8c_slow(src):
+    """6b357 (review): a time limit is "left for this computer", never "down". A picture or a video that outlasted its cap
+    (ServerSlow), like a first word that took too long, says it took too long and falls back WITHOUT marking the server
+    down; a refusal or a connection failure still does."""
+    downs, said, steps = [], [], []
+    ns = {"server_refresh_modes": lambda ctx: None, "server_take_wake_notes": lambda: [], "_srv_plain": lambda n: n,
+          "server_gen_pick": lambda ctx, kind: {"name": "Desk", "id": "x"}, "srv_gen_opts": lambda kind, use: {"width": 8, "height": 8},
+          "ServerGenStopped": type("ServerGenStopped", (Exception,), {}),
+          "StaleProfile": type("StaleProfile", (OSError,), {}), "_client_gone": lambda sock: False,
+          "server_mark_down": lambda ctx, n, w: downs.append((n, w)), "_SRV_GEN_WHY": {"offline": "didn’t answer"}}
+    exec(src[src.index("class ServerError(RuntimeError):"):src.index("def _srv_conn(")], ns)
+    exec(_p2_fn(src, "server_make"), ns)
+    box = {}
+
+    def gen(e, kind, subject, opts, status, gone):
+        raise box["x"]
+    ns["server_generate"] = gen
+    got = {}
+    for name, exc in (("too long", ns["ServerSlow"]("offline", "Desk took more than 5 minutes to make the picture.")),
+                      ("a refusal", ns["ServerError"]("offline", "Desk didn’t answer."))):
+        downs.clear(), said.clear()
+        box["x"] = exc
+        r = ns["server_make"](None, "image", "a cat", {}, [], None, lambda *a: None, lambda *a: steps.append(a), said.append)
+        got[name] = (r is False and (downs == []) == (name == "too long")
+                     and any(("took too long" in x) == (name == "too long") for x in said[-1:]))
+    # where the limits are raised: a first word or a quiet stretch past the limit, and a job past its cap
+    got["limits are slow"] = ('                    raise ServerSlow("offline", "%s sent nothing for %s, so "' in src
+                              and '                raise ServerSlow("offline", "%s took more than %d minutes to make the %s, so it was "' in src)
+    return all(got.values()), got
+
+
+def _p8c_pins(src):
+    """6b357 (review), where Cloud Only meets the three sites that reached a server: the image follow-up's rewrite, an
+    export's title and /api/title (its ticket, set by the Cloud Only turn); every other server-first call site is
+    guarded by its own cloud_only line or never runs in a Cloud Only chat (listed in NOTES)."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    ti = src[src.index('        if self.path == "/api/title":'):]
+    ti = ti[:ti.index('        if self.path == "/api/open-logs":')]
+    got = {
+        "follow-up": "                                          refine=not srv_only_tier(tier),\n"
+                     "                                          server=not cloud_only)" in ch
+        and "    said = _refine_with_model(prev_subject, t, server) if refine else \"\"" in src,
+        "export title": "                     make_title(src[:600], local=not _seat_fb,\n"
+                        "                                ask_server=not cloud_only))" in ch,
+        "/api/title": "            _co = bool(_tcid and time.time() - _cloud_only_chats.get(" in ti
+        and "make_title(txt, conf=_conf, ask_server=not _co)" in ti,
+        "the ticket": "        if cloud_only and _title_cid:\n            _cloud_only_chats[(self.ctx.name, _title_cid)] = time.time()" in ch
+        and "        _cloud_only_chats.pop((self.ctx.name, _title_cid), None)  # 6b357" in ch,
+        "memory": "            out = (None if server_label(label) or cloud_only\n                   else server_side_text(ask, base))" in src,
     }
     return all(got.values()), got
 
@@ -21181,7 +21273,7 @@ def _p3c_quiet(src):
                         "                _srv_only_chats[(user_base.name, _title_cid)] = (\n"
                         "                    _srv_lbl if _model_said[0] and not _so_fail else \"\",\n"
                         "                    time.time())" in ch,
-        "title from the ticket": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf)")
+        "title from the ticket": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf, ask_server=not _co)")
         and "            if _so and time.time() - _so[1] < 300:" in tit,
         "no memory pass without an answer": "                    and not _gone and not _so_fail\n"
                                             "                    and not (_srv_lbl and not _model_said[0])\n" in ch,
@@ -21195,6 +21287,11 @@ def _p3c_quiet(src):
 
 
 _P2_CHECKS += [
+    ("Cloud Only never sends text to a server: a title, an image prompt's rewrite and the memory pass skip it when told "
+     "to; the same calls otherwise still ask it (6b357 review)", _p8c_cloud_only),
+    ("a time limit is left for this computer, not marked down: a job past its cap, like a slow first word; a refusal "
+     "still marks the server down (6b357 review)", _p8c_slow),
+    ("Cloud Only meets the follow-up, an export's title and /api/title (pinned) (6b357 review)", _p8c_pins),
     ("a picture in a mode: the server's model that says it reads pictures, fits its card and isn't a coder, embedding or "
      "guard model; the strongest; asked at most six times, remembered; none with no server, the switch off or an error "
      "(6b357)", _p7c_vision),
@@ -21358,7 +21455,7 @@ _P2_MUT = [
     ("a seat's title when nothing asked the server", '        if not res:\n            return None\n', ''),
     ("a seat's title over a cloud answer", '    if not seat_fb or cloud_answered:\n        return None', '    if not seat_fb:\n        return None'),
     ("Only making pictures", '        if _srv_only and (img_subject or vid_subject):', '        if False:'),
-    ("Only wording a prompt with a model", '    said = _refine_with_model(prev_subject, t) if refine else ""', '    said = _refine_with_model(prev_subject, t)'),
+    ("Only wording a prompt with a model", '    said = _refine_with_model(prev_subject, t, server) if refine else ""', '    said = _refine_with_model(prev_subject, t, server)'),
     ("Only running an agent", '        if agent_name and srv_only_tier(tier):', '        if False:'),
     ("Only's agent not cleared", '            agent_name = ""\n        ag_system, ag_research, ag_remote = "", False, False', '        ag_system, ag_research, ag_remote = "", False, False'),
     ("an agent leaving Only on", '  if(name&&isSrvMode(tier)){tier="Fast";po.tier="Fast";}\n', ''),
@@ -21387,8 +21484,8 @@ _P2_MUT = [
     ("a side pass with no deadline", '        with server_first_deadline(SRV_SIDE_FIRST_S):\n            server_stream(m["label"], messages, parts.append)',
      '        if True:\n            server_stream(m["label"], messages, parts.append)'),
     ("a failed side pass not marked down", '        server_mark_down(ctx, m["server"], str(exc))\n        return None\n    return strip_think', '        return None\n    return strip_think'),
-    ("a Stop in a side pass marking the server down", '    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except Exception as exc:\n        server_mark_down(ctx, m["server"]',
-     '    except Exception as exc:\n        server_mark_down(ctx, m["server"]'),
+    ("a Stop in a side pass marking the server down", '    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except Exception as exc:\n        # a first word that took too long',
+     '    except Exception as exc:\n        # a first word that took too long'),
     ("a side pass on the strongest, not the quick", '    top = srv_rank(cands, role, effort, server_speeds(ctx))', '    top = srv_rank(cands, role, "normal", server_speeds(ctx))'),
     ("a picture to a model that doesn't read it", '            if _srv_reads_pictures(e, m["name"]):\n                return m', '            if True:\n                return m'),
     ("a coder reading the picture", '        if not (f["embed"] or f["guard"] or f["coder"]):', '        if not (f["embed"] or f["guard"]):'),
@@ -21396,9 +21493,9 @@ _P2_MUT = [
     ("a server error read as an answer", "            return None           # the server didn't answer: this computer reads it", '            raise'),
     ("the weakest reads it", '    ranked = sorted(cands, key=lambda m: (m.get("params") is None, -(m.get("params") or 0.0),',
      '    ranked = sorted(cands, key=lambda m: (m.get("params") is None, (m.get("params") or 0.0),'),
-    ("a title here before the server", '    t = server_side_text([{"role": "user", "content": TITLE_PROMPT + text[:600]}])\n    if t is not None:\n        return _clean_title(t)\n', ''),
+    ("a title here before the server", '    t = (server_side_text([{"role": "user", "content": TITLE_PROMPT + text[:600]}])\n         if ask_server else None)\n    if t is not None:\n        return _clean_title(t)\n', ''),
     ("a seat's title on this computer", '    if not local:\n        return ""\n', ''),
-    ("a rewrite here before the server", '        out = server_side_text([{"role": "user", "content": _REFINE_PROMPT % (prev_subject, said)}])', '        out = None'),
+    ("a rewrite here before the server", '        out = (server_side_text([{"role": "user", "content": _REFINE_PROMPT % (prev_subject, said)}])', '        out = (None'),
     ("the Remote agent never on the server", '    if _sd is not None:\n        return ("server", _sd["label"])', '    if False:\n        return ("server", _sd["label"])'),
     ("the Remote agent's turn with no deadline", '            with server_first_deadline(60.0):\n                run_model(who, convo, parts.append)', '            if True:\n                run_model(who, convo, parts.append)'),
     ("a failed Remote turn not marked down", '            server_mark_down(bound_ctx(), who.split(SERVER_SEP, 1)[0], str(exc))\n            return ""', '            return ""'),
@@ -21412,6 +21509,18 @@ _P2_MUT = [
      '                                _ps = None\n'),
     ("the rescue never on the server", '                _rs = (server_side_pick(user_base, "fast", "normal")\n                       if not images else None)\n', '                _rs = None\n'),
     ("a fresh video's overrides read for a picture", '        if vid_subject and _skey != "video":\n            _skey = "video"\n', '        if False:\n            _skey = "video"\n'),
+    ("a slow first word marking the server down", '        if not getattr(exc, "slow", False):\n            server_mark_down(ctx, m["server"], str(exc))', '        if True:\n            server_mark_down(ctx, m["server"], str(exc))'),
+    ("a job past its cap marking the server down", '        if k in ("offline", "tls", "crypto") and not getattr(exc, "slow", False):', '        if k in ("offline", "tls", "crypto"):'),
+    ("a first-word timeout not slow", '                    raise ServerSlow("offline", "%s sent nothing for %s, so "', '                    raise ServerError("offline", "%s sent nothing for %s, so "'),
+    ("a job cap not slow", '                raise ServerSlow("offline", "%s took more than %d minutes to make the %s, so it was "', '                raise ServerError("offline", "%s took more than %d minutes to make the %s, so it was "'),
+    ("a slow job said as an offline one", '        why = "took too long" if getattr(exc, "slow", False) else _SRV_GEN_WHY.get(k, "couldn’t make it")', '        why = _SRV_GEN_WHY.get(k, "couldn’t make it")'),
+    ("a Cloud Only follow-up rewritten by the server", '                                          server=not cloud_only)', '                                          server=True)'),
+    ("a Cloud Only export titled by the server", '                                ask_server=not cloud_only))', '                                ask_server=True))'),
+    ("a Cloud Only chat titled by the server", 'make_title(txt, conf=_conf, ask_server=not _co)', 'make_title(txt, conf=_conf)'),
+    ("a Cloud Only turn leaving no ticket", '        if cloud_only and _title_cid:\n            _cloud_only_chats[', '        if False:\n            _cloud_only_chats['),
+    ("a Cloud Only memory pass on the server", '            out = (None if server_label(label) or cloud_only\n', '            out = (None if server_label(label)\n'),
+    ("a Cloud Only title asking the server", '         if ask_server else None)', '         if True else None)'),
+    ("a Cloud Only rewrite asking the server", '               if server else None)', '               if True else None)'),
     ("a fallback answer badged as the server", '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}', ''),
 ]
 _p2m = []
@@ -22197,6 +22306,17 @@ def _modes_live39(inst, sid, svn, only=None):
                 and not any(h.startswith(("Summarise what this message", "You maintain long-term memory")) for h in lheads)
                 and isinstance(tj_, dict) and isinstance(tj_.get("title"), str))
             det["side"] = [heads, lheads, tj_]
+            # a Cloud Only chat's title never reaches the server (the same call for a pick of the person's did, above)
+            cb = _page_body39("Cloud Only", "tell me about lighthouses 357h")
+            _mchat39(inst, cb)
+            time.sleep(2.0)
+            n_st2 = len(_chats39())
+            q("/api/title", "POST", {"text": "tell me about lighthouses 357h", "chat_id": cb["chat_id"]})
+            time.sleep(1.5)
+            co_heads = [str(c[2]["messages"][-1]["content"])[:40] for c in _chats39()[n_st2:]]
+            got["a Cloud Only chat's title is never asked of the server"] = not any(
+                h.startswith(("Summarise what this message", "You maintain long-term memory")) for h in co_heads)
+            det["cloud only title"] = co_heads
         if only in (None, "funnel"):
             # a funnel stage in the page's shape: the server's model asks first, nothing runs here
             _o1("/reply", {"text": json.dumps({"q": "Which way should it lean?", "options": [
@@ -22244,7 +22364,8 @@ check("servers (live): a plain server pick starts no engine on this computer",
 _MUT39 = [
     ("a picture in a mode never asking the server", '            if _mode_pic:\n                try:\n                    _vis_srv = server_vision_pick(self.ctx)',
      '            if False:\n                try:\n                    _vis_srv = server_vision_pick(self.ctx)', "pic"),
-    ("the memory pass on this computer", '            out = None if server_label(label) else server_side_text(ask, base)', '            out = None', "pic"),
+    ("a Cloud Only chat titled by the server", 'make_title(txt, conf=_conf, ask_server=not _co)', 'make_title(txt, conf=_conf)', "pic"),
+    ("the memory pass on this computer", '                   else server_side_text(ask, base))', '                   else None)', "pic"),
     ("the handler not asking for a server merge", 'srv_merge=(tier in TIERS and not cloud_only))', 'srv_merge=False)', "modes"),
     ("the page's stale model used for a mode",
      '            model_name = ""\n        elif srv_only_tier(tier):', '        elif srv_only_tier(tier):', "modes"),

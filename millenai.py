@@ -5716,7 +5716,7 @@ def _clean_title(raw: str) -> str:
         else ""
 
 
-def make_title(text: str, conf=None, server=None, local: bool = True) -> str:
+def make_title(text: str, conf=None, server=None, local: bool = True, ask_server: bool = True) -> str:
     """Name a chat with a small model — reusing whatever engine is already
     loaded, so it costs almost nothing. A chat the cloud answered is
     named by that provider's quick model instead (6b308): a keys-only
@@ -5748,7 +5748,9 @@ def make_title(text: str, conf=None, server=None, local: bool = True) -> str:
                 return t
     # the person's server before this computer (6b357); one that answered
     # with no usable title is not asked again on this computer
-    t = server_side_text([{"role": "user", "content": TITLE_PROMPT + text[:600]}])
+    # (never in a Cloud Only chat: nothing of it goes to a server, ask_server False)
+    t = (server_side_text([{"role": "user", "content": TITLE_PROMPT + text[:600]}])
+         if ask_server else None)
     if t is not None:
         return _clean_title(t)
     if not local:
@@ -6650,7 +6652,7 @@ def _residual(text: str) -> str:
     return re.sub(r"[\s,.;:!?]+", " ", _FILLER.sub(" ", text or "")).strip()
 
 
-def image_followup(text: str, prev_subject: str, refine: bool = True):
+def image_followup(text: str, prev_subject: str, refine: bool = True, server: bool = True):
     """A new prompt when this message refines the picture just made, else
     None. Liberal by design: after an image, the burden is on a message
     to look like a NEW topic, not on it to look like a refinement.
@@ -6686,7 +6688,7 @@ def image_followup(text: str, prev_subject: str, refine: bool = True):
     rest = " ".join(toks).strip(" ,.")
     # refine=False: a model of this computer may not be asked ("<name> Only",
     # 6b339: it makes no picture, so it asks no model to word one)
-    said = _refine_with_model(prev_subject, t) if refine else ""
+    said = _refine_with_model(prev_subject, t, server) if refine else ""
     if said:
         return said
     if not rest:
@@ -6709,7 +6711,7 @@ _REFINE_PROMPT = (
     "one line, under 30 words, no quotes, no preamble, no explanation.")
 
 
-def _refine_with_model(prev_subject: str, said: str) -> str:
+def _refine_with_model(prev_subject: str, said: str, server: bool = True) -> str:
     """Let a model fold the change into the prompt. Only a model that is
     ALREADY resident is used — a cold multi-GB load to rewrite eight
     words would cost more than the picture (make_title, 6b247, uses the
@@ -6717,7 +6719,8 @@ def _refine_with_model(prev_subject: str, said: str) -> str:
     does not look like a prompt."""
     try:
         # the person's server first (6b357), then a model already resident here
-        out = server_side_text([{"role": "user", "content": _REFINE_PROMPT % (prev_subject, said)}])
+        out = (server_side_text([{"role": "user", "content": _REFINE_PROMPT % (prev_subject, said)}])
+               if server else None)
         if out is None:
             pulled = ollama_pulled_tags() or set()
             live = [l for l in MODEL_ROUTES
@@ -12817,7 +12820,8 @@ def _extract_memory(label: str, user_msg: str, base, conf=None,
             if not label:
                 return
             # a model of this computer's: the person's server first (6b357)
-            out = None if server_label(label) else server_side_text(ask, base)
+            out = (None if server_label(label) or cloud_only
+                   else server_side_text(ask, base))
             if out is None:
                 parts = []
                 run_model(label, ask, parts.append)
@@ -17200,9 +17204,20 @@ class ServerError(RuntimeError):
     (its str). kind: offline, tls, access, auth, clock, replay, busy,
     fit, missing, server, gone, unpaired, crypto."""
 
+    slow = False         # a time limit, not a refusal (ServerSlow): the server is up, only too slow for this
+
     def __init__(self, kind: str, text: str, code: str = ""):
         RuntimeError.__init__(self, text)
         self.kind, self.code = kind, code
+
+
+class ServerSlow(ServerError):
+    """A first word, a quiet stretch or a job that outlasted the limit this
+    caller gave it (6b357, review): the server is left for this computer for
+    this one, and is NOT marked down (a cold load of a model can take longer
+    than a side pass is willing to wait, and a healthy server must not be
+    skipped for a minute because of it)."""
+    slow = True
 
 
 def _srv_conn(e, timeout: float):
@@ -17424,7 +17439,7 @@ def server_stream(label: str, messages: list, emit) -> dict:
                     line = resp.readline(1 << 22)
                 except (TimeoutError, _socket.timeout):
                     _w = SRV_IDLE_S if got_any[0] else _first
-                    raise ServerError("offline", "%s sent nothing for %s, so "
+                    raise ServerSlow("offline", "%s sent nothing for %s, so "
                                       "the answer stopped there." % (
                                           e["name"], "%d minutes" % (_w // 60)
                                           if _w >= 120 else "%d seconds" % _w))
@@ -17575,6 +17590,9 @@ _SRV_PARAMS_RX = re.compile(r"(?<![\w.])e?(?:(\d+)x)?(\d+(?:\.\d+)?)([bm])(?![a-
 # (profile, chat id) -> (label or "", time): the chat's last answer was
 # "<server> Only", so its title goes to that server or nowhere
 _srv_only_chats = profile_cache("_srv_only_chats", {})
+# (profile, chat id) -> time: the chat's last turn was Cloud Only (6b357, review), so its
+# title is never asked of a server (/api/title carries no tier of its own)
+_cloud_only_chats = profile_cache("_cloud_only_chats", {})
 
 
 def srv_only_tier(tier) -> bool:
@@ -17968,7 +17986,9 @@ def server_side_text(messages: list, ctx=None, role: str = "fast"):
     except (StaleProfile, BrokenPipeError, ConnectionResetError):
         raise
     except Exception as exc:
-        server_mark_down(ctx, m["server"], str(exc))
+        # a first word that took too long leaves the server for this computer, for this pass only (6b357, review)
+        if not getattr(exc, "slow", False):
+            server_mark_down(ctx, m["server"], str(exc))
         return None
     return strip_think("".join(parts))
 
@@ -18584,7 +18604,7 @@ def server_generate(e, kind: str, prompt: str, opts: dict, status, gone=None) ->
                 _srv_gen_forget(e, jid)
                 raise ServerGenStopped("stopped")
             if time.monotonic() - t0 > SRV_GEN_CAP_S[kind]:
-                raise ServerError("offline", "%s took more than %d minutes to make the %s, so it was "
+                raise ServerSlow("offline", "%s took more than %d minutes to make the %s, so it was "
                                   "stopped." % (e["name"], SRV_GEN_CAP_S[kind] // 60, what))
             _srv_gen_wait(SRV_GEN_POLL_S)
             try:
@@ -19109,8 +19129,9 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
         raise
     except Exception as exc:
         k = getattr(exc, "kind", "")
-        why = _SRV_GEN_WHY.get(k, "couldn’t make it")
-        if k in ("offline", "tls", "crypto"):
+        why = "took too long" if getattr(exc, "slow", False) else _SRV_GEN_WHY.get(k, "couldn’t make it")
+        # a job that outlasted its cap is slow, not down (6b357, review)
+        if k in ("offline", "tls", "crypto") and not getattr(exc, "slow", False):
             server_mark_down(ctx, e["name"], "%s %s." % (name, why))
         step("srvgen", "%s couldn’t make the %s" % (name, what), "done", why)
         status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))
@@ -27582,11 +27603,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # server's model or not at all (6b337): never a local one
             _so = (_srv_only_chats.get((self.ctx.name, _tcid))
                    if _tcid else None)
+            _co = bool(_tcid and time.time() - _cloud_only_chats.get(
+                (self.ctx.name, _tcid), 0) < 300)
             if _so and time.time() - _so[1] < 300:
                 self._send_json({"title": make_title(txt, server=_so[0])
                                  if txt else ""})
                 return
-            self._send_json({"title": make_title(txt, conf=_conf)
+            self._send_json({"title": make_title(txt, conf=_conf, ask_server=not _co)
                              if txt else ""})
             return
         if self.path == "/api/open-logs":
@@ -27960,12 +27983,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _title_cid = str((self._turn or {}).get("id") or "")
         _last_cloud.pop((self.ctx.name, _title_cid), None)
         _srv_only_chats.pop((self.ctx.name, _title_cid), None)   # 6b337
+        _cloud_only_chats.pop((self.ctx.name, _title_cid), None)  # 6b357
         for _k in [k for k, v in list(_last_cloud.items())
                    if time.time() - v[1] > 300]:
             _last_cloud.pop(_k, None)
         for _k in [k for k, v in list(_srv_only_chats.items())
                    if time.time() - v[1] > 300]:
             _srv_only_chats.pop(_k, None)
+        for _k in [k for k, v in list(_cloud_only_chats.items())
+                   if time.time() - v > 300]:
+            _cloud_only_chats.pop(_k, None)
         if tier == "Smart":
             tier = "Fast"   # merged tiers (1.20) — old clients still send Smart
         if tier == "Best":
@@ -27973,6 +28000,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if tier == "Power":
             tier = "Pro"    # Pro absorbed Power (5.3)
         cloud_only = bool(TIERS.get(tier, {}).get("cloud_only"))
+        if cloud_only and _title_cid:
+            _cloud_only_chats[(self.ctx.name, _title_cid)] = time.time()
         # ADVANCED overrides (6b248, per Patrick): a custom run names its
         # own cloud voices and its own compositor. cloud=None means "no
         # opinion" (tier rules apply); cloud=[] means explicitly none.
@@ -28149,7 +28178,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _fu = _prev
                 else:
                     _fu = (image_followup(_pclean, _prev,
-                                          refine=not srv_only_tier(tier))
+                                          refine=not srv_only_tier(tier),
+                                          server=not cloud_only)
                            if _pclean else None) or (_prev if _ovr else None)
                 if _fu:
                     if _prev_img:
@@ -29185,7 +29215,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             ttl = next((b[2] for b in x_blocks(src) if b[0] == "h"), "") \
                 or ((make_title(src[:600], server=_srv_lbl)
                      if (_srv_only or _srv_lbl) else
-                     make_title(src[:600], local=not _seat_fb))
+                     make_title(src[:600], local=not _seat_fb,
+                                ask_server=not cloud_only))
                     if len(src) > 200 else "")
             step("export", "Writing the file", "run",
                  EXPORT_KIND.get(ext, ("", ext))[1])

@@ -62,6 +62,28 @@ the server trumps anything run on the local machine."
     computer), dictation (whisper on this Mac; the server kit has no speech
     model), picture and video MAKING (FLUX and Wan; a server has no image
     generator), an explicit local pick (the person chose it), and Cloud Only.
+- **The review of the merged side passes (two MEDIUM, fixed).**
+  - Cloud Only is exempt from server-first (Pat's privacy rule: nothing of a
+    Cloud Only chat goes to a server), and three sites broke it: the image
+    follow-up's rewrite (`image_followup(..., server=not cloud_only)`), an
+    export's title (`make_title(..., ask_server=not cloud_only)`) and
+    `/api/title`, which carries no tier: the Cloud Only turn leaves a ticket
+    (`_cloud_only_chats`, per profile and chat, voided by the chat's next
+    request, five minutes) that the title route reads. The memory pass also
+    skips the server under Cloud Only. Audit of every server-first call site:
+    guarded or never in a Cloud Only chat: the merge (`srv_merge`), the picture
+    reader (`_mode_pic`), the place pins and the rescue (`not cloud_only`), a
+    picture or video made on the server (`not cloud_only`), the mode refresh
+    (`not cloud_only`), funnels, Research and the Remote agent (their own
+    lanes: Cloud Only answers before them). Fixed: the three above and the
+    memory pass.
+  - A time limit is not "down" (`ServerSlow`, a `ServerError` whose `slow` is
+    true: a first word or a quiet stretch past the caller's limit, or a picture
+    or video past its 5/20-minute cap). A side pass or a long job that hit one
+    leaves the server for this computer, this once, and does NOT mark it down: a
+    cold load of the 7-15B title model can outlast 30 s, and a healthy server
+    must not be skipped for a minute. Refusals and connection failures still
+    mark it down. The seats' and councils' own marking is unchanged.
 - **The review of 6b344 (MED)**: the server merge caught every exception, so a
   Stop, a closed window or a profile switch while the server wrote the merge
   marked a healthy server down and, before the first word, started this Mac's
