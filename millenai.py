@@ -768,7 +768,7 @@ if HAS_WEBVIEW:
         # page says it can't start, rather than run with the bridge open
         pass
 
-APP_VERSION = "6.1.0"   # bump here — UI, window, DMG all follow
+APP_VERSION = "7.0.0"   # bump here — UI, window, DMG all follow
 # BETA HOLD (per Patrick): the 6.x line is beta until the kinks are out.
 # While > 0: every display surface says "beta N", release.sh publishes
 # as a GitHub PRERELEASE, and — because the desktop updater reads
@@ -784,7 +784,7 @@ APP_BETA = 0
 # release title, while KEEPING the prerelease hold above — an RC is
 # still not the stable build, so /releases/latest must not offer it.
 # Set back to 0 when 6.1 ships for real (after sign-on + cloud sync).
-APP_RC = 1
+APP_RC = 0
 # CHANNELS (6b285, per Patrick): stable, beta, nightly. A nightly is the
 # single rolling `nightly` release GitHub Actions rebuilds on every push
 # to main; CI stamps this constant with "<run> <sha7>" so the app knows
@@ -833,7 +833,7 @@ def spec_version() -> str:
     commit alone says nightly — no other build carries one — so the
     word goes: "6.0.4 · e6fb576". Betas and RCs already fit."""
     return short_version().replace(" nightly ", " \u00b7 ")
-APP_BUILD = 276               # integer compared against the GitHub release tag
+APP_BUILD = 277               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 try:                          # feeds the page ETag: an edited source must
     _SRC_MTIME = int(os.path.getmtime(__file__))   # never 304 as "unchanged"

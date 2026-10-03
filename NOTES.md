@@ -498,6 +498,22 @@ What changed (`lib/o1dashui.py` rewritten, new `lib/o1dashterm.py`,
   `sudo systemctl restart ollama1-dash`), and `cat /run/ollama1/dash-font.json`
   says which font and glyphs it chose.
 
+## 6b363 — main becomes the 7.0 nightly; no pre-releases until it rolls out
+Patrick (2026-10-02): "Move 6.1 rc1 to stable, and when everything here is done
+that we're working on, turn that into version 7.0 nightly. After that, there
+won't be a pre-release for now until we roll that out."
+
+6.1 went stable on 2026-10-02 as release v277 ("6.1", Latest), cut from the RC1
+commit (1695977) on its own branch `release-6.1`, not from main (main was 111
+commits past it). Main now carries everything built since, as 7.0:
+`APP_VERSION = "7.0.0"`, `APP_BETA = 0`, `APP_RC = 0` (so the nightly is named
+"7.0 nightly <sha>" and nothing publishes as a pre-release), and
+`APP_BUILD = 277`: the stable cut took 277, so the next `./release.sh` from main
+computes 278 and cannot collide with it. Until Patrick says to roll 7.0 out, no
+beta or RC is cut (release.sh would refuse a beta on a line with RC 0 and no
+betas anyway: it asks for `beta 7.0.0`, which is the command to avoid).
+Nothing else changed in this entry.
+
 ## 6b361 — the server's graphics card: its highest power limit and a memory-clock bump
 Patrick (2026-10-02) asked for "a bit more power limit and a modest VRAM clock
 bump on the RX 6900 XT, about 5% faster replies", and chose "Yes, and turn it
