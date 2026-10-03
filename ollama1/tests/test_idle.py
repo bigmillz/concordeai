@@ -26,11 +26,15 @@ class TestDecide(unittest.TestCase):
     def test_all_clear_sleeps(self):
         self.assertEqual(d(), (True, "idle 60 minutes"))
 
+    def test_a_login_does_not_block_sleep(self):
+        # 6b364: an open SSH tab or console login is not activity; only a
+        # request, a running tool, load, the card or a lock keeps the server awake
+        self.assertEqual(d(sessions=3), (True, "idle 60 minutes"))
+
     def test_each_blocker(self):
         table = [
             (dict(enabled=False), "off"), (dict(enabled=None), "off"), (dict(enabled=1), "off"),
             (dict(supported=False), "no deep sleep"), (dict(supported=None), "no deep sleep"),
-            (dict(sessions=1), "logged in"), (dict(sessions=None), "who is logged in"),
             (dict(inflight=1), "request is running"), (dict(inflight=None), "whether a request is running"),
             (dict(loadavg=None), "load average"), (dict(loadavg=1.6), "busy (load 1.6)"), (dict(loadavg=9), "busy (load"),
             (dict(boot_time=None), "when it started"),
@@ -83,7 +87,6 @@ class TestDecide(unittest.TestCase):
     def test_bad_inputs_never_sleep(self):
         self.assertEqual(o1idle.decide({}), (False, "auto sleep is off"))
         self.assertFalse(o1idle.decide(dict(BASE, now=None))[0])
-        self.assertFalse(o1idle.decide(dict(BASE, sessions="x"))[0])
         i = dict(BASE)
         del i["now"]
         self.assertFalse(o1idle.decide(i)[0])
@@ -543,7 +546,7 @@ class TestTick(unittest.TestCase):
 
     def test_each_probe_failing_blocks(self):
         self.act(NOW - 3600)
-        for name in ("sessions", "inhibitors", "tools", "busy", "boot_time", "loadavg"):
+        for name in ("inhibitors", "tools", "busy", "boot_time", "loadavg"):
             box = FakeBox()
             box.p[name] = lambda: (_ for _ in ()).throw(OSError("x"))
             self.assertFalse(box.idle.tick()[0], name)

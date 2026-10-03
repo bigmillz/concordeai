@@ -9,6 +9,22 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b364 — the server sleeps with people logged in (per Patrick)
+
+- Auto sleep never fired on a server with an open SSH tab or console login:
+  `ollama1-idle` logged "not sleeping: someone is logged in" for the whole
+  hour, because `decide()` refused whenever `loginctl` listed a session.
+  An open terminal on an admin's computer is not use of the server. The
+  session check (and its "couldn't ask who is logged in" twin) is gone from
+  `decide()` and the probe is no longer run each tick. What still keeps it
+  awake: a request in flight, a running download or tool (stability test,
+  install...), a held block lock, a load average above 1.5, the graphics
+  card at 10% or more, and the idle minutes since the last request.
+- Tests: `test_a_login_does_not_block_sleep`; the two session mutants in
+  `mutate.py` are gone with the check they guarded.
+- A person at the keyboard running something long is still protected (a
+  tool, load or the card is busy); a person only reading a log is not.
+
 ## 6b358 — a server added with no name is "My server"
 Patrick (2026-10-02), asked whether to change the blank-name fallback for a new
 server from "Desktop": "Call it \"My server\"". `server_add` now names it "My

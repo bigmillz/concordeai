@@ -162,7 +162,7 @@ def decide(i):
     hold; a probe that couldn't answer (None) blocks rather than guesses.
 
     Inputs: enabled, supported, minutes, now, last_activity, boot_time,
-    last_resume (epoch seconds, or None), inflight, sessions (count),
+    last_resume (epoch seconds, or None), inflight,
     gpu_busy (percent) and gpu_present (False only on a machine with no
     graphics card: a card with no reading blocks), loadavg (1-minute; above
     LOAD_BUSY something is running), busy (reasons from o1sleep.busy_reasons),
@@ -177,10 +177,6 @@ def decide(i):
             return False, "the idle time isn't a number"
         minutes = clamp_minutes(minutes)
         now = float(i["now"])
-        if i.get("sessions") is None:
-            return False, "couldn't ask who is logged in"
-        if i["sessions"] > 0:
-            return False, "someone is logged in"
         if i.get("inflight") is None:
             return False, "couldn't tell whether a request is running"
         if i["inflight"] > 0:
@@ -463,7 +459,7 @@ def published_wake(path=None):
 # ---- the root service's tick ------------------------------------------------------
 
 class Idle:
-    """One tick every TICK_S seconds. `probes` supplies sessions, inhibitors,
+    """One tick every TICK_S seconds. `probes` supplies inhibitors,
     tools, gpu_busy, busy, supported, wake; `suspend` is called when the
     decision is yes and returns 0 when the machine slept (or woke again)."""
 
@@ -503,7 +499,7 @@ class Idle:
             "last_activity": act["last"], "boot_time": self._probe("boot_time"),
             "loadavg": self._probe("loadavg"), "gpu_present": self._probe("gpu_present"),
             "last_resume": self.last_resume, "inflight": act["inflight"],
-            "sessions": self._probe("sessions"), "gpu_busy": self._probe("gpu_busy"),
+            "gpu_busy": self._probe("gpu_busy"),
             "busy": self._probe("busy"), "tools": self._probe("tools"),
             "inhibitors": self._probe("inhibitors")})
         if why != self.last_reason:
