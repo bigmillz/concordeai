@@ -26860,7 +26860,7 @@ _G56_MUT = [
     ("a job abandoned when the reader's pipe breaks", '                except (BrokenPipeError, ConnectionResetError):\n                    # the reader left between two polls', '                except ZeroDivisionError:\n                    # the reader left between two polls'),
     ("a failure answered with nothing", '        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))\n        return False',
      '        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))\n        return True'),
-    ("a server that failed not marked down", '        if k in ("offline", "tls", "crypto"):\n            server_mark_down(', '        if False:\n            server_mark_down('),
+    ("a server that failed not marked down", '        if k in ("offline", "tls", "crypto") and not getattr(exc, "slow", False):\n            server_mark_down(', '        if False:\n            server_mark_down('),
     ("a WebP clip saved as a video", '    sub = VIDEO_SUB if ctype == "video/mp4" else IMAGE_SUB', '    sub = VIDEO_SUB if kind == "video" else IMAGE_SUB'),
     ("Stop going on to another way", '        step("srvgen", "Stopped", "done", "")\n        return True', '        step("srvgen", "Stopped", "done", "")\n        return False'),
     ("a wake not said", '    for _wn, _wok in server_take_wake_notes():\n        status(', '    for _wn, _wok in []:\n        status('),
