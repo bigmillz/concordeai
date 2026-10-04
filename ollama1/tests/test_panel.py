@@ -764,7 +764,7 @@ class TestLayout(unittest.TestCase):
     def test_boxes_are_inside_the_screen_and_never_overlap(self):
         for w, h in SIZES:
             boxes = o1panel.layout(w, h)
-            self.assertEqual(set(boxes), {"header", "gpu", "cpu", "models", "storage", "status", "footer"}, (w, h))
+            self.assertEqual(set(boxes), {"header", "gpu", "cpu", "models", "storage", "fans", "status", "footer"}, (w, h))
             items = list(boxes.items())
             for name, (x, y, bw, bh) in items:
                 self.assertTrue(x >= 0 and y >= 0 and x + bw <= w and y + bh <= h and bw > 0 and bh > 0, (w, h, name))
@@ -1939,6 +1939,7 @@ class TestRaidLine(unittest.TestCase):
             for md, kind in ((mdstat("UU", MD_CHECK), "info"), (mdstat("U_"), "bad"), (mdstat("UU"), "ok")):
                 st = dash_sample.sample(now=1790000000.0)
                 st["raid"] = self.parse(md)
+                st["disks"] = st["disks"][:1]                                     # the box is shorter now: one disk leaves room for the line
                 seen = []
                 orig = o1hipix.HiPixmap.text
 
@@ -1958,6 +1959,176 @@ class TestRaidLine(unittest.TestCase):
                         self.assertLessEqual(tx + mw, x + w - 8 + 1, (s_, sw))      # the line is cut to the box, not drawn past it
                         if "check" in s_:
                             self.assertEqual(c, o1panel.T["text"])
+
+
+class TestFans(unittest.TestCase):
+    """The FANS box (6b416): /run/ollama1/fan.json, and the memory temperature in the card box."""
+
+    NOW = 1790000000.0
+
+    def st(self, **fan):
+        st = dash_sample.sample(now=self.NOW)
+        st["fan"].update(fan)
+        return st
+
+    def test_two_bars_and_one_average(self):
+        kind, head, warn, rows, cool = o1panel.fan_view(self.st(), self.NOW)
+        self.assertEqual((kind, head, warn), ("rows", "working 100% - gpu busy", False))
+        self.assertEqual([r[0] for r in rows], ["GPU fan", "Case fans"])
+        self.assertEqual(rows[0][1:3], ("2310 rpm", 1.0))
+        # fan1 1180, fan2 1150 and the radiator fans 1180, 1175: the average of four (fan3: no rpm, not controlled)
+        self.assertEqual(rows[1][1], "%d rpm avg" % round((1180 + 1150 + 1180 + 1175) / 4.0))
+        self.assertEqual(rows[1][2], 1.0)
+        self.assertEqual(cool, "Pump 2400 rpm, quiet, coolant 31\u00b0C")
+
+    def test_the_average_bar_is_the_mean_of_the_bars_and_the_pump_is_left_out(self):
+        outs = [{"label": "fan1", "enable": 1, "pwm": 255, "rpm": 2000}, {"label": "fan2", "enable": 1, "pwm": 51, "rpm": 400}]
+        rows = o1panel.fan_view(self.st(outputs=outs, aio=None), self.NOW)[3]
+        self.assertEqual(rows, [("Case fans", "1200 rpm avg", 0.6, "fan")])
+        aio = {"found": True, "state": "controlling", "pump_rpm": 9000, "pump_mode": "balanced", "coolant_c": None,
+               "fans": [{"n": 1, "rpm": 600, "pct": 20}]}
+        v = o1panel.fan_view(self.st(outputs=outs, aio=aio), self.NOW)
+        self.assertEqual(v[3][0][1], "1000 rpm avg")                              # (2000 + 400 + 600) / 3: no pump in it
+        self.assertAlmostEqual(v[3][0][2], (1.0 + 0.2 + 0.2) / 3)
+        self.assertEqual(v[4], "Pump 9000 rpm, balanced")
+
+    def test_phases(self):
+        for phase, pct, why, want in (("idle20", 20, "idle", "idle 20%"), ("hold100", 100, "the work ended", "cooling down 100%"),
+                                      ("hold50", 50, "x", "cooling down 50%"), ("ramp", 73, "x", "cooling down 73%"),
+                                      ("calibrating", 100, "x", "measuring 100%"), (None, 40, None, "40%")):
+            self.assertEqual(o1panel.fan_view(self.st(phase=phase, pct=pct, why=why), self.NOW)[1], want)
+        v = o1panel.fan_view(self.st(phase="hot", pct=100, why="too warm: GPU junction"), self.NOW)
+        self.assertTrue(v[2])
+        self.assertTrue(o1panel.fan_view(self.st(hot=["x"]), self.NOW)[2])
+
+    def test_controlled_output_without_rpm_is_shown_an_idle_unreadable_one_is_not(self):
+        outs = [{"label": "fan1", "enable": 1, "pwm": 128, "rpm": None}, {"label": "fan2", "enable": 2, "pwm": 0, "rpm": 0}]
+        rows = o1panel.fan_view(self.st(outputs=outs, aio=None), self.NOW)[3]
+        self.assertEqual([(r[0], r[1]) for r in rows], [("Case fans", "-")])
+        self.assertAlmostEqual(rows[0][2], 128 / 255.0)
+
+    def test_no_data_when_missing_or_stale(self):
+        st = dash_sample.sample(now=self.NOW)
+        st["fan"] = None
+        self.assertEqual(o1panel.fan_view(st, self.NOW), ("none", None))
+        st = self.st()
+        self.assertEqual(o1panel.fan_view(st, self.NOW + 31), ("none", None))
+        self.assertEqual(o1panel.fan_view(st, self.NOW + 29)[0], "rows")
+        seen = []
+        orig = o1hipix.HiPixmap.text
+
+        def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+            seen.append(s_)
+            return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+        o1hipix.HiPixmap.text = rec
+        try:
+            st["fan"]["at"] = int(self.NOW) - 100
+            o1panel.render(st, 640, 360, scale=1)
+        finally:
+            o1hipix.HiPixmap.text = orig
+        self.assertIn("no fan data", seen)
+
+    def test_the_card_shows_memory_temperature_not_the_fan(self):
+        seen = []
+        orig = o1hipix.HiPixmap.text
+
+        def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+            seen.append(s_)
+            return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+        o1hipix.HiPixmap.text = rec
+        try:
+            o1panel.render(dash_sample.sample(now=self.NOW), 640, 360)
+        finally:
+            o1hipix.HiPixmap.text = orig
+        self.assertIn("Mem", seen)
+        self.assertIn("70\u00b0C", seen)
+        self.assertNotIn("Fan", seen)
+        self.assertEqual([t for t in seen if t in ("VRAM", "Power", "Temp", "Mem")][:4], ["VRAM", "Power", "Temp", "Mem"])
+
+    def test_it_fits_at_every_resolution_and_with_many_fans(self):
+        outs = [{"label": "GPU fan", "enable": 1, "pwm": 200, "rpm": 2000}] + \
+               [{"label": "fan%d" % i, "enable": 1, "pwm": 90, "rpm": 900 + i} for i in range(9)]
+        for sw, sh in ((1920, 1080), (2560, 1440), (3840, 2160), (1366, 768)):
+            k, lw, lh = o1fb.choose_scale(sw, sh)
+            for fan in ({}, {"outputs": outs, "why": "x" * 150}, {"phase": "hot", "outputs": outs}):
+                st = self.st(**fan)
+                pm = o1panel.render(st, lw, lh, scale=k)
+                x, y, w, h = o1panel.layout(lw, lh)["fans"]
+                for yy in range((y + 4) * k, (y + h - 4) * k, max(1, k)):
+                    for xx in list(range((x + w - 2) * k - k, (x + w - 1) * k)) + list(range((x + 1) * k, (x + 2) * k)):
+                        self.assertEqual(pm.buf[yy * pm.pw + xx], o1panel.T["panel"] if not fan.get("phase") else pm.buf[yy * pm.pw + xx])
+
+    def test_box_titles_are_the_hardware_names(self):
+        for name, want in (("Navi 21 [Radeon RX 6900 XT]", "AMD RX 6900 XT"),
+                           ("Advanced Micro Devices, Inc. [AMD/ATI] Navi 21 [Radeon RX 6800/6800 XT / 6900 XT]", "AMD RX 6800/6800 XT / 6900 XT"),
+                           ("AMD Radeon RX 6900 XT Graphics", "AMD RX 6900 XT"), ("NVIDIA GeForce RTX 4090", "NVIDIA GeForce RTX 4090"),
+                           (None, "Graphics card"), ("", "Graphics card"), (7, "7")):
+            self.assertEqual(o1panel.gpu_title({"name": name}), want)
+        self.assertEqual(o1panel.gpu_title(None), "Graphics card")
+        for name, want in (("AMD Ryzen 9 5950X 16-Core Processor", "AMD Ryzen 9 5950X"),
+                           ("Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz", "Intel Core i7-9700K"),
+                           ("AMD Ryzen 7 5700G with Radeon Graphics", "AMD Ryzen 7 5700G"), (None, "Processor and memory")):
+            self.assertEqual(o1panel.cpu_title({"model": name}), want)
+        seen = []
+        orig = o1hipix.HiPixmap.text
+
+        def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+            seen.append(s_)
+            return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+        o1hipix.HiPixmap.text = rec
+        try:
+            o1panel.render(dash_sample.sample(now=self.NOW), 640, 360)
+            self.assertIn("AMD RX 6900 XT".upper(), [t.upper() for t in seen])
+            self.assertIn("AMD RYZEN 9 5950X", [t.upper() for t in seen])
+            del seen[:]
+            st = dash_sample.sample(now=self.NOW)
+            st["gpu"]["name"] = None
+            st["cpu"]["model"] = None
+            o1panel.render(st, 640, 360)
+            self.assertIn("GRAPHICS CARD", [t.upper() for t in seen])
+            self.assertIn("PROCESSOR AND MEMORY", [t.upper() for t in seen])
+        finally:
+            o1hipix.HiPixmap.text = orig
+
+    def test_a_long_title_is_cut_and_the_value_text_stays_whole(self):
+        for sw, sh in ((1920, 1080), (3840, 2160), (1366, 768)):
+            k, lw, lh = o1fb.choose_scale(sw, sh)
+            st = dash_sample.sample(now=self.NOW)
+            st["gpu"]["name"] = "Some Very Long Graphics Adapter Name With Many Many Words In It 9000 Ultra Max Pro"
+            st["cpu"]["model"] = "X" * 200
+            seen = []
+            orig = o1hipix.HiPixmap.text
+
+            def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+                seen.append((s_, x, max_w))
+                return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+            o1hipix.HiPixmap.text = rec
+            try:
+                o1panel.render(st, lw, lh, scale=k)
+            finally:
+                o1hipix.HiPixmap.text = orig
+            boxes = o1panel.layout(lw, lh)
+            for name in ("gpu", "cpu"):
+                x, y, w, h = boxes[name]
+                titles = [t for t in seen if x <= t[1] < x + w and t[0].isupper() and t[0].startswith(("SOME", "XXX"))]
+                self.assertTrue(titles, (name, sw))
+                for s_, tx, mw in titles:
+                    right = "core 2310 MHz" if name == "gpu" else "32 cores"
+                    self.assertLessEqual(tx + min(mw, o1vtext.text_width(s_)) + o1vtext.text_width(right) + 10, x + w - 8 + 1)
+                self.assertIn(right, [t[0] for t in seen])                           # the right-hand text is still there
+
+    def test_the_middle_column_is_two_boxes_of_one_width(self):
+        for w, h in ((640, 360), (800, 450), (1024, 768), (480, 270)):
+            b = o1panel.layout(w, h)
+            self.assertEqual((b["storage"][0], b["storage"][2]), (b["fans"][0], b["fans"][2]))
+            self.assertLess(b["storage"][1] + b["storage"][3], b["fans"][1])
+            self.assertEqual(b["fans"][1] + b["fans"][3], b["models"][1] + b["models"][3])
+            self.assertEqual(b["storage"][1], b["models"][1])
+
+    def test_the_sampler_reads_the_file(self):
+        import o1metrics
+        src = open(os.path.join(U.LIB, "o1metrics.py")).read()
+        self.assertIn('"fan.json"', src)
 
 
 class TestWidgets(unittest.TestCase):

@@ -179,8 +179,10 @@ class Sampler:
                        "tx_bps": max(0, cur["net"][1] - self.prev["net"][1]) / dt}
         self.prev = cur
         g = o1stats.gpu()
+        names = self._slow("names", 300, device_names) or {}
         if g:
             g.update(gpu_clocks(o1stats.gpu_card()))
+            g["name"] = names.get("gpu")
         mi = o1stats.meminfo()
         mem = {"total": mi.get("MemTotal"), "available": mi.get("MemAvailable"),
                "swap_total": mi.get("SwapTotal"), "swap_free": mi.get("SwapFree")}
@@ -192,7 +194,8 @@ class Sampler:
             "gw": gw,
             "gpu": g,
             "cpu": dict({"total": cpu_total, "cores": cores, "temp": self._slow("ctemp", 2, cpu_temp),
-                         "load": o1stats.loadavg()}, **(self._slow("cclock", 2, cpu_clock) or {})),
+                         "load": o1stats.loadavg(), "model": names.get("cpu")},
+                        **(self._slow("cclock", 2, cpu_clock) or {})),
             "mem": mem,
             "ollama_cg": ollama_cgroup(),
             "disks": self._slow("disks", 10, o1stats.disks) or [],
@@ -203,6 +206,7 @@ class Sampler:
             "updates": self._slow("updates", 30, o1stats.updates) or {},
             "pairing": o1stats.pairing_window(),
             "power": self._slow("power", 5, power_state),
+            "fan": read_json(os.path.join(Paths.run, "fan.json")),          # the fan service's status (6b416)
             "activity": read_json(os.path.join(Paths.stats_dir, "activity.json")),
             "idle": self._slow("idle", 5, lambda: read_json(os.path.join(Paths.run, "idle.json"))),
         }
@@ -239,6 +243,23 @@ def cpu_clock(probe=[None]):
     if f.get("avg_mhz") is None:
         return None
     return {"mhz": f["avg_mhz"], "max_mhz": f.get("max_mhz") or f.get("rated_mhz")}
+
+
+def device_names():
+    """{"gpu": card name, "cpu": processor model} for the panel's box titles; rarely changes, so
+    the sampler asks every five minutes. Either may be None."""
+    out = {"gpu": None, "cpu": None}
+    try:
+        import o1gpu
+        out["gpu"] = o1gpu.detect().get("name")
+    except Exception:
+        pass
+    try:
+        import o1cpu
+        out["cpu"] = o1cpu.parse_cpuinfo(o1cpu.read_text(PROC + "/cpuinfo", o1cpu.CPUINFO_LIMIT)).get("model")
+    except Exception:
+        pass
+    return out
 
 
 def power_state():
