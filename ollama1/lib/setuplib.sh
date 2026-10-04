@@ -107,9 +107,9 @@ fans_choice() { # FLAG ENV SAVED -> "on" or "off" (6b385): the flag, else the en
 
 fans_plan() { # the plan's line for the fans (6b385)
   if [ "$1" = off ]; then
-    printf 'Fans OFF (--fans off): the graphics card and case fans stay automatic. On: --fans on'
+    printf 'Fans OFF (--fans off): the graphics card and case fans stay automatic (BIOS control). On: --fans on'
   else
-    printf 'Fans ON: graphics card and case fans at 100%% while the server works and for one minute after, otherwise automatic (ollama1-fan). Off: --fans off'
+    printf 'Fans ON: graphics card and case fans at 100%% while the server works and 60 s after, 50%% for 60 s, then 20%% (ollama1-fan). Off: --fans off'
   fi
 }
 

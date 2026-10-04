@@ -1,16 +1,17 @@
 #!/usr/bin/python3
-"""ollama1-fan: the fans at full speed while the server works, and for one
-minute after (6b385). The graphics card's fan and every fan header the
-motherboard's chip lets the kit control; otherwise automatic, never at 100%
-all the time (that wears the bearings). See lib/o1fan.py.
+"""ollama1-fan: fan levels that follow the server's work (6b385, 6b386). The
+graphics card's fan and every fan header the motherboard's chip lets the kit
+control: 100% while working and for 60 s after, then 50% for 60 s, then 20%.
+See lib/o1fan.py.
 
-  ollama1-fan status          mode (full, hold, auto), the outputs, each fan's
-                              rpm, the temperatures, why (no root needed)
+  ollama1-fan status          level, phase (working, hold100 Ns, hold50 Ns, idle20),
+                              each fan's rpm and lowest level, the temperatures
+                              (no root needed)
 
 Used by the system:
   run             ollama1-fan.service
   load-modules    its ExecStartPre: modprobe nct6775 when no motherboard fan chip shows
-  stop-post       its ExecStopPost: after a clean stop, put the fans back as they were
+  stop-post       its ExecStopPost: after any exit, put the fans back as they were
   setup on|off    setup.sh's step (--fans on|off)
 """
 import os

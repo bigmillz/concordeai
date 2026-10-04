@@ -1,23 +1,28 @@
-# Fans at full speed while the server works (6b385): the graphics card's fan
-# and every fan header the motherboard's chip lets the kit control go to 100%
-# while a request, the card, a long job or the load says it is working, and for
-# one minute after; then back to automatic, exactly as they were. A sensor over
-# its limit forces 100% too. Root, because it writes the fans' sysfs files; no
-# network; writes only its own state and status files.
+# Fan levels that follow the server's work (6b385, 6b386): the graphics card's
+# fan and every fan header the motherboard's chip lets the kit control go to
+# 100% while a request, the card, a long job or the load says it is working
+# and for 60 s after, then 50% for 60 s, then 20%. A sensor over its limit
+# forces 100%. Root, because it writes the fans' sysfs files; no network;
+# writes only its own state and status files.
+#
+# A fan must never be left at 20% by a dead service: ExecStopPost puts every
+# output back to its own control (the BIOS's automatic) after ANY exit (a clean
+# stop, a crash, a kill, the watchdog), and Restart=always starts it again.
+# The service pings systemd on every poll (sd_notify, stdlib only);
+# WatchdogSec=10 restarts it when the poll loop has not run for 10 s.
 #
 # ProtectKernelTunables stays off (it would make /sys read-only), and
 # ProtectKernelModules is on: the module (nct6775, the motherboard's chip) is
 # loaded by the "+" line below, which runs outside this sandbox.
-#
-# A clean stop puts the fans back as they were (the service does it, and
-# ExecStopPost again). A crash leaves them at 100%, never stopped: Restart=always
-# brings it back in 2 s and it takes over from the saved originals.
 [Unit]
-Description=ollama1: fans at full speed while the server works, and one minute after
+Description=ollama1: fan levels that follow the server's work (100%, 50%, 20%)
 After=ollama1-gateway.service
 StartLimitIntervalSec=0
 
 [Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=10
 ExecStartPre=-+/usr/local/lib/ollama1/bin/ollama1-fan load-modules
 ExecStart=/usr/local/lib/ollama1/bin/ollama1-fan run
 ExecStopPost=/usr/local/lib/ollama1/bin/ollama1-fan stop-post

@@ -9,7 +9,55 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b386 — fan levels 100 / 50 / 20 instead of automatic after the hold (per Patrick)
+
+Patrick (2026-10-04) changed the 6b385 policy: idle (more than 2 minutes after
+work) every controlled fan at 20%; working 100%; after work ends 100% for
+60 s, then 50% for 60 s, then 20%; a new request at any time returns to 100%
+and restarts the sequence. The temperature override stays. Everything below
+replaces what 6b385 below says about "auto after the hold".
+
+- Phases in `lib/o1fan.py`: `working` / `hot` / `calibrating` (100%),
+  `hold100` (age < 60 s), `hold50` (60 <= age < 120), `idle20`. The boundaries
+  are strict (`<`), tested at 59/60/61 and 119/120/121 s. pwm = round(pct *
+  255 / 100), halves up: 20% = 51, 30% = 77, 50% = 128. While the service runs
+  it always holds the outputs; it gives them back only when it stops.
+- Nothing is known about the NCT6797 header layout (fan, pump, nothing), so a
+  low level is never trusted. The first start measures each output's rpm at
+  100% (6 s settle) and keeps it. 6 s after a low level, rpm 0 or under
+  `fanN_min` raises that output by 10% a step to the lowest level that spins
+  (floor per output, logged). Still >= 60% of its 100% rpm when asked for 20%:
+  a probable pump, 100% for good, logged. No rpm at 100% (or no reading):
+  100% only while working, otherwise given back to its own control. Learned
+  values (rpm100, min_pct, always100, pump_checked) live under `learned` in
+  `/var/lib/ollama1/fan.json`, keyed by chip name and pwm number (hwmonN moves
+  between boots), and survive stops and reboots; the originals (`orig`) do not
+  survive a reboot. To relearn: stop, delete the file, start.
+- Crash safety reversed from 6b385: a crash must not leave fans at 20%, so
+  `ExecStopPost` now restores after ANY exit (the `SERVICE_RESULT` check is
+  gone) and `Restart=always` brings it back. Added `Type=notify`,
+  `NotifyAccess=main`, `WatchdogSec=10` and a stdlib `sd_notify` ping
+  (`WATCHDOG=1`, `READY=1` after the first tick) on every loop turn, also when
+  the tick failed: a loop that does not run is what the watchdog catches.
+  A restart that finds the originals still held (a kill with no stop-post)
+  takes them over and runs the whole sequence from 100%.
+- Wake: unchanged mechanism (SIGUSR1 from the sleep hook, per-tick verify),
+  now at the current level. Status: `level: 50%  phase: hold50 30s`, each fan's
+  rpm and `min N%`, notes for pumps and no-rpm outputs; the admin card line is
+  `Fans: 20% (idle)` / `Fans: 100% (a request is running)` / `Fans: 100% for
+  30 s more, then 50%` / `Fans: 50% for 30 s more, then 20%`.
+- Tests: `tests/test_fan.py` (58 tests, fans whose rpm follows their pwm) and 41
+  `fan:` mutants in `tests/mutate.py` (each timing and edge, the 100/50/20
+  levels, the rounding, the restore, restore after any exit, the watchdog
+  ping, the stall and pump rules, each limit and the hysteresis).
+- Unverified on the MS-7C35: that a 20% pwm on each NCT6797 header spins what
+  is plugged in (the stall check is the guard, and it needs rpm readings: an
+  output with none is left to the BIOS except while working); nct6775's fanN
+  numbering matching pwmN; that the card's fan answers pwm 51 and reports rpm.
+  The 6 s settle may be short for a large fan spinning up from rest.
+
 ## 6b385 — the server's fans run at 100% while it works, and a minute after (per Patrick)
+(superseded by 6b386 for the levels after the hold and for crashes)
 
 Patrick (2026-10-04): "keep the GPU fan on full anytime there's a request
 running. We don't want to burn the bearings out on it, but I want maximum
