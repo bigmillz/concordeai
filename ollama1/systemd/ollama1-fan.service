@@ -1,0 +1,64 @@
+# Fan levels that follow the server's work (6b385, 6b386): the graphics card's
+# fan and every fan header the motherboard's chip lets the kit control go to
+# 100% while a request, the card, a long job or the load says it is working
+# and for 60 s after, then 50% for 60 s, then 20%. A sensor over its limit
+# forces 100%. Root, because it writes the fans' sysfs files; no network;
+# writes only its own state and status files.
+#
+# A fan must never be left at 20% by a dead service: ExecStopPost puts every
+# output back to its own control (the BIOS's automatic) after ANY exit (a clean
+# stop, a crash, a kill, the watchdog), and Restart=always starts it again.
+# The service pings systemd on every poll (sd_notify, stdlib only);
+# WatchdogSec=10 restarts it when the poll loop has not run for 10 s.
+#
+# An optional liquid cooler (Corsair Hydro, lib/o1aio.py) is driven through the
+# liquidctl program, a subprocess of this service: it needs USB (the device
+# nodes stay allowed), AF_NETLINK (libusb/udev), a runtime folder of its own
+# (RuntimeDirectory; kept between runs) and memory for a second Python, so
+# MemoryMax is 192M. A cooler left on its safe curve by ExecStopPost is the
+# same program, run in the same sandbox.
+#
+# ProtectKernelTunables stays off (it would make /sys read-only), and
+# ProtectKernelModules is on: the module (nct6775, the motherboard's chip) is
+# loaded by the "+" line below, which runs outside this sandbox.
+[Unit]
+Description=ollama1: fan levels that follow the server's work (100%, 50%, 20%)
+After=ollama1-gateway.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=10
+ExecStartPre=-+/usr/local/lib/ollama1/bin/ollama1-fan load-modules
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-fan run
+ExecStopPost=/usr/local/lib/ollama1/bin/ollama1-fan stop-post
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1 /var/lib/ollama1
+RuntimeDirectory=liquidctl
+RuntimeDirectoryPreserve=yes
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+MemoryMax=192M
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

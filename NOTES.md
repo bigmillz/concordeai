@@ -9,6 +9,661 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b396 — the panel's sleep line is the idle service's own decision; RAID check parsed (per Patrick)
+
+Two bugs on the real monitor.
+- **"Idle long enough: may sleep now" right after a wake.** The panel worked out
+  its own idle time from the gateway's activity file and ignored the resume time
+  and the busy reasons. Fixed at the source: `ollama1-idle` (`o1idle.Idle.tick`)
+  now decides FIRST and then writes `/run/ollama1/idle.json` with the decision
+  beside the setting: `sleep_ok` (the bool decide() returned: it is about to
+  suspend), `reason` (decide()'s exact text), `idle_s` (seconds since the latest
+  of last activity, boot and last resume: `o1idle.idle_seconds`), plus `at`,
+  `enabled`, `minutes`, `supported`, `wake` as before. `o1panel.sleep_summary`
+  shows only that: "Sleeps in mm:ss" (minutes*60 - idle_s - the file's age) when
+  the reason is the timer ("idle N of M minutes"), the reason itself in amber
+  when something blocks it (busy, running tool, a block lock, the card, a
+  request), "Going to sleep now" only when sleep_ok, "Auto sleep is off",
+  "No deep sleep on this machine", and "Sleep status unknown" (amber) when the
+  file is older than 3 minutes or has no decision (an old service). Nothing is
+  estimated in the panel any more. The admin panel and the app compute no idle
+  time of their own (they show the setting and the last sleep/wake), so there is
+  nothing else to align.
+- **"RAID md127: check -%".** `o1stats.raid` split the progress line on the first
+  "=", which is inside the bar "[==>...]". It now uses a regex for
+  `(resync|recovery|check|reshape) = N%` with or without spaces, a
+  `resync=DELAYED`/`PENDING` word (action, no percentage) and
+  `finish=NNN.Nmin`. The panel line reads "RAID md127: check 12.1%, about 10 h
+  left" (`o1dashui.raid_action`, `raid_left`). A scheduled check of a healthy
+  [UU] mirror is information (blue, no warning in the Status box or the badge);
+  a resync, recovery or reshape is amber; a missing member is red, with the
+  recovery progress after it.
+- Tests: ticks around a resume (idle_s restarts at 0, "idle 3 of 30 minutes"),
+  every busy reason, sleep_ok, disabled, the file's age; the panel text in each
+  state and at 1080p/1440p/4K without overflow; real mdstat samples (check,
+  resync, recovery, degraded, idle, delayed) with every spacing; the colour rule.
+- Install: lib/o1idle.py (then `systemctl restart ollama1-idle`), lib/o1stats.py,
+  lib/o1dashui.py, lib/o1panel.py, then restart ollama1-dash.
+
+## 6b388 — the Corsair liquid cooler is driven too, through liquidctl (per Patrick)
+
+Patrick: "max the cooler's fans too, and make sure the pump runs at 100% when
+necessary but not all the time". His H115i Platinum (USB 1b1c:0c17) has its
+fans and pump on its own USB controller, not on the Super-IO headers.
+
+- New `lib/o1aio.py`, used by `o1fan.Fan(aio=...)`. liquidctl is a subprocess
+  with a 4 s timeout on every call (the unit's watchdog is 10 s), never
+  fatal. `liquidctl list --json` finds the cooler (vendor Corsair and a
+  description matching Hydro / H<nn>i; the product ids are only used by setup
+  and are from memory: `liquidctl list` is the authority); `--match <the
+  description>` goes on every later call. No liquidctl, or no cooler: one log
+  line, looked for again every 5 minutes.
+- The cooler runs in its own thread (`aio_loop`, one `step` a second); the
+  poll loop only sets the phase (`set_phase`) and reads a snapshot, so a slow
+  USB call can never stall the watchdog ping. `Fan(aio_inline=True)` steps it
+  on the tick for the tests' fake clock. The learned table is shared with
+  the case fans (`aio/fanN`, saved in the same fan.json; `_persist` has a lock).
+- Mapping: working / hot / hold100 100% + pump extreme; calibrating 100% +
+  balanced; hold50 50% + balanced; idle20 20% (floor per fan from stall
+  learning, a fan with no rpm at 100% stays 100%) + quiet. Coolant >= 40 C
+  (plausible readings only) forces extreme + 100% until < 35 C. The pump is
+  extreme ONLY in working/hot/hold100 or when the coolant is hot.
+- Status is read at most every 5 s, a command only when its target changed
+  and not more often than every 5 s (a flapping phase is slowed to that
+  rate); liquidctl has no batch for `set`, so each changed part is its own
+  call (fans, then pump). `initialize` runs once per start and after a wake
+  (`SIGUSR1` -> `fan.wake()` -> `aio.reset()`), then everything is sent again.
+- Safe without us: `safe_exit` sets `fanN speed 25 30 35 60 45 100` (30% @
+  25 C, 60% @ 35 C, 100% @ 45 C) and `pump mode balanced`. It runs on a
+  clean stop (`Fan.shutdown`), after FAILS_MAX=5 failures in a row (the cooler
+  is then left alone, the case fans go on), and from `ExecStopPost` after any
+  exit through a marker file (`/var/lib/ollama1/fan-aio.json`, written when
+  the first command succeeds, removed after a successful safe exit).
+- Setup: `aio_setup` installs `liquidctl` (apt) only when the fan step is on,
+  a Corsair Hydro id is on USB (sysfs idVendor/idProduct) and liquidctl is
+  missing; the plan line mentions the cooler. Unit: `MemoryMax=192M` (a second
+  Python), `AF_NETLINK` (libusb/udev), `RuntimeDirectory=liquidctl` (kept).
+- Tests: `tests/test_aio.py` (a fake `liquidctl` script that records calls and
+  prints JSON; 42 tests) and 28 `fan: cooler` mutants (pump rule, 40 C limit
+  and its hysteresis, rate limits, de-dup, failure count, timeout, exit curve,
+  marker, stop-post, stall, no-rpm, wake, usb ids, setup).
+- Unverified (no cooler here): liquidctl's real status key names ("Liquid
+  temperature", "Fan N speed", "Pump speed"; read loosely, a missing one is
+  just not shown), the channel names `fan1`/`fan2`/`pump` and the curve
+  argument format on a Hydro Platinum, whether the sandbox lets libusb/hidraw
+  reach the device, and that the apt package is new enough. A cooler left at
+  20%/quiet by a power cut keeps that setting until the service starts.
+
+## 6b387 — more temperature sources for the fan override (per Patrick)
+
+- The override (100% whatever the load, until 10 C under) now watches every
+  temperature input of the Super-IO chip by its `temp*_label`: 70 C for
+  system/board/AUXTIN and any label it does not know (unknown is monitored
+  at the default, never ignored), 85 C for CPUTIN/PECI/TSI/CPU labels, 90 C
+  for VRM/MOS (`\bMOS`, so CMOS stays 70), 80 C for CHIPSET/PCH; the DIMMs
+  (jc42) 70 C; the card's memory 95 C and edge 85 C beside the junction 90 C.
+  Two sensors with one name get a number ("DIMM 1", "DIMM 2").
+- A reading of 0 C or less (-128 is an unplugged input) or 120 C or more is a
+  disconnected or stuck sensor: `read_temps` gives it `None`, it is ignored,
+  and `overheated()` lets go of its key if it was hot. A sensor whose file
+  can't be read at all is left out of the list, so its state is kept (the
+  older "a sensor that stops answering keeps its state" rule).
+- `ollama1-fan status` shows `temps: highest X 60 C; closest to its limit: Y
+  38 C of 70 (32 under)` and a `sensors:` line of all of them with their
+  limits; the admin line ends with the same two facts.
+- Tests: `TestTempSources` (each source and label class at its limit, below
+  it, 9.9 and 10.1 under, implausible values 0, -0.5, -128, 120, 125, 255, 1000,
+  a sensor that sticks while hot, the summary) and 16 `fan:` mutants for the
+  new limits and the plausibility range.
+## 6b395 — server lights: white idle, red while working (per Patrick)
+
+Patrick (2026-10-04): "Lights 100% brightness on white when running, fade to
+red when it's processing a query, then fade back to white when it's not
+running anything." Kit only (`ollama1/`), branch `leds-1004` off `kit-1004`.
+Written and tested against a fake OpenRGB server; NOTHING here has run on the
+real server yet (see "Unverified").
+
+- **One definition of working.** The probes and the "working" rule moved from
+  `lib/o1fan.py` to `lib/o1work.py` (`Gpu`, `probes()`, `Work`), code moved
+  unchanged; `Fan.working` delegates to a `Work`, and `o1fan.Gpu`/`o1fan.probes`
+  stay as aliases. The fan's behaviour and tests are unchanged (58 tests
+  green); only the four "working" mutants in `tests/mutate.py` now point at
+  `lib/o1work.py`. Both services import it, so the lights and the fans cannot
+  drift apart (a test asserts the same object and the same answers).
+- **Two units, not a child process.** `ollama1-openrgb.service` runs
+  `openrgb --server` (via `ollama1-leds openrgb`, which adds `--server-host
+  127.0.0.1` only when `openrgb --help` lists it); `ollama1-leds.service`
+  speaks the SDK protocol to it. A sibling unit restarts on its own
+  (`Restart=always`, no start limit), and the client only has to reconnect.
+  Both have `IPAddressDeny=any` + `IPAddressAllow=localhost`, so nothing but
+  the loopback reaches the server even if a build ignores the host flag.
+- **Why the server is root but cannot touch I2C.** It needs the root-only
+  hidraw nodes. OpenRGB can also probe SMBus/I2C for memory and graphics-card
+  RGB, which on some boards writes to chips that are not what it thinks (DIMM
+  SPD). `DevicePolicy=closed` with only `char-hidraw` and `char-usb_device`
+  makes `/dev/i2c-*` unopenable, so it cannot. `CapabilityBoundingSet=
+  CAP_DAC_OVERRIDE` is the one capability kept (a node some rule gave to
+  another owner). If Patrick wants DIMM lighting that is a deliberate change.
+- **The client** (`lib/o1leds.py`) is stdlib: 16-byte little-endian header
+  (`ORGB`, device, packet id, size); SET_CLIENT_NAME (50), REQUEST_PROTOCOL_VERSION
+  (40; we offer 4 and use the lower of the two, 0 if the server never
+  answers), REQUEST_CONTROLLER_COUNT (0), REQUEST_CONTROLLER_DATA (1, body = the
+  version), UPDATELEDS (1050), UPDATEMODE (1101); DEVICE_LIST_UPDATED (51) is
+  honoured; UPDATEZONELEDS (1051) has an encoder and test but is not used (the
+  whole-device update covers every zone). Controller data is parsed for
+  versions 0 to 4 (brightness from 3, segments from 4); anything else raises
+  `ProtocolError`, counts are bounded. Versions above 4 are not parsed:
+  we never offer them.
+- **Mode.** Direct, else Custom, else Static; a device whose mode takes its
+  colour in the mode (Static, mode-specific) gets UPDATEMODE with the colour
+  each frame; a mode with a brightness gets `brightness_max`. Devices with no
+  LEDs or no usable mode are skipped, and shown as such in `status`.
+- **The fade.** One number, `pos`, 0 = white to 1 = red; the colour is
+  smoothstep(pos) between 255,255,255 and 255,0,0, so a turn round in the
+  middle starts from the colour on show and nothing jumps. 0.8 s to red, 2 s
+  to white, both linear in time on `pos`. Frames at 20 Hz only while `pos` is
+  moving; otherwise the loop sleeps until the next poll (2 s), which re-reads
+  the probes, checks the socket, and sends the colour again (keepalive). The
+  first tick of a fade has dt 0, so waking from a 2 s sleep never skips ahead.
+- **The 3 s.** Counted from the poll that first sees no work (not from the last
+  poll that saw work, which would shorten it by up to a poll): red lasts 3 to 5
+  s after the work really ended. Boundary is strict: at exactly 3.0 s still red.
+- **Failure.** A dead or broken server closes the client, sets the error (shown
+  in `status` and the panel), and retries after 2, 4, 8, 16, 30 s (capped); the
+  error is logged once per change, not per try. A tick that raises is logged by
+  type only and the watchdog is still pinged (`WatchdogSec=30`: one connect may
+  take up to 10 s). A stop (SIGTERM) sets white first. No CLI fallback: it
+  would not reach hardware the server cannot.
+- **Wake.** The sleep hook (`config/ollama1-sleep-hook`) restarts
+  `ollama1-openrgb` (the USB devices may come back new) and sends `SIGUSR1` to
+  `ollama1-leds`, which reconnects and resends the colour. Lights are not
+  turned off for suspend (Patrick: the board decides).
+- **setup.sh**: opt-in, default OFF (`--leds on|off`, `OLLAMA1_LEDS`, saved as
+  `LEDS=`), `leds_choice`/`leds_plan` in `lib/setuplib.sh`, a plan line, and
+  `step "Lights"` after Fans: `ollama1-leds setup on|off` installs `openrgb`
+  with apt only when it is not already there, enables and restarts both units;
+  off stops and disables both and removes nothing.
+- **Panel.** `/run/ollama1/leds.json` (0644, written at each poll and on every
+  state change) feeds `o1leds.panel_line()` into the admin state as `leds`,
+  shown as one line under the fan line. `ollama1-leds status` reads the same.
+- **Also fixed:** `tests/mutate.py` on `kit-1004` had a merge leftover (two stray
+  lines after the "a saved off is not kept by a re-run" fan mutant) and did not
+  parse; removed.
+- **Tests.** `tests/test_leds.py` (70) with `tests/fakeopenrgb.py`, a real
+  127.0.0.1 listener that builds replies with its own struct code (so an
+  encoder bug in the kit cannot cancel out) and records every packet; 22
+  mutants in `tests/mutate.py` (`leds: ...`: the delay, its boundary, where it
+  counts from, the colours, the fade direction and durations, the bind
+  address, brightness, mode preference, the unit's address filter and device
+  policy, the default).
+
+**Unverified on the real server (all of it):** that `openrgb --help` lists
+`--server-host` on this build (if not, only the unit's address filter keeps it
+local; `ollama1-openrgb` logs which); that `openrgb --server` runs headless
+with `QT_QPA_PLATFORM=offscreen` and no display; that the board's Mystic Light
+(1462:7c35) and the Corsair Hydro Platinum are detected through hidraw alone
+(Corsair may need `char-usb_device`, which is allowed, or I2C, which is not);
+that the pump head has a Direct mode (else Static with mode colour is used);
+that the protocol version this build answers is one we parse; that the board
+and cooler show exactly 255,255,255 at "100%" (Mystic Light may have its own
+brightness scale); that `CapabilityBoundingSet=CAP_DAC_OVERRIDE` and
+`DevicePolicy=closed` do not block something OpenRGB needs; that devices
+survive or re-detect after a suspend; that the DIMM and graphics-card RGB, if
+any, stay dark (by design: no I2C).
+
+---
+
+## 6b386 — fan levels 100 / 50 / 20 instead of automatic after the hold (per Patrick)
+
+Patrick (2026-10-04) changed the 6b385 policy: idle (more than 2 minutes after
+work) every controlled fan at 20%; working 100%; after work ends 100% for
+60 s, then 50% for 60 s, then 20%; a new request at any time returns to 100%
+and restarts the sequence. The temperature override stays. Everything below
+replaces what 6b385 below says about "auto after the hold".
+
+- Phases in `lib/o1fan.py`: `working` / `hot` / `calibrating` (100%),
+  `hold100` (age < 60 s), `hold50` (60 <= age < 120), `idle20`. The boundaries
+  are strict (`<`), tested at 59/60/61 and 119/120/121 s. pwm = round(pct *
+  255 / 100), halves up: 20% = 51, 30% = 77, 50% = 128. While the service runs
+  it always holds the outputs; it gives them back only when it stops.
+- Nothing is known about the NCT6797 header layout (fan, pump, nothing), so a
+  low level is never trusted. The first start measures each output's rpm at
+  100% (6 s settle) and keeps it. 6 s after a low level, rpm 0 or under
+  `fanN_min` raises that output by 10% a step to the lowest level that spins
+  (floor per output, logged). Still >= 60% of its 100% rpm when asked for 20%:
+  a probable pump, 100% for good, logged. No rpm at 100% (or no reading):
+  100% only while working, otherwise given back to its own control. Learned
+  values (rpm100, min_pct, always100, pump_checked) live under `learned` in
+  `/var/lib/ollama1/fan.json`, keyed by chip name and pwm number (hwmonN moves
+  between boots), and survive stops and reboots; the originals (`orig`) do not
+  survive a reboot. To relearn: stop, delete the file, start.
+- Crash safety reversed from 6b385: a crash must not leave fans at 20%, so
+  `ExecStopPost` now restores after ANY exit (the `SERVICE_RESULT` check is
+  gone) and `Restart=always` brings it back. Added `Type=notify`,
+  `NotifyAccess=main`, `WatchdogSec=10` and a stdlib `sd_notify` ping
+  (`WATCHDOG=1`, `READY=1` after the first tick) on every loop turn, also when
+  the tick failed: a loop that does not run is what the watchdog catches.
+  A restart that finds the originals still held (a kill with no stop-post)
+  takes them over and runs the whole sequence from 100%.
+- Wake: unchanged mechanism (SIGUSR1 from the sleep hook, per-tick verify),
+  now at the current level. Status: `level: 50%  phase: hold50 30s`, each fan's
+  rpm and `min N%`, notes for pumps and no-rpm outputs; the admin card line is
+  `Fans: 20% (idle)` / `Fans: 100% (a request is running)` / `Fans: 100% for
+  30 s more, then 50%` / `Fans: 50% for 30 s more, then 20%`.
+- Tests: `tests/test_fan.py` (58 tests, fans whose rpm follows their pwm) and 41
+  `fan:` mutants in `tests/mutate.py` (each timing and edge, the 100/50/20
+  levels, the rounding, the restore, restore after any exit, the watchdog
+  ping, the stall and pump rules, each limit and the hysteresis).
+- Unverified on the MS-7C35: that a 20% pwm on each NCT6797 header spins what
+  is plugged in (the stall check is the guard, and it needs rpm readings: an
+  output with none is left to the BIOS except while working); nct6775's fanN
+  numbering matching pwmN; that the card's fan answers pwm 51 and reports rpm.
+  The 6 s settle may be short for a large fan spinning up from rest.
+## 6b383 — every font and shape in the panel smooth, at the screen's real resolution (per Patrick)
+
+Patrick: "Smooth all the fonts in the interface so it's not all blocky: use the
+available resolution to your advantage, but keep everything large and readable."
+- **Drawn at the real resolution.** `o1hipix.HiPixmap` is a Pixmap you draw on in
+  LOGICAL units (the same ~640x360 grid, so every size and every layout rule is
+  as before) that is stored at `scale` times that: on a 3840x2160 screen
+  `o1fb.choose_scale` gives 6 and the panel is drawn at 3840x2160 with nothing
+  stretched afterwards. `PanelRenderer` replaces the old per-frame render and
+  `Presenter(info, lw*k, lh*k, 1)` takes its pixels as they are (XRGB8888: no
+  conversion; only changed rows are written).
+- **Text.** `o1vecfont` gained lower case (x-height 70, ascenders to the capital
+  top, descenders to 125) and every printable ASCII sign plus the degree sign,
+  and a mixed-case mode (`clean(text, mixed=True)`; the cost screen still
+  uses capitals). Names keep their case. `o1vtext` measures in grid units for
+  the layout (rounded up, so what fits there fits when drawn). Glyphs are
+  cached as ready pixel rows per (character, height, colours); a string is a few
+  slice assignments per glyph row.
+- **Shapes.** `o1raster.stroke_rows` rasterizes capsules (round caps and joins)
+  as sparse rows with an active-set sweep; used for glyphs, ring arcs, graph
+  lines. Rounded rectangles and discs come from cached corner/disc coverage.
+  Rectangles and hairlines stay exact. Graph fills run column by column
+  under the line.
+- **Cheap.** Boxes redraw only when their numbers changed (`box_key`: the
+  numbers, only the tail of each series, a minute for the model countdowns
+  which now show minutes); a changed box is cleared first (anti-aliased corners
+  would otherwise pile up). Dials and graph plots are kept pictures
+  (`HiPixmap.cached`, bounded to 6 M pixels) keyed by what they show; graph
+  data is cut at a time step (`GRAPH_STEP_S` = 6 s: the plot is the data up to a
+  multiple of 6 s) so a graph's picture is the same for several ticks.
+  Measured with `tests`-style synthetic states, every number changing on every
+  2-second tick: 1920x1080 24 ms per tick (1.2% of a core), 3840x2160 56 ms
+  (2.8%), 10.7 MB written per tick at 4K; first frame 0.09 s / 0.22 s. Nothing
+  changing: ~24 ms (the status and header boxes show seconds).
+- **Found on the way:** `series()` now returns a few extra samples for the
+  step; the panel's model countdown shows minutes; `--png --size` is the
+  SCREEN's pixels (the grid and scale come from `choose_scale`).
+- Tests: 155 -> the raster, the smooth surface (round corners, areas, clipping
+  in logical units, caches equal to redrawing), the mixed-case font, and the
+  whole panel at 1920x1080, 2560x1440 and 3840x2160 (nothing outside its box,
+  hostile text, pairing, anti-aliased edges, incremental == full redraw, a
+  still machine redraws nothing); 7 new mutants.
+- Not verified on the monitor: how the smooth text reads from across the room,
+  the real per-tick CPU including the sampler (a synthetic 4K bench here),
+  and the first full-screen write.
+
+## 6b385 — the server's fans run at 100% while it works, and a minute after (per Patrick)
+(superseded by 6b386 for the levels after the hold and for crashes)
+
+Patrick (2026-10-04): "keep the GPU fan on full anytime there's a request
+running. We don't want to burn the bearings out on it, but I want maximum
+cooling when it's working. If you can control all the system fans too, have
+those go 100% when there's any request running ... 100% for one minute after
+requests have ended ... so heat doesn't build up." Otherwise automatic.
+
+- New root service `ollama1-fan.service` (`bin/ollama1-fan`, `lib/o1fan.py`,
+  stdlib only). Polls every 2 s. "Working" reuses the auto-sleep probes and
+  limits (o1idle: the gateway's activity file, `GPU_IDLE_PCT`, `scan_tools`,
+  `LOAD_BUSY`). `o1sleep.busy_reasons` (downloads, updates, backups) is left
+  out on purpose: it keeps the server awake but it is not heat. A tool such as
+  stability-test.sh counts, and the load average (1 minute) lags a stress
+  test's end by about a minute, so the hold after one is a little longer.
+- Outputs: amdgpu `pwm1` and every `pwmN` of a Super-IO chip (`nct67xx`,
+  `it8xxx` ...), found by chip name. Writes "manual, 255" (enable file first).
+  A file with no write bit, or one a write fails on, is skipped and said once.
+  Nothing below 255 is ever written except to put an output back.
+- Originals: each output's `pwmN_enable` (and `pwmN` when it was manual) goes
+  to `/var/lib/ollama1/fan.json` with the boot id BEFORE the first write.
+  A restart or crash mid-hold takes them from there (not the manual values it
+  would read now), holds a minute from the restart, then restores. A different
+  boot id drops the file (the chip is back to its own settings).
+- Stops: SIGTERM restores at once; ExecStopPost restores only when
+  `$SERVICE_RESULT` is `success`; a crash leaves 100% and `Restart=always`,
+  `StartLimitIntervalSec=0` brings it back. This reads Patrick's "stay at 100%
+  rather than stopping" over "restore on crash": a crash is not a reason to
+  slow the fans.
+- Override: CPU 80 C (Tctl/Tdie), GPU junction 90 C (edge if there is no
+  junction), NVMe composite 70 C force 100% until 10 C under the limit.
+  A sensor that stops answering keeps its state.
+- Wake: the sleep hook sends SIGUSR1 (`systemctl kill --kill-whom=main`), and
+  every tick rewrites an output it holds whose values changed (amdgpu resets
+  `pwm1_enable` on resume). In auto the service writes nothing at all.
+- Modules: `ExecStartPre=-+ ... load-modules` runs `modprobe nct6775` outside
+  the sandbox when no chip with fan outputs shows (ProtectKernelModules stays
+  on for the service; ProtectKernelTunables is left off so /sys is writable).
+  `setup on` writes `/etc/modules-load.d/ollama1-fan.conf` only when the chip
+  loaded. NOT verified on the MS-7C35: whether the kernel's nct6775 binds to
+  the NCT6797D without `acpi_enforce_resources=lax` (the README says what to
+  look for in the kernel log).
+- Status: `ollama1-fan status` (mode full / hold Ns / auto, why, outputs, rpm,
+  temps; no root) and the admin panel's CPU card, one line from
+  `/run/ollama1/fan.json` (`o1fan.panel_line`, `st["fan"]`).
+- setup.sh: `--fans on|off` (default on; `OLLAMA1_FANS`; saved as `FANS=` in
+  setup.env, always written; `fans_choice` in setuplib.sh) and a step "Fans"
+  between graphics card tuning and Cloudflare that calls `ollama1-fan setup`.
+  With `on` it removes the hand-made `ollama1-gpu-fan.service` (full speed
+  always), stops it and gives amdgpu's `pwm1_enable` back (2) so the first
+  "original" is not that unit's manual setting.
+- Tests: `tests/test_fan.py` (fake sysfs, fake clock) and 25 mutants in
+  `tests/mutate.py` ("fan: ..."): hold time and its edge, restart of the
+  hold, 255, restore (enable and manual value), originals saved first, boot
+  id, crash vs clean stop, wake re-apply, each limit, hysteresis, unwritable,
+  each source of work, the hook, the old unit, the default.
+## 6b382 — the cost screen in smooth rounded print, no asterisks (per Patrick)
+
+Patrick on the real 4K monitor: the cost screen works, but the digits (a 5x7
+bitmap scaled about 10x then x6) were blocky and hard to read.
+- **New `lib/o1vecfont.py`: a stroke font.** Each glyph (0-9 . , : - / $ and the
+  euro, pound and yen signs, A-Z, space) is a skeleton of lines and arcs drawn
+  with a round pen (round caps and joins), anti-aliased by exact coverage:
+  every segment is a capsule, and for each of 8 sub-rows of a pixel row the
+  capsules' x-extent is found analytically, merged, and added as fractional
+  coverage. No per-pixel distance tests, so it is fast. Glyph bitmaps (rows of
+  0..255 coverage) are cached by (character, height); `Pixmap.blit_coverage`
+  paints them over a flat background through a 256-entry colour table. Digits
+  are 16% wider than the first design (Nunito-like proportions) and all one
+  width. Capitals only; the screen's words are in capitals.
+- **Drawn at the screen's own resolution** (`o1fb.choose_cost_scale`: 1:1 up to
+  3840 wide, else a whole-number fraction), by its own `Presenter`; the panel
+  keeps its 640x360 x k. A flip clears the screen and rewrites it in full.
+  `o1panel.render_cost` keeps the picture until the figures or the size change
+  (the clock is not on this screen), so after the first draw each two-second
+  tick is a row compare and no writes. At 3840x2160: about 0.25 s to draw the
+  first time, 10 ms to prepare the frame (plus the write of the 33 MB).
+- **Layout.** Label, kWh and (if the history is short) a note in a left column;
+  the figure, one common height for all three rows, fills the rest of the row.
+  The ink (a $ or a comma reaches beyond the capitals) is centred and fitted
+  by `vertical_extent`, so nothing touches the row's edge. Messages ("Set your
+  electricity price in the admin panel", "No data yet") are drawn the same
+  way, as large as they fit, wrapped by `wrap_vec`.
+- **No asterisk anywhere on this screen** and no footnote (Patrick's explicit
+  instruction for it; the estimate rule still holds on the other screens). The
+  "only 3d 4h of data" note stays, in amber, under the kWh.
+- **Found on the way:** `Presenter.merge` joined adjacent writes by repeated
+  `bytes +`, quadratic on a 4K frame (4 s); it now joins once. A screen in
+  plain XRGB8888 (the usual one) now sends the buffer's own bytes, with no
+  conversion.
+- Tests: the stroke font (areas of capsules to 1%, round ends and joins,
+  anti-aliased edges, clipping, centring, fit), the cost screen at 640x360 to
+  3840x2160 (one size for the three figures, overflow of 123456789012.34 in
+  seven currencies at five sizes, the cache, the loop's presenter); four new
+  mutants. `ollama1-dash --png out.png --screen cost [--size 3840x2160]`.
+
+## 6b381 — Space on the server's keyboard shows only the electricity cost (per Patrick)
+
+- The panel gets a second screen: three large rows, 24 HOURS / 7 DAYS / 30
+  DAYS, each a cost in the tariff's symbol at the largest whole scale that
+  fits (one size for all three), with kWh small beside the label. Space flips
+  to it and back; every other key is ignored (`o1paneld.handle_keys`, with a
+  0.3 s debounce so a held key is one flip). A pairing window takes the screen
+  from either (`render(screen="cost")` is ignored while `st["pairing"]`). The
+  normal footer says "Space: electricity cost".
+- **Same calculation as the admin panel.** The root power service already
+  computes `o1power.window()` for 1 d, 1 w and 1 m (30 d); `compact()` now
+  also publishes those three (`cost`, `kwh`, `measured_h`, `est`) plus
+  `currency`, `priced`, `since` in `/run/ollama1/power/summary.json`, and
+  `o1metrics.power_state()` passes them through. Nothing is recomputed in
+  the panel. `est` = any of the window's hours came from a source other than
+  a plug; those figures get a `*` and a footnote (estimates always do).
+  **The power service must be restarted** after the kit is updated
+  (`sudo systemctl restart ollama1-power`), or 7 d and 30 d say NO DATA (the
+  panel falls back to the 24 h figure of the old summary).
+- Honest empties: no tariff price -> "Set your electricity price in the admin
+  panel"; no readings -> "No data yet"; a window with none -> NO DATA, never a
+  zero; a history shorter than 90% of a window -> "only 3d 4h of data". JPY
+  has no decimals; unknown currencies show their code. The font gained
+  the euro, pound and yen signs.
+- **Keyboard.** `o1paneld.Keys` puts the unit's tty (stdin, tty1) in raw mode
+  (no echo, no ISIG/ICANON), flushes what was typed before, reads with
+  `select` for at most the loop's 0.5 s poll (so a press flips within half a
+  second and the draw loop is never blocked), and restores the attributes in
+  `finally`. A fd that is not a terminal just sleeps. getty is masked on
+  tty1, so no login prompt can see the keys. KD_GRAPHICS does not change the
+  keyboard mode, so the tty still delivers them (unverified on the server).
+- `ollama1-dash --png out.png --screen cost` for the picture. Tests: the keys
+  with a fake termios and select, the loop with a scripted keyboard, the
+  windows, empties, currencies, no overflow of 1234.56 / 123456789012.34 in
+  any symbol at 480x270 to 1280x1024, and the power summary round trip; four
+  new mutants.
+
+## 6b380 — a graphical information panel for the server's monitor (per Patrick)
+
+Patrick: "annoying trying to read all these hash marks". With a monitor
+connected the server now shows a picture instead of the text dashboard. He
+chose a lightweight renderer drawn straight to the screen (no desktop, no
+browser), low resolution being fine.
+
+- **Where it lives (kit only, `ollama1/`).** `lib/o1pixfont.py` (a 5x7 bitmap
+  font with descenders, crisp, drawn at whole-number scales; digits fixed
+  width), `lib/o1gfx.py` (a pixel buffer: clipped rectangles, lines, arcs,
+  text, a PNG writer), `lib/o1panel.py` (layout and the panels),
+  `lib/o1fb.py` (the framebuffer and the console), `lib/o1paneld.py` (the
+  loop), `bin/ollama1-dash` (mode, fall-back, `--png`).
+- **Rendering.** The panel is drawn at about 640x360 and scaled up by the
+  whole number that brings the screen's width nearest 640 (`choose_scale`:
+  1080p x3, 1440p x4, 720p x2), centred; the rest stays black. The buffer
+  is one `array('I')` of 0xRRGGBB, so a filled rectangle is a slice
+  assignment and a frame takes under 25 ms. Each panel is drawn inside
+  `Pixmap.clipped(box)` and `frame()` narrows the clip again to the panel's
+  inside, so a widget cannot paint over a border or its neighbour; text is
+  cut with "..." by its measured pixel width (`o1pixfont.fit`), never by its
+  length. The bar rows cap their label and value columns (a 200-character
+  mount name once pushed everything out of its box in a test).
+- **Framebuffer.** `FBIOGET_VSCREENINFO`/`FSCREENINFO` give the size, depth,
+  colour layout and stride; `Presenter` converts to 32, 24 or 16 bits with
+  any layout through a colour lookup, scales a row once, and returns only
+  the rows that changed since the last frame as `(offset, bytes)` writes
+  (merged when contiguous), honouring `line_length` and the pan offset.
+  `FbDevice.write` is `pwrite` on `/dev/fb0`; no mmap.
+- **Console.** `TtyGraphics` sets `KD_GRAPHICS` on the unit's tty (it is the
+  controlling terminal, so no capability is needed) and restores `KD_TEXT`,
+  the cursor and a cleared screen in `finally`; SIGTERM is turned into a
+  clean stop. While another virtual terminal is on the screen
+  (`VT_GETSTATE`) nothing is drawn; coming back clears and redraws in full.
+- **When it runs.** `--dash auto|text|graphic` (flag, then `OLLAMA1_DASH`,
+  then `/etc/ollama1/dash-mode`, then auto). Auto = `/dev/fb0` exists and a
+  `/sys/class/drm/*/status` says `connected` (`unknown` does not count). The
+  text dashboard polls every 10 s and switches when a monitor appears. Any
+  exception from the panel (open refused, odd depth, a bug) is logged to the
+  journal with its traceback and the text dashboard takes over for the rest
+  of the process; the console is back in text mode before that.
+  `setup.sh --dash` (tiny change: `dash_mode_choice` / `dash_mode_step` in
+  `lib/setuplib.sh`, saved as `DASH=` in `setup.env` only when not auto). The
+  unit gets `SupplementaryGroups=... video` for `/dev/fb0`.
+- **Data.** The same state dict as the text dashboard (`o1metrics.Sampler`),
+  and `o1dashui.warnings()` for the problems, so the two cannot disagree.
+  The sampler gained four one-second series (`gpu_temp`, `cpu_temp`,
+  `cpu_mhz`, `fan_rpm`), `cpu.mhz`/`cpu.max_mhz` (from `o1cpu.CpuProbe`, every
+  2 s), and `activity` (the gateway's activity file) and `idle`
+  (`/run/ollama1/idle.json`) for the sleep line. The sleep line says "Sleeps in
+  mm:ss" only if the idle service publishes `enabled` and `minutes` in
+  `idle.json`; today it publishes `supported` and the wake cards only, so the
+  panel shows "Idle for N" until it does (`sleep_summary` reads them if
+  present).
+- **Preview.** `ollama1-dash --png out.png [--size WxH] [--scale N]
+  [--pairing] [--live]`. Sample data comes from `tests/dash_sample.py`
+  (`--live` uses this machine).
+- **Not verified on real hardware** (no framebuffer here): the ioctl structs
+  were built from the kernel headers' layout and tested with packed fake
+  bytes; `KDSETMODE` on the unit's tty, `/dev/fb0` permissions through the
+  `video` group, `pwrite` on simpledrm/amdgpu fbdev emulation, and how the
+  screen looks at 1080p are all for the first run on the server. If the
+  panel does not appear: `journalctl -u ollama1-dash`, then
+  `sudo ./setup.sh --dash text` puts the old dashboard back.
+- Tests: `tests/test_panel.py` (font, buffer and clipping, layout, pixel
+  formats and strides, the loop on a fake screen, detection with a fake
+  sysfs, fall-back, the setting).
+
+---
+## 6b374 — setup.sh works on a server moved with migrate-os (kit)
+
+- Pat's server after the move: the system and the models on ONE NVMe (plain
+  partitions: `/` ext4 on p3, `/boot` p2, ESP p1, `/srv/models` p4), the
+  mirror on its own, setup.env still naming the old drive as OS_SERIAL.
+  `setup.sh --dash graphic` stopped: "/ is not on the disk with serial <old>;
+  refusing to touch any disk". That refusal is right and stays.
+- The disk guards left setup.sh for `lib/setuplib.sh` (so the tests run
+  them): `check_disks`, `plan_wipes`, `models_done`, `raid_done`, `root_disk`,
+  `root_on_lvm`, `show_disks`. New layout "models on the OS disk": allowed
+  only when OS_SERIAL == MODELS_SERIAL (same disk) AND `/srv/models` is
+  mounted from a partition of that disk that is not the root filesystem.
+  Then `models_done` is true, `plan_wipes` lists nothing for it, and nothing on
+  the disk is touched. If it is not mounted from there: die ("never wipes the
+  OS disk"). A mirror disk can never be the OS disk; two roles can never share
+  a disk otherwise; `plan_wipes` and `models_step` each refuse the OS disk
+  too. A stale OS_SERIAL still dies, and when `/` and `/srv/models` are both on
+  the models disk the message gives the one line that fixes it.
+- Step 3 (grow the root LV) is `grow_root_if_lvm`: skipped with a note when `/`
+  is not a logical volume; no vgs, lvextend or partition command ever runs
+  on a plain-partition root. The plan line says so.
+- `migrate-os --finish` rewrites `/etc/ollama1/setup.env` (`rewrite_setup_env`,
+  `update_setup_env`): OS_SERIAL and MODELS_SERIAL both to the new drive's
+  serial; atomic (temp file beside it, fsync, rename), same owner/mode, every
+  other line and its order kept, missing keys appended; a missing file or a
+  failed write only prints the one-line setup command (never fails finish).
+  For an already-moved server: `sudo ./setup.sh --os-serial X --models-serial X`
+  (setup.env keeps the rest).
+- Tests: `TestOsAndModelsOnOneDisk` and `TestRootNotOnLvm` in
+  `test_setuplib.py` (the exact scenario: guards pass, WIPES=0, no disk
+  writes; the models-elsewhere variant still wipes only that disk; same disk
+  with `/srv/models` unmounted, mounted elsewhere or the root itself dies),
+  `TestSetupEnvAfterTheMove` in `test_migrate_efi.py`; fakecmd learned
+  `findmnt -no SOURCE` and the device tree walk; 15 mutants.
+- Not run: setup.sh itself on any real machine.
+
+## 6b373 — migrate-os: reading `efibootmgr -v`, reusing the entry, and an optional way to stop the old drive booting (kit)
+
+- Branch note: migrate-os (6b362) was not on main yet, so `kit-fixes-1004`
+  carries it by a merge of `origin/migrate-os`; these fixes sit on top of it.
+- The final firmware stage stopped with "efibootmgr made no entry labelled
+  ollama1-new" although the entry existed (twice). The reader assumed one
+  shape of `efibootmgr -v`: label, tab, `HD(...)/File(...)`. Now `parse_efi`
+  handles a tab or only spaces after the label (a label can hold spaces and
+  device words: "UEFI: Built-in EFI Shell", "PCI HD ..."), entries with and
+  without the `*`, a `File(...)` loader or a bare path, trailing data after
+  the loader (`\EFI\BOOT\BOOTX64.EFI0000424f`, Boot0003 style), CRLF, and
+  the same entry under several numbers (`entries_for`, `norm_loader`,
+  `same_loader`: FAT is not case sensitive).
+- The firmware stage is idempotent: an entry for the new ESP's PARTUUID and
+  the loader path `\EFI\o1new\<loader>` that already exists (any label,
+  the one labelled ollama1-new preferred, the lowest number when it is listed
+  twice) is reused, and made active if it was not; no second `efibootmgr -c`.
+  The new entry's duplicates are left out of `BootOrder`. When no entry can
+  be found after making one, the stop says how many entries the list has and
+  what is on that ESP, and that `--resume` reuses it.
+- `find_old_entry` no longer returns nothing when several entries share the
+  old ESP (ubuntu's, the `\EFI\BOOT` fallback, duplicates): the distro's own
+  loader first, then the earliest in the boot order.
+- New, **off by default**: `--finish --disable-old-boot-files`. After the move
+  the server's firmware kept re-ordering `BootOrder` and booting the old
+  drive. This renames `EFI/ubuntu` and `EFI/BOOT` on the old drive's EFI
+  partition to `*.off` so it has nothing to boot. It is the one step that
+  writes to the old drive: only its ESP, found by the PARTUUID the tool
+  recorded (never guessed, vfat only), mounted just for this, asks `yes`,
+  writes the undo (`/srv/data/old-drive-boot-files-undo.txt`: mount and `mv`
+  back) before the first rename, refuses when a `.off` is already in the way,
+  repeating it is a no-op. The firmware entries are not touched by it.
+- Tests: `tests/test_migrate_efi.py` (parser against real-looking samples,
+  duplicates, the stage on a fake server with spaces / bare paths / an entry
+  from a stopped run / one listed twice / inactive / none appearing, and the
+  old-boot-files step) and ten mutants in `mutate.py` ("migrate: ..." from
+  "no tab after the label"). `fakemigrate.py` can print the list those ways
+  (`sep`, `bare`, `trail`) and make an entry on another ESP.
+- Unverified on the real server: that spaces/bare paths are what its
+  efibootmgr printed (the log showed only the failure); the reader now takes
+  every shape named above.
+
+## 6b372 — the graphics card check no longer reverts on one slow reading (kit)
+
+- The load check reverted a fine card: "answers were slower than stock
+  (148.7 against 249.5 tokens/s)", measured while a drive and an engine were
+  failing. The old rule compared one 60 s tuned run with a stock figure taken
+  days earlier (when tuning was turned on), in whatever state the server was.
+- Now a slow first reading only starts a repeat (`confirm_slowdown`): stock
+  and tuned are measured again, alternating `CONFIRM_ROUNDS` (2) times, 20 s
+  each. Revert only if every alternation is more than 5% slower AND the
+  medians are; the reason names what was measured ("slower than stock in 2 of
+  2 repeats (median tuned .. against median stock .., limit 95%; tuned
+  a/b/c, stock d/e ...)"). A repeat that is fine passes ("didn't repeat").
+- Defer, don't revert, when the reading can't be trusted (`self.noise`, from
+  `_load`): NVMe errors in the kernel log since the values were applied
+  (`nvme_errors`: I/O timeouts, controller down, I/O errors on nvme devices),
+  another model loaded during the load (a model resident from the start, like
+  an embedding model, is not noise), the card already 35% busy or more before
+  the load (lowest of three looks), an answer that failed partway, or repeats
+  that didn't finish. The check is recorded as `deferred`, `pending()` stays
+  true, so it runs again next boot; the tuned values stay applied.
+- Unchanged: real amdgpu errors (also during a repeat), 105 C junction and
+  100 C memory revert at once; so does Ctrl-C mid-check, a check the machine
+  never finished, and an amdgpu error in the previous boot's log.
+- Tests: `TestSlowdownIsNotReverted` in `tests/test_gputune.py` (the incident,
+  a slowdown that repeats, one that doesn't, each noise source, safety
+  reverts still firing, Ctrl-C in the repeats, the NVMe regex) and seven
+  mutants in `tests/mutate.py`.
+
+## 6b371 — the check after a wake waits for the card and the models drive (kit)
+
+- After a wake the record once read "Ollama didn't answer; restarted Ollama
+  and the tunnel; Ollama STILL NOT ANSWERING". The old check looked once,
+  restarted Ollama at once and looked again, with no wait for what Ollama
+  needs: right after a suspend the amdgpu driver (ROCm/KFD) and the NVMe
+  holding `/srv/models` come back after the hook has run, and a restart in
+  that gap starts Ollama into a card it can't use (`ollama1-wait-gpu` only
+  covers a service start, and gives up after 90 s and starts anyway). Also
+  possible: the check's own 60 s look being short, and the check racing
+  `ollama1-gpu-tune.service`, which the same hook starts.
+- `o1sleep.resume_check` now: healthy -> done at once (no waiting when all is
+  well). Otherwise it waits, bounded (90 s), for the card (`gpu_ok`, only
+  when an AMD card is on the PCI bus: `gpu_expected`) and the models drive
+  (`models_ok`: listable, and a mount or not empty), looks at Ollama again
+  (it was only slow: no restart), restarts Ollama and the tunnel, and if it
+  still doesn't answer, waits again for whatever was missing and restarts
+  once more. A whole-check budget of 8 minutes; the unit allows 15 and runs
+  after `ollama1-gpu-tune.service`.
+- The record carries the why: `detail` ("Ollama didn't answer; after 90 s
+  still missing: the graphics card; restarted ... again: Ollama STILL NOT
+  ANSWERING") and `waited_s`, `gpu_ready`, `models_ready`, `restarts`.
+  Existing keys (`ok`, `detail`, `at`) are unchanged.
+- Tests (fake clock and fakes): `TestResumeCheck` in `tests/test_sleep.py`;
+  mutants for no wait, no retry, unbounded wait, no reason.
+- Unverified on the real server: that the missing card/drive really is the
+  cause. The next failed wake will now say which.
+
+## 6b370 — the auto sleep setting is proven to stay saved (kit)
+
+- Patrick's report: the setting looked like it didn't stick. Server side it
+  does, and now tests say so: `tests/test_sleepcfg.py`. The setting is
+  `/var/lib/ollama1-gateway/sleep.json` (the gateway's StateDirectory, user
+  `o1gw`, mode 0600), not the `/var/lib/ollama1/sleep.json` record that holds
+  the last sleep/wake and the resume check. Tests: a new Gateway object (a
+  restart) and a new `Idle` read it back; it isn't under `/run`; no temp file
+  is left; a failed write keeps the old one; `setup.sh` (any flag) never
+  names it, writes it or removes the folder; tmpfiles doesn't clean it.
+- One real gap closed: `write_json_atomic(sync_dir=True)` now also flushes the
+  folder after the rename (the file was flushed, the rename was not), so a
+  power cut right after Save can't bring the old file back. Only
+  `write_config` uses it.
+- `sudo ollama1-idle status` prints the saved setting (and whether deep sleep
+  is supported). The nightly backup now includes the file (`settings.tar.gz`).
+- `/run/ollama1/idle.json` now also carries `enabled` (bool) and `minutes`
+  (int), the saved setting, rewritten every tick; the graphical server panel
+  shows "Sleeps in mm:ss" from it. Test: `TestIdleFilePublishesTheSetting`.
+- README: the stale "automatic idle sleep is on hold" line is replaced by what
+  it does and where the setting lives. The app reading the setting back is
+  the app's side, not the kit's.
 ## 6b390 — the starter chips follow what you ask about (per Patrick)
 
 Patrick (2026-10-04): the three chips above the composer came from a fixed pool.
@@ -239,6 +894,93 @@ lanes keep their own sets.
   `mutate.py` are gone with the check they guarded.
 - A person at the keyboard running something long is still protected (a
   tool, load or the card is busy); a person only reading a log is not.
+
+## 6b362 — moving the server's OS onto its other NVMe, in software (kit only, no app change)
+Patrick (2026-10-02): "Is there a way we can clone the one NVMe to the other and
+boot from the other one? Because I don't feel like ripping out the GPU just to
+get an NVMe out of there." He accepts re-downloading models and wants it "as
+simple and safe as possible". Then, same day: "how do we start cloning, then
+have it reboot from the other nvme once done?" (so `--reboot`), and that the
+coordinator, not he, runs it over SSH through a temporary narrow sudo rule.
+The OS drive (the CPU-attached M.2 slot) repeatedly drops off the bus under load
+("nvme controller is down; CSTS=0xffffffff", then ext4 goes read-only); the
+models drive, on the chipset slot, is healthy. `ollama1/tools/migrate-os.sh`
++ `ollama1/lib/o1migrate.py`; docs in `ollama1/README.md` ("Moving the system to
+the other drive").
+
+THE CHOICE: copy (rsync), not `pvmove`. `vgextend` + `pvmove` rewrites the
+volume group's metadata ON THE OLD DRIVE, moves every extent of `/` off it (the
+old drive then boots only while the new one is also there and no longer holds
+the system as it was) and, if the drive drops mid-move, leaves a VG with a
+missing PV. The brief's own test was "keep the old drive bootable as a
+fallback", so: `/` and `/boot` are copied onto plain ext4 partitions of the other
+NVMe (new UUIDs, fstab rewritten ON THE COPY, initramfs and GRUB built in a
+chroot), and the old drive is never written to. Consequences: the new root is
+not LVM (so `setup.sh`, which assumes `ubuntu-vg` and a separate models disk,
+stops at its first checks on a migrated server; not changed here, flagged in the
+README); the old ESP is not copied (its stub points at the old `/boot`);
+`/swap.img` is made new, not copied. No LVM command exists in the tool (a test
+greps for it).
+
+DESIGN
+- Serials are arguments (`--from-serial`, `--to-serial`); nothing about a
+  server is in the repo. Drives are found by sysfs serial (nvme0/nvme1 swap
+  between boots), addressed only by `/dev/disk/by-id`, and the serial is read
+  again immediately before every writing command (`check_target`).
+- Stages 0 checks, 1 park (rsync to `/srv/data/models-parked`, verified by a
+  dry run and sizes), 2 partition (ESP 1G, /boot 2G, / `--root-size`, models
+  the rest), 3 copy, 4 boot (fstab, initramfs, grub-install --no-nvram,
+  update-grub in a chroot; the copy's `grub.cfg` must carry the running
+  kernel's options and the GRUB drop-ins must be on the copy), 5 restore,
+  6 firmware (the boot entry, made LAST: new first, old second, old found by
+  its ESP's PARTUUID; until then the old drive is the default boot). State in
+  `/srv/data/o1migrate/state.json`, refused if that folder is on either NVMe;
+  `--resume` after a crash; a typed serial or `--confirm-serial` (must equal
+  `--to-serial`) once per run.
+- Unattended (the coordinator's run): after the confirmation the tool starts
+  itself again in a detached tmux session `migrate` (no terminal needed),
+  writes `/srv/data/migrate-os.status` (0644, no serials: state, stage N of 6,
+  percent, last line, times, next step; rewritten every 15 s) and a 0600 log,
+  stops on any failure with `FAILED` and no reboot, and with `--reboot`
+  reboots (10 s countdown, Ctrl-C cancels) only after every stage and check
+  passed. Without `--reboot` an interactive run asks `[y/N]` (default no).
+  `--status` (no sudo) diagnoses a status left by a reboot or crash. A systemd
+  unit for that was not made: it would have to be installed on the old drive.
+- `--finish` (no serials needed) checks `/`, `/boot`, `/boot/efi` and
+  `/srv/models` are on the new drive and that the running `/proc/cmdline` has
+  the old system's options (the NVMe power settings, `amdgpu.ppfeaturemask` when
+  the GPU tuning is on, 6b361). The parked copy is deleted only on request, after
+  the live copy is checked to hold every file.
+- Delegation: `--install-remote [--sudoers-user NAME]` copies the script and
+  library to `/usr/local/lib/ollama1-migrate` (root:root, 0755/0644), and adds
+  one sudoers rule (written to a temp file, `visudo -cf`, 0440, the whole set
+  checked again). As root the script runs only from a path of root-owned, not
+  group/world-writable components (shell and Python both check), with `python3
+  -I`, and ignores `O1M_*` overrides unless a test sets `O1M_TEST=1`. The rule is
+  temporary; `--finish` reminds and offers to remove it.
+
+SAFETY REVIEW, same day (second commit). An independent review found the tool not
+safe unattended; fixed: (1) the old models partition's ext4 superblock sits where
+the new ESP starts, so a probe after the wipe aborted the run: each new partition
+is now wiped, always formatted and read back; (2) the firmware entry is BootNext
+only, the old drive stays first until `--finish`, and the copy boots with
+`panic=10`; (3) a final content compare (all files up to 64 MiB, 18 MiB spread
+over larger ones; not a full checksum, which would take hours on a terabyte),
+RAID `[UU]`/rw/md checks and a refusal to create the state folder off /srv/data
+right before the wipe; (4) admin panel, pulls, restart and reboot units stop,
+and the bare `/srv/models` is `chattr +i` while unmounted; (5) TO must hold
+`/srv/models` and exactly one partition, duplicate serials refused, multipath
+names resolved; (6) O_NOFOLLOW everywhere, root-owned and not-writable
+`/srv/data` and state folder, state values validated, no `O1M_*` override as
+root; (7) FROM may have no other mounts; (10) the ESP's grub.cfg stub is
+checked; (12) the status file holds fixed phrases and numbers only; chroot binds
+are unmounted in a `finally`. Tests and mutants for each.
+
+NOT VERIFIED ON REAL HARDWARE: partitioning, the chroot's grub-install and
+update-initramfs, the EFI entry, a firmware that ignores `BootOrder`, a real
+drop-out during the copy, the shim path on this board's Secure Boot setting.
+Tests (`test_migrate*.py`, 3 files) use fakes for every program; mutants in
+`mutate.py` ("migrate: ...").
 
 ## 6b358 — a server added with no name is "My server"
 Patrick (2026-10-02), asked whether to change the blank-name fallback for a new

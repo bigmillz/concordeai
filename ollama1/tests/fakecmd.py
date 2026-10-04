@@ -40,6 +40,8 @@ def main():
             out = "FAKE-DISK 7.3T"
         elif "PKNAME" in spec:
             out = ""
+        elif "NAME,TYPE" in spec and dev in s.get("up", {}):    # walking up from a partition / LVM volume to its disk
+            out = s["up"][dev]
         elif "NAME,TYPE" in spec:
             out = "\n".join("%s %s" % (d, "disk" if d == dev else "part") for d in s["devs"].get(dev, [dev]))
         elif "NAME" in spec:
@@ -81,7 +83,11 @@ def main():
         if any(a.startswith("-n1:") for a in args):
             open(args[-1] + "-part1", "w").close()
     elif cmd == "findmnt":
-        rc = 0 if args[-1] in s.get("mounted_devs", []) else 1
+        if "SOURCE" in args:                             # findmnt -no SOURCE <mountpoint>
+            out = s.get("findmnt_source", {}).get(args[-1], "")
+            rc = 0 if out else 1
+        else:
+            rc = 0 if args[-1] in s.get("mounted_devs", []) else 1
     elif cmd == "mountpoint":
         rc = 0 if args[-1] in s.get("mounted", []) else 1
     elif cmd == "mount":

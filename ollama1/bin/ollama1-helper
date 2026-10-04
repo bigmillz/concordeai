@@ -179,7 +179,8 @@ def backup():
     with tarfile.open(os.path.join(tmp, "settings.tar.gz"), "w:gz") as tf:
         for path in ("/etc/ollama1", "/etc/cloudflared", "/etc/ssh/sshd_config.d/10-ollama1.conf",
                      "/etc/apt/apt.conf.d/52ollama1-unattended-upgrades",
-                     "/etc/default/grub.d/99-ollama1.cfg"):
+                     "/etc/default/grub.d/99-ollama1.cfg",
+                     os.path.join(Paths.gw_state, "sleep.json")):      # the auto sleep setting (6b370)
             if os.path.exists(path):
                 tf.add(path)
     st, data = o1ollama.call(OLLAMA, "GET", "/api/tags")

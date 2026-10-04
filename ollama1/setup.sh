@@ -7,6 +7,10 @@
 #                                    everything, in order (safe to run again).
 #                                    What you give is saved in /etc/ollama1/setup.env
 #                                    (root-only), so a re-run needs none of it again.
+#   sudo ./setup.sh --os-serial X --models-serial X
+#                                    a server whose system was moved onto its models disk
+#                                    (migrate-os): both roles are that one disk, never wiped;
+#                                    migrate-os --finish already writes this into setup.env
 #   sudo ./setup.sh --skip-cloudflare  everything except the tunnel and Access
 #   sudo ./setup.sh --remove-setup-key also take claude-setup@concordeai out of
 #                                    ~<your-user>/.ssh/authorized_keys (your own key stays)
@@ -26,6 +30,16 @@
 #                                    again after a safety revert
 #   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
 #                                    to stock, and the setting saved as off
+#   sudo ./setup.sh --fans on|off    the graphics card's and the case fans at 100% while the server
+#                                    works and for 60 s after, 50% for 60 s, then 20% (ollama1-fan).
+#                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
+#   sudo ./setup.sh --leds on|off    the case, board and cooler lights: 100% white when idle, red while the server
+#                                    works, white again 3 s after (ollama1-leds, through the openrgb package, which
+#                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
+#   sudo ./setup.sh --dash text|graphic|auto   what the server's monitor shows (also:
+#                                    OLLAMA1_DASH): auto (the default) draws the graphical panel
+#                                    when a monitor is connected, else the text dashboard; text
+#                                    keeps the text one. Saved in setup.env, so a re-run keeps it
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # Settings (each is asked for if it is not given and cannot be found):
@@ -102,15 +116,24 @@ SWAP_ACTION=""
 SWAP_SIZE=""
 VG_RESERVE_GIB=0
 A_GPU_TUNE=""
+A_FANS=""
+A_LEDS=""
+A_DASH=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
 A_OS=""; A_MODELS=""; A_HDD1=""; A_HDD2=""
 prev=""
 for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
+  if [ "$prev" = --leds ]; then A_LEDS=$a; leds_choice "$A_LEDS" "" "" >/dev/null || { echo "--leds takes on or off"; exit 2; }; prev=""; continue; fi
+  if [ "$prev" = --fans ]; then A_FANS=$a; fans_choice "$A_FANS" "" "" >/dev/null || { echo "--fans takes on or off"; exit 2; }; prev=""; continue; fi
   case "$prev" in
     --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
       set_option "$prev" "$a"; prev=""; continue ;;
   esac
+  if [ "$prev" = --dash ]; then
+    dash_mode_choice "$a" "" "" >/dev/null || { echo "--dash takes text, graphic or auto"; exit 2; }
+    A_DASH=$a; prev=""; continue
+  fi
   if [ "$prev" = --vg-reserve ]; then
     [[ "$a" =~ ^[0-9]{1,6}G$ ]] || { echo "--vg-reserve takes a size in GiB, like 64G (at most 999999G)"; exit 2; }
     VG_RESERVE_GIB=$((10#${a%G})); prev=""; continue   # 10#: "08G" is decimal, not octal
@@ -119,7 +142,8 @@ for a in "$@"; do
   case "$a" in
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
-    --vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --vg-reserve|--fans|--leds|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --dash|--vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
@@ -130,7 +154,7 @@ for a in "$@"; do
       want=on; [ "$a" = --gpu-tune ] || want=off
       [ -z "$A_GPU_TUNE" ] || [ "$A_GPU_TUNE" = "$want" ] || { echo "--gpu-tune and --no-gpu-tune: give one"; exit 2; }
       A_GPU_TUNE=$want ;;
-    -h|--help) sed -n '2,61p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,/^[^#]/{/^#/p;}' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
@@ -141,6 +165,12 @@ fi
 gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_TUNE takes 1 or 0 (on or off)"; exit 2; }
 # a flag left waiting for its value (the size forgotten) must not mean "no reserve"
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
+[ "$prev" != --fans ] || { echo "--fans takes on or off"; exit 2; }
+fans_choice "" "${OLLAMA1_FANS:-}" "" >/dev/null || { echo "OLLAMA1_FANS takes 1 or 0 (on or off)"; exit 2; }
+[ "$prev" != --leds ] || { echo "--leds takes on or off"; exit 2; }
+leds_choice "" "${OLLAMA1_LEDS:-}" "" >/dev/null || { echo "OLLAMA1_LEDS takes 1 or 0 (on or off)"; exit 2; }
+case "$prev" in --dash) echo "--dash takes text, graphic or auto"; exit 2 ;; esac
+dash_mode_choice "" "${OLLAMA1_DASH:-}" "" >/dev/null || { echo "OLLAMA1_DASH takes text, graphic or auto"; exit 2; }
 case "$prev" in --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
   echo "$prev takes a value"; exit 2 ;; esac
 
@@ -219,6 +249,10 @@ resolve_settings() {
   pick HDD2_SERIAL "$A_HDD2" HDD2_SERIAL "" valid_serial
   GPU_TUNE=$(gpu_tune_choice "$A_GPU_TUNE" "${OLLAMA1_GPU_TUNE:-}" "$(saved GPU_TUNE)") \
     || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
+  FANS=$(fans_choice "$A_FANS" "${OLLAMA1_FANS:-}" "$(saved FANS)") || die "the saved FANS in $SAVED is not on or off; give --fans on or --fans off"
+  LEDS=$(leds_choice "$A_LEDS" "${OLLAMA1_LEDS:-}" "$(saved LEDS)") || die "the saved LEDS in $SAVED is not on or off; give --leds on or --leds off"
+  DASH=$(dash_mode_choice "$A_DASH" "${OLLAMA1_DASH:-}" "$(saved DASH)") \
+    || die "the saved DASH in $SAVED is not text, graphic or auto; give --dash"
 }
 
 # After the relaunch in tmux (a prompt needs the terminal): ask for what is
@@ -254,6 +288,9 @@ save_settings() { # after "yes": so a re-run needs no arguments
       printf 'OS_SERIAL=%s\nMODELS_SERIAL=%s\nHDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' \
         "$OS_SERIAL" "$MODELS_SERIAL" "$HDD1_SERIAL" "$HDD2_SERIAL"
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
+      printf 'FANS=%s\n' "$FANS"
+      printf 'LEDS=%s\n' "$LEDS"
+      if [ "$DASH" != auto ]; then printf 'DASH=%s\n' "$DASH"; fi
     } >"$t" )
   chown root:root "$t"; chmod 0600 "$t"; mv "$t" "$SAVED"
 }
@@ -265,8 +302,6 @@ derive_hosts() { # the hostnames: config.json's own win, else <name>.<zone>
 }
 
 # ---- disks ----------------------------------------------------------------
-root_disk() { disk_of "$(findmnt -no SOURCE /)"; }   # lsblk -s follows / through LVM to its own disk
-
 find_disks() {
   OS_DISK=$(disk_by_serial "$OS_SERIAL")
   MODELS_DISK=$(disk_by_serial "$MODELS_SERIAL")
@@ -276,18 +311,8 @@ find_disks() {
 
 home_on_own_disk() { findmnt -n --target /home -o TARGET 2>/dev/null | grep -qx /home; }
 home_in_fstab() { awk '$0 !~ /^[[:space:]]*#/ && $2 == "/home"' /etc/fstab | grep -q .; }
-models_done() { mountpoint -q /srv/models && [ "$(disk_of "$(findmnt -no SOURCE /srv/models)")" = "$MODELS_DISK" ]; }
-raid_done() { mountpoint -q /srv/data && [ -n "$(raid_find)" ]; }
 
 # ---- the plan --------------------------------------------------------------
-show_disks() {
-  printf '\n   %-13s %-17s %-32s %s\n' "Device" "Serial" "Model / size" "Role"
-  printf '   %-13s %-17s %-32s %s\n' "${OS_DISK:-MISSING}" "$OS_SERIAL" "$(disk_desc "${OS_DISK:-/dev/null}")" "OS: kept; root LV grows into free space"
-  printf '   %-13s %-17s %-32s %s\n' "${MODELS_DISK:-MISSING}" "$MODELS_SERIAL" "$(disk_desc "${MODELS_DISK:-/dev/null}")" "$(models_done && echo 'models: already set up' || echo 'WIPED -> ext4 /srv/models')"
-  printf '   %-13s %-17s %-32s %s\n' "${HDD1:-MISSING}" "$HDD1_SERIAL" "$(disk_desc "${HDD1:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data (after /home moves off it)')"
-  printf '   %-13s %-17s %-32s %s\n' "${HDD2:-MISSING}" "$HDD2_SERIAL" "$(disk_desc "${HDD2:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data')"
-}
-
 state() { if eval "$1" >/dev/null 2>&1; then printf '%sdone%s ' "$G" "$N"; else printf 'to do'; fi; }
 
 policy_line() { # which Access policy name the admin panel's access uses, and what another --owner does
@@ -317,9 +342,9 @@ print_plan() {
 
    $(state '[ "$(hostname)" = "$SERVER_NAME" ]')  1. Host name $SERVER_NAME, time zone $TIMEZONE, boot menu shown for 5 s
    $(state 'command -v cloudflared && command -v ttyd && python3 -c "import nacl"')  2. Packages: ttyd, python3-nacl, mdadm, nftables, zstd, cloudflared (Cloudflare's apt repo, key checked)
-   $(state '[ "$(vg_free_extents)" -le "$(vg_keep_extents "$VG_RESERVE_GIB")" ]')  3. Grow the root volume into the free space on the OS disk (online)
+   $(state '! root_on_lvm || [ "$(vg_free_extents)" -le "$(vg_keep_extents "$VG_RESERVE_GIB")" ]')  3. Grow the root volume into the free space on the OS disk (online); skipped when / is not on LVM
    $(state '! home_on_own_disk && ! home_in_fstab')  4. Copy /home onto the root filesystem, check it (SSH keys included), stop mounting the old disk
-   $(state models_done)  5. Models disk: wipe, ext4, mount at /srv/models (noatime)
+   $(state models_done)  5. Models disk: wipe, ext4, mount at /srv/models (noatime); never when it is also the OS disk
    $(state raid_done)  6. Mirror: wipe both mirror disks, RAID1, ext4, mount at /srv/data (resync runs in the background)
    $(state 'id o1gw && id o1admin && id o1dash && id ollama')  7. Service users (ollama, o1gw, o1admin, o1dash, cloudflared), no shells
    $(state '[ -x $LIBDIR/bin/ollama1-gateway ]')  8. Install the gateway, admin panel, dashboard, pairing tool, updater, units, polkit rule
@@ -329,6 +354,8 @@ print_plan() {
    $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 04:00 when needed; weekly Ollama update
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen (big console font), timers
    $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
+   $(state 'systemctl is-active ollama1-fan')     $(fans_plan "$FANS")
+   $(state 'systemctl is-active ollama1-leds')    $(leds_plan "$LEDS")
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
@@ -439,24 +466,11 @@ derive_hosts
 for f in lib/o1common.py lib/setuplib.sh bin/ollama1-gateway systemd/ollama.service config/50-ollama1.rules; do
   [ -f "$KIT/$f" ] || die "the kit is incomplete: $f is missing"
 done
-[ -n "$OS_DISK" ] || die "no disk with serial $OS_SERIAL (the OS disk)"
-[ -n "$MODELS_DISK" ] || die "no disk with serial $MODELS_SERIAL (the models disk)"
-[ -n "$HDD1" ] || die "no disk with serial $HDD1_SERIAL"
-[ -n "$HDD2" ] || die "no disk with serial $HDD2_SERIAL"
-for pair in "$HDD1:$HDD1_SERIAL" "$HDD2:$HDD2_SERIAL" "$MODELS_DISK:$MODELS_SERIAL"; do
-  serial_is "${pair%%:*}" "${pair#*:}" || die "serial check failed for ${pair%%:*}; refusing to touch any disk"
-done
-[ "$(root_disk)" = "$OS_DISK" ] || die "/ is not on the disk with serial $OS_SERIAL; refusing to touch any disk"
-for d in "$MODELS_DISK" "$HDD1" "$HDD2"; do
-  [ "$d" != "$OS_DISK" ] || die "$d is the OS disk"
-done
-[ "$HDD1" != "$HDD2" ] && [ "$MODELS_DISK" != "$HDD1" ] && [ "$MODELS_DISK" != "$HDD2" ] || die "two roles map to one disk"
+check_disks
 id "$ADMIN_USER" >/dev/null 2>&1 || die "no user $ADMIN_USER"
 
 print_plan
-WIPES=()
-models_done || WIPES+=("$MODELS_DISK ($MODELS_SERIAL, $(disk_desc "$MODELS_DISK"))")
-raid_done || WIPES+=("$HDD1 ($HDD1_SERIAL, $(disk_desc "$HDD1"))" "$HDD2 ($HDD2_SERIAL, $(disk_desc "$HDD2"))")
+plan_wipes
 echo
 if [ "${#WIPES[@]}" -gt 0 ]; then
   printf '%sThese disks will be ERASED. Everything on them is lost:%s\n' "$R$B" "$N"
@@ -545,8 +559,12 @@ ok "ttyd $(ttyd --version 2>&1 | awk '{print $NF}'), cloudflared $(cloudflared -
 
 # ---- 3. root volume -----------------------------------------------------------
 step "Root volume"
-grow_root "$VG_RESERVE_GIB"
-ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); $ROOT_VG_FREE_EXT extents left free in ubuntu-vg"
+grow_root_if_lvm "$VG_RESERVE_GIB"
+if root_on_lvm; then
+  ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); $ROOT_VG_FREE_EXT extents left free in ubuntu-vg"
+else
+  ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free), not on LVM; left as it is"
+fi
 
 # ---- 4. /home onto the root filesystem -------------------------------------------
 step "/home onto the root filesystem"
@@ -644,7 +662,8 @@ ok "ollama, o1gw, o1admin, o1dash, cloudflared (all /usr/sbin/nologin)"
 # ---- 6. models disk ---------------------------------------------------------------
 step "Models disk ($MODELS_SERIAL)"
 if models_done; then
-  ok "/srv/models already on $MODELS_DISK"
+  if models_on_os_disk; then ok "/srv/models is on the OS disk $MODELS_DISK, already set up; nothing on that disk is touched"
+  else ok "/srv/models already on $MODELS_DISK"; fi
 else
   models_step "$MODELS_DISK" "$MODELS_SERIAL"
   ok "/srv/models: $(df -h --output=size /srv/models | tail -n1 | tr -d ' ')"
@@ -683,6 +702,8 @@ ln -sfn "$LIBDIR/bin/ollama1-models" /usr/local/sbin/ollama1-models
 ln -sfn "$LIBDIR/bin/ollama1-power" /usr/local/sbin/ollama1-power
 ln -sfn "$LIBDIR/bin/ollama1-gpu-tune" /usr/local/sbin/ollama1-gpu-tune
 ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
+ln -sfn "$LIBDIR/bin/ollama1-fan" /usr/local/bin/ollama1-fan
+ln -sfn "$LIBDIR/bin/ollama1-leds" /usr/local/bin/ollama1-leds
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
@@ -957,6 +978,7 @@ run systemctl restart ollama1-idle.service
 "$LIBDIR/bin/ollama1-idle" wol-setup || note "couldn't set up wake on a magic packet; auto sleep still works, waking it from the app won't"
 systemctl stop getty@tty1.service >/dev/null 2>&1 || true
 dash_font_step "$LIBDIR/bin/ollama1-dash" /dev/tty1
+dash_mode_step
 run systemctl restart ollama1-dash.service
 sleep 2
 for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power ollama1-idle; do
@@ -1022,6 +1044,21 @@ else
   fi
   ok "off (--no-gpu-tune): the graphics card runs at stock"
 fi
+
+# ---- 14b. fans (6b385) ------------------------------------------------------------------------
+# ON unless --fans off (OLLAMA1_FANS=0; saved in setup.env): the service puts the graphics card's and the
+# case fans at 100% while the server works and 60 s after, 50% for 60 s, then 20% (lib/o1fan.py); it
+# gives them back to the BIOS's control whenever it stops. The step also removes
+# the old hand-made full-speed-always fan unit (see the README) when it is there.
+step "Fans"
+"$LIBDIR/bin/ollama1-fan" setup "$FANS" || note "ollama1-fan setup stopped (see above); the fans are left as they were"
+
+# ---- 14c. lights (6b395) ----------------------------------------------------------------------
+# OFF unless --leds on (OLLAMA1_LEDS=1; saved in setup.env): installs the openrgb package and runs its server on
+# 127.0.0.1 (ollama1-openrgb) and the service that makes every light white when idle and red while the server
+# works (ollama1-leds, lib/o1leds.py). --leds off stops and disables both and removes nothing else.
+step "Lights"
+"$LIBDIR/bin/ollama1-leds" setup "$LEDS" || note "ollama1-leds setup stopped (see above); the lights are left as they were"
 
 # ---- 15. Cloudflare -------------------------------------------------------------------------
 step "Cloudflare Tunnel and Access"

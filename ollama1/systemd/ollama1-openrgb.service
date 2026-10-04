@@ -1,0 +1,50 @@
+# The OpenRGB server the lights talk to (6b395): `openrgb --server`, no window,
+# bound to 127.0.0.1 only (--server-host when this build has it; and always the
+# address filter below: nothing but the loopback may reach it, in or out).
+# Root, because it opens the lights' USB hidraw nodes (the motherboard's Mystic
+# Light, the cooler's pump head). It can reach NOTHING else in /dev: the device
+# policy lets it open hidraw and USB nodes only, so the I2C/SMBus scans OpenRGB
+# can do for memory modules and graphics cards (which can write to the wrong
+# chip) fail to open /dev/i2c-* and find nothing. CAP_DAC_OVERRIDE is the one
+# capability kept, for a device node a rule gave to another owner.
+# The package ships its own udev rules; this unit does not need them.
+[Unit]
+Description=ollama1: OpenRGB server on 127.0.0.1 (USB lights only)
+Before=ollama1-leds.service
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-leds openrgb
+Environment=PYTHONDONTWRITEBYTECODE=1 QT_QPA_PLATFORM=offscreen HOME=/var/lib/ollama1-openrgb XDG_CONFIG_HOME=/var/lib/ollama1-openrgb
+StateDirectory=ollama1-openrgb
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+LimitCORE=0
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+DevicePolicy=closed
+DeviceAllow=char-hidraw rw
+DeviceAllow=char-usb_device rw
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+MemoryMax=384M
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_NETLINK
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

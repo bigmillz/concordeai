@@ -26,6 +26,7 @@ LIB = os.environ.get("OLLAMA1_TEST_LIB") or os.path.join(KIT, "lib")
 BIN = os.environ.get("OLLAMA1_TEST_BIN") or os.path.join(KIT, "bin")
 TOOLS = os.environ.get("OLLAMA1_TEST_TOOLS") or os.path.join(KIT, "tools")
 CONFIG = os.environ.get("OLLAMA1_TEST_CONFIG") or os.path.join(KIT, "config")
+SYSTEMD = os.environ.get("OLLAMA1_TEST_SYSTEMD") or os.path.join(KIT, "systemd")
 
 if not os.environ.get("OLLAMA1_PREFIX"):
     _prefix = tempfile.mkdtemp(prefix="o1test-")

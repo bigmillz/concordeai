@@ -730,7 +730,14 @@ def compact(s):
     return {"t": s["time"], "watts": live.get("watts"), "src": live.get("src"),
             "kwh_24h": d["kwh"], "cost_24h": d["cost"], "symbol": s["symbol"],
             "badge": s["badge"]["text"] if s["mode"] == "tou" else None,
-            "price": s["badge"]["price"]}
+            "price": s["badge"]["price"],
+            # for the screen's electricity-cost view (6b381): the same window() figures the
+            # admin panel shows, for 24 hours, 7 days and 30 days
+            "currency": s["currency"], "priced": s["priced"], "since": s["since"],
+            "windows": {k: {"cost": s["windows"][k]["cost"], "kwh": s["windows"][k]["kwh"],
+                            "measured_h": s["windows"][k]["measured_h"],
+                            "est": any(src != "plug" and h > 0 for src, h in s["windows"][k]["sources_h"].items())}
+                        for k in ("1d", "1w", "1m")}}
 
 
 # ---- the sampler (root) ----------------------------------------------------------------

@@ -90,6 +90,52 @@ gpu_tune_choice() { # FLAG ENV SAVED -> "on", "off" or "default" (6b361): the fl
   echo default
 }
 
+fans_choice() { # FLAG ENV SAVED -> "on" or "off" (6b385): the flag, else the environment (OLLAMA1_FANS), else what an
+  # earlier run saved, else "on": the fans-at-full-speed-while-working service is on unless turned off.
+  # Fails on a value it doesn't know.
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      on|1|yes|true) echo on; return 0 ;;
+      off|0|no|false) echo off; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo on
+}
+
+fans_plan() { # the plan's line for the fans (6b385)
+  if [ "$1" = off ]; then
+    printf 'Fans OFF (--fans off): the graphics card and case fans stay automatic (BIOS control). On: --fans on'
+  else
+    printf 'Fans ON: graphics card and case fans at 100%% while the server works and 60 s after, 50%% for 60 s, then 20%%; a Corsair Hydro liquid cooler on USB is controlled too (installs liquidctl) (ollama1-fan). Off: --fans off'
+  fi
+}
+
+leds_choice() { # FLAG ENV SAVED -> "on" or "off" (6b395): the flag, else the environment (OLLAMA1_LEDS), else what an
+  # earlier run saved, else "off": the lights service installs a package and takes over the case lights, so it is
+  # opt-in. Fails on a value it doesn't know.
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      on|1|yes|true) echo on; return 0 ;;
+      off|0|no|false) echo off; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo off
+}
+
+leds_plan() { # the plan's line for the lights (6b395)
+  if [ "$1" = on ]; then
+    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when idle, red while the server works (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
+  else
+    printf 'Lights OFF (default): nothing installed, the lights stay as the board leaves them. On: --leds on'
+  fi
+}
+
 saved() { # KEY -> its value from the file an earlier run wrote, if any
   [ -r "$SAVED" ] || return 0
   sed -n "s/^$1=//p" "$SAVED" | head -n1
@@ -145,6 +191,74 @@ byid_for() { # disk serial -> the /dev/disk/by-id path of that whole disk
     if [ "$(readlink -f "$f")" = "$(readlink -f "$disk")" ]; then echo "$f"; return 0; fi
   done
   return 1
+}
+
+# ---- which disk holds what (6b374) -------------------------------------------------------------
+root_source() { findmnt -no SOURCE /; }
+root_disk() { disk_of "$(root_source)"; }   # lsblk -s follows / through LVM to its own disk
+root_on_lvm() { # true when / is a logical volume (a plain partition root, as migrate-os leaves it, is not)
+  local src; src=$(root_source 2>/dev/null) || return 1
+  [ -n "$src" ] || return 1
+  lsblk -lsnpo NAME,TYPE "$src" 2>/dev/null | awk '$2=="lvm"{f=1} END{exit !f}'
+}
+models_done() { # /srv/models is mounted from a partition of the models disk
+  mountpoint -q "${MODELS_MNT:-/srv/models}" \
+    && [ "$(disk_of "$(findmnt -no SOURCE "${MODELS_MNT:-/srv/models}")")" = "$MODELS_DISK" ]
+}
+raid_done() { mountpoint -q "${DATA_MNT:-/srv/data}" && [ -n "$(raid_find)" ]; }
+models_on_os_disk() { [ -n "${OS_DISK:-}" ] && [ "$MODELS_DISK" = "$OS_DISK" ]; }
+
+check_disks() { # every refusal before any disk is touched. Needs OS_DISK MODELS_DISK HDD1 HDD2 and their serials.
+  [ -n "$OS_DISK" ] || die "no disk with serial $OS_SERIAL (the OS disk)"
+  [ -n "$MODELS_DISK" ] || die "no disk with serial $MODELS_SERIAL (the models disk)"
+  [ -n "$HDD1" ] || die "no disk with serial $HDD1_SERIAL"
+  [ -n "$HDD2" ] || die "no disk with serial $HDD2_SERIAL"
+  local pair d rd
+  for pair in "$HDD1:$HDD1_SERIAL" "$HDD2:$HDD2_SERIAL" "$MODELS_DISK:$MODELS_SERIAL"; do
+    serial_is "${pair%%:*}" "${pair#*:}" || die "serial check failed for ${pair%%:*}; refusing to touch any disk"
+  done
+  rd=$(root_disk)
+  if [ "$rd" != "$OS_DISK" ]; then
+    if [ "$rd" = "$MODELS_DISK" ] && models_done; then   # a server moved with migrate-os, its setup.env still the old one
+      die "/ and /srv/models are both on the disk with serial $MODELS_SERIAL, but the OS disk is set to $OS_SERIAL; refusing to touch any disk. If the system was moved onto that disk, run once: sudo ./setup.sh --os-serial $MODELS_SERIAL --models-serial $MODELS_SERIAL"
+    fi
+    die "/ is not on the disk with serial $OS_SERIAL; refusing to touch any disk"
+  fi
+  # The one case where a role disk may be the OS disk: the models share it, because the system was moved there
+  # (migrate-os). Only when /srv/models is already mounted from it, as its own partition, and then nothing on
+  # that disk is wiped, repartitioned or reformatted.
+  if [ "$MODELS_DISK" = "$OS_DISK" ]; then
+    models_done || die "$OS_DISK (serial $OS_SERIAL) is both the OS disk and the models disk, but /srv/models is not mounted from it. Setup never wipes the OS disk: mount the models partition at /srv/models, or give another --models-serial"
+    [ "$(findmnt -no SOURCE "${MODELS_MNT:-/srv/models}")" != "$(root_source)" ] \
+      || die "/srv/models is the root filesystem itself, not a partition of its own; refusing to touch any disk"
+  fi
+  for d in "$HDD1" "$HDD2"; do
+    [ "$d" != "$OS_DISK" ] || die "$d is the OS disk"
+  done
+  [ "$HDD1" != "$HDD2" ] && [ "$MODELS_DISK" != "$HDD1" ] && [ "$MODELS_DISK" != "$HDD2" ] || die "two roles map to one disk"
+}
+
+show_disks() {
+  printf '\n   %-13s %-17s %-32s %s\n' "Device" "Serial" "Model / size" "Role"
+  if models_on_os_disk; then   # moved with migrate-os: the system and the models share one disk, which is never wiped
+    printf '   %-13s %-17s %-32s %s\n' "${OS_DISK:-MISSING}" "$OS_SERIAL" "$(disk_desc "${OS_DISK:-/dev/null}")" "OS + models: kept, never wiped; $(root_on_lvm && echo 'root LV grows into free space' || echo 'root is a plain partition, left as it is')"
+    printf '   %-13s %-17s %-32s %s\n' "(same disk)" "$MODELS_SERIAL" "" "$(models_done && echo 'models: on the OS disk, already set up' || echo 'models: NOT mounted from the OS disk: setup will stop, nothing is wiped')"
+  else
+    printf '   %-13s %-17s %-32s %s\n' "${OS_DISK:-MISSING}" "$OS_SERIAL" "$(disk_desc "${OS_DISK:-/dev/null}")" "OS: kept; $(root_on_lvm && echo 'root LV grows into free space' || echo 'root is not on LVM, left as it is')"
+    printf '   %-13s %-17s %-32s %s\n' "${MODELS_DISK:-MISSING}" "$MODELS_SERIAL" "$(disk_desc "${MODELS_DISK:-/dev/null}")" "$(models_done && echo 'models: already set up' || echo 'WIPED -> ext4 /srv/models')"
+  fi
+  printf '   %-13s %-17s %-32s %s\n' "${HDD1:-MISSING}" "$HDD1_SERIAL" "$(disk_desc "${HDD1:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data (after /home moves off it)')"
+  printf '   %-13s %-17s %-32s %s\n' "${HDD2:-MISSING}" "$HDD2_SERIAL" "$(disk_desc "${HDD2:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data')"
+}
+
+plan_wipes() { # sets WIPES: the disks that will be erased
+  WIPES=()
+  if ! models_done; then
+    [ "$MODELS_DISK" != "$OS_DISK" ] || die "refusing to wipe the OS disk $OS_DISK"
+    WIPES+=("$MODELS_DISK ($MODELS_SERIAL, $(disk_desc "$MODELS_DISK"))")
+  fi
+  raid_done || WIPES+=("$HDD1 ($HDD1_SERIAL, $(disk_desc "$HDD1"))" "$HDD2 ($HDD2_SERIAL, $(disk_desc "$HDD2"))")
+  return 0
 }
 
 disk_desc() { lsblk -dno MODEL,SIZE "$1" 2>/dev/null | sed 's/  */ /g;s/^ //'; }
@@ -207,6 +321,16 @@ vg_keep_extents() { # GiB -> extents of ubuntu-vg to leave free (rounded up), or
   [ "${1:-0}" -gt 0 ] || { echo 0; return 0; }   # no reserve: no extent size needed
   e=$(vg_extent_bytes) || return 1
   echo $(( (${1:-0} * 1073741824 + e - 1) / e ))
+}
+
+grow_root_if_lvm() { # reserve GiB: step 3. A root that is a plain partition (a server moved with migrate-os) is left
+  # exactly as it is: no volume group to grow, and no partition of an in-use root is ever touched.
+  if root_on_lvm; then
+    grow_root "$@"
+  else
+    ROOT_VG_FREE_EXT=0
+    note "/ is not on LVM, so there is no root volume to grow; left as it is"
+  fi
 }
 
 grow_root() { # reserve GiB: grow ubuntu-lv and its filesystem (online) into ubuntu-vg's
@@ -329,11 +453,34 @@ dash_font_step() {
   fi
 }
 
+# What the server's monitor shows (6b380): text, graphic or auto (the default: the graphical
+# panel when a monitor is connected). dash_mode_choice FLAG ENV SAVED -> the word, or fails on one
+# it doesn't know; dash_mode_step writes it where the dashboard reads it.
+: "${DASH_MODE_FILE:=/etc/ollama1/dash-mode}"
+dash_mode_choice() {
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      text|graphic|auto) echo "$v"; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo auto
+}
+dash_mode_step() {
+  mkdir -p "$(dirname "$DASH_MODE_FILE")"
+  printf '%s\n' "${DASH:-auto}" >"$DASH_MODE_FILE"
+  chmod 0644 "$DASH_MODE_FILE"
+  ok "monitor: ${DASH:-auto} (text, graphic or auto: setup.sh --dash)"
+}
+
 wait_for() { local _; for _ in $(seq 1 50); do [ -e "$1" ] && return 0; sleep 0.2; done; return 1; }
 
 # The models disk. $1 disk, $2 serial.
 models_step() {
   local disk=$1 serial=$2 part byid uuid
+  [ -z "${OS_DISK:-}" ] || [ "$disk" != "$OS_DISK" ] || die "$disk is the OS disk; not wiping"
   part=$(first_part "$disk")
   local label=""
   [ -n "$part" ] && { label=$(probe "$part" LABEL) || die "$BLKID_FAIL"; }

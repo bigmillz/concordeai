@@ -6,6 +6,7 @@ snapshot. Nothing here ever sees a prompt or an answer.
 import glob
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -197,6 +198,10 @@ def disks():
     return out
 
 
+ACTION_RX = re.compile(r"\b(resync|recovery|check|reshape)\s*=\s*(?:(\d+(?:\.\d+)?)%|[A-Za-z]+)")
+FINISH_RX = re.compile(r"finish\s*=\s*(\d+(?:\.\d+)?)\s*min")
+
+
 def raid():
     """Arrays from /proc/mdstat: name, level, members up, resync progress."""
     text = _read(PROC + "/mdstat", "") or ""
@@ -214,16 +219,16 @@ def raid():
             seg = line.strip().split()[-1]
             if seg.startswith("[") and seg.endswith("]"):
                 cur["members"] = seg[1:-1]
-        elif cur is not None and ("resync" in line or "recovery" in line or "check" in line):
-            for word in ("resync", "recovery", "check", "reshape"):
-                if word in line:
-                    cur["action"] = word
-            try:
-                cur["progress"] = float(line.split("=")[1].split("%")[0].strip())
-            except (IndexError, ValueError):
-                pass
-            if "finish=" in line:
-                cur["finish"] = line.split("finish=")[1].split()[0]
+        elif cur is not None and ACTION_RX.search(line):
+            # "[==>......]  check = 12.1% (946458368/7813791040) finish=615.5min speed=185934K/sec"
+            # (the bar holds "=" too, and the spaces around "=" come and go); "resync=DELAYED" has no percentage
+            m = ACTION_RX.search(line)
+            cur["action"] = m.group(1)
+            if m.group(2):
+                cur["progress"] = float(m.group(2))
+            f = FINISH_RX.search(line)
+            if f:
+                cur["finish"] = f.group(1) + "min"
     for a in arrays:
         a["healthy"] = bool(a["members"]) and "_" not in a["members"]
     return arrays

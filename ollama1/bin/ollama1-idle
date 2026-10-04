@@ -5,6 +5,8 @@ owner turned that on (Settings > Your servers, in the app).
   ollama1-idle run          the service (ollama1-idle.service): every 30 s,
                             decide, and suspend only when every condition holds
   sudo ollama1-idle check   say what it would do right now, and why
+  sudo ollama1-idle status  the saved setting (on/off and the minutes), as the
+                            service reads it; the app's setting is this file
   sudo ollama1-idle wol-setup
                             for each network card that can wake on a magic
                             packet: its systemd .link file and `ethtool -s
@@ -84,6 +86,14 @@ def main():
         idle = o1idle.Idle(probes(), lambda: 0, log=lambda s: None)
         sleep, why = idle.tick()
         print(("would sleep now: " if sleep else "would not sleep: ") + why)
+    elif cmd == "status":
+        need_root()
+        print(o1idle.describe_config())
+        try:
+            idle = o1idle.read_json_safe(o1idle.idle_file(), {}, max_bytes=4096)
+            print("deep sleep supported: %s" % ("yes" if (idle or {}).get("supported") else "no (or not reported yet)"))
+        except Exception:
+            pass
     elif cmd == "wol-setup":
         need_root()
         macs = o1idle.wol_setup(ethtool=o1idle.ethtool_set)
