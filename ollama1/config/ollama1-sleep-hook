@@ -16,6 +16,10 @@ case "$1" in
     systemctl start --no-block ollama1-resume-check.service
     if systemctl is-enabled --quiet ollama1-gpu-tune.service 2>/dev/null; then
       systemctl start --no-block ollama1-gpu-tune.service
+    fi
+    # the fans (6b385): amdgpu may have reset its fan to automatic; the service looks at once
+    if systemctl is-active --quiet ollama1-fan.service 2>/dev/null; then
+      systemctl kill --kill-whom=main --signal=USR1 ollama1-fan.service
     fi ;;
 esac
 exit 0

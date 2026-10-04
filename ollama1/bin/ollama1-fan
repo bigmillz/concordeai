@@ -1,0 +1,64 @@
+#!/usr/bin/python3
+"""ollama1-fan: the fans at full speed while the server works, and for one
+minute after (6b385). The graphics card's fan and every fan header the
+motherboard's chip lets the kit control; otherwise automatic, never at 100%
+all the time (that wears the bearings). See lib/o1fan.py.
+
+  ollama1-fan status          mode (full, hold, auto), the outputs, each fan's
+                              rpm, the temperatures, why (no root needed)
+
+Used by the system:
+  run             ollama1-fan.service
+  load-modules    its ExecStartPre: modprobe nct6775 when no motherboard fan chip shows
+  stop-post       its ExecStopPost: after a clean stop, put the fans back as they were
+  setup on|off    setup.sh's step (--fans on|off)
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1fan  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal: modes and counts, never what anyone asked
+
+
+def need_root(cmd):
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("Run it with sudo: sudo ollama1-fan " + cmd, file=sys.stderr)
+        sys.exit(1)
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if cmd == "status":
+        outs = o1fan.find_outputs()
+        print(o1fan.render_status(o1fan.read_status(), o1fan.snapshot(outs)))
+        return 0
+    if cmd not in ("run", "load-modules", "stop-post", "setup"):
+        print("usage: ollama1-fan status", file=sys.stderr)
+        return 2
+    need_root(cmd)
+    if cmd == "run":
+        return o1fan.run_service(log)
+    if cmd == "load-modules":
+        o1fan.load_modules(log=log)
+        return 0                                  # best effort: never fatal
+    if cmd == "stop-post":
+        o1fan.restore_after_stop(log=log)
+        return 0
+    choice = argv[2] if len(argv) > 2 else ""
+    if choice not in ("on", "off"):
+        print("usage: ollama1-fan setup on|off", file=sys.stderr)
+        return 2
+    return o1fan.setup(choice, log=log)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

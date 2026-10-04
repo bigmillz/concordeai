@@ -34,6 +34,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
 import o1cpu  # noqa: E402
+import o1fan  # noqa: E402
 import o1library  # noqa: E402
 import o1ollama  # noqa: E402
 import o1pair  # noqa: E402
@@ -167,6 +168,10 @@ class Panel:
             except Exception as e:           # a CPU reading never takes the panel's data down
                 log("cpu-probe-error", kind=type(e).__name__)
                 st["cpu"] = None
+            try:
+                st["fan"] = o1fan.panel_line()           # one line from the fan service's status file, or None
+            except Exception:
+                st["fan"] = None
             self.state_cache = (now, st)
             return st
 
@@ -595,6 +600,7 @@ label{color:var(--ink2);font-size:13px}#pseasontabs button.on{border-color:var(-
 <div class="card" id="cpucard"><h2>CPU</h2>
  <div class="cpumodel" id="cpumodel"></div><div class="sub" id="cpuline"></div>
  <div class="sub warn" id="cpunote" hidden></div>
+ <div class="sub" id="fanline" hidden></div>
  <div class="tiles">
   <div class="tile"><div class="sub">Busy</div><div class="big" id="cpubusy">-</div><div class="sub" id="cpubusysub"></div></div>
   <div class="tile" id="cpuspeedtile" hidden><div class="sub">Speed now</div><div class="big" id="cpuspeed">-</div><div class="sub" id="cpuspeedsub"></div></div>
@@ -751,7 +757,8 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){retur
  (s.disks||[]).forEach(d=>pairs.push([d.mount,d.mounted?tib(d.used)+' of '+tib(d.total)+' ('+Math.round(100*d.used/d.total)+'%)':'not mounted',d.mounted?'':'bad']));
  (s.raid||[]).forEach(a=>pairs.push([a.name,a.level+' ['+a.members+'] '+(a.healthy?'healthy':'DEGRADED')+(a.action?'  ·  '+a.action+' '+a.progress+'%'+(a.finish?' ('+a.finish+' left)':''):''),a.healthy?'ok':'bad']));
  if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn']);kv($('sys'),pairs);
- try{renderCpu(s.cpu,s);}catch(e){}}
+ try{renderCpu(s.cpu,s);}catch(e){}
+ const fl=$('fanline');if(fl){fl.hidden=!s.fan;fl.textContent=s.fan||'';}}
 async function refreshSlow(){try{const d=await api('/api/devices');table($('devices'),['Name','Id','Paired',''],d.devices.map(x=>{
   const b=el('button','Remove','danger');b.addEventListener('click',()=>{if(confirm('Unpair '+x.name+'? It will need to pair again at the server.'))act('remove-device',x.id);});
   return [x.name,x.id,(x.paired_at||'').slice(0,16).replace('T',' '),b];}));}catch(e){}

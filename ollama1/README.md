@@ -111,6 +111,7 @@ it asks for any it can't find, at the terminal):
 | `--owner <your-name>` | Your name, used only in the Access policy's name. Default: from your admin email |
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial`, `--hdd1-serial`, `--hdd2-serial` | The four disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything |
+| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for one minute after, otherwise automatic: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -213,6 +214,10 @@ Every step skips what is already done, so it is safe to run again.
     overdrive switch, `/etc/default/grub.d/97-amdgpu-overdrive.cfg`, so it
     starts after a reboot; setup lists that under "Still to do". Without
     `--gpu-tune` it only prints that the option exists.
+    Then the fans (see "Fans" below), unless you give `--fans off`: it
+    removes the hand-made `ollama1-gpu-fan.service` if there is one, loads
+    the motherboard's fan chip driver when it isn't loaded, and starts
+    `ollama1-fan.service`.
 15. It sets up Cloudflare with the API token you paste: the tunnel, the DNS
     records and Access (see below).
 16. It checks what listens on the network: nothing but sshd may listen
@@ -801,6 +806,71 @@ does the same. With no model installed yet the check runs once one is
   a wake the sleep hook runs it again (amdgpu should keep the values across
   a suspend; it writes only what differs).
 
+## Fans
+
+**On unless you say `--fans off`**: `sudo ./setup.sh --fans off` (or
+`OLLAMA1_FANS=0`) turns it off, and the choice is saved in
+`/etc/ollama1/setup.env`. The aim is maximum cooling while the server works
+without running the fans flat out for ever, which wears the bearings:
+`ollama1-fan.service` (`bin/ollama1-fan`, `lib/o1fan.py`) puts
+
+- the graphics card's fan (amdgpu `pwm1`), and
+- every fan header the motherboard's Super-IO chip lets it control (on an MSI
+  MEG X570 ACE, the NCT6797D, hwmon `nct6797`, `pwm1` to `pwm7`)
+
+at 100% in manual mode **while the server is working**, keeps them there for
+**one minute after the work ends** (a new request starts the minute again),
+and then gives them back to automatic, exactly as they were.
+
+**Working** is what auto sleep already counts as busy, read with the same
+probes and limits: a request in flight (the gateway's activity file), the
+graphics card at 10% or more, a long job running (`stability-test.sh` and
+the like), or a 1-minute load average above 1.5. A download, an update or a
+backup is not heat and does not count.
+
+**Temperature override.** A CPU (k10temp, Tctl) at 80 C, the graphics card's
+junction at 90 C or an NVMe drive at 70 C forces 100% whatever the load
+says, until it is 10 C under its limit; then the normal rule follows.
+
+**Fail-safe.**
+- Before the first change, each output's `pwmN_enable` (and its `pwmN`, if it
+  was manual) is saved in `/var/lib/ollama1/fan.json` with the boot id. A
+  service that restarts or crashes in the middle of a hold puts back the
+  saved originals, not the manual ones. After a reboot the file is dropped:
+  the hardware is already as it was.
+- The kit never writes a value below 255, except to put an output back as it
+  was. A clean stop (`systemctl stop`, a shutdown) puts everything back at
+  once. A crash leaves the fans at 100%, not stopped; `Restart=always` brings
+  the service back in 2 s, with no start limit.
+- An output the kit cannot write is skipped; setup and the service log what
+  it controls once, like "controlling GPU fan + 7 case/CPU fan outputs".
+- After a wake, amdgpu resets its fan to automatic: the sleep hook pokes the
+  service (`SIGUSR1`), and every tick writes again any output it holds that
+  has changed.
+
+**The motherboard's chip.** The service loads `nct6775` (it covers the
+NCT6797D) when no chip with fan outputs shows, before it starts, outside its
+sandbox (`ExecStartPre=-+`, so a failure is never fatal). Setup adds
+`/etc/modules-load.d/ollama1-fan.conf` only when the chip does load. If it
+doesn't, the card's fan is still controlled, and `journalctl -u ollama1-fan`
+says why. If the kernel log says `ACPI: resource ... conflicts with ACPI
+region`, the board's firmware holds the chip: the kit does not change kernel
+settings for it (the usual fix is `acpi_enforce_resources=lax` on the kernel
+command line; that is your call). Do not run `fancontrol` or another fan
+daemon beside this one.
+
+**Status.** `ollama1-fan status` (no root) shows the mode (`full - <why>`,
+`hold 42s`, `auto`), which outputs it controls, each fan's setting and rpm,
+and the temperatures. The admin panel's CPU card shows the same one line.
+Logs: `journalctl -u ollama1-fan` (modes and counts only).
+
+**The hand-pasted `ollama1-gpu-fan.service`** (full speed always) is replaced
+by this. Setup removes it when it finds one, and gives the card's fan back
+to the driver. To remove it by hand:
+`sudo systemctl disable --now ollama1-gpu-fan.service && sudo rm /etc/systemd/system/ollama1-gpu-fan.service && sudo systemctl daemon-reload`
+and then `echo 2 | sudo tee /sys/class/drm/card*/device/hwmon/hwmon*/pwm1_enable`
+(2 is automatic).
+
 ## Power and electricity cost
 
 The panel's **Power and cost** card shows what the server draws now (with
@@ -1256,6 +1326,7 @@ With a bridge, the firewall is set so it can't cut the other device off:
 | GPU seen by Ollama | `journalctl -u ollama \| grep -i "inference compute"` should say ROCm, gfx1030. The RX 6900 XT is supported as is, so `HSA_OVERRIDE_GFX_VERSION` is not set. If Ollama ever reports no GPU, the gateway refuses every model instead of running it on the CPU |
 | Mirror | `cat /proc/mdstat`, `sudo mdadm --detail /dev/md/o1data` |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
+| Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
 | System move to the other NVMe | `cat /srv/data/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
 | SSH | `sudo sshd -T -C user=<your-user>,host=x,addr=<a-lan-address> \| grep -E 'password\|permitroot'` |

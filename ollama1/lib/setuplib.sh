@@ -90,6 +90,29 @@ gpu_tune_choice() { # FLAG ENV SAVED -> "on", "off" or "default" (6b361): the fl
   echo default
 }
 
+fans_choice() { # FLAG ENV SAVED -> "on" or "off" (6b385): the flag, else the environment (OLLAMA1_FANS), else what an
+  # earlier run saved, else "on": the fans-at-full-speed-while-working service is on unless turned off.
+  # Fails on a value it doesn't know.
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      on|1|yes|true) echo on; return 0 ;;
+      off|0|no|false) echo off; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo on
+}
+
+fans_plan() { # the plan's line for the fans (6b385)
+  if [ "$1" = off ]; then
+    printf 'Fans OFF (--fans off): the graphics card and case fans stay automatic. On: --fans on'
+  else
+    printf 'Fans ON: graphics card and case fans at 100%% while the server works and for one minute after, otherwise automatic (ollama1-fan). Off: --fans off'
+  fi
+}
+
 saved() { # KEY -> its value from the file an earlier run wrote, if any
   [ -r "$SAVED" ] || return 0
   sed -n "s/^$1=//p" "$SAVED" | head -n1
