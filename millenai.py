@@ -13038,7 +13038,9 @@ def suggest_forget(ctx):
     try:
         if os.path.exists(_pfile(SUGGEST_FILE, ctx)):
             _write_json(SUGGEST_FILE, {}, ctx)
-    except (StoreReadError, NoProfile, StaleProfile, OSError):
+    except StaleProfile:
+        raise           # a profile switch mid-write is not swallowed (6b356)
+    except (StoreReadError, NoProfile, OSError):
         pass
 
 
@@ -13182,6 +13184,8 @@ def suggest_pass(ctx, force: bool = False):
             base.update(topics=topics, at=time.time(), checked=time.time(),
                         made=who)
         _write_json(SUGGEST_FILE, base, ctx)
+    except StaleProfile:
+        raise           # a profile switch mid-write is not swallowed (6b356)
     except Exception:
         pass            # the fixed pool is always there: never break a page over it
     finally:
@@ -13209,8 +13213,16 @@ def suggest_start(ctx, force: bool = False) -> bool:
         if not suggest_on(ctx) or not suggest_due(suggest_read(ctx), force):
             return False
         _suggest_state["running"] = True
-    ctx_thread(target=suggest_pass, args=(ctx, force), daemon=True).start()
+    ctx_thread(target=_suggest_thread, args=(ctx, force), daemon=True).start()
     return True
+
+
+def _suggest_thread(ctx, force: bool = False):
+    """suggest_pass on its thread: a profile switch while it ran just ends it."""
+    try:
+        suggest_pass(ctx, force)
+    except StaleProfile:
+        pass
 
 
 def suggest_view(ctx, refresh: bool = False) -> dict:

@@ -16933,7 +16933,7 @@ _SG_STATIC = [
     ("the route answering from what is kept", lambda p, s: '            self._send_json(suggest_view(self.ctx))' in s),
     ("Refresh forcing a pass", lambda p, s: '            self._send_json(suggest_view(self.ctx, refresh=True))' in s),
     ("the summary erased with the chats", lambda p, s: '                suggest_forget(base)    # the summary of them goes too (6b390)' in s),
-    ("a pass started on the asker's own ctx, a daemon", lambda p, s: "    ctx_thread(target=suggest_pass, args=(ctx, force), daemon=True).start()" in s),
+    ("a pass started on the asker's own ctx, a daemon", lambda p, s: "    ctx_thread(target=_suggest_thread, args=(ctx, force), daemon=True).start()" in s),
     ("the model asked with the labels only", lambda p, s: 'suggest_ask(ctx, SUGGEST_PROMPT + "\\n".join(labels))' in s),
     ("the test route only with its hook", lambda p, s: 'if self.path == "/api/test/suggest" and _suggest_hooked():' in s),
 ]
@@ -29426,7 +29426,7 @@ _B41_MUT = [
     ("a server-only chat not held", "            self._bench_srv_held = True\n", "            pass\n", [14]),
     ("the chat's server hold never released", "            if self._bench_srv_held:\n                self._bench_srv_held = False\n                bench_release_remote()\n",
      "            if self._bench_srv_held:\n                self._bench_srv_held = False\n", [14]),
-    ("the profile's file not personal", "\"remote_known_hosts\", \"bench_targets.jsonl\", \"images\"", "\"remote_known_hosts\", \"images\"", [14]),
+    ("the profile's file not personal", "\"remote_known_hosts\", \"bench_targets.jsonl\", \"suggest.json\", \"images\"", "\"remote_known_hosts\", \"suggest.json\", \"images\"", [14]),
     ("a provider rested by a benchmark call", "    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", "    cloud_glitch({}, '')\n    if spec.get(\"understood\") is not True:\n        raise _BenchRefuse(", [14]),
     ("the passage changed", "\"Using only the passage above, explain step by step how a tide mill \"", "\"Using only the passage above, explain how a tide mill \"", [13, 14]),
     # stored runs from other builds, hand-edited or damaged (12, 13)
