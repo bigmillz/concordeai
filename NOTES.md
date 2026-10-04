@@ -14,13 +14,19 @@ Current: repo `bigmillz/concordeai` — version and build live in
 - The bottom-middle box is split: STORAGE AND NETWORK above (46%, rows 11 units apart; its Disk/Net/Link
   lines and the RAID line go first when there is no room, disks never), and FANS below, same width; the bottom
   row is still three columns at the same heights. `layout()` gains "fans".
-- FANS reads `/run/ollama1/fan.json` (`o1metrics` adds it as `st["fan"]` every tick; one small file). Rows: GPU fan,
-  `Case fan 1..n` (outputs with an rpm or under control, in file order; an unreadable uncontrolled one is skipped),
-  Radiator fans and Pump (rpm and mode) when the Corsair cooler is controlling, then "Coolant NN C" if every row
-  fits ("+N more" otherwise). The bar is the output's setting (pwm of 255; the file has no maximum rpm), or its rpm
-  against the fastest fan. Header: "working 100% - why", "cooling down NN%" (hold100, hold50 and the coming `ramp`
-  phase), "idle 20%", "measuring 100%", just the level for an unknown phase; amber and an amber border when the phase
-  is "hot" or the file lists hot sensors. "no fan data" when the file is missing or older than 30 s.
+- FANS reads `/run/ollama1/fan.json` (`o1metrics` adds it as `st["fan"]` every tick; one small file). TWO bars
+  (Pat's follow-up): "GPU fan" and "Case fans", the latter ONE bar averaging every case-type output (reads an rpm or
+  is controlled) and the cooler's radiator fans: the bar is the mean of their bars, the text "1171 rpm avg". The pump
+  is not in the average: a small line under the bars, "Pump 2400 rpm, quiet, coolant 31 C", shown when there is room.
+  The bar is the output's setting (pwm of 255; the file has no maximum rpm) or its rpm against the fastest fan.
+  Header: "working 100% - why", "cooling down NN%" (hold100, hold50 and the coming `ramp` phase), "idle 20%",
+  "measuring 100%", just the level for an unknown phase; amber and an amber border when the phase is "hot" or the file
+  lists hot sensors. "no fan data" when the file is missing or older than 30 s.
+- Box titles are the hardware names: `o1metrics.device_names` (every 5 min: `o1gpu.detect()["name"]`, the
+  /proc/cpuinfo model) go in `st["gpu"]["name"]` and `st["cpu"]["model"]`; `gpu_title` ("AMD RX 6900 XT" from
+  "Navi 21 [Radeon RX 6900 XT]", vendor boilerplate and "Graphics" dropped) and `cpu_title` ("AMD Ryzen 9 5950X"
+  from "... 16-Core Processor", (R), (TM), CPU, @ GHz dropped); the old titles when unknown. `frame()` now cuts the
+  title with "..." to the room left of the right-hand text, which is never shortened by a long name.
 - GRAPHICS CARD: the Fan row is gone; in its place Mem, the card's own memory temperature (`temps["mem"]`, already read
   by `o1stats.gpu()`, no new sampling), full bar at 95 C, amber from 85, red from 95. Temp stays the junction/edge one.
 - Install: lib/o1panel.py, lib/o1metrics.py, then restart ollama1-dash. Tests: TestFans; 4 mutants.

@@ -23,6 +23,7 @@ to the real one by a whole number) and adapts to anything from 480x270 up.
 """
 import datetime
 import math
+import re
 
 import o1dashui as D
 import o1gfx
@@ -134,7 +135,8 @@ def frame(pm, r, title, right="", accent=None, right_colour=None):
     x, y, w, h = r
     pm.rrect(x, y, w, h, 3, accent if accent is not None else T["edge"])
     pm.rrect(x + 1, y + 1, w - 2, h - 2, 2, T["panel"])
-    tw = pm.text(x + 8, y + 5, title.upper(), T["title"], max_w=w - 16)
+    rw = F.text_width(right) if right else 0
+    tw = pm.text(x + 8, y + 5, title.upper(), T["title"], max_w=max(16, w - 16 - (rw + 10 if right else 0)))
     if right:
         room = w - 16 - tw - 10
         if room > 12:
@@ -335,17 +337,38 @@ def _graph_row(pm, inner, used_h, left, right, ctx):
     graph(pm, (x + gw + 6, gy, w - gw - 6, gh), right, "")
 
 
+def gpu_title(g):
+    """The card's name for the box title: "AMD RX 6900 XT" from "Navi 21 [Radeon RX 6900 XT]" or
+    "Advanced Micro Devices, Inc. [AMD/ATI] Radeon RX 6900 XT"; the old title when it is unknown."""
+    name = str(_d(g).get("name") or "")
+    cand = [x for x in re.findall(r"\[([^\]]+)\]", name) if "AMD/ATI" not in x]
+    name = cand[-1] if cand else name
+    name = re.sub(r"\((R|TM|C)\)|\b(Advanced Micro Devices, Inc\.?|Corporation|Graphics|Series|Laptop GPU)\b|\[AMD/ATI\]", " ", name)
+    name = re.sub(r"\bAMD\s+Radeon\b|\bRadeon\b", "AMD", " " + name + " ")
+    name = re.sub(r"\s+", " ", name).strip()
+    return name or "Graphics card"
+
+
+def cpu_title(c):
+    """The processor's name for the box title: "AMD Ryzen 9 5950X" from "AMD Ryzen 9 5950X 16-Core Processor"."""
+    name = str(_d(c).get("model") or "")
+    name = re.sub(r"\((R|TM|C)\)", " ", name)
+    name = re.sub(r"\b\d+-Core\b|\bProcessor\b|\bCPU\b|\bwith Radeon Graphics\b|@\s*[\d.]+\s*GHz|\bGenuine\b", " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name or "Processor and memory"
+
+
 MEM_TEMP_MAX = 95.0       # the memory temperature bar is full at this (the card's limit)
 
 
 def draw_gpu(pm, r, st, ctx):
     g = st.get("gpu")
     if not isinstance(g, dict):
-        inner = frame(pm, r, "Graphics card", accent=T["bad"])
+        inner = frame(pm, r, gpu_title(st.get("gpu")), accent=T["bad"])
         pm.text(inner[0], inner[1] + 4, "No graphics card found", T["bad"], 2, max_w=inner[2])
         return
     sclk = D._f(g.get("sclk_mhz"))
-    inner = frame(pm, r, "Graphics card", ("core %d MHz" % sclk) if sclk else "")
+    inner = frame(pm, r, gpu_title(g), ("core %d MHz" % sclk) if sclk else "")
     x, y, w, h = inner
     busy = D._f(g.get("busy_pct"))
     vu, vt = D._f(g.get("vram_used")), D._f(g.get("vram_total"))
@@ -385,7 +408,7 @@ def draw_gpu(pm, r, st, ctx):
 def draw_cpu(pm, r, st, ctx):
     cpu, m, cg = _d(st.get("cpu")), _d(st.get("mem")), _d(st.get("ollama_cg"))
     mhz, mhz_max = D._f(cpu.get("mhz")), D._f(cpu.get("max_mhz"))
-    inner = frame(pm, r, "Processor and memory", ("%d cores" % len(_l(cpu.get("cores")))) if _l(cpu.get("cores")) else "")
+    inner = frame(pm, r, cpu_title(cpu), ("%d cores" % len(_l(cpu.get("cores")))) if _l(cpu.get("cores")) else "")
     x, y, w, h = inner
     use = D._f(cpu.get("total"))
     temp = D._f(cpu.get("temp"))
@@ -575,30 +598,35 @@ def fan_view(st, now):
     outs = [o for o in _l(fan.get("outputs")) if isinstance(o, dict)]
     top_rpm = max([D._f(o.get("rpm")) or 0 for o in outs] + [1])
 
-    def row(label, o):
+    def bar_of(o):
         rpm, pwm = D._f(o.get("rpm")), D._f(o.get("pwm"))
-        f = pwm / 255.0 if pwm is not None and o.get("enable") == 1 else (rpm / top_rpm if rpm else None)
-        return (label, ("%d rpm" % rpm) if rpm is not None else "-", f, "fan")
-    rows, n = [], 0
+        return pwm / 255.0 if pwm is not None and o.get("enable") == 1 else (rpm / top_rpm if rpm else None)
+    rows, case = [], []                                # case: (bar fraction or None, rpm or None) of every case-type fan
     for o in outs:
         rpm = D._f(o.get("rpm"))
         if o.get("label") == "GPU fan":
-            rows.insert(0, row("GPU fan", o))
+            rows.insert(0, ("GPU fan", ("%d rpm" % rpm) if rpm is not None else "-", bar_of(o), "fan"))
         elif rpm or o.get("enable") == 1:
-            n += 1
-            rows.append(row("Case fan %d" % n, o))
+            case.append((bar_of(o), rpm))
     a = _d(fan.get("aio"))
     cool = ""
     if a.get("found") and a.get("state") == "controlling":
-        fr = [f for f in _l(a.get("fans")) if isinstance(f, dict)]
-        rp = [D._f(f.get("rpm")) for f in fr if D._f(f.get("rpm")) is not None]
-        pc = [D._f(f.get("pct")) for f in fr if D._f(f.get("pct")) is not None]
-        if fr:
-            rows.append(("Radiator fans", ("%d rpm" % (sum(rp) / len(rp))) if rp else "-", (pc[0] / 100.0) if pc else None, "fan"))
+        for f in _l(a.get("fans")):                    # the radiator fans count with the case fans
+            if isinstance(f, dict) and D._f(f.get("rpm")) is not None:
+                pc = D._f(f.get("pct"))
+                case.append((pc / 100.0 if pc is not None else None, D._f(f.get("rpm"))))
+        parts = []
         pr = D._f(a.get("pump_rpm"))
-        rows.append(("Pump", ("%d rpm" % pr if pr is not None else "-") + (" %s" % a["pump_mode"] if a.get("pump_mode") else ""), None, "pump"))
+        if pr is not None:                             # the pump is not averaged in: a line of its own
+            parts.append("Pump %d rpm%s" % (pr, (", %s" % a["pump_mode"]) if a.get("pump_mode") else ""))
         if D._f(a.get("coolant_c")) is not None:
-            cool = "Coolant %s\u00b0C" % D.num(a.get("coolant_c"), "%.0f")
+            parts.append("coolant %s\u00b0C" % D.num(a.get("coolant_c"), "%.0f"))
+        cool = ", ".join(parts)
+    if case:
+        bars = [b for b, _r in case if b is not None]
+        rpms = [r for _b, r in case if r is not None]
+        rows.append(("Case fans", ("%d rpm avg" % round(sum(rpms) / len(rpms))) if rpms else "-",
+                     sum(bars) / len(bars) if bars else None, "fan"))
     return ("rows", head, warn, rows, cool)
 
 
