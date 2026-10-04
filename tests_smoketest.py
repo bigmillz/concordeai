@@ -26268,6 +26268,15 @@ R.next=[N(undefined,okd),N({st:"ok",minutes:45},{ok:false,kind:"old"}),N({st:"ok
   N({st:"ok",enabled:true,minutes:45,supported:true},{ok:false,kind:"input",err:"Say on or off."}),N({st:"load"},{ok:false,kind:"server",err:"It said no."}),
   N({st:"ok",minutes:45},{ok:false,kind:"gone"}),N({st:"load"},{ok:false,kind:"offline"}),N(undefined,null),
   N(undefined,{ok:true,sleep:{enabled:false,minutes:30,supported:false}})];
+// a failed READ leaves nothing known; a failed WRITE keeps what the server last said (6b370)
+const okz={st:"ok",enabled:true,minutes:45,supported:true,wakeable:true};
+R.read=[N(okz,{ok:false,kind:"offline",err:"x"}),N(okz,{ok:false,kind:"server",err:"It said no."}),N(okz,{ok:false,kind:"tls",err:"Its certificate."}),
+  N(okz,{ok:false,kind:"auth",err:"No longer paired."}),N(okz,null),N(okz,{ok:false,kind:"old"})];
+R.write=[N(okz,{ok:false,kind:"offline",err:"x"},true),N(okz,{ok:false,kind:"server",err:"It said no."},true),N({st:"load"},{ok:false,kind:"offline"},true),
+  N(okz,{ok:false,kind:"old"},true),N(okz,{ok:true,sleep:{enabled:false,minutes:60,supported:true},wakeable:true},true)];
+R.unk=[V({st:"off"}),V({st:"err",msg:"Couldn\u2019t read the setting. Its certificate."})];
+R.htmlOff=srvSleepHtml({id:"a1",paired:true,name:"Desk"},{st:"off"});
+R.htmlErr=srvSleepHtml({id:"a1",paired:true,name:"Desk"},{st:"err",msg:"Couldn\u2019t read the setting."});
 const sv={id:"a1",paired:true,name:"Desk"};
 R.html=[srvSleepHtml({id:"a1",paired:false},{st:"ok"}),srvSleepHtml(sv,{st:"ok",enabled:true,minutes:45,supported:true,wakeable:true}),
   srvSleepHtml(sv,{st:"load"}),srvSleepHtml(sv,{st:"err",msg:"<b>x</b> & y"}),srvSleepHtml(sv,undefined)];
@@ -26287,22 +26296,23 @@ def _w46c_ui(src):
                                   {"v": 1440, "clamped": True}, None, None, None, None, None, {"v": 45, "clamped": False},
                                   None, None, None, None, {"v": 7, "clamped": False}]
     v = R["view"]
-    out["view"] = (v[0] == v[1] == {"disabled": True, "checked": False, "minutes": 30, "hint": "Checking\u2026"}
-                   and v[2]["disabled"] and v[2]["hint"] == "Update the server kit to use sleep."
-                   and v[3] == {"disabled": True, "checked": True, "minutes": 40,
-                                "hint": "The server isn\u2019t answering, so this can\u2019t be changed now."}
+    out["view"] = (v[0] == v[1] == {"disabled": True, "unknown": True, "checked": False, "minutes": None,
+                                    "hint": "Reading it from the server\u2026"}
+                   and v[2]["disabled"] and v[2]["unknown"] and v[2]["hint"] == "Update the server kit to use sleep."
+                   and v[3] == {"disabled": True, "unknown": True, "checked": False, "minutes": None,
+                                "hint": "Couldn\u2019t read the setting. The server isn\u2019t answering."}
                    and v[4]["hint"] == "Nope." and v[4]["disabled"] and v[5]["hint"] == "Couldn\u2019t read the setting."
-                   and v[6] == {"disabled": True, "checked": True, "minutes": 45,
+                   and v[6] == {"disabled": True, "unknown": False, "checked": True, "minutes": 45,
                                 "hint": "This server can\u2019t sleep (no deep sleep)."}
-                   and v[7] == {"disabled": False, "checked": False, "minutes": 45,
+                   and v[7] == {"disabled": False, "unknown": False, "checked": False, "minutes": 45,
                                 "hint": "Sleeps after this long with no questions, and wakes when you ask."}
                    and v[8]["disabled"] is False and v[8]["checked"] is True and v[8]["minutes"] == 5
                    and v[8]["hint"].endswith("Waking it from here needs wake-on-LAN set up on the server."))
     n = R["next"]
     out["next"] = (n[0] == {"st": "ok", "enabled": True, "minutes": 45, "supported": True, "wakeable": True}
                    and n[1] == {"st": "old"}
-                   and n[2] == {"st": "off", "enabled": True, "minutes": 45, "supported": True, "wakeable": True}
-                   and n[3] == {"st": "ok", "enabled": True, "minutes": 45, "supported": True, "msg": "Say on or off."}
+                   and n[2] == {"st": "off"}
+                   and n[3] == {"st": "err", "msg": "Say on or off."}
                    and n[4] == {"st": "err", "msg": "It said no."} and n[5] == {"st": "ok", "minutes": 45}
                    and n[6] == {"st": "off"} and n[7] == {"st": "off"}
                    and n[8] == {"st": "ok", "enabled": False, "minutes": 30, "supported": False, "wakeable": False})
@@ -26314,15 +26324,33 @@ def _w46c_ui(src):
                                 'data-a="sleepmin" data-k="smin" value="45" aria-label="Minutes with no questions before it sleeps">'
                                 '<span>minutes</span></span></div><div class="srv-hint">Sleeps after this long with no questions, '
                                 'and wakes when you ask.</div></div>')
-                   and h[2].count(" disabled") == 2 and "Checking\u2026" in h[2]
-                   and "&lt;b&gt;x&lt;/b&gt; &amp; y" in h[3] and "<b>x</b>" not in h[3]
-                   and h[4].count(" disabled") == 2 and 'value="30"' in h[4])
+                   and "<input" not in h[2] and "Reading it from the server\u2026" in h[2] and "Sleep when idle" in h[2]
+                   and "&lt;b&gt;x&lt;/b&gt; &amp; y" in h[3] and "<b>x</b>" not in h[3] and "<input" not in h[3]
+                   and "<input" not in h[4] and 'value="30"' not in h[4] and "checked" not in h[4])
+    # THE SERVER HOLDS IT (6b370): a read that fails shows "couldn't read", never an off switch or a
+    # default of 30; a write that fails keeps what the server last said; each opening reads again
+    rd, wr, un = R["read"], R["write"], R["unk"]
+    out["read back"] = (rd[0] == {"st": "off"} and rd[1] == {"st": "err", "msg": "It said no."}
+                        and rd[2] == {"st": "err", "msg": "Couldn\u2019t read the setting. Its certificate."}
+                        and rd[3]["st"] == "err" and rd[3]["msg"].startswith("Couldn\u2019t read the setting.")
+                        and rd[4] == {"st": "off"} and rd[5] == {"st": "old"}
+                        and wr[0] == {"st": "ok", "enabled": True, "minutes": 45, "supported": True, "wakeable": True, "msg": "x"}
+                        and wr[1]["st"] == "ok" and wr[1]["msg"] == "It said no." and wr[1]["minutes"] == 45
+                        and wr[2] == {"st": "off"} and wr[3] == {"st": "old"}
+                        and wr[4] == {"st": "ok", "enabled": False, "minutes": 60, "supported": True, "wakeable": True}
+                        and all(x["unknown"] and not x["checked"] and x["minutes"] is None and x["disabled"] for x in un)
+                        and "Couldn\u2019t read the setting. The server isn\u2019t answering." in R["htmlOff"]
+                        and "<input" not in R["htmlOff"] and "<input" not in R["htmlErr"])
     # the card carries it, loads it with the pane, and the strings have no product name
     a = src.index("function srvSleepParse(raw){")
     b = src.index("function srvCard(s){")
     c = src.index("// the switch and the minutes box (6b346)")
     dd = src.index('$("#srv-list").addEventListener("click"', c)
     seg = src[a:b] + src[c:dd]
+    out["reads again"] = ("  gs.forEach(s=>{srvSleep[s.id]={st:\"load\"};});" in src
+                          and "srvSleep[s.id]=srvSleepNext(undefined,d||{ok:false,kind:\"offline\"});" in src
+                          and "srvSleep[id]=srvSleepNext(z,d,true);" in src
+                          and "srv-sleep" in src and "s.sleep" not in seg)
     out["wiring"] = ("    +srvSleepHtml(s,srvSleep[s.id])" in src and "loadServers(true).then(srvSleepLoadAll);" in src
                      and 'srvPost("sleep",body)' in seg and 'api("/api/servers/sleep?id="+encodeURIComponent(s.id))' in seg
                      and "c.disabled=true;" in seg and 'c.dataset.a==="sleepon"' in seg
@@ -26541,6 +26569,11 @@ _W46_MUT = [
     ("the minutes box taking anything", 'if(!/^\\d{1,6}$/.test(t))return null;', "if(false)return null;"),
     ("the minutes box not clamped", "return {v:Math.max(5,Math.min(1440,n)),clamped:n<5||n>1440};", "return {v:n,clamped:false};"),
     ("the controls usable while it's off", 'else if(z.st==="off")v.hint', 'else if(z.st==="off"&&false)v.hint'),
+    ("a failed read shown as the last value", 'if(write&&p.st==="ok")return', 'if(p.st==="ok")return'),
+    ("a switch and 30 minutes shown before it is read", "  if(v.unknown)return '<div class=\"srv-sleep\">", "  if(false)return '<div class=\"srv-sleep\">"),
+    ("the last opening's values shown while it loads", 'gs.forEach(s=>{srvSleep[s.id]={st:"load"};});',
+     'gs.forEach(s=>{if(!srvSleep[s.id])srvSleep[s.id]={st:"load"};});'),
+    ("a failed read called off", 'if(k==="offline"||!k)return {st:"off"};', 'if(k==="offline"||!k)return {st:"ok",enabled:false,minutes:30,supported:true};'),
     ("an old kit usable", 'else if(z.st==="old")v.hint="Update the server kit to use sleep.";', 'else if(z.st==="old")v.hint="";'),
     ("no deep sleep usable", "else if(z.supported===false)v.hint", "else if(false)v.hint"),
     ("an old kit's answer lost", 'if(k==="old")return {st:"old"};', ""),

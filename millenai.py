@@ -41503,13 +41503,17 @@ function srvSleepParse(raw){
   const n=parseInt(t,10);
   return {v:Math.max(5,Math.min(1440,n)),clamped:n<5||n>1440};
 }
-// what the controls show and whether they can be used
+// what the controls show and whether they can be used. THE SERVER HOLDS THE
+// SETTING (6b370): the switch and the minutes show only what the server said when
+// the app read it back. Until then, or when the read failed, there is no switch
+// and no minutes (v.unknown): not an "off", not a default of 30.
 function srvSleepView(z){
   z=z||{st:"load"};
-  const v={disabled:true,checked:!!z.enabled,minutes:z.minutes||30,hint:""};
-  if(z.st==="load")v.hint="Checking\u2026";
+  const known=z.st==="ok";
+  const v={disabled:true,unknown:!known,checked:known&&!!z.enabled,minutes:known?(z.minutes||30):null,hint:""};
+  if(z.st==="load")v.hint="Reading it from the server\u2026";
   else if(z.st==="old")v.hint="Update the server kit to use sleep.";
-  else if(z.st==="off")v.hint="The server isn\u2019t answering, so this can\u2019t be changed now.";
+  else if(z.st==="off")v.hint="Couldn\u2019t read the setting. The server isn\u2019t answering.";
   else if(z.st==="err")v.hint=z.msg||"Couldn\u2019t read the setting.";
   else if(z.supported===false)v.hint="This server can\u2019t sleep (no deep sleep).";
   else{
@@ -41519,19 +41523,26 @@ function srvSleepView(z){
   }
   return v;
 }
-// the next state from what the app answered (d = {ok, sleep, wakeable} or {ok:false, kind, err})
-function srvSleepNext(prev,d){
+// the next state from what the app answered (d = {ok, sleep, wakeable} or {ok:false, kind, err}).
+// A READ that fails leaves nothing known (never the last value, never "off"); a WRITE that
+// fails keeps what the server last said, and the card's line says why it didn't take
+function srvSleepNext(prev,d,write){
   if(d&&d.ok&&d.sleep)return {st:"ok",enabled:!!d.sleep.enabled,minutes:d.sleep.minutes,
     supported:d.sleep.supported!==false,wakeable:!!d.wakeable};
   const k=d&&d.kind,p=prev||{},msg=(d&&d.err)||"";
   if(k==="old")return {st:"old"};
-  if(k==="input"||k==="server")return p.st==="ok"?Object.assign({},p,{msg:msg}):{st:"err",msg:msg};
   if(k==="gone")return p;
-  return Object.assign({},p,{st:"off"});
+  if(write&&p.st==="ok")return Object.assign({},p,{msg:msg});
+  if(k==="input"||k==="server")return {st:"err",msg:msg};
+  if(k==="offline"||!k)return {st:"off"};
+  return {st:"err",msg:"Couldn\u2019t read the setting. "+msg};
 }
 function srvSleepHtml(s,z){
   if(!s.paired)return "";
   const v=srvSleepView(z),dis=v.disabled?" disabled":"";
+  // nothing read back yet: the name of the setting and why, no controls to mislead
+  if(v.unknown)return '<div class="srv-sleep"><div class="srv-row"><span class="srv-pref"><span>Sleep when idle</span></span></div>'
+    +'<div class="srv-hint">'+esc(v.hint)+'</div></div>';
   return '<div class="srv-sleep"><div class="srv-row"><label class="srv-pref">'
     +'<input type="checkbox" data-a="sleepon"'+(v.checked?" checked":"")+dis+'><span>Sleep when idle</span></label>'
     +'<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
@@ -41664,11 +41675,12 @@ async function srvSleepLoad(s){
     const r=await api("/api/servers/sleep?id="+encodeURIComponent(s.id));
     if(r.ok)d=await r.json();
   }catch(e){}
-  srvSleep[s.id]=srvSleepNext(srvSleep[s.id],d||{ok:false,kind:"offline"});
+  srvSleep[s.id]=srvSleepNext(undefined,d||{ok:false,kind:"offline"});
 }
 async function srvSleepLoadAll(){
   const gs=srvList.filter(s=>s.paired);
-  gs.forEach(s=>{if(!srvSleep[s.id])srvSleep[s.id]={st:"load"};});
+  // every opening reads it again: what an earlier opening showed is not shown while it loads
+  gs.forEach(s=>{srvSleep[s.id]={st:"load"};});
   paintServers();
   await Promise.all(gs.map(srvSleepLoad));
   Object.keys(srvSleep).forEach(k=>{if(!gs.some(s=>s.id===k))delete srvSleep[k];});
@@ -41691,7 +41703,7 @@ $("#srv-list").addEventListener("change",async ev=>{
   let d;
   try{d=await srvPost("sleep",body);}
   catch(e){d={ok:false,kind:"offline",err:"Couldn\u2019t reach the app. Try again."};}
-  srvSleep[id]=srvSleepNext(z,d);
+  srvSleep[id]=srvSleepNext(z,d,true);
   srvMsgs[id]=d.ok?"Saved.":(d.err||"");
   paintServers();
 });

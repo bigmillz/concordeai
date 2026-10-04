@@ -9,6 +9,31 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b370 — the sleep setting shown is the server's, read back (app side; per Patrick)
+
+- Patrick: once auto sleep is on with its minutes, it has to stay set on the server
+  when the app is closed. The server keeping it is the kit's job (another build); the
+  app's part is below.
+- Audited: the app writes the setting in one place, `server_sleep_set`, which POSTs
+  only the key the person changed (`enabled`, or `minutes`, 5 to 1440) to
+  `/v1/sleep-config`; nothing else in the app posts to it (adding, pairing, checking,
+  opening Settings and starting the app only GET). So the app edits and never
+  re-asserts. The copy in servers.json (`sleep`, `wake`) is a cache for the wake rules
+  and the page never reads it for the switch.
+- Fixed in the page: before and after a failed read the card showed an unchecked
+  "Sleep when idle" and a default "30" (disabled), i.e. it looked like "off, 30". Now the
+  switch and the minutes appear only once the server has answered (`srvSleepView`
+  `unknown`): "Reading it from the server..." while it loads, "Couldn't read the setting.
+  The server isn't answering." when it didn't answer, and the error in words for the
+  others (certificate, pairing lost, ...), with no controls. Each opening of the pane
+  reads again and does not show the last opening's values meanwhile. A failed write
+  keeps what the server last said and the card's line says why it didn't take
+  (`srvSleepNext(prev, d, write)`); a successful write shows the server's own echo.
+- Tests: the node check of the sleep pane (views, reads that fail, writes that fail, the
+  markup without controls) and four new mutants.
+- Not verified live: no paired server in the dev copy, so the card was not drawn
+  against a real gateway.
+
 ## 6b369 — "<name> Only" on a sleeping server wakes it where the page can see (per Patrick)
 
 - Patrick: with the engine chip on "Ollama1 Only" the question showed a tiny spinner
