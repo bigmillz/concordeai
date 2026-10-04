@@ -9,6 +9,48 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b373 — migrate-os: reading `efibootmgr -v`, reusing the entry, and an optional way to stop the old drive booting (kit)
+
+- Branch note: migrate-os (6b362) was not on main yet, so `kit-fixes-1004`
+  carries it by a merge of `origin/migrate-os`; these fixes sit on top of it.
+- The final firmware stage stopped with "efibootmgr made no entry labelled
+  ollama1-new" although the entry existed (twice). The reader assumed one
+  shape of `efibootmgr -v`: label, tab, `HD(...)/File(...)`. Now `parse_efi`
+  handles a tab or only spaces after the label (a label can hold spaces and
+  device words: "UEFI: Built-in EFI Shell", "PCI HD ..."), entries with and
+  without the `*`, a `File(...)` loader or a bare path, trailing data after
+  the loader (`\EFI\BOOT\BOOTX64.EFI0000424f`, Boot0003 style), CRLF, and
+  the same entry under several numbers (`entries_for`, `norm_loader`,
+  `same_loader`: FAT is not case sensitive).
+- The firmware stage is idempotent: an entry for the new ESP's PARTUUID and
+  the loader path `\EFI\o1new\<loader>` that already exists (any label,
+  the one labelled ollama1-new preferred, the lowest number when it is listed
+  twice) is reused, and made active if it was not; no second `efibootmgr -c`.
+  The new entry's duplicates are left out of `BootOrder`. When no entry can
+  be found after making one, the stop says how many entries the list has and
+  what is on that ESP, and that `--resume` reuses it.
+- `find_old_entry` no longer returns nothing when several entries share the
+  old ESP (ubuntu's, the `\EFI\BOOT` fallback, duplicates): the distro's own
+  loader first, then the earliest in the boot order.
+- New, **off by default**: `--finish --disable-old-boot-files`. After the move
+  the server's firmware kept re-ordering `BootOrder` and booting the old
+  drive. This renames `EFI/ubuntu` and `EFI/BOOT` on the old drive's EFI
+  partition to `*.off` so it has nothing to boot. It is the one step that
+  writes to the old drive: only its ESP, found by the PARTUUID the tool
+  recorded (never guessed, vfat only), mounted just for this, asks `yes`,
+  writes the undo (`/srv/data/old-drive-boot-files-undo.txt`: mount and `mv`
+  back) before the first rename, refuses when a `.off` is already in the way,
+  repeating it is a no-op. The firmware entries are not touched by it.
+- Tests: `tests/test_migrate_efi.py` (parser against real-looking samples,
+  duplicates, the stage on a fake server with spaces / bare paths / an entry
+  from a stopped run / one listed twice / inactive / none appearing, and the
+  old-boot-files step) and ten mutants in `mutate.py` ("migrate: ..." from
+  "no tab after the label"). `fakemigrate.py` can print the list those ways
+  (`sep`, `bare`, `trail`) and make an entry on another ESP.
+- Unverified on the real server: that spaces/bare paths are what its
+  efibootmgr printed (the log showed only the failure); the reader now takes
+  every shape named above.
+
 ## 6b372 — the graphics card check no longer reverts on one slow reading (kit)
 
 - The load check reverted a fine card: "answers were slower than stock

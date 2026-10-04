@@ -12,7 +12,7 @@
 #         --reboot reboots into the new drive at the end (10 s countdown).
 #   sudo bash migrate-os.sh --resume [--reboot]                          carry on after a crash, hang or power cycle
 #   sudo bash migrate-os.sh --finish                                     after rebooting into the new drive
-#         (--delete-parked, --disable-old-entry, --remove-sudoers: see README)
+#         (--delete-parked, --disable-old-entry, --disable-old-boot-files, --remove-sudoers: see README)
 #   bash migrate-os.sh --status                                          what the run is doing (no sudo needed)
 #   --root-size 300G    size of / on the new drive (default 300G)
 #   --bwlimit KiB/s     copy speed limit (default 200000; 0 = none)

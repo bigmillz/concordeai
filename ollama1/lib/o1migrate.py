@@ -59,6 +59,8 @@ import sys
 import threading
 import time
 
+OLD_BOOT_DIRS = ("ubuntu", "BOOT")      # the folders of the old ESP's EFI folder that --disable-old-boot-files puts aside
+OFF_SUFFIX = ".off"
 STAGES = ["preflight", "park", "partition", "copy", "boot", "restore", "firmware"]
 STAGE_TEXT = {"preflight": "checks", "park": "park the models on the RAID", "partition": "partition and format the TO drive",
               "copy": "copy / and /boot", "boot": "fstab, initramfs and GRUB on the copy",
@@ -238,10 +240,50 @@ def chroot_commands(root):
             base + ["update-grub"]]
 
 
+_DEVPATH_START = r"(?:PciRoot|ACPI|HD|VenHw|VenMedia|BBS|MAC|FvVol|Fv|USB|UsbClass|SATA|Sata|NVMe|Nvme|Pci|Scsi|Uri|IPv4|IPv6)\("
+_BOOT_LINE = re.compile(r"^Boot([0-9A-Fa-f]{4})(\*?)\s*(.*)$")
+
+
+def split_label(rest):
+    """The text after "Boot0003* " -> (label, device path). efibootmgr -v puts a tab between them; a
+    label can have spaces in it, and some versions print spaces instead of the tab, so without a tab the
+    path starts at the first device-path node (HD(, PciRoot(, ...)."""
+    if "\t" in rest:
+        label, _, path = rest.partition("\t")
+    else:
+        m = re.search(r"\s(?=%s)" % _DEVPATH_START, rest)
+        label, path = (rest[:m.start()], rest[m.end():]) if m else (rest, "")
+    return label.strip(), path.strip()
+
+
+def norm_loader(path):
+    """A loader path as the firmware printed it -> \\EFI\\dir\\file.efi, without the data efibootmgr -v
+    appends after it (Boot0003 style: `\\EFI\\BOOT\\BOOTX64.EFI0000424f`), slashes as backslashes."""
+    p = (path or "").strip().replace("/", "\\")
+    m = re.match(r"(?is)^(.*?\.efi)", p)
+    return (m.group(1) if m else p).rstrip()
+
+
+def same_loader(a, b):
+    """FAT file names are not case sensitive."""
+    return bool(a) and bool(b) and norm_loader(a).lower() == norm_loader(b).lower()
+
+
+def _loader_of(path):
+    m = re.search(r"File\(([^)]*)\)", path)
+    if m:
+        return norm_loader(m.group(1))
+    m = re.search(r"\)/?(\\[^\s]*)\s*$", path) or re.search(r"(\\[^\s]*)\s*$", path)   # no File(): a bare path
+    return norm_loader(m.group(1)) if m else ""
+
+
 def parse_efi(text):
-    """efibootmgr -v -> {'order': [...], 'entries': {num: {'label','partuuid','active','loader'}}}"""
+    """efibootmgr -v -> {'order': [...], 'next': num|None,
+    'entries': {num: {'label','partuuid','active','loader'}}}. Entries with and without the `*`,
+    a label followed by a tab (or only by spaces), a File(...) path or a bare one with trailing data,
+    and the same entry listed more than once under different numbers are all read."""
     order, entries, nxt = [], {}, None
-    for line in text.splitlines():
+    for line in (text or "").splitlines():
         m = re.match(r"BootNext:\s*([0-9A-Fa-f]{4})\s*$", line)
         if m:
             nxt = m.group(1).upper()
@@ -250,51 +292,72 @@ def parse_efi(text):
         if m:
             order = [x for x in m.group(1).split(",") if x]
             continue
-        m = re.match(r"Boot([0-9A-Fa-f]{4})(\*?)\s+(.*)", line)
+        m = _BOOT_LINE.match(line.rstrip("\r"))
         if m:
-            rest = m.group(3)
-            label, _, path = rest.partition("\t")
+            label, path = split_label(m.group(3))
             pu = re.search(r"HD\(\d+,GPT,([0-9A-Fa-f-]{36}),", path)
-            ld = re.search(r"File\(([^)]*)\)", path)
-            entries[m.group(1).upper()] = {"label": label.strip(), "active": m.group(2) == "*",
+            entries[m.group(1).upper()] = {"label": label, "active": m.group(2) == "*",
                                            "partuuid": pu.group(1).lower() if pu else "",
-                                           "loader": ld.group(1) if ld else ""}
+                                           "loader": _loader_of(path)}
     return {"order": [o.upper() for o in order], "entries": entries, "next": nxt}
 
 
+def entries_for(efi, partuuid, loader=None, label=None):
+    """Entry numbers on that ESP (and, when given, with that loader / label), in boot-order order then
+    number order: the same entry listed twice gives two numbers."""
+    pu = (partuuid or "").lower()
+    if not pu:
+        return []
+    hits = [n for n, e in efi["entries"].items() if e["partuuid"] == pu
+            and (loader is None or same_loader(e["loader"], loader))
+            and (label is None or e["label"] == label)]
+    pos = {n: i for i, n in enumerate(efi["order"])}
+    return sorted(hits, key=lambda n: (pos.get(n, len(pos)), n))
+
+
 def find_old_entry(efi, from_esp_partuuid):
-    """The firmware entry that boots the old drive: the one whose ESP is the old
-    drive's. None if there isn't exactly one."""
-    if not from_esp_partuuid:
+    """The firmware entry that boots the old drive: one whose ESP is the old drive's. Several can share
+    the ESP (ubuntu's own, the fallback \\EFI\\BOOT one, duplicates): the distro's own loader first,
+    then the earliest in the boot order. None if there is none."""
+    hits = entries_for(efi, from_esp_partuuid)
+    if not hits:
         return None
-    hits = [n for n, e in efi["entries"].items() if e["partuuid"] == from_esp_partuuid.lower()]
-    return hits[0] if len(hits) == 1 else None
+    own = [n for n in hits if "\\efi\\boot\\" not in efi["entries"][n]["loader"].lower()]
+    return (own or hits)[0]
 
 
-def boot_order(new, old, previous):
-    """New entry first, the old drive's entry second, everything else after, no duplicates."""
+def boot_order(new, old, previous, efi=None, pu=None):
+    """New entry first, the old drive's entry second, everything else after, no duplicates (and none of
+    the new entry's own duplicates, when efi and the new ESP's partuuid are given)."""
+    drop = set(entries_for(efi, pu, loader=efi["entries"][new]["loader"])) - {new} if efi and pu and new in efi["entries"] else set()
     order = [new]
     if old and old != new:
         order.append(old)
     for n in previous:
-        if n not in order:
+        if n not in order and n not in drop:
             order.append(n)
     return order
 
 
-def boot_order_old_first(new, old, previous):
+def boot_order_old_first(new, old, previous, efi=None, pu=None):
     """The order that keeps the old drive the default: the old entry first, the new one last, so only a
     BootNext (one boot) tries the new drive."""
-    rest = [n for n in previous if n not in (new, old)]
+    drop = set(entries_for(efi, pu, loader=efi["entries"][new]["loader"])) - {new} if efi and pu and new in efi["entries"] else set()
+    rest = [n for n in previous if n not in (new, old) and n not in drop]
     return ([old] if old else []) + rest + [new]
 
 
-def new_entry_number(efi, partuuid):
-    """The entry this tool made earlier (same label, same ESP), if any."""
-    for n, e in efi["entries"].items():
-        if e["label"] == BOOT_LABEL and e["partuuid"] == partuuid.lower():
-            return n
-    return None
+def new_entry_number(efi, partuuid, loader=None):
+    """The entry this tool made earlier (or that an earlier, half-finished run made), if any: the same
+    ESP and the same loader path (any label, active or not). The one labelled ollama1-new is preferred
+    when there are several; with the same entry listed twice, the lowest number is the one used."""
+    hits = entries_for(efi, partuuid, loader=loader)
+    if not hits and loader is not None:
+        hits = entries_for(efi, partuuid, label=BOOT_LABEL)       # the label and the ESP alone: the loader name differs
+    if not hits:
+        return None
+    mine = [n for n in hits if efi["entries"][n]["label"] == BOOT_LABEL]
+    return sorted(mine or hits)[0]
 
 
 def drive_dead(ctrl, state, root_opts, klog):
@@ -1558,7 +1621,8 @@ class Migrator:
         loader = self.state.get("loader")
         if not loader:
             raise Abort("no boot loader was recorded by the boot stage; run --resume to redo it")
-        efi = parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))
+        text = self.rn.run(["efibootmgr", "-v"], ro=True)
+        efi = parse_efi(text)
         previous = self.state.get("efi", {}).get("previous_order") or efi["order"]
         if "old_esp_partuuid" not in self.state:
             from_esp = self.mount_of(self.mounts(), "/boot/efi")
@@ -1566,15 +1630,28 @@ class Migrator:
                                               if from_esp and from_esp["target"] == "/boot/efi" else "")
         old = find_old_entry(efi, self.state["old_esp_partuuid"])
         pu = self.state["esp_partuuid"]
-        new = new_entry_number(efi, pu)
-        if not new:
-            self.w("to", ["efibootmgr", "-c", "-d", d.byid, "-p", "1", "-L", BOOT_LABEL,
-                          "-l", "\\EFI\\%s\\%s" % (BOOT_ID, loader)], d.byid)
-            efi2 = parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))
-            new = new_entry_number(efi2, pu)
+        path = "\\EFI\\%s\\%s" % (BOOT_ID, loader)
+        new = new_entry_number(efi, pu, path)
+        if new:
+            # made by an earlier run (this stage was stopped, or --resume): the same ESP and loader path, so it is
+            # used, not made again; the firmware may also list it twice under two numbers
+            dup = [n for n in entries_for(efi, pu, loader=path) if n != new]
+            print("  firmware: entry %s already boots the new drive's ESP (%s); using it%s" % (
+                new, path, ("; the firmware lists it again as %s, left as it is" % ",".join(dup)) if dup else ""))
+            if not efi["entries"][new]["active"]:
+                self.rn.run(["efibootmgr", "-a", "-b", new])
+        else:
+            self.w("to", ["efibootmgr", "-c", "-d", d.byid, "-p", "1", "-L", BOOT_LABEL, "-l", path], d.byid)
+            text = self.rn.run(["efibootmgr", "-v"], ro=True)
+            efi = parse_efi(text)
+            new = new_entry_number(efi, pu, path)
             if not new:
-                raise Abort("efibootmgr made no entry labelled %s; stopped" % BOOT_LABEL)
-        order = boot_order_old_first(new, old, [n for n in previous if n != new])
+                mine = [l.strip()[:160] for l in text.splitlines() if pu and pu in l.lower()]
+                raise Abort("efibootmgr made no entry for the new drive's ESP (%s, %s). Its list has %d entries, %d on that "
+                            "ESP%s. Look at `efibootmgr -v`; if the entry is there, run --resume again, it is reused" % (
+                                BOOT_LABEL, path, len(efi["entries"]), len(mine), (": " + mine[0]) if mine else ""))
+        previous = [n for n in previous if n != new]
+        order = boot_order_old_first(new, old, previous, efi, pu)
         self.rn.run(["efibootmgr", "-o", ",".join(order)])
         self.rn.run(["efibootmgr", "-n", new])            # BootNext: only the next boot tries the new drive
         self.state["efi"] = {"new": new, "old": old, "previous_order": previous, "order": order}
@@ -1975,6 +2052,8 @@ class Migrator:
             self.delete_parked()
         if a.disable_old_entry:
             self.disable_old()
+        if a.disable_old_boot_files:
+            self.disable_old_boot_files()
         self.state["finished"] = self.now()
         self.save_state()
         old = self.state.get("efi", {}).get("old")
@@ -1986,6 +2065,9 @@ class Migrator:
                 ":  sudo blkdiscard %s" % fd.byid if fd else ""),
             "Its firmware entry (%s) is still there, second in the order%s." % (
                 old or "not found", " (inactive now)" if a.disable_old_entry else "; --finish --disable-old-entry makes it inactive"),
+            ("Its boot files (EFI/ubuntu, EFI/BOOT) are put aside as *.off: it is not a fallback until they are renamed back (%s)." % self.undo_path()
+             if a.disable_old_boot_files else
+             "Its boot files are untouched. If the firmware keeps picking it anyway: --finish --disable-old-boot-files (off by default; undoable)."),
             "The parked models copy %s%s" % (
                 "was deleted." if a.delete_parked else "is still at %s;" % c.parked,
                 "" if a.delete_parked else " --finish --delete-parked frees the space (it checks the live copy first)."),
@@ -2010,7 +2092,7 @@ class Migrator:
         efi = parse_efi(self.rn.run(["efibootmgr", "-v"], ro=True))
         if new not in efi["entries"]:
             raise Abort("the new drive's firmware entry %s is gone; set the boot order by hand with efibootmgr" % new)
-        order = boot_order(new, old, efi["order"])
+        order = boot_order(new, old, efi["order"], efi, self.state.get("esp_partuuid"))
         if efi["order"] != order:
             self.rn.run(["efibootmgr", "-o", ",".join(order)])
         e["order"] = order
@@ -2042,6 +2124,73 @@ class Migrator:
             raise Abort("not confirmed; the parked copy was kept")
         self.rn.run(["rm", "-rf", "--one-file-system", "--", p])
 
+    def old_esp_part(self, fd):
+        """The old drive's EFI partition (by-id name): the partition of that drive whose PARTUUID is the one recorded
+        for the ESP the old system booted from. Never guessed."""
+        pu = self.state.get("old_esp_partuuid")
+        if not pu:
+            raise Abort("this tool never recorded which partition is the old drive's EFI partition; rename EFI/ubuntu "
+                        "and EFI/BOOT there by hand")
+        for n in range(1, 5):
+            part = fd.part(n)
+            if os.path.exists(part) and self.probe(part, "PARTUUID").lower() == pu.lower():
+                if self.probe(part, "TYPE").lower() != "vfat":
+                    raise Abort("the old drive's EFI partition (%s) is not vfat; not touching it" % part)
+                return part
+        raise Abort("no partition of the old drive (serial %s) has the EFI partition's id %s; not touching anything"
+                    % (self.args.from_serial, pu))
+
+    def disable_old_boot_files(self):
+        """Optional (--finish --disable-old-boot-files), off by default. The firmware of this server kept
+        re-ordering BootOrder and booting the old drive. Renaming EFI/ubuntu and EFI/BOOT on the old drive's EFI
+        partition to *.off leaves it nothing to boot there, so it falls through to the new drive. It does make the
+        old drive no longer a fallback until undone; the undo is written to /srv/data first and said out loud."""
+        a, c = self.args, self.cfg
+        fd = self.resolve(a.from_serial)
+        if fd is None:
+            raise Abort("the old drive (serial %s) is not there, so its boot files cannot be put aside" % a.from_serial)
+        part = self.old_esp_part(fd)
+        if [m for m in self.mounts() if os.path.realpath(m["source"]) == os.path.realpath(part)
+                and m["target"] != c.mnt + "/old-esp"]:
+            raise Abort("the old drive's EFI partition is mounted already (%s); not touching it" % part)
+        target = c.mnt + "/old-esp"
+        os.makedirs(target, exist_ok=True)
+        print("About to rename EFI/ubuntu and EFI/BOOT on the OLD drive's EFI partition (%s) to *.off." % part)
+        print("The old drive stops being a fallback until they are renamed back. How to undo it is written to %s." % self.undo_path())
+        if self.ask("type yes> ") != "yes":
+            raise Abort("not confirmed; the old drive's boot files were left as they are")
+        self.w("from", ["mount", "-t", "vfat", part, target], part)
+        try:
+            efi_dir = target + "/EFI"
+            names = os.listdir(efi_dir) if os.path.isdir(efi_dir) else []
+            todo, done, blocked = plan_boot_file_renames(names)
+            if blocked:
+                raise Abort("not renaming: " + "; ".join(blocked) + ". Sort that out by hand")
+            if not todo:
+                print("  old drive: nothing to rename (%s)" % (("already put aside: " + ", ".join(done)) if done else
+                                                              "there is no EFI/ubuntu or EFI/BOOT"))
+            else:
+                self.write_undo(part, todo)                  # the way back is on disk before the first rename
+                for old_name, new_name in todo:
+                    os.rename(os.path.join(efi_dir, old_name), os.path.join(efi_dir, new_name))
+                    print("  old drive: EFI/%s -> EFI/%s" % (old_name, new_name))
+                os.sync()
+        finally:
+            self.rn.run(["umount", target], ok=(0, 32))
+
+    def undo_path(self):
+        return self.cfg.data + "/old-drive-boot-files-undo.txt"
+
+    def write_undo(self, part, renamed):
+        text = undo_note_text(part, None, renamed, self.args.from_serial, self.now())
+        tmp = self.undo_path() + ".tmp"
+        with open(tmp, "w") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, self.undo_path())
+        print("  the way back is in %s" % self.undo_path())
+
     def disable_old(self):
         old = self.state.get("efi", {}).get("old")
         if not old:
@@ -2050,6 +2199,39 @@ class Migrator:
         if self.ask("type yes> ") != "yes":
             raise Abort("not confirmed; the entry was left as it is")
         self.rn.run(["efibootmgr", "-A", "-b", old])
+
+
+def plan_boot_file_renames(names):
+    """The entries of the old ESP's EFI folder to put aside -> [(name, name + ".off")], and what is already put
+    aside or in the way. Only `ubuntu` and `BOOT` (FAT is not case sensitive; the names are matched that way)."""
+    lower = {n.lower(): n for n in names}
+    todo, done, blocked = [], [], []
+    for base in OLD_BOOT_DIRS:
+        have, off = lower.get(base.lower()), lower.get(base.lower() + OFF_SUFFIX)
+        if have and off:
+            blocked.append("%s and %s both exist" % (have, off))
+        elif have:
+            todo.append((have, have + OFF_SUFFIX))
+        elif off:
+            done.append(off)
+    return todo, done, blocked
+
+
+def undo_note_text(part, esp_mount_hint, renamed, serial, when):
+    """What to run to put the old drive's boot files back."""
+    lines = ["Old drive (serial %s): boot files put aside by migrate-os.sh --finish --disable-old-boot-files on %s." % (serial, when),
+             "",
+             "The old drive's EFI partition is %s." % part,
+             "Renamed, inside its EFI folder: %s." % ", ".join("%s -> %s" % (a, b) for a, b in renamed),
+             "",
+             "To make the old drive bootable again (as root):",
+             "  mkdir -p /mnt/old-esp && mount %s /mnt/old-esp" % part]
+    lines += ["  mv /mnt/old-esp/EFI/%s /mnt/old-esp/EFI/%s" % (b, a) for a, b in renamed]
+    lines += ["  umount /mnt/old-esp",
+              "",
+              "Then, if its firmware entry was made inactive too (--disable-old-entry), make it active again:  efibootmgr -a -b <number>",
+              "(efibootmgr -v shows the numbers).", ""]
+    return "\n".join(lines)
 
 
 def parse_status(text):
@@ -2098,13 +2280,16 @@ def parse_args(argv):
     ap.add_argument("--sudoers-user", default=None)
     ap.add_argument("--delete-parked", action="store_true", help="with --finish: delete the parked models copy")
     ap.add_argument("--disable-old-entry", action="store_true", help="with --finish: make the old drive's firmware entry inactive")
+    ap.add_argument("--disable-old-boot-files", action="store_true",
+                    help="with --finish: rename EFI/ubuntu and EFI/BOOT on the old drive's ESP to *.off, so a firmware that "
+                         "keeps picking the old drive finds nothing to boot there (off by default; the undo is written to /srv/data)")
     ap.add_argument("--remove-sudoers", action="store_true", help="with --finish: remove the temporary sudo permission")
     a = ap.parse_args(argv)
     a.mode = a.mode or "plan"
     a.root_size_given = a.root_size is not None
     a.root_gib = parse_size_gib(a.root_size or "300G")
-    if (a.delete_parked or a.disable_old_entry or a.remove_sudoers) and a.mode != "finish":
-        ap.error("--delete-parked, --disable-old-entry and --remove-sudoers go with --finish")
+    if (a.delete_parked or a.disable_old_entry or a.disable_old_boot_files or a.remove_sudoers) and a.mode != "finish":
+        ap.error("--delete-parked, --disable-old-entry, --disable-old-boot-files and --remove-sudoers go with --finish")
     if a.reboot and a.mode not in ("run", "resume"):
         ap.error("--reboot goes with --run or --resume")
     if a.in_session and a.mode != "resume":

@@ -1019,7 +1019,31 @@ boot (`efibootmgr -o`: new first, the old drive's entry second). It tells you th
 reuse it (that is yours to do, later; the tool never wipes a drive). Options:
 `--delete-parked` (frees the parked models after checking the live copy has
 every file; you type `delete`), `--disable-old-entry` (makes the old drive's
-firmware entry inactive, not deleted; you type `yes`), `--remove-sudoers`.
+firmware entry inactive, not deleted; you type `yes`), `--remove-sudoers`, and
+`--disable-old-boot-files` (**off by default**, below).
+
+**The firmware keeps booting the old drive.** Some boards re-order `BootOrder`
+after the move and pick the old drive again. `--finish --disable-old-boot-files`
+renames `EFI/ubuntu` and `EFI/BOOT` on the old drive's EFI partition to
+`ubuntu.off` and `BOOT.off`, so there is nothing to boot there and the firmware
+falls through to the new drive. It is the one step that writes to the old drive
+(only its EFI partition, found by the PARTUUID recorded at the start, never
+guessed, mounted only for this), so the old drive stops being a fallback until
+you undo it. You type `yes`; the way back is written to
+`/srv/data/old-drive-boot-files-undo.txt` before the first rename (mount the
+partition, `mv` the two folders back). It refuses if a `.off` folder is already
+in the way, and repeating it changes nothing. It does not change the firmware
+entries (`--disable-old-entry` does that).
+
+The firmware stage reads `efibootmgr -v` in its several shapes (a tab or only
+spaces after the label, entries with and without the `*`, a `File(...)` loader
+or a bare path with trailing data such as `...BOOTX64.EFI0000424f`, the same
+entry listed twice under two numbers). An entry for the new drive's EFI
+partition and loader that is already there (an earlier run stopped after
+making it) is reused, and made active if it was not, instead of making another
+or stopping with "efibootmgr made no entry"; if no entry for the new drive can
+be found after making one, the message says how many entries the list has and
+what is on that partition.
 
 ### If something goes wrong
 

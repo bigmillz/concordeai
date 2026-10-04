@@ -161,7 +161,10 @@ def efi_text(s):
         "BootOrder: " + ",".join(e["order"])]
     for n in sorted(e["entries"]):
         x = e["entries"][n]
-        lines.append("Boot%s%s %s\t%s" % (n, "*" if x.get("active", True) else "", x["label"], x["path"]))
+        path = x["path"]
+        if e.get("bare"):                              # some firmware/efibootmgr versions: no File(...), data after the path
+            path = re.sub(r"File\(([^)]*)\)", lambda m: m.group(1) + e.get("trail", "0000424f"), path)
+        lines.append("Boot%s%s %s%s%s" % (n, "*" if x.get("active", True) else "", x["label"], e.get("sep", "\t"), path))
     return "\n".join(lines)
 
 
@@ -337,6 +340,8 @@ def main():
             dev = args[args.index("-d") + 1]
             block, _ = block_of(s, dev)
             pu = [p for p in s["disks"][block]["parts"] if p["n"] == int(args[args.index("-p") + 1])][0]["partuuid"]
+            if s.get("efi_make_wrong_esp"):
+                pu = "-".join(["9" * 8, "9" * 4, "9" * 4, "9" * 4, "9" * 12])
             n = "%04X" % (max([int(x, 16) for x in e["entries"]] + [0]) + 1)
             e["entries"][n] = {"label": args[args.index("-L") + 1], "active": True,
                                "path": "HD(1,GPT,%s,0x800,0x200000)/File(%s)" % (pu, args[args.index("-l") + 1])}
