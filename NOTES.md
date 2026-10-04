@@ -9,6 +9,52 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b383 — every font and shape in the panel smooth, at the screen's real resolution (per Patrick)
+
+Patrick: "Smooth all the fonts in the interface so it's not all blocky: use the
+available resolution to your advantage, but keep everything large and readable."
+- **Drawn at the real resolution.** `o1hipix.HiPixmap` is a Pixmap you draw on in
+  LOGICAL units (the same ~640x360 grid, so every size and every layout rule is
+  as before) that is stored at `scale` times that: on a 3840x2160 screen
+  `o1fb.choose_scale` gives 6 and the panel is drawn at 3840x2160 with nothing
+  stretched afterwards. `PanelRenderer` replaces the old per-frame render and
+  `Presenter(info, lw*k, lh*k, 1)` takes its pixels as they are (XRGB8888: no
+  conversion; only changed rows are written).
+- **Text.** `o1vecfont` gained lower case (x-height 70, ascenders to the capital
+  top, descenders to 125) and every printable ASCII sign plus the degree sign,
+  and a mixed-case mode (`clean(text, mixed=True)`; the cost screen still
+  uses capitals). Names keep their case. `o1vtext` measures in grid units for
+  the layout (rounded up, so what fits there fits when drawn). Glyphs are
+  cached as ready pixel rows per (character, height, colours); a string is a few
+  slice assignments per glyph row.
+- **Shapes.** `o1raster.stroke_rows` rasterizes capsules (round caps and joins)
+  as sparse rows with an active-set sweep; used for glyphs, ring arcs, graph
+  lines. Rounded rectangles and discs come from cached corner/disc coverage.
+  Rectangles and hairlines stay exact. Graph fills run column by column
+  under the line.
+- **Cheap.** Boxes redraw only when their numbers changed (`box_key`: the
+  numbers, only the tail of each series, a minute for the model countdowns
+  which now show minutes); a changed box is cleared first (anti-aliased corners
+  would otherwise pile up). Dials and graph plots are kept pictures
+  (`HiPixmap.cached`, bounded to 6 M pixels) keyed by what they show; graph
+  data is cut at a time step (`GRAPH_STEP_S` = 6 s: the plot is the data up to a
+  multiple of 6 s) so a graph's picture is the same for several ticks.
+  Measured with `tests`-style synthetic states, every number changing on every
+  2-second tick: 1920x1080 24 ms per tick (1.2% of a core), 3840x2160 56 ms
+  (2.8%), 10.7 MB written per tick at 4K; first frame 0.09 s / 0.22 s. Nothing
+  changing: ~24 ms (the status and header boxes show seconds).
+- **Found on the way:** `series()` now returns a few extra samples for the
+  step; the panel's model countdown shows minutes; `--png --size` is the
+  SCREEN's pixels (the grid and scale come from `choose_scale`).
+- Tests: 155 -> the raster, the smooth surface (round corners, areas, clipping
+  in logical units, caches equal to redrawing), the mixed-case font, and the
+  whole panel at 1920x1080, 2560x1440 and 3840x2160 (nothing outside its box,
+  hostile text, pairing, anti-aliased edges, incremental == full redraw, a
+  still machine redraws nothing); 7 new mutants.
+- Not verified on the monitor: how the smooth text reads from across the room,
+  the real per-tick CPU including the sampler (a synthetic 4K bench here),
+  and the first full-screen write.
+
 ## 6b382 — the cost screen in smooth rounded print, no asterisks (per Patrick)
 
 Patrick on the real 4K monitor: the cost screen works, but the digits (a 5x7

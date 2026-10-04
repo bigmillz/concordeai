@@ -185,10 +185,11 @@ class Presenter:
         """The writes that make the screen show `pm`: [(offset, bytes)],
         only for rows that differ from the last frame (all of them when
         force). Adjacent screen rows are joined when the stride allows."""
-        if (pm.w, pm.h) != (self.lw, self.lh):
-            raise ValueError("pixmap %dx%d is not the logical size %dx%d" % (pm.w, pm.h, self.lw, self.lh))
+        pw, ph = getattr(pm, "pw", pm.w), getattr(pm, "ph", pm.h)           # a smooth surface knows its pixels
+        if (pw, ph) != (self.lw, self.lh):
+            raise ValueError("pixmap %dx%d is not the logical size %dx%d" % (pw, ph, self.lw, self.lh))
         out = []
-        W = pm.w
+        W = pw
         for y in range(self.lh):
             raw = pm.buf[y * W:(y + 1) * W].tobytes()
             if not force and self.prev[y] == raw:

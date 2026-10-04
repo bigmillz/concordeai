@@ -580,11 +580,18 @@ around a little from time to time.
   update turn the badge and the Status box red). When a pairing window is
   open the whole screen shows the code, as large as fits, with the time left.
   - It draws straight to the screen's framebuffer (`/dev/fb0`): no desktop,
-    no browser, nothing added to the server. It draws at a small fixed size
-    (about 640x360) and scales it up by a whole number, centred, so it costs
-    little: one picture every 2 seconds (every second while pairing), only
-    the rows that changed are written, and nothing is drawn while another
-    console (Alt+F2) is on the screen. It puts the console in graphics mode
+    no browser, nothing added to the server. **Everything is smooth**: it is
+    laid out on a small grid (about 640x360) so sizes stay big and readable
+    from across a room, but drawn at the screen's real resolution (a 3840x2160
+    screen is drawn at 3840x2160; the grid is multiplied by 6, never a small
+    picture stretched). All text is a rounded stroke font (capitals, lower
+    case, digits and every sign the panel prints, names kept as they are);
+    rings, bars, graph lines (round joins) and box corners have anti-aliased
+    edges. It costs little: a picture every 2 seconds (every second while
+    pairing), only the boxes whose numbers changed are redrawn, dials and graph
+    plots come from kept pictures, only the rows that changed are written (about
+    3% of one core at 4K with every number moving), and nothing is drawn while
+    another console (Alt+F2) is on the screen. It puts the console in graphics mode
     while it runs, so the text console never paints over it, and always puts
     it back when it stops.
   - **When it is used.** `--dash auto` (the default): when `/dev/fb0` exists
@@ -612,7 +619,7 @@ around a little from time to time.
     (`journalctl -u ollama1-dash`) and the text dashboard takes over; it
     does not try the panel again until the service restarts.
   - To see the design without a screen: `ollama1-dash --png panel.png`
-    (`--size 800x450`, `--scale 3`, `--pairing`, `--live` for this
+    (`--size 3840x2160` is the screen's size in pixels, `--screen cost`, `--pairing`, `--live` for this
     machine's own numbers instead of sample ones). It reads the same numbers
     as the text dashboard and shows counts, sizes and times only.
 - **Text dashboard:** it fills the server's monitor (tty1) when the panel is

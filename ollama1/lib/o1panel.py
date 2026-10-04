@@ -26,8 +26,9 @@ import math
 
 import o1dashui as D
 import o1gfx
-import o1pixfont as F
+import o1hipix
 import o1vecfont as V
+import o1vtext as F
 import o1tariff
 
 # ---- colours -------------------------------------------------------------------
@@ -92,9 +93,13 @@ def _l(v):
     return v if isinstance(v, list) else []
 
 
+GRAPH_STEP_S = 6          # a graph's picture moves this often
+
+
 def series(st, name, range_s):
+    """The last range_s samples, plus a few more that a graph that moves in steps drops again."""
     s = _d(st.get("series")).get(name)
-    return list(s)[-range_s:] if isinstance(s, (list, tuple)) else []
+    return list(s)[-(range_s + GRAPH_STEP_S):] if isinstance(s, (list, tuple)) else []
 
 
 def last_value(vals):
@@ -147,11 +152,11 @@ def bar(pm, x, y, w, h, f, color):
     if f is None:
         return
     f = max(0.0, min(1.0, f))
-    n = int(round(f * w))
+    n = f * w if getattr(pm, "hires", False) else int(round(f * w))
     if f > 0 and n < 2:
         n = 2
     if n:
-        pm.rrect(x, y, n, h, min(2, h // 2, n // 2), color)
+        pm.rrect(x, y, n, h, min(2, h // 2, n / 2.0), color)
 
 
 def widest(items, scale=1):
@@ -184,10 +189,14 @@ def bar_rows(pm, box, rows, row_h=13):
 def ring(pm, cx, cy, r, th, f, color, label, sub=""):
     """A 270-degree dial, open at the bottom, with a figure inside."""
     start, sweep = 225.0, 270.0
-    pm.arc(cx, cy, r, r - th, start, start + sweep, T["track"])
     f = D._f(f)
-    if f is not None and f > 0:
-        pm.arc(cx, cy, r, r - th, start, start + sweep * max(0.0, min(1.0, f)), color)
+    fq = None if f is None else round(max(0.0, min(1.0, f)) * 270) / 270.0       # a degree at a time
+
+    def dial():
+        pm.arc(cx, cy, r, r - th, start, start + sweep, T["track"])
+        if fq is not None and fq > 0:
+            pm.arc(cx, cy, r, r - th, start, start + sweep * fq, color)
+    pm.cached(("ring", r, th, color, fq), (cx - r - 1, cy - r - 1, 2 * r + 3, 2 * r + 3), dial)
     inner = 2 * (r - th) - 6
     number, unit = (label[:-1], "%") if label.endswith("%") else (label, "")
     scale = 2 if F.text_width(number, 2) + (F.advance("%") if unit else 0) <= inner else 1
@@ -220,46 +229,55 @@ def graph(pm, box, curves, range_label=""):
     if range_label and lx + F.text_width(range_label) + 4 <= x + w:
         pm.text_right(x + w, y, range_label, T["dim"])
     px, py, pw, ph = x, y + 11, w, h - 11
-    pm.rrect(px, py, pw, ph, 2, T["edge"])
-    pm.rrect(px + 1, py + 1, pw - 2, ph - 2, 1, T["plot"])
     ix, iy, iw, ih = px + 2, py + 2, pw - 4, ph - 4
     if iw < 8 or ih < 8:
+        pm.rrect(px, py, pw, ph, 2, T["edge"])
+        pm.rrect(px + 1, py + 1, pw - 2, ph - 2, 1, T["plot"])
         return
-    with pm.clipped(ix, iy, iw, ih):
-        for q in (1, 2, 3):
-            pm.hline(ix, iy + ih * q // 4, iw, T["grid"])
-        any_data = False
-        for k, c in enumerate(curves):
-            pts = D.resample(c["values"], iw)
-            seen = [v for v in (D._f(p) for p in pts) if v is not None]
-            if not seen:
+    traces = []                                    # what the plot shows: one list of (x, y) runs per curve
+    for k, c in enumerate(curves):
+        vals = c["values"]
+        shift = c.get("shift") or 0
+        if shift and len(vals) > shift + 10:        # the picture moves every few seconds, not every one
+            vals = vals[:len(vals) - shift]
+        if c.get("window"):
+            vals = vals[-c["window"]:]
+        pts = D.resample(vals, iw)
+        seen = [v for v in (D._f(p) for p in pts) if v is not None]
+        if not seen:
+            continue
+        top = c.get("vmax") or nice_max(max(seen) * 1.05, c.get("floor", 1.0))
+        runs, run = [], []
+        for i, p in enumerate(pts):
+            v = D._f(p)
+            if v is None:
+                if run:
+                    runs.append(run)
+                run = []
                 continue
-            any_data = True
-            top = c.get("vmax") or nice_max(max(seen) * 1.05, c.get("floor", 1.0))
-            ys = []
-            for p in pts:
-                v = D._f(p)
-                ys.append(None if v is None else iy + ih - 1 - int(round(max(0.0, min(1.0, v / top)) * (ih - 1))))
-            if c.get("fill", k == 0):
-                shade = o1gfx.mix(T["plot"], c["color"], 0.22)
-                for i, yy in enumerate(ys):
-                    if yy is not None:
-                        pm.vline(ix + i, yy + 1, iy + ih - yy - 1, shade)
-            thick = ih >= 28
-            prev = None
-            for i, yy in enumerate(ys):
-                if yy is None:
-                    prev = None
-                    continue
-                if prev is not None:
-                    pm.line(ix + i - 1, prev, ix + i, yy, c["color"])
-                    if thick:
-                        pm.line(ix + i - 1, prev + 1, ix + i, yy + 1, c["color"])
-                else:
-                    pm.px(ix + i, yy, c["color"])
-                prev = yy
-        if not any_data:
-            pm.text_center(ix + iw // 2, iy + ih // 2 - 3, "no data yet", T["dim"], max_w=iw - 4)
+            run.append((round(ix + i + 0.5, 1), round(iy + ih - 0.5 - max(0.0, min(1.0, v / top)) * (ih - 1), 2)))
+        if run:
+            runs.append(run)
+        traces.append((c["color"], c.get("fill", k == 0), tuple(tuple(r_) for r_ in runs)))
+
+    def plot():
+        pm.rrect(px, py, pw, ph, 2, T["edge"])
+        pm.rrect(px + 1, py + 1, pw - 2, ph - 2, 1, T["plot"])
+        with pm.clipped(ix, iy, iw, ih):
+            for q in (1, 2, 3):
+                pm.hairline(ix, iy + ih * q // 4, iw, T["grid"], 0.5)
+            for color, fill, runs in traces:
+                if fill:
+                    shade = o1gfx.mix(T["plot"], color, 0.22)
+                    for run in runs:
+                        if len(run) > 1:
+                            pm.fill_under(list(run), iy + ih, shade)
+                width = 1.7 if ih >= 28 else 1.1
+                for run in runs:
+                    pm.polyline(list(run), width, color)
+            if not traces:
+                pm.text_center(ix + iw // 2, iy + ih // 2 - 3, "no data yet", T["dim"], max_w=iw - 4)
+    pm.cached(("plot", tuple(traces), T["edge"]), (px, py, pw, ph), plot)
 
 
 def tile(pm, x, y, w, big, label, color=None):
@@ -308,6 +326,9 @@ def _graph_row(pm, inner, used_h, left, right, ctx):
     if gh < 30:
         return
     gw = (w - 6) // 2
+    for c in left + right:
+        c["shift"] = ctx.get("shift", 0)
+        c["window"] = ctx["range_s"]
     graph(pm, (x, gy, gw, gh), left, "")
     graph(pm, (x + gw + 6, gy, w - gw - 6, gh), right, "")
 
@@ -396,6 +417,12 @@ def draw_cpu(pm, r, st, ctx):
           "now": ("%.1f GHz" % (mhz / 1000.0)) if mhz else "", "fill": False}], ctx)
 
 
+def _minutes(text):
+    """"54m 40s" -> "54m": a countdown that changes once a minute."""
+    parts = str(text).split()
+    return " ".join(parts[:1]) if len(parts) == 2 and parts[1].endswith("s") and parts[0].endswith("m") else str(text)
+
+
 def draw_models(pm, r, st, ctx):
     gw = _d(st.get("gw"))
     inner = frame(pm, r, "Requests and models", ("%d today" % (D._f(gw.get("requests_today")) or 0)) if gw else "")
@@ -422,7 +449,7 @@ def draw_models(pm, r, st, ctx):
     for m in shown:
         size, vram = int(D._f(m.get("size")) or 0), int(D._f(m.get("size_vram")) or 0)
         share = int(100 * vram / size) if size else 0
-        right = "%d%% GPU  %sG  %s" % (share, gb(vram), D._until(m.get("expires_at"), now))
+        right = "%d%% GPU  %sG  %s" % (share, gb(vram), _minutes(D._until(m.get("expires_at"), now)))
         ok = share >= 100 or m.get("ram_allowed")
         rw = F.text_width(right)
         pm.text_right(x + w, yy, right, T["text"] if ok else T["warn"], max_w=w // 2 + 20)
@@ -435,6 +462,7 @@ def draw_models(pm, r, st, ctx):
     if gh >= 32:
         sp = series(st, "tps", ctx["range_s"])
         graph(pm, (x, yy + 2, w, gh), [{"values": sp, "color": T["tps"], "vmax": None, "floor": 10, "label": "Speed",
+                                         "shift": ctx.get("shift", 0), "window": ctx["range_s"],
                                          "now": "%s tok/s" % D.num(last_value(sp), "%.0f") if last_value(sp) is not None else ""}],
               "")
 
@@ -874,38 +902,93 @@ def draw_cost(pm, view):
 
 # ---- the whole frame ----------------------------------------------------------------
 
-def render(st, w, h, range_s=300, pm=None, screen="panel"):
-    """The whole panel as a Pixmap of w x h (drawn into `pm` if one is
-    given: the caller keeps one buffer and the frame is repainted over it).
-    screen="cost" shows only the electricity cost (6b381); an open pairing
+class PanelRenderer:
+    """The panel drawn at `scale` times its logical size (a 6 draws it on a
+    3840x2160 screen at 3840x2160). It keeps its surface between frames and
+    with incremental=True redraws only the boxes whose numbers changed (and
+    the dials and graphs inside them come from pictures it kept), so a quiet
+    machine costs almost nothing to show."""
+
+    BOXES = (("header", "draw_header"), ("gpu", "draw_gpu"), ("cpu", "draw_cpu"), ("models", "draw_models"),
+             ("storage", "draw_storage"), ("status", "draw_status"), ("footer", "draw_footer"))
+
+    def __init__(self, w, h, scale=1, pm=None):
+        self.w, self.h, self.scale = w, h, scale
+        self.pm = pm if (pm is not None and getattr(pm, "hires", False) and (pm.w, pm.h, pm.S) == (w, h, scale)) \
+            else o1hipix.HiPixmap(w, h, T["bg"], scale)
+        self.keys = {}
+        self.overlay = True
+
+    def box_key(self, name, st, ctx):
+        """What a box shows, as something comparable: its numbers (not the long
+        series, only their tails), the minute for countdowns, the graph step."""
+        def tail(*names):
+            return tuple(last_value(series(st, n, 5)) for n in names)
+        g = (ctx["graph"], ctx["shift"])
+        if name == "header":
+            return (st.get("host"), int(ctx["now"]), D.dur(st.get("uptime")), repr(ctx["warns"]))
+        if name == "footer":
+            return (repr(_d(st.get("net")).get("address")), repr(D.dig(st, "updates", "ollama")),
+                    repr(_d(st.get("power"))), ctx["rng"], repr(D.dig(st, "gw", "ollama_version")))
+        if name == "gpu":
+            return (repr(st.get("gpu")), tail("gpu_busy", "vram_used", "gpu_power", "gpu_temp"), g)
+        if name == "cpu":
+            return (repr(st.get("cpu")), repr(st.get("mem")), repr(st.get("ollama_cg")),
+                    tail("cpu_total", "cpu_temp", "cpu_mhz", "ram_used"), g)
+        if name == "models":
+            return (repr(st.get("gw")), tail("tps"), g, int(ctx["now"] // 60))
+        if name == "storage":
+            return (repr(st.get("disks")), repr(st.get("raid")), repr(st.get("io")), repr(st.get("net")))
+        return (repr(ctx["warns"]), sleep_summary(st, ctx["now"]), repr(st.get("tunnel")), repr(st.get("updates")),
+                repr(st.get("power")), repr(st.get("gw") and bool(_d(st.get("gw")).get("stale"))))
+
+    def draw(self, st, range_s=300, incremental=False):
+        pm, w, h = self.pm, self.w, self.h
+        st = st if isinstance(st, dict) else {}
+        now = D._f(st.get("time")) or 0
+        boxes = layout(w, h)
+        full = not incremental or self.overlay
+        if full:
+            pm.fill_rect(0, 0, w, h, T["bg"])
+            self.keys.clear()
+        if not boxes:
+            pm.text(8, 8, "Screen too small for the panel", T["warn"], 1, max_w=w - 16)
+            return pm
+        warns = D.warnings(st, now)
+        ctx = {"now": now, "range_s": range_s, "rng": "5 min" if range_s <= 300 else "1 h", "warns": warns,
+               "shift": int(now) % GRAPH_STEP_S, "graph": int(now) // GRAPH_STEP_S}
+        for name, fname in self.BOXES:
+            fn = globals()[fname]
+            r = boxes[name]
+            key = self.box_key(name, st, ctx)
+            if not full and self.keys.get(name) == key:
+                continue
+            self.keys[name] = key
+            if not full:
+                pm.fill_rect(r[0] - 1, r[1] - 1, r[2] + 2, r[3] + 2, T["bg"])
+            with pm.clipped(*r):
+                try:
+                    fn(pm, r, st, ctx)
+                except Exception as e:                   # one bad reading must not blank the screen
+                    ERRORS.append("%s: %r" % (name, e))
+                    pm.fill_rect(*r, T["panel"])
+                    pm.text(r[0] + 8, r[1] + 8, "%s: no data" % name, T["dim"], max_w=r[2] - 16)
+        self.overlay = False
+        if st.get("pairing"):
+            try:
+                draw_pairing(pm, st, now)
+            except Exception as e:
+                ERRORS.append("pairing: %r" % (e,))
+            self.overlay = True                          # what was under it is gone: redraw everything afterwards
+        return pm
+
+
+def render(st, w, h, range_s=300, pm=None, screen="panel", scale=1):
+    """The whole panel as a smooth surface of w x h logical units (w*scale x
+    h*scale pixels; drawn into `pm` if one of that size is given). screen="cost"
+    shows only the electricity cost (6b381) at w x h pixels; an open pairing
     window takes the screen from either."""
     st = st if isinstance(st, dict) else {}
-    if pm is None or (pm.w, pm.h) != (w, h):
-        pm = o1gfx.Pixmap(w, h, T["bg"])
-    else:
-        pm.fill_rect(0, 0, w, h, T["bg"])
-    now = D._f(st.get("time")) or 0
     if screen == "cost" and not st.get("pairing"):
         return render_cost(st, w, h)
-    boxes = layout(w, h)
-    if not boxes:
-        pm.text(8, 8, "Screen too small for the panel", T["warn"], 1, max_w=w - 16)
-        return pm
-    warns = D.warnings(st, now)
-    ctx = {"now": now, "range_s": range_s, "rng": "5 min" if range_s <= 300 else "1 h", "warns": warns}
-    for name, fn in (("header", draw_header), ("gpu", draw_gpu), ("cpu", draw_cpu), ("models", draw_models),
-                     ("storage", draw_storage), ("status", draw_status), ("footer", draw_footer)):
-        r = boxes[name]
-        with pm.clipped(*r):
-            try:
-                fn(pm, r, st, ctx)
-            except Exception as e:                   # one bad reading must not blank the screen
-                ERRORS.append("%s: %r" % (name, e))
-                pm.fill_rect(*r, T["panel"])
-                pm.text(r[0] + 8, r[1] + 8, "%s: no data" % name, T["dim"], max_w=r[2] - 16)
-    if st.get("pairing"):
-        try:
-            draw_pairing(pm, st, now)
-        except Exception as e:
-            ERRORS.append("pairing: %r" % (e,))
-    return pm
+    return PanelRenderer(w, h, scale, pm).draw(st, range_s)

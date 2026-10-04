@@ -225,11 +225,12 @@ def png(args):
     import o1gfx
     import o1panel
     out = args[args.index("--png") + 1]
-    cost = "--screen" in args and args[args.index("--screen") + 1:][:1] == ["cost"]
-    w, h = (1920, 1080) if cost else (640, 360)          # the cost screen is smooth print drawn at screen size
+    screen = args[args.index("--screen") + 1] if "--screen" in args else "panel"
+    cost = screen == "cost"
+    w, h = 1920, 1080                                     # the screen's size in pixels: everything is drawn at it
     if "--size" in args:
         w, h = (int(x) for x in args[args.index("--size") + 1].lower().split("x"))
-    up = int(args[args.index("--scale") + 1]) if "--scale" in args else (1 if cost else 2)
+    up = int(args[args.index("--scale") + 1]) if "--scale" in args else 1
     st = None
     if "--live" not in args:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "tests"))
@@ -243,11 +244,17 @@ def png(args):
         sampler.tick()
         time.sleep(1.0)
         st = sampler.tick()
-    screen = args[args.index("--screen") + 1] if "--screen" in args else "panel"
-    pm = o1panel.render(st, w, h, screen=screen if screen in ("panel", "cost") else "panel")
+    t0 = time.time()
+    if cost and not st.get("pairing"):
+        pm = o1panel.render_cost(st, w, h)
+    else:
+        k, lw, lh = o1fb.choose_scale(w, h)               # the panel's grid and the whole number that fills the screen
+        pm = o1panel.render(st, lw, lh, scale=k)
+    ms = (time.time() - t0) * 1000
+    pw, ph = getattr(pm, "pw", pm.w), getattr(pm, "ph", pm.h)
     with open(out, "wb") as f:
-        f.write(o1gfx.png_bytes(pm.w, pm.h, pm.buf, upscale=up))
-    print("wrote %s (%dx%d, x%d)" % (out, pm.w, pm.h, up))
+        f.write(o1gfx.png_bytes(pw, ph, pm.buf, upscale=up))
+    print("wrote %s (%dx%d, x%d), drawn in %.0f ms" % (out, pw, ph, up, ms))
 
 
 def once(size, force_ascii):

@@ -103,6 +103,34 @@ class Pixmap:
         n = yb - ya
         self.buf[ya * self.w + x:(yb - 1) * self.w + x + 1:self.w] = array("I", [c]) * n
 
+    def cached(self, key, box, fn):
+        """Draw fn (a Pixmap keeps nothing; the smooth HiPixmap pastes a stored picture)."""
+        fn()
+        return False
+
+    def hairline(self, x, y, w, c, thick=0.5):
+        self.hline(x, y, w, c)
+
+    def polyline(self, points, width, c):
+        """A line through the points (floats are fine): one-pixel segments,
+        doubled when `width` is 1.5 or more."""
+        pts = [(int(px), int(py)) for px, py in points]
+        if len(pts) == 1:
+            self.px(pts[0][0], pts[0][1], c)
+        for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+            self.line(ax, ay, bx, by, c)
+            if width >= 1.5:
+                self.line(ax, ay + 1, bx, by + 1, c)
+
+    def fill_under(self, points, base_y, c):
+        """Fill from a polyline (left to right) down to base_y, a column at a time."""
+        for (ax, ay), (bx, by) in zip(points, points[1:]):
+            for xp in range(int(ax), int(bx) + (1 if (ax, ay) == points[-2] else 0)):
+                t = (xp - ax) / (bx - ax) if bx > ax else 0.0
+                yt = int(round(ay + (by - ay) * t)) + 1
+                if base_y > yt:
+                    self.vline(xp, yt, int(base_y) - yt, c)
+
     def rect(self, x, y, w, h, c):
         """A one-pixel outline."""
         if w < 1 or h < 1:

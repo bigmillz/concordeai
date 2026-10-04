@@ -108,7 +108,8 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
     k, lw, lh = o1fb.choose_scale(info.xres, info.yres)
     if lw < o1fb.MIN_LOGICAL_W:
         raise o1fb.FbError("the screen (%dx%d) is too small for the panel" % (info.xres, info.yres))
-    pres = o1fb.Presenter(info, lw, lh, k)
+    pres = o1fb.Presenter(info, lw * k, lh * k, 1)         # the panel is drawn at the screen's own resolution (6b383)
+    renderer = o1panel.PanelRenderer(lw, lh, k)
     kc, lwc, lhc = o1fb.choose_cost_scale(info.xres, info.yres)       # the cost screen draws at (about) full resolution
     pres_by = {"panel": pres, "cost": o1fb.Presenter(info, lwc, lhc, kc)}
     if log:
@@ -118,7 +119,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
     try:
         for off, data in pres.clear():
             fb.write(off, data)
-        st, pm = None, None
+        st = None
         next_tick = next_draw = 0.0
         last_full = clock()
         shown = True
@@ -145,7 +146,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
                 if eff == "cost":
                     pic = o1panel.render_cost(st, lwc, lhc)             # kept until the figures change
                 else:
-                    pm = pic = o1panel.render(st, lw, lh, range_s, pm, "panel")
+                    pic = renderer.draw(st, range_s, incremental=True)
                 for off, data in pres_by[eff].frame(pic, force=full):
                     fb.write(off, data)
                 next_draw = now + (PAIRING_DRAW_S if st.get("pairing") else DRAW_S)
