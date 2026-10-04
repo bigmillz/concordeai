@@ -7,6 +7,10 @@
 #                                    everything, in order (safe to run again).
 #                                    What you give is saved in /etc/ollama1/setup.env
 #                                    (root-only), so a re-run needs none of it again.
+#   sudo ./setup.sh --os-serial X --models-serial X
+#                                    a server whose system was moved onto its models disk
+#                                    (migrate-os): both roles are that one disk, never wiped;
+#                                    migrate-os --finish already writes this into setup.env
 #   sudo ./setup.sh --skip-cloudflare  everything except the tunnel and Access
 #   sudo ./setup.sh --remove-setup-key also take claude-setup@concordeai out of
 #                                    ~<your-user>/.ssh/authorized_keys (your own key stays)
@@ -130,7 +134,7 @@ for a in "$@"; do
       want=on; [ "$a" = --gpu-tune ] || want=off
       [ -z "$A_GPU_TUNE" ] || [ "$A_GPU_TUNE" = "$want" ] || { echo "--gpu-tune and --no-gpu-tune: give one"; exit 2; }
       A_GPU_TUNE=$want ;;
-    -h|--help) sed -n '2,61p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,65p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
@@ -265,8 +269,6 @@ derive_hosts() { # the hostnames: config.json's own win, else <name>.<zone>
 }
 
 # ---- disks ----------------------------------------------------------------
-root_disk() { disk_of "$(findmnt -no SOURCE /)"; }   # lsblk -s follows / through LVM to its own disk
-
 find_disks() {
   OS_DISK=$(disk_by_serial "$OS_SERIAL")
   MODELS_DISK=$(disk_by_serial "$MODELS_SERIAL")
@@ -276,18 +278,8 @@ find_disks() {
 
 home_on_own_disk() { findmnt -n --target /home -o TARGET 2>/dev/null | grep -qx /home; }
 home_in_fstab() { awk '$0 !~ /^[[:space:]]*#/ && $2 == "/home"' /etc/fstab | grep -q .; }
-models_done() { mountpoint -q /srv/models && [ "$(disk_of "$(findmnt -no SOURCE /srv/models)")" = "$MODELS_DISK" ]; }
-raid_done() { mountpoint -q /srv/data && [ -n "$(raid_find)" ]; }
 
 # ---- the plan --------------------------------------------------------------
-show_disks() {
-  printf '\n   %-13s %-17s %-32s %s\n' "Device" "Serial" "Model / size" "Role"
-  printf '   %-13s %-17s %-32s %s\n' "${OS_DISK:-MISSING}" "$OS_SERIAL" "$(disk_desc "${OS_DISK:-/dev/null}")" "OS: kept; root LV grows into free space"
-  printf '   %-13s %-17s %-32s %s\n' "${MODELS_DISK:-MISSING}" "$MODELS_SERIAL" "$(disk_desc "${MODELS_DISK:-/dev/null}")" "$(models_done && echo 'models: already set up' || echo 'WIPED -> ext4 /srv/models')"
-  printf '   %-13s %-17s %-32s %s\n' "${HDD1:-MISSING}" "$HDD1_SERIAL" "$(disk_desc "${HDD1:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data (after /home moves off it)')"
-  printf '   %-13s %-17s %-32s %s\n' "${HDD2:-MISSING}" "$HDD2_SERIAL" "$(disk_desc "${HDD2:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data')"
-}
-
 state() { if eval "$1" >/dev/null 2>&1; then printf '%sdone%s ' "$G" "$N"; else printf 'to do'; fi; }
 
 policy_line() { # which Access policy name the admin panel's access uses, and what another --owner does
@@ -317,9 +309,9 @@ print_plan() {
 
    $(state '[ "$(hostname)" = "$SERVER_NAME" ]')  1. Host name $SERVER_NAME, time zone $TIMEZONE, boot menu shown for 5 s
    $(state 'command -v cloudflared && command -v ttyd && python3 -c "import nacl"')  2. Packages: ttyd, python3-nacl, mdadm, nftables, zstd, cloudflared (Cloudflare's apt repo, key checked)
-   $(state '[ "$(vg_free_extents)" -le "$(vg_keep_extents "$VG_RESERVE_GIB")" ]')  3. Grow the root volume into the free space on the OS disk (online)
+   $(state '! root_on_lvm || [ "$(vg_free_extents)" -le "$(vg_keep_extents "$VG_RESERVE_GIB")" ]')  3. Grow the root volume into the free space on the OS disk (online); skipped when / is not on LVM
    $(state '! home_on_own_disk && ! home_in_fstab')  4. Copy /home onto the root filesystem, check it (SSH keys included), stop mounting the old disk
-   $(state models_done)  5. Models disk: wipe, ext4, mount at /srv/models (noatime)
+   $(state models_done)  5. Models disk: wipe, ext4, mount at /srv/models (noatime); never when it is also the OS disk
    $(state raid_done)  6. Mirror: wipe both mirror disks, RAID1, ext4, mount at /srv/data (resync runs in the background)
    $(state 'id o1gw && id o1admin && id o1dash && id ollama')  7. Service users (ollama, o1gw, o1admin, o1dash, cloudflared), no shells
    $(state '[ -x $LIBDIR/bin/ollama1-gateway ]')  8. Install the gateway, admin panel, dashboard, pairing tool, updater, units, polkit rule
@@ -439,24 +431,11 @@ derive_hosts
 for f in lib/o1common.py lib/setuplib.sh bin/ollama1-gateway systemd/ollama.service config/50-ollama1.rules; do
   [ -f "$KIT/$f" ] || die "the kit is incomplete: $f is missing"
 done
-[ -n "$OS_DISK" ] || die "no disk with serial $OS_SERIAL (the OS disk)"
-[ -n "$MODELS_DISK" ] || die "no disk with serial $MODELS_SERIAL (the models disk)"
-[ -n "$HDD1" ] || die "no disk with serial $HDD1_SERIAL"
-[ -n "$HDD2" ] || die "no disk with serial $HDD2_SERIAL"
-for pair in "$HDD1:$HDD1_SERIAL" "$HDD2:$HDD2_SERIAL" "$MODELS_DISK:$MODELS_SERIAL"; do
-  serial_is "${pair%%:*}" "${pair#*:}" || die "serial check failed for ${pair%%:*}; refusing to touch any disk"
-done
-[ "$(root_disk)" = "$OS_DISK" ] || die "/ is not on the disk with serial $OS_SERIAL; refusing to touch any disk"
-for d in "$MODELS_DISK" "$HDD1" "$HDD2"; do
-  [ "$d" != "$OS_DISK" ] || die "$d is the OS disk"
-done
-[ "$HDD1" != "$HDD2" ] && [ "$MODELS_DISK" != "$HDD1" ] && [ "$MODELS_DISK" != "$HDD2" ] || die "two roles map to one disk"
+check_disks
 id "$ADMIN_USER" >/dev/null 2>&1 || die "no user $ADMIN_USER"
 
 print_plan
-WIPES=()
-models_done || WIPES+=("$MODELS_DISK ($MODELS_SERIAL, $(disk_desc "$MODELS_DISK"))")
-raid_done || WIPES+=("$HDD1 ($HDD1_SERIAL, $(disk_desc "$HDD1"))" "$HDD2 ($HDD2_SERIAL, $(disk_desc "$HDD2"))")
+plan_wipes
 echo
 if [ "${#WIPES[@]}" -gt 0 ]; then
   printf '%sThese disks will be ERASED. Everything on them is lost:%s\n' "$R$B" "$N"
@@ -545,8 +524,12 @@ ok "ttyd $(ttyd --version 2>&1 | awk '{print $NF}'), cloudflared $(cloudflared -
 
 # ---- 3. root volume -----------------------------------------------------------
 step "Root volume"
-grow_root "$VG_RESERVE_GIB"
-ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); $ROOT_VG_FREE_EXT extents left free in ubuntu-vg"
+grow_root_if_lvm "$VG_RESERVE_GIB"
+if root_on_lvm; then
+  ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); $ROOT_VG_FREE_EXT extents left free in ubuntu-vg"
+else
+  ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free), not on LVM; left as it is"
+fi
 
 # ---- 4. /home onto the root filesystem -------------------------------------------
 step "/home onto the root filesystem"
@@ -644,7 +627,8 @@ ok "ollama, o1gw, o1admin, o1dash, cloudflared (all /usr/sbin/nologin)"
 # ---- 6. models disk ---------------------------------------------------------------
 step "Models disk ($MODELS_SERIAL)"
 if models_done; then
-  ok "/srv/models already on $MODELS_DISK"
+  if models_on_os_disk; then ok "/srv/models is on the OS disk $MODELS_DISK, already set up; nothing on that disk is touched"
+  else ok "/srv/models already on $MODELS_DISK"; fi
 else
   models_step "$MODELS_DISK" "$MODELS_SERIAL"
   ok "/srv/models: $(df -h --output=size /srv/models | tail -n1 | tr -d ' ')"

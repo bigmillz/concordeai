@@ -68,6 +68,7 @@ STAGE_TEXT = {"preflight": "checks", "park": "park the models on the RAID", "par
 SESSION = "migrate"
 INSTALL_DIR = "/usr/local/lib/ollama1-migrate"
 SUDOERS_FILE = "/etc/sudoers.d/90-ollama1-migrate"
+SETUP_ENV_FILE = "/etc/ollama1/setup.env"       # what setup.sh remembers: its OS_SERIAL / MODELS_SERIAL are the old drive's until --finish
 SBIN = ("/usr/local/sbin", "/usr/sbin", "/sbin")
 GIB = 1 << 30
 MIB = 1 << 20
@@ -133,6 +134,7 @@ class Cfg:
         self.heartbeat = float(g("HEARTBEAT_SECS", "15"))
         self.tmux = g("TMUX_BIN", "tmux")
         self.sudoers = g("SUDOERS", SUDOERS_FILE)
+        self.setup_env = g("SETUP_ENV", SETUP_ENV_FILE)
         self.new_root = self.mnt + "/root"
         self.new_models = self.mnt + "/models"
 
@@ -2048,6 +2050,11 @@ class Migrator:
         fd = self.resolve(a.from_serial)
         self.promote_new_entry()
         self.thaw_old_models_dir(self.lsblk(fd.dev) if fd else {})
+        try:
+            self.update_setup_env()
+        except OSError as e:
+            print("  setup.env could not be updated (%s). Run setup.sh once with: --os-serial %s --models-serial %s" % (
+                e.strerror or e, self.state["to_serial"], self.state["to_serial"]))
         if a.delete_parked:
             self.delete_parked()
         if a.disable_old_entry:
@@ -2072,7 +2079,8 @@ class Migrator:
                 "was deleted." if a.delete_parked else "is still at %s;" % c.parked,
                 "" if a.delete_parked else " --finish --delete-parked frees the space (it checks the live copy first)."),
             "The new drive is now the default boot; a kernel panic reboots (panic=10) into it, and the old drive stays second.",
-            "The kit's setup.sh still thinks / is an LVM volume on the old drive; see ollama1/README.md before re-running it."]
+            "setup.sh works on the new layout: / is a plain partition (no LVM to grow) and the models share the OS disk, which it never wipes.",
+            "/etc/ollama1/setup.env now names the new drive for both the OS and the models; see ollama1/README.md."]
         if os.path.exists(c.sudoers):
             if a.remove_sudoers or self.offer_remove_sudoers():
                 os.remove(c.sudoers)
@@ -2123,6 +2131,45 @@ class Migrator:
         if self.ask("delete> ") != "delete":
             raise Abort("not confirmed; the parked copy was kept")
         self.rn.run(["rm", "-rf", "--one-file-system", "--", p])
+
+    def update_setup_env(self):
+        """So setup.sh works on the moved server: its saved OS_SERIAL and MODELS_SERIAL become the new drive's
+        serial. Atomic (a temp file beside it, flushed, renamed), same owner and mode, every other line kept.
+        A server without that file (setup.sh never ran) is left alone."""
+        p, serial = self.cfg.setup_env, self.state["to_serial"]
+        try:
+            with open(p) as fh:
+                text = fh.read()
+            st = os.stat(p)
+        except OSError:
+            print("  setup.env: %s is not there (setup.sh never ran here); nothing to update. Later: "
+                  "sudo ./setup.sh --os-serial %s --models-serial %s" % (p, serial, serial))
+            return
+        new, changed = rewrite_setup_env(text, serial)
+        if not changed:
+            print("  setup.env: OS_SERIAL and MODELS_SERIAL are already %s" % serial)
+            return
+        tmp = "%s.migrate-%d.tmp" % (p, os.getpid())
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(new)
+                fh.flush()
+                os.fchmod(fh.fileno(), st.st_mode & 0o7777)
+                try:
+                    os.fchown(fh.fileno(), st.st_uid, st.st_gid)
+                except OSError:
+                    pass
+                os.fsync(fh.fileno())
+            os.replace(tmp, p)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+        print("  setup.env: OS_SERIAL and MODELS_SERIAL are now %s (the new drive). Every other line is as it was; "
+              "setup.sh knows the system and the models share this disk" % serial)
 
     def old_esp_part(self, fd):
         """The old drive's EFI partition (by-id name): the partition of that drive whose PARTUUID is the one recorded
@@ -2199,6 +2246,28 @@ class Migrator:
         if self.ask("type yes> ") != "yes":
             raise Abort("not confirmed; the entry was left as it is")
         self.rn.run(["efibootmgr", "-A", "-b", old])
+
+
+def rewrite_setup_env(text, serial):
+    """setup.env's text with OS_SERIAL and MODELS_SERIAL both set to the new drive's serial (the system and the models
+    share it after the move): every other line, and the order, exactly as it was; a missing key is appended.
+    Returns (new text, changed?)."""
+    if not valid_serial(serial):
+        raise Abort("%r is not a disk serial; setup.env was left as it is" % serial)
+    out, seen, changed = [], set(), False
+    for line in text.split("\n"):
+        m = re.match(r"^(OS_SERIAL|MODELS_SERIAL)=(.*)$", line)
+        if m:
+            seen.add(m.group(1))
+            if m.group(2) != serial:
+                line, changed = "%s=%s" % (m.group(1), serial), True
+        out.append(line)
+    new = "\n".join(out)
+    for key in ("OS_SERIAL", "MODELS_SERIAL"):
+        if key not in seen:
+            new = new.rstrip("\n") + ("\n" if new.strip() else "") + "%s=%s\n" % (key, serial)
+            changed = True
+    return new, changed
 
 
 def plan_boot_file_renames(names):

@@ -313,10 +313,10 @@ class TestVgFree(unittest.TestCase):
 
     def test_setup_calls_grow_root_with_the_reserve(self):
         setup = open(os.path.join(U.KIT, "setup.sh")).read()
-        self.assertIn('grow_root "$VG_RESERVE_GIB"', setup)
+        self.assertIn('grow_root_if_lvm "$VG_RESERVE_GIB"', setup)
         self.assertIn("VG_RESERVE_GIB=0\n", setup)                       # default: no reserve
         self.assertNotIn("lvextend", setup)                               # only through grow_root
-        self.assertLess(setup.index('grow_root "$VG_RESERVE_GIB"'), setup.index('step "/home onto the root filesystem"'))
+        self.assertLess(setup.index('grow_root_if_lvm "$VG_RESERVE_GIB"'), setup.index('step "/home onto the root filesystem"'))
 
 
 class TestGrowRoot(unittest.TestCase):
@@ -667,3 +667,202 @@ echo DONE
         self.assertIn("ExecStartPre=-+/usr/local/lib/ollama1/bin/ollama1-dash --set-font /dev/tty1", unit)
         self.assertIn("User=o1dash", unit)
         self.assertIn("TTYPath=/dev/tty1", unit)
+
+
+class TestOsAndModelsOnOneDisk(unittest.TestCase):
+    """6b374: a server moved with migrate-os has the system and the models on ONE disk (plain partitions, / on p3,
+    /srv/models on p4) and the mirror on its own. Setup must accept that, wipe nothing on that disk, and still
+    refuse every other way of two roles landing on the OS disk."""
+
+    def setUp(self):
+        self.sb = Sandbox()
+        self.addCleanup(self.sb.close)
+        sb = self.sb
+        self.new = sb.nvme                                           # the disk with the system and the models
+        self.old = os.path.join(sb.dir, "nvme0n1")                   # the old drive, still in the machine
+        open(self.old, "w").close()
+        os.symlink(self.old, os.path.join(sb.byid, "nvme-Samsung_SSD_980_PRO_2TB_SERIAL-OLD"))
+        self.models_mnt = os.path.join(sb.dir, "srv-models")
+        self.data_mnt = os.path.join(sb.dir, "srv-data")
+        st = sb.state
+        st["serial"][self.old] = "SERIAL-OLD"
+        st["up"] = {}
+        for disk in (self.new, self.old, sb.sda):
+            st["devs"][disk] = [disk] + [disk + "p%d" % n for n in (1, 2, 3, 4)]
+            for n in (1, 3, 4):
+                st["up"][disk + "p%d" % n] = "%sp%d part\n%s disk" % (disk, n, disk)
+        st["findmnt_source"] = {"/": self.new + "p3", self.models_mnt: self.new + "p4"}
+        st["mounted"] = [self.models_mnt, self.data_mnt]
+        st["md_detail"] = ["ARRAY /dev/md127 metadata=1.2 name=ollama1:data UUID=x"]
+        sb.save()
+
+    def roles(self, os_disk, os_serial, models_disk, models_serial):
+        return ('OS_DISK="%s"; OS_SERIAL=%s; MODELS_DISK="%s"; MODELS_SERIAL=%s; HDD1="%s"; HDD1_SERIAL=SERIAL-HDD1; '
+                'HDD2="%s"; HDD2_SERIAL=SERIAL-HDD2; ' % (os_disk, os_serial, models_disk, models_serial, self.sb.sda, self.sb.sdb))
+
+    def check(self, os_disk, os_serial, models_disk, models_serial, extra=""):
+        return self.sb.run(self.roles(os_disk, os_serial, models_disk, models_serial) +
+                           'check_disks; plan_wipes; echo "WIPES=${#WIPES[@]}"; ' + extra)
+
+    def no_disk_writes(self):
+        for tool in ("wipefs", "sgdisk", "mkfs.ext4", "partprobe", "lvextend"):
+            self.assertEqual(self.sb.log(tool), [], tool)
+        self.assertEqual([l for l in self.sb.log("mdadm") if "--create" in l or "--zero" in l or "--assemble" in l], [])
+
+    def test_the_moved_server_passes_the_guards_and_wipes_nothing(self):
+        rc = self.check(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS")
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertIn("WIPES=0", self.sb.out)
+        self.assertNotIn("DIE", self.sb.out)
+        self.no_disk_writes()
+
+    def test_the_plan_says_models_are_on_the_os_disk(self):
+        rc = self.sb.run(self.roles(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS") + "show_disks")
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertIn("models: on the OS disk, already set up", self.sb.out)
+        self.assertIn("OS + models: kept, never wiped", self.sb.out)
+        self.assertIn("root is a plain partition, left as it is", self.sb.out)
+        self.assertNotIn("WIPED -> ext4", self.sb.out)
+        self.assertIn("mirror: already set up", self.sb.out)
+
+    def test_the_old_setup_env_still_refuses_and_says_what_to_run(self):
+        # OS_SERIAL is the old drive's: that refusal stays, and it names the one line that fixes it
+        rc = self.check(self.old, "SERIAL-OLD", self.new, "SERIAL-MODELS")
+        self.assertEqual(rc, 1)
+        self.assertIn("refusing to touch any disk", self.sb.out)
+        self.assertIn("--os-serial SERIAL-MODELS --models-serial SERIAL-MODELS", self.sb.out)
+        self.assertNotIn("WIPES=", self.sb.out)
+        self.no_disk_writes()
+
+    def test_the_old_serial_alone_refuses_without_the_hint_when_models_are_elsewhere(self):
+        self.sb.state["findmnt_source"][self.models_mnt] = self.sb.sda + "p1"
+        self.sb.save()
+        rc = self.check(self.old, "SERIAL-OLD", self.new, "SERIAL-MODELS")
+        self.assertEqual(rc, 1)
+        self.assertIn("/ is not on the disk with serial SERIAL-OLD; refusing to touch any disk", self.sb.out)
+        self.assertNotIn("--os-serial", self.sb.out)
+
+    def test_models_on_another_disk_are_still_wiped_and_only_that_disk(self):
+        # the system on the old drive, /srv/models not set up: the models disk is the one that gets wiped
+        self.sb.state["findmnt_source"] = {"/": self.old + "p3"}
+        self.sb.state["mounted"] = [self.data_mnt]
+        self.sb.save()
+        rc = self.check(self.old, "SERIAL-OLD", self.new, "SERIAL-MODELS", 'for w in "${WIPES[@]}"; do echo "W: $w"; done')
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertIn("WIPES=1", self.sb.out)
+        self.assertIn("W: %s (SERIAL-MODELS" % self.new, self.sb.out)
+        self.assertNotIn("SERIAL-OLD)", self.sb.out)
+        self.assertEqual(self.sb.log("wipefs"), [])          # planning wipes nothing; models_step does, below
+        rc = self.sb.run(self.roles(self.old, "SERIAL-OLD", self.new, "SERIAL-MODELS") + 'models_step "%s" SERIAL-MODELS' % self.new)
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertEqual([l.split()[-1] for l in self.sb.log("wipefs")],
+                         [os.path.join(self.sb.byid, "nvme-Samsung_SSD_980_PRO_2TB_SERIAL-MODELS")])
+
+    def test_everything_still_to_do_lists_all_three_disks(self):
+        self.sb.state["findmnt_source"] = {"/": self.old + "p3"}
+        self.sb.state["mounted"] = []
+        self.sb.state["md_detail"] = []
+        self.sb.save()
+        rc = self.check(self.old, "SERIAL-OLD", self.new, "SERIAL-MODELS")
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertIn("WIPES=3", self.sb.out)
+
+    def test_the_same_disk_without_models_mounted_from_it_dies(self):
+        self.sb.state["mounted"].remove(self.models_mnt)                          # not mounted
+        self.sb.save()
+        rc = self.check(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS")
+        self.assertEqual(rc, 1)
+        self.assertIn("is both the OS disk and the models disk, but /srv/models is not mounted from it", self.sb.out)
+        self.assertIn("never wipes the OS disk", self.sb.out)
+        self.assertNotIn("WIPES=", self.sb.out)
+        self.no_disk_writes()
+
+    def test_the_same_disk_with_models_mounted_from_another_disk_dies(self):
+        self.sb.state["findmnt_source"][self.models_mnt] = self.sb.sda + "p1"
+        self.sb.save()
+        rc = self.check(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS")
+        self.assertEqual(rc, 1)
+        self.assertIn("never wipes the OS disk", self.sb.out)
+        self.assertNotIn("WIPES=", self.sb.out)
+        self.no_disk_writes()
+
+    def test_models_that_are_the_root_filesystem_itself_refuse(self):
+        self.sb.state["findmnt_source"][self.models_mnt] = self.new + "p3"       # the same partition as /
+        self.sb.save()
+        rc = self.check(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS")
+        self.assertEqual(rc, 1)
+        self.assertIn("root filesystem itself", self.sb.out)
+
+    def test_plan_wipes_never_lists_the_os_disk(self):
+        self.sb.state["mounted"].remove(self.models_mnt)
+        self.sb.save()
+        rc = self.sb.run(self.roles(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS") + 'plan_wipes; echo "WIPES=${#WIPES[@]}"')
+        self.assertEqual(rc, 1)
+        self.assertIn("refusing to wipe the OS disk", self.sb.out)
+        self.assertNotIn("WIPES=", self.sb.out)
+
+    def test_models_step_never_wipes_the_os_disk(self):
+        self.sb.state["mounted"].remove(self.models_mnt)
+        self.sb.save()
+        rc = self.sb.run(self.roles(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS") + 'models_step "%s" SERIAL-MODELS' % self.new)
+        self.assertEqual(rc, 1)
+        self.assertIn("is the OS disk; not wiping", self.sb.out)
+        self.no_disk_writes()
+
+    def test_a_mirror_disk_is_never_the_os_disk_and_two_roles_never_share(self):
+        roles = self.roles(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS")
+        roles = roles.replace('HDD1="%s"' % self.sb.sda, 'HDD1="%s"' % self.new).replace("HDD1_SERIAL=SERIAL-HDD1", "HDD1_SERIAL=SERIAL-MODELS")
+        rc = self.sb.run(roles + "check_disks")
+        self.assertEqual(rc, 1)
+        self.assertIn("is the OS disk", self.sb.out)
+        self.sb.state["findmnt_source"] = {"/": self.old + "p3"}
+        self.sb.save()
+        rc = self.sb.run(self.roles(self.old, "SERIAL-OLD", self.sb.sda, "SERIAL-HDD1") + "check_disks")      # models = a mirror disk
+        self.assertEqual(rc, 1)
+        self.assertIn("two roles map to one disk", self.sb.out)
+
+    def test_a_serial_that_does_not_match_still_refuses(self):
+        rc = self.sb.run(self.roles(self.new, "SERIAL-MODELS", self.new, "WRONG") + "check_disks")
+        self.assertEqual(rc, 1)
+        self.assertIn("serial check failed", self.sb.out)
+
+    def test_setup_uses_the_checked_functions(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        for word in ("check_disks\n", "plan_wipes\n", "grow_root_if_lvm"):
+            self.assertIn(word, setup)
+        self.assertNotIn('[ "$d" != "$OS_DISK" ]', setup)          # the guards live in lib/setuplib.sh now, tested here
+        self.assertNotIn("WIPES+=", setup)
+
+
+class TestRootNotOnLvm(unittest.TestCase):
+    def setUp(self):
+        self.sb = Sandbox()
+        self.addCleanup(self.sb.close)
+        self.root = os.path.join(self.sb.dir, "nvme1n1p3")
+        self.sb.state.update({"findmnt_source": {"/": self.root}, "vgs": "  451190 ", "log": []})
+
+    def grow(self, up):
+        self.sb.state["up"] = {self.root: up}
+        return self.sb.run('grow_root_if_lvm 0; echo "LEFT=$ROOT_VG_FREE_EXT"; root_on_lvm && echo LVM || echo PLAIN')
+
+    def test_a_plain_partition_root_is_left_alone(self):
+        rc = self.grow("%s part\n%s disk" % (self.root, self.sb.nvme))
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertIn("PLAIN", self.sb.out)
+        self.assertIn("not on LVM", self.sb.out)
+        self.assertEqual(self.sb.log("lvextend"), [])
+        self.assertEqual(self.sb.log("vgs"), [])                  # not even asked about a volume group
+        for tool in ("sgdisk", "wipefs", "partprobe", "mkfs.ext4"):
+            self.assertEqual(self.sb.log(tool), [], tool)
+
+    def test_an_lvm_root_still_grows(self):
+        rc = self.grow("/dev/mapper/ubuntu--vg-ubuntu--lv lvm\n%s part\n%s disk" % (self.root, self.sb.nvme))
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertIn("LVM", self.sb.out)
+        self.assertEqual(self.sb.log("lvextend"), ["lvextend -r -l +451190 /dev/ubuntu-vg/ubuntu-lv"])
+
+    def test_no_answer_about_root_is_not_lvm(self):
+        self.sb.state["findmnt_source"] = {}
+        rc = self.sb.run('grow_root_if_lvm 0; root_on_lvm && echo LVM || echo PLAIN')
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertEqual(self.sb.log("lvextend"), [])

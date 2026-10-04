@@ -9,6 +9,42 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b374 — setup.sh works on a server moved with migrate-os (kit)
+
+- Pat's server after the move: the system and the models on ONE NVMe (plain
+  partitions: `/` ext4 on p3, `/boot` p2, ESP p1, `/srv/models` p4), the
+  mirror on its own, setup.env still naming the old drive as OS_SERIAL.
+  `setup.sh --dash graphic` stopped: "/ is not on the disk with serial <old>;
+  refusing to touch any disk". That refusal is right and stays.
+- The disk guards left setup.sh for `lib/setuplib.sh` (so the tests run
+  them): `check_disks`, `plan_wipes`, `models_done`, `raid_done`, `root_disk`,
+  `root_on_lvm`, `show_disks`. New layout "models on the OS disk": allowed
+  only when OS_SERIAL == MODELS_SERIAL (same disk) AND `/srv/models` is
+  mounted from a partition of that disk that is not the root filesystem.
+  Then `models_done` is true, `plan_wipes` lists nothing for it, and nothing on
+  the disk is touched. If it is not mounted from there: die ("never wipes the
+  OS disk"). A mirror disk can never be the OS disk; two roles can never share
+  a disk otherwise; `plan_wipes` and `models_step` each refuse the OS disk
+  too. A stale OS_SERIAL still dies, and when `/` and `/srv/models` are both on
+  the models disk the message gives the one line that fixes it.
+- Step 3 (grow the root LV) is `grow_root_if_lvm`: skipped with a note when `/`
+  is not a logical volume; no vgs, lvextend or partition command ever runs
+  on a plain-partition root. The plan line says so.
+- `migrate-os --finish` rewrites `/etc/ollama1/setup.env` (`rewrite_setup_env`,
+  `update_setup_env`): OS_SERIAL and MODELS_SERIAL both to the new drive's
+  serial; atomic (temp file beside it, fsync, rename), same owner/mode, every
+  other line and its order kept, missing keys appended; a missing file or a
+  failed write only prints the one-line setup command (never fails finish).
+  For an already-moved server: `sudo ./setup.sh --os-serial X --models-serial X`
+  (setup.env keeps the rest).
+- Tests: `TestOsAndModelsOnOneDisk` and `TestRootNotOnLvm` in
+  `test_setuplib.py` (the exact scenario: guards pass, WIPES=0, no disk
+  writes; the models-elsewhere variant still wipes only that disk; same disk
+  with `/srv/models` unmounted, mounted elsewhere or the root itself dies),
+  `TestSetupEnvAfterTheMove` in `test_migrate_efi.py`; fakecmd learned
+  `findmnt -no SOURCE` and the device tree walk; 15 mutants.
+- Not run: setup.sh itself on any real machine.
+
 ## 6b373 — migrate-os: reading `efibootmgr -v`, reusing the entry, and an optional way to stop the old drive booting (kit)
 
 - Branch note: migrate-os (6b362) was not on main yet, so `kit-fixes-1004`

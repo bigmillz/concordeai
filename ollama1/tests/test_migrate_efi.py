@@ -361,5 +361,80 @@ class TestDisableOldBootFiles(FirmwareBase):
         self.assertIn("efibootmgr -a -b <number>", text)
 
 
+class TestSetupEnvAfterTheMove(FirmwareBase):
+    """6b374: --finish points setup.env's OS_SERIAL and MODELS_SERIAL at the new drive, so setup.sh works on the
+    moved server (the system and the models share that disk)."""
+    ENV = ("SERVER_NAME=my-server\nADMIN_USER=alice\nHOME_LAN=10.0.0.0/24\nCF_ZONE=example.com\nOWNER=Alice\n"
+           "TIMEZONE=America/New_York\nOS_SERIAL=OLDOSSERIAL1\nMODELS_SERIAL=%s\nHDD1_SERIAL=HDDONE0001\n"
+           "HDD2_SERIAL=HDDTWO0002\nGPU_TUNE=on\n")
+
+    def env_path(self):
+        return self.m.dir + "/setup.env"
+
+    def test_the_rewrite_changes_only_the_two_serials(self):
+        text = self.ENV % "OLDMODELS99"
+        new, changed = L.rewrite_setup_env(text, TO)
+        self.assertTrue(changed)
+        want = text.replace("OS_SERIAL=OLDOSSERIAL1", "OS_SERIAL=" + TO).replace("MODELS_SERIAL=OLDMODELS99", "MODELS_SERIAL=" + TO)
+        self.assertEqual(new, want)
+        again, changed = L.rewrite_setup_env(new, TO)
+        self.assertEqual((again, changed), (new, False))
+
+    def test_other_lines_comments_and_spacing_are_kept(self):
+        text = "# saved by setup\nSERVER_NAME=x\n\nOS_SERIAL=AAAA1111\n#MODELS_SERIAL=commented\nHDD1_SERIAL=BBBB2222\n"
+        new, changed = L.rewrite_setup_env(text, TO)
+        self.assertEqual(new.split("\n")[:3], ["# saved by setup", "SERVER_NAME=x", ""])
+        self.assertIn("#MODELS_SERIAL=commented", new)
+        self.assertIn("HDD1_SERIAL=BBBB2222", new)
+        self.assertIn("OS_SERIAL=" + TO, new)
+        self.assertEqual(new.count("MODELS_SERIAL=" + TO), 1)         # missing: appended
+        self.assertTrue(new.endswith("\n"))
+
+    def test_a_bad_serial_changes_nothing(self):
+        with self.assertRaises(L.Abort):
+            L.rewrite_setup_env("OS_SERIAL=AAAA1111\n", "bad serial; rm -rf /")
+
+    def test_finish_rewrites_the_file_atomically_keeping_its_mode(self):
+        self.full_run()
+        m = self.m
+        m.reboot_into_new()
+        text = self.ENV % "OLDMODELS99"
+        m.put(self.env_path(), text)
+        os.chmod(self.env_path(), 0o640)
+        self.assertEqual(m.run("--finish", answers=["n"]), 0, m.out)
+        got = m.read(self.env_path())
+        self.assertEqual(got, text.replace("OS_SERIAL=OLDOSSERIAL1", "OS_SERIAL=" + TO).replace("MODELS_SERIAL=OLDMODELS99", "MODELS_SERIAL=" + TO))
+        self.assertEqual(os.stat(self.env_path()).st_mode & 0o777, 0o640)
+        self.assertEqual([n for n in os.listdir(m.dir) if n.startswith("setup.env.")], [])        # no temp file left
+        self.assertIn("setup.env: OS_SERIAL and MODELS_SERIAL are now " + TO, m.out)
+        self.assertEqual(m.run("--finish", answers=["n"]), 0, m.out)
+        self.assertIn("are already " + TO, m.out)
+
+    def test_finish_without_a_setup_env_says_what_to_run_later(self):
+        self.full_run()
+        self.m.reboot_into_new()
+        self.assertEqual(self.m.run("--finish", answers=["n"]), 0, self.m.out)
+        self.assertFalse(os.path.exists(self.env_path()))
+        self.assertIn("--os-serial %s --models-serial %s" % (TO, TO), self.m.out)
+
+    def test_a_failed_write_does_not_fail_the_finish(self):
+        self.full_run()
+        m = self.m
+        m.reboot_into_new()
+        sub = m.dir + "/etc-ollama1"
+        path = sub + "/setup.env"
+        m.put(path, self.ENV % "OLDMODELS99")
+        os.chmod(sub, 0o500)                                          # the folder can't take the temp file
+        try:
+            rc = m.run("--finish", answers=["n"], O1M_SETUP_ENV=path)
+        finally:
+            os.chmod(sub, 0o700)
+        if os.geteuid() != 0:
+            self.assertEqual(rc, 0, m.out)
+            self.assertIn("setup.env could not be updated", m.out)
+            self.assertIn("--os-serial %s --models-serial %s" % (TO, TO), m.out)
+            self.assertIn("OLDOSSERIAL1", m.read(path))
+
+
 if __name__ == "__main__":
     unittest.main()

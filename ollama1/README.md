@@ -1022,6 +1022,22 @@ every file; you type `delete`), `--disable-old-entry` (makes the old drive's
 firmware entry inactive, not deleted; you type `yes`), `--remove-sudoers`, and
 `--disable-old-boot-files` (**off by default**, below).
 
+**setup.sh after the move.** Afterwards the system (plain partitions, `/` on
+the third, no LVM) and `/srv/models` are on the one new drive, and `--finish`
+rewrites `/etc/ollama1/setup.env` so `OS_SERIAL` and `MODELS_SERIAL` both name
+it (atomically, every other line kept). `setup.sh` then accepts the layout
+"models on the OS disk": only when `/srv/models` is mounted from a partition of
+that disk (its own partition, not the root filesystem), and then nothing on the
+disk is wiped, repartitioned or reformatted; the plan says "models: on the OS
+disk, already set up". If `/srv/models` is not mounted from it, setup stops
+rather than touch the OS disk. The root-volume growth step is skipped when `/`
+is not on LVM. For a server moved before `--finish` did this, or by hand, one
+line does it, setup.env keeping the rest:
+`sudo ./setup.sh --os-serial <new-serial> --models-serial <new-serial>`.
+The refusal "/ is not on the disk with serial ..." for a stale `OS_SERIAL`
+stays, and now names that line when `/` and `/srv/models` are both on the
+models disk.
+
 **The firmware keeps booting the old drive.** Some boards re-order `BootOrder`
 after the move and pick the old drive again. `--finish --disable-old-boot-files`
 renames `EFI/ubuntu` and `EFI/BOOT` on the old drive's EFI partition to
