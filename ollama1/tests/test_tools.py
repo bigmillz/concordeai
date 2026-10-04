@@ -334,6 +334,24 @@ class TestStabilityTest(unittest.TestCase):
             self.assertIn("NEXT: %s for" % name, out)
         self.assertLess(out.index("NEXT: gpu"), out.index("== gpu"))
 
+    def test_the_mix_phase_is_the_card_plus_half_the_processor(self):
+        """--phases mix: the graphics card flat out and the processor at --cpu-load (default 50)."""
+        code, out = self.run_script("--phases", "mix", "--seconds", "3")
+        self.assertEqual(code, 0, out)
+        self.assertIn("result mix OK", self.record())
+        self.assertIn("cpu load in the mix 50%", out)
+        self.assertIn("== mix", out)
+        code, out = self.run_script("--phases", "mix", "--cpu-load", "35", "--seconds", "3")
+        self.assertEqual(code, 0, out)
+        self.assertIn("cpu load in the mix 35%", out)
+        for bad in ("0", "101", "abc", ""):
+            code, out = self.run_script("--phases", "mix", "--cpu-load", bad, "--seconds", "3")
+            self.assertEqual(code, 2, (bad, out))
+        # the card must really be on the card in a mix, like the gpu phase
+        code, out = self.run_script("--phases", "mix", "--seconds", "3", env={"FAKE_VRAM": "0"})
+        self.assertEqual(code, 1, out)
+        self.assertIn("graphics card wasn't tested", out)
+
     def test_a_gpu_phase_with_no_answers_fails(self):
         code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_NO_ANSWER": "1"})
         self.assertEqual(code, 1, out)

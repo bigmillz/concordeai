@@ -11,11 +11,14 @@
 #   gpu      the graphics card, reading long prompts and writing long answers
 #            nonstop (Ollama), which loads its compute and its memory both
 #   all      all three at once (the combination that crashed it)
+#   mix      the graphics card flat out plus the processor at --cpu-load percent (default 50)
 #
 #   sudo bash stability-test.sh                 one load at a time: cpu, then gpu, then memory, 10 minutes each
 #   sudo bash stability-test.sh --minutes 30    a longer soak
 #   sudo bash stability-test.sh --phases cpu,gpu,memory,all   each alone first, then all at once
 #   sudo bash stability-test.sh --model gemma4:12b   the model for the gpu load
+#   sudo bash stability-test.sh --phases mix --minutes 60   card at 100% and processor at 50% for an hour
+#   sudo bash stability-test.sh --cpu-load 50   how hard the processor works in the mix phase (1-100)
 #   bash stability-test.sh status               the last run, and any hardware
 #                                               errors logged since this boot
 #
@@ -41,6 +44,7 @@ MODEL=gemma4:12b
 MINUTES=10
 SECS_OVERRIDE=""
 PHASES=cpu,gpu,memory
+CPU_LOAD=50
 
 usage() { awk 'NR > 1 && /^#/ {sub(/^# ?/, ""); print; next} NR > 1 {exit}' "$0"; }
 say() { printf '%s\n' "$*" | tee -a "$LOG"; }
@@ -103,16 +107,18 @@ while [ "$#" -gt 0 ]; do
     --minutes) MINUTES=${2:-}; shift 2 ;;
     --phases) PHASES=${2:-}; shift 2 ;;
     --model) MODEL=${2:-}; shift 2 ;;
+    --cpu-load) CPU_LOAD=${2:-}; shift 2 ;;
     --seconds) SECS_OVERRIDE=${2:-}; shift 2 ;;     # for the tests
     *) echo "unknown option: $1"; usage; exit 2 ;;
   esac
 done
 [[ "$MINUTES" =~ ^[0-9]{1,3}$ ]] && [ "$MINUTES" -ge 1 ] || { echo "--minutes takes a whole number, like 5"; exit 2; }
+[[ "$CPU_LOAD" =~ ^[0-9]{1,3}$ ]] && [ "$CPU_LOAD" -ge 1 ] && [ "$CPU_LOAD" -le 100 ] || { echo "--cpu-load takes a whole number from 1 to 100"; exit 2; }
 [[ "$MODEL" =~ ^[A-Za-z0-9._:/-]{1,80}$ ]] || { echo "--model takes a model name, like gemma4:12b"; exit 2; }
 [ -z "$SECS_OVERRIDE" ] || [[ "$SECS_OVERRIDE" =~ ^[0-9]{1,4}$ ]] || { echo "--seconds takes a whole number"; exit 2; }
 IFS=, read -r -a PHASE_LIST <<< "$PHASES"
 for p in "${PHASE_LIST[@]}"; do
-  case "$p" in cpu|memory|gpu|all) ;; *) echo "unknown phase: $p (cpu, memory, gpu, all)"; exit 2 ;; esac
+  case "$p" in cpu|memory|gpu|all|mix) ;; *) echo "unknown phase: $p (cpu, memory, gpu, all, mix)"; exit 2 ;; esac
 done
 
 [ "$(id -u)" -eq 0 ] || [ "${O1_STABILITY_NOROOT:-}" = 1 ] || { echo "Run it with sudo."; exit 1; }
@@ -133,7 +139,7 @@ if ! command -v stress-ng >/dev/null; then
 fi
 
 WANT_GPU=0
-for p in "${PHASE_LIST[@]}"; do case "$p" in gpu|all) WANT_GPU=1 ;; esac; done
+for p in "${PHASE_LIST[@]}"; do case "$p" in gpu|all|mix) WANT_GPU=1 ;; esac; done
 if [ "$WANT_GPU" -eq 1 ]; then
   # the answer is read whole, then searched: `curl | grep -q` under pipefail
   # fails when grep stops at the first match and curl gets SIGPIPE on a long list
@@ -157,6 +163,8 @@ start_loads() { # start_loads PHASE SECONDS : sets LOADS (pids)
     cpu)    stress-ng --cpu 0 --cpu-method matrixprod --verify -t "${secs}s" --metrics-brief >>"$LOG" 2>&1 & LOADS+=($!) ;;
     memory) stress-ng --vm 16 --vm-bytes "$(mem_kb 16)k" --vm-method all --verify -t "${secs}s" --metrics-brief >>"$LOG" 2>&1 & LOADS+=($!) ;;
     gpu)    gpu_load "$secs" & LOADS+=($!) ;;
+    mix)    stress-ng --cpu 0 --cpu-load "$CPU_LOAD" --cpu-method matrixprod --verify -t "${secs}s" --metrics-brief >>"$LOG" 2>&1 & LOADS+=($!)
+            gpu_load "$secs" & LOADS+=($!) ;;
     all)    stress-ng --cpu 0 --cpu-method all --vm 8 --vm-bytes "$(mem_kb 8)k" --vm-method all --verify -t "${secs}s" --metrics-brief >>"$LOG" 2>&1 & LOADS+=($!)
             gpu_load "$secs" & LOADS+=($!) ;;
   esac
@@ -217,10 +225,10 @@ run_phase() {
   done
   errs1=$(hw_errors)
   if [ "$errs1" -gt "$errs0" ]; then verdict="FAIL"; why="$((errs1 - errs0)) new hardware-error record(s) in the kernel log"; fi
-  case "$name" in gpu|all)
+  case "$name" in gpu|all|mix)
     if [ "$verdict" = OK ] && [ ! -s "$GPU_OK" ]; then verdict="FAIL"; why="Ollama gave no answer during the phase"; fi ;;
   esac
-  case "$name" in gpu|all)
+  case "$name" in gpu|all|mix)
     # The load only tests the card if Ollama really put the model on it. After a reboot
     # Ollama once started before the driver was ready and ran everything on the CPU.
     on_card=$(grep -o '"size_vram":[0-9]*' "$GPU_OK.ps" 2>/dev/null | grep -vc ':0$' || true)
@@ -235,7 +243,7 @@ run_phase() {
 }
 
 say ""
-say "ollama1 stability test $(date '+%F %T'): phases ${PHASES}, $MINUTES min each, gpu model $MODEL"
+say "ollama1 stability test $(date '+%F %T'): phases ${PHASES}, $MINUTES min each, gpu model $MODEL, cpu load in the mix ${CPU_LOAD}%"
 say "Hardware-error records already in this boot's log: $(hw_errors)"
 : > "$STATE"
 failed=0

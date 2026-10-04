@@ -9,6 +9,15 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b397 — a stability phase for the card at 100% and the processor at 50% (per Patrick)
+
+- `stability-test.sh --phases mix` runs the graphics card flat out (Ollama, long
+  answers nonstop) together with the processor at `--cpu-load` percent
+  (default 50; 1-100), memory untouched, for `--minutes`. It is checked like
+  the gpu phase: no hardware-error record, no stress-ng failure, and the model
+  must really be on the card. The default run is still one load at a time
+  (cpu, gpu, memory). Test: `test_the_mix_phase_is_the_card_plus_half_the_processor`.
+
 ## 6b396 — the panel's sleep line is the idle service's own decision; RAID check parsed (per Patrick)
 
 Two bugs on the real monitor.
