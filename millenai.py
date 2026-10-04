@@ -33099,8 +33099,12 @@ body.gen #chip-model{color:var(--accent)}
 /* the Models group (6b350): an arrow at the left that turns down when it is open,
    and its three panes set in under it */
 .snav-grp{display:flex;align-items:center;gap:7px}
-.snav-chev{display:inline-block;width:9px;font-size:9px;line-height:1;
-  transition:transform .15s}
+/* the arrow is a drawn triangle in em, so its size is a share of the label's own
+   text: .64em tall against a cap height of about .71em (6b368: "much bigger", a bit
+   under the cap height; it was a 9px glyph with about 5px of ink) */
+.snav-chev{display:block;flex:none;width:0;height:0;border-style:solid;
+  border-width:.32em 0 .32em .52em;border-color:transparent transparent transparent currentColor;
+  margin-right:.1em;transition:transform .15s}
 .snav-grp[aria-expanded="true"] .snav-chev{transform:rotate(90deg)}
 .snav-grp.has-on{color:var(--text)}
 .snav-kid{padding-left:34px}
@@ -34734,7 +34738,7 @@ __CODE_ROWS__
              opens its three panes. The panes keep their ids. -->
         <button class="snav snav-grp" id="snav-models" type="button"
           aria-expanded="false" aria-controls="snav-models-kids"><span
-          class="snav-chev" aria-hidden="true">&#9656;</span>Models</button>
+          class="snav-chev" aria-hidden="true"></span>Models</button>
         <div id="snav-models-kids" hidden>
           <button class="snav snav-kid" data-pane="p-models">Local</button>
           <button class="snav snav-kid" data-pane="p-cloud">Cloud</button>

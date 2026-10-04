@@ -8775,7 +8775,9 @@ def _mg_ok(p):
 def _mg_ok1(p):
     rail = p[p.index('<div id="set-nav">'):][:2200]
     return ('id="snav-models" type="button"' in rail and 'aria-expanded="false" aria-controls="snav-models-kids"' in rail
-            and 'class="snav-chev" aria-hidden="true">&#9656;</span>Models</button>' in rail
+            and 'class="snav-chev" aria-hidden="true"></span>Models</button>' in rail
+            and "border-width:.32em 0 .32em .52em;border-color:transparent transparent transparent currentColor;" in p
+            and ".snav-chev{display:block;flex:none;width:0;height:0;border-style:solid;" in p
             and '<div id="snav-models-kids" hidden>' in rail
             and rail.index('data-pane="p-models">Local<') < rail.index('data-pane="p-cloud">Cloud<')
             < rail.index('data-pane="p-servers">Servers<') < rail.index('data-pane="p-usage">Usage<')
@@ -8791,7 +8793,8 @@ _mg_mut = [page.replace('<div id="snav-models-kids" hidden>', '<div id="snav-mod
            page.replace('$$(".snav[data-pane]")', '$$(".snav")', 1),
            page.replace('data-pane="p-cloud">Cloud<', 'data-pane="p-cloud">Cloud power<', 1),
            page.replace('.snav-grp[aria-expanded="true"] .snav-chev{transform:rotate(90deg)}',
-                        '.snav-grp[aria-expanded="true"] .snav-chev{transform:none}', 1)]
+                        '.snav-grp[aria-expanded="true"] .snav-chev{transform:none}', 1),
+           page.replace("border-width:.32em 0 .32em .52em;", "border-width:.2em 0 .2em .3em;", 1)]
 check("settings rail: Models opens Local, Cloud and Servers; a pane under it opens the group",
       _mg_ok(page) and not any(_mg_ok(m_) for m_ in _mg_mut) and all(m_ != page for m_ in _mg_mut),
       "%r" % ([_mg_ok(page), [_mg_ok(m_) for m_ in _mg_mut]],))

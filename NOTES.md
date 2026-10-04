@@ -9,6 +9,21 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b368 — a bigger arrow on the Settings Models row (per Patrick)
+
+- The caret that opens Local / Cloud / Servers (6b350) was a 9px "▸" glyph with
+  about 5px of ink. It is now a triangle drawn with borders in em, so it scales
+  with the label: `.snav-chev` is 0 × 0 with `border-width:.32em 0 .32em .52em`,
+  that is .64em tall (8px at the label's 12.5px) against a cap height of .70em
+  (8.75px, measured with canvas `actualBoundingBoxAscent` of "H"): 91% of the
+  cap height. Still a flex item of the row (`align-items:center`), still turns
+  90 degrees when the group opens. The glyph is gone from the markup.
+- Measured in the Browser pane (Blink; not WKWebView) with getBoundingClientRect:
+  closed 6.5 × 8, centre offset from the row's centre 0; open 8 × 6.5 (rotated),
+  offset 0, `matrix(0,1,-1,0,0,0)`.
+- Test: the 6b350 rail check now pins the empty span and the border rule, with a
+  sixth mutation that shrinks the triangle.
+
 ## 6b367 — Settings › Models › Servers: Test ends in a visible result
 
 - Patrick: the Test button said "Checking" and went back to "Test" with nothing
