@@ -19,6 +19,7 @@ and the console's graphics mode, with nothing but the standard library.
     framebuffer exists AND a monitor is attached (/sys/class/drm/*/status).
 """
 import glob
+import math
 import os
 import struct
 import sys
@@ -107,6 +108,15 @@ def choose_scale(xres, yres, design_w=DESIGN_W):
     return k, max(1, xres // k), max(1, yres // k)
 
 
+def choose_cost_scale(xres, yres, max_w=3840):
+    """(k, logical width, logical height) for the electricity cost screen. Its
+    smooth big print is cheap to draw, so it is drawn at the screen's own
+    resolution (k = 1) up to 4K; only a screen wider than that is drawn at a
+    whole-number fraction of its size."""
+    k = max(1, int(math.ceil(xres / float(max_w))))
+    return k, max(1, xres // k), max(1, yres // k)
+
+
 # ---- pixel format ---------------------------------------------------------------------
 
 def make_packer(info):
@@ -142,6 +152,9 @@ class Presenter:
         self.tc = {32: "I", 16: "H"}.get(info.bpp)
         self.lut = {}
         self.prev = [None] * lh
+        # the common XRGB8888 screen takes the buffer's own bytes: no conversion at all (a 4K picture in milliseconds)
+        self.identity = (self.tc == "I" and k == 1 and sys.byteorder == "little"
+                         and self.pack(0x123456) == 0x123456 and self.pack(0xFFFFFF) == 0xFFFFFF)
 
     # -- one logical row -> one screen row's bytes (the k copies share it) ---------------
     def row_bytes(self, row):
@@ -181,20 +194,21 @@ class Presenter:
             if not force and self.prev[y] == raw:
                 continue
             self.prev[y] = raw
-            data = self.row_bytes(pm.buf[y * W:(y + 1) * W])
+            data = raw if self.identity else self.row_bytes(pm.buf[y * W:(y + 1) * W])
             for j in range(self.k):
                 out.append((self._offset(self.oy + y * self.k + j), data))
         return self.merge(out)
 
     def merge(self, writes):
         """Join writes that touch consecutive bytes (when there are no side margins the rows are contiguous)."""
-        merged = []
+        groups = []                      # [offset, end, [pieces]]
         for off, data in writes:
-            if merged and merged[-1][0] + len(merged[-1][1]) == off:
-                merged[-1] = (merged[-1][0], merged[-1][1] + data)
+            if groups and groups[-1][1] == off:
+                groups[-1][1] = off + len(data)
+                groups[-1][2].append(data)
             else:
-                merged.append((off, data))
-        return merged
+                groups.append([off, off + len(data), [data]])
+        return [(g[0], g[2][0] if len(g[2]) == 1 else b"".join(g[2])) for g in groups]
 
     def clear(self):
         """The writes that paint the whole visible screen black, and forget

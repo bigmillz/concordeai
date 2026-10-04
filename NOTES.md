@@ -9,6 +9,46 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b382 — the cost screen in smooth rounded print, no asterisks (per Patrick)
+
+Patrick on the real 4K monitor: the cost screen works, but the digits (a 5x7
+bitmap scaled about 10x then x6) were blocky and hard to read.
+- **New `lib/o1vecfont.py`: a stroke font.** Each glyph (0-9 . , : - / $ and the
+  euro, pound and yen signs, A-Z, space) is a skeleton of lines and arcs drawn
+  with a round pen (round caps and joins), anti-aliased by exact coverage:
+  every segment is a capsule, and for each of 8 sub-rows of a pixel row the
+  capsules' x-extent is found analytically, merged, and added as fractional
+  coverage. No per-pixel distance tests, so it is fast. Glyph bitmaps (rows of
+  0..255 coverage) are cached by (character, height); `Pixmap.blit_coverage`
+  paints them over a flat background through a 256-entry colour table. Digits
+  are 16% wider than the first design (Nunito-like proportions) and all one
+  width. Capitals only; the screen's words are in capitals.
+- **Drawn at the screen's own resolution** (`o1fb.choose_cost_scale`: 1:1 up to
+  3840 wide, else a whole-number fraction), by its own `Presenter`; the panel
+  keeps its 640x360 x k. A flip clears the screen and rewrites it in full.
+  `o1panel.render_cost` keeps the picture until the figures or the size change
+  (the clock is not on this screen), so after the first draw each two-second
+  tick is a row compare and no writes. At 3840x2160: about 0.25 s to draw the
+  first time, 10 ms to prepare the frame (plus the write of the 33 MB).
+- **Layout.** Label, kWh and (if the history is short) a note in a left column;
+  the figure, one common height for all three rows, fills the rest of the row.
+  The ink (a $ or a comma reaches beyond the capitals) is centred and fitted
+  by `vertical_extent`, so nothing touches the row's edge. Messages ("Set your
+  electricity price in the admin panel", "No data yet") are drawn the same
+  way, as large as they fit, wrapped by `wrap_vec`.
+- **No asterisk anywhere on this screen** and no footnote (Patrick's explicit
+  instruction for it; the estimate rule still holds on the other screens). The
+  "only 3d 4h of data" note stays, in amber, under the kWh.
+- **Found on the way:** `Presenter.merge` joined adjacent writes by repeated
+  `bytes +`, quadratic on a 4K frame (4 s); it now joins once. A screen in
+  plain XRGB8888 (the usual one) now sends the buffer's own bytes, with no
+  conversion.
+- Tests: the stroke font (areas of capsules to 1%, round ends and joins,
+  anti-aliased edges, clipping, centring, fit), the cost screen at 640x360 to
+  3840x2160 (one size for the three figures, overflow of 123456789012.34 in
+  seven currencies at five sizes, the cache, the loop's presenter); four new
+  mutants. `ollama1-dash --png out.png --screen cost [--size 3840x2160]`.
+
 ## 6b381 — Space on the server's keyboard shows only the electricity cost (per Patrick)
 
 - The panel gets a second screen: three large rows, 24 HOURS / 7 DAYS / 30

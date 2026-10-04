@@ -109,6 +109,8 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
     if lw < o1fb.MIN_LOGICAL_W:
         raise o1fb.FbError("the screen (%dx%d) is too small for the panel" % (info.xres, info.yres))
     pres = o1fb.Presenter(info, lw, lh, k)
+    kc, lwc, lhc = o1fb.choose_cost_scale(info.xres, info.yres)       # the cost screen draws at (about) full resolution
+    pres_by = {"panel": pres, "cost": o1fb.Presenter(info, lwc, lhc, kc)}
     if log:
         log("graphical panel: %dx%d at %d bits, drawn %dx%d scaled x%d" % (info.xres, info.yres, info.bpp, lw, lh, k))
     tty.enter()
@@ -120,6 +122,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
         next_tick = next_draw = 0.0
         last_full = clock()
         shown = True
+        on_screen = "panel"
         keys = keys or _Sleeper(sleep)
         screen, last_flip = "panel", -1e9
         while not stop():
@@ -130,14 +133,20 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
             active = tty.vt_active() if vt is not None else None
             mine = vt is None or active is None or active == vt
             if mine and (now >= next_draw or not shown):
-                if not shown:                    # another terminal was on the screen: start from black
-                    for off, data in pres.clear():
+                eff = "panel" if st.get("pairing") else screen          # an open pairing window takes the screen
+                if not shown or eff != on_screen:    # another terminal was showing, or the picture's size changes: start from black
+                    for off, data in pres_by[eff].clear():
                         fb.write(off, data)
+                    on_screen = eff
+                    shown = False
                 full = not shown or now - last_full >= FULL_REFRESH_S
                 if full:
                     last_full = now
-                pm = o1panel.render(st, lw, lh, range_s, pm, screen)
-                for off, data in pres.frame(pm, force=full):
+                if eff == "cost":
+                    pic = o1panel.render_cost(st, lwc, lhc)             # kept until the figures change
+                else:
+                    pm = pic = o1panel.render(st, lw, lh, range_s, pm, "panel")
+                for off, data in pres_by[eff].frame(pic, force=full):
                     fb.write(off, data)
                 next_draw = now + (PAIRING_DRAW_S if st.get("pairing") else DRAW_S)
                 frames += 1

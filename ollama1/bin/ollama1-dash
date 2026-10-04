@@ -225,10 +225,11 @@ def png(args):
     import o1gfx
     import o1panel
     out = args[args.index("--png") + 1]
-    w, h = 640, 360
+    cost = "--screen" in args and args[args.index("--screen") + 1:][:1] == ["cost"]
+    w, h = (1920, 1080) if cost else (640, 360)          # the cost screen is smooth print drawn at screen size
     if "--size" in args:
         w, h = (int(x) for x in args[args.index("--size") + 1].lower().split("x"))
-    up = int(args[args.index("--scale") + 1]) if "--scale" in args else 2
+    up = int(args[args.index("--scale") + 1]) if "--scale" in args else (1 if cost else 2)
     st = None
     if "--live" not in args:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "tests"))

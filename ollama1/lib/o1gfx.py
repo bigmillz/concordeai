@@ -207,6 +207,30 @@ class Pixmap:
         w = o1pixfont.text_width(s, scale)
         return self.text(xc - w // 2, y, s, c, scale)
 
+    def blit_coverage(self, x, y, rows, lut):
+        """Paint a glyph given as rows of coverage bytes (0..255) with its
+        top-left at (x, y): each pixel becomes lut[coverage] (the ink colour
+        already mixed over the flat background, so the background under it
+        must be that colour). Clipped; blank margins are skipped."""
+        x0, y0, x1, y1 = self.clip
+        W = self.w
+        for j, row in enumerate(rows):
+            yy = y + j
+            if yy < y0 or yy >= y1:
+                continue
+            lead = len(row) - len(row.lstrip(b"\0"))
+            if lead == len(row):
+                continue
+            seg = row[lead:len(row.rstrip(b"\0"))]
+            xs = x + lead
+            if xs < x0:
+                seg, xs = seg[x0 - xs:], x0
+            if xs + len(seg) > x1:
+                seg = seg[:max(0, x1 - xs)]
+            if seg:
+                i = yy * W + xs
+                self.buf[i:i + len(seg)] = array("I", map(lut.__getitem__, seg))
+
     # ---- output ------------------------------------------------------------
     def rows(self):
         W = self.w

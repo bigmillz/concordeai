@@ -27,6 +27,7 @@ import math
 import o1dashui as D
 import o1gfx
 import o1pixfont as F
+import o1vecfont as V
 import o1tariff
 
 # ---- colours -------------------------------------------------------------------
@@ -751,73 +752,124 @@ def cost_view(st):
     return ("rows", rows, est_any)
 
 
-def fit_scale(value, star, max_w, max_h, top=12):
-    """The largest whole scale at which the value (and its small *) fits the box."""
-    for s in range(top, 0, -1):
-        w = F.text_width(value, s) + ((F.text_width("*", max(2, s // 3)) + 2) if star else 0)
-        if w <= max_w and 7 * s <= max_h:
-            return s
-    return 1
+def wrap_vec(text, max_w, height):
+    """The words in lines no wider than max_w at this height (a word wider
+    than the line stands alone)."""
+    lines, cur = [], ""
+    for wd in text.split():
+        trial = (cur + " " + wd).strip()
+        if cur and V.text_width(trial, height) > max_w:
+            lines.append(cur)
+            cur = wd
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    return lines
 
 
-def draw_cost(pm, st, now):
-    """Only the cost over the last 24 hours, 7 days and 30 days, in large print,
-    using the whole screen. Estimated figures carry a * and a footnote."""
+def cost_layout(w, h):
+    """The three row boxes of the cost screen and the footer line's top:
+    ([(x, y, width, height)] x 3, footer y)."""
+    m = max(6, h // 45)
+    foot_h = max(14, h // 22)
+    gap = max(4, h // 60)
+    rh = (h - foot_h - 2 * m - 2 * gap) // 3
+    return [(m, m + i * (rh + gap), w - 2 * m, rh) for i in range(3)], h - foot_h
+
+
+_COST_CACHE = {"key": None, "pm": None}
+
+
+def render_cost(st, w, h):
+    """The electricity cost screen as a Pixmap of w x h in the smooth stroke
+    font: only the cost over the last 24 hours, 7 days and 30 days, using the
+    whole screen. The picture is kept and handed back again until the figures
+    (or the size) change, so showing it costs nothing after the first time."""
+    view = cost_view(st if isinstance(st, dict) else {})
+    key = (w, h, tuple((r[0], r[1], r[2], r[4]) for r in view[1]) if view[0] == "rows" else view)
+    if _COST_CACHE["key"] == key:
+        return _COST_CACHE["pm"]
+    pm = o1gfx.Pixmap(w, h, T["bg"])
+    try:
+        draw_cost(pm, view)
+    except Exception as e:
+        ERRORS.append("cost: %r" % (e,))
+    _COST_CACHE.update(key=key, pm=pm)
+    return pm
+
+
+def draw_cost(pm, view):
     w, h = pm.w, pm.h
-    pm.fill_rect(0, 0, w, h, T["bg"])
-    view = cost_view(st)
-    m = 8
-    foot_h = 14
+    bg, panel = T["bg"], T["panel"]
+    rows_boxes, foot_y = cost_layout(w, h)
+    foot_h = h - foot_y
+    hint_h = max(8, int(foot_h * 0.55))
     if view[0] == "message":
-        text = view[1]
-        best = (1, [text])
-        for s in range(10, 0, -1):
-            lines = wrap(text, w - 2 * m - 8, 4, s)
-            if lines and " ".join(lines).replace("...", "") == text and 9 * s * len(lines) + 4 * (len(lines) - 1) <= h - foot_h - 2 * m:
-                best = (s, lines)
-                break
-        s, lines = best
-        total = 9 * s * len(lines) + 4 * (len(lines) - 1)
-        y = (h - foot_h - total) // 2
+        text = view[1].upper()
+        colour = T["warn"] if view[1] == MSG_NO_PRICE else T["dim"]
+        area_w, area_h = w - 2 * rows_boxes[0][0] - w // 20, foot_y - 2 * rows_boxes[0][0]
+        best = None
+        for lines_n in (1, 2, 3, 4):
+            hh = V.fit_height(text, area_w * lines_n, area_h // lines_n)
+            while hh >= 4:
+                lines = wrap_vec(text, area_w, hh)
+                if len(lines) * int(hh * 1.25) <= area_h and all(V.text_width(l, hh) <= area_w for l in lines):
+                    break
+                hh -= max(1, hh // 20)
+            else:
+                continue
+            if best is None or hh > best[0]:
+                best = (hh, lines)
+        if best is None:
+            best = (4, wrap_vec(text, area_w, 4))
+        hh, lines = best
+        line_h = int(hh * 1.25)
+        y = (foot_y - line_h * len(lines) + (line_h - hh)) // 2
+        pm.fill_rect(0, 0, w, foot_y, bg)
         for ln in lines:
-            pm.text_center(w // 2, y, ln, T["warn"] if text == MSG_NO_PRICE else T["dim"], s, max_w=w - 2 * m)
-            y += 9 * s + 4
+            V.draw(pm, (w - V.text_width(ln, hh)) // 2, y, ln, hh, colour, bg)
+            y += line_h
     else:
-        _kind, rows, est_any = view
-        gap = 6
-        avail = h - foot_h - m - gap * 2 - m
-        rh = avail // 3
-        area = rh - 7 - 14 - 10
-        common = min([fit_scale(r[1], r[3] and r[1] not in ("NO DATA", "-"), w - 2 * m - 20, area)
-                      for r in rows if r[1] not in ("NO DATA", "-")] or [12])      # one size for all three
-        for i, (label, value, kwh, est, note) in enumerate(rows):
-            y = m + i * (rh + gap)
-            pm.rrect(m, y, w - 2 * m, rh, 4, T["edge"])
-            pm.rrect(m + 1, y + 1, w - 2 * m - 2, rh - 2, 3, T["panel"])
-            ix, iw = m + 10, w - 2 * m - 20
-            pm.text(ix, y + 7, label, T["title"], 2, max_w=iw // 2)
-            right = "  ".join(x for x in (note, kwh) if x)
-            rw = F.text_width(right, 2) if F.text_width(right, 2) <= iw // 2 else 0
-            if right and rw:
-                pm.text_right(ix + iw, y + 7, right, T["warn"] if note and not kwh else T["dim"], 2)
-            elif right:
-                pm.text_right(ix + iw, y + 7, right, T["dim"], 1, max_w=iw // 2)
-            area_h = rh - 7 - 14 - 10
-            star = est and value not in ("NO DATA", "-")
-            s = min(common, fit_scale(value, star, iw, area_h))
-            vy = y + 7 + 14 + 4 + (area_h - 7 * s) // 2
-            colour = T["dim"] if value in ("NO DATA", "-") else T["text"]
-            vw = F.text_width(value, s)
-            ss = max(2, s // 3)
-            sw = F.text_width("*", ss) + 2 if star else 0
-            vx = ix + max(0, (iw - vw - sw) // 2)
-            pm.text(vx, vy, value, colour, s, max_w=iw)
-            if star:
-                pm.text(vx + vw + 2, vy, "*", T["warn"], ss)
-        foot = ("* estimated from the card, processor and a base load, not read from a plug" if est_any else "")
-        if foot:
-            pm.text(m, h - foot_h + 3, foot, T["dim"], 1, max_w=w - 2 * m - 80)
-    pm.text_right(w - m, h - foot_h + 3, "Space: back", T["dim"], 1)
+        rows = view[1]
+        rh0 = rows_boxes[0][3]
+        pad = max(10, rh0 // 12)
+        label_h = max(8, rh0 // 7)
+        small_h = max(7, rh0 // 12)
+        inner = [(x + pad, y + pad, bw - 2 * pad, bh - 2 * pad) for x, y, bw, bh in rows_boxes]
+        # a left column for the label, the kWh and (if short of history) a note; the figure takes the rest
+        col_w = max(max(V.text_width(r[0], label_h), V.text_width(r[2].upper(), small_h)) for r in rows)
+        col_w = max(col_w, (inner[0][2]) // 8)
+        figure_w = inner[0][2] - col_w - pad * 2
+        vh = None
+        for (ix, iy, iw, ih), r in zip(inner, rows):
+            if r[1] in ("NO DATA", "-"):
+                continue
+            f = V.fit_height(r[1], figure_w, ih)
+            vh = f if vh is None else min(vh, f)
+        vh = vh or max(8, inner[0][3] // 2)
+        for (bx, by, bw, bh), (ix, iy, iw, ih), (label, value, kwh, _est, note) in zip(rows_boxes, inner, rows):
+            pm.rrect(bx, by, bw, bh, max(4, bh // 12), T["edge"])
+            pm.rrect(bx + 2, by + 2, bw - 4, bh - 4, max(3, bh // 12 - 2), panel)
+            V.draw(pm, ix, iy, label, label_h, T["title"], panel)
+            ty = iy + label_h + max(6, label_h // 2)
+            if kwh:
+                V.draw(pm, ix, ty, kwh.upper(), small_h, T["dim"], panel)
+                ty += small_h + max(6, small_h // 2)
+            if note:
+                for ln in wrap_vec(note.upper(), col_w, small_h)[:3]:
+                    if ty + small_h > iy + ih:
+                        break
+                    V.draw(pm, ix, ty, ln, small_h, T["warn"], panel)
+                    ty += small_h + max(4, small_h // 3)
+            dim = value in ("NO DATA", "-")
+            h_ = V.fit_height(value, figure_w, ih, top=vh) if dim else min(vh, V.fit_height(value, figure_w, ih))
+            vw = V.text_width(value, h_)
+            fx = ix + col_w + pad
+            V.draw(pm, fx + (figure_w - vw) // 2, V.ink_top(value, h_, iy, ih), value, h_,
+                   T["dim"] if dim else T["text"], panel)
+    V.draw(pm, w - 2 * 8 - V.text_width("SPACE: BACK", hint_h), foot_y + (foot_h - hint_h) // 2, "SPACE: BACK", hint_h,
+           T["dim"], bg)
 
 
 # ---- the whole frame ----------------------------------------------------------------
@@ -834,11 +886,7 @@ def render(st, w, h, range_s=300, pm=None, screen="panel"):
         pm.fill_rect(0, 0, w, h, T["bg"])
     now = D._f(st.get("time")) or 0
     if screen == "cost" and not st.get("pairing"):
-        try:
-            draw_cost(pm, st, now)
-        except Exception as e:
-            ERRORS.append("cost: %r" % (e,))
-        return pm
+        return render_cost(st, w, h)
     boxes = layout(w, h)
     if not boxes:
         pm.text(8, 8, "Screen too small for the panel", T["warn"], 1, max_w=w - 16)

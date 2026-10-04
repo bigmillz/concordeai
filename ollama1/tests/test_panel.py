@@ -9,6 +9,7 @@ import importlib.machinery
 import importlib.util
 import io
 import json
+import math
 import os
 import random
 import shutil
@@ -27,6 +28,7 @@ import o1gfx
 import o1panel
 import o1paneld
 import o1pixfont as F
+import o1vecfont
 
 BG = 0x112233
 
@@ -1019,12 +1021,16 @@ class TestCostScreen(unittest.TestCase):
     def run_loop(self, script, st=None, max_frames=40):
         """Run the loop with these keyboard reads (one per poll); returns the screens drawn, in order."""
         seen = []
-        real = o1panel.render
+        real, real_cost = o1panel.render, o1panel.render_cost
 
         def spy(st_, w, h, range_s=300, pm=None, screen="panel"):
             seen.append(screen)
             return real(st_, w, h, range_s, pm, screen)
-        o1panel.render = spy
+
+        def spy_cost(st_, w, h):
+            seen.append("cost")
+            return real_cost(st_, w, h)
+        o1panel.render, o1panel.render_cost = spy, spy_cost
         polls = iter(script)
         c = Clock()
 
@@ -1040,7 +1046,7 @@ class TestCostScreen(unittest.TestCase):
                 return n[0] > len(script) + 3
             o1paneld.run(FakeFb(), FakeTty(), FakeSampler(st), clock=c.now, sleep=c.sleep, keys=K(), stop=stop)
         finally:
-            o1panel.render = real
+            o1panel.render, o1panel.render_cost = real, real_cost
         return seen
 
     def test_the_screen_flips_within_one_poll_and_back(self):
@@ -1122,12 +1128,139 @@ class TestCostScreen(unittest.TestCase):
 
     # -- how it is drawn --------------------------------------------------------------
     def texts_drawn(self, fn):
+        """[(text, height in pixels)] for every string the smooth font draws while fn runs."""
+        seen = []
+        orig = o1vecfont.draw
+
+        def rec(pm, x, y, text, height, colour, bg):
+            seen.append((text, height))
+            return orig(pm, x, y, text, height, colour, bg)
+        o1vecfont.draw = rec
+        try:
+            fn()
+        finally:
+            o1vecfont.draw = orig
+        return seen
+
+    def cost(self, st, w=640, h=360):
+        o1panel._COST_CACHE.update(key=None, pm=None)
+        return o1panel.render(st, w, h, screen="cost")
+
+    def test_the_figures_are_very_large_and_all_one_size(self):
+        for w, h in ((640, 360), (1920, 1080), (3840, 2160)):
+            seen = self.texts_drawn(lambda: self.cost(cost_state(), w, h))
+            big = [hh for s, hh in seen if s.startswith("$")]
+            self.assertEqual(len(big), 3)
+            self.assertEqual(len(set(big)), 1)
+            self.assertGreaterEqual(big[0], 0.18 * h)                     # three rows share the screen: each figure is about a fifth of its height
+            labels = [hh for s, hh in seen if s in ("24 HOURS", "7 DAYS", "30 DAYS")]
+            self.assertEqual(len(labels), 3)
+            self.assertLess(max(labels), big[0])
+
+    def test_it_shows_only_the_cost_and_never_an_asterisk(self):
+        seen = self.texts_drawn(lambda: self.cost(cost_state()))
+        words = " ".join(s for s, _ in seen)
+        for gone in ("GRAPHICS CARD", "PROCESSOR AND MEMORY", "GATEWAY", "ADDRESS", "TUNNEL", "VRAM", "ESTIMATED"):
+            self.assertNotIn(gone, words.upper())
+        self.assertNotIn("*", words)
+        for there in ("24 HOURS", "7 DAYS", "30 DAYS", "SPACE: BACK"):
+            self.assertIn(there, words)
+        est = cost_state()
+        for w in est["power"]["windows"].values():
+            w["est"] = True
+        self.assertNotIn("*", " ".join(s for s, _ in self.texts_drawn(lambda: self.cost(est))))
+        a, b = self.cost(cost_state()), self.cost(est)
+        self.assertEqual(a.buf, b.buf)                                     # whether estimated or not, the screen is the same
+
+    def test_messages_are_smooth_large_and_in_full(self):
+        for text, st in ((o1panel.MSG_NO_PRICE, cost_state(priced=False)), (o1panel.MSG_NO_DATA, {"time": 1790000000.0})):
+            for w, h in ((640, 360), (1920, 1080)):
+                seen = self.texts_drawn(lambda: self.cost(st, w, h))
+                lines = [(s, hh) for s, hh in seen if s != "SPACE: BACK"]
+                self.assertEqual(" ".join(s for s, _ in lines), text.upper())
+                self.assertGreaterEqual(min(hh for _, hh in lines), h // 12)
+                self.assertNotIn("$", " ".join(s for s, _ in lines))
+                for s_, hh in lines:
+                    self.assertLessEqual(o1vecfont.text_width(s_, hh), w)
+
+    def test_big_numbers_in_any_currency_never_overflow_their_row(self):
+        for sym, cur in (("$", "USD"), ("\u20ac", "EUR"), ("\u00a3", "GBP"), ("\u00a5", "JPY"), ("CHF ", "CHF"), ("kr ", "SEK"),
+                         ("R$ ", "BRL")):
+            for cost in (0.01, 1234.56, 99999.99, 1234567.89, 123456789012.34):
+                st = cost_state(symbol=sym, currency=cur)
+                for w in st["power"]["windows"].values():
+                    w["cost"] = cost
+                for sw, sh in ((640, 360), (480, 270), (1920, 1080), (1024, 768)):
+                    pm = self.cost(st, sw, sh)
+                    boxes, _foot = o1panel.cost_layout(sw, sh)
+                    for (x, y, bw, bh) in boxes:
+                        for yy in range(y + bh // 6, y + bh - bh // 6, max(1, bh // 40)):
+                            for xx in list(range(x + 5, x + 8)) + list(range(x + bw - 8, x + bw - 5)):
+                                self.assertEqual(pm.get(xx, yy), o1panel.T["panel"], (sym, cost, sw, sh, xx, yy))
+                    texts = self.texts_drawn(lambda: self.cost(st, sw, sh))
+                    for s_, hh in texts:
+                        self.assertLessEqual(o1vecfont.text_width(s_, hh), sw - 2 * boxes[0][0], (s_, hh, sw))
+
+    def test_the_row_sizes_follow_the_screen(self):
+        for w, h in ((480, 270), (640, 360), (640, 480), (1024, 600), (1920, 1080), (3840, 2160)):
+            pm = self.cost(cost_state(), w, h)
+            self.assertEqual((pm.w, pm.h), (w, h))
+            self.assertGreater(len({v for v in pm.buf}), 4)
+
+    def test_the_picture_is_kept_until_the_figures_change(self):
+        o1panel._COST_CACHE.update(key=None, pm=None)
+        st = cost_state()
+        a = o1panel.render_cost(st, 640, 360)
+        self.assertIs(o1panel.render_cost(st, 640, 360), a)                 # same figures: the very same picture, nothing redrawn
+        self.assertIs(o1panel.render_cost(dict(st, time=st["time"] + 60), 640, 360), a)    # the clock is not on this screen
+        st2 = cost_state()
+        st2["power"]["windows"]["1d"]["cost"] = 0.62
+        b = o1panel.render_cost(st2, 640, 360)
+        self.assertIsNot(b, a)
+        self.assertIsNot(o1panel.render_cost(st2, 800, 450), b)             # another screen size
+
+    def test_the_cost_screen_has_its_own_picture_size_at_full_resolution(self):
+        self.assertEqual(o1fb.choose_cost_scale(3840, 2160), (1, 3840, 2160))
+        self.assertEqual(o1fb.choose_cost_scale(1920, 1080), (1, 1920, 1080))
+        self.assertEqual(o1fb.choose_cost_scale(7680, 4320), (2, 3840, 2160))
+        self.assertEqual(o1fb.choose_cost_scale(1366, 768), (1, 1366, 768))
+
+    def test_the_loop_draws_the_cost_screen_at_the_screens_own_size(self):
+        sizes = []
+        real = o1panel.render_cost
+
+        def spy(st_, w, h):
+            sizes.append((w, h))
+            return real(st_, w, h)
+        o1panel.render_cost = spy
+        try:
+            c = Clock()
+            polls = iter([b" ", b"", b""])
+
+            class K:
+                def wait(self_, t):
+                    c.sleep(t)
+                    return next(polls, b"")
+            fb = FakeFb()
+            n = [0]
+
+            def stop():
+                n[0] += 1
+                return n[0] > 8
+            o1paneld.run(fb, FakeTty(), FakeSampler(cost_state()), clock=c.now, sleep=c.sleep, keys=K(), stop=stop)
+        finally:
+            o1panel.render_cost = real
+        self.assertTrue(sizes)
+        self.assertEqual(set(sizes), {(1280, 720)})                         # FakeFb's own size, drawn 1:1
+        self.assertGreater(sum(n_ for _o, n_ in fb.writes), 3 * 1280 * 720 * 4)   # and the whole screen was rewritten when it flipped
+
+    def bitmap_texts(self, fn):
         seen = []
         orig = o1gfx.Pixmap.text
 
-        def rec(self_, x, y, s, c, scale=1, max_w=None, ellipsis=True):
-            seen.append((s, scale))
-            return orig(self_, x, y, s, c, scale, max_w, ellipsis)
+        def rec(self_, x, y, text, c, scale=1, max_w=None, ellipsis=True):
+            seen.append((text, scale))
+            return orig(self_, x, y, text, c, scale, max_w, ellipsis)
         o1gfx.Pixmap.text = rec
         try:
             fn()
@@ -1135,65 +1268,10 @@ class TestCostScreen(unittest.TestCase):
             o1gfx.Pixmap.text = orig
         return seen
 
-    def test_the_figures_are_very_large(self):
-        seen = self.texts_drawn(lambda: o1panel.render(cost_state(), 640, 360, screen="cost"))
-        big = [sc for s, sc in seen if s.startswith("$")]
-        self.assertEqual(len(big), 3)
-        self.assertGreaterEqual(min(big), 8)                               # 8 x 7 px capitals at 640x360: 15% of the screen height
-        self.assertEqual(len(set(big)), 1)                                 # one size for the three
-
-    def test_it_shows_only_the_cost(self):
-        seen = self.texts_drawn(lambda: o1panel.render(cost_state(), 640, 360, screen="cost"))
-        words = " ".join(s for s, _ in seen)
-        for gone in ("GRAPHICS CARD", "PROCESSOR AND MEMORY", "Gateway", "Address", "Tunnel", "VRAM"):
-            self.assertNotIn(gone, words.upper() if gone.isupper() else words)
-        for there in ("24 HOURS", "7 DAYS", "30 DAYS"):
-            self.assertIn(there, words)
-
-    def test_messages_are_drawn_large_and_in_full(self):
-        for text, st in ((o1panel.MSG_NO_PRICE, cost_state(priced=False)), (o1panel.MSG_NO_DATA, {"time": 1790000000.0})):
-            seen = self.texts_drawn(lambda: o1panel.render(st, 640, 360, screen="cost"))
-            lines = [(s, sc) for s, sc in seen if s not in ("Space: back",)]
-            self.assertEqual(" ".join(s for s, _ in lines), text)
-            self.assertGreaterEqual(min(sc for _, sc in lines), 4)
-            self.assertNotIn("$", " ".join(s for s, _ in lines))
-
-    def test_big_numbers_in_any_currency_never_overflow_their_row(self):
-        for sym, cur in (("$", "USD"), ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("CHF ", "CHF"), ("kr ", "SEK"), ("R$ ", "BRL")):
-            for cost in (0.01, 1234.56, 99999.99, 1234567.89, 123456789012.34):
-                st = cost_state(symbol=sym, currency=cur)
-                for w in st["power"]["windows"].values():
-                    w["cost"] = cost
-                pm = o1panel.render(st, 640, 360, screen="cost")
-                rh = (360 - 14 - 8 - 12 - 8) // 3
-                boxes = [(8, 8 + i * (rh + 6), 640 - 16, rh) for i in range(3)]
-                for (x, y, bw, bh) in boxes:
-                    for yy in range(y + 6, y + bh - 6):
-                        for xx in list(range(x + 2, x + 9)) + list(range(x + bw - 9, x + bw - 2)):
-                            self.assertEqual(pm.get(xx, yy), o1panel.T["panel"], (sym, cost, xx, yy))
-                # and in the real row boxes of every size the screen may have
-                for w, h in ((480, 270), (640, 360), (800, 450), (1024, 768), (1280, 1024)):
-                    o1panel.render(st, w, h, screen="cost")
-
-    def test_the_row_sizes_follow_the_screen(self):
-        for w, h in ((480, 270), (640, 360), (640, 480), (1024, 600)):
-            pm = o1panel.render(cost_state(), w, h, screen="cost")
-            self.assertGreater(len({v for v in pm.buf}), 4)
-
-    def test_the_estimate_footnote_only_when_something_is_estimated(self):
-        def foot(st):
-            return " ".join(s for s, _ in self.texts_drawn(lambda: o1panel.render(st, 640, 360, screen="cost")))
-        self.assertIn("estimated", foot(cost_state()))
-        plug = cost_state()
-        for w in plug["power"]["windows"].values():
-            w["est"] = False
-        self.assertNotIn("estimated", foot(plug))
-        self.assertIn("Space: back", foot(plug))
-
     def test_the_normal_panel_hints_at_the_key(self):
-        seen = self.texts_drawn(lambda: o1panel.render(cost_state(), 640, 360))
+        seen = self.bitmap_texts(lambda: o1panel.render(cost_state(), 640, 360))
         self.assertIn("Space: electricity cost", " ".join(s for s, _ in seen))
-        seen = self.texts_drawn(lambda: o1panel.render(dash_sample.sample(now=1790000000.0), 480, 270))
+        seen = self.bitmap_texts(lambda: o1panel.render(dash_sample.sample(now=1790000000.0), 480, 270))
         self.assertTrue(any("Space:" in s for s, _ in seen))
 
     def test_the_new_glyphs(self):
@@ -1237,6 +1315,106 @@ class TestCostScreen(unittest.TestCase):
         got = o1metrics.power_state()
         self.assertEqual(got["windows"], c["windows"])                       # and the dashboard reads them back
         self.assertEqual((got["priced"], got["currency"]), (True, "USD"))
+
+
+class TestVectorFont(unittest.TestCase):
+    """The smooth rounded stroke font of the cost screen."""
+
+    def test_every_character_the_screen_can_say_is_there(self):
+        for ch in "0123456789.,:-/$\u20ac\u00a3\u00a5ABCDEFGHIJKLMNOPQRSTUVWXYZ ":
+            self.assertTrue(o1vecfont.supported(ch), repr(ch))
+        for text in ("SET YOUR ELECTRICITY PRICE IN THE ADMIN PANEL", "NO DATA YET", "ONLY 3D 4H OF DATA", "24 HOURS", "7 DAYS",
+                     "30 DAYS", "118.6 KWH", "SPACE: BACK"):
+            self.assertEqual(o1vecfont.clean(text), text)
+        self.assertEqual(o1vecfont.clean("abc"), "ABC")                      # capitals only
+        self.assertEqual(o1vecfont.clean("a\x00\u6f22"), "A ")
+
+    def test_digits_are_all_one_width_and_figures_do_not_shift(self):
+        self.assertEqual(len({o1vecfont.advance_units(d) for d in "0123456789"}), 1)
+        for h in (40, 120, 333):
+            self.assertEqual(o1vecfont.text_width("1111", h), o1vecfont.text_width("8888", h))
+            self.assertEqual(o1vecfont.layout("1234", h)[3][1] - o1vecfont.layout("1234", h)[2][1],
+                             o1vecfont.layout("8888", h)[3][1] - o1vecfont.layout("8888", h)[2][1])
+
+    def capsule_area(self, length, r, size=200):
+        rows = o1vecfont.rasterize([(30, 100, 30 + length, 100)], r, size, 200)
+        return sum(sum(row) for row in rows) / 255.0, rows
+
+    def test_a_capsule_has_the_area_of_a_capsule_and_round_ends(self):
+        for length, r in ((60, 12.0), (0, 20.0), (100, 7.5)):
+            area, rows = self.capsule_area(length, r)
+            want = 2 * r * length + math.pi * r * r
+            self.assertAlmostEqual(area / want, 1.0, delta=0.01, msg=(length, r))
+        area, rows = self.capsule_area(60, 12.0)
+        self.assertEqual(rows[100][60], 255)                                  # the middle is solid
+        self.assertEqual(rows[100 - 12 - 2][60], 0)                           # clear of the pen above it
+        self.assertEqual(rows[100 - 12 + 1][60], 255)                         # solid just inside
+        left_end = 30 - 12                                                    # the round cap: the extreme corner is empty
+        self.assertEqual(rows[100 - 12][left_end], 0)
+        self.assertGreater(rows[100][left_end + 1], 200)
+
+    def test_edges_are_anti_aliased(self):
+        _a, rows = self.capsule_area(80, 11.3)
+        edge = {v for row in rows for v in row if 0 < v < 255}
+        self.assertGreater(len(edge), 10)                                     # many in-between levels, not a hard 0 / 255 edge
+        diag = o1vecfont.rasterize([(10, 10, 150, 90)], 6.0, 160, 100)
+        self.assertGreater(len({v for row in diag for v in row}), 15)
+
+    def test_joins_are_round_and_do_not_double_count(self):
+        # two segments meeting at a corner: the union, so the overlap at the joint is not added twice
+        rows = o1vecfont.rasterize([(20, 20, 80, 20), (80, 20, 80, 80)], 8.0, 120, 120)
+        self.assertTrue(all(0 <= v <= 255 for row in rows for v in row))
+        self.assertEqual(rows[20][80], 255)
+        corner_outside = rows[20 - 8][80 + 8]                                 # the square corner of the pen's bounding box
+        self.assertEqual(corner_outside, 0)                                   # round join, not a mitre
+
+    def test_glyph_bitmaps_have_ink_inside_their_box_and_are_cached(self):
+        for ch in "0123456789.,$\u20ac\u00a3\u00a5AGMQRSW":
+            rows, w, h, ox, oy = o1vecfont.glyph(ch, 120)
+            self.assertEqual((len(rows), len(rows[0])), (h, w))
+            self.assertTrue(any(any(r) for r in rows), ch)
+            self.assertIs(o1vecfont.glyph(ch, 120), o1vecfont.glyph(ch, 120))      # cached
+            self.assertEqual(max(max(r) for r in rows), 255)                     # fully inked somewhere
+        self.assertGreater(sum(map(sum, o1vecfont.glyph("8", 160)[0])), sum(map(sum, o1vecfont.glyph("1", 160)[0])))
+
+    def test_a_digit_is_as_tall_as_asked(self):
+        for h in (60, 200, 400):
+            rows, w, hh, ox, oy = o1vecfont.glyph("0", h)
+            inked = [i for i, r in enumerate(rows) if any(v > 127 for v in r)]
+            span = inked[-1] - inked[0] + 1
+            self.assertAlmostEqual(span / float(h), 0.99, delta=0.03)       # the zero's skeleton spans 8..92, plus the pen
+
+    def test_draw_stays_inside_the_clip_and_keeps_the_background(self):
+        bg, fg = 0x112233, 0xE0F0FF
+        pm = o1gfx.Pixmap(400, 200, bg)
+        with pm.clipped(50, 40, 120, 90):
+            o1vecfont.draw(pm, 20, 20, "$1234567.89", 150, fg, bg)
+        for y in range(200):
+            for x in range(400):
+                if not (50 <= x < 170 and 40 <= y < 130):
+                    self.assertEqual(pm.get(x, y), bg)
+        self.assertTrue(any(v not in (bg, fg) for v in pm.buf))                # anti-aliased edge colours
+        self.assertTrue(any(v == fg for v in pm.buf))
+
+    def test_fit_height_never_overflows(self):
+        for text in ("$0.61", "$1234.56", "\u20ac123456789012.34", "NO DATA", "SET YOUR ELECTRICITY PRICE"):
+            for mw, mh in ((300, 100), (3000, 100), (50, 500), (1900, 300), (7, 7)):
+                h = o1vecfont.fit_height(text, mw, mh)
+                self.assertGreaterEqual(h, 4)
+                if h > 4:
+                    self.assertLessEqual(o1vecfont.text_width(text, h), mw + 1)
+                    y0, y1 = o1vecfont.vertical_extent(text)
+                    self.assertLessEqual((y1 - y0) * h / 100.0, mh + 1)
+
+    def test_ink_is_centred_in_its_box(self):
+        bg, fg = 0, 0xFFFFFF
+        for text in ("$8", "0.61", "-"):
+            pm = o1gfx.Pixmap(600, 300, bg)
+            h = 120
+            top = o1vecfont.ink_top(text, h, 50, 200)
+            o1vecfont.draw(pm, 20, top, text, h, fg, bg)
+            ys = [y for y in range(300) if any(pm.get(x, y) for x in range(600))]
+            self.assertLessEqual(abs((ys[0] + ys[-1]) / 2.0 - 150), 3, text)
 
 
 class TestWidgets(unittest.TestCase):

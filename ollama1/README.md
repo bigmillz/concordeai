@@ -597,12 +597,12 @@ around a little from time to time.
     `OLLAMA1_DASH=text` in the unit's environment.
   - **Space: electricity cost.** Press Space on the server's keyboard and the
     screen shows only the cost of electricity over the last 24 hours, 7 days
-    and 30 days, in very large print (the same figures as the admin panel's
-    Power card, with the tariff's currency symbol); Space again goes back.
-    Other keys do nothing. A figure that is estimated (no plug) carries a
-    `*` and a line says so. With no price set it says "Set your electricity
-    price in the admin panel", with no readings yet "No data yet", and a
-    history shorter than a window is labelled ("only 3d 4h of data"). An open
+    and 30 days, in very large smooth rounded print (the same figures as the
+    admin panel's Power card, with the tariff's currency symbol); Space again
+    goes back. Other keys do nothing. There are no asterisks on this screen,
+    estimated or not. With no price set it says "Set your electricity price in
+    the admin panel", with no readings yet "No data yet", and a history shorter
+    than a window is labelled ("only 3d 4h of data"). An open
     pairing window takes the screen from either view. The keyboard is read
     without echo, so keys never reach a login prompt. The seven-day and
     30-day figures come from the power service, so it needs restarting after
