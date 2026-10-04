@@ -68,6 +68,11 @@ hwtemp() {
   done
 }
 cpu_temp() { hwtemp k10temp temp1_input; }
+gpu_busy() { # the card's own busy percent, or nothing
+  local f; for f in "${O1_DRM:-/sys/class/drm}"/card*/device/gpu_busy_percent; do
+    [ -r "$f" ] && { cat "$f" 2>/dev/null; return; }
+  done
+}
 gpu_temp() { local t; t=$(hwtemp amdgpu temp2_input); [ -n "$t" ] || t=$(hwtemp amdgpu temp1_input); printf '%s' "$t"; }
 
 # hardware-error records the kernel has logged this boot (after a crash, the
@@ -193,9 +198,11 @@ gpu_load() { # answers questions nonstop for $1 seconds; one line in $GPU_OK per
       else
         body="{\"model\":\"$1\",\"prompt\":\"Count from 1 to 300 in words.\",\"stream\":false,\"keep_alive\":\"10m\",\"options\":{\"num_ctx\":8192,\"num_predict\":500}}"
       fi
-      if curl -fsS -m 300 "$0/api/generate" -d "$body" >/dev/null 2>&1; then
+      if curl -fsS -m 300 "$0/api/generate" -d "$body" >/dev/null 2>"$2.err"; then
         echo ok >> "$2"
         curl -fsS -m 10 "$0/api/ps" > "$2.ps" 2>/dev/null    # where the model is loaded: see the check below
+      else
+        sleep 2       # a refused or failing request must not spin the processor
       fi
     done' "$OLLAMA_URL" "$MODEL" "$GPU_OK" >/dev/null 2>&1
 }
@@ -216,7 +223,22 @@ run_phase() {
     if [ -n "$c" ] && { [ -z "$maxc" ] || [ "$c" -gt "$maxc" ]; }; then maxc=$c; fi
     if [ -n "$g" ] && { [ -z "$maxg" ] || [ "$g" -gt "$maxg" ]; }; then maxg=$g; fi
     n=$((n + 1))
-    [ $((n * TICK % 30)) -ne 0 ] || say "   cpu ${c:-?} C, gpu ${g:-?} C"
+    if [ $((n * TICK % 30)) -eq 0 ]; then
+      case "$name" in
+        gpu|all|mix) say "   cpu ${c:-?} C, gpu ${g:-?} C, card busy $(gpu_busy || true)%, answers $(wc -l < "$GPU_OK" | tr -d ' ')" ;;
+        *) say "   cpu ${c:-?} C, gpu ${g:-?} C" ;;
+      esac
+    fi
+    # A load on the card that has produced nothing after 150 s is not testing the card: say so now
+    # (Ollama down, the model not loading, a stalled drive) instead of running the full time.
+    case "$name" in gpu|all|mix)
+      if [ $((n * TICK)) -ge 150 ] && [ ! -s "$GPU_OK" ] && [ "$verdict" = OK ]; then
+        verdict="FAIL"; why="Ollama gave no answer in the first 150 s ($(tr '\n' ' ' < "$GPU_OK.err" 2>/dev/null | cut -c1-120)); check: sudo systemctl status ollama"
+        for p in "${LOADS[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done
+        pkill stress-ng 2>/dev/null
+        break
+      fi ;;
+    esac
     if [ -n "$c" ] && [ "$c" -ge "$CPU_ABORT_C" ]; then verdict="ABORTED"; why="CPU reached $c C"; fi
     if [ -n "$g" ] && [ "$g" -ge "$GPU_ABORT_C" ]; then verdict="ABORTED"; why="graphics junction reached $g C"; fi
     if [ "$verdict" = ABORTED ]; then

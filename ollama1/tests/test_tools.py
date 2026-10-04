@@ -362,6 +362,15 @@ class TestStabilityTest(unittest.TestCase):
         self.assertIn("tmux has-session -t ollama1-stress", sh)
         self.assertNotIn("new-session -A -s ollama1-stress", sh)
 
+    def test_the_gpu_wrapper_and_the_tick_line(self):
+        sh = open(os.path.join(U.TOOLS, "stability-gpu.sh")).read()
+        self.assertIn('--phases gpu --minutes "$MIN" --model "$MODEL"', sh)
+        self.assertTrue(os.access(os.path.join(U.TOOLS, "stability-gpu.sh"), os.X_OK))
+        src = open(self.SCRIPT).read()
+        self.assertIn("card busy $(gpu_busy || true)%, answers", src)
+        self.assertIn("Ollama gave no answer in the first 150 s", src)
+        self.assertIn("a refused or failing request must not spin the processor", src)
+
     def test_a_gpu_phase_with_no_answers_fails(self):
         code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_NO_ANSWER": "1"})
         self.assertEqual(code, 1, out)

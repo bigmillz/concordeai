@@ -9,6 +9,15 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b398 — a graphics-card-only stability run that says what it is doing (per Patrick)
+
+- `stability-gpu.sh [minutes] [model]` runs the card flat out and leaves the
+  processor alone. The gpu/mix/all phases print every 30 s the temperatures,
+  the card's busy percent and the answers so far, and stop with the reason when
+  Ollama has answered nothing after 150 s (a run once sat with the card idle
+  and said nothing); a failing request waits 2 s instead of spinning the
+  processor. The option loop no longer loses the options in the tmux re-exec (6b397).
+
 ## 6b397 — a stability phase for the card at 100% and the processor at 50% (per Patrick)
 
 - `stability-test.sh --phases mix` runs the graphics card flat out (Ollama, long
