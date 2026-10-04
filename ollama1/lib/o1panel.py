@@ -117,10 +117,6 @@ def gb(v):
     return "%.1f" % ((D._f(v) or 0) / 2**30)
 
 
-def rate_short(bps):
-    return D.rate(bps).replace("/s", "/s")
-
-
 # ---- widgets: each draws inside the box it is given -------------------------------
 
 def frame(pm, r, title, right="", accent=None):
@@ -312,10 +308,6 @@ def _graph_row(pm, inner, used_h, left, right, ctx):
     gw = (w - 6) // 2
     graph(pm, (x, gy, gw, gh), left, "")
     graph(pm, (x + gw + 6, gy, w - gw - 6, gh), right, "")
-
-
-def temp_style(t, warn, bad):
-    return D.pct_style(t, warn, bad)
 
 
 def draw_gpu(pm, r, st, ctx):

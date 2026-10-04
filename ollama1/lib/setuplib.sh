@@ -329,6 +329,28 @@ dash_font_step() {
   fi
 }
 
+# What the server's monitor shows (6b380): text, graphic or auto (the default: the graphical
+# panel when a monitor is connected). dash_mode_choice FLAG ENV SAVED -> the word, or fails on one
+# it doesn't know; dash_mode_step writes it where the dashboard reads it.
+: "${DASH_MODE_FILE:=/etc/ollama1/dash-mode}"
+dash_mode_choice() {
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      text|graphic|auto) echo "$v"; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo auto
+}
+dash_mode_step() {
+  mkdir -p "$(dirname "$DASH_MODE_FILE")"
+  printf '%s\n' "${DASH:-auto}" >"$DASH_MODE_FILE"
+  chmod 0644 "$DASH_MODE_FILE"
+  ok "monitor: ${DASH:-auto} (text, graphic or auto: setup.sh --dash)"
+}
+
 wait_for() { local _; for _ in $(seq 1 50); do [ -e "$1" ] && return 0; sleep 0.2; done; return 1; }
 
 # The models disk. $1 disk, $2 serial.

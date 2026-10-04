@@ -21,6 +21,7 @@ TICK_S = 1.0
 DRAW_S = 2.0
 PAIRING_DRAW_S = 1.0
 POLL_S = 0.5
+FULL_REFRESH_S = 30.0     # every row again this often: a screen that lost its picture (suspend, a mode change) heals
 
 
 def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.sleep,
@@ -43,6 +44,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
             fb.write(off, data)
         st, pm = None, None
         next_tick = next_draw = 0.0
+        last_full = clock()
         shown = True
         while not stop():
             now = clock()
@@ -55,8 +57,11 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
                 if not shown:                    # another terminal was on the screen: start from black
                     for off, data in pres.clear():
                         fb.write(off, data)
+                full = not shown or now - last_full >= FULL_REFRESH_S
+                if full:
+                    last_full = now
                 pm = o1panel.render(st, lw, lh, range_s, pm)
-                for off, data in pres.frame(pm, force=not shown):
+                for off, data in pres.frame(pm, force=full):
                     fb.write(off, data)
                 next_draw = now + (PAIRING_DRAW_S if st.get("pairing") else DRAW_S)
                 frames += 1

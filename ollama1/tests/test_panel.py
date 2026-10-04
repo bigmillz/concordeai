@@ -12,6 +12,7 @@ import os
 import random
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import time
@@ -108,7 +109,7 @@ class TestFont(unittest.TestCase):
         self.assertEqual(F.text_width("a"), F.GLYPHS["a"][1])
         self.assertEqual(F.text_width("ab"), F.advance("a") + F.GLYPHS["b"][1])
         for s in ("Hello 97%", "gpt-oss:120b", "14.6/16.0 GiB"):
-            self.assertEqual(F.text_width(s, 3), 3 * F.text_width(s, 1) + 0 if False else F.text_width(s, 3))
+            self.assertEqual(F.text_width(s, 3), sum(F.advance(c, 3) for c in s) - 3)
             self.assertEqual(F.text_width(s, 2), sum(F.advance(c, 2) for c in s) - 2)
 
     def test_fit_never_exceeds_the_width(self):
@@ -567,6 +568,16 @@ class TestLoop(unittest.TestCase):
         self.assertEqual(seen[3], seen[4])                       # nothing drawn while away
         self.assertGreater(seen[-1], seen[4])                    # drawn again after
 
+    def test_an_unchanged_picture_writes_nothing_but_is_refreshed_in_full_every_so_often(self):
+        st = dash_sample.sample(now=1790000000.0)
+        screen = 1280 * 720 * 4
+
+        def written(frames):
+            _n, fb, _t, _c = self.go(sampler=FakeSampler(st), max_frames=frames)
+            return sum(n for _o, n in fb.writes) / float(screen)
+        self.assertAlmostEqual(written(10), 2.0, delta=0.01)        # the black at the start, then the first picture
+        self.assertAlmostEqual(written(20), 3.0, delta=0.01)        # and everything again after 30 s
+
     def test_a_dead_screen_raises_and_still_restores_the_console(self):
         tty = FakeTty()
         c = Clock()
@@ -673,6 +684,72 @@ class TestFallback(unittest.TestCase):
             self.dash.png(["--png", out, "--scale", "2", "--pairing"])
         w, h, _ = decode_png(self.slurp(out))
         self.assertEqual((w, h), (1280, 720))
+
+
+class TestDashSetting(unittest.TestCase):
+    """setup.sh --dash text|graphic|auto: parsed, saved, written where the dashboard reads it."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="o1dashmode-")
+        self.addCleanup(shutil.rmtree, self.d, ignore_errors=True)
+        self.lib = os.path.join(U.KIT, "lib", "setuplib.sh")
+        self.setup = os.path.join(U.KIT, "setup.sh")
+
+    def sh(self, script, env=None):
+        e = dict(os.environ, DASH_MODE_FILE=os.path.join(self.d, "etc", "dash-mode"))
+        e.update(env or {})
+        r = subprocess.run(["bash", "-c", 'ok() { echo "OK: $*"; }\nsource "%s"\n%s' % (self.lib, script)], env=e,
+                           capture_output=True, text=True, timeout=30)
+        return r.returncode, (r.stdout + r.stderr).strip()
+
+    def test_the_flag_wins_then_the_environment_then_what_was_saved(self):
+        self.assertEqual(self.sh('dash_mode_choice "" "" ""'), (0, "auto"))
+        self.assertEqual(self.sh('dash_mode_choice "" "" text'), (0, "text"))
+        self.assertEqual(self.sh('dash_mode_choice "" graphic text'), (0, "graphic"))
+        self.assertEqual(self.sh('dash_mode_choice text graphic auto'), (0, "text"))
+
+    def test_a_word_it_does_not_know_is_refused(self):
+        for args in ('"bogus" "" ""', '"" "bogus" ""', '"" "" "bogus"', '"" "" "TEXT"'):
+            rc, out = self.sh("dash_mode_choice %s" % args)
+            self.assertEqual(rc, 1, args)
+
+    def test_the_step_writes_the_choice_for_the_dashboard(self):
+        f = os.path.join(self.d, "etc", "dash-mode")
+        rc, out = self.sh("DASH=text; dash_mode_step")
+        self.assertEqual(rc, 0, out)
+        with open(f) as fh:
+            self.assertEqual(fh.read(), "text\n")
+        with open(f) as fh:
+            self.assertEqual(o1fb.resolve_mode(None, None, fh.read()), "text")
+        self.sh("unset DASH; dash_mode_step")
+        with open(f) as fh:
+            self.assertEqual(fh.read(), "auto\n")                  # a re-run without it brings the default back
+        self.assertEqual(oct(os.stat(f).st_mode & 0o777), "0o644")
+
+    def test_setup_checks_the_option_before_doing_anything(self):
+        for args in (["--dash", "bogus"], ["--dash"]):
+            r = subprocess.run(["bash", self.setup] + args, capture_output=True, text=True, timeout=30)
+            self.assertEqual(r.returncode, 2, args)
+            self.assertIn("--dash takes text, graphic or auto", r.stdout + r.stderr)
+        r = subprocess.run(["bash", self.setup, "--plan"], env=dict(os.environ, OLLAMA1_DASH="zzz"),
+                           capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("OLLAMA1_DASH takes", r.stdout + r.stderr)
+
+    def test_help_and_the_saved_settings_mention_it(self):
+        r = subprocess.run(["bash", self.setup, "--help"], capture_output=True, text=True, timeout=30)
+        self.assertIn("--dash text|graphic|auto", r.stdout)
+        with open(self.setup) as f:
+            src = f.read()
+        self.assertIn("printf 'DASH=%s\\n' \"$DASH\"", src)
+        self.assertIn('"$(saved DASH)"', src)
+        self.assertLess(src.index('dash_font_step "$LIBDIR/bin/ollama1-dash" /dev/tty1'), src.index("\ndash_mode_step\n"))
+
+    def test_the_unit_gives_the_dashboard_the_framebuffer_group(self):
+        with open(os.path.join(U.KIT, "systemd", "ollama1-dash.service")) as f:
+            unit = f.read()
+        self.assertRegex(unit, r"(?m)^SupplementaryGroups=o1view o1pair video$")
+        self.assertIn("TTYPath=/dev/tty1", unit)                      # the console it takes out of text mode is its own
 
 
 SIZES = [(480, 270), (640, 360), (640, 400), (640, 480), (683, 384), (800, 450), (1024, 600), (1280, 1024), (1920, 1080)]

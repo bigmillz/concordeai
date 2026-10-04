@@ -9,6 +9,76 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b380 — a graphical information panel for the server's monitor (per Patrick)
+
+Patrick: "annoying trying to read all these hash marks". With a monitor
+connected the server now shows a picture instead of the text dashboard. He
+chose a lightweight renderer drawn straight to the screen (no desktop, no
+browser), low resolution being fine.
+
+- **Where it lives (kit only, `ollama1/`).** `lib/o1pixfont.py` (a 5x7 bitmap
+  font with descenders, crisp, drawn at whole-number scales; digits fixed
+  width), `lib/o1gfx.py` (a pixel buffer: clipped rectangles, lines, arcs,
+  text, a PNG writer), `lib/o1panel.py` (layout and the panels),
+  `lib/o1fb.py` (the framebuffer and the console), `lib/o1paneld.py` (the
+  loop), `bin/ollama1-dash` (mode, fall-back, `--png`).
+- **Rendering.** The panel is drawn at about 640x360 and scaled up by the
+  whole number that brings the screen's width nearest 640 (`choose_scale`:
+  1080p x3, 1440p x4, 720p x2), centred; the rest stays black. The buffer
+  is one `array('I')` of 0xRRGGBB, so a filled rectangle is a slice
+  assignment and a frame takes under 25 ms. Each panel is drawn inside
+  `Pixmap.clipped(box)` and `frame()` narrows the clip again to the panel's
+  inside, so a widget cannot paint over a border or its neighbour; text is
+  cut with "..." by its measured pixel width (`o1pixfont.fit`), never by its
+  length. The bar rows cap their label and value columns (a 200-character
+  mount name once pushed everything out of its box in a test).
+- **Framebuffer.** `FBIOGET_VSCREENINFO`/`FSCREENINFO` give the size, depth,
+  colour layout and stride; `Presenter` converts to 32, 24 or 16 bits with
+  any layout through a colour lookup, scales a row once, and returns only
+  the rows that changed since the last frame as `(offset, bytes)` writes
+  (merged when contiguous), honouring `line_length` and the pan offset.
+  `FbDevice.write` is `pwrite` on `/dev/fb0`; no mmap.
+- **Console.** `TtyGraphics` sets `KD_GRAPHICS` on the unit's tty (it is the
+  controlling terminal, so no capability is needed) and restores `KD_TEXT`,
+  the cursor and a cleared screen in `finally`; SIGTERM is turned into a
+  clean stop. While another virtual terminal is on the screen
+  (`VT_GETSTATE`) nothing is drawn; coming back clears and redraws in full.
+- **When it runs.** `--dash auto|text|graphic` (flag, then `OLLAMA1_DASH`,
+  then `/etc/ollama1/dash-mode`, then auto). Auto = `/dev/fb0` exists and a
+  `/sys/class/drm/*/status` says `connected` (`unknown` does not count). The
+  text dashboard polls every 10 s and switches when a monitor appears. Any
+  exception from the panel (open refused, odd depth, a bug) is logged to the
+  journal with its traceback and the text dashboard takes over for the rest
+  of the process; the console is back in text mode before that.
+  `setup.sh --dash` (tiny change: `dash_mode_choice` / `dash_mode_step` in
+  `lib/setuplib.sh`, saved as `DASH=` in `setup.env` only when not auto). The
+  unit gets `SupplementaryGroups=... video` for `/dev/fb0`.
+- **Data.** The same state dict as the text dashboard (`o1metrics.Sampler`),
+  and `o1dashui.warnings()` for the problems, so the two cannot disagree.
+  The sampler gained four one-second series (`gpu_temp`, `cpu_temp`,
+  `cpu_mhz`, `fan_rpm`), `cpu.mhz`/`cpu.max_mhz` (from `o1cpu.CpuProbe`, every
+  2 s), and `activity` (the gateway's activity file) and `idle`
+  (`/run/ollama1/idle.json`) for the sleep line. The sleep line says "Sleeps in
+  mm:ss" only if the idle service publishes `enabled` and `minutes` in
+  `idle.json`; today it publishes `supported` and the wake cards only, so the
+  panel shows "Idle for N" until it does (`sleep_summary` reads them if
+  present).
+- **Preview.** `ollama1-dash --png out.png [--size WxH] [--scale N]
+  [--pairing] [--live]`. Sample data comes from `tests/dash_sample.py`
+  (`--live` uses this machine).
+- **Not verified on real hardware** (no framebuffer here): the ioctl structs
+  were built from the kernel headers' layout and tested with packed fake
+  bytes; `KDSETMODE` on the unit's tty, `/dev/fb0` permissions through the
+  `video` group, `pwrite` on simpledrm/amdgpu fbdev emulation, and how the
+  screen looks at 1080p are all for the first run on the server. If the
+  panel does not appear: `journalctl -u ollama1-dash`, then
+  `sudo ./setup.sh --dash text` puts the old dashboard back.
+- Tests: `tests/test_panel.py` (font, buffer and clipping, layout, pixel
+  formats and strides, the loop on a fake screen, detection with a fake
+  sysfs, fall-back, the setting).
+
+---
+
 ## 6b365 — the stability test runs one load at a time by default (per Patrick)
 
 - `stability-test.sh` with no options ran "all" (cpu, memory and the card at
