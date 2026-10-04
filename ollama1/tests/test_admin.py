@@ -413,6 +413,244 @@ class TestMoneyFormat(unittest.TestCase):
         self.assertNotIn("Cost per 1,000 tokens", src)
 
 
+class TestGraphicalPage(unittest.TestCase):
+    """The graphical page (6b398): the same actions and protections as
+    before, a strict CSP, nothing from anywhere else, and nothing from the
+    server ever treated as markup."""
+
+    def page(self):
+        st, data, r = get("/")
+        self.assertEqual(st, 200)
+        return data.decode(), r.getheader("Content-Security-Policy")
+
+    def script(self, page):
+        return re.search(r'<script nonce="[^"]+">(.*?)</script>', page, re.S).group(1)
+
+    def test_csp_is_strict_and_matches_the_page(self):
+        page, csp = self.page()
+        nonce = re.search(r"script-src 'nonce-([A-Za-z0-9_-]+)'", csp).group(1)
+        for part in ("default-src 'none'", "style-src 'nonce-%s'" % nonce, "connect-src 'self'",
+                     "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'",
+                     "require-trusted-types-for 'script'", "trusted-types 'none'"):
+            self.assertIn(part, csp)
+        for loose in ("unsafe-inline", "unsafe-eval", "unsafe-hashes", "*", "http:", "https:"):
+            self.assertNotIn(loose, csp)
+        # one script and one style block, each with this response's nonce; a second load gets a new one
+        self.assertEqual(re.findall(r"<script\b[^>]*>", page), ['<script nonce="%s">' % nonce])
+        self.assertEqual(re.findall(r"<style\b[^>]*>", page), ['<style nonce="%s">' % nonce])
+        self.assertNotEqual(self.page()[1], csp)
+        # the CSP would block inline handlers and style attributes, so there must be none
+        markup = page.replace(self.script(page), "")
+        self.assertIsNone(re.search(r"<[^>]+\son[a-z]+\s*=", markup, re.I))
+        self.assertIsNone(re.search(r"<[^>]+\sstyle\s*=", markup, re.I))
+
+    def test_nothing_comes_from_anywhere_else(self):
+        page, _ = self.page()
+        urls = set(re.findall(r"(?:https?:)?//[A-Za-z0-9.-]+\.[A-Za-z]{2,}[^\s\"')]*", page))
+        self.assertEqual(urls, {"http://www.w3.org/2000/svg"})        # the SVG namespace name, never fetched
+        self.assertNotIn("@import", page)
+        self.assertIsNone(re.search(r"\ssrc\s*=", page))
+        self.assertIsNone(re.search(r"<link\b(?![^>]*rel=\"icon\" href=\"data:)", page))
+        self.assertLess(len(page.encode()), 150 * 1024)
+
+    def test_no_markup_is_built_from_strings(self):
+        page, _ = self.page()
+        js = self.script(page)
+        for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function",
+                     "setAttribute('style'", "srcdoc"):
+            self.assertNotIn(sink, js, sink)
+        self.assertIn("Every figure from the server goes in with textContent", js)
+
+    def test_every_action_is_on_the_page_and_posts_with_the_token(self):
+        page, _ = self.page()
+        js = self.script(page)
+        acts = set(re.findall(r'data-act="([a-z-]+)"', page))
+        self.assertEqual(acts, {"sleep", "reboot", "restart", "update", "lan", "backup", "pair"})
+        mod = A["mod"]
+        reach = {"lan-on": "'lan-on'", "lan-off": "'lan-off'", "library-preview": "act('library-preview'",
+                 "library-sync": "act('library-sync',p.id,p.id", "power-apply": "post('/api/power/schedule'"}
+        for k in mod.FIXED_UNITS:
+            self.assertTrue(k in acts or reach.get(k, "\0") in js, k)
+        for k, how in (("remove-device", "act('remove-device',x.id"), ("pull", "act('pull',a.hash"),
+                       ("remove-model", "if(c===x.name)act('remove-model',x.hash,c")):
+            self.assertIn(k, mod.TEMPLATE_UNITS)
+            self.assertIn(how, js)
+        # one POST in the whole page: JSON, same origin, the CSRF header
+        self.assertEqual(js.count("method:'POST'"), 1)
+        self.assertIn("{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',"
+                      "'X-O1-CSRF':CSRF},body:JSON.stringify(obj)}", js)
+        self.assertEqual(js.count("fetch("), 2)                          # that one, and api() for the GETs
+        # every destructive action asks first, in the styled dialog
+        self.assertIn("act('reboot',null,'reboot',b)", js)
+        self.assertIn("act('sleep',null,'sleep',b)", js)
+        for title in ("Reboot the server now?", "Put the server to sleep?", "Apply updates now?",
+                      "Restart the services?", "'Unpair '+x.name+'?'", "'Remove '+x.name+'?'",
+                      "Apply the library changes?", "Turn LAN mode on?", "Replace the prices?"):
+            self.assertIn(title, js)
+        self.assertIn('<dialog id="dlg" aria-labelledby="dlgt">', page)
+        self.assertEqual(re.findall(r"(?<![.\w])(?:confirm|prompt|alert)\(", js), [])  # window.* only as the fallback
+        # answers are shown as the server gave them
+        self.assertIn("toast((LABEL[action]||action)+(r.ok?': '+r.msg:' refused')", js)
+
+    def test_polling_pauses_while_hidden(self):
+        js = self.script(self.page()[0])
+        self.assertIn("document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPolling();else startPolling();});", js)
+        self.assertIn("@media (prefers-reduced-motion:reduce)", self.page()[0])
+
+
+class TestStateForThePage(unittest.TestCase):
+    """The status files the page draws, cut down to known fields."""
+
+    def setUp(self):
+        import o1fan
+        import o1gputune
+        import o1leds
+        self.files = {"fan": o1fan.status_path(), "leds": o1leds.status_path(),
+                      "idle": os.path.join(Paths.run, "idle.json"), "tune": o1gputune.state_path(),
+                      "stats": Paths.stats}
+        for f in self.files.values():
+            self.addCleanup(lambda f=f: os.path.exists(f) and os.unlink(f))
+        A["panel"].state_cache = (0, None)
+        self.addCleanup(lambda: setattr(A["panel"], "state_cache", (0, None)))
+
+    def write(self, key, obj):
+        os.makedirs(os.path.dirname(self.files[key]), exist_ok=True)
+        with open(self.files[key], "w") as f:
+            json.dump(obj, f)
+
+    def state(self):
+        A["panel"].state_cache = (0, None)
+        st, raw, _ = get("/api/state")
+        self.assertEqual(st, 200)
+        return raw, json.loads(raw)
+
+    def test_absent_files_are_none(self):
+        _, s = self.state()
+        for k in ("fan_status", "leds_status", "idle", "gpu_tune"):
+            self.assertIn(k, s)
+            self.assertIsNone(s[k], k)
+
+    def test_shapes_and_hostile_text(self):
+        now = int(time.time())
+        evil = "<script>alert(1)</script>"
+        self.write("fan", {"at": now, "phase": "hold100", "pct": 100, "hold_left": 42, "why": evil,
+                           "outputs": [{"label": evil, "rpm": 1500, "pwm": 255, "secret": "x"},
+                                       {"label": "Case fan 2", "rpm": "fast", "pwm": float("nan")}],
+                           "temps": [{"label": "NVMe", "c": 58, "limit": 70}], "line": "Fans: 100%",
+                           "aio": {"found": True, "name": "AIO", "pump_rpm": 2800, "coolant_c": 31.5}})
+        self.write("leds", {"at": now, "state": "red", "target": "red", "rgb": [255, 0, 999], "connected": True,
+                            "devices": [{"name": evil}], "line": "Lights: red"})
+        self.write("idle", {"at": now - 20, "enabled": True, "minutes": 30, "supported": True, "sleep_ok": False,
+                            "reason": "idle 12 of 30 minutes", "idle_s": 720, "wake": ["02:00:5e:10:00:01"]})
+        self.write("tune", {"wanted": "on", "applied": {"power_uw": 293_000_000, "mclk": 1075, "at": now},
+                            "stock": {"power_uw": 255_000_000, "mclk": 1000},
+                            "check": {"result": "passed", "note": "passed: 12 answers", "at": now}})
+        raw, s = self.state()
+        self.assertNotIn(b"<script", raw)                       # < in the JSON; the page uses textContent
+        f = s["fan_status"]
+        self.assertEqual((f["phase"], f["pct"], f["hold_left"]), ("hold100", 100, 42))
+        self.assertEqual(f["outputs"][0], {"label": evil, "rpm": 1500, "pwm": 255, "min_pct": None, "note": None})
+        self.assertEqual((f["outputs"][1]["rpm"], f["outputs"][1]["pwm"]), (None, None))
+        self.assertEqual(f["aio"]["pump_rpm"], 2800)
+        self.assertEqual(s["fan"], "Fans: 100%")                 # the one-line text is still there
+        led = s["leds_status"]
+        self.assertEqual(led["rgb"], [255, 0, 255])
+        self.assertEqual((led["devices"], led["names"]), (1, [evil]))
+        i = s["idle"]
+        self.assertEqual((i["enabled"], i["minutes"], i["sleep_ok"], i["idle_s"], i["wake_cards"]), (True, 30, False, 720, 1))
+        self.assertGreaterEqual(i["age_s"], 19)                 # by the server's clock, not the browser's
+        t = s["gpu_tune"]
+        self.assertEqual((t["applied"]["power_w"], t["stock"]["power_w"], t["check"]["result"]), (293, 255, "passed"))
+
+    def test_a_stale_fan_file_is_none(self):
+        self.write("fan", {"at": int(time.time()) - 600, "phase": "working", "pct": 100, "line": "x"})
+        _, s = self.state()
+        self.assertIsNone(s["fan_status"])
+        self.assertIsNone(s["fan"])
+
+    def test_logs_add_events_and_errors_and_escape(self):
+        from o1common import write_json_atomic
+        evil = "<img src=x onerror=alert(1)>"
+        write_json_atomic(Paths.stats, {"time": int(time.time()), "recent": [{"t": 1, "device": evil, "model": evil,
+                                                                             "status": 200}],
+                                        "events": [{"t": 1, "kind": "load", "model": evil}], "errors": {"busy": 2}},
+                          mode=0o644)
+        st, raw, _ = get("/api/logs")
+        self.assertEqual(st, 200)
+        self.assertNotIn(b"<img", raw)
+        d = json.loads(raw)
+        self.assertEqual(d["recent"][0]["device"], evil)        # the same text once decoded
+        self.assertEqual(d["events"][0]["model"], evil)
+        self.assertEqual(d["errors"], {"busy": 2})
+        for k in ("recent", "per_minute", "totals", "auth_failures", "actions", "ollama_update"):
+            self.assertIn(k, d)
+
+    @unittest.skipUnless(__import__("shutil").which("node"), "node not installed")
+    def test_sleep_text_matches_the_server_screen(self):
+        """The page's sleep line says what the HDMI panel says (o1panel.sleep_summary), from the same file."""
+        import subprocess
+        import o1panel
+        page = get("/")[1].decode()
+        fn = re.search(r"^function sleepSummary.*?^(?=// ---- gauges)", page, re.S | re.M).group(0)
+        now = int(time.time())
+        base = {"at": now - 10, "enabled": True, "supported": True, "minutes": 30, "sleep_ok": False,
+                "reason": "idle 12 of 30 minutes", "idle_s": 720}
+        cases = [base, dict(base, sleep_ok=True), dict(base, enabled=False), dict(base, supported=False),
+                 dict(base, reason="a request is running"), dict(base, at=now - 400), dict(base, idle_s=1795)]
+        mod = A["mod"]
+        ins = [mod.clean_idle(c, now) for c in cases] + [None]
+        js = ("const isNum=v=>typeof v==='number'&&isFinite(v);const mmss=s=>Math.floor(s/60)+':'+"
+              "String(Math.floor(s%60)).padStart(2,'0');let fetchedAt=Date.now()/1000+60;" + fn +
+              "console.log(JSON.stringify(" + json.dumps(ins) + ".map(sleepSummary)));")
+        r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)
+        want = [o1panel.sleep_summary({"idle": c}, now)[0] for c in cases]
+        self.assertEqual(want, ["Sleeps in 17:50", "Going to sleep now", "Auto sleep is off",
+                                "No deep sleep on this machine", "A request is running", "Sleep status unknown",
+                                "Sleeping very soon"])
+        page_says = {"Sleeps in 17:50": ["in 17:50"], "Going to sleep now": ["Now", "going to sleep now"],
+                     "Auto sleep is off": ["Off", "auto sleep is off"], "No deep sleep on this machine": ["No deep sleep"],
+                     "A request is running": ["Awake", "A request is running"], "Sleep status unknown": ["Unknown"],
+                     "Sleeping very soon": ["Very soon", "sleeping very soon"]}
+        want.append("Sleep status unknown")            # no file at all
+        for w, g in zip(want, got):
+            for part in page_says[w]:
+                self.assertIn(part, (g[0], g[2]), (w, g))
+
+
+class TestDemoNeverInProduction(unittest.TestCase):
+    """tests/admin_demo.py drives the real panel on made-up data for a
+    browser on a development machine. It is never installed, refuses root and
+    systemd, and the panel itself has no switch for it."""
+
+    def test_refusals(self):
+        import admin_demo
+        self.assertIn("root", admin_demo.refuse_reason(euid=0, environ={}))
+        self.assertIn("systemd", admin_demo.refuse_reason(euid=1000, environ={"INVOCATION_ID": "abc"}))
+        self.assertIsNone(admin_demo.refuse_reason(euid=1000, environ={}))
+
+    def test_refused_under_systemd_before_anything_starts(self):
+        import subprocess
+        import sys
+        port = U.free_port()
+        r = subprocess.run([sys.executable, os.path.join(U.HERE, "admin_demo.py"), str(port)], capture_output=True,
+                           text=True, timeout=60, env=dict(os.environ, INVOCATION_ID="x"))
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("never part of a server", r.stderr)
+
+    def test_not_installed_and_no_switch_in_the_panel(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        self.assertIn('install -m 0755 "$KIT"/bin/* "$LIBDIR/bin/"', setup)
+        self.assertNotIn("tests/", setup)
+        self.assertFalse(os.path.exists(os.path.join(U.BIN, "admin_demo.py")))
+        src = open(os.path.join(U.BIN, "ollama1-admin")).read()
+        for word in ("environ", "getenv", "demo", "DEMO"):
+            self.assertNotIn(word, src, word)
+        unit = open(os.path.join(U.SYSTEMD, "ollama1-admin.service")).read()
+        self.assertEqual(re.findall(r"^Environment=(.*)$", unit, re.M), ["PYTHONDONTWRITEBYTECODE=1"])
+
+
 class FakeTtyd:
     """ttyd on a UNIX socket, sending its own (weaker) framing headers."""
 
