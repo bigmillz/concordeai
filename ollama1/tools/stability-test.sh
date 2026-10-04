@@ -102,6 +102,9 @@ case "${1:-}" in
   status) cmd_status; exit 0 ;;
 esac
 
+# Kept whole: the loop below shifts them away, and the tmux wrapper further down
+# must hand the same options to the run inside it (they were once all lost there).
+ORIG_ARGS=("$@")
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --minutes) MINUTES=${2:-}; shift 2 ;;
@@ -135,7 +138,7 @@ if [ -z "${TMUX:-}" ] && [ "${O1_NO_TMUX:-}" != 1 ] && [ -t 0 ] && command -v tm
   fi
   echo "Starting in tmux (session ollama1-stress). If the connection drops: sudo tmux attach -t ollama1-stress"
   exec tmux new-session -s ollama1-stress \
-    "O1_NO_TMUX=1 bash '$HERE/stability-test.sh'$(quoted_args "$@"); echo; read -r -p 'Finished. Press Enter to close. ' _"
+    "O1_NO_TMUX=1 bash '$HERE/stability-test.sh'$(quoted_args "${ORIG_ARGS[@]}"); echo; read -r -p 'Finished. Press Enter to close. ' _"
 fi
 
 mkdir -p "$STATE_DIR"

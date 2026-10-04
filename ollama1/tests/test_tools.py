@@ -441,6 +441,27 @@ class TestStabilityTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("Run it with sudo", r.stdout + r.stderr)
 
+    def test_the_options_reach_the_run_inside_tmux(self):
+        """The option loop shifts "$@" away; the tmux wrapper once handed the run
+        inside it none of them, so every run was the default (cpu, gpu, memory)."""
+        import pty
+        rec = os.path.join(self.dir, "tmux-args")
+        self.fake("tmux", 'case "$1" in has-session) exit 1;; esac; printf "%s\\n" "$@" > "' + rec + '"')
+        e = dict(os.environ, PATH=self.bin + os.pathsep + os.environ["PATH"], O1_STATE_DIR=self.state,
+                 O1_STABILITY_LOG=os.path.join(self.dir, "log"), O1_STABILITY_NOROOT="1")
+        e.pop("TMUX", None)
+        e.pop("O1_NO_TMUX", None)
+        m, s = pty.openpty()
+        try:
+            r = subprocess.run(["bash", self.SCRIPT, "--phases", "mix", "--minutes", "60", "--cpu-load", "50",
+                                "--model", "gemma4:12b"], stdin=s, capture_output=True, text=True, timeout=60, env=e)
+        finally:
+            os.close(m)
+            os.close(s)
+        with open(rec) as f:
+            cmd = f.read()
+        self.assertIn("--phases mix --minutes 60 --cpu-load 50 --model gemma4:12b", cmd, r.stdout + r.stderr)
+
     def test_no_empty_argument_for_tmux(self):
         with open(self.SCRIPT) as f:
             src = f.read()
