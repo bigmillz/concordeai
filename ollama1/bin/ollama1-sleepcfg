@@ -1,0 +1,36 @@
+#!/usr/bin/python3
+"""ollama1-sleepcfg: set the auto sleep setting for the admin panel (6b402).
+
+    ollama1-sleepcfg on-30       (ollama1-sleepcfg@on-30.service)
+    ollama1-sleepcfg off-60
+
+Runs as the gateway's user (o1gw), never root: it writes the same file the
+gateway's /v1/sleep-config writes (/var/lib/ollama1-gateway/sleep.json),
+through the same code (o1idle.write_config), so owner, mode and atomic
+write are the gateway's own. The only input is the instance name, "on" or
+"off", a dash and 1 to 4 digits (clamped to 5..1440); anything else is
+refused. It reads the file back and leaves the answer in
+/run/ollama1/stats/sleepcfg.json for the panel to show.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1idle  # noqa: E402
+
+
+def main(argv):
+    if os.geteuid() == 0:
+        print("ollama1-sleepcfg runs as the gateway's user (ollama1-sleepcfg@.service), not root", file=sys.stderr)
+        return 2
+    if len(argv) != 2:
+        print("usage: ollama1-sleepcfg on-30|off-30", file=sys.stderr)
+        return 2
+    ok, res = o1idle.apply_sleepcfg(argv[1])
+    print("sleepcfg: %s %s" % (argv[1][:16], "saved" if ok else "refused: " + res.get("error", "")), flush=True)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -288,11 +288,14 @@ class Fake:
                           {"name": "Corsair H115i Platinum", "vendor": "Corsair", "leds": 16, "mode": "Direct", "usable": True}]}
         ls["line"] = o1leds.status_line(ls)
         self.wj("run/ollama1/leds.json", ls)
-        idle_s = 0 if busy else int((now - self.t0) % 90 - 55) * 20 + 600
-        self.wj("run/ollama1/idle.json", {"at": int(now) - 4, "supported": True, "wake": ["02:00:5e:10:00:01"],
-                                          "enabled": True, "minutes": 30, "sleep_ok": False,
-                                          "reason": "a request is running" if busy else "idle %d of 30 minutes" % (idle_s // 60),
-                                          "idle_s": idle_s})
+        import o1idle
+        cfg = o1idle.read_config()            # the setting the page (or a test) saved: the idle service re-reads it every tick
+        idle_s = 0 if busy else 90 + int(now - self.t0) % max(60, cfg["minutes"] * 60 - 120)
+        reason = ("auto sleep is off" if not cfg["enabled"] else "a request is running" if busy
+                  else "idle %d of %d minutes" % (idle_s // 60, cfg["minutes"]))
+        self.wj("run/ollama1/idle.json", {"at": int(now), "supported": True, "wake": ["02:00:5e:10:00:01"],
+                                          "enabled": cfg["enabled"], "minutes": cfg["minutes"], "sleep_ok": False,
+                                          "reason": reason, "idle_s": idle_s})
         w = self.wave(305 if busy else 96, 20 if busy else 4, 30)
         series = []
         for i in range(360):
@@ -347,6 +350,9 @@ class Fake:
                     n = line.split()[0] if line.split() else ""
                     if n and name_hash(n) == h:
                         self.pull = {"model": n, "status": "pulling", "completed": 0, "total": int(14.3 * GIB)}
+            elif verb == "sleepcfg":
+                import o1idle                 # the real program's own function, as the gateway's user would run it
+                o1idle.apply_sleepcfg(unit.split("@", 1)[1][:-len(".service")])
             elif verb == "rmmodel":
                 h = unit.split("@")[1].split(".")[0]
                 self.models = {n: s for n, s in self.models.items() if name_hash(n) != h}

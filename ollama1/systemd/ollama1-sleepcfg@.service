@@ -1,0 +1,47 @@
+# Sets the auto sleep setting for the admin panel (6b402). The instance name
+# is the whole request: ollama1-sleepcfg@on-30.service, @off-60.service (on or
+# off, a dash, 1 to 4 digits; the polkit rule allows only that shape and the
+# program checks it again and clamps the minutes to 5..1440). It runs as the
+# gateway's own user, with no capabilities and no network, and writes only the
+# gateway's state folder (the same sleep.json /v1/sleep-config writes, through
+# the same code) and its answer in /run/ollama1/stats. The panel can start it
+# and nothing else about it.
+[Unit]
+Description=ollama1: set auto sleep (%i) for the admin panel
+
+[Service]
+Type=oneshot
+User=o1gw
+Group=o1gw
+SupplementaryGroups=o1view
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-sleepcfg %i
+Environment=PYTHONDONTWRITEBYTECODE=1
+StateDirectory=ollama1-gateway
+StateDirectoryMode=0700
+ReadWritePaths=/run/ollama1/stats
+TimeoutStartSec=30
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+RestrictAddressFamilies=AF_UNIX
+UMask=0027
