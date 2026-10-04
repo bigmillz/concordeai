@@ -203,6 +203,7 @@ class Sampler:
             "updates": self._slow("updates", 30, o1stats.updates) or {},
             "pairing": o1stats.pairing_window(),
             "power": self._slow("power", 5, power_state),
+            "fan": read_json(os.path.join(Paths.run, "fan.json")),          # the fan service's status (6b416)
             "activity": read_json(os.path.join(Paths.stats_dir, "activity.json")),
             "idle": self._slow("idle", 5, lambda: read_json(os.path.join(Paths.run, "idle.json"))),
         }

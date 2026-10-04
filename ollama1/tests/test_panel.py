@@ -764,7 +764,7 @@ class TestLayout(unittest.TestCase):
     def test_boxes_are_inside_the_screen_and_never_overlap(self):
         for w, h in SIZES:
             boxes = o1panel.layout(w, h)
-            self.assertEqual(set(boxes), {"header", "gpu", "cpu", "models", "storage", "status", "footer"}, (w, h))
+            self.assertEqual(set(boxes), {"header", "gpu", "cpu", "models", "storage", "fans", "status", "footer"}, (w, h))
             items = list(boxes.items())
             for name, (x, y, bw, bh) in items:
                 self.assertTrue(x >= 0 and y >= 0 and x + bw <= w and y + bh <= h and bw > 0 and bh > 0, (w, h, name))
@@ -1939,6 +1939,7 @@ class TestRaidLine(unittest.TestCase):
             for md, kind in ((mdstat("UU", MD_CHECK), "info"), (mdstat("U_"), "bad"), (mdstat("UU"), "ok")):
                 st = dash_sample.sample(now=1790000000.0)
                 st["raid"] = self.parse(md)
+                st["disks"] = st["disks"][:1]                                     # the box is shorter now: one disk leaves room for the line
                 seen = []
                 orig = o1hipix.HiPixmap.text
 
@@ -1958,6 +1959,105 @@ class TestRaidLine(unittest.TestCase):
                         self.assertLessEqual(tx + mw, x + w - 8 + 1, (s_, sw))      # the line is cut to the box, not drawn past it
                         if "check" in s_:
                             self.assertEqual(c, o1panel.T["text"])
+
+
+class TestFans(unittest.TestCase):
+    """The FANS box (6b416): /run/ollama1/fan.json, and the memory temperature in the card box."""
+
+    NOW = 1790000000.0
+
+    def st(self, **fan):
+        st = dash_sample.sample(now=self.NOW)
+        st["fan"].update(fan)
+        return st
+
+    def test_rows_and_header(self):
+        kind, head, warn, rows, cool = o1panel.fan_view(self.st(), self.NOW)
+        self.assertEqual((kind, head, warn), ("rows", "working 100% - gpu busy", False))
+        self.assertEqual([r[0] for r in rows], ["GPU fan", "Case fan 1", "Case fan 2", "Radiator fans", "Pump"])   # fan3: no rpm, not controlled
+        self.assertEqual(rows[0][1], "2310 rpm")
+        self.assertEqual(rows[0][2], 1.0)
+        self.assertEqual(rows[4][1], "2400 rpm quiet")
+        self.assertEqual(cool, "Coolant 31\u00b0C")
+
+    def test_phases(self):
+        for phase, pct, why, want in (("idle20", 20, "idle", "idle 20%"), ("hold100", 100, "the work ended", "cooling down 100%"),
+                                      ("hold50", 50, "x", "cooling down 50%"), ("ramp", 73, "x", "cooling down 73%"),
+                                      ("calibrating", 100, "x", "measuring 100%"), (None, 40, None, "40%")):
+            self.assertEqual(o1panel.fan_view(self.st(phase=phase, pct=pct, why=why), self.NOW)[1], want)
+        v = o1panel.fan_view(self.st(phase="hot", pct=100, why="too warm: GPU junction"), self.NOW)
+        self.assertTrue(v[2])
+        self.assertTrue(o1panel.fan_view(self.st(hot=["x"]), self.NOW)[2])
+
+    def test_controlled_output_without_rpm_is_shown_an_idle_unreadable_one_is_not(self):
+        outs = [{"label": "fan1", "enable": 1, "pwm": 128, "rpm": None}, {"label": "fan2", "enable": 2, "pwm": 0, "rpm": 0}]
+        rows = o1panel.fan_view(self.st(outputs=outs, aio=None), self.NOW)[3]
+        self.assertEqual([(r[0], r[1]) for r in rows], [("Case fan 1", "-")])
+        self.assertAlmostEqual(rows[0][2], 128 / 255.0)
+
+    def test_no_data_when_missing_or_stale(self):
+        st = dash_sample.sample(now=self.NOW)
+        st["fan"] = None
+        self.assertEqual(o1panel.fan_view(st, self.NOW), ("none", None))
+        st = self.st()
+        self.assertEqual(o1panel.fan_view(st, self.NOW + 31), ("none", None))
+        self.assertEqual(o1panel.fan_view(st, self.NOW + 29)[0], "rows")
+        seen = []
+        orig = o1hipix.HiPixmap.text
+
+        def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+            seen.append(s_)
+            return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+        o1hipix.HiPixmap.text = rec
+        try:
+            st["fan"]["at"] = int(self.NOW) - 100
+            o1panel.render(st, 640, 360, scale=1)
+        finally:
+            o1hipix.HiPixmap.text = orig
+        self.assertIn("no fan data", seen)
+
+    def test_the_card_shows_memory_temperature_not_the_fan(self):
+        seen = []
+        orig = o1hipix.HiPixmap.text
+
+        def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+            seen.append(s_)
+            return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+        o1hipix.HiPixmap.text = rec
+        try:
+            o1panel.render(dash_sample.sample(now=self.NOW), 640, 360)
+        finally:
+            o1hipix.HiPixmap.text = orig
+        self.assertIn("Mem", seen)
+        self.assertIn("70\u00b0C", seen)
+        self.assertNotIn("Fan", seen)
+        self.assertEqual([t for t in seen if t in ("VRAM", "Power", "Temp", "Mem")][:4], ["VRAM", "Power", "Temp", "Mem"])
+
+    def test_it_fits_at_every_resolution_and_with_many_fans(self):
+        outs = [{"label": "GPU fan", "enable": 1, "pwm": 200, "rpm": 2000}] + \
+               [{"label": "fan%d" % i, "enable": 1, "pwm": 90, "rpm": 900 + i} for i in range(9)]
+        for sw, sh in ((1920, 1080), (2560, 1440), (3840, 2160), (1366, 768)):
+            k, lw, lh = o1fb.choose_scale(sw, sh)
+            for fan in ({}, {"outputs": outs, "why": "x" * 150}, {"phase": "hot", "outputs": outs}):
+                st = self.st(**fan)
+                pm = o1panel.render(st, lw, lh, scale=k)
+                x, y, w, h = o1panel.layout(lw, lh)["fans"]
+                for yy in range((y + 4) * k, (y + h - 4) * k, max(1, k)):
+                    for xx in list(range((x + w - 2) * k - k, (x + w - 1) * k)) + list(range((x + 1) * k, (x + 2) * k)):
+                        self.assertEqual(pm.buf[yy * pm.pw + xx], o1panel.T["panel"] if not fan.get("phase") else pm.buf[yy * pm.pw + xx])
+
+    def test_the_middle_column_is_two_boxes_of_one_width(self):
+        for w, h in ((640, 360), (800, 450), (1024, 768), (480, 270)):
+            b = o1panel.layout(w, h)
+            self.assertEqual((b["storage"][0], b["storage"][2]), (b["fans"][0], b["fans"][2]))
+            self.assertLess(b["storage"][1] + b["storage"][3], b["fans"][1])
+            self.assertEqual(b["fans"][1] + b["fans"][3], b["models"][1] + b["models"][3])
+            self.assertEqual(b["storage"][1], b["models"][1])
+
+    def test_the_sampler_reads_the_file(self):
+        import o1metrics
+        src = open(os.path.join(U.LIB, "o1metrics.py")).read()
+        self.assertIn('"fan.json"', src)
 
 
 class TestWidgets(unittest.TestCase):

@@ -9,6 +9,22 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b416 — a FANS box on the panel; memory temperature in place of the fan bar (per Patrick)
+
+- The bottom-middle box is split: STORAGE AND NETWORK above (46%, rows 11 units apart; its Disk/Net/Link
+  lines and the RAID line go first when there is no room, disks never), and FANS below, same width; the bottom
+  row is still three columns at the same heights. `layout()` gains "fans".
+- FANS reads `/run/ollama1/fan.json` (`o1metrics` adds it as `st["fan"]` every tick; one small file). Rows: GPU fan,
+  `Case fan 1..n` (outputs with an rpm or under control, in file order; an unreadable uncontrolled one is skipped),
+  Radiator fans and Pump (rpm and mode) when the Corsair cooler is controlling, then "Coolant NN C" if every row
+  fits ("+N more" otherwise). The bar is the output's setting (pwm of 255; the file has no maximum rpm), or its rpm
+  against the fastest fan. Header: "working 100% - why", "cooling down NN%" (hold100, hold50 and the coming `ramp`
+  phase), "idle 20%", "measuring 100%", just the level for an unknown phase; amber and an amber border when the phase
+  is "hot" or the file lists hot sensors. "no fan data" when the file is missing or older than 30 s.
+- GRAPHICS CARD: the Fan row is gone; in its place Mem, the card's own memory temperature (`temps["mem"]`, already read
+  by `o1stats.gpu()`, no new sampling), full bar at 95 C, amber from 85, red from 95. Temp stays the junction/edge one.
+- Install: lib/o1panel.py, lib/o1metrics.py, then restart ollama1-dash. Tests: TestFans; 4 mutants.
+
 ## 6b404 — the RAID mirror is gone from the kit (per Patrick: "pointless, it just ties up resources checking and rebuilding")
 
 Kit only (`ollama1/`). The mirror (two 8 TB disks, RAID1 at /srv/data) is no longer built,

@@ -72,12 +72,14 @@ def layout(w, h):
     w2 = avail * 32 // 100
     w3 = avail - w1 - w2
     y2 = top + top_h + m
+    st_h = (bot_h - m) * 46 // 100                     # the middle column: storage over fans
     return {
         "header": (0, 0, w, head_h),
         "gpu": (m, top, col_w, top_h),
         "cpu": (m + col_w + m, top, w - 2 * m - col_w - m, top_h),
         "models": (m, y2, w1, bot_h),
-        "storage": (m + w1 + m, y2, w2, bot_h),
+        "storage": (m + w1 + m, y2, w2, st_h),
+        "fans": (m + w1 + m, y2 + st_h + m, w2, bot_h - st_h - m),
         "status": (m + w1 + m + w2 + m, y2, w3, bot_h),
         "footer": (0, h - foot_h, w, foot_h),
     }
@@ -126,7 +128,7 @@ def gb(v):
 
 # ---- widgets: each draws inside the box it is given -------------------------------
 
-def frame(pm, r, title, right="", accent=None):
+def frame(pm, r, title, right="", accent=None, right_colour=None):
     """A panel: border, fill, title. Returns the inside box, and narrows the
     clip to it (the caller's clipped() block restores the old one)."""
     x, y, w, h = r
@@ -136,7 +138,7 @@ def frame(pm, r, title, right="", accent=None):
     if right:
         room = w - 16 - tw - 10
         if room > 12:
-            pm.text_right(x + w - 8, y + 5, right, T["dim"], max_w=room)
+            pm.text_right(x + w - 8, y + 5, right, right_colour if right_colour is not None else T["dim"], max_w=room)
     inner = (x + 8, y + 18, w - 16, h - 18 - 6)
     c = pm.clip                                   # from here on the widgets cannot reach the border or the title
     pm.clip = (max(c[0], inner[0]), max(c[1], inner[1]), min(c[2], inner[0] + inner[2]), min(c[3], inner[1] + inner[3]))
@@ -333,6 +335,9 @@ def _graph_row(pm, inner, used_h, left, right, ctx):
     graph(pm, (x + gw + 6, gy, w - gw - 6, gh), right, "")
 
 
+MEM_TEMP_MAX = 95.0       # the memory temperature bar is full at this (the card's limit)
+
+
 def draw_gpu(pm, r, st, ctx):
     g = st.get("gpu")
     if not isinstance(g, dict):
@@ -348,7 +353,7 @@ def draw_gpu(pm, r, st, ctx):
     temps = [t for t in (D._f(v) for v in _d(g.get("temps")).values()) if t is not None]
     hot = D._f(D.dig(g, "temps", "junction"))
     hot = hot if hot is not None else (max(temps) if temps else None)
-    rpm, fan = D._f(g.get("fan_rpm")), D._f(g.get("fan_pct"))
+    memt = D._f(D.dig(g, "temps", "mem"))             # the card's memory sensor: already read with the others (6b416)
     rd = 28 if h >= 100 else 22
     ring(pm, x + rd + 1, y + rd, rd, 6 if rd == 28 else 5, (busy or 0) / 100.0 if busy is not None else None,
          T["gpu"], "%s%%" % D.num(busy, "%.0f") if busy is not None else "-", "busy" if rd == 28 else "")
@@ -360,8 +365,8 @@ def draw_gpu(pm, r, st, ctx):
          D.frac(pw, cap), T["pow"]),
         ("Temp", ("%s°C" % D.num(hot, "%.0f")) if hot is not None else "-", None if hot is None else hot / 110.0,
          col(D.pct_style(hot, 80, 95))),
-        ("Fan", ("%d rpm" % rpm) if rpm is not None else ("%s%%" % D.num(fan, "%.0f") if fan is not None else "-"),
-         None if fan is None else fan / 100.0, T["net"]),
+        ("Mem", ("%s\u00b0C" % D.num(memt, "%.0f")) if memt is not None else "-", None if memt is None else memt / MEM_TEMP_MAX,
+         col(D.pct_style(memt, 85, 95)) if memt is not None else T["net"]),
     ]
     used = max(2 * rd + 1, bar_rows(pm, (x + 2 * rd + 10, y, w - 2 * rd - 10, 2 * rd + 2), rows, 14 if rd == 28 else 12))
     rs = ctx["range_s"]
@@ -497,18 +502,18 @@ def draw_storage(pm, r, st, ctx):
             tail.append(("Link", "%d port%s %d Mb/s" % (len(ports), "" if len(ports) == 1 else "s", sp.pop()), True))
         else:
             tail.append(("Link", "%d of %d ports up" % (len(up), len(ports)), False))
-    while tail and 13 * len(rows) - 6 + 3 + 12 * len(tail) > h:        # every disk first, then the lines under them
+    while tail and 11 * len(rows) - 4 + 3 + 10 * len(tail) > h:        # every disk first, then the lines under them
         tail.pop()
-    keep = max(1, (h - 3 - 12 * len(tail) + 6) // 13)
+    keep = max(1, (h - 3 - 10 * len(tail) + 4) // 11)
     if len(rows) > keep:
         rows.sort(key=lambda r: 0 if r[1] == "MISSING" else 1)           # a missing disk is never the one left out
         more = len(rows) - keep + 1
         rows = rows[:keep - 1] + [("+%d more" % more, "", None, T["dim"])]
-    used = bar_rows(pm, (x, y, w, h), rows)
+    used = bar_rows(pm, (x, y, w, h), rows, 11)
     for i, row in enumerate(rows):
         if row[1] == "MISSING":
-            pm.text_right(x + w, y + i * 13, row[1], T["bad"], max_w=w // 2)
-    yy = y + used + 3
+            pm.text_right(x + w, y + i * 11, row[1], T["bad"], max_w=w // 2)
+    yy = y + used + 2
     lw = widest([t[0] for t in tail if t[0] != "raid"])
     for label, text, ok in tail:
         if yy + 8 > y + h:
@@ -520,7 +525,7 @@ def draw_storage(pm, r, st, ctx):
         else:
             pm.text(x, yy, label, T["dim"], max_w=lw)
             pm.text(x + lw + 6, yy, text, T["text"] if ok else T["warn"], max_w=w - lw - 6)
-        yy += 12
+        yy += 10
 
 
 RAID_COLOURS = {"ok": T["ok"], "info": T["gpu"], "warn": T["warn"], "bad": T["bad"]}
@@ -540,6 +545,79 @@ def raid_status(a):
     if not action:
         return "RAID %s healthy" % name, "ok"
     return "RAID %s: %s" % (name, D.raid_action(a, "%.1f", True)), "info" if action == "check" else "warn"
+
+
+FAN_STALE_S = 30
+
+
+def fan_fresh(st, now):
+    fan = _d(st.get("fan"))
+    at = D._f(fan.get("at"))
+    return at is not None and abs(now - at) <= FAN_STALE_S
+
+
+def fan_view(st, now):
+    """What the FANS box shows, from the fan service's status file
+    (/run/ollama1/fan.json): ("none", None) when there is none or it is stale,
+    else ("rows", header text, header is a warning, [(label, value, fraction, kind)], coolant line).
+    The bar is the output's setting (pwm of 255) and falls back to its rpm against the fastest fan."""
+    fan = _d(st.get("fan"))
+    if not fan or not fan_fresh(st, now):
+        return ("none", None)
+    phase, pct = fan.get("phase"), int(D._f(fan.get("pct")) or 0)
+    word = {"working": "working", "hot": "working", "calibrating": "measuring", "idle20": "idle",
+            "hold100": "cooling down", "hold50": "cooling down", "ramp": "cooling down"}.get(phase, "")
+    head = ("%s %d%%" % (word, pct)) if word else ("%d%%" % pct)
+    why = fan.get("why")
+    if phase in ("working", "hot") and isinstance(why, str) and why:
+        head += " - " + why
+    warn = phase == "hot" or bool(fan.get("hot"))
+    outs = [o for o in _l(fan.get("outputs")) if isinstance(o, dict)]
+    top_rpm = max([D._f(o.get("rpm")) or 0 for o in outs] + [1])
+
+    def row(label, o):
+        rpm, pwm = D._f(o.get("rpm")), D._f(o.get("pwm"))
+        f = pwm / 255.0 if pwm is not None and o.get("enable") == 1 else (rpm / top_rpm if rpm else None)
+        return (label, ("%d rpm" % rpm) if rpm is not None else "-", f, "fan")
+    rows, n = [], 0
+    for o in outs:
+        rpm = D._f(o.get("rpm"))
+        if o.get("label") == "GPU fan":
+            rows.insert(0, row("GPU fan", o))
+        elif rpm or o.get("enable") == 1:
+            n += 1
+            rows.append(row("Case fan %d" % n, o))
+    a = _d(fan.get("aio"))
+    cool = ""
+    if a.get("found") and a.get("state") == "controlling":
+        fr = [f for f in _l(a.get("fans")) if isinstance(f, dict)]
+        rp = [D._f(f.get("rpm")) for f in fr if D._f(f.get("rpm")) is not None]
+        pc = [D._f(f.get("pct")) for f in fr if D._f(f.get("pct")) is not None]
+        if fr:
+            rows.append(("Radiator fans", ("%d rpm" % (sum(rp) / len(rp))) if rp else "-", (pc[0] / 100.0) if pc else None, "fan"))
+        pr = D._f(a.get("pump_rpm"))
+        rows.append(("Pump", ("%d rpm" % pr if pr is not None else "-") + (" %s" % a["pump_mode"] if a.get("pump_mode") else ""), None, "pump"))
+        if D._f(a.get("coolant_c")) is not None:
+            cool = "Coolant %s\u00b0C" % D.num(a.get("coolant_c"), "%.0f")
+    return ("rows", head, warn, rows, cool)
+
+
+def draw_fans(pm, r, st, ctx):
+    view = fan_view(st, ctx["now"])
+    if view[0] == "none":
+        inner = frame(pm, r, "Fans")
+        pm.text(inner[0], inner[1] + 3, "no fan data", T["dim"], max_w=inner[2])
+        return
+    _k, head, warn, rows, cool = view
+    inner = frame(pm, r, "Fans", head, accent=T["warn"] if warn else None, right_colour=T["warn"] if warn else None)
+    x, y, w, h = inner
+    brows = [(label, value, f, T["warn"] if warn else (T["net"] if kind == "fan" else T["gpu2"])) for label, value, f, kind in rows]
+    keep = max(1, (h + 3 - 7) // 10)
+    if len(brows) > keep:
+        brows = brows[:keep - 1] + [("+%d more" % (len(brows) - keep + 1), "", None, T["dim"])]
+    used = bar_rows(pm, (x, y, w, h), brows, 10)
+    if cool and len(brows) == len(rows) and used + 8 <= h:          # only when every row is shown
+        pm.text(x, y + used + 1, cool, T["dim"], max_w=w)
 
 
 SLEEP_STALE_S = 180
@@ -933,7 +1011,7 @@ class PanelRenderer:
     machine costs almost nothing to show."""
 
     BOXES = (("header", "draw_header"), ("gpu", "draw_gpu"), ("cpu", "draw_cpu"), ("models", "draw_models"),
-             ("storage", "draw_storage"), ("status", "draw_status"), ("footer", "draw_footer"))
+             ("storage", "draw_storage"), ("fans", "draw_fans"), ("status", "draw_status"), ("footer", "draw_footer"))
 
     def __init__(self, w, h, scale=1, pm=None):
         self.w, self.h, self.scale = w, h, scale
@@ -962,6 +1040,8 @@ class PanelRenderer:
             return (repr(st.get("gw")), tail("tps"), g, int(ctx["now"] // 60))
         if name == "storage":
             return (repr(st.get("disks")), repr(st.get("raid")), repr(st.get("io")), repr(st.get("net")))
+        if name == "fans":
+            return (repr(st.get("fan")), fan_fresh(st, ctx["now"]))
         return (repr(ctx["warns"]), sleep_summary(st, ctx["now"]), repr(st.get("tunnel")), repr(st.get("updates")),
                 repr(st.get("power")), repr(st.get("gw") and bool(_d(st.get("gw")).get("stale"))))
 
