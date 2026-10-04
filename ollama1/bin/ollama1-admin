@@ -762,7 +762,7 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){retur
   (net.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+p.speed_mbps+' Mb/s':''):'no link')]));}
  (s.disks||[]).forEach(d=>pairs.push([d.mount,d.mounted?tib(d.used)+' of '+tib(d.total)+' ('+Math.round(100*d.used/d.total)+'%)':'not mounted',d.mounted?'':'bad']));
  (s.raid||[]).forEach(a=>pairs.push([a.name,a.level+' ['+a.members+'] '+(a.healthy?'healthy':'DEGRADED')+(a.action?'  ·  '+a.action+' '+a.progress+'%'+(a.finish?' ('+a.finish+' left)':''):''),a.healthy?'ok':'bad']));
- if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn']);kv($('sys'),pairs);
+ kv($('sys'),pairs);
  try{renderCpu(s.cpu,s);}catch(e){}
  const fl=$('fanline');if(fl){fl.hidden=!s.fan;fl.textContent=s.fan||'';}
  const ll=$('ledsline');if(ll){ll.hidden=!s.leds;ll.textContent=s.leds||'';}}

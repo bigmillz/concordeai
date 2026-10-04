@@ -3,6 +3,7 @@ disks get wiped, when a filesystem gets made, and what reaches fstab.
 No real disk is ever touched: every tool is tests/fakecmd.py."""
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -96,151 +97,89 @@ echo DONE
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
-class TestRaid(unittest.TestCase):
+class TestNoMirror(unittest.TestCase):
+    """6b400: the kit builds no RAID. The two old mirror disks are accepted on the command line and in setup.env, and
+    ignored: nothing wipes, assembles or mounts them, no step names them, nothing says mdadm."""
+
     def setUp(self):
         self.sb = Sandbox()
-        self.call = 'raid_step "%s" "%s" SERIAL-HDD1 SERIAL-HDD2' % (self.sb.sda, self.sb.sdb)
-        self.md = os.path.join(self.sb.dir, "md-o1data")
+        self.addCleanup(self.sb.close)
+        self.roles = ('OS_DISK="%s"; OS_SERIAL=SERIAL-OS; MODELS_DISK="%s"; MODELS_SERIAL=SERIAL-MODELS; '
+                      % (self.sb.nvme, self.sb.nvme))
 
-    def tearDown(self):
-        self.sb.close()
+    def setup_text(self):
+        return open(os.path.join(U.KIT, "setup.sh")).read()
 
-    def data_lines(self):
-        return [l for l in self.sb.fstab_text().splitlines() if "srv-data" in l]
+    def lib_text(self):
+        return open(LIBSH).read()
 
-    def test_fresh_build(self):
-        self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
-        wiped = [l.split()[-1] for l in self.sb.log("wipefs")]
-        self.assertEqual(wiped, [os.path.join(self.sb.byid, "ata-ST8000DM004-2CX188_SERIAL-HDD1"),
-                                 os.path.join(self.sb.byid, "ata-ST8000DM004-2U9188_SERIAL-HDD2")])
-        self.assertEqual(len(self.sb.log("mkfs.ext4")), 1)
-        lines = self.data_lines()
-        self.assertEqual(len(lines), 1)
-        self.assertTrue(lines[0].startswith("UUID=00000000-"))
+    def test_no_function_builds_assembles_or_looks_for_an_array(self):
+        for fn in ("raid_step", "raid_find", "raid_done", "raid_members_on_disk", "md_saved_uuid", "md_line_is_ours"):
+            self.assertEqual(self.sb.run("type %s" % fn), 1, fn)
+        lib = re.sub(r"(?m)^\s*#.*$", "", self.lib_text())
+        for word in ("mdadm", "mdadm.conf", "MD_DEV", "MD_NAME", "/srv/data", "DATA_MNT", "raid.mkfs-pending"):
+            self.assertNotIn(word, lib, word)
 
-    def test_rerun_after_crash_between_create_and_mkfs(self):
-        # the array exists and is running, but has no filesystem; the run
-        # that created it left its marker
-        self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
-        self.sb.state["blkid"][self.md] = {}
-        os.makedirs(os.path.join(self.sb.dir, "state"), exist_ok=True)
-        open(os.path.join(self.sb.dir, "state", "raid.mkfs-pending"), "w").close()
-        self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
-        self.assertEqual(self.sb.log("wipefs"), [])
-        self.assertEqual(len(self.sb.log("mkfs.ext4")), 1)
-        self.assertTrue(self.data_lines()[0].startswith("UUID=00000000-"))
+    def test_setup_has_no_mirror_step_no_mdadm_package_and_no_srv_data(self):
+        text = re.sub(r"(?m)^\s*#.*$", "", self.setup_text())
+        for word in ("mdadm", "raid_step", "raid_done", "raid_find", "RAID_PENDING", "/srv/data", "home_on_own_disk"):
+            self.assertNotIn(word, text, word)
+        self.assertNotIn("Mirror (", text)
 
-    def test_found_array_without_filesystem_is_never_formatted(self):
-        """No marker: setup didn't make this array, so an unreadable
-        filesystem may be damage. Stop with the e2fsck hint, never mkfs."""
-        self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
-        self.sb.state["blkid"][self.md] = {}
-        before = self.sb.fstab_text()
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertEqual(self.sb.log("mkfs.ext4"), [])
-        self.assertEqual(self.sb.log("wipefs"), [])
-        self.assertIn("e2fsck -b", self.sb.out)
-        self.assertIn("mke2fs -n", self.sb.out)
-        self.assertEqual(self.sb.fstab_text(), before)
+    def test_the_plan_says_no_mirror_not_used_and_never_wipes_the_old_disks(self):
+        rc = self.sb.run('OS_DISK="%s"; OS_SERIAL=SERIAL-OS; MODELS_DISK="%s"; MODELS_SERIAL=SERIAL-MODELS; '
+                         'HDD1="%s"; HDD1_SERIAL=SERIAL-HDD1; HDD2="%s"; HDD2_SERIAL=SERIAL-HDD2; show_disks; plan_wipes; '
+                         'echo "WIPES=${#WIPES[@]}"; for w in "${WIPES[@]}"; do echo "W: $w"; done'
+                         % (self.sb.dir + "/os", self.sb.nvme, self.sb.sda, self.sb.sdb))
+        self.assertEqual(rc, 0, self.sb.out)
+        self.assertIn("WIPES=1", self.sb.out)
+        self.assertIn("W: %s (SERIAL-MODELS" % self.sb.nvme, self.sb.out)
+        self.assertIn("no mirror: not used", self.sb.out)
+        self.assertIn("old mirror serials are ignored", self.sb.out)
+        self.assertNotIn("RAID1", self.sb.out)
+        self.assertNotIn("SERIAL-HDD", self.sb.out.replace("old mirror serials are ignored", ""))
 
-    def test_reassembled_array_without_filesystem_is_never_formatted(self):
-        p1, p2 = self.sb.sda + "1", self.sb.sdb + "1"
-        self.sb.state["devs"] = {self.sb.sda: [self.sb.sda, p1], self.sb.sdb: [self.sb.sdb, p2]}
-        self.sb.state["blkid"] = {p1: {"TYPE": "linux_raid_member"}, p2: {"TYPE": "linux_raid_member"}}
-        line = "ARRAY /dev/md/data metadata=1.2 UUID=aaaa1111:bbbb2222:cccc3333:dddd4444 name=ollama1:data"
-        self.sb.state["md_examine"] = {p1: line, p2: line}
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertEqual(self.sb.log("mkfs.ext4"), [])
-        self.assertEqual(self.sb.log("wipefs"), [])
+    def test_old_hdd_serials_change_nothing_check_disks_passes_and_no_tool_touches_them(self):
+        mnt = os.path.join(self.sb.dir, "srv-models")
+        nv = self.sb.nvme
+        self.sb.state["findmnt_source"] = {"/": nv + "p3", mnt: nv + "p4"}
+        self.sb.state["devs"][nv] = [nv, nv + "p3", nv + "p4"]
+        self.sb.state["up"] = {nv + "p3": "%sp3 part\n%s disk" % (nv, nv), nv + "p4": "%sp4 part\n%s disk" % (nv, nv)}
+        self.sb.state["mounted"] = [mnt]
+        self.sb.save()
+        rc = self.sb.run(self.roles + 'HDD1="%s"; HDD1_SERIAL=SERIAL-HDD1; HDD2="%s"; HDD2_SERIAL=SERIAL-HDD2; check_disks'
+                         % (self.sb.sda, self.sb.sdb))
+        self.assertEqual(rc, 0, self.sb.out)
+        for tool in ("wipefs", "sgdisk", "mkfs.ext4", "partprobe", "mdadm"):
+            self.assertEqual(self.sb.log(tool), [], tool)
+        self.assertNotIn(self.sb.sda, " ".join(self.sb.state["log"]))
+        self.assertNotIn(self.sb.sdb, " ".join(self.sb.state["log"]))
 
-    def test_blkid_read_error_stops(self):
-        self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
-        self.sb.state["blkid_fail"] = [self.md]
-        os.makedirs(os.path.join(self.sb.dir, "state"), exist_ok=True)
-        open(os.path.join(self.sb.dir, "state", "raid.mkfs-pending"), "w").close()
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertIn("blkid could not read", self.sb.out)
-        self.assertEqual(self.sb.log("mkfs.ext4"), [])
+    def test_the_hdd_options_are_accepted_with_a_note_and_still_checked_for_shape(self):
+        r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh"), "--plan", "--hdd1-serial", "SERIAL-HDD1",
+                            "--hdd2-serial", "SERIAL-HDD2"], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30)
+        out = r.stdout + r.stderr
+        self.assertEqual(r.returncode, 0, out)
+        self.assertIn("--hdd1-serial and --hdd2-serial are ignored", out)
+        self.assertIn("6. No mirror: not used", out)
+        self.assertNotIn("RAID1", out)
+        self.assertNotIn("Mirror:", out)
+        r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh"), "--plan"], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, timeout=30)
+        self.assertNotIn("ignored", r.stdout + r.stderr)                        # no note when they are not given
+        self.assertIn("No mirror: not used", r.stdout)
 
-    def test_blkid_read_error_on_a_disk_stops_before_wiping(self):
-        self.sb.state["blkid_fail"] = [self.sb.sdb]
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertEqual(self.sb.log("wipefs"), [])
+    def test_a_saved_setup_env_with_hdd_serials_still_works_and_is_not_asked_for(self):
+        s = self.setup_text()
+        self.assertNotIn("ask_setting HDD", s)                                   # never prompts for them
+        self.assertIn('[ -z "$HDD1_SERIAL$HDD2_SERIAL" ] || printf', s)          # kept in setup.env only if present
+        self.assertIn('pick HDD1_SERIAL "$A_HDD1" HDD1_SERIAL "" valid_serial', s)
 
-    def test_marker_cleared_after_mkfs(self):
-        self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
-        self.assertFalse(os.path.exists(os.path.join(self.sb.dir, "state", "raid.mkfs-pending")))
-
-    def test_existing_filesystem_is_kept(self):
-        self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
-        self.sb.state["blkid"][self.md] = {"TYPE": "ext4", "UUID": fu("a")}
-        self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
-        self.assertEqual(self.sb.log("mkfs.ext4"), [])
-        self.assertEqual(self.sb.log("wipefs"), [])
-
-    def test_array_on_disks_but_not_assembled_is_never_wiped(self):
-        p1, p2 = self.sb.sda + "1", self.sb.sdb + "1"
-        self.sb.state["devs"] = {self.sb.sda: [self.sb.sda, p1], self.sb.sdb: [self.sb.sdb, p2]}
-        self.sb.state["blkid"] = {p1: {"TYPE": "linux_raid_member"}, p2: {"TYPE": "linux_raid_member"},
-                                  self.md: {"TYPE": "ext4", "UUID": fu("a")}}
-        line = "ARRAY /dev/md/data metadata=1.2 UUID=aaaa1111:bbbb2222:cccc3333:dddd4444 name=ollama1:data"
-        self.sb.state["md_examine"] = {p1: line, p2: line}
-        self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
-        self.assertEqual(self.sb.log("wipefs"), [])
-        self.assertEqual(self.sb.log("sgdisk"), [])
-        self.assertEqual(self.sb.log("mkfs.ext4"), [])
-        self.assertTrue(any("--assemble" in l for l in self.sb.log("mdadm")))
-
-    def test_other_array_on_disks_is_refused(self):
-        p1 = self.sb.sda + "1"
-        self.sb.state["devs"][self.sb.sda] = [self.sb.sda, p1]
-        self.sb.state["blkid"][p1] = {"TYPE": "linux_raid_member"}
-        self.sb.state["md_examine"] = {p1: "ARRAY /dev/md/x metadata=1.2 UUID=1:2:3:4 name=nas:stuff"}
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertIn("linux_raid_member", self.sb.out)
-        self.assertEqual(self.sb.log("wipefs"), [])
-
-    def test_unexpected_signature_refused(self):
-        self.sb.state["blkid"][self.sb.sdb] = {"TYPE": "crypto_LUKS", "UUID": fu("7")}
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertIn("crypto_LUKS", self.sb.out)
-        self.assertEqual(self.sb.log("wipefs"), [])
-
-    def test_disk_still_in_fstab_refused(self):
-        with open(self.sb.fstab, "a") as f:
-            f.write("/dev/disk/by-uuid/%s /home ext4 defaults 0 1\n" % OLD_HOME_UUID)
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertIn("still used by fstab", self.sb.out)
-        self.assertEqual(self.sb.log("wipefs"), [])
-
-    def test_disk_in_crypttab_or_swap_refused(self):
-        with open(os.path.join(self.sb.dir, "swaps"), "w") as f:
-            f.write("Filename Type Size Used Priority\n%s partition 1 0 -2\n" % self.sb.sdb)
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertIn("swap is on", self.sb.out)
-        self.assertEqual(self.sb.log("wipefs"), [])
-
-    def test_serial_mismatch_refused(self):
-        self.sb.state["serial"][self.sb.sdb] = "SERIAL-HDDX"
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertIn("serial check failed", self.sb.out)
-        self.assertEqual(self.sb.log("wipefs"), [])
-
-    def test_no_uuid_no_fstab_line(self):
-        self.sb.state["mkfs_uuid"] = ""
-        before = self.sb.fstab_text()
-        self.assertEqual(self.sb.run(self.call), 1)
-        self.assertIn("no filesystem UUID", self.sb.out)
-        self.assertEqual(self.sb.fstab_text(), before)
-
-    def test_set_fstab_refuses_empty_uuid(self):
-        before = self.sb.fstab_text()
-        self.assertEqual(self.sb.run('set_fstab /srv/data "UUID= /srv/data ext4 defaults 0 2"'), 1)
-        self.assertEqual(self.sb.fstab_text(), before)
-        self.assertEqual(self.sb.run('set_fstab /srv/data "UUID=0f0f0f0f-1111 /srv/data ext4 defaults 0 2"'), 0)
-        self.assertEqual(self.sb.run('set_fstab /srv/data "UUID=0f0f0f0f-2222 /srv/data ext4 defaults 0 2"'), 0)
-        self.assertEqual([l for l in self.sb.fstab_text().splitlines() if "/srv/data" in l],
-                         ["UUID=0f0f0f0f-2222 /srv/data ext4 defaults 0 2"])
+    def test_the_backup_folder_is_one_constant_that_the_python_side_agrees_with(self):
+        import o1common
+        out = subprocess.run(["bash", "-c", '. "%s"; echo "$BACKUP_DIR $STATE_DIR"' % LIBSH], capture_output=True,
+                             text=True, env={k: v for k, v in os.environ.items() if k not in ("BACKUP_DIR", "STATE_DIR")}).stdout.split()
+        self.assertEqual(out, [o1common.Paths.backups[len(o1common.PREFIX):], o1common.Paths.state[len(o1common.PREFIX):]])
 
 
 class TestModels(unittest.TestCase):
@@ -280,6 +219,58 @@ class TestModels(unittest.TestCase):
         self.assertEqual(self.sb.run(self.call), 1)
         self.assertEqual(self.sb.log("wipefs"), [])
 
+    def test_unexpected_signature_crypto_luks_refused(self):
+        self.sb.state["blkid"][self.sb.nvme] = {"TYPE": "crypto_LUKS", "UUID": fu("7")}
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertIn("crypto_LUKS", self.sb.out)
+        self.assertEqual(self.sb.log("wipefs"), [])
+
+    def test_blkid_read_error_stops_before_wiping(self):
+        self.sb.state["blkid_fail"] = [self.sb.nvme]
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertEqual(self.sb.log("wipefs"), [])
+
+    def test_a_disk_still_in_fstab_is_refused(self):
+        with open(self.sb.fstab, "a") as f:
+            f.write("/dev/disk/by-uuid/%s /mnt ext4 defaults 0 1\n" % fu("6"))
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertIn("still used by fstab", self.sb.out)
+        self.assertEqual(self.sb.log("wipefs"), [])
+
+    def test_a_disk_with_swap_on_it_is_refused(self):
+        with open(os.path.join(self.sb.dir, "swaps"), "w") as f:
+            f.write("Filename Type Size Used Priority\n%s partition 1 0 -2\n" % self.sb.nvme)
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertIn("swap is on", self.sb.out)
+        self.assertEqual(self.sb.log("wipefs"), [])
+
+    def test_a_serial_mismatch_is_refused(self):
+        self.sb.state["serial"][self.sb.nvme] = "SERIAL-OTHER"
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertIn("serial check failed", self.sb.out)
+        self.assertEqual(self.sb.log("wipefs"), [])
+
+    def test_no_uuid_no_fstab_line(self):
+        self.sb.state["mkfs_uuid"] = ""
+        before = self.sb.fstab_text()
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertIn("no filesystem UUID", self.sb.out)
+        self.assertEqual(self.sb.fstab_text(), before)
+
+    def test_set_fstab_refuses_empty_uuid_and_replaces_its_own_line(self):
+        before = self.sb.fstab_text()
+        self.assertEqual(self.sb.run('set_fstab /srv/models "UUID= /srv/models ext4 defaults 0 2"'), 1)
+        self.assertEqual(self.sb.fstab_text(), before)
+        self.assertEqual(self.sb.run('set_fstab /srv/models "UUID=0f0f0f0f-1111 /srv/models ext4 defaults 0 2"'), 0)
+        self.assertEqual(self.sb.run('set_fstab /srv/models "UUID=0f0f0f0f-2222 /srv/models ext4 defaults 0 2"'), 0)
+        self.assertEqual([l for l in self.sb.fstab_text().splitlines() if "/srv/models" in l],
+                         ["UUID=0f0f0f0f-2222 /srv/models ext4 defaults 0 2"])
+
+    def test_the_marker_is_cleared_after_mkfs(self):
+        self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
+        self.assertEqual(len(self.sb.log("mkfs.ext4")), 1)
+        self.assertFalse(os.path.exists(os.path.join(self.sb.dir, "state", "models.mkfs-pending")))
+
 
 class TestVgFree(unittest.TestCase):
     def setUp(self):
@@ -316,7 +307,7 @@ class TestVgFree(unittest.TestCase):
         self.assertIn('grow_root_if_lvm "$VG_RESERVE_GIB"', setup)
         self.assertIn("VG_RESERVE_GIB=0\n", setup)                       # default: no reserve
         self.assertNotIn("lvextend", setup)                               # only through grow_root
-        self.assertLess(setup.index('grow_root_if_lvm "$VG_RESERVE_GIB"'), setup.index('step "/home onto the root filesystem"'))
+        self.assertLess(setup.index('grow_root_if_lvm "$VG_RESERVE_GIB"'), setup.index('step "/home"'))
 
 
 class TestGrowRoot(unittest.TestCase):
@@ -671,7 +662,7 @@ echo DONE
 
 class TestOsAndModelsOnOneDisk(unittest.TestCase):
     """6b374: a server moved with migrate-os has the system and the models on ONE disk (plain partitions, / on p3,
-    /srv/models on p4) and the mirror on its own. Setup must accept that, wipe nothing on that disk, and still
+    /srv/models on p4). Setup must accept that, wipe nothing on that disk, and still
     refuse every other way of two roles landing on the OS disk."""
 
     def setUp(self):
@@ -683,7 +674,6 @@ class TestOsAndModelsOnOneDisk(unittest.TestCase):
         open(self.old, "w").close()
         os.symlink(self.old, os.path.join(sb.byid, "nvme-Samsung_SSD_980_PRO_2TB_SERIAL-OLD"))
         self.models_mnt = os.path.join(sb.dir, "srv-models")
-        self.data_mnt = os.path.join(sb.dir, "srv-data")
         st = sb.state
         st["serial"][self.old] = "SERIAL-OLD"
         st["up"] = {}
@@ -692,13 +682,11 @@ class TestOsAndModelsOnOneDisk(unittest.TestCase):
             for n in (1, 3, 4):
                 st["up"][disk + "p%d" % n] = "%sp%d part\n%s disk" % (disk, n, disk)
         st["findmnt_source"] = {"/": self.new + "p3", self.models_mnt: self.new + "p4"}
-        st["mounted"] = [self.models_mnt, self.data_mnt]
-        st["md_detail"] = ["ARRAY /dev/md127 metadata=1.2 name=ollama1:data UUID=x"]
+        st["mounted"] = [self.models_mnt]
         sb.save()
 
     def roles(self, os_disk, os_serial, models_disk, models_serial):
-        return ('OS_DISK="%s"; OS_SERIAL=%s; MODELS_DISK="%s"; MODELS_SERIAL=%s; HDD1="%s"; HDD1_SERIAL=SERIAL-HDD1; '
-                'HDD2="%s"; HDD2_SERIAL=SERIAL-HDD2; ' % (os_disk, os_serial, models_disk, models_serial, self.sb.sda, self.sb.sdb))
+        return 'OS_DISK="%s"; OS_SERIAL=%s; MODELS_DISK="%s"; MODELS_SERIAL=%s; ' % (os_disk, os_serial, models_disk, models_serial)
 
     def check(self, os_disk, os_serial, models_disk, models_serial, extra=""):
         return self.sb.run(self.roles(os_disk, os_serial, models_disk, models_serial) +
@@ -707,7 +695,7 @@ class TestOsAndModelsOnOneDisk(unittest.TestCase):
     def no_disk_writes(self):
         for tool in ("wipefs", "sgdisk", "mkfs.ext4", "partprobe", "lvextend"):
             self.assertEqual(self.sb.log(tool), [], tool)
-        self.assertEqual([l for l in self.sb.log("mdadm") if "--create" in l or "--zero" in l or "--assemble" in l], [])
+        self.assertEqual(self.sb.log("mdadm"), [])
 
     def test_the_moved_server_passes_the_guards_and_wipes_nothing(self):
         rc = self.check(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS")
@@ -723,7 +711,7 @@ class TestOsAndModelsOnOneDisk(unittest.TestCase):
         self.assertIn("OS + models: kept, never wiped", self.sb.out)
         self.assertIn("root is a plain partition, left as it is", self.sb.out)
         self.assertNotIn("WIPED -> ext4", self.sb.out)
-        self.assertIn("mirror: already set up", self.sb.out)
+        self.assertIn("no mirror: not used", self.sb.out)
 
     def test_the_old_setup_env_still_refuses_and_says_what_to_run(self):
         # OS_SERIAL is the old drive's: that refusal stays, and it names the one line that fixes it
@@ -745,7 +733,7 @@ class TestOsAndModelsOnOneDisk(unittest.TestCase):
     def test_models_on_another_disk_are_still_wiped_and_only_that_disk(self):
         # the system on the old drive, /srv/models not set up: the models disk is the one that gets wiped
         self.sb.state["findmnt_source"] = {"/": self.old + "p3"}
-        self.sb.state["mounted"] = [self.data_mnt]
+        self.sb.state["mounted"] = []
         self.sb.save()
         rc = self.check(self.old, "SERIAL-OLD", self.new, "SERIAL-MODELS", 'for w in "${WIPES[@]}"; do echo "W: $w"; done')
         self.assertEqual(rc, 0, self.sb.out)
@@ -758,14 +746,13 @@ class TestOsAndModelsOnOneDisk(unittest.TestCase):
         self.assertEqual([l.split()[-1] for l in self.sb.log("wipefs")],
                          [os.path.join(self.sb.byid, "nvme-Samsung_SSD_980_PRO_2TB_SERIAL-MODELS")])
 
-    def test_everything_still_to_do_lists_all_three_disks(self):
+    def test_everything_still_to_do_lists_only_the_models_disk(self):
         self.sb.state["findmnt_source"] = {"/": self.old + "p3"}
         self.sb.state["mounted"] = []
-        self.sb.state["md_detail"] = []
         self.sb.save()
         rc = self.check(self.old, "SERIAL-OLD", self.new, "SERIAL-MODELS")
         self.assertEqual(rc, 0, self.sb.out)
-        self.assertIn("WIPES=3", self.sb.out)
+        self.assertIn("WIPES=1", self.sb.out)
 
     def test_the_same_disk_without_models_mounted_from_it_dies(self):
         self.sb.state["mounted"].remove(self.models_mnt)                          # not mounted
@@ -808,18 +795,6 @@ class TestOsAndModelsOnOneDisk(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("is the OS disk; not wiping", self.sb.out)
         self.no_disk_writes()
-
-    def test_a_mirror_disk_is_never_the_os_disk_and_two_roles_never_share(self):
-        roles = self.roles(self.new, "SERIAL-MODELS", self.new, "SERIAL-MODELS")
-        roles = roles.replace('HDD1="%s"' % self.sb.sda, 'HDD1="%s"' % self.new).replace("HDD1_SERIAL=SERIAL-HDD1", "HDD1_SERIAL=SERIAL-MODELS")
-        rc = self.sb.run(roles + "check_disks")
-        self.assertEqual(rc, 1)
-        self.assertIn("is the OS disk", self.sb.out)
-        self.sb.state["findmnt_source"] = {"/": self.old + "p3"}
-        self.sb.save()
-        rc = self.sb.run(self.roles(self.old, "SERIAL-OLD", self.sb.sda, "SERIAL-HDD1") + "check_disks")      # models = a mirror disk
-        self.assertEqual(rc, 1)
-        self.assertIn("two roles map to one disk", self.sb.out)
 
     def test_a_serial_that_does_not_match_still_refuses(self):
         rc = self.sb.run(self.roles(self.new, "SERIAL-MODELS", self.new, "WRONG") + "check_disks")

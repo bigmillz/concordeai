@@ -27,10 +27,12 @@ Layout made on the TO drive (GPT, one drive, nothing LVM):
     3  /        --root-size (default 300G)   ext4
     4  models   the rest      ext4 label o1models  (mounted at /srv/models)
 
-Stages (each records its completion in STATE_DIR on /srv/data, never on an NVMe,
-so a crash, hang or power cycle is picked up with --resume):
+Stages (each records its completion in STATE_DIR, /var/lib/ollama1/o1migrate on the root
+filesystem of the FROM drive (6b400: it was on the RAID mirror, which the kit no longer has),
+so a crash, hang or power cycle is picked up with --resume; at the end the state is copied onto
+the new root so --finish finds it after the reboot):
     0 preflight   read-only checks, then the kit's services that use the models stop
-    1 park        /srv/models -> /srv/data/models-parked, checked by a dry run
+    1 park        /srv/models -> /var/lib/ollama1/models-parked (or --park-dir), checked by a dry run
     2 partition   the TO drive is wiped, partitioned and formatted
     3 copy        / and /boot copied, a fresh /swap.img made
     4 boot        fstab rewritten on the COPY, initramfs, GRUB (its kernel options checked)
@@ -40,7 +42,7 @@ so a crash, hang or power cycle is picked up with --resume):
 --run and --resume ask for the TO drive's serial once (or take --confirm-serial,
 which must equal it), then start themselves again in a detached tmux session
 ("migrate"), so a dropped SSH connection can't stop them. Progress is in
-/srv/data/migrate-os.status (readable by everyone) and /srv/data/migrate-os.log.
+/var/lib/ollama1/migrate-os.status (readable by everyone) and migrate-os.log beside it.
 Every drive is found by SERIAL (nvme0/nvme1 swap between boots) and addressed
 only through /dev/disk/by-id; the serial is read again immediately before every
 command that writes to a drive.
@@ -62,7 +64,8 @@ import time
 OLD_BOOT_DIRS = ("ubuntu", "BOOT")      # the folders of the old ESP's EFI folder that --disable-old-boot-files puts aside
 OFF_SUFFIX = ".off"
 STAGES = ["preflight", "park", "partition", "copy", "boot", "restore", "firmware"]
-STAGE_TEXT = {"preflight": "checks", "park": "park the models on the RAID", "partition": "partition and format the TO drive",
+DATA_DIR = "/var/lib/ollama1"           # = o1common.Paths.state (a test keeps the two equal): state, status, log, the default parked copy
+STAGE_TEXT = {"preflight": "checks", "park": "park the models on the root filesystem (or --park-dir)", "partition": "partition and format the TO drive",
               "copy": "copy / and /boot", "boot": "fstab, initramfs and GRUB on the copy",
               "restore": "copy the models back", "firmware": "firmware boot entry (new first, old second)"}
 SESSION = "migrate"
@@ -116,7 +119,7 @@ class Cfg:
         self.sys = g("SYS", "/sys")
         self.dev = g("DEV", "/dev")
         self.byid = g("BYID", "/dev/disk/by-id")
-        self.data = g("DATA", "/srv/data")
+        self.data = g("DATA", DATA_DIR)
         self.models = g("MODELS", "/srv/models")
         self.state_dir = g("STATE_DIR", self.data + "/o1migrate")
         self.parked = g("PARKED", self.data + "/models-parked")
@@ -126,7 +129,6 @@ class Cfg:
         self.efi_sys = g("EFI_SYS", "/sys/firmware/efi")
         self.bios_key = g("BIOS_KEY", "F11")
         self.cmdline = g("CMDLINE", "/proc/cmdline")
-        self.mdstat = g("MDSTAT", "/proc/mdstat")
         self.drop_caches = g("DROP_CACHES", "/proc/sys/vm/drop_caches")
         self.countdown = int(g("COUNTDOWN_SECS", "10"))
         self.status = g("STATUS", self.data + "/migrate-os.status")
@@ -415,6 +417,11 @@ def valid_uuid(v):
     return isinstance(v, str) and bool(UUID_RX.fullmatch(v))
 
 
+def valid_park_dir(path):
+    """An absolute, plain path: no .., no spaces or odd characters (it goes into rsync and rm arguments)."""
+    return bool(re.fullmatch(r"/[A-Za-z0-9_.@+-]+(/[A-Za-z0-9_.@+-]+)*", path or "")) and ".." not in path.split("/") and path != "/"
+
+
 def validate_state(st):
     """Every value of the state file that later reaches fstab, efibootmgr or a command line, checked
     against what it can be. The state file is root's, but a damaged or edited one must not become a command."""
@@ -423,6 +430,7 @@ def validate_state(st):
             raise Abort("the state file has a bad %s; not using it" % what)
     need(valid_serial(st.get("from_serial")) and valid_serial(st.get("to_serial")), "serial")
     need(isinstance(st.get("root_gib"), int) and 1 <= st["root_gib"] <= 100000, "root size")
+    need(st.get("parked") is None or (isinstance(st["parked"], str) and valid_park_dir(st["parked"])), "parked folder")
     for k, v in (st.get("uuids") or {}).items():
         need(k in ("esp", "boot", "root", "models") and valid_uuid(v), "filesystem UUID")
     for k in ("esp_partuuid", "old_esp_partuuid"):
@@ -436,26 +444,6 @@ def validate_state(st):
     need(all(isinstance(t, str) and re.fullmatch(r"[A-Za-z0-9_.:=,/+@-]+", t) for t in st.get("cmdline_required") or []),
          "kernel option")
     return st
-
-
-def raid_ok(mdstat, name):
-    """'' if the md array is in mdstat with every member up ([UU]), else why not."""
-    block, found = [], False
-    for line in (mdstat or "").splitlines():
-        if re.match(r"^%s\s*:" % re.escape(name), line):
-            found, block = True, [line]
-        elif found and line.strip() and not re.match(r"^md\d+\s*:", line):
-            block.append(line)
-        elif found:
-            break
-    if not found:
-        return "%s is not in /proc/mdstat" % name
-    m = re.search(r"\[(\d+)/(\d+)\]\s+\[([U_]+)\]", "\n".join(block))
-    if not m:
-        return "cannot read the state of %s in /proc/mdstat" % name
-    if m.group(3) != "U" * len(m.group(3)) or m.group(1) != m.group(2):
-        return "the RAID %s is degraded [%s]: the parked models would be on one disk only" % (name, m.group(3))
-    return ""
 
 
 def dir_perm_problem(path, uid):
@@ -590,8 +578,8 @@ def check_facts(f):
         p.append(f["state_mount_bad"])
     if f["perm_bad"]:
         p.append(f["perm_bad"])
-    if f["raid_bad"]:
-        p.append(f["raid_bad"])
+    if f["park_bad"]:
+        p.append(f["park_bad"])
     if f["dpkg_busy"]:
         p.append("apt/dpkg is running; wait for it, because the copy would catch it half way")
     root_gib = f["root_gib"]
@@ -609,8 +597,9 @@ def check_facts(f):
     if f["need_space"] and f["models_used"] is not None and f["data_avail"] is not None:
         margin = 10 * GIB + int(f["models_used"] * 0.02)
         if f["data_avail"] < f["models_used"] + margin:
-            p.append("%s has %s free and parking the models needs %s (%s of models plus a margin)" % (
-                f["data_path"], human(f["data_avail"]), human(f["models_used"] + margin), human(f["models_used"])))
+            p.append("%s has %s free and parking the models needs %s (%s of models plus a margin). Free space there, or "
+                     "give --park-dir <a folder on a disk with room; not the TO drive>" % (
+                         f["data_path"], human(f["data_avail"]), human(f["models_used"] + margin), human(f["models_used"])))
     return p
 
 
@@ -1007,18 +996,21 @@ class Migrator:
         f = {"from_serial": a.from_serial, "to_serial": a.to_serial, "from_drive": fd, "to_drive": td,
              "serials_present": self.serials_present(), "root_gib": a.root_gib, "from_tree": {}, "to_tree": {},
              "from_dead": "", "smart_from": 0, "smart_to": 0, "to_size": 0, "models_used": None,
-             "root_used": None, "data_avail": None, "data_path": self.cfg.data, "need_space": "park" not in done,
+             "root_used": None, "data_avail": None, "data_path": self.cfg.parked, "need_space": "park" not in done,
              "efi_path": self.cfg.efi_sys, "efi_boot": os.path.isdir(self.cfg.efi_sys), "state_mount_bad": "",
              "dpkg_busy": False, "missing_tools": {t: pkg for t, pkg in TOOLS.items() if not shutil.which(t)},
              "mounts": mounts, "data_ok": False, "fresh": "partition" not in started, "models_from_to": False,
-             "models_path": self.cfg.models, "to_parts": 0, "raid_bad": "", "perm_bad": ""}
-        dm = [m for m in mounts if m["target"] == self.cfg.data]
-        f["data_ok"] = bool(dm) and not re.search(r"nvme|ubuntu--vg", dm[-1]["source"])
-        f["raid_bad"] = self.check_data_raid(mounts)
+             "models_path": self.cfg.models, "to_parts": 0, "park_bad": "", "perm_bad": ""}
+        # the data folder (state, status, log) is on the FROM drive's root filesystem; the parked copy is wherever
+        # --park-dir says (by default beside them), anywhere but on the TO drive, which is erased
         uid = os.geteuid()
-        f["perm_bad"] = dir_perm_problem(self.cfg.data, uid) if dm else ""
+        sm = self.mount_of(mounts, self.cfg.state_dir)
+        f["data_ok"] = sm is not None and sm["target"] == "/"
+        top = self.cfg.data if not os.path.lexists(self.cfg.data) else None
+        f["perm_bad"] = (dir_perm_problem(os.path.dirname(self.cfg.data), uid) if top else dir_perm_problem(self.cfg.data, uid))
         if not f["perm_bad"] and os.path.lexists(self.cfg.state_dir):
             f["perm_bad"] = dir_perm_problem(self.cfg.state_dir, uid)
+        f["park_bad"] = self.check_parked_place(mounts)
         # what the TO drive may have mounted: /srv/models (until it is wiped) and our own mount points
         f["to_allowed_mounts"] = {self.cfg.models}
         f["to_allowed_prefixes"] = [self.cfg.mnt]
@@ -1038,36 +1030,45 @@ class Migrator:
                 f["models_used"] = self.df(self.cfg.models, "used")
             elif "park" in done:
                 f["models_used"] = (self.state or {}).get("parked_bytes")
-            f["data_avail"] = self.df(self.cfg.data, "avail")
-            sm = self.mount_of(mounts, self.cfg.state_dir)
-            bad = tree_mounts(f["from_tree"]) | tree_mounts(f["to_tree"])
-            if sm is None or sm["target"] == "/" or sm["target"] in bad:
-                f["state_mount_bad"] = ("the state file's folder (%s) is on a NVMe drive or the root filesystem; it must be "
-                                        "on %s (the RAID), which survives whatever happens to either NVMe"
-                                        % (self.cfg.state_dir, self.cfg.data))
-            elif sm["target"] != self.cfg.data:
-                f["state_mount_bad"] = "%s is not on %s as expected (it is on %s)" % (self.cfg.state_dir, self.cfg.data, sm["target"])
+            try:
+                f["data_avail"] = self.df(self.nearest_existing(self.cfg.parked), "avail")
+            except Abort:
+                f["data_avail"] = None                      # the park folder's filesystem cannot be measured: said by park_bad or not at all
+            if sm is None or sm["target"] != "/" or not (
+                    self.cfg.state_dir == self.cfg.data or self.cfg.state_dir.startswith(self.cfg.data.rstrip("/") + "/")):
+                f["state_mount_bad"] = ("the state file's folder (%s) must be on the root filesystem of the FROM drive, inside "
+                                        "%s (it is on %s)" % (self.cfg.state_dir, self.cfg.data, sm["target"] if sm else "no mount"))
+            to_mounts = tree_mounts(f["to_tree"])
+            pm = self.mount_of(mounts, self.cfg.parked)
+            if not f["park_bad"] and pm is not None and (pm["target"] in to_mounts or any(
+                    self.cfg.parked == t or self.cfg.parked.startswith(t.rstrip("/") + "/") for t in to_mounts)):
+                f["park_bad"] = ("the parked models would be on the TO drive (%s), which is erased; use a folder on "
+                                 "another disk (--park-dir)" % self.cfg.parked)
             f["dpkg_busy"] = self.rn.rc(["fuser", "-s", "/var/lib/dpkg/lock-frontend"]) == 0
         f["data_ok"] = f["data_ok"] and not f["state_mount_bad"] and not f["perm_bad"]
         return f
 
-    def check_data_raid(self, mounts):
-        """'' if /srv/data is a mount point of a read-write md array with every member up, else why not.
-        The parked models are on it, and a degraded mirror would leave them on one disk."""
-        dm = [m for m in mounts if m["target"] == self.cfg.data]
-        if not dm:
-            return "%s is not a mount point; the models would be parked on the root filesystem" % self.cfg.data
-        base = os.path.basename(os.path.realpath(dm[-1]["source"]))
-        if not re.fullmatch(r"md\d+", base):
-            return "%s is mounted from %s, not from the md mirror" % (self.cfg.data, dm[-1]["source"])
-        if "rw" not in dm[-1]["options"].split(","):
-            return "%s is not mounted read-write" % self.cfg.data
-        try:
-            with open(self.cfg.mdstat) as fh:
-                text = fh.read()
-        except OSError:
-            return "cannot read /proc/mdstat"
-        return raid_ok(text, base)
+    @staticmethod
+    def nearest_existing(path):
+        """The folder itself, or the first of its parents that exists (df needs one)."""
+        while path and not os.path.lexists(path) and path != "/":
+            path = os.path.dirname(path) or "/"
+        return path or "/"
+
+    def check_parked_place(self, mounts):
+        """'' if the parked models' folder can hold them: on a filesystem that is mounted read-write, and not under
+        the models mount (which is about to be unmounted and erased). Whether it is on the TO drive is checked with
+        the drive's tree in gather(). The root filesystem of the FROM drive is the default and is fine: the models are
+        only parked there until they are copied back."""
+        c = self.cfg
+        if c.parked == c.models or c.parked.startswith(c.models.rstrip("/") + "/"):
+            return "the parked models folder (%s) is inside %s, which is erased" % (c.parked, c.models)
+        pm = self.mount_of(mounts, c.parked)
+        if pm is None:
+            return "%s is on no mounted filesystem" % c.parked
+        if "rw" not in pm["options"].split(","):
+            return "%s is on a filesystem mounted read-only (%s)" % (c.parked, pm["target"])
+        return ""
 
     # -- state file ---------------------------------------------------------------------------
 
@@ -1087,13 +1088,19 @@ class Migrator:
         return validate_state(st)
 
     def ensure_state_dir(self):
-        """The state folder, made only if /srv/data is a mount point (never silently on the root filesystem),
-        and only if it and /srv/data belong to root and nobody else can write them."""
+        """The data folder and the state folder in it, on the root filesystem of the FROM drive, made only if what
+        they sit in belongs to root and nobody else can write it."""
         c, uid = self.cfg, os.geteuid()
+        if not os.path.lexists(c.data):
+            why = dir_perm_problem(os.path.dirname(c.data), uid)
+            if why:
+                raise Abort("refusing to create %s: %s" % (c.data, why))
+            os.mkdir(c.data, 0o755)
         if not os.path.lexists(c.state_dir):
-            if not any(m["target"] == c.data for m in self.mounts()):
-                raise Abort("refusing to create %s: %s is not a mount point, so it would land on the root filesystem"
-                            % (c.state_dir, c.data))
+            sm = self.mount_of(self.mounts(), c.state_dir)
+            if sm is None or sm["target"] != "/":
+                raise Abort("refusing to create %s: it is not on the root filesystem of the FROM drive (it would be on %s)"
+                            % (c.state_dir, sm["target"] if sm else "no mount"))
             why = dir_perm_problem(c.data, uid)
             if why:
                 raise Abort("refusing to create %s: %s" % (c.state_dir, why))
@@ -1136,8 +1143,8 @@ class Migrator:
         sudo = "sudo " + script if script.startswith("/") else "sudo bash " + script
         if mode in ("resume", "finish"):          # the serials are in the state file
             return "%s --%s" % (sudo, mode)
-        return "%s --from-serial %s --to-serial %s --root-size %dG --%s" % (
-            sudo, a.from_serial, a.to_serial, a.root_gib, mode)
+        return "%s --from-serial %s --to-serial %s --root-size %dG%s --%s" % (
+            sudo, a.from_serial, a.to_serial, a.root_gib, (" --park-dir " + a.park_dir) if a.park_dir else "", mode)
 
     @staticmethod
     def sibling_script():
@@ -1167,8 +1174,8 @@ class Migrator:
         L.append("READ: / (%s used) and /boot of the FROM drive, /srv/models (%s) of the TO drive." % (
             human(f["root_used"]) if f["root_used"] is not None else "?",
             human(f["models_used"]) if f["models_used"] is not None else "?"))
-        L.append("BACKED UP FIRST: /srv/models -> %s on the RAID (checked by a dry run and by size);" % self.cfg.parked)
-        L.append("   it stays there until --finish --delete-parked.")
+        L.append("BACKED UP FIRST: /srv/models -> %s (checked by a dry run and by size);" % self.cfg.parked)
+        L.append("   that is on the FROM drive's root filesystem unless --park-dir says another disk; it stays there until deleted.")
         L.append("ERASED: the whole TO drive. Its partitions are rebuilt:")
         if lay:
             L.append("   1  ESP    %d GiB vfat    2  /boot  %d GiB ext4    3  /  %d GiB ext4" % (lay["esp_gib"], lay["boot_gib"], lay["root_gib"]))
@@ -1178,11 +1185,12 @@ class Migrator:
         L.append("   one firmware boot entry (%s), made last, used only for the NEXT boot (BootNext); the old drive stays the" % BOOT_LABEL)
         L.append("   default until --finish, so a power cycle after a bad first boot comes back to it; the new system has panic=10;")
         L.append("   the models copied back to the new models partition.")
+        L.append("WRITTEN on the FROM drive's root filesystem only: this tool's state, status and log (and the parked models above).")
         L.append("NEVER TOUCHED: the FROM drive: its partitions, LVM, fstab, boot loader and boot entry. If the new")
         L.append("   system doesn't boot, the firmware falls back to it, or pick it in the BIOS boot menu (%s)." % self.cfg.bios_key)
         L.append("STOPPED meanwhile: ollama, the gateway, the admin panel, model pulls, syncs and updates, the restart and reboot")
         L.append("   units, comfyui, apt's timers (they start again at the next boot). /srv/models is marked immutable while it is unmounted.")
-        L.append("State file (on the RAID, not on either NVMe): %s" % self.state_path)
+        L.append("State file (on the FROM root filesystem; copied onto the new root at the end): %s" % self.state_path)
         L.append("Status (readable by everyone) and log: %s, %s" % (self.cfg.status, self.cfg.log))
         L.append("")
         L.append("Stages:")
@@ -1373,14 +1381,14 @@ class Migrator:
         print("  partitions made and formatted: " + ", ".join("%s %s" % (k, v) for k, v in uu.items()))
 
     def verify_before_wipe(self):
-        """The last look before the TO drive is erased: the RAID is whole and mounted read-write, and the parked
+        """The last look before the TO drive is erased: the parked folder is on a filesystem mounted read-write, and the parked
         copy is the models. With /srv/models still mounted, a rsync dry run and sizes again, then a content
         compare of every file up to 64 MiB and of 18 MiB spread over each larger one (a full checksum of a
         models store of a terabyte or more would read it twice over disks of 150 MB/s, hours; the sizes and
         times of everything are already exact). Resumed after the unmount, the parked folder is compared with
         the size recorded when it was verified."""
         c = self.cfg
-        why = self.check_data_raid(self.mounts())
+        why = self.check_parked_place(self.mounts())
         if why:
             raise Abort(why + "; not erasing the drive")
         if any(m["target"] == c.models for m in self.mounts()):
@@ -1442,7 +1450,16 @@ class Migrator:
     # -- stage 3: copy / and /boot -----------------------------------------------------------------
 
     ROOT_EXCLUDES = ["/proc/*", "/sys/*", "/dev/*", "/run/*", "/tmp/*", "/swap.img", "/lost+found",
-                     "/boot/*", "/srv/models/*", "/srv/data/*"]
+                     "/boot/*", "/srv/models/*"]
+
+    def root_excludes(self):
+        """The fixed list, and the parked models copy when it sits on the root being copied (it does by default: the
+        models must not be copied into the new root, they are restored onto the models partition)."""
+        out = list(self.ROOT_EXCLUDES)
+        rel = os.path.relpath(self.cfg.parked, self.cfg.src_root)
+        if not rel.startswith(".."):
+            out.append("/" + rel)
+        return out
 
     def stage_copy(self):
         c, d = self.cfg, self.drive_to()
@@ -1452,7 +1469,7 @@ class Migrator:
         base = ["rsync", "-aHAXx", "--numeric-ids", "--delete"]
         if self.args.bwlimit:
             base.append("--bwlimit=%d" % self.args.bwlimit)
-        base += ["--exclude=" + e for e in self.ROOT_EXCLUDES]
+        base += ["--exclude=" + e for e in self.root_excludes()]
         for n in (1, 2):
             print("  copying / (pass %d of 2; the second only catches what changed)" % n)
             self.check_target(self.args.to_serial, d.byid)
@@ -1700,6 +1717,42 @@ class Migrator:
             self.mark("done", s)
             print("stage %s: done" % s)
 
+    def hand_over(self):
+        """The state, a final status and the log, onto the NEW root: after the reboot the old drive's filesystem is not
+        mounted, and --finish (and --status) read them from the same place on the system that is running then."""
+        c, d = self.cfg, self.drive_to()
+        self.ensure_mounted(d.part(3), c.new_root)
+        self.verify_mounted(d.part(3), c.new_root)
+
+        def dest(path):
+            rel = os.path.relpath(path, c.src_root)
+            return os.path.join(c.new_root, rel if not rel.startswith("..") else path.lstrip("/"))
+        sd = dest(c.state_dir)
+        os.makedirs(sd, mode=0o700, exist_ok=True)
+        os.chmod(sd, 0o700)
+        tmp = os.path.join(sd, "state.json.new")
+        fd = open_nofollow(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            json.dump(self.state, fh, indent=1)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, os.path.join(sd, "state.json"))
+        f = dict(self.st.f) if self.st else {"state": "", "stage": "", "percent": "", "doing": "", "started": self.now(),
+                                             "updated": self.now(), "boot_id": "", "next": ""}
+        f.update(state="DONE (copied here from the old drive)", stage="finished", percent="", doing="waiting for the reboot and --finish",
+                 updated=self.now(), next="after the reboot: " + self.cmdline("finish"))
+        os.makedirs(os.path.dirname(dest(c.status)), exist_ok=True)
+        with open(dest(c.status), "w") as fh:
+            fh.write(render_status(f))
+        os.chmod(dest(c.status), 0o644)
+        try:
+            shutil.copyfile(c.log, dest(c.log))
+            os.chmod(dest(c.log), 0o600)
+        except OSError:
+            pass
+        self.unmount_new()
+        print("  state, status and log copied onto the new root (%s); the new system is unmounted" % (sd[len(c.new_root):] or sd))
+
     def check_alive(self):
         fd = self.resolve(self.args.from_serial)
         if fd is None:
@@ -1749,7 +1802,8 @@ class Migrator:
             "models restored. Firmware: the new drive (entry %s) boots NEXT (BootNext), once; the old drive (entry %s) stays" % (
                 efi.get("new", "?"), efi.get("old") or "?"),
             "first in the boot order until --finish, so a power cycle after a bad first boot returns to it.",
-            "The old drive (serial %s) was not written to (only its bare /srv/models folder is marked immutable)." % self.args.from_serial,
+            "The old drive (serial %s): its partitions, LVM, fstab and boot loader were not written to; its root filesystem holds this tool's" % self.args.from_serial,
+            "state, log and the parked models (%s), and its bare /srv/models folder is marked immutable." % self.cfg.parked,
             "",
             ("Rebooting into the new drive in %d seconds (Ctrl-C cancels)." % self.cfg.countdown) if rebooting
             else "Reboot into the new drive:   sudo reboot",
@@ -1762,7 +1816,7 @@ class Migrator:
         done, _ = self.progress()
         self.box("STOPPED: " + why.splitlines()[0][:200], [
             "Stages finished: %s" % (", ".join(s for s in STAGES if s in done) or "none"),
-            "The old drive (serial %s) has not been written to. Nothing was rebooted." % a.from_serial,
+            "The old drive's partitions, LVM, fstab and boot loader were not written to. Nothing was rebooted.",
             "Anything an earlier stage finished is kept; running again carries on:",
             "   %s" % self.cmdline("resume"),
             "Services stopped for this: %s (they start by themselves at the next boot)" % (
@@ -1859,7 +1913,7 @@ class Migrator:
             if st and st.get("done") and any(s in st["done"] for s in STAGES[1:]):
                 raise Abort("a migration is already under way (%s). Use --resume to carry on" % self.state_path)
             return {"version": 1, "from_serial": a.from_serial, "to_serial": a.to_serial, "root_gib": a.root_gib,
-                    "created": self.now(), "done": {}, "started": {}}
+                    "created": self.now(), "done": {}, "started": {}, "parked": self.cfg.parked}
         if not st:
             raise Abort("there is no migration to resume (no %s). Start with --run" % self.state_path)
         if st["from_serial"] != a.from_serial or st["to_serial"] != a.to_serial:
@@ -1868,10 +1922,14 @@ class Migrator:
         if a.root_size_given and a.root_gib != st["root_gib"]:
             raise Abort("--root-size %dG differs from the %dG this migration began with" % (a.root_gib, st["root_gib"]))
         a.root_gib = st["root_gib"]
+        if st.get("parked"):
+            if a.park_dir and a.park_dir + "/models-parked" != st["parked"]:
+                raise Abort("--park-dir %s differs from %s, where this migration began parking the models" % (a.park_dir, st["parked"]))
+            self.cfg.parked = st["parked"]
         return st
 
     def begin_outputs(self):
-        """Status file and log, once the lock is ours and the folder is known to be on the RAID."""
+        """Status file and log, once the lock is ours and the folder is known to be on the root filesystem."""
         a = self.args
         self.st = Status(self.cfg, redact=[(a.from_serial, "<old-drive>"), (a.to_serial, "<new-drive>")])
         self.st.enable()
@@ -1982,6 +2040,7 @@ class Migrator:
             if "firmware" in self.progress()[0]:
                 self.rearm_bootnext()
             self.run_stages()
+            self.hand_over()
             self.final_checks()
         except Abort as e:
             self.fail(str(e), e)
@@ -2007,7 +2066,7 @@ class Migrator:
             with open(c.status) as fh:
                 text = fh.read()
         except OSError:
-            print("No migration status at %s (nothing has run, or /srv/data is not mounted)." % c.status)
+            print("No migration status at %s (nothing has run on this system; after the move the old drive's copy is not mounted)." % c.status)
             return 1
         print(text, end="")
         verdict = diagnose_status(text, Status.boot_id(), time.time())
@@ -2019,6 +2078,10 @@ class Migrator:
         self.need_args()
         a, c = self.args, self.cfg
         self.state = self.load_state()
+        if self.state and self.state.get("parked"):
+            if a.park_dir and a.park_dir + "/models-parked" != self.state["parked"]:
+                raise Abort("--park-dir %s differs from %s, where this migration parked the models" % (a.park_dir, self.state["parked"]))
+            self.cfg.parked = self.state["parked"]
         if not self.state or not all(s in self.state.get("done", {}) for s in STAGES[1:]):
             raise Abort("the migration did not reach its end (stages done: %s); finish that with --resume first" % (
                 ", ".join(s for s in STAGES[1:] if s in (self.state or {}).get("done", {})) or "none"))
@@ -2065,7 +2128,7 @@ class Migrator:
         self.save_state()
         old = self.state.get("efi", {}).get("old")
         lines = [
-            "The old drive (serial %s)%s was never written to. It is still a complete, bootable system:" % (
+            "The old drive (serial %s)%s: its partitions, LVM, fstab and boot loader were never written to. It is still a complete, bootable system:" % (
                 a.from_serial, "" if fd else " (not visible now)"),
             "keep it as the fallback for a while. Reusing it is yours to do, when the new system has run well for a",
             "while (this tool never wipes a drive)%s." % (
@@ -2076,8 +2139,8 @@ class Migrator:
              if a.disable_old_boot_files else
              "Its boot files are untouched. If the firmware keeps picking it anyway: --finish --disable-old-boot-files (off by default; undoable)."),
             "The parked models copy %s%s" % (
-                "was deleted." if a.delete_parked else "is still at %s;" % c.parked,
-                "" if a.delete_parked else " --finish --delete-parked frees the space (it checks the live copy first)."),
+                "was dealt with (above)." if a.delete_parked else "is on the old drive's root filesystem (or the --park-dir disk) at %s;" % c.parked,
+                "" if a.delete_parked else " if that disk is mounted, --finish --delete-parked frees the space (it checks the live copy first)."),
             "The new drive is now the default boot; a kernel panic reboots (panic=10) into it, and the old drive stays second.",
             "setup.sh works on the new layout: / is a plain partition (no LVM to grow) and the models share the OS disk, which it never wipes.",
             "/etc/ollama1/setup.env now names the new drive for both the OS and the models; see ollama1/README.md."]
@@ -2118,7 +2181,13 @@ class Migrator:
 
     def delete_parked(self):
         p = self.cfg.parked
-        if os.path.islink(p) or not os.path.isdir(p) or os.path.realpath(p) != os.path.realpath(self.cfg.data + "/models-parked"):
+        if not os.path.lexists(p):
+            print("The parked models copy is not on this system (it was made on the old drive's root filesystem, which is not "
+                  "mounted now, or on the disk --park-dir named). Nothing to delete here; it goes when that drive is reused.")
+            return
+        made = (self.state or {}).get("parked")
+        if (os.path.islink(p) or not os.path.isdir(p) or not made or os.path.realpath(p) != os.path.realpath(made)
+                or os.path.basename(p) != "models-parked"):
             raise Abort("%s is not the parked-models folder this tool made; not deleting anything" % p)
         out = self.rn.run(["rsync", "-rn", "--size-only", "--itemize-changes", p.rstrip("/") + "/",
                            self.cfg.models.rstrip("/") + "/"], ok=RSYNC_OK)
@@ -2191,7 +2260,7 @@ class Migrator:
         """Optional (--finish --disable-old-boot-files), off by default. The firmware of this server kept
         re-ordering BootOrder and booting the old drive. Renaming EFI/ubuntu and EFI/BOOT on the old drive's EFI
         partition to *.off leaves it nothing to boot there, so it falls through to the new drive. It does make the
-        old drive no longer a fallback until undone; the undo is written to /srv/data first and said out loud."""
+        old drive no longer a fallback until undone; the undo is written to the data folder first and said out loud."""
         a, c = self.args, self.cfg
         fd = self.resolve(a.from_serial)
         if fd is None:
@@ -2337,6 +2406,8 @@ def parse_args(argv):
     ap.add_argument("--to-serial", help="serial of the drive that will be ERASED and become the OS drive")
     ap.add_argument("--root-size", default=None, help="size of / on the new drive (default 300G)")
     ap.add_argument("--bwlimit", type=int, default=200000, help="copy speed limit, KiB/s (0 = none); gentler on a drive that drops out under load")
+    ap.add_argument("--park-dir", default=None, help="the folder the models are parked in, as <folder>/models-parked, while the TO drive is erased (default "
+                    "/var/lib/ollama1 on the FROM drive's root filesystem): a folder on another disk if / has no room; never on the TO drive")
     ap.add_argument("--confirm-serial", default=None, help="instead of typing the serial: it must equal --to-serial. With it, nothing is asked")
     ap.add_argument("--reboot", action="store_true", help="with --run/--resume: reboot into the new drive when everything has passed (10 s countdown, Ctrl-C cancels)")
     ap.add_argument("--in-session", action="store_true", help=argparse.SUPPRESS)
@@ -2351,10 +2422,14 @@ def parse_args(argv):
     ap.add_argument("--disable-old-entry", action="store_true", help="with --finish: make the old drive's firmware entry inactive")
     ap.add_argument("--disable-old-boot-files", action="store_true",
                     help="with --finish: rename EFI/ubuntu and EFI/BOOT on the old drive's ESP to *.off, so a firmware that "
-                         "keeps picking the old drive finds nothing to boot there (off by default; the undo is written to /srv/data)")
+                         "keeps picking the old drive finds nothing to boot there (off by default; the undo is written to /var/lib/ollama1)")
     ap.add_argument("--remove-sudoers", action="store_true", help="with --finish: remove the temporary sudo permission")
     a = ap.parse_args(argv)
     a.mode = a.mode or "plan"
+    if a.park_dir is not None:
+        if not valid_park_dir(a.park_dir.rstrip("/") or "/"):
+            ap.error("--park-dir takes an absolute folder path made of letters, digits and . _ - + @ (no spaces, no ..)")
+        a.park_dir = os.path.normpath(a.park_dir)
     a.root_size_given = a.root_size is not None
     a.root_gib = parse_size_gib(a.root_size or "300G")
     if (a.delete_parked or a.disable_old_entry or a.disable_old_boot_files or a.remove_sudoers) and a.mode != "finish":
@@ -2386,7 +2461,10 @@ def main(argv=None):
     except Abort as e:
         print("STOPPED: %s" % e, file=sys.stderr)
         return 2
-    m = Migrator(Cfg(), a)
+    cfg = Cfg()
+    if a.park_dir:
+        cfg.parked = a.park_dir + "/models-parked"
+    m = Migrator(cfg, a)
     m.st = None
     try:
         if a.mode == "plan":

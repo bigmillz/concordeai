@@ -12,8 +12,8 @@ It is for people comfortable with a Linux shell. The pieces are in
 - systemd units and a model updater.
 
 > **Status.** `ollama1/setup.sh` installs everything in one go, but for one
-> machine layout (Ubuntu 26.04, an OS disk, a models disk and two mirror
-> disks, which it wipes). Your server's name, user, LAN, domain and disks are
+> machine layout (Ubuntu 26.04, an OS disk and a models disk; it wipes only the
+> models disk and builds no mirror). Your server's name, user, LAN, domain and disks are
 > arguments to it (see [ollama1/README.md](../ollama1/README.md)). A general
 > installer is coming, as the app's "Add a server". Until then, the manual
 > steps below are the way for any other machine.

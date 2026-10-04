@@ -10,7 +10,7 @@ import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))   # so `python3 -m unittest tests.test_migrate` works from ollama1/
 
-from migrate_fixture import FROM, FSTAB, MDSTAT_DEGRADED, TO, WRITES_TO_DRIVE, Machine, load_lib
+from migrate_fixture import FROM, FSTAB, TO, WRITES_TO_DRIVE, Machine, load_lib
 
 L = load_lib()
 
@@ -89,7 +89,7 @@ class TestResume(unittest.TestCase):
         self.assertIn("stage park: done earlier, skipped", m.out)
         self.assertIn("stage partition: done earlier, skipped", m.out)
         later = m.log("rsync")[rsyncs:]                         # parking is not repeated
-        self.assertTrue(all("models-parked" not in l or l.endswith("/run/o1migrate/models/") for l in later))
+        self.assertTrue(all("models-parked" not in l or l.endswith("/run/o1migrate/models/") or "--exclude=" in l for l in later))
 
     def test_a_crash_inside_the_partition_stage_redoes_it_whole(self):
         m = self.m
@@ -102,29 +102,35 @@ class TestResume(unittest.TestCase):
         self.assertEqual(len(disk_wipes), 2)                   # wiped again; the parked copy was checked first
         self.assertEqual(m.run("--finish"), 1)                 # (not rebooted yet)
 
-    def test_a_raid_that_degrades_before_the_wipe_stops_it(self):
+    def ro_parked(self, m):
+        m.reload()
+        m.fs["mounts"].append({"target": m.data_dir + "/models-parked", "source": "/dev/sdz1", "fstype": "ext4",
+                               "options": "ro,noatime"})
+        m.flush()
+
+    def test_a_parked_place_that_goes_read_only_before_the_wipe_stops_it(self):
         m = self.m
         m.set_state(kill=[{"cmd": "rsync", "nth": 2, "when": "after"}])        # parked and checked, not yet wiped
         self.assertEqual(m.run("--run"), -signal.SIGKILL, m.out)
         m.set_state(kill=[])
-        m.put(m.mdstat_file, MDSTAT_DEGRADED)
+        self.ro_parked(m)
         self.assertEqual(m.run("--resume"), 1, m.out)                          # the preflight refuses
-        self.assertIn("is degraded [U_]", m.out)
+        self.assertIn("mounted read-only", m.out)
         self.assertEqual(m.log("wipefs"), [])
         self.assertEqual(m.log("umount"), [])
 
-    def test_the_raid_is_looked_at_again_inside_the_partition_stage(self):
+    def test_the_parked_place_is_looked_at_again_inside_the_partition_stage(self):
         import os
         from unittest import mock
         m = self.m
         mg = L.Migrator(L.Cfg(m.env()), L.parse_args(["--from-serial", FROM, "--to-serial", TO, "--run"]))
         os.makedirs(m.data_dir + "/models-parked")
         mg.state = {"done": {"park": "x"}, "started": {}}
-        m.put(m.mdstat_file, MDSTAT_DEGRADED)
+        self.ro_parked(m)
         with mock.patch.dict(os.environ, m.env()):
             with self.assertRaises(L.Abort) as cm:
                 mg.stage_partition()
-        self.assertIn("degraded", str(cm.exception))
+        self.assertIn("read-only", str(cm.exception))
         self.assertEqual(m.log("wipefs"), [])
 
     def test_bootnext_used_up_by_a_boot_is_set_again_on_resume(self):

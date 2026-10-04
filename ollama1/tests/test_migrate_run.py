@@ -3,6 +3,7 @@ writes where (and never to the old drive), the fstab and GRUB on the copy, the
 firmware order, the tmux relaunch, the status file, the reboot (flag, prompt,
 countdown, never after a failure) and --finish. No real disk is touched."""
 import copy
+import json
 import os
 import re
 import shlex
@@ -116,10 +117,31 @@ class SharedRun(unittest.TestCase):
             self.assertGreaterEqual(writes, 6)
         self.assertNotEqual(self.m.names["to"], self.swapped.names["to"])
 
-    def test_the_state_file_is_on_the_raid(self):
-        self.assertTrue(self.m.cfg_state.startswith(self.m.data_dir + "/"))
-        found = subprocess.run(["find", self.m.dir, "-name", "state.json"], capture_output=True, text=True).stdout.split()
-        self.assertEqual(found, [self.m.cfg_state])
+    def test_the_state_file_is_on_the_root_filesystem_and_a_copy_goes_to_the_new_root(self):
+        m = self.m
+        self.assertTrue(m.cfg_state.startswith(m.data_dir + "/"))
+        mine = m.dir + "/run/o1migrate/root/var/lib/ollama1/o1migrate/state.json"      # data_dir is src/var/lib/ollama1
+        found = sorted(subprocess.run(["find", m.dir, "-name", "state.json"], capture_output=True, text=True).stdout.split())
+        self.assertEqual(found, sorted([m.cfg_state, mine]))
+        with open(mine) as fh:
+            copy = json.load(fh)
+        self.assertEqual(sorted(copy["done"]), sorted(m.state()["done"]))
+        self.assertIn("firmware", copy["done"])
+        self.assertEqual(copy["parked"], m.data_dir + "/models-parked")
+        self.assertEqual(os.stat(mine).st_mode & 0o777, 0o600)
+        self.assertEqual(os.stat(os.path.dirname(mine)).st_mode & 0o777, 0o700)
+        new_status = read(m.dir + "/run/o1migrate/root/var/lib/ollama1/migrate-os.status")
+        self.assertIn("state:      DONE", new_status)
+        self.assertIn("--finish", new_status)
+        self.assertEqual(os.stat(m.dir + "/run/o1migrate/root/var/lib/ollama1/migrate-os.status").st_mode & 0o777, 0o644)
+        self.assertIn("copied onto the new root", m.out)
+
+    def test_the_parked_models_are_not_copied_into_the_new_root(self):
+        m = self.m
+        self.assertTrue(os.path.isfile(m.data_dir + "/models-parked/a.gguf"))
+        self.assertFalse(os.path.exists(m.dir + "/run/o1migrate/root/var/lib/ollama1/models-parked"))
+        self.assertTrue(os.path.isfile(m.dir + "/run/o1migrate/root/usr/bin/tool"))            # the rest of / was
+        self.assertTrue(os.path.isfile(m.dir + "/run/o1migrate/models/a.gguf"))                # and the models went back to their own partition
 
     def test_fstab_is_rewritten_on_the_copy_only(self):
         m = self.m
@@ -370,7 +392,7 @@ class TestRun(Base):
         self.assertEqual(m.run("--run"), 1)
         self.assertIn("STOPPED", m.out)
         self.assertIn("sudo bash migrate-os.sh --resume", m.out)
-        self.assertIn("The old drive (serial %s) has not been written to" % FROM, m.out)
+        self.assertIn("The old drive's partitions, LVM, fstab and boot loader were not written to", m.out)
         self.assertIn("park", m.state()["done"])
         self.assertNotIn("copy", m.state()["done"])
 
@@ -796,10 +818,26 @@ class TestFinish(Base):
         self.m.reboot_into_new()
         other = self.m.dir + "/precious"
         os.makedirs(other)
-        self.assertEqual(self.m.run("--finish", "--delete-parked", answers=["delete"], O1M_PARKED=other), 1)
-        self.assertIn("not the parked-models folder", self.m.out)
+        self.assertEqual(self.m.run("--finish", "--delete-parked", "--park-dir", other, answers=["delete"]), 1)
+        self.assertIn("differs from", self.m.out)
         self.assertEqual(self.m.log("rm"), [])
         self.assertTrue(os.path.isdir(other))
+        st = self.m.state()
+        st["parked"] = other                                  # a state file that names a folder this tool did not make
+        with open(self.m.cfg_state, "w") as fh:
+            json.dump(st, fh)
+        os.makedirs(self.m.data_dir + "/models-parked", exist_ok=True)
+        self.assertEqual(self.m.run("--finish", "--delete-parked", answers=["delete"]), 1)
+        self.assertEqual(self.m.log("rm"), [])
+        self.assertTrue(os.path.isdir(other))
+
+    def test_delete_parked_when_the_copy_is_on_the_old_drive_says_so_and_deletes_nothing(self):
+        self.full_run()
+        self.m.reboot_into_new()
+        shutil.rmtree(self.m.data_dir + "/models-parked")           # the old drive's root is not what is mounted now
+        self.assertEqual(self.m.run("--finish", "--delete-parked", answers=["delete"]), 0, self.m.out)
+        self.assertIn("is not on this system", self.m.out)
+        self.assertEqual(self.m.log("rm"), [])
 
     def test_disable_old_entry_is_inactive_not_deleted_and_asks(self):
         m = self.m

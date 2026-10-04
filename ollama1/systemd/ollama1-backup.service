@@ -1,6 +1,5 @@
 [Unit]
-Description=ollama1: copy settings and the model list to /srv/data
-RequiresMountsFor=/srv/data
+Description=ollama1: copy settings and the model list to /var/backups/ollama1
 
 [Service]
 Type=oneshot

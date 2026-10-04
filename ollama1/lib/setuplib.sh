@@ -9,23 +9,22 @@
 #     /dev/disk/by-id/...<serial> path, after an exact serial check;
 #   - nothing is wiped that fstab, crypttab or swap uses, or that carries a
 #     signature other than the ones this machine is known to have;
-#   - a mirror already on the disks is assembled, never wiped;
-#   - a filesystem is made only on a partition or array this script has
-#     just created (a marker in $STATE_DIR says so, so a crash between
-#     mdadm --create and mkfs is picked up on the next run). A found or
-#     reassembled one without a readable filesystem stops setup instead:
-#     that may be damage, and mkfs would destroy what's left;
+#   - there is no mirror (6b400): no RAID is built, assembled or mounted, and
+#     the old mirror disks are never looked at, let alone wiped;
+#   - a filesystem is made only on a partition this script has just created
+#     (a marker in $STATE_DIR says so, so a crash between the partitioning and
+#     mkfs is picked up on the next run). A found one without a readable
+#     filesystem stops setup instead: that may be damage, and mkfs would
+#     destroy what's left;
 #   - a disk blkid can't read (any exit status but 0 or 2) stops setup;
 #   - fstab never gets a line without a real UUID.
 
 : "${FSTAB:=/etc/fstab}"
 : "${CRYPTTAB:=/etc/crypttab}"
 : "${SWAPS:=/proc/swaps}"
-: "${MDADM_CONF:=/etc/mdadm/mdadm.conf}"
-: "${STATE_DIR:=/var/lib/ollama1}"
+: "${STATE_DIR:=/var/lib/ollama1}"            # = o1common.Paths.state (a test keeps the two equal)
+: "${BACKUP_DIR:=/var/backups/ollama1}"       # = o1common.Paths.backups: the nightly settings backup (6b400)
 : "${BYID:=/dev/disk/by-id}"
-: "${MD_DEV:=/dev/md/o1data}"
-: "${MD_NAME:=ollama1:data}"
 
 # ---- the owner's settings -----------------------------------------------------
 # Nothing about a particular server is written in setup.sh or the repo: the
@@ -228,16 +227,13 @@ models_done() { # /srv/models is mounted from a partition of the models disk
   mountpoint -q "${MODELS_MNT:-/srv/models}" \
     && [ "$(disk_of "$(findmnt -no SOURCE "${MODELS_MNT:-/srv/models}")")" = "$MODELS_DISK" ]
 }
-raid_done() { mountpoint -q "${DATA_MNT:-/srv/data}" && [ -n "$(raid_find)" ]; }
 models_on_os_disk() { [ -n "${OS_DISK:-}" ] && [ "$MODELS_DISK" = "$OS_DISK" ]; }
 
-check_disks() { # every refusal before any disk is touched. Needs OS_DISK MODELS_DISK HDD1 HDD2 and their serials.
+check_disks() { # every refusal before any disk is touched. Needs OS_DISK MODELS_DISK and their serials.
   [ -n "$OS_DISK" ] || die "no disk with serial $OS_SERIAL (the OS disk)"
   [ -n "$MODELS_DISK" ] || die "no disk with serial $MODELS_SERIAL (the models disk)"
-  [ -n "$HDD1" ] || die "no disk with serial $HDD1_SERIAL"
-  [ -n "$HDD2" ] || die "no disk with serial $HDD2_SERIAL"
-  local pair d rd
-  for pair in "$HDD1:$HDD1_SERIAL" "$HDD2:$HDD2_SERIAL" "$MODELS_DISK:$MODELS_SERIAL"; do
+  local pair rd
+  for pair in "$MODELS_DISK:$MODELS_SERIAL"; do
     serial_is "${pair%%:*}" "${pair#*:}" || die "serial check failed for ${pair%%:*}; refusing to touch any disk"
   done
   rd=$(root_disk)
@@ -255,10 +251,6 @@ check_disks() { # every refusal before any disk is touched. Needs OS_DISK MODELS
     [ "$(findmnt -no SOURCE "${MODELS_MNT:-/srv/models}")" != "$(root_source)" ] \
       || die "/srv/models is the root filesystem itself, not a partition of its own; refusing to touch any disk"
   fi
-  for d in "$HDD1" "$HDD2"; do
-    [ "$d" != "$OS_DISK" ] || die "$d is the OS disk"
-  done
-  [ "$HDD1" != "$HDD2" ] && [ "$MODELS_DISK" != "$HDD1" ] && [ "$MODELS_DISK" != "$HDD2" ] || die "two roles map to one disk"
 }
 
 show_disks() {
@@ -270,8 +262,7 @@ show_disks() {
     printf '   %-13s %-17s %-32s %s\n' "${OS_DISK:-MISSING}" "$OS_SERIAL" "$(disk_desc "${OS_DISK:-/dev/null}")" "OS: kept; $(root_on_lvm && echo 'root LV grows into free space' || echo 'root is not on LVM, left as it is')"
     printf '   %-13s %-17s %-32s %s\n' "${MODELS_DISK:-MISSING}" "$MODELS_SERIAL" "$(disk_desc "${MODELS_DISK:-/dev/null}")" "$(models_done && echo 'models: already set up' || echo 'WIPED -> ext4 /srv/models')"
   fi
-  printf '   %-13s %-17s %-32s %s\n' "${HDD1:-MISSING}" "$HDD1_SERIAL" "$(disk_desc "${HDD1:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data (after /home moves off it)')"
-  printf '   %-13s %-17s %-32s %s\n' "${HDD2:-MISSING}" "$HDD2_SERIAL" "$(disk_desc "${HDD2:-/dev/null}")" "$(raid_done && echo 'mirror: already set up' || echo 'WIPED -> RAID1 /srv/data')"
+  printf '   no mirror: not used (every other disk is left alone%s)\n' "$( [ -z "${HDD1_SERIAL:-}${HDD2_SERIAL:-}" ] || echo '; the old mirror serials are ignored' )"
 }
 
 plan_wipes() { # sets WIPES: the disks that will be erased
@@ -280,7 +271,6 @@ plan_wipes() { # sets WIPES: the disks that will be erased
     [ "$MODELS_DISK" != "$OS_DISK" ] || die "refusing to wipe the OS disk $OS_DISK"
     WIPES+=("$MODELS_DISK ($MODELS_SERIAL, $(disk_desc "$MODELS_DISK"))")
   fi
-  raid_done || WIPES+=("$HDD1 ($HDD1_SERIAL, $(disk_desc "$HDD1"))" "$HDD2 ($HDD2_SERIAL, $(disk_desc "$HDD2"))")
   return 0
 }
 
@@ -417,35 +407,6 @@ signatures_ok() { # disk allowed-types... -> true if every signature on it is ex
   return $bad
 }
 
-md_saved_uuid() { cat "$STATE_DIR/raid.uuid" 2>/dev/null || true; }
-
-md_line_is_ours() { # an "ARRAY ..." line from mdadm -> true if it is the ollama1 mirror
-  local line=$1 saved
-  saved=$(md_saved_uuid)
-  [[ " $line " == *" name=$MD_NAME "* ]] && return 0
-  [ -n "$saved" ] && [[ " $line " == *" UUID=$saved "* ]] && return 0
-  return 1
-}
-
-raid_find() { # the running mirror's device, if assembled
-  local line
-  while IFS= read -r line; do
-    case "$line" in ARRAY*) md_line_is_ours "$line" && { echo "$line" | awk '{print $2}'; return 0; } ;; esac
-  done < <(mdadm --detail --scan 2>/dev/null || true)
-  return 0
-}
-
-raid_members_on_disk() { # the partitions of our mirror found on these disks (not assembled)
-  local disk dev line
-  for disk in "$@"; do
-    for dev in $(devs_of "$disk"); do
-      line=$(mdadm --examine --brief "$dev" 2>/dev/null | grep '^ARRAY' | head -n1 || true)
-      [ -n "$line" ] && md_line_is_ours "$line" && echo "$dev"
-    done
-  done
-  return 0
-}
-
 # The dashboard's console font (6b359). The monitor is read from across a room,
 # so the dashboard wants a big font (about 120 columns: 16x32 on a 1080p
 # screen), and the console's own small one gives 240. $1 the dashboard
@@ -541,71 +502,4 @@ models_step() {
   mkdir -p "${MODELS_MNT:-/srv/models}"
   set_fstab "${MODELS_MNT:-/srv/models}" "UUID=$uuid ${MODELS_MNT:-/srv/models} ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"
   mountpoint -q "${MODELS_MNT:-/srv/models}" || run mount "${MODELS_MNT:-/srv/models}"
-}
-
-# The mirror. $1 $2 disks, $3 $4 their serials. The caller has made sure
-# /home no longer lives on either.
-raid_step() {
-  local d1=$1 d2=$2 s1=$3 s2=$4 md members b1 b2 b d p t uuid
-  md=$(raid_find)
-  if [ -z "$md" ]; then
-    members=()
-    while IFS= read -r p; do [ -n "$p" ] && members+=("$p"); done < <(raid_members_on_disk "$d1" "$d2")
-    if [ "${#members[@]}" -gt 0 ]; then
-      note "the mirror is already on the disks (${members[*]}); assembling it, nothing is wiped"
-      run mdadm --assemble --run "$MD_DEV" "${members[@]}"
-      md=$MD_DEV
-    fi
-  fi
-  if [ -z "$md" ]; then
-    serial_is "$d1" "$s1" || die "serial check failed for $d1 (expected $s1)"
-    serial_is "$d2" "$s2" || die "serial check failed for $d2 (expected $s2)"
-    b1=$(byid_for "$d1" "$s1") || die "no /dev/disk/by-id path for $s1"
-    b2=$(byid_for "$d2" "$s2") || die "no /dev/disk/by-id path for $s2"
-    for d in "$d1" "$d2"; do
-      for p in $(devs_of "$d"); do findmnt -S "$p" >/dev/null 2>&1 && die "$p is mounted; not wiping"; done
-      referenced "$d" && die "$d is still used by fstab, crypttab or swap; not wiping"
-      signatures_ok "$d" ext4 || die "$d carries something setup doesn't expect (above); not wiping"
-    done
-    for b in "$b1" "$b2"; do
-      run wipefs -a "$b"
-      run sgdisk --zap-all "$b"
-      # 100 MiB left free at the end, so a slightly smaller replacement disk fits
-      run sgdisk -n1:1MiB:-100MiB -t1:FD00 -c1:ollama1-data "$b"
-    done
-    partprobe "$b1" "$b2" 2>/dev/null || true
-    udevadm settle 2>/dev/null || true
-    wait_for "$b1-part1" || die "no partition appeared on $b1"
-    wait_for "$b2-part1" || die "no partition appeared on $b2"
-    mkdir -p "$STATE_DIR"; touch "$STATE_DIR/raid.mkfs-pending"   # this run makes the array, so it may format it
-    run mdadm --create "$MD_DEV" --run --level=1 --raid-devices=2 --metadata=1.2 \
-      --bitmap=internal --homehost="${MD_NAME%%:*}" --name="${MD_NAME#*:}" "$b1-part1" "$b2-part1"
-    udevadm settle 2>/dev/null || true
-    md=$MD_DEV
-  fi
-  mkdir -p "$STATE_DIR"
-  mdadm --detail --export "$md" 2>/dev/null | sed -n 's/^MD_UUID=//p' >"$STATE_DIR/raid.uuid" || true
-  t=$(fs_type "$md") || die "$BLKID_FAIL"
-  if [ -z "$t" ]; then
-    [ -f "$STATE_DIR/raid.mkfs-pending" ] || fsck_hint "$md" "$STATE_DIR/raid.mkfs-pending"
-    run mkfs.ext4 -F -q -L o1data -m 0 -E lazy_itable_init=1,lazy_journal_init=1 "$md"
-  elif [ "$t" != ext4 ]; then
-    die "$md holds '$t', not ext4; not touching it"
-  fi
-  rm -f "$STATE_DIR/raid.mkfs-pending"
-  touch "$MDADM_CONF"
-  local saved conf_line pats
-  saved=$(md_saved_uuid)
-  conf_line=$(mdadm --detail --brief "$md")
-  pats=(-e "name=$MD_NAME")
-  [ -n "$saved" ] && pats+=(-e "UUID=$saved")
-  grep -v "${pats[@]}" "$MDADM_CONF" >"$MDADM_CONF.new" || true
-  printf '%s\n' "$conf_line" >>"$MDADM_CONF.new"
-  mv "$MDADM_CONF.new" "$MDADM_CONF"
-  run update-initramfs -u
-  uuid=$(probe "$md" UUID) || die "$BLKID_FAIL"
-  [ -n "$uuid" ] || die "no filesystem UUID on $md; fstab left as it was"
-  mkdir -p "${DATA_MNT:-/srv/data}"
-  set_fstab "${DATA_MNT:-/srv/data}" "UUID=$uuid ${DATA_MNT:-/srv/data} ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"
-  mountpoint -q "${DATA_MNT:-/srv/data}" || run mount "${DATA_MNT:-/srv/data}"
 }

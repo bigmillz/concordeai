@@ -60,8 +60,11 @@
 #   --zone <your-domain>       your domain on Cloudflare (not needed with --skip-cloudflare)
 #   --owner <your-name>        your name, only in the Access policy's name
 #   --timezone <Area/City>     default: the time zone the machine already has
-#   --os-serial / --models-serial / --hdd1-serial / --hdd2-serial <serial>
+#   --os-serial / --models-serial <serial>
 #                              the disks, by serial (lsblk -d -o NAME,SIZE,MODEL,SERIAL)
+#   --hdd1-serial / --hdd2-serial <serial>   accepted and IGNORED (6b400): there is no mirror any more, and
+#                              setup never wipes, assembles or mounts those disks. Old command lines and
+#                              setup.env files keep working; tools/remove-raid.sh tears an existing mirror down
 #
 # It runs itself inside tmux (session "ollama1-setup"), so a dropped SSH
 # connection can't stop it halfway: log in again and `sudo tmux attach -t
@@ -163,6 +166,9 @@ for a in "$@"; do
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
+if [ -n "$A_HDD1$A_HDD2" ]; then
+  echo "note: --hdd1-serial and --hdd2-serial are ignored: this kit no longer builds a mirror (tools/remove-raid.sh removes an existing one)"
+fi
 # the LAN is checked once every flag is read (so --lan-public-ok may come after it)
 if [ -n "$A_LAN" ] && ! valid_lan "$A_LAN"; then
   bad_option --lan "a private network of /16 or narrower, like 10.0.0.0/24 (SSH is let in from it, and from nowhere else); add --lan-public-ok only if a larger or public network is really meant"
@@ -279,13 +285,11 @@ prompt_settings() {
   ask_setting ADMIN_USER "The Linux user who may log in over SSH" --user valid_user "alice"
   ask_setting HOME_LAN "Your LAN, the network SSH is allowed from" --lan valid_lan "10.0.0.0/24"
   [ "$SKIP_CF" = 1 ] || ask_setting CF_ZONE "Your domain on Cloudflare" --zone valid_zone "example.com"
-  if [ -z "$OS_SERIAL$MODELS_SERIAL$HDD1_SERIAL$HDD2_SERIAL" ] && [ -r /dev/tty ]; then
+  if [ -z "$OS_SERIAL$MODELS_SERIAL" ] && [ -r /dev/tty ]; then
     printf '\n   Your disks, by serial:\n'; lsblk -d -o NAME,SIZE,MODEL,SERIAL 2>/dev/null | sed 's/^/     /' || true
   fi
   ask_setting OS_SERIAL "Serial of the OS disk (kept)" --os-serial valid_serial "from the list above"
   ask_setting MODELS_SERIAL "Serial of the models disk (WIPED)" --models-serial valid_serial "from the list above"
-  ask_setting HDD1_SERIAL "Serial of the first mirror disk (WIPED)" --hdd1-serial valid_serial "from the list above"
-  ask_setting HDD2_SERIAL "Serial of the second mirror disk (WIPED)" --hdd2-serial valid_serial "from the list above"
 }
 save_settings() { # after "yes": so a re-run needs no arguments
   install -d -m 0755 /etc/ollama1
@@ -293,8 +297,9 @@ save_settings() { # after "yes": so a re-run needs no arguments
   ( umask 077; {
       printf 'SERVER_NAME=%s\nADMIN_USER=%s\nHOME_LAN=%s\nCF_ZONE=%s\nOWNER=%s\nTIMEZONE=%s\n' \
         "$SERVER_NAME" "$ADMIN_USER" "$HOME_LAN" "$CF_ZONE" "$OWNER" "$TIMEZONE"
-      printf 'OS_SERIAL=%s\nMODELS_SERIAL=%s\nHDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' \
-        "$OS_SERIAL" "$MODELS_SERIAL" "$HDD1_SERIAL" "$HDD2_SERIAL"
+      printf 'OS_SERIAL=%s\nMODELS_SERIAL=%s\n' "$OS_SERIAL" "$MODELS_SERIAL"
+      # kept only if an earlier run or the command line had them: never used here, tools/remove-raid.sh reads them
+      [ -z "$HDD1_SERIAL$HDD2_SERIAL" ] || printf 'HDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' "$HDD1_SERIAL" "$HDD2_SERIAL"
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
       printf 'FANS=%s\n' "$FANS"
       printf 'LEDS=%s\n' "$LEDS"
@@ -314,12 +319,7 @@ derive_hosts() { # the hostnames: config.json's own win, else <name>.<zone>
 find_disks() {
   OS_DISK=$(disk_by_serial "$OS_SERIAL")
   MODELS_DISK=$(disk_by_serial "$MODELS_SERIAL")
-  HDD1=$(disk_by_serial "$HDD1_SERIAL")
-  HDD2=$(disk_by_serial "$HDD2_SERIAL")
 }
-
-home_on_own_disk() { findmnt -n --target /home -o TARGET 2>/dev/null | grep -qx /home; }
-home_in_fstab() { awk '$0 !~ /^[[:space:]]*#/ && $2 == "/home"' /etc/fstab | grep -q .; }
 
 # ---- the plan --------------------------------------------------------------
 state() { if eval "$1" >/dev/null 2>&1; then printf '%sdone%s ' "$G" "$N"; else printf 'to do'; fi; }
@@ -350,11 +350,11 @@ print_plan() {
   cat <<EOF
 
    $(state '[ "$(hostname)" = "$SERVER_NAME" ]')  1. Host name $SERVER_NAME, time zone $TIMEZONE, boot menu shown for 5 s
-   $(state 'command -v cloudflared && command -v ttyd && python3 -c "import nacl"')  2. Packages: ttyd, python3-nacl, mdadm, nftables, zstd, cloudflared (Cloudflare's apt repo, key checked)
+   $(state 'command -v cloudflared && command -v ttyd && python3 -c "import nacl"')  2. Packages: ttyd, python3-nacl, nftables, zstd, cloudflared (Cloudflare's apt repo, key checked)
    $(state '! root_on_lvm || [ "$(vg_free_extents)" -le "$(vg_keep_extents "$VG_RESERVE_GIB")" ]')  3. Grow the root volume into the free space on the OS disk (online); skipped when / is not on LVM
-   $(state '! home_on_own_disk && ! home_in_fstab')  4. Copy /home onto the root filesystem, check it (SSH keys included), stop mounting the old disk
+   $(state true)  4. /home: left where it is
    $(state models_done)  5. Models disk: wipe, ext4, mount at /srv/models (noatime); never when it is also the OS disk
-   $(state raid_done)  6. Mirror: wipe both mirror disks, RAID1, ext4, mount at /srv/data (resync runs in the background)
+   $(state true)  6. No mirror: not used (setup never touches any other disk)
    $(state 'id o1gw && id o1admin && id o1dash && id ollama')  7. Service users (ollama, o1gw, o1admin, o1dash, cloudflared), no shells
    $(state '[ -x $LIBDIR/bin/ollama1-gateway ]')  8. Install the gateway, admin panel, dashboard, pairing tool, updater, units, polkit rule
    $(state 'ufw status | grep -q "Status: active"')  9. Firewall: nothing in except SSH from $HOME_LAN; bridged LAN traffic untouched
@@ -369,7 +369,7 @@ print_plan() {
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
-   Not touched: the network settings (netplan, br0), anything in /home besides the move.
+   Not touched: the network settings (netplan, br0), /home, every disk but the models disk.
    No models are installed.
    $(policy_line)
 EOF
@@ -384,8 +384,6 @@ if [ "$PLAN_ONLY" = 1 ]; then
   if [ -z "$HOME_LAN" ]; then HOME_LAN="<lan-cidr>"; LAN_SOURCE="not found: give --lan"; fi
   [ -n "$OS_SERIAL" ] || OS_SERIAL="<os-serial>"
   [ -n "$MODELS_SERIAL" ] || MODELS_SERIAL="<models-serial>"
-  [ -n "$HDD1_SERIAL" ] || HDD1_SERIAL="<hdd1-serial>"
-  [ -n "$HDD2_SERIAL" ] || HDD2_SERIAL="<hdd2-serial>"
   [ -n "$TIMEZONE" ] || TIMEZONE="<your-timezone>"
   find_disks
   derive_hosts
@@ -485,8 +483,6 @@ echo
 if [ "${#WIPES[@]}" -gt 0 ]; then
   printf '%sThese disks will be ERASED. Everything on them is lost:%s\n' "$R$B" "$N"
   for w in "${WIPES[@]}"; do printf '   %s\n' "$w"; done
-  printf '(/home is copied off %s first, and the copy is checked before that disk is touched.\n' "$HDD1"
-  printf ' A mirror already on the mirror disks is reassembled, never wiped.)\n'
 fi
 # Setup locks SSH to the LAN. A session that comes from outside it is cut off, and so is
 # every other connection from there: say so, and go on only on an explicit yes
@@ -561,7 +557,7 @@ fi
 ok "Cloudflare apt key $CF_KEY_FPR (only that key)"
 echo "deb [signed-by=$KEYRING] https://pkg.cloudflare.com/cloudflared any main" >/etc/apt/sources.list.d/cloudflared.list
 run apt-get update -q
-run apt-get install -y -q ttyd python3-nacl mdadm rsync zstd nftables ufw gdisk parted curl gnupg unattended-upgrades tmux cloudflared ethtool
+run apt-get install -y -q ttyd python3-nacl rsync zstd nftables ufw gdisk parted curl gnupg unattended-upgrades tmux cloudflared ethtool
 # ttyd must never listen on its own; only ollama1-ttyd (a UNIX socket, login) may run.
 systemctl disable --now ttyd.service >/dev/null 2>&1 || true
 python3 -c 'import nacl.signing' || die "python3-nacl did not install"
@@ -576,71 +572,12 @@ else
   ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free), not on LVM; left as it is"
 fi
 
-# ---- 4. /home onto the root filesystem -------------------------------------------
-step "/home onto the root filesystem"
+# ---- 4. /home ---------------------------------------------------------------------------------
+# /home is left where it is (6b400). It used to be copied onto the root filesystem so that a mirror disk could
+# be wiped; there is no mirror any more, and setup never touches /home or its fstab line.
+step "/home"
 KEYS=/home/$ADMIN_USER/.ssh/authorized_keys
-if home_on_own_disk; then
-  src=$(findmnt -no SOURCE /home)
-  hdisk=$(disk_of "$src")
-  [ "$hdisk" = "$HDD1" ] || [ "$hdisk" = "$HDD2" ] || die "/home is on $hdisk, not one of the mirror disks; not moving it"
-  # du warns (and exits non-zero) on anything unreadable; the total still counts
-  need=$( { du -sxm /home 2>/dev/null || true; } | awk '{print $1}' | tail -n1)
-  avail=$(df -m --output=avail / | tail -n1 | tr -d ' ')
-  [ "${need:-0}" -lt $((avail - 1024)) ] || die "/home needs ${need} MB and / has ${avail} MB free"
-  keysum=""
-  [ -f "$KEYS" ] && keysum=$(sha256sum "$KEYS" | cut -d' ' -f1)
-  ROOTVIEW=/run/ollama1-rootfs
-  mkdir -p "$ROOTVIEW"
-  mountpoint -q "$ROOTVIEW" || mount --bind / "$ROOTVIEW"   # / alone: the real /home folder under the mount
-  mkdir -p "$ROOTVIEW/home"
-  # Whatever already sits in the root filesystem's own /home (hidden under
-  # the mount) is set aside, not deleted. A copy from an earlier run is
-  # recognised by its marker and simply brought up to date.
-  if [ ! -f /var/lib/ollama1/home-copy-started ] && [ -n "$(ls -A "$ROOTVIEW/home" 2>/dev/null)" ]; then
-    aside="/home.pre-ollama1-$(date +%Y%m%d-%H%M%S)"
-    run mv "$ROOTVIEW/home" "$ROOTVIEW$aside"
-    mkdir -p "$ROOTVIEW/home"
-    note "what was already under the root's own /home is now in $aside"
-  fi
-  mkdir -p /var/lib/ollama1; touch /var/lib/ollama1/home-copy-started
-  home_sync() {
-    rsync -aHAX --numeric-ids --delete --exclude=/lost+found /home/ "$ROOTVIEW/home/"
-    local diffs
-    diffs=$(rsync -aHAXn --numeric-ids --delete --checksum --itemize-changes --exclude=/lost+found /home/ "$ROOTVIEW/home/")
-    [ -z "$diffs" ] || { umount "$ROOTVIEW"; die "the copy of /home differs from the original: $diffs"; }
-  }
-  printf '   $ rsync /home -> root filesystem, then compare\n'
-  home_sync
-  if [ -n "$keysum" ]; then
-    [ "$(sha256sum "$ROOTVIEW$KEYS" | cut -d' ' -f1)" = "$keysum" ] || { umount "$ROOTVIEW"; die "authorized_keys did not copy intact"; }
-    ok "copy checked, file by file; $KEYS intact ($(grep -cvE '^[[:space:]]*(#|$)' "$KEYS") key(s))"
-  fi
-  # Once more, right before the switch, so anything written meanwhile is in.
-  # Writes to the old /home after this point (seconds) are not copied.
-  printf '   $ rsync /home again, then compare\n'
-  home_sync
-  umount "$ROOTVIEW"; rmdir "$ROOTVIEW"
-  cp -a /etc/fstab "/etc/fstab.before-ollama1-$(date +%Y%m%d-%H%M%S)"
-  awk -v d="$(date +%F)" '
-    /^[[:space:]]*#/ {print; next}
-    $2 == "/home" {print "# ollama1 " d ": /home now lives on the root filesystem"; print "# " $0; next}
-    {print}' /etc/fstab >/etc/fstab.ollama1.new
-  mv /etc/fstab.ollama1.new /etc/fstab
-  systemctl daemon-reload
-  if umount /home 2>/dev/null; then
-    ok "/home now on the root filesystem"
-  else
-    # A login (probably yours) still has a folder open on the old disk. Detach
-    # it: new logins and every /home path now use the copy; the old disk is
-    # released when those sessions end.
-    run umount -l /home
-    note "/home detached; the old disk is released when every earlier login has ended"
-  fi
-  [ -f "$KEYS" ] || [ -z "$keysum" ] || die "authorized_keys is missing after the move; the old disk is untouched, see /etc/fstab.before-ollama1-*"
-else
-  home_in_fstab && die "/etc/fstab still mounts /home but it isn't mounted; look at it before continuing"
-  ok "/home is on the root filesystem"
-fi
+ok "/home stays where it is ($(findmnt -no SOURCE --target /home 2>/dev/null || echo 'the root filesystem'))"
 
 # ---- 5. users (the disks need the ollama user) ------------------------------------------
 step "Service users"
@@ -680,25 +617,7 @@ else
 fi
 chown ollama:ollama /srv/models; chmod 0750 /srv/models
 
-# ---- 7. the mirror ------------------------------------------------------------------
-step "Mirror ($HDD1_SERIAL + $HDD2_SERIAL)"
-RAID_PENDING=0
-if raid_done; then
-  ok "/srv/data already on $(raid_find)"
-elif home_on_own_disk; then
-  die "/home is still mounted from a mirror disk; not wiping"
-elif home_in_fstab; then
-  die "/etc/fstab still mounts /home; not wiping"
-elif [ -z "$(raid_find)" ] && [ -z "$(raid_members_on_disk "$HDD1" "$HDD2")" ] && { dev_busy "$HDD1" || dev_busy "$HDD2"; }; then
-  RAID_PENDING=1
-  note "a mirror disk is still held by an earlier login that had /home open (the old /home)."
-  note "Log out of every SSH session (or reboot), log in again and run setup.sh again: it continues here."
-  later "Build the mirror: log out of every session (or reboot), then run sudo ./setup.sh again"
-else
-  raid_step "$HDD1" "$HDD2" "$HDD1_SERIAL" "$HDD2_SERIAL"
-  install -d -m 0700 /srv/data/backups
-  ok "/srv/data: $(df -h --output=size /srv/data | tail -n1 | tr -d ' '), RAID1; the first sync runs in the background (cat /proc/mdstat)"
-fi
+# ---- 7. (the mirror was here: removed in 6b400. No step builds, assembles or mounts a RAID.) -------
 
 # ---- 8. the kit -------------------------------------------------------------------------
 step "Install the kit"
@@ -1321,5 +1240,4 @@ if [ "${#LATER[@]}" -gt 0 ]; then
   printf '\n%sStill to do:%s\n' "$Y$B" "$N"
   for l in "${LATER[@]}"; do printf '  - %s\n' "$l"; done
 fi
-if [ "$RAID_PENDING" = 1 ]; then exit 3; fi
 exit 0

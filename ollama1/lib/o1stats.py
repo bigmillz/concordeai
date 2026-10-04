@@ -1,5 +1,5 @@
 """System figures for the console dashboard, ollama1-top and the admin
-panel: the GPU (amdgpu sysfs/hwmon), CPU, memory, disks, the RAID mirror,
+panel: the GPU (amdgpu sysfs/hwmon), CPU, memory, disks, a RAID if there is one,
 the tunnel, updates. Read-only, stdlib only. Plus the gateway's counts-only
 snapshot. Nothing here ever sees a prompt or an answer.
 """
@@ -180,9 +180,21 @@ def loadavg():
         return None
 
 
+def in_fstab(mp, fstab=None):
+    """True when /etc/fstab has an active line for this mount point."""
+    text = _read(fstab or p("/etc/fstab"), "") or ""
+    return any(len(f) > 1 and f[1] == mp for f in (l.split() for l in text.splitlines() if not l.lstrip().startswith("#")))
+
+
 def disks():
+    """The root filesystem, the models mount, and /srv/data only for a server that still has one (a mount there, or
+    a line for it in fstab, so a mount that drops stays MISSING). The kit builds no mirror any more (6b400): a server
+    without /srv/data shows no row for it, and nothing says it is missing."""
     out = []
-    for label, mp in (("/", "/"), ("models", "/srv/models"), ("data", "/srv/data")):
+    rows = [("/", "/"), ("models", "/srv/models")]
+    if os.path.ismount(p("/srv/data")) or in_fstab("/srv/data"):
+        rows.append(("data", "/srv/data"))
+    for label, mp in rows:
         path = p(mp) if mp != "/" else (p("/") or "/")
         try:
             if mp != "/" and not os.path.ismount(path) and not os.environ.get("OLLAMA1_PREFIX"):
