@@ -126,8 +126,15 @@ done
 # In tmux, so a dropped SSH connection can't stop it halfway (reattach:
 # sudo tmux attach -t ollama1-stress).
 if [ -z "${TMUX:-}" ] && [ "${O1_NO_TMUX:-}" != 1 ] && [ -t 0 ] && command -v tmux >/dev/null; then
+  # An older session of this test still open would swallow the new command (new-session -A
+  # attaches to it and runs nothing), so a run with other options would silently be the old run.
+  if tmux has-session -t ollama1-stress 2>/dev/null; then
+    echo "A stability test session is already open (sudo tmux attach -t ollama1-stress)."
+    echo "Close it first (sudo tmux kill-session -t ollama1-stress) and run this again."
+    exit 1
+  fi
   echo "Starting in tmux (session ollama1-stress). If the connection drops: sudo tmux attach -t ollama1-stress"
-  exec tmux new-session -A -s ollama1-stress \
+  exec tmux new-session -s ollama1-stress \
     "O1_NO_TMUX=1 bash '$HERE/stability-test.sh'$(quoted_args "$@"); echo; read -r -p 'Finished. Press Enter to close. ' _"
 fi
 

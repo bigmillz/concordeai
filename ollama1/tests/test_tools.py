@@ -352,6 +352,16 @@ class TestStabilityTest(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("graphics card wasn't tested", out)
 
+    def test_the_mix_wrapper_fixes_its_options(self):
+        sh = open(os.path.join(U.TOOLS, "stability-mix.sh")).read()
+        self.assertIn('--phases mix --minutes "$MIN" --cpu-load 50 --model "$MODEL"', sh)
+        self.assertTrue(os.access(os.path.join(U.TOOLS, "stability-mix.sh"), os.X_OK))
+
+    def test_an_open_session_is_not_silently_reused(self):
+        sh = open(self.SCRIPT).read()
+        self.assertIn("tmux has-session -t ollama1-stress", sh)
+        self.assertNotIn("new-session -A -s ollama1-stress", sh)
+
     def test_a_gpu_phase_with_no_answers_fails(self):
         code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_NO_ANSWER": "1"})
         self.assertEqual(code, 1, out)
