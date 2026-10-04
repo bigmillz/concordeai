@@ -19465,7 +19465,7 @@ def _soc_pins(src):
     tit = src[src.index('        if self.path == "/api/title":'):]
     tit = tit[:tit.index('        if self.path == "/api/open-logs":')]
     got = {
-        "resolved from this profile's servers": "server_only_resolve(\n                    srv_only_id(tier), self.ctx)" in br
+        "resolved from this profile's servers": "server_only_resolve(\n                    srv_only_id(tier), self.ctx, defer=True)" in br
         and ch.index("        elif srv_only_tier(tier):") < ch.index('council = [m for m in req_json.get("models", [])'),
         # the council IS the one label (or the placeholder): no tier's line-up beside it
         "one model, no council": "            council = [_so_c0]\n            model_name = _so_c0" in br
@@ -26145,8 +26145,8 @@ def _w46c_wake(src):
     r1 = ns["server_wake_if_down"](e, ctx)
     notes = ns["server_take_wake_notes"]()
     infos = [x for x in log if x[1] == "/v1/info"]
-    out["woke"] = (sorted(packets) == sorted([(ns["srv_magic_packet"](m), (a, 9)) for m in (_W46_MAC, _W46_MAC2)
-                                              for a in ("255.255.255.255", "192.168.1.255")])
+    out["woke"] = (sorted(packets) == sorted([(ns["srv_magic_packet"](m), (a, pt)) for m in (_W46_MAC, _W46_MAC2)
+                                              for a in ("255.255.255.255", "192.168.1.255") for pt in (9, 7)])
                    and [x[1] for x in log[:3]] == ["/v1/info"] * 3 and t[0] == 1000.0 + 6 and all(x[0] == "GET" and x[3] for x in infos)
                    and notes == [("Desktop", True)] and ns["server_take_wake_notes"]() == []
                    and ns["_srv_seen"][sid]["reachable"] is True)
@@ -26162,7 +26162,7 @@ def _w46c_wake(src):
     routes["/v1/whoami"] = [off]
     ta = t[0]
     ns["server_wake_if_down"](e, ctx)
-    out["timeout"] = (len(packets) == n0 + 4 and 60 <= t[0] - ta <= 62
+    out["timeout"] = (len(packets) == n0 + 8 and 60 <= t[0] - ta <= 62
                       and ns["server_take_wake_notes"]() == [("Desktop", False)]
                       and ns["_srv_seen"][sid]["reachable"] is False)
     out["marked"] = (ns["server_label_down"](ctx, e["name"] + " \u00b7 small:8b")
@@ -26210,13 +26210,13 @@ def _w46c_wake(src):
     routes["/v1/info"] = [_SvResp(200, {"gpu": {}})]
     routes["/v1/whoami"] = [off, _SvResp(200, {"device_id": "x"})]
     ns["server_refresh_modes"](ctx)
-    out["modes"] = (len(packets) == 4 and ns["server_take_wake_notes"]() == [("Desktop", True)])
+    out["modes"] = (len(packets) == 8 and ns["server_take_wake_notes"]() == [("Desktop", True)])
     packets.clear()
     ns["_srv_wake_at"].clear()
     ns["_srv_seen"][sid]["at"] = 0
     routes["/v1/whoami"] = [off, _SvResp(200, {"device_id": "x"})]
     ns["server_only_resolve"](sid, ctx)
-    out["only"] = (len(packets) == 4 and ns["server_take_wake_notes"]() == [("Desktop", True)])
+    out["only"] = (len(packets) == 8 and ns["server_take_wake_notes"]() == [("Desktop", True)])
     # a server that has prefer off isn't refreshed for a mode, so isn't woken by one
     packets.clear()
     ns["_srv_wake_at"].clear()
@@ -26350,7 +26350,105 @@ def _w46c_text(src):
     out["public"] = '"sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),' in src
     out["gap"] = ("SRV_WAKE_GAP_S = 300 " in src and "SRV_WAKE_WAIT_S = 60 " in src and "SRV_WAKE_POLL_S = 2" in src)
     out["lock"] = "    with _srv_lock:          # two questions at once send one wake-up call, not two" in src
-    out["port"] = "_srv_udp(pkt, (tgt, 9))" in seg
+    out["port"] = "            for port in (9, 7):\n                try:\n                    _srv_udp(pkt, (tgt, port))" in seg
+    return all(out.values()), out
+
+
+def _w46c_only_wake(src):
+    """"<name> Only" on a sleeping server (6b369): the check is made before the
+    headers but the wake is not; it goes out after them with a status the page
+    shows ("Waking Desk... 12 s"), the Stop button ends it, and a server that
+    does not come up ends in one line. The packet goes to ports 9 and 7."""
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    t = [1000.0]
+    packets = []
+    ns["_srv_wake_clock"] = lambda: t[0]
+
+    def _spin(s_):
+        if t[0] > 9000:
+            raise RuntimeError("the wake never gave up")
+        t[0] += s_
+    ns["_srv_wake_sleep"] = _spin
+    ns["_srv_udp"] = lambda pkt, addr: packets.append((pkt, addr))
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255", "192.168.1.255"]
+    good = {"enabled": True, "minutes": 30, "supported": True, "wake": [_W46_MAC]}
+    routes, off = _w46_ok_routes(ns)
+    routes["/v1/sleep-config"] = [_SvResp(200, good)]
+    log = []
+    _w46_router(ns, routes, log)
+    ns["server_sleep_get"](ctx, sid)
+    e = ns["_srv_read"](ctx)[0]
+    # the check finds it asleep; nothing waits and nothing is sent yet
+    routes["/v1/whoami"] = [off]
+    ns["_srv_seen"][sid] = {"at": 0}
+    ns["server_take_wake_pending"]()
+    t0 = t[0]
+    r = ns["server_only_resolve"](sid, ctx, defer=True)
+    out["deferred"] = (r[0] == "" and not packets and t[0] == t0 and ns["server_take_wake_pending"]() == sid
+                       and ns["server_take_wake_pending"]() == "")
+    # the wake: said as it waits, ends when it is up
+    said = []
+    routes["/v1/info"] = [off, off, off, _SvResp(200, {"gpu": {}})]
+    routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
+    lbl, why = ns["server_only_wake"](sid, ctx, said.append, lambda: True)
+    out["woke"] = (lbl == "Desktop \u00b7 small:8b" and why == ""
+                   and said[:3] == ["Waking Desktop...", "Waking Desktop... 0 s", "Waking Desktop... 2 s"]
+                   and said[-1] == "Desktop is awake." and len(packets) == 4
+                   and sorted(a for _p, a in packets) == sorted((x, pt) for x in ("255.255.255.255", "192.168.1.255") for pt in (9, 7)))
+    # it does not come up: one line, the server marked down, a minute's worth of status on the way
+    ns["_srv_wake_at"].clear()
+    routes["/v1/info"] = [off]
+    routes["/v1/whoami"] = [off]
+    said = []
+    ta = t[0]
+    lbl, why = ns["server_only_wake"](sid, ctx, said.append, lambda: True)
+    out["failed"] = (lbl == "" and why == "Desktop didn\u2019t wake up in 60 seconds. It may be off or offline. "
+                                          "Nothing was sent anywhere else."
+                     and 60 <= t[0] - ta <= 62 and said[0] == "Waking Desktop..."
+                     and len(said) >= 28 and said[-1].startswith("Waking Desktop... 5")
+                     and ns["server_label_down"](ctx, "Desktop \u00b7 small:8b"))
+    # Stop: it ends within one poll, quietly
+    ns["_srv_wake_at"].clear()
+    said = []
+    n = [0]
+
+    def alive():
+        n[0] += 1
+        return n[0] < 3
+    ta = t[0]
+    r2 = ns["server_only_wake"](sid, ctx, said.append, alive)
+    out["stopped"] = r2 == ("", "") and t[0] - ta <= 6 and not any("didn\u2019t wake" in x for x in said)
+    # inside the five minutes nothing more is sent, and the answer is the state as it is
+    n0 = len(packets)
+    said = []
+    r3 = ns["server_only_wake"](sid, ctx, said.append, lambda: True)
+    out["gap"] = len(packets) == n0 and r3[0] == ""
+    # sleep on but no card known: said plainly, with the way out
+    e2 = ns["_srv_read"](ctx)[0]
+    ns["_srv_update"](ctx, lambda es: ([x.update(wake=[]) for x in es], {"ok": True})[1])
+    ns["_srv_wake_at"].clear()
+    routes["/v1/whoami"] = [off]
+    ns["_srv_seen"][sid] = {"at": 0}
+    ns["server_take_wake_pending"]()
+    r4 = ns["server_only_resolve"](sid, ctx, defer=True)
+    out["no card"] = (r4[0] == "" and ns["server_take_wake_pending"]() == ""
+                      and "doesn\u2019t know how to wake it. Open Settings \u203a Servers while it is on." in r4[2])
+    # the handler: the check before the headers, the wake after them, the page told, Stop ends it
+    h0 = src.index("server_only_resolve(\n                    srv_only_id(tier), self.ctx, defer=True)")
+    h1 = src.index("self.end_headers()", h0)
+    h2 = src.index("def status(text: str):", h1)
+    h3 = src.index("if _so_wake and _srv_only:", h2)
+    h4 = src.index("server_answer(_srv_lbl, full_messages, memit, emit, status,", h3)
+    seg = src[h3:h4]
+    out["handler"] = (h0 < h1 < h2 < h3 < h4
+                      and "lambda: not _client_gone(self.connection)" in seg
+                      and "_so_c0, council, model_name = _w_lbl, [_w_lbl], _w_lbl" in seg
+                      and "_srv_lbl = route_label = _w_lbl" in seg
+                      and "                _so_fail = _w_why" in seg
+                      and "hb_stop.set()\n                return" in seg)
     return all(out.values()), out
 
 
@@ -26362,6 +26460,9 @@ _W46_CHECKS = [
     ("auto sleep: a sleeping server is woken for the question (a magic packet to each card on each network, then its signed "
      "/v1/info every 2 s for up to 60 s), once a minute at most, said in the chat, and never by the sidebar's poll, Settings "
      "or reading the setting", _w46c_wake),
+    ("auto sleep: \"<name> Only\" on a sleeping server checks before the headers and wakes after them, says "
+     "\"Waking <name>... N s\", ends in one line if it doesn't come up, stops with Stop, sends to ports 9 and 7 (6b369)",
+     _w46c_only_wake),
     ("auto sleep: the pane's minutes box and switch (node): parsing, what is shown and disabled in each state, the next "
      "state from each answer, the markup, the wiring", _w46c_ui),
     ("auto sleep: nothing logged, only the question's paths wake a server, the routes use the profile's own servers, "
@@ -26403,9 +26504,9 @@ _W46_MUT = [
     ("no rate limit", "        if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:\n            return \"\"",
      "        if False:\n            return \"\""),
     ("woken without the setting known", '(e.get("sleep") or {}).get("enabled") is True', "True"),
-    ("woken with no card", 'if not (_srv_paired(e) and e.get("wake") and (e.get("sleep")', "if not (_srv_paired(e) and (e.get(\"sleep\")"),
+    ("woken with no card", 'return bool(_srv_paired(e) and e.get("wake") and (e.get("sleep")', "return bool(_srv_paired(e) and (e.get(\"sleep\")"),
     ("woken for any failure", 'if s.get("reachable") or s.get("kind") != "offline":\n        return', 'if s.get("reachable"):\n        return'),
-    ("waiting for ever", "if _srv_wake_clock() - t0 >= SRV_WAKE_WAIT_S:\n            return \"tried\"",
+    ("waiting for ever", "if waited >= SRV_WAKE_WAIT_S:\n            return \"tried\"",
      "if False:\n            return \"tried\""),
     ("the answer not checked", "            if st == 200:\n                server_check(e)\n                return \"woke\"",
      "            if True:\n                server_check(e)\n                return \"woke\""),
@@ -26427,7 +26528,16 @@ _W46_MUT = [
      '    server_wake_if_down(e)\n    try:\n        st, js = _srv_json(e, method, "/v1/sleep-config"'),
     ("the wake's notes kept from an earlier request", "server_take_wake_notes()           # none left from an earlier request on this thread (6b346)\n", ""),
     ("the chat not told", 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)', "pass"),
-    ("the packet to the wrong port", "_srv_udp(pkt, (tgt, 9))", "_srv_udp(pkt, (tgt, 7))"),
+    ("the wake after the headers made before them", "        if _so_wake and _srv_only:\n", "        if False:\n"),
+    ("no status while it waits", 'r = server_wake(e, lambda w: status("Waking %s... %d s" % (name, int(w))), alive)',
+     'r = server_wake(e, None, alive)'),
+    ("Stop not heard", '        if alive is not None and not alive():\n            return "stopped"\n', ""),
+    ("a wake waited for before the headers", "        if _srv_wake_due(e):\n            _srv_wake_tl.pending = e[\"id\"]\n        return\n",
+     "        pass\n"),
+    ("a failed wake not marked down", '    if r == "tried":\n        server_mark_down(ctx, e["name"], "%s didn\\u2019t wake." % e["name"])\n        return "", (',
+     '    if r == "tried":\n        return "", ('),
+    ("the packet to the wrong port", "_srv_udp(pkt, (tgt, port))", "_srv_udp(pkt, (tgt, 9))"),
+    ("only port 9", "            for port in (9, 7):\n", "            for port in (9,):\n"),
     ("the minutes box taking anything", 'if(!/^\\d{1,6}$/.test(t))return null;', "if(false)return null;"),
     ("the minutes box not clamped", "return {v:Math.max(5,Math.min(1440,n)),clamped:n<5||n>1440};", "return {v:n,clamped:false};"),
     ("the controls usable while it's off", 'else if(z.st==="off")v.hint', 'else if(z.st==="off"&&false)v.hint'),

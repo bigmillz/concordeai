@@ -17786,7 +17786,7 @@ def server_only_tiers(ctx) -> dict:
     return out
 
 
-def server_only_resolve(sid: str, ctx):
+def server_only_resolve(sid: str, ctx, defer=False):
     """(label, server name, why not) for tier "srv:<sid>" in ctx, for a
     chat: the last check when it is under a minute old and answered, else
     a new one. Only ctx's own servers are looked at, so another profile's
@@ -17804,8 +17804,14 @@ def server_only_resolve(sid: str, ctx):
         if not (s.get("models") and s.get("reachable") and not s.get("err")
                 and time.time() - float(s.get("at") or 0) < SRV_ONLY_FRESH_S):
             server_check(e)
-            server_wake_if_down(e, ctx)
+            server_wake_if_down(e, ctx, defer)
     st = server_only_state(e)
+    if (defer and not st["ok"] and _srv_paired(e) and not getattr(_srv_wake_tl, "pending", "")
+            and (_srv_seen.get(e["id"]) or {}).get("kind") == "offline"
+            and _srv_sleeps(e) and not e.get("wake")):
+        # asleep on purpose, but this app was never told which card wakes it
+        st["why"] = ("%s didn\u2019t answer, and this app doesn\u2019t know how to wake it. "
+                     "Open Settings \u203a Servers while it is on." % e["name"])
     return st["label"], e["name"], st["why"]
 
 
@@ -19097,13 +19103,32 @@ def _srv_wake_clock() -> float:
     return time.monotonic()
 
 
-def server_wake(e) -> str:
+def _srv_wakeable(e) -> bool:
+    """Whether e is a server this app knows how to wake: paired, the cards
+    that wake it known (read from its gateway), and sleep set on."""
+    return bool(_srv_paired(e) and e.get("wake") and (e.get("sleep") or {}).get("enabled") is True)
+
+
+def _srv_sleeps(e) -> bool:
+    return bool((e.get("sleep") or {}).get("enabled"))
+
+
+def _srv_wake_due(e) -> bool:
+    """Whether a wake call would go out now (not within SRV_WAKE_GAP_S of the last)."""
+    last = _srv_wake_at.get(e["id"])
+    return _srv_wakeable(e) and not (last is not None and 0 <= _srv_wake_clock() - last < SRV_WAKE_GAP_S)
+
+
+def server_wake(e, progress=None, alive=None) -> str:
     """Wake server e with a magic packet and wait for it to answer. "woke",
-    "tried" (no answer in SRV_WAKE_WAIT_S), or "" (nothing asked: it has no
-    card to wake it, it wasn't known to sleep, or a call went out within the
-    last SRV_WAKE_GAP_S, five minutes). The packet carries nothing but the card's address;
-    the answer is waited for with the server's own signed /v1/info."""
-    if not (_srv_paired(e) and e.get("wake") and (e.get("sleep") or {}).get("enabled") is True):
+    "tried" (no answer in SRV_WAKE_WAIT_S), "stopped" (alive() said the reader
+    left), or "" (nothing asked: it has no card to wake it, it wasn't known to
+    sleep, or a call went out within the last SRV_WAKE_GAP_S, five minutes).
+    The packet carries nothing but the card's address, to UDP ports 9 and 7 (the two a
+    card listens on) of the whole-network broadcast and of each real network's own
+    broadcast address; the answer is waited for with the server's own signed
+    /v1/info. progress(seconds waited) is called as it waits, so a page can say so."""
+    if not _srv_wakeable(e):
         return ""
     t0 = _srv_wake_clock()
     with _srv_lock:          # two questions at once send one wake-up call, not two
@@ -19114,12 +19139,17 @@ def server_wake(e) -> str:
     for mac in e["wake"]:
         pkt = srv_magic_packet(mac)
         for tgt in _srv_bcast_addrs():
-            try:
-                _srv_udp(pkt, (tgt, 9))
-            except OSError:
-                pass
+            for port in (9, 7):
+                try:
+                    _srv_udp(pkt, (tgt, port))
+                except OSError:
+                    pass
+    if progress is not None:
+        progress(0)
     while True:
         _srv_wake_sleep(SRV_WAKE_POLL_S)
+        if alive is not None and not alive():
+            return "stopped"
         try:
             st, _js = _srv_json(e, "GET", "/v1/info", timeout=SRV_WAKE_POLL_S + 1)
             if st == 200:
@@ -19127,17 +19157,35 @@ def server_wake(e) -> str:
                 return "woke"
         except ServerError:
             pass
-        if _srv_wake_clock() - t0 >= SRV_WAKE_WAIT_S:
+        waited = _srv_wake_clock() - t0
+        if waited >= SRV_WAKE_WAIT_S:
             return "tried"
+        if progress is not None:
+            progress(waited)
 
 
-def server_wake_if_down(e, ctx=None):
+def server_take_wake_pending():
+    """The server whose wake "<name> Only" put off until the page has its
+    headers (6b369): its id, or "". Forgotten once taken."""
+    p = getattr(_srv_wake_tl, "pending", "") or ""
+    _srv_wake_tl.pending = ""
+    return p
+
+
+def server_wake_if_down(e, ctx=None, defer=False):
     """After a check that found e not answering: wake it for the question
     being asked. Only the request paths call this. A wake that got no answer
     marks the server down (as any failed request does), so the questions of
-    the next minute skip it instead of each waiting for it."""
+    the next minute skip it instead of each waiting for it. defer: do not
+    wait here (the page has no headers yet, so it would see nothing for a
+    minute); say which server is to be woken (server_take_wake_pending) and
+    let the caller wake it with a status the page shows (server_only_wake)."""
     s = _srv_seen.get(e["id"]) or {}
     if s.get("reachable") or s.get("kind") != "offline":
+        return
+    if defer:
+        if _srv_wake_due(e):
+            _srv_wake_tl.pending = e["id"]
         return
     r = server_wake(e)
     if r:
@@ -19147,6 +19195,33 @@ def server_wake_if_down(e, ctx=None):
             server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
         except (StoreReadError, NoProfile):
             pass
+
+
+def server_only_wake(sid: str, ctx, status, alive=None):
+    """The wake of "<name> Only", run once the page has its headers (6b369):
+    (label to run on, why not). The page sees "Waking <name>... 12 s" every
+    two seconds, a stop of the reader ends it, and a server that did not come
+    up in SRV_WAKE_WAIT_S ends in one line that says so. ("", "") when the
+    reader left."""
+    try:
+        e = _srv_find(_srv_read(ctx), sid)
+    except (StoreReadError, NoProfile):
+        return "", "Couldn\u2019t read your servers."
+    if e is None:
+        return "", SRV_GONE
+    name = _srv_plain(e["name"])
+    status("Waking %s..." % name)
+    r = server_wake(e, lambda w: status("Waking %s... %d s" % (name, int(w))), alive)
+    if r == "stopped":
+        return "", ""
+    if r == "tried":
+        server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
+        return "", ("%s didn\u2019t wake up in %d seconds. It may be off or offline. "
+                    "Nothing was sent anywhere else." % (name, SRV_WAKE_WAIT_S))
+    st = server_only_state(e)
+    if r == "woke":
+        status("%s is awake." % name)
+    return st["label"], st["why"]
 
 
 # ==== servers: end ====
@@ -28110,8 +28185,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # from this profile's own servers. With nothing to run on, the
         # council is a placeholder label and `_so_fail` says why: no other
         # model ever answers in its place.
-        _so_c0, _so_fail = "", ""
+        _so_c0, _so_fail, _so_wake = "", "", ""
         server_take_wake_notes()           # none left from an earlier request on this thread (6b346)
+        server_take_wake_pending()
         # a mode's server seats -> what answers in their place (6b339), and
         # how the turn's one seat went ("server", "fallback", "failed")
         _seat_fb = {}
@@ -28138,8 +28214,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             model_name = ""
         elif srv_only_tier(tier):
             try:
+                # a sleeping server is woken after the headers, with a status the
+                # page shows (6b369); here only the check is made
                 _so_lbl, _so_name, _so_why = server_only_resolve(
-                    srv_only_id(tier), self.ctx)
+                    srv_only_id(tier), self.ctx, defer=True)
+                _so_wake = server_take_wake_pending()
             except (StaleProfile, BrokenPipeError, ConnectionResetError):
                 raise
             except Exception:
@@ -29271,6 +29350,29 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # a server that was asleep was woken before this answer (6b346)
         for _wn, _wok in server_take_wake_notes():
             status(("Woke %s." if _wok else "%s didn\u2019t wake.") % _wn)
+
+        # "<name> Only" on a server that sleeps (6b369): the wake goes out now
+        # that the page has its headers, says "Waking <name>... 12 s" while it
+        # waits (the page saw nothing for up to 75 s before), ends in one line
+        # if it does not come up, and stops with the Stop button
+        if _so_wake and _srv_only:
+            try:
+                _w_lbl, _w_why = server_only_wake(
+                    _so_wake, self.ctx, status,
+                    lambda: not _client_gone(self.connection))
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                _w_lbl, _w_why = "", "Couldn\u2019t wake your server."
+            if _w_lbl:
+                _so_c0, council, model_name = _w_lbl, [_w_lbl], _w_lbl
+                _srv_lbl = route_label = _w_lbl
+                _so_fail = ""
+            elif not _w_why:                 # the reader left
+                hb_stop.set()
+                return
+            else:
+                _so_fail = _w_why
 
         # MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER (review of
         # 6b334): a chat on your own server that took no hold takes it

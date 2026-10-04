@@ -9,6 +9,45 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b369 — "<name> Only" on a sleeping server wakes it where the page can see (per Patrick)
+
+- Patrick: with the engine chip on "Ollama1 Only" the question showed a tiny spinner
+  and the stop button, the server never woke and nothing said why.
+- Traced: `/api/chat` resolved "<name> Only" (`server_only_resolve`) BEFORE
+  `send_response`, and that call made the check (up to 15 s) and then the wake
+  (`server_wake`: the packet, then `/v1/info` every 2 s for up to 60 s) with no byte
+  to the page, so there was no STATUS frame and no heartbeat yet (both start after the
+  headers). Up to 75 s of an empty spinner, and a Stop only closed a socket the thread
+  was not looking at. The wake notes ("Woke X." / "X didn't wake.") were drained after,
+  as a status that is replaced at once.
+- Now `server_only_resolve(sid, ctx, defer=True)` (the chat's call) checks but does not
+  wake: `server_wake_if_down(..., defer=True)` records the server
+  (`server_take_wake_pending`). After the headers and `status` exist the handler runs
+  `server_only_wake`: "Waking <name>..." then "Waking <name>... 12 s" every poll, the
+  Stop button (`_client_gone`) ends it within one poll, "<name> is awake." and the answer
+  goes to that server's model, or one line in the chat: "<name> didn't wake up in 60
+  seconds. It may be off or offline. Nothing was sent anywhere else." (the server is
+  marked down for a minute, as before). The mode seats (Fast, Thinking, Pro) still wake in
+  `server_refresh_modes` before the headers; they fall back to this computer, so nobody
+  is left without an answer, but the 60 s of silence is the same there (not changed).
+- The wake itself: the packet is `ff*6 + mac*16` (102 bytes), the cards are the ones the
+  server's gateway reported on `/v1/sleep-config` (kept in servers.json as `wake`), and
+  it now goes to UDP ports 9 and 7 (it was 9 only) of 255.255.255.255 and of each real
+  private network's own broadcast address (`srv_bcast_for`: no tunnels, containers, VMs,
+  /32, wider than /16). Still only for a paired server with sleep switched on and a card
+  known, and only once in `SRV_WAKE_GAP_S` (5 minutes): a second try inside it sends
+  nothing and reports the server as it stands.
+- A server that has sleep on but no recorded card (the app never read the setting) now says
+  so: "<name> didn't answer, and this app doesn't know how to wake it. Open Settings >
+  Servers while it is on." instead of "didn't answer".
+- Tests: `_w46c_only_wake` (deferred check; waits and says "Waking Desktop... 2 s";
+  does not come up, one line, marked down; Stop; the gap; no card; the handler's order
+  pinned) plus 5 mutants; the old wake tests now expect ports 9 and 7.
+- Not verified: a real sleeping server end to end (no paired server in the dev copy; the
+  handler's wiring is pinned in source and the chat path ran against a missing server).
+  Whether a 60 s wait is long enough for a real resume plus tunnel is unknown; `SRV_WAKE_WAIT_S`
+  is unchanged.
+
 ## 6b368 — a bigger arrow on the Settings Models row (per Patrick)
 
 - The caret that opens Local / Cloud / Servers (6b350) was a 9px "▸" glyph with
