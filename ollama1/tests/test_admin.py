@@ -996,6 +996,92 @@ class TestPanelConnections(unittest.TestCase):
             self.assertIn(b"Connection: close", data)
 
 
+class TestModelPlanLine(unittest.TestCase):
+    """The Models card's one line about the last model set from the app
+    (6b410): known fields only, drawn as text."""
+
+    def setUp(self):
+        import o1modelplan
+        self.M = o1modelplan
+        os.makedirs(Paths.modelplan_run, exist_ok=True)
+        for f in (o1modelplan.status_file(), o1modelplan.record_file()):
+            if os.path.exists(f):
+                os.unlink(f)
+            self.addCleanup(lambda f=f: os.path.exists(f) and os.unlink(f))
+
+    def rec(self, **over):
+        r = {"v": 1, "request": "0123456789abcdef", "state": "done",
+             "plan": {"name": "recommended", "at": 1791100000, "by": "Alice's Mac<b>"}, "device": "fedcba9876543210",
+             "add": ["a:1b", "b:1b"], "remove": ["c:1b"], "started": 1791100000, "finished": 1791100100,
+             "jobs": [{"name": "c:1b", "action": "remove", "state": "done", "pct": 100, "error": ""},
+                      {"name": "a:1b", "action": "pull", "state": "failed", "pct": 3, "error": "boom"},
+                      {"name": "b:1b", "action": "pull", "state": "done", "pct": 100, "error": ""}],
+             "evil": "<script>x</script>"}
+        r.update(over)
+        return r
+
+    def test_none_yet(self):
+        self.assertIsNone(json.loads(get("/api/models")[1])["last_plan"])
+
+    def test_no_single_pull_or_removal_while_a_set_runs(self):
+        import fcntl
+        A["started"].clear()
+        with open(Paths.allow, "w") as f:
+            f.write("small:8b\n")
+        fd = os.open(self.M.lock_file(), os.O_RDWR | os.O_CREAT, 0o640)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)                  # root's program, applying a set
+            h = name_hash("small:8b")
+            for obj in ({"action": "pull", "arg": h}, {"action": "remove-model", "arg": h, "confirm": "small:8b"}):
+                st, data, _ = post(obj)
+                self.assertEqual(st, 409, obj)
+                self.assertIn("model set from the app", json.loads(data)["result"])
+            self.assertEqual(A["started"], [])
+        finally:
+            os.close(fd)
+            os.unlink(Paths.allow)
+        self.assertEqual(post({"action": "pull", "arg": name_hash("small:8b")})[0], 403)   # (list gone) checks run again
+
+    def test_known_fields_only(self):
+        from o1common import write_json_atomic
+        write_json_atomic(self.M.status_file(), self.rec())
+        st, data, _ = get("/api/models")
+        self.assertEqual(st, 200)
+        self.assertEqual(json.loads(data)["last_plan"], {"plan": "recommended", "by": "Alice's Mac<b>", "at": 1791100000,
+                                                         "added": 2, "removed": 1, "state": "done", "failed": 1})
+        self.assertNotIn(b"<", data)                    # escaped, and the unknown field never passed on
+        self.assertNotIn(b"script", data)
+        write_json_atomic(self.M.status_file(), self.rec(plan={"name": "turbo", "at": 1, "by": "x"}))
+        self.assertIsNone(json.loads(get("/api/models")[1])["last_plan"])
+
+    def test_the_page_draws_it_as_text(self):
+        page = get("/")[1].decode()
+        self.assertIn('<div class="sub mt" id="planline" hidden></div>', page)
+        js = re.search(r'<script nonce="[^"]+">(.*?)</script>', page, re.S).group(1)
+        line = re.search(r"const lp=m\.last_plan.*?:''\);", js, re.S).group(0)
+        self.assertIn("pl.textContent=", line)
+        if not __import__("shutil").which("node"):
+            self.skipTest("node not installed")
+        import subprocess
+        out = []
+        for lp in ({"plan": "recommended", "by": "Alice's Mac", "at": 5, "added": 3, "removed": 1, "state": "done",
+                    "failed": 0},
+                   {"plan": "light", "by": "", "at": 5, "added": 0, "removed": 2, "state": "running", "failed": 0},
+                   {"plan": "everything", "by": "iPad", "at": 5, "added": 4, "removed": 0, "state": "done", "failed": 2},
+                   {"plan": "light", "by": "iPad", "at": 5, "added": 1, "removed": 0, "state": "interrupted", "failed": 1},
+                   None):
+            prog = ("const pl0={};const $=()=>pl0;const stamp=t=>'T'+t;const m={last_plan:%s};%s"
+                    "console.log(JSON.stringify([pl0.hidden,pl0.textContent||null]));" % (json.dumps(lp), line))
+            r = subprocess.run(["node", "-e", prog], capture_output=True, text=True, timeout=30)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            out.append(json.loads(r.stdout))
+        self.assertEqual(out, [[False, "Last change: Recommended from Alice's Mac, T5: +3 -1"],
+                               [False, "Last change: Light from a paired device, T5: +0 -2 (in progress)"],
+                               [False, "Last change: Everything from iPad, T5: +4 -0 (2 failed)"],
+                               [False, "Last change: Light from iPad, T5: +1 -0 (stopped before it finished)"],
+                               [True, None]])
+
+
 class TestPolkitMatchesPanel(unittest.TestCase):
     """Every unit the panel can start is allowed by the polkit rule, exists
     in systemd/, and the rule allows nothing else."""
@@ -1003,9 +1089,18 @@ class TestPolkitMatchesPanel(unittest.TestCase):
     def rule(self):
         return open(os.path.join(U.CONFIG, "50-ollama1.rules")).read()
 
+    def admin_rule(self):
+        """The panel's rule: the first addRule (the second is the gateway's, test_modelplan.py)."""
+        rule = self.rule()
+        first = rule.index("polkit.addRule(")
+        second = rule.find("polkit.addRule(", first + 1)
+        self.assertIn('subject.user !== "o1admin"', rule[first:second if second > 0 else None])
+        return rule[first:second if second > 0 else None]
+
     def test_fixed_units(self):
-        fixed = set(re.findall(r'"(ollama1-[a-z-]+\.service)"', self.rule()))
+        fixed = set(re.findall(r'"(ollama1-[a-z-]+\.service)"', self.admin_rule()))
         self.assertEqual(fixed, set(A["mod"].FIXED_UNITS.values()))
+        self.assertNotIn("ollama1-modelplan.service", fixed)         # the gateway's unit, never the panel's (6b410)
         for u in fixed:
             self.assertTrue(os.path.exists(os.path.join(U.KIT, "systemd", u)), u)
 

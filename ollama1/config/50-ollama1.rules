@@ -3,6 +3,7 @@
 // root-owned /usr/local/lib/ollama1/bin/ollama1-helper. Template units take
 // only a hex hash (a model on the allow-list / an installed model) or a
 // 16-hex device id, which the helper checks again.
+// The gateway's user (o1gw) has the second rule below: one unit, start only.
 polkit.addRule(function(action, subject) {
     if (subject.user !== "o1admin") {
         return polkit.Result.NOT_HANDLED;
@@ -40,6 +41,22 @@ polkit.addRule(function(action, subject) {
     // auto sleep (6b402): "on" or "off", a dash, 1 to 4 digits; the unit runs as the
     // gateway's own user and its program checks the shape and the 5..1440 range again
     if (/^ollama1-sleepcfg@(on|off)-[0-9]{1,4}\.service$/.test(unit)) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NO;
+});
+
+// The gateway's user (o1gw) may START one unit, ollama1-modelplan.service
+// (6b410: a model set chosen in the app), and do nothing else through polkit:
+// no other unit, no other verb, no other action. The unit takes no argument;
+// its root program reads the gateway's request and checks all of it again.
+polkit.addRule(function(action, subject) {
+    if (subject.user !== "o1gw") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (action.id === "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") === "ollama1-modelplan.service" &&
+        action.lookup("verb") === "start") {
         return polkit.Result.YES;
     }
     return polkit.Result.NO;

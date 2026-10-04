@@ -202,7 +202,8 @@ def cmd_add(args):
         sys.exit("usage: ollama1-models add NAME [ram]")
     name, ram = args[0], len(args) == 2
     try:
-        what = L.allow_add(name, ram)
+        with L.Lock():      # one writer of the list at a time: a sync, a model set from the app (6b410)
+            what = L.allow_add(name, ram)
     except ValueError as e:
         sys.exit(str(e))
     say("%s: %s%s" % (name, what, " (may use system memory)" if ram else ""))

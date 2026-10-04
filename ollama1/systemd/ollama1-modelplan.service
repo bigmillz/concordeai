@@ -1,0 +1,55 @@
+# Applies the model set chosen in the app (6b410). The gateway (o1gw) leaves
+# the request in its own folder (/var/lib/ollama1-gateway/modelplan-request.json)
+# and starts this unit: polkit lets o1gw start this one unit, and nothing else.
+# The program, as root, reads the request without trusting it (no symlink
+# followed, a regular file with one link, owned by o1gw, at most 16 KiB, made in
+# the last 2 minutes), checks all of it again, edits /etc/ollama1/models.allow
+# (those lines only, one rename) and asks Ollama to delete, then pull. It never
+# writes the gateway's folder (CAP_DAC_READ_SEARCH reads it; there is no
+# CAP_DAC_OVERRIDE). Its only network is loopback: Ollama does the downloading,
+# in its own service, so this unit reaches 127.0.0.1:11434 and nothing else.
+# Writable: /etc/ollama1 (the rename needs the folder; config.json and
+# devices.json are mounted read-only on top), its answer and progress in
+# /run/ollama1/modelplan, the library lock in /run/ollama1/library, and its
+# record in /var/lib/ollama1-modelplan.
+[Unit]
+Description=ollama1: apply the model set chosen in the app
+After=ollama.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-modelplan
+Environment=PYTHONDONTWRITEBYTECODE=1
+# "Everything" can be a few hundred GB on a slow line; a stalled download still
+# ends (each read gives up after an hour), and a stopped run reads as cut short
+TimeoutStartSec=48h
+StateDirectory=ollama1-modelplan
+StateDirectoryMode=0755
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/etc/ollama1 /run/ollama1/modelplan /run/ollama1/library
+ReadOnlyPaths=-/etc/ollama1/config.json -/etc/ollama1/devices.json
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_CHOWN
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0027

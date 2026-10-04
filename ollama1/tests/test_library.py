@@ -691,6 +691,22 @@ class TestCLI(unittest.TestCase):
             os.close(fd)
         self.assertFalse(o1sleep.setup_running(lock))
 
+    def test_add_never_writes_the_list_while_someone_else_holds_it(self):
+        # a sync, or a model set from the app (6b410), holds the library lock: the list has one writer at a time
+        import fcntl
+        lock = os.path.join(self.pre, "run/ollama1/library/sync.lock")
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            r = self.run_cli("add", "fresh:2b", stdin="n\n")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("another model-library sync is running", r.stderr)
+            self.assertNotIn("fresh:2b", open(self.allow).read())
+        finally:
+            os.close(fd)
+        r = self.run_cli("add", "fresh:2b", stdin="n\n")
+        self.assertIn("added", r.stdout)
+
     def test_needs_root_outside_tests(self):
         env = {k: v for k, v in os.environ.items() if k != "OLLAMA1_PREFIX"}
         if os.geteuid() == 0:

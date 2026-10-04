@@ -20,7 +20,7 @@ import test_gateway as TG
 
 GATEWAY_FILES = [os.path.join(U.BIN, "ollama1-gateway")] + [
     os.path.join(U.LIB, m) for m in ("o1auth.py", "o1pair.py", "o1ollama.py", "o1common.py",
-                                     "o1jwt.py", "o1crypto.py", "o1stats.py", "o1gen.py")]
+                                     "o1jwt.py", "o1crypto.py", "o1stats.py", "o1gen.py", "o1modelplan.py")]
 
 # Functions allowed to open a file for writing, and why.
 WRITERS = {
@@ -29,7 +29,8 @@ WRITERS = {
     "spool_burn": "pairing hand-off: a flag",
 }
 LOG_FIELDS = {"reason", "device", "model", "kind", "status", "ms", "tokens", "prompt_tokens",
-              "attempts_left", "id", "port", "lan", "crypto", "access", "gpu_pct"}
+              "attempts_left", "id", "port", "lan", "crypto", "access", "gpu_pct",
+              "added", "removed"}       # a model set's counts (6b410)
 
 
 def funcs_with_writes(tree):

@@ -1,0 +1,358 @@
+#!/usr/bin/python3
+"""ollama1-modelplan: carry out the model set chosen in the app (6b410).
+
+    ollama1-modelplan      (root, from ollama1-modelplan.service; not for typing)
+
+The gateway (o1gw) leaves the request in its own folder,
+/var/lib/ollama1-gateway/modelplan-request.json, and starts
+ollama1-modelplan.service, the only unit polkit lets it start. This reads
+that file as root without trusting it: a regular file (no symlink followed,
+no FIFO) with one link, owned by o1gw, at most 16 KiB, made in the last two
+minutes, not answered before. Then everything the gateway checked is
+checked again:
+
+  * the request's shape (o1modelplan.parse_request: the set's name, at most
+    40 library tags per list, no model twice, none in both lists);
+  * the device is still paired (its name comes from devices.json, never
+    from the request);
+  * nothing else is changing the models: no other plan, no sync and no
+    `ollama1-models` at the server (the library lock, held from here on),
+    no single pull or removal from the panel;
+  * `seen` is the hash of the models on the disk now: nothing the person
+    didn't see listed goes;
+  * nothing to remove is loaded.
+
+A refusal is answered in /run/ollama1/modelplan/answer.json and changes
+nothing. Accepted: models.allow gains a line for each tag to add and loses
+the lines naming a tag to remove, nothing else, in one rename; then the
+removals run first, then the pulls in the order given, each checked against
+the allow-list again right before (and a removal against what is loaded
+then). A failed pull (3 tries) is marked failed and the next one runs.
+Progress goes to /run/ollama1/modelplan/status.json (GET /v1/models/state,
+the panel), the record to /var/lib/ollama1-modelplan/last.json, and every
+request and its result to the journal.
+
+Exit status: 0 done (or answered already), 1 refused or a job failed, 2 no
+request it could trust.
+"""
+import fcntl
+import fnmatch
+import os
+import pwd
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1library as L  # noqa: E402
+import o1modelplan as M  # noqa: E402
+import o1ollama  # noqa: E402
+import o1pair  # noqa: E402
+import o1sleep  # noqa: E402
+from o1common import (Paths, fmt_bytes, parse_allow_list, read_json_safe, safe_label,  # noqa: E402
+                      share_with_viewers, write_json_atomic)
+
+OWNER = "o1gw"
+LOCK_TRIES = 20       # a lock held only for a moment (someone checking it) is waited out, about 2 s
+WHY = dict(o1sleep.BUSY_UNITS)[M.UNIT]          # the reason logind shows for holding sleep off
+
+
+def say(*a):
+    print(*a, flush=True)
+
+
+class Refused(Exception):
+    def __init__(self, code, error, **extra):
+        super().__init__(error)
+        self.code = code
+        self.extra = extra
+
+
+def gateway_uid():
+    """The request's owner must be the gateway's user. With OLLAMA1_PREFIX
+    (the tests, a user-mode trial) it is whoever runs this."""
+    if os.environ.get("OLLAMA1_PREFIX"):
+        return os.getuid()
+    try:
+        return pwd.getpwnam(OWNER).pw_uid
+    except KeyError:
+        return None
+
+
+def trusted_request(owner_uid, path=None):
+    """The request if it is a regular file with one link, owned by
+    `owner_uid`, of at most 16 KiB, read without following a symlink; else
+    None. Root never writes or deletes anything in the gateway's folder."""
+    if owner_uid is None:
+        return None
+    r = read_json_safe(path or M.request_file(), None, max_bytes=M.REQUEST_MAX_BYTES,
+                       check=lambda st: st.st_nlink == 1 and st.st_uid == owner_uid)
+    return r if isinstance(r, dict) else None
+
+
+def take_lock(path, sleep, tries=LOCK_TRIES):
+    """An exclusive lock on `path` (root's folder; the file made group o1view
+    so the gateway and the panel can see it held), or None if it stays taken."""
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0), 0o640)
+    share_with_viewers(fd)
+    for i in range(tries):
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except OSError:
+            if i + 1 < tries:
+                sleep(0.1)
+    os.close(fd)
+    return None
+
+
+def let_go(fd):
+    if fd is not None:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
+def answer(rid, ok, code="", error="", **extra):
+    """Root's answer to request `rid`, for the gateway (it waits for this)."""
+    try:
+        os.makedirs(Paths.modelplan_run, exist_ok=True)
+        write_json_atomic(M.answer_file(), dict({"request": rid, "ok": ok, "code": code, "error": str(error)[:300],
+                                                 "at": int(time.time())}, **extra), mode=0o640, group="o1view")
+    except OSError as e:
+        say("modelplan: could not write the answer (%s)" % (e.strerror or e))
+
+
+def save(rec, keep=False):
+    """The plan for GET /v1/models/state and the panel (/run); with keep, also
+    the copy that outlives a reboot. A file that can't be written never
+    stops the work."""
+    rec["at"] = int(time.time())
+    try:
+        write_json_atomic(M.status_file(), rec, mode=0o640, group="o1view")
+        if keep:
+            os.makedirs(Paths.modelplan_state, exist_ok=True)        # systemd makes it (StateDirectory=)
+            write_json_atomic(M.record_file(), rec, mode=0o640, group="o1view", sync_dir=True)
+    except OSError as e:
+        say("modelplan: could not write the status (%s)" % (e.strerror or e))
+
+
+def ollama_now(base):
+    """(names on the disk, names loaded) from Ollama now, or raises Refused."""
+    try:
+        st, tags = o1ollama.call(base, "GET", "/api/tags", timeout=20)
+        st2, ps = o1ollama.call(base, "GET", "/api/ps", timeout=20)
+    except OSError:
+        raise Refused("ollama", "Ollama isn't answering")
+    if st != 200 or st2 != 200 or not isinstance(tags, dict) or not isinstance(ps, dict):
+        raise Refused("ollama", "Ollama isn't answering")
+    return [m["name"] for m in M.local_models(tags)], M.loaded_names(ps)
+
+
+def check_request(req, now):
+    """The request itself, again (the gateway's checks, never trusted).
+    Returns (the request, the device's name) or raises Refused."""
+    if set(req) != set(M.REQUEST_KEYS) or req.get("v") != 1:
+        raise Refused("bad_request", "not a request this program knows")
+    t = req["t"]
+    if not isinstance(t, int) or isinstance(t, bool) or abs(now - t) > M.REQUEST_MAX_AGE:
+        raise Refused("bad_request", "the request is more than %d seconds old (or from the future): send it again"
+                      % M.REQUEST_MAX_AGE)
+    clean, err = M.parse_request({k: req[k] for k in M.KEYS})
+    if err:
+        raise Refused("bad_request", err)
+    dev = req["device"]
+    if not isinstance(dev, str) or not M.ID_RE.fullmatch(dev):
+        raise Refused("bad_request", "not a device id")
+    devices = o1pair.load_devices()
+    if dev not in devices:
+        raise Refused("unpaired", "the device that asked is not paired with this server")
+    return clean, devices[dev]["name"]
+
+
+def check_server(clean, base, active_units):
+    """The server, now, with both locks held: nothing else changing the
+    models, the models the app saw, nothing to remove loaded. Raises Refused."""
+    units = active_units([p for p, _ in M.BUSY_UNITS[1:]])       # not ollama1-modelplan.service: that is this
+    if units is None:
+        raise Refused("busy", "systemd could not be asked what is running")
+    for pattern, why in M.BUSY_UNITS[1:]:
+        if any(fnmatch.fnmatchcase(u, pattern) for u in units):
+            raise Refused("busy", "not now: " + why)
+    names, loaded = ollama_now(base)
+    if M.seen_hash(names) != clean["seen"]:
+        raise Refused("changed", "the models on the server changed since the app looked", models=sorted(names))
+    for tag in clean["remove"]:
+        if any(o1ollama.same_model(tag, n) for n in loaded):
+            raise Refused("in_use", "%s is loaded right now; apply the set again once it is unloaded" % tag, name=tag)
+
+
+def remove_job(job, base, allow_path):
+    """'' when the model is gone (or was never installed), else why not."""
+    name = job["name"]
+    entries, _errors = parse_allow_list(allow_path)
+    if L.kept(name, [e["name"] for e in entries], L.protected_names(allow_path)):
+        return "the allow-list names it again; not removed"
+    try:
+        st, ps = o1ollama.call(base, "GET", "/api/ps", timeout=20)
+        st2, tags = o1ollama.call(base, "GET", "/api/tags", timeout=20)
+    except OSError:
+        return "Ollama isn't answering"
+    if st != 200 or st2 != 200:
+        return "Ollama isn't answering"
+    if any(o1ollama.same_model(name, n) for n in M.loaded_names(ps)):
+        return "it is loaded right now; not removed (apply the set again later)"
+    for n in [m["name"] for m in M.local_models(tags) if o1ollama.same_model(m["name"], name)]:
+        if not L.delete_one(n, base):
+            return "Ollama could not delete it"
+    return ""
+
+
+def pull_job(job, base, allow_path, sleep, tries, progress):
+    """'' when the model is on the disk, else why not."""
+    name = job["name"]
+    if not L.listed(name, L.allowed_names(allow_path)):
+        return "it is no longer on the allow-list; not downloaded"
+    err = "the download failed"
+    for attempt in range(1, tries + 1):
+        free = M.disk_free()
+        if free is None:
+            return "can't read the free space on the models disk"
+        if free < L.MIN_FREE:
+            return "the models disk has less than %s free" % fmt_bytes(L.MIN_FREE)
+        try:
+            L.pull_one(name, progress, base)
+            return ""
+        except Exception as e:        # RuntimeError from pull_one, or a broken answer (IncompleteRead): try again
+            err = (str(e) if isinstance(e, RuntimeError) else "Ollama: %s" % type(e).__name__)[:200] or err
+            if attempt < tries:
+                sleep(min(30, 5 * attempt))
+    return err
+
+
+def execute(rec, base, allow_path, sleep, tries, log):
+    """Every job in its order (the removals were put first), whatever the
+    one before did."""
+    for job in rec["jobs"]:
+        job["state"] = "running"
+        save(rec, keep=True)
+        last = [0.0]
+
+        def progress(done, total, job=job):
+            pct = min(99, int(100 * done / total)) if total else 0
+            if pct != job["pct"] and time.monotonic() - last[0] >= 1.0:
+                job["pct"] = pct
+                last[0] = time.monotonic()
+                save(rec)
+        try:
+            if job["action"] == "remove":
+                err = remove_job(job, base, allow_path)
+            else:
+                err = pull_job(job, base, allow_path, sleep, tries, progress)
+        except Exception as e:          # one job's surprise never stops the rest
+            err = "internal error (%s)" % type(e).__name__
+        job["state"], job["error"] = ("failed", err) if err else ("done", "")
+        if not err:
+            job["pct"] = 100
+        save(rec, keep=True)
+        log("modelplan: %s %s: %s" % (job["action"], job["name"], "failed: " + err if err else "done"))
+
+
+def run(owner_uid=None, base=None, allow_path=None, active_units=o1sleep._active_units, clock=time.time,
+        sleep=time.sleep, tries=L.TRIES, log=say, inhibit=o1sleep.Inhibit):
+    req = trusted_request(gateway_uid() if owner_uid is None else owner_uid)
+    if req is None:
+        log("modelplan: no request to carry out (it must be a regular file with one link, owned by %s, "
+            "at most %d bytes)" % (OWNER, M.REQUEST_MAX_BYTES))
+        return 2
+    rid = req.get("id")
+    if not isinstance(rid, str) or not M.ID_RE.fullmatch(rid):
+        log("modelplan: the request has no id; nothing done")
+        return 2
+    prev = read_json_safe(M.answer_file(), None, max_bytes=M.FILE_MAX_BYTES)
+    if isinstance(prev, dict) and prev.get("request") == rid:
+        log("modelplan: request %s was answered already; nothing done" % rid)
+        return 0
+    base = L.ollama_url(base)
+    os.makedirs(Paths.modelplan_run, exist_ok=True)               # tmpfiles makes it; tests
+    plan_fd = lib = None
+    try:
+        clean, by = check_request(req, clock())
+        plan_fd = take_lock(M.lock_file(), sleep)
+        if plan_fd is None:
+            raise Refused("busy", "not now: " + M.BUSY_UNITS[0][1])
+        for i in range(LOCK_TRIES):
+            try:
+                lib = L.Lock().__enter__()
+                break
+            except RuntimeError:
+                if i + 1 < LOCK_TRIES:
+                    sleep(0.1)
+        if lib is None:
+            raise Refused("busy", "not now: " + M.LIBRARY_BUSY)
+        check_server(clean, base, active_units)
+        try:
+            added, dropped = L.allow_apply(clean["add"], clean["remove"], allow_path)
+        except (OSError, ValueError, UnicodeDecodeError) as e:
+            raise Refused("internal", "the allow-list (/etc/ollama1/models.allow) can't be changed (%s): "
+                                      "fix it at the server" % (getattr(e, "strerror", None) or type(e).__name__))
+    except Refused as r:
+        answer(rid, False, r.code, str(r), **r.extra)
+        log("modelplan: refused request %s (%s): %s" % (rid, r.code, r))
+        if lib is not None:
+            lib.__exit__(None, None, None)
+        let_go(plan_fd)
+        return 1
+    except Exception as e:
+        answer(rid, False, "internal", "internal error (%s)" % type(e).__name__)
+        log("modelplan: request %s stopped: internal error (%s)" % (rid, type(e).__name__))
+        if lib is not None:
+            lib.__exit__(None, None, None)
+        let_go(plan_fd)
+        return 1
+    who = safe_label(by, 40)
+    now = int(clock())
+    # removals first, so their space is there for the pulls; each list in the order given
+    jobs = [{"name": t, "action": "remove", "state": "queued", "pct": 0, "error": ""} for t in clean["remove"]] + \
+           [{"name": t, "action": "pull", "state": "queued", "pct": 0, "error": ""} for t in clean["add"]]
+    rec = {"v": 1, "request": rid, "state": "running", "plan": {"name": clean["plan"], "at": now, "by": by},
+           "device": req["device"], "add": clean["add"], "remove": clean["remove"], "jobs": jobs,
+           "started": now, "finished": None}
+    save(rec, keep=True)
+    answer(rid, True)
+    log("modelplan: applying the %s set for %s (device %s, request %s): add %s; remove %s; allow-list: %d line(s) "
+        "added, %d taken out" % (clean["plan"], who, req["device"], rid, ",".join(clean["add"]) or "-",
+                                 ",".join(clean["remove"]) or "-", len(added), len(dropped)))
+    try:
+        with inhibit(WHY):
+            execute(rec, base, allow_path, sleep, tries, log)
+    finally:
+        for j in jobs:          # only if something stopped the loop itself (Ctrl+C at a terminal, a bug)
+            if j["state"] in ("queued", "running"):
+                j["state"], j["error"] = "failed", "stopped before it finished"
+        rec["state"], rec["finished"] = "done", int(clock())
+        save(rec, keep=True)
+        lib.__exit__(None, None, None)
+        let_go(plan_fd)
+    done = {a: [j["name"] for j in jobs if j["action"] == a and j["state"] == "done"] for a in M.ACTIONS}
+    failed = ["%s %s (%s)" % (j["action"], j["name"], j["error"]) for j in jobs if j["state"] != "done"]
+    log("modelplan: finished the %s set for %s: removed %s; pulled %s; failed %s"
+        % (clean["plan"], who, ",".join(done["remove"]) or "-", ",".join(done["pull"]) or "-",
+           "; ".join(failed) or "-"))
+    return 1 if failed else 0
+
+
+def main(argv):
+    if len(argv) > 1:
+        print(__doc__.split("\n\n")[1], file=sys.stderr)
+        return 2
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("ollama1-modelplan runs as root, from ollama1-modelplan.service", file=sys.stderr)
+        return 2
+    os.umask(0o027)
+    return run()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

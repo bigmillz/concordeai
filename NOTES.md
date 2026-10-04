@@ -9,6 +9,78 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b410 — model sets from the app: the server side (per Patrick: Light / Recommended / Everything, chosen in the app, carried out by the server)
+
+Kit only (`ollama1/`); the app side is built separately to the same contract. The app computes the
+set for the server's card, shows the exact Download and Remove lists and sends them; the server
+carries them out. PROTOCOL.md "Model sets" is the contract, README "Model sets from the app" the
+owner's view.
+
+- **Routes** (bin/ollama1-gateway, signed and paired-only like /v1/sleep-config).
+  `GET /v1/models/state` → exactly `models` (Ollama's /api/tags, cloud entries out, sorted, with
+  `loaded` from /api/ps), `allow`, `busy`, `jobs`, `plan` (or null), `disk_free_bytes`,
+  `vram_bytes`. `POST /v1/models/apply` `{plan, add, remove, seen}` → 202 `{"ok":true,"jobs"}` or
+  400 `bad_request` / 409 `changed` (+`models`) / 409 `busy` / 409 `in_use` (+`name`); beyond the
+  contract: 403 `unpaired`, 502 `ollama`, 503 `not_started` (systemctl refused), 504 `no_answer`
+  (root didn't answer in 15 s; the request file is left for it). `seen` = sha256 of
+  `"\n".join(sorted(names))` over exactly the `models` names.
+- **Privilege line.** o1gw can't write models.allow, so the gateway checks the request
+  (`o1modelplan.parse_request`: the contract's regex matched whole, no trailing newline, at most 40
+  per list, no model twice or in both lists, not both empty, a known set name), then busy (root's
+  plan lock, the library lock, active pull@/rmmodel@/sync/modelplan units via `systemctl
+  list-units`, cached 2 s for GET), `seen`, in-use; writes `/var/lib/ollama1-gateway/
+  modelplan-request.json` (0600, its own StateDirectory: no gateway unit change) and runs `systemctl
+  start --no-block ollama1-modelplan.service` (its only subprocess), then waits for root's answer
+  by request id. polkit (50-ollama1.rules, a second addRule): o1gw may start that one unit, verb
+  start, and gets NO for everything else. The unit (root, oneshot, no argument) runs
+  bin/ollama1-modelplan: reads the request with `read_json_safe` (no symlink, no FIFO, one link,
+  owner o1gw, ≤16 KiB), refuses one older than 120 s or already answered (replay), checks the shape
+  again (same function), that the device is paired (the name it records comes from devices.json,
+  never from the request), takes the plan lock and the library lock (so a sync or `ollama1-models`
+  can't run meanwhile; a lock held for a moment by someone checking it is waited out, ~2 s), asks
+  systemd about pull@/rmmodel@/sync units (can't ask = busy), then `seen` and in-use against Ollama
+  now. Refusals go to /run/ollama1/modelplan/answer.json and change nothing.
+- **The work.** `o1library.allow_apply`: one read, lines naming a remove tag dropped (any letter
+  case: `kept()` protects a model named in any case, so its line must go too), add tags not listed
+  appended without a flag, every other byte kept (comments, CRLF, blank lines, bad lines), one
+  temp-file + fsync + rename + folder fsync, 0644; a missing, non-UTF-8 or >1 MiB list is never
+  written (a new list holding only the set would let the next sync delete everything else).
+  Then jobs: removals first, then pulls in the given order, through `o1library.pull_one` /
+  `delete_one` (the code the sync uses), 3 tries per pull; at its turn a removal is refused if any
+  line names the model again or it is loaded, a pull if it left the list or the models disk has
+  < 2 GiB free. A failed job is marked and the next runs. Progress (pct at most 1/s) to
+  /run/ollama1/modelplan/status.json; the record, at every job transition, also to
+  /var/lib/ollama1-modelplan/last.json (StateDirectory) so `plan` survives a reboot. A record that
+  says running while nobody holds the plan lock reads as interrupted, its unfinished jobs failed.
+  Journal: the request (device, set, add, remove, allow-list line counts), each job, a summary.
+- **Unit sandbox.** ProtectSystem=strict, ReadWritePaths=/etc/ollama1 /run/ollama1/modelplan
+  /run/ollama1/library, ReadOnlyPaths=-config.json -devices.json on top, StateDirectory,
+  CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_CHOWN (reads o1gw's 0700 folder, can't write it),
+  IPAddressDeny=any + IPAddressAllow=localhost (Ollama pulls in its own service; the unit only needs
+  127.0.0.1:11434 and D-Bus), the usual Protect*/Restrict*, @system-service, no [Install].
+- **Small changes around it.** tmpfiles: `d /run/ollama1/modelplan 0750 root o1view`. setup.sh: the
+  kit-completeness check (`for f in ...`, line 474) also needs bin/ollama1-modelplan and the unit;
+  everything else is installed by the existing globs and the rules-file line. o1sleep.BUSY_UNITS
+  has the unit (sleep held off, said once even though it also holds the library lock).
+  `o1common.share_with_viewers`: the library lock file is now group o1view 0640 (under a unit's
+  UMask=0027 it was root:root 0640, so the panel's "a sync is already running" check could never
+  see a sync). `ollama1-models add` now takes the library lock around its list edit (one writer
+  at a time). The panel refuses its single Pull/Remove while a set runs, and its Models card shows
+  "Last change: Recommended from <device>, <time>: +N -M" (+ in progress / N failed / stopped),
+  from `clean_modelplan` (known fields only, textContent). An accepted set touches the idle clock
+  once. Tightenings beyond the contract, all 400s: a tag with ".." (the allow-list would read it
+  as a bad line and block every sync removal) and a cloud tag in `add`.
+- **Tests.** tests/test_modelplan.py (63; real gateway + stub Ollama + root program in a thread,
+  plus the program end to end in its own prefix with a stand-in systemctl), test_admin (+4, and the
+  polkit-vs-panel test now looks at the panel's own rule), test_library (+1), polkit_check.js runs
+  every rule in order (+14 cases), test_stateless scans o1modelplan.py too. 52 mutants
+  (`python3 tests/mutate.py modelplan`), all killed. Six older mutants were already BROKEN (anchor
+  not found once) before this branch: two idle, one cpu, two gpu-tune, one fan; untouched.
+- **Unverified (all of it on the real server).** polkit actually granting o1gw that start (and
+  the subject being o1gw from the sandboxed gateway), `systemctl list-units` working from the
+  gateway's sandbox, the unit's namespace setup (nested ReadOnlyPaths inside ReadWritePaths,
+  IPAddressDeny with the port guard), systemd-inhibit from it, a real multi-GB pull's progress,
+  Ollama's delete of a model while another loads, and the 15 s answer wait on a cold start.
 ## 6b416 — a FANS box on the panel; memory temperature in place of the fan bar (per Patrick)
 
 - The bottom-middle box is split: STORAGE AND NETWORK above (46%, rows 11 units apart; its Disk/Net/Link
