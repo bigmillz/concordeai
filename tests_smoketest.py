@@ -16621,9 +16621,11 @@ def _sg_code(src):
 def _sg_ns(src, **stubs):
     """The suggestion block of src (a mutated copy too) as a namespace, with
     the real tender-topic pattern and degeneracy test, and the stubs given."""
+    class StaleProfile(OSError):          # millenai's: a profile switch mid-write (6b356)
+        pass
     ns = {"re": re, "random": _sg_random, "hashlib": _sg_hash, "time": time, "os": os,
           "json": json, "threading": _sg_th, "TEST_HOOKS": frozenset(),
-          "_hook_arg": lambda n: ""}
+          "_hook_arg": lambda n: "", "StaleProfile": StaleProfile}
     for c_ in _sg_code(src):
         exec(c_, ns)
     ns.update(stubs)
