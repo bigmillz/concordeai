@@ -9,6 +9,77 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b390 — the starter chips follow what you ask about (per Patrick)
+
+Patrick (2026-10-04): the three chips above the composer came from a fixed pool.
+"If a person often asks about car repairs and a few times about cooking, show two
+car-repair chips and one healthy-eating chip." Chat lane only; the Code and Funnel
+lanes keep their own sets.
+
+- **What is read.** Only a topic summary: the titles of the newest 30 chat-lane
+  chats (a chat with no title, or a "(copy)", gives its first question instead),
+  scrubbed (no address, link or 4+ digit number) and cut to 60 characters. Never a
+  message, an answer, a Code or Funnel chat, or a label that touches
+  `_TENDER_RX` (health, a relationship, grief: so "Battery keeps dying" is left
+  out too, "dying" is in the pattern; deliberate, the home screen is the one place
+  someone else might read over a shoulder). Fewer than 3 labels: the pool.
+- **Who writes them** (`suggest_ask`): the person's server first
+  (`server_side_text`, 6b357's rule), else a model of this computer that is
+  ALREADY loaded and capable (>= 2.4 GB; a side pass never loads one; none up is
+  "no model free" and the pool stays), and in Cloud Only the cloud's quick model
+  (`fast_cloud_ladder(utility=True)` behind `gate_ladder`) and nothing else, never
+  a server or a local model, as the title pass (6b357). The cloud is therefore
+  asked only by someone who chose Cloud Only, at most once a quarter hour while no
+  summary exists and once per 6 h after; a failed call costs nothing.
+- **One call** groups the labels into at most 4 topics with counts and writes 3
+  starter questions each (`SUGGEST_PROMPT`; `TOPIC: x | COUNT: n` then `- chip`
+  lines). `suggest_parse` keeps only chips that pass `_suggest_chip`: 8-48
+  characters, at least two words, no address, link, 4+ digits, no tender topic, no
+  collapsed text, none sharing a word with the person's `user_name` or
+  `home_area`, none a near copy (word overlap >= 0.7) of a chat title; a missing
+  emoji becomes 💡. Fewer than two good chips overall is nothing.
+- **Kept** in the profile's own `suggest.json` (`PERSONAL_NAMES`, so it is the
+  profile's and never the machine's): `{v, sig, n, tried, at, checked, topics:
+  [{topic, n, chips}], made}`. Erased with "Forget chats" and when the switch goes
+  off. A pass is **due** when there is no summary (a quarter hour apart), or the
+  summary was made or last looked at over 6 h ago, and then asks only if the
+  title list changed (`sig`); otherwise it just stamps `checked`. A pass that
+  gave nothing is not repeated for 15 minutes. Refresh ignores age and sig.
+- **Background, never in the way.** `GET /api/suggest` answers at once from the
+  file and starts a pass behind it on `ctx_thread`; it is only called when the
+  page paints the chat-lane chips, never to load the page or open a chat. A pass
+  waits (`suggest_busy`) while an answer is streaming (`turns_live_count`), a
+  benchmark runs or counts a hold, a model download is queued or running, or an
+  update runs; held back, it writes nothing and asks again 90 s later. Any error
+  is the pool.
+- **Picking** (`suggest_pick`, per painting): two chips of the biggest topic, one
+  of the next (a tie by lot), drawn afresh from the 3 each kept; the page puts
+  them FIRST, then the fixed pool, and the existing one-row trim drops from the
+  end. With 3 chips of about 30 characters all three fit at the composer's
+  780 px; on a narrow window the trim leaves fewer, as for the pool.
+- **Page.** `suggLoad()` (a look at most every 5 min; a few extra looks 4 s apart
+  while the first pass runs, so the chips arrive without a reload; only the first
+  answer repaints the row). State is `var`, not `let`: a painting that runs
+  before the declaration would hit the temporal dead zone and kill the page.
+- **Settings › Personality**: "Personalise suggestions" (`suggest_own`, a synced,
+  typed setting, on unless saved off), one line saying what it reads and where it
+  runs, "Refresh", and a status line.
+- **Test hook** (dev copies): `suggest-fake` answers as a model would;
+  `suggest-fake=unsafe` answers with chips that must all be refused;
+  `suggest-fake=fail` answers nothing; `GET /api/test/suggest` says how many times
+  the pass asked and what it sent.
+- **Gauntlet** ("starter chips from your chats"): 60 unit checks over the labels,
+  the chip filter, the picking, the model's route, busy, due and a whole pass on
+  stand-ins; 22 source and page checks; 12 live checks on four copies (first look,
+  topic mix, what is sent, the file, auth, the 6 h rule, switch off and on,
+  Refresh, fewer than 3 chats, Forget, a benchmark running, unsafe and failing
+  models); 65 mutants, each caught. The old synced-set check now names
+  `suggest_own`.
+- Not done: no benchmark of how well a 3B model groups titles (the filter and the
+  pool are the safety net); a local model is used only if one is already loaded.
+
+---
+
 ## 6b365 — the stability test runs one load at a time by default (per Patrick)
 
 - `stability-test.sh` with no options ran "all" (cpu, memory and the card at
