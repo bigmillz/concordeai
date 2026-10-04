@@ -484,6 +484,73 @@ class TestStabilityTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
+class TestGpuBurn(unittest.TestCase):
+    """tools/gpu-burn.sh against a fake llama-bench and fake sysfs."""
+    SCRIPT = os.path.join(U.TOOLS, "gpu-burn.sh")
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        d = self.dir
+        os.makedirs(d + "/models/manifests/registry.ollama.ai/library/gemma4")
+        os.makedirs(d + "/models/blobs")
+        open(d + "/models/blobs/sha256-abc", "w").write("x")
+        json.dump({"layers": [{"mediaType": "application/vnd.ollama.image.model", "digest": "sha256:abc"}]},
+                  open(d + "/models/manifests/registry.ollama.ai/library/gemma4/12b", "w"))
+        os.makedirs(d + "/drm/card1/device")
+        os.makedirs(d + "/hwmon/hwmon0")
+        open(d + "/hwmon/hwmon0/name", "w").write("amdgpu\n")
+        for f, v in (("temp1_input", "50000"), ("temp2_input", "60000"), ("power1_average", "250000000")):
+            open(d + "/hwmon/hwmon0/" + f, "w").write(v + "\n")
+        os.makedirs(d + "/bin")
+        open(d + "/proc-stat", "w").write("cpu  100 0 50 800 0 0 0 0 0 0\n")
+        open(d + "/bin/timeout", "w").write('#!/bin/sh\ns=$1; shift; "$@" & p=$!; (sleep "$s"; kill $p 2>/dev/null) & wait $p\n')
+        os.chmod(d + "/bin/timeout", 0o755)
+        self.bench = d + "/llama-bench"
+        open(self.bench, "w").write("#!/bin/sh\nsleep 1\n")
+        os.chmod(self.bench, 0o755)
+
+    def run_burn(self, *args, busy="99", env=None):
+        open(self.dir + "/drm/card1/device/gpu_busy_percent", "w").write(busy + "\n")
+        e = dict(os.environ, O1_BURN_NOROOT="1", O1_GPU_BURN_LOG=self.dir + "/log", O1_DRM=self.dir + "/drm",
+                 O1_HWMON=self.dir + "/hwmon", O1_MODELS=self.dir + "/models", O1_LLAMA_BENCH=self.bench,
+                 O1_BURN_TICK="1", O1_BURN_REPORT="1", O1_BURN_WARMUP="1", O1_BURN_SECONDS="4",
+                 O1_PROC_STAT=self.dir + "/proc-stat", PATH=self.dir + "/bin" + os.pathsep + os.environ["PATH"])
+        e.update(env or {})
+        r = subprocess.run(["bash", self.SCRIPT] + list(args), capture_output=True, text=True, timeout=60, env=e,
+                           stdin=subprocess.DEVNULL)
+        return r.returncode, r.stdout + r.stderr
+
+    def test_syntax(self):
+        self.assertEqual(subprocess.run(["bash", "-n", self.SCRIPT]).returncode, 0)
+
+    def test_a_busy_card_passes_and_the_lines_say_what_it_is_doing(self):
+        code, out = self.run_burn("1")
+        self.assertEqual(code, 0, out)
+        self.assertIn("card busy 99%", out)
+        self.assertIn("processor busy", out)
+        self.assertIn("PASSED", out)
+
+    def test_an_idle_card_fails_with_the_reason(self):
+        code, out = self.run_burn("1", busy="3")
+        self.assertEqual(code, 1, out)
+        self.assertIn("the card was only 3% busy", out)
+
+    def test_a_missing_model_or_bench_is_said_not_guessed(self):
+        code, out = self.run_burn("1", "nope:1b")
+        self.assertEqual(code, 1)
+        self.assertIn("isn't installed", out)
+        code, out = self.run_burn("1", env={"O1_LLAMA_BENCH": self.dir + "/none"})
+        self.assertEqual(code, 1)
+        self.assertIn("llama-bench not found", out)
+
+    def test_one_processor_thread_and_no_ollama(self):
+        src = open(self.SCRIPT).read()
+        self.assertIn("-ngl 99 -t 1", src)
+        self.assertNotIn("stress-ng", src)
+        self.assertNotIn("api/generate", src)
+
+
 class TestRamTestCleansUp(unittest.TestCase):
     def test_hangup_and_term_leave_through_the_cleanup(self):
         src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()

@@ -9,6 +9,16 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b399 — gpu-burn.sh: the graphics card at 100% and nothing else (per Patrick)
+
+- Driving the card through Ollama's HTTP requests (stability-test.sh's gpu phase)
+  left it on and off between requests and used a lot of the processor. `tools/gpu-burn.sh
+  [minutes] [model]` runs llama.cpp's `llama-bench` with ONE processor thread, over and
+  over, on the model file Ollama already holds (no Ollama in the loop, no stress-ng), and
+  prints every 30 s the card's busy percent, edge/junction temperatures, watts and the
+  processor's busy percent. It stops with the reason on a new hardware-error record, at
+  105 C junction, or when the card averages under 40% busy. Tests: TestGpuBurn.
+
 ## 6b398 — a graphics-card-only stability run that says what it is doing (per Patrick)
 
 - `stability-gpu.sh [minutes] [model]` runs the card flat out and leaves the
