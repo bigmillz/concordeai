@@ -1238,7 +1238,13 @@ Ed25519 (the server uses PyNaCl). They cover:
 - graphics card tuning against fixture sysfs trees and a stand-in driver:
   the card found by its ids, values clamped to what the card reports, only
   the overdrive bit added to the feature mask, back to stock on a kernel
-  error, heat or a slower answer, and a revert never re-applied;
+  error or heat, a slower answer only when it repeats in stock/tuned
+  alternations (and not while a drive logs errors, another model loads or the
+  card is busy), and a revert never re-applied;
+- the auto sleep setting across a gateway restart, the idle service's, a
+  reboot and a setup.sh run (`test_sleepcfg.py`), and the check after a wake
+  waiting, bounded, for the card and the models drive (`test_sleep.py`,
+  fake clock);
 - the move of the OS to the other NVMe (`tools/migrate-os.sh`) against a fake
   server (fake sysfs and /dev, stand-ins for lsblk, sgdisk, rsync, mount,
   chroot, efibootmgr, tmux; `test_migrate*.py`): drives found by serial with
@@ -1249,5 +1255,7 @@ Ed25519 (the server uses PyNaCl). They cover:
   order (new first, old second, made last), the tmux relaunch, the status
   file (mode, no serials, kept moving), no reboot after a failure, the
   countdown and its Ctrl-C, a run killed at each stage boundary and resumed,
-  the root-owned install and the one-rule sudoers text;
+  the root-owned install and the one-rule sudoers text; `efibootmgr -v` read
+  in its several shapes, an entry of a stopped run reused, and the optional
+  renaming of the old drive's boot files (`test_migrate_efi.py`);
 - that the repo holds no personal data and no utility's schedule.

@@ -118,6 +118,30 @@ class TestSurvives(Base):
         self.assertIn('os.path.join(Paths.gw_state, "sleep.json")', src)
 
 
+class TestIdleFilePublishesTheSetting(Base):
+    """The server panel reads enabled and minutes from /run/ollama1/idle.json."""
+
+    def tick_and_read(self):
+        new_idle_service([]).tick()
+        return json.load(open(o1idle.idle_file()))
+
+    def test_enabled_and_minutes_are_published_with_the_old_fields(self):
+        d = self.tick_and_read()                       # nothing saved: off, 30
+        self.assertEqual((d["enabled"], d["minutes"]), (False, 30))
+        self.assertIn("supported", d)
+        self.assertIn("wake", d)
+        o1idle.write_config({"enabled": True, "minutes": 45})
+        d = self.tick_and_read()
+        self.assertIs(d["enabled"], True)
+        self.assertEqual(d["minutes"], 45)
+        self.assertEqual(sorted(d), ["at", "enabled", "minutes", "supported", "wake"])
+
+    def test_the_gateway_still_reads_the_wake_list_from_it(self):
+        o1idle.write_config({"enabled": True, "minutes": 10})
+        self.tick_and_read()
+        self.assertEqual(o1idle.published_wake(), [])
+
+
 class TestSetupLeavesItAlone(unittest.TestCase):
     """setup.sh is run again for every update and with --no-... flags; none of that may reset the file."""
 

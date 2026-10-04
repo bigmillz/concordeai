@@ -123,6 +123,9 @@ Current: repo `bigmillz/concordeai` — version and build live in
   `write_config` uses it.
 - `sudo ollama1-idle status` prints the saved setting (and whether deep sleep
   is supported). The nightly backup now includes the file (`settings.tar.gz`).
+- `/run/ollama1/idle.json` now also carries `enabled` (bool) and `minutes`
+  (int), the saved setting, rewritten every tick; the graphical server panel
+  shows "Sleeps in mm:ss" from it. Test: `TestIdleFilePublishesTheSetting`.
 - README: the stale "automatic idle sleep is on hold" line is replaced by what
   it does and where the setting lives. The app reading the setting back is
   the app's side, not the kit's.

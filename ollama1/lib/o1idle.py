@@ -499,12 +499,13 @@ class Idle:
             w = self._probe("wake")
             self.wake = w if isinstance(w, list) else []
             self.wake_at = mono
+        cfg = read_config()
         try:
-            write_json_atomic(idle_file(), {"at": int(now), "supported": supported, "wake": self.wake[:MAX_WAKE]},
-                              mode=0o644)
+            # the server panel reads the setting from here (enabled, minutes) beside what the card list says
+            write_json_atomic(idle_file(), {"at": int(now), "supported": supported, "wake": self.wake[:MAX_WAKE],
+                                            "enabled": cfg["enabled"], "minutes": cfg["minutes"]}, mode=0o644)
         except OSError:
             pass
-        cfg = read_config()
         act = read_activity(now)
         sleep, why = decide({
             "enabled": cfg["enabled"], "supported": supported, "minutes": cfg["minutes"], "now": now,

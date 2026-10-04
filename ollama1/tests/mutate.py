@@ -993,6 +993,8 @@ MUTANTS = [
     ("sleep-config: the setting saved under /run (lost at reboot)", "lib/o1idle.py",
      'return os.path.join(Paths.gw_state, "sleep.json")', 'return os.path.join(Paths.run, "sleep.json")',
      ["test_sleepcfg", "test_idle"]),
+    ("sleep-config: the idle file doesn't publish the setting", "lib/o1idle.py",
+     '"enabled": cfg["enabled"], "minutes": cfg["minutes"]}, mode=0o644)', '}, mode=0o644)', ["test_sleepcfg"]),
     ("sleep-config: status doesn't print the saved setting", "bin/ollama1-idle",
      "print(o1idle.describe_config())", "print('auto sleep')", ["test_sleepcfg"]),
     ("resume-check: restarts Ollama without waiting for the card", "lib/o1sleep.py",

@@ -582,7 +582,8 @@ class TestTick(unittest.TestCase):
     def test_it_publishes_the_card_list_and_support(self):
         self.box.idle.tick()
         d_ = json.load(open(o1idle.idle_file()))
-        self.assertEqual(d_, {"at": int(NOW), "supported": True, "wake": ["02:00:5e:10:00:01"]})
+        self.assertEqual(d_, {"at": int(NOW), "supported": True, "wake": ["02:00:5e:10:00:01"],
+                              "enabled": True, "minutes": 30})   # enabled/minutes: the server panel reads them
         self.assertEqual(o1idle.published_wake(), ["02:00:5e:10:00:01"])
 
     def test_the_log_has_reasons_only(self):
