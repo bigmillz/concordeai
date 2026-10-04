@@ -9,6 +9,152 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b382 — the cost screen in smooth rounded print, no asterisks (per Patrick)
+
+Patrick on the real 4K monitor: the cost screen works, but the digits (a 5x7
+bitmap scaled about 10x then x6) were blocky and hard to read.
+- **New `lib/o1vecfont.py`: a stroke font.** Each glyph (0-9 . , : - / $ and the
+  euro, pound and yen signs, A-Z, space) is a skeleton of lines and arcs drawn
+  with a round pen (round caps and joins), anti-aliased by exact coverage:
+  every segment is a capsule, and for each of 8 sub-rows of a pixel row the
+  capsules' x-extent is found analytically, merged, and added as fractional
+  coverage. No per-pixel distance tests, so it is fast. Glyph bitmaps (rows of
+  0..255 coverage) are cached by (character, height); `Pixmap.blit_coverage`
+  paints them over a flat background through a 256-entry colour table. Digits
+  are 16% wider than the first design (Nunito-like proportions) and all one
+  width. Capitals only; the screen's words are in capitals.
+- **Drawn at the screen's own resolution** (`o1fb.choose_cost_scale`: 1:1 up to
+  3840 wide, else a whole-number fraction), by its own `Presenter`; the panel
+  keeps its 640x360 x k. A flip clears the screen and rewrites it in full.
+  `o1panel.render_cost` keeps the picture until the figures or the size change
+  (the clock is not on this screen), so after the first draw each two-second
+  tick is a row compare and no writes. At 3840x2160: about 0.25 s to draw the
+  first time, 10 ms to prepare the frame (plus the write of the 33 MB).
+- **Layout.** Label, kWh and (if the history is short) a note in a left column;
+  the figure, one common height for all three rows, fills the rest of the row.
+  The ink (a $ or a comma reaches beyond the capitals) is centred and fitted
+  by `vertical_extent`, so nothing touches the row's edge. Messages ("Set your
+  electricity price in the admin panel", "No data yet") are drawn the same
+  way, as large as they fit, wrapped by `wrap_vec`.
+- **No asterisk anywhere on this screen** and no footnote (Patrick's explicit
+  instruction for it; the estimate rule still holds on the other screens). The
+  "only 3d 4h of data" note stays, in amber, under the kWh.
+- **Found on the way:** `Presenter.merge` joined adjacent writes by repeated
+  `bytes +`, quadratic on a 4K frame (4 s); it now joins once. A screen in
+  plain XRGB8888 (the usual one) now sends the buffer's own bytes, with no
+  conversion.
+- Tests: the stroke font (areas of capsules to 1%, round ends and joins,
+  anti-aliased edges, clipping, centring, fit), the cost screen at 640x360 to
+  3840x2160 (one size for the three figures, overflow of 123456789012.34 in
+  seven currencies at five sizes, the cache, the loop's presenter); four new
+  mutants. `ollama1-dash --png out.png --screen cost [--size 3840x2160]`.
+
+## 6b381 — Space on the server's keyboard shows only the electricity cost (per Patrick)
+
+- The panel gets a second screen: three large rows, 24 HOURS / 7 DAYS / 30
+  DAYS, each a cost in the tariff's symbol at the largest whole scale that
+  fits (one size for all three), with kWh small beside the label. Space flips
+  to it and back; every other key is ignored (`o1paneld.handle_keys`, with a
+  0.3 s debounce so a held key is one flip). A pairing window takes the screen
+  from either (`render(screen="cost")` is ignored while `st["pairing"]`). The
+  normal footer says "Space: electricity cost".
+- **Same calculation as the admin panel.** The root power service already
+  computes `o1power.window()` for 1 d, 1 w and 1 m (30 d); `compact()` now
+  also publishes those three (`cost`, `kwh`, `measured_h`, `est`) plus
+  `currency`, `priced`, `since` in `/run/ollama1/power/summary.json`, and
+  `o1metrics.power_state()` passes them through. Nothing is recomputed in
+  the panel. `est` = any of the window's hours came from a source other than
+  a plug; those figures get a `*` and a footnote (estimates always do).
+  **The power service must be restarted** after the kit is updated
+  (`sudo systemctl restart ollama1-power`), or 7 d and 30 d say NO DATA (the
+  panel falls back to the 24 h figure of the old summary).
+- Honest empties: no tariff price -> "Set your electricity price in the admin
+  panel"; no readings -> "No data yet"; a window with none -> NO DATA, never a
+  zero; a history shorter than 90% of a window -> "only 3d 4h of data". JPY
+  has no decimals; unknown currencies show their code. The font gained
+  the euro, pound and yen signs.
+- **Keyboard.** `o1paneld.Keys` puts the unit's tty (stdin, tty1) in raw mode
+  (no echo, no ISIG/ICANON), flushes what was typed before, reads with
+  `select` for at most the loop's 0.5 s poll (so a press flips within half a
+  second and the draw loop is never blocked), and restores the attributes in
+  `finally`. A fd that is not a terminal just sleeps. getty is masked on
+  tty1, so no login prompt can see the keys. KD_GRAPHICS does not change the
+  keyboard mode, so the tty still delivers them (unverified on the server).
+- `ollama1-dash --png out.png --screen cost` for the picture. Tests: the keys
+  with a fake termios and select, the loop with a scripted keyboard, the
+  windows, empties, currencies, no overflow of 1234.56 / 123456789012.34 in
+  any symbol at 480x270 to 1280x1024, and the power summary round trip; four
+  new mutants.
+
+## 6b380 — a graphical information panel for the server's monitor (per Patrick)
+
+Patrick: "annoying trying to read all these hash marks". With a monitor
+connected the server now shows a picture instead of the text dashboard. He
+chose a lightweight renderer drawn straight to the screen (no desktop, no
+browser), low resolution being fine.
+
+- **Where it lives (kit only, `ollama1/`).** `lib/o1pixfont.py` (a 5x7 bitmap
+  font with descenders, crisp, drawn at whole-number scales; digits fixed
+  width), `lib/o1gfx.py` (a pixel buffer: clipped rectangles, lines, arcs,
+  text, a PNG writer), `lib/o1panel.py` (layout and the panels),
+  `lib/o1fb.py` (the framebuffer and the console), `lib/o1paneld.py` (the
+  loop), `bin/ollama1-dash` (mode, fall-back, `--png`).
+- **Rendering.** The panel is drawn at about 640x360 and scaled up by the
+  whole number that brings the screen's width nearest 640 (`choose_scale`:
+  1080p x3, 1440p x4, 720p x2), centred; the rest stays black. The buffer
+  is one `array('I')` of 0xRRGGBB, so a filled rectangle is a slice
+  assignment and a frame takes under 25 ms. Each panel is drawn inside
+  `Pixmap.clipped(box)` and `frame()` narrows the clip again to the panel's
+  inside, so a widget cannot paint over a border or its neighbour; text is
+  cut with "..." by its measured pixel width (`o1pixfont.fit`), never by its
+  length. The bar rows cap their label and value columns (a 200-character
+  mount name once pushed everything out of its box in a test).
+- **Framebuffer.** `FBIOGET_VSCREENINFO`/`FSCREENINFO` give the size, depth,
+  colour layout and stride; `Presenter` converts to 32, 24 or 16 bits with
+  any layout through a colour lookup, scales a row once, and returns only
+  the rows that changed since the last frame as `(offset, bytes)` writes
+  (merged when contiguous), honouring `line_length` and the pan offset.
+  `FbDevice.write` is `pwrite` on `/dev/fb0`; no mmap.
+- **Console.** `TtyGraphics` sets `KD_GRAPHICS` on the unit's tty (it is the
+  controlling terminal, so no capability is needed) and restores `KD_TEXT`,
+  the cursor and a cleared screen in `finally`; SIGTERM is turned into a
+  clean stop. While another virtual terminal is on the screen
+  (`VT_GETSTATE`) nothing is drawn; coming back clears and redraws in full.
+- **When it runs.** `--dash auto|text|graphic` (flag, then `OLLAMA1_DASH`,
+  then `/etc/ollama1/dash-mode`, then auto). Auto = `/dev/fb0` exists and a
+  `/sys/class/drm/*/status` says `connected` (`unknown` does not count). The
+  text dashboard polls every 10 s and switches when a monitor appears. Any
+  exception from the panel (open refused, odd depth, a bug) is logged to the
+  journal with its traceback and the text dashboard takes over for the rest
+  of the process; the console is back in text mode before that.
+  `setup.sh --dash` (tiny change: `dash_mode_choice` / `dash_mode_step` in
+  `lib/setuplib.sh`, saved as `DASH=` in `setup.env` only when not auto). The
+  unit gets `SupplementaryGroups=... video` for `/dev/fb0`.
+- **Data.** The same state dict as the text dashboard (`o1metrics.Sampler`),
+  and `o1dashui.warnings()` for the problems, so the two cannot disagree.
+  The sampler gained four one-second series (`gpu_temp`, `cpu_temp`,
+  `cpu_mhz`, `fan_rpm`), `cpu.mhz`/`cpu.max_mhz` (from `o1cpu.CpuProbe`, every
+  2 s), and `activity` (the gateway's activity file) and `idle`
+  (`/run/ollama1/idle.json`) for the sleep line. The sleep line says "Sleeps in
+  mm:ss" only if the idle service publishes `enabled` and `minutes` in
+  `idle.json`; today it publishes `supported` and the wake cards only, so the
+  panel shows "Idle for N" until it does (`sleep_summary` reads them if
+  present).
+- **Preview.** `ollama1-dash --png out.png [--size WxH] [--scale N]
+  [--pairing] [--live]`. Sample data comes from `tests/dash_sample.py`
+  (`--live` uses this machine).
+- **Not verified on real hardware** (no framebuffer here): the ioctl structs
+  were built from the kernel headers' layout and tested with packed fake
+  bytes; `KDSETMODE` on the unit's tty, `/dev/fb0` permissions through the
+  `video` group, `pwrite` on simpledrm/amdgpu fbdev emulation, and how the
+  screen looks at 1080p are all for the first run on the server. If the
+  panel does not appear: `journalctl -u ollama1-dash`, then
+  `sudo ./setup.sh --dash text` puts the old dashboard back.
+- Tests: `tests/test_panel.py` (font, buffer and clipping, layout, pixel
+  formats and strides, the loop on a fake screen, detection with a fake
+  sysfs, fall-back, the setting).
+
+---
 ## 6b374 — setup.sh works on a server moved with migrate-os (kit)
 
 - Pat's server after the move: the system and the models on ONE NVMe (plain

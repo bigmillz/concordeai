@@ -8,6 +8,21 @@
   ollama1-top --ascii           plain ASCII (any terminal)
   ollama1-top --once [--size 120x40]   one text frame, then exit
   ollama1-dash --set-font TTY   (root, from the unit) pick a console font for the screen
+  ollama1-dash --dash text|graphic|auto   what --console draws (default auto, below)
+  ollama1-dash --png out.png [--size 640x360] [--scale 2] [--pairing] [--live] [--screen cost]
+                                one frame of the graphical panel as a picture (sample
+                                numbers, or --live ones), to look at the design
+
+On a screen that is connected, --console shows a GRAPHICAL panel (6b380): bar
+gauges, rings and rolling charts drawn straight to the framebuffer (/dev/fb0), no
+desktop and no browser (lib/o1panel.py, o1fb.py, o1paneld.py). "auto" uses it when
+/dev/fb0 exists and a monitor is attached (/sys/class/drm/*/status); "text" keeps
+the text dashboard below; "graphic" insists on the panel when there is a
+framebuffer. The setting is OLLAMA1_DASH, or /etc/ollama1/dash-mode (setup.sh
+--dash). Any failure of the panel (no permission, an odd pixel format, an
+exception) is logged to the journal and the text dashboard takes over.
+On the panel, Space on the server's keyboard flips to a screen of only the
+electricity cost (24 hours, 7 days, 30 days) and back (6b381); other keys are ignored.
 
 It shows counts, sizes, timings and names in a few fixed boxes: the GPU,
 CPU and memory, requests, loaded models, storage, network and health, each a
@@ -23,11 +38,13 @@ import select
 import signal
 import sys
 import time
+import traceback
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
 import o1dashterm  # noqa: E402
 import o1dashui  # noqa: E402
+import o1fb  # noqa: E402
 import o1metrics  # noqa: E402
 
 try:
@@ -35,6 +52,10 @@ try:
 except ImportError:           # not a Unix (the tests import this on a Mac: fine)
     termios = None
 
+MODE_FILE = "/etc/ollama1/dash-mode"
+FB_PATH = "/dev/fb0"
+TTY_PATH = "/dev/tty1"
+SWITCH_CHECK_S = 10.0     # the text dashboard looks for a newly connected screen this often
 TICK_S = 1.0     # new numbers once a second
 POLL_S = 0.25    # the size and the keys are looked at four times a second
 
@@ -84,7 +105,9 @@ def read_keys():
     return b""
 
 
-def run(console, force_ascii):
+def run(console, force_ascii, switch=None):
+    """The text dashboard. With `switch` (a function), it returns "graphic"
+    as soon as that says the graphical panel can run (a monitor was plugged in)."""
     glyphs = pick_glyphs(console, force_ascii)
     sampler = o1metrics.Sampler()
     screen = o1dashterm.Screen()
@@ -94,9 +117,14 @@ def run(console, force_ascii):
         write("\x1b%G")            # the console reads UTF-8 (the blocks are multi-byte)
     range_s = 300
     st, next_tick, last_size, dirty = None, 0.0, None, True
+    next_switch = time.time() + SWITCH_CHECK_S
     try:
         while True:
             now = time.time()
+            if switch and now >= next_switch:
+                next_switch = now + SWITCH_CHECK_S
+                if switch():
+                    return "graphic"
             if st is None or now >= next_tick:
                 st = sampler.tick()
                 if not console and os.geteuid() != 0:
@@ -125,6 +153,103 @@ def run(console, force_ascii):
         write(o1dashterm.RESTORE + (o1dashterm.CLEAR if not console else ""))
 
 
+def read_mode_file(path=MODE_FILE):
+    try:
+        with open(path) as f:
+            return f.read(32)
+    except OSError:
+        return None
+
+
+def log(msg):
+    sys.stderr.write("ollama1-dash: %s\n" % msg)
+    sys.stderr.flush()
+
+
+class Stop(Exception):
+    pass
+
+
+def run_graphic(fb_path=FB_PATH, tty_path=TTY_PATH):
+    """The graphical panel until it is told to stop. Raises on any failure (the
+    caller falls back to text); the console is back in text mode either way."""
+    import o1paneld
+    fb = o1fb.FbDevice(fb_path)
+    stopping = [False]
+
+    def term(*_):
+        stopping[0] = True
+    old = signal.signal(signal.SIGTERM, term)
+    try:
+        fd = 1 if os.isatty(1) else os.open(tty_path, os.O_RDWR)       # the unit gives us tty1 as stdout
+        tty = o1fb.TtyGraphics(fd)
+        sampler = o1metrics.Sampler()
+        keys = o1paneld.Keys(0 if os.isatty(0) else fd)               # Space flips to the electricity cost (6b381)
+        keys.start()
+        try:
+            o1paneld.run(fb, tty, sampler, vt=o1fb.vt_of(os.ttyname(fd)), stop=lambda: stopping[0], log=log, keys=keys)
+        finally:
+            keys.stop()
+    finally:
+        signal.signal(signal.SIGTERM, old)
+        fb.close()
+    return "stopped"
+
+
+def console_main(force_ascii, flag):
+    """--console: the graphical panel when it can run, else the text dashboard;
+    and if the panel ever fails, the text dashboard for good (until restart)."""
+    mode = o1fb.resolve_mode(flag, os.environ.get("OLLAMA1_DASH"), read_mode_file())
+    failed = [False]
+
+    def graphic_ok():
+        if mode == "text" or failed[0]:
+            return False
+        if mode == "graphic":
+            return os.path.exists(FB_PATH)
+        return o1fb.panel_available(FB_PATH)[0]
+    while True:
+        if graphic_ok():
+            try:
+                if run_graphic() == "stopped":
+                    return
+            except Exception:                                  # never leave the screen dead
+                log("the graphical panel stopped, using the text dashboard:\n" + traceback.format_exc())
+                failed[0] = True
+        if run(True, force_ascii, switch=graphic_ok if mode != "text" and not failed[0] else None) != "graphic":
+            return
+
+
+def png(args):
+    """--png FILE: one frame of the graphical panel as a PNG, to review the design."""
+    import o1gfx
+    import o1panel
+    out = args[args.index("--png") + 1]
+    cost = "--screen" in args and args[args.index("--screen") + 1:][:1] == ["cost"]
+    w, h = (1920, 1080) if cost else (640, 360)          # the cost screen is smooth print drawn at screen size
+    if "--size" in args:
+        w, h = (int(x) for x in args[args.index("--size") + 1].lower().split("x"))
+    up = int(args[args.index("--scale") + 1]) if "--scale" in args else (1 if cost else 2)
+    st = None
+    if "--live" not in args:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "tests"))
+        try:
+            import dash_sample
+            st = dash_sample.sample(now=time.time(), pairing="--pairing" in args)
+        except ImportError:
+            st = None
+    if st is None:
+        sampler = o1metrics.Sampler()
+        sampler.tick()
+        time.sleep(1.0)
+        st = sampler.tick()
+    screen = args[args.index("--screen") + 1] if "--screen" in args else "panel"
+    pm = o1panel.render(st, w, h, screen=screen if screen in ("panel", "cost") else "panel")
+    with open(out, "wb") as f:
+        f.write(o1gfx.png_bytes(pm.w, pm.h, pm.buf, upscale=up))
+    print("wrote %s (%dx%d, x%d)" % (out, pm.w, pm.h, up))
+
+
 def once(size, force_ascii):
     w, h = 120, 40
     if size:
@@ -148,6 +273,8 @@ def main():
     console = "--console" in args
     force_ascii = "--ascii" in args
     locale.setlocale(locale.LC_ALL, "")
+    if "--png" in args:
+        return png(args)
     if "--once" in args:
         size = args[args.index("--size") + 1] if "--size" in args else None
         return once(size, force_ascii)
@@ -157,6 +284,8 @@ def main():
         # Linux console: never blank the screen, never power it down.
         sys.stdout.write("\033[9;0]\033[14;0]")
         sys.stdout.flush()
+        flag = args[args.index("--dash") + 1] if "--dash" in args and len(args) > args.index("--dash") + 1 else None
+        return console_main(force_ascii, flag)
     run(console, force_ascii)
 
 

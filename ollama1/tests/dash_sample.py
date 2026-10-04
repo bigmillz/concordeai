@@ -22,6 +22,10 @@ def sample(now=None, pairing=False, marker=None):
         "net_tx": [wave(5e5, 5e5, 25, i) for i in range(n)],
         "cpu_total": [wave(12, 10, 40, i) for i in range(n)],
         "active": [1 if i % 90 < 40 else 0 for i in range(n)],
+        "gpu_temp": [wave(66, 14, 80, i) for i in range(n)],
+        "cpu_temp": [wave(58, 8, 90, i) for i in range(n)],
+        "cpu_mhz": [wave(3200, 900, 60, i) for i in range(n)],
+        "fan_rpm": [wave(1400, 300, 80, i) for i in range(n)],
     }
     gw = {
         "time": int(now), "stale": False, "active": 1, "queued": 2, "requests_today": 184,
@@ -57,7 +61,7 @@ def sample(now=None, pairing=False, marker=None):
         "gpu": {"busy_pct": 97, "vram_used": 14.6 * GIB, "vram_total": 16 * GIB,
                 "temps": {"edge": 64.0, "junction": 78.0, "mem": 70.0}, "power_w": 212.0, "power_cap_w": 289,
                 "fan_rpm": 1450, "fan_pct": 38, "sclk_mhz": 2310, "mclk_mhz": 1000},
-        "cpu": {"total": 14.2, "cores": [(i * 13) % 100 for i in range(32)], "temp": 58.5, "load": [1.2, 0.9, 0.8]},
+        "cpu": {"mhz": 3612, "max_mhz": 4700, "total": 14.2, "cores": [(i * 13) % 100 for i in range(32)], "temp": 58.5, "load": [1.2, 0.9, 0.8]},
         "mem": {"total": 60.7 * GIB, "available": 38.2 * GIB, "swap_total": 8 * GIB, "swap_free": 8 * GIB},
         "ollama_cg": {"current": 47.1 * GIB, "max": 52.7 * GIB},
         "disks": [{"label": "/", "mount": "/", "mounted": True, "total": 1.8e12, "used": 3.1e11, "free": 1.4e12},
@@ -79,7 +83,13 @@ def sample(now=None, pairing=False, marker=None):
                               "resume_check": {"ok": True, "detail": "Ollama and the GPU answered"}}},
         "pairing": {"id": "x", "code": "7K4M2QXD9FHT", "expires_at": now + 200} if pairing else None,
         "power": {"watts": 312.4, "src": "plug", "kwh_24h": 3.54, "cost_24h": 0.61, "symbol": "$",
-                  "badge": "on-peak until 19:00", "price": 0.3},
+                  "badge": "on-peak until 19:00", "price": 0.3,
+                  "currency": "USD", "priced": True, "since": int(now) - 90 * 86400,
+                  "windows": {"1d": {"cost": 0.61, "kwh": 3.54, "measured_h": 24.0, "est": True},
+                              "1w": {"cost": 4.87, "kwh": 27.9, "measured_h": 168.0, "est": True},
+                              "1m": {"cost": 21.34, "kwh": 118.6, "measured_h": 700.0, "est": True}}},
+        "activity": {"last": now - 420, "at": now, "inflight": 1},
+        "idle": {"supported": True, "enabled": True, "minutes": 30},
         "series": series,
     }
     return st

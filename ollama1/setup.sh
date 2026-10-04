@@ -30,6 +30,10 @@
 #                                    again after a safety revert
 #   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
 #                                    to stock, and the setting saved as off
+#   sudo ./setup.sh --dash text|graphic|auto   what the server's monitor shows (also:
+#                                    OLLAMA1_DASH): auto (the default) draws the graphical panel
+#                                    when a monitor is connected, else the text dashboard; text
+#                                    keeps the text one. Saved in setup.env, so a re-run keeps it
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # Settings (each is asked for if it is not given and cannot be found):
@@ -106,6 +110,7 @@ SWAP_ACTION=""
 SWAP_SIZE=""
 VG_RESERVE_GIB=0
 A_GPU_TUNE=""
+A_DASH=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
 A_OS=""; A_MODELS=""; A_HDD1=""; A_HDD2=""
 prev=""
@@ -115,6 +120,10 @@ for a in "$@"; do
     --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
       set_option "$prev" "$a"; prev=""; continue ;;
   esac
+  if [ "$prev" = --dash ]; then
+    dash_mode_choice "$a" "" "" >/dev/null || { echo "--dash takes text, graphic or auto"; exit 2; }
+    A_DASH=$a; prev=""; continue
+  fi
   if [ "$prev" = --vg-reserve ]; then
     [[ "$a" =~ ^[0-9]{1,6}G$ ]] || { echo "--vg-reserve takes a size in GiB, like 64G (at most 999999G)"; exit 2; }
     VG_RESERVE_GIB=$((10#${a%G})); prev=""; continue   # 10#: "08G" is decimal, not octal
@@ -123,7 +132,7 @@ for a in "$@"; do
   case "$a" in
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
-    --vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --dash|--vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
@@ -145,6 +154,8 @@ fi
 gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_TUNE takes 1 or 0 (on or off)"; exit 2; }
 # a flag left waiting for its value (the size forgotten) must not mean "no reserve"
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
+case "$prev" in --dash) echo "--dash takes text, graphic or auto"; exit 2 ;; esac
+dash_mode_choice "" "${OLLAMA1_DASH:-}" "" >/dev/null || { echo "OLLAMA1_DASH takes text, graphic or auto"; exit 2; }
 case "$prev" in --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
   echo "$prev takes a value"; exit 2 ;; esac
 
@@ -223,6 +234,8 @@ resolve_settings() {
   pick HDD2_SERIAL "$A_HDD2" HDD2_SERIAL "" valid_serial
   GPU_TUNE=$(gpu_tune_choice "$A_GPU_TUNE" "${OLLAMA1_GPU_TUNE:-}" "$(saved GPU_TUNE)") \
     || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
+  DASH=$(dash_mode_choice "$A_DASH" "${OLLAMA1_DASH:-}" "$(saved DASH)") \
+    || die "the saved DASH in $SAVED is not text, graphic or auto; give --dash"
 }
 
 # After the relaunch in tmux (a prompt needs the terminal): ask for what is
@@ -258,6 +271,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
       printf 'OS_SERIAL=%s\nMODELS_SERIAL=%s\nHDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' \
         "$OS_SERIAL" "$MODELS_SERIAL" "$HDD1_SERIAL" "$HDD2_SERIAL"
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
+      if [ "$DASH" != auto ]; then printf 'DASH=%s\n' "$DASH"; fi
     } >"$t" )
   chown root:root "$t"; chmod 0600 "$t"; mv "$t" "$SAVED"
 }
@@ -941,6 +955,7 @@ run systemctl restart ollama1-idle.service
 "$LIBDIR/bin/ollama1-idle" wol-setup || note "couldn't set up wake on a magic packet; auto sleep still works, waking it from the app won't"
 systemctl stop getty@tty1.service >/dev/null 2>&1 || true
 dash_font_step "$LIBDIR/bin/ollama1-dash" /dev/tty1
+dash_mode_step
 run systemctl restart ollama1-dash.service
 sleep 2
 for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power ollama1-idle; do

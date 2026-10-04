@@ -37,7 +37,8 @@ however you like. This page writes it as `<server-name>`, your user as
   - Security updates install automatically, with a reboot at 04:00 when an
     update needs one.
   - Ollama is updated weekly, from verified downloads.
-- It has a text dashboard on the server's monitor, and a web admin panel
+- It has a graphical information panel on the server's monitor (a text
+  dashboard where none can be drawn), and a web admin panel
   with a terminal that still asks for your Linux password.
 
 The request-signing and pairing rules the app follows are in
@@ -57,7 +58,7 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 | Gateway | 127.0.0.1:8431, user `o1gw` |
 | Admin panel | 127.0.0.1:8432, user `o1admin` |
 | Web terminal (ttyd + `login`) | a UNIX socket in `/run/ollama1/ttyd` (root and the panel's user only), reached only through the panel |
-| Dashboard | tty1 (the monitor), user `o1dash`. Also `ollama1-top` over SSH |
+| Dashboard | tty1 (the monitor), user `o1dash`: the graphical panel (`/dev/fb0`) or the text dashboard. Also `ollama1-top` over SSH |
 | ComfyUI (optional) | 127.0.0.1:8188, only root and the gateway may connect. Not installed by `setup.sh`: `sudo bash tools/install-comfyui.sh` (images and video; see [docs/your-own-server.md](../docs/your-own-server.md)) |
 | Settings | `/etc/ollama1/`: `config.json` (root-only), `devices.json`, `models.allow` |
 | Setup log | `/var/log/ollama1-setup.log` |
@@ -568,8 +569,55 @@ around a little from time to time.
       nothing, if the swap can't be taken back in (not enough free memory),
       and it puts `/swap.img` back in fstab only if `on` took it out, and
       removes the volume only if `on` made it.
-- **Dashboard:** it fills the server's monitor (tty1), and `ollama1-top` shows
-  it over SSH (`q` quits, `--ascii` for plain terminals, `--once` for one
+- **Graphical panel (the monitor's default when one is connected):** instead
+  of characters and hash marks, the monitor shows a picture: ring and bar
+  gauges, and rolling line graphs of the last 5 minutes (graphics card use,
+  VRAM, power and temperature; CPU use, temperature, clock and RAM; tokens
+  per second), the loaded models, requests in flight and waiting, disks and
+  the network, the sleep state (idle time and the countdown when auto sleep
+  is on), and the server's name and address. Green, amber and red are the
+  same as the text dashboard's (a drive missing, a hot card, a failed
+  update turn the badge and the Status box red). When a pairing window is
+  open the whole screen shows the code, as large as fits, with the time left.
+  - It draws straight to the screen's framebuffer (`/dev/fb0`): no desktop,
+    no browser, nothing added to the server. It draws at a small fixed size
+    (about 640x360) and scales it up by a whole number, centred, so it costs
+    little: one picture every 2 seconds (every second while pairing), only
+    the rows that changed are written, and nothing is drawn while another
+    console (Alt+F2) is on the screen. It puts the console in graphics mode
+    while it runs, so the text console never paints over it, and always puts
+    it back when it stops.
+  - **When it is used.** `--dash auto` (the default): when `/dev/fb0` exists
+    and a monitor is connected (`/sys/class/drm/*/status` says `connected`);
+    a monitor plugged in later is picked up within 10 seconds. Otherwise
+    the text dashboard below. `sudo ./setup.sh --dash text` keeps the text
+    dashboard always, `--dash graphic` insists on the panel whenever there is
+    a framebuffer, `--dash auto` goes back; the choice is saved in
+    `setup.env` and written to `/etc/ollama1/dash-mode`. A one-off:
+    `OLLAMA1_DASH=text` in the unit's environment.
+  - **Space: electricity cost.** Press Space on the server's keyboard and the
+    screen shows only the cost of electricity over the last 24 hours, 7 days
+    and 30 days, in very large smooth rounded print (the same figures as the
+    admin panel's Power card, with the tariff's currency symbol); Space again
+    goes back. Other keys do nothing. There are no asterisks on this screen,
+    estimated or not. With no price set it says "Set your electricity price in
+    the admin panel", with no readings yet "No data yet", and a history shorter
+    than a window is labelled ("only 3d 4h of data"). An open
+    pairing window takes the screen from either view. The keyboard is read
+    without echo, so keys never reach a login prompt. The seven-day and
+    30-day figures come from the power service, so it needs restarting after
+    an update of this kit (`sudo systemctl restart ollama1-power`).
+  - **If anything goes wrong** (the framebuffer can't be opened, an odd
+    pixel format, any error while drawing) the reason goes to the journal
+    (`journalctl -u ollama1-dash`) and the text dashboard takes over; it
+    does not try the panel again until the service restarts.
+  - To see the design without a screen: `ollama1-dash --png panel.png`
+    (`--size 800x450`, `--scale 3`, `--pairing`, `--live` for this
+    machine's own numbers instead of sample ones). It reads the same numbers
+    as the text dashboard and shows counts, sizes and times only.
+- **Text dashboard:** it fills the server's monitor (tty1) when the panel is
+  off, and `ollama1-top` shows it over SSH (`q` quits, `--ascii` for plain
+  terminals, `--once` for one
   text frame). It updates every second. It is made to be read from a few
   feet away: a few boxes, each a label, a value and one bar or trend line
   (the trend covers the last 5 minutes, or an hour after pressing `t`).

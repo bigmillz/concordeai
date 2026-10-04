@@ -10,7 +10,9 @@ Before=getty.target
 [Service]
 User=o1dash
 Group=o1dash
-SupplementaryGroups=o1view o1pair
+# video: /dev/fb0, for the graphical panel (6b380). It is used when a monitor is
+# connected and falls back to the text dashboard if the framebuffer cannot be opened.
+SupplementaryGroups=o1view o1pair video
 # A console font for the screen size, with as many of the dashboard's glyphs
 # as the installed fonts offer (braille / blocks / ASCII); never fatal.
 ExecStartPre=-+/usr/local/lib/ollama1/bin/ollama1-dash --set-font /dev/tty1
