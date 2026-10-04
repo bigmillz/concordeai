@@ -110,6 +110,93 @@ Current: repo `bigmillz/concordeai` — version and build live in
 - A person at the keyboard running something long is still protected (a
   tool, load or the card is busy); a person only reading a log is not.
 
+## 6b362 — moving the server's OS onto its other NVMe, in software (kit only, no app change)
+Patrick (2026-10-02): "Is there a way we can clone the one NVMe to the other and
+boot from the other one? Because I don't feel like ripping out the GPU just to
+get an NVMe out of there." He accepts re-downloading models and wants it "as
+simple and safe as possible". Then, same day: "how do we start cloning, then
+have it reboot from the other nvme once done?" (so `--reboot`), and that the
+coordinator, not he, runs it over SSH through a temporary narrow sudo rule.
+The OS drive (the CPU-attached M.2 slot) repeatedly drops off the bus under load
+("nvme controller is down; CSTS=0xffffffff", then ext4 goes read-only); the
+models drive, on the chipset slot, is healthy. `ollama1/tools/migrate-os.sh`
++ `ollama1/lib/o1migrate.py`; docs in `ollama1/README.md` ("Moving the system to
+the other drive").
+
+THE CHOICE: copy (rsync), not `pvmove`. `vgextend` + `pvmove` rewrites the
+volume group's metadata ON THE OLD DRIVE, moves every extent of `/` off it (the
+old drive then boots only while the new one is also there and no longer holds
+the system as it was) and, if the drive drops mid-move, leaves a VG with a
+missing PV. The brief's own test was "keep the old drive bootable as a
+fallback", so: `/` and `/boot` are copied onto plain ext4 partitions of the other
+NVMe (new UUIDs, fstab rewritten ON THE COPY, initramfs and GRUB built in a
+chroot), and the old drive is never written to. Consequences: the new root is
+not LVM (so `setup.sh`, which assumes `ubuntu-vg` and a separate models disk,
+stops at its first checks on a migrated server; not changed here, flagged in the
+README); the old ESP is not copied (its stub points at the old `/boot`);
+`/swap.img` is made new, not copied. No LVM command exists in the tool (a test
+greps for it).
+
+DESIGN
+- Serials are arguments (`--from-serial`, `--to-serial`); nothing about a
+  server is in the repo. Drives are found by sysfs serial (nvme0/nvme1 swap
+  between boots), addressed only by `/dev/disk/by-id`, and the serial is read
+  again immediately before every writing command (`check_target`).
+- Stages 0 checks, 1 park (rsync to `/srv/data/models-parked`, verified by a
+  dry run and sizes), 2 partition (ESP 1G, /boot 2G, / `--root-size`, models
+  the rest), 3 copy, 4 boot (fstab, initramfs, grub-install --no-nvram,
+  update-grub in a chroot; the copy's `grub.cfg` must carry the running
+  kernel's options and the GRUB drop-ins must be on the copy), 5 restore,
+  6 firmware (the boot entry, made LAST: new first, old second, old found by
+  its ESP's PARTUUID; until then the old drive is the default boot). State in
+  `/srv/data/o1migrate/state.json`, refused if that folder is on either NVMe;
+  `--resume` after a crash; a typed serial or `--confirm-serial` (must equal
+  `--to-serial`) once per run.
+- Unattended (the coordinator's run): after the confirmation the tool starts
+  itself again in a detached tmux session `migrate` (no terminal needed),
+  writes `/srv/data/migrate-os.status` (0644, no serials: state, stage N of 6,
+  percent, last line, times, next step; rewritten every 15 s) and a 0600 log,
+  stops on any failure with `FAILED` and no reboot, and with `--reboot`
+  reboots (10 s countdown, Ctrl-C cancels) only after every stage and check
+  passed. Without `--reboot` an interactive run asks `[y/N]` (default no).
+  `--status` (no sudo) diagnoses a status left by a reboot or crash. A systemd
+  unit for that was not made: it would have to be installed on the old drive.
+- `--finish` (no serials needed) checks `/`, `/boot`, `/boot/efi` and
+  `/srv/models` are on the new drive and that the running `/proc/cmdline` has
+  the old system's options (the NVMe power settings, `amdgpu.ppfeaturemask` when
+  the GPU tuning is on, 6b361). The parked copy is deleted only on request, after
+  the live copy is checked to hold every file.
+- Delegation: `--install-remote [--sudoers-user NAME]` copies the script and
+  library to `/usr/local/lib/ollama1-migrate` (root:root, 0755/0644), and adds
+  one sudoers rule (written to a temp file, `visudo -cf`, 0440, the whole set
+  checked again). As root the script runs only from a path of root-owned, not
+  group/world-writable components (shell and Python both check), with `python3
+  -I`, and ignores `O1M_*` overrides unless a test sets `O1M_TEST=1`. The rule is
+  temporary; `--finish` reminds and offers to remove it.
+
+SAFETY REVIEW, same day (second commit). An independent review found the tool not
+safe unattended; fixed: (1) the old models partition's ext4 superblock sits where
+the new ESP starts, so a probe after the wipe aborted the run: each new partition
+is now wiped, always formatted and read back; (2) the firmware entry is BootNext
+only, the old drive stays first until `--finish`, and the copy boots with
+`panic=10`; (3) a final content compare (all files up to 64 MiB, 18 MiB spread
+over larger ones; not a full checksum, which would take hours on a terabyte),
+RAID `[UU]`/rw/md checks and a refusal to create the state folder off /srv/data
+right before the wipe; (4) admin panel, pulls, restart and reboot units stop,
+and the bare `/srv/models` is `chattr +i` while unmounted; (5) TO must hold
+`/srv/models` and exactly one partition, duplicate serials refused, multipath
+names resolved; (6) O_NOFOLLOW everywhere, root-owned and not-writable
+`/srv/data` and state folder, state values validated, no `O1M_*` override as
+root; (7) FROM may have no other mounts; (10) the ESP's grub.cfg stub is
+checked; (12) the status file holds fixed phrases and numbers only; chroot binds
+are unmounted in a `finally`. Tests and mutants for each.
+
+NOT VERIFIED ON REAL HARDWARE: partitioning, the chroot's grub-install and
+update-initramfs, the EFI entry, a firmware that ignores `BootOrder`, a real
+drop-out during the copy, the shim path on this board's Secure Boot setting.
+Tests (`test_migrate*.py`, 3 files) use fakes for every program; mutants in
+`mutate.py` ("migrate: ...").
+
 ## 6b358 — a server added with no name is "My server"
 Patrick (2026-10-02), asked whether to change the blank-name fallback for a new
 server from "Desktop": "Call it \"My server\"". `server_add` now names it "My

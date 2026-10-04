@@ -875,6 +875,241 @@ each future minute at its tier. Cost per million tokens (shown in whole cents) i
 electricity over the last 30 days divided by the tokens generated then, so
 idle time is included.
 
+## Moving the system to the other drive
+
+For a server whose OS drive keeps dropping off the PCIe bus under load (the
+kernel logs `nvme controller is down; CSTS=0xffffffff`, then the root
+filesystem goes read-only) while the models drive, on the other slot, is
+healthy. `tools/migrate-os.sh` moves the operating system onto the models
+drive, in software, with no drive swapping, and keeps the old drive exactly as
+it was, bootable, until the new system has booted and been checked.
+
+**What it does, and why it copies.** The OS drive holds LVM (`ubuntu-vg`). The
+obvious way, `vgextend` and `pvmove`, was rejected: it rewrites the volume
+group's metadata *on the old drive* while it runs, moves every extent of `/`
+off it (the old drive would boot only while the new one is also there, and no
+longer holds the system as it was), and a drive that drops off the bus half way
+leaves a volume group with a missing disk. So the old drive is never written to.
+`/` and `/boot` are copied file by file (`rsync -aHAXx`) onto plain ext4
+partitions of the other drive, with new UUIDs; the copy gets its own
+`/etc/fstab` (the old one is not touched), initramfs and GRUB, built in a
+chroot; and one firmware boot entry is added for the NEW drive, used for the
+next boot only (UEFI `BootNext`), while the old drive's entry stays first in the
+boot order. The new root is a plain partition, not LVM. Only `--finish`, once
+the new system has booted and been checked, makes the new drive the default;
+until then a power cycle, or a kernel panic (the new system boots with
+`panic=10`), brings the machine back to the old drive.
+
+The other drive is **erased and re-partitioned**. Its models are parked on the
+RAID first (`/srv/data/models-parked`, checked by an `rsync -n` dry run and by
+size) and copied back at the end:
+
+| | | |
+|---|---|---|
+| 1 | ESP | 1 GiB vfat (a new boot loader; the old ESP is not copied, its stub points at the old `/boot`) |
+| 2 | `/boot` | 2 GiB ext4 |
+| 3 | `/` | `--root-size` (default 300G) ext4. It must be at least 20% more than `/` uses now, and at least 30G |
+| 4 | models | the rest, ext4, label `o1models`, mounted at `/srv/models` |
+
+The models partition ends up smaller than the old one by the size of `/`; the
+tool refuses, before touching anything, if the models would not fit.
+
+**Drives are found by serial**, never by `nvme0`/`nvme1` (those swap between
+boots): `lsblk -d -o NAME,SIZE,MODEL,SERIAL`. Everything is addressed through
+`/dev/disk/by-id`, and the serial is read again from sysfs immediately before
+each command that writes to a drive; any mismatch stops the run. `FROM` is the
+drive the system runs from now (read, never written); `TO` is the drive that is
+erased.
+
+### Install it (once, with your password)
+
+The tool refuses to run as root from a folder anyone but root can write to, so
+first it is installed root-owned:
+
+```bash
+cd ~/concordeai && git pull
+sudo bash ollama1/tools/migrate-os.sh --install-remote
+```
+
+This copies `migrate-os.sh` (0755) and `o1migrate.py` (0644) to
+`/usr/local/lib/ollama1-migrate/` (root:root) and checks that no folder or file
+on the way is writable by anyone else. Everything below runs that copy:
+
+```bash
+M=/usr/local/lib/ollama1-migrate/migrate-os.sh
+```
+
+### Run it
+
+```bash
+sudo $M --from-serial <os-serial> --to-serial <models-serial>         # 1. the plan; changes NOTHING
+sudo $M --from-serial <os-serial> --to-serial <models-serial> --run --reboot   # 2. do it
+```
+
+The plan says what is read, backed up, erased and written, and lists the
+stages. `--run` then asks you to **type the serial of the drive to be erased**
+(or take `--confirm-serial <models-serial>`, which must equal `--to-serial`;
+then no terminal is needed). After that nothing more is asked: the tool starts
+itself again in a detached **tmux** session named `migrate`, so a dropped SSH
+connection or a closed laptop can't stop it, and prints how to watch it.
+`--reboot` reboots into the new drive at the end, after a 10-second countdown
+that Ctrl-C cancels, and only if every stage and check passed. Without it the
+tool stops and says so, and (when run in a terminal, not detached) asks
+`Reboot into the new drive now? [y/N]` (the default is no). Default mode is
+`--plan`; `--bwlimit KiB/s` (default 200000) keeps the copy gentle on a drive
+that drops out under load.
+
+The services that use the models stop for the duration (`ollama`,
+`ollama1-gateway`, `ollama1-admin`, any `ollama1-pull@*` instance,
+`ollama1-restart` and `ollama1-reboot` with their timers, `comfyui` if present,
+the model sync and update timers, and apt's timers), so the server is out of
+service until the reboot: plan for hours if the models are large. They start
+again by themselves at the next boot. While `/srv/models` is unmounted, its
+bare folder on the old root is marked immutable (`chattr +i`), so nothing can
+write models into it. The mark stays on the old root (so a fallback boot of the
+old drive is protected too) and is never put on the new root's folder; `--finish`
+takes it off only if the old root happens to be mounted where it can reach it,
+otherwise `sudo chattr -i /srv/models` on the old drive does, if you ever boot or
+reuse it (mounting something on the folder works either way).
+While it runs it holds a logind block on sleep and the power button, so the
+kit's auto sleep can't suspend the server in the middle of a copy.
+
+### Watch it
+
+```bash
+cat /srv/data/migrate-os.status      # anyone can read it: state, stage N of 6, percent, what it is doing, times, next step
+bash $M --status                     # the same, plus a diagnosis if it was interrupted (no sudo needed)
+sudo tmux attach -t migrate          # the live screen; Ctrl-b then d leaves it running
+sudo less /srv/data/migrate-os.log   # the whole log (root only)
+```
+
+The status file is on the RAID, never on an NVMe, is rewritten at least every
+15 seconds while it runs, and ends in `DONE` or `FAILED in stage <name>` with the
+next step. It holds only fixed phrases, stage names and numbers: no serials, no
+paths, none of a command's output (that is in the root-only log, with the
+reason). A stage that is part-way through is picked up where it stopped.
+
+### What each stage does and prints
+
+| Stage | What it does |
+|---|---|
+| 0 checks | Both serials found (each by exactly one controller, native-multipath names understood) and different; `/` is on FROM and FROM has no mounted filesystem but `/`, `/boot`, `/boot/efi` and swap (`rsync -x` would silently skip another); `/srv/models` is mounted from a partition of TO, TO has exactly that one partition, no LVM/RAID, nothing else mounted; both drives report no critical warning (`nvme smart-log`); FROM is not dead right now (controller state, read-only `/`, the kernel log); UEFI boot; `/srv/data` is a mount point of the md mirror, read-write, `/proc/mdstat` showing `[UU]`, and it and the state folder belong to root and nobody else can write them; room on it for the models; the root and models fit; `apt` is idle. Anything wrong is listed and nothing is changed. Then the model services stop |
+| 1 park | `/srv/models` to `/srv/data/models-parked`; the `rsync -n --itemize-changes` dry run must find nothing left and the sizes must agree, or nothing is erased |
+| 2 partition | Refused unless stage 1 is verified. Immediately before the wipe it looks again: the RAID whole and read-write; the page cache is flushed and dropped (`sync`, `drop_caches`) so the compare reads the disks; the dry run and sizes again; and a content compare of every parked file up to 64 MiB and of 18 MiB spread over each larger one (not a full checksum: reading a terabyte or more twice over disks of 150 MB/s takes hours, and sizes and times of everything are already exact). Then `/srv/models` is unmounted and marked immutable, the TO drive is wiped (`wipefs`, `sgdisk --zap-all`), partitioned, **each new partition is wiped again** (an old filesystem's signature can sit exactly where a new partition starts: the old models partition and the new ESP both begin at 1 MiB), then always formatted and read back |
+| 3 copy | `/` (two passes: the second catches what changed) and `/boot`. Each destination is checked to be the new partition before anything is copied into it. `/swap.img` is made new, not copied |
+| 4 boot | `/etc/fstab` of the **copy** rewritten (`/`, `/boot`, `/boot/efi`, `/srv/models` by their new UUIDs; `/srv/data`, swap and every other line kept); `update-initramfs`, `grub-install --no-nvram`, `update-grub` in a chroot (`/dev`, `/sys`, `/run` bound as slaves so unmounting never reaches the host, and unmounted again even if a command fails). The copy gets `panic=10` (a drop-in, `98-ollama1-migrate.cfg`), so a kernel panic reboots into the default boot, the old drive. The copy's `grub.cfg` must carry every kernel option the running system has (the NVMe settings, and the GPU overdrive switch if the tuning is on) and `panic=10`, the kit's GRUB drop-ins must be on the copy, and `EFI/o1new/grub.cfg` must exist next to the loader |
+| 5 restore | The models are copied back to the new models partition and checked; the parked copy stays |
+| 6 firmware | The boot entry is made **last**. The old drive's entry (found by its ESP) stays first in the boot order, the new entry goes last, and `efibootmgr -n <new>` (BootNext) sends the next boot, once, to the new drive. Until `--finish` the old drive is the default boot |
+
+When all of it has passed the tool prints a one-screen summary and, with
+`--reboot`, reboots.
+
+### After the reboot
+
+```bash
+findmnt /                        # the source must be a partition of the NEW drive, not ubuntu--vg
+sudo $M --finish            # no serials needed; they are in the state file
+```
+
+`--finish` verifies that `/`, `/boot`, `/boot/efi` and `/srv/models` are on the
+TO drive, and that the running kernel command line has the options the old
+system ran with (the NVMe power settings, `amdgpu.ppfeaturemask` when the GPU
+tuning is on) and `panic=10`. Only then does it make the new drive the default
+boot (`efibootmgr -o`: new first, the old drive's entry second). It tells you that the old drive was never written to and how to
+reuse it (that is yours to do, later; the tool never wipes a drive). Options:
+`--delete-parked` (frees the parked models after checking the live copy has
+every file; you type `delete`), `--disable-old-entry` (makes the old drive's
+firmware entry inactive, not deleted; you type `yes`), `--remove-sudoers`.
+
+### If something goes wrong
+
+- **It stops with FAILED**: nothing was rebooted and the old drive is
+  untouched. Fix what it says (if the drive dropped off the bus, power the
+  server off at the switch for a minute first), then
+  `sudo $M --resume --reboot`. Finished stages are not repeated.
+- **The machine restarted or crashed mid-run**: the status file still says
+  `RUNNING` with a stale time; `bash $M --status` says `INTERRUPTED` and what to
+  run. The old drive is the default boot unless stage 6 had finished, so the
+  server comes back as it was. (A boot-time unit would have to be installed on
+  the old drive, which this tool never writes.) `--resume` asks for the serial
+  again, or takes `--confirm-serial`.
+- **The new drive does not boot**: BootNext was used up by that one try, so a
+  power cycle (or a kernel panic, `panic=10`) comes back to the old drive, which
+  is still first in the boot order. Or press the boot-menu key (F11 on an MSI
+  board) and pick a drive. Run `--finish` only after a boot you have checked.
+  BootNext is single use: any boot between stage 6 and the planned reboot (a
+  power cut, a failed first boot that fell back) consumes it. `--resume --reboot`
+  checks the entries and the order (new entry present, old first) and, if they
+  are right, sets BootNext again (`efibootmgr -n`) and goes on; it stops only if
+  the entries themselves are wrong.
+- **Rollback, after booting the old drive**: nothing on it was changed. Its
+  `fstab` still has the line for `/srv/models` with the UUID of the *old*
+  models partition, which was wiped and re-made, so that mount fails (it has
+  `nofail`, so the boot goes on) and `/srv/models` is an empty folder, so Ollama
+  sees no models. Either put them back by hand: `sudo mount LABEL=o1models
+  /srv/models` (the new models partition, once stage 5 finished; before that, `sudo mount
+  --bind /srv/data/models-parked /srv/models`), and, to make it stick, change that fstab
+  line to `LABEL=o1models` (the one change you may want on the old drive; the
+  bare folder is immutable, which does not stop a mount, only writes into it); or
+  just re-download the models, or point Ollama at `/srv/data/models-parked`. To
+  drop the new entry from the firmware: `sudo efibootmgr` to see its number (label `ollama1-new`), then
+  `sudo efibootmgr -B -b <number>`.
+- **Not rebooted into the new drive?** `--finish` says which of `/`, `/boot`,
+  `/boot/efi` and `/srv/models` are still on the old one.
+
+### Letting someone without root run it (temporary)
+
+An account without root can run exactly this tool, as root, without a password,
+through one sudoers rule, installed from a root session:
+
+```bash
+sudo bash ollama1/tools/migrate-os.sh --install-remote --sudoers-user <admin-user>
+```
+
+That installs the root-owned copy (as above), then writes the drop-in to a
+temporary file, checks it with `visudo -cf`, installs it `0440 root:root` as
+`/etc/sudoers.d/90-ollama1-migrate` and checks the whole sudoers set (undoing it
+if that fails). Its entire content:
+
+```
+# ollama1 migrate-os: lets <admin-user> run the system-migration tool as root, with no password, and nothing else.
+# It is temporary: remove it when the migration is done:  sudo rm /etc/sudoers.d/90-ollama1-migrate
+<admin-user> ALL=(root) NOPASSWD: /usr/local/lib/ollama1-migrate/migrate-os.sh
+```
+
+The same by hand: write those three lines to a file in a private folder
+(`mktemp -d`), `visudo -cf <file>`, `install -o root -g root -m 0440 <file>
+/etc/sudoers.d/90-ollama1-migrate`. The user then runs
+`sudo /usr/local/lib/ollama1-migrate/migrate-os.sh <arguments>` (always the
+full path: no wildcard, no `SETENV`, `secure_path` unchanged). The script and
+its library are root-owned, and as root it refuses to run from anywhere that is
+not (every folder and file on the way owned by root, none writable by group or
+others). `--print-sudoers --sudoers-user <name>` prints the text.
+
+**Remove the rule when the migration is done:**
+
+```bash
+sudo rm /etc/sudoers.d/90-ollama1-migrate
+```
+
+`--finish` reminds you of it and, run in a terminal as root, offers to remove it
+(`--remove-sudoers` does it without asking). While it exists, that account can
+run the tool with any arguments (which is as far as the tool's own checks let
+it go: a drive of a serial it names, found by sysfs, passing the checks above,
+confirmed with `--confirm-serial`).
+
+### After the move: re-running `setup.sh`
+
+`setup.sh` (not changed by this) still assumes `/` is an LVM volume
+(`ubuntu-vg`) on the OS-serial disk and the models are on a separate disk. On a
+migrated system a re-run stops at its first checks (`/ is not on the disk with
+serial ...`, or, with the new serial, `... is the OS disk`) before changing
+anything. Until `setup.sh` learns the one-NVMe layout, don't re-run it, and
+note `--encrypted-swap` (an LVM volume in `ubuntu-vg`) and `--vg-reserve` do
+not apply. The services, timers, tunnel and config keep working: they live in
+`/etc` and `/var/lib`, which were copied.
+
+
 ## The rules, and where they're enforced
 
 | Rule | Where |
@@ -933,6 +1168,7 @@ With a bridge, the firewall is set so it can't cut the other device off:
 | GPU seen by Ollama | `journalctl -u ollama \| grep -i "inference compute"` should say ROCm, gfx1030. The RX 6900 XT is supported as is, so `HSA_OVERRIDE_GFX_VERSION` is not set. If Ollama ever reports no GPU, the gateway refuses every model instead of running it on the CPU |
 | Mirror | `cat /proc/mdstat`, `sudo mdadm --detail /dev/md/o1data` |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
+| System move to the other NVMe | `cat /srv/data/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
 | SSH | `sudo sshd -T -C user=<your-user>,host=x,addr=<a-lan-address> \| grep -E 'password\|permitroot'` |
 
@@ -940,8 +1176,9 @@ With a bridge, the firewall is set so it can't cut the other device off:
 
 ```bash
 cd ollama1/tests
-python3 -m unittest discover -s .      # ~20 s; stub Ollama, fake Access certs, all on 127.0.0.1
-python3 mutate.py                      # ~20 min; breaks each of about 250 protections on purpose, expects a failing test
+python3 -m unittest discover -s .      # ~20 s, plus ~3.5 min for the OS-move tests (test_migrate*.py); stub Ollama, fake Access certs, all on 127.0.0.1
+python3 mutate.py                      # ~25 min; breaks each of about 320 protections on purpose, expects a failing test
+python3 mutate.py migrate              # only the OS-move ones (about 75, each run against the test that must catch it)
 python3 gen_vectors.py                 # regenerates PROTOCOL.md's test vectors
 ```
 
@@ -978,4 +1215,15 @@ Ed25519 (the server uses PyNaCl). They cover:
   the card found by its ids, values clamped to what the card reports, only
   the overdrive bit added to the feature mask, back to stock on a kernel
   error, heat or a slower answer, and a revert never re-applied;
+- the move of the OS to the other NVMe (`tools/migrate-os.sh`) against a fake
+  server (fake sysfs and /dev, stand-ins for lsblk, sgdisk, rsync, mount,
+  chroot, efibootmgr, tmux; `test_migrate*.py`): drives found by serial with
+  swapped nvme names, every refusal, that `--plan` changes nothing, the typed
+  or `--confirm-serial` confirmation, every write through a by-id path after a
+  fresh serial check, the fstab rewrite (and the old one untouched), the
+  chroot and GRUB commands and the kernel options carried over, the firmware
+  order (new first, old second, made last), the tmux relaunch, the status
+  file (mode, no serials, kept moving), no reboot after a failure, the
+  countdown and its Ctrl-C, a run killed at each stage boundary and resumed,
+  the root-owned install and the one-rule sudoers text;
 - that the repo holds no personal data and no utility's schedule.
