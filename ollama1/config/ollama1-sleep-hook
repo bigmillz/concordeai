@@ -20,6 +20,12 @@ case "$1" in
     # the fans (6b385): amdgpu may have reset its fan to automatic; the service looks at once
     if systemctl is-active --quiet ollama1-fan.service 2>/dev/null; then
       systemctl kill --kill-whom=main --signal=USR1 ollama1-fan.service
+    fi
+    # the lights (6b395): the USB devices may have come back new, so the OpenRGB server looks again,
+    # and the lights service connects afresh and sets the colour at once
+    if systemctl is-active --quiet ollama1-leds.service 2>/dev/null; then
+      systemctl restart --no-block ollama1-openrgb.service
+      systemctl kill --kill-whom=main --signal=USR1 ollama1-leds.service
     fi ;;
 esac
 exit 0

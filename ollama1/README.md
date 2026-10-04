@@ -112,6 +112,7 @@ it asks for any it can't find, at the terminal):
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial`, `--hdd1-serial`, `--hdd2-serial` | The four disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists 100% white when idle, red while the server works, white again 3 s after it stops (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -218,6 +219,10 @@ Every step skips what is already done, so it is safe to run again.
     removes the hand-made `ollama1-gpu-fan.service` if there is one, loads
     the motherboard's fan chip driver when it isn't loaded, and starts
     `ollama1-fan.service`.
+    Then the lights (see "Lights" below), only with `--leds on`: it installs
+    the `openrgb` package, and starts `ollama1-openrgb.service` and
+    `ollama1-leds.service`. With `--leds off` (the default) it stops and
+    disables both and removes nothing else.
 15. It sets up Cloudflare with the API token you paste: the tunnel, the DNS
     records and Access (see below).
 16. It checks what listens on the network: nothing but sshd may listen
@@ -909,6 +914,62 @@ to the driver. To remove it by hand:
 and then `echo 2 | sudo tee /sys/class/drm/card*/device/hwmon/hwmon*/pwm1_enable`
 (2 is automatic).
 
+## Lights
+
+**Off unless you say `--leds on`**: `sudo ./setup.sh --leds on` (or
+`OLLAMA1_LEDS=1`); `--leds off` stops and disables it again. The choice is
+saved in `/etc/ollama1/setup.env`. `on` runs `apt-get -y -q install openrgb`
+(the plan says so before you confirm). Every RGB device OpenRGB lists (on an
+MSI MEG X570 ACE with a Corsair H115i Platinum: the board's Mystic Light and
+the cooler's pump head) gets the same colour, on all its LEDs:
+
+| State | Colour | When |
+|---|---|---|
+| idle | 100% white, 255,255,255 | at start, and whenever nothing is running |
+| working | red, 255,0,0 | faded to over 0.8 s |
+| ended | red for 3 s, then white | back to white over 2 s |
+
+"Working" is the **same definition as the fans** (`lib/o1work.py`, shared by
+both services): a request in flight, the graphics card at 10% or more, a long
+job running, or a 1-minute load above 1.5. The 3 s (an anti-flicker pause
+between two requests) count from the poll that first sees the work has ended,
+so the red lasts 3 s to 5 s after it really did. A new request at any point
+turns the fade round from the colour it has reached; nothing jumps. Frames go
+out at 20 Hz only while a fade runs; the rest of the time the service sleeps,
+with a look at the probes every 2 s that also sends the colour again (a
+keepalive: a device that was reset gets it back).
+
+**How.** Two units. `ollama1-openrgb.service` runs `openrgb --server` with no
+window, bound to `127.0.0.1` (`--server-host` when this build has it, and
+always an address filter: `IPAddressDeny=any`, `IPAddressAllow=localhost`).
+`ollama1-leds.service` speaks OpenRGB's SDK network protocol to it with the
+standard library (`lib/o1leds.py`; the protocol version is negotiated, capped
+at 4), so a fade costs no process per frame. Each device is put in Direct mode
+(else Custom, else Static) and, where its mode has a brightness, at its
+maximum. If the server is gone the service says so in its status and tries
+again with a pause that grows to 30 s; it does not exit.
+
+**Why root, and what it can reach.** The OpenRGB server opens the lights'
+USB `hidraw` nodes (root-only), so it runs as root, but its device policy
+allows only `hidraw` and USB nodes: the I2C/SMBus scans OpenRGB can do for
+memory modules and graphics cards (which can write to the wrong chip) find no
+`/dev/i2c-*` to open, so DIMM sensors and the card are not touched. It has no
+network but the loopback. The lights service has no device access and no
+network but the loopback; it reads what the fan service reads and writes only
+`/run/ollama1/leds.json`. If you want OpenRGB to drive more than USB lights,
+that is your call, not the kit's.
+
+**A stop** (including `--leds off`) sets the lights white first, so they are
+never left red; after that they are as the board leaves them. After a wake the
+sleep hook restarts the OpenRGB server (the USB devices may have come back new)
+and pokes the service (`SIGUSR1`), which connects afresh and sets the colour at
+once. The lights are not turned off for sleep: the board decides.
+
+**Status.** `ollama1-leds status` (no root): the state (`white`, `fading`,
+`red`), the colour now, the devices found and their mode, why it is red, and
+any error. The admin panel's CPU card shows one line, "Lights: ...". Logs:
+`journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
+
 ## Power and electricity cost
 
 The panel's **Power and cost** card shows what the server draws now (with
@@ -1365,6 +1426,7 @@ With a bridge, the firewall is set so it can't cut the other device off:
 | Mirror | `cat /proc/mdstat`, `sudo mdadm --detail /dev/md/o1data` |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
+| Lights | `ollama1-leds status`; `journalctl -u ollama1-leds -u ollama1-openrgb`; off: `sudo ./setup.sh --leds off` |
 | System move to the other NVMe | `cat /srv/data/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
 | SSH | `sudo sshd -T -C user=<your-user>,host=x,addr=<a-lan-address> \| grep -E 'password\|permitroot'` |

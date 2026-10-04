@@ -9,6 +9,104 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b395 — server lights: white idle, red while working (per Patrick)
+
+Patrick (2026-10-04): "Lights 100% brightness on white when running, fade to
+red when it's processing a query, then fade back to white when it's not
+running anything." Kit only (`ollama1/`), branch `leds-1004` off `kit-1004`.
+Written and tested against a fake OpenRGB server; NOTHING here has run on the
+real server yet (see "Unverified").
+
+- **One definition of working.** The probes and the "working" rule moved from
+  `lib/o1fan.py` to `lib/o1work.py` (`Gpu`, `probes()`, `Work`), code moved
+  unchanged; `Fan.working` delegates to a `Work`, and `o1fan.Gpu`/`o1fan.probes`
+  stay as aliases. The fan's behaviour and tests are unchanged (58 tests
+  green); only the four "working" mutants in `tests/mutate.py` now point at
+  `lib/o1work.py`. Both services import it, so the lights and the fans cannot
+  drift apart (a test asserts the same object and the same answers).
+- **Two units, not a child process.** `ollama1-openrgb.service` runs
+  `openrgb --server` (via `ollama1-leds openrgb`, which adds `--server-host
+  127.0.0.1` only when `openrgb --help` lists it); `ollama1-leds.service`
+  speaks the SDK protocol to it. A sibling unit restarts on its own
+  (`Restart=always`, no start limit), and the client only has to reconnect.
+  Both have `IPAddressDeny=any` + `IPAddressAllow=localhost`, so nothing but
+  the loopback reaches the server even if a build ignores the host flag.
+- **Why the server is root but cannot touch I2C.** It needs the root-only
+  hidraw nodes. OpenRGB can also probe SMBus/I2C for memory and graphics-card
+  RGB, which on some boards writes to chips that are not what it thinks (DIMM
+  SPD). `DevicePolicy=closed` with only `char-hidraw` and `char-usb_device`
+  makes `/dev/i2c-*` unopenable, so it cannot. `CapabilityBoundingSet=
+  CAP_DAC_OVERRIDE` is the one capability kept (a node some rule gave to
+  another owner). If Patrick wants DIMM lighting that is a deliberate change.
+- **The client** (`lib/o1leds.py`) is stdlib: 16-byte little-endian header
+  (`ORGB`, device, packet id, size); SET_CLIENT_NAME (50), REQUEST_PROTOCOL_VERSION
+  (40; we offer 4 and use the lower of the two, 0 if the server never
+  answers), REQUEST_CONTROLLER_COUNT (0), REQUEST_CONTROLLER_DATA (1, body = the
+  version), UPDATELEDS (1050), UPDATEMODE (1101); DEVICE_LIST_UPDATED (51) is
+  honoured; UPDATEZONELEDS (1051) has an encoder and test but is not used (the
+  whole-device update covers every zone). Controller data is parsed for
+  versions 0 to 4 (brightness from 3, segments from 4); anything else raises
+  `ProtocolError`, counts are bounded. Versions above 4 are not parsed:
+  we never offer them.
+- **Mode.** Direct, else Custom, else Static; a device whose mode takes its
+  colour in the mode (Static, mode-specific) gets UPDATEMODE with the colour
+  each frame; a mode with a brightness gets `brightness_max`. Devices with no
+  LEDs or no usable mode are skipped, and shown as such in `status`.
+- **The fade.** One number, `pos`, 0 = white to 1 = red; the colour is
+  smoothstep(pos) between 255,255,255 and 255,0,0, so a turn round in the
+  middle starts from the colour on show and nothing jumps. 0.8 s to red, 2 s
+  to white, both linear in time on `pos`. Frames at 20 Hz only while `pos` is
+  moving; otherwise the loop sleeps until the next poll (2 s), which re-reads
+  the probes, checks the socket, and sends the colour again (keepalive). The
+  first tick of a fade has dt 0, so waking from a 2 s sleep never skips ahead.
+- **The 3 s.** Counted from the poll that first sees no work (not from the last
+  poll that saw work, which would shorten it by up to a poll): red lasts 3 to 5
+  s after the work really ended. Boundary is strict: at exactly 3.0 s still red.
+- **Failure.** A dead or broken server closes the client, sets the error (shown
+  in `status` and the panel), and retries after 2, 4, 8, 16, 30 s (capped); the
+  error is logged once per change, not per try. A tick that raises is logged by
+  type only and the watchdog is still pinged (`WatchdogSec=30`: one connect may
+  take up to 10 s). A stop (SIGTERM) sets white first. No CLI fallback: it
+  would not reach hardware the server cannot.
+- **Wake.** The sleep hook (`config/ollama1-sleep-hook`) restarts
+  `ollama1-openrgb` (the USB devices may come back new) and sends `SIGUSR1` to
+  `ollama1-leds`, which reconnects and resends the colour. Lights are not
+  turned off for suspend (Patrick: the board decides).
+- **setup.sh**: opt-in, default OFF (`--leds on|off`, `OLLAMA1_LEDS`, saved as
+  `LEDS=`), `leds_choice`/`leds_plan` in `lib/setuplib.sh`, a plan line, and
+  `step "Lights"` after Fans: `ollama1-leds setup on|off` installs `openrgb`
+  with apt only when it is not already there, enables and restarts both units;
+  off stops and disables both and removes nothing.
+- **Panel.** `/run/ollama1/leds.json` (0644, written at each poll and on every
+  state change) feeds `o1leds.panel_line()` into the admin state as `leds`,
+  shown as one line under the fan line. `ollama1-leds status` reads the same.
+- **Also fixed:** `tests/mutate.py` on `kit-1004` had a merge leftover (two stray
+  lines after the "a saved off is not kept by a re-run" fan mutant) and did not
+  parse; removed.
+- **Tests.** `tests/test_leds.py` (70) with `tests/fakeopenrgb.py`, a real
+  127.0.0.1 listener that builds replies with its own struct code (so an
+  encoder bug in the kit cannot cancel out) and records every packet; 22
+  mutants in `tests/mutate.py` (`leds: ...`: the delay, its boundary, where it
+  counts from, the colours, the fade direction and durations, the bind
+  address, brightness, mode preference, the unit's address filter and device
+  policy, the default).
+
+**Unverified on the real server (all of it):** that `openrgb --help` lists
+`--server-host` on this build (if not, only the unit's address filter keeps it
+local; `ollama1-openrgb` logs which); that `openrgb --server` runs headless
+with `QT_QPA_PLATFORM=offscreen` and no display; that the board's Mystic Light
+(1462:7c35) and the Corsair Hydro Platinum are detected through hidraw alone
+(Corsair may need `char-usb_device`, which is allowed, or I2C, which is not);
+that the pump head has a Direct mode (else Static with mode colour is used);
+that the protocol version this build answers is one we parse; that the board
+and cooler show exactly 255,255,255 at "100%" (Mystic Light may have its own
+brightness scale); that `CapabilityBoundingSet=CAP_DAC_OVERRIDE` and
+`DevicePolicy=closed` do not block something OpenRGB needs; that devices
+survive or re-detect after a suspend; that the DIMM and graphics-card RGB, if
+any, stay dark (by design: no I2C).
+
+---
+
 ## 6b386 — fan levels 100 / 50 / 20 instead of automatic after the hold (per Patrick)
 
 Patrick (2026-10-04) changed the 6b385 policy: idle (more than 2 minutes after

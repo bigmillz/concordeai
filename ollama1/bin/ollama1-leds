@@ -1,0 +1,57 @@
+#!/usr/bin/python3
+"""ollama1-leds: lights that follow the server's work (6b395). Every RGB device
+OpenRGB lists is 100% white when idle, fades to red (0.8 s) while the server
+works and, 3 s after the work ends, back to white (2 s). See lib/o1leds.py.
+
+  ollama1-leds status         state (white, fading, red), the colour now, the
+                              devices found, why, and any error (no root needed)
+
+Used by the system:
+  run             ollama1-leds.service (talks to the OpenRGB server on 127.0.0.1)
+  openrgb         ollama1-openrgb.service: starts `openrgb --server`, local only
+  setup on|off    setup.sh's step (--leds on|off)
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1leds  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal: states and counts, never what anyone asked
+
+
+def need_root(cmd):
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("Run it with sudo: sudo ollama1-leds " + cmd, file=sys.stderr)
+        sys.exit(1)
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if cmd == "status":
+        print(o1leds.render_status(o1leds.read_status()))
+        return 0
+    if cmd not in ("run", "openrgb", "setup"):
+        print("usage: ollama1-leds status", file=sys.stderr)
+        return 2
+    need_root(cmd)
+    if cmd == "run":
+        return o1leds.run_service(log)
+    if cmd == "openrgb":
+        return o1leds.run_openrgb(log)
+    choice = argv[2] if len(argv) > 2 else ""
+    if choice not in ("on", "off"):
+        print("usage: ollama1-leds setup on|off", file=sys.stderr)
+        return 2
+    return o1leds.setup(choice, log=log)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

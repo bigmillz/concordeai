@@ -1,0 +1,53 @@
+# Lights that follow the server's work (6b395): white when idle, red while a
+# request, the card, a long job or the load says it is working, back to white
+# 3 s after (lib/o1leds.py). It only talks to the OpenRGB server of
+# ollama1-openrgb.service on 127.0.0.1 and reads what the fan service reads
+# (the gateway's activity file, the card's busy percent, /proc); it writes
+# only its own status file. Root, like the fan service, for those reads; no
+# device access and no network but the loopback.
+#
+# A dead service must not leave the lights red: a stop sets them white first
+# (SIGTERM), and Restart=always starts it again. The service pings systemd on
+# every turn of its loop (sd_notify); WatchdogSec=30 restarts it when the loop
+# has not run for 30 s (one connect attempt may take up to 10 s).
+[Unit]
+Description=ollama1: lights that follow the server's work (white, red while working)
+After=ollama1-gateway.service ollama1-openrgb.service
+Wants=ollama1-openrgb.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=30
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-leds run
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+MemoryMax=64M
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=localhost
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

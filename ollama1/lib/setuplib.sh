@@ -113,6 +113,29 @@ fans_plan() { # the plan's line for the fans (6b385)
   fi
 }
 
+leds_choice() { # FLAG ENV SAVED -> "on" or "off" (6b395): the flag, else the environment (OLLAMA1_LEDS), else what an
+  # earlier run saved, else "off": the lights service installs a package and takes over the case lights, so it is
+  # opt-in. Fails on a value it doesn't know.
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      on|1|yes|true) echo on; return 0 ;;
+      off|0|no|false) echo off; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo off
+}
+
+leds_plan() { # the plan's line for the lights (6b395)
+  if [ "$1" = on ]; then
+    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when idle, red while the server works (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
+  else
+    printf 'Lights OFF (default): nothing installed, the lights stay as the board leaves them. On: --leds on'
+  fi
+}
+
 saved() { # KEY -> its value from the file an earlier run wrote, if any
   [ -r "$SAVED" ] || return 0
   sed -n "s/^$1=//p" "$SAVED" | head -n1

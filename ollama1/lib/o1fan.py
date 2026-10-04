@@ -77,8 +77,7 @@ import time
 
 import o1common
 import o1cpu
-import o1gpu
-import o1idle
+import o1work
 from o1common import read_json_safe, write_json_atomic
 
 POLL_S = 2
@@ -90,7 +89,7 @@ SETTLE_S = 6                     # a level is judged by rpm only after this long
 PUMP_RATIO = 0.6                 # at 20% still this share of its 100% rpm: a pump or a fixed header
 HYST_C = 10                      # a temperature override ends this far under its limit
 STATUS_STALE_S = 15              # a status file older than this: the service isn't running
-TOOLS_EVERY_S = 6                # /proc is walked at most this often
+TOOLS_EVERY_S = 6                # /proc is walked at most this often (lib/o1work.py)
 LIMIT_CPU_C, LIMIT_GPU_C, LIMIT_NVME_C = 80, 90, 70
 OLD_UNIT = "ollama1-gpu-fan.service"          # the hand-made full-speed-always experiment
 MODULES_CONF = "/etc/modules-load.d/ollama1-fan.conf"
@@ -281,7 +280,7 @@ class Fan:
         self.checked = {}              # key -> the level whose rpm was judged
         self.phase, self.pct, self.why, self.left = "idle20", LOW_PCT, "idle", 0
         self.seen = None               # what it last said it controls
-        self.tools_at, self.tools = -1e9, []
+        self.work = o1work.Work(probes, clock, tools_every)
         self._load_state()
 
     # -- the saved originals and what was learned ------------------------------------
@@ -321,36 +320,9 @@ class Fan:
                           mode=0o600)
 
     # -- what counts as working -----------------------------------------------------
-    def _probe(self, name):
-        try:
-            return self.p[name]()
-        except Exception:
-            return None
-
-    def _tools(self, now):
-        """The long jobs running; /proc is walked at most every tools_every seconds."""
-        if now - self.tools_at >= self.tools_every:
-            self.tools_at = now
-            self.tools = self._probe("tools") or []
-        return self.tools
-
     def working(self, now=None):
-        """(working?, the reasons): the probes auto sleep uses, with its limits."""
-        now = self.clock() if now is None else now
-        why = []
-        n = self._probe("inflight")
-        if isinstance(n, int) and not isinstance(n, bool) and n > 0:
-            why.append("a request is running")
-        g = self._probe("gpu_busy")
-        if isinstance(g, (int, float)) and g >= o1idle.GPU_IDLE_PCT:
-            why.append("the graphics card is busy (%d%%)" % g)
-        t = self._tools(now)
-        if t:
-            why.append("running: " + ", ".join(sorted(str(x) for x in t)))
-        la = self._probe("loadavg")
-        if isinstance(la, (int, float)) and la > o1idle.LOAD_BUSY:
-            why.append("the machine is busy (load %.1f)" % la)
-        return bool(why), why
+        """(working?, the reasons): lib/o1work.py, the probes and limits auto sleep uses."""
+        return self.work.working(self.clock() if now is None else now)
 
     def overheated(self):
         """(hot?, the reasons): a sensor over its limit stays hot until HYST_C under it."""
@@ -670,25 +642,10 @@ def render_status(st, live):
     return "\n".join(out)
 
 
-# ---- probes the service uses (the same ones auto sleep uses) -------------------------
+# ---- probes the service uses: lib/o1work.py (shared with the lights) ---------------------
 
-class Gpu:
-    """The card's busy percent, found once and looked for again until there is one."""
-
-    def __init__(self):
-        self.vendor, self.at = None, -1e9
-
-    def busy(self):
-        if not self.vendor and time.monotonic() - self.at > 60:
-            self.at = time.monotonic()
-            self.vendor = o1gpu.detect().get("vendor")
-        return o1gpu.usage(self.vendor)["busy_pct"] if self.vendor else None
-
-
-def probes():
-    gpu = Gpu()
-    return {"inflight": lambda: o1idle.read_activity(time.time())["inflight"], "gpu_busy": gpu.busy,
-            "tools": o1idle.tools_running, "loadavg": o1idle.loadavg1}
+Gpu = o1work.Gpu
+probes = o1work.probes
 
 
 # ---- the modules and setup -------------------------------------------------------------

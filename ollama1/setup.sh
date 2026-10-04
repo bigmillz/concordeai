@@ -33,6 +33,9 @@
 #   sudo ./setup.sh --fans on|off    the graphics card's and the case fans at 100% while the server
 #                                    works and for 60 s after, 50% for 60 s, then 20% (ollama1-fan).
 #                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
+#   sudo ./setup.sh --leds on|off    the case, board and cooler lights: 100% white when idle, red while the server
+#                                    works, white again 3 s after (ollama1-leds, through the openrgb package, which
+#                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
 #   sudo ./setup.sh --dash text|graphic|auto   what the server's monitor shows (also:
 #                                    OLLAMA1_DASH): auto (the default) draws the graphical panel
 #                                    when a monitor is connected, else the text dashboard; text
@@ -114,12 +117,14 @@ SWAP_SIZE=""
 VG_RESERVE_GIB=0
 A_GPU_TUNE=""
 A_FANS=""
+A_LEDS=""
 A_DASH=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
 A_OS=""; A_MODELS=""; A_HDD1=""; A_HDD2=""
 prev=""
 for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
+  if [ "$prev" = --leds ]; then A_LEDS=$a; leds_choice "$A_LEDS" "" "" >/dev/null || { echo "--leds takes on or off"; exit 2; }; prev=""; continue; fi
   if [ "$prev" = --fans ]; then A_FANS=$a; fans_choice "$A_FANS" "" "" >/dev/null || { echo "--fans takes on or off"; exit 2; }; prev=""; continue; fi
   case "$prev" in
     --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
@@ -137,7 +142,7 @@ for a in "$@"; do
   case "$a" in
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
-    --vg-reserve|--fans|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --vg-reserve|--fans|--leds|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --dash|--vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
@@ -162,6 +167,8 @@ gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
 [ "$prev" != --fans ] || { echo "--fans takes on or off"; exit 2; }
 fans_choice "" "${OLLAMA1_FANS:-}" "" >/dev/null || { echo "OLLAMA1_FANS takes 1 or 0 (on or off)"; exit 2; }
+[ "$prev" != --leds ] || { echo "--leds takes on or off"; exit 2; }
+leds_choice "" "${OLLAMA1_LEDS:-}" "" >/dev/null || { echo "OLLAMA1_LEDS takes 1 or 0 (on or off)"; exit 2; }
 case "$prev" in --dash) echo "--dash takes text, graphic or auto"; exit 2 ;; esac
 dash_mode_choice "" "${OLLAMA1_DASH:-}" "" >/dev/null || { echo "OLLAMA1_DASH takes text, graphic or auto"; exit 2; }
 case "$prev" in --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
@@ -243,6 +250,7 @@ resolve_settings() {
   GPU_TUNE=$(gpu_tune_choice "$A_GPU_TUNE" "${OLLAMA1_GPU_TUNE:-}" "$(saved GPU_TUNE)") \
     || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
   FANS=$(fans_choice "$A_FANS" "${OLLAMA1_FANS:-}" "$(saved FANS)") || die "the saved FANS in $SAVED is not on or off; give --fans on or --fans off"
+  LEDS=$(leds_choice "$A_LEDS" "${OLLAMA1_LEDS:-}" "$(saved LEDS)") || die "the saved LEDS in $SAVED is not on or off; give --leds on or --leds off"
   DASH=$(dash_mode_choice "$A_DASH" "${OLLAMA1_DASH:-}" "$(saved DASH)") \
     || die "the saved DASH in $SAVED is not text, graphic or auto; give --dash"
 }
@@ -281,6 +289,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
         "$OS_SERIAL" "$MODELS_SERIAL" "$HDD1_SERIAL" "$HDD2_SERIAL"
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
       printf 'FANS=%s\n' "$FANS"
+      printf 'LEDS=%s\n' "$LEDS"
       if [ "$DASH" != auto ]; then printf 'DASH=%s\n' "$DASH"; fi
     } >"$t" )
   chown root:root "$t"; chmod 0600 "$t"; mv "$t" "$SAVED"
@@ -346,6 +355,7 @@ print_plan() {
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen (big console font), timers
    $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
    $(state 'systemctl is-active ollama1-fan')     $(fans_plan "$FANS")
+   $(state 'systemctl is-active ollama1-leds')    $(leds_plan "$LEDS")
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
@@ -693,6 +703,7 @@ ln -sfn "$LIBDIR/bin/ollama1-power" /usr/local/sbin/ollama1-power
 ln -sfn "$LIBDIR/bin/ollama1-gpu-tune" /usr/local/sbin/ollama1-gpu-tune
 ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
 ln -sfn "$LIBDIR/bin/ollama1-fan" /usr/local/bin/ollama1-fan
+ln -sfn "$LIBDIR/bin/ollama1-leds" /usr/local/bin/ollama1-leds
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
@@ -1041,6 +1052,13 @@ fi
 # the old hand-made full-speed-always fan unit (see the README) when it is there.
 step "Fans"
 "$LIBDIR/bin/ollama1-fan" setup "$FANS" || note "ollama1-fan setup stopped (see above); the fans are left as they were"
+
+# ---- 14c. lights (6b395) ----------------------------------------------------------------------
+# OFF unless --leds on (OLLAMA1_LEDS=1; saved in setup.env): installs the openrgb package and runs its server on
+# 127.0.0.1 (ollama1-openrgb) and the service that makes every light white when idle and red while the server
+# works (ollama1-leds, lib/o1leds.py). --leds off stops and disables both and removes nothing else.
+step "Lights"
+"$LIBDIR/bin/ollama1-leds" setup "$LEDS" || note "ollama1-leds setup stopped (see above); the lights are left as they were"
 
 # ---- 15. Cloudflare -------------------------------------------------------------------------
 step "Cloudflare Tunnel and Access"
