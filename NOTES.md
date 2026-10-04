@@ -9,6 +9,63 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b385 — the server's fans run at 100% while it works, and a minute after (per Patrick)
+
+Patrick (2026-10-04): "keep the GPU fan on full anytime there's a request
+running. We don't want to burn the bearings out on it, but I want maximum
+cooling when it's working. If you can control all the system fans too, have
+those go 100% when there's any request running ... 100% for one minute after
+requests have ended ... so heat doesn't build up." Otherwise automatic.
+
+- New root service `ollama1-fan.service` (`bin/ollama1-fan`, `lib/o1fan.py`,
+  stdlib only). Polls every 2 s. "Working" reuses the auto-sleep probes and
+  limits (o1idle: the gateway's activity file, `GPU_IDLE_PCT`, `scan_tools`,
+  `LOAD_BUSY`). `o1sleep.busy_reasons` (downloads, updates, backups) is left
+  out on purpose: it keeps the server awake but it is not heat. A tool such as
+  stability-test.sh counts, and the load average (1 minute) lags a stress
+  test's end by about a minute, so the hold after one is a little longer.
+- Outputs: amdgpu `pwm1` and every `pwmN` of a Super-IO chip (`nct67xx`,
+  `it8xxx` ...), found by chip name. Writes "manual, 255" (enable file first).
+  A file with no write bit, or one a write fails on, is skipped and said once.
+  Nothing below 255 is ever written except to put an output back.
+- Originals: each output's `pwmN_enable` (and `pwmN` when it was manual) goes
+  to `/var/lib/ollama1/fan.json` with the boot id BEFORE the first write.
+  A restart or crash mid-hold takes them from there (not the manual values it
+  would read now), holds a minute from the restart, then restores. A different
+  boot id drops the file (the chip is back to its own settings).
+- Stops: SIGTERM restores at once; ExecStopPost restores only when
+  `$SERVICE_RESULT` is `success`; a crash leaves 100% and `Restart=always`,
+  `StartLimitIntervalSec=0` brings it back. This reads Patrick's "stay at 100%
+  rather than stopping" over "restore on crash": a crash is not a reason to
+  slow the fans.
+- Override: CPU 80 C (Tctl/Tdie), GPU junction 90 C (edge if there is no
+  junction), NVMe composite 70 C force 100% until 10 C under the limit.
+  A sensor that stops answering keeps its state.
+- Wake: the sleep hook sends SIGUSR1 (`systemctl kill --kill-whom=main`), and
+  every tick rewrites an output it holds whose values changed (amdgpu resets
+  `pwm1_enable` on resume). In auto the service writes nothing at all.
+- Modules: `ExecStartPre=-+ ... load-modules` runs `modprobe nct6775` outside
+  the sandbox when no chip with fan outputs shows (ProtectKernelModules stays
+  on for the service; ProtectKernelTunables is left off so /sys is writable).
+  `setup on` writes `/etc/modules-load.d/ollama1-fan.conf` only when the chip
+  loaded. NOT verified on the MS-7C35: whether the kernel's nct6775 binds to
+  the NCT6797D without `acpi_enforce_resources=lax` (the README says what to
+  look for in the kernel log).
+- Status: `ollama1-fan status` (mode full / hold Ns / auto, why, outputs, rpm,
+  temps; no root) and the admin panel's CPU card, one line from
+  `/run/ollama1/fan.json` (`o1fan.panel_line`, `st["fan"]`).
+- setup.sh: `--fans on|off` (default on; `OLLAMA1_FANS`; saved as `FANS=` in
+  setup.env, always written; `fans_choice` in setuplib.sh) and a step "Fans"
+  between graphics card tuning and Cloudflare that calls `ollama1-fan setup`.
+  With `on` it removes the hand-made `ollama1-gpu-fan.service` (full speed
+  always), stops it and gives amdgpu's `pwm1_enable` back (2) so the first
+  "original" is not that unit's manual setting.
+- Tests: `tests/test_fan.py` (fake sysfs, fake clock) and 25 mutants in
+  `tests/mutate.py` ("fan: ..."): hold time and its edge, restart of the
+  hold, 255, restore (enable and manual value), originals saved first, boot
+  id, crash vs clean stop, wake re-apply, each limit, hysteresis, unwritable,
+  each source of work, the hook, the old unit, the default.
+
 ## 6b365 — the stability test runs one load at a time by default (per Patrick)
 
 - `stability-test.sh` with no options ran "all" (cpu, memory and the card at

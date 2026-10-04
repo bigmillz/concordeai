@@ -26,6 +26,9 @@
 #                                    again after a safety revert
 #   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
 #                                    to stock, and the setting saved as off
+#   sudo ./setup.sh --fans on|off    the graphics card's and the case fans at 100% while the server
+#                                    works and for one minute after, else automatic (ollama1-fan).
+#                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # Settings (each is asked for if it is not given and cannot be found):
@@ -102,11 +105,13 @@ SWAP_ACTION=""
 SWAP_SIZE=""
 VG_RESERVE_GIB=0
 A_GPU_TUNE=""
+A_FANS=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
 A_OS=""; A_MODELS=""; A_HDD1=""; A_HDD2=""
 prev=""
 for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
+  if [ "$prev" = --fans ]; then A_FANS=$a; fans_choice "$A_FANS" "" "" >/dev/null || { echo "--fans takes on or off"; exit 2; }; prev=""; continue; fi
   case "$prev" in
     --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
       set_option "$prev" "$a"; prev=""; continue ;;
@@ -119,7 +124,7 @@ for a in "$@"; do
   case "$a" in
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
-    --vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --vg-reserve|--fans|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
@@ -130,7 +135,7 @@ for a in "$@"; do
       want=on; [ "$a" = --gpu-tune ] || want=off
       [ -z "$A_GPU_TUNE" ] || [ "$A_GPU_TUNE" = "$want" ] || { echo "--gpu-tune and --no-gpu-tune: give one"; exit 2; }
       A_GPU_TUNE=$want ;;
-    -h|--help) sed -n '2,61p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,64p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
@@ -141,6 +146,8 @@ fi
 gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_TUNE takes 1 or 0 (on or off)"; exit 2; }
 # a flag left waiting for its value (the size forgotten) must not mean "no reserve"
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
+[ "$prev" != --fans ] || { echo "--fans takes on or off"; exit 2; }
+fans_choice "" "${OLLAMA1_FANS:-}" "" >/dev/null || { echo "OLLAMA1_FANS takes 1 or 0 (on or off)"; exit 2; }
 case "$prev" in --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
   echo "$prev takes a value"; exit 2 ;; esac
 
@@ -219,6 +226,7 @@ resolve_settings() {
   pick HDD2_SERIAL "$A_HDD2" HDD2_SERIAL "" valid_serial
   GPU_TUNE=$(gpu_tune_choice "$A_GPU_TUNE" "${OLLAMA1_GPU_TUNE:-}" "$(saved GPU_TUNE)") \
     || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
+  FANS=$(fans_choice "$A_FANS" "${OLLAMA1_FANS:-}" "$(saved FANS)") || die "the saved FANS in $SAVED is not on or off; give --fans on or --fans off"
 }
 
 # After the relaunch in tmux (a prompt needs the terminal): ask for what is
@@ -254,6 +262,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
       printf 'OS_SERIAL=%s\nMODELS_SERIAL=%s\nHDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' \
         "$OS_SERIAL" "$MODELS_SERIAL" "$HDD1_SERIAL" "$HDD2_SERIAL"
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
+      printf 'FANS=%s\n' "$FANS"
     } >"$t" )
   chown root:root "$t"; chmod 0600 "$t"; mv "$t" "$SAVED"
 }
@@ -329,6 +338,7 @@ print_plan() {
    $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 04:00 when needed; weekly Ollama update
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen (big console font), timers
    $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
+   $(state 'systemctl is-active ollama1-fan')     $(fans_plan "$FANS")
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
@@ -683,6 +693,7 @@ ln -sfn "$LIBDIR/bin/ollama1-models" /usr/local/sbin/ollama1-models
 ln -sfn "$LIBDIR/bin/ollama1-power" /usr/local/sbin/ollama1-power
 ln -sfn "$LIBDIR/bin/ollama1-gpu-tune" /usr/local/sbin/ollama1-gpu-tune
 ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
+ln -sfn "$LIBDIR/bin/ollama1-fan" /usr/local/bin/ollama1-fan
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
@@ -1022,6 +1033,13 @@ else
   fi
   ok "off (--no-gpu-tune): the graphics card runs at stock"
 fi
+
+# ---- 14b. fans (6b385) ------------------------------------------------------------------------
+# ON unless --fans off (OLLAMA1_FANS=0; saved in setup.env): the service puts the graphics card's and the
+# case fans at 100% while the server works and for a minute after (lib/o1fan.py). The step also removes
+# the old hand-made full-speed-always fan unit (see the README) when it is there.
+step "Fans"
+"$LIBDIR/bin/ollama1-fan" setup "$FANS" || note "ollama1-fan setup stopped (see above); the fans are left as they were"
 
 # ---- 15. Cloudflare -------------------------------------------------------------------------
 step "Cloudflare Tunnel and Access"
