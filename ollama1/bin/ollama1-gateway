@@ -35,6 +35,13 @@ Pairing: the gateway never sees the code; it hands requests to a root step
 GPU only: a model whose weights plus context can't fit in VRAM is refused
 before it loads, and after it loads /api/ps must show it 100% in VRAM; if
 any of it landed on the CPU it is unloaded and the request gets an error.
+
+Model sets (6b410): a paired device can read the model state and apply a set
+the app chose (/v1/models/state, /v1/models/apply). The gateway can't change
+a model or the allow-list itself: it checks the request, leaves it in its
+own folder and starts ollama1-modelplan.service, the one unit polkit lets it
+start, whose root program checks everything again and does the work. That
+is the only thing the gateway ever starts.
 """
 import datetime
 import ipaddress
@@ -42,6 +49,7 @@ import json
 import os
 import re
 import secrets
+import subprocess
 import sys
 import threading
 import time
@@ -52,7 +60,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 
 import o1crypto  # noqa: E402
 from o1auth import AuthError, PAIR_MIN_INTERVAL, RequestVerifier, SKEW, parse_pair_request  # noqa: E402
-from o1common import (Paths, load_config, ram_models, read_json, safe_label,  # noqa: E402
+from o1common import (Paths, load_config, ram_models, read_allow_list, read_json, safe_label,  # noqa: E402
                        valid_model_name, write_json_atomic)
 from o1jwt import AccessVerifier, JWTError  # noqa: E402
 import o1ollama  # noqa: E402
@@ -60,6 +68,8 @@ from o1pair import DeviceStore, read_public, spool_request, wait_result  # noqa:
 import o1gen  # noqa: E402
 import o1gpu  # noqa: E402
 import o1idle  # noqa: E402
+import o1modelplan  # noqa: E402
+import o1sleep  # noqa: E402
 import o1stats  # noqa: E402
 
 VERSION = "1"
@@ -67,6 +77,8 @@ USAGE_KEYS = ("busy_pct", "vram_used_bytes", "vram_total_bytes")
 RAM_KEYS = ("used_bytes", "total_bytes")
 USAGE_CACHE_S = 1.0     # GET /v1/usage reads the card at most this often
 GPU_RECHECK_S = 15      # how often a missing card is looked for again (Gateway.gpu)
+PLAN_WAIT_S = 15.0      # how long POST /v1/models/apply waits for root's answer (6b410)
+UNITS_CACHE_S = 2.0     # GET /v1/models/state asks systemd what is running at most this often
 
 # Top-level fields and options passed on to Ollama. Anything else is dropped.
 # Options that change how a model loads (num_gpu, main_gpu, low_vram,
@@ -101,6 +113,19 @@ class GatewayError(Exception):
         self.status = status
         self.code = code
         self.extra = extra
+
+
+def start_plan_unit():
+    """The one unit the gateway ever starts: ollama1-modelplan.service. polkit
+    (50-ollama1.rules) lets o1gw start that unit and nothing else, and no
+    other verb. Returns (started, what systemctl said: its complaints come
+    back on the one pipe, nothing is written anywhere)."""
+    try:
+        r = subprocess.run(["systemctl", "start", "--no-block", "--no-ask-password", o1modelplan.UNIT],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, type(e).__name__
+    return r.returncode == 0, (r.stdout or "").strip()[:200]
 
 
 # ---- counts-only statistics ------------------------------------------------
@@ -371,6 +396,14 @@ class Gateway:
         self.tags_at = 0.0
         self.info = {}
         self.lan_net = ipaddress.ip_network(cfg["lan_cidr"], strict=False) if cfg.get("lan_cidr") else None
+        # model sets from the app (6b410): one request at a time, handed to root
+        self.plan_lock = threading.Lock()
+        self.start_plan_unit = start_plan_unit
+        self.list_units = o1sleep._active_units
+        self.units_lock = threading.Lock()
+        self.units_at = None
+        self.units_val = None
+        self.plan_wait_s = PLAN_WAIT_S
 
     # -- Access ---------------------------------------------------------
 
@@ -415,6 +448,128 @@ class Gateway:
             # only these, whatever the reader returned
             return {"gpu": {k: self.usage_val.get(k) for k in USAGE_KEYS},
                     "ram": dict(self.ram_val)}
+
+    # -- model sets from the app (6b410) ----------------------------------
+    def active_units(self, patterns, fresh=False):
+        """The units systemd says are running among `patterns` (None: it
+        couldn't be asked), asked at most every UNITS_CACHE_S unless fresh."""
+        with self.units_lock:
+            now = time.monotonic()
+            if fresh or self.units_at is None or now - self.units_at >= UNITS_CACHE_S:
+                self.units_val = self.list_units(patterns)
+                self.units_at = now
+            return self.units_val
+
+    def models_busy(self, fresh=False):
+        """Why the models can't change now ([] = they can)."""
+        return o1modelplan.busy_reasons(lambda pats: self.active_units(pats, fresh))
+
+    def disk_models(self):
+        """The models on the disk (Ollama's /api/tags, cloud entries left
+        out), sorted by name: what the app's `seen` hashes."""
+        try:
+            st, data = o1ollama.call(self.base, "GET", "/api/tags", timeout=10)
+        except OSError:
+            raise GatewayError(502, "ollama", "Ollama is not answering")
+        if st != 200 or not isinstance(data, dict):
+            raise GatewayError(502, "ollama", "Ollama is not answering")
+        return sorted(o1modelplan.local_models(data), key=lambda m: m["name"])
+
+    def models_state(self):
+        """GET /v1/models/state: exactly models, allow, busy, jobs, plan,
+        disk_free_bytes and vram_bytes."""
+        disk = self.disk_models()
+        try:
+            loaded = self.loaded_names()
+        except (OSError, ValueError):
+            loaded = []
+
+        def size(m):
+            s = m.get("size")
+            return s if isinstance(s, int) and not isinstance(s, bool) and s >= 0 else 0
+        models = [{"name": m["name"], "size": size(m),
+                   "loaded": any(o1ollama.same_model(m["name"], n) for n in loaded)} for m in disk]
+        st = o1modelplan.read_status()
+        vram = (self.gpu() or {}).get("vram_bytes")
+        if not (isinstance(vram, int) and not isinstance(vram, bool) and vram > 0):
+            try:
+                vram = max(0, int(self.cfg.get("vram_total_bytes") or 0))
+            except (TypeError, ValueError):
+                vram = 0
+        return {"models": models, "allow": read_allow_list(), "busy": bool(self.models_busy()),
+                "jobs": st["jobs"] if st else [], "plan": st["plan"] if st else None,
+                "disk_free_bytes": o1modelplan.disk_free() or 0, "vram_bytes": vram}
+
+    def wait_plan_answer(self, rid):
+        """Root's answer to request `rid`, or None after plan_wait_s."""
+        end = time.monotonic() + self.plan_wait_s
+        while True:
+            a = o1modelplan.read_answer()
+            if a is not None and a["request"] == rid:
+                return a
+            if time.monotonic() >= end:
+                return None
+            time.sleep(0.1)
+
+    def models_apply(self, obj, dev_id, dev):
+        """POST /v1/models/apply: the body for the 202, or a GatewayError.
+        Each request and its outcome go to the journal (counts and names)."""
+        try:
+            out, clean = self._models_apply(obj, dev_id)
+        except GatewayError as e:
+            log("model-plan", device=dev["name"], status=e.status, reason=e.code)
+            raise
+        log("model-plan", device=dev["name"], status=202, kind=clean["plan"], added=len(clean["add"]),
+            removed=len(clean["remove"]))
+        return out
+
+    def _models_apply(self, obj, dev_id):
+        clean, problem = o1modelplan.parse_request(obj)
+        if problem:
+            raise GatewayError(400, "bad_request", problem)
+        if not self.plan_lock.acquire(blocking=False):
+            raise GatewayError(409, "busy", "not now: a model set is being handed to the server")
+        try:
+            why = self.models_busy(fresh=True)
+            if why:
+                raise GatewayError(409, "busy", "not now: " + "; ".join(why))
+            names = [m["name"] for m in self.disk_models()]
+            if o1modelplan.seen_hash(names) != clean["seen"]:
+                raise GatewayError(409, "changed", "the models on the server changed since the app looked",
+                                   models=names)
+            try:
+                loaded = self.loaded_names()
+            except (OSError, ValueError):
+                raise GatewayError(502, "ollama", "Ollama is not answering")
+            for tag in clean["remove"]:
+                if any(o1ollama.same_model(tag, n) for n in loaded):
+                    raise GatewayError(409, "in_use", "%s is loaded right now" % tag, name=tag)
+            # root checks all of this again: this side is only the early, cheap answer
+            rid = secrets.token_hex(8)
+            try:
+                o1modelplan.write_request(rid, dev_id, clean, self.clock())
+            except OSError:
+                raise GatewayError(500, "internal", "couldn't hand the request to the server")
+            ok, said = self.start_plan_unit()
+            if not ok:
+                o1modelplan.drop_request()
+                raise GatewayError(503, "not_started", "the server couldn't start the change (%s)"
+                                   % safe_label(said or "no reason given", 160))
+            ans = self.wait_plan_answer(rid)
+            if ans is None:     # the request stays: root may still take it (it refuses one over 2 minutes old)
+                raise GatewayError(504, "no_answer", "the change was started but the server didn't confirm it "
+                                                     "in time: look at GET /v1/models/state")
+            o1modelplan.drop_request()
+            if not ans["ok"]:
+                extra = ({"models": ans["models"]} if ans["code"] == "changed"
+                         else {"name": ans["name"]} if ans["code"] == "in_use" else {})
+                raise GatewayError(o1modelplan.REFUSALS[ans["code"]], ans["code"], ans["error"] or "refused",
+                                   **extra)
+            self.activity.touch()        # a set being applied: the idle clock starts again (the work keeps it awake)
+            st = o1modelplan.read_status()
+            return {"ok": True, "jobs": st["jobs"] if st and st["request"] == rid else []}, clean
+        finally:
+            self.plan_lock.release()
 
     def check_access(self, headers, lan, client_ip, method="GET"):
         if lan:
@@ -918,6 +1073,10 @@ def make_handler(gw, lan=False):
                 except OSError:
                     raise GatewayError(500, "internal", "couldn't save the setting")
                 return self.send_json(200, view)
+            if route == "/v1/models/state" and method == "GET":
+                return self.send_json(200, gw.models_state())
+            if route == "/v1/models/apply" and method == "POST":
+                return self.send_json(202, gw.models_apply(self.json_body(body), dev_id, dev))
             if route.startswith("/v1/generate/"):
                 return self.generate(method, route, body, dev_id)
             if method == "GET" and route == "/v1/whoami":

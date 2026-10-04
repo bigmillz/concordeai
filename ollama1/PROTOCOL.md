@@ -176,6 +176,8 @@ Ollama's own API shapes, minus anything that changes state on the server:
 | `GET /v1/usage` | `{"gpu": {"busy_pct", "vram_used_bytes", "vram_total_bytes"}, "ram": {"used_bytes", "total_bytes"}}`, see below |
 | `GET /v1/sleep-config` | `{"enabled", "minutes", "supported", "wake"}`: the auto sleep setting, see below |
 | `POST /v1/sleep-config` | `{"enabled": bool, "minutes": int}` (either): saves it and answers as the GET does |
+| `GET /v1/models/state` | The models on the server, its allow-list, and the model set being applied or last applied: see "Model sets" below |
+| `POST /v1/models/apply` | `{"plan", "add", "remove", "seen"}`: apply a model set chosen in the app, see "Model sets" below |
 | `GET /api/tags` | Installed local models. Ollama cloud models are never listed. Each has `placement` and `gpu_pct` (below) |
 | `GET /api/ps` | Loaded models, with `size`, `size_vram`, `placement` and `gpu_pct` |
 | `GET /api/version` | `{"version"}` |
@@ -247,9 +249,11 @@ always exactly these four keys:
   404 `not_found`: treat that as "update the server kit".
 - Only chat, generate and embeddings count as work, and so does a picture or
   video job (see "Images and video" below) from its start until two minutes
-  after the last poll or fetch of it. `/v1/info`, `/v1/usage`, `/v1/whoami`,
-  the model list, `/v1/generate/capabilities` and this route never keep the
-  server awake.
+  after the last poll or fetch of it. A model set the server accepts counts
+  once, when it is accepted; the server then doesn't sleep until the set is
+  done. `/v1/info`, `/v1/usage`, `/v1/whoami`, the model list,
+  `/v1/models/state`, `/v1/generate/capabilities` and this route never keep
+  the server awake.
 
 To wake it, send a magic packet: six `0xFF` bytes then the card's address
 sixteen times, as a UDP broadcast to port 9, and ask `/v1/info` every couple of
@@ -317,8 +321,104 @@ How a job shares the card with chats:
 The tunnel drops a response that stays silent for about 100 s, so none of these calls
 waits for a job: start it, then poll.
 
+### Model sets
+
+The person picks a set for the server in the app (Light, Recommended or
+Everything). The app works out which models that means for the card in
+`/v1/info`, shows the exact Download and Remove lists, and sends them. The
+gateway can't change a model itself: it checks the request and hands it to a
+root step on the server, which checks all of it again, edits the server's
+allow-list and has Ollama delete and download. Both routes are signed and
+paired-only. A kit without them answers 404 `not_found`: treat that as "update
+the server kit".
+
+`GET /v1/models/state` answers exactly these keys:
+
+```json
+{"models": [{"name": "gemma4:12b", "size": 7600000000, "loaded": false}],
+ "allow": ["gemma4:12b"],
+ "busy": false,
+ "jobs": [{"name": "gpt-oss:20b", "action": "pull", "state": "running", "pct": 41, "error": ""}],
+ "plan": {"name": "recommended", "at": 1791100000, "by": "Alice's Mac"},
+ "disk_free_bytes": 812345678912,
+ "vram_bytes": 17163091968}
+```
+
+- `models`: what Ollama has on the server's disk, sorted by name; `size` in
+  bytes; `loaded` is true while the model is in memory. Ollama cloud entries
+  are never listed.
+- `allow`: the names on the server's allow-list, in its order (a line it
+  can't read is left out).
+- `busy`: true while a set is being applied, while a model-library sync or
+  `ollama1-models` runs at the server, or while the admin panel pulls or
+  removes a model. Applying then answers 409 `busy`.
+- `jobs`: the jobs of the set being applied, or of the last one, kept until
+  the next one starts (a refused request is not a set). Each is exactly
+  `{"name", "action": "remove" | "pull", "state": "queued" | "running" |
+  "done" | "failed", "pct": 0 to 100, "error"}`, in the order they run;
+  `error` is `""` unless the job failed. A set the server couldn't finish (it
+  restarted, say) shows its unfinished jobs as failed.
+- `plan`: that set's name, when the server accepted it (unix seconds) and the
+  device's name from the server's own list of paired devices; `null` if no
+  set was ever applied.
+- `disk_free_bytes`: free space on the models disk (0 if it can't be read).
+  `vram_bytes`: the card's VRAM as in `/v1/info`, else the server's configured
+  figure, else 0.
+
+`POST /v1/models/apply` takes exactly these four keys:
+
+```json
+{"plan": "recommended", "add": ["gpt-oss:20b"], "remove": ["llama3.2:3b"], "seen": "<hex sha256>"}
+```
+
+- `plan`: `"light"`, `"recommended"` or `"everything"`.
+- `add`, `remove`: at most 40 tags each, from Ollama's own library only:
+  `^[a-z0-9][a-z0-9._-]{0,79}(:[a-z0-9][a-z0-9._-]{0,63})?$` and no `..` (no
+  host, no namespace, no `/`). No model twice (`x` is `x:latest`), none in both
+  lists, not both empty, no Ollama cloud model to add.
+- `seen`: the hex sha256 of the model names the app saw: `"\n".join(sorted(names))`
+  in UTF-8, where `names` are the `name`s in `models` above (the hash of no
+  models is the hash of the empty string). It proves the lists were made from
+  what is on the server now; if anything changed, nothing is done.
+
+| Status | `code` | Meaning |
+|---|---|---|
+| **202** | | `{"ok": true, "jobs": [...]}`: accepted; the jobs in the order they run (the removals first) |
+| 400 | `bad_request` | Unknown or missing keys, wrong types, a tag outside the pattern, more than 40 in a list, a model in both lists, nothing to add or remove, a set name outside the three |
+| 409 | `changed` | `seen` isn't the hash of the models on the server now. The body has `"models"`: their names now. Nothing changed: rebuild the lists from those |
+| 409 | `busy` | Something else is changing the models (see `busy` above) |
+| 409 | `in_use` | A model to remove is loaded right now. The body has `"name"`. Nothing changed |
+| 403 | `unpaired` | The server's root step no longer finds the device paired |
+| 502 | `ollama` | Ollama isn't answering |
+| 503 | `not_started` | The server couldn't start its root step (an incomplete kit: run its setup again) |
+| 504 | `no_answer` | Started, but the server didn't confirm within 15 s: read `GET /v1/models/state` before sending it again |
+
+Error bodies are the usual `{"error", "code", "server_time"}`, plus `models` or
+`name` as listed.
+
+What the server does with an accepted set:
+
+- Its allow-list gains a line for each tag to add (at the end, with no flag)
+  and loses every line naming a tag to remove; nothing else on it changes. A
+  later model-library sync at the server follows that list, so it doesn't
+  undo the set (it would remove other models that aren't on the list, as it
+  always has).
+- The removals run first, so their space is there for the downloads, then the
+  downloads in the order given. Each download is tried 3 times; one that
+  still fails is marked failed and the next one runs. A removal is not done
+  (failed) if the model is loaded at that moment or is back on the
+  allow-list; a download is not done if it was taken off the list meanwhile
+  or the models disk has less than 2 GiB free. The server doesn't check that
+  everything fits before it starts: use `disk_free_bytes`.
+- The POST returns as soon as the server has accepted the set (normally
+  within a few seconds); the work goes on after it. Poll `GET
+  /v1/models/state` every few seconds until `busy` is false; `pct` moves at
+  most once a second.
+
 Anything else is a 404: `pull`, `delete`, `create`, `copy`, `push` and `blobs`
-are never reachable from outside. Models are managed at the server only.
+are never reachable from outside. A paired device changes which models the
+server has only through a model set, above; everything else about models is
+managed at the server.
 
 Request shaping (so every request stands alone and stays on the GPU):
 

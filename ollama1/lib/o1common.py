@@ -48,6 +48,8 @@ class Paths:
     helper_status = p("/var/lib/ollama1/actions.json")
     admin_state = p("/var/lib/ollama1-admin")
     history = p("/var/lib/ollama1-admin/history.json")
+    modelplan_run = p("/run/ollama1/modelplan")               # a model set from the app: root's answer, its progress (6b410)
+    modelplan_state = p("/var/lib/ollama1-modelplan")         # the last one, kept across reboots (its unit's StateDirectory)
     models = p("/srv/models")
     backups = p("/var/backups/ollama1")                       # the nightly settings backup (6b400; it was on the mirror)
     opt = p("/opt/ollama")
@@ -265,6 +267,19 @@ def write_json_atomic(path, obj, mode=0o640, group=None, sync_dir=False):
                 os.close(dfd)
         except OSError:
             pass
+
+
+def share_with_viewers(fd, mode=0o640):
+    """A lock file the gateway and the panel (group o1view) may open to see
+    whether it is held (6b410). Under a unit's UMask=0027 root made it
+    root:root 0640, which nobody else could open, so "is a sync running?"
+    always said no outside root. Best effort: set on the open file."""
+    try:
+        os.fchmod(fd, mode)
+        import grp
+        os.fchown(fd, -1, grp.getgrnam("o1view").gr_gid)
+    except (KeyError, OSError, ImportError):
+        pass
 
 
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._\-/]{0,127}(:[A-Za-z0-9._\-]{1,64})?$")

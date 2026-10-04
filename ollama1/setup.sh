@@ -471,7 +471,8 @@ resolve_settings
 prompt_settings
 find_disks
 derive_hosts
-for f in lib/o1common.py lib/setuplib.sh bin/ollama1-gateway systemd/ollama.service config/50-ollama1.rules; do
+for f in lib/o1common.py lib/setuplib.sh bin/ollama1-gateway bin/ollama1-modelplan systemd/ollama.service \
+         systemd/ollama1-modelplan.service config/50-ollama1.rules; do
   [ -f "$KIT/$f" ] || die "the kit is incomplete: $f is missing"
 done
 check_disks

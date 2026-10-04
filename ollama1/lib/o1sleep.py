@@ -3,9 +3,9 @@ and the health check after waking.
 
 The admin panel's Sleep button and the root helper both ask busy_reasons()
 first. Sleep is refused while any of these runs: a model pull or library
-sync, an update (the panel's, the Ollama updater, apt's daily jobs), or
-setup.sh. A RAID resync is allowed: the md driver pauses it and carries on
-after waking.
+sync, a model set from the app, an update (the panel's, the Ollama updater,
+apt's daily jobs), or setup.sh. A RAID resync is allowed: the md driver
+pauses it and carries on after waking.
 """
 import fcntl
 import fnmatch
@@ -21,6 +21,7 @@ SETUP_LOCK = "/run/ollama1-setup.lock"
 BUSY_UNITS = [
     ("ollama1-pull@*.service", "a model is being downloaded"),
     ("ollama1-models-sync.service", "the model library is being synced"),
+    ("ollama1-modelplan.service", "a model set from the app is being applied"),     # 6b410
     ("ollama1-update-now.service", "updates are being applied"),
     ("ollama1-update-ollama.service", "Ollama is being updated"),
     ("apt-daily.service", "the daily update check is running"),
@@ -115,7 +116,8 @@ def busy_reasons(active_units=_active_units, setup_lock=None):
         reasons.append("setup.sh is running")
     lib_why = dict(BUSY_UNITS)["ollama1-models-sync.service"]
     if lib_why not in reasons and setup_running(library_lock()):   # sudo ollama1-models sync
-        reasons.append(lib_why)
+        if dict(BUSY_UNITS)["ollama1-modelplan.service"] not in reasons:   # a set from the app holds it too: say it once
+            reasons.append(lib_why)
     return reasons
 
 

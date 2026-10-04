@@ -39,6 +39,7 @@ import o1gputune  # noqa: E402
 import o1idle  # noqa: E402
 import o1leds  # noqa: E402
 import o1library  # noqa: E402
+import o1modelplan  # noqa: E402
 import o1ollama  # noqa: E402
 import o1pair  # noqa: E402
 import o1power  # noqa: E402
@@ -212,6 +213,19 @@ def effective_sleep_setting(idle, res):
     return best
 
 
+def clean_modelplan(st):
+    """The last model set from the app (6b410), for the Models card's one
+    line: the set, the device, when, how many added and removed, whether it
+    is still running or was cut short, how many jobs failed. From
+    o1modelplan.read_status(), already cut down to known fields."""
+    if not isinstance(st, dict) or not st.get("plan"):
+        return None
+    jobs = st.get("jobs") or []
+    return {"plan": st["plan"]["name"], "by": st["plan"]["by"], "at": st["plan"]["at"],
+            "added": len(st.get("add") or []), "removed": len(st.get("remove") or []), "state": st.get("state"),
+            "failed": sum(1 for j in jobs if j.get("state") == "failed")}
+
+
 def json_bytes(obj):
     """JSON with <, > and & as \\u escapes: the same data to any JSON reader,
     and never markup to anything that sniffs it (6b398)."""
@@ -357,8 +371,12 @@ class Panel:
         allow = [{"name": e["name"], "ram": e["ram"], "hash": name_hash(e["name"]),
                   "installed": e["name"] in names or (e["name"] + ":latest") in names}
                  for e in entries]
+        try:
+            last_plan = clean_modelplan(o1modelplan.read_status())
+        except Exception:                # the line is extra: it never takes the models card down
+            last_plan = None
         return {"installed": installed, "allow": allow, "allow_errors": errors,
-                "pull": read_json(Paths.pull_status)}
+                "pull": read_json(Paths.pull_status), "last_plan": last_plan}
 
     def power(self):
         """Watts, kWh and cost; recomputed at most every 15 s, or at once
@@ -494,11 +512,15 @@ class Panel:
             allowed = {name_hash(n): n for n in read_allow_list()}
             if arg not in allowed:
                 return 403, "not on the allow-list"
+            if o1modelplan.plan_running():
+                return 409, "not now: a model set from the app is being applied"
             unit = TEMPLATE_UNITS[act] % arg
         elif act == "remove-model":
             names = {m["hash"]: m["name"] for m in self.models()["installed"]}
             if arg not in names or obj.get("confirm") != names[arg]:
                 return 400, "no such model, or not confirmed"
+            if o1modelplan.plan_running():
+                return 409, "not now: a model set from the app is being applied"
             unit = TEMPLATE_UNITS[act] % arg
         else:
             return 400, "unknown action"
@@ -1121,10 +1143,11 @@ footer{max-width:1680px;margin:0 auto;padding:0 28px 40px;color:var(--muted);fon
  </div>
  <div class="card s7"><h3><span class="t">Library</span><span class="row"><button type="button" id="libbtn" class="small">Update model library</button></span></h3>
   <div class="tbl"><table id="models"></table></div>
+  <div class="sub mt" id="planline" hidden></div>
   <div class="sub mt" id="pull"></div>
   <div class="sub mt" id="libmsg" role="status"></div>
   <div id="lib"></div>
-  <p class="note mt">Update model library shows what it would change first: it downloads models on the allow-list that aren't installed, updates the ones with a newer version, and removes installed models that aren't on the allow-list (nothing else). Only models on the allow-list (/etc/ollama1/models.allow, or <code>sudo ollama1-models add NAME</code> at the server) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p>
+  <p class="note mt">Update model library shows what it would change first: it downloads models on the allow-list that aren't installed, updates the ones with a newer version, and removes installed models that aren't on the allow-list (nothing else). Only models on the allow-list (/etc/ollama1/models.allow, <code>sudo ollama1-models add NAME</code> at the server, or a model set chosen in the app) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p>
  </div>
 </div>
 </section>
@@ -1531,7 +1554,11 @@ function renderModels(){const m=models;if(!m)return;const rows=[];
  m.allow.filter(a=>!a.installed).forEach(a=>{const b=el('button','Pull','small');b.type='button';b.addEventListener('click',()=>act('pull',a.hash,undefined,b));rows.push([el('span',a.name,'mono'),'-','allow-listed'+(a.ram?', may use system memory':'')+', not installed',b]);});
  (m.allow_errors||[]).forEach(e=>rows.push(['line '+e.line+': '+e.text,'-','ignored: '+e.reason,'']));
  table($('models'),['Model','Size','',''],rows);const p=m.pull,pe=$('pull');pe.replaceChildren();
- if(p&&p.model){pe.append(el('div','Pull '+p.model+': '+p.status+(p.total?' '+Math.round(100*p.completed/p.total)+'%':'')));if(p.total)pe.append(bar(p.completed/p.total));}}
+ if(p&&p.model){pe.append(el('div','Pull '+p.model+': '+p.status+(p.total?' '+Math.round(100*p.completed/p.total)+'%':'')));if(p.total)pe.append(bar(p.completed/p.total));}
+ // the last model set from the app (6b410): one line, as text
+ const lp=m.last_plan,pl=$('planline');pl.hidden=!lp;
+ if(lp)pl.textContent='Last change: '+lp.plan.charAt(0).toUpperCase()+lp.plan.slice(1)+' from '+(lp.by||'a paired device')+', '+stamp(lp.at)+': +'+lp.added+' -'+lp.removed
+  +(lp.state==='running'?' (in progress)':lp.state==='interrupted'?' (stopped before it finished)':lp.failed?' ('+lp.failed+' failed)':'');}
 
 // --- model library: preview, then exactly that ---
 let libWant=0,libState=null;

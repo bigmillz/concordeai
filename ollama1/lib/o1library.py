@@ -30,8 +30,8 @@ import urllib.error
 import urllib.request
 
 import o1ollama
-from o1common import (Paths, load_config, parse_allow_list, read_json, read_json_safe, valid_model_name,
-                      write_json_atomic)
+from o1common import (Paths, load_config, parse_allow_list, read_json, read_json_safe, share_with_viewers,
+                      valid_model_name, write_json_atomic)
 
 OLLAMA = "http://127.0.0.1:11434"
 REGISTRY = "https://registry.ollama.ai"
@@ -372,6 +372,7 @@ class Lock:
     def __enter__(self):
         os.makedirs(library_dir(), exist_ok=True)
         self.fd = os.open(lock_file(), os.O_RDWR | os.O_CREAT, 0o644)
+        share_with_viewers(self.fd)     # so the gateway and the panel can see a sync running (6b410)
         try:
             fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
@@ -496,13 +497,24 @@ def execute(p, base=None, allow_path=None, report=None, tries=TRIES, sleep=time.
 # ---- the allow-list -----------------------------------------------------------
 
 def _write_allow(lines, allow_path):
+    _write_allow_text("\n".join(lines).rstrip("\n") + "\n", allow_path)
+
+
+def _write_allow_text(text, allow_path):
+    """The whole list, replaced in one rename (the old list or the new one,
+    never half of either): a temp file in the same folder, flushed to the
+    disk, 0644 set on the open file, renamed over the list, the folder
+    flushed. Root writes it, so it stays root:root 0644."""
     import tempfile
     path = allow_path or Paths.allow
-    fd, tmp = tempfile.mkstemp(prefix=".models.allow-", dir=os.path.dirname(path))
+    d = os.path.dirname(path)
+    fd, tmp = tempfile.mkstemp(prefix=".models.allow-", dir=d)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines).rstrip("\n") + "\n")
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+            f.flush()
             os.fchmod(f.fileno(), 0o644)
+            os.fsync(f.fileno())
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -510,6 +522,14 @@ def _write_allow(lines, allow_path):
         except OSError:
             pass
         raise
+    try:
+        dfd = os.open(d or ".", os.O_RDONLY)
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
+    except OSError:
+        pass
 
 
 def _read_lines(allow_path):
@@ -555,3 +575,42 @@ def allow_remove(name, allow_path=None):
         return False
     _write_allow(keep, allow_path)
     return True
+
+
+ALLOW_MAX_BYTES = 1 << 20
+
+
+def allow_apply(add, remove, allow_path=None):
+    """The one edit a model set from the app makes (6b410, root only): every
+    line whose model is a `remove` tag goes, in any letter case (a model the
+    list names in any case is never deleted, so its line must go too); every
+    `add` tag the list doesn't have yet gets a line of its own at the end, no
+    flag. Nothing else changes: the other lines, comments, flags, blank lines
+    and line endings stay byte for byte. One write, one rename. A list that
+    is missing (OSError: a new one holding only these tags would let the next
+    sync delete every other model), isn't UTF-8 (UnicodeDecodeError) or is
+    over 1 MiB (ValueError) is never written. Returns (the tags that got a
+    line, the lines taken out)."""
+    path = allow_path or Paths.allow
+    with open(path, "rb") as f:
+        raw = f.read(ALLOW_MAX_BYTES + 1)
+    if len(raw) > ALLOW_MAX_BYTES:
+        raise ValueError("models.allow is over 1 MiB")
+    text = raw.decode("utf-8")
+    lines = text.splitlines(keepends=True)
+    gone = [t.lower() for t in remove]
+    keep, removed = [], []
+    for ln in lines:
+        name = _line_name(ln)
+        if name and any(o1ollama.same_model(name.lower(), t) for t in gone):
+            removed.append(ln.rstrip("\r\n"))
+        else:
+            keep.append(ln)
+    have = [n for n in (_line_name(ln) for ln in keep) if n]
+    added = [t for t in add if not any(o1ollama.same_model(h, t) for h in have)]
+    if added and keep and not keep[-1].endswith(("\n", "\r")):
+        keep[-1] += "\n"
+    out = "".join(keep) + "".join(t + "\n" for t in added)
+    if out != text:
+        _write_allow_text(out, path)
+    return added, removed

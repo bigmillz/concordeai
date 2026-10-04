@@ -383,7 +383,8 @@ around a little from time to time.
   - The gateway never sees the code: a root step checks it and adds the key.
   - To list devices: `sudo ollama1-pair --list`.
   - To remove one: `sudo ollama1-pair --remove ID`, or use the panel.
-- **Models:** none are installed. Choose them first. The allow-list,
+- **Models:** none are installed. Choose them first: in the app (a model
+  set, see "Model sets from the app" below) or here. The allow-list,
   `/etc/ollama1/models.allow`, decides what may be installed (one name per
   line, e.g. `qwen3:14b`), and `ollama1-models` makes the installed models
   match it:
@@ -775,6 +776,64 @@ around a little from time to time.
   `http://<server-ip>:8431` from the home LAN, without Access. Signatures
   are still required, and traffic on the LAN is unencrypted. To change it:
   `sudo ollama1-lan on|off`, or use the panel.
+
+## Model sets from the app
+
+In ConcordeAI (Settings > Your servers) you can pick a model set for a paired
+server: **Light**, **Recommended** or **Everything**. The app works out which
+models that means for this server's graphics card, shows the exact
+**Download** and **Remove** lists, and, when you apply it, sends them here.
+The server carries it out; nothing else about models changes. The routes are
+in `PROTOCOL.md` ("Model sets").
+
+**Who may do what.** The gateway runs as `o1gw` and can't touch a model or the
+allow-list. It checks the request, leaves it in its own folder
+(`/var/lib/ollama1-gateway/modelplan-request.json`, 0600) and starts
+`ollama1-modelplan.service`: the polkit rule lets `o1gw` start that one unit
+and nothing else, with no other verb. The unit runs
+`/usr/local/lib/ollama1/bin/ollama1-modelplan` as root, and that program trusts
+nothing the gateway wrote:
+
+- it reads the request without following a symlink, only a regular file with
+  one link, owned by `o1gw`, at most 16 KiB, made in the last 2 minutes and not
+  answered before;
+- it checks the request's shape again (the set's name, at most 40 tags per
+  list, Ollama library names only: no host, no namespace, no `/`; no model in
+  both lists), that the device is still paired (the name it records comes from
+  `devices.json`, not from the request), that nothing else is changing the
+  models (another set, a sync or `ollama1-models` at the server, a pull or
+  removal from the panel), that the models on the disk are exactly the ones
+  the app saw (`seen`: "nothing unlisted goes"), and that nothing to remove is
+  loaded. Any refusal changes nothing.
+
+Then it edits `/etc/ollama1/models.allow`: a line for each model to add (at
+the end, no flag), and the lines naming a model to remove taken out; every
+other line, comment and flag stays as it was, and the file is replaced in one
+rename (root:root, 0644). A missing or unreadable list is never rewritten.
+Then it removes first and downloads after, in the order the app gave, each
+model checked against the list again right before. A download is tried 3
+times; one that still fails is marked failed and the next one runs. It never
+reaches the internet itself: Ollama downloads, in its own service, and the
+unit may only talk to 127.0.0.1 (`IPAddressDeny=any`), with no capability but
+reading other users' files (the request) and setting a file's group.
+
+- **Follow it:** `journalctl -u ollama1-modelplan` has every request (device,
+  set, models to add and remove) and each result. The panel's Models card
+  shows "Last change: Recommended from Alice's Mac, Oct 4 14:03: +3 -1".
+- **The sync keeps it.** `sudo ollama1-models sync` (and the panel's Update
+  model library) follow the allow-list, which the set updated, so they never
+  undo it. They still remove installed models that aren't on the list, as
+  before: a set never does (it removes only what it lists).
+- **One thing at a time.** While a set runs, a sync, `ollama1-models add` and
+  `remove`, the panel's Pull and Remove buttons and another set are refused,
+  and the server doesn't sleep. A set is refused while any of those runs.
+- **What it doesn't do.** It never sets the `ram` flag: a model that needs
+  system memory still has to be marked at the server. It doesn't check
+  beforehand that every download fits (the app has the free space); it
+  stops downloading when the models disk has less than 2 GiB free.
+- **If the app says the server couldn't start the change**, the polkit rule
+  or the unit is missing: run `setup.sh` again. To undo a set, apply another
+  one, or edit the list and run `sudo ollama1-models sync`.
 
 ## Graphics card tuning
 
@@ -1613,7 +1672,7 @@ not apply. The services, timers, tunnel and config keep working: they live in
 | Replay, old requests | 60 s timestamp window, nonces remembered for 2 minutes, anything signed before the gateway last started is refused |
 | Nothing mixes, nothing kept | One request at a time on the GPU. When the next request comes from a different paired device, every loaded model is unloaded first, so not even Ollama's prompt cache is shared (the cost: one reload when the device changes). No history; bodies are never written or logged (`tests/test_stateless.py` checks the source and does a live check with markers); Ollama and the gateway run with no core dumps and no swap, and Ollama at its normal log level (its debug levels could print prompts) |
 | GPU only | Fit estimate before loading, `/api/ps` must show 100% VRAM after. Options that change placement (`num_gpu`, etc.) are stripped. Ollama cloud models are refused |
-| No model management from outside | The gateway passes on chat, generate, embed, tags, ps, show, version. Pull/delete/create/copy/push are 404. The panel can pull only allow-listed models |
+| No model management from outside | The gateway passes on chat, generate, embed, tags, ps, show, version. Pull/delete/create/copy/push are 404. The panel can pull only allow-listed models. A paired device can apply a model set: the gateway can only start `ollama1-modelplan.service` (polkit), whose root program checks the request again, edits the allow-list and has Ollama delete and pull exactly those library models |
 | Admin only | Panel: Access JWT with your email on every request. Actions need a CSRF token, same-origin and JSON. It can only *start* fixed systemd units (polkit rule), never run a command |
 | Local users | `ollama1-nft` lets only the kit's users (and root) connect to Ollama, the gateway and the panel, on any of the machine's own addresses; the services won't start without it. The terminal has no TCP port at all |
 | Services | Dedicated no-shell users, `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, empty capability sets. Secrets are handed in with `LoadCredential=`, so they stay root-only on disk |
@@ -1714,6 +1773,13 @@ Ed25519 (the server uses PyNaCl). They cover:
   anywhere;
 - the model library sync: nothing on the allow-list is ever deleted, and a
   sync does exactly its preview;
+- model sets from the app (`test_modelplan.py`): both routes signed and
+  paired-only, every refusal (bad requests, `changed`, `busy`, `in_use`) from
+  the gateway and again from root's program when only it can see the
+  problem, the request file it trusts (owner, links, symlinks, FIFOs, size,
+  age, replays), the exact allow-list edit, removals first, a failed download
+  that doesn't stop the rest, the status files, and the unit's sandbox and the
+  polkit rule (`o1gw`: that unit, start only);
 - power and prices: DST, holidays, weekends, windows past midnight, season
   changes, minute-boundary splits, gaps as unknown, the RAPL wrap, the four
   plug types (fake plugs), LAN-only plugs;
