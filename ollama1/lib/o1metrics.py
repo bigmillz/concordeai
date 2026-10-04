@@ -18,7 +18,8 @@ from o1stats import PROC, SYS
 
 HISTORY = 3600
 SERIES = ("tps", "gpu_busy", "vram_used", "gpu_power", "ram_used", "io_read", "io_write",
-          "net_rx", "net_tx", "cpu_total", "active")
+          "net_rx", "net_tx", "cpu_total", "active",
+          "gpu_temp", "cpu_temp", "cpu_mhz", "fan_rpm")      # the last four: the graphical panel (6b380)
 DISK_RE = re.compile(r"^(nvme\d+n\d+|sd[a-z]+|vd[a-z]+|hd[a-z]+)$")
 
 
@@ -190,8 +191,8 @@ class Sampler:
             "uptime": o1stats.uptime(),
             "gw": gw,
             "gpu": g,
-            "cpu": {"total": cpu_total, "cores": cores, "temp": self._slow("ctemp", 2, cpu_temp),
-                    "load": o1stats.loadavg()},
+            "cpu": dict({"total": cpu_total, "cores": cores, "temp": self._slow("ctemp", 2, cpu_temp),
+                         "load": o1stats.loadavg()}, **(self._slow("cclock", 2, cpu_clock) or {})),
             "mem": mem,
             "ollama_cg": ollama_cgroup(),
             "disks": self._slow("disks", 10, o1stats.disks) or [],
@@ -202,6 +203,8 @@ class Sampler:
             "updates": self._slow("updates", 30, o1stats.updates) or {},
             "pairing": o1stats.pairing_window(),
             "power": self._slow("power", 5, power_state),
+            "activity": read_json(os.path.join(Paths.stats_dir, "activity.json")),
+            "idle": self._slow("idle", 5, lambda: read_json(os.path.join(Paths.run, "idle.json"))),
         }
         tot = mem.get("total") or 0
         vals = {
@@ -214,11 +217,28 @@ class Sampler:
             "net_rx": netrate["rx_bps"], "net_tx": netrate["tx_bps"],
             "cpu_total": cpu_total,
             "active": (gw or {}).get("active"),
+            "gpu_temp": ((g or {}).get("temps") or {}).get("junction") or ((g or {}).get("temps") or {}).get("edge"),
+            "cpu_temp": st["cpu"]["temp"],
+            "cpu_mhz": st["cpu"].get("mhz"),
+            "fan_rpm": (g or {}).get("fan_rpm"),
         }
         for k, v in vals.items():
             self.series[k].append(v)
         st["series"] = {k: list(v) for k, v in self.series.items()}
         return st
+
+
+def cpu_clock(probe=[None]):
+    """{"mhz": average, "max_mhz": the top speed} from cpufreq (o1cpu), or
+    None where there is none (a virtual machine). The probe is made once."""
+    import o1cpu
+    if probe[0] is None:
+        probe[0] = o1cpu.CpuProbe()
+    dirs, _n = probe[0].cpu_dirs()
+    f = probe[0].frequency(dirs)
+    if f.get("avg_mhz") is None:
+        return None
+    return {"mhz": f["avg_mhz"], "max_mhz": f.get("max_mhz") or f.get("rated_mhz")}
 
 
 def power_state():
