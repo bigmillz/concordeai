@@ -6036,6 +6036,22 @@ for _d5, _o5, _n5, _w5 in _S5_MUT:
 check("the three sets: %d mutations of their rules, each caught by the check that guards it" % len(_S5_MUT),
       all(isinstance(v, list) for _d, v in _s5m), "%r" % [x for x in _s5m if not isinstance(x[1], list)])
 # ==== 6b405 model sets: end ====
+# 6b408, per Patrick: the studio cards' Remove looked unfinished (a thin grey
+# box with the browser's own text). It and "Continue in background" are the
+# app's about-btn now, the same size, font and radius as Add, in the card's
+# action row at its right edge, a quiet danger tint on Remove's hover
+_st8 = page[page.index(".studio .stacts{"):page.index(".studio .about-btn.slim[disabled]")]
+check("studio cards: Remove is the app's own button, in the action row beside Add (6b408)",
+      "h+='<button class=\"about-btn slim ghost strm\">Remove</button>';" in page
+      and "h+='<button class=\"about-btn slim ghost stbg\">Continue in background</button>';" in page
+      and "else h+='<button class=\"about-btn slim stadd\"'" in page
+      and "justify-content:flex-end" in _st8
+      and ".studio .stacts .about-btn{width:auto;margin-top:0;padding:6px 14px;" in _st8
+      and "border-radius:9px}" in _st8
+      and ".studio .stacts .about-btn.strm:hover,.studio .stacts .about-btn.strm[data-sure=\"1\"]{" in _st8
+      and "color:#e8907e;border-color:rgba(226,109,90,.5)" in _st8
+      and ".studio .stacts .about-btn:focus-visible{" in _st8
+      and 'class="ghost slim strm"' not in page, _st8[:200])
 
 print("== resolvers ==")
 s, h, b = req("/api/tiers", cookie=K)

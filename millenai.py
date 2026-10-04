@@ -34406,11 +34406,23 @@ body.gen #chip-model{color:var(--accent)}
   transition:width .6s cubic-bezier(.4,0,.2,1)}
 .studio .stnums{display:flex;justify-content:space-between;margin-top:5px;
   font-family:var(--mono);font-size:9.5px;color:var(--faint)}
-.studio .stacts{display:flex;gap:7px;margin-top:9px}
+/* the studio cards' buttons (6b408, per Patrick: Remove looked unfinished,
+   a thin grey box with the browser's own text): the app's about-btn, the
+   same height, padding, font and radius as Add, in the card's action row
+   at its right edge; Remove a quiet ghost that warms to the danger tint */
+.studio .stacts{display:flex;gap:7px;margin-top:10px;justify-content:flex-end;
+  align-items:center}
 .studio .stacts button[hidden]{display:none}
-.studio .ghost.slim{background:none;border:1px solid var(--line);
-  color:var(--faint)}
-.studio .ghost.slim:hover{color:var(--text);border-color:var(--dim)}
+.studio .stacts .about-btn{width:auto;margin-top:0;padding:6px 14px;
+  font-size:12px;line-height:1.2;border-radius:9px}
+.studio .stacts .about-btn.ghost{background:none;border:1px solid var(--line);
+  color:var(--dim)}
+.studio .stacts .about-btn.ghost:hover{color:var(--text);border-color:var(--dim);
+  background:rgba(255,255,255,.04)}
+.studio .stacts .about-btn.strm:hover,.studio .stacts .about-btn.strm[data-sure="1"]{
+  color:#e8907e;border-color:rgba(226,109,90,.5);background:rgba(226,109,90,.06)}
+.studio .stacts .about-btn:focus-visible{outline:2px solid var(--accent-hot);
+  outline-offset:2px}
 .studio .about-btn.slim[disabled]{opacity:.4;cursor:not-allowed}
 .genvid{display:block;max-width:min(100%,640px);border-radius:12px;
   margin:6px 0 10px;background:#000;
@@ -44514,8 +44526,9 @@ function studioHTML(key,st){
       +'</span></div></div>';
   }
   h+='<div class="stacts">';
-  if(st.ready) h+='<button class="ghost slim strm">Remove</button>';
-  else if(busy) h+='<button class="ghost slim stbg">Continue in background</button>';
+  // the app's own secondary button (6b408), sat in the card's action row
+  if(st.ready) h+='<button class="about-btn slim ghost strm">Remove</button>';
+  else if(busy) h+='<button class="about-btn slim ghost stbg">Continue in background</button>';
   else h+='<button class="about-btn slim stadd"'
     +(cur.fit==="red"?" disabled":"")+'>'
     +(st.status==="error"?"Retry":"Add")+' \u00b7 '+(cur.gb||0)+' GB</button>';

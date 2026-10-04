@@ -9,6 +9,17 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b408 — the studio cards' Remove is a real button (per Patrick)
+
+The Remove (and Continue in background) buttons on the Image and Video generation cards were
+`ghost slim` without the app's button class: a thin grey box with the browser's own text, under
+the title at the left. They are `about-btn slim ghost` now: the same height, padding, font and
+9 px radius as Add, in the card's action row at its right edge (`.studio .stacts`
+justify-content:flex-end), a subtle border, a hover, a focus ring, and Remove warms to the danger
+tint on hover and while it asks "really remove?". Text and the confirm step unchanged. Gauntlet:
+a CSS/markup substring check. Seen in the Browser pane (dark; the app has no light theme), not
+in WKWebView.
+
 ## 6b407 — the same three sets on your server, with the exact lists before anything goes (per Patrick)
 
 Settings › Servers: each paired server's card has "Models on <name>" with the three cards,
