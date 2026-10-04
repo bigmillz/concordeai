@@ -9056,7 +9056,7 @@ ACCOUNTS_DIR = "accounts"
 PERSONAL_NAMES = frozenset((
     CHATS_FILE, MEMORY_FILE, LEGACY_CHATS, LEGACY_MEMORY, PERSONAL_FILE,
     LOCAL_FILE, QUALITY_FILE, "usage.jsonl", "cloud.json", "remote.json",
-    "remote_known_hosts", "bench_targets.jsonl", "images", "videos",
+    "remote_known_hosts", "bench_targets.jsonl", "suggest.json", "images", "videos",
     "exports", "sync", "account.key", "servers.json"))
 # absent means "not written yet" for these only until their first write
 # (0b 5.2, L1); after it a missing file is a read error, never empty
@@ -9566,7 +9566,7 @@ def ctx_timer(interval, fn, args=(), ctx=None):
 # and PROFILE_LOCAL in local.json, and reads MACHINE from prefs.json.
 SYNCED_SETTINGS = frozenset((
     "user_name", "persona", "length", "home_area", "funnel_effort",
-    "funnel_cloud", "polish"))
+    "funnel_cloud", "polish", "suggest_own"))
 PROFILE_LOCAL = frozenset((
     "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
     "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
@@ -9598,6 +9598,8 @@ SYNCED_ALLOWED = {
     # funnel; cloud power and a key still decide whether any is asked
     "funnel_cloud": ("one of", (True, False)),
     "polish": ("one of", (True, False)),
+    # "Personalise suggestions" (6b390): the starter chips follow the chats
+    "suggest_own": ("one of", (True, False)),
 }
 
 
@@ -12867,6 +12869,368 @@ def _extract_memory(label: str, user_msg: str, base, conf=None,
             _save_memory(items, base)
     except Exception:
         pass  # memory is best-effort — never break chat over it
+
+
+# ------------------------------------------- starter chips from your chats
+# THE THREE CHIPS ABOVE THE COMPOSER FOLLOW WHAT THE PERSON ASKS (6b390,
+# per Patrick: "if a person often asks about car repairs and a few times
+# about cooking, show two car-repair chips and one healthy-eating chip").
+# Only a TOPIC SUMMARY is ever read: the titles of the newest chats (the
+# chat's own headline, or its first question cut short when it has none),
+# scrubbed and cut to SUGGEST_LABEL_MAX characters, never a message. One
+# model groups the labels into topics, counts them and writes three starter
+# questions for each; the result is kept in the profile's own suggest.json
+# and the page picks from it (the biggest topic two chips, the next one, the
+# fixed pool for the rest). The pass runs in the BACKGROUND, only when the
+# page asks for the chips (never to load a page or open a chat), at most
+# every SUGGEST_AGE_S and only when the titles changed; never while an
+# answer is being written or a download or benchmark runs; and every failure
+# means the fixed pool, as before.
+# WHICH MODEL (per Patrick: the server beats this computer, the cloud never
+# but in Cloud Only): the person's server first (server_side_text), else a
+# model of this computer that is ALREADY loaded (a side pass never loads
+# one), and in Cloud Only the cloud's quick model and nothing else.
+SUGGEST_FILE = "suggest.json"
+SUGGEST_MIN_CHATS = 3            # fewer chats than this: the fixed pool
+SUGGEST_LABELS = 30              # the newest this many topic labels
+SUGGEST_LABEL_MAX = 60           # a label is cut here
+SUGGEST_AGE_S = 6 * 3600         # a kept summary is looked at again after this
+SUGGEST_RETRY_S = 15 * 60        # a pass that gave nothing is not repeated sooner
+SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 48
+SUGGEST_TOPICS = 4               # topics kept
+SUGGEST_PROMPT = (
+    "Below are the topics a person chatted about recently, one per line, "
+    "newest first. Group them into at most 4 topics and count how many lines "
+    "each topic covers. For every topic write 3 short starter questions the "
+    "person might want to ask next: each under 32 characters, one fitting "
+    "emoji at the start, general (no names, places, numbers or personal "
+    "details) and different from every line below. Answer in exactly this "
+    "form and nothing else:\n"
+    "TOPIC: <the topic in one to three words> | COUNT: <number of lines>\n"
+    "- <emoji> <starter question>\n- <emoji> <starter question>\n"
+    "- <emoji> <starter question>\n\nCHATS:\n")
+# the pass's state: whether one runs, when to look again, and (for the test
+# hook) what it asked; a profile's own, emptied at a switch
+_suggest_state = profile_cache("_suggest_state", {})
+_suggest_lock = threading.Lock()
+
+
+def _suggest_scrub(text: str) -> str:
+    """A label with nothing in it a stranger could follow: no address, no
+    link, no long number; cut short."""
+    t = re.sub(r"https?://\S+|www\.\S+|\S+@\S+", " ", str(text or ""))
+    t = re.sub(r"\d{4,}", " ", t)
+    t = " ".join(t.split())
+    return t[:SUGGEST_LABEL_MAX].strip(" -—:,.\"'")
+
+
+def _suggest_first_user(c) -> str:
+    for m in _chat_msgs(c):
+        if isinstance(m, dict) and m.get("role") == "user" \
+                and isinstance(m.get("content"), str):
+            return m["content"]
+    return ""
+
+
+def suggest_labels(chats) -> tuple:
+    """(the topic labels sent, how many chats there were to read). Chat-lane
+    chats only, newest first. A label that touches the tender topics the
+    Funnel treats with care (health, a relationship, grief) is left out, so
+    the home screen never shows one."""
+    rows = [c for c in chats if isinstance(c, dict)
+            and (c.get("lane") or "ai") == "ai" and _suggest_first_user(c)]
+    rows.sort(key=_chat_ts, reverse=True)
+    out, seen = [], set()
+    for c in rows:
+        t = str(c.get("title") or "")
+        if not t or t.endswith("(copy)"):
+            t = _suggest_first_user(c)
+        t = _suggest_scrub(t)
+        if len(t) < 3 or _TENDER_RX.search(t) or t.lower() in seen:
+            continue
+        seen.add(t.lower())
+        out.append(t)
+        if len(out) >= SUGGEST_LABELS:
+            break
+    return out, len(rows)
+
+
+def _suggest_words(s: str) -> set:
+    return set(re.findall(r"[a-z]{3,}", str(s).lower()))
+
+
+def _suggest_chip(raw: str, labels: list, hide: set):
+    """One starter question as the page shows it ("🔧 How do I ..."), or
+    None when it isn't safe to show: not 8 to 48 characters, with an
+    address, a link, a long number or a tender topic in it, a word of the
+    person's own name or place, collapsed text, or the same as a chat they
+    already have."""
+    s = " ".join(str(raw or "").split())
+    s = re.sub(r"^(?:[-*•]|\d+[.)])\s*", "", s).strip("\"'*` ")
+    m = re.match(r"^([^\w\"'(]{1,8})\s*(.+)$", s)
+    emoji, body = (m.group(1).strip(), m.group(2)) if m else ("\U0001F4A1", s)
+    body = body.strip("\"'*` ")
+    if not (SUGGEST_CHIP_MIN <= len(body) <= SUGGEST_CHIP_MAX) \
+            or len(body.split()) < 2 or not emoji:
+        return None
+    if re.search(r"https?:|www\.|@|\.com\b|\d{4,}|[<>{}|\\]", body) \
+            or _TENDER_RX.search(body) or _looks_degenerate(body):
+        return None
+    w = _suggest_words(body)
+    if w & hide:
+        return None
+    for lb in labels:
+        lw = _suggest_words(lb)
+        if lw and w and len(w & lw) / len(w | lw) >= 0.7:
+            return None
+    return emoji + " " + body[0].upper() + body[1:]
+
+
+def suggest_parse(text: str, labels: list, hide: set) -> list:
+    """The model's reply as [{"topic", "n", "chips"}], the biggest first.
+    Anything it wrote that isn't safe is dropped; a reply with fewer than
+    two good starter questions is nothing at all."""
+    topics, cur = [], None
+    for ln in str(text or "").splitlines():
+        ln = ln.strip()
+        m = re.match(r"^(?:\*\*)?TOPIC:?(?:\*\*)?\s*(.+?)\s*"
+                     r"(?:\|\s*COUNT:?\s*(\d+))?\s*$", ln, re.I)
+        if m:
+            cur = {"topic": _suggest_scrub(m.group(1))[:30],
+                   "n": max(1, min(int(m.group(2) or 1), len(labels) or 1)),
+                   "chips": []}
+            topics.append(cur)
+        elif cur is not None and re.match(r"^(?:[-*•]|\d+[.)])\s", ln):
+            c = _suggest_chip(ln, labels, hide)
+            if c and c not in cur["chips"] and len(cur["chips"]) < 3:
+                cur["chips"].append(c)
+    topics = [t for t in topics if t["topic"] and t["chips"]]
+    topics.sort(key=lambda t: -t["n"])
+    topics = topics[:SUGGEST_TOPICS]
+    return topics if sum(len(t["chips"]) for t in topics) >= 2 else []
+
+
+def suggest_pick(cache: dict, rng=random) -> list:
+    """The personal chips for one painting: two from the biggest topic and
+    one from the next. Each painting draws afresh from the three each topic
+    kept; a topic tied for biggest is chosen by lot."""
+    tp = [t for t in (cache.get("topics") or []) if t.get("chips")]
+    if not tp:
+        return []
+    first = rng.choice([t for t in tp if t["n"] == tp[0]["n"]])
+    rest = [t for t in tp if t is not first]
+    out = rng.sample(first["chips"], min(2, len(first["chips"])))
+    if rest:
+        out += rng.sample(rest[0]["chips"], 1)
+    return out
+
+
+def suggest_read(ctx) -> dict:
+    try:
+        d = _read_json(SUGGEST_FILE, ctx, dict)
+    except (StoreReadError, NoProfile, StaleProfile):
+        return {}
+    return d if isinstance(d, dict) and d.get("v") == 1 else {}
+
+
+def suggest_forget(ctx):
+    """The kept summary goes (the switch turned off, or the chats erased)."""
+    try:
+        if os.path.exists(_pfile(SUGGEST_FILE, ctx)):
+            _write_json(SUGGEST_FILE, {}, ctx)
+    except (StoreReadError, NoProfile, StaleProfile, OSError):
+        pass
+
+
+def suggest_on(ctx) -> bool:
+    try:
+        return user_prefs(ctx).get("suggest_own", True) is not False
+    except Exception:
+        return False
+
+
+def suggest_busy(ctx) -> bool:
+    """An answer being written, a benchmark, a download or an update: the
+    pass waits for it. A question it can't answer counts as busy."""
+    try:
+        if turns_live_count(ctx) or _bench.get("running") \
+                or _bench_busy.get("n") or _bench_busy.get("srv"):
+            return True
+        if _modup.get("state") == "running":
+            return True
+        with _setup_lock:
+            return any((j or {}).get("status") in ("downloading", "queued")
+                       for j in _setup_jobs.values())
+    except Exception:
+        return True
+
+
+def _suggest_local_label():
+    """A model of this computer that is loaded RIGHT NOW and capable enough
+    (a side pass never loads one): the smallest such, or None."""
+    try:
+        up_ollama = set(_ollama_loaded())
+    except Exception:
+        up_ollama = set()
+    live = []
+    for lb, (kind, tgt) in MODEL_ROUTES.items():
+        if MODEL_MEM_BYTES.get(lb, 0) < 2.4e9:
+            continue
+        if (kind == "mlx" and _engine_up(tgt)) \
+                or (kind == "ollama" and tgt in up_ollama):
+            live.append(lb)
+    live.sort(key=lambda lb: MODEL_MEM_BYTES.get(lb, 0))
+    return live[0] if live else None
+
+
+# the test hook's replies (dev copies only): suggest-fake answers as a model
+# would; suggest-fake=unsafe answers with starter questions that must all be
+# refused; suggest-fake=fail answers nothing
+_SUGGEST_FAKE = (
+    "TOPIC: car repairs | COUNT: 6\n"
+    "- \U0001F527 How do I change my brake pads?\n"
+    "- \U0001F697 Why is my car shaking at speed?\n"
+    "- \U0001F6E0️ How often should I change oil?\n"
+    "TOPIC: healthy eating | COUNT: 2\n"
+    "- \U0001F957 What are easy healthy dinners?\n"
+    "- \U0001F34E How do I cut down on sugar?\n"
+    "- \U0001F966 Meal prep ideas for a week\n")
+_SUGGEST_UNSAFE = (
+    "TOPIC: car repairs | COUNT: 5\n"
+    "- \U0001F527 Email me at pat@example.com about brakes\n"
+    "- \U0001F697 See https://example.com/brakes for pads\n"
+    "- \U0001F6E0 How do I deal with my anxiety about cars?\n"
+    "- \U0001F527 How do I change my brake pads and also fix the engine?\n"
+    "- \U0001F527 Brakes?\n")
+
+
+def _suggest_hooked() -> bool:
+    return "suggest-fake" in TEST_HOOKS or bool(_hook_arg("suggest-fake"))
+
+
+def suggest_ask(ctx, prompt: str):
+    """(the reply, who wrote it) or (None, ""): the server first, else a
+    loaded model here; in Cloud Only the cloud's quick model and nothing
+    else (never a server, never a model of this computer)."""
+    st = _suggest_state
+    st["asks"] = int(st.get("asks", 0)) + 1
+    st["prompt"] = prompt
+    if _suggest_hooked():
+        mode = _hook_arg("suggest-fake")
+        if mode == "fail":
+            return None, ""
+        return (_SUGGEST_UNSAFE if mode == "unsafe" else _SUGGEST_FAKE), "test"
+    ask = [{"role": "user", "content": prompt}]
+    try:
+        cloud_only = profile_local(ctx).get("tier") == "Cloud Only"
+    except Exception:
+        cloud_only = False
+    if cloud_only:
+        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):
+            out = cloud_text(conf, ask, timeout=40, max_tokens=700, quiet=True)
+            if out:
+                return strip_think(out), "the cloud"
+        return None, ""
+    out = server_side_text(ask, ctx)
+    if out is not None:
+        return out, "your server"
+    label = _suggest_local_label()
+    if not label:
+        return None, ""
+    parts = []
+    run_model(label, ask, parts.append)
+    return strip_think(strip_special("".join(parts))), "this computer"
+
+
+def suggest_pass(ctx, force: bool = False):
+    """One pass, on its own thread for the profile that asked: reads the
+    titles, asks one model, keeps the summary. A pass held back because
+    something else was busy writes nothing."""
+    st = _suggest_state
+    now = time.time()
+    try:
+        if not suggest_on(ctx):
+            return
+        with _chats_lock:
+            chats = load_chats(ctx)
+        labels, n = suggest_labels(chats)
+        sig = hashlib.sha1("\n".join(labels).encode("utf-8")).hexdigest()
+        old = suggest_read(ctx)
+        base = {"v": 1, "sig": sig, "n": n, "tried": now,
+                "at": old.get("at", 0), "checked": old.get("checked", 0),
+                "topics": old.get("topics") or [], "made": old.get("made", "")}
+        if n < SUGGEST_MIN_CHATS or len(labels) < SUGGEST_MIN_CHATS:
+            base.update(topics=[], at=0, made="")
+            _write_json(SUGGEST_FILE, base, ctx)
+            return
+        if not force and old.get("topics") and old.get("sig") == sig:
+            base["checked"] = now          # nothing new: left as it is
+            _write_json(SUGGEST_FILE, base, ctx)
+            return
+        if suggest_busy(ctx):
+            st["hold"] = now + 90          # the page asks again later
+            return
+        user = user_prefs(ctx)
+        hide = set()
+        for k in ("user_name", "home_area"):
+            hide |= _suggest_words(user.get(k, ""))
+        out, who = suggest_ask(ctx, SUGGEST_PROMPT + "\n".join(labels))
+        topics = suggest_parse(out, labels, hide) if out else []
+        if not suggest_on(ctx):
+            return                         # switched off while it ran
+        if topics:
+            base.update(topics=topics, at=time.time(), checked=time.time(),
+                        made=who)
+        _write_json(SUGGEST_FILE, base, ctx)
+    except Exception:
+        pass            # the fixed pool is always there: never break a page over it
+    finally:
+        st["running"] = False
+
+
+def suggest_due(cache: dict, force: bool = False) -> bool:
+    now = time.time()
+    if _suggest_state.get("running"):
+        return False
+    if force:
+        return True
+    if now < _suggest_state.get("hold", 0) \
+            or now - float(cache.get("tried") or 0) < SUGGEST_RETRY_S:
+        return False
+    if not cache.get("topics"):
+        return True
+    return now - max(float(cache.get("at") or 0),
+                     float(cache.get("checked") or 0)) >= SUGGEST_AGE_S
+
+
+def suggest_start(ctx, force: bool = False) -> bool:
+    """Start a pass if one is due and none runs: True when one started."""
+    with _suggest_lock:
+        if not suggest_on(ctx) or not suggest_due(suggest_read(ctx), force):
+            return False
+        _suggest_state["running"] = True
+    ctx_thread(target=suggest_pass, args=(ctx, force), daemon=True).start()
+    return True
+
+
+def suggest_view(ctx, refresh: bool = False) -> dict:
+    """What GET /api/suggest answers, at once, from what is kept; a pass
+    that is due starts behind it. chips is [] for the fixed pool."""
+    if not suggest_on(ctx):
+        if suggest_read(ctx):
+            suggest_forget(ctx)
+        return {"on": False, "chips": [], "refreshing": False}
+    busy = suggest_busy(ctx)
+    started = False
+    if not busy:
+        started = suggest_start(ctx, refresh)
+    c = suggest_read(ctx)
+    return {"on": True, "chips": suggest_pick(c),
+            "at": c.get("at") or 0, "made": c.get("made") or "",
+            "n": c.get("n") or 0,
+            "topics": [t["topic"] for t in c.get("topics") or []],
+            "refreshing": bool(_suggest_state.get("running")),
+            "busy": busy, "started": started}
 
 
 # ------------------------------------------------------------- voice
@@ -26130,6 +26494,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if self.path == "/api/test/local" and "local-record" in TEST_HOOKS:
             self._send_json({"calls": [list(c) for c in _LOCAL_CALLS]})
             return
+        if self.path == "/api/test/suggest" and _suggest_hooked():
+            # what the starter-chip pass last asked, and how often (6b390)
+            self._send_json({"asks": int(_suggest_state.get("asks", 0)),
+                             "prompt": _suggest_state.get("prompt", ""),
+                             "running": bool(_suggest_state.get("running"))})
+            return
         if self.path == "/":
             # exactly "/" (6b321): "/?anything" is no longer the page, so
             # "/?key=" gets the gate's 403 even with the cookie. The page
@@ -26523,6 +26893,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(out)
         elif self.path == "/api/prefs":
             self._send_json(prefs_view(self.ctx))
+        elif self.path == "/api/suggest":
+            # the starter chips from the person's chats (6b390): what is
+            # kept, at once; a pass that is due runs behind it
+            self._send_json(suggest_view(self.ctx))
         elif self.path == "/api/chats":
             # an unreadable store answers 503, never an empty list (0b L1)
             with _chats_lock:
@@ -27746,6 +28120,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 ev.set()
             self._send_json({"ok": bool(ev)})
             return
+        if self.path == "/api/suggest/refresh":
+            # "Refresh" in Settings (6b390): a pass now, unless an answer, a
+            # download or a benchmark is running
+            self._send_json(suggest_view(self.ctx, refresh=True))
+            return
         if self.path == "/api/title":
             n = int(self.headers.get("Content-Length", 0))
             try:
@@ -27850,6 +28229,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     del _cs[:]
                     _cs.gone = []
                     store_chats(_cs, base, erase=True)
+                suggest_forget(base)    # the summary of them goes too (6b390)
             if "prefs" in scopes:
                 # personal keys only — machine config (turbo, update
                 # channel) is not "about the user" and must survive
@@ -33850,6 +34230,13 @@ body.gen #chip-model{color:var(--accent)}
    earlier attempt silently no-op'd — its anchor never matched, so
    the control fell back to the native blue slider. */
 #len-row{margin-top:12px}
+#p-persona .toggle-row{margin-top:16px;font-size:12px;padding:2px 2px}
+#p-persona .toggle-row span{color:var(--dim)}
+#sugg-note{font-size:11px;line-height:1.5;color:var(--faint);
+  margin:2px 2px 2px 36px}
+#sugg-note .about-btn.slim{display:inline-block;width:auto;margin:6px 8px 0 0;
+  padding:4px 12px;vertical-align:middle}
+#sugg-status{display:inline-block;margin-top:6px}
 #len-head{font-family:var(--mono);font-size:9px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--faint);margin-bottom:9px;
   display:flex;justify-content:space-between;align-items:baseline;gap:10px}
@@ -34929,6 +35316,12 @@ __CODE_ROWS__
         <div id="len-head">Response length <b id="len-val">Balanced</b></div>
         <input type="range" id="len-slider" min="1" max="5" step="1" value="3">
       </div>
+      <!-- 6b390: the starter chips follow what you ask about -->
+      <div class="toggle-row on" id="sugg-toggle"
+           title="The three chips above the message box follow what you ask about most.">
+        <div class="switch"></div><span>Personalise suggestions</span></div>
+      <div id="sugg-note">Reads the titles of your recent chats, nothing else. Your server writes the chips, else this computer; the cloud only in Cloud Only.<br>
+        <button class="about-btn slim" id="sugg-refresh" type="button">Refresh</button><span id="sugg-status"></span></div>
     </section>
     <section class="spane" id="p-cloud">
       <div class="set-h">Cloud power</div>
@@ -38942,6 +39335,29 @@ function startFunnel(text){
   const go=$("#fn-go"); if(go)go.click();
 }
 
+// STARTER CHIPS THAT FOLLOW THE CHATS (6b390): the server keeps a summary of
+// what the person asks about and hands back up to three chips (two from the
+// biggest topic, one from the next); the fixed pool fills the rest and is the
+// whole answer when there is nothing yet, the switch is off or anything
+// fails. A fetch never holds a painting up: the pool shows first and the
+// first answer repaints once. var, not let: no temporal dead zone for a
+// painting that runs before this line.
+var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0;
+function suggLoad(){
+  if(Date.now()-suggAsked<300000)return;     // the server's own copy moves slowly
+  suggAsked=Date.now();
+  api("/api/suggest").then(r=>r.json()).then(d=>{
+    suggOwn=(d&&d.on&&Array.isArray(d.chips))
+      ?d.chips.filter(c=>typeof c==="string").slice(0,3):[];
+    const wait=!suggOwn.length&&d&&d.refreshing&&suggWaits++<8;
+    const first=!suggGot&&!wait;if(!wait)suggGot=true;
+    if(typeof suggPane==="function")suggPane(d);
+    if(first&&suggOwn.length&&uiMode==="ai"&&$("#hero")&&!generating)paintSuggest();
+    // a pass is under way: look again in a few seconds, a few times, so
+    // the first chips come in without a reload
+    if(wait)setTimeout(()=>{suggAsked=0;suggLoad();},4000);
+  }).catch(()=>{suggAsked=0;});
+}
 function paintSuggest(){
   const box=$("#suggest"); if(!box)return;
   // THE CODE TAB GETS SERVER TASKS (6b250, per Patrick), not dinner
@@ -39031,8 +39447,14 @@ function paintSuggest(){
     const j=Math.floor(Math.random()*(i+1));
     [pick[i],pick[j]]=[pick[j],pick[i]];
   }
-  box.innerHTML=pick.map(q=>'<button class="sugg" type="button">'
-    +esc(q)+'</button>').join("");
+  // the chips that follow the person's chats (6b390) come first, so the
+  // one-row trim below drops the fixed ones before them
+  suggLoad();
+  const own=suggOwn.slice().sort(()=>Math.random()-0.5);
+  box.innerHTML=own.map(q=>'<button class="sugg" type="button" data-own="1">'
+      +esc(q)+'</button>').join("")
+    +pick.map(q=>'<button class="sugg" type="button">'
+      +esc(q)+'</button>').join("");
   box.hidden=false;
   // HOW MANY FIT IS MEASURED, NOT GUESSED: lay them out, then drop
   // anything that wrapped past the FIRST row (6b248, per Patrick: one
@@ -41504,7 +41926,7 @@ function srvSleepParse(raw){
   return {v:Math.max(5,Math.min(1440,n)),clamped:n<5||n>1440};
 }
 // what the controls show and whether they can be used. THE SERVER HOLDS THE
-// SETTING (6b370): the switch and the minutes show only what the server said when
+// SETTING (6b375): the switch and the minutes show only what the server said when
 // the app read it back. Until then, or when the read failed, there is no switch
 // and no minutes (v.unknown): not an "off", not a default of 30.
 function srvSleepView(z){
@@ -43127,6 +43549,8 @@ async function openAbout(){
     $("#user-name").value=pr.user_name||"";
     const lv=Math.max(1,Math.min(5,+(pr.length||3)));
     lenSlider.value=lv;paintLen(lv);
+    $("#sugg-toggle").classList.toggle("on",pr.suggest_own!==false);
+    suggAsked=0;suggLoad();
   }catch(e){}
   try{
     const [m,st]=await Promise.all([
@@ -43381,6 +43805,52 @@ $("#persona-save").addEventListener("click",async ev=>{
     b.textContent="Saved \u2713";
   }catch(e){b.textContent="Couldn\u2019t save";}
   setTimeout(()=>{b.textContent="Save";},1800);
+});
+/* "Personalise suggestions" (6b390): the switch is a setting of the person's
+   (suggest_own, on unless saved off); the line under it says where the chips
+   stand and Refresh asks for a pass now */
+function suggAgo(ts){
+  const m=Math.max(1,Math.round((Date.now()/1000-ts)/60));
+  return m<60?m+(m===1?" minute":" minutes")+" ago"
+    :m<2880?Math.round(m/60)+(Math.round(m/60)===1?" hour":" hours")+" ago"
+    :Math.round(m/1440)+" days ago";
+}
+function suggPane(d){
+  const el=$("#sugg-status");if(!el)return;
+  const who={"your server":"your server","this computer":"this computer",
+    "the cloud":"the cloud"};
+  el.textContent=!d||!d.on?"Off. You see the standard suggestions."
+    :d.refreshing?"Updating…"
+    :d.busy&&d.refresh?"An answer or download is running. Try again after it."
+    :d.chips&&d.chips.length?"Updated "+suggAgo(d.at)+(who[d.made]?", by "+who[d.made]:"")+"."
+    :"Using the standard suggestions for now.";
+}
+$("#sugg-toggle").addEventListener("click",async()=>{
+  const on=!$("#sugg-toggle").classList.contains("on");
+  $("#sugg-toggle").classList.toggle("on",on);
+  try{
+    await api("/api/prefs",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({suggest_own:on})});
+  }catch(e){}
+  suggAsked=0;suggGot=false;
+  if(!on){
+    suggOwn=[];suggPane({on:false});
+    if(uiMode==="ai"&&$("#hero")&&!generating)paintSuggest();
+  }
+  suggLoad();
+});
+$("#sugg-refresh").addEventListener("click",async()=>{
+  let d={};
+  try{d=await(await api("/api/suggest/refresh",{method:"POST"})).json();}catch(e){}
+  if(d.busy)d.refresh=true;
+  suggPane(d);
+  for(let i=0;i<20&&d.refreshing;i++){      // a pass takes seconds, not minutes
+    await new Promise(r=>setTimeout(r,2500));
+    try{d=await(await api("/api/suggest")).json();}catch(e){break;}
+    suggPane(d);
+  }
+  if(d&&d.on&&Array.isArray(d.chips))suggOwn=d.chips.filter(c=>typeof c==="string").slice(0,3);
 });
 const LEN_NAMES={1:"Brief",2:"Short",3:"Balanced",4:"Detailed",5:"In depth"};
 const lenSlider=$("#len-slider");
