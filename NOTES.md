@@ -9,6 +9,34 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b371 — the check after a wake waits for the card and the models drive (kit)
+
+- After a wake the record once read "Ollama didn't answer; restarted Ollama
+  and the tunnel; Ollama STILL NOT ANSWERING". The old check looked once,
+  restarted Ollama at once and looked again, with no wait for what Ollama
+  needs: right after a suspend the amdgpu driver (ROCm/KFD) and the NVMe
+  holding `/srv/models` come back after the hook has run, and a restart in
+  that gap starts Ollama into a card it can't use (`ollama1-wait-gpu` only
+  covers a service start, and gives up after 90 s and starts anyway). Also
+  possible: the check's own 60 s look being short, and the check racing
+  `ollama1-gpu-tune.service`, which the same hook starts.
+- `o1sleep.resume_check` now: healthy -> done at once (no waiting when all is
+  well). Otherwise it waits, bounded (90 s), for the card (`gpu_ok`, only
+  when an AMD card is on the PCI bus: `gpu_expected`) and the models drive
+  (`models_ok`: listable, and a mount or not empty), looks at Ollama again
+  (it was only slow: no restart), restarts Ollama and the tunnel, and if it
+  still doesn't answer, waits again for whatever was missing and restarts
+  once more. A whole-check budget of 8 minutes; the unit allows 15 and runs
+  after `ollama1-gpu-tune.service`.
+- The record carries the why: `detail` ("Ollama didn't answer; after 90 s
+  still missing: the graphics card; restarted ... again: Ollama STILL NOT
+  ANSWERING") and `waited_s`, `gpu_ready`, `models_ready`, `restarts`.
+  Existing keys (`ok`, `detail`, `at`) are unchanged.
+- Tests (fake clock and fakes): `TestResumeCheck` in `tests/test_sleep.py`;
+  mutants for no wait, no retry, unbounded wait, no reason.
+- Unverified on the real server: that the missing card/drive really is the
+  cause. The next failed wake will now say which.
+
 ## 6b370 — the auto sleep setting is proven to stay saved (kit)
 
 - Patrick's report: the setting looked like it didn't stick. Server side it

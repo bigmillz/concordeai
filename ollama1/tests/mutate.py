@@ -995,6 +995,16 @@ MUTANTS = [
      ["test_sleepcfg", "test_idle"]),
     ("sleep-config: status doesn't print the saved setting", "bin/ollama1-idle",
      "print(o1idle.describe_config())", "print('auto sleep')", ["test_sleepcfg"]),
+    ("resume-check: restarts Ollama without waiting for the card", "lib/o1sleep.py",
+     "        st = wait_ready(gpu, models, gpu_needed, wait_s, sleep, clock)\n        if st",
+     "        st = {'gpu': True, 'models': True, 'waited': 0}\n        if st", ["test_sleep"]),
+    ("resume-check: no second restart", "lib/o1sleep.py", "for attempt in (1, 2):", "for attempt in (1,):",
+     ["test_sleep"]),
+    ("resume-check: the wait is not bounded", "lib/o1sleep.py",
+     "if (state[\"gpu\"] and state[\"models\"]) or clock() - start >= wait_s:",
+     "if (state[\"gpu\"] and state[\"models\"]):", ["test_sleep"]),
+    ("resume-check: the reason is not recorded", "lib/o1sleep.py", 'detail = "; ".join(parts)',
+     'detail = parts[0]', ["test_sleep"]),
 ]
 
 

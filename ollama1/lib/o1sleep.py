@@ -178,19 +178,104 @@ def gpu_ok(sys_root=None):
     return False
 
 
-def resume_check(ollama=ollama_ok, gpu=gpu_ok, restart=None, log=print):
-    """After waking: if Ollama or the GPU isn't healthy, restart Ollama and
-    the tunnel. Returns the record written."""
-    restart = restart or (lambda units: subprocess.run(["systemctl", "restart"] + units))
-    o, g = ollama(), gpu()
+def gpu_expected(sys_root=None):
+    """True when an AMD graphics card is on the PCI bus: then the driver owes us
+    a card after waking. With none (a machine without one, or an NVIDIA card,
+    which ollama1-wait-gpu handles) there is nothing to wait for."""
+    import glob
+    root = sys_root or os.environ.get("OLLAMA1_SYS", "/sys")
+    for d in glob.glob(root + "/bus/pci/devices/*"):
+        try:
+            if (open(d + "/class").read().strip().startswith("0x03")
+                    and open(d + "/vendor").read().strip() == "0x1002"):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def models_ok(path=None):
+    """The models drive is back: /srv/models can be listed, and is either a
+    mount or holds something (an unmounted mount point is an empty folder)."""
+    path = path or Paths.models
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return False
+    return os.path.ismount(path) or bool(names)
+
+
+WAIT_S = 90           # the most it waits for the card and the models drive after a wake
+RETRY_S = 3
+CHECK_BUDGET_S = 480  # the whole check, so a stuck one still ends (the unit allows 10 minutes)
+
+
+def wait_ready(gpu, models, gpu_needed, wait_s=WAIT_S, sleep=time.sleep, clock=time.monotonic):
+    """Wait, at most wait_s, for the card's driver and the models drive to be
+    back after a wake. Returns {"gpu": bool, "models": bool, "waited": seconds}."""
+    start = clock()
+    state = {"gpu": True, "models": True}
+    while True:
+        state["gpu"] = bool(gpu()) or not gpu_needed()
+        state["models"] = bool(models())
+        if (state["gpu"] and state["models"]) or clock() - start >= wait_s:
+            break
+        sleep(RETRY_S)
+    state["waited"] = int(clock() - start)
+    return state
+
+
+def _missing(st):
+    return ", ".join(x for x, ok in (("the graphics card", st["gpu"]), ("the models drive", st["models"])) if not ok)
+
+
+def resume_check(ollama=ollama_ok, gpu=gpu_ok, restart=None, log=print, models=models_ok, gpu_needed=gpu_expected,
+                 sleep=time.sleep, clock=time.monotonic, wait_s=WAIT_S):
+    """After waking: if Ollama or the GPU isn't healthy, wait (at most wait_s)
+    for the card's driver and the models drive to be back, then restart Ollama
+    and the tunnel, and once more if Ollama still doesn't answer. The record
+    says what it saw: how long it waited, what was missing, how many restarts.
+    (6b371: after a wake it once recorded "Ollama STILL NOT ANSWERING" having
+    restarted Ollama straight away, while the card's driver was not back.)"""
+    restart = restart or (lambda units: subprocess.run(["systemctl", "restart"] + units, timeout=300))
+    t0 = clock()
+    o, g = ollama(), (gpu() or not gpu_needed())
+    facts = {"restarts": 0}
     if o and g:
-        detail = "Ollama and the GPU answered"
-        ok = True
+        detail, ok = "Ollama and the GPU answered", True
     else:
         why = ", ".join(x for x, bad in (("Ollama didn't answer", not o), ("the GPU didn't report", not g)) if bad)
-        log("resume: %s; restarting Ollama and the tunnel" % why)
-        restart(["ollama.service", "ollama1-tunnel.service"])
-        ok = ollama()
-        detail = "%s; restarted Ollama and the tunnel; Ollama %s" % (why, "answers now" if ok else "STILL NOT ANSWERING")
+        parts = [why]
+        log("resume: %s; waiting for the card and the models drive (at most %d s)" % (why, wait_s))
+        st = wait_ready(gpu, models, gpu_needed, wait_s, sleep, clock)
+        if st["gpu"] and st["models"]:
+            parts.append("the card and the models drive were back after %d s" % st["waited"])
+        else:
+            parts.append("after %d s still missing: %s" % (st["waited"], _missing(st)))
+        facts.update(waited_s=st["waited"], gpu_ready=st["gpu"], models_ready=st["models"])
+        ok = False
+        for attempt in (1, 2):
+            if clock() - t0 > CHECK_BUDGET_S:
+                parts.append("out of time before restart %d" % attempt)
+                break
+            if attempt == 2 and not (st["gpu"] and st["models"]):
+                # the first restart didn't bring it back: one more bounded wait for what was missing
+                st = wait_ready(gpu, models, gpu_needed, wait_s, sleep, clock)
+                facts.update(gpu_ready=st["gpu"], models_ready=st["models"])
+                parts.append("waited %d s more: %s" % (
+                    st["waited"], "both back" if st["gpu"] and st["models"] else "still missing " + _missing(st)))
+            if attempt == 1 and st["gpu"] and st["models"] and ollama():
+                ok = True                       # it was only slow: nothing to restart
+                parts.append("Ollama answers now without a restart")
+                break
+            log("resume: restarting Ollama and the tunnel (try %d)" % attempt)
+            restart(["ollama.service", "ollama1-tunnel.service"])
+            facts["restarts"] = attempt
+            ok = ollama()
+            parts.append("restarted Ollama and the tunnel%s: Ollama %s" % (
+                "" if attempt == 1 else " again", "answers now" if ok else "STILL NOT ANSWERING"))
+            if ok:
+                break
+        detail = "; ".join(parts)
     log("resume: " + detail)
-    return record(resume_check={"ok": ok, "detail": detail, "at": int(time.time())})
+    return record(resume_check=dict(facts, ok=ok, detail=detail, at=int(time.time())))

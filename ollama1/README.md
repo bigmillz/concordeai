@@ -660,8 +660,14 @@ around a little from time to time.
     job however the job ends, even if it is killed. Holding the button down
     still forces it off. `systemd-inhibit --list` shows who holds one.
   - After every wake a check runs. Ollama must answer (`/api/version`,
-    `/api/ps`) and the GPU must report through sysfs; if not, Ollama and
-    the tunnel restart.
+    `/api/ps`) and the GPU must report through sysfs. If not, it first waits
+    (at most 90 s) for the card's driver and the models drive (`/srv/models`)
+    to be back, then restarts Ollama and the tunnel, and once more (after
+    another bounded wait for whatever was missing) if Ollama still doesn't
+    answer. The record says why: how long it waited, what was still missing,
+    how many restarts (`resume_check` in `/var/lib/ollama1/sleep.json`, shown
+    on the dashboard and the panel). A server with no AMD card isn't held up
+    waiting for one.
   - The dashboard and the panel show the last sleep and wake times, and the
     result of that check.
   - **Untested until someone tries it by hand.** AMD GPU compute (ROCm)

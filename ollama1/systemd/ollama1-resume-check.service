@@ -1,8 +1,14 @@
+# After a wake (the sleep hook starts it): Ollama and the card must answer.
+# If not, it waits for the card's driver and the models drive to be back
+# (at most 90 s each time), restarts Ollama and the tunnel, and once more if
+# Ollama still doesn't answer; the record says what it saw (6b371). After
+# ollama1-gpu-tune.service when that is running too, so the two don't fight
+# over the card.
 [Unit]
 Description=ollama1: after waking, check Ollama and the GPU; restart Ollama and the tunnel if needed
-After=ollama.service
+After=ollama.service ollama1-gpu-tune.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper resume-check
-TimeoutStartSec=5min
+TimeoutStartSec=15min
