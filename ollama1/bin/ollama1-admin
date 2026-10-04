@@ -1351,7 +1351,7 @@ function renderSvc(s){const gw=s.gateway||{},tun=s.tunnel||{},up=s.updates||{},o
   ['Security updates',up.last_unattended?'last ran '+ago(up.last_unattended):'never'],
   ['Ollama updater',(ou.result||'not run')+' '+(ou.version||'')+(ou.last_run?', '+ago(ou.last_run):''),ou.result==='failed'?'bad':''],
   ['Next Ollama check',up.next_ollama_update||'?']]);
- chip('updchip',ou.result==='failed'?'Last update failed':up.reboot_required?'Reboot needed':ou.result?'Up to date':'Not run',ou.result==='failed'?'bad':up.reboot_required?'warn':ou.result?'ok':'');
+ const waiting=ou.result==='waiting for the network';chip('updchip',ou.result==='failed'?'Last update failed':waiting?'Waiting for the network':up.reboot_required?'Reboot needed':ou.result?'Up to date':'Not run',ou.result==='failed'?'bad':(up.reboot_required||waiting)?'warn':ou.result?'ok':'');
  const u=[['Ollama',(gw.ollama_version||'?')],['Updater',(ou.result||'not run')+(ou.version?' '+ou.version:'')+(ou.last_run?', '+ago(ou.last_run):''),ou.result==='failed'?'bad':''],
   ['Next check',up.next_ollama_update||'?'],['Security updates',up.last_unattended?'last ran '+ago(up.last_unattended):'never'],['Reboot required',up.reboot_required?'yes'+((up.reboot_pkgs||[]).length?' ('+up.reboot_pkgs.join(', ')+')':''):'no',up.reboot_required?'warn':'']];
  if(ou.detail)u.push(['Detail',ou.detail,ou.result==='failed'?'bad':'']);kv($('upd'),u);

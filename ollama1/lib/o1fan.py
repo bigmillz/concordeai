@@ -3,7 +3,7 @@ and every fan header the motherboard's chip lets the kit control follow what
 the server is doing, so it is cool when it works and quiet, and easy on the
 bearings, when it does not:
 
-  working     100%   a request, the card, a long job or the load says so
+  working     100%   a request, a long job, the card or the processors say so
   hold100     100%   for 60 s after the work ends
   hold50       50%   for the next 60 s
   idle20       20%   from 120 s after the work ended (and from the start)
@@ -17,9 +17,9 @@ What counts as "working" is what auto sleep already counts as busy
 (lib/o1idle.py), read with the same probes and the same limits:
 
   * a request in flight (the gateway's activity file);
-  * the graphics card at GPU_IDLE_PCT or more;
+  * the graphics card at 15% or more, averaged over 6 s;
   * a long job running (stability-test.sh and the like: o1idle.tools_running);
-  * a 1-minute load average above LOAD_BUSY.
+  * the processors at 40% or more, averaged over 10 s (no load average, 6b401).
 
 o1sleep.busy_reasons (a download, an update, a backup) is not used: those keep
 the server awake but are not heat.

@@ -9,6 +9,51 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b401 — "working" without the load average; the Ollama updater waits for the network (per Patrick)
+
+Patrick: "I swear the fans keep going up on their own." On the real server the
+journal showed `working: the machine is busy (load 5.2)` for minutes after boot
+with nothing running: the 1-minute load average counts tasks blocked on a disk
+(the RAID check, apt/snapd bursts, boot work) and lags by a minute, and the 60
+s + 60 s holds followed it.
+
+- `lib/o1work.py` (shared by the fan service and the lights) no longer reads the
+  load average. Working = a request in flight (at once); a running tool (at
+  once: whatever `o1idle.scan_tools` knows; gpu-burn.sh is not in its list and
+  is covered by the card signal; `o1idle` itself is untouched); the card
+  >= 15% averaged over 6 s; the processors >= 40% averaged over 10 s from
+  `/proc/stat` deltas (busy = user+nice+system+irq+softirq; total = all eight
+  fields, so iowait and idle are in the total, steal is not busy). Sampled at
+  the callers' 2 s poll; a window must span its length less 1 s before it says
+  anything (the first seconds after a start are quiet). Hysteresis: once the card
+  or processors made it work, it stays until that value has been under its
+  threshold for 6 s (the averages themselves lag, so a release is 6 s plus).
+- The reasons are `a request is running`, `running stability-test.sh`, `the card
+  is 62% busy`, `processors 71% busy`; the fan status, the admin line and the
+  lights' status carry them unchanged. Hold timing (60 s at 100%, 60 s at 50%) is
+  untouched. A one-sample 100% reading at the 2 s poll averages to 25% over the
+  4 samples of a 6 s window, so a single GPU spike can still count; that is the
+  spec's averaging, not a bug.
+- Tests: `tests/test_work.py` (fake /proc/stat, fake clock: a boot-like load
+  with idle processors, a 3 s burst, 10 s of 45%, iowait-heavy samples, steal,
+  each busy field, the card at 14/15/16%, averaging, both hysteresis edges, a 2 s
+  poll, which signal) and 22 `work:` mutants (thresholds, windows, hysteresis,
+  each /proc/stat field, the load average back). `test_fan`/`test_leds` changed
+  only where they asserted the load average or a single GPU sample.
+- The weekly Ollama updater failed at boot with "Temporary failure in name
+  resolution": the timer's catch-up run fires before DNS works, and a refusal
+  wrote `failed`. `bin/ollama1-update-ollama` now waits up to 2 minutes for the
+  API host to resolve (`wait_for_dns`), and a failure that is only "no network"
+  (`is_no_network`: gaierror, timeouts, connection errors, no route; not an HTTP
+  answer) is retried every 30 s for 10 minutes (`run_with_retries`). Until the
+  budget is spent `ollama-update.json` says `waiting for the network`, which a
+  later `updated`/`current` overwrites; only then (or for any other failure at
+  once) `failed`. The admin chip says "Waiting for the network" (warn), not
+  "Last update failed". `--no-wait` and `--check` make one attempt. Unit:
+  `After=network-online.target nss-lookup.target`; no `Restart=` (a real
+  failure must not loop). Tests: `TestNetworkWait*` in test_updater.py with a
+  fake clock and resolver, and 10 `updater:` mutants.
+
 ## 6b400 — the web admin panel is graphical now, same actions and protections (per Patrick)
 
 Patrick: "Rebuild the web interface so that it's much more graphical, but

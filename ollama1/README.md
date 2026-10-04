@@ -871,7 +871,7 @@ at a level that follows what the server is doing:
 
 | Phase | Level | When |
 |---|---|---|
-| `working` | 100% | a request, the card, a long job or the load says it is working |
+| `working` | 100% | a request, a long job, the card or the processors say it is working |
 | `hold100` | 100% | for 60 s after the work ends |
 | `hold50` | 50% | for the next 60 s |
 | `idle20` | 20% | from 120 s after the work ended, and from the start |
@@ -882,11 +882,19 @@ is 255. While the service runs it always holds the outputs; whenever it
 stops, for any reason, they go back to their own control (the BIOS's
 automatic), and that is also what is in force at boot before it starts.
 
-**Working** is what auto sleep already counts as busy, read with the same
-probes and limits: a request in flight (the gateway's activity file), the
-graphics card at 10% or more, a long job running (`stability-test.sh` and
-the like), or a 1-minute load average above 1.5. A download, an update or a
-backup is not heat and does not count.
+**Working** (`lib/o1work.py`, shared with the lights) is a request in flight (at once), a long job running (`stability-test.sh` and
+the like, at once), the graphics card at 15% or more averaged over 6 s, or the
+processors at 40% or more averaged over 10 s (`/proc/stat` user, nice, system,
+irq and softirq over every field, so time waiting on a disk does not count).
+Once the card or the processors made it work it stays working until the value
+has been under its threshold for 6 s. The 1-minute **load average is not used**:
+it counts tasks blocked on a disk (a RAID check, boot work, apt) and lags by a
+minute, which kept the fans at 100% with nothing running. Status, the admin
+line and the lights' status say which signal made it work ("a request is
+running", "the card is 62% busy", "processors 71% busy", "running
+stability-test.sh"). A
+download, an update or a backup is not heat and does not count. Auto sleep keeps
+its own idle rules, load average included.
 
 **Temperature override.** Any of these at its limit forces 100% whatever the
 load says, until it is 10 C under it; then the normal rule follows:
@@ -1017,8 +1025,17 @@ the cooler's pump head) gets the same colour, on all its LEDs:
 | ended | red for 3 s, then white | back to white over 2 s |
 
 "Working" is the **same definition as the fans** (`lib/o1work.py`, shared by
-both services): a request in flight, the graphics card at 10% or more, a long
-job running, or a 1-minute load above 1.5. The 3 s (an anti-flicker pause
+both services): a request in flight (at once), a long job running (`stability-test.sh` and
+the like, at once), the graphics card at 15% or more averaged over 6 s, or the
+processors at 40% or more averaged over 10 s (`/proc/stat` user, nice, system,
+irq and softirq over every field, so time waiting on a disk does not count).
+Once the card or the processors made it work it stays working until the value
+has been under its threshold for 6 s. The 1-minute **load average is not used**:
+it counts tasks blocked on a disk (a RAID check, boot work, apt) and lags by a
+minute, which kept the fans at 100% with nothing running. Status, the admin
+line and the lights' status say which signal made it work ("a request is
+running", "the card is 62% busy", "processors 71% busy", "running
+stability-test.sh"). The 3 s (an anti-flicker pause
 between two requests) count from the poll that first sees the work has ended,
 so the red lasts 3 s to 5 s after it really did. A new request at any point
 turns the fade round from the colour it has reached; nothing jumps. Frames go
@@ -1478,6 +1495,12 @@ not apply. The services, timers, tunnel and config keep working: they live in
     for the file.
   - It switches to the new version, then checks that it starts. If it
     doesn't, it switches back. On any mismatch it stays where it is.
+  - The catch-up run after a boot waits for the network: up to 2 minutes at
+    a time for `api.github.com` to resolve, and a run that fails only because
+    the network is missing is retried every 30 s for 10 minutes. Until then
+    the panel says "Waiting for the network", not "failed"; a later success
+    replaces it. Any other failure (a checksum, an HTTP error) is "failed" at
+    once. `--no-wait` makes one attempt.
   - To run it by hand: `sudo systemctl start ollama1-update-ollama`.
 - **Backups:** every night at 02:30, `/etc/ollama1`, the tunnel credential,
   the SSH/apt/GRUB drop-ins and the model list go to

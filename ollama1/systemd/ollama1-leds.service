@@ -1,5 +1,5 @@
 # Lights that follow the server's work (6b395): white when idle, red while a
-# request, the card, a long job or the load says it is working, back to white
+# request, a long job, the card or the processors say it is working, back to white
 # 3 s after (lib/o1leds.py). It only talks to the OpenRGB server of
 # ollama1-openrgb.service on 127.0.0.1 and reads what the fan service reads
 # (the gateway's activity file, the card's busy percent, /proc); it writes

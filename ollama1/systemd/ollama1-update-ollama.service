@@ -1,6 +1,8 @@
 [Unit]
 Description=ollama1: update Ollama from its verified GitHub release
-After=network-online.target
+# The timer's catch-up run fires at boot: the program itself waits (up to 2 minutes at a time, 10 in all) for
+# the API host to resolve and answers "waiting for the network", not "failed", until that is spent (6b401).
+After=network-online.target nss-lookup.target
 Wants=network-online.target
 
 [Service]

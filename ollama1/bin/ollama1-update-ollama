@@ -14,16 +14,30 @@ verified. Runs as root (weekly timer, the panel's "apply updates", setup).
    for /api/version to report the new version. If it doesn't, it switches
    back to the previous version and restarts again.
 Keeps the previous version for rollback; older ones are removed.
+
+The network (6b401): the weekly timer's catch-up run fires at boot, before name
+resolution works. The run waits up to DNS_WAIT_S (2 minutes) for the API host
+to resolve, and a failure that is only "no network" (a name that doesn't
+resolve, no route, a timeout) is retried every RETRY_EVERY_S until
+RETRY_BUDGET_S (10 minutes) is spent. Until then the result in
+ollama-update.json is "waiting for the network", never "failed"; a later run
+that succeeds writes "updated" or "current" over it. Any other failure (a bad
+checksum, an HTTP error) is "failed" at once. --check and --no-wait make one
+attempt and don't wait.
 """
 import argparse
+import errno
 import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tarfile
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
@@ -37,8 +51,71 @@ PARTS = [BASE, BASE + "-rocm"]
 UA = {"User-Agent": "ollama1-updater", "Accept": "application/vnd.github+json"}
 
 
+DNS_WAIT_S = 120                 # waiting for the API host to resolve, at most this long a time
+DNS_POLL_S = 5
+RETRY_BUDGET_S = 600             # the whole run's patience with the network
+RETRY_EVERY_S = 30
+NET_ERRNOS = frozenset((errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ENETDOWN, errno.ECONNREFUSED,
+                        errno.ECONNRESET, errno.ETIMEDOUT))
+WAITING = "waiting for the network"
+
+
 class Refused(Exception):
     pass
+
+
+class NoNetwork(Exception):
+    """The attempt failed only because the network isn't there (yet)."""
+
+
+def is_no_network(e):
+    """True for a name that doesn't resolve, no route, a refused or reset connection, a timeout: not for an
+    HTTP error answer (the network works) or anything about the files."""
+    r = e.reason if isinstance(e, urllib.error.URLError) else e
+    if isinstance(r, (socket.gaierror, socket.timeout, TimeoutError, ConnectionError)):
+        return True
+    return isinstance(r, OSError) and r.errno in NET_ERRNOS
+
+
+def wait_for_dns(host, wait_s, resolver=socket.getaddrinfo, sleep=time.sleep, clock=time.monotonic):
+    """True as soon as `host` resolves; False after wait_s seconds of trying (at least one try)."""
+    deadline = clock() + wait_s
+    while True:
+        try:
+            resolver(host, 443)
+            return True
+        except OSError:
+            if clock() >= deadline:
+                return False
+            sleep(DNS_POLL_S)
+
+
+def run_with_retries(attempt, host, cur, wait=True, resolver=socket.getaddrinfo, sleep=time.sleep,
+                     clock=time.monotonic, set_status=None, log=None):
+    """One attempt, or several while the network is missing: see the module's note. `attempt()` returns the
+    exit code or raises NoNetwork."""
+    set_status = set_status or status
+    log = log or say
+    start = clock()
+    while True:
+        detail = None
+        if wait and not wait_for_dns(host, min(DNS_WAIT_S, max(RETRY_BUDGET_S - (clock() - start), 0)),
+                                     resolver, sleep, clock):
+            detail = "can't resolve %s" % host
+        else:
+            try:
+                return attempt()
+            except NoNetwork as e:
+                detail = str(e)
+        left = RETRY_BUDGET_S - (clock() - start)
+        if not wait or left <= 0:
+            log("update refused, staying at %s: no network (%s)" % (cur or "none", detail))
+            why = ("no network for %d minutes: %s" % (RETRY_BUDGET_S // 60, detail)) if wait else detail
+            set_status("failed", cur or "", why)
+            return 1
+        log("no network yet (%s); trying again" % detail)
+        set_status(WAITING, cur or "", "%s; trying again" % detail)
+        sleep(min(RETRY_EVERY_S, left))
 
 
 def say(msg):
@@ -159,6 +236,7 @@ def main():
     ap.add_argument("--no-rocm", action="store_true",
                     help="skip the ROCm component (NVIDIA or no GPU); also set by ollama_rocm=false in config.json")
     ap.add_argument("--no-restart", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--no-wait", action="store_true", help="one attempt: don't wait for the network")
     ap.add_argument("--api", default=API, help=argparse.SUPPRESS)
     a = ap.parse_args()
     if a.api != API and not os.environ.get("OLLAMA1_PREFIX"):
@@ -170,6 +248,11 @@ def main():
     versions = os.path.join(opt, "versions")
     os.makedirs(versions, exist_ok=True)
     cur = current_tag(opt)
+    host = urllib.parse.urlparse(a.api).hostname or "api.github.com"
+    return run_with_retries(lambda: attempt(a, opt, versions, cur), host, cur, wait=not (a.no_wait or a.check))
+
+
+def attempt(a, opt, versions, cur):
     try:
         release = json.loads(fetch(a.api))
         tag = release.get("tag_name", "")
@@ -216,6 +299,8 @@ def main():
         os.rename(stage, final)
         shutil.rmtree(cache, ignore_errors=True)
     except (Refused, OSError, ValueError, KeyError, tarfile.TarError) as e:
+        if is_no_network(e):
+            raise NoNetwork(str(e))
         say("update refused, staying at %s: %s" % (cur or "none", e))
         status("failed", cur or "", e)
         return 1

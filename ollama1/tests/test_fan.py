@@ -114,7 +114,7 @@ class FanCase(unittest.TestCase):
         self.clean()
         self.addCleanup(self.clean)
         self.clock = Clock()
-        self.p = {"inflight": 0, "gpu_busy": 0, "tools": [], "loadavg": 0.1}
+        self.p = {"inflight": 0, "gpu_busy": 0, "tools": [], "cpu": None}
         self.lines = []
         self.boot = "boot-1"
 
@@ -188,16 +188,38 @@ class TestLevels(FanCase):
         self.assertTrue(self.tree.at(255))
 
     def test_each_source_of_work_counts_and_its_limit(self):
-        for name, busy, quiet in (("inflight", 1, 0), ("gpu_busy", 10, 9), ("tools", ["stability-test.sh"], []),
-                                  ("loadavg", 1.6, 1.5)):
+        for name, busy, quiet in (("inflight", 1, 0), ("tools", ["stability-test.sh"], [])):
             with self.subTest(name):
                 self.setUp()
                 f = self.up()
                 self.p[name] = quiet
                 self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20", name)
                 self.p[name] = busy
-                self.assertEqual(self.go(f, self.clock.t + 1)[0], "working", name)
+                self.assertEqual(self.go(f, self.clock.t + 1)[0], "working", name)      # at once
                 self.assertTrue(self.tree.at(255))
+
+    def test_the_card_counts_at_15_percent_sustained_not_a_single_sample(self):
+        for pct, works in ((14, False), (16, True)):
+            with self.subTest(pct):
+                self.setUp()
+                f = self.up()
+                self.p["gpu_busy"] = pct
+                phases = self.run_for(f, 20)
+                self.assertEqual(phases[-1] == "working", works, pct)
+                if works:
+                    self.assertEqual(phases[1], "idle20")           # not on the first samples
+                    self.assertTrue(self.tree.at(255))
+        self.setUp()
+        f = self.up()
+        self.p["gpu_busy"] = 100
+        self.go(f, self.clock.t + 1)                                # one sample, nothing yet
+        self.assertEqual(f.phase, "idle20")
+
+    def test_a_boot_like_load_average_with_idle_processors_is_not_work(self):
+        self.p["loadavg"] = 5.2                                     # tasks waiting on a disk: the old rule's mistake
+        f = self.up()
+        self.assertEqual(set(self.run_for(f, 120)), {"idle20"})
+        self.assertTrue(self.tree.at(51))
 
     def test_a_probe_that_fails_is_not_work(self):
         f = o1fan.Fan({"inflight": lambda: 1 / 0, "gpu_busy": lambda: None, "tools": lambda: None},
@@ -255,7 +277,8 @@ class TestSequence(FanCase):
     def test_working_all_along_never_lets_go(self):
         f = self.up()
         self.p["gpu_busy"] = 99
-        self.assertEqual(set(self.run_for(f, 300, step=2)), {"working"})
+        phases = self.run_for(f, 300, step=2)
+        self.assertEqual(set(phases[4:]), {"working"})              # from the first 6 s window on
         self.assertTrue(self.tree.at(255))
 
     def test_the_countdown_is_in_the_status(self):
@@ -313,10 +336,10 @@ class TestOverride(FanCase):
         f = self.up()
         self.tree.temp("gpu", 95, "temp2_input")
         self.go(f, self.clock.t + 1)
-        self.p["loadavg"] = 5
+        self.p["tools"] = ["stability-test.sh"]
         self.tree.temp("gpu", 40, "temp2_input")
         self.assertEqual(self.go(f, self.clock.t + 1)[0], "working")
-        self.p["loadavg"] = 0.1
+        self.p["tools"] = []
         self.assertEqual(self.go(f, self.clock.t + 1)[0], "hold100")
 
     def test_a_sensor_that_stops_answering_keeps_its_state(self):
@@ -782,10 +805,9 @@ class TestStatus(FanCase):
         f = self.up()
         self.p["inflight"] = 1
         self.p["gpu_busy"] = 80
-        self.go(f, self.clock.t + 1)
-        self.go(f, self.clock.t + 1)
+        self.run_for(f, 8)
         text = self.text()
-        self.assertIn("level: 100%  phase: working - a request is running; the graphics card is busy (80%)", text)
+        self.assertIn("level: 100%  phase: working - a request is running; the card is 80% busy", text)
         self.assertIn("controlling: GPU fan + 7 case/CPU fan outputs", text)
         self.assertRegex(text, r"GPU fan\s+manual\s+pwm 255/255\s+2550 rpm\s+min 20%")
         self.assertRegex(text, r"case/CPU fan 3\s+manual\s+pwm 255/255\s+2550 rpm")

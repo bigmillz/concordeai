@@ -17,7 +17,7 @@ the probes that also re-sends the colour (a keepalive: a device that was reset
 by a wake or a hot-plug gets it again).
 
 "Working" is lib/o1work.py's, the same as the fan service: a request in flight,
-the graphics card at 10% or more, a long job, a load above 1.5.
+a long job, the card at 15% (6 s average) or the processors at 40% (10 s average); no load average.
 
 How it talks to the lights: the sibling unit ollama1-openrgb.service runs
 `openrgb --server` (the OpenRGB package; it owns the USB access), bound to

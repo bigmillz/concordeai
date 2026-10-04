@@ -43,7 +43,7 @@ class FakeClock:
 
 class Probes:
     def __init__(self):
-        self.v = {"inflight": 0, "gpu_busy": 0, "tools": [], "loadavg": 0.1}
+        self.v = {"inflight": 0, "gpu_busy": 0, "tools": [], "cpu": None}
 
     def dict(self):
         return {k: (lambda k=k: self.v[k]) for k in self.v}
@@ -525,7 +525,7 @@ class TestBehaviour(Rig):
     def test_a_probe_that_raises_is_not_work_and_not_a_crash(self):
         def boom():
             raise OSError("x")
-        self.leds.work.p = {k: boom for k in ("inflight", "gpu_busy", "tools", "loadavg")}
+        self.leds.work.p = {k: boom for k in ("inflight", "gpu_busy", "tools", "cpu")}
         self.leds.tick()
         self.assertEqual(self.leds.fader.rgb(), WHITE)
 
@@ -557,13 +557,10 @@ class TestSameDefinitionAsTheFans(Rig):
 
     def test_the_four_probes_and_their_limits_are_the_fans(self):
         self.assertTrue(self.red_after(inflight=1))
-        self.assertTrue(self.red_after(gpu_busy=10))
-        self.assertFalse(self.red_after(gpu_busy=9))
         self.assertTrue(self.red_after(tools=["stability-test.sh"]))
-        self.assertTrue(self.red_after(loadavg=1.6))
-        self.assertFalse(self.red_after(loadavg=1.5))
+        self.assertFalse(self.red_after(loadavg=9))                   # the load average is not work (6b401)
         self.assertFalse(self.red_after())
-        self.assertFalse(self.red_after(inflight=True * 0, gpu_busy=None, loadavg=None))
+        self.assertFalse(self.red_after(inflight=True * 0, gpu_busy=None, cpu=None))
 
     def test_it_is_the_same_code_as_the_fan_service_not_a_copy(self):
         self.assertIsInstance(self.leds.work, o1work.Work)
@@ -572,12 +569,12 @@ class TestSameDefinitionAsTheFans(Rig):
         self.assertIs(o1fan.probes, o1work.probes)
         self.assertIs(o1fan.Gpu, o1work.Gpu)
         for v in ({"inflight": 1}, {"gpu_busy": 50}, {"tools": ["x"]}, {"loadavg": 3}, {}):
-            self.probes.v.update({"inflight": 0, "gpu_busy": 0, "tools": [], "loadavg": 0.1})
+            self.probes.v.update({"inflight": 0, "gpu_busy": 0, "tools": [], "cpu": None})
             self.probes.v.update(v)
             self.assertEqual(self.leds.work.working(self.clock.t)[0], fan.working(self.clock.t)[0], v)
 
     def test_the_service_builds_the_shared_probes(self):
-        self.assertEqual(set(o1work.probes()), {"inflight", "gpu_busy", "tools", "loadavg"})
+        self.assertEqual(set(o1work.probes()), {"inflight", "gpu_busy", "tools", "cpu"})
 
 
 # ---- the server dying and coming back -----------------------------------------------------
