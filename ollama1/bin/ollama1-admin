@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 
 import o1cpu  # noqa: E402
 import o1fan  # noqa: E402
+import o1gputune  # noqa: E402
 import o1leds  # noqa: E402
 import o1library  # noqa: E402
 import o1ollama  # noqa: E402
@@ -44,7 +45,7 @@ import o1sleep  # noqa: E402
 import o1stats  # noqa: E402
 import o1tariff  # noqa: E402
 from o1common import (Paths, load_config, name_hash, parse_allow_list, read_allow_list, read_json,  # noqa: E402
-                      write_json_atomic)
+                      read_json_safe, write_json_atomic)
 from o1jwt import AccessVerifier, JWTError  # noqa: E402
 
 FIXED_UNITS = {
@@ -65,7 +66,9 @@ TEMPLATE_UNITS = {
     "pull": "ollama1-pull@%s.service",
     "remove-model": "ollama1-rmmodel@%s.service",
 }
-HISTORY_COLS = 9      # t, tps, gpu busy, vram, gpu temp, gpu power, active, cpu temp, cpu GHz
+HISTORY_COLS = 11     # t, tps, gpu busy, vram, gpu temp, gpu power, active, cpu temp, cpu GHz, cpu %, RAM GiB
+HISTORY_FIELDS = ["t", "tps", "gpu_busy", "vram_gib", "gpu_temp", "power_w", "active", "cpu_temp", "cpu_ghz",
+                  "cpu_pct", "ram_gib"]
 TERM_OVERRIDE = {"x-frame-options", "content-security-policy", "cache-control", "referrer-policy",
                  "x-content-type-options"}
 
@@ -93,6 +96,99 @@ def log(event, **fields):
           flush=True)
 
 
+# ---- status files, cut down to known fields (6b398) -------------------------------
+# The page draws the fan, lights, sleep and GPU-tuning cards from these. Each
+# file is someone else's (root services write them), so only named fields of
+# the expected type are passed on, strings are cut short, and the page puts
+# every one of them in with textContent, never as markup.
+
+def _num(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) < 1e12 else None
+
+
+def _txt(v, n=160):
+    return v[:n] if isinstance(v, str) else None
+
+
+def _temp_row(t):
+    if not isinstance(t, dict):
+        return None
+    return {"label": _txt(t.get("label"), 40), "c": _num(t.get("c")), "limit": _num(t.get("limit"))}
+
+
+def clean_fan(st):
+    """The fan service's status (/run/ollama1/fan.json, already checked for
+    freshness by o1fan.read_status): phase, level, each output's rpm."""
+    if not isinstance(st, dict):
+        return None
+    outs = []
+    for o in (st.get("outputs") if isinstance(st.get("outputs"), list) else [])[:16]:
+        if isinstance(o, dict):
+            outs.append({"label": _txt(o.get("label"), 40), "rpm": _num(o.get("rpm")), "pwm": _num(o.get("pwm")),
+                         "min_pct": _num(o.get("min_pct")), "note": _txt(o.get("note"), 120)})
+    aio = st.get("aio") if isinstance(st.get("aio"), dict) else None
+    return {"at": _num(st.get("at")), "phase": _txt(st.get("phase"), 16), "pct": _num(st.get("pct")),
+            "why": _txt(st.get("why"), 120), "hold_left": _num(st.get("hold_left")), "outputs": outs,
+            "temps": [r for r in (_temp_row(t) for t in (st.get("temps") if isinstance(st.get("temps"), list)
+                                                          else [])[:16]) if r],
+            "hottest": _temp_row(st.get("hottest")), "closest": _temp_row(st.get("closest")),
+            "aio": {"name": _txt(aio.get("name"), 60), "pump_rpm": _num(aio.get("pump_rpm")),
+                    "coolant_c": _num(aio.get("coolant_c"))} if aio and aio.get("found") else None}
+
+
+def clean_leds(st):
+    """The lights service's status (/run/ollama1/leds.json)."""
+    if not isinstance(st, dict):
+        return None
+    rgb = st.get("rgb")
+    rgb = [max(0, min(255, int(c))) for c in rgb] if isinstance(rgb, list) and len(rgb) == 3 and all(
+        _num(c) is not None for c in rgb) else None
+    devs = st.get("devices") if isinstance(st.get("devices"), list) else []
+    return {"at": _num(st.get("at")), "state": _txt(st.get("state"), 16), "target": _txt(st.get("target"), 16),
+            "rgb": rgb, "why": _txt(st.get("why"), 120), "connected": st.get("connected") is True,
+            "error": _txt(st.get("error"), 160), "devices": len(devs),
+            "names": [_txt(d.get("name"), 60) for d in devs[:8] if isinstance(d, dict) and isinstance(d.get("name"), str)]}
+
+
+def clean_idle(st, now):
+    """The idle service's last decision (/run/ollama1/idle.json, 6b396):
+    the setting, sleep_ok, its exact reason and the idle seconds it counted,
+    plus the file's age in seconds by the server's own clock (so the page's
+    "Sleeps in mm:ss" never depends on the browser's clock)."""
+    if not isinstance(st, dict) or _num(st.get("at")) is None:
+        return None
+    return {"at": st["at"], "age_s": round(now - st["at"], 1),
+            "enabled": st.get("enabled") if isinstance(st.get("enabled"), bool) else None,
+            "minutes": _num(st.get("minutes")),
+            "supported": st.get("supported") if isinstance(st.get("supported"), bool) else None,
+            "sleep_ok": st.get("sleep_ok") if isinstance(st.get("sleep_ok"), bool) else None,
+            "reason": _txt(st.get("reason"), 160), "idle_s": _num(st.get("idle_s")),
+            "wake_cards": len(st["wake"]) if isinstance(st.get("wake"), list) else 0}
+
+
+def clean_gpu_tune(st):
+    """The GPU tuner's saved state (/var/lib/ollama1/gpu-tune.json): what was
+    asked, what is applied, and the last check's verdict."""
+    if not isinstance(st, dict) or not st:
+        return None
+    ap = st.get("applied") if isinstance(st.get("applied"), dict) else {}
+    stock = st.get("stock") if isinstance(st.get("stock"), dict) else {}
+    chk = st.get("check") if isinstance(st.get("check"), dict) else {}
+    watts = (lambda uw: round(uw / 1e6) if _num(uw) else None)
+    return {"wanted": _txt(st.get("wanted"), 8), "reverted": _txt(st.get("reverted"), 200),
+            "reverted_at": _num(st.get("reverted_at")),
+            "applied": {"power_w": watts(ap.get("power_uw")), "mclk": _num(ap.get("mclk")), "at": _num(ap.get("at"))},
+            "stock": {"power_w": watts(stock.get("power_uw")), "mclk": _num(stock.get("mclk"))},
+            "check": {"result": _txt(chk.get("result"), 20), "note": _txt(chk.get("note"), 300),
+                      "at": _num(chk.get("at")), "tps": _num(chk.get("tps"))} if chk else None}
+
+
+def json_bytes(obj):
+    """JSON with <, > and & as \\u escapes: the same data to any JSON reader,
+    and never markup to anything that sniffs it (6b398)."""
+    return json.dumps(obj).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026").encode()
+
+
 def start_unit(unit):
     """The only way the panel acts: `systemctl start` of a named unit."""
     r = subprocess.run(["systemctl", "start", "--no-block", unit], capture_output=True, text=True,
@@ -116,8 +212,8 @@ class Panel:
         self.history = collections.deque(maxlen=24 * 360)
         h = read_json(Paths.history, {}) or {}
         for row in h.get("rows", []) if isinstance(h, dict) else []:
-            if isinstance(row, list) and len(row) in (7, HISTORY_COLS) and self.clock() - row[0] < 86400:
-                self.history.append(row + [None] * (HISTORY_COLS - len(row)))   # older files have 7 columns
+            if isinstance(row, list) and len(row) in (7, 9, HISTORY_COLS) and self.clock() - row[0] < 86400:
+                self.history.append(row + [None] * (HISTORY_COLS - len(row)))   # older files have 7 or 9 columns
         self.state_cache = (0, None)
         self.power_cache = (0, None, None)
         self.busy = o1sleep.busy_reasons
@@ -177,6 +273,16 @@ class Panel:
                 st["leds"] = o1leds.panel_line()         # the same from the lights service's status file
             except Exception:
                 st["leds"] = None
+            # the graphical page's fan, lights, sleep and GPU-tuning cards (6b398): known fields only
+            for key, read in (("fan_status", lambda: clean_fan(o1fan.read_status())),
+                              ("leds_status", lambda: clean_leds(o1leds.read_status())),
+                              ("idle", lambda: clean_idle(read_json_safe(os.path.join(Paths.run, "idle.json"), None,
+                                                                         max_bytes=8192), now)),
+                              ("gpu_tune", lambda: clean_gpu_tune(o1gputune.read_state()))):
+                try:
+                    st[key] = read()
+                except Exception:
+                    st[key] = None
             self.state_cache = (now, st)
             return st
 
@@ -187,10 +293,14 @@ class Panel:
         temps = g.get("temps") or {}
         cpu = st.get("cpu") or {}
         ghz = (cpu.get("freq") or {}).get("avg_mhz")
+        mem = st.get("memory") or {}
+        util = cpu.get("util_pct") if isinstance(cpu.get("util_pct"), (int, float)) else st.get("cpu_pct")
         row = [int(self.clock()), (gw.get("tps") or {}).get("current", 0), g.get("busy_pct"),
                round((g.get("vram_used") or 0) / 2**30, 2), temps.get("junction", temps.get("edge")),
                g.get("power_w"), gw.get("active", 0),
-               (cpu.get("temp") or {}).get("c"), round(ghz / 1000.0, 2) if ghz else None]
+               (cpu.get("temp") or {}).get("c"), round(ghz / 1000.0, 2) if ghz else None,
+               round(util, 1) if isinstance(util, (int, float)) else None,
+               round(mem["used"] / 2**30, 2) if mem.get("total") else None]
         self.history.append(row)
 
     def save_history(self):
@@ -318,6 +428,7 @@ class Panel:
         gw = o1stats.gateway_snapshot() or {}
         return {"recent": gw.get("recent", []), "per_minute": gw.get("per_minute", []),
                 "totals": gw.get("totals", {}), "auth_failures": gw.get("auth_failures", {}),
+                "events": gw.get("events", []), "errors": gw.get("errors", {}),
                 "actions": read_json(Paths.helper_status, {}) or {},
                 "ollama_update": read_json(Paths.update_status, {}) or {}}
 
@@ -335,7 +446,7 @@ def make_handler(panel):
 
         def send(self, status, body, ctype="application/json", extra=None):
             raw = body if isinstance(body, bytes) else (
-                json.dumps(body).encode() if ctype == "application/json" else body.encode())
+                json_bytes(body) if ctype == "application/json" else body.encode())
             self.send_response(status)
             self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
             self.send_header("Content-Length", str(len(raw)))
@@ -372,16 +483,17 @@ def make_handler(panel):
                 nonce = secrets.token_urlsafe(16)
                 page = PAGE.replace("{{CSRF}}", panel.csrf(email)).replace("{{NONCE}}", nonce) \
                     .replace("{{EMAIL}}", html.escape(email)).replace("{{NAME}}", html.escape(cfg.get("server_name") or "")).replace("{{HOST}}", html.escape(cfg["hostname_gateway"]))
+                # nothing loads from anywhere else; the one script and the one style block carry this
+                # request's nonce; the page builds no markup from strings (Trusted Types, 6b398)
                 csp = ("default-src 'none'; script-src 'nonce-%s'; style-src 'nonce-%s'; "
                        "connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
-                       "base-uri 'none'; form-action 'none'" % (nonce, nonce))
+                       "base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; "
+                       "trusted-types 'none'" % (nonce, nonce))
                 return self.send(200, page, "text/html", {"Content-Security-Policy": csp})
             if path == "/api/state":
                 return self.send(200, panel.state())
             if path == "/api/history":
-                return self.send(200, {"rows": list(panel.history),
-                                       "fields": ["t", "tps", "gpu_busy", "vram_gib", "gpu_temp",
-                                                  "power_w", "active", "cpu_temp", "cpu_ghz"]})
+                return self.send(200, {"rows": list(panel.history), "fields": HISTORY_FIELDS})
             if path == "/api/devices":
                 return self.send(200, {"devices": o1pair.devices_list()})
             if path == "/api/models":
@@ -544,93 +656,390 @@ def serve(cfg, runner=start_unit):
 PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <meta name="csrf" content="{{CSRF}}">
 <title>{{NAME}} admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%232dd4ef'/%3E%3C/svg%3E">
 <style nonce="{{NONCE}}">
-:root{--bg:#f6f6f4;--card:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#8a8984;--line:#e4e3de;
---grid:#ecebe6;--series:#2a78d6;--good:#008300;--warn:#b86e00;--bad:#c62f2f;--btn:#fff;--btnline:#cfcec8}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121211;--card:#1a1a19;--ink:#fff;
---ink2:#c3c2b7;--muted:#8d8c85;--line:#2d2d2b;--grid:#262624;--series:#3987e5;--good:#3fae3f;--warn:#e0a030;
---bad:#e66767;--btn:#222220;--btnline:#3a3a37}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
-font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line)}
-header h1{font-size:16px;margin:0;font-weight:600}header .who{color:var(--ink2);font-size:13px}
-main{max-width:1180px;margin:0 auto;padding:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:12px;min-width:0}
-.card h2{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink2);margin:0 0 10px;font-weight:600}
-.big{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}.sub{color:var(--ink2);font-size:13px}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-variant-numeric:tabular-nums}.kv dt{color:var(--ink2)}.kv dd{margin:0}
-.ok{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--grid);font-size:13px}th{color:var(--ink2);font-weight:500}
-button{background:var(--btn);color:var(--ink);border:1px solid var(--btnline);border-radius:6px;padding:6px 11px;font:inherit;cursor:pointer}
-button:hover{border-color:var(--ink2)}button.danger{color:var(--bad)}
-.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
-.chart{position:relative}.chart svg{width:100%;height:150px;display:block}
-.chart .tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:6px;
-padding:4px 8px;font-size:12px;display:none;white-space:nowrap}.tip b{font-size:13px}
-.seg button.on{border-color:var(--series);color:var(--series)}
-#msg{min-height:20px;color:var(--ink2);font-size:13px;margin-top:8px}
-.note{color:var(--muted);font-size:12px}
-.chip{border:1px solid var(--line);border-radius:12px;padding:2px 10px;font-size:12px;color:var(--ink2)}
-.chip.bad{color:var(--bad);border-color:var(--bad)}.chip.warn{color:var(--warn);border-color:var(--warn)}.chip.ok{color:var(--good);border-color:var(--good)}
-.pgrid{display:grid;grid-template-columns:minmax(160px,1fr) 2fr;gap:12px;align-items:center}.pgrid svg{width:100%;height:90px;display:block}
-@media (max-width:600px){.pgrid{grid-template-columns:1fr}}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}
-.tile{border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0}.tile[hidden]{display:none}
-.tile .big{font-size:22px}.tile .sub{overflow-wrap:anywhere}
-.cpumodel{font-weight:600;overflow-wrap:anywhere}
-.strips{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}.strips[hidden],.strip[hidden]{display:none}
-.strip svg{width:100%;height:34px;display:block;background:var(--grid);border-radius:3px}
-.sparks{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}
-.spark svg{width:100%;height:46px;display:block}
+:root{color-scheme:dark;--bg:#05070c;--bg2:#0a0f1a;--card:rgba(17,23,38,.78);--card2:rgba(255,255,255,.035);--card3:rgba(255,255,255,.06);
+--line:rgba(148,163,200,.13);--line2:rgba(148,163,200,.26);--ink:#eef2fb;--ink2:#b4bcd2;--muted:#8a93ab;
+--cyan:#2dd4ef;--blue:#6f8fff;--violet:#a78bfa;--pink:#f472b6;--amber:#fbbf24;--green:#34d399;--red:#fb7185;--orange:#fb923c;
+--series:var(--cyan);--grid:rgba(148,163,200,.10);--good:var(--green);--warn:var(--amber);--bad:var(--red);
+--r:18px;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;scroll-padding-top:64px;-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--ink);background:var(--bg);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+min-height:100vh;overflow-x:hidden;
+background-image:radial-gradient(1100px 620px at 8% -8%,rgba(64,120,255,.20),transparent 62%),
+radial-gradient(900px 560px at 96% -4%,rgba(167,139,250,.16),transparent 60%),
+radial-gradient(1200px 800px at 50% 115%,rgba(45,212,239,.07),transparent 60%)}
+.defs{position:absolute;width:0;height:0;overflow:hidden}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sr:focus{position:fixed;left:16px;top:16px;width:auto;height:auto;clip:auto;padding:8px 12px;background:#101827;color:var(--ink);z-index:60;border-radius:10px}
+a{color:var(--cyan)}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums}
+.ok{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.dim{color:var(--muted)}
+/* hero */
+.hero{max-width:1680px;margin:0 auto;padding:30px 28px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"id status" "kpis status";column-gap:28px;align-items:center}
+.hero-id{grid-area:id}.kpis{grid-area:kpis}.status{grid-area:status}
+.hero-id{display:flex;gap:16px;align-items:center;min-width:0}
+.logo{width:54px;height:54px;flex:none;border-radius:16px;display:grid;place-items:center;
+background:linear-gradient(135deg,rgba(45,212,239,.22),rgba(167,139,250,.22));border:1px solid var(--line2);box-shadow:0 8px 30px rgba(45,212,239,.15)}
+.logo svg{width:30px;height:30px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.hero h1{margin:0;font-size:42px;line-height:1.08;font-weight:750;letter-spacing:-.02em;overflow-wrap:anywhere;
+background:linear-gradient(92deg,#fff 10%,#b9e9ff 45%,#c7b8ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.host{color:var(--ink2);font-size:13px;overflow-wrap:anywhere}.who{color:var(--muted);font-size:12px;margin-top:2px;overflow-wrap:anywhere}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:22px}
+.kpi{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+.kpi .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.kpi .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .v small{font-size:13px;color:var(--ink2);font-weight:600;margin-left:3px}
+.kpi .s{font-size:12px;color:var(--ink2);overflow-wrap:anywhere}
+.status{display:flex;gap:22px;align-items:center}
+.ring{position:relative;width:196px;height:196px;flex:none}
+.ring svg{width:100%;height:100%;overflow:visible}
+.ring .track{fill:none;stroke:rgba(148,163,200,.12);stroke-width:10}
+.ring .arc{fill:none;stroke-width:10;stroke-linecap:round;transform-origin:60px 60px;stroke-dasharray:100 0}
+.ring .halo{fill:none;stroke-width:22;opacity:.16;transform-origin:60px 60px;stroke-dasharray:100 0}
+.ring.work .arc,.ring.work .halo{stroke-dasharray:62 38}
+.ring.work .arc,.ring.work .halo{animation:spin 2.6s linear infinite}
+.ring.ok .arc,.ring.ok .halo{stroke:url(#gr-green)}.ring.work .arc,.ring.work .halo{stroke:url(#gr-cyan)}
+.ring.warn .arc,.ring.warn .halo{stroke:url(#gr-amber)}.ring.bad .arc,.ring.bad .halo{stroke:var(--red)}
+.ring .in{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:30px}
+.ring .w{font-size:24px;font-weight:750;letter-spacing:-.01em}
+.ring .sub{font-size:12px;color:var(--ink2);margin-top:2px}
+.ring.ok .w{color:var(--green)}.ring.work .w{color:var(--cyan)}.ring.warn .w{color:var(--amber)}.ring.bad .w{color:var(--red)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.attn{list-style:none;margin:0;padding:0;display:grid;gap:7px;min-width:220px;max-width:320px}
+.attn li{display:flex;gap:9px;align-items:baseline;font-size:13px;color:var(--ink2)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--muted);transform:translateY(-1px)}
+.dot.ok{background:var(--green);box-shadow:0 0 10px var(--green)}.dot.warn{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.dot.bad{background:var(--red);box-shadow:0 0 10px var(--red)}.dot.info{background:var(--blue);box-shadow:0 0 10px var(--blue)}
+/* nav */
+.nav{position:sticky;top:0;z-index:20;background:rgba(5,7,12,.78);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1680px;margin:0 auto;padding:8px 28px;display:flex;gap:4px;align-items:center;overflow-x:auto;scrollbar-width:none}
+.nav-in::-webkit-scrollbar{display:none}
+.nav a{color:var(--ink2);text-decoration:none;font-size:13px;font-weight:600;padding:7px 12px;border-radius:999px;white-space:nowrap}
+.nav a:hover{color:var(--ink);background:var(--card3)}
+.live{margin-left:auto;display:flex;gap:7px;align-items:center;font-size:12px;color:var(--muted);white-space:nowrap;padding-left:12px}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:pulse 2s infinite}
+.live.off i{background:var(--red);animation:none}.live.paused i{background:var(--muted);animation:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)}70%{box-shadow:0 0 0 8px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+/* layout */
+main{max-width:1680px;margin:0 auto;padding:8px 28px 60px}
+section{margin-top:26px}
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+h2.sec{margin:0;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);font-weight:700}
+.g{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.s3{grid-column:span 3}.s4{grid-column:span 4}.s5{grid-column:span 5}.s6{grid-column:span 6}.s7{grid-column:span 7}.s8{grid-column:span 8}.s12{grid-column:span 12}
+.col{display:grid;gap:16px;align-content:start;min-width:0}.wide{width:100%}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;min-width:0;
+box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 18px 40px -24px rgba(0,0,0,.7)}
+.card h3{margin:0 0 12px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);font-weight:700;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.card h3 .t{display:flex;gap:9px;align-items:center}
+.ico{width:18px;height:18px;flex:none;color:var(--cyan)}
+.big{font-size:30px;font-weight:750;font-variant-numeric:tabular-nums;line-height:1.15}
+.sub{color:var(--ink2);font-size:13px}.note{color:var(--muted);font-size:12px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 16px;margin:0;font-variant-numeric:tabular-nums;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;overflow-wrap:anywhere}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.between{justify-content:space-between}.mt{margin-top:12px}.mt2{margin-top:18px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--ink2);white-space:nowrap;font-weight:600;text-transform:none;letter-spacing:0}
+.chip.ok{color:var(--green);border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.08)}
+.chip.warn{color:var(--amber);border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.08)}
+.chip.bad{color:var(--red);border-color:rgba(251,113,133,.5);background:rgba(251,113,133,.09)}
+.chip.info{color:var(--cyan);border-color:rgba(45,212,239,.45);background:rgba(45,212,239,.08)}
+/* buttons */
+button,.btn{font:inherit;font-size:13px;font-weight:650;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid var(--line2);border-radius:11px;
+padding:8px 14px;cursor:pointer;display:inline-flex;white-space:nowrap;gap:8px;align-items:center;justify-content:center;text-decoration:none;transition:background .15s,border-color .15s,transform .1s;min-height:36px}
+button:hover,.btn:hover{background:rgba(255,255,255,.1);border-color:rgba(148,163,200,.45)}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+button[aria-busy=true]{opacity:.7;cursor:progress}
+button[aria-busy=true]::after{content:"";width:12px;height:12px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite}
+.primary{background:linear-gradient(135deg,#1fb6d8,#5b7cff);border-color:transparent;color:#fff}
+.primary:hover{background:linear-gradient(135deg,#28c6e8,#6e8bff)}
+.danger{color:#ffd1d9;background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.45)}
+.danger:hover{background:rgba(251,113,133,.22);border-color:rgba(251,113,133,.7)}
+.ghost{background:transparent}
+.small{padding:5px 10px;min-height:30px;font-size:12px;border-radius:9px}
+.switch{display:flex;gap:12px;align-items:center;justify-content:space-between;width:100%;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left;min-height:56px}
+.switch .knob{width:46px;height:26px;border-radius:999px;background:rgba(148,163,200,.25);position:relative;flex:none;transition:background .2s}
+.switch .knob::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.switch[aria-checked=true] .knob{background:linear-gradient(135deg,#1fb6d8,#5b7cff)}
+.switch[aria-checked=true] .knob::after{transform:translateX(20px)}
+.switch .lab{display:grid;gap:2px}.switch .lab b{font-size:14px}.switch .lab span{font-size:12px;color:var(--ink2);font-weight:500}
+.switch.ro{cursor:default}
+/* gauges */
+.gauges{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:16px}
+.gauge{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 12px 14px;text-align:center;min-width:0;overflow:hidden}
+.gauge::before{content:"";position:absolute;inset:-40% -20% auto;height:120px;background:radial-gradient(closest-side,var(--glow,rgba(45,212,239,.16)),transparent);pointer-events:none}
+.gauge .gw{position:relative;width:150px;height:126px;margin:0 auto}
+.gauge svg{width:150px;height:150px;display:block}
+.gauge .trk{fill:none;stroke:rgba(148,163,200,.13);stroke-width:9;stroke-linecap:round}
+.gauge .val{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1),stroke .3s}
+.gauge .gv{position:absolute;left:0;right:0;top:48px;font-size:28px;font-weight:750;font-variant-numeric:tabular-nums;line-height:1}
+.gauge .gv small{font-size:13px;color:var(--ink2);font-weight:650;margin-left:2px}
+.gauge .gl{position:absolute;left:0;right:0;top:84px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.gauge .gs{font-size:12px;color:var(--ink2);margin-top:2px;min-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gauge.warn .val{stroke:var(--amber)}.gauge.bad .val{stroke:var(--red)}.gauge.none .gv{color:var(--muted)}
+/* charts */
+.seg{display:inline-flex;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;min-height:30px;padding:5px 14px;border-radius:9px;color:var(--ink2)}
+.seg button.on{background:rgba(45,212,239,.16);color:var(--ink)}
+.charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+.chart{position:relative}.chart .hd{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}
+.chart .ti{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);font-weight:700}
+.chart .cv{font-size:20px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chart .mm{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.plot{position:relative;height:150px}.plot svg{display:block;overflow:visible}
+.plot.tall{height:190px}
+.tip{position:absolute;pointer-events:none;background:rgba(10,14,24,.94);border:1px solid var(--line2);border-radius:9px;padding:5px 9px;font-size:12px;display:none;white-space:nowrap;z-index:2;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.tip b{font-size:13px;margin-right:6px}
+/* cpu card (kept ids) */
+.cpumodel{font-weight:700;font-size:16px;overflow-wrap:anywhere}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px}
+.tile{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:10px 12px;min-width:0}.tile[hidden]{display:none}
+.tile .big{font-size:24px}.tile .sub{overflow-wrap:anywhere;font-size:12px}
+.strips{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:14px}.strips[hidden],.strip[hidden]{display:none}
+.strip svg{width:100%;height:38px;display:block;background:rgba(148,163,200,.07);border-radius:6px}
+.sparks{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:14px}
+.spark svg{width:100%;height:46px;display:block}.spark[hidden]{display:none}
 @media (max-width:600px){.strips,.sparks{grid-template-columns:1fr}}
-details summary{cursor:pointer;color:var(--ink2);font-weight:600}input,select{background:var(--btn);color:var(--ink);border:1px solid var(--btnline);border-radius:5px;padding:4px 6px;font:inherit}
-label{color:var(--ink2);font-size:13px}#pseasontabs button.on{border-color:var(--series);color:var(--series)}
-.filebtn{border:1px solid var(--btnline);border-radius:6px;padding:6px 11px;cursor:pointer;color:var(--ink);background:var(--btn)}.filebtn input{display:none}
-.bar{height:8px;background:var(--grid);border-radius:4px;overflow:hidden;margin:4px 0 8px}.bar i{display:block;height:100%;background:var(--series)}.between{justify-content:space-between}.mt{margin-top:10px}
-@media (max-width:600px){main{padding:10px}header{padding:12px}}
+.line{font-size:12px;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}.line[hidden]{display:none}
+/* fans and lights */
+.phase{display:flex;gap:14px;align-items:center}
+.phase .pct{font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.phase .pct small{font-size:16px;color:var(--ink2)}
+.holdbar{height:6px;border-radius:999px;background:rgba(148,163,200,.14);overflow:hidden;margin-top:10px}
+.holdbar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--blue));border-radius:999px;transition:width 1s linear}
+.fans{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;margin-top:14px}
+.fan{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;gap:10px;align-items:center;min-width:0}
+.fan svg{width:34px;height:34px;flex:none;color:var(--cyan)}
+.fan .blades{transform-origin:50% 50%;transform-box:fill-box;animation:spin linear infinite;animation-play-state:paused}
+.fan.on .blades{animation-play-state:running}
+.fan .fl{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fan .fr{font-size:16px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fan .fp{font-size:11px;color:var(--ink2)}
+.fan>div{min-width:0}
+.orbwrap{display:flex;gap:18px;align-items:center}
+.orb{width:74px;height:74px;border-radius:50%;flex:none;background:#333;border:1px solid rgba(255,255,255,.25);transition:background 1s,box-shadow 1s}
+/* bars */
+.bar{height:8px;background:rgba(148,163,200,.14);border-radius:999px;overflow:hidden;margin:6px 0 4px}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue));transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.bar.warn i{background:linear-gradient(90deg,var(--amber),var(--orange))}.bar.bad i{background:linear-gradient(90deg,var(--red),#e11d48)}
+.bar.violet i{background:linear-gradient(90deg,var(--violet),var(--pink))}
+.stack{display:flex;height:12px;border-radius:999px;overflow:hidden;background:rgba(148,163,200,.14);margin:8px 0}
+.stack i{display:block;height:100%;transition:width .8s}
+.list{display:grid;gap:12px}
+.item{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+.item .hd{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.item .nm{font-weight:700;overflow-wrap:anywhere;min-width:0}
+.mono{font-family:var(--mono);font-size:12.5px}
+.members{display:flex;gap:4px}.members span{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:800}
+.members .u{background:rgba(52,211,153,.18);color:var(--green)}.members .x{background:rgba(251,113,133,.2);color:var(--red)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2)}
+.legend span{display:inline-flex;gap:6px;align-items:center;min-width:0;overflow-wrap:anywhere}
+.legend i{width:9px;height:9px;border-radius:3px;flex:none}
+/* tables */
+.tbl{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--grid);font-size:13px;vertical-align:middle}
+th{color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+td{overflow-wrap:anywhere}
+tr:last-child td{border-bottom:0}
+/* energy */
+.ehero{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:22px;align-items:center}
+.watts{font-size:54px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;background:linear-gradient(92deg,#fde68a,#fb923c 60%,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.watts small{font-size:20px;-webkit-text-fill-color:var(--ink2)}
+.costs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+.cost{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+.cost .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.cost .v{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+.cost .s{font-size:12px;color:var(--ink2);overflow-wrap:anywhere}
+.cost .bar{height:5px}
+details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+details summary{cursor:pointer;color:var(--ink2);font-weight:700;font-size:13px;list-style-position:inside}
+input,select{background:rgba(0,0,0,.3);color:var(--ink);border:1px solid var(--line2);border-radius:9px;padding:6px 9px;font:inherit;font-size:13px;max-width:100%;min-height:34px}
+input:focus,select:focus{border-color:var(--cyan)}
+input[type=checkbox],input[type=radio]{min-height:0;accent-color:var(--cyan)}
+label{color:var(--ink2);font-size:13px}
+#pseasontabs button.on{border-color:var(--cyan);color:var(--cyan)}
+.filebtn{position:relative}.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+ul.errs{margin:8px 0 0;padding-left:18px;color:var(--red)}
+/* controls */
+.acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.acts button,.acts .btn{min-height:44px;width:100%}
+.big-act{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 14px;min-height:64px}
+.big-act span{font-size:12px;font-weight:500;color:var(--ink2);white-space:normal}
+.primary.big-act span{color:rgba(255,255,255,.88)}
+#models td:last-child{width:1%}
+.sleepbox{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:12px}
+.sleepbox .st{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums}
+/* logs */
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+.tabs button{border-radius:10px;min-height:34px;padding:6px 12px;background:transparent;border-color:transparent;color:var(--ink2);white-space:nowrap}
+.tabs button[aria-selected=true]{background:rgba(45,212,239,.14);border-color:rgba(45,212,239,.4);color:var(--ink)}
+.tabs .n{font-size:11px;color:var(--muted);font-weight:600}
+.logbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.logbar input[type=search]{flex:1 1 220px;min-width:0}
+.logbar label{display:flex;gap:6px;align-items:center}
+.logview{height:420px;overflow:auto;background:rgba(0,0,0,.42);border:1px solid var(--line);border-radius:14px;padding:10px 0;font-family:var(--mono);font-size:12.5px;line-height:1.6}
+.logview div{padding:0 14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.logview div:hover{background:rgba(255,255,255,.04)}
+.logview .ts{color:var(--muted);margin-right:10px}
+.logview .bad{color:#fda4af}.logview .warn{color:#fcd34d}.logview .ok{color:#86efac}
+.logview .empty{color:var(--muted);font-family:inherit}
+/* dialog and toasts */
+dialog{background:#0e1422;color:var(--ink);border:1px solid var(--line2);border-radius:20px;padding:0;max-width:min(520px,calc(100vw - 32px));width:100%;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+dialog::backdrop{background:rgba(2,4,9,.66);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.dlg-in{padding:22px 22px 18px}
+.dlg-in h3{margin:0 0 8px;font-size:19px}
+.dlg-body p{margin:0 0 10px;color:var(--ink2);overflow-wrap:anywhere}
+.dlg-type{display:grid;gap:6px;margin:6px 0 4px}.dlg-type[hidden]{display:none}
+.dlg-type input{font-family:var(--mono);width:100%}
+.dlg-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.toasts{position:fixed;right:20px;bottom:20px;z-index:50;display:grid;gap:10px;max-width:min(420px,calc(100vw - 32px))}
+.toast{background:#101827;border:1px solid var(--line2);border-left:4px solid var(--cyan);border-radius:12px;padding:10px 14px;box-shadow:0 16px 40px rgba(0,0,0,.5);font-size:13px;overflow-wrap:anywhere;animation:rise .25s ease-out}
+.toast.ok{border-left-color:var(--green)}.toast.bad{border-left-color:var(--red)}.toast.warn{border-left-color:var(--amber)}
+.toast b{display:block;margin-bottom:2px}
+@keyframes rise{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+footer{max-width:1680px;margin:0 auto;padding:0 28px 40px;color:var(--muted);font-size:12px}
+/* responsive */
+@media (max-width:1280px){.s3{grid-column:span 6}.s4{grid-column:span 6}.s5,.s7,.s8{grid-column:span 12}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:980px){.hero{grid-template-columns:1fr;grid-template-areas:"id" "status" "kpis";row-gap:18px}.kpis{margin-top:0}.status{justify-content:flex-start}.costs{grid-template-columns:repeat(2,minmax(0,1fr))}.ehero{grid-template-columns:1fr}}
+@media (max-width:760px){.s3,.s4,.s6{grid-column:span 12}.charts{grid-template-columns:1fr}}
+@media (max-width:600px){.hero{padding:20px 16px 8px;gap:18px}.nav-in{padding:8px 16px}main{padding:4px 16px 40px}footer{padding:0 16px 30px}
+.hero h1{font-size:30px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpi:last-child{grid-column:span 2}.kpi .v{font-size:22px}
+.ring{width:150px;height:150px}.ring .in{padding:22px}.ring .w{font-size:19px}.status{gap:16px}.attn{min-width:0}
+.card{padding:16px}.gauges{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.gauge{padding:10px 6px}
+.gauge .gw{width:128px;height:108px}.gauge svg{width:128px;height:128px}.gauge .gv{top:40px;font-size:23px}.gauge .gl{top:72px}
+.costs{grid-template-columns:1fr 1fr;gap:10px}.acts>:last-child:nth-child(odd){grid-column:1/-1}.cost .v{font-size:22px}.watts{font-size:44px}
+.logview{height:360px;font-size:12px}.toasts{right:16px;left:16px;bottom:16px;max-width:none}}
+@media (max-width:380px){.gauges{grid-template-columns:1fr 1fr}.gauge .gw{width:118px;height:100px}.gauge svg{width:118px;height:118px}.gauge .gv{top:36px;font-size:20px}.gauge .gl{top:66px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style></head><body>
-<header><h1>{{NAME}}</h1><span class="who">{{EMAIL}}</span></header>
+<svg class="defs" aria-hidden="true" focusable="false" width="0" height="0"><defs>
+<linearGradient id="gr-cyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2dd4ef"/><stop offset="1" stop-color="#6f8fff"/></linearGradient>
+<linearGradient id="gr-violet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#f472b6"/></linearGradient>
+<linearGradient id="gr-amber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde047"/><stop offset="1" stop-color="#fb923c"/></linearGradient>
+<linearGradient id="gr-green" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#2dd4ef"/></linearGradient>
+<linearGradient id="gr-pink" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f472b6"/><stop offset="1" stop-color="#fb923c"/></linearGradient>
+<linearGradient id="gr-blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6f8fff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
+<linearGradient id="fa-cyan" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2dd4ef" stop-opacity=".38"/><stop offset="1" stop-color="#2dd4ef" stop-opacity="0"/></linearGradient>
+<linearGradient id="fa-violet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a78bfa" stop-opacity=".38"/><stop offset="1" stop-color="#a78bfa" stop-opacity="0"/></linearGradient>
+<linearGradient id="fa-amber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf24" stop-opacity=".34"/><stop offset="1" stop-color="#fbbf24" stop-opacity="0"/></linearGradient>
+<linearGradient id="fa-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".34"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/></linearGradient>
+<linearGradient id="fa-pink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f472b6" stop-opacity=".34"/><stop offset="1" stop-color="#f472b6" stop-opacity="0"/></linearGradient>
+<linearGradient id="fa-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6f8fff" stop-opacity=".36"/><stop offset="1" stop-color="#6f8fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="fa-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fb923c" stop-opacity=".38"/><stop offset="1" stop-color="#fb923c" stop-opacity="0"/></linearGradient>
+</defs></svg>
+<a class="sr" href="#overview">Skip to the readings</a>
+<header class="hero">
+  <div class="hero-id">
+   <div class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="url(#gr-cyan)" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="5" width="22" height="7" rx="2.5"/><rect x="5" y="15" width="22" height="7" rx="2.5"/><path d="M10 27h12"/><circle cx="9.5" cy="8.5" r=".6" fill="#2dd4ef"/><circle cx="9.5" cy="18.5" r=".6" fill="#2dd4ef"/></svg></div>
+   <div><div class="eyebrow">Server admin</div><h1>{{NAME}}</h1><div class="host">{{HOST}}</div><div class="who">Signed in as {{EMAIL}}</div></div>
+  </div>
+  <div class="kpis">
+   <div class="kpi"><div class="k">Tokens / s</div><div class="v" id="tps">-</div><div class="s" id="tpsavg"></div></div>
+   <div class="kpi"><div class="k">In flight</div><div class="v" id="req">-</div><div class="s" id="reqsub"></div></div>
+   <div class="kpi"><div class="k">Power</div><div class="v" id="herow">-</div><div class="s" id="herowsub"></div></div>
+   <div class="kpi"><div class="k">Sleep</div><div class="v" id="sleeptxt">-</div><div class="s" id="sleepsub"></div></div>
+   <div class="kpi"><div class="k">Up</div><div class="v" id="uptime">-</div><div class="s" id="upsub"></div></div>
+  </div>
+ <div class="status">
+  <div class="ring" id="ring" role="img" aria-label="Server status">
+   <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="52"/><circle class="halo" cx="60" cy="60" r="52" pathLength="100" stroke-dasharray="70 30"/><circle class="arc" cx="60" cy="60" r="52" pathLength="100" stroke-dasharray="70 30"/></svg>
+   <div class="in"><div class="w" id="statusword">...</div><div class="sub" id="statussub">Reading the server</div></div>
+  </div>
+  <ul class="attn" id="attn" aria-label="What needs attention"></ul>
+ </div>
+</header>
+<nav class="nav" aria-label="Sections"><div class="nav-in">
+ <a href="#overview">Live</a><a href="#trends">History</a><a href="#hardware">Hardware</a><a href="#models-s">Models</a><a href="#energy">Power and cost</a>
+ <a href="#controls">Controls</a><a href="#devices-s">Devices</a><a href="#logs">Logs</a>
+ <span class="live" id="live" role="status"><i></i><span id="livetxt">Live</span></span>
+</div></nav>
 <main>
-<div class="grid">
- <div class="card"><h2>Tokens per second</h2><div class="big" id="tps">-</div><div class="sub" id="tpsavg"></div></div>
- <div class="card"><h2>Requests</h2><div class="big" id="req">-</div><div class="sub" id="reqsub"></div></div>
- <div class="card"><h2>GPU</h2><div class="big" id="gpu">-</div><div class="sub" id="gpusub"></div></div>
- <div class="card"><h2>Service</h2><dl class="kv" id="svc"></dl></div>
+<section id="overview" aria-labelledby="h-ov"><div class="sec-head"><h2 class="sec" id="h-ov">Live</h2><span class="note" id="asof"></span></div>
+ <div class="gauges" id="gauges"></div>
+</section>
+
+<section id="trends" aria-labelledby="h-hist"><div class="sec-head"><h2 class="sec" id="h-hist">History</h2>
+ <div class="seg" role="group" aria-label="Time range"><button type="button" data-range="3600" class="on" aria-pressed="true">1 h</button><button type="button" data-range="86400" aria-pressed="false">24 h</button></div></div>
+ <div class="charts" id="charts"></div>
+</section>
+
+<section id="hardware" aria-labelledby="h-hw"><div class="sec-head"><h2 class="sec" id="h-hw">Hardware</h2></div>
+<div class="g">
+ <div class="card s8" id="cpucard"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>CPU</span></h3>
+  <div class="cpumodel" id="cpumodel"></div><div class="sub" id="cpuline"></div>
+  <div class="sub warn" id="cpunote" hidden></div>
+  <div class="tiles">
+   <div class="tile"><div class="sub">Busy</div><div class="big" id="cpubusy">-</div><div class="sub" id="cpubusysub"></div></div>
+   <div class="tile" id="cpuspeedtile" hidden><div class="sub">Speed now</div><div class="big" id="cpuspeed">-</div><div class="sub" id="cpuspeedsub"></div></div>
+   <div class="tile" id="cputemptile" hidden><div class="sub">Temperature</div><div class="big" id="cputemp">-</div><div class="sub" id="cputempsub"></div></div>
+   <div class="tile" id="cpuwtile" hidden><div class="sub">Power</div><div class="big" id="cpuw">-</div><div class="sub" id="cpuwsub"></div></div>
+  </div>
+  <div class="strips">
+   <div class="strip" id="cstrip1" hidden><div class="note">Busy, each thread</div><svg id="cbars" preserveAspectRatio="none" role="img" aria-label="Busy per thread"></svg></div>
+   <div class="strip" id="cstrip2" hidden><div class="note">Speed, each thread (full height is the rated top speed)</div><svg id="cfreq" preserveAspectRatio="none" role="img" aria-label="Speed per thread"></svg></div>
+  </div>
+  <div class="sparks">
+   <div class="spark" id="cspark1" hidden><div class="note">Temperature, last 5 minutes</div><svg id="ctempspark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="CPU temperature, last 5 minutes"></svg></div>
+   <div class="spark" id="cspark2" hidden><div class="note">Speed, last 5 minutes</div><svg id="cspeedspark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="CPU speed, last 5 minutes"></svg></div>
+  </div>
+  <div class="line" id="fanline" hidden></div>
+  <div class="line" id="ledsline" hidden></div>
+ </div>
+ <div class="card s4"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7s3 4 0 6M14 12c4 0 7 1 7 4s-4 3-6 0M12 14c0 4-1 7-4 7s-3-4 0-6M10 12c-4 0-7-1-7-4s4-3 6 0"/></svg>Fans</span><span class="chip" id="fanphase">-</span></h3>
+  <div class="phase"><div class="pct" id="fanpct">-</div><div class="sub" id="fanwhy"></div></div>
+  <div class="holdbar" id="fanhold" hidden><i></i></div>
+  <div class="fans" id="fans"></div>
+  <div class="note mt" id="fantemps"></div>
+ </div>
+ <div class="card s4"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Storage</span></h3>
+  <div class="list" id="disks"></div><div class="list mt" id="raid"></div>
+ </div>
+ <div class="col s4">
+  <div class="card"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Services</span></h3><dl class="kv" id="svc"></dl></div>
+  <div class="card"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 14V9h10v5M12 9V3M7 18h.01M11 18h.01"/></svg>Network</span><span class="chip" id="tunchip">-</span></h3>
+   <dl class="kv" id="net"></dl></div>
+ </div>
+ <div class="col s4">
+  <div class="card"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg>Lights</span><span class="chip" id="ledchip">-</span></h3>
+   <div class="orbwrap"><div class="orb" id="orb" aria-hidden="true"></div><div><div class="big" id="ledstate">-</div><div class="sub" id="ledwhy"></div><div class="note" id="leddevs"></div></div></div></div>
+  <div class="card"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 17v3M18 17v3M6 11h4M14 11h4"/></svg>GPU tuning</span><span class="chip" id="tunechip">-</span></h3>
+   <dl class="kv" id="tune"></dl><p class="note" id="tunenote"></p></div>
+ </div>
 </div>
-<div class="card" id="cpucard"><h2>CPU</h2>
- <div class="cpumodel" id="cpumodel"></div><div class="sub" id="cpuline"></div>
- <div class="sub warn" id="cpunote" hidden></div>
- <div class="sub" id="fanline" hidden></div>
- <div class="sub" id="ledsline" hidden></div>
- <div class="tiles">
-  <div class="tile"><div class="sub">Busy</div><div class="big" id="cpubusy">-</div><div class="sub" id="cpubusysub"></div></div>
-  <div class="tile" id="cpuspeedtile" hidden><div class="sub">Speed now</div><div class="big" id="cpuspeed">-</div><div class="sub" id="cpuspeedsub"></div></div>
-  <div class="tile" id="cputemptile" hidden><div class="sub">Temperature</div><div class="big" id="cputemp">-</div><div class="sub" id="cputempsub"></div></div>
-  <div class="tile" id="cpuwtile" hidden><div class="sub">Power</div><div class="big" id="cpuw">-</div><div class="sub" id="cpuwsub"></div></div>
+</section>
+
+<section id="models-s" aria-labelledby="h-mod"><div class="sec-head"><h2 class="sec" id="h-mod">Models</h2></div>
+<div class="g">
+ <div class="card s5"><h3><span class="t">Loaded now</span><span class="chip" id="vramchip">-</span></h3>
+  <div class="stack" id="vstack" role="img" aria-label="Graphics memory by model"></div><div class="legend" id="vlegend"></div>
+  <div class="list mt" id="loaded"></div>
  </div>
- <div class="strips">
-  <div class="strip" id="cstrip1" hidden><div class="note">Busy, each thread</div><svg id="cbars" preserveAspectRatio="none" role="img" aria-label="Busy per thread"></svg></div>
-  <div class="strip" id="cstrip2" hidden><div class="note">Speed, each thread (full height is the rated top speed)</div><svg id="cfreq" preserveAspectRatio="none" role="img" aria-label="Speed per thread"></svg></div>
- </div>
- <div class="sparks">
-  <div class="spark" id="cspark1" hidden><div class="note">Temperature, last 5 minutes</div><svg id="ctempspark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="CPU temperature, last 5 minutes"></svg></div>
-  <div class="spark" id="cspark2" hidden><div class="note">Speed, last 5 minutes</div><svg id="cspeedspark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="CPU speed, last 5 minutes"></svg></div>
+ <div class="card s7"><h3><span class="t">Library</span><span class="row"><button type="button" id="libbtn" class="small">Update model library</button></span></h3>
+  <div class="tbl"><table id="models"></table></div>
+  <div class="sub mt" id="pull"></div>
+  <div class="sub mt" id="libmsg" role="status"></div>
+  <div id="lib"></div>
+  <p class="note mt">Update model library shows what it would change first: it downloads models on the allow-list that aren't installed, updates the ones with a newer version, and removes installed models that aren't on the allow-list (nothing else). Only models on the allow-list (/etc/ollama1/models.allow, or <code>sudo ollama1-models add NAME</code> at the server) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p>
  </div>
 </div>
-<div class="card"><div class="row between"><h2>History</h2>
- <div class="row seg"><button data-range="3600" class="on">1 h</button><button data-range="86400">24 h</button></div></div>
- <div class="charts" id="charts"></div></div>
-<div class="card" id="powercard"><div class="row between"><h2>Power and cost</h2><span class="chip" id="pbadge"></span></div>
- <div class="pgrid"><div><div class="big" id="pw">-</div><div class="sub" id="pwsrc"></div></div>
-  <div class="chart"><svg id="pchart" viewBox="0 0 360 90" preserveAspectRatio="none" role="img" aria-label="Watts, last hour"></svg><div class="note">Watts, last hour</div></div></div>
- <table id="ptable" class="mt"></table>
+</section>
+
+<section id="energy" aria-labelledby="h-en"><div class="sec-head"><h2 class="sec" id="h-en">Power and cost</h2><span class="chip" id="pbadge"></span></div>
+<div class="card" id="powercard">
+ <div class="ehero"><div><div class="watts" id="pw">-</div><div class="sub" id="pwsrc"></div></div>
+  <div class="chart"><div class="hd"><span class="ti">Watts, last hour</span><span class="mm" id="pmm"></span></div><div class="plot" id="pchart"></div></div></div>
+ <div class="costs" id="costs"></div>
  <div class="sub mt" id="pproj"></div><div class="sub" id="ptok"></div>
- <details class="mt" id="pset"><summary>Prices</summary>
+ <details id="pset"><summary>Prices</summary>
   <div class="row mt"><label>Currency <input id="pcur" size="4" maxlength="3"></label>
    <label><input type="radio" name="pmode" value="flat"> Flat rate</label><label><input type="radio" name="pmode" value="tou"> Time of use</label></div>
   <div id="pflat" class="row mt"><label>Price per kWh <input id="pflatrate" type="number" step="0.0001" min="0" max="10"></label></div>
@@ -647,76 +1056,218 @@ label{color:var(--ink2);font-size:13px}#pseasontabs button.on{border-color:var(-
    <div class="row mt"><span class="note">Start from a generic shape (typical, verify against your bill):</span><span id="ppresets" class="row"></span></div>
    <p class="note">Where windows overlap, the most specific wins (fewer days, then the shorter window). Time no window covers is off-peak. A window that ends at or before its start runs past midnight.</p>
   </div>
-  <div class="row mt"><button id="psave">Save prices</button><a href="/api/power/schedule.json" download><button type="button">Export JSON</button></a>
-   <label class="filebtn">Import JSON<input type="file" id="pimport" accept="application/json,.json"></label><span id="pmsg" class="sub"></span></div>
-  <ul id="perr" class="bad"></ul>
- </details></div>
-<div class="grid">
- <div class="card"><h2>Loaded models</h2><table id="loaded"></table></div>
- <div class="card"><h2>System</h2><dl class="kv" id="sys"></dl></div>
+  <div class="row mt"><button type="button" id="psave" class="primary">Save prices</button><a class="btn" href="/api/power/schedule.json" download>Export JSON</a>
+   <label class="btn filebtn">Import JSON<input type="file" id="pimport" accept="application/json,.json"></label><span id="pmsg" class="sub" role="status"></span></div>
+  <ul id="perr" class="errs"></ul>
+ </details>
 </div>
-<div class="card"><h2>Models</h2><table id="models"></table>
- <div class="row mt"><button id="libbtn">Update model library</button><span class="sub" id="libmsg"></span></div>
- <div id="lib"></div>
- <p class="note">Update model library shows what it would change first: it downloads models on the allow-list that aren't installed, updates the ones with a newer version, and removes installed models that aren't on the allow-list (nothing else). Only models on the allow-list (/etc/ollama1/models.allow, or <code>sudo ollama1-models add NAME</code> at the server) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p><div id="pull" class="sub"></div></div>
-<div class="grid">
- <div class="card"><h2>Paired devices</h2><table id="devices"></table>
-  <div class="row mt"><button data-act="pair">Open pairing window</button></div>
-  <p class="note">The code appears on the server's screen only.</p></div>
- <div class="card"><h2>Actions</h2><div class="row">
-  <button data-act="update">Apply updates now</button><button data-act="restart">Restart services</button>
-  <button data-act="backup">Back up now</button><button data-act="lan" id="lanbtn">LAN mode</button>
-  <button data-act="sleep">Sleep</button><button data-act="reboot" class="danger">Reboot</button></div>
-  <div class="row mt"><a href="/term/" target="_blank" rel="noopener"><button>Open terminal</button></a></div>
-  <div id="msg"></div><dl class="kv mt" id="acts"></dl></div>
+</section>
+
+<section id="controls" aria-labelledby="h-ctl"><div class="sec-head"><h2 class="sec" id="h-ctl">Controls</h2></div>
+<div class="g">
+ <div class="card s4"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>Power</span></h3>
+  <div class="acts">
+   <button type="button" class="big-act" data-act="sleep">Sleep now<span>Wake it with the power button</span></button>
+   <button type="button" class="big-act danger" data-act="reboot">Reboot<span>Asks first</span></button>
+   <button type="button" class="big-act" data-act="restart">Restart services<span>Ollama, gateway, terminal, tunnel</span></button>
+  </div>
+  <div class="sleepbox"><div class="row between"><span class="note">Auto sleep</span><span class="chip" id="autochip">-</span></div>
+   <div class="st" id="autostate">-</div><div class="sub" id="autosub"></div>
+   <div class="note mt" id="autonote">The app sets auto sleep (on or off, and after how many idle minutes); this panel shows the setting and the server's own decision.</div></div>
+ </div>
+ <div class="card s4"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>Updates</span><span class="chip" id="updchip">-</span></h3>
+  <button type="button" class="big-act primary wide" data-act="update">Apply updates now<span>System updates, then Ollama</span></button>
+  <dl class="kv mt" id="upd"></dl>
+ </div>
+ <div class="card s4"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 17l6-6-6-6M12 19h8"/></svg>Access and upkeep</span></h3>
+  <button type="button" class="switch" role="switch" aria-checked="false" data-act="lan" id="lanbtn"><span class="lab"><b>LAN mode</b><span id="lansub">Answer on the home network too</span></span><span class="knob" aria-hidden="true"></span></button>
+  <div class="acts mt"><button type="button" data-act="backup">Back up now</button><a class="btn" href="/term/" target="_blank" rel="noopener">Open terminal</a></div>
+  <div class="note mt">The terminal still asks for your Linux user and password.</div>
+  <dl class="kv mt" id="acts"></dl>
+ </div>
 </div>
-<div class="card"><h2>Log (counts only)</h2><table id="log"></table></div>
+</section>
+
+<section id="devices-s" aria-labelledby="h-dev"><div class="sec-head"><h2 class="sec" id="h-dev">Devices</h2></div>
+ <div class="card"><h3><span class="t">Paired devices</span><span class="row"><span class="chip" id="pairchip">-</span><button type="button" class="small" data-act="pair">Open pairing window</button></span></h3>
+  <div class="list" id="devices"></div>
+  <p class="note mt">The code appears on the server's screen only.</p></div>
+</section>
+
+<section id="logs" aria-labelledby="h-log"><div class="sec-head"><h2 class="sec" id="h-log">Logs</h2><span class="note">Counts, names and times only: never a prompt or an answer.</span></div>
+ <div class="card">
+  <div class="tabs" role="tablist" aria-label="Log" id="logtabs"></div>
+  <div class="logbar"><input type="search" id="logq" placeholder="Filter lines" aria-label="Filter the log lines">
+   <label><input type="checkbox" id="logfollow" checked> Follow new lines</label>
+   <button type="button" class="small" id="logcopy">Copy</button><span class="note" id="logcount"></span></div>
+  <div class="logview" id="logview" role="tabpanel" tabindex="0" aria-live="off"></div>
+ </div>
+</section>
 </main>
+<footer>ollama1 admin panel. Every action starts one fixed systemd unit; nothing here runs a command.</footer>
+<dialog id="dlg" aria-labelledby="dlgt"><div class="dlg-in">
+ <h3 id="dlgt"></h3><div class="dlg-body" id="dlgb"></div>
+ <label class="dlg-type" id="dlgl" hidden><span id="dlgls"></span><input id="dlgin" autocomplete="off" spellcheck="false" autocapitalize="off"></label>
+ <div class="dlg-btns"><button type="button" id="dlgno" class="ghost">Cancel</button><button type="button" id="dlgok" class="primary">Confirm</button></div>
+</div></dialog>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <script nonce="{{NONCE}}">
 "use strict";
+// Every figure from the server goes in with textContent or an SVG attribute, never as markup.
 const CSRF=document.querySelector('meta[name=csrf]').content;
 const $=id=>document.getElementById(id);
-const el=(t,txt,cls)=>{const e=document.createElement(t);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;};
+const el=(t,txt,cls)=>{const e=document.createElement(t);if(txt!==undefined&&txt!==null)e.textContent=txt;if(cls)e.className=cls;return e;};
+const NS='http://www.w3.org/2000/svg';const sv=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const isNum=v=>typeof v==='number'&&isFinite(v);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const gib=b=>b==null?'?':(b/1073741824).toFixed(1)+' GiB';
 const tib=b=>b==null?'?':(b>=1099511627776?(b/1099511627776).toFixed(1)+' TiB':gib(b));
-const ago=t=>{if(!t)return 'never';const s=Date.now()/1000-t;return s<90?Math.round(s)+' s ago':s<5400?Math.round(s/60)+' min ago':s<172800?Math.round(s/3600)+' h ago':Math.round(s/86400)+' d ago';};
+let skew=0;                                   // server clock minus this browser's, from /api/state
+const snow=()=>Date.now()/1000+skew;
+const ago=t=>{if(!t)return 'never';const s=snow()-t;return s<90?Math.max(0,Math.round(s))+' s ago':s<5400?Math.round(s/60)+' min ago':s<172800?Math.round(s/3600)+' h ago':Math.round(s/86400)+' d ago';};
 const dur=s=>{if(s==null)return '?';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+'d '+h+'h':h+'h '+m+'m';};
+const mmss=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+const hhmm=t=>new Date(t*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const stamp=t=>{const d=new Date(t*1000);return d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});};
 function kv(dl,pairs){dl.replaceChildren();for(const [k,v,c] of pairs){dl.append(el('dt',k));dl.append(el('dd',v,c||''));}}
 function table(t,head,rows){t.replaceChildren();const tr=el('tr');head.forEach(h=>tr.append(el('th',h)));t.append(tr);
  if(!rows.length){const r=el('tr'),td=el('td','None','note');td.colSpan=head.length;r.append(td);t.append(r);}
  rows.forEach(cells=>{const r=el('tr');cells.forEach(c=>{const td=el('td');if(c instanceof Node)td.append(c);else td.textContent=c;r.append(td);});t.append(r);});}
-async function api(p){const r=await fetch(p,{credentials:'same-origin'});if(!r.ok)throw new Error(r.status);return r.json();}
-async function act(action,arg,confirm){const m=$('msg');m.textContent='Starting '+action+'...';
- try{const r=await fetch('/api/action',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-O1-CSRF':CSRF},
- body:JSON.stringify({action,arg,confirm})});const j=await r.json();m.textContent=action+': '+j.result;}catch(e){m.textContent=action+': failed ('+e.message+')';}
- setTimeout(refreshSlow,1500);}
-let lan=false;
-document.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',()=>{const a=b.dataset.act;
- if(a==='reboot'){if(confirm('Reboot the server now?'))act('reboot',null,'reboot');return;}
+function chip(id,text,cls){const c=$(id);c.textContent=text;c.className='chip'+(cls?' '+cls:'');}
+function bar(f,cls){const b=el('div',undefined,'bar'+(cls?' '+cls:'')),i=el('i');i.style.width=Math.round(clamp(f||0,0,1)*100)+'%';b.append(i);return b;}
+
+// ---- talking to the server ----------------------------------------------------------
+const live=$('live');
+function setLive(state,text){live.className='live'+(state?' '+state:'');$('livetxt').textContent=text;}
+async function api(p){const r=await fetch(p,{credentials:'same-origin',cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+// every POST: JSON, same origin, the CSRF token; the answer is shown as the server gave it
+async function post(path,obj){
+ try{const r=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-O1-CSRF':CSRF},body:JSON.stringify(obj)});
+  let j={};try{j=await r.json();}catch(e){}
+  const msg=j.result||j.error||(Array.isArray(j.errors)?j.errors.join('; '):'')||('HTTP '+r.status);
+  return {ok:r.ok,status:r.status,msg,j};}
+ catch(e){return {ok:false,status:0,msg:'no answer from the server ('+e.message+')',j:{}};}}
+function toast(title,text,kind){const t=el('div',undefined,'toast'+(kind?' '+kind:''));t.append(el('b',title));if(text)t.append(document.createTextNode(text));
+ $('toasts').append(t);setTimeout(()=>t.remove(),kind==='bad'?10000:6000);}
+const LABEL={update:'Apply updates',restart:'Restart services',reboot:'Reboot',sleep:'Sleep',pair:'Pairing window',backup:'Back up','lan-on':'LAN mode on','lan-off':'LAN mode off',
+ 'library-preview':'Model library check','library-sync':'Model library sync','remove-device':'Remove device',pull:'Download model','remove-model':'Remove model'};
+async function act(action,arg,confirm,btn){if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true');}
+ const r=await post('/api/action',{action,arg,confirm});
+ if(btn){btn.disabled=false;btn.removeAttribute('aria-busy');}
+ toast((LABEL[action]||action)+(r.ok?': '+r.msg:' refused'),r.ok?'The server answered '+r.status+'.':r.msg+' ('+(r.status||'no answer')+')',r.ok?'ok':'bad');
+ setTimeout(refreshSlow,1500);setTimeout(refreshFast,1500);return r;}
+
+// ---- a styled, accessible confirm (the native <dialog>: focus kept inside, Esc cancels) --
+function ask(o){return new Promise(res=>{const d=$('dlg'),ok=$('dlgok'),no=$('dlgno'),inp=$('dlgin'),lab=$('dlgl');
+ $('dlgt').textContent=o.title;const b=$('dlgb');b.replaceChildren();(o.body||[]).forEach(p=>b.append(el('p',p)));
+ ok.textContent=o.ok||'Confirm';ok.className=o.danger?'danger':'primary';
+ lab.hidden=!o.typed;inp.value='';$('dlgls').textContent=o.typed?o.typedLabel:'';ok.disabled=!!o.typed;
+ const check=()=>{ok.disabled=o.typed?inp.value!==o.typed:false;};
+ const done=v=>{inp.removeEventListener('input',check);inp.removeEventListener('keydown',key);ok.onclick=no.onclick=null;d.onclose=null;if(d.open)d.close();res(v);};
+ const key=e=>{if(e.key==='Enter'&&!ok.disabled){e.preventDefault();done(inp.value);}};
+ inp.addEventListener('input',check);inp.addEventListener('keydown',key);
+ ok.onclick=()=>done(o.typed?inp.value:true);no.onclick=()=>done(null);d.onclose=()=>done(null);
+ if(typeof d.showModal==='function'){d.showModal();(o.typed?inp:no).focus();}
+ else{const v=o.typed?window.prompt(o.title+'\n'+o.typedLabel):window.confirm(o.title+'\n\n'+(o.body||[]).join('\n'));done(o.typed?v:(v||null));}});}
+
+// ---- the buttons ---------------------------------------------------------------------------
+let lan=false,lastState={};
+document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+ if(a==='reboot'){if(await ask({title:'Reboot the server now?',body:['It can\'t be reached until it has started again, and running requests end.'],ok:'Reboot',danger:true}))act('reboot',null,'reboot',b);return;}
  if(a==='sleep'){let t='The server will sleep. Press its power button to wake it. While it sleeps it can\'t be reached, and anything plugged into its second network port loses its connection.';
-  if((lastState.raid||[]).some(r=>r.action))t+=' The mirror\'s sync pauses while it sleeps and carries on after it wakes.';
-  if(confirm(t))act('sleep',null,'sleep');return;}
- if(a==='lan'){if(confirm(lan?'Turn LAN mode off?':'Turn LAN mode on? The gateway will also answer on the home network without Cloudflare Access (signatures still required, traffic unencrypted).'))act(lan?'lan-off':'lan-on');return;}
- if(a==='update'&&!confirm('Apply all pending updates and update Ollama now?'))return;
- if(a==='restart'&&!confirm('Restart Ollama, the gateway, the terminal and the tunnel? Running requests end.'))return;
- act(a);}));
-let lastState={};
-// --- CPU card: every figure goes in with textContent or an SVG attribute, never as markup ---
+  const body=[t];if((lastState.raid||[]).some(r=>r.action))body.push('The mirror\'s sync pauses while it sleeps and carries on after it wakes.');
+  if(await ask({title:'Put the server to sleep?',body,ok:'Sleep now'}))act('sleep',null,'sleep',b);return;}
+ if(a==='lan'){if(await ask(lan?{title:'Turn LAN mode off?',body:['The gateway will answer only through Cloudflare again.'],ok:'Turn off'}:
+   {title:'Turn LAN mode on?',body:['Turn LAN mode on? The gateway will also answer on the home network without Cloudflare Access (signatures still required, traffic unencrypted).'],ok:'Turn on',danger:true}))act(lan?'lan-off':'lan-on',null,undefined,b);return;}
+ if(a==='update'&&!await ask({title:'Apply updates now?',body:['Apply all pending updates and update Ollama now?'],ok:'Apply updates'}))return;
+ if(a==='restart'&&!await ask({title:'Restart the services?',body:['Restart Ollama, the gateway, the terminal and the tunnel? Running requests end.'],ok:'Restart',danger:true}))return;
+ act(a,undefined,undefined,b);});
+
+// ---- status: the ring, the attention list, the hero figures -------------------------------
+function gpuTemp(g){const t=(g||{}).temps||{};return isNum(t.junction)?t.junction:isNum(t.edge)?t.edge:null;}
+function assess(s){const bad=[],warn=[],info=[];const gw=s.gateway||{},tun=s.tunnel||{},up=s.updates||{},c=s.cpu||{};
+ if(!tun.up)bad.push('Tunnel is down');
+ if(!(gw.time&&!gw.stale))bad.push('Gateway is not running');
+ (s.raid||[]).forEach(a=>{if(!a.healthy)bad.push('RAID '+a.name+' is missing a member');
+  else if(a.action&&a.action!=='check')warn.push('RAID '+a.name+': '+a.action+(a.progress!=null?' '+a.progress+'%':''));
+  else if(a.action)info.push('RAID '+a.name+': check '+(a.progress!=null?a.progress+'%':'running'));});
+ (s.disks||[]).forEach(d=>{if(!d.mounted)bad.push(d.mount+' is not mounted');else if(d.total&&d.used/d.total>=0.9)warn.push(d.mount+' is '+Math.round(100*d.used/d.total)+'% full');});
+ if((up.ollama||{}).result==='failed')bad.push('The last Ollama update failed');
+ if(((up.sleep||{}).resume_check||{}).ok===false)bad.push('The check after waking failed');
+ const gt=gpuTemp(s.gpu);if(gt!=null&&gt>=100)bad.push('GPU at '+Math.round(gt)+' °C');else if(gt!=null&&gt>=90)warn.push('GPU at '+Math.round(gt)+' °C');
+ const t=c.temp,th=c.thresholds||{};if(t&&isNum(t.c)){if(t.c>=(th.hot_c||90))bad.push('CPU at '+Math.round(t.c)+' °C');else if(t.c>=(th.warn_c||80))warn.push('CPU at '+Math.round(t.c)+' °C');}
+ if(c.throttle)warn.push('CPU: '+c.throttle);
+ if(up.reboot_required)warn.push('A reboot is needed for updates');
+ if(s.pairing_open)warn.push('The pairing window is open');
+ const working=(gw.active||0)>0||(gw.queued||0)>0;
+ return {bad,warn,info,working,level:bad.length?'bad':warn.length?'warn':working?'work':'ok'};}
+function renderHero(s){const a=assess(s),gw=s.gateway||{},ring=$('ring');
+ ring.className='ring '+a.level;
+ const WORD={ok:'Healthy',work:'Working',warn:'Attention',bad:'Problem'};$('statusword').textContent=WORD[a.level];
+ const sub=a.level==='work'?(gw.active||0)+' running, '+(gw.queued||0)+' queued':a.level==='ok'?'All systems normal':(a.bad[0]||a.warn[0]);
+ $('statussub').textContent=sub;ring.setAttribute('aria-label','Server status: '+WORD[a.level]+'. '+sub);
+ const L=$('attn');L.replaceChildren();const items=[...a.bad.map(x=>[x,'bad']),...a.warn.map(x=>[x,'warn']),...a.info.map(x=>[x,'info'])];
+ if(!items.length){const tun=s.tunnel||{};items.push(['Tunnel up ('+(tun.connections||0)+' connections)','ok'],['Gateway running','ok']);
+  if((s.raid||[]).length)items.push(['RAID healthy','ok']);items.push(['Ollama '+(gw.ollama_version||'?'),'ok']);}
+ items.slice(0,6).forEach(([t,c])=>{const li=el('li');li.append(el('span',undefined,'dot '+c),el('span',t));L.append(li);});
+ const tp=gw.tps||{};$('tps').textContent=(tp.current??0).toFixed(1);$('tpsavg').textContent='1 h '+(tp['1h']??0)+'  ·  24 h '+(tp['24h']??0);
+ $('req').textContent=String(gw.active||0);$('reqsub').textContent=(gw.queued||0)+' queued  ·  '+(gw.requests_today||0)+' today  ·  '+((gw.totals||{}).refused_gpu||0)+' refused for GPU';
+ $('uptime').textContent=dur(s.uptime);$('upsub').textContent=s.hostname||'';
+ const sl=sleepSummary(s.idle);$('sleeptxt').textContent=sl[0];$('sleeptxt').className='v'+(sl[1]==='warn'?' warn':'');$('sleepsub').textContent=sl[2]||'';}
+
+// the idle service's own last decision (idle.json, 6b396), as the server screen shows it
+function sleepSummary(i){if(!i)return ['Unknown','warn','no word from the idle service'];
+ const age=(i.age_s||0)+Math.max(0,Date.now()/1000-fetchedAt);
+ if(age>180||i.sleep_ok==null){if(i.supported===false&&age<=180)return ['No deep sleep','dim','this machine can\'t suspend'];
+  if(i.enabled===false&&age<=180)return ['Off','dim','auto sleep is off'];return ['Unknown','warn','the idle service hasn\'t said lately'];}
+ if(i.supported===false)return ['No deep sleep','dim','this machine can\'t suspend'];
+ if(i.enabled===false)return ['Off','dim','auto sleep is off'];
+ if(i.sleep_ok===true)return ['Now','warn','going to sleep now'];
+ const reason=String(i.reason||'').trim();
+ if(reason.startsWith('idle ')&&i.minutes&&isNum(i.idle_s)){const left=i.minutes*60-i.idle_s-age;
+  if(left<=0)return ['Very soon','warn','sleeping very soon'];return ['in '+mmss(left),left<300?'warn':'','after '+i.minutes+' min idle'];}
+ return ['Awake','warn',reason?reason.charAt(0).toUpperCase()+reason.slice(1):'awake'];}
+
+// ---- gauges -------------------------------------------------------------------------------------
+const ARC='M23.23 96.77 A52 52 0 1 1 96.77 96.77';            // 270 degrees, the gap at the bottom
+const GA=[
+ {id:'gpu',label:'GPU',grad:'cyan',glow:'rgba(45,212,239,.16)',f:s=>{const g=s.gpu||{};return {v:g.busy_pct,max:100,t:isNum(g.busy_pct)?String(Math.round(g.busy_pct)):null,u:'%',sub:g.sclk_mhz?g.sclk_mhz+' MHz core':'busy'};}},
+ {id:'vram',label:'VRAM',grad:'violet',glow:'rgba(167,139,250,.16)',f:s=>{const g=s.gpu||{};return {v:g.vram_used,max:g.vram_total,t:isNum(g.vram_used)?(g.vram_used/1073741824).toFixed(1):null,u:'GiB',sub:g.vram_total?'of '+gib(g.vram_total)+'  ·  '+Math.round(100*g.vram_used/g.vram_total)+'%':''};}},
+ {id:'gpow',label:'GPU power',grad:'pink',glow:'rgba(244,114,182,.15)',f:s=>{const g=s.gpu||{};return {v:g.power_w,max:g.power_cap_w||Math.max(300,g.power_w||0),t:isNum(g.power_w)?String(Math.round(g.power_w)):null,u:'W',sub:g.power_cap_w?'limit '+g.power_cap_w+' W':''};}},
+ {id:'gtemp',label:'GPU temp',grad:'amber',glow:'rgba(251,191,36,.13)',f:s=>{const g=s.gpu||{},t=gpuTemp(g),o=Object.entries(g.temps||{}).filter(([k])=>k!=='junction').map(([k,v])=>k+' '+Math.round(v)+'°');
+  return {v:t,max:110,t:t!=null?String(Math.round(t)):null,u:'°C',sub:(isNum((g.temps||{}).junction)?'junction':'edge')+(o.length?'  ·  '+o.join('  '):''),lvl:t>=100?'bad':t>=90?'warn':''};}},
+ {id:'cpu',label:'CPU',grad:'green',glow:'rgba(52,211,153,.13)',f:s=>{const c=s.cpu||{},u=isNum(c.util_pct)?c.util_pct:s.cpu_pct;return {v:u,max:100,t:isNum(u)?String(Math.round(u)):null,u:'%',sub:(s.load||[]).length?'load '+s.load.map(x=>x.toFixed(2)).join(' '):''};}},
+ {id:'clk',label:'CPU clock',grad:'blue',glow:'rgba(111,143,255,.15)',f:s=>{const f=((s.cpu||{}).freq)||{},top=f.rated_mhz||f.max_mhz;return {v:f.avg_mhz,max:top||5000,t:isNum(f.avg_mhz)?(f.avg_mhz/1000).toFixed(2):null,u:'GHz',sub:top?'of '+(top/1000).toFixed(2)+' GHz':''};}},
+ {id:'ctemp',label:'CPU temp',grad:'amber',glow:'rgba(251,146,60,.13)',f:s=>{const c=s.cpu||{},t=c.temp,th=c.thresholds||{},v=t&&isNum(t.c)?t.c:null;
+  return {v,max:Math.max(100,(th.hot_c||90)+10),t:v!=null?String(Math.round(v)):null,u:'°C',sub:t?(t.label||'')+(isNum(t.peak_c)?'  ·  peak '+Math.round(t.peak_c)+'°':''):'',lvl:v>=(th.hot_c||90)?'bad':v>=(th.warn_c||80)?'warn':''};}},
+ {id:'ram',label:'Memory',grad:'violet',glow:'rgba(167,139,250,.13)',f:s=>{const m=s.memory||{};return {v:m.used,max:m.total,t:m.total?(m.used/1073741824).toFixed(1):null,u:'GiB',sub:m.total?'of '+gib(m.total)+'  ·  '+Math.round(100*m.used/m.total)+'%':''};}}];
+(function buildGauges(){const box=$('gauges');for(const g of GA){const c=el('div',undefined,'gauge none');c.id='g-'+g.id;c.style.setProperty('--glow',g.glow);c.setAttribute('role','img');
+ const w=el('div',undefined,'gw'),svg=sv('svg',{viewBox:'0 0 120 120','aria-hidden':'true'});
+ svg.append(sv('path',{d:ARC,class:'trk'}),sv('path',{d:ARC,class:'val',stroke:'url(#gr-'+g.grad+')',pathLength:100,'stroke-dasharray':'100 200','stroke-dashoffset':100}));
+ const v=el('div','-','gv'),l=el('div',g.label,'gl');w.append(svg,v,l);c.append(w,el('div','','gs'));box.append(c);}})();
+function renderGauges(s){for(const g of GA){let r;try{r=g.f(s);}catch(e){r={};}const c=$('g-'+g.id),val=c.querySelector('.val'),v=c.querySelector('.gv');
+ const f=isNum(r.v)&&r.max>0?clamp(r.v/r.max,0,1):0;val.setAttribute('stroke-dashoffset',String(100-f*100));val.setAttribute('opacity',isNum(r.v)&&f>0.004?1:0);
+ v.replaceChildren(document.createTextNode(r.t==null?'-':r.t));if(r.t!=null&&r.u)v.append(el('small',r.u));
+ c.querySelector('.gs').textContent=r.t==null?'no reading':(r.sub||'');c.className='gauge'+(r.t==null?' none':'')+(r.lvl?' '+r.lvl:'');
+ c.setAttribute('aria-label',g.label+': '+(r.t==null?'no reading':r.t+' '+(r.u||''))+(r.sub?', '+r.sub:''));}}
+
+// ---- the CPU card (unchanged figures, new look) ---------------------------------------------
 const fnum=(v,d)=>typeof v==='number'&&isFinite(v)?v.toFixed(d):null;
 const ghz=m=>{const t=fnum(m==null?null:m/1000,2);return t==null?null:t+' GHz';};
 const deg=v=>{const t=fnum(v,0);return t==null?null:t+' °C';};
-function bars(id,vals,max,name,fmt){const svg=$(id),box=svg.parentNode;svg.replaceChildren();
+function bars(id,vals,max,name,fmt,hot){const svg=$(id),box=svg.parentNode;svg.replaceChildren();
  const n=Math.min(vals.length,1024);if(!n||!vals.some(v=>v!=null)){box.hidden=true;return;}box.hidden=false;
  svg.setAttribute('viewBox','0 0 '+n*4+' 24');
  for(let i=0;i<n;i++){const v=vals[i],f=v==null||!(max>0)?0:Math.max(0,Math.min(1,v/max)),h=Math.max(f*24,v==null?0:1);
-  const r=sv('rect',{x:i*4,y:24-h,width:3,height:h,fill:'var(--series)'});
+  const r=sv('rect',{x:i*4,y:24-h,width:3,height:h,rx:0.6,fill:hot&&f>0.85?'#fb923c':'url(#gr-cyan)'});
   if(n<=128){const t=sv('title',{});t.textContent=name+' '+i+': '+(v==null?'no reading':fmt(v));r.append(t);}svg.append(r);}}
-function spark(id,boxId,ix,live,scale,minSpan){const svg=$(id),box=$(boxId);svg.replaceChildren();const now=Date.now()/1000;
- const pts=((hist||{}).rows||[]).filter(r=>r[0]>=now-300&&typeof r[ix]==='number').map(r=>[r[0],r[ix]*scale]);
+function spark(id,boxId,ix,live,scale,minSpan){const svg=$(id),box=$(boxId);svg.replaceChildren();const now=snow();
+ const pts=rows().filter(r=>r[0]>=now-300&&typeof r[ix]==='number').map(r=>[r[0],r[ix]*scale]);
  if(typeof live==='number')pts.push([now,live]);if(pts.length<2){box.hidden=true;return;}box.hidden=false;
  let lo=Math.min(...pts.map(p=>p[1])),hi=Math.max(...pts.map(p=>p[1]));if(hi-lo<minSpan){const m=(hi+lo)/2;lo=m-minSpan/2;hi=m+minSpan/2;}
  let d='';pts.forEach((p,i)=>{d+=(i?'L':'M')+((p[0]-(now-300))/300*200).toFixed(1)+' '+(42-(p[1]-lo)/(hi-lo)*38).toFixed(1);});
- svg.append(sv('path',{d,fill:'none',stroke:'var(--series)','stroke-width':2,'stroke-linejoin':'round','vector-effect':'non-scaling-stroke'}));}
+ svg.append(sv('path',{d:d+'L200 46L0 46Z',fill:'url(#fa-cyan)',stroke:'none'}));
+ svg.append(sv('path',{d,fill:'none',stroke:'#2dd4ef','stroke-width':2,'stroke-linejoin':'round','vector-effect':'non-scaling-stroke'}));}
 function renderCpu(c,s){c=c||{};const f=c.freq||{},t=c.temp,th=c.thresholds||{},warn=th.warn_c||80,hot=th.hot_c||90;
  $('cpumodel').textContent=c.model||'';
  const lim=f.max_mhz&&f.rated_mhz&&f.max_mhz<f.rated_mhz*0.98;
@@ -733,18 +1284,65 @@ function renderCpu(c,s){c=c||{};const f=c.freq||{},t=c.temp,th=c.thresholds||{},
  $('cputempsub').textContent=t?[t.label,'peak '+(deg(t.peak_c)||'?')+' since the panel started'].concat(others).join('  ·  '):'';
  const live=pw&&pw.live,w=typeof c.power_w==='number'?c.power_w:(live&&typeof live.cpu_w==='number'?live.cpu_w:null);
  $('cpuwtile').hidden=w==null;$('cpuw').textContent=w==null?'-':Math.round(w)+' W';$('cpuwsub').textContent=w==null?'':(typeof c.power_w==='number'?'package, measured':'package, from the power sampler');
- bars('cbars',c.util_cores||[],100,'Thread',v=>Math.round(v)+'%');
+ bars('cbars',c.util_cores||[],100,'Thread',v=>Math.round(v)+'%',true);
  bars('cfreq',f.cores||[],f.rated_mhz||f.max_mhz||Math.max(0,...(f.cores||[]).filter(v=>v!=null)),'Thread',v=>ghz(v));
  spark('ctempspark','cspark1',7,t&&typeof t.c==='number'?t.c:null,1,10);
  spark('cspeedspark','cspark2',8,typeof f.avg_mhz==='number'?f.avg_mhz/1000:null,1,0.5);}
-async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){return;}
- lastState=s;
- const gw=s.gateway||{},t=gw.tps||{},g=s.gpu||{},tun=s.tunnel||{},up=s.updates||{},ou=up.ollama||{};
- $('tps').textContent=(t.current??0).toFixed(1);$('tpsavg').textContent='1 h '+(t['1h']??0)+'  ·  24 h '+(t['24h']??0);
- $('req').textContent=(gw.active||0)+' active';$('reqsub').textContent=(gw.queued||0)+' queued  ·  '+(gw.requests_today||0)+' today  ·  '+((gw.totals||{}).refused_gpu||0)+' refused for GPU';
- $('gpu').textContent=(g.busy_pct??'?')+'% busy';const temps=Object.entries(g.temps||{}).map(([k,v])=>k+' '+Math.round(v)+'°C').join('  ');
- $('gpusub').textContent='VRAM '+gib(g.vram_used)+' of '+gib(g.vram_total)+'  ·  '+temps+'  ·  '+(g.power_w??'?')+' W  ·  fan '+(g.fan_rpm??'?')+' rpm';
- lan=!!s.lan_mode;$('lanbtn').textContent=lan?'LAN mode: on':'LAN mode: off';
+
+// ---- fans, lights, storage, network, GPU tuning, services ----------------------------------
+const PHASE={working:['Working','info'],hold100:['Cooling down','info'],hold50:['Cooling down','info'],idle20:['Idle',''],idle:['Idle',''],hot:['Hot','bad'],calibrating:['Calibrating','warn']};
+function fanIcon(){const s=sv('svg',{viewBox:'0 0 32 32','aria-hidden':'true'});const g=sv('g',{class:'blades',fill:'currentColor'});
+ for(let i=0;i<4;i++)g.append(sv('path',{d:'M16 16 C14 10 15 5 19 4 C22 4 21 10 16 16Z',transform:'rotate('+i*90+' 16 16)',opacity:.85}));
+ s.append(sv('circle',{cx:16,cy:16,r:14.5,fill:'none',stroke:'currentColor','stroke-opacity':.25,'stroke-width':1.5}),g,sv('circle',{cx:16,cy:16,r:2.6,fill:'#0b1220',stroke:'currentColor','stroke-width':1.2}));return s;}
+function renderFans(f){const box=$('fans');box.replaceChildren();
+ if(!f){chip('fanphase','Not reporting','');$('fanpct').textContent='-';$('fanwhy').textContent='The fan service isn\'t reporting: the fans are under the board\'s own control (or the kit doesn\'t manage them here).';$('fanhold').hidden=true;$('fantemps').textContent='';return;}
+ const p=PHASE[f.phase]||[f.phase||'?',''];chip('fanphase',p[0]+(f.phase==='hold100'||f.phase==='hold50'?' · '+f.phase.slice(4)+'%':''),p[1]);
+ const pc=$('fanpct');pc.replaceChildren(document.createTextNode(isNum(f.pct)?String(Math.round(f.pct)):'-'));pc.append(el('small','%'));
+ const hold=f.phase==='hold100'||f.phase==='hold50';$('fanwhy').textContent=hold?(f.phase==='hold100'?'100% for '+(f.hold_left||0)+' s more, then 50%':'50% for '+(f.hold_left||0)+' s more, then 20%'):(f.why||(f.phase==='idle20'?'idle: 20%':''));
+ const hb=$('fanhold');hb.hidden=!hold;if(hold){const span=Math.max(f.hold_left||0,hb._max&&hb._phase===f.phase?hb._max:0);hb._max=span;hb._phase=f.phase;hb.firstChild.style.width=(span?100*(f.hold_left||0)/span:0)+'%';}
+ (f.outputs||[]).forEach(o=>{const t=el('div',undefined,'fan'+(isNum(o.rpm)&&o.rpm>0?' on':''));const ic=fanIcon();
+  if(isNum(o.rpm)&&o.rpm>0)ic.querySelector('.blades').style.animationDuration=clamp(600/o.rpm,0.18,3).toFixed(2)+'s';
+  const d=el('div');d.append(el('div',o.label||'fan','fl'),el('div',isNum(o.rpm)?Math.round(o.rpm)+' rpm':'no rpm','fr'),el('div',isNum(o.pwm)?Math.round(o.pwm/2.55)+'% duty':(o.note||''),'fp'));
+  t.title=o.note||'';t.append(ic,d);box.append(t);});
+ if(f.aio){const t=el('div',undefined,'fan'+(f.aio.pump_rpm>0?' on':''));const ic=fanIcon();if(f.aio.pump_rpm>0)ic.querySelector('.blades').style.animationDuration=clamp(1200/f.aio.pump_rpm,0.18,3).toFixed(2)+'s';
+  const d=el('div');d.append(el('div','Pump'+(f.aio.name?' · '+f.aio.name:''),'fl'),el('div',isNum(f.aio.pump_rpm)?Math.round(f.aio.pump_rpm)+' rpm':'no rpm','fr'),el('div',isNum(f.aio.coolant_c)?'coolant '+f.aio.coolant_c.toFixed(1)+' °C':'','fp'));t.append(ic,d);box.append(t);}
+ const h=f.hottest,n=f.closest;$('fantemps').textContent=h&&n?'Hottest: '+h.label+' '+Math.round(h.c)+' °C  ·  closest to its limit: '+n.label+' '+Math.round(n.c)+' of '+n.limit+' °C':'';}
+function renderLeds(l){const orb=$('orb');
+ if(!l){chip('ledchip','Not reporting','');$('ledstate').textContent='-';$('ledwhy').textContent='The lights service isn\'t reporting (it is off unless setup.sh --leds on).';$('leddevs').textContent='';orb.style.background='#1a2030';orb.style.boxShadow='none';return;}
+ const rgb=l.rgb||[40,48,64],c='rgb('+rgb.join(',')+')';orb.style.background='radial-gradient(circle at 35% 30%,#fff8,'+c+' 45%,'+c+')';orb.style.boxShadow='0 0 34px 6px rgba('+rgb.join(',')+',.45)';
+ chip('ledchip',l.connected?'Connected':'Not connected',l.connected?'ok':'warn');
+ $('ledstate').textContent=!l.connected?'Waiting':l.state==='fading'?(l.target==='red'?'Fading to red':'Fading to white'):l.state==='red'?'Red':'White';
+ $('ledwhy').textContent=l.error?'OpenRGB: '+l.error:(l.why||'');
+ $('leddevs').textContent=l.devices?l.devices+' device'+(l.devices===1?'':'s')+(l.names.length?': '+l.names.join(', '):''):'no devices';}
+function renderStorage(s){const D=$('disks');D.replaceChildren();
+ (s.disks||[]).forEach(d=>{const it=el('div',undefined,'item'),hd=el('div',undefined,'hd');hd.append(el('span',d.mount+(d.label&&d.label!=='/'?'  ('+d.label+')':''),'nm'));
+  if(!d.mounted){hd.append(el('span','not mounted','chip bad'));it.append(hd);D.append(it);return;}
+  const f=d.total?d.used/d.total:0;hd.append(el('span',Math.round(100*f)+'%','num '+(f>=0.9?'bad':f>=0.8?'warn':'dim')));
+  it.append(hd,bar(f,f>=0.9?'bad':f>=0.8?'warn':''),el('div',tib(d.used)+' used of '+tib(d.total)+'  ·  '+tib(d.free)+' free','note'));D.append(it);});
+ const R=$('raid');R.replaceChildren();if(!(s.raid||[]).length){R.append(el('div','No RAID array','note'));return;}
+ (s.raid||[]).forEach(a=>{const it=el('div',undefined,'item'),hd=el('div',undefined,'hd');hd.append(el('span',a.name+'  ·  '+(a.level||'?'),'nm'));
+  hd.append(el('span',a.healthy?(a.action?a.action:'healthy'):'missing a member','chip '+(a.healthy?(a.action&&a.action!=='check'?'warn':a.action?'info':'ok'):'bad')));
+  const m=el('div',undefined,'members');m.setAttribute('aria-label','Members: '+(a.members||'?'));String(a.members||'').split('').forEach(ch=>m.append(el('span',ch==='U'?'U':'_',ch==='U'?'u':'x')));
+  it.append(hd,m);
+  if(a.action){it.append(bar((a.progress||0)/100,a.healthy?'':'bad'),el('div',a.action+' '+(a.progress!=null?a.progress+'%':'waiting')+(a.finish?'  ·  about '+dur(parseFloat(a.finish)*60)+' left':''),'note'));}
+  R.append(it);});}
+function renderNet(s){const n=s.network,tun=s.tunnel||{},pairs=[];chip('tunchip',tun.up?'Tunnel up':'Tunnel down',tun.up?'ok':'bad');
+ pairs.push(['Tunnel',tun.up?'connected ('+tun.connections+' links)':'down',tun.up?'ok':'bad']);
+ if(n){pairs.push([n.name+(n.bridge?' (bridge)':''),(n.address||'no address')+'  ·  '+(n.state==='up'?'up':n.state),n.state==='up'?'':'bad']);
+  (n.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+(p.speed_mbps>=1000?(p.speed_mbps/1000)+' Gb/s':p.speed_mbps+' Mb/s'):''):'no link'),p.carrier?'ok':'dim']));}
+ else pairs.push(['LAN','no wired port found','warn']);
+ pairs.push(['LAN mode',s.lan_mode?'on: answers on the home network too':'off',s.lan_mode?'warn':'']);kv($('net'),pairs);}
+function renderTune(t,g){g=g||{};const pairs=[];
+ if(!t){chip('tunechip','Not set up','');pairs.push(['Power limit',g.power_cap_w?g.power_cap_w+' W':'?']);if(g.sclk_mhz)pairs.push(['Core clock now',g.sclk_mhz+' MHz']);
+  kv($('tune'),pairs);$('tunenote').textContent='Off unless you opt in at the server: sudo ./setup.sh --gpu-tune (an AMD Navi 21 card only).';return;}
+ chip('tunechip',t.reverted?'Back at stock':t.wanted==='on'?'On':t.wanted==='off'?'Off':'Not set up',t.reverted?'warn':t.wanted==='on'?'ok':'');
+ pairs.push(['Power limit',(g.power_cap_w?g.power_cap_w+' W now':'?')+(t.stock.power_w?'  ·  stock '+t.stock.power_w+' W':'')]);
+ if(t.applied.mclk||t.stock.mclk)pairs.push(['Memory clock',(t.applied.mclk?t.applied.mclk+' ('+t.applied.mclk*2+' MHz effective)':'stock')+(t.stock.mclk?'  ·  stock '+t.stock.mclk:'')]);
+ if(t.applied.at)pairs.push(['Applied',ago(t.applied.at)]);
+ if(t.check)pairs.push(['Last check',(t.check.result||'?')+(t.check.at?', '+ago(t.check.at):''),t.check.result==='passed'?'ok':t.check.result==='reverted'?'bad':'']);
+ if(t.reverted)pairs.push(['Kept at stock after',t.reverted,'warn']);kv($('tune'),pairs);
+ $('tunenote').textContent=(t.check&&t.check.note?t.check.note+'. ':'')+'Change it at the server: sudo ollama1-gpu-tune on, off or status.';}
+function renderSvc(s){const gw=s.gateway||{},tun=s.tunnel||{},up=s.updates||{},ou=up.ollama||{};
  kv($('svc'),[['Tunnel',tun.up?'connected ('+tun.connections+')':'down',tun.up?'ok':'bad'],
   ['Gateway',gw.time&&!gw.stale?'running':'not running',gw.time&&!gw.stale?'ok':'bad'],
   ['Ollama',gw.ollama_version||'?'],['Pairing window',s.pairing_open?'open':'closed',s.pairing_open?'warn':''],
@@ -753,43 +1351,75 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){retur
   ['Security updates',up.last_unattended?'last ran '+ago(up.last_unattended):'never'],
   ['Ollama updater',(ou.result||'not run')+' '+(ou.version||'')+(ou.last_run?', '+ago(ou.last_run):''),ou.result==='failed'?'bad':''],
   ['Next Ollama check',up.next_ollama_update||'?']]);
- const vt=g.vram_total||0;table($('loaded'),['Model','Size','On GPU','Context'],(gw.loaded||[]).map(m=>{const sh=m.size?m.size_vram/m.size:0;
-  return [m.name,gib(m.size),sh>=1?'100%':Math.round(sh*100)+'% (rest in system memory)',String(m.context_length??'?')];}));
- if(vt){const r=el('tr'),td=el('td','VRAM headroom '+gib(vt-(g.vram_used||0)),'note');td.colSpan=4;r.append(td);$('loaded').append(r);}
- const mem=s.memory||{},pairs=[['Uptime',dur(s.uptime)],['CPU',(s.cpu_pct??'?')+'%  ·  load '+(s.load||[]).map(x=>x.toFixed(2)).join(' ')],
-  ['Memory',gib(mem.used)+' of '+gib(mem.total)]];
- const net=s.network;if(net){pairs.push([net.name,(net.address||'no address')+'  ·  '+(net.state==='up'?'up':net.state),net.state==='up'?'':'bad']);
-  (net.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+p.speed_mbps+' Mb/s':''):'no link')]));}
- (s.disks||[]).forEach(d=>pairs.push([d.mount,d.mounted?tib(d.used)+' of '+tib(d.total)+' ('+Math.round(100*d.used/d.total)+'%)':'not mounted',d.mounted?'':'bad']));
- (s.raid||[]).forEach(a=>pairs.push([a.name,a.level+' ['+a.members+'] '+(a.healthy?'healthy':'DEGRADED')+(a.action?'  ·  '+a.action+' '+a.progress+'%'+(a.finish?' ('+a.finish+' left)':''):''),a.healthy?'ok':'bad']));
- if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn']);kv($('sys'),pairs);
- try{renderCpu(s.cpu,s);}catch(e){}
+ chip('updchip',ou.result==='failed'?'Last update failed':up.reboot_required?'Reboot needed':ou.result?'Up to date':'Not run',ou.result==='failed'?'bad':up.reboot_required?'warn':ou.result?'ok':'');
+ const u=[['Ollama',(gw.ollama_version||'?')],['Updater',(ou.result||'not run')+(ou.version?' '+ou.version:'')+(ou.last_run?', '+ago(ou.last_run):''),ou.result==='failed'?'bad':''],
+  ['Next check',up.next_ollama_update||'?'],['Security updates',up.last_unattended?'last ran '+ago(up.last_unattended):'never'],['Reboot required',up.reboot_required?'yes'+((up.reboot_pkgs||[]).length?' ('+up.reboot_pkgs.join(', ')+')':''):'no',up.reboot_required?'warn':'']];
+ if(ou.detail)u.push(['Detail',ou.detail,ou.result==='failed'?'bad':'']);kv($('upd'),u);
+ const i=s.idle,sl=sleepSummary(i);chip('autochip',!i?'Unknown':i.enabled?'On':i.enabled===false?'Off':'Unknown',!i?'warn':i.enabled?'ok':'');
+ $('autostate').textContent=i&&i.enabled?(sl[0].startsWith('in ')?'Sleeps '+sl[0]:sl[0]):sl[0];$('autostate').className='st'+(sl[1]==='warn'?' warn':'');
+ $('autosub').textContent=i?[i.enabled?'after '+i.minutes+' minutes idle':null,i.supported===false?'this machine has no deep sleep':null,i.reason?'now: '+i.reason:null,i.wake_cards?i.wake_cards+' network card'+(i.wake_cards===1?'':'s')+' can wake it':null].filter(Boolean).join('  ·  '):'No word from the idle service.';
+ lan=!!s.lan_mode;const lb=$('lanbtn');lb.setAttribute('aria-checked',String(lan));$('lansub').textContent=lan?'On: the gateway also answers on the home network':'Off: only through Cloudflare';
+ chip('pairchip',s.pairing_open?'Pairing open':'Pairing closed',s.pairing_open?'warn':'');}
+const MODEL_COLORS=['#2dd4ef','#a78bfa','#f472b6','#fbbf24','#34d399','#6f8fff','#fb923c'];
+function renderLoaded(s){const gw=s.gateway||{},g=s.gpu||{},L=$('loaded'),st=$('vstack'),lg=$('vlegend');L.replaceChildren();st.replaceChildren();lg.replaceChildren();
+ const vt=g.vram_total||0,used=g.vram_used||0;chip('vramchip',vt?gib(used)+' of '+gib(vt):'no GPU reading','');
+ let acc=0;(gw.loaded||[]).forEach((m,ix)=>{const col=MODEL_COLORS[ix%MODEL_COLORS.length],sh=m.size?m.size_vram/m.size:0;
+  if(vt&&m.size_vram){const i=el('i');i.style.width=(100*clamp(m.size_vram/vt,0,1-acc))+'%';i.style.background=col;st.append(i);acc+=m.size_vram/vt;}
+  const sp=el('span'),k=el('i');k.style.background=col;sp.append(k,document.createTextNode(m.name+' '+gib(m.size_vram)));lg.append(sp);
+  const it=el('div',undefined,'item'),hd=el('div',undefined,'hd');hd.append(el('span',m.name,'nm mono'),el('span',gib(m.size),'num dim'));
+  let exp='';const e=Date.parse(m.expires_at||'');if(isFinite(e)){const left=e/1000-snow();exp=left>3e7?'stays loaded':left>0?'unloads in '+mmss(left):'unloading';}
+  it.append(hd,bar(sh,sh>=1?'':'warn'),el('div',(sh>=1?'100% on the GPU':Math.round(sh*100)+'% on the GPU (rest in system memory)')+'  ·  context '+(m.context_length??'?')+(exp?'  ·  '+exp:''),'note'));L.append(it);});
+ if(vt&&used>acc*vt+1){const i=el('i');i.style.width=(100*clamp((used-acc*vt)/vt,0,1-acc))+'%';i.style.background='rgba(148,163,200,.45)';st.append(i);const sp=el('span'),k=el('i');k.style.background='rgba(148,163,200,.45)';sp.append(k,document.createTextNode('other '+gib(used-acc*vt)));lg.append(sp);}
+ if(vt){const sp=el('span'),k=el('i');k.style.background='rgba(148,163,200,.14)';sp.append(k,document.createTextNode('free '+gib(vt-used)));lg.append(sp);}
+ if(!(gw.loaded||[]).length)L.append(el('div','No model is loaded. The first request loads one.','note'));}
+
+// ---- fast refresh: /api/state every few seconds -------------------------------------------
+let fetchedAt=Date.now()/1000;
+async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){setLive('off','Offline');return;}
+ fetchedAt=Date.now()/1000;if(isNum(s.time))skew=s.time-fetchedAt;lastState=s;if(JOBS[0].t)setLive('','Live');
+ $('asof').textContent='Updated '+new Date().toLocaleTimeString();
+ pushLive(s);
+ const parts=[['hero',()=>renderHero(s)],['gauges',()=>renderGauges(s)],['cpu',()=>renderCpu(s.cpu,s)],['fans',()=>renderFans(s.fan_status)],['leds',()=>renderLeds(s.leds_status)],
+  ['storage',()=>renderStorage(s)],['net',()=>renderNet(s)],['tune',()=>renderTune(s.gpu_tune,s.gpu)],['svc',()=>renderSvc(s)],['loaded',()=>renderLoaded(s)],['charts',draw]];
+ for(const [,f] of parts){try{f();}catch(e){}}
  const fl=$('fanline');if(fl){fl.hidden=!s.fan;fl.textContent=s.fan||'';}
- const ll=$('ledsline');if(ll){ll.hidden=!s.leds;ll.textContent=s.leds||'';}}
-async function refreshSlow(){try{const d=await api('/api/devices');table($('devices'),['Name','Id','Paired',''],d.devices.map(x=>{
-  const b=el('button','Remove','danger');b.addEventListener('click',()=>{if(confirm('Unpair '+x.name+'? It will need to pair again at the server.'))act('remove-device',x.id);});
-  return [x.name,x.id,(x.paired_at||'').slice(0,16).replace('T',' '),b];}));}catch(e){}
- try{const m=await api('/api/models');const rows=[];const allowed=new Set(m.allow.map(a=>a.name));
-  m.installed.forEach(x=>{const b=el('button','Remove','danger');b.addEventListener('click',()=>{const c=prompt('Type the model name to remove it: '+x.name);if(c===x.name)act('remove-model',x.hash,c);});
-   const a=m.allow.find(a=>a.name===x.name);rows.push([x.name,gib(x.size),a?(a.ram?'allow-listed, may use system memory':'allow-listed, GPU only'):'installed by hand, GPU only',b]);});
-  m.allow.filter(a=>!a.installed).forEach(a=>{const b=el('button','Pull');b.addEventListener('click',()=>act('pull',a.hash));rows.push([a.name,'-','allow-listed'+(a.ram?', may use system memory':'')+', not installed',b]);});
-  (m.allow_errors||[]).forEach(e=>rows.push(['line '+e.line+': '+e.text,'-','ignored: '+e.reason,'']));
-  table($('models'),['Model','Size','',''],rows);const p=m.pull;
-  $('pull').textContent=p&&p.model?('Pull '+p.model+': '+p.status+(p.total?' '+Math.round(100*p.completed/p.total)+'%':'')):'';}catch(e){}
- try{const l=await api('/api/logs');const acts=[];for(const [k,v] of Object.entries(l.actions||{}))acts.push([k,v.result+', '+ago(v.at),v.result==='failed'?'bad':'']);kv($('acts'),acts);
-  table($('log'),['Time','Device','Model','Kind','Status','ms','Tokens in','Tokens out'],(l.recent||[]).slice().reverse().slice(0,40).map(r=>
-   [new Date(r.t*1000).toLocaleTimeString(),r.device,r.model,r.kind,String(r.status),String(r.ms),String(r.prompt_tokens),String(r.tokens)]));}catch(e){}}
+ const ll=$('ledsline');if(ll){ll.hidden=!s.leds;ll.textContent=s.leds||'';}
+ if(LOG.tab==='status')renderLogs();}
+
+// ---- slow refresh: devices, models, logs -------------------------------------------------
+let devs=[],models=null,logs=null;
+async function refreshSlow(){
+ try{const d=await api('/api/devices');devs=d.devices||[];renderDevices();}catch(e){}
+ try{models=await api('/api/models');renderModels();}catch(e){}
+ try{logs=await api('/api/logs');const acts=[];for(const [k,v] of Object.entries(logs.actions||{}))acts.push([LABEL[k]||k,v.result+', '+ago(v.at),v.result==='failed'?'bad':'']);
+  acts.sort();kv($('acts'),acts.length?acts:[['Last actions','none yet']]);renderLogs();}catch(e){}}
+function renderDevices(){const box=$('devices');box.replaceChildren();const on={};((lastState.gateway||{}).devices||[]).forEach(d=>{on[d.id]=d;});
+ if(!devs.length){box.append(el('div','No paired devices yet. Open the pairing window, then pair from the app with the code on the server\'s screen.','note'));return;}
+ devs.forEach(x=>{const it=el('div',undefined,'item'),hd=el('div',undefined,'hd'),g=on[x.id];
+  const nm=el('span',undefined,'nm row');nm.append(el('span',undefined,'dot '+(g&&g.connected?'ok':'')),el('span',x.name));hd.append(nm);
+  const b=el('button','Remove','danger small');b.type='button';b.addEventListener('click',async()=>{if(await ask({title:'Unpair '+x.name+'?',body:['Unpair '+x.name+'? It will need to pair again at the server.'],ok:'Remove',danger:true}))act('remove-device',x.id,undefined,b);});
+  hd.append(b);it.append(hd,el('div','id '+x.id+'  ·  paired '+(x.paired_at||'').slice(0,16).replace('T',' ')+(g?'  ·  '+(g.active?g.active+' running':g.connected?'connected':'last seen '+ago(g.last_seen)):''),'note mono'));box.append(it);});}
+function renderModels(){const m=models;if(!m)return;const rows=[];
+ m.installed.forEach(x=>{const b=el('button','Remove','danger small');b.type='button';
+  b.addEventListener('click',async()=>{const c=await ask({title:'Remove '+x.name+'?',body:['This deletes the model from the server\'s disk. Download it again from the allow-list to get it back.'],typed:x.name,typedLabel:'Type the model name to remove it: '+x.name,ok:'Remove model',danger:true});
+   if(c===x.name)act('remove-model',x.hash,c,b);});
+  const a=m.allow.find(a=>a.name===x.name);rows.push([el('span',x.name,'mono'),gib(x.size),a?(a.ram?'allow-listed, may use system memory':'allow-listed, GPU only'):'installed by hand, GPU only',b]);});
+ m.allow.filter(a=>!a.installed).forEach(a=>{const b=el('button','Pull','small');b.type='button';b.addEventListener('click',()=>act('pull',a.hash,undefined,b));rows.push([el('span',a.name,'mono'),'-','allow-listed'+(a.ram?', may use system memory':'')+', not installed',b]);});
+ (m.allow_errors||[]).forEach(e=>rows.push(['line '+e.line+': '+e.text,'-','ignored: '+e.reason,'']));
+ table($('models'),['Model','Size','',''],rows);const p=m.pull,pe=$('pull');pe.replaceChildren();
+ if(p&&p.model){pe.append(el('div','Pull '+p.model+': '+p.status+(p.total?' '+Math.round(100*p.completed/p.total)+'%':'')));if(p.total)pe.append(bar(p.completed/p.total));}}
+
 // --- model library: preview, then exactly that ---
-let libWant=0;
-$('libbtn').addEventListener('click',()=>{libWant=Date.now()/1000-2;act('library-preview');$('libmsg').textContent='Checking the registry...';});
-function bar(f){const b=el('div',undefined,'bar'),i=el('i');i.style.width=Math.round(Math.max(0,Math.min(1,f))*100)+'%';b.append(i);return b;}
+let libWant=0,libState=null;
+$('libbtn').addEventListener('click',()=>{libWant=Date.now()/1000-2;act('library-preview',undefined,undefined,$('libbtn'));$('libmsg').textContent='Checking the registry...';});
 function eta(s){if(s==null)return '';return s<60?'less than a minute left':'about '+Math.ceil(s/60)+' min left';}
-async function refreshLib(){let l;try{l=await api('/api/library');}catch(e){return;}
+async function refreshLib(){let l;try{l=await api('/api/library');}catch(e){return;}libState=l;
  const box=$('lib'),p=l.preview,sy=l.sync||{};box.replaceChildren();$('libbtn').disabled=sy.state==='running';
+ if(LOG.tab==='library')renderLogs();
  if(sy.state==='running'){const e=sy.event||{};$('libmsg').textContent='Syncing...';
   if(e.phase!=='remove'&&e.model_total!=null){box.append(el('div',(e.phase==='update'?'Updating ':'Downloading ')+e.index+' of '+e.count+': '+e.name+'  ·  '+gib(e.model_done)+' of '+gib(e.model_total)+(e.attempt>1?' (try '+e.attempt+' of 3)':''),'sub'),bar(e.model_total?e.model_done/e.model_total:0),
-   el('div','All: '+Math.round(100*(e.overall||0))+'%'+(e.eta!=null?'  ·  '+eta(e.eta):''),'sub'),bar(e.overall||0));}
-  (sy.log||[]).forEach(x=>box.append(el('div',x,'note')));return;}
+   el('div','All: '+Math.round(100*(e.overall||0))+'%'+(e.eta!=null?'  ·  '+eta(e.eta):''),'sub'),bar(e.overall||0,'violet'));}
+  (sy.log||[]).slice(-6).forEach(x=>box.append(el('div',x,'note')));return;}
  if(sy.state==='done'&&sy.summary&&!libWant){const s=sy.summary;$('libmsg').textContent=sy.message||('Done '+ago(sy.at)+': removed '+(s.removed||[]).length+', downloaded '+(s.downloaded||[]).length+', updated '+(s.updated||[]).length+((s.failed||[]).length?', failed '+s.failed.length:''));
   (s.failed||[]).forEach(f=>box.append(el('div','failed: '+f.name+' ('+f.error+')','bad')));return;}
  if(sy.state==='failed'||sy.state==='changed'||sy.state==='refused')$('libmsg').textContent=sy.message||sy.state;
@@ -798,49 +1428,52 @@ async function refreshLib(){let l;try{l=await api('/api/library');}catch(e){retu
  if(libWant){$('libmsg').textContent='';}
  (p.allow_errors||[]).forEach(e=>box.append(el('div','Allow-list line '+e.line+' ignored ('+e.reason+'): '+e.text,'bad')));
  if((p.removals_blocked||[]).length)box.append(el('div','Not removing '+p.removals_blocked.map(x=>x.name).join(', ')+' while the allow-list has a line it can\'t read. Fix it at the server first.','warn'));
- const rows=[];p.remove.forEach(x=>rows.push(['Remove',x.name,gib(x.bytes)]));p.download.forEach(x=>rows.push(['Download',x.name,gib(x.bytes)]));
- p.update.forEach(x=>rows.push(['Update',x.name,gib(x.bytes)]));(p.unknown||[]).forEach(x=>rows.push(['?',x.name,x.why]));
- const t=el('table');table(t,['','Model','Size'],rows);box.append(t);const tt=p.totals;
+ const rows=[];p.remove.forEach(x=>rows.push([el('span','Remove','chip bad'),x.name,gib(x.bytes)]));p.download.forEach(x=>rows.push([el('span','Download','chip info'),x.name,gib(x.bytes)]));
+ p.update.forEach(x=>rows.push([el('span','Update','chip ok'),x.name,gib(x.bytes)]));(p.unknown||[]).forEach(x=>rows.push(['?',x.name,x.why]));
+ const t=el('table');table(t,['','Model','Size'],rows);const w=el('div',undefined,'tbl mt');w.append(t);box.append(w);const tt=p.totals;
  box.append(el('div','Download '+gib(tt.download_bytes+tt.update_bytes)+'  ·  free '+gib(tt.freed_bytes)+'  ·  disk free now '+tib(tt.free_now)+', after '+tib(tt.free_after),'sub'));
  const n=p.remove.length+p.download.length+p.update.length;
  if(!n){box.append(el('div','Nothing to change: the library matches the allow-list.','sub'));return;}
  if(!p.enough_space){box.append(el('div',tt.free_now==null?'Can\'t read the free disk space, so nothing will be done.':'Not enough disk space for this.','bad'));return;}
- const go=el('button','Apply these '+n+' changes');go.className='mt';go.addEventListener('click',()=>{
-  const warn=(p.allow_errors||[]).length?'\n\nThe allow-list has '+p.allow_errors.length+' line(s) it can\'t read; models they name are kept.':'';
-  if(confirm('Remove '+p.remove.length+', download '+p.download.length+', update '+p.update.length+' model(s), exactly as listed?'+(p.remove.length?'\n\nRemoving: '+p.remove.map(x=>x.name).join(', '):'')+warn)){libWant=0;act('library-sync',p.id,p.id);}});
+ const go=el('button','Apply these '+n+' changes','primary');go.type='button';go.classList.add('mt');go.addEventListener('click',async()=>{
+  const body=['Remove '+p.remove.length+', download '+p.download.length+', update '+p.update.length+' model(s), exactly as listed?'];
+  if(p.remove.length)body.push('Removing: '+p.remove.map(x=>x.name).join(', '));
+  if((p.allow_errors||[]).length)body.push('The allow-list has '+p.allow_errors.length+' line(s) it can\'t read; models they name are kept.');
+  if(await ask({title:'Apply the library changes?',body,ok:'Apply',danger:p.remove.length>0})){libWant=0;act('library-sync',p.id,p.id,go);}});
  box.append(go);}
-setInterval(refreshLib,2000);refreshLib();
+
 // --- power and cost ---
 let pw=null,edit=null,seasonIx=0;
 // money is whole cents, always two digits; an amount under half a cent says so instead of showing $0.00
 const money=(v,sym)=>{if(v==null)return '-';const c=Math.round(Math.abs(v)*100);if(v>0&&c===0)return '<'+sym+'0.01';return (v<0?'-':'')+sym+(c/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
 const TIERN={on:'On-peak',mid:'Mid-peak',off:'Off-peak',discount:'Discount',flat:'Flat'};
-function pchart(series){const svg=$('pchart');svg.replaceChildren();const W=360,H=90,now=Date.now()/1000;
- const pts=(series||[]).filter(p=>p[0]>=now-3600&&p[1]!=null);if(pts.length<2){const t=sv('text',{x:W/2,y:H/2,'text-anchor':'middle','font-size':11,fill:'var(--muted)'});t.textContent='No data yet';svg.append(t);return;}
- let max=Math.max(...pts.map(p=>p[1]))*1.15||1;const x=t=>(t-(now-3600))/3600*W,y=v=>H-4-(v/max)*(H-8);
- let d='',prev=null;for(const p of pts){d+=(prev&&p[0]-prev>40?'M':(d?'L':'M'))+x(p[0]).toFixed(1)+' '+y(p[1]).toFixed(1);prev=p[0];}
- svg.append(sv('path',{d,fill:'none',stroke:'var(--series)','stroke-width':2,'vector-effect':'non-scaling-stroke'}));
- const t=sv('text',{x:4,y:12,'font-size':10,fill:'var(--muted)'});t.textContent=Math.round(max/1.15)+' W peak';svg.append(t);}
 function renderPower(){const s=pw,sym=s.symbol,live=s.live;
- $('pw').textContent=live?Math.round(live.watts)+' W':'-';
+ const pe=$('pw');pe.replaceChildren(document.createTextNode(live?String(Math.round(live.watts)):'-'));if(live)pe.append(el('small',' W'));
+ $('herow').textContent=live?Math.round(live.watts)+' W':'-';$('herowsub').textContent=s.windows&&s.priced?money(s.windows['1d'].cost,sym)+' in 24 h':live?(live.src==='plug'?'smart plug':'estimate'):'no reading';
  if(!live)$('pwsrc').textContent='No reading: is ollama1-power.service running?';
  else if(live.src==='plug')$('pwsrc').textContent='Smart plug ('+live.plug.type+')';
  else $('pwsrc').textContent='Estimate: GPU '+(live.gpu_w??'?')+' W + CPU '+(live.cpu_w??'?')+' W + '+live.baseline_w+' W for the rest, at '+Math.round(live.psu_efficiency*100)+'% PSU efficiency'+(live.plug&&live.plug.configured&&!live.plug.ok?'. Smart plug not answering ('+live.plug.error+')':'');
  const b=s.badge;$('pbadge').textContent=b.text.charAt(0).toUpperCase()+b.text.slice(1)+(b.price!=null?'  ·  '+sym+b.price.toFixed(4)+'/kWh':'');
  $('pbadge').className='chip '+(b.tier==='on'?'bad':b.tier==='mid'?'warn':b.tier==='discount'?'ok':'');
- pchart(live&&live.series);
- const rows=[['Last hour','1h'],['Last 24 h','1d'],['Last 7 days','1w'],['Last 30 days','1m']].map(([lab,k])=>{const w=s.windows[k];
-  const split=Object.entries(w.by_tier).filter(([t])=>t!=='flat').sort((a,b)=>b[1].kwh-a[1].kwh).map(([t,v])=>TIERN[t]+' '+v.kwh.toFixed(2)+' kWh'+(v.cost!=null?' '+money(v.cost,sym):'')).join(', ');
-  const r=[lab,w.kwh.toFixed(3)+' kWh',s.priced?money(w.cost,sym):'set a price'];if(s.mode==='tou')r.push(split||'-');r.push(w.unknown_h>=0.1?w.unknown_h.toFixed(1)+' h':'');return r;});
- table($('ptable'),['','Energy','Cost'].concat(s.mode==='tou'?['By tier']:[],['Unknown']),rows);
- if(s.since&&s.since>Date.now()/1000-30*86400){const r=el('tr'),td=el('td','Measured since '+new Date(s.since*1000).toLocaleString()+'. Unknown = time with no reading (the server off, or the sampler stopped); it is never counted as zero.','note');td.colSpan=5;r.append(td);$('ptable').append(r);}
+ const series=((live&&live.series)||[]).filter(p=>p[1]!=null);const now=snow();
+ drawChart($('pchart'),series,{t0:now-3600,t1:now,color:'orange',fmt:v=>Math.round(v)+' W',label:'Watts, last hour',gap:40});
+ if(series.length){const v=series.map(p=>p[1]);$('pmm').textContent='low '+Math.round(Math.min(...v))+' W  ·  peak '+Math.round(Math.max(...v))+' W';}
+ const box=$('costs');box.replaceChildren();
+ for(const [lab,k,hrs] of [['Last hour','1h',1],['Last 24 h','1d',24],['Last 7 days','1w',168],['Last 30 days','1m',720]]){const w=s.windows[k];const c=el('div',undefined,'cost');
+  c.append(el('div',lab,'k'),el('div',s.priced?money(w.cost,sym):w.kwh.toFixed(2)+' kWh','v'));
+  const span=Math.min(hrs,(w.measured_h||0)+(w.unknown_h||0))||hrs;c.append(bar(span?(w.measured_h||0)/span:0,'violet'));
+  const est=Object.entries(w.sources_h||{}).some(([src,h])=>src!=='plug'&&h>0);
+  c.append(el('div',(s.priced?w.kwh.toFixed(w.kwh<10?3:1)+' kWh  ·  ':'set a price  ·  ')+(w.measured_h||0).toFixed(1)+' h measured'+(w.unknown_h>=0.1?', '+w.unknown_h.toFixed(1)+' h unknown':'')+(est?'  ·  estimated':''),'s'));
+  if(s.mode==='tou'){const split=Object.entries(w.by_tier).filter(([t])=>t!=='flat').sort((a,b)=>b[1].kwh-a[1].kwh).map(([t,v])=>TIERN[t]+' '+v.kwh.toFixed(2)+' kWh'+(v.cost!=null?' '+money(v.cost,sym):'')).join(', ');if(split)c.append(el('div',split,'note'));}
+  box.append(c);}
  const p=s.projection;$('pproj').textContent=p?'Next 30 days: about '+p.kwh.toFixed(0)+' kWh'+(p.cost!=null?', about '+money(p.cost,sym):'')+' (the average of each hour of the week over the last '+p.basis_days+' days, at '+Math.round(p.avg_w)+' W on average)':'Next 30 days: not enough data yet.';
- const m=s.windows['1m'];$('ptok').textContent=m.cost_per_1k_tokens!=null?'Cost per 1 million tokens: '+money(m.cost_per_1k_tokens*1000,sym)+' (all electricity in the last 30 days over '+m.tokens.toLocaleString()+' tokens generated)':'';}
+ const m=s.windows['1m'];$('ptok').textContent=m.cost_per_1k_tokens!=null?'Cost per 1 million tokens: '+money(m.cost_per_1k_tokens*1000,sym)+' (all electricity in the last 30 days over '+m.tokens.toLocaleString()+' tokens generated)':'';
+ if(s.since&&s.since>snow()-30*86400)$('pproj').textContent+='  Measured since '+new Date(s.since*1000).toLocaleString()+'. Unknown = time with no reading (the server off, or the sampler stopped); it is never counted as zero.';}
 function editorFrom(s){edit=JSON.parse(JSON.stringify(s));seasonIx=0;drawEditor();}
 function inp(type,val,on,attrs){const e=document.createElement('input');e.type=type;if(type==='checkbox')e.checked=!!val;else e.value=val??'';for(const k in attrs||{})e.setAttribute(k,attrs[k]);e.addEventListener('change',()=>on(type==='checkbox'?e.checked:e.value));return e;}
 function drawEditor(){const s=edit,o=pw.options;$('pcur').value=s.currency;
  document.querySelectorAll('input[name=pmode]').forEach(r=>r.checked=r.value===s.mode);
- $('pflat').style.display=s.mode==='flat'?'':'none';$('ptou').style.display=s.mode==='tou'?'':'none';
+ $('pflat').hidden=s.mode!=='flat';$('ptou').hidden=s.mode!=='tou';
  $('pflatrate').value=s.flat_rate??'';$('ptz').value=s.timezone;$('pwknd').checked=s.weekends_off_peak;
  $('phol').checked=s.holidays.enabled;$('pobs').checked=s.holidays.observed;$('pholx').value=s.holidays.extra.join(', ');
  const tiers=$('ptiers');tiers.replaceChildren();for(const t of ['on','mid','off','discount']){const l=el('label',TIERN[t]+' ');
@@ -848,72 +1481,142 @@ function drawEditor(){const s=edit,o=pw.options;$('pcur').value=s.currency;
  const hn=$('pholnames');hn.replaceChildren();for(const [k,n] of Object.entries(o.holiday_names)){const l=el('label','');
   l.append(inp('checkbox',s.holidays.names.includes(k),v=>{s.holidays.names=Object.keys(o.holiday_names).filter(x=>x===k?v:s.holidays.names.includes(x));}),document.createTextNode(' '+n));hn.append(l);}
  const tabs=$('pseasontabs');tabs.replaceChildren(el('span','Seasons:','note'));
- s.seasons.forEach((se,i)=>{const b=el('button',se.name||('Season '+(i+1)));b.type='button';if(i===seasonIx)b.className='on';b.addEventListener('click',()=>{seasonIx=i;drawEditor();});tabs.append(b);});
- const add=el('button','+ Season');add.type='button';add.addEventListener('click',()=>{s.seasons.push({name:'Season '+(s.seasons.length+1),from:'01-01',to:'12-31',windows:[]});seasonIx=s.seasons.length-1;drawEditor();});tabs.append(add);
+ s.seasons.forEach((se,i)=>{const b=el('button',se.name||('Season '+(i+1)),'small');b.type='button';if(i===seasonIx)b.classList.add('on');b.addEventListener('click',()=>{seasonIx=i;drawEditor();});tabs.append(b);});
+ const add=el('button','+ Season','small');add.type='button';add.addEventListener('click',()=>{s.seasons.push({name:'Season '+(s.seasons.length+1),from:'01-01',to:'12-31',windows:[]});seasonIx=s.seasons.length-1;drawEditor();});tabs.append(add);
  const box=$('pseason');box.replaceChildren();const se=s.seasons[seasonIx];if(!se)return;
  const head=el('div',undefined,'row mt');const nm=el('label','Name ');nm.append(inp('text',se.name,v=>{se.name=v;drawEditor();},{size:'14',maxlength:'40'}));
  const fr=el('label','From (MM-DD) ');fr.append(inp('text',se.from,v=>{se.from=v;},{size:'6',placeholder:'05-01'}));
  const to=el('label','to ');to.append(inp('text',se.to,v=>{se.to=v;},{size:'6',placeholder:'09-30'}));
- const del=el('button','Remove season','danger');del.type='button';del.addEventListener('click',()=>{if(s.seasons.length>1){s.seasons.splice(seasonIx,1);seasonIx=0;drawEditor();}});
+ const del=el('button','Remove season','danger small');del.type='button';del.addEventListener('click',()=>{if(s.seasons.length>1){s.seasons.splice(seasonIx,1);seasonIx=0;drawEditor();}});
  head.append(nm,fr,to,del);box.append(head);
  const t=el('table');t.className='mt';const hr=el('tr');['Tier','Days','Start','End',''].forEach(h=>hr.append(el('th',h)));t.append(hr);
- se.windows.forEach((w,j)=>{const r=el('tr');const sel=document.createElement('select');for(const k of ['on','mid','discount','off']){const op=el('option',TIERN[k]);op.value=k;sel.append(op);}sel.value=w.tier;sel.addEventListener('change',()=>{w.tier=sel.value;});
-  const days=document.createElement('select');for(const k of ['weekdays','weekends','every day','custom']){const op=el('option',k);op.value=k;days.append(op);}
+ se.windows.forEach((w,j)=>{const r=el('tr');const sel=document.createElement('select');sel.setAttribute('aria-label','Tier');for(const k of ['on','mid','discount','off']){const op=el('option',TIERN[k]);op.value=k;sel.append(op);}sel.value=w.tier;sel.addEventListener('change',()=>{w.tier=sel.value;});
+  const days=document.createElement('select');days.setAttribute('aria-label','Days');for(const k of ['weekdays','weekends','every day','custom']){const op=el('option',k);op.value=k;days.append(op);}
   const custom=Array.isArray(w.days);days.value=custom?'custom':w.days;const cd=el('span','');
   const dn=['mon','tue','wed','thu','fri','sat','sun'];if(custom){dn.forEach(d=>{const l=el('label','');l.append(inp('checkbox',w.days.includes(d),v=>{w.days=dn.filter(x=>x===d?v:w.days.includes(x));}),document.createTextNode(d+' '));cd.append(l);});}
   days.addEventListener('change',()=>{w.days=days.value==='custom'?['mon','tue','wed','thu','fri']:days.value;drawEditor();});
   const dcell=el('td');dcell.append(days,cd);
-  const st=inp('time',w.start,v=>{w.start=v;},{step:'60'}),en=inp('text',w.end,v=>{w.end=v;},{size:'5',placeholder:'21:00'});
-  const x=el('button','Remove','danger');x.type='button';x.addEventListener('click',()=>{se.windows.splice(j,1);drawEditor();});
+  const st=inp('time',w.start,v=>{w.start=v;},{step:'60','aria-label':'Start'}),en=inp('text',w.end,v=>{w.end=v;},{size:'5',placeholder:'21:00','aria-label':'End'});
+  const x=el('button','Remove','danger small');x.type='button';x.addEventListener('click',()=>{se.windows.splice(j,1);drawEditor();});
   [sel,dcell,st,en,x].forEach(c=>{if(c.tagName==='TD')r.append(c);else{const td=el('td');td.append(c);r.append(td);}});t.append(r);});
- box.append(t);const aw=el('button','+ Window');aw.type='button';aw.className='mt';aw.addEventListener('click',()=>{se.windows.push({tier:'on',days:'weekdays',start:'16:00',end:'21:00'});drawEditor();});box.append(aw);
- const pr=$('ppresets');pr.replaceChildren();for(const [k,v] of Object.entries(o.presets)){const b=el('button',v.label);b.type='button';b.addEventListener('click',()=>{const keep=edit;editorFrom(v.schedule);edit.tiers=keep.tiers;edit.currency=keep.currency;drawEditor();});pr.append(b);}}
+ const tw=el('div',undefined,'tbl');tw.append(t);box.append(tw);const aw=el('button','+ Window','small');aw.type='button';aw.classList.add('mt');aw.addEventListener('click',()=>{se.windows.push({tier:'on',days:'weekdays',start:'16:00',end:'21:00'});drawEditor();});box.append(aw);
+ const pr=$('ppresets');pr.replaceChildren();for(const [k,v] of Object.entries(o.presets)){const b=el('button',v.label,'small');b.type='button';b.addEventListener('click',()=>{const keep=edit;editorFrom(v.schedule);edit.tiers=keep.tiers;edit.currency=keep.currency;drawEditor();});pr.append(b);}}
 function readEditor(){const s=edit;s.currency=$('pcur').value.trim().toUpperCase();
  s.mode=(document.querySelector('input[name=pmode]:checked')||{}).value||'flat';
  const fr=$('pflatrate').value;s.flat_rate=fr===''?null:+fr;s.timezone=$('ptz').value.trim();s.weekends_off_peak=$('pwknd').checked;
  s.holidays.enabled=$('phol').checked;s.holidays.observed=$('pobs').checked;
  s.holidays.extra=$('pholx').value.split(/[\s,]+/).filter(Boolean);return s;}
-async function saveSchedule(obj){$('pmsg').textContent='Saving...';$('perr').replaceChildren();
- try{const r=await fetch('/api/power/schedule',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-O1-CSRF':CSRF},body:JSON.stringify(obj)});
-  const j=await r.json();if(r.ok){$('pmsg').textContent='Saved.';edit=null;await new Promise(z=>setTimeout(z,1500));pw=null;await refreshPower(true);}
-  else{$('pmsg').textContent='Not saved:';(j.errors||[j.error||'failed']).forEach(e=>$('perr').append(el('li',e)));}}catch(e){$('pmsg').textContent='Not saved ('+e.message+')';}}
+async function saveSchedule(obj){$('pmsg').textContent='Saving...';$('perr').replaceChildren();const b=$('psave');b.disabled=true;b.setAttribute('aria-busy','true');
+ const r=await post('/api/power/schedule',obj);b.disabled=false;b.removeAttribute('aria-busy');
+ if(r.ok){$('pmsg').textContent='Saved.';toast('Prices saved','The server checked them and started the apply step.','ok');edit=null;await new Promise(z=>setTimeout(z,1500));pw=null;await refreshPower(true);}
+ else{$('pmsg').textContent='Not saved:';(r.j.errors||[r.msg]).forEach(e=>$('perr').append(el('li',e)));toast('Prices not saved',r.msg,'bad');}}
 document.querySelectorAll('input[name=pmode]').forEach(r=>r.addEventListener('change',()=>{readEditor();drawEditor();}));
 $('psave').addEventListener('click',()=>saveSchedule(readEditor()));
 $('pimport').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
  let obj;try{obj=JSON.parse(await f.text());}catch(err){$('pmsg').textContent='That file isn\'t JSON.';return;}
- if(confirm('Replace the prices with '+f.name+'?'))saveSchedule(obj);});
-async function refreshPower(force){try{pw=await api('/api/power');renderPower();if(!edit||force)editorFrom(pw.schedule);}catch(e){}}
-refreshPower();setInterval(()=>{if(!$('pset').open)refreshPower();else api('/api/power').then(p=>{pw=p;renderPower();}).catch(()=>{});},10000);
-// --- history charts: one series each, one axis each, crosshair + tooltip ---
-let range=3600,hist={rows:[]};
-const CH=[['Tokens per second',1,v=>v.toFixed(1)],['GPU busy (%)',2,v=>Math.round(v)+'%'],['VRAM used (GiB)',3,v=>v.toFixed(1)+' GiB'],
- ['GPU temperature (°C)',4,v=>Math.round(v)+'°C'],['GPU power (W)',5,v=>Math.round(v)+' W'],
- ['CPU temperature (°C)',7,v=>Math.round(v)+'°C'],['CPU speed (GHz)',8,v=>v.toFixed(2)+' GHz']];
-const NS='http://www.w3.org/2000/svg';const sv=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
-function draw(){const box=$('charts');box.replaceChildren();const now=Date.now()/1000,rows=hist.rows.filter(r=>r[0]>=now-range);
- for(const [title,ix,fmt] of CH){const wrap=el('div',undefined,'chart');wrap.append(el('div',title,'sub'));
-  const W=360,H=150,L=38,R=8,T=8,B=20;const svg=sv('svg',{viewBox:'0 0 '+W+' '+H,preserveAspectRatio:'none',role:'img','aria-label':title});
-  const pts=rows.filter(r=>r[ix]!=null).map(r=>[r[0],r[ix]]);let max=Math.max(1,...pts.map(p=>p[1]));
-  const nice=Math.pow(10,Math.floor(Math.log10(max)));max=Math.ceil(max/nice)*nice;
-  const x=t=>L+(t-(now-range))/range*(W-L-R),y=v=>T+(1-v/max)*(H-T-B);
-  for(let i=0;i<=2;i++){const v=max*i/2;svg.append(sv('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:'var(--grid)','stroke-width':1}));
-   const tx=sv('text',{x:L-4,y:y(v)+4,'text-anchor':'end','font-size':10,fill:'var(--muted)'});tx.textContent=Number.isInteger(v)?v:v.toFixed(1);svg.append(tx);}
-  const lab=range===3600?['-60 min','-30 min','now']:['-24 h','-12 h','now'];[0,.5,1].forEach((f,i)=>{const tx=sv('text',{x:L+f*(W-L-R),y:H-5,'text-anchor':i===0?'start':i===2?'end':'middle','font-size':10,fill:'var(--muted)'});tx.textContent=lab[i];svg.append(tx);});
-  if(pts.length>1){let d='';let prev=null;for(const p of pts){d+=(prev&&p[0]-prev>60?'M':(d?'L':'M'))+x(p[0]).toFixed(1)+' '+y(p[1]).toFixed(1);prev=p[0];}
-   svg.append(sv('path',{d,fill:'none',stroke:'var(--series)','stroke-width':2,'stroke-linejoin':'round','vector-effect':'non-scaling-stroke'}));}
-  else{const tx=sv('text',{x:W/2,y:H/2,'text-anchor':'middle','font-size':11,fill:'var(--muted)'});tx.textContent='No data yet';svg.append(tx);}
-  const hair=sv('line',{y1:T,y2:H-B,stroke:'var(--ink2)','stroke-width':1,visibility:'hidden','vector-effect':'non-scaling-stroke'});svg.append(hair);
-  const tip=el('div',undefined,'tip');wrap.append(svg,tip);
-  svg.addEventListener('pointermove',e=>{if(!pts.length)return;const r=svg.getBoundingClientRect();const t=(now-range)+((e.clientX-r.left)/r.width*W-L)/(W-L-R)*range;
-   let best=pts[0];for(const p of pts)if(Math.abs(p[0]-t)<Math.abs(best[0]-t))best=p;const px=x(best[0]);hair.setAttribute('x1',px);hair.setAttribute('x2',px);hair.setAttribute('visibility','visible');
-   tip.replaceChildren(el('b',fmt(best[1])),document.createTextNode('  '+new Date(best[0]*1000).toLocaleTimeString()));tip.style.display='block';
-   const left=px/W*r.width;tip.style.left=Math.min(left+8,r.width-tip.offsetWidth)+'px';tip.style.top='18px';});
-  svg.addEventListener('pointerleave',()=>{hair.setAttribute('visibility','hidden');tip.style.display='none';});
-  box.append(wrap);}}
+ if(await ask({title:'Replace the prices?',body:['Replace the prices with '+f.name+'?'],ok:'Replace'}))saveSchedule(obj);});
+async function refreshPower(force){try{const p=await api('/api/power');pw=p;renderPower();if(!edit||force)editorFrom(pw.schedule);}catch(e){}}
+async function refreshPowerTick(){if(!$('pset').open)return refreshPower();try{pw=await api('/api/power');renderPower();}catch(e){}}
+
+// ---- history charts: area under a line, one axis each, crosshair + tooltip ---------------
+let range=3600,hist={rows:[]};const liveRows=[];
+function pushLive(s){const g=s.gpu||{},gw=s.gateway||{},t=(g.temps)||{},c=s.cpu||{},f=c.freq||{},m=s.memory||{};if(!isNum(s.time))return;
+ const u=isNum(c.util_pct)?c.util_pct:s.cpu_pct;
+ liveRows.push([s.time,(gw.tps||{}).current??0,g.busy_pct??null,g.vram_used!=null?g.vram_used/1073741824:null,t.junction??t.edge??null,g.power_w??null,gw.active||0,
+  (c.temp||{}).c??null,isNum(f.avg_mhz)?f.avg_mhz/1000:null,isNum(u)?u:null,m.total?m.used/1073741824:null]);
+ while(liveRows.length&&liveRows[0][0]<s.time-3700)liveRows.shift();}
+function rows(){const r=hist.rows||[],last=r.length?r[r.length-1][0]:0;return r.concat(liveRows.filter(x=>x[0]>last));}
+const CH=[['Tokens per second',1,'cyan',v=>v.toFixed(1),null],['GPU busy (%)',2,'blue',v=>Math.round(v)+'%',100],['VRAM used (GiB)',3,'violet',v=>v.toFixed(1)+' GiB','vram'],
+ ['GPU temperature (°C)',4,'amber',v=>Math.round(v)+'°C',null],['GPU power (W)',5,'pink',v=>Math.round(v)+' W',null],
+ ['CPU busy (%)',9,'green',v=>Math.round(v)+'%',100],['CPU temperature (°C)',7,'orange',v=>Math.round(v)+'°C',null],['CPU speed (GHz)',8,'blue',v=>v.toFixed(2)+' GHz',null],
+ ['Memory used (GiB)',10,'violet',v=>v.toFixed(1)+' GiB','ram']];
+const STROKE={cyan:'#2dd4ef',blue:'#6f8fff',violet:'#a78bfa',amber:'#fbbf24',pink:'#f472b6',green:'#34d399',orange:'#fb923c'};
+(function buildCharts(){const box=$('charts');CH.forEach(([title],i)=>{const c=el('div',undefined,'card chart');const hd=el('div',undefined,'hd'),l=el('div');
+ l.append(el('div',title,'ti'),el('div','','mm'));hd.append(l,el('div','-','cv'));const p=el('div',undefined,'plot');p.id='ch'+i;c.append(hd,p);box.append(c);});})();
+function niceMax(v){if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),n=v/p;return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p;}
+function drawChart(host,pts,o){const W=Math.max(160,Math.round(host.clientWidth||360)),H=Math.max(90,Math.round(host.clientHeight||150)),L=40,R=8,T=8,B=22;
+ const svg=sv('svg',{width:W,height:H,viewBox:'0 0 '+W+' '+H,role:'img','aria-label':o.label});const span=o.t1-o.t0;
+ pts=pts.filter(p=>p[0]>=o.t0-span*0.02&&isNum(p[1]));
+ const px=t=>L+(t-o.t0)/span*(W-L-R);
+ // one point per 2 pixels: the mean of what falls there (24 h of 10 s rows stays cheap)
+ const bk=[];let cur=null;for(const p of pts){const b=Math.floor(px(p[0])/2);if(!cur||cur.b!==b){cur={b,t:0,v:0,n:0,last:p[0]};bk.push(cur);}cur.t+=p[0];cur.v+=p[1];cur.n++;cur.last=p[0];}
+ const P=bk.map(b=>[b.t/b.n,b.v/b.n]);
+ let max=o.max||niceMax(Math.max(1e-9,...P.map(p=>p[1]))*1.08);const y=v=>T+(1-clamp(v/max,0,1))*(H-T-B);
+ for(let i=0;i<=3;i++){const v=max*i/3;svg.append(sv('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:'rgba(148,163,200,.10)','stroke-width':1}));
+  const tx=sv('text',{x:L-6,y:y(v)+4,'text-anchor':'end','font-size':10,fill:'#8a93ab'});tx.textContent=v>=100||Number.isInteger(v)?Math.round(v):v.toFixed(1);svg.append(tx);}
+ const lab=span<=3600?['-60 min','-30 min','now']:['-24 h','-12 h','now'];[0,.5,1].forEach((f,i)=>{const tx=sv('text',{x:L+f*(W-L-R),y:H-5,'text-anchor':i===0?'start':i===2?'end':'middle','font-size':10,fill:'#8a93ab'});tx.textContent=lab[i];svg.append(tx);});
+ const tip=el('div',undefined,'tip');host.replaceChildren(svg,tip);
+ if(P.length<2){const tx=sv('text',{x:(L+W)/2,y:H/2,'text-anchor':'middle','font-size':12,fill:'#8a93ab'});tx.textContent='No data yet';svg.append(tx);return;}
+ const gap=Math.max(o.gap||60,span/W*4);const segs=[];let seg=[];
+ for(let i=0;i<P.length;i++){if(seg.length&&P[i][0]-P[i-1][0]>gap){segs.push(seg);seg=[];}seg.push([px(P[i][0]),y(P[i][1])]);}if(seg.length)segs.push(seg);
+ const col=STROKE[o.color]||'#2dd4ef';
+ for(const s of segs){let d='M'+s[0][0].toFixed(1)+' '+s[0][1].toFixed(1);
+  for(let i=1;i<s.length;i++){const mx=((s[i-1][0]+s[i][0])/2).toFixed(1);d+='C'+mx+' '+s[i-1][1].toFixed(1)+' '+mx+' '+s[i][1].toFixed(1)+' '+s[i][0].toFixed(1)+' '+s[i][1].toFixed(1);}
+  svg.append(sv('path',{d:d+'L'+s[s.length-1][0].toFixed(1)+' '+(H-B)+'L'+s[0][0].toFixed(1)+' '+(H-B)+'Z',fill:'url(#fa-'+o.color+')',stroke:'none'}));
+  svg.append(sv('path',{d,fill:'none',stroke:col,'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'}));}
+ const lp=segs[segs.length-1][segs[segs.length-1].length-1];
+ svg.append(sv('circle',{cx:lp[0],cy:lp[1],r:7,fill:col,opacity:.2}),sv('circle',{cx:lp[0],cy:lp[1],r:3.2,fill:col}));
+ const hair=sv('line',{y1:T,y2:H-B,stroke:'rgba(238,242,251,.35)','stroke-width':1,visibility:'hidden'}),hd=sv('circle',{r:4,fill:col,stroke:'#05070c','stroke-width':2,visibility:'hidden'});svg.append(hair,hd);
+ const show=cx=>{let best=P[0];const t=o.t0+(cx-L)/(W-L-R)*span;for(const p of P)if(Math.abs(p[0]-t)<Math.abs(best[0]-t))best=p;
+  const x=px(best[0]);hair.setAttribute('x1',x);hair.setAttribute('x2',x);hair.setAttribute('visibility','visible');hd.setAttribute('cx',x);hd.setAttribute('cy',y(best[1]));hd.setAttribute('visibility','visible');
+  tip.replaceChildren(el('b',o.fmt(best[1])),document.createTextNode(new Date(best[0]*1000).toLocaleTimeString()));tip.style.display='block';
+  tip.style.left=clamp(x+10,0,W-tip.offsetWidth)+'px';tip.style.top='0px';host._hx=cx;};
+ svg.addEventListener('pointermove',e=>{const r=svg.getBoundingClientRect();show((e.clientX-r.left)/r.width*W);});
+ svg.addEventListener('pointerleave',()=>{hair.setAttribute('visibility','hidden');hd.setAttribute('visibility','hidden');tip.style.display='none';host._hx=null;});
+ if(host._hx!=null)show(host._hx);}
+function draw(){const now=snow(),all=rows(),g=lastState.gpu||{},m=lastState.memory||{};
+ CH.forEach(([title,ix,color,fmt,mx],i)=>{const host=$('ch'+i),card=host.parentNode;const pts=all.filter(r=>r[0]>=now-range&&r[ix]!=null).map(r=>[r[0],r[ix]]);
+  const max=mx==='vram'?(g.vram_total?niceMax(g.vram_total/1073741824):null):mx==='ram'?(m.total?niceMax(m.total/1073741824):null):mx;
+  drawChart(host,pts,{t0:now-range,t1:now,color,fmt,max,label:title,gap:range>3600?120:60});
+  const last=pts.length?pts[pts.length-1][1]:null;card.querySelector('.cv').textContent=last==null?'-':fmt(last);
+  const v=pts.map(p=>p[1]);card.querySelector('.mm').textContent=v.length?'low '+fmt(Math.min(...v))+'  ·  high '+fmt(Math.max(...v)):'';});}
 document.querySelectorAll('button[data-range]').forEach(b=>b.addEventListener('click',()=>{range=+b.dataset.range;
- document.querySelectorAll('button[data-range]').forEach(x=>x.classList.toggle('on',x===b));draw();}));
+ document.querySelectorAll('button[data-range]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',String(x===b));});draw();}));
 async function refreshHist(){try{hist=await api('/api/history');draw();}catch(e){}}
-refreshFast();refreshSlow();refreshHist();setInterval(refreshFast,2000);setInterval(refreshSlow,10000);setInterval(refreshHist,30000);
+let rsz=null;if(window.ResizeObserver)new ResizeObserver(()=>{clearTimeout(rsz);rsz=setTimeout(()=>{draw();if(pw)renderPower();},120);}).observe($('charts'));
+
+// ---- logs: a tab per source, filter, follow, copy -----------------------------------------
+const LOG={tab:'requests',q:'',follow:true};
+const TABS=[['requests','Requests'],['events','Model events'],['actions','Actions'],['updates','Updates'],['library','Model library'],['errors','Errors'],['status','Status lines']];
+function logLines(tab){const L=logs||{},out=[];const s=lastState||{},up=s.updates||{};
+ if(tab==='requests')(L.recent||[]).forEach(r=>out.push([r.t,[r.status,r.device,r.model,r.kind,r.ms!=null?r.ms+' ms':null,r.prompt_tokens!=null?'in '+r.prompt_tokens:null,r.tokens!=null?'out '+r.tokens:null,r.code?'('+r.code+')':null].filter(x=>x!=null&&x!=='').join('  '),r.status>=400?'bad':'']));
+ if(tab==='events')(L.events||[]).forEach(e=>out.push([e.t,(e.kind||'?')+'  '+(e.model||''),'']));
+ if(tab==='actions')Object.entries(L.actions||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).forEach(([k,v])=>out.push([v.at,k+'  '+v.result+(v.detail?'  '+v.detail:''),v.result==='failed'?'bad':v.result==='ok'?'ok':'']));
+ if(tab==='updates'){const o=L.ollama_update||{};if(o.last_run)out.push([o.last_run,'ollama updater  '+(o.result||'?')+(o.version?'  '+o.version:'')+(o.detail?'  '+o.detail:''),o.result==='failed'?'bad':'ok']);
+  if(up.last_unattended)out.push([up.last_unattended,'security updates ran','']);if(up.reboot_required)out.push([null,'reboot required'+((up.reboot_pkgs||[]).length?' by '+up.reboot_pkgs.join(', '):''),'warn']);
+  if(up.next_ollama_update)out.push([null,'next Ollama check: '+up.next_ollama_update,'']);out.sort((a,b)=>(a[0]??Infinity)-(b[0]??Infinity));}
+ if(tab==='library'){const sy=(libState||{}).sync||{};if(sy.state)out.push([sy.at||null,'sync '+sy.state+(sy.message?': '+sy.message:''),sy.state==='failed'?'bad':'']);(sy.log||[]).forEach(x=>out.push([null,String(x),/fail|error/i.test(x)?'bad':'']));
+  const pl=(models||{}).pull;if(pl&&pl.model)out.push([null,'pull '+pl.model+': '+pl.status+(pl.total?' '+Math.round(100*pl.completed/pl.total)+'%':''),'']);}
+ if(tab==='errors'){const tt=L.totals||{};out.push([null,'totals: '+Object.entries(tt).map(([k,v])=>k+' '+v).join(', '),'']);
+  Object.entries(L.errors||{}).forEach(([k,v])=>out.push([null,'error '+k+': '+v,'bad']));Object.entries(L.auth_failures||{}).forEach(([k,v])=>out.push([null,'refused sign-in '+k+': '+v,'warn']));}
+ if(tab==='status'){[['fans',s.fan],['lights',s.leds],['cpu',(s.cpu||{}).throttle],['sleep',(s.idle||{}).reason],['gpu tuning',((s.gpu_tune||{}).check||{}).note]].forEach(([k,v])=>{if(v)out.push([null,k+': '+v,'']);});}
+ return out;}
+(function buildTabs(){const T=$('logtabs');TABS.forEach(([k,lab])=>{const b=el('button');b.type='button';b.setAttribute('role','tab');b.id='tab-'+k;b.setAttribute('aria-controls','logview');b.dataset.tab=k;
+ b.append(document.createTextNode(lab+' '),el('span','','n'));b.addEventListener('click',()=>{LOG.tab=k;renderLogs(true);});
+ b.addEventListener('keydown',e=>{const i=TABS.findIndex(t=>t[0]===LOG.tab);if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();LOG.tab=TABS[(i+(e.key==='ArrowRight'?1:TABS.length-1))%TABS.length][0];renderLogs(true);$('tab-'+LOG.tab).focus();}});T.append(b);});})();
+function renderLogs(jump){const v=$('logview'),q=LOG.q.toLowerCase();
+ TABS.forEach(([k])=>{const b=$('tab-'+k),on=k===LOG.tab;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;b.querySelector('.n').textContent=String(logLines(k).length);});
+ v.setAttribute('aria-labelledby','tab-'+LOG.tab);
+ const lines=logLines(LOG.tab).map(([t,txt,c])=>[t?(LOG.tab==='requests'||LOG.tab==='events'?hhmm(t):stamp(t)):'',txt,c]).filter(([t,txt])=>!q||(t+' '+txt).toLowerCase().includes(q));
+ const atEnd=v.scrollTop+v.clientHeight>=v.scrollHeight-8;v.replaceChildren();
+ if(!lines.length)v.append(el('div',logs?(q?'No line matches.':'Nothing here yet.'):'Loading...','empty'));
+ for(const [t,txt,c] of lines){const d=el('div',undefined,c);if(t)d.append(el('span',t,'ts'));d.append(document.createTextNode(txt));v.append(d);}
+ $('logcount').textContent=lines.length+' line'+(lines.length===1?'':'s');v._lines=lines;
+ if(LOG.follow&&(atEnd||jump))v.scrollTop=v.scrollHeight;else if(jump)v.scrollTop=0;}
+$('logq').addEventListener('input',e=>{LOG.q=e.target.value;renderLogs();});
+$('logfollow').addEventListener('change',e=>{LOG.follow=e.target.checked;if(LOG.follow)$('logview').scrollTop=$('logview').scrollHeight;});
+$('logcopy').addEventListener('click',async()=>{const text=($('logview')._lines||[]).map(([t,txt])=>(t?t+'  ':'')+txt).join('\n');
+ try{await navigator.clipboard.writeText(text);toast('Copied',($('logview')._lines||[]).length+' lines','ok');}
+ catch(e){const r=document.createRange();r.selectNodeContents($('logview'));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Selected','Press Ctrl+C or Cmd+C to copy.','warn');}});
+
+// ---- polling: every few seconds while the tab is visible, paused while it is hidden ---------
+const JOBS=[[refreshFast,2500],[refreshSlow,10000],[refreshLib,3000],[refreshPowerTick,10000],[refreshHist,30000]];
+function startPolling(){for(const j of JOBS){if(j.t)continue;j[0]();j.t=setInterval(j[0],j[1]);}setLive('','Live');}
+function stopPolling(){for(const j of JOBS){clearInterval(j.t);j.t=null;}setLive('paused','Paused');}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPolling();else startPolling();});
+renderLogs();refreshPower();refreshHist();
+if(document.hidden){refreshFast();refreshSlow();refreshLib();setLive('paused','Paused');}else startPolling();
+setInterval(()=>{if(document.hidden||!lastState.time)return;try{renderHero(lastState);renderSvc(lastState);renderLoaded(lastState);}catch(e){}},1000);
 </script></body></html>
 """
 

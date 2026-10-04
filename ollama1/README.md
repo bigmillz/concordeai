@@ -690,9 +690,45 @@ around a little from time to time.
     names.
   - A frame takes a few milliseconds.
 - **Admin panel:** `https://<server-name>-admin.<your-domain>`. Access asks
-  for your email and a one-time code. The panel has:
-  - the same figures, plus 1 h / 24 h graphs;
-  - a **CPU** card: the model, cores and threads, the frequency driver and
+  for your email and a one-time code. It is one dark, graphical page that
+  updates itself every few seconds (and stops asking while its tab is
+  hidden). From the top:
+  - a header with the server's name, a status ring (Healthy, Working,
+    Attention or Problem, with what needs attention beside it: tunnel or
+    gateway down, a RAID member missing, a disk over 90%, a failed update,
+    a hot CPU or GPU, a reboot needed, the pairing window open), and tokens
+    per second, requests in flight, watts, the sleep countdown and uptime;
+  - live gauges: GPU busy, VRAM, GPU power and temperature, CPU busy, clock
+    and temperature, memory;
+  - 1 h / 24 h area graphs of tokens per second, GPU busy, VRAM, GPU
+    temperature and power, CPU busy, temperature and speed, and memory,
+    with a crosshair that reads out any moment;
+  - **Hardware**: the CPU card below, the fans (the phase: working, hold100,
+    hold50 or idle20, the level, each fan's rpm and the pump), the lights
+    (their colour now and why), storage (each disk's use, the RAID mirror
+    and its check's progress), the services, the network, and GPU tuning
+    (what is applied and the last check; it is changed at the server only);
+  - **Models**: what is loaded, how much of the graphics memory each uses
+    and when it unloads; the library with Remove (type the name to confirm),
+    Pull, and Update model library;
+  - **Power and cost**: watts now and over the last hour, cost and energy
+    for the last hour, 24 h, 7 and 30 days with the hours measured, the
+    projection, and the prices editor;
+  - **Controls**: Sleep now, Reboot, Restart services, the auto sleep
+    setting and the server's own decision ("Sleeps in 12:34", or why not;
+    the app sets auto sleep), Apply updates now with the updater's last
+    result, LAN mode, Back up now and Open terminal;
+  - **Devices**, with Remove and Open pairing window;
+  - **Logs**: requests, model loads, actions, updates, the model library,
+    errors and the services' status lines, each with a filter, Follow new
+    lines and Copy. Counts, names and times only, never a prompt or an
+    answer.
+
+  Every button that changes something asks first in a dialog, and the
+  answer shown afterwards is the server's own (a refusal says why). The
+  page loads nothing from anywhere else.
+  - the CPU card in detail:
+    the model, cores and threads, the frequency driver and
     governor, the speed now (average, highest and lowest across the
     threads, and a strip for each thread), the temperature (the CPU's own
     sensor, found by name: `k10temp` on AMD, `coretemp` on Intel; amber at
@@ -702,14 +738,15 @@ around a little from time to time.
     CPU runs well under its top speed while busy. Two small graphs show the
     last 5 minutes; the 1 h / 24 h graphs gain CPU temperature and speed. A
     reading the machine doesn't give (a virtual machine has no temperature)
-    is simply left out;
-  - buttons to apply updates, restart the services, reboot, back up, and
-    turn LAN mode on or off;
-  - pairing and devices;
-  - models from the allow-list;
-  - a counts-only log;
-  - **Open terminal**, which asks for your Linux user and password.
-- **Sleep.** The panel's **Sleep** button (next to Reboot) suspends the
+    is simply left out.
+  - **Open terminal** asks for your Linux user and password.
+  - To look at the page without a server (development only):
+    `python3 ollama1/tests/admin_demo.py 9910`, then open
+    `http://127.0.0.1:9910/`. It runs the real panel on made-up data in a
+    scratch folder, starts nothing (it prints each unit a button would
+    start), refuses to run as root or under systemd, and is never
+    installed (setup.sh copies `bin/` and `lib/` only).
+- **Sleep.** The panel's **Sleep now** button (next to Reboot) suspends the
   server. Its power button does the same.
   - To wake it, press the power button again. Holding the button down
     still forces it off.

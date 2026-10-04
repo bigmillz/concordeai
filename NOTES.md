@@ -9,6 +9,74 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b398 — the web admin panel is graphical now, same actions and protections (per Patrick)
+
+Patrick: "Rebuild the web interface so that it's much more graphical, but
+still retains the settings in there for things like reboot, sleep, update,
+view logs." The page in `bin/ollama1-admin` (PAGE) is rewritten; the routes,
+the POST bodies and every check behind them are unchanged.
+
+- **The page.** One dark page: a header with the name, a status ring
+  (Healthy / Working / Attention / Problem, computed in the page from
+  /api/state: tunnel, gateway, RAID, disks over 90%, a failed Ollama update or
+  wake check, GPU >= 90/100 °C, the CPU's own warn/hot thresholds, throttling,
+  reboot needed, pairing open) and five figures; eight SVG gauges; nine 1 h /
+  24 h area charts drawn by the page's own code (one point per 2 px, the mean
+  of what falls there, so 24 h of 10 s rows stays cheap; a crosshair readout);
+  Hardware (the CPU card with its old ids, fans, lights, storage + RAID check,
+  services, network, GPU tuning); Models (VRAM by model, unload countdown,
+  the library with typed-name Remove, Pull, Update model library); Power and
+  cost (watts chart, 1 h / 24 h / 7 d / 30 d tiles with hours measured and
+  "estimated" when not all from the plug, the prices editor as before);
+  Controls; Devices; Logs (tabs for requests, model events, actions, updates,
+  library, errors, status lines; filter, follow, copy). Polls /api/state every
+  2.5 s, the rest every 3-30 s, all paused while the tab is hidden. Every
+  number from the server goes in with textContent or an SVG attribute.
+  Confirmations are a native `<dialog>` (focus stays inside, Esc cancels);
+  the toast after an action shows the server's own answer and status code.
+  Respects prefers-reduced-motion; usable at 375 px (single column, no
+  sideways scroll, 16 px gutters). About 105 KB.
+- **Sleep line** is the same rule as the HDMI panel's `o1panel.sleep_summary`
+  (6b396), from the same file; the server adds `age_s` (its own clock), so a
+  browser with a wrong clock can't move the countdown. A node test checks the
+  page's function against `sleep_summary` case by case.
+- **Auto sleep is shown, not set, here.** The setting lives in the gateway's
+  state folder (`/var/lib/ollama1-gateway/sleep.json`) and the app sets it
+  through `/v1/sleep-config`; the panel's unit has `ProtectSystem=strict` and
+  can write only its own folder, and polkit lets it start only the fixed
+  units. Setting it from the panel needs a new fixed unit + a helper verb + a
+  polkit line (like power-apply): not done here, Patrick to decide. Likewise
+  GPU tuning stays `sudo ollama1-gpu-tune on|off` at the server; the panel
+  shows its state file.
+- **/api/state gains** `fan_status`, `leds_status`, `idle`, `gpu_tune`
+  (module-level `clean_fan` / `clean_leds` / `clean_idle` / `clean_gpu_tune`:
+  named fields of the expected type only, strings cut short, NaN/inf dropped;
+  the fan and lights files must be fresh, as before). **/api/logs gains**
+  `events` and `errors` (from the gateway's snapshot). **/api/history** rows
+  gain `cpu_pct` and `ram_gib` (11 columns; 7- and 9-column files still load).
+- **Security.** CSP tightened: the same nonce-only script/style, plus
+  `require-trusted-types-for 'script'; trusted-types 'none'` (no string can
+  become markup or script even by mistake). All JSON answers now escape
+  `<`, `>` and `&` as `<` etc. (`json_bytes`): the same data to a JSON
+  reader, never markup to anything that sniffs. CSRF, Origin,
+  Sec-Fetch-Site, JSON-only, the size limits, the confirm fields (reboot,
+  sleep, remove-model by name, library-sync by preview id) and polkit are
+  untouched. No external URL, font or script.
+- **Looking at it without a server:** `tests/admin_demo.py` runs the real
+  `serve()` on made-up files in a scratch OLLAMA1_PREFIX (fake /sys and /proc
+  that move every second, a stub Ollama, hostile names on purpose), with a
+  runner that starts nothing, behind a local proxy that adds what Access
+  adds. It refuses root and systemd (INVOCATION_ID); setup.sh never installs
+  tests/. The panel itself has no demo switch (a test checks the source has
+  no environ/demo).
+- Tests: the CSP and nonce, no external URL, no inline handlers or style
+  attributes, no markup sinks in the script, every FIXED/TEMPLATE action
+  reachable and the single POST with the CSRF header, the dialogs, polling
+  pause, the cut-down status files with hostile text, NaN and stale files,
+  JSON escaping, the sleep text against the HDMI panel's, the demo's
+  refusals. test_cpu's history-column checks updated for 11 columns.
+- Install: `bin/ollama1-admin` only (then `systemctl restart ollama1-admin`).
+
 ## 6b396 — the panel's sleep line is the idle service's own decision; RAID check parsed (per Patrick)
 
 Two bugs on the real monitor.
