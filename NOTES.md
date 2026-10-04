@@ -9,6 +9,55 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b388 — the Corsair liquid cooler is driven too, through liquidctl (per Patrick)
+
+Patrick: "max the cooler's fans too, and make sure the pump runs at 100% when
+necessary but not all the time". His H115i Platinum (USB 1b1c:0c17) has its
+fans and pump on its own USB controller, not on the Super-IO headers.
+
+- New `lib/o1aio.py`, used by `o1fan.Fan(aio=...)`. liquidctl is a subprocess
+  with a 4 s timeout on every call (the unit's watchdog is 10 s), never
+  fatal. `liquidctl list --json` finds the cooler (vendor Corsair and a
+  description matching Hydro / H<nn>i; the product ids are only used by setup
+  and are from memory: `liquidctl list` is the authority); `--match <the
+  description>` goes on every later call. No liquidctl, or no cooler: one log
+  line, looked for again every 5 minutes.
+- The cooler runs in its own thread (`aio_loop`, one `step` a second); the
+  poll loop only sets the phase (`set_phase`) and reads a snapshot, so a slow
+  USB call can never stall the watchdog ping. `Fan(aio_inline=True)` steps it
+  on the tick for the tests' fake clock. The learned table is shared with
+  the case fans (`aio/fanN`, saved in the same fan.json; `_persist` has a lock).
+- Mapping: working / hot / hold100 100% + pump extreme; calibrating 100% +
+  balanced; hold50 50% + balanced; idle20 20% (floor per fan from stall
+  learning, a fan with no rpm at 100% stays 100%) + quiet. Coolant >= 40 C
+  (plausible readings only) forces extreme + 100% until < 35 C. The pump is
+  extreme ONLY in working/hot/hold100 or when the coolant is hot.
+- Status is read at most every 5 s, a command only when its target changed
+  and not more often than every 5 s (a flapping phase is slowed to that
+  rate); liquidctl has no batch for `set`, so each changed part is its own
+  call (fans, then pump). `initialize` runs once per start and after a wake
+  (`SIGUSR1` -> `fan.wake()` -> `aio.reset()`), then everything is sent again.
+- Safe without us: `safe_exit` sets `fanN speed 25 30 35 60 45 100` (30% @
+  25 C, 60% @ 35 C, 100% @ 45 C) and `pump mode balanced`. It runs on a
+  clean stop (`Fan.shutdown`), after FAILS_MAX=5 failures in a row (the cooler
+  is then left alone, the case fans go on), and from `ExecStopPost` after any
+  exit through a marker file (`/var/lib/ollama1/fan-aio.json`, written when
+  the first command succeeds, removed after a successful safe exit).
+- Setup: `aio_setup` installs `liquidctl` (apt) only when the fan step is on,
+  a Corsair Hydro id is on USB (sysfs idVendor/idProduct) and liquidctl is
+  missing; the plan line mentions the cooler. Unit: `MemoryMax=192M` (a second
+  Python), `AF_NETLINK` (libusb/udev), `RuntimeDirectory=liquidctl` (kept).
+- Tests: `tests/test_aio.py` (a fake `liquidctl` script that records calls and
+  prints JSON; 42 tests) and 28 `fan: cooler` mutants (pump rule, 40 C limit
+  and its hysteresis, rate limits, de-dup, failure count, timeout, exit curve,
+  marker, stop-post, stall, no-rpm, wake, usb ids, setup).
+- Unverified (no cooler here): liquidctl's real status key names ("Liquid
+  temperature", "Fan N speed", "Pump speed"; read loosely, a missing one is
+  just not shown), the channel names `fan1`/`fan2`/`pump` and the curve
+  argument format on a Hydro Platinum, whether the sandbox lets libusb/hidraw
+  reach the device, and that the apt package is new enough. A cooler left at
+  20%/quiet by a power cut keeps that setting until the service starts.
+
 ## 6b387 — more temperature sources for the fan override (per Patrick)
 
 - The override (100% whatever the load, until 10 C under) now watches every

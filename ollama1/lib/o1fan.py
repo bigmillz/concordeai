@@ -72,6 +72,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -79,6 +80,7 @@ import sys
 import threading
 import time
 
+import o1aio
 import o1common
 import o1cpu
 import o1gpu
@@ -103,6 +105,7 @@ LIMIT_VRM_C = 90                 # a label with VRM or MOS in it
 LIMIT_CHIPSET_C = 80             # a label with CHIPSET or PCH in it
 LIMIT_DIMM_C = 70                # jc42: the memory modules
 TEMP_LOW_C, TEMP_HIGH_C = 0, 120  # at or under, or at or over, these a sensor is disconnected or stuck: ignored
+CALL_JOIN_S = 6                  # the cooler's thread is given this long to finish a call at a stop
 OLD_UNIT = "ollama1-gpu-fan.service"          # the hand-made full-speed-always experiment
 MODULES_CONF = "/etc/modules-load.d/ollama1-fan.conf"
 SUPER_IO_RX = re.compile(r"^(nct67\d\d|it8\d\d\d[a-z]?|f718\d\d[a-z]*|w836\d\d[a-z]*)$")   # the motherboard's fan chips
@@ -335,8 +338,10 @@ class Fan:
     monotonic (the levels must not jump); `wall` stamps the status file."""
 
     def __init__(self, probes, clock=time.monotonic, wall=time.time, log=print, io=None, sysroot=None,
-                 boot_id=read_boot_id, tools_every=TOOLS_EVERY_S):
+                 boot_id=read_boot_id, tools_every=TOOLS_EVERY_S, aio=None, aio_inline=False):
         self.p, self.clock, self.wall, self.log = probes, clock, wall, log
+        self.aio, self.aio_inline = aio, aio_inline      # the liquid cooler, if any (lib/o1aio.py)
+        self.plock = threading.Lock()
         self.io = io or SysfsIO()
         self.sysroot = sysroot
         self.boot_id = boot_id
@@ -354,6 +359,8 @@ class Fan:
         self.seen = None               # what it last said it controls
         self.tools_at, self.tools = -1e9, []
         self._load_state()
+        if self.aio:
+            self.aio.attach(self.learned, self._persist, self.log)
 
     # -- the saved originals and what was learned ------------------------------------
     def _load_state(self):
@@ -381,15 +388,16 @@ class Fan:
         self._persist()                                # another boot's originals go: the hardware is as it was
 
     def _persist(self):
-        if not self.orig and not self.learned:
-            try:
-                os.unlink(state_path())
-            except OSError:
-                pass
-            return
-        os.makedirs(os.path.dirname(state_path()), exist_ok=True)
-        write_json_atomic(state_path(), {"v": 2, "boot": self.boot_id(), "orig": self.orig, "learned": self.learned},
-                          mode=0o600)
+        with self.plock:                                   # the cooler's thread saves what it learns too
+            if not self.orig and not self.learned:
+                try:
+                    os.unlink(state_path())
+                except OSError:
+                    pass
+                return
+            os.makedirs(os.path.dirname(state_path()), exist_ok=True)
+            write_json_atomic(state_path(), {"v": 2, "boot": self.boot_id(), "orig": self.orig,
+                                             "learned": self.learned}, mode=0o600)
 
     # -- what counts as working -----------------------------------------------------
     def _probe(self, name):
@@ -598,7 +606,7 @@ class Fan:
             phase, pct, why = "hot", FULL_PCT, "too warm: " + "; ".join(hwhy)
         elif working:
             phase, pct, why = "working", FULL_PCT, "; ".join(wwhy)
-        elif any(o.lkey not in self.learned for o in usable):
+        elif any(o.lkey not in self.learned for o in usable) or (self.aio and self.aio.needs_calibration()):
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
         elif age is not None and age < HOLD100_S:
             phase, pct, why, left = "hold100", FULL_PCT, "the work ended", int(HOLD100_S - age + 0.999)
@@ -608,6 +616,10 @@ class Fan:
             phase, pct, why = "idle20", LOW_PCT, "idle"
         self.apply(outs, pct, now)
         self.sample(usable, now)
+        if self.aio:
+            self.aio.set_phase(phase, pct)
+            if self.aio_inline:
+                self.aio.step(now)
         if phase != self.phase or (phase in ("working", "hot") and why != self.why):
             self.log("%s: %s" % (phase, why))
         self.phase, self.pct, self.why, self.left = phase, pct, why, left
@@ -615,9 +627,16 @@ class Fan:
         return phase, why
 
     def shutdown(self):
-        """A stop: everything held goes back as it was."""
+        """A stop: everything held goes back as it was, and the cooler is left on its safe curve."""
         if self.engaged:
             self.release()
+        if self.aio and self.aio.active():
+            self.aio.safe_exit()
+
+    def wake(self):
+        """After a suspend: the cooler may have lost what it was told; send it all again."""
+        if self.aio:
+            self.aio.reset()
 
     # -- status ------------------------------------------------------------------------
     def notes(self, o):
@@ -636,6 +655,7 @@ class Fan:
             row["min_pct"], row["note"] = self.notes(o)
         st = {"at": int(self.wall()), "phase": self.phase, "pct": self.pct, "why": self.why, "hold_left": self.left,
               "controlling": controlling_text(outs), "outputs": live["outputs"], "temps": live["temps"],
+              "aio": self.aio.snapshot() if self.aio else None,
               "hottest": live["hottest"], "closest": live["closest"], "hot": sorted(self.hot.values())}
         st["line"] = status_line(st)
         try:
@@ -702,7 +722,8 @@ def status_line(st):
         head = "Fans: 20% (idle)"
     rpm = _rpm_summary(st.get("outputs") or [])
     t = temp_summary(st)
-    return head + ("  -  " + ", ".join(rpm) if rpm else "") + ("  -  " + t if t else "")
+    c = o1aio.aio_text(st.get("aio"))
+    return head + ("  -  " + ", ".join(rpm) if rpm else "") + ("  -  " + t if t else "") + ("  -  " + c if c else "")
 
 
 def read_status(path=None, now=None):
@@ -719,7 +740,7 @@ def panel_line(path=None, now=None):
     """The one status line, or None (no service, nothing to say) for the admin panel."""
     st = read_status(path, now)
     line = st.get("line") if st else None
-    return line[:300] if isinstance(line, str) and line else None
+    return line[:400] if isinstance(line, str) and line else None
 
 
 def render_status(st, live):
@@ -754,6 +775,20 @@ def render_status(st, live):
         out.append("sensors: " + ", ".join("%s %.0f/%d" % (t["label"], t["c"], t["limit"]) for t in live["temps"]))
     else:
         out.append("temps: none read")
+    a = (st or {}).get("aio")
+    if a and a.get("found"):
+        out.append("cooler: %s - %s" % (a.get("name"), a.get("state")))
+        if a.get("coolant_c") is not None:
+            out.append("  coolant %.1f C%s   pump %s%s" % (
+                a["coolant_c"], " (>= %d C: pump extreme, fans 100%%)" % o1aio.COOLANT_HOT_C if a.get("coolant_hot") else "",
+                a.get("pump_mode") or "?", " %d rpm" % a["pump_rpm"] if a.get("pump_rpm") is not None else ""))
+        for f in a.get("fans", []):
+            out.append("  cooler fan %d  %s  %s%s" % (
+                f["n"], "%d%%" % f["pct"] if f.get("pct") is not None else "?%",
+                "%d rpm" % f["rpm"] if f.get("rpm") is not None else "no rpm reading",
+                "  min %d%%" % f["min_pct"] if f.get("min_pct") is not None else ""))
+    elif a and a.get("state") and a["state"] != "not looked for yet":
+        out.append("cooler: %s" % a["state"])
     if st is not None and st.get("hot"):
         out.append("too warm: " + "; ".join(st["hot"]))
     return "\n".join(out)
@@ -805,10 +840,11 @@ def restore_after_stop(env=None, io=None, sysroot=None, boot_id=read_boot_id, lo
     """ExecStopPost: after ANY exit (a clean stop, a crash, a kill, the watchdog) put
     anything still held back as it was. A fan left at 20% by a dead service would be
     the one outcome that is not acceptable."""
+    cooler = o1aio.safe_exit_if_controlled(log=log)
     fan = Fan({}, io=io, sysroot=sysroot, boot_id=boot_id, log=log)
     if not fan.engaged:
-        return True
-    return fan.release()
+        return cooler
+    return fan.release() and cooler
 
 
 def run_systemctl(*args):
@@ -842,7 +878,35 @@ def release_old_unit(systemctl=run_systemctl, io=None, sysroot=None, log=print):
     return True
 
 
-def setup(choice, systemctl=run_systemctl, sysroot=None, log=print, modules=None):
+def apt_install_liquidctl():
+    env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
+    try:
+        r = subprocess.run(["apt-get", "install", "-y", "liquidctl"], env=env, capture_output=True, text=True,
+                           timeout=900)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def aio_setup(sysroot=None, which=None, installer=None, log=print):
+    """Install liquidctl, only when a Corsair Hydro cooler is on USB and it isn't installed. Never fatal.
+    Returns True when a cooler is there and liquidctl is (now) installed."""
+    which = which or shutil.which
+    if not o1aio.usb_present(sysroot):
+        log("no Corsair Hydro liquid cooler on USB: nothing to install for one")
+        return False
+    if which("liquidctl"):
+        log("a Corsair Hydro liquid cooler is on USB; liquidctl is installed: it is controlled too")
+        return True
+    if (installer or apt_install_liquidctl)():
+        log("a Corsair Hydro liquid cooler is on USB: installed liquidctl (apt); it is controlled too")
+        return True
+    log("a Corsair Hydro liquid cooler is on USB but liquidctl could not be installed (sudo apt install liquidctl); "
+        "the case fans are controlled, the cooler is not")
+    return False
+
+
+def setup(choice, systemctl=run_systemctl, sysroot=None, log=print, modules=None, aio=None):
     """setup.sh's step. on: the old unit out, the chip's module loaded (and kept at boot
     only when a chip showed up), the service enabled and started. off: stopped (which puts
     the fans back), disabled, the boot-time module entry removed."""
@@ -850,6 +914,7 @@ def setup(choice, systemctl=run_systemctl, sysroot=None, log=print, modules=None
     if choice == "on":
         release_old_unit(systemctl, sysroot=sysroot, log=log)
         chip = (modules or load_modules)(sysroot=sysroot, log=log)
+        (aio or aio_setup)(sysroot=sysroot, log=log)
         if chip:
             os.makedirs(os.path.dirname(conf), exist_ok=True)
             with open(conf, "w") as f:
@@ -896,17 +961,35 @@ def service_step(fan, notify=sd_notify, log=print, first=False):
                                                                                     "hold_left": fan.left}))
 
 
+def aio_loop(aio, stop, log=print):
+    """The cooler's own thread: liquidctl calls are slow (a USB transaction, a subprocess), and the poll loop must
+    keep pinging the watchdog whatever they do."""
+    while not stop.is_set():
+        try:
+            aio.step(time.monotonic())
+        except Exception as e:                                    # never stop; say what kind, not what it held
+            log("cooler step failed: %s" % type(e).__name__)
+        stop.wait(1)
+
+
 def run_service(log=print):
-    fan = Fan(probes(), log=log)
-    stop, poke = threading.Event(), threading.Event()
+    aio = o1aio.Aio(log=log)
+    fan = Fan(probes(), log=log, aio=aio)
+    stop, poke, woke = threading.Event(), threading.Event(), threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: (stop.set(), poke.set()))
     signal.signal(signal.SIGINT, lambda *_: (stop.set(), poke.set()))
-    signal.signal(signal.SIGUSR1, lambda *_: poke.set())          # the sleep hook: a wake, look now
+    signal.signal(signal.SIGUSR1, lambda *_: (woke.set(), poke.set()))     # the sleep hook: a wake, look now
+    worker = threading.Thread(target=aio_loop, args=(aio, stop, log), daemon=True)
+    worker.start()
     first = True
     while not stop.is_set():
+        if woke.is_set():
+            woke.clear()
+            fan.wake()
         service_step(fan, log=log, first=first)
         first = False
         poke.wait(POLL_S)
         poke.clear()
+    worker.join(timeout=CALL_JOIN_S)                               # a call in flight ends (its own timeout)
     fan.shutdown()
     return 0

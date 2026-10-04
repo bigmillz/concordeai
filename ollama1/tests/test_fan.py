@@ -879,15 +879,15 @@ class TestModulesAndSetup(FanCase):
             calls.append(a)
             return True
         self.assertEqual(o1fan.setup("on", systemctl=systemctl, sysroot=self.tree.root, log=self.lines.append,
-                                     modules=lambda **kw: True), 0)
+                                     modules=lambda **kw: True, aio=lambda **kw: False), 0)
         self.assertIn(("enable", "ollama1-fan.service"), calls)
         self.assertIn(("restart", "ollama1-fan.service"), calls)
         self.assertIn("nct6775", open(conf).read())
         self.assertEqual(o1fan.setup("on", systemctl=systemctl, sysroot=self.tree.root, log=self.lines.append,
-                                     modules=lambda **kw: False), 0)
+                                     modules=lambda **kw: False, aio=lambda **kw: False), 0)
         self.assertFalse(os.path.exists(conf))                # no chip: no boot-time entry
         self.assertEqual(o1fan.setup("on", systemctl=lambda *a: False, sysroot=self.tree.root, log=self.lines.append,
-                                     modules=lambda **kw: False), 1)
+                                     modules=lambda **kw: False, aio=lambda **kw: False), 1)
 
     def test_setup_off_stops_the_service_and_drops_the_module_entry(self):
         conf = o1fan.o1common.p(o1fan.MODULES_CONF)
@@ -926,8 +926,8 @@ class TestWiring(unittest.TestCase):
         self.assertIn("\nStartLimitIntervalSec=0\n", u)                      # never gives up: a dead service means stuck fans
         for line in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ReadWritePaths=/run/ollama1 /var/lib/ollama1",
                      "ProtectHome=yes", "PrivateTmp=yes", "PrivateNetwork=yes", "ProtectKernelModules=yes",
-                     "ProtectKernelLogs=yes", "ProtectControlGroups=yes", "RestrictAddressFamilies=AF_UNIX",
-                     "LimitCORE=0", "MemoryMax=64M", "RestrictNamespaces=yes", "SystemCallArchitectures=native"):
+                     "ProtectKernelLogs=yes", "ProtectControlGroups=yes", "RestrictAddressFamilies=AF_UNIX AF_NETLINK",
+                     "LimitCORE=0", "MemoryMax=192M", "RestrictNamespaces=yes", "SystemCallArchitectures=native"):
             self.assertIn("\n" + line + "\n", u, line)
         self.assertNotIn("\nProtectKernelTunables", u)                        # it writes /sys
         self.assertNotIn("IPAddressAllow", u)

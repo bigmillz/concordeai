@@ -825,6 +825,40 @@ To forget what was learned (a fan was changed), stop the service, delete
   service (`SIGUSR1`), and every tick writes again any output it holds that
   has changed, at the current level.
 
+**A Corsair liquid cooler (optional).** A Hydro Platinum, Pro XT or Elite
+cooler (an H115i Platinum is USB `1b1c:0c17`) has its fans and its pump on
+its own USB controller, so the motherboard's headers never reach them.
+`liquidctl` does. Setup installs the `liquidctl` apt package only when the
+fan step is on and a Corsair Hydro cooler is on USB (the plan line says so);
+without liquidctl or without a cooler the service logs one line and carries on
+with the case fans. The cooler follows the same phases:
+
+| Phase | Cooler fans | Pump |
+|---|---|---|
+| `working`, temperature override, `hold100` | 100% | extreme |
+| first start (measuring) | 100% | balanced |
+| `hold50` | 50% | balanced |
+| `idle20` | 20% (or higher for a fan that stalls) | quiet |
+
+The pump is at extreme only while working and for the 60 s after, and when the
+coolant is hot: a coolant at 40 C or more forces the pump to extreme and the
+fans to 100% until it is under 35 C. A cooler fan is measured at 100% on the
+first start and raised in steps if it stalls at a low level, like the case
+fans; one that reads no rpm stays at 100%. The cooler's status is read at
+most every 5 s (a USB transaction), a command is sent only when its target
+changes and no more often than every 5 s, and every `liquidctl` call has a
+4 s timeout and runs in a thread of its own so the watchdog is never starved.
+Five failed calls in a row leave the cooler on its safe curve, log it, and
+the case fans carry on.
+
+**The cooler is safe without the service.** When the service stops for any
+reason, `ExecStopPost` (using a marker in `/var/lib/ollama1/fan-aio.json`)
+sets the pump to balanced and each fan to a coolant-temperature curve the
+cooler follows by itself: 30% at 25 C, 60% at 35 C, 100% at 45 C. The
+unit allows what `liquidctl` needs (USB, `AF_NETLINK`, a runtime folder,
+`MemoryMax=192M` for a second Python); `ollama1-fan status` and the admin
+line show the coolant, the pump mode and rpm, and the fans' rpm.
+
 **The motherboard's chip.** The service loads `nct6775` (it covers the
 NCT6797D) when no chip with fan outputs shows, before it starts, outside its
 sandbox (`ExecStartPre=-+`, so a failure is never fatal). Setup adds

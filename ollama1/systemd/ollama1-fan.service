@@ -11,6 +11,13 @@
 # The service pings systemd on every poll (sd_notify, stdlib only);
 # WatchdogSec=10 restarts it when the poll loop has not run for 10 s.
 #
+# An optional liquid cooler (Corsair Hydro, lib/o1aio.py) is driven through the
+# liquidctl program, a subprocess of this service: it needs USB (the device
+# nodes stay allowed), AF_NETLINK (libusb/udev), a runtime folder of its own
+# (RuntimeDirectory; kept between runs) and memory for a second Python, so
+# MemoryMax is 192M. A cooler left on its safe curve by ExecStopPost is the
+# same program, run in the same sandbox.
+#
 # ProtectKernelTunables stays off (it would make /sys read-only), and
 # ProtectKernelModules is on: the module (nct6775, the motherboard's chip) is
 # loaded by the "+" line below, which runs outside this sandbox.
@@ -34,6 +41,8 @@ LimitCORE=0
 NoNewPrivileges=yes
 ProtectSystem=strict
 ReadWritePaths=/run/ollama1 /var/lib/ollama1
+RuntimeDirectory=liquidctl
+RuntimeDirectoryPreserve=yes
 ProtectHome=yes
 PrivateTmp=yes
 PrivateNetwork=yes
@@ -42,14 +51,14 @@ ProtectKernelLogs=yes
 ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
-MemoryMax=64M
+MemoryMax=192M
 RestrictSUIDSGID=yes
 RestrictRealtime=yes
 RestrictNamespaces=yes
 LockPersonality=yes
 SystemCallArchitectures=native
 UMask=0022
-RestrictAddressFamilies=AF_UNIX
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target
