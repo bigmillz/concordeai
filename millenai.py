@@ -19747,6 +19747,232 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
     return True
 # ==== server pictures: end ====
 
+# ==== server model sets: begin ====
+# THE SAME THREE SETS ON YOUR SERVER (6b407, per Patrick: "the server gets
+# the same three sets sized for its card, chosen in Settings › Servers,
+# with the exact add/remove list shown before anything is deleted"). The
+# sets are model_sets's own, for target {"vram": the card}: a catalog row
+# fits when its Ollama file fits the card whole (_srv_fits), the roles and
+# the nesting as on this computer. The gateway keeps the list and does the
+# work: signed GET /v1/models/state, and POST /v1/models/apply (removals
+# first, then pulls in the order given). `seen` is the sha256 of the model
+# names as this app saw them, so the gateway refuses a list that changed
+# since the sheet was drawn; this app sends only what its last read put on
+# the sheet (the names it saw, the set's own downloads), so nothing is
+# removed that the person wasn't shown.
+SRV_TAG_RX = re.compile(r"[a-z0-9][a-z0-9._-]{0,79}(?::[a-z0-9][a-z0-9._-]{0,63})?")
+SRV_SETS_MAX = 40               # names per list the gateway takes
+SRV_SETS_FRESH_S = 900          # a sheet older than this is read again
+SRV_SETS_OLD = "Update the server kit to manage its models from here."
+SRV_SETS_CHANGED = "The server\u2019s list changed. Check it again."
+# id -> what the last read of a server's models put on its sheets
+_srv_mstate = profile_cache("_srv_mstate", {})
+
+
+def srv_seen_hash(names) -> str:
+    """The `seen` of /v1/models/apply: sha256 of the sorted names, one a line."""
+    return hashlib.sha256("\n".join(sorted(str(n) for n in names))
+                          .encode("utf-8")).hexdigest()
+
+
+def _srv_text(v, n: int) -> str:
+    return " ".join("".join(ch for ch in str(v or "") if ch.isprintable()).split())[:n]
+
+
+def _srv_jobs_parse(v) -> list:
+    """The gateway's jobs, field by field; anything else is dropped."""
+    out = []
+    for j in (v if isinstance(v, list) else [])[:100]:
+        if not isinstance(j, dict):
+            continue
+        name, act, st = j.get("name"), j.get("action"), j.get("state")
+        if (not isinstance(name, str) or not SRV_TAG_RX.fullmatch(name)
+                or act not in ("pull", "remove")
+                or st not in ("queued", "running", "done", "failed")):
+            continue
+        pct = j.get("pct")
+        pct = (int(pct) if isinstance(pct, (int, float)) and not isinstance(pct, bool)
+               and 0 <= pct <= 100 else 0)
+        out.append({"name": name, "action": act, "state": st, "pct": pct,
+                    "error": _srv_text(j.get("error"), 160)})
+    return out
+
+
+def _srv_mstate_parse(js):
+    """/v1/models/state checked field by field, or None when it isn't that
+    shape: models (name, size, loaded), busy, jobs, the set last picked
+    (name, when, by which device), free disk and the card's size."""
+    if not isinstance(js, dict) or not isinstance(js.get("models"), list):
+        return None
+    models = []
+    for m in js["models"][:400]:
+        n = m.get("name") if isinstance(m, dict) else None
+        if not isinstance(n, str) or not n or len(n) > 200 or not n.isprintable():
+            continue
+        sz = m.get("size")
+        models.append({"name": n, "loaded": m.get("loaded") is True,
+                       "size": sz if isinstance(sz, int) and not isinstance(sz, bool)
+                       and sz >= 0 else 0})
+    p = js.get("plan")
+    plan = None
+    if isinstance(p, dict) and model_set_key(p.get("name")):
+        at = p.get("at")
+        plan = {"name": model_set_key(p["name"]), "by": _srv_text(p.get("by"), 60),
+                "at": at if isinstance(at, (int, float)) and not isinstance(at, bool) else None}
+
+    def num(k):
+        v = js.get(k)
+        return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 1 << 50 else 0
+    return {"models": models, "busy": js.get("busy") is True,
+            "jobs": _srv_jobs_parse(js.get("jobs")), "plan": plan,
+            "disk_free_bytes": num("disk_free_bytes"), "vram_bytes": num("vram_bytes")}
+
+
+def server_sets_view(state: dict, vram) -> dict:
+    """What a server's three cards and their sheets show, from its state:
+    per set the tags, Download (missing, with sizes), Remove (on the
+    server, outside the set, a name the gateway takes; at most 40), how
+    many others stay, the GB both ways, "same" and the state ("yours": the
+    set last picked there while all of it is there, else the largest set
+    all there; "installed"; "download")."""
+    sets = model_sets({"vram": vram}) if vram else {k: [] for k in MODEL_SETS}
+    names = [m["name"] for m in state["models"]]
+    size = {m["name"]: m["size"] for m in state["models"]}
+    have = {_srv_tag_key(n) for n in names}
+    out = {"sets": {}, "seen": srv_seen_hash(names), "n": len(names),
+           "vram": vram or 0}
+    keys, full = {}, []
+    for i, k in enumerate(MODEL_SETS):
+        tags = [MODEL_INFO[l]["ollama"] for l in sets[k]]
+        keys[k] = {_srv_tag_key(t) for t in tags}
+        dl = [{"name": t, "gb": round(_set_tag_bytes(t) / 1e9, 1)}
+              for t in tags if _srv_tag_key(t) not in have]
+        rm = [{"name": n, "gb": round(size.get(n, 0) / 1e9, 1)} for n in names
+              if _srv_tag_key(n) not in keys[k] and SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]
+        same = next((p for p in MODEL_SETS[:i] if keys[k] and keys[p] == keys[k]), "")
+        out["sets"][k] = {"n": len(tags), "tags": tags, "download": dl, "remove": rm,
+                          "keep_n": len(names) - len(rm), "same": same,
+                          "dl_gb": round(sum(d["gb"] for d in dl), 1),
+                          "free_gb": round(sum(r["gb"] for r in rm), 1)}
+        if tags and not dl:
+            full.append(k)
+    plan = (state.get("plan") or {}).get("name") or ""
+    mine = plan if plan in full else next(
+        (k for k in reversed(MODEL_SETS) if k in full and not out["sets"][k]["same"]), "")
+    for k in MODEL_SETS:
+        out["sets"][k]["state"] = ("yours" if k == mine else
+                                   "installed" if k in full else "download")
+    jobs = state.get("jobs") or []
+    out.update(mine=mine, plan=state.get("plan"), jobs=jobs,
+               busy=bool(state.get("busy")),
+               running=any(j["state"] in ("queued", "running") for j in jobs),
+               disk_free_gb=round(state.get("disk_free_bytes", 0) / 1e9, 1))
+    return out
+
+
+def _srv_sets_entry(ctx, sid: str):
+    """(entry, None) for a paired server of ctx, else (None, the reply)."""
+    try:
+        e = _srv_find(_srv_read(ctx), sid)
+    except (StoreReadError, NoProfile):
+        return None, {"ok": False, "kind": "gone", "err": "Couldn\u2019t read your servers."}
+    if e is None:
+        return None, {"ok": False, "kind": "gone", "err": SRV_GONE}
+    if not _srv_paired(e):
+        return None, {"ok": False, "kind": "unpaired",
+                      "err": "%s isn\u2019t paired with this computer." % e["name"]}
+    if not cai_crypto.available():
+        return None, {"ok": False, "kind": "crypto", "err": SRV_NO_CRYPTO}
+    return e, None
+
+
+def server_models_get(ctx, sid: str) -> dict:
+    """GET /api/servers/models: a server's models, its three sets sized for
+    its card, the set it has, and any changes it is making. One signed
+    read; what it put on the sheets is kept for the apply's check."""
+    e, bad = _srv_sets_entry(ctx, sid)
+    if bad:
+        return bad
+    try:
+        st, js = _srv_json(e, "GET", "/v1/models/state", timeout=SRV_CONNECT_S)
+    except ServerError as se:
+        return {"ok": False, "kind": se.kind, "err": str(se)}
+    if st == 404 and str(js.get("code") or "") == "not_found":
+        return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
+    if st != 200:
+        return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
+    state = _srv_mstate_parse(js)
+    if state is None:
+        return {"ok": False, "kind": "server", "err": "%s answered in a way this app "
+                "doesn\u2019t understand." % e["name"]}
+    # the card's size: the gateway's own, else the last check's
+    vram = state["vram_bytes"] or ((_srv_seen.get(e["id"]) or {}).get("gpu") or {}).get("vram_bytes")
+    view = server_sets_view(state, vram)
+    _srv_mstate[e["id"]] = {
+        "seen": view["seen"], "at": time.time(),
+        "names": [m["name"] for m in state["models"]],
+        "dl": {k: [d["name"] for d in x["download"]] for k, x in view["sets"].items()},
+        "rm": {k: [r["name"] for r in x["remove"]] for k, x in view["sets"].items()}}
+    return dict(view, ok=True, name=e["name"])
+
+
+def _srv_tag_list(v) -> bool:
+    return (isinstance(v, list) and len(v) <= SRV_SETS_MAX
+            and all(isinstance(t, str) and SRV_TAG_RX.fullmatch(t) for t in v)
+            and len(set(v)) == len(v))
+
+
+def server_models_apply(ctx, sid: str, d: dict) -> dict:
+    """POST /api/servers/models {id, plan, add, remove, seen}: the sheet the
+    person confirmed, sent to the gateway as it was shown. add must be the
+    set's own downloads and remove names the last read listed outside the
+    set, both from the read that made `seen`; otherwise nothing is sent and
+    the sheet is read again. The gateway's refusals come back in words."""
+    plan = model_set_key(d.get("plan"))
+    add, rm, seen = d.get("add"), d.get("remove"), d.get("seen")
+    if not plan:
+        return {"ok": False, "kind": "input", "err": "Pick Light, Recommended or Everything."}
+    if (not _srv_tag_list(add) or not _srv_tag_list(rm) or set(add) & set(rm)
+            or not isinstance(seen, str) or not re.fullmatch(r"[0-9a-f]{64}", seen)):
+        return {"ok": False, "kind": "input", "err": "That isn\u2019t a list this app made."}
+    if not add and not rm:
+        return {"ok": False, "kind": "input", "err": "Nothing to change."}
+    e, bad = _srv_sets_entry(ctx, sid)
+    if bad:
+        return bad
+    ms = _srv_mstate.get(e["id"])
+    if (not ms or ms["seen"] != seen or time.time() - ms["at"] > SRV_SETS_FRESH_S
+            or not set(add) <= set(ms["dl"].get(plan) or [])
+            or not set(rm) <= set(ms["rm"].get(plan) or [])):
+        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}
+    body = {"plan": plan, "add": list(add), "remove": list(rm), "seen": seen}
+    try:
+        st, js = _srv_json(e, "POST", "/v1/models/apply", body, timeout=SRV_CONNECT_S)
+    except ServerError as se:
+        return {"ok": False, "kind": se.kind, "err": str(se)}
+    code, name = str(js.get("code") or ""), e["name"]
+    if st == 202 and js.get("ok") is True:
+        _srv_mstate.pop(e["id"], None)      # a sheet is good for one change
+        return {"ok": True, "jobs": _srv_jobs_parse(js.get("jobs"))}
+    if st == 409 and code == "changed":
+        _srv_mstate.pop(e["id"], None)
+        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}
+    if st == 409 and code == "busy":
+        return {"ok": False, "kind": "busy", "err": "%s is busy changing its models. "
+                "Nothing was changed. Try again in a moment." % name}
+    if st == 409 and code == "in_use":
+        return {"ok": False, "kind": "in_use", "err": "%s is in use on %s, so nothing was "
+                "changed. Try again when it\u2019s done." % (_srv_text(js.get("name"), 80)
+                                                          or "A model", name)}
+    if st == 400:
+        return {"ok": False, "kind": "server", "err": "%s refused the change%s. Nothing was "
+                "changed." % (name, (": " + _srv_text(js.get("error"), 160))
+                              if js.get("error") else "")}
+    if st == 404 and code == "not_found":
+        return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
+    return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
+# ==== server model sets: end ====
+
 
 
 def stream_ollama(tag: str, messages: list, emit,
@@ -26743,6 +26969,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _sid = (_sq.get("id") or [""])[0]
             self._send_json(server_sleep_get(self.ctx, _sid)
                             if _SRV_ID_RX.fullmatch(_sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+        elif urllib.parse.urlparse(self.path).path == "/api/servers/models":
+            # Settings › Your servers (6b407): its models and the three sets
+            _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            _sid = (_sq.get("id") or [""])[0]
+            self._send_json(server_models_get(self.ctx, _sid)
+                            if _SRV_ID_RX.fullmatch(_sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
         elif urllib.parse.urlparse(self.path).path == "/api/servers/usage":
             # the sidebar meters' read of one server's card (6b342): while
             # a benchmark runs nothing is asked of any server
@@ -27344,6 +27576,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             elif op == "sleep":
                 # auto sleep (6b346): this server's setting, in the active profile
                 out = (server_sleep_set(self.ctx, sid, {k: d[k] for k in ("enabled", "minutes") if k in d})
+                       if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+            elif op == "models":
+                # a set for this server, as the sheet showed it (6b407)
+                out = (server_models_apply(self.ctx, sid, d)
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
             elif op not in ("pair", "test", "access", "remove", "prefer"):
                 self.send_error(404)
@@ -33865,6 +34101,40 @@ body.gen #chip-model{color:var(--accent)}
 .bm-gh{font-family:var(--mono);font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--faint);padding:8px 0 0}
 .bm-gh:first-child{padding-top:6px}
+/* a set for one of your servers (6b407): the cost dialog's look */
+#srvset-veil{position:fixed;inset:0;z-index:66;display:flex;
+  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#srvset-veil[hidden],#srvset-rml[hidden]{display:none}
+#srvset-card{width:min(460px,calc(100vw - 48px));padding:22px 24px 16px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);max-height:min(86vh,720px);
+  overflow:hidden auto;animation:doorPop .4s cubic-bezier(.16,1,.3,1) both}
+#srvset-card .set-h{margin-bottom:4px}
+#srvset-list{margin:10px 0 8px;max-height:46vh;overflow-y:auto}
+#srvset-list .mrow{display:flex;align-items:baseline;justify-content:space-between;
+  gap:14px;padding:6px 2px;border-bottom:1px solid var(--line-soft)}
+#srvset-list .mname{font-family:var(--mono);font-size:12px;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#srvset-list .msize{font-family:var(--mono);font-size:11px;color:var(--faint);flex:none}
+#srvset-list .og{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);padding:12px 2px 2px}
+#srvset-list .og:first-child{padding-top:0}
+#srvset-list .mmore{padding:10px 2px 0;font-size:11.5px;color:var(--faint)}
+#srvset-sum{font-size:11.5px;color:var(--dim);margin:8px 0 0}
+#srvset-note{font-size:12px;color:#d9c08a;margin:6px 0 0;min-height:0}
+#srvset-note:empty{display:none}
+#srvset-card .sh-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+#srvset-card .sh-foot .about-btn{width:auto;margin-top:0;padding:7px 20px}
+#srvset-card .ghost{background:none;border:1px solid var(--line);color:var(--faint)}
+#srvset-card .ghost:hover{color:var(--text);border-color:var(--dim)}
+.srv-sets{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.srv-sh{font-size:12px;color:var(--text);font-weight:600}
+.srv-setrow{margin:8px 0 2px}
+.srv-jobs{margin-top:6px;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  line-height:1.6}
+.srv-job.failed{color:#e8907e}
+.srv-job.done{color:var(--faint)}
 #bmc-veil,#bmv-veil{position:fixed;inset:0;z-index:66;display:flex;
   align-items:center;justify-content:center;background:rgba(6,7,10,.72);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -35584,6 +35854,21 @@ __CODE_ROWS__
     <div class="sh-foot">
       <button id="bmc-cancel" class="about-btn slim ghost">Cancel</button>
       <button id="bmc-go" class="about-btn slim" disabled>Call these models</button>
+    </div>
+  </div>
+</div>
+<!-- a set for one of your servers (6b407): exactly what will download and
+     what will be removed, before anything is -->
+<div id="srvset-veil" hidden>
+  <div id="srvset-card" role="dialog" aria-modal="true" aria-labelledby="srvset-title">
+    <div class="set-h" id="srvset-title"></div>
+    <div id="srvset-list"></div>
+    <label class="bmc-ck" id="srvset-rml"><input type="checkbox" id="srvset-rm" checked> <span id="srvset-rmt"></span></label>
+    <p id="srvset-sum"></p>
+    <p id="srvset-note"></p>
+    <div class="sh-foot">
+      <button id="srvset-cancel" class="about-btn slim ghost">Cancel</button>
+      <button id="srvset-go" class="about-btn slim">Apply</button>
     </div>
   </div>
 </div>
@@ -40142,6 +40427,7 @@ document.addEventListener("keydown",e=>{
     if(engMenuEsc()){e.preventDefault();return;}
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
+    if(srvSheetAt){srvSheetClose();e.preventDefault();return;}
     for(const sel of ["#bmc-veil","#bmv-veil","#new-veil","#update-veil",
                       "#about-veil","#setup-veil"]){
       const el=$(sel);
@@ -42042,6 +42328,7 @@ function srvCard(s){
       +'<div class="srv-hint">The Workspace and Coding agents can send the contents of a '
       +'folder you give them to this server.</div>':"")
     +srvSleepHtml(s,srvSleep[s.id])
+    +srvSetsHtml(s,srvSets[s.id])
     +(pairing?'<div class="srv-pair"><input class="srv-code" data-k="code" maxlength="20" '
         +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
         +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
@@ -42149,6 +42436,154 @@ async function srvSleepLoadAll(){
   Object.keys(srvSleep).forEach(k=>{if(!gs.some(s=>s.id===k))delete srvSleep[k];});
   paintServers();
 }
+/* MODELS ON YOUR SERVER (6b407, per Patrick: "the server gets the same
+   three sets sized for its card, chosen in Settings \u203a Servers, with the
+   exact add/remove list shown before anything is deleted"). The three
+   cards are setCardsHtml's, from /api/servers/models (the gateway's list,
+   the sets sized for its card). A card opens the sheet: Download and
+   Remove by name and size, the rest unchanged, a switch for the removals;
+   Apply sends exactly that, and the card follows the server's jobs until
+   they end, then shows what the server really has. Pure helpers first,
+   so the gauntlet runs them in node. */
+const srvSets={};          // server id -> {st:"load"|"ok"|"err", d, msg, kind, line}
+// the sheet's lists for set k of server answer d; rm: the switch is on
+function srvSheet(d,k,rm){
+  const x=((d||{}).sets||{})[k]||{},dl=x.download||[],out=rm?(x.remove||[]):[];
+  return {dl:dl,rm:out,keep:(d.n||0)-out.length,n_rm:(x.remove||[]).length,
+    dl_gb:x.dl_gb||0,free_gb:rm?(x.free_gb||0):0,
+    add:dl.map(m=>m.name),remove:out.map(m=>m.name),
+    empty:!dl.length&&!out.length};
+}
+function srvSheetHtml(sh){
+  const row=m=>'<div class="mrow"><span class="mname">'+esc(m.name)+'</span>'
+    +'<span class="msize">'+muGB(m.gb)+'</span></div>';
+  return (sh.dl.length?'<div class="og">Download</div>'+sh.dl.map(row).join(""):"")
+    +(sh.rm.length?'<div class="og">Remove</div>'+sh.rm.map(row).join(""):"")
+    +(sh.keep>0?'<div class="mmore">'+sh.keep+' other model'+(sh.keep>1?"s":"")+' unchanged</div>':"")
+    +(sh.empty?'<div class="mmore">Nothing to change.</div>':"");
+}
+function srvSheetSum(sh){
+  return [sh.dl_gb?muGB(sh.dl_gb)+" to download":"",sh.free_gb?muGB(sh.free_gb)+" freed":""]
+    .filter(Boolean).join(" \u00b7 ");
+}
+// a job, in words
+function srvJobLine(j){
+  const w=j.action==="remove"?{queued:"to remove",running:"removing",done:"removed",failed:"couldn\u2019t remove"}
+    :{queued:"waiting",running:"downloading "+(j.pct||0)+"%",done:"downloaded",failed:"couldn\u2019t download"};
+  return j.name+" \u00b7 "+w[j.state]+(j.state==="failed"&&j.error?": "+j.error:"");
+}
+// the line under the cards: which set the server has, or what it is doing
+function srvSetsLine(name,d){
+  if(!d.vram)return name+" didn\u2019t say how much graphics memory it has, so the sets can\u2019t be sized. Update the server kit.";
+  if(d.running)return name+" is changing its models\u2026";
+  const by=d.plan&&d.plan.by?" Picked on "+d.plan.by+".":"";
+  return d.mine?name+" has "+SET_NAMES[d.mine]+"."+(d.plan&&d.plan.name===d.mine?by:"")
+    :name+" has "+d.n+" model"+(d.n===1?"":"s")+", not all of any set.";
+}
+function srvSetsHtml(s,z){
+  if(!s.paired)return "";
+  let h='<div class="srv-sets"><div class="srv-sh">Models on '+esc(s.name)+'</div>';
+  if(!z||z.st==="load")return h+'<div class="srv-hint">Reading its models\u2026</div></div>';
+  if(z.st==="err")return h+'<div class="srv-hint">'+esc(z.msg||"")+'</div></div>';
+  const d=z.d;
+  h+='<div class="set-row srv-setrow" data-sid="'+esc(s.id)+'">'
+    +setCardsHtml(d.sets,{where:s.name})+'</div>';
+  h+='<div class="srv-hint">'+esc(srvSetsLine(s.name,d))+'</div>';
+  const jobs=(d.jobs||[]).filter(j=>d.running||j.state==="failed");
+  if(jobs.length)h+='<div class="srv-jobs">'+jobs.map(j=>'<div class="srv-job '+j.state+'">'
+    +esc(srvJobLine(j))+'</div>').join("")+'</div>';
+  if(z.line)h+='<div class="srv-msg'+(z.kind?" "+z.kind:"")+'">'+esc(z.line)+'</div>';
+  return h+'</div>';
+}
+let srvSetsT=0;
+function srvSetsShown(){
+  const p=$("#p-servers");return !aboutVeil.hidden&&!!p&&p.classList.contains("on");}
+async function srvSetsLoad(s){
+  if(!s.paired)return;
+  let d=null;
+  try{const r=await api("/api/servers/models?id="+encodeURIComponent(s.id));if(r.ok)d=await r.json();}
+  catch(e){}
+  const z=srvSets[s.id]||{},was=z.st==="ok"&&z.d&&z.d.running;
+  if(d&&d.ok){
+    srvSets[s.id]={st:"ok",d:d,line:z.line||"",kind:z.kind||""};
+    if(was&&!d.running){
+      // the change ended: what the server really has now, and the picker's list with it
+      const bad=(d.jobs||[]).filter(j=>j.state==="failed");
+      srvSets[s.id].line=bad.length?"Some changes didn\u2019t finish.":"Done.";
+      srvSets[s.id].kind=bad.length?"warn":"ok";
+      try{const t=await srvPost("test",{id:s.id});if(t.server)srvPut(t.server);}catch(e){}
+    }
+  }else srvSets[s.id]={st:"err",msg:(d&&d.err)||"Couldn\u2019t read its models. Try again."};
+}
+async function srvSetsLoadAll(){
+  const gs=srvList.filter(s=>s.paired);
+  gs.forEach(s=>{if(!srvSets[s.id])srvSets[s.id]={st:"load"};});
+  paintServers();
+  await Promise.all(gs.map(srvSetsLoad));
+  Object.keys(srvSets).forEach(k=>{if(!gs.some(s=>s.id===k))delete srvSets[k];});
+  paintServers();
+  srvSetsPoll();
+}
+// while a server changes its models, its card follows the jobs
+function srvSetsPoll(){
+  clearTimeout(srvSetsT);srvSetsT=0;
+  const live=srvList.filter(s=>s.paired&&srvSets[s.id]&&srvSets[s.id].d&&srvSets[s.id].d.running);
+  if(!live.length||!srvSetsShown())return;
+  srvSetsT=setTimeout(async()=>{
+    await Promise.all(live.map(srvSetsLoad));paintServers();srvSetsPoll();},1500);
+}
+// the sheet
+let srvSheetAt=null;      // {sid, k}
+function srvSheetPaint(note){
+  const a=srvSheetAt;if(!a)return;
+  const z=srvSets[a.sid],s=srvList.find(x=>x.id===a.sid);
+  if(!z||!z.d||!s){srvSheetClose();return;}
+  const rmOn=$("#srvset-rm").checked,sh=srvSheet(z.d,a.k,rmOn),n=sh.n_rm;
+  $("#srvset-title").textContent=SET_NAMES[a.k]+" on "+s.name;
+  $("#srvset-list").innerHTML=srvSheetHtml(sh);
+  $("#srvset-rml").hidden=!n;
+  $("#srvset-rmt").textContent="Also remove the "+n+" model"+(n===1?"":"s")+" outside "+SET_NAMES[a.k];
+  $("#srvset-sum").textContent=srvSheetSum(sh);
+  $("#srvset-note").textContent=note||"";
+  $("#srvset-go").disabled=sh.empty;
+}
+function srvSheetOpen(sid,k){
+  srvSheetAt={sid:sid,k:k};$("#srvset-rm").checked=true;
+  $("#srvset-veil").hidden=false;srvSheetPaint();$("#srvset-cancel").focus();
+}
+function srvSheetClose(){srvSheetAt=null;$("#srvset-veil").hidden=true;}
+$("#srv-list").addEventListener("click",ev=>{
+  const c=ev.target.closest(".srv-setrow .set-card");if(!c)return;
+  const sid=c.closest(".srv-setrow").dataset.sid,z=srvSets[sid];
+  if(!z||!z.d||z.d.running)return;
+  srvSheetOpen(sid,c.dataset.set);
+});
+$("#srvset-rm").addEventListener("change",()=>srvSheetPaint());
+$("#srvset-cancel").addEventListener("click",srvSheetClose);
+$("#srvset-veil").addEventListener("click",e=>{if(e.target===$("#srvset-veil"))srvSheetClose();});
+$("#srvset-go").addEventListener("click",async()=>{
+  const a=srvSheetAt;if(!a)return;
+  const z=srvSets[a.sid],s=srvList.find(x=>x.id===a.sid);if(!z||!z.d||!s)return;
+  const sh=srvSheet(z.d,a.k,$("#srvset-rm").checked);
+  const go=$("#srvset-go");go.disabled=true;$("#srvset-note").textContent="Sending\u2026";
+  let r;
+  try{r=await srvPost("models",{id:a.sid,plan:a.k,add:sh.add,remove:sh.remove,seen:z.d.seen});}
+  catch(e){r={ok:false,err:"Couldn\u2019t reach the app. Try again."};}
+  if(r.ok){
+    srvSheetClose();
+    z.d.running=true;z.d.jobs=r.jobs||[];z.line="";z.kind="";
+    paintServers();srvSetsPoll();
+    return;
+  }
+  if(r.kind==="changed"){
+    // the server's list moved: read it again and show the sheet as it is now
+    await srvSetsLoad(s);paintServers();
+    if(srvSheetAt&&srvSets[a.sid]&&srvSets[a.sid].st==="ok")srvSheetPaint(r.err);
+    else srvSheetClose();
+    return;
+  }
+  srvSheetPaint(r.err||"That didn\u2019t work. Try again.");
+});
 $("#srv-list").addEventListener("change",async ev=>{
   const c=ev.target.closest('input[data-a="sleepon"],input[data-a="sleepmin"]');if(!c)return;
   const id=c.closest(".srv").dataset.id,z=srvSleep[id];
@@ -42977,6 +43412,7 @@ function settingsPane(id){
   if(id==="p-usage")loadUsage();      // fresh numbers on every visit (6b325)
   if(id==="p-usage")loadBench();      // and the benchmark's runs (6b331)
   if(id==="p-servers")loadServers(true).then(srvSleepLoadAll);   // each server checked (6b334), its sleep setting read (6b346)
+  if(id==="p-servers")srvSetsLoadAll();   // and its models and the three sets (6b407)
 }
 /* ------------------------------------------------ Settings › Usage (6b325)
    The four figures and the chart come from /api/usage (the usage

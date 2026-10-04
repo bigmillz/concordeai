@@ -9,6 +9,52 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b407 — the same three sets on your server, with the exact lists before anything goes (per Patrick)
+
+Settings › Servers: each paired server's card has "Models on <name>" with the three cards,
+computed by the same `model_sets`, for target `{"vram": the card}`: a catalog row fits when its
+Ollama file (OLLAMA_BYTES, by the tag in its ollama column) fits the card whole by `_srv_fits`'s
+own rule (size × 1.05 + 1.25 GiB), the same roles and nesting, one row per tag, giants only in
+Everything. The card's size: /v1/models/state's `vram_bytes`, else the last check's. A 16 GB card:
+Light = llama3.2:3b, llama3.2:1b, gemma4:12b (10.9 GB); Recommended adds gpt-oss:20b, qwen3.5:9b,
+deepseek-r1:8b (36.5 GB); Everything adds ministral-3:14b, hermes3:8b (50.3 GB).
+
+- **Contract (client side; the kit is being built by another agent).** Signed GET
+  /v1/models/state and POST /v1/models/apply {plan, add, remove, seen}; `seen` is the sha256 of
+  the sorted model names as this app saw them. New section `# ==== server model sets ====`:
+  `_srv_mstate_parse` (field by field), `server_sets_view` (per set: Download with sizes, Remove
+  = models on the server outside the set whose names the gateway takes, at most 40, models not
+  in the catalog included; others unchanged; state yours/installed/download: the set picked
+  there while complete, else the largest complete), `server_models_get`, `server_models_apply`;
+  routes GET /api/servers/models?id= and POST /api/servers/models.
+- **Nothing removed that wasn't on the sheet.** The read keeps, per server, the seen hash and
+  each set's Download and Remove lists (`_srv_mstate`, a profile cache). An apply is sent only
+  when its seen is that read's, add ⊆ the set's downloads and remove ⊆ its Remove list, within
+  15 minutes; a sheet is good for one change. Otherwise nothing is sent and the sheet is read
+  again. Tags are checked against the contract's pattern, at most 40 a list, disjoint.
+- **The sheet** (`#srvset-veil`): "<Set> on <name>", Download and Remove by name and size, "N
+  other models unchanged", the switch "Also remove the N models outside <Set>" (on), the totals,
+  Cancel/Apply. While jobs run the card lists them ("gpt-oss:20b · downloading 40%",
+  "… · removed", "… · couldn't download: <why>") and polls every 1.5 s while the pane is open;
+  then it shows what the server has, "Done." or "Some changes didn't finish.", and refreshes the
+  server's model list (the picker's).
+- **Errors in words:** changed "The server's list changed. Check it again." (the sheet is read
+  again and redrawn); busy "<name> is busy changing its models. Nothing was changed. Try again
+  in a moment."; in_use "<model> is in use on <name>, so nothing was changed. Try again when
+  it's done."; 400 "<name> refused the change: <why>. Nothing was changed."; offline the
+  existing text; an older kit "Update the server kit to manage its models from here."; no card
+  size "<name> didn't say how much graphics memory it has, so the sets can't be sized. Update
+  the server kit."
+- **Gauntlet.** New `== the three sets on your server (6b407) ==`: 5 in-process checks (sizing
+  on 8/16/24/320 GB cards, the view, the signed read, every refusal of the gateway and of this
+  app, the sheet in node) and 16 mutations. The stand-in gateway: the harness wraps the real
+  gateway's handler so /v1/models/* are served (on the stub Ollama's list) behind the real
+  Access and signature checks, until the kit's gateway has its own (`GW_HAS_MODELS`); control
+  /models-reset, /models-fail, /models-loaded. Live (in the 6b334 section): the signed read,
+  unsigned refused, Light applied with the switch off, then a used sheet, a changed list, a
+  model in use, busy and a 400.
+- **Not verified:** against the real kit routes (not built yet), on the real server.
+
 ## 6b405 — three model sets, defined once: Light, Recommended, Everything (per Patrick)
 
 The same idea, sets of models to install, was in four places with three vocabularies: the

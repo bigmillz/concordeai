@@ -22872,6 +22872,95 @@ cfg.update({"access_team_domain": U.TEAM, "gateway_aud": U.GW_AUD, "admin_aud": 
             "certs_url": JWKS.url, "allow_insecure_certs_url": True,
             "vram_total_bytes": 16 * (1 << 30), "queue_wait_s": 20})
 U.write_devices([])
+# THE MODEL SETS' ROUTES (6b407): the kit's own GET /v1/models/state and
+# POST /v1/models/apply are being built beside this. Until the gateway has
+# them, the stand-in serves them here, BEHIND the real gateway's Access and
+# signature checks (handle_any runs both before route), on the stub Ollama's
+# list. A removal goes to DROPPED and a pull to CLONED, so /restore puts the
+# list back; /models-reset clears the jobs and the plan.
+import hashlib as _hl7
+import re as _re7
+MODELS = {"jobs": [], "plan": None, "lock": threading.Lock(), "fail": set()}
+_TAG7 = _re7.compile(r"[a-z0-9][a-z0-9._-]{0,79}(?::[a-z0-9][a-z0-9._-]{0,63})?")
+GW_HAS_MODELS = "/v1/models/state" in open(os.path.join(KIT, "bin", "ollama1-gateway")).read()
+
+
+def _mstate():
+    with STUB.lock:
+        have = {n: m.get("size", 0) for n, m in STUB.models.items()}
+        loaded = set(STUB.loaded)
+    with MODELS["lock"]:
+        jobs = [dict(j) for j in MODELS["jobs"]]
+        plan = MODELS["plan"]
+    return {"models": [{"name": n, "size": s, "loaded": n in loaded} for n, s in sorted(have.items())],
+            "allow": sorted(have), "busy": any(j["state"] in ("queued", "running") for j in jobs),
+            "jobs": jobs, "plan": plan, "disk_free_bytes": 500 * 10 ** 9, "vram_bytes": 16 << 30}
+
+
+def _mwork(jobs):
+    for j in jobs:
+        with MODELS["lock"]:
+            j["state"] = "running"
+        time.sleep(0.2)
+        with STUB.lock:
+            ok = j["name"] not in MODELS["fail"]
+            if ok and j["action"] == "remove":
+                DROPPED[j["name"]] = STUB.models.pop(j["name"], None)
+            elif ok:
+                STUB.models[j["name"]] = {"size": 2 << 30, "info": {}}
+                CLONED.append(j["name"])
+        with MODELS["lock"]:
+            j.update(state="done" if ok else "failed", pct=100 if ok else 0,
+                     error="" if ok else "the registry answered 500")
+
+
+def _mroute(h, method, route, body, dev):
+    if route == "/v1/models/state" and method == "GET":
+        return h.send_json(200, _mstate())
+    if route == "/v1/models/apply" and method == "POST":
+        obj = h.json_body(body)
+        add, rm = obj.get("add"), obj.get("remove")
+
+        def okl(v):
+            return (isinstance(v, list) and len(v) <= 40
+                    and all(isinstance(t, str) and _TAG7.fullmatch(t) for t in v))
+        if (obj.get("plan") not in ("light", "recommended", "everything") or not okl(add)
+                or not okl(rm) or set(add) & set(rm) or not isinstance(obj.get("seen"), str)):
+            raise GW.GatewayError(400, "bad_request", "that isn't a plan")
+        st = _mstate()
+        if st["busy"]:
+            raise GW.GatewayError(409, "busy", "a change is running")
+        names = [m["name"] for m in st["models"]]
+        if obj["seen"] != _hl7.sha256("\n".join(sorted(names)).encode()).hexdigest():
+            raise GW.GatewayError(409, "changed", "the list changed", models=names)
+        hit = next((n for n in rm if any(m["name"] == n and m["loaded"] for m in st["models"])), None)
+        if hit:
+            raise GW.GatewayError(409, "in_use", "in use", name=hit)
+        jobs = ([{"name": n, "action": "remove", "state": "queued", "pct": 0, "error": ""} for n in rm]
+                + [{"name": n, "action": "pull", "state": "queued", "pct": 0, "error": ""} for n in add])
+        with MODELS["lock"]:
+            MODELS["jobs"] = jobs
+            MODELS["plan"] = {"name": obj["plan"], "at": int(time.time()), "by": (dev or {}).get("name", "")}
+        threading.Thread(target=_mwork, args=(jobs,), daemon=True).start()
+        return h.send_json(202, {"ok": True, "jobs": [dict(j) for j in jobs]})
+    raise GW.GatewayError(404, "not_found", "not available through the gateway")
+
+
+_REAL_MH = GW.make_handler
+
+
+def _mh(gw, lan=False):
+    H = _REAL_MH(gw, lan)
+
+    class HM(H):
+        def route(self, method, route, body, dev_id, dev, t0):
+            if route.startswith("/v1/models/") and not GW_HAS_MODELS:
+                return _mroute(self, method, route, body, dev)
+            return H.route(self, method, route, body, dev_id, dev, t0)
+    return HM
+
+
+GW.make_handler = _mh
 GWO, GWS, GWSTOP = GW.serve(cfg)
 GWO.gen.poll_s = 0.1
 GWO.gen.hooks.vram = lambda: (1 << 30, 16 << 30)
@@ -23069,6 +23158,19 @@ class Ctl(BaseHTTPRequestHandler):
             return self.reply({"ok": True})
         if p == "/usage":
             USAGE["v"] = d
+            return self.reply({"ok": True})
+        if p == "/models-reset":
+            with MODELS["lock"]:
+                MODELS.update(jobs=[], plan=None, fail=set())
+            with STUB.lock:
+                STUB.loaded.clear()
+            return self.reply({"ok": True})
+        if p == "/models-fail":
+            MODELS["fail"].add(d["name"])
+            return self.reply({"ok": True})
+        if p == "/models-loaded":
+            with STUB.lock:
+                STUB.loaded[d["name"]] = {"name": d["name"], "model": d["name"], "size": 1, "size_vram": 1}
             return self.reply({"ok": True})
         if p == "/ram":
             RAM["v"] = d
@@ -24423,6 +24525,98 @@ check("server pictures (live): Stop (the reader leaves) cancels the job at the g
 _o1("/comfy-set", {"run_s": 0.6, "steps": 4})
 _o1("/comfy-off", {})
 # ==== 6b356 server pictures (live): end ====
+# ==== 6b407 server model sets (live): begin ====
+# the three sets on the server, through the app's own routes: the real
+# gateway's Access and signature checks in front of the stand-in's model
+# routes (the kit's own are being built beside this)
+_o1("/restore", {})
+_o1("/models-reset", {})
+
+
+def _l7_get():
+    return _svq("/api/servers/models?id=" + _sid34)[1]
+
+
+def _l7_wait(secs=20):
+    end = time.time() + secs
+    g = _l7_get()
+    while time.time() < end and g.get("running"):
+        time.sleep(0.3)
+        g = _l7_get()
+    return g
+
+
+_l7_n = len(_o1("/log")["log"])
+_l7a = _l7_get()
+_l7lg = [r_ for r_ in _o1("/log")["log"][_l7_n:] if r_["path"].startswith("/v1/models/")]
+_l7t = {k_: [m_["name"] for m_ in v_["download"]] for k_, v_ in (_l7a.get("sets") or {}).items()}
+check("server sets (live): one signed read through Access; the 16 GB card's sets, every model outside them listed",
+      _l7a.get("ok") is True and _l7a.get("vram") == 16 << 30
+      and _l7t.get("light") == ["llama3.2:3b", "llama3.2:1b", "gemma4:12b"]
+      and _l7t.get("recommended") == ["llama3.2:3b", "llama3.2:1b", "gemma4:12b", "gpt-oss:20b",
+                                      "qwen3.5:9b", "deepseek-r1:8b"]
+      and sorted(m_["name"] for m_ in _l7a["sets"]["light"]["remove"]) == sorted(
+          n_ for n_ in ("small:8b", "huge:70b", "sneaky:14b", "moe:120b", "embed:small", "embed:spill"))
+      and [(r_["method"], r_["path"], r_["access"]) for r_ in _l7lg] == [("GET", "/v1/models/state", True)]
+      and "X-O1-Signature" in _l7lg[0]["headers"],
+      "%r" % [_l7a.get("ok"), _l7a.get("err"), _l7t, _l7lg[:2]])
+# unsigned, with Access: the gateway's own check turns it away
+_l7r = urllib.request.Request("http://127.0.0.1:%d/v1/models/state" % _O1FRONT,
+                              headers={"CF-Access-Client-Id": _O1CID, "CF-Access-Client-Secret": _O1SEC})
+try:
+    _l7u = urllib.request.urlopen(_l7r, timeout=10).status
+except urllib.error.HTTPError as e_:
+    _l7u = e_.code
+# Light, keeping the rest (the switch off): only the three pulls go
+_l7p = _svq("/api/servers/models", "POST", {"id": _sid34, "plan": "light", "add": _l7t["light"], "remove": [],
+                                            "seen": _l7a["seen"]})[1]
+_l7b = _l7_wait()
+_l7have = {m_["name"] for m_ in (_svq("/api/servers")[1].get("servers") or [{}])[0].get("models") or []}
+check("server sets (live): unsigned is refused; Light with the switch off pulls its three and removes nothing; "
+      "the card then shows what the server has",
+      _l7u == 401 and _l7p.get("ok") is True and [j_["action"] for j_ in _l7p.get("jobs") or []] == ["pull"] * 3
+      and _l7b.get("running") is False and _l7b.get("mine") == "light"
+      and (_l7b.get("plan") or {}).get("name") == "light"
+      and _l7b["sets"]["light"]["state"] == "yours" and _l7b["sets"]["light"]["download"] == []
+      and {"small:8b", "huge:70b"} <= {m_["name"] for m_ in (_l7b["sets"]["light"]["remove"])}
+      and {"llama3.2:3b", "gemma4:12b"} <= _l7have,
+      "%r" % [_l7u, _l7p, _l7b.get("mine"), _l7b.get("jobs"), sorted(_l7have)])
+# the same sheet again: this app reads the list again first; the list
+# changed at the server since the sheet: the gateway refuses, nothing moves
+_l7c = _svq("/api/servers/models", "POST", {"id": _sid34, "plan": "light", "add": [], "remove": ["small:8b"],
+                                            "seen": _l7a["seen"]})[1]
+_l7d = _l7_get()
+_o1("/clone", {"name": "extra:1b", "from": "small:8b"})
+_l7n2 = len(_o1("/log")["log"])
+_l7e = _svq("/api/servers/models", "POST", {"id": _sid34, "plan": "light", "add": [],
+                                            "remove": ["small:8b"], "seen": _l7d["seen"]})[1]
+_l7lg2 = [r_["path"] for r_ in _o1("/log")["log"][_l7n2:]]
+# a model in use, and a busy server
+_o1("/models-loaded", {"name": "small:8b"})
+_l7f = _l7_get()
+_l7g = _svq("/api/servers/models", "POST", {"id": _sid34, "plan": "light", "add": [],
+                                            "remove": ["small:8b", "huge:70b"], "seen": _l7f["seen"]})[1]
+_l7h0 = _l7_get()
+_o1("/next", {"path": "/v1/models/apply", "status": 409, "body": {"code": "busy", "error": "busy"}})
+_l7h = _svq("/api/servers/models", "POST", {"id": _sid34, "plan": "light", "add": [], "remove": ["huge:70b"],
+                                            "seen": _l7h0["seen"]})[1]
+_l7i0 = _l7_get()
+_o1("/next", {"path": "/v1/models/apply", "status": 400, "body": {"code": "bad_request", "error": "no such tag"}})
+_l7i = _svq("/api/servers/models", "POST", {"id": _sid34, "plan": "light", "add": [], "remove": ["huge:70b"],
+                                            "seen": _l7i0["seen"]})[1]
+_l7left = {m_["name"] for m_ in (_l7_get().get("sets") or {}).get("light", {}).get("remove") or []}
+check("server sets (live): a used sheet, a list that changed, a model in use, busy and a refusal: each in words, "
+      "nothing removed",
+      _l7c == {"ok": False, "kind": "changed", "err": "The server’s list changed. Check it again."}
+      and _l7e.get("kind") == "changed" and "/v1/models/apply" in _l7lg2
+      and _l7g.get("kind") == "in_use" and "small:8b is in use on " + _SVN in _l7g.get("err", "")
+      and _l7h.get("kind") == "busy" and "Nothing was changed" in _l7h.get("err", "")
+      and _l7i.get("kind") == "server" and "no such tag" in _l7i.get("err", "")
+      and {"small:8b", "huge:70b", "extra:1b"} <= _l7left,
+      "%r" % [_l7c, _l7e, _l7g, _l7h, _l7i, sorted(_l7left)])
+_o1("/restore", {})
+_o1("/models-reset", {})
+# ==== 6b407 server model sets (live): end ====
 # the Access secret and the device key: in servers.json only
 _rowA = json.load(open(_sfile34))["servers"][0]
 _seed34 = _rowA.get("seed", "")
@@ -28304,6 +28498,310 @@ for _d56, _o56, _n56 in _G56_MUT:
 check("server pictures: %d mutations, each caught by a check above" % len(_G56_MUT),
       all(isinstance(v, list) for _d, v in _g56m), "%r" % [x for x in _g56m if not isinstance(x[1], list)])
 # ==== 6b356 server pictures: end ====
+
+
+# ==== 6b407 server model sets: begin ====
+print("== the three sets on your server (6b407) ==")
+# Per Patrick: the server gets the same three sets sized for its card,
+# picked in Settings › Servers, with the exact add/remove list shown before
+# anything is deleted. In process: model_sets for a card, the view the
+# cards and sheets draw, the signed GET /v1/models/state and POST
+# /v1/models/apply through the real servers section on a stand-in
+# transport (every refusal of the gateway and of this app), the page's
+# sheet in node; each protection then broken and shown caught. Live: the
+# real gateway's Access and signature checks in front of the stand-in's
+# model routes (the 6b334 section).
+_GI7 = 1 << 30
+
+
+def _s7_ns(src):
+    ns, ctx, d = _sv_ns(src)
+    exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
+    ns.update(IS_ARM=False, IS_WIN=False)
+    exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
+    ns["MODEL_MEM_BYTES"] = {l: i["mem"] for l, i in ns["MODEL_INFO"].items()}
+    _s5_exec(src, ns, {"GIANT_GB", "model_is_giant", "TIERS", "MODEL_SETS", "MODEL_SET_NAMES",
+                       "MODEL_SET_ALIASES", "QUICK_PAIR", "EVERYDAY_MAX_GB", "MERGE_PREFS",
+                       "CODE_LADDER", "VISION_MODEL", "model_set_key", "_set_tag_bytes",
+                       "model_sets", "_family_of"})
+    exec(_sv_sect(src, "server model sets"), ns)
+    return ns, ctx, d
+
+
+def _s7_tags(ns, vram):
+    s = ns["model_sets"]({"vram": vram})
+    return {k: [ns["MODEL_INFO"][l]["ollama"] for l in s[k]] for k in ("light", "recommended", "everything")}
+
+
+def _s7_sets(src):
+    """The sets for a card: by its size whole, the same roles and nesting."""
+    ns, ctx, d = _s7_ns(src)
+    t16, t8, t24 = _s7_tags(ns, 16 * _GI7), _s7_tags(ns, 8 * _GI7), _s7_tags(ns, 24 * _GI7)
+    t320 = _s7_tags(ns, 320 * _GI7)
+    out = {"16 GB": (t16["light"] == ["llama3.2:3b", "llama3.2:1b", "gemma4:12b"]
+                     and t16["recommended"] == t16["light"] + ["gpt-oss:20b", "qwen3.5:9b", "deepseek-r1:8b"]
+                     and t16["everything"] == t16["recommended"] + ["ministral-3:14b", "hermes3:8b"]),
+           "8 GB: no Gemma fits whole": t8["light"] == ["llama3.2:3b", "llama3.2:1b", "qwen3.5:9b"],
+           "24 GB": t24["recommended"][3:6] == ["gemma4:26b", "qwen3.8:27b", "qwen3.6:35b"],
+           "a giant only in Everything": ("qwen3-coder:480b" in t320["everything"]
+                                          and "qwen3-coder:480b" not in t320["recommended"]),
+           "no card size, no sets": ns["model_sets"]({"vram": None})["everything"] == [],
+           "one per tag": all(len(v) == len(set(v)) for v in t16.values()),
+           "nested": all(set(t["light"]) <= set(t["recommended"]) <= set(t["everything"])
+                         for t in (t16, t8, t24, t320))}
+    return all(out.values()), {"failed": [k for k, v in out.items() if not v], "16": t16, "8": t8}
+
+
+_S7_STATE = {"models": [{"name": "gemma4:12b", "size": 7556508396, "loaded": True},
+                        {"name": "custom:1b", "size": 1 << 30, "loaded": False},
+                        {"name": "hf.co/User/x:Q4", "size": 2 << 30, "loaded": False},
+                        {"name": "llama3.2:3b", "size": 2019393189, "loaded": False}],
+             "allow": ["gemma4:12b"], "busy": False, "plan": {"name": "pro", "at": 1791100000, "by": "Pat’s MacBook"},
+             "jobs": [{"name": "gpt-oss:20b", "action": "pull", "state": "running", "pct": 40, "error": ""},
+                      {"name": "BAD NAME", "action": "pull", "state": "running", "pct": 1, "error": ""},
+                      {"name": "x:1b", "action": "explode", "state": "running", "pct": 1, "error": ""}],
+             "disk_free_bytes": 400 * 10 ** 9, "vram_bytes": 16 * _GI7}
+
+
+def _s7_view(src):
+    """What the cards and the sheet show: Download by size, Remove (outside
+    the set, a name the gateway takes, a model not in the catalog too), the
+    rest unchanged, the state, the plan and the jobs as parsed."""
+    ns, ctx, d = _s7_ns(src)
+    st = ns["_srv_mstate_parse"](json.loads(json.dumps(_S7_STATE)))
+    v = ns["server_sets_view"](st, st["vram_bytes"])
+    L, R = v["sets"]["light"], v["sets"]["recommended"]
+    names = [m["name"] for m in _S7_STATE["models"]]
+    out = {
+        "seen": v["seen"] == _h34.sha256("\n".join(sorted(names)).encode()).hexdigest(),
+        "light": ([x["name"] for x in L["download"]] == ["llama3.2:1b"] and L["download"][0]["gb"] == 1.3
+                  and [x["name"] for x in L["remove"]] == ["custom:1b"] and L["keep_n"] == 3
+                  and L["state"] == "download"),
+        "recommended": ([x["name"] for x in R["download"]] == ["llama3.2:1b", "gpt-oss:20b", "qwen3.5:9b",
+                                                             "deepseek-r1:8b"]
+                        and R["remove"] == [{"name": "custom:1b", "gb": 1.1}] and R["dl_gb"] == 26.9),
+        "the plan, an old name read as its set": v["plan"] == {"name": "recommended", "at": 1791100000,
+                                                               "by": "Pat’s MacBook"},
+        "jobs as parsed": v["jobs"] == [{"name": "gpt-oss:20b", "action": "pull", "state": "running",
+                                         "pct": 40, "error": ""}] and v["running"] is True,
+        "nothing complete, nothing yours": v["mine"] == "" and all(
+            x["state"] == "download" for x in v["sets"].values())}
+    full = {"models": [{"name": t, "size": 1, "loaded": False}
+                       for t in ["llama3.2:3b", "llama3.2:1b", "gemma4:12b", "gpt-oss:20b", "qwen3.5:9b",
+                                 "deepseek-r1:8b"]], "busy": False, "jobs": [], "plan": None,
+            "disk_free_bytes": 0, "vram_bytes": 0}
+    v2 = ns["server_sets_view"](full, 16 * _GI7)
+    out["the largest complete set is yours"] = (v2["mine"] == "recommended"
+                                                and v2["sets"]["light"]["state"] == "installed"
+                                                and v2["sets"]["recommended"]["remove"] == [])
+    full["plan"] = {"name": "light", "at": 1, "by": "x"}
+    out["the set picked there, when complete"] = ns["server_sets_view"](full, 16 * _GI7)["mine"] == "light"
+    bad = [ns["_srv_mstate_parse"](x) for x in (None, [], {"models": "x"}, {})]
+    out["a shape it doesn't know"] = bad == [None] * 4
+    return all(out.values()), {"failed": [k for k, v in out.items() if not v], "view": v}
+
+
+def _s7_get(src):
+    """One signed GET; the sheet's lists kept for the apply; refusals in words."""
+    ns, ctx, d = _s7_ns(src)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    pub = _sv_unb64u(e["public_key"])
+    sent = _sv_fake(ns, [_SvResp(200, _S7_STATE)])
+    r = ns["server_models_get"](ctx, e["id"])
+    out = {"read": (r["ok"] is True and r["name"] == "Desktop" and len(sent) == 1
+                    and sent[0]["method"] == "GET" and sent[0]["path"] == "/v1/models/state"
+                    and sent[0]["body"] == b"" and _sv_verify(pub, sent[0])),
+           "kept": ns["_srv_mstate"][e["id"]]["seen"] == r["seen"]
+           and ns["_srv_mstate"][e["id"]]["rm"]["light"] == ["custom:1b"]}
+    got = {}
+    for k, v in {"old": _SvResp(404, {"error": "no", "code": "not_found"}),
+                 "server": _SvResp(500, {"error": "boom"}), "shape": _SvResp(200, {"models": 3})}.items():
+        _sv_fake(ns, [v])
+        got[k] = ns["server_models_get"](ctx, e["id"])
+
+    def off(rec):
+        raise ns["ServerError"]("offline", "Desktop didn’t answer.")
+    _sv_fake(ns, [off])
+    got["offline"] = ns["server_models_get"](ctx, e["id"])
+    out["refusals"] = (got["old"] == {"ok": False, "kind": "old",
+                                      "err": "Update the server kit to manage its models from here."}
+                       and got["server"]["kind"] == "server" and "boom" in got["server"]["err"]
+                       and got["shape"]["kind"] == "server" and "doesn’t understand" in got["shape"]["err"]
+                       and got["offline"] == {"ok": False, "kind": "offline", "err": "Desktop didn’t answer."})
+    a2 = ns["server_add"](ctx, {"url": "https://other.example.com", "name": "Other", "access_id": "id.access",
+                                "access_secret": "SECRET-" + "y" * 20})
+    sent = _sv_fake(ns, [])
+    out["gone"] = ns["server_models_get"](ctx, "deadbeef")["kind"] == "gone" and not sent
+    out["unpaired"] = ns["server_models_get"](ctx, a2["id"])["kind"] == "unpaired" and not sent
+    return all(out.values()), out
+
+
+def _s7_apply(src):
+    """The sheet as shown, signed, to the gateway; each of its refusals and
+    each of this app's in words; nothing sent that the sheet didn't list."""
+    ns, ctx, d = _s7_ns(src)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    sid, pub = e["id"], _sv_unb64u(e["public_key"])
+
+    def sheet():
+        _sv_fake(ns, [_SvResp(200, _S7_STATE)])
+        return ns["server_models_get"](ctx, sid)
+    v = sheet()
+    good = {"plan": "light", "add": ["llama3.2:1b"], "remove": ["custom:1b"], "seen": v["seen"]}
+    sent = _sv_fake(ns, [_SvResp(202, {"ok": True, "jobs": [
+        {"name": "custom:1b", "action": "remove", "state": "queued", "pct": 0, "error": ""},
+        {"name": "llama3.2:1b", "action": "pull", "state": "queued", "pct": 0, "error": ""}]})])
+    r = ns["server_models_apply"](ctx, sid, dict(good, id=sid))
+    out = {"sent as shown": (r["ok"] is True and len(r["jobs"]) == 2 and len(sent) == 1
+                             and sent[0]["method"] == "POST" and sent[0]["path"] == "/v1/models/apply"
+                             and json.loads(sent[0]["body"]) == good and _sv_verify(pub, sent[0]))}
+    sent = _sv_fake(ns, [])
+    again = ns["server_models_apply"](ctx, sid, good)
+    out["a sheet is good once"] = again["kind"] == "changed" and not sent
+    # this app's own refusals: nothing goes out
+    v = sheet()
+    g = dict(good, seen=v["seen"])
+    bad = [dict(g, plan="max2"), dict(g, add=["Bad Tag"]), dict(g, remove=["x"] * 41),
+           dict(g, add=["custom:1b"], remove=["custom:1b"]), dict(g, seen="0" * 63),
+           dict(g, add=[], remove=[]), dict(g, add="llama3.2:1b")]
+    sent = _sv_fake(ns, [])
+    rs = [ns["server_models_apply"](ctx, sid, b) for b in bad]
+    out["bad input refused here"] = all(x["kind"] == "input" for x in rs) and not sent
+    stale = [dict(g, seen="1" * 64), dict(g, add=["qwen3.8:27b"]), dict(g, remove=["gemma4:12b"]),
+             dict(g, remove=["llama3.2:3b"]), dict(g, plan="recommended", remove=["hf.co"])]
+    rs = [ns["server_models_apply"](ctx, sid, b) for b in stale]
+    out["not on the sheet: the list is read again"] = (
+        all(x == {"ok": False, "kind": "changed", "err": "The server’s list changed. Check it again."}
+            for x in rs[:4]) and rs[4]["kind"] in ("input", "changed") and not sent)
+    # the gateway's refusals
+    got = {}
+    for k, resp in {"changed": _SvResp(409, {"code": "changed", "models": []}),
+                    "busy": _SvResp(409, {"code": "busy"}),
+                    "in_use": _SvResp(409, {"code": "in_use", "name": "custom:1b"}),
+                    "bad": _SvResp(400, {"code": "bad_request", "error": "add and remove overlap"}),
+                    "old": _SvResp(404, {"code": "not_found", "error": "no"})}.items():
+        sheet()
+        _sv_fake(ns, [resp])
+        got[k] = ns["server_models_apply"](ctx, sid, dict(g, seen=ns["_srv_mstate"][sid]["seen"]))
+    out["the gateway's refusals in words"] = (
+        got["changed"] == {"ok": False, "kind": "changed", "err": "The server’s list changed. Check it again."}
+        and got["busy"]["kind"] == "busy" and "Nothing was changed" in got["busy"]["err"]
+        and got["in_use"]["kind"] == "in_use" and "custom:1b is in use on Desktop" in got["in_use"]["err"]
+        and got["bad"]["kind"] == "server" and "add and remove overlap" in got["bad"]["err"]
+        and got["old"]["kind"] == "old")
+    sheet()
+
+    def off(rec):
+        raise ns["ServerError"]("offline", "Desktop didn’t answer.")
+    _sv_fake(ns, [off])
+    out["offline"] = ns["server_models_apply"](ctx, sid, dict(g, seen=ns["_srv_mstate"][sid]["seen"]))["kind"] == "offline"
+    out["secrets"] = not any(x in json.dumps([r, got]) for x in ("SECRET34", "seed", "access_secret"))
+    return all(out.values()), out
+
+
+def _s7_page(src):
+    """The sheet in node: both lists, the switch, the totals, a job in words."""
+    js = ("function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}"
+          'function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";}'
+          'const SET_NAMES={light:"Light",recommended:"Recommended",everything:"Everything"};'
+          + _jsfn(src, "function srvSheet(") + _jsfn(src, "function srvSheetHtml(")
+          + _jsfn(src, "function srvSheetSum(") + _jsfn(src, "function srvJobLine(")
+          + _jsfn(src, "function srvSetsLine(")
+          + r'''
+const d={n:4,vram:1,seen:"x",mine:"",running:false,plan:null,sets:{light:{download:[{name:"llama3.2:1b",gb:1.3}],
+  remove:[{name:"custom:1b",gb:1.1},{name:"old:7b",gb:4}],dl_gb:1.3,free_gb:5.1}}};
+const on=srvSheet(d,"light",true),off=srvSheet(d,"light",false);
+process.stdout.write(JSON.stringify({on:on,off:off,h:srvSheetHtml(on),hoff:srvSheetHtml(off),
+  sum:srvSheetSum(on),soff:srvSheetSum(off),
+  jobs:[srvJobLine({name:"a:1b",action:"pull",state:"running",pct:40}),
+        srvJobLine({name:"a:1b",action:"pull",state:"failed",error:"disk full"}),
+        srvJobLine({name:"b:1b",action:"remove",state:"done"})],
+  lines:[srvSetsLine("Desk",d),srvSetsLine("Desk",Object.assign({},d,{mine:"recommended",
+    plan:{name:"recommended",by:"Pat's MacBook"}})),srvSetsLine("Desk",Object.assign({},d,{vram:0})),
+    srvSetsLine("Desk",Object.assign({},d,{running:true}))]}));''')
+    o = _node_json(js, "s7.js")
+    ok = (o["on"]["add"] == ["llama3.2:1b"] and o["on"]["remove"] == ["custom:1b", "old:7b"]
+          and o["on"]["keep"] == 2 and o["off"]["remove"] == [] and o["off"]["keep"] == 4
+          and o["on"]["n_rm"] == 2 and o["off"]["n_rm"] == 2
+          and '<div class="og">Download</div>' in o["h"] and '<div class="og">Remove</div>' in o["h"]
+          and "2 other models unchanged" in o["h"] and "Remove" not in o["hoff"]
+          and "4 other models unchanged" in o["hoff"]
+          and o["sum"] == "1.3 GB to download · 5.1 GB freed" and o["soff"] == "1.3 GB to download"
+          and o["jobs"] == ["a:1b · downloading 40%", "a:1b · couldn’t download: disk full",
+                            "b:1b · removed"]
+          and o["lines"][0] == "Desk has 4 models, not all of any set."
+          and o["lines"][1] == "Desk has Recommended. Picked on Pat's MacBook."
+          and "can’t be sized" in o["lines"][2] and o["lines"][3] == "Desk is changing its models…"
+          # the page sends what the sheet showed, and the route takes it
+          and "srvPost(\"models\",{id:a.sid,plan:a.k,add:sh.add,remove:sh.remove,seen:z.d.seen})" in src
+          and 'elif op == "models":' in src and '"/api/servers/models"' in src
+          and 'Also remove the "+n+" model' in src
+          and '<input type="checkbox" id="srvset-rm" checked>' in src)
+    return ok, o
+
+
+_S7_CHECKS = [
+    ("server sets: sized for the card whole, by the same roles, nested, one per tag", _s7_sets),
+    ("server sets: the cards' and sheet's lists, the state, the plan and the jobs from the gateway's state", _s7_view),
+    ("server sets: one signed read, its lists kept for the change, refusals in words", _s7_get),
+    ("server sets: the sheet as shown, signed; every refusal of the gateway and of this app in words; "
+     "nothing sent that the sheet didn't list", _s7_apply),
+    ("server sets: the sheet's lists, the switch, the totals and the jobs in words (node)", _s7_page),
+]
+
+
+def _s7_run(src, which=None):
+    out = []
+    for i, (name, fn) in enumerate(_S7_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        out.append((i, name, bool(ok), det))
+    return out
+
+
+for _i7, _n7, _o7, _d7 in _s7_run(_MILLENAI_SRC):
+    check(_n7, _o7, "%r" % (_d7,))
+_S7_MUT = [
+    ("a model that spills fitted", '            return bool(tag) and _srv_fits(\n                {"placement": "gpu", "size": _set_tag_bytes(tag)}, vram, True)',
+     '            return bool(tag)', [0]),
+    ("the seen hash unsorted", '    return hashlib.sha256("\\n".join(sorted(str(n) for n in names))', '    return hashlib.sha256("\\n".join(str(n) for n in names)', [1]),
+    ("a set's own model removed", "              if _srv_tag_key(n) not in keys[k] and SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]",
+     "              if SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]", [1]),
+    ("a name the gateway can't take listed", "              if _srv_tag_key(n) not in keys[k] and SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]",
+     "              if _srv_tag_key(n) not in keys[k]][:SRV_SETS_MAX]", [1]),
+    ("an unknown job kept", '                or act not in ("pull", "remove")', '                or False', [1]),
+    ("the read unsigned", '        st, js = _srv_json(e, "GET", "/v1/models/state", timeout=SRV_CONNECT_S)',
+     '        st, js = _srv_json(e, "GET", "/v1/models/state", signed=False, timeout=SRV_CONNECT_S)', [2]),
+    ("an old kit not said", '        return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}\n    if st != 200:', '    if st != 200:', [2]),
+    ("the sheet's lists not kept", '    _srv_mstate[e["id"]] = {', '    _srv_mstate["x"] = {', [2, 3]),
+    ("an add outside the set sent", '            or not set(add) <= set(ms["dl"].get(plan) or [])\n', '', [3]),
+    ("a removal not on the sheet sent", '            or not set(rm) <= set(ms["rm"].get(plan) or [])):', '            or False):', [3]),
+    ("a stale seen sent", '    if (not ms or ms["seen"] != seen or', '    if (not ms or', [3]),
+    ("a sheet used twice", '        _srv_mstate.pop(e["id"], None)      # a sheet is good for one change\n', '', [3]),
+    ("the in-use model not named", '"changed. Try again when it\\u2019s done." % (_srv_text(js.get("name"), 80)',
+     '"changed. Try again when it\\u2019s done." % (""', [3]),
+    ("busy said as an error", '    if st == 409 and code == "busy":', '    if False:', [3]),
+    ("the list sent unchecked", "    if (not _srv_tag_list(add) or not _srv_tag_list(rm) or set(add) & set(rm)",
+     "    if (False", [3]),
+    ("the switch ignored", "const x=((d||{}).sets||{})[k]||{},dl=x.download||[],out=rm?(x.remove||[]):[];",
+     "const x=((d||{}).sets||{})[k]||{},dl=x.download||[],out=x.remove||[];", [4]),
+]
+_s7m = []
+for _d7, _o7, _n7, _w7 in _S7_MUT:
+    if _MILLENAI_SRC.count(_o7) != 1:
+        _s7m.append((_d7, "anchor x%d" % _MILLENAI_SRC.count(_o7)))
+        continue
+    _r7 = _s7_run(_MILLENAI_SRC.replace(_o7, _n7), _w7)
+    _s7m.append((_d7, [i for i, _n, o, _x in _r7 if not o] or "MISSED"))
+check("server sets: %d mutations, each caught by the check that guards it" % len(_S7_MUT),
+      all(isinstance(v, list) for _d, v in _s7m), "%r" % [x for x in _s7m if not isinstance(x[1], list)])
+# ==== 6b407 server model sets: end ====
 
 
 # ==== 6b341 benchmark targets: begin ====
