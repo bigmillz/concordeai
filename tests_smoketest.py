@@ -29241,10 +29241,11 @@ def _b41_server_run(src):
         o.loaded = []
         ok1, run1, fin1 = W.run(W.spec(("small:8b",)))
         r1 = W.rows()[0]
-        P["no engine duration: measured here"] = (
+        P["no engine duration: measured here; the load timed here (6b409)"] = (
             ok1 and fin1 and r1["src"] == "measured" and r1["gen_tps"] == 40.0 and r1["gen_tokens"] == 40
-            and not r1.get("est") and r1["prompt_tps"] is None and r1["load_s"] is None
-            and r1["load_src"] == "not measured" and r1["note"] == "The server didn’t report a load time.")
+            and not r1.get("est") and r1["prompt_tps"] is None
+            and isinstance(r1["load_s"], float) and 0 < r1["load_s"] < 1
+            and r1["load_src"] == "timed" and not r1.get("note"))
         return _b41_done(P, [s, m, r1])
     finally:
         W.stop()
@@ -29917,6 +29918,8 @@ out.htmlMixed=bmCmpHtml(out.mixed);
 out.htmlSame=bmCmpHtml(out.same);
 // the pane's rows for a server's and a cloud row
 out.rowSrv=bmRow(srv.models[0],false,null,256);
+// (6b409) a load this computer timed says so
+out.rowSrvT=bmRow(Object.assign({},srv.models[0],{load_s:4.2,load_src:"timed"}),false,null,256);
 out.rowCl=bmRow(cl.models[0],false,null,256);
 out.rowClF=bmRow(cl.models[1],false,null,256);
 out.rowClNow=bmRow({label:"m",provider:"Groq",model:"m",engine:"cloud",network:true,status:"reading"},true,null,256);
@@ -30003,7 +30006,8 @@ try{const sc=bmCompare(sparse);out.sparse={ok:true,rows:sc.rows.map(r=>[r.name,r
         and "Load \u00b7 seconds, shorter is faster" in h and 'class="best"' in h,
         "the pane's server row": "reads not measured" in o["rowSrv"] and "(incl. network)" in o["rowSrv"]
         and "load not measured" in o["rowSrv"] and "100% on the server" in o["rowSrv"]
-        and ">gpt-oss:20b<" in o["rowSrv"],
+        and ">gpt-oss:20b<" in o["rowSrv"] and "timed by this computer" not in o["rowSrv"]
+        and "load 4.2 s, timed by this computer" in o["rowSrvT"],
         "the pane's cloud row": "reads - \u00b7 first token 0.30 s \u00b7 load - \u00b7 total 1.00 s" in o["rowCl"]
         and "cloud, includes the network" in o["rowCl"] and ">Groq</span>" in o["rowCl"]
         and "memory" not in o["rowCl"] and ">400.0<small>" in o["rowCl"],
@@ -30269,6 +30273,11 @@ _B41_MUT = [
     ("the load waits only as long as a connect", "                                       SRV_CONNECT_S, skew, wait=wait)\n                if resp.status == 200:\n                    return conn, resp",
      "                                       SRV_CONNECT_S, skew)\n                if resp.status == 200:\n                    return conn, resp", [15]),
     ("the load's own cap not passed on", "self._open(method, path, obj, read_s)", "self._open(method, path, obj)", [15]),
+    # (6b409) a load the server doesn't time is timed here, and says so
+    ("the load not timed here", '            out["load_s"] = t_done - t0\n', '            pass\n', [0]),
+    ("the time not taken at the last line", "                final, t_done = obj, time.monotonic()", "                final = obj", [0]),
+    ("a timed load called not measured", '            nums["load_src"] = "timed"       # by this computer, network in it (6b409)\n            return\n', '', [0]),
+    ("a timed load shown without its label", '+(r.load_src==="timed"&&r.load_s!=null?", timed by this computer":"")', '', [13]),
     ("a provider's dropped line read as no answer", "            except (ConnectionError, http.client.HTTPException):\n                conn.close()\n                raise RuntimeError(\"the connection dropped\") from None",
      "            except (ConnectionError, http.client.HTTPException):\n                conn.close()\n                raise RuntimeError(\"the provider didn\u2019t answer\") from None", [15]),
 ]

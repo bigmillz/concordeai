@@ -9,6 +9,17 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b409 — a server's load time, timed here when Ollama doesn't say
+
+The Benchmark's server rows always said "load not measured: The server didn't report a load
+time." Ollama 0.35.1 answers the empty-prompt load with only {"done":true,"done_reason":"load"}
+(checked on the server). `_BenchServer.load` now times the load itself when the model wasn't
+loaded: monotonic, from the request going out to the done line, so the network is in it.
+`fix()` keeps it as `load_src` "timed" (Ollama's own load_duration is still used when sent; a
+model already loaded is still "not measured"). The row reads "load 4.2 s, timed by this
+computer". Gauntlet: the server-run check expects the timed load; the pane's row in node; four
+mutations.
+
 ## 6b408 — the studio cards' Remove is a real button (per Patrick)
 
 The Remove (and Continue in background) buttons on the Image and Video generation cards were

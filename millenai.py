@@ -21549,8 +21549,10 @@ def _bench_save(rec: dict):
 #     refusal lines as a chat to it), one model at a time, with the
 #     figures in Ollama's own last line, which the gateway passes through
 #     as it is. Nothing is unloaded (the gateway drops keep_alive), so a
-#     load time is the server's own load_duration, and "not measured"
-#     for a model that was already loaded.
+#     load time is the server's own load_duration, else timed here from
+#     the load request to its last line, network included (6b409:
+#     Ollama 0.35 reports none), and "not measured" for a model that was
+#     already loaded.
 #   * The CLOUD is called with the app's own request bodies and headers
 #     (_openai_body, _anthropic_body) at 256 tokens, streamed, so the
 #     first token can be timed. No keys are ever shown, stored or put in
@@ -21949,9 +21951,10 @@ class _BenchServer:
             return [m for m in ps.get("models") or [] if isinstance(m, dict)
                     and (m.get("name") or m.get("model")) == self.model]
         self.was_loaded = bool(mine(self._ps()))
-        final = {}
+        final, t_done = {}, None
         # an empty prompt loads the model and answers nothing; streamed,
         # because Cloudflare ends a plain call that takes over 100 s
+        t0 = time.monotonic()
         for line in self._lines("POST", "/api/generate", {
                 "model": self.model, "prompt": "", "stream": True,
                 "options": {"num_ctx": BENCH_CTX}}, BENCH_LOAD_CAP):
@@ -21959,10 +21962,16 @@ class _BenchServer:
             if obj.get("error"):
                 raise _srv_fail(self.e, 0, obj, self.model)
             if obj.get("done"):
-                final = obj
+                final, t_done = obj, time.monotonic()
         out = {}
         if not self.was_loaded and _bench_pos(final.get("load_duration")):
             out["load_duration"] = final["load_duration"]
+        elif not self.was_loaded and t_done is not None:
+            # TIMED HERE (6b409): Ollama 0.35 answers the empty load with
+            # only {"done": true, "done_reason": "load"}, no load_duration.
+            # From the request going out to that last line, so the network
+            # is in it; fix() labels it so
+            out["load_s"] = t_done - t0
         try:
             for m in mine(self._ps()):
                 self.ps = {"gpu_size": _bench_int(m.get("size")),
@@ -22017,11 +22026,15 @@ class _BenchServer:
         nums["network"] = True
         if nums.get("src") != "engine":
             nums["prompt_tps"] = None        # reads: only from the server's own numbers
-        if nums.get("load_src") != "engine":
-            nums["load_s"], nums["load_src"] = None, "not measured"
-            nums["note"] = ("Already in the server\u2019s memory, so its load time "
-                            "wasn\u2019t measured." if self.was_loaded else
-                            "The server didn\u2019t report a load time.")
+        if nums.get("load_src") == "engine":
+            return
+        if not self.was_loaded and nums.get("load_s") is not None:
+            nums["load_src"] = "timed"       # by this computer, network in it (6b409)
+            return
+        nums["load_s"], nums["load_src"] = None, "not measured"
+        nums["note"] = ("Already in the server\u2019s memory, so its load time "
+                        "wasn\u2019t measured." if self.was_loaded else
+                        "The server didn\u2019t report a load time.")
 
     def close(self, keep):
         pass
@@ -43625,7 +43638,8 @@ function bmRow(r,cur,old,max,ow){
     // includes the network; a server's first token does too
     sub=r.provider?"reads - · first token "+bmS(r.ttft_s)+" · load - · total "+bmS(r.total_s)
       :"reads "+bmNM(r,r.prompt_tps,v=>bmTps(v)+" tok/s")+" · first token "+bmS(r.ttft_s)
-      +(r.network?" (incl. network)":"")+" · load "+bmNM(r,r.load_s,v=>bmS(v,1));
+      +(r.network?" (incl. network)":"")+" \u00b7 load "+bmNM(r,r.load_s,v=>bmS(v,1))
+      +(r.load_src==="timed"&&r.load_s!=null?", timed by this computer":"");
     if(r.provider)sub+='<br><span class="bm-f">cloud, includes the network</span>';
     if(r.note)sub+="<br>"+esc(r.note);
   }else if(cur){
