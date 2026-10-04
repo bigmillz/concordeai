@@ -1665,9 +1665,10 @@ check("model downloads: batch-true progress, live pane, current preset",
       and "_MLX_GATE = threading.Semaphore(2)" in _MILLENAI_SRC
       and "with _MLX_GATE:" in _MILLENAI_SRC
       and "// 1_000_000" in _MILLENAI_SRC
-      and set((_st.get("plan_state") or {}).keys()) == {"min", "rec", "full", "all"}
-      and all(v in ("current", "installed", "partial", "none")
-              for v in (_st.get("plan_state") or {}).values())
+      # (6b405) the three sets' one status replaced plan_state
+      and all((_st.get("sets") or {}).get(k, {}).get("state") in ("yours", "installed", "download")
+              for k in ("light", "recommended", "everything"))
+      and "plan_state" not in _st and "plans" not in _st and "plan_n" not in _st
       and "now" in _st and "queued_n" in _st
       and "function manageTick" in page and "function nowLine" in page
       and 'class="cur"' in page and "already installed \\u2014 nothing to download" in page
@@ -2792,40 +2793,60 @@ _MG = ("GLM 5.3", "DeepSeek V3.2 671B")
 _jsf = lambda nm: _MILLENAI_SRC[_MILLENAI_SRC.index("function %s(" % nm):
                                 _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index(
                                     "function %s(" % nm)) + 3]
-_mjs = (_jsf("currentPlan") + _jsf("paintManualGo")
-        + 'function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";}'
-        'const out=[];let setupPlan;const setupGo={dataset:{}};'
-        'const P={basic:0,pro:9.2,max:9.4};'
-        'for(const [plan,cu] of [["basic",{updates:[],gb:0}],'
-        '["basic",{updates:[{old:"A",new:"B"}],dl_gb:2.4,gb:1}],'
-        '["basic",{updates:[{old:"A"}],gb:4.7}],["pro",{updates:[],gb:0}]]){'
-        'setupPlan=plan;paintManualGo({mlx_ok:true,plans:P,cleanup:cu});'
-        'out.push([setupGo.textContent,setupGo.dataset.act,setupGo.disabled]);}'
-        'out.push(currentPlan({plans:P}),currentPlan({plans:{basic:0,pro:0,max:0}}),'
-        'currentPlan({plans:{basic:1,pro:9,max:9}}));'
+# (6b405) THE THREE SETS' CARDS, one renderer for Settings, the wizard, the
+# first-run window and each server, run in node: the badge on the set that
+# is yours, "installed" or the GB still to download, the same-as line, the
+# risky card's warning and its question, and nothing named Basic/Pro/Max
+_mjs = ("const IS_PC=false;function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}"
+        'function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";}'
+        + _MILLENAI_SRC[_MILLENAI_SRC.index("const SET_KEYS="):_MILLENAI_SRC.index("function setDesc(")]
+        + _jsf("setDesc") + _jsf("setLine") + _MILLENAI_SRC[
+            _MILLENAI_SRC.index("const setArm={};"):_MILLENAI_SRC.index("// true when a click on card c")]
+        + _jsf("setCardsHtml")
+        + 'const S={light:{n:3,dl_gb:0,state:"installed",same:""},'
+        'recommended:{n:7,dl_gb:0,state:"yours",same:""},'
+        'everything:{n:14,dl_gb:61,state:"download",same:""},risky:true};'
+        'const T={light:{n:3,dl_gb:9.4,state:"download",same:""},recommended:{n:4,dl_gb:11.8,state:"download",same:""},'
+        'everything:{n:4,dl_gb:11.8,state:"download",same:"recommended"},risky:false};'
+        'const out={a:setCardsHtml(S,{pick:"light"}),b:setCardsHtml(T,{where:"Desk"})};'
+        'setArm.grid={k:"everything",at:Date.now()};out.c=setCardsHtml(S,{scr:"grid"});'
         'process.stdout.write(JSON.stringify(out));')
 try:
     open(os.path.join(_si_dir, "mw.js"), "w").write(_mjs)
     _mo = json.loads(subprocess.run(["node", os.path.join(_si_dir, "mw.js")],
                                     capture_output=True, text=True, timeout=30).stdout)
 except Exception as _e:
-    _mo = ["ERR %s" % _e]
+    _mo = {"err": "%s" % _e}
+_mcard = lambda h, k: (h.split('data-set="%s"' % k)[1].split("</div>")[0] if 'data-set="%s"' % k in h else "")
+_ma, _mb, _mc = _mo.get("a", ""), _mo.get("b", ""), _mo.get("c", "")
 _flag = _MILLENAI_SRC.split("function paintModelsFlag(st){")[1].split("\n}\n")[0]
-check("models window: your set updates, a bigger set adds, no upsell",
-      _mo == [["Up to date ✓", "", True],
-              ["Update models · 2 GB", "update", False],
-              ["Clear out old models · 4.7 GB", "update", False],
-              ["Add Pro · 9 GB", "add", False],
-              "basic", "max", ""]
-      and 'f.textContent="MODEL UPDATES";' in _flag
+check("the three sets' cards: yours, installed, to download, the same-as line, the risky one warned (node)",
+      "✓ yours" in _mcard(_ma, "recommended") and "3 models · installed" in _mcard(_ma, "light")
+      and "14 models · 61 GB to download" in _mcard(_ma, "everything")
+      and '<div class="plan-card set-card on"' in _ma
+      and _ma.count("set-card risky") == 1 and "⚠" in _mcard(_ma, "everything")
+      and "even ones too big for this Mac" in _mcard(_ma, "everything")
+      and "The same as Recommended on Desk." in _mcard(_mb, "everything") and "risky" not in _mb
+      and "9.4 GB to download" in _mcard(_mb, "light")
+      and "Click again to go ahead." in _mcard(_mc, "everything")
+      and [x in _ma + _mb for x in (">Light<", ">Recommended<", ">Everything<")] == [True] * 3
+      and not re.search(r">(Basic|Minimum|Full|Max|Pro|Fast)<", _ma + _mb),
+      "%r" % _mo)
+# the Your models chooser is gone (6b405), and with it its false sentence; the
+# update and clean-out job stays in Settings (the auto-clean bar's button and
+# the MODEL UPDATES chip open the Update models card)
+check("the Add models chooser is gone; updates and clean-outs stay in Settings",
+      'f.textContent="MODEL UPDATES";' in _flag
       and "c.updates" in _flag and "m.star" not in _flag
       and '$("#models-flag").addEventListener("click",()=>{openModelUpdates();});' in _MILLENAI_SRC
+      and '$("#clean-now").addEventListener("click",openModelUpdates);' in _MILLENAI_SRC
+      and "async function runModelUpdate(){" in _MILLENAI_SRC
+      and 'id="autoclean-toggle"' in page and 'id="clean-now"' in page
+      and 'id="open-setup"' not in page and "function planCards(" not in _MILLENAI_SRC
+      and "function paintManualGo(" not in _MILLENAI_SRC and "function currentPlan(" not in _MILLENAI_SRC
+      and "every model this machine can run, and they" not in _MILLENAI_SRC
       and 'setTitle("Updates available"' not in _MILLENAI_SRC
-      and '<h2 id="setup-title">Updates available' not in _MILLENAI_SRC
-      and "if(setupManual&&setupGo.dataset.act===\"update\"){" in _MILLENAI_SRC
-      and "closeSetup();runModelUpdate();return;}" in _MILLENAI_SRC
-      and "if(!mine&&(rem[setupPlan]||0)<=0){" in _MILLENAI_SRC,
-      str(_mo))
+      and '{k:"go",t:"Add models\\u2026",run:()=>openModelSets()},' in _MILLENAI_SRC)
 check("giants box says what they need, from the catalog, per platform",
       _gl == _wl == _il == "Include models for 512 GB+ systems"
       # the Mac: exactly today's text, its two MLX giants only
@@ -2894,7 +2915,9 @@ _ss_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def setup_status()"):
                         _MILLENAI_SRC.index("def _other_millenai_running")]
 check("Windows: the model list never raises on a row with no route",
       not _mc_err
-      and "installed = {MODEL_ROUTES.get(l, (None, l)) for l, ok in SUPPORTED.items()\n                 if ok and model_cached(l, pulled)}" in _ss_src
+      # (6b405) the sets' one status reads what is installed
+      and "    have = {dk(l) for l, ok in SUPPORTED.items()\n            if ok and model_cached(l, pulled)}" in _MILLENAI_SRC
+      and '"sets": model_sets_status(pulled, sets),' in _ss_src
       and "if SUPPORTED.get(l) and model_cached(l, pulled)\n                           and l not in chosen" in _MILLENAI_SRC,
       "%r" % _mc_err[:6])
 # 6b314: a bare name in ollama_pulled_tags stood for EVERY tag, so the
@@ -3174,7 +3197,7 @@ def _pc(ram_gib, smi="", adapters=(), ours=False, used_gb=6, cm=True):
                     "_gpu_pool", "gpu_vram_bytes", "gpu_room_bytes", "machine_budget_bytes",
                     "giant_fits_here", "GIANT_GB", "model_is_giant", "slow_giant",
                     "BASELINE_RAM", "_ram_part", "_mem_factor",
-                    "model_fits_machine", "model_fits_memory"})
+                    "model_fits_machine", "fits_by_memory", "model_fits_memory"})
     wr, ct = _fake_win(list(adapters), cm)
     _saved = {m: sys.modules.get(m) for m in ("winreg", "ctypes")}
     sys.modules["winreg"], sys.modules["ctypes"] = wr, ct
@@ -3326,21 +3349,27 @@ _pz2 = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
             SUPPORTED=_plat["windows"]["SUPPORTED"],
             MODEL_MEM_BYTES=_plat["windows"]["MODEL_MEM_BYTES"],
             MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
-            model_fits_machine=lambda l: True, giants_on=lambda: _pcf["gi"],
-            giant_fits_here=lambda l: _pcf.get("fit", True))
-# (main, 6b317) plan_labels is one per download over _plan_labels
-_exec_names(_pz2, {"GIANT_GB", "model_is_giant", "plan_labels", "_plan_labels",
-                   "_family_of", "_gen_of", "_starter_labels"})
-_pz2.update(no_limits=lambda: False, HAS_PSUTIL=False)
-_pro = _pz2["plan_labels"]("pro")
+            giants_on=lambda: _pcf["gi"],
+            giant_fits_here=lambda l: _pcf.get("fit", True),
+            # no Gemma 4 here: the everyday line falls to the largest model
+            # of catalog size 8.5 GB or less (6b405)
+            fits_by_memory=lambda l: not l.startswith("Gemma 4"))
+_exec_names(_pz2, {"GIANT_GB", "model_is_giant", "_family_of", "TIERS", "MODEL_SETS",
+                   "QUICK_PAIR", "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER",
+                   "VISION_MODEL", "model_sets"})
+_pz2["model_fits_machine"] = lambda l: (not _pz2["model_is_giant"](l)
+                                        or (_pcf["gi"] and _pcf.get("fit", True)))
+_pro = _pz2["model_sets"]()["light"]
 _pcf.update(gi=True, fit=False)
-_all_small = _pz2["plan_labels"]("all")
+_all_small = _pz2["model_sets"]()["everything"]
 _pcf.update(gi=True, fit=True)
-_all_big = _pz2["plan_labels"]("all")
+_all_big = _pz2["model_sets"]()
 _pcf.update(gi=False, fit=True)
-check("presets pick by catalog size; 'all' lists giants only where they fit",
-      _pro[:1] == ["Ministral 3 14B"]
-      and not set(_WG) & set(_all_small) and set(_WG) <= set(_all_big),
+check("sets pick by catalog size (Ministral 3 14B is 8.5 GB in the catalog, 9.1 on Ollama); "
+      "Everything lists giants only where they fit, Light and Recommended never",
+      _pro == ["Llama 3.2 3B", "Llama 3.2 1B", "Ministral 3 14B"]
+      and not set(_WG) & set(_all_small) and set(_WG) <= set(_all_big["everything"])
+      and not set(_WG) & set(_all_big["recommended"] + _all_big["light"]),
       "%r" % [_pro, sorted(set(_WG) & set(_all_small))])
 # the download endpoint never starts a giant a PC can't hold, and leaves
 # no job behind (the progress bar would wait for it forever)
@@ -4573,18 +4602,19 @@ _gz.update(MODEL_MEM_BYTES={l: i["mem"] for l, i in _gz["MODEL_INFO"].items()},
            _starter_labels=lambda: [])
 _pref_stubs(_gz)
 _exec_names(_gz, {"GIANT_GB", "_giants", "giants_on", "model_is_giant",
-                  "model_fits_machine", "plan_labels", "_plan_labels",
-                  "_family_of", "_gen_of"})
+                  "model_fits_machine", "fits_by_memory", "_family_of", "TIERS",
+                  "MODEL_SETS", "QUICK_PAIR", "EVERYDAY_MAX_GB", "MERGE_PREFS",
+                  "CODE_LADDER", "VISION_MODEL", "model_sets"})
 def _gz_set(nl, gi):
     _GP.update(no_limits=nl, include_giants=gi); _gz["_giants"]["v"] = None
 _big = [l for l, i in _gz["MODEL_INFO"].items() if i["mem"] > 128e9]
 _gz_set(False, False); _v0 = [_gz["model_fits_machine"](l) for l in _big]
-_max0 = _gz["plan_labels"]("all")
+_max0 = _gz["model_sets"]()["everything"]
 _gz_set(True, False); _v1 = [_gz["model_fits_machine"](l) for l in _big]
 _gz_set(False, True); _v2 = [_gz["model_fits_machine"](l) for l in _big]
 _gz_set(True, True); _v3 = [_gz["model_fits_machine"](l) for l in _big]
-_max3 = _gz["plan_labels"]("all")
-check("giant models only with both boxes ticked, and never in Max otherwise",
+_max3 = _gz["model_sets"]()["everything"]
+check("giant models only with both boxes ticked, and never in Everything otherwise",
       _big and not any(_v0 + _v1 + _v2) and all(_v3)
       and not set(_big) & set(_max0) and set(_big) <= set(_max3)
       and _gz["model_fits_machine"]("GPT-OSS 120B") in (True, False),
@@ -4594,15 +4624,14 @@ check("giant models only with both boxes ticked, and never in Max otherwise",
 # fallback on Ollama, where it runs from system RAM.
 _gz_set(True, True)
 _gz.update(HAS_PSUTIL=False)
-_exec_names(_gz, {"_starter_labels"})
-_rec3 = _gz["plan_labels"]("rec")
-_max3b = _gz["_starter_labels"]()
+_rec3 = _gz["model_sets"]()["recommended"]
+_max3b = _gz["model_sets"]()["light"]
 _gz_set(False, False)
 _rt_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def resolve_tier("):
-                        _MILLENAI_SRC.index("def _starter_labels(")]
+                        _MILLENAI_SRC.index("# THE THREE SETS (6b405")]
 _mt_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def make_title("):
                         _MILLENAI_SRC.index("def make_title(") + 3000]
-check("giants: never in a preset; an Ollama giant is never seated for you",
+check("giants: never in Light or Recommended; an Ollama giant is never seated for you",
       _rec3 and _max3b and not set(_big) & set(_rec3)
       and not set(_big) & set(_max3b)
       and "and model_fits_memory(l) and not slow_giant(l))" in _rt_src
@@ -4995,7 +5024,8 @@ check("roster rows: a failed giant says why and offers retry",
       and _ro[7] == "Hermes 3 8B \u00b7 checking  \u00b7  Gemma 4 12B \u00b7 40%"
       and '"checking": (status == "downloading"' in _MILLENAI_SRC
       and '"checking": m.get("checking", False)}' in _MILLENAI_SRC
-      and _MILLENAI_SRC.count("dlPct(m)") == 5
+      # (6b405) the Your models window's per-model rows went with it
+      and _MILLENAI_SRC.count("dlPct(m)") == 4
       and 'm.pct+"%"' not in page, "%r" % _ro)
 check("giant installs ask twice; long downloads read in hours",
       'if(i.dataset.giant==="1"){' in page and "if(age<600)return;" in page
@@ -5140,7 +5170,7 @@ def _of_ns(src):
         model_cached=lambda l, pulled=None: l in st["disk"],
         mlx_model_cached=lambda repo: repo in st["disk"],
         model_fits_machine=lambda l: ns["MODEL_INFO"][l]["mem"] / 1e9 <= st["fit"],
-        plan_labels=lambda plan: list(st["max"]),
+        offer_set_labels=lambda pulled=None: list(st["max"]),
         load_prefs=lambda base=None: dict(st["prefs"]),
         store_prefs=lambda d, base=None: st.update(prefs=dict(d)),
         _sweep_leftovers=lambda: 0)
@@ -5657,13 +5687,13 @@ check("roster: text actions, no checkboxes, and it scrolls",
 # taken) and offers four honestly-labelled sizes. Only the last can
 # hurt — it installs models bigger than this Mac's memory — so it
 # wears a warning triangle and confirms in place before it runs.
-check("manage: inventory + four sizes, the risky one warned",
+check("manage: inventory + the three sets, the risky one warned and asked twice",
       'id="mg-count"' in page and 'id="mg-space"' in page
-      and '"rec","Recommended"' in page.replace(" ", "")
-      and 'classList.contains("risky")' in page
-      and "may crash it if memory runs out" in page
-      and '"plan_n"' in _MILLENAI_SRC
-      and 'if plan == "rec":' in _MILLENAI_SRC
+      and 'const SET_NAMES={light:"Light",recommended:"Recommended",everything:"Everything"};' in page
+      and 'if(!c.classList.contains("risky")||setArmed(scr)===c.dataset.set){' in page
+      and "They can crash it. Click again to go ahead." in page
+      and 'if(!setConfirm("grid",c))return;' in page and 'if(!setConfirm("wiz",c))return;' in page
+      and 'if(!setConfirm("setup",c))return;' in page
       and "def _family_of" in _MILLENAI_SRC)
 # 6b258: a release body is hard-wrapped at ~72 columns for git, and
 # rendering it pre-wrap dropped those breaks mid-sentence in a narrow
@@ -5731,6 +5761,281 @@ check("a full forget empties the three stores in place and never removes a folde
 check("model removal is honest and locked",
       '"ollama rm failed"' in _MILLENAI_SRC
       and _MILLENAI_SRC.count("with _engine_lock:") >= 4)
+
+# ==== 6b405 model sets: begin ====
+print("== the three model sets (6b405) ==")
+# Per Patrick: ONE set of three, defined once (model_sets), shown the same
+# way everywhere, named Light / Recommended / Everything, each inside the
+# next. Run on the real catalog, budget and tier code of simulated Macs (8,
+# 16, 48 and 128 GB) and a PC with a 24 GB card; then the status every
+# screen draws, the old names, the More-models card, the page; each rule
+# then broken in the source and shown caught.
+_S5_NAMES = {"GIANT_GB", "model_is_giant", "giant_fits_here", "machine_budget_bytes",
+             "model_fits_machine", "fits_by_memory", "BASELINE_RAM", "_ram_part", "_mem_factor",
+             "TIERS", "MODEL_SETS", "MODEL_SET_NAMES", "MODEL_SET_ALIASES", "QUICK_PAIR",
+             "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_set_key",
+             "_set_tag_bytes", "model_sets", "_family_of", "model_set_chosen", "model_sets_status",
+             "offer_set_labels", "first_set_labels", "_srv_fits", "_srv_tag_key"}
+
+
+class _S5VM:
+    def __init__(self, total):
+        self.total, self.available, self.used = total, total, 0
+
+
+def _s5_exec(src, ns, names):
+    tree = _ast.parse(src)
+    for n in tree.body:
+        nm = getattr(n, "name", None)
+        if nm is None and isinstance(n, _ast.Assign):
+            nm = next((getattr(t, "id", None) for t in n.targets), None)
+        if nm in names:
+            exec(_ast.get_source_segment(src, n), ns)
+
+
+def _s5_mac(src, gib, nl=False, gi=False, disk=(), prefs=None):
+    """A simulated Apple-silicon Mac of gib GB on src's own code: the
+    catalog, its routes and sizes, the budget, the tiers and the sets."""
+    ns = dict(_LH)
+    exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
+    ns.update(IS_ARM=True, IS_WIN=False, IS_MAC=True)
+    exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
+    ns["MODEL_MEM_BYTES"] = {l: i["mem"] for l, i in ns["MODEL_INFO"].items()}
+    total = gib * (1 << 30)
+    p = dict(prefs or {})
+    ns.update(HAS_PSUTIL=True, psutil=_types.SimpleNamespace(virtual_memory=lambda: _S5VM(total)),
+              gpu_vram_bytes=lambda: 0, gpu_room_bytes=lambda: 0,
+              no_limits=lambda: nl, giants_on=lambda: nl and gi,
+              machine_prefs=lambda strict=False: p, _S5P=p,
+              machine_prefs_update=lambda fn: fn(p),
+              model_cached=lambda l, pulled=None: l in disk, ollama_pulled_tags=lambda: set())
+    _s5_exec(src, ns, _S5_NAMES)
+    return ns
+
+
+def _s5_pc(src, key):
+    """One of the simulated PCs above (the real inventory and budget), with
+    the sets' code of src."""
+    z = dict(_pcs[key])
+    z.update(machine_prefs=lambda strict=False: {}, model_cached=lambda l, pulled=None: False,
+             ollama_pulled_tags=lambda: set())
+    _s5_exec(src, z, _S5_NAMES - {"machine_budget_bytes", "giant_fits_here", "GIANT_GB",
+                                  "model_is_giant", "BASELINE_RAM", "_ram_part", "_mem_factor"})
+    return z
+
+
+_S5_REC48 = ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B", "Qwen 3.8 27B",
+             "Qwen 3.6 35B MoE", "Qwen 3.5 Vision 9B"]
+
+
+def _s5_rules(src):
+    """The sets on five machines: nested, Light and Recommended by memory
+    whatever No limits says, never a giant in them, Everything every model
+    that fits (No limits adds the ones over memory, the second box the
+    giants), one row per download."""
+    out = {}
+    m = {g: _s5_mac(src, g)["model_sets"]() for g in (8, 16, 48, 128)}
+    nl48 = _s5_mac(src, 48, nl=True)["model_sets"]()
+    gi512 = _s5_mac(src, 512, nl=True, gi=True)["model_sets"]()
+    pc = _s5_pc(src, "xtx+64")["model_sets"]()
+    out["48 GB Mac"] = (m[48]["light"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"]
+                        and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 13
+                        and "GPT-OSS 120B" not in m[48]["everything"] and m[48]["over"] == [])
+    out["No limits: Everything only"] = (nl48["light"] == m[48]["light"]
+                                         and nl48["recommended"] == m[48]["recommended"]
+                                         and nl48["everything"] == m[48]["everything"] + ["GPT-OSS 120B"]
+                                         and nl48["over"] == ["GPT-OSS 120B"])
+    out["8 GB Mac"] = (m[8]["light"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Hermes 3 8B"]
+                       and m[8]["recommended"] == m[8]["light"] + ["DeepSeek R1 8B"]
+                       and m[8]["everything"] == m[8]["recommended"])
+    out["16 GB Mac"] = (m[16]["recommended"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B", "Qwen 3.5 9B",
+                                                 "DeepSeek R1 8B", "Qwen 3.5 Vision 9B"]
+                        and len(m[16]["everything"]) == 9)
+    out["128 GB Mac"] = (m[128]["recommended"][3] == "GPT-OSS 120B" and "Gemma 4 26B" in m[128]["recommended"]
+                         and len(m[128]["everything"]) == 14)
+    out["giants: only Everything, only with both boxes"] = (
+        {"GLM 5.3", "DeepSeek V3.2 671B"} <= set(gi512["everything"])
+        and not {"GLM 5.3", "DeepSeek V3.2 671B"} & set(gi512["recommended"])
+        and not any(_s5_mac(src, 512)["model_is_giant"](l) for l in
+                    _s5_mac(src, 512, nl=True)["model_sets"]()["everything"]))
+    # 24 GB on the card and 64 GB beside it: GPT-OSS 120B's experts sit in
+    # RAM (6b315), so it answers Fast; Qwen 3.5 9B and its Vision row are one
+    # Ollama download, listed once
+    out["a PC with a 24 GB card"] = (pc["light"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"]
+                                     and pc["recommended"][3] == "GPT-OSS 120B"
+                                     and len({"Qwen 3.5 9B", "Qwen 3.5 Vision 9B"}
+                                             & set(pc["everything"])) == 1
+                                     and pc["over"] == [])
+    nested = all(set(x["light"]) <= set(x["recommended"]) <= set(x["everything"])
+                 and x["recommended"][:len(x["light"])] == x["light"]
+                 for x in list(m.values()) + [nl48, gi512, pc])
+    out["nested everywhere"] = nested
+    return all(out.values()), {"failed": [k for k, v in out.items() if not v],
+                               "48": m[48], "16": m[16], "8": m[8], "pc": pc}
+
+
+def _s5_status(src):
+    """The one status: yours (picked and all here, else the largest all
+    here), installed, to download (only what is missing), the same-as, and
+    "every" only while Everything is all here; old names read as new."""
+    out = {}
+    a = _s5_mac(src, 8, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Hermes 3 8B", "DeepSeek R1 8B"})
+    s = a["model_sets_status"](set())
+    out["small Mac, all here"] = (s["recommended"]["state"] == "yours" and s["light"]["state"] == "installed"
+                                  and s["everything"]["same"] == "recommended"
+                                  and s["everything"]["state"] == "installed" and s["every"] is True)
+    b = _s5_mac(src, 48, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B"})
+    s = b["model_sets_status"](set())
+    out["48 GB, Light here"] = (s["light"]["state"] == "yours" and s["recommended"]["state"] == "download"
+                                and s["recommended"]["missing"] == ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+                                                                    "Qwen 3.5 Vision 9B"]
+                                and s["recommended"]["dl_gb"] == round(16.1 + 18.5 + 6.6, 1)
+                                and s["every"] is False and s["mine"] == "light")
+    c = _s5_mac(src, 48, disk=set(_S5_REC48), prefs={"model_set": "pro"})
+    s = c["model_sets_status"](set())
+    out["picked (an old name) and all here"] = (s["chosen"] == "recommended" and s["mine"] == "recommended"
+                                                and s["light"]["state"] == "installed")
+    c["_S5P"]["model_set"] = "everything"
+    s = c["model_sets_status"](set())
+    out["picked but not all here: the largest that is"] = (s["mine"] == "recommended"
+                                                           and s["everything"]["state"] == "download")
+    k = a["model_set_key"]
+    out["aliases"] = ([k(x) for x in ("basic", "min", "pro", "REC", "max", "full", "all", "Light",
+                                      "recommended", "everything", "", None, "x", "Fast")]
+                      == ["light"] * 2 + ["recommended"] * 2 + ["everything"] * 3
+                      + ["light", "recommended", "everything", "", "", "", ""])
+    return all(out.values()), out
+
+
+def _s5_offer(src):
+    """The More-models card offers what is missing from THE PERSON'S set,
+    never a bigger set's: nothing when none was picked and the largest
+    complete set has nothing missing."""
+    out = {}
+    b = _s5_mac(src, 48, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"})
+    out["no pick, Light here: nothing"] = b["offer_set_labels"](set()) == b["model_sets"]()["light"]
+    b2 = _s5_mac(src, 48, disk={"Llama 3.2 3B"})
+    out["no pick, no set complete: nothing"] = b2["offer_set_labels"](set()) == []
+    c = _s5_mac(src, 48, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"},
+                prefs={"model_set": "recommended"})
+    out["Recommended picked: its own"] = c["offer_set_labels"](set()) == _S5_REC48
+    d = _s5_mac(src, 48, disk=set(_S5_REC48), prefs={"model_set": "light"})
+    out["Light picked: never Recommended's"] = d["offer_set_labels"](set()) == d["model_sets"]()["light"]
+    # the card itself: only models not on disk, so those offers download nothing
+    body = src[src.index("def model_offer_plan("):src.index("def offer_matches(")]
+    out["the card asks it"] = ("    for l in list(offer_set_labels(pulled)) + list(olds_of):\n" in body
+                               and "plan_labels" not in src and "STARTER_LABELS" not in src
+                               and "_starter_labels" not in src)
+    return all(out.values()), out
+
+
+def _s5_wiring(src):
+    """One function everywhere: /api/setup's status, the install route (by
+    name or old name, adding only, the pick kept), first-run's set, the
+    downloads' default, the offer card, the merger and code ladders."""
+    i = src.index('        if self.path == "/api/setup/install":')
+    route = src[i:src.index("            return\n", src.index("model_set_choose(_key)", i)) + 20]
+    ss = src[src.index("def setup_status()"):src.index("def _other_millenai_running")]
+    return (route.index("_key = model_set_key(") < route.index(
+                "            if not _key:\n                self._send_json({\"err\": \"Pick Light, Recommended or "
+                "Everything.\"},\n                                code=400)\n                return\n")
+            < route.index("_want = model_sets()[_key]")
+            < route.index("start_model_downloads(_want)") < route.index("model_set_choose(_key)")
+            and "_remove_models" not in route
+            and '"sets": model_sets_status(pulled, sets),' in ss and "sets = model_sets()\n" in ss
+            and 'first = sets[model_set_chosen() or "recommended"]' in ss
+            and "    stars_now = set(first)\n" in ss
+            and "    for label in (labels if labels is not None else first_set_labels()):\n" in src
+            and "    for pref in MERGE_PREFS:\n" in src and "    for l in CODE_LADDER:\n" in src
+            and '"remind_models_off", "model_set"))' in src
+            and src.count("def model_sets(") == 1), route[-200:]
+
+
+def _s5_page(src):
+    """The page: one renderer in the grid, the wizard, the first-run window
+    and each server; the No limits boxes beside Everything; the old names
+    gone as set names, and the false sentence gone."""
+    pg = page
+    return ("planCardsPut(setCardsHtml(lastSetup.sets,{scr:\"grid\"}));" in src
+            and 'box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});' in src
+            and "+setCardsHtml(sets,{pick:setupPlan,scr:\"setup\"})+" in src
+            and "+setCardsHtml(d.sets,{where:s.name})+" in src
+            and src.count("setCardsHtml(") == 6
+            and '<div id="plan-row"><div id="plan-limits">' in pg
+            and pg.index('id="plan-limits"') < pg.index('id="nolimits"') < pg.index('id="giants"')
+            and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<div id="zito">')]
+            and "No limits: Everything adds models too big for this" in pg
+            and not re.search(r'"(Basic|Minimum|Full|Max)"', src[src.index("const SET_KEYS="):
+                                                                src.index("function renderSetup(")])
+            and "Basic" not in pg[pg.index('<div id="wiz-veil"'):pg.index('<div id="setup-veil"')]
+            and "every model this machine can run, and" not in pg
+            and "The best this machine can run" not in pg and '["min","Minimum"' not in pg), ""
+
+
+_S5_CHECKS = [
+    ("the sets: nested on five machines, by role from the ladders, Light and Recommended never over memory "
+     "or a giant, No limits and the giants box only in Everything", _s5_rules),
+    ("the sets' one status: yours, installed, to download, same-as, every; the old names read as new", _s5_status),
+    ("the More-models card offers only what the person's set misses, never a bigger set", _s5_offer),
+    ("one function behind /api/setup, the install route (adds, keeps the pick), first run, the downloads, the card", _s5_wiring),
+    ("the page: one renderer on four screens, No limits beside Everything, no old set names, no false sentence", _s5_page),
+]
+
+
+def _s5_run(src, which=None):
+    out = []
+    for i, (name, fn) in enumerate(_S5_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        out.append((i, name, bool(ok), det))
+    return out
+
+
+import types as _types
+for _i5, _n5, _o5, _d5 in _s5_run(_MILLENAI_SRC):
+    check(_n5, _o5, "%r" % (_d5,))
+_S5_MUT = [
+    ("Light sized with No limits", "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n                    and fits_by_memory(l))",
+     "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n                    and model_fits_machine(l))", [0]),
+    ("a giant in Recommended", "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n",
+     "            return (bool(SUPPORTED.get(l))\n", [0]),
+    ("the everyday not a Gemma first", 'next((l for l in small if l.startswith("Gemma 4")), None)', 'None', [0]),
+    ("no quick pair", "    for l in QUICK_PAIR + (everyday,):\n", "    for l in (everyday,):\n", [0]),
+    ("Thinking not filled", "        if seats >= TIERS[\"Thinking\"][\"count\"]:", "        if seats >= 1:", [0]),
+    ("no code model", "    add(first(CODE_LADDER))\n", "", [0]),
+    ("no vision model", "    add(VISION_MODEL)\n", "", [0]),
+    ("one per row, not per download", "        if l and fits(l) and key(l) not in keys:\n", "        if l and fits(l) and l not in out:\n", [0]),
+    ("Everything without No limits' extras", "        pool = [l for l in MODEL_INFO\n                if SUPPORTED.get(l) and model_fits_machine(l)]",
+     "        pool = [l for l in MODEL_INFO\n                if SUPPORTED.get(l) and fits_by_memory(l)]", [0]),
+    ("nothing over memory flagged", '            "over": ([l for l in out if not fits_by_memory(l)]', '            "over": ([l for l in out if False]', [0]),
+    ("the pick believed while incomplete", "    mine = chosen if chosen in full else next(\n        (k for k in reversed(MODEL_SETS) if k in full and not out[k][\"same\"]),",
+     "    mine = chosen or next(\n        (k for k in reversed(MODEL_SETS) if k in full and not out[k][\"same\"]),", [1]),
+    ("everything counted, not what is missing", '                  "dl_gb": round(sum(MODEL_INFO[l]["gb"] for l in miss), 1)}',
+     '                  "dl_gb": round(sum(MODEL_INFO[l]["gb"] for l in ls), 1)}', [1]),
+    ("no same-as", '        same = next((p for p in MODEL_SETS[:i]\n', '        same = next((p for p in ()\n', [1]),
+    ("old names not read", "    k = MODEL_SET_ALIASES.get(k, k)\n", "", [1]),
+    ("the card offers Everything", "    k = st[\"chosen\"] or st[\"mine\"]\n    return list(st[k][\"labels\"]) if k else []",
+     "    return list(st[\"everything\"][\"labels\"])", [2]),
+    ("the card offers a set nobody picked", "    k = st[\"chosen\"] or st[\"mine\"]\n", "    k = st[\"chosen\"] or \"recommended\"\n", [2]),
+    ("the pick not kept", "            model_set_choose(_key)\n", "", [3]),
+    ("an unknown name installs something", "            if not _key:\n                self._send_json({\"err\": \"Pick Light, Recommended or Everything.\"},",
+     "            if not _key:\n                _key = \"everything\"\n            if False:\n                self._send_json({\"err\": \"Pick Light, Recommended or Everything.\"},", [3]),
+    ("the wizard with its own cards", 'box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});', 'box.innerHTML="";', [4]),
+]
+_s5m = []
+for _d5, _o5, _n5, _w5 in _S5_MUT:
+    if _MILLENAI_SRC.count(_o5) != 1:
+        _s5m.append((_d5, "anchor x%d" % _MILLENAI_SRC.count(_o5)))
+        continue
+    _r5 = _s5_run(_MILLENAI_SRC.replace(_o5, _n5), _w5)
+    _s5m.append((_d5, [i for i, _n, o, _x in _r5 if not o] or "MISSED"))
+check("the three sets: %d mutations of their rules, each caught by the check that guards it" % len(_S5_MUT),
+      all(isinstance(v, list) for _d, v in _s5m), "%r" % [x for x in _s5m if not isinstance(x[1], list)])
+# ==== 6b405 model sets: end ====
 
 print("== resolvers ==")
 s, h, b = req("/api/tiers", cookie=K)
@@ -7909,12 +8214,18 @@ check("Windows: an Ollama service whose owner can't be read is 'not ours', so ou
       _wlm(_AD) is False and _wlm(_NSP) is None, "%r" % [_wlm(_AD), _wlm(_NSP)])
 
 # plans count a shared download once; council drafts stop and keep apart
-_pl = {"MODEL_ROUTES": {"Qwen 3.5 9B": ("ollama", "qwen3.5:9b"), "Qwen 3.5 Vision 9B": ("ollama", "qwen3.5:9b"),
-                        "Llama 3.2 3B": ("ollama", "llama3.2:3b")},
-       "_plan_labels": lambda p: ["Qwen 3.5 9B", "Qwen 3.5 Vision 9B", "Llama 3.2 3B"]}
-_exec_names(_pl, {"plan_labels"})
+# (6b405) the sets: on a PC Qwen 3.5 9B and its Vision row are one Ollama tag
+_pl = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"], SUPPORTED=_plat["windows"]["SUPPORTED"],
+           MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
+           MODEL_MEM_BYTES=_plat["windows"]["MODEL_MEM_BYTES"],
+           fits_by_memory=lambda l: _plat["windows"]["MODEL_INFO"][l]["mem"] <= 9e9,
+           model_fits_machine=lambda l: _plat["windows"]["MODEL_INFO"][l]["mem"] <= 9e9)
+_exec_names(_pl, {"GIANT_GB", "model_is_giant", "_family_of", "TIERS", "MODEL_SETS", "QUICK_PAIR",
+                  "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_sets"})
+_plr = _pl["model_sets"]()
 check("plans count a shared download once; an abandoned council draft stops and writes nowhere else",
-      _pl["plan_labels"]("rec") == ["Qwen 3.5 9B", "Llama 3.2 3B"]
+      "Qwen 3.5 9B" in _plr["recommended"] and "Qwen 3.5 Vision 9B" not in _plr["recommended"]
+      and "Qwen 3.5 Vision 9B" not in _plr["everything"]
       and "def _collect(chunk, _p=parts, _s=_stop):" in _M
       and "def _draft_local(_lbl=label, _c=_collect, _e=_err):" in _M
       and "                run_model(_lbl, messages, _c," in _M
@@ -7922,8 +8233,8 @@ check("plans count a shared download once; an abandoned council draft stops and 
       and "                run_model(_lbl, messages, parts.append," not in _M
       and "            _stop.set()\n" in _M
       and "class _DraftAbandoned(Exception):" in _M
-      and "want_set = {MODEL_ROUTES.get(l, (None, l)) for l in plan_labels(pl)}" in _M,
-      "%r" % _pl["plan_labels"]("rec"))
+      and "        if l and fits(l) and key(l) not in keys:\n" in _M,
+      "%r" % _plr)
 
 # exports: a 1969 all-day event (Windows' mktime can't); a frozen build is honest
 _ics = ""
@@ -22001,6 +22312,9 @@ def _p7c_passes(src):
            "server_side_pick": lambda ctx, role="fast", effort="fast": pick["m"] if role == "code" and effort == "normal" else None,
            "ollama_pulled_tags": lambda: set(), "MODEL_ROUTES": {"GPT-OSS 20B": 1}, "model_cached": lambda l, p=None: True,
            "model_fits_memory": lambda l: True, "strip_think": lambda x: x, "cloud_text": lambda *a, **k: "",
+           # (6b405) the code ladder is the one constant the sets read too
+           "CODE_LADDER": ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 26B",
+                           "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B"),
            "server_first_deadline": _RcDeadline, "server_mark_down": lambda c, n, w: downs.append(n),
            "SERVER_SEP": " · ", "StaleProfile": type("StaleProfile", (OSError,), {})}
     seen = []

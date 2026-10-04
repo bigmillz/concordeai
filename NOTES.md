@@ -9,6 +9,88 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b405 — three model sets, defined once: Light, Recommended, Everything (per Patrick)
+
+The same idea, sets of models to install, was in four places with three vocabularies: the
+wizard's Basic/Pro/Max, the Add models… window's Fast/Pro/Max ("Fast" and "Pro" are also the chat
+modes, with other meanings), Settings' Minimum/Recommended/Full/Max, and the More-models card's
+"max spread". On Patrick's 48 GB Mac with No limits ticked, Full and Max were the same 14 models
+(GPT-OSS 120B, 61 GB, in "every model this Mac's memory can actually run"), Recommended picked
+GPT-OSS 120B too, and the Your models window said "You have every model this machine can run"
+whenever the 6-model max spread was installed (he had 7 of 14).
+
+- **One function.** `model_sets(target=None)` (the catalog block, where `_starter_labels`,
+  `STARTER_LABELS`, `plan_labels`, `_plan_labels` and `_gen_of` were; all deleted). By role, from
+  the ladders the modes use: Light = the quick pair (Llama 3.2 3B, 1B) + ONE everyday model that
+  also merges (the largest Gemma 4 of catalog size <= `EVERYDAY_MAX_GB` 8.5, else the largest
+  non-vision model of that size); Recommended = Light + Fast's first fitting pick + the merger
+  (`MERGE_PREFS`, which `merge_pref_label` now reads) + Thinking's seats (its picks, to its count;
+  a model already in counts) + `CODE_LADDER`'s first (factored out of `remote_driver`) + the
+  vision model; Everything = every supported model `model_fits_machine` allows (so No limits adds
+  the over-memory rows and the second box the giants). Light and Recommended use
+  `fits_by_memory` (model_fits_machine's memory rule, factored out, with No limits set aside) and
+  never hold a giant. One row per download (the MODEL_ROUTES key). `over` lists what Everything
+  holds beyond memory; the card then wears ⚠ and asks twice.
+- **What the rules give** (simulated, real budget code): 48 GB Mac: Light = Llama 3.2 3B, 1B,
+  Gemma 4 12B (9.4 GB); Recommended adds Gemma 4 26B, Qwen 3.8 27B, Qwen 3.6 35B MoE (Thinking's
+  third seat, its ladder order) and Qwen 3.5 Vision 9B (7 models, 66.0 GB); Everything 13 models,
+  110.0 GB; with No limits 14, 171.0 GB, GPT-OSS 120B over memory. 16 GB: Recommended = Light +
+  Qwen 3.5 9B, DeepSeek R1 8B, Vision (26.6 GB). 8 GB: Light's everyday is Hermes 3 8B (no Gemma
+  fits), Recommended adds DeepSeek R1 8B, Everything is the same as Recommended. 128 GB: GPT-OSS
+  120B answers Fast (108.5 GB). A PC with a 24 GB card and 64 GB: GPT-OSS 120B too (its experts
+  in RAM, 6b315).
+- **One status.** `model_sets_status` (in /api/setup as `sets`; `plan_state`, `plans`, `plan_n`
+  are gone): per set its models, GB of the whole and of what is missing, `same` (a smaller set it
+  equals here), and a state: "yours" (the set picked, while all of it is here; else the largest
+  set all here), "installed", "download". `every` is true only while Everything is all here.
+  The pick is kept in prefs `model_set` (a MACHINE key) by POST /api/setup/install, which takes
+  a set's name or an old plan's (basic/min -> light, pro/rec -> recommended, max/full/all ->
+  everything; `model_set_key`), refuses anything else with 400, adds what is missing and deletes
+  nothing. `first_set_labels()` (the pick, else Recommended: the old default "pro") is what the
+  first-run window waits for (`star`), the Ollama engine row and the downloads' default.
+- **The offer card follows the person's set.** `offer_set_labels`: what is missing from the
+  set they picked, else from the largest complete set (nothing). Never a bigger set (6b312's
+  rule); newer versions of what they have as before.
+- **Screens.** One renderer, `setCardsHtml`, draws the same three cards in Settings › Models
+  (the grid), the wizard's step 2, the first-run window (wizard skipped) and each server card
+  (6b407). The Add models… button and its chooser window are gone (the palette's "Add models…"
+  opens Settings › Models with the grid in view, `openModelSets`); the setup window is the
+  first-run download window only, and after a strip-opened download it says "Downloads
+  finished". Updating and clearing out old models stay where they were: the auto-clean bar's
+  button and the MODEL UPDATES chip open the Update models card. No limits and the 512 GB box
+  moved from that window to the grid's fourth cell, beside Everything (`#plan-limits`, static so
+  their listeners and the giants text stay). The risky card's question (`setConfirm`) survives a
+  repaint for 8 s.
+- **Copy (old -> new).** Set names: Basic/Fast/Minimum -> Light; Pro -> Recommended; Max/Full ->
+  Everything. Descriptions: "Quick answers, tiny download" / "the lightest models — smallest
+  footprint that still answers" -> "One everyday model and two quick ones."; "Great everyday
+  quality" / "one of each kind, newest generation, no superseded versions" -> "A model for each
+  job: answers, thinking, code and pictures."; "The best this machine can run" / "every model
+  this Mac's memory can actually run" -> "Every model this Mac can run."; "every model there is,
+  including ones too big for this Mac — they may crash it if memory runs out" -> "Every model,
+  even ones too big for this Mac. They can crash it."; new: "The same as Recommended on this
+  Mac." Count line: "N models · X GB to download" / "· already installed" / "· this is what you
+  have" -> "N models · X GB to download" / "N models · installed"; badge "✓ current" -> "✓
+  yours". Risky click: "this installs models bigger than this Mac's memory and can crash it —
+  click again to go ahead" -> "This adds models bigger than this Mac's memory. They can crash
+  it. Click again to go ahead." No limits: "No limits — offer models beyond this machine's memory
+  (can swap hard)" and the wizard's "Ignore system limits — offer every model in each list even
+  beyond this machine's memory. May swap hard or crash; use at your own risk." -> "No limits:
+  Everything adds models too big for this machine's memory. They can swap hard or crash it."
+  First-run button "Update · N GB" -> "Download <Set> · N GB". Window title (static) "Your
+  models" -> "Downloading models"; after a strip-opened download "Downloads finished" / "Add
+  more, or pick another set, in Settings › Models." with "Done". Gone: "You have every model
+  this machine can run, and they're up to date.", "Newer versions of models you have are ready.
+  Pick your set…", "Your set is up to date. Pick a bigger set…", "Add <name> · N GB", the "Add
+  models…" button.
+- **Gauntlet.** New `== the three model sets (6b405) ==` (5 checks on simulated 8/16/48/128 GB
+  Macs and a PC with a 24 GB card, the status, aliases, the offer card, the wiring, the page; 19
+  mutations), plus rewritten pins: the cards in node, the chooser gone, sets by catalog size,
+  giants only in Everything, plans counting a download once, the manage pane, the live
+  /api/setup status. Ran the sections it touches (see the report).
+- **Not verified.** WKWebView (the Browser pane is Blink); the first-run window and wizard were
+  drawn from a dev copy with models already on disk (forced open), not from a real first run.
+
 ## 6b404 — the RAID mirror is gone from the kit (per Patrick: "pointless, it just ties up resources checking and rebuilding")
 
 Kit only (`ollama1/`). The mirror (two 8 TB disks, RAID1 at /srv/data) is no longer built,

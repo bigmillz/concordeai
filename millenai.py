@@ -1805,6 +1805,13 @@ def model_fits_machine(label: str) -> bool:
         # Patrick's "disobey the limits" switch: every supported model is
         # offered. The runtime admission check still referees actual RAM.
         return SUPPORTED.get(label, False)
+    return fits_by_memory(label)
+
+
+def fits_by_memory(label: str) -> bool:
+    """model_fits_machine's memory rule alone, whatever the No limits box
+    says (6b405): Light and Recommended are sized by it, so ticking the box
+    only ever adds to Everything."""
     budget = machine_budget_bytes(moe=label in MOE_ROWS)
     need = MODEL_MEM_BYTES.get(label)
     if budget is None or need is None:
@@ -4033,72 +4040,210 @@ def resolve_agent_seat(name, ctx=None):
     return label, a, ""
 
 
-# First run downloads the AUTOSELECTED set: for each tier, the single best
-# pick this machine can hold — the strongest brain per job, nothing more.
-# A 48 GB Mac gets the 35B MoE; a 16 GB Air lands on Phi-4/Gemma; nobody
-# is asked for 100 GB of also-rans (that was possible when this listed
-# every tier pick).
-def _starter_labels() -> list:
-    """The MAX spread: since the tier merge every tier leads with the same
-    ladder, "best per tier" collapsed to ONE model (seen live: a fresh
-    machine would have installed only the 35B — no merger, no quick
-    path). Build the spread by ROLE instead: flagship, Gemma merger,
-    everyday mid, the quick pair, vision."""
-    # no giant in a preset (6b314): one "Download" on the More-models
-    # card would otherwise start a 300-420 GB pull. Giants are installed
-    # one at a time from the list, which names the size first.
-    fits = [l for l in MODEL_INFO
-            if SUPPORTED.get(l) and model_fits_machine(l)
-            and not model_is_giant(l)]
-    picks = []
+# THE THREE SETS (6b405, per Patrick: "one set of three, defined once,
+# shown the same way everywhere"). Light, Recommended and Everything, each
+# inside the next. They replace seven names in three vocabularies: the
+# wizard's Basic/Pro/Max, the Your models window's Fast/Pro/Max (where
+# "Fast" and "Pro" were also the chat modes, with other meanings) and
+# Settings' Minimum/Recommended/Full/Max, whose Full and Max came out the
+# same with No limits ticked and whose "every model this machine can run"
+# was said while half of them were missing. Built by ROLE from the ladders
+# the modes already use, so no machine is ever written in here:
+#   Light        the quick pair (Llama 3.2 3B and 1B) and ONE everyday
+#                model that also writes merges: the largest Gemma 4 of
+#                catalog size EVERYDAY_MAX_GB or less, else the largest
+#                model of that size that isn't the vision model; pictures
+#                fetch the vision model on first use
+#   Recommended  Light, plus one model for each job a mode reaches for
+#                here: Fast's answer (the first of its picks that fits),
+#                the merger (merge_pref_label's order), Thinking's seats
+#                (its picks, to its count; models already in count), the
+#                code ladder's first and the vision model
+#   Everything   every supported model that fits; with No limits also the
+#                ones bigger than memory, and with the second box the
+#                giants this computer can hold (model_fits_machine decides)
+# Light and Recommended are sized by memory whatever No limits says
+# (fits_by_memory) and never hold a giant. One row per download (the
+# MODEL_ROUTES key, 6b317). target None is this computer; a server is
+# {"vram": bytes} (6b407): a model fits when its Ollama file fits the
+# card whole, by _srv_fits's own rule, and its key is the tag.
+MODEL_SETS = ("light", "recommended", "everything")
+MODEL_SET_NAMES = {"light": "Light", "recommended": "Recommended",
+                   "everything": "Everything"}
+# the old plans' names, as the install route and saved settings may say them
+MODEL_SET_ALIASES = {"basic": "light", "min": "light",
+                     "pro": "recommended", "rec": "recommended",
+                     "max": "everything", "full": "everything",
+                     "all": "everything"}
+QUICK_PAIR = ("Llama 3.2 3B", "Llama 3.2 1B")
+EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
+# who writes the merge, best first: merge_pref_label reads it too
+MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
+# the code lane's local planner, strongest first: remote_driver reads it too
+CODE_LADDER = ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
+               "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B")
+VISION_MODEL = "Qwen 3.5 Vision 9B"
 
-    def add(label):
-        if label and label in fits and label not in picks:
-            picks.append(label)
 
-    by_size = sorted(fits, key=lambda l: -MODEL_INFO[l]["cat_gb"])
-    if no_limits() and HAS_PSUTIL:
-        # unlocked, not unhinged: the flagship stays within what RAM can
-        # plausibly page (~1.6x memory = a 70B on 48GB, never the 235B)
-        # 6b315: plus what the graphics cards hold, or ticking the box
-        # took GPT-OSS 120B away from a 96 GB card in a 64 GB PC
-        cap = psutil.virtual_memory().total + gpu_room_bytes()
-        sized = [l for l in by_size
-                 if MODEL_MEM_BYTES.get(l, 0) <= cap]
-        by_size = sized or by_size
-    add(next((l for l in by_size), None))                      # flagship
-    add(next((l for l in by_size if l.startswith("Gemma 4")), None))
-    add(next((l for l in by_size if MODEL_INFO[l]["cat_gb"] <= 8.5
-              and "Vision" not in l), None))                   # everyday
-    add("Llama 3.2 3B")
-    add("Llama 3.2 1B")
-    add("Qwen 3.5 Vision 9B")
-    return picks
+def model_set_key(name) -> str:
+    """"light", "recommended" or "everything" for a set's name or an old
+    plan's, in any case; '' for anything else."""
+    k = str(name or "").strip().lower()
+    k = MODEL_SET_ALIASES.get(k, k)
+    return k if k in MODEL_SETS else ""
 
 
-STARTER_LABELS = _starter_labels()
+def _set_tag_bytes(tag: str) -> int:
+    """What an Ollama tag downloads: the registry's size, else the
+    catalog's for the row that names it."""
+    if tag in OLLAMA_BYTES:
+        return OLLAMA_BYTES[tag]
+    for i in MODEL_INFO.values():
+        if i["ollama"] == tag:
+            return int(i["cat_gb"] * 1e9)
+    return 0
 
 
-def _gen_of(label: str) -> float:
-    """The GENERATION in a model's name, never its parameter count —
-    'Qwen 2.5 Coder 7B' is generation 2.5 at size 7B. Any token ending
-    in B is a size and skipped; 'Phi-4' hands over its tail. Unknown
-    reads as 0, which simply lets size decide within that family."""
-    best = 0.0
-    for tok in label.split():
-        if tok[-1:] in ("B", "b"):
-            continue
-        try:
-            best = max(best, float(tok))
-            continue
-        except ValueError:
-            pass
-        if "-" in tok:
-            try:
-                best = max(best, float(tok.rsplit("-", 1)[-1]))
-            except ValueError:
-                pass
-    return best
+def model_sets(target=None) -> dict:
+    """{"light": [...], "recommended": [...], "everything": [...],
+    "over": [...]}: catalog labels, each set inside the next, one per
+    download (see above). "over" is what Everything holds beyond this
+    computer's memory (No limits, the giants); a server's is empty."""
+    if target is None:
+        def fits(l):
+            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)
+                    and fits_by_memory(l))
+
+        def key(l):
+            return MODEL_ROUTES.get(l, (None, l))
+        pool = [l for l in MODEL_INFO
+                if SUPPORTED.get(l) and model_fits_machine(l)]
+    else:
+        vram = (target or {}).get("vram")
+
+        def card(l):
+            tag = (MODEL_INFO.get(l) or {}).get("ollama")
+            return bool(tag) and _srv_fits(
+                {"placement": "gpu", "size": _set_tag_bytes(tag)}, vram, True)
+
+        def fits(l):
+            return card(l) and not model_is_giant(l)
+
+        def key(l):
+            return _srv_tag_key(MODEL_INFO[l]["ollama"])
+        pool = [l for l in MODEL_INFO if card(l)]
+    out, keys = [], set()
+
+    def add(l):
+        if l and fits(l) and key(l) not in keys:
+            keys.add(key(l))
+            out.append(l)
+
+    def first(ladder):
+        return next((l for l in ladder if fits(l)), None)
+    small = sorted((l for l in MODEL_INFO if fits(l)
+                    and MODEL_INFO[l]["cat_gb"] <= EVERYDAY_MAX_GB),
+                   key=lambda l: -MODEL_INFO[l]["cat_gb"])
+    everyday = (next((l for l in small if l.startswith("Gemma 4")), None)
+                or next((l for l in small if _family_of(l) != "vision"
+                         and l not in QUICK_PAIR), None))
+    for l in QUICK_PAIR + (everyday,):
+        add(l)
+    light = list(out)
+    add(first(TIERS["Fast"]["picks"]))
+    add(first(MERGE_PREFS))
+    seats = 0
+    for l in TIERS["Thinking"]["picks"]:
+        if seats >= TIERS["Thinking"]["count"]:
+            break
+        if fits(l):
+            add(l)              # a model already in counts as a seat
+            seats += 1
+    add(first(CODE_LADDER))
+    add(VISION_MODEL)
+    rec = list(out)
+    for l in pool:
+        if key(l) not in keys:
+            keys.add(key(l))
+            out.append(l)
+    return {"light": light, "recommended": rec, "everything": list(out),
+            "over": ([l for l in out if not fits_by_memory(l)]
+                     if target is None else [])}
+
+
+def model_set_chosen() -> str:
+    """The set the person picked last (model_set; an old plan's name reads
+    as its set), or ''."""
+    try:
+        return model_set_key(machine_prefs().get("model_set"))
+    except Exception:
+        return ""
+
+
+def model_set_choose(key: str):
+    """Remember the person's set, so the status and the More-models card
+    follow THEIR set (6b405)."""
+    key = model_set_key(key)
+    if key:
+        machine_prefs_update(lambda p: p.__setitem__("model_set", key))
+
+
+def first_set_labels() -> list:
+    """The set a first run downloads and its window waits for: the one the
+    person picked, Recommended until they pick (the wizard's old default,
+    "pro", reads as Recommended)."""
+    return list(model_sets()[model_set_chosen() or "recommended"])
+
+
+def model_sets_status(pulled=None, sets=None) -> dict:
+    """ONE STATUS FOR EVERY SCREEN (6b405). Per set: its models, how many,
+    the GB of the whole set and of what is still missing (only that would
+    download), "same" (the smaller set it equals here, or ''), and a state:
+    "yours" (the set the person picked while all of it is here; until they
+    pick, the largest set all here), "installed" (all here) or "download".
+    "every" is True only while Everything is all here: nothing may say
+    "every model this machine can run" otherwise. Compared by download,
+    not by row (6b317)."""
+    if pulled is None:
+        pulled = ollama_pulled_tags() or set()
+    sets = sets or model_sets()
+
+    def dk(l):
+        return MODEL_ROUTES.get(l, (None, l))
+    have = {dk(l) for l, ok in SUPPORTED.items()
+            if ok and model_cached(l, pulled)}
+    chosen = model_set_chosen()
+    out = {"chosen": chosen, "over": list(sets.get("over") or []),
+           "risky": bool(sets.get("over"))}
+    full = []
+    for i, k in enumerate(MODEL_SETS):
+        ls = list(sets[k])
+        ks = {dk(l) for l in ls}
+        miss = [l for l in ls if dk(l) not in have]
+        same = next((p for p in MODEL_SETS[:i]
+                     if ks and {dk(l) for l in sets[p]} == ks), "")
+        out[k] = {"labels": ls, "n": len(ls), "missing": miss, "same": same,
+                  "gb": round(sum(MODEL_INFO[l]["gb"] for l in ls), 1),
+                  "dl_gb": round(sum(MODEL_INFO[l]["gb"] for l in miss), 1)}
+        if ls and not miss:
+            full.append(k)
+    mine = chosen if chosen in full else next(
+        (k for k in reversed(MODEL_SETS) if k in full and not out[k]["same"]),
+        "")
+    for k in MODEL_SETS:
+        out[k]["state"] = ("yours" if k == mine else
+                           "installed" if k in full else "download")
+    out["mine"], out["every"] = mine, "everything" in full
+    return out
+
+
+def offer_set_labels(pulled=None) -> list:
+    """What the More-models card may offer from the sets (6b405, 6b312's
+    rule): what is missing from the person's own set, the one they picked,
+    else the largest set that is all here (so nothing). Never a bigger set."""
+    st = model_sets_status(pulled)
+    k = st["chosen"] or st["mine"]
+    return list(st[k]["labels"]) if k else []
 
 
 def _family_of(label: str) -> str:
@@ -4114,81 +4259,6 @@ def _family_of(label: str) -> str:
     return base
 
 
-def plan_labels(plan: str) -> list:
-    """The plan's models, one per download (6b317, from the Windows
-    sweep): off Apple silicon Qwen 3.5 9B and its Vision row are the SAME
-    Ollama tag, and plans counted it twice, 6.6 GB too many."""
-    out, seen = [], set()
-    for l in _plan_labels(plan):
-        key = MODEL_ROUTES.get(l, (None, l))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(l)
-    return out
-
-
-def _plan_labels(plan: str) -> list:
-    """Install plans. basic/pro/max belong to the first-run wizard and
-    are unchanged; min/rec/full/all drive the Manage-models selector
-    (6b258, per Patrick):
-
-      min   the lightest footprint that still answers
-      rec   ONE model per family, newest generation — an efficient
-            spread that never spends disk on a superseded version
-      full  everything this machine's memory can actually run
-      all   every model there is, including ones that do NOT fit — the
-            pane warns, because this is how a Mac gets OOM-killed
-    """
-    fits = [l for l in MODEL_INFO
-            if SUPPORTED.get(l) and model_fits_machine(l)]
-    if plan == "min":
-        small = sorted(fits, key=lambda l: MODEL_INFO[l]["cat_gb"])
-        picks = [l for l in ("Llama 3.2 1B", "Llama 3.2 3B") if l in fits]
-        return picks or small[:2]
-    if plan == "rec":
-        # an efficient spread never holds a giant (6b314): with both
-        # boxes ticked, DeepSeek's 400 GB row replaced the 4.6 GB R1 8B
-        groups = {}
-        for l in fits:
-            if model_is_giant(l):
-                continue
-            groups.setdefault(_family_of(l), []).append(l)
-        picks = []
-        for _fam, ls in groups.items():
-            # newest generation first, then the largest of that
-            # generation: the best of the family, exactly once
-            ls.sort(key=lambda l: (_gen_of(l), MODEL_INFO[l]["cat_gb"]),
-                    reverse=True)
-            picks.append(ls[0])
-        # a quick model earns its disk however big the rest are
-        for extra in ("Llama 3.2 3B", "Llama 3.2 1B"):
-            if extra in fits and extra not in picks:
-                picks.append(extra)
-        return picks
-    if plan == "full":
-        return list(fits)
-    if plan == "all":
-        # every model there is, bar the giants unless opted in (6b307):
-        # on a 48 GB Mac "Max" offered 926 GB, 796 of it two models
-        return [l for l in MODEL_INFO if SUPPORTED.get(l)
-                and (giants_on() or not model_is_giant(l))
-                and giant_fits_here(l)]
-    if plan == "basic":
-        # the smallest capable brain: ~1 GB, instant town
-        small = sorted(fits, key=lambda l: MODEL_INFO[l]["cat_gb"])
-        return small[:1]
-    if plan == "pro":
-        # one strong everyday model plus the quick pair — ~10 GB
-        mids = sorted((l for l in fits if MODEL_INFO[l]["cat_gb"] <= 8.5),
-                      key=lambda l: -MODEL_INFO[l]["cat_gb"])
-        picks = mids[:1]
-        for extra in ("Llama 3.2 3B", "Llama 3.2 1B"):
-            if extra in fits and extra not in picks:
-                picks.append(extra)
-        return picks
-    return _starter_labels()
-
 # who merges in combine mode — strongest first
 MERGE_RANK = sorted((l for l in MODEL_ROUTES),
                     key=lambda l: -MODEL_INFO[l]["mem"])
@@ -4201,7 +4271,7 @@ def merge_pref_label() -> str:
     uses it to put the merger LAST in the council roster and run_council
     uses it to pick the merger — if these two ever disagree, the roster
     ordering optimisation warms the wrong engine."""
-    for pref in ("Gemma 4 26B", "Gemma 4 12B"):
+    for pref in MERGE_PREFS:
         if model_cached(pref) and model_fits_memory(pref):
             return pref
     return ""
@@ -9576,7 +9646,7 @@ MACHINE = frozenset((
     "auto_cleanup", "studio_image", "studio_video", "studio_opts",
     "update_channel", "beta_updates", "auto_update_check", "last_ident",
     "last_version", "wizard_done", "seen_models", "remind_models_ts",
-    "remind_models_off"))
+    "remind_models_off", "model_set"))
 # whole families of machine keys: studio_* (the negative prompt, which
 # PROFILE_LOCAL names by path, apart), last_*, seen_*, remind_*, and the
 # retired Contribute keys the boot sweep removes
@@ -14343,7 +14413,7 @@ def start_model_downloads(labels=None) -> list:
         return []
     started, ollama_batch = [], []
     pulled = ollama_pulled_tags() or set()
-    for label in (labels if labels is not None else STARTER_LABELS):
+    for label in (labels if labels is not None else first_set_labels()):
         if not SUPPORTED.get(label):
             continue
         if not giant_fits_here(label):
@@ -14388,13 +14458,13 @@ def _batch_labels() -> list:
     to count the first-run starter set only — every starter was already
     on disk, so a preset that added OTHER models read 100% with a speed
     of nothing while eleven downloads ran unseen. Now: every model that
-    has ever been queued this session, and the starters only until
-    something has."""
+    has ever been queued this session, and the first-run set (the
+    person's, 6b405) only until something has."""
     with _setup_lock:
         batch = [l for l in _setup_jobs
                  if l != ENGINE_ROW and (l in MODEL_ROUTES
                                          or l in _STUDIO_ROWS)]
-    return batch or list(STARTER_LABELS)
+    return batch or first_set_labels()
 
 
 def _downloaded_bytes(pulled, labels=None) -> tuple:
@@ -14760,9 +14830,10 @@ def _offer_reason(label: str, olds: list, seen: set) -> str:
 
 def model_offer_plan(pulled=None) -> dict:
     """What the card's button will do.
-    download: the Max spread's models not on disk, and the replacement
-      of every retired model (on disk, or swept with its offer kept),
-      one row per download, none already in flight;
+    download: what is missing from the person's own set (never a bigger
+      set, offer_set_labels, 6b405), and the replacement of every retired
+      model (on disk, or swept with its offer kept), one row per
+      download, none already in flight;
     remove: exactly what an auto-clean pass would delete now
       (_auto_clean_targets), with the space each frees;
     keep_n: every other model on disk, unchanged.
@@ -14780,7 +14851,7 @@ def model_offer_plan(pulled=None) -> dict:
         moving = {l for l, j in _setup_jobs.items()
                   if (j or {}).get("status") in ("downloading", "queued")}
     download, routes = [], set()
-    for l in list(plan_labels("max")) + list(olds_of):
+    for l in list(offer_set_labels(pulled)) + list(olds_of):
         key = MODEL_ROUTES.get(l, (None, l))
         if (key in routes or not SUPPORTED.get(l) or l in moving
                 or model_cached(l, pulled)):
@@ -15049,9 +15120,14 @@ def setup_status() -> dict:
     pulled = ollama_pulled_tags() or set()
     models = []
 
+    # THE THREE SETS (6b405), sized once for this call: the first-run set
+    # (the person's, Recommended until they pick) is what the welcome
+    # window waits for and what decides whether Ollama is needed at all
+    sets = model_sets()
+    first = sets[model_set_chosen() or "recommended"]
     # engine pseudo-row: shown only while the app still has to fetch Ollama
     starters_need_ollama = any(
-        MODEL_ROUTES[l][0] == "ollama" for l in STARTER_LABELS)
+        MODEL_ROUTES[l][0] == "ollama" for l in first)
     with _setup_lock:
         ejob = dict(_setup_jobs.get(ENGINE_ROW, {}))
     if starters_need_ollama and (ejob or _ollama_bin() is None):
@@ -15066,7 +15142,7 @@ def setup_status() -> dict:
 
     # fit-filtered like the sidebar: the add-models panel never offers a
     # model this machine cannot hold resident
-    stars_now = set(_starter_labels())
+    stars_now = set(first)
     # an INSTALLED model is listed whatever the limits say (6b307): a
     # giant downloaded while opted in, or a 70B from "no limits", must
     # still have a row with a Remove button once the box is unticked
@@ -15120,23 +15196,6 @@ def setup_status() -> dict:
     have, want = _downloaded_bytes(pulled)
     bps = _dl_speed(have)
     busy = any(m["status"] in ("downloading", "queued") for m in models)
-    # WHICH PRESET IS ON DISK (6b290, per Patrick: "highlight that so
-    # the user knows which one they're on"). current = exactly this
-    # set; installed = all of it plus extras; partial = some; none.
-    # compared by download, not by row: two rows can share one (6b317)
-    installed = {MODEL_ROUTES.get(l, (None, l)) for l, ok in SUPPORTED.items()
-                 if ok and model_cached(l, pulled)}
-    plan_state = {}
-    for pl in ("min", "rec", "full", "all"):
-        want_set = {MODEL_ROUTES.get(l, (None, l)) for l in plan_labels(pl)}
-        if want_set and want_set == installed:
-            plan_state[pl] = "current"
-        elif want_set and want_set <= installed:
-            plan_state[pl] = "installed"
-        elif want_set & installed:
-            plan_state[pl] = "partial"
-        else:
-            plan_state[pl] = "none"
     return {
         # the models moving right now, and how many wait behind them —
         # so the bar is never the only sign of life
@@ -15144,7 +15203,10 @@ def setup_status() -> dict:
                  "checking": m.get("checking", False)}
                 for m in models if m["status"] == "downloading"][:4],
         "queued_n": sum(1 for m in models if m["status"] == "queued"),
-        "plan_state": plan_state,
+        # WHICH SET IS YOURS, and what each would download (6b405): one
+        # status that the Settings grid, the wizard and the first-run
+        # window all draw (it replaced plan_state, plans and plan_n)
+        "sets": model_sets_status(pulled, sets),
         "have_gb": round(have / 1e9, 1), "want_gb": round(want / 1e9, 1),
         "have_b": have, "want_b": want,
         "checking": busy and any(m.get("checking") for m in models)
@@ -15160,24 +15222,13 @@ def setup_status() -> dict:
                         max(1, round((want - have) / bps / 60)))
                     if busy and bps > 2e5 and want > have else None),
         "busy": busy,
-        # nag on first run only: once a couple of models work, the welcome
-        # screen is opt-in via "Add models…"
+        # nag on first run only: once a couple of models work, the sets
+        # are in Settings › Models
         "needs_setup": ready_n < 2,
         # the ONE bare psutil call in the file killed /api/setup (and the
         # header download strip with it) on any python without psutil
         "mem_gb": (round(psutil.virtual_memory().total / 1e9)
                    if HAS_PSUTIL else 0),
-        # remaining GB per plan — basic/pro/max for the first-run
-        # wizard, min/rec/full/all for the Manage selector (6b258)
-        "plans": {pl: round(sum(
-            MODEL_INFO[l]["gb"] for l in plan_labels(pl)
-            if not model_cached(l, pulled)), 1)
-            for pl in ("basic", "pro", "max",
-                       "min", "rec", "full", "all")},
-        # how many models each plan ends up with, so the pane can talk
-        # in models ("11 of 20") and not only in gigabytes
-        "plan_n": {pl: len(plan_labels(pl))
-                   for pl in ("min", "rec", "full", "all")},
         # what the auto-clean sweep would reclaim right now (6b265)
         "cleanup": _cleanup_stat(pulled),
         "image": _studios["image"],
@@ -24375,7 +24426,7 @@ def remote_driver():
     if _sd is not None:
         return ("server", _sd["label"])
     pulled = ollama_pulled_tags() or set()
-    for l in ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B"):
+    for l in CODE_LADDER:
         if l in MODEL_ROUTES and model_cached(l, pulled) \
                 and model_fits_memory(l):
             return ("local", l)
@@ -27700,12 +27751,23 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 pass
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
-                plan = (json.loads(self.rfile.read(n)) or {}).get("plan", "max")
+                _d = json.loads(self.rfile.read(n)) if n else {}
             except (ValueError, json.JSONDecodeError):
-                plan = "max"
-            _want = plan_labels(plan)
+                _d = {}
+            # ONE OF THE THREE SETS (6b405), by name or by an old plan's
+            # (basic/min -> light, pro/rec -> recommended, max/full/all ->
+            # everything). It ADDS what is missing and deletes nothing: an
+            # outdated version stays auto-clean's job. The pick is kept, so
+            # the status and the More-models card follow the person's set
+            _key = model_set_key((_d if isinstance(_d, dict) else {}).get("plan"))
+            if not _key:
+                self._send_json({"err": "Pick Light, Recommended or Everything."},
+                                code=400)
+                return
+            _want = model_sets()[_key]
             _started = start_model_downloads(_want)
-            self._send_json({"started": _started, "n": len(_want),
+            model_set_choose(_key)
+            self._send_json({"set": _key, "started": _started, "n": len(_want),
                              "already": len(_want) - len(_started),
                              "gb": round(sum(MODEL_INFO[l]["gb"]
                                              for l in _started), 1)})
@@ -33941,7 +34003,7 @@ body.gen #chip-model{color:var(--accent)}
 .plan-card b{display:block;font-size:12px}
 .plan-card span{font-size:10.5px;color:var(--faint);line-height:1.4;
   display:block}
-.plan-card .warn{color:#d9a95a}
+.plan-card .warn{color:#d9a95a;display:inline}
 .plan-card.risky:hover{border-color:rgba(217,169,90,.6)}
 .plan-card .gb{font-family:var(--mono);font-size:9.5px;color:var(--dim);
   display:block;margin-top:3px}
@@ -34529,16 +34591,16 @@ body.gen #chip-model{color:var(--accent)}
   text-transform:uppercase;color:#fff;font-weight:400;line-height:1}
 #wiz-ver{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
   text-transform:uppercase;color:var(--faint)}
-#wiz-plans{display:flex;gap:8px;margin:4px 0 12px}
-.wplan{flex:1;padding:12px 10px;border-radius:11px;cursor:pointer;
-  border:1px solid var(--line);background:rgba(255,255,255,.03);
-  text-align:center;transition:border-color .13s,background .13s}
-.wplan:hover{background:rgba(255,255,255,.06)}
-.wplan.on{border-color:rgba(255,255,255,.45);background:var(--accent-dim)}
-.wplan b{display:block;font-size:13.5px;margin-bottom:3px}
-.wplan span{display:block;color:var(--dim);font-size:11px;line-height:1.4}
-.wplan .wgb{font-family:var(--mono);font-size:9.5px;color:var(--faint);
-  letter-spacing:.1em;margin-top:5px;display:block}
+/* the three sets (6b405): the same cards in the wizard, the first-run
+   window and Settings; three across where there is room */
+#wiz-plans,.set-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  margin:4px 0 12px}
+.set-row{margin:14px 0 4px}
+.set-card{padding-right:12px}
+.set-card.current{padding-top:22px}
+.set-card.on{border-color:var(--accent-hot);background:var(--accent-dim)}
+.set-card:focus-visible{outline:2px solid var(--accent-hot);outline-offset:2px}
+.set-card.none{opacity:.5;cursor:default}
 #wiz-autoclean,#wiz-nolimits{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);line-height:1.5;cursor:pointer}
 #wiz-autoclean input,#wiz-nolimits input{margin-top:2px}
@@ -34632,26 +34694,15 @@ body.gen #chip-model{color:var(--accent)}
   transition:all .13s;
 }
 #setup-foot button:hover{color:var(--text);border-color:var(--dim)}
-.plans{display:flex;gap:10px;margin:14px 0 4px}
-.plan{flex:1;border:1px solid var(--line);border-radius:12px;
-  padding:12px 12px 10px;cursor:pointer;transition:all .15s;
-  display:flex;flex-direction:column;gap:4px}
-.plan b{font-size:15px}
-.plan span{font-size:11.5px;color:var(--dim);line-height:1.35}
-.plan em{font-style:normal;font-family:var(--mono);font-size:10.5px;
-  color:var(--faint)}
-.plan:hover{border-color:var(--accent-hot)}
-.plan.on{border-color:var(--accent-hot);background:var(--accent-dim)}
-.plan.done{opacity:.45;cursor:default}
-.plan.done:hover{border-color:var(--line)}
-/* 6b312: in the Your models window the installed set is a real choice
-   (picking it updates what you have), so it isn't greyed out there */
-.plans.mine .plan.done{opacity:1;cursor:pointer}
-.plans.mine .plan.done:hover{border-color:var(--accent-hot)}
-.plans.mine .plan.done em{color:var(--accent-hot)}
 #nolimits-row{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);margin:10px 2px 0;cursor:pointer;
   line-height:1.5;text-align:left}
+/* 6b405: the No limits boxes in the grid's fourth cell, beside Everything */
+#plan-limits{display:flex;flex-direction:column;justify-content:center;
+  padding:4px 2px}
+#plan-limits #nolimits-row{margin:0;padding:0;font-size:10.5px;
+  align-items:flex-start;color:var(--faint)}
+#plan-limits .giants-row{margin:6px 0 0 27px;font-size:10.5px}
 /* 6b307: the giants box hangs under "no limits", greyed until it's on */
 .giants-row{display:flex;gap:8px;align-items:center;font-size:11px;
   color:var(--faint);margin:6px 2px 0 24px;cursor:pointer;line-height:1.5;
@@ -35372,16 +35423,23 @@ __CODE_ROWS__
       <div id="roster"></div>
       <div id="roster-foot">
         <button class="about-btn slim" id="roster-manage">Manage models&hellip;</button>
-        <!-- 6b306: this opens the installer; "updates" now means the
-             Update models card, so the button says what it does -->
-        <button class="about-btn slim" id="open-setup">Add models&hellip;</button>
       </div>
       <div id="manage-box" hidden>
         <dl id="mg-stats">
           <div><dt>models installed</dt><dd id="mg-count">&mdash;</dd></div>
           <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
         </dl>
-        <div id="plan-row"></div>
+        <!-- THE THREE SETS (6b405): Light, Recommended, Everything, drawn by
+             setCardsHtml; the No limits boxes sit beside Everything, the
+             only set they change -->
+        <div id="plan-row"><div id="plan-limits">
+          <label id="nolimits-row"><input type="checkbox" id="nolimits">
+            <span>No limits: Everything adds models too big for this
+            machine&rsquo;s memory. They can swap hard or crash it.</span></label>
+          <label id="giants-row" class="giants-row off"><input type="checkbox"
+            id="giants" disabled><span>__GIANT_LABEL__</span><i
+            class="hint" title="__GIANT_TIP__">i</i></label>
+        </div></div>
         <!-- 6b294, per Patrick: image generation is an extra under the
              presets, not a preset — a smaller box, one button -->
         <!-- 6b297/6b299, per Patrick: no paragraph. Installed is one
@@ -35622,9 +35680,8 @@ __CODE_ROWS__
         Also add video generation &mdash; short video from a description,
         entirely on this Mac (19.6 GB)</label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
-        Ignore system limits &mdash; offer every model in each list even
-        beyond this machine&rsquo;s memory. May swap hard or crash;
-        use at your own risk.</label>
+        No limits: Everything adds models too big for this
+        machine&rsquo;s memory. They can swap hard or crash it.</label>
       <!-- 6b307, per Patrick: the giants sit behind a second box that
            only wakes up once the first is ticked -->
       <label id="wiz-giants" class="giants-row off"><input type="checkbox"
@@ -35660,16 +35717,11 @@ __CODE_ROWS__
 
 <div id="setup-veil" hidden>
   <div id="setup-card">
-    <h2 id="setup-title">Your models</h2>
-    <p class="sub" id="setup-sub">Pick your set to update it, or a bigger
-      set to add models.</p>
+    <!-- 6b405: the first-run download window only; picking a set is
+         Settings \u203a Models (or the wizard), the same three cards -->
+    <h2 id="setup-title">Downloading models</h2>
+    <p class="sub" id="setup-sub"></p>
     <div id="setup-list"></div>
-    <label id="nolimits-row"><input type="checkbox" id="nolimits">
-      No limits — offer models beyond this machine&rsquo;s memory
-      (can swap hard)</label>
-    <label id="giants-row" class="giants-row off"><input type="checkbox"
-      id="giants" disabled><span>__GIANT_LABEL__</span><i
-      class="hint" title="__GIANT_TIP__">i</i></label>
     <div id="setup-note"></div>
     <div id="setup-foot">
       <button id="setup-later">Later</button>
@@ -39984,7 +40036,7 @@ function palActions(){
   const acts=[
     {k:"new",t:"New chat",run:()=>$("#newchat").click()},
     {k:"go",t:"Settings",run:()=>openAbout()},
-    {k:"go",t:"Add models\u2026",run:()=>openSetup()},
+    {k:"go",t:"Add models\u2026",run:()=>openModelSets()},
     {k:"go",t:"Update models\u2026",run:()=>openModelUpdates()},
     {k:"set",t:"Toggle visual effects",
      run:()=>$("#fx-toggle").click()},
@@ -41475,12 +41527,73 @@ function dlLeftIn(s){
 }
 // a line's " · about 6 min left", or nothing
 function dlTail(t){return t?" \u00b7 "+t:"";}
+/* THE THREE SETS (6b405, per Patrick: "one set of three, defined once,
+   shown the same way everywhere"). Light, Recommended and Everything, each
+   inside the next. The server decides what is in each and where each
+   stands (model_sets and model_sets_status: /api/setup's `sets`; a
+   server's are /api/servers/models'); this one renderer draws the three
+   cards in Settings \u203a Models, the first-run wizard, the first-run window
+   and on each of your servers. */
+const SET_KEYS=["light","recommended","everything"];
+const SET_NAMES={light:"Light",recommended:"Recommended",everything:"Everything"};
+const SET_HERE=IS_PC?"this PC":"this Mac";
+const SET_ASK="This adds models bigger than "+SET_HERE+"\u2019s memory. They can crash it. Click again to go ahead.";
+function setDesc(k,x,where){
+  if(x.same)return "The same as "+SET_NAMES[x.same]+" on "+where+".";
+  if(k==="light")return "One everyday model and two quick ones.";
+  if(k==="recommended")return "A model for each job: answers, thinking, code and pictures.";
+  return x.risky?"Every model, even ones too big for "+where+". They can crash it."
+    :"Every model "+where+" can run.";
+}
+// the count line: what is here already, or what would download
+function setLine(x){
+  const n=x.n+" model"+(x.n===1?"":"s");
+  return x.state==="download"?n+" \u00b7 "+muGB(x.dl_gb)+" to download":n+" \u00b7 installed";
+}
+// THE RISKY CARD ASKS TWICE, in place, naming the risk (6b258): Everything
+// while it holds models over memory. The question is the screen's own for
+// 8 s, so a repaint while it waits keeps it
+const setArm={};
+function setArmed(scr){return setArm[scr]&&Date.now()-setArm[scr].at<8000?setArm[scr].k:"";}
+// true when a click on card c may act; a risky card's first click asks
+function setConfirm(scr,c){
+  if(!c.classList.contains("risky")||setArmed(scr)===c.dataset.set){
+    delete setArm[scr];return true;}
+  setArm[scr]={k:c.dataset.set,at:Date.now()};
+  const d=c.querySelector(".sd");if(d)d.textContent=SET_ASK;
+  return false;
+}
+// sets: {light:{n,dl_gb,state,same}, recommended, everything, risky};
+// o: pick (the card chosen on this screen), where (whose: "this Mac" or a
+// server's name), scr (the screen, for the risky card's question)
+function setCardsHtml(sets,o){
+  o=o||{};sets=sets||{};
+  const where=o.where||SET_HERE,armed=o.scr?setArmed(o.scr):"";
+  return SET_KEYS.map(k=>{
+    const x=sets[k];if(!x)return "";
+    const risky=k==="everything"&&!!sets.risky&&!x.same;
+    return '<div class="plan-card set-card'+(risky?" risky":"")
+      +(x.state==="yours"?" current":"")+(o.pick===k?" on":"")+(x.n?"":" none")
+      +'" data-set="'+k+'" role="button" tabindex="0">'
+      +(x.state==="yours"?'<i class="cur">\u2713 yours</i>':"")
+      +'<b>'+(risky?'<span class="warn">\u26a0</span> ':"")+SET_NAMES[k]+'</b>'
+      +'<span class="sd">'+esc(armed===k?SET_ASK:x.n?setDesc(k,Object.assign({},x,{risky:risky}),where)
+        :"Nothing fits "+where+".")+'</span>'
+      +(x.n?'<span class="gb">'+esc(setLine(x))+'</span>':"")+'</div>';
+  }).join("");
+}
+// a card is a button: Enter and Space press it
+document.addEventListener("keydown",e=>{
+  const c=e.target&&e.target.classList&&e.target.classList.contains("set-card")?e.target:null;
+  if(c&&(e.key==="Enter"||e.key===" ")){e.preventDefault();c.click();}
+});
 function renderSetup(st){
+  setupSt=st;
   const stars=st.models.filter(m=>m.star);
   setupAllReady=stars.every(m=>m.status==="ready");
   const anyDl=st.busy;
   const pct=st.overall_pct;
-  // headline: overall progress across the recommended set
+  // headline: overall progress across the batch
   let html=
     '<div class="big-bar"><i style="width:'+pct+'%"></i></div>'+
     '<div class="big-stat"><span>'+st.have_gb+' / '+st.want_gb+' GB</span>'+
@@ -41489,6 +41602,7 @@ function renderSetup(st){
       (st.speed_mbs>0?st.speed_mbs+' MB/s':'starting\u2026')+
       dlTail(dlLeft("batch",st.have_b,st.want_b,null,st.checking))+'</div>'
       +'<div class="big-now">'+nowLine(st)+'</div>':'');
+  setupLater.hidden=false;
 
   // WHILE DOWNLOADING (first run or updates): one bar, bandwidth,
   // percent — never a wall of per-model rows
@@ -41496,107 +41610,36 @@ function renderSetup(st){
     setTitle("Downloading updates",
       "Keep chatting \u2014 this finishes in the background.");
     setupList.innerHTML=html;
-    $("#setup-later").textContent="Continue in background";
+    setupLater.textContent="Continue in background";
     finishSetupChrome(st,stars,anyDl);
     return;
   }
-  $("#setup-later").textContent="Later";
+  setupLater.textContent="Later";
 
-  // FIRST RUN stays simple: the machine already picked its best brains —
-  // show what it chose and one number, never the catalog. The full list
-  // only exists behind "Add models…" for people who go looking.
+  // FIRST RUN, without the wizard: the same three cards as the wizard and
+  // Settings (6b405), the button downloading the one picked
   if(!setupManual){
     setTitle("Welcome to MillenAI",
       "We\u2019re getting you set up \u2014 private, and entirely on "
       +"this Mac. Start chatting the moment the first piece lands.");
-    html+=planCards(st);
-    setupList.innerHTML=html;
-    wirePlans(st);
+    const sets=st.sets||{};
+    if(!setupPlanPicked){if(sets.chosen)setupPlan=sets.chosen;setupPlanPicked=true;}
+    setupList.innerHTML=html+'<div class="set-row">'
+      +setCardsHtml(sets,{pick:setupPlan,scr:"setup"})+'</div>';
     finishSetupChrome(st,stars,anyDl);
     return;
   }
 
-  // …then every model individually, so anything can be added on its own
-  const state=m=>{
-    if(m.status==="ready")   return TICK;
-    if(m.status==="downloading") return '<span class="st dl">'+dlPct(m)+'</span>';
-    if(m.status==="queued")  return '<span class="st wait">queued</span>';
-    if(m.status==="error")   return '<span class="st err" title="'+esc(m.note)+'">failed</span>';
-    return '<span class="st get">'+m.est_gb+' GB \u2193</span>';
-  };
-  // an installed model gets its name and a tick - a full progress bar on
-  // something already at 100% is just noise on every row you have finished
-  const row=m=>
-    m.status==="ready"
-      ? '<div class="setup-row done"><span class="nm">'+esc(m.label)+'</span>'
-        +TICK+'</div>'
-      : '<div class="setup-row clickable" data-model="'+esc(m.label)+'">'
-        +'<span class="nm">'+esc(m.label)+'</span>'+state(m)
-        +'<div class="bar"><i style="width:'+(m.pct||0)+'%"></i></div></div>';
-  // YOUR MODELS, NOT AN UPSELL (6b312, per Patrick: "why can't they
-  // select the fast preset that they already have installed to update
-  // their library of models without adding more models they may not
-  // want? ... It should be an update and clean out"). This window
-  // called itself "Updates available" whenever ANY model of the biggest
-  // set was missing, greyed out the set you have and preselected the
-  // next one up. Now your set opens selected, picking it updates what
-  // you have and clears out old versions (the Update models run), and
-  // a bigger set is an add that says so. No progress bar until
-  // something actually downloads.
-  if(!setupPlanPicked){
-    const have=currentPlan(st);
-    if(have)setupPlan=have;
-    setupPlanPicked=true;
-  }
-  const cu=st.cleanup||{};
-  const upd=(cu.updates||[]).some(u=>u.new)||(cu.gb||0)>0;
-  const all=((st.plans||{}).max||0)<=0;
-  setTitle("Your models",
-    upd?"Newer versions of models you have are ready. Pick your set to "
-        +"update it and clear out the old ones, or a bigger set to add more."
-    :all?"You have every model this machine can run, and they\u2019re up "
-        +"to date."
-    :"Your set is up to date. Pick a bigger set to add more; it downloads "
-        +"in the background while you keep chatting.");
-  setupList.innerHTML=planCards(st,true);
-  wirePlans(st);
-
-  if(!st.mlx_ok){
-    setupNote.textContent="engine not installed \u2014 reopen the app to finish setup";
-  }else if(stars.some(m=>m.status==="error")){
-    setupNote.textContent="a download failed \u2014 check your connection, then retry";
-  }else{
-    setupNote.textContent="";
-  }
-  paintManualGo(st);
+  // OPENED FROM THE DOWNLOAD STRIP, and the downloads are over. The window
+  // that picked sets here is gone (6b405): adding models, or another set,
+  // is Settings › Models; updates and clean-outs stay its Update models card
+  setTitle("Downloads finished",
+    "Add more, or pick another set, in Settings \u203a Models.");
+  setupList.innerHTML=html;
+  setupLater.hidden=true;
+  finishSetupChrome(st,stars,anyDl);
 }
-// the largest set that's fully installed: the one this person has
-function currentPlan(st){
-  const rem=st.plans||{};
-  return ["max","pro","basic"].find(k=>(rem[k]||0)<=0)||"";
-}
-// the Your models window's one button: your own set updates, a bigger
-// set adds, and nothing to do says so
-function paintManualGo(st){
-  const cu=st.cleanup||{},left=(st.plans||{})[setupPlan]||0;
-  const name={basic:"Fast",pro:"Pro",max:"Max"}[setupPlan]||"models";
-  setupGo.disabled=!st.mlx_ok;
-  if(left>0){
-    setupGo.dataset.act="add";
-    setupGo.textContent="Add "+name+" \u00b7 "+Math.max(1,Math.round(left))+" GB";
-  }else if((cu.updates||[]).some(u=>u.new)){
-    setupGo.dataset.act="update";
-    setupGo.textContent="Update models"
-      +(cu.dl_gb?" \u00b7 "+Math.max(1,Math.round(cu.dl_gb))+" GB":"");
-  }else if((cu.gb||0)>0){
-    setupGo.dataset.act="update";
-    setupGo.textContent="Clear out old models \u00b7 "+muGB(cu.gb);
-  }else{
-    setupGo.dataset.act="";setupGo.disabled=true;
-    setupGo.textContent="Up to date \u2713";
-  }
-}
-// the button quotes the CHOSEN plan, not the whole catalog
+// the button quotes the CHOSEN set, not the whole catalog
 function setTitle(t,s){
   const h=$("#setup-title"),p=$("#setup-sub");
   if(h)h.textContent=t;
@@ -41610,39 +41653,14 @@ function nowLine(st){
   const q=st.queued_n?(st.queued_n+" waiting"):"";
   return [now.join("  \u00b7  "),q].filter(Boolean).join("  \u00b7  ");
 }
-function planCards(st,mine){
-  const rem=st.plans||{};
-  const meta=[["basic","Fast","Quick answers, tiny download"],
-              ["pro","Pro","Great everyday quality"],
-              ["max","Max","The best this machine can run"]];
-  if(!mine&&(rem[setupPlan]||0)<=0){
-    const next=meta.find(([k])=>rem[k]>0);
-    if(next)setupPlan=next[0];
-  }
-  return '<div class="plans'+(mine?' mine':'')+'">'+meta.map(([k,name,desc])=>{
-    const left=rem[k]||0;
-    return '<div class="plan'+(left<=0?' done':'')+'" data-plan="'+k+'">'
-      +'<b>'+name+'</b><span>'+desc+'</span>'
-      +'<em>'+(left<=0?'Installed \u2713':'~'+Math.max(1,Math.round(left))+' GB')+'</em></div>';
-  }).join("")+'</div>';
-}
-function wirePlans(st){
-  setupList.querySelectorAll(".plan").forEach(el=>{
-    el.classList.toggle("on",el.dataset.plan===setupPlan);
-    // your own set is a choice in the Your models window (6b312)
-    if(el.classList.contains("done")&&!setupManual)return;
-    el.addEventListener("click",()=>{
-      setupPlan=el.dataset.plan;setupPlanPicked=true;
-      setupList.querySelectorAll(".plan").forEach(x=>
-        x.classList.toggle("on",x===el));
-      if(setupManual)paintManualGo(st);
-      else setupGo.textContent="Update \u00b7 "+planGB(st)+" GB";
-    });
-  });
-}
-function planGB(st){
-  return Math.max(1,Math.round((st.plans||{})[setupPlan]||0));
-}
+// a card picked in the first-run window: the button re-prices for it
+setupList.addEventListener("click",e=>{
+  const c=e.target.closest&&e.target.closest(".set-card");
+  if(!c||setupManual||!setupSt)return;
+  if(!setConfirm("setup",c))return;
+  setupPlan=c.dataset.set;setupPlanPicked=true;
+  renderSetup(setupSt);
+});
 
 function finishSetupChrome(st,stars,anyDl){
   if(!st.mlx_ok){
@@ -41653,16 +41671,19 @@ function finishSetupChrome(st,stars,anyDl){
   }else{
     setupNote.textContent="";
   }
+  setupGo.dataset.act="";
   if(anyDl){
     setupGo.disabled=true;setupGo.textContent="Downloading\u2026";
+  }else if(setupManual){
+    setupGo.disabled=false;setupGo.dataset.act="close";setupGo.textContent="Done";
   }else if(setupAllReady){
     setupGo.disabled=false;setupGo.textContent="Let\u2019s run it";
   }else{
-    const left=(st.plans||{})[setupPlan]||0;
+    const left=(((st.sets||{})[setupPlan])||{}).dl_gb||0;
     setupGo.disabled=!st.mlx_ok||left<=0;
     setupGo.textContent=left<=0?"Up to date \u2713"
-      :(stars.some(m=>m.status==="error")?"Retry":"Update")+
-       " \u00b7 "+planGB(st)+" GB";
+      :(stars.some(m=>m.status==="error")?"Retry":"Download "+SET_NAMES[setupPlan])
+       +" \u00b7 "+muGB(left);
   }
 }
 
@@ -41762,9 +41783,12 @@ function rainbowWipe(){
 }
 
 let wasDownloading=false;
-// true when the panel was opened to add models rather than by first-run setup
+// true when the window was opened from the download strip (its progress),
+// not by a first run
 let setupManual=false;
-let setupPlan="pro",setupPlanPicked=false;
+// the set picked in the first-run window (6b405): Recommended until one is
+// (the old default, "pro", is Recommended now); the last status it drew
+let setupPlan="recommended",setupPlanPicked=false,setupSt=null;
 function celebrateDownloads(){
   const card=$("#setup-card"),veil=$("#setup-veil");
   // the card grows and dissolves, then the wipe runs
@@ -41847,17 +41871,22 @@ function openSetup(){
 function closeSetup(){veil.hidden=true;if(setupTimer){clearInterval(setupTimer);setupTimer=null;}input.focus();}
 setupLater.addEventListener("click",closeSetup);
 setupGo.addEventListener("click",async()=>{
-  // your own set picked: update what you have, in the Update models card
-  if(setupManual&&setupGo.dataset.act==="update"){
-    closeSetup();runModelUpdate();return;}
-  if(setupAllReady&&!(setupManual&&setupGo.dataset.act==="add")){
-    closeSetup();return;}
+  if(setupGo.dataset.act==="close"||setupAllReady){closeSetup();return;}
+  // a first run: download the set picked (a risky one asked twice already)
   await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:setupPlan})});
   setupTick();
 });
-$("#open-setup").addEventListener("click",()=>{aboutVeil.hidden=true;openSetup();});
+// WHERE MODELS ARE ADDED NOW (6b405): Settings › Models, its three sets in
+// view. The Add models… window that picked sets of its own is gone
+async function openModelSets(){
+  await openAbout();
+  settingsPane("p-models");
+  if(!manageOn)$("#roster-manage").click();
+  const r=$("#plan-row");
+  if(r&&r.scrollIntoView)r.scrollIntoView({block:"center"});
+}
 // THE PROVIDER BOARD (6b218, per Patrick): fixed rows —
 // Gemini / Groq / Claude / Kimi K3 — grey until a key is saved, green ✓
 // when its key works, red ✗ with the reason when it doesn't. The rows
@@ -42656,15 +42685,21 @@ $("#nolimits").addEventListener("change",async()=>{
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(on?{no_limits:true}
       :{no_limits:false,include_giants:false})});
-  setupTick();   // the plans + GB re-price under the new rules
+  plansRefresh();   // Everything re-prices under the new rules
 });
 $("#giants").addEventListener("change",async()=>{
   syncLimits($("#nolimits").checked,$("#giants").checked);
   await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({include_giants:$("#giants").checked})});
-  setupTick();
+  plansRefresh();
 });
+// the grid reads the status again and draws it (6b405)
+async function plansRefresh(){
+  lastSetup=null;
+  try{await ensureSetup();}catch(e){}
+  paintPlans();paintMgStats();
+}
 $("#models-flag").addEventListener("click",()=>{openModelUpdates();});
 
 /* -------------------------------------------------- first-run wizard */
@@ -42673,7 +42708,8 @@ $("#models-flag").addEventListener("click",()=>{openModelUpdates();});
 // start downloads, /api/cloud + /api/cloud/set for keys, and the old
 // setup veil for the progress bar once the wizard hands off.
 const wizVeil=$("#wiz-veil");
-let wizStep=1,wizPlan="pro";
+// the set the wizard installs (6b405): Recommended until one is picked
+let wizStep=1,wizPlan="recommended",wizPicked=false,wizSets=null;
 const WIZ_PROVS=[
   ["gemini","Gemini","free","https://aistudio.google.com/app/apikey"],
   ["groq","Groq","free","https://console.groq.com/keys"],
@@ -42693,27 +42729,22 @@ async function wizPaintPlans(){
   const box=$("#wiz-plans");
   let st={};
   try{st=await(await api("/api/setup")).json();}catch(e){return;}
-  const rem=st.plans||{};
   const ss=st.studios||{};
   const wi=$("#wiz-image");
   if(wi)wi.hidden=!(ss.image&&ss.image.supported&&!ss.image.ready);
   const wv=$("#wiz-video");
   if(wv)wv.hidden=!(ss.video&&ss.video.supported&&!ss.video.ready);
-  const meta=[["basic","Basic","Quick answers, tiny download"],
-              ["pro","Pro","Great everyday quality"],
-              ["max","Max","The best this machine can run"]];
-  box.innerHTML=meta.map(([k,name,d])=>
-    '<div class="wplan'+(wizPlan===k?" on":"")+'" data-plan="'+k+'">'
-    +'<b>'+name+'</b><span>'+d+'</span>'
-    +'<span class="wgb">'+((rem[k]||0)>0
-        ?"~"+rem[k]+" GB":"installed ✓")+'</span></div>').join("");
+  // the same three cards as Settings (6b405)
+  wizSets=st.sets||{};
+  if(!wizPicked&&wizSets.chosen)wizPlan=wizSets.chosen;
+  box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});
 }
 $("#wiz-plans").addEventListener("click",e=>{
-  const c=e.target.closest&&e.target.closest(".wplan");
+  const c=e.target.closest&&e.target.closest(".set-card");
   if(!c)return;
-  wizPlan=c.dataset.plan;
-  $$("#wiz-plans .wplan").forEach(el=>
-    el.classList.toggle("on",el===c));
+  if(!setConfirm("wiz",c))return;
+  wizPlan=c.dataset.set;wizPicked=true;
+  $("#wiz-plans").innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});
 });
 $("#wiz-ac").addEventListener("change",async()=>{
   await api("/api/prefs",{method:"POST",
@@ -43974,38 +44005,18 @@ function paintMgStats(){
   $("#mg-space").textContent=(gb>=10?Math.round(gb):Math.round(gb*10)/10)
     +" GB";
 }
+// the grid's cards before the No limits boxes, which stay put (their
+// listeners and the server's giants text live in the page) (6b405)
+function planCardsPut(html){
+  const row=$("#plan-row"),lim=$("#plan-limits");if(!row||!lim)return;
+  row.querySelectorAll(".set-card,.plan-wait").forEach(n=>n.remove());
+  lim.insertAdjacentHTML("beforebegin",html);
+}
 function paintPlans(){
   if(!lastSetup)return;
-  // FOUR SIZES, HONESTLY LABELLED (6b258, per Patrick). Only the last
-  // one can hurt: it installs models this machine cannot hold, so it
-  // wears a warning triangle and says what happens.
-  const P=[["min","Minimum",
-            "the lightest models — smallest footprint that still answers",0],
-           ["rec","Recommended",
-            "one of each kind, newest generation, no superseded versions",0],
-           ["full","Full",
-            "every model this Mac's memory can actually run",0],
-           ["all","Max",
-            "every model there is, including ones too big for this Mac — "
-            +"they may crash it if memory runs out",1]];
-  const ps=lastSetup.plan_state||{};
-  $("#plan-row").innerHTML=P.map(p=>{
-    const gb=(lastSetup.plans||{})[p[0]];
-    const n=(lastSetup.plan_n||{})[p[0]];
-    const stt=ps[p[0]]||"";
-    // the set on disk wears a badge (6b290, per Patrick): "current"
-    // is exactly this preset; a preset fully contained in what is
-    // installed reads installed; anything else says what is left
-    return '<div class="plan-card'+(p[3]?" risky":"")
-      +(stt==="current"?" current":"")+'" data-plan="'+p[0]+'">'
-      +(stt==="current"?'<i class="cur">\u2713 current</i>':"")
-      +'<b>'+(p[3]?'<span class="warn">⚠</span> ':"")+p[1]
-      +'</b><span>'+esc(p[2])+'</span>'
-      +'<span class="gb">'+(n?n+" models":"")
-      +(gb?" · "+gb+" GB to download"
-          :(stt==="current"?" · this is what you have":" · already installed"))
-      +'</span></div>';
-  }).join("");
+  // THE THREE SETS (6b405): the same cards as the wizard; the one that is
+  // yours wears the badge, Everything over memory wears the warning
+  planCardsPut(setCardsHtml(lastSetup.sets,{scr:"grid"}));
 }
 // THE SIZE LADDER (6b299, per Patrick: "a slider from small to most
 // accurate … green … yellow … red … notches one for each model"). Built
@@ -44257,7 +44268,7 @@ $("#roster-manage").addEventListener("click",async()=>{
   $("#manage-box").hidden=!manageOn;
   $("#roster").classList.toggle("managing",manageOn);
   if(manageOn){
-    $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
+    planCardsPut('<div class="plan-card plan-wait">reading disk\u2026</div>');
     await ensureSetup();
     paintPlans();paintMgStats();paintCleanNote();paintStudios();
     if(lastSetup&&lastSetup.busy)manageTick();   // a batch is already running
@@ -44437,21 +44448,17 @@ $("#autoclean-toggle").addEventListener("click",async()=>{
   muSettled();
 });
 $("#plan-row").addEventListener("click",async e=>{
-  const c=e.target.closest(".plan-card");if(!c||!c.dataset.plan)return;
+  const c=e.target.closest(".set-card");if(!c||!c.dataset.set)return;
   // the risky one asks twice, in place, naming the risk
-  if(c.classList.contains("risky")&&c.dataset.sure!=="1"){
-    c.dataset.sure="1";
-    c.querySelector("span").textContent=
-      "this installs models bigger than this Mac's memory and can crash "
-      +"it — click again to go ahead";
-    return;
-  }
+  if(!setConfirm("grid",c))return;
+  // a set ADDS what is missing and removes nothing (6b405); it becomes yours
   $("#manage-note").textContent="starting\u2026";
   let r={};
   try{r=await(await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({plan:c.dataset.plan})})).json();}
+    body:JSON.stringify({plan:c.dataset.set})})).json();}
   catch(e2){$("#manage-note").textContent="could not start \u2014 try again";return;}
+  plansRefresh();
   if(!(r.started||[]).length){
     $("#manage-note").textContent=r.n
       ?"already installed \u2014 nothing to download"
