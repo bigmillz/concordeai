@@ -742,6 +742,16 @@ class TestSlowdownIsNotReverted(Base):
         st = self.state()
         self.assertIn("ring gfx_0.0.0 timeout", st["reverted"])
         self.assertEqual((self.cap(), self.mclk()), (255 * W, 1000))
+        self.assertEqual(len(self.ollama.calls), 27)   # stopped there: no further answer was asked for
+
+    def test_a_real_amdgpu_error_in_a_stock_repeat_reverts_at_once_too(self):
+        def hang(n):
+            if n == 22:                                # during the first stock repeat
+                self.klog.append(RING_TIMEOUT)
+        self.run_on(incident, on_generate=hang)
+        self.assertIn("ring gfx_0.0.0 timeout", self.state()["reverted"])
+        self.assertEqual((self.cap(), self.mclk()), (255 * W, 1000))
+        self.assertEqual(len(self.ollama.calls), 22)   # stopped there: no further answer was asked for
 
     def test_an_amdgpu_error_in_the_first_load_is_not_softened_by_nvme_noise(self):
         def hang(n):
