@@ -217,13 +217,17 @@ def read_json_safe(path, default=None, max_bytes=1 << 20, check=None):
             os.close(fd)
 
 
-def write_json_atomic(path, obj, mode=0o640, group=None):
+def write_json_atomic(path, obj, mode=0o640, group=None, sync_dir=False):
     """Write counts/state JSON atomically. Only ever called with numbers,
     names and ids, never with request or response content.
 
     Mode and group are set on the open file (fchmod/fchown), never by path,
     so a symlink planted in the folder can't redirect them; the rename
-    replaces a planted symlink at `path` instead of writing through it."""
+    replaces a planted symlink at `path` instead of writing through it.
+
+    sync_dir=True also flushes the folder entry after the rename, so a power
+    cut right after the write can't bring the old file back (6b370: the sleep
+    setting)."""
     d = os.path.dirname(path)
     fd, tmp = tempfile.mkstemp(prefix=".tmp-", dir=d)
     try:
@@ -245,6 +249,15 @@ def write_json_atomic(path, obj, mode=0o640, group=None):
         except OSError:
             pass
         raise
+    if sync_dir:
+        try:
+            dfd = os.open(d or ".", os.O_RDONLY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except OSError:
+            pass
 
 
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._\-/]{0,127}(:[A-Za-z0-9._\-]{1,64})?$")

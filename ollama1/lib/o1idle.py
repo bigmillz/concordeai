@@ -88,9 +88,21 @@ def parse_config_update(obj):
     return out, ""
 
 
+def describe_config(cfg=None, path=None):
+    """One line for `ollama1-idle status`: the saved setting, as the root
+    service will read it."""
+    cfg = cfg or read_config(path)
+    if cfg["enabled"]:
+        return "auto sleep: on, after %d minutes idle (saved in %s)" % (cfg["minutes"], path or config_file())
+    return "auto sleep: off (saved: %d minutes when turned on; file %s)" % (cfg["minutes"], path or config_file())
+
+
 def write_config(cfg, path=None):
+    """Saved where it survives a restart of the gateway or this service, a
+    reboot and a setup.sh run: a state folder (never /run), written whole
+    through a temp file and a rename, the folder flushed, mode 0600."""
     cfg = clean_config(cfg)
-    write_json_atomic(path or config_file(), cfg, mode=0o600)
+    write_json_atomic(path or config_file(), cfg, mode=0o600, sync_dir=True)
     return cfg
 
 

@@ -988,6 +988,13 @@ MUTANTS = [
      'for v in "$1" "$2"; do', ["test_gputune"]),
     ("gpu-tune: setup's opt-out ignored", "lib/setuplib.sh",
      "off|0|no|false) echo off; return 0 ;;", "off|0|no|false) echo on; return 0 ;;", ["test_gputune"]),
+    ("sleep-config: the setting saved without flushing the folder", "lib/o1idle.py",
+     "mode=0o600, sync_dir=True)", "mode=0o600)", ["test_sleepcfg"]),
+    ("sleep-config: the setting saved under /run (lost at reboot)", "lib/o1idle.py",
+     'return os.path.join(Paths.gw_state, "sleep.json")', 'return os.path.join(Paths.run, "sleep.json")',
+     ["test_sleepcfg", "test_idle"]),
+    ("sleep-config: status doesn't print the saved setting", "bin/ollama1-idle",
+     "print(o1idle.describe_config())", "print('auto sleep')", ["test_sleepcfg"]),
 ]
 
 

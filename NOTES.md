@@ -9,6 +9,26 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b370 — the auto sleep setting is proven to stay saved (kit)
+
+- Patrick's report: the setting looked like it didn't stick. Server side it
+  does, and now tests say so: `tests/test_sleepcfg.py`. The setting is
+  `/var/lib/ollama1-gateway/sleep.json` (the gateway's StateDirectory, user
+  `o1gw`, mode 0600), not the `/var/lib/ollama1/sleep.json` record that holds
+  the last sleep/wake and the resume check. Tests: a new Gateway object (a
+  restart) and a new `Idle` read it back; it isn't under `/run`; no temp file
+  is left; a failed write keeps the old one; `setup.sh` (any flag) never
+  names it, writes it or removes the folder; tmpfiles doesn't clean it.
+- One real gap closed: `write_json_atomic(sync_dir=True)` now also flushes the
+  folder after the rename (the file was flushed, the rename was not), so a
+  power cut right after Save can't bring the old file back. Only
+  `write_config` uses it.
+- `sudo ollama1-idle status` prints the saved setting (and whether deep sleep
+  is supported). The nightly backup now includes the file (`settings.tar.gz`).
+- README: the stale "automatic idle sleep is on hold" line is replaced by what
+  it does and where the setting lives. The app reading the setting back is
+  the app's side, not the kit's.
+
 ## 6b365 — the stability test runs one load at a time by default (per Patrick)
 
 - `stability-test.sh` with no options ran "all" (cpu, memory and the card at

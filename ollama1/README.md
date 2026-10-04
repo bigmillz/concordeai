@@ -666,7 +666,15 @@ around a little from time to time.
     result of that check.
   - **Untested until someone tries it by hand.** AMD GPU compute (ROCm)
     after a suspend is a known weak spot.
-  - Automatic idle sleep and Wake-on-LAN are on hold.
+  - **Auto sleep** (the app's Settings > Your servers) suspends the server
+    after the minutes you pick with no real work (a request, a download or
+    tool, load, a busy card). The setting is one small file,
+    `/var/lib/ollama1-gateway/sleep.json` (mode 0600, written whole through a
+    rename and flushed, never under `/run`), so it stays across a restart of
+    the gateway or `ollama1-idle`, a reboot, and another run of `setup.sh`
+    (setup never touches it, whatever its flags). The nightly backup copies it
+    to `/srv/data`. `sudo ollama1-idle status` prints the saved setting.
+    Wake-on-LAN is set up by setup.sh for each card that can do it.
 - **LAN mode** is off by default. With it on, the gateway also answers on
   `http://<server-ip>:8431` from the home LAN, without Access. Signatures
   are still required, and traffic on the LAN is unencrypted. To change it:
