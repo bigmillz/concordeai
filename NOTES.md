@@ -9,6 +9,52 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b399 — hardware watchdog for a server that loses its system NVMe (per Patrick)
+
+The failure: the system NVMe drops off the bus, the machine stays up from memory
+(it pings, every program on disk gives "Input/output error", SSH resets) and only
+a manual power cycle brings it back. Built (kit only, `ollama1/`):
+`systemd/ollama1-watchdog.service`, `bin/ollama1-watchdog`, `lib/o1watchdog.py`
+(stdlib), `setup.sh --watchdog on|off` (default on; `WATCHDOG=` in setup.env, the
+way FANS/LEDS are saved), a pause/resume pair in the sleep hook, README "Hardware
+watchdog", `tests/test_watchdog.py` (82 tests on fakes), 29 mutants.
+
+- **Hardware only.** `sp5100_tco`, else `wdat_wdt`, loaded best effort from
+  `ExecStartPre=-+...load-modules` and kept at boot through
+  `/etc/modules-load.d/ollama1-watchdog.conf`, written by setup only when a device
+  showed up. `softdog` is never loaded and a watchdog whose sysfs identity says
+  "Software" is skipped: a frozen kernel cannot run it.
+- **What pets it.** Every 10 s, only after a probe that passed: write a token on
+  the root fs, fsync, drop it from the cache, read it back; stat (and read 4 KB
+  of) an entry on /srv/models when something is mounted there; read 4 KB of an
+  uncached root file at a different offset each time. The probe runs in a daemon
+  thread with an 8 s limit; a probe still stuck from an earlier turn is not
+  repeated (no pile of threads on a dead drive) and fails the turn at once.
+  Two failures in a row (about 20 s) and it stops petting for good (latched,
+  until restart) without closing the device; timeout 60 s (90 or 30 if the chip
+  refuses; the pet interval is a third of whatever the chip clamps it to).
+- **The close rules.** `V` + close disarms the Linux watchdog; any other close
+  leaves the timer running. `V` is written in one function (`_disarm`), called
+  from a stop of a healthy service and from the sleep pause. A crash, a kill,
+  `WatchdogSec`, a stop while failing or tripped: armed, and `Restart=always`
+  comes back in 2 s. The unit has no `ExecStopPost`, no memory/CPU cap,
+  `OOMScoreAdjust=-900`, and none of PrivateDevices/ProtectClock/DeviceAllow
+  (they would hide or close /dev/watchdog0; this was deliberate: ProtectClock in
+  particular is not used although the fan unit has it).
+- **Sleep.** The hook calls `ollama1-watchdog pause` (SIGUSR2; the service closes
+  with `V`, the hook waits up to 5 s for the status to say so) before suspend and
+  `resume` (SIGUSR1) first thing after waking; the service then waits for a probe
+  to pass before reopening, but at most 90 s, so a drive that never returns still
+  ends in a reset. A pause while tripped is ignored. A clock jump (CLOCK_BOOTTIME
+  ahead of CLOCK_MONOTONIC by more than 25 s) clears the failure count: the same
+  protection if the hook ever does not run. The hook guards on the file existing,
+  not on `systemctl is-active`, so the other hook tests' call logs are unchanged.
+- **Not done / unverified.** Nothing ran on the real board. Whether this board's
+  `sp5100_tco` starts and resets, whether the BIOS has its own timer, and how a
+  heavy `migrate-os` copy interacts with an 8 s fsync limit are for the server.
+  README has the by-hand drill and the MSI BIOS notes (Integrated Peripherals,
+  and "Restore after AC power loss" = Power On for remote power cycles).
+
 ## 6b396 — the panel's sleep line is the idle service's own decision; RAID check parsed (per Patrick)
 
 Two bugs on the real monitor.

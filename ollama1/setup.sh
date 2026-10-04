@@ -36,6 +36,9 @@
 #   sudo ./setup.sh --leds on|off    the case, board and cooler lights: 100% white when idle, red while the server
 #                                    works, white again 3 s after (ollama1-leds, through the openrgb package, which
 #                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
+#   sudo ./setup.sh --watchdog on|off   the hardware watchdog (ollama1-watchdog): the chipset's timer resets the board
+#                                    when the system disk stops answering (about 60 s), petted only while a real disk probe
+#                                    passes. Default on; also OLLAMA1_WATCHDOG=1|0; saved in setup.env
 #   sudo ./setup.sh --dash text|graphic|auto   what the server's monitor shows (also:
 #                                    OLLAMA1_DASH): auto (the default) draws the graphical panel
 #                                    when a monitor is connected, else the text dashboard; text
@@ -118,6 +121,7 @@ VG_RESERVE_GIB=0
 A_GPU_TUNE=""
 A_FANS=""
 A_LEDS=""
+A_WATCHDOG=""
 A_DASH=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
 A_OS=""; A_MODELS=""; A_HDD1=""; A_HDD2=""
@@ -125,6 +129,7 @@ prev=""
 for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
   if [ "$prev" = --leds ]; then A_LEDS=$a; leds_choice "$A_LEDS" "" "" >/dev/null || { echo "--leds takes on or off"; exit 2; }; prev=""; continue; fi
+  if [ "$prev" = --watchdog ]; then A_WATCHDOG=$a; watchdog_choice "$A_WATCHDOG" "" "" >/dev/null || { echo "--watchdog takes on or off"; exit 2; }; prev=""; continue; fi
   if [ "$prev" = --fans ]; then A_FANS=$a; fans_choice "$A_FANS" "" "" >/dev/null || { echo "--fans takes on or off"; exit 2; }; prev=""; continue; fi
   case "$prev" in
     --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
@@ -142,7 +147,7 @@ for a in "$@"; do
   case "$a" in
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
-    --vg-reserve|--fans|--leds|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --vg-reserve|--fans|--leds|--watchdog|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --dash|--vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
@@ -167,6 +172,8 @@ gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
 [ "$prev" != --fans ] || { echo "--fans takes on or off"; exit 2; }
 fans_choice "" "${OLLAMA1_FANS:-}" "" >/dev/null || { echo "OLLAMA1_FANS takes 1 or 0 (on or off)"; exit 2; }
+[ "$prev" != --watchdog ] || { echo "--watchdog takes on or off"; exit 2; }
+watchdog_choice "" "${OLLAMA1_WATCHDOG:-}" "" >/dev/null || { echo "OLLAMA1_WATCHDOG takes 1 or 0 (on or off)"; exit 2; }
 [ "$prev" != --leds ] || { echo "--leds takes on or off"; exit 2; }
 leds_choice "" "${OLLAMA1_LEDS:-}" "" >/dev/null || { echo "OLLAMA1_LEDS takes 1 or 0 (on or off)"; exit 2; }
 case "$prev" in --dash) echo "--dash takes text, graphic or auto"; exit 2 ;; esac
@@ -251,6 +258,7 @@ resolve_settings() {
     || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
   FANS=$(fans_choice "$A_FANS" "${OLLAMA1_FANS:-}" "$(saved FANS)") || die "the saved FANS in $SAVED is not on or off; give --fans on or --fans off"
   LEDS=$(leds_choice "$A_LEDS" "${OLLAMA1_LEDS:-}" "$(saved LEDS)") || die "the saved LEDS in $SAVED is not on or off; give --leds on or --leds off"
+  WATCHDOG=$(watchdog_choice "$A_WATCHDOG" "${OLLAMA1_WATCHDOG:-}" "$(saved WATCHDOG)") || die "the saved WATCHDOG in $SAVED is not on or off; give --watchdog on or --watchdog off"
   DASH=$(dash_mode_choice "$A_DASH" "${OLLAMA1_DASH:-}" "$(saved DASH)") \
     || die "the saved DASH in $SAVED is not text, graphic or auto; give --dash"
 }
@@ -290,6 +298,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
       printf 'FANS=%s\n' "$FANS"
       printf 'LEDS=%s\n' "$LEDS"
+      printf 'WATCHDOG=%s\n' "$WATCHDOG"
       if [ "$DASH" != auto ]; then printf 'DASH=%s\n' "$DASH"; fi
     } >"$t" )
   chown root:root "$t"; chmod 0600 "$t"; mv "$t" "$SAVED"
@@ -356,6 +365,7 @@ print_plan() {
    $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
    $(state 'systemctl is-active ollama1-fan')     $(fans_plan "$FANS")
    $(state 'systemctl is-active ollama1-leds')    $(leds_plan "$LEDS")
+   $(state 'systemctl is-active ollama1-watchdog')    $(watchdog_plan "$WATCHDOG")
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
@@ -704,6 +714,7 @@ ln -sfn "$LIBDIR/bin/ollama1-gpu-tune" /usr/local/sbin/ollama1-gpu-tune
 ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
 ln -sfn "$LIBDIR/bin/ollama1-fan" /usr/local/bin/ollama1-fan
 ln -sfn "$LIBDIR/bin/ollama1-leds" /usr/local/bin/ollama1-leds
+ln -sfn "$LIBDIR/bin/ollama1-watchdog" /usr/local/bin/ollama1-watchdog
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
@@ -1059,6 +1070,13 @@ step "Fans"
 # works (ollama1-leds, lib/o1leds.py). --leds off stops and disables both and removes nothing else.
 step "Lights"
 "$LIBDIR/bin/ollama1-leds" setup "$LEDS" || note "ollama1-leds setup stopped (see above); the lights are left as they were"
+
+# ---- 14d. hardware watchdog (6b399) -----------------------------------------------------------
+# ON unless --watchdog off (OLLAMA1_WATCHDOG=0; saved in setup.env): the chipset's timer resets the board when
+# the system disk stops answering (lib/o1watchdog.py). It loads sp5100_tco (else wdat_wdt, never softdog) and
+# keeps it at boot only when /dev/watchdog showed up. A clean stop of the service disarms the timer.
+step "Hardware watchdog"
+"$LIBDIR/bin/ollama1-watchdog" setup "$WATCHDOG" || note "ollama1-watchdog setup stopped (see above); the watchdog is left as it was"
 
 # ---- 15. Cloudflare -------------------------------------------------------------------------
 step "Cloudflare Tunnel and Access"

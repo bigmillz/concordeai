@@ -37,6 +37,8 @@ class Paths:
     gw_state = p("/var/lib/ollama1-gateway")
     counters = p("/var/lib/ollama1-gateway/counters.json")
     state = p("/var/lib/ollama1")
+    watchdog_status = p("/run/ollama1/watchdog.json")         # tmpfs: it is there until the reset (6b399)
+    watchdog_token = p("/var/lib/ollama1/watchdog.token")     # the hardware watchdog's disk probe writes this
     update_status = p("/var/lib/ollama1/ollama-update.json")
     helper_status = p("/var/lib/ollama1/actions.json")
     admin_state = p("/var/lib/ollama1-admin")

@@ -8,10 +8,18 @@
 # should keep the power limit and the memory clock across a suspend, and
 # ollama1-gpu-tune restore writes only what differs (and first reads this
 # boot's kernel log since it was set: an amdgpu error puts it back to stock).
+# The hardware watchdog (6b399) must not reset the machine across a sleep: before
+# suspending it closes the device cleanly ('V') and waits (at most 5 s) until that
+# is done; after waking it reopens as soon as the system disk answers (or 90 s at
+# the latest, so a drive that never comes back still ends in a reset).
 HELPER=${OLLAMA1_HELPER:-/usr/local/lib/ollama1/bin/ollama1-helper}
+WATCHDOG=${OLLAMA1_WATCHDOG:-/usr/local/lib/ollama1/bin/ollama1-watchdog}
 case "$1" in
-  pre) "$HELPER" stamp sleep ;;
+  pre)
+    [ ! -x "$WATCHDOG" ] || "$WATCHDOG" pause    # does nothing when the service is not running
+    "$HELPER" stamp sleep ;;
   post)
+    [ ! -x "$WATCHDOG" ] || "$WATCHDOG" resume
     "$HELPER" stamp wake
     systemctl start --no-block ollama1-resume-check.service
     if systemctl is-enabled --quiet ollama1-gpu-tune.service 2>/dev/null; then

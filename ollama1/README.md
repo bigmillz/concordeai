@@ -1020,6 +1020,98 @@ once. The lights are not turned off for sleep: the board decides.
 any error. The admin panel's CPU card shows one line, "Lights: ...". Logs:
 `journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
 
+## Hardware watchdog
+
+**On unless you say `--watchdog off`**: `sudo ./setup.sh --watchdog on|off` (or
+`OLLAMA1_WATCHDOG=1|0`; saved in `/etc/ollama1/setup.env`). It answers one
+failure: the system NVMe drops off the bus, the machine stays up from memory (it
+pings, nothing on disk can be read, every program gives "Input/output error",
+SSH resets) and only a power cycle brings it back. The chipset's own timer does
+that power cycle by itself: `ollama1-watchdog.service` arms it with a timeout of
+60 s (30 to 90 s if the chip limits it) and pets it every 10 s, but **only while
+a real health probe passes**.
+
+**Hardware only.** The driver is `sp5100_tco` (the AMD chipset's timer; on an
+MSI MEG X570 ACE it is the processor's own), else `wdat_wdt` (a timer described
+by ACPI). `softdog` is never used: it is software, and a frozen kernel cannot
+run it. A watchdog that calls itself "Software Watchdog" is skipped. The service
+loads the driver best effort from `ExecStartPre` (a `+` line, outside its
+sandbox); setup also writes `/etc/modules-load.d/ollama1-watchdog.conf`, and
+only when `/dev/watchdog0` really appeared.
+
+**The probe** (every 10 s, in a thread that is given 8 s, so a read stuck on a
+dead drive cannot stop the loop):
+
+| Check | What it does |
+|---|---|
+| `token` | writes a small token to `/var/lib/ollama1/watchdog.token`, fsyncs it, drops it from the page cache and reads it back |
+| `models` | when something is mounted at `/srv/models`: stats one of its entries and reads 4 KB of it (nothing mounted: skipped) |
+| `rootread` | reads 4 KB of a real file on the root filesystem (the Python program), at a different place each time, after `posix_fadvise(DONTNEED)`, so it is not from the cache |
+
+**Two probes in a row** that fail or time out (about 20 s) and the service
+**stops petting and does not close the device**, for good until it is restarted
+(a machine whose disk answers again is still reset: it has been dead). The board
+resets within the timeout, 60 s after the last pet. What failed goes to the
+journal (best effort: the journal may be on the dead drive) and to
+`/run/ollama1/watchdog.json` (a tmpfs: it is there until the reset). A machine
+that is only slow is not tripped: a probe has 8 s, two must fail one after the
+other, and a load of 20 or more does not do it (`test_watchdog.py` runs 24 busy
+processes). During a heavy copy (`migrate-os`) a probe can in principle take
+longer than 8 s twice; if that ever happens, `sudo systemctl stop
+ollama1-watchdog` for the duration (a clean stop disarms it) and start it again.
+
+**How it is closed.** Writing the magic character `V` and closing disarms the
+timer; closing any other way leaves it running. `V` is written in exactly two
+places: a deliberate `systemctl stop` of a healthy service, and the pause before
+sleep. A crash, a kill, a stop while a probe is failing, the unit's own
+`WatchdogSec=30`: the timer stays armed and `Restart=always` starts the service
+again within 2 s. The unit has no `ExecStopPost`, no memory or CPU limit,
+`OOMScoreAdjust=-900`, `ProtectSystem=strict` (it writes only `/run/ollama1` and
+`/var/lib/ollama1`), no network, and no `PrivateDevices`/`ProtectClock`/
+`DeviceAllow` (any of them would hide `/dev/watchdog0`).
+
+**Sleep.** The sleep hook runs `ollama1-watchdog pause` before suspend (the
+service closes the device with `V` and the hook waits up to 5 s until the status
+says so) and `ollama1-watchdog resume` first thing after the wake: the service
+reopens the device when the first probe passes (the drive may take a moment to
+come back), or 90 s after the wake at the latest, so a drive that never comes
+back still ends in a reset. A machine that slept without the hook (the clock
+that counts sleep runs ahead of the one that does not) has its failure count
+cleared. A pause while the watchdog has already tripped is ignored.
+
+**Status.** `ollama1-watchdog status` (no root; exit 1 when it is not healthy):
+the device and its driver, the timeout, whether it is petting and when it last
+did, the last probe with each check and its time, the failure count, and why it
+stopped if it did. `sudo ollama1-watchdog probe` runs one probe now and prints it.
+
+**In the BIOS.** The board may have a watchdog of its own, or leave the
+chipset's timer off, and both matter:
+
+- *MSI:* Settings, Advanced, **Integrated Peripherals** (some versions have a
+  **Watchdog** or **Watch Dog Timer** entry under Advanced). Leave the BIOS's own
+  watchdog **Disabled**: if the BIOS arms the timer first and keeps it running,
+  the kit's `ollama1-watchdog` still works (it sets the timeout when it opens the
+  device), but a BIOS timer with a short fixed timeout can reset the machine
+  before Linux boots. If `sudo modprobe sp5100_tco` finds no device, look for an
+  option such as "TCO timer" or "AMD fTPM/PSP watchdog" and enable it, and read
+  `journalctl -k | grep -i tco`.
+- *MSI:* Settings, Advanced, Power Management Setup: set
+  **Restore after AC power loss** to `Power On`, so a remote power cycle (a smart
+  plug off and on) brings the machine back by itself instead of waiting for the
+  power button.
+- systemd can use the same timer (`RuntimeWatchdogSec` in `/etc/systemd/system.conf`):
+  leave that off, only one program can hold `/dev/watchdog0` (the service says
+  "held by another program" when it cannot).
+
+**What the kit cannot know from here.** That your board's `sp5100_tco` really
+starts the timer and that the board resets (rather than only logging) on this
+firmware. Test it once, on purpose, with nothing running: stop the service
+(a clean stop, it disarms), open the device from a shell and never pet it:
+`sudo sh -c 'systemctl stop ollama1-watchdog && exec 3>/dev/watchdog0 && sleep 300'`.
+The board must reset about 60 s later (the timeout in `ollama1-watchdog status`);
+the service starts again at boot. Killing the service does not test it: it
+restarts in 2 s and pets again.
+
 ## Power and electricity cost
 
 The panel's **Power and cost** card shows what the server draws now (with
@@ -1475,6 +1567,7 @@ With a bridge, the firewall is set so it can't cut the other device off:
 | GPU seen by Ollama | `journalctl -u ollama \| grep -i "inference compute"` should say ROCm, gfx1030. The RX 6900 XT is supported as is, so `HSA_OVERRIDE_GFX_VERSION` is not set. If Ollama ever reports no GPU, the gateway refuses every model instead of running it on the CPU |
 | Mirror | `cat /proc/mdstat`, `sudo mdadm --detail /dev/md/o1data` |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
+| Watchdog | `ollama1-watchdog status`; `journalctl -u ollama1-watchdog`; off: `sudo ./setup.sh --watchdog off`; see "Hardware watchdog" |
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
 | Lights | `ollama1-leds status`; `journalctl -u ollama1-leds -u ollama1-openrgb`; off: `sudo ./setup.sh --leds off` |
 | System move to the other NVMe | `cat /srv/data/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |

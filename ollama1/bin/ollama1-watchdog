@@ -1,0 +1,76 @@
+#!/usr/bin/python3
+"""ollama1-watchdog: the server's hardware watchdog (6b399). The chipset's timer
+resets the board when the system disk stops answering: it is petted every 10 s
+only while a real probe (write and read back a token on the root filesystem, a
+stat on /srv/models, a 4 KB read of an uncached root file) passes. See
+lib/o1watchdog.py and the README.
+
+  ollama1-watchdog status     device, timeout, the last probes and when, whether it is
+                              petting (no root needed; exit 1 when it is not healthy)
+
+Used by the system:
+  run             ollama1-watchdog.service
+  load-modules    its ExecStartPre: modprobe sp5100_tco (else wdat_wdt; never softdog)
+  pause, resume   the sleep hook: close the device cleanly before suspend, reopen after
+  probe           run the health probe once, now, and print it (root)
+  setup on|off    setup.sh's step (--watchdog on|off)
+"""
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1watchdog  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)
+
+
+def need_root(cmd):
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("Run it with sudo: sudo ollama1-watchdog " + cmd, file=sys.stderr)
+        sys.exit(1)
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if cmd == "status":
+        st = o1watchdog.read_status()
+        dev = o1watchdog.find_device()
+        facts = o1watchdog.sysfs_facts(st["device"].rsplit("/", 1)[-1]) if st and st.get("device") else (
+            dict(o1watchdog.sysfs_facts(dev["name"]), name=dev["name"]) if dev else None)
+        print(o1watchdog.render_status(st, time.time(), facts))
+        word, ok = o1watchdog.status_verdict(st, time.time())
+        return 0 if ok else 1
+    if cmd not in ("run", "load-modules", "pause", "resume", "probe", "setup"):
+        print("usage: ollama1-watchdog status", file=sys.stderr)
+        return 2
+    need_root(cmd)
+    if cmd == "run":
+        return o1watchdog.run_service()
+    if cmd == "load-modules":
+        o1watchdog.load_modules(log=log)
+        return 0                                  # best effort: never fatal
+    if cmd in ("pause", "resume"):
+        o1watchdog.sleep_signal(cmd, log=log)
+        return 0                                  # never holds up a suspend or a wake
+    if cmd == "probe":
+        res = o1watchdog.real_probe(o1watchdog.ProbeConfig())
+        for c in res["checks"]:
+            print("%-9s %-4s %5.2f s  %s" % (c["name"], "ok" if c["ok"] else "FAIL", c["took_s"], c["detail"]))
+        return 0 if res["ok"] else 1
+    choice = argv[2] if len(argv) > 2 else ""
+    if choice not in ("on", "off"):
+        print("usage: ollama1-watchdog setup on|off", file=sys.stderr)
+        return 2
+    return o1watchdog.setup(choice, log=log)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

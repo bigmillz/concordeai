@@ -136,6 +136,29 @@ leds_plan() { # the plan's line for the lights (6b395)
   fi
 }
 
+watchdog_choice() { # FLAG ENV SAVED -> "on" or "off" (6b399): the flag, else the environment (OLLAMA1_WATCHDOG), else what
+  # an earlier run saved, else "on": the hardware watchdog resets a server whose system disk has stopped answering.
+  # Fails on a value it doesn't know.
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      on|1|yes|true) echo on; return 0 ;;
+      off|0|no|false) echo off; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo on
+}
+
+watchdog_plan() { # the plan's line for the hardware watchdog (6b399)
+  if [ "$1" = off ]; then
+    printf 'Watchdog OFF (--watchdog off): nothing resets the board when the system disk stops answering. On: --watchdog on'
+  else
+    printf 'Watchdog ON: the chipset timer resets the board (about 60 s) when the system disk stops answering; petted every 10 s only while a real disk probe passes (ollama1-watchdog). Off: --watchdog off'
+  fi
+}
+
 saved() { # KEY -> its value from the file an earlier run wrote, if any
   [ -r "$SAVED" ] || return 0
   sed -n "s/^$1=//p" "$SAVED" | head -n1
