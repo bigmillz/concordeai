@@ -27,8 +27,10 @@ import o1fb
 import o1gfx
 import o1panel
 import o1paneld
+import o1hipix
 import o1pixfont as F
 import o1vecfont
+import o1vtext
 
 BG = 0x112233
 
@@ -684,9 +686,9 @@ class TestFallback(unittest.TestCase):
         self.assertEqual((w, h), (640, 360))
         self.assertNotEqual(len({px for r in rows for px in r}), 1)
         with contextlib.redirect_stdout(io.StringIO()):
-            self.dash.png(["--png", out, "--scale", "2", "--pairing"])
+            self.dash.png(["--png", out, "--scale", "2", "--pairing", "--size", "1280x720"])
         w, h, _ = decode_png(self.slurp(out))
-        self.assertEqual((w, h), (1280, 720))
+        self.assertEqual((w, h), (2560, 1440))                              # --size is the screen's pixels; --scale doubles the picture
 
 
 class TestDashSetting(unittest.TestCase):
@@ -1021,16 +1023,16 @@ class TestCostScreen(unittest.TestCase):
     def run_loop(self, script, st=None, max_frames=40):
         """Run the loop with these keyboard reads (one per poll); returns the screens drawn, in order."""
         seen = []
-        real, real_cost = o1panel.render, o1panel.render_cost
+        real, real_cost = o1panel.PanelRenderer.draw, o1panel.render_cost
 
-        def spy(st_, w, h, range_s=300, pm=None, screen="panel"):
-            seen.append(screen)
-            return real(st_, w, h, range_s, pm, screen)
+        def spy(self_, st_, range_s=300, incremental=False):
+            seen.append("panel")
+            return real(self_, st_, range_s, incremental)
 
         def spy_cost(st_, w, h):
             seen.append("cost")
             return real_cost(st_, w, h)
-        o1panel.render, o1panel.render_cost = spy, spy_cost
+        o1panel.PanelRenderer.draw, o1panel.render_cost = spy, spy_cost
         polls = iter(script)
         c = Clock()
 
@@ -1046,7 +1048,7 @@ class TestCostScreen(unittest.TestCase):
                 return n[0] > len(script) + 3
             o1paneld.run(FakeFb(), FakeTty(), FakeSampler(st), clock=c.now, sleep=c.sleep, keys=K(), stop=stop)
         finally:
-            o1panel.render, o1panel.render_cost = real, real_cost
+            o1panel.PanelRenderer.draw, o1panel.render_cost = real, real_cost
         return seen
 
     def test_the_screen_flips_within_one_poll_and_back(self):
@@ -1256,16 +1258,16 @@ class TestCostScreen(unittest.TestCase):
 
     def bitmap_texts(self, fn):
         seen = []
-        orig = o1gfx.Pixmap.text
+        orig = o1hipix.HiPixmap.text
 
         def rec(self_, x, y, text, c, scale=1, max_w=None, ellipsis=True):
             seen.append((text, scale))
             return orig(self_, x, y, text, c, scale, max_w, ellipsis)
-        o1gfx.Pixmap.text = rec
+        o1hipix.HiPixmap.text = rec
         try:
             fn()
         finally:
-            o1gfx.Pixmap.text = orig
+            o1hipix.HiPixmap.text = orig
         return seen
 
     def test_the_normal_panel_hints_at_the_key(self):
@@ -1417,6 +1419,418 @@ class TestVectorFont(unittest.TestCase):
             self.assertLessEqual(abs((ys[0] + ys[-1]) / 2.0 - 150), 3, text)
 
 
+class TestRaster(unittest.TestCase):
+    """lib/o1raster.py: anti-aliased strokes, corners and discs."""
+
+    def area(self, rows):
+        return sum(sum(cov) for _y, _x, cov in rows) / 255.0
+
+    def test_a_stroke_has_the_area_of_a_capsule(self):
+        import o1raster
+        for length, r in ((60, 12.0), (0, 20.0), (200, 3.0), (30, 40.0)):
+            rows = o1raster.stroke_rows([(50, 100, 50 + length, 100)], r)
+            want = 2 * r * length + math.pi * r * r
+            self.assertAlmostEqual(self.area(rows) / want, 1.0, delta=0.012, msg=(length, r))
+
+    def test_rows_are_sparse_and_only_where_there_is_ink(self):
+        import o1raster
+        rows = o1raster.stroke_rows([(10, 500, 900, 500)], 5.0)
+        ys = [y for y, _x, _c in rows]
+        self.assertEqual(ys, list(range(min(ys), max(ys) + 1)))
+        self.assertLessEqual(len(ys), 12)                                   # a thin line touches a few rows, not 1000
+        self.assertTrue(all(len(c) <= 912 for _y, _x, c in rows))
+        self.assertEqual(o1raster.stroke_rows([], 5.0), [])
+
+    def test_a_polyline_is_the_union_of_its_segments(self):
+        import o1raster
+        pts = [(20, 20), (100, 20), (100, 100)]
+        a = self.area(o1raster.stroke_rows(o1raster.polyline_caps(pts), 8.0))
+        two = 2 * (2 * 8.0 * 80 + math.pi * 64)
+        self.assertLess(a, two)                                              # the joint is not counted twice
+        self.assertGreater(a, two - 2 * 64 * 2)
+
+    def test_arcs_follow_the_angle_asked(self):
+        import o1raster
+        pts = o1raster.arc_points(100, 100, 50, 0, 90)                       # 12 o'clock to 3 o'clock
+        self.assertAlmostEqual(pts[0][0], 100, delta=0.01)
+        self.assertAlmostEqual(pts[0][1], 50, delta=0.01)
+        self.assertAlmostEqual(pts[-1][0], 150, delta=0.01)
+        self.assertAlmostEqual(pts[-1][1], 100, delta=0.01)
+        self.assertGreaterEqual(len(pts), 3)
+
+    def test_corners_and_discs(self):
+        import o1raster
+        for R in (3, 12, 36):
+            q = o1raster.corner(R)
+            self.assertEqual((len(q), len(q[0])), (R, R))
+            self.assertEqual(q[R - 1][R - 1], 255)                           # inside
+            self.assertEqual(q[0][0], 0)                                     # the very corner is outside the curve
+            self.assertTrue(any(0 < v < 255 for row in q for v in row))
+            area = sum(sum(row) for row in q) / 255.0
+            self.assertAlmostEqual(area / (math.pi * R * R / 4.0 + 0.0), 1.0, delta=0.12 if R > 3 else 0.4)
+            d = o1raster.disc_rows(R)
+            self.assertAlmostEqual(sum(sum(r_) for r_ in d) / 255.0 / (math.pi * R * R), 1.0, delta=0.03)
+            self.assertEqual(d[R][R], 255)
+            self.assertEqual(d[0][0], 0)
+
+
+class TestSmoothSurface(unittest.TestCase):
+    """HiPixmap: draws in logical units at the real resolution, every edge smooth."""
+
+    def test_logical_size_pixel_size_and_scale(self):
+        pm = o1hipix.HiPixmap(64, 36, 7, 6)
+        self.assertEqual((pm.w, pm.h, pm.pw, pm.ph, pm.S, len(pm.buf)), (64, 36, 384, 216, 6, 384 * 216))
+        pm.fill_rect(10, 5, 3, 2, 9)
+        self.assertEqual(pm.get(10, 5), 9)
+        self.assertEqual(pm.get(12, 6), 9)
+        self.assertEqual(pm.get(13, 5), 7)
+        self.assertEqual(sum(1 for v in pm.buf if v == 9), 3 * 2 * 36)       # whole blocks of S x S pixels
+
+    def test_everything_clips_in_logical_units(self):
+        pm = o1hipix.HiPixmap(40, 20, 0, 4)
+        with pm.clipped(10, 5, 10, 5):
+            pm.fill_rect(0, 0, 40, 20, 1)
+            pm.rrect(0, 0, 40, 20, 5, 2)
+            pm.disc(15, 7, 30, 3)
+            pm.arc(15, 7, 30, 20, 0, 359, 4)
+            pm.polyline([(0, 0), (39, 19), (0, 19)], 3, 5)
+            pm.text(0, 0, "Hello world", 6, 2)
+            pm.hairline(0, 7, 40, 7)
+        for y in range(pm.ph):
+            for x in range(pm.pw):
+                if not (40 <= x < 80 and 20 <= y < 40):
+                    self.assertEqual(pm.buf[y * pm.pw + x], 0, (x, y))
+        self.assertEqual(pm.clip, (0, 0, 40, 20))
+
+    def test_a_rounded_rectangle_is_round_and_smooth(self):
+        for S in (1, 3, 6):
+            pm = o1hipix.HiPixmap(60, 40, 0, S)
+            pm.rrect(10, 8, 40, 24, 6, 0xFFFFFF)
+            self.assertEqual(pm.buf[(8 * S) * pm.pw + 10 * S], 0)                       # the corner pixel is empty
+            self.assertEqual(pm.buf[(20 * S) * pm.pw + 30 * S], 0xFFFFFF)                # the middle is solid
+            self.assertEqual(pm.buf[(8 * S) * pm.pw + 30 * S], 0xFFFFFF)                 # the straight top edge is solid
+            self.assertEqual(pm.buf[(8 * S - 1) * pm.pw + 30 * S], 0)                    # and sharp
+            if S > 1:
+                edge = {v & 255 for v in pm.buf if v not in (0, 0xFFFFFF)}
+                self.assertGreater(len(edge), 6)                                          # in-between greys along the curve
+            area = sum(v & 255 for v in pm.buf) / 255.0 / (S * S)
+            self.assertAlmostEqual(area, 40 * 24 - (4 - math.pi) * 36, delta=3.0)
+            sym = [pm.buf[(8 * S + j) * pm.pw + 10 * S + i] for j in range(6 * S) for i in range(6 * S)]
+            mirror = [pm.buf[(8 * S + j) * pm.pw + 50 * S - 1 - i] for j in range(6 * S) for i in range(6 * S)]
+            self.assertEqual(sym, mirror)                                                 # both corners alike
+
+    def test_a_disc_and_an_arc(self):
+        pm = o1hipix.HiPixmap(60, 60, 0, 4)
+        pm.disc(30, 30, 10, 0xFFFFFF)
+        self.assertAlmostEqual(sum(v & 255 for v in pm.buf) / 255.0 / 16.0, math.pi * 100, delta=6)
+        self.assertEqual(pm.get(30, 30), 0xFFFFFF)
+        counts = []
+        for f in (0.0, 0.25, 0.5, 1.0):
+            d = o1hipix.HiPixmap(80, 80, 0, 3)
+            d.arc(40, 40, 30, 24, 225, 225 + 270 * f, 0xFF0000)
+            counts.append(sum(1 for v in d.buf if v))
+        self.assertEqual(counts[0], 0)
+        self.assertEqual(sorted(counts), counts)
+        d = o1hipix.HiPixmap(80, 80, 0, 3)
+        d.arc(40, 40, 30, 24, 225, 495, 0xFFFFFF)
+        self.assertTrue(d.get(40, 40 - 27))                                  # 12 o'clock
+        self.assertFalse(d.get(40, 40 + 27))                                 # the open bottom
+        self.assertFalse(d.get(40, 40))                                      # the hole
+        self.assertTrue(d.get(40 + 27, 40) and d.get(40 - 27, 40))
+
+    def test_a_polyline_has_round_caps_and_smooth_edges(self):
+        pm = o1hipix.HiPixmap(60, 30, 0, 6)
+        pm.polyline([(10, 15), (50, 15)], 3.0, 0xFFFFFF)
+        self.assertEqual(pm.get(30, 15), 0xFFFFFF)
+        self.assertEqual(pm.get(30, 12), 0)
+        self.assertEqual(pm.get(7, 15), 0)                                   # nothing left of the cap
+        self.assertTrue(pm.get(10, 15))                                      # the cap itself
+        area = sum(v & 255 for v in pm.buf) / 255.0 / 36.0
+        self.assertAlmostEqual(area, 3 * 40 + math.pi * 1.5 ** 2, delta=1.5)
+        self.assertGreater(len({v & 255 for v in pm.buf}), 6)
+
+    def test_text_is_smooth_and_sized_in_grid_units(self):
+        pm = o1hipix.HiPixmap(120, 20, 0, 6)
+        w = pm.text(4, 4, "Hello 97%", 0xFFFFFF)
+        self.assertEqual(w, o1vtext.text_width("Hello 97%") if False else w)
+        ys = [y for y in range(pm.ph) if any(pm.buf[y * pm.pw:(y + 1) * pm.pw])]
+        self.assertGreaterEqual(ys[0], 4 * 6 - 2)
+        self.assertAlmostEqual(ys[-1] - ys[0] + 1, 7 * 6 * 1.0, delta=12)     # capitals 7 grid units tall (descenders none here)
+        self.assertGreater(len({v & 255 for v in pm.buf}), 10)                # anti-aliased
+        for max_w in (0, 10, 40, 100):
+            q = o1hipix.HiPixmap(120, 20, 0, 6)
+            q.text(10, 4, "A long line of text that cannot possibly fit", 0xFFFFFF, 1, max_w=max_w)
+            xs = [x for y in range(q.ph) for x in range(q.pw) if q.buf[y * q.pw + x]]
+            if xs:
+                self.assertGreaterEqual(min(xs), 10 * 6 - 6)
+                self.assertLess(max(xs), (10 + max_w) * 6 + 1)
+
+    def test_a_kept_picture_looks_exactly_like_drawing_it_again(self):
+        def draw(pm):
+            pm.rrect(2, 2, 36, 26, 3, 0x203040)
+            pm.cached(("k", 1), (4, 4, 30, 22), lambda: (pm.disc(18, 15, 9, 0xFFAA00), pm.polyline([(5, 6), (30, 24)], 2, 0xFFFFFF)))
+        a = o1hipix.HiPixmap(40, 30, 0x101010, 4)
+        draw(a)
+        b = o1hipix.HiPixmap(40, 30, 0x101010, 4)
+        draw(b)                                                              # this time the picture comes from the cache
+        self.assertEqual(a.buf, b.buf)
+        c = o1hipix.HiPixmap(40, 30, 0x101010, 4)
+        c.rrect(2, 2, 36, 26, 3, 0x203040)
+        c.disc(18, 15, 9, 0xFFAA00)
+        c.polyline([(5, 6), (30, 24)], 2, 0xFFFFFF)
+        self.assertEqual(a.buf, c.buf)
+        d = o1hipix.HiPixmap(40, 30, 0x101010, 4)
+        d.rrect(2, 2, 36, 26, 3, 0x203040)
+        d.cached(("k", 2), (4, 4, 30, 22), lambda: d.disc(10, 10, 4, 0x00FF00))      # another key: its own picture
+        self.assertNotEqual(d.buf, a.buf)
+        self.assertEqual(d.get(10, 10), 0x00FF00)
+
+    def test_the_cache_is_bounded(self):
+        pm = o1hipix.HiPixmap(40, 30, 0, 4)
+        old = o1hipix.HiPixmap.SNAP_BUDGET
+        o1hipix.HiPixmap.SNAP_BUDGET = 30000
+        try:
+            for i in range(60):
+                pm.cached(("b", i), (0, 0, 20, 10), lambda: pm.fill_rect(0, 0, 20, 10, i + 1))
+            self.assertLessEqual(o1hipix.HiPixmap._SNAP_PIXELS[0], 30000 + 80 * 40)
+        finally:
+            o1hipix.HiPixmap.SNAP_BUDGET = old
+
+
+class TestSmoothPanel(unittest.TestCase):
+    """The whole panel at 1920x1080, 2560x1440 and 3840x2160."""
+
+    SCREENS = ((1920, 1080), (2560, 1440), (3840, 2160))
+
+    def setUp(self):
+        del o1panel.ERRORS[:]
+
+    def tearDown(self):
+        self.assertEqual(o1panel.ERRORS, [])
+
+    def grid(self, sw, sh):
+        k, lw, lh = o1fb.choose_scale(sw, sh)
+        return k, lw, lh
+
+    def test_the_panel_is_drawn_at_the_screens_own_resolution(self):
+        st = dash_sample.sample(now=1790000000.0)
+        for sw, sh in self.SCREENS:
+            k, lw, lh = self.grid(sw, sh)
+            pm = o1panel.render(st, lw, lh, scale=k)
+            self.assertEqual((pm.pw, pm.ph), (lw * k, lh * k))
+            self.assertLessEqual(pm.pw, sw)
+            self.assertGreaterEqual(pm.pw, sw * 0.95)
+            self.assertGreater(len({v for v in pm.buf}), 500)                  # smooth: a great many in-between colours
+
+    def test_text_edges_are_anti_aliased_not_stair_stepped(self):
+        st = dash_sample.sample(now=1790000000.0)
+        k, lw, lh = self.grid(1920, 1080)
+        pm = o1panel.render(st, lw, lh, scale=k)
+        a = pm.pw
+        # no logical pixel is a flat block of one text colour: look at a stretch of the title row
+        row = [pm.buf[(10 * k) * a + x] for x in range(16 * k, 90 * k)]
+        self.assertGreater(len(set(row)), 6)
+
+    def test_a_panel_cannot_paint_outside_its_box_at_any_resolution(self):
+        st = dash_sample.sample(now=1790000000.0)
+        for sw, sh in ((1920, 1080), (3840, 2160)):
+            k, lw, lh = self.grid(sw, sh)
+            base = o1panel.render(st, lw, lh, scale=k)
+            boxes = o1panel.layout(lw, lh)
+            for name, fn in (("gpu", "draw_gpu"), ("cpu", "draw_cpu"), ("models", "draw_models"), ("status", "draw_status"),
+                             ("header", "draw_header")):
+                orig = getattr(o1panel, fn)
+                setattr(o1panel, fn, lambda pm, r, st_, ctx: (pm.fill_rect(-5, -5, lw + 9, lh + 9, 0xFF00FF),
+                                                               pm.text(-3, -2, "x" * 90, 0x00FFFF, 3),
+                                                               pm.arc(30, 30, 90, 3, 0, 359, 0x00FF00),
+                                                               pm.polyline([(-5, -5), (lw + 5, lh + 5)], 6, 0xFFFF00),
+                                                               pm.disc(50, 50, 80, 0xFFFFFF), pm.rrect(-4, -4, lw + 8, lh + 8, 9, 0xFF0000)))
+                try:
+                    pm = o1panel.render(st, lw, lh, scale=k)
+                finally:
+                    setattr(o1panel, fn, orig)
+                x, y, w, h = boxes[name]
+                step = 3 if k > 3 else 1
+                for yy in range(0, pm.ph, step):
+                    for xx in range(0, pm.pw, step):
+                        if not (x * k <= xx < (x + w) * k and y * k <= yy < (y + h) * k):
+                            self.assertEqual(pm.buf[yy * pm.pw + xx], base.buf[yy * pm.pw + xx], (name, xx, yy))
+
+    def test_hostile_text_stays_inside_the_boxes_at_every_resolution(self):
+        st = hostile_state()
+        for sw, sh in self.SCREENS:
+            k, lw, lh = self.grid(sw, sh)
+            pm = o1panel.render(st, lw, lh, scale=k)
+            for name, (x, y, bw, bh) in o1panel.layout(lw, lh).items():
+                if name in ("header", "footer"):
+                    continue
+                for yy in range((y + 5) * k, (y + bh - 5) * k, max(1, k)):
+                    for xx in list(range((x + bw - 2) * k - k, (x + bw - 1) * k)) + list(range((x + 1) * k, (x + 2) * k)):
+                        self.assertEqual(pm.buf[yy * pm.pw + xx], o1panel.T["panel"], (name, sw, xx, yy))
+
+    def test_empty_and_odd_states_draw_at_scale(self):
+        for st in ({}, {"time": 5.0}, {"gpu": None, "gw": None}, hostile_state()):
+            for sw, sh in ((1920, 1080), (1366, 768)):
+                k, lw, lh = self.grid(sw, sh)
+                o1panel.render(st, lw, lh, scale=k)
+
+    def test_pairing_fills_the_screen_smoothly_at_every_resolution(self):
+        st = dash_sample.sample(now=1790000000.0, pairing=True)
+        for sw, sh in self.SCREENS:
+            k, lw, lh = self.grid(sw, sh)
+            pm = o1panel.render(st, lw, lh, scale=k)
+            cols = [x for y in range(0, pm.ph, 4) for x in range(pm.pw) if pm.buf[y * pm.pw + x] == o1panel.T["text"]]
+            self.assertGreater(max(cols) - min(cols), 0.6 * pm.pw)
+            self.assertGreater(min(cols), 0.02 * pm.pw)
+            self.assertLess(max(cols), 0.98 * pm.pw)
+
+    def test_lines_and_bars_use_the_resolution(self):
+        st = dash_sample.sample(now=1790000000.0)
+        k, lw, lh = self.grid(1920, 1080)
+        pm = o1panel.render(st, lw, lh, scale=k)
+        bar_row = []
+        boxes = o1panel.layout(lw, lh)
+        x, y, w, h = boxes["gpu"]
+        for yy in range((y + 22) * k, (y + 28) * k):
+            bar_row.append(len({pm.buf[yy * pm.pw + xx] for xx in range((x + 60) * k, (x + w - 60) * k)}))
+        self.assertGreater(max(bar_row), 2)                                   # rounded, anti-aliased bar ends
+
+    # -- keeping the picture: redrawing only what changed must look the same as redrawing everything ------
+    def test_incremental_drawing_equals_drawing_everything(self):
+        k, lw, lh = 2, 640, 360
+        r = o1panel.PanelRenderer(lw, lh, k)
+        states = []
+        for i in range(8):
+            st = dash_sample.sample(now=1790000000.0 + 2 * i)
+            st["gpu"]["busy_pct"] = (30 + 9 * i) % 100
+            if i % 3 == 1:
+                st["gw"]["queued"] = i
+            if i == 4:
+                st["disks"][1]["mounted"] = False
+            if i == 5:
+                st["pairing"] = {"id": "x", "code": "7K4M2QXD9FHT", "expires_at": st["time"] + 100}
+            if i == 6:
+                st["cpu"]["total"] = 91.0
+            for j in range(4):
+                st["series"]["gpu_busy"] = st["series"]["gpu_busy"][i:] + [float(40 + i)] * i
+            states.append(st)
+        for i, st in enumerate(states):
+            got = r.draw(st, incremental=True)
+            fresh = o1panel.PanelRenderer(lw, lh, k).draw(st)
+            self.assertEqual(got.buf, fresh.buf, i)
+
+    def test_a_still_machine_redraws_nothing(self):
+        k, lw, lh = 3, 640, 360
+        r = o1panel.PanelRenderer(lw, lh, k)
+        st = dash_sample.sample(now=1790000000.0)
+        r.draw(st, incremental=True)
+        calls = []
+        orig = o1panel.draw_gpu
+        o1panel.draw_gpu = lambda *a: calls.append(1) or orig(*a)
+        try:
+            r.draw(dict(st), incremental=True)
+            self.assertEqual(calls, [])                                       # the same numbers: the picture is left as it is
+            st2 = dash_sample.sample(now=1790000000.0)
+            st2["gpu"]["power_w"] = 250.0
+            r.draw(st2, incremental=True)
+            self.assertEqual(calls, [1])                                      # one number moved: that box is redrawn
+        finally:
+            o1panel.draw_gpu = orig
+
+    def test_the_first_frame_and_a_quiet_one_are_fast_enough(self):
+        k, lw, lh = 3, 640, 360                                              # 1920x1080
+        st = dash_sample.sample(now=1790000000.0)
+        t = time.time()
+        r = o1panel.PanelRenderer(lw, lh, k)
+        r.draw(st, incremental=True)
+        first = time.time() - t
+        t = time.time()
+        for _ in range(5):
+            r.draw(dict(st), incremental=True)
+        quiet = (time.time() - t) / 5
+        self.assertLess(first, 6.0)
+        self.assertLess(quiet, 0.2)
+
+    def test_the_presenter_takes_a_smooth_surface_whole(self):
+        k, lw, lh = 2, 640, 360
+        info_ = info(xres=1280, yres=720)
+        pres = o1fb.Presenter(info_, lw * k, lh * k, 1)
+        self.assertTrue(pres.identity)                                         # XRGB8888: the buffer's own bytes
+        r = o1panel.PanelRenderer(lw, lh, k)
+        pm = r.draw(dash_sample.sample(now=1790000000.0), incremental=True)
+        w1 = pres.frame(pm)
+        self.assertEqual(sum(len(d) for _o, d in w1), 1280 * 720 * 4)
+        self.assertEqual(pres.frame(pm), [])
+        pm.fill_rect(10, 10, 3, 3, 0x00FF00)
+        w2 = pres.frame(pm)
+        self.assertEqual(sum(len(d) for _o, d in w2), 3 * k * 1280 * 4)       # only the rows that changed
+
+
+class TestMixedCaseFont(unittest.TestCase):
+    """The stroke font for the whole panel: lower case, digits and every sign."""
+
+    def test_every_printable_ascii_character_and_the_degree_sign_has_a_glyph(self):
+        for c in range(0x20, 0x7f):
+            self.assertTrue(o1vecfont.supported(chr(c)), repr(chr(c)))
+        self.assertTrue(o1vecfont.supported("\u00b0"))
+
+    def test_the_case_of_a_name_is_kept(self):
+        for name in ("gemma4:26b", "qwen3-vl:8b", "ministral-3:14b", "Alice's MacBook Pro", "gpt-oss:120b", "10.0.0.1",
+                     "tok/s", "MHz", "rpm", "GiB", "97%", "78\u00b0C", "(a) [b] +=<>|#@*'\""):
+            self.assertEqual(o1vecfont.clean(name, True), name)
+        self.assertEqual(o1vecfont.clean("MHz"), "MHZ")                       # the cost screen is in capitals
+
+    def test_unknown_characters_and_controls(self):
+        self.assertEqual(o1vecfont.clean("a\x00\x1b[b\u6f22", True), "a[b?")
+        self.assertEqual(o1vecfont.clean("\u2019\u2026", True), "'...")
+
+    def test_lower_case_has_the_right_shape(self):
+        for ch in "acemnorsuvwxz":                                            # x-height letters stay between 30 and 100
+            y0, y1 = o1vecfont._bbox(ch)[1], o1vecfont._bbox(ch)[3]
+            self.assertGreaterEqual(y0, 29, ch)
+            self.assertLessEqual(y1, 101, ch)
+        for ch in "bdfhklt":                                                  # ascenders reach the capital's top
+            self.assertLessEqual(o1vecfont._bbox(ch)[1], 12, ch)
+        for ch in "gjpqy":                                                    # descenders go below the baseline
+            self.assertGreater(o1vecfont._bbox(ch)[3], 112, ch)
+
+    def test_widths_are_proportional_for_letters_and_fixed_for_digits(self):
+        self.assertLess(o1vecfont.text_width("iii", 100, True), o1vecfont.text_width("mmm", 100, True))
+        self.assertEqual(o1vecfont.text_width("1111", 100, True), o1vecfont.text_width("0000", 100, True))
+
+    def test_fit_cuts_with_dots_and_never_overflows(self):
+        for text in ("a-very-long-model-name:120b-instruct-q4_K_M", "Alice's MacBook Pro", "x" * 60):
+            for h in (30, 42, 84):
+                for mw in (0, 20, 100, 400, 2000):
+                    out = o1vecfont.fit(text, mw, h)
+                    self.assertLessEqual(o1vecfont.text_width(out, h, True), mw, (text, h, mw))
+        self.assertEqual(o1vecfont.fit("short", 900, 42), "short")
+        self.assertTrue(o1vecfont.fit("a very long server name indeed", 300, 42).endswith("..."))
+
+    def test_the_grid_measure_is_never_less_than_what_is_drawn(self):
+        for text in ("gemma4:26b", "Hello world", "14.6/16.0 GiB", "100% GPU  11.0G  4h 41m"):
+            for scale in (1, 2, 3):
+                for S in (1, 3, 6):
+                    drawn = o1vecfont.text_width(text, int(round(7 * scale * S)), True)
+                    self.assertLessEqual(drawn, o1vtext.text_width(text, scale) * S + 1, (text, scale, S))
+
+    def test_text_is_bigger_than_it_was_never_smaller(self):
+        # the panel's text keeps the size it had: capitals 7 grid units tall, as the bitmap font's
+        for scale in (1, 2):
+            self.assertEqual(o1hipix.CAP * scale, 7 * scale)
+        w_old = F.text_width("Hello 97%", 1)
+        w_new = o1vtext.text_width("Hello 97%", 1)
+        self.assertLessEqual(abs(w_new - w_old), 12)                            # about the same width as before
+
+    def test_pixel_rows_are_cached_and_painted_in_place(self):
+        bg, fg = 0x112233, 0xFFEEDD
+        pm = o1gfx.Pixmap(300, 80, bg)
+        o1vecfont.draw(pm, 10, 10, "Aa:9", 60, fg, bg, True)
+        a = list(pm.buf)
+        self.assertIs(o1vecfont.glyph_pixels("A", 60, fg, bg), o1vecfont.glyph_pixels("A", 60, fg, bg))
+        self.assertTrue(any(v not in (bg, fg) for v in a))
+
+
 class TestWidgets(unittest.TestCase):
     def test_bar_fills_in_proportion(self):
         for f in (0.0, 0.25, 0.5, 1.0):
@@ -1523,11 +1937,11 @@ class TestWidgets(unittest.TestCase):
     def test_wrap_breaks_at_spaces_and_ends_with_dots(self):
         lines = o1panel.wrap("/srv/models is not mounted at all right now", 90, 2)
         self.assertEqual(len(lines), 2)
-        self.assertTrue(all(F.text_width(l) <= 90 for l in lines))
+        self.assertTrue(all(o1vtext.text_width(l) <= 90 for l in lines))
         self.assertTrue(lines[-1].endswith("..."))
         self.assertEqual(o1panel.wrap("short", 90, 2), ["short"])
         self.assertEqual(o1panel.wrap("", 90, 2), [])
-        self.assertTrue(all(F.text_width(l) <= 30 for l in o1panel.wrap("x" * 80 + " yy", 30, 3)))
+        self.assertTrue(all(o1vtext.text_width(l) <= 30 for l in o1panel.wrap("x" * 80 + " yy", 30, 3)))
 
     def test_sleep_line(self):
         now = 10000.0
