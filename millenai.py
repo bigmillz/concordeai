@@ -33899,6 +33899,9 @@ body.gen #chip-model{color:var(--accent)}
 .srv-msg,#srv-note{font-size:11px;color:var(--faint);margin-top:6px;
   line-height:1.45}
 .srv-msg:empty,#srv-note:empty{display:none}
+.srv-msg.ok{color:#9fd8b4;font-size:12px}
+.srv-msg.bad{color:#e8907e;font-size:12px}
+.srv-msg.warn{color:#d9c08a;font-size:12px}
 .srv-none{font-size:11.5px;color:var(--faint);margin:0}
 .srv-about{font-size:11.5px;color:var(--faint);line-height:1.5;margin:0 0 12px}
 .srv-link{color:var(--dim);text-decoration:underline;text-underline-offset:2px}
@@ -35536,7 +35539,7 @@ let srvAllFrom=null,cloudSt=null;
 // minutes, supported, wakeable, msg}
 const srvSleep={};
 // a card's line and its open Access form survive a repaint (review)
-const srvArmed={},srvPairOpen={},srvMsgs={},srvTokOpen={};
+const srvArmed={},srvPairOpen={},srvMsgs={},srvMsgKind={},srvTestSeq={},srvTokOpen={};
 const SRV_SEP=" \u00b7 ";
 let councilManual=false;
 // declared up here: setCombine() runs during boot and reads it, which would
@@ -41365,6 +41368,23 @@ function srvStatus(s){
     +(st.latency_ms!=null?" \u00b7 "+st.latency_ms+" ms":"")
     +(st.version?" \u00b7 Ollama "+st.version:"");
 }
+// what a press of Test ends in (6b367, per Patrick: it said "checking" and went
+// back to "Test" with nothing shown): a green OK with what the check found, or
+// the error in the app's own words (offline, slow, certificate, pairing lost,
+// clock, Access, busy...). Held a few seconds or until the next press.
+const SRV_TEST_HOLD_MS=8000;
+function srvTestResult(s){
+  const st=(s&&s.status)||{};
+  if(st.err)return {kind:"bad",text:st.err};
+  if(!st.at)return {kind:"warn",text:"No answer yet. Try again."};
+  const ms=st.latency_ms!=null?st.latency_ms+" ms":"";
+  if(!s.paired)return {kind:"warn",text:"Reachable"+(ms?" ("+ms+")":"")+", but not paired yet. Pair it first."};
+  const bits=["Reachable","signed in"];
+  if(s.gpu&&s.gpu.name)bits.push(s.gpu.name);
+  if(st.version)bits.push("Ollama "+st.version);
+  if(ms)bits.push(ms);
+  return {kind:"ok",text:"OK \u00b7 "+bits.join(" \u00b7 ")};
+}
 // SLEEP WHEN IDLE (6b346, per Patrick: "have an option to turn this auto sleep
 // mode on or off under the Your Servers tab in Settings. Also allow the user to
 // put in a box there how many minutes of inactivity before it should sleep.
@@ -41462,7 +41482,7 @@ function srvCard(s){
       +'<button class="about-btn slim" data-a="toksave">Save</button>'
       +'<button class="about-btn slim" data-a="tokcancel">Cancel</button></div>'
       +'<div class="srv-hint">Both empty removes the token.</div>':"")
-    +'<div class="srv-msg">'+esc(srvMsgs[s.id]||"")+'</div></div>';
+    +'<div class="srv-msg'+(srvMsgKind[s.id]?" "+srvMsgKind[s.id]:"")+'">'+esc(srvMsgs[s.id]||"")+'</div></div>';
 }
 function paintServers(){
   const box=$("#srv-list");if(!box)return;
@@ -41501,10 +41521,10 @@ async function srvPost(op,body){
   return await(await api("/api/servers/"+op,{method:"POST",
     headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
 }
-function srvMsg(id,t){
-  srvMsgs[id]=t||"";
+function srvMsg(id,t,kind){
+  srvMsgs[id]=t||"";srvMsgKind[id]=t&&kind?kind:"";
   const el=document.querySelector('#srv-list .srv[data-id="'+id+'"] .srv-msg');
-  if(el)el.textContent=t||"";
+  if(el){el.textContent=t||"";el.className="srv-msg"+(srvMsgKind[id]?" "+srvMsgKind[id]:"");}
 }
 function srvPut(s){
   const i=srvList.findIndex(x=>x.id===s.id);
@@ -41605,6 +41625,7 @@ $("#srv-list").addEventListener("click",async ev=>{
   }
   delete srvArmed[id];
   b.disabled=true;
+  srvTestSeq[id]=(srvTestSeq[id]||0)+1;
   srvMsg(id,a==="pair"?"Pairing\u2026":a==="rm"?"Removing\u2026":"Checking\u2026");
   let d={};
   try{
@@ -41620,7 +41641,12 @@ $("#srv-list").addEventListener("click",async ev=>{
   if(d.server){srvPut(d.server);if(a==="pair")delete srvPairOpen[id];}
   srvModesRefresh();
   paintServers();paintSrvChips();
-  srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
+  if(a==="test"){
+    // the result stays: until the next press, or a few seconds
+    const r=d.err?{kind:"bad",text:d.err}:srvTestResult(d.server||s),seq=srvTestSeq[id]=(srvTestSeq[id]||0)+1;
+    srvMsg(id,r.text,r.kind);
+    setTimeout(()=>{if(srvTestSeq[id]===seq&&srvMsgs[id]===r.text)srvMsg(id,"");},SRV_TEST_HOLD_MS);
+  }else srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
   paintEngMenuServers();
 });
 $("#srv-add-go").addEventListener("click",async()=>{

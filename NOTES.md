@@ -9,6 +9,28 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b367 — Settings › Models › Servers: Test ends in a visible result
+
+- Patrick: the Test button said "Checking" and went back to "Test" with nothing
+  shown. The reply to a test is `{ok, server}` (the error is in the server's
+  `status`), and the handler cleared the line when `d.err` was empty.
+- Now `srvTestResult(server)` turns the check into one line: a green "OK ·
+  Reachable · signed in · <card name> · Ollama <version> · <ms>", or the error in
+  the app's own words from item 1/6b366 (offline, "took longer than N seconds
+  to start answering", certificate, pairing lost, clock, Access, busy...), red.
+  A server that answers but isn't paired is amber ("Reachable (9 ms), but not
+  paired yet. Pair it first."). The line is held 8 s (`SRV_TEST_HOLD_MS`) or
+  until the next press of any button on the card, whichever is first; a timer
+  that fires after a newer message leaves it alone (`srvTestSeq`). `srvMsg` takes
+  a kind (`ok`, `bad`, `warn`) and the card keeps it through a repaint.
+- Seen in the dev copy (Browser pane): a dead address ends in "Dead didn't answer.
+  It may be off, asleep or offline...", red, held, then cleared; a listener that
+  accepts and never answers ends in "Slow took longer than 15 seconds to start
+  answering." with the button disabled and "Checking…" until then. The green OK
+  is covered in node only (no paired server in the dev copy).
+- Tests: `_svc_testbtn` (node: every kind of result, the card's class; the handler
+  and the hold pinned) with 5 mutants.
+
 ## 6b366 — a server benchmark waits for a cold load, and a failed call says what happened
 
 - Found by reading code: `_BenchServer._open()` called `_srv_send(..., SRV_CONNECT_S=12, ...)`,

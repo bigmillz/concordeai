@@ -18326,7 +18326,7 @@ def _svc_page(src):
           + 'let tier="",advOn=false,agent="",council=["Desktop \\u00b7 gpt-oss:120b"];'
           + src[src.index("function srvWhere(m){"):src.index("function paintServers(){")]
           + src[src.index("function whereBadge(lm,who){"):src.index("function paintEngMenuServers(){")]
-          + "const srvMsgs={a1b2c3d4:'Paired.'},srvTokOpen={e5f6a7b8:true};"
+          + "const srvMsgs={a1b2c3d4:'Paired.'},srvMsgKind={},srvTokOpen={e5f6a7b8:true};"
           + "let srvList=[{id:'a1b2c3d4',name:'Desktop',host:'s1.example.com',paired:true,"
           + "status:{at:1,reachable:true,auth:true,latency_ms:42,version:'0.34.4'},models:["
           + "{name:'gpt-oss:120b',label:'Desktop \\u00b7 gpt-oss:120b',placement:'gpu+ram',loaded:true},"
@@ -18818,8 +18818,8 @@ _SV_MUT = [
     ("typed values lost on a repaint", "      if(k[i.dataset.k]!=null)i.value=k[i.dataset.k];});", "      });"),
     ("no Change Access token", "    +(srvTokOpen[s.id]?\"\":'<button class=\"about-btn slim\" data-a=\"tok\">Change Access token</button>')",
      "+''"),
-    ("the card's line lost on a repaint", "    +'<div class=\"srv-msg\">'+esc(srvMsgs[s.id]||\"\")+'</div></div>';",
-     "    +'<div class=\"srv-msg\"></div></div>';"),
+    ("the card's line lost on a repaint", "esc(srvMsgs[s.id]||\"\")+'</div></div>';",
+     "''+'</div></div>';"),
     ("X-Models sent raw", 'self.send_header("X-Models", header_text(xm))', 'self.send_header("X-Models", xm)'),
     ("the page not decoding X-Models", 'function hdrText(v){try{return decodeURIComponent(v||"");}',
      'function hdrText(v){try{return (v||"");}'),
@@ -19053,6 +19053,92 @@ for _d66, _o66, _nw66 in _SVW_MUT:
     _svwm.append((_d66, [n for n, o, _x in _r66 if not o][:1] or "MISSED"))
 check("servers: %d mutations of how a failed call is told, each caught" % len(_SVW_MUT),
       all(isinstance(v, list) for _d, v in _svwm), "%r" % [x for x in _svwm if not isinstance(x[1], list)])
+
+
+def _svc_testbtn(src):
+    """Settings > Servers > Test ends in a result (6b367): a green OK with what
+    the check found, or the error in the app's own words; held for a few
+    seconds or until the next press. The pure function and the card's class in
+    node, the handler pinned in the source."""
+    a = src.index("function esc(s){")
+    esc = src[a:src.index(";}\n", a) + 3]
+    res = src[src.index("const SRV_TEST_HOLD_MS="):src.index("// SLEEP WHEN IDLE (6b346")]
+    card = src[src.index("function srvCard(s){"):src.index("function paintServers(){")]
+    js = esc + r"""
+const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvMsgKind={},srvSleep={};
+function srvSleepHtml(){return "";}
+""" + res + card + r"""
+const mk=(paired,st,extra)=>Object.assign({id:"a1",name:"Desk",host:"h",paired:paired,status:st,models:[]},extra||{});
+const R={
+ ok:srvTestResult(mk(true,{at:1,reachable:true,auth:true,latency_ms:42,version:"0.34.4"},{gpu:{name:"RX 6900 XT"}})),
+ okbare:srvTestResult(mk(true,{at:1,reachable:true,auth:true})),
+ off:srvTestResult(mk(true,{at:1,err:"Desk didn\u2019t answer. It may be off, asleep or offline.",kind:"offline"})),
+ slow:srvTestResult(mk(true,{at:1,err:"Desk took longer than 12 seconds to start answering.",kind:"offline"})),
+ cert:srvTestResult(mk(true,{at:1,err:"Desk\u2019s certificate didn\u2019t check out.",kind:"tls"})),
+ lost:srvTestResult(mk(true,{at:1,err:"Desk no longer accepts this computer.",kind:"auth"})),
+ unpaired:srvTestResult(mk(false,{at:1,reachable:true,latency_ms:9})),
+ never:srvTestResult(mk(true,{})),
+ none:srvTestResult({})};
+srvMsgs.a1="OK";srvMsgKind.a1="ok";
+R.cardOk=srvCard(mk(true,{at:1}));
+srvMsgs.a1="x";srvMsgKind.a1="bad";
+R.cardBad=srvCard(mk(true,{at:1}));
+srvMsgs.a1="";srvMsgKind.a1="";
+R.cardNone=srvCard(mk(true,{at:1}));
+process.stdout.write(JSON.stringify(R));
+"""
+    pth = os.path.join(_si_dir, "test67.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    R = json.loads(p.stdout)
+    got = {
+        "ok: green with what was found": R["ok"] == {"kind": "ok", "text": "OK \u00b7 Reachable \u00b7 signed in \u00b7 RX 6900 XT \u00b7 Ollama 0.34.4 \u00b7 42 ms"}
+        and R["okbare"] == {"kind": "ok", "text": "OK \u00b7 Reachable \u00b7 signed in"},
+        "the error in the app's words": R["off"] == {"kind": "bad", "text": "Desk didn\u2019t answer. It may be off, asleep or offline."}
+        and R["slow"]["kind"] == "bad" and "took longer than 12 seconds" in R["slow"]["text"]
+        and "certificate" in R["cert"]["text"] and R["lost"]["text"] == "Desk no longer accepts this computer.",
+        "not paired is said, not OK": R["unpaired"] == {"kind": "warn", "text": "Reachable (9 ms), but not paired yet. Pair it first."},
+        "no answer yet": R["never"]["kind"] == "warn" and R["none"]["kind"] == "warn",
+        "the card carries the kind": '<div class="srv-msg ok">OK</div>' in R["cardOk"]
+        and '<div class="srv-msg bad">x</div>' in R["cardBad"] and '<div class="srv-msg"></div>' in R["cardNone"],
+        "the handler shows it and holds it": 'if(a==="test"){' in src
+        and "const r=d.err?{kind:\"bad\",text:d.err}:srvTestResult(d.server||s)" in src
+        and "    srvMsg(id,r.text,r.kind);\n    setTimeout(" in src
+        and "setTimeout(()=>{if(srvTestSeq[id]===seq&&srvMsgs[id]===r.text)srvMsg(id,\"\");},SRV_TEST_HOLD_MS);" in src
+        and "const SRV_TEST_HOLD_MS=8000;" in src
+        and ".srv-msg.ok{color:#9fd8b4" in src and ".srv-msg.bad{color:#e8907e" in src,
+        "the next press replaces it": "  srvTestSeq[id]=(srvTestSeq[id]||0)+1;\n  srvMsg(id,a===\"pair\"?" in src}
+    bad = [k for k, v in got.items() if not v]
+    return not bad, {"failed": bad, "seen": R}
+
+
+_SVT_CHECKS = [("servers: Test ends in a result held for a few seconds: a green OK with what the check found, or "
+                "the error in the app's words (6b367)", _svc_testbtn)]
+for _n67, _f67 in _SVT_CHECKS:
+    try:
+        _ok67, _d67 = _f67(_MILLENAI_SRC)
+    except Exception as _x67:
+        _ok67, _d67 = False, "raised %r" % (_x67,)
+    check(_n67, _ok67, "%r" % (_d67,))
+_SVT_MUT = [
+    ("the result thrown away", "    srvMsg(id,r.text,r.kind);\n", "    srvMsg(id,\"\");\n"),
+    ("an error shown as OK", "  if(st.err)return {kind:\"bad\",text:st.err};\n  if(!st.at)", "  if(!st.at)"),
+    ("not paired shown as OK", "  if(!s.paired)return {kind:\"warn\",", "  if(false)return {kind:\"warn\","),
+    ("held for ever", "if(srvTestSeq[id]===seq&&srvMsgs[id]===r.text)srvMsg(id,\"\");", "if(false)srvMsg(id,\"\");"),
+    ("the colour not on the card", "'<div class=\"srv-msg'+(srvMsgKind[s.id]?\" \"+srvMsgKind[s.id]:\"\")+'\">'", "'<div class=\"srv-msg\">'"),
+]
+_svtm = []
+for _d67, _o67, _nw67 in _SVT_MUT:
+    if _MILLENAI_SRC.count(_o67) != 1:
+        _svtm.append((_d67, "anchor missing"))
+        continue
+    try:
+        _r67 = _svc_testbtn(_MILLENAI_SRC.replace(_o67, _nw67, 1))[0]
+    except Exception:
+        _r67 = False
+    _svtm.append((_d67, "MISSED" if _r67 else [1]))
+check("servers: %d mutations of the Test result, each caught" % len(_SVT_MUT),
+      all(isinstance(v, list) for _d, v in _svtm), "%r" % [x for x in _svtm if not isinstance(x[1], list)])
 
 
 # ---- <server> Only (6b337)
@@ -21627,7 +21713,7 @@ _P2_MUT = [
     ("a mark that never ages", '    return bool(s.get("err")) and time.time() - float(s.get("at") or 0) < SRV_DOWN_S', '    return bool(s.get("err"))'),
     ("a seat with no first-word deadline", '        with server_first_deadline(first_s):\n            _stream_guarded(label, messages, _m, status, None,',
      '        if True:\n            _stream_guarded(label, messages, _m, status, None,'),
-    ("the deadline not applied", '            _first = getattr(_srv_first, "s", None) or SRV_FIRST_S', '            _first = SRV_FIRST_S'),
+    ("the deadline not applied", '    _first = getattr(_srv_first, "s", None) or SRV_FIRST_S', '    _first = SRV_FIRST_S'),
     ("no second pass on the server", '        if draft and not _looks_degenerate(draft):', '        if False:'),
     ("a failing second pass said loudly", '            except ServerError:\n                # the draft stands, and nothing alarming is said',
      '            except ZeroDivisionError:\n                # the draft stands, and nothing alarming is said'),
@@ -26956,7 +27042,7 @@ def _g56c_ui(src):
     esc = src[a:src.index(";}\n", a) + 3]
     card = src[src.index("function srvCard(s){"):src.index("function paintServers(){")]
     js = esc + r'''
-const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvSleep={};
+const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvMsgKind={},srvSleep={};
 function srvSleepHtml(){return "";}
 ''' + card + r'''
 const base={id:"a1",name:"Desk",host:"h",paired:true,status:{at:1},models:[]};
