@@ -582,9 +582,84 @@ class TestTick(unittest.TestCase):
     def test_it_publishes_the_card_list_and_support(self):
         self.box.idle.tick()
         d_ = json.load(open(o1idle.idle_file()))
-        self.assertEqual(d_, {"at": int(NOW), "supported": True, "wake": ["02:00:5e:10:00:01"],
-                              "enabled": True, "minutes": 30})   # enabled/minutes: the server panel reads them
+        for k, v in (("at", int(NOW)), ("supported", True), ("wake", ["02:00:5e:10:00:01"]), ("enabled", True),
+                     ("minutes", 30)):
+            self.assertEqual(d_[k], v, k)            # enabled/minutes: the server panel reads them
+        self.assertEqual(set(d_), {"at", "supported", "wake", "enabled", "minutes", "sleep_ok", "reason", "idle_s"})
         self.assertEqual(o1idle.published_wake(), ["02:00:5e:10:00:01"])
+
+    def published(self):
+        with open(o1idle.idle_file()) as f:
+            return json.load(f)
+
+    def test_it_publishes_its_decision_every_tick(self):
+        self.act(NOW - 600)
+        self.assertEqual(self.box.idle.tick(), (False, "idle 10 of 30 minutes"))
+        d_ = self.published()
+        self.assertEqual((d_["sleep_ok"], d_["reason"], d_["idle_s"], d_["minutes"], d_["enabled"]),
+                         (False, "idle 10 of 30 minutes", 600, 30, True))
+        self.box.advance(30)
+        self.act(NOW - 600, at=self.box.wall)
+        self.box.idle.tick()
+        self.assertEqual(self.published()["idle_s"], 630)
+        self.assertEqual(self.published()["at"], int(NOW + 30))
+
+    def test_the_decision_after_a_wake_counts_from_the_resume(self):
+        self.act(NOW - 7200)                                         # a long idle before the sleep
+        self.box.idle.tick()
+        self.box.advance(8 * 3600, slept=8 * 3600)                   # asleep all night: the wall clock jumps, the monotonic one doesn't
+        self.act(NOW - 7200, at=self.box.wall)
+        self.assertEqual(self.box.idle.tick(), (False, "idle 0 of 30 minutes"))
+        d_ = self.published()
+        self.assertEqual((d_["sleep_ok"], d_["reason"], d_["idle_s"]), (False, "idle 0 of 30 minutes", 0))
+        self.box.advance(180)
+        self.act(NOW - 7200, at=self.box.wall)
+        self.box.idle.tick()
+        d_ = self.published()
+        self.assertEqual((d_["reason"], d_["idle_s"]), ("idle 3 of 30 minutes", 180))
+
+    def test_the_decision_names_what_keeps_it_awake(self):
+        self.act(NOW - 7200)
+        self.box.p["tools"] = lambda: ["stability-test.sh"]
+        self.box.idle.tick()
+        d_ = self.published()
+        self.assertEqual((d_["sleep_ok"], d_["reason"]), (False, "running: stability-test.sh"))
+        self.assertEqual(d_["idle_s"], 7200)                         # the idle seconds are still said
+        self.box.p["tools"] = lambda: []
+        self.box.p["busy"] = lambda: ["downloading a model"]
+        self.box.idle.tick()
+        self.assertEqual(self.published()["reason"], "busy: downloading a model")
+        self.box.p["busy"] = lambda: []
+        self.box.p["inhibitors"] = lambda: ["gdm: user is active"]
+        self.box.idle.tick()
+        self.assertTrue(self.published()["reason"].startswith("something blocks sleep"))
+        self.box.p["inhibitors"] = lambda: []
+        self.act(NOW - 7200, inflight=2)
+        self.box.idle.tick()
+        self.assertEqual(self.published()["reason"], "a request is running")
+
+    def test_the_decision_when_it_does_sleep_and_when_it_is_off(self):
+        self.act(NOW - 3600)
+        self.assertEqual(self.box.idle.tick(), (True, "idle 60 minutes"))
+        d_ = self.published()
+        self.assertEqual((d_["sleep_ok"], d_["reason"], d_["idle_s"]), (True, "idle 60 minutes", 3600))
+        o1idle.write_config({"enabled": False, "minutes": 30})
+        self.box.advance(10)
+        self.box.idle.tick()
+        d_ = self.published()
+        self.assertEqual((d_["sleep_ok"], d_["reason"], d_["enabled"]), (False, "auto sleep is off", False))
+
+    def test_idle_seconds_from_the_inputs(self):
+        i = {"now": 10000.0, "last_activity": 9000.0, "boot_time": 100.0, "last_resume": None}
+        self.assertEqual(o1idle.idle_seconds(i), 1000)
+        i["last_resume"] = 9800.0
+        self.assertEqual(o1idle.idle_seconds(i), 200)
+        i["boot_time"] = 9900.0
+        self.assertEqual(o1idle.idle_seconds(i), 100)
+        i["last_activity"] = 20000.0                                  # from the future: capped at now
+        self.assertEqual(o1idle.idle_seconds(i), 0)
+        self.assertIsNone(o1idle.idle_seconds({"now": 1.0}))
+        self.assertIsNone(o1idle.idle_seconds({"now": 1.0, "boot_time": None}))
 
     def test_the_log_has_reasons_only(self):
         self.act(NOW - 3600)

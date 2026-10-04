@@ -498,7 +498,7 @@ def w_storage(c, st, ctx):
                                      "healthy" if a.get("healthy") else "DEGRADED")) if c.w >= 46 else \
             ("RAID %s %s" % (a.get("name"), "healthy" if a.get("healthy") else "DEGRADED"))
         if a.get("action"):
-            s += "  %s %s%%" % (a["action"], num(a.get("progress"), "%.0f"))
+            s += "  " + raid_action(a, "%.0f")
         c.put(0, y, s, "ok" if a.get("healthy") else "bad")
         y += 1
     put_parts(c, y, [("Disk IO ", "dim"), ("read ", "dim"), (rate(io.get("read_bps")), "value"),
@@ -529,6 +529,37 @@ def w_network(c, st, ctx):
     put_parts(c, 2, [("Tunnel ", "dim"), ("connected (%d)" % (_f(t.get("connections")) or 0) if up else "DOWN", "ok" if up else "bad"),
                      ("   rtt ", "dim"), (("%.0f ms" % rtt) if rtt is not None else "-", "value")])
     trend(c, 3, ctx["rng"], _series(st, "net_rx", ctx["range_s"]), ctx["range_s"], style="c_net")
+
+
+def raid_action(a, fmt="%.1f", with_left=False):
+    """"check 12.1%" (and ", about 10 h left" when asked) for an array that is
+    checking, resyncing, recovering or reshaping; just the action when the
+    kernel gave no percentage yet (resync=DELAYED)."""
+    s = str(a.get("action") or "")
+    p = _f(a.get("progress"))
+    if p is not None:
+        s += " " + (fmt % p) + "%"
+    if with_left:
+        left = raid_left(a.get("finish"))
+        if left:
+            s += ", " + left
+    return s
+
+
+def raid_left(finish):
+    """"615.5min" -> "about 10 h left"; None if it isn't a number of minutes."""
+    try:
+        m = float(str(finish).replace("min", "").strip())
+    except ValueError:
+        return None
+    if m != m or m < 0:
+        return None
+    if m < 90:
+        return "about %d min left" % max(1, round(m))
+    h = m / 60.0
+    if h < 48:
+        return "about %d h left" % round(h)
+    return "about %d days left" % round(h / 24.0)
 
 
 def warnings(st, now=0):
@@ -571,7 +602,8 @@ def warnings(st, now=0):
         if not a.get("healthy"):
             out.append(("RAID %s degraded" % a.get("name"), "bad"))
         elif a.get("action"):
-            out.append(("RAID %s: %s %s%%" % (a.get("name"), a["action"], num(a.get("progress"), "%.0f")), "warn"))
+            if a["action"] != "check":                      # a scheduled check of a healthy mirror is only information
+                out.append(("RAID %s: %s" % (a.get("name"), raid_action(a, "%.0f")), "warn"))
     t = st.get("tunnel")
     if isinstance(t, dict) and not t.get("up"):
         out.append(("Tunnel is down", "bad"))

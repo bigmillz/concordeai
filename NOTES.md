@@ -9,6 +9,42 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b396 — the panel's sleep line is the idle service's own decision; RAID check parsed (per Patrick)
+
+Two bugs on the real monitor.
+- **"Idle long enough: may sleep now" right after a wake.** The panel worked out
+  its own idle time from the gateway's activity file and ignored the resume time
+  and the busy reasons. Fixed at the source: `ollama1-idle` (`o1idle.Idle.tick`)
+  now decides FIRST and then writes `/run/ollama1/idle.json` with the decision
+  beside the setting: `sleep_ok` (the bool decide() returned: it is about to
+  suspend), `reason` (decide()'s exact text), `idle_s` (seconds since the latest
+  of last activity, boot and last resume: `o1idle.idle_seconds`), plus `at`,
+  `enabled`, `minutes`, `supported`, `wake` as before. `o1panel.sleep_summary`
+  shows only that: "Sleeps in mm:ss" (minutes*60 - idle_s - the file's age) when
+  the reason is the timer ("idle N of M minutes"), the reason itself in amber
+  when something blocks it (busy, running tool, a block lock, the card, a
+  request), "Going to sleep now" only when sleep_ok, "Auto sleep is off",
+  "No deep sleep on this machine", and "Sleep status unknown" (amber) when the
+  file is older than 3 minutes or has no decision (an old service). Nothing is
+  estimated in the panel any more. The admin panel and the app compute no idle
+  time of their own (they show the setting and the last sleep/wake), so there is
+  nothing else to align.
+- **"RAID md127: check -%".** `o1stats.raid` split the progress line on the first
+  "=", which is inside the bar "[==>...]". It now uses a regex for
+  `(resync|recovery|check|reshape) = N%` with or without spaces, a
+  `resync=DELAYED`/`PENDING` word (action, no percentage) and
+  `finish=NNN.Nmin`. The panel line reads "RAID md127: check 12.1%, about 10 h
+  left" (`o1dashui.raid_action`, `raid_left`). A scheduled check of a healthy
+  [UU] mirror is information (blue, no warning in the Status box or the badge);
+  a resync, recovery or reshape is amber; a missing member is red, with the
+  recovery progress after it.
+- Tests: ticks around a resume (idle_s restarts at 0, "idle 3 of 30 minutes"),
+  every busy reason, sleep_ok, disabled, the file's age; the panel text in each
+  state and at 1080p/1440p/4K without overflow; real mdstat samples (check,
+  resync, recovery, degraded, idle, delayed) with every spacing; the colour rule.
+- Install: lib/o1idle.py (then `systemctl restart ollama1-idle`), lib/o1stats.py,
+  lib/o1dashui.py, lib/o1panel.py, then restart ollama1-dash.
+
 ## 6b388 — the Corsair liquid cooler is driven too, through liquidctl (per Patrick)
 
 Patrick: "max the cooler's fans too, and make sure the pump runs at 100% when

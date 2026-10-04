@@ -89,7 +89,8 @@ def sample(now=None, pairing=False, marker=None):
                               "1w": {"cost": 4.87, "kwh": 27.9, "measured_h": 168.0, "est": True},
                               "1m": {"cost": 21.34, "kwh": 118.6, "measured_h": 700.0, "est": True}}},
         "activity": {"last": now - 420, "at": now, "inflight": 1},
-        "idle": {"supported": True, "enabled": True, "minutes": 30},
+        "idle": {"at": int(now), "supported": True, "enabled": True, "minutes": 30, "sleep_ok": False,
+                 "reason": "idle 7 of 30 minutes", "idle_s": 420},
         "series": series,
     }
     return st

@@ -1831,6 +1831,135 @@ class TestMixedCaseFont(unittest.TestCase):
         self.assertTrue(any(v not in (bg, fg) for v in a))
 
 
+MD_HEAD = "Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] \n"
+MD_TAIL = "      bitmap: 0/59 pages [0KB], 65536KB chunk\n\nunused devices: <none>\n"
+
+
+def mdstat(members, progress_line=""):
+    return (MD_HEAD + "md127 : active raid1 sdc[1] sdb[0]\n      7813791040 blocks super 1.2 [2/%d] [%s]\n%s%s"
+            % (members.count("U"), members, progress_line, MD_TAIL))
+
+
+MD_CHECK = "      [==>..................]  check = 12.1% (946458368/7813791040) finish=615.5min speed=185934K/sec\n"
+
+
+class TestRaidLine(unittest.TestCase):
+    """/proc/mdstat as the kernel writes it, and the one RAID line the panel shows."""
+
+    def parse(self, text):
+        import o1stats
+        d = tempfile.mkdtemp(prefix="o1md-")
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        with open(os.path.join(d, "mdstat"), "w") as f:
+            f.write(text)
+        old = o1stats.PROC
+        o1stats.PROC = d
+        try:
+            return o1stats.raid()
+        finally:
+            o1stats.PROC = old
+
+    def test_a_check_with_spaces_around_the_equals_sign(self):
+        a = self.parse(mdstat("UU", MD_CHECK))[0]
+        self.assertEqual((a["action"], a["progress"], a["finish"], a["healthy"], a["members"]),
+                         ("check", 12.1, "615.5min", True, "UU"))
+
+    def test_every_action_with_and_without_spaces(self):
+        for action in ("check", "resync", "recovery", "reshape"):
+            for sep in (" = ", "=", " =", "= "):
+                line = "      [>....................]  %s%s 3.4%% (265416192/7813791040) finish=1234.5min speed=100K/sec\n" % (action, sep)
+                a = self.parse(mdstat("UU", line))[0]
+                self.assertEqual((a["action"], a["progress"], a["finish"]), (action, 3.4, "1234.5min"), (action, sep))
+        line = "      [=====>...............]  recovery = 31.0% (1/2) finish=12.0min speed=1K/sec\n"
+        a = self.parse(mdstat("U_", line))[0]
+        self.assertEqual((a["action"], a["progress"], a["healthy"]), ("recovery", 31.0, False))
+
+    def test_a_delayed_resync_has_no_percentage_and_nothing_breaks(self):
+        a = self.parse(mdstat("UU", "      \tresync=DELAYED\n"))[0]
+        self.assertEqual((a["action"], a["progress"], a["finish"]), ("resync", None, None))
+        a = self.parse(mdstat("UU", "      \tresync=PENDING\n"))[0]
+        self.assertEqual((a["action"], a["progress"]), ("resync", None))
+
+    def test_idle_and_degraded_arrays(self):
+        a = self.parse(mdstat("UU"))[0]
+        self.assertEqual((a["action"], a["progress"], a["finish"], a["healthy"]), (None, None, None, True))
+        a = self.parse(mdstat("U_"))[0]
+        self.assertEqual((a["action"], a["healthy"], a["members"]), (None, False, "U_"))
+
+    def test_the_bitmap_line_is_not_an_action(self):
+        a = self.parse(mdstat("UU", "      bitmap: 3/59 pages [12KB], 65536KB chunk, check = 5.0%\n"))[0]
+        self.assertEqual(a["action"], "check")                               # whatever the kernel puts on a progress-like line
+        self.assertEqual(self.parse("garbage\n"), [])
+
+    def test_how_long_is_left(self):
+        import o1dashui
+        for finish, want in (("615.5min", "about 10 h left"), ("45.2min", "about 45 min left"), ("89.9min", "about 90 min left"),
+                             ("90min", "about 2 h left"), ("0.2min", "about 1 min left"), ("4000.0min", "about 3 days left"),
+                             ("2880min", "about 2 days left"), (None, None), ("soon", None), ("nanmin", None)):
+            self.assertEqual(o1dashui.raid_left(finish), want, finish)
+
+    def test_the_text(self):
+        import o1dashui
+        a = {"action": "check", "progress": 12.1, "finish": "615.5min"}
+        self.assertEqual(o1dashui.raid_action(a, "%.1f", True), "check 12.1%, about 10 h left")
+        self.assertEqual(o1dashui.raid_action(a), "check 12.1%")
+        self.assertEqual(o1dashui.raid_action(dict(a, progress=None), "%.1f", True), "check, about 10 h left")
+        self.assertEqual(o1dashui.raid_action({"action": "resync", "progress": None}), "resync")
+
+    def array(self, text):
+        return self.parse(text)[0]
+
+    def test_the_colour_rule(self):
+        self.assertEqual(o1panel.raid_status(self.array(mdstat("UU", MD_CHECK))), ("RAID md127: check 12.1%, about 10 h left", "info"))
+        self.assertEqual(o1panel.raid_status(self.array(mdstat("UU")))[1], "ok")
+        self.assertEqual(o1panel.raid_status(self.array(mdstat("UU")))[0], "RAID md127 healthy")
+        resync = "      [=>...................]  resync =  8.0% (1/2) finish=312.4min speed=1K/sec\n"
+        self.assertEqual(o1panel.raid_status(self.array(mdstat("UU", resync))), ("RAID md127: resync 8.0%, about 5 h left", "warn"))
+        rec = "      [=>...................]  recovery = 31.0% (1/2) finish=45.0min speed=1K/sec\n"
+        txt, kind = o1panel.raid_status(self.array(mdstat("U_", rec)))
+        self.assertEqual((txt, kind), ("RAID md127 DEGRADED, recovery 31.0%, about 45 min left", "bad"))
+        self.assertEqual(o1panel.raid_status(self.array(mdstat("U_"))), ("RAID md127 DEGRADED", "bad"))
+        self.assertEqual(o1panel.RAID_COLOURS["info"], o1panel.T["gpu"])           # blue, not amber
+        self.assertNotEqual(o1panel.RAID_COLOURS["info"], o1panel.RAID_COLOURS["warn"])
+
+    def test_a_scheduled_check_is_not_a_warning_but_a_resync_and_a_degraded_mirror_are(self):
+        import o1dashui
+        st = dash_sample.sample(now=1790000000.0)
+        st["raid"] = self.parse(mdstat("UU", MD_CHECK))
+        self.assertEqual([t for t, _ in o1dashui.warnings(st, st["time"]) if t.startswith("RAID")], [])
+        st["raid"] = self.parse(mdstat("UU", "      [=>...................]  resync =  8.0% (1/2) finish=312.4min speed=1K/sec\n"))
+        self.assertEqual([(t, k) for t, k in o1dashui.warnings(st, st["time"]) if t.startswith("RAID")],
+                         [("RAID md127: resync 8%", "warn")])
+        st["raid"] = self.parse(mdstat("U_"))
+        self.assertEqual([(t, k) for t, k in o1dashui.warnings(st, st["time"]) if t.startswith("RAID")], [("RAID md127 degraded", "bad")])
+
+    def test_the_panel_shows_it_at_every_resolution_without_overflow(self):
+        for sw, sh in ((1920, 1080), (2560, 1440), (3840, 2160)):
+            k, lw, lh = o1fb.choose_scale(sw, sh)
+            for md, kind in ((mdstat("UU", MD_CHECK), "info"), (mdstat("U_"), "bad"), (mdstat("UU"), "ok")):
+                st = dash_sample.sample(now=1790000000.0)
+                st["raid"] = self.parse(md)
+                seen = []
+                orig = o1hipix.HiPixmap.text
+
+                def rec(self_, tx, ty, s_, c, scale=1, max_w=None, ellipsis=True):
+                    seen.append((s_, c, tx, max_w))
+                    return orig(self_, tx, ty, s_, c, scale, max_w, ellipsis)
+                o1hipix.HiPixmap.text = rec
+                try:
+                    o1panel.render(st, lw, lh, scale=k)
+                finally:
+                    o1hipix.HiPixmap.text = orig
+                lines = [t for t in seen if t[0].startswith("RAID md127")]
+                self.assertTrue(lines, (sw, kind))
+                x, y, w, h = o1panel.layout(lw, lh)["storage"]
+                for s_, c, tx, mw in lines:
+                    if s_.startswith("RAID md127 DEGRADED") or "check" in s_ or s_.endswith("healthy"):
+                        self.assertLessEqual(tx + mw, x + w - 8 + 1, (s_, sw))      # the line is cut to the box, not drawn past it
+                        if "check" in s_:
+                            self.assertEqual(c, o1panel.T["text"])
+
+
 class TestWidgets(unittest.TestCase):
     def test_bar_fills_in_proportion(self):
         for f in (0.0, 0.25, 0.5, 1.0):
@@ -1946,21 +2075,60 @@ class TestWidgets(unittest.TestCase):
     def test_sleep_line(self):
         now = 10000.0
 
-        def line(**kw):
-            st = {"activity": {"last": now - kw.get("idle", 0), "at": now - kw.get("age", 0), "inflight": kw.get("inflight", 0)},
-                  "idle": kw.get("idle_info", {})}
-            return o1panel.sleep_summary(st, now)
-        self.assertEqual(line(idle_info={"supported": False}), ("No deep sleep on this machine", "dim"))
-        self.assertEqual(line(idle_info={"enabled": False}), ("Auto sleep is off", "dim"))
-        self.assertEqual(line(inflight=2)[0], "Awake: request running")
-        text, style = line(idle=600, idle_info={"enabled": True, "minutes": 30})
-        self.assertTrue(text.startswith("Sleeps in 20:00"), text)
-        self.assertEqual(style, "text")
-        self.assertEqual(line(idle=1600, idle_info={"enabled": True, "minutes": 30})[1], "warn")
-        self.assertEqual(line(idle=4000, idle_info={"enabled": True, "minutes": 30})[0], "Idle long enough: may sleep now")
-        self.assertEqual(line(idle=600)[0], "Idle for 10m 0s")
-        self.assertEqual(o1panel.sleep_summary({}, now), ("Awake", "text"))
-        self.assertEqual(line(idle=600, age=500, idle_info={"enabled": True, "minutes": 30})[0], "Awake")   # a stale file says nothing
+        def line(age=0, **idle):
+            base = {"at": now - age, "supported": True, "enabled": True, "minutes": 60, "sleep_ok": False,
+                    "reason": "idle 3 of 60 minutes", "idle_s": 180}
+            base.update(idle)
+            return o1panel.sleep_summary({"idle": base}, now)
+        # the timer is all that is left: the countdown from the service's own count
+        self.assertEqual(line(), ("Sleeps in 57:00", "text"))
+        self.assertEqual(line(age=20), ("Sleeps in 56:40", "text"))               # it counts down between the service's ticks
+        self.assertEqual(line(idle_s=3400)[1], "warn")                              # the last five minutes
+        self.assertEqual(line(idle_s=3600, reason="idle 60 minutes")[0], "Sleeping very soon")
+        # right after a wake the service counts from the resume: a small idle_s, never "may sleep now"
+        self.assertEqual(line(idle_s=5, reason="idle 0 of 60 minutes")[0], "Sleeps in 59:55")
+        for st_ in (line(), line(idle_s=5), line(idle_s=3599), line(reason="busy: x")):
+            self.assertNotIn("may sleep", st_[0].lower())
+        # anything that keeps it awake is said as the service said it, in amber
+        for reason, shown in (("busy: downloading a model", "Busy: downloading a model"),
+                              ("running: stability-test.sh", "Running: stability-test.sh"),
+                              ("a request is running", "A request is running"),
+                              ("something blocks sleep: gdm: user is active", "Something blocks sleep: gdm: user is active"),
+                              ("the graphics card is busy (35%)", "The graphics card is busy (35%)"),
+                              ("the machine is busy (load 2.3)", "The machine is busy (load 2.3)")):
+            self.assertEqual(line(reason=reason), (shown, "warn"))
+        self.assertEqual(line(sleep_ok=True, reason="idle 60 minutes"), ("Going to sleep now", "warn"))
+        self.assertEqual(line(enabled=False, reason="auto sleep is off"), ("Auto sleep is off", "dim"))
+        self.assertEqual(line(supported=False), ("No deep sleep on this machine", "dim"))
+        # a service that has not written for three minutes, or never has, is not guessed at
+        self.assertEqual(line(age=179)[0][:6], "Sleeps")
+        self.assertEqual(line(age=181), ("Sleep status unknown", "warn"))
+        self.assertEqual(o1panel.sleep_summary({}, now), ("Sleep status unknown", "warn"))
+        self.assertEqual(o1panel.sleep_summary({"idle": {"supported": True, "enabled": True, "minutes": 30, "at": now}}, now),
+                         ("Sleep status unknown", "warn"))                         # an old service with no decision in the file
+
+    def test_the_sleep_box_text_fits_at_every_resolution(self):
+        long_reason = "something blocks sleep: " + "a long description of what holds the lock " * 4
+        for sw, sh in ((1920, 1080), (2560, 1440), (3840, 2160)):
+            k, lw, lh = o1fb.choose_scale(sw, sh)
+            for reason in (long_reason, "idle 3 of 60 minutes", "busy: " + "x" * 120):
+                st = dash_sample.sample(now=1790000000.0)
+                st["idle"].update(reason=reason, sleep_ok=False, idle_s=180, minutes=60, at=int(st["time"]))
+                x, y, w, h = o1panel.layout(lw, lh)["status"]
+                texts = []
+                orig = o1hipix.HiPixmap.text
+
+                def rec(self_, tx, ty, s_, c, scale=1, max_w=None, ellipsis=True):
+                    texts.append((s_, tx, max_w))
+                    return orig(self_, tx, ty, s_, c, scale, max_w, ellipsis)
+                o1hipix.HiPixmap.text = rec
+                try:
+                    o1panel.render(st, lw, lh, scale=k)
+                finally:
+                    o1hipix.HiPixmap.text = orig
+                for s_, tx, mw in texts:
+                    if tx >= x and tx < x + w and mw is not None:
+                        self.assertLessEqual(tx + min(mw, o1vtext.text_width(s_)), x + w, (s_, tx, mw))
 
 
 if __name__ == "__main__":

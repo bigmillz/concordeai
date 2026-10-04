@@ -134,7 +134,7 @@ class TestIdleFilePublishesTheSetting(Base):
         d = self.tick_and_read()
         self.assertIs(d["enabled"], True)
         self.assertEqual(d["minutes"], 45)
-        self.assertEqual(sorted(d), ["at", "enabled", "minutes", "supported", "wake"])
+        self.assertEqual(sorted(d), ["at", "enabled", "idle_s", "minutes", "reason", "sleep_ok", "supported", "wake"])   # + the decision (6b396)
 
     def test_the_gateway_still_reads_the_wake_list_from_it(self):
         o1idle.write_config({"enabled": True, "minutes": 10})

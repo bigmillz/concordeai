@@ -227,6 +227,19 @@ def decide(i):
         return False, "couldn't read the inputs"
 
 
+def idle_seconds(i):
+    """Seconds counted since the latest of the last real work, the boot and
+    the last resume (what decide() compares with the idle time), or None when
+    the inputs don't say."""
+    try:
+        now = float(i["now"])
+        last = min(float(i.get("last_activity") or 0), now)
+        since = max(last, float(i["boot_time"]), float(i.get("last_resume") or 0))
+        return int(max(0, now - since))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 # ---- probes (parsers are pure; the callers run the commands) ----------------------
 
 def parse_sessions(text):
@@ -500,21 +513,25 @@ class Idle:
             self.wake = w if isinstance(w, list) else []
             self.wake_at = mono
         cfg = read_config()
-        try:
-            # the server panel reads the setting from here (enabled, minutes) beside what the card list says
-            write_json_atomic(idle_file(), {"at": int(now), "supported": supported, "wake": self.wake[:MAX_WAKE],
-                                            "enabled": cfg["enabled"], "minutes": cfg["minutes"]}, mode=0o644)
-        except OSError:
-            pass
         act = read_activity(now)
-        sleep, why = decide({
+        inputs = {
             "enabled": cfg["enabled"], "supported": supported, "minutes": cfg["minutes"], "now": now,
             "last_activity": act["last"], "boot_time": self._probe("boot_time"),
             "loadavg": self._probe("loadavg"), "gpu_present": self._probe("gpu_present"),
             "last_resume": self.last_resume, "inflight": act["inflight"],
             "gpu_busy": self._probe("gpu_busy"),
             "busy": self._probe("busy"), "tools": self._probe("tools"),
-            "inhibitors": self._probe("inhibitors")})
+            "inhibitors": self._probe("inhibitors")}
+        sleep, why = decide(inputs)
+        try:
+            # the server panel reads the setting (enabled, minutes) and this tick's DECISION from here
+            # (6b396): sleep_ok, the exact reason decide() gave, and the idle seconds it counted
+            write_json_atomic(idle_file(), {"at": int(now), "supported": supported, "wake": self.wake[:MAX_WAKE],
+                                            "enabled": cfg["enabled"], "minutes": cfg["minutes"],
+                                            "sleep_ok": bool(sleep), "reason": why[:160],
+                                            "idle_s": idle_seconds(inputs)}, mode=0o644)
+        except OSError:
+            pass
         if why != self.last_reason:
             self.log("%s: %s" % ("sleeping" if sleep else "not sleeping", why))
             self.last_reason = why

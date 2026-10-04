@@ -485,11 +485,8 @@ def draw_storage(pm, r, st, ctx):
     # the lines under the disks, most important first; the last ones go when the box is short
     tail = []
     for a in raid[:1]:
-        ok = bool(a.get("healthy"))
-        txt = "RAID %s %s" % (a.get("name"), "healthy" if ok else "DEGRADED")
-        if a.get("action"):
-            txt += " %s %s%%" % (a["action"], D.num(a.get("progress"), "%.0f"))
-        tail.append(("raid", txt, ok))
+        txt, kind = raid_status(a)
+        tail.append(("raid", txt, kind))
     tail.append(("Disk", "read %s  write %s" % (D.rate(io.get("read_bps")), D.rate(io.get("write_bps"))), True))
     tail.append(("Net", "in %s  out %s" % (D.rate(net.get("rx_bps")), D.rate(net.get("tx_bps"))), True))
     ports = [p for p in _l(net.get("ports")) if isinstance(p, dict)]
@@ -517,40 +514,66 @@ def draw_storage(pm, r, st, ctx):
         if yy + 8 > y + h:
             break
         if label == "raid":
-            dot(pm, x, yy, T["ok"] if ok else T["bad"])
-            pm.text(x + 10, yy, text, T["text"] if ok else T["bad"], max_w=w - 10)
+            colour = RAID_COLOURS[ok]
+            dot(pm, x, yy, colour)
+            pm.text(x + 10, yy, text, T["text"] if ok in ("ok", "info") else colour, max_w=w - 10)
         else:
             pm.text(x, yy, label, T["dim"], max_w=lw)
             pm.text(x + lw + 6, yy, text, T["text"] if ok else T["warn"], max_w=w - lw - 6)
         yy += 12
 
 
+RAID_COLOURS = {"ok": T["ok"], "info": T["gpu"], "warn": T["warn"], "bad": T["bad"]}
+
+
+def raid_status(a):
+    """(text, kind) for the array's line: kind is "ok" (healthy, idle), "info"
+    (a scheduled check of a healthy mirror: blue, nothing to do), "warn" (a
+    resync, recovery or reshape is running) or "bad" (a member is missing)."""
+    name = a.get("name")
+    action = a.get("action")
+    if not a.get("healthy"):
+        txt = "RAID %s DEGRADED" % name
+        if action:
+            txt += ", " + D.raid_action(a, "%.1f", True)
+        return txt, "bad"
+    if not action:
+        return "RAID %s healthy" % name, "ok"
+    return "RAID %s: %s" % (name, D.raid_action(a, "%.1f", True)), "info" if action == "check" else "warn"
+
+
+SLEEP_STALE_S = 180
+
+
 def sleep_summary(st, now):
-    """What the sleep line says: (text, style). Uses the activity file the
-    gateway writes (the last real work and the requests in flight) and, when
-    the idle service has published them, whether auto sleep is on and after
-    how long."""
-    act, idle = _d(st.get("activity")), _d(st.get("idle"))
-    last, at = D._f(act.get("last")), D._f(act.get("at"))
-    inflight = act.get("inflight") if isinstance(act.get("inflight"), int) else None
-    fresh = at is not None and now - at <= 120
+    """What the sleep line says: (text, style), from the idle service's own
+    last decision in /run/ollama1/idle.json (6b396): sleep_ok, the exact reason
+    decide() gave, the idle seconds it counted, and the setting. Nothing here
+    is estimated from other files, so it cannot disagree with the service
+    (after a wake the service counts from the resume; a request, a tool, a
+    block lock or the card keeps it awake and says so)."""
+    idle = _d(st.get("idle"))
+    at = D._f(idle.get("at"))
+    if at is None or now - at > SLEEP_STALE_S or "sleep_ok" not in idle:
+        if idle.get("supported") is False and at is not None and now - at <= SLEEP_STALE_S:
+            return "No deep sleep on this machine", "dim"
+        if idle.get("enabled") is False and at is not None and now - at <= SLEEP_STALE_S:
+            return "Auto sleep is off", "dim"
+        return "Sleep status unknown", "warn"                 # the service has not said lately
     if idle.get("supported") is False:
         return "No deep sleep on this machine", "dim"
-    enabled = idle.get("enabled") if isinstance(idle.get("enabled"), bool) else None
-    minutes = D._f(idle.get("minutes"))
-    if enabled is False:
+    if idle.get("enabled") is False:
         return "Auto sleep is off", "dim"
-    if fresh and inflight:
-        return "Awake: request running", "ok"
-    if last and fresh:
-        idle_s = max(0, now - last)
-        if enabled and minutes:
-            left = minutes * 60 - idle_s
-            if left > 0:
-                return "Sleeps in %d:%02d (idle %s)" % (left // 60, left % 60, D.dur(idle_s)), "warn" if left < 300 else "text"
-            return "Idle long enough: may sleep now", "warn"
-        return "Idle for %s" % D.dur(idle_s), "text"
-    return "Awake", "text"
+    if idle.get("sleep_ok") is True:
+        return "Going to sleep now", "warn"
+    reason = str(idle.get("reason") or "").strip()
+    minutes, idle_s = D._f(idle.get("minutes")), D._f(idle.get("idle_s"))
+    if reason.startswith("idle ") and minutes and idle_s is not None:      # only the timer is left
+        left = minutes * 60 - idle_s - max(0.0, now - at)
+        if left <= 0:
+            return "Sleeping very soon", "warn"
+        return "Sleeps in %d:%02d" % (left // 60, left % 60), "warn" if left < 300 else "text"
+    return (reason[:1].upper() + reason[1:]) if reason else "Awake", "warn"
 
 
 def draw_status(pm, r, st, ctx):
