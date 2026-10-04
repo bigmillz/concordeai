@@ -3,8 +3,10 @@
 # memory clock on, say). 60 s of answers from a model already installed,
 # watching the kernel log for amdgpu errors and the card's junction and
 # memory temperatures; any error, 105 C junction or 100 C memory, or answers
-# slower than stock puts the card back to stock for good. Nothing to do
-# otherwise, so most boots it exits at once.
+# slower than stock that stay slower when stock and tuned are measured again
+# (6b372) puts the card back to stock for good. A reading taken while a drive
+# logged errors, another model loaded or the card was busy changes nothing and
+# is tried again next boot. Nothing to do otherwise, so most boots it exits at once.
 [Unit]
 Description=ollama1: graphics card tuning check under load
 After=ollama.service ollama1-gpu-tune.service

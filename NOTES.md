@@ -9,6 +9,34 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b372 — the graphics card check no longer reverts on one slow reading (kit)
+
+- The load check reverted a fine card: "answers were slower than stock
+  (148.7 against 249.5 tokens/s)", measured while a drive and an engine were
+  failing. The old rule compared one 60 s tuned run with a stock figure taken
+  days earlier (when tuning was turned on), in whatever state the server was.
+- Now a slow first reading only starts a repeat (`confirm_slowdown`): stock
+  and tuned are measured again, alternating `CONFIRM_ROUNDS` (2) times, 20 s
+  each. Revert only if every alternation is more than 5% slower AND the
+  medians are; the reason names what was measured ("slower than stock in 2 of
+  2 repeats (median tuned .. against median stock .., limit 95%; tuned
+  a/b/c, stock d/e ...)"). A repeat that is fine passes ("didn't repeat").
+- Defer, don't revert, when the reading can't be trusted (`self.noise`, from
+  `_load`): NVMe errors in the kernel log since the values were applied
+  (`nvme_errors`: I/O timeouts, controller down, I/O errors on nvme devices),
+  another model loaded during the load (a model resident from the start, like
+  an embedding model, is not noise), the card already 35% busy or more before
+  the load (lowest of three looks), an answer that failed partway, or repeats
+  that didn't finish. The check is recorded as `deferred`, `pending()` stays
+  true, so it runs again next boot; the tuned values stay applied.
+- Unchanged: real amdgpu errors (also during a repeat), 105 C junction and
+  100 C memory revert at once; so does Ctrl-C mid-check, a check the machine
+  never finished, and an amdgpu error in the previous boot's log.
+- Tests: `TestSlowdownIsNotReverted` in `tests/test_gputune.py` (the incident,
+  a slowdown that repeats, one that doesn't, each noise source, safety
+  reverts still firing, Ctrl-C in the repeats, the NVMe regex) and seven
+  mutants in `tests/mutate.py`.
+
 ## 6b371 — the check after a wake waits for the card and the models drive (kit)
 
 - After a wake the record once read "Ollama didn't answer; restarted Ollama

@@ -726,10 +726,16 @@ itself tainted; that is expected.
 **Safety.** After the values are set, a check runs 60 seconds of answers on
 the card with a model already installed, while it watches the kernel log for
 amdgpu errors (a ring timeout, a GPU reset, a page fault) and the card's
-temperatures. Any error, the junction at 105 C or the memory at 100 C, or
-answers more than 5% slower than stock (measured when it was turned on, with
-the same model) puts
-the card back to stock at once. It then stays at stock, across reboots, until
+temperatures. Any error, the junction at 105 C or the memory at 100 C puts
+the card back to stock at once. Slow answers (more than 5% under the stock
+speed measured when it was turned on, with the same model) are not enough on
+their own: the check measures stock and tuned again, alternating twice, and
+only a slowdown that repeats (each alternation and the medians) puts the card
+back, with the figures in the reason. If anything made a reading unreliable,
+the check changes nothing and runs again next boot: a drive logging NVMe
+errors, another model loaded, the card already busy for someone else, an
+answer that failed partway (`status` shows "deferred" and why). A revert
+stays at stock, across reboots, until
 you run `sudo ollama1-gpu-tune on`; `status` says why. Every boot also reads
 the kernel log of the boot the tuning last ran in, and an amdgpu error there
 does the same. With no model installed yet the check runs once one is

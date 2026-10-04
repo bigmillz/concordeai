@@ -233,7 +233,7 @@ class Base(unittest.TestCase):
         self.ollama = ollama or FakeOllama(self.clock, self.tree)
         return T.Tuner(io=self.driver, ollama=self.ollama, journal=self.journal,
                        clock=lambda: 1700000000 + self.clock.t, mono=lambda: self.clock.t, boot=lambda: self.boot,
-                       out=self.out.append, check_seconds=60, stock_seconds=20, **kw)
+                       out=self.out.append, check_seconds=60, stock_seconds=20, pause=lambda s: None, **kw)
 
     def dev(self, rel, addr=NAVI_ADDR):
         return open(os.path.join(self.tree.root, "bus/pci/devices", addr, rel)).read()
@@ -581,6 +581,204 @@ class TestSafety(Base):
         t.cmd_on()
         self.assertEqual(self.state()["check"]["result"], "no answer")
         self.assertTrue(t.pending())
+
+
+NVME_TIMEOUT = "nvme nvme0: I/O 713 QID 4 timeout, aborting"
+
+
+class ScriptedOllama(FakeOllama):
+    """FakeOllama whose speed follows a script: tps_fn(tuned, n) with n the 1-based answer count. The
+    first 5 answers are the stock measurement (20 s), 6..20 the first tuned load (60 s), then the
+    repeats: stock 21..25, tuned 26..30, stock 31..35, tuned 36..40."""
+
+    def __init__(self, clock, tree, tps_fn, loaded_fn=None, **kw):
+        super().__init__(clock, tree, **kw)
+        self.tps_fn = tps_fn
+        self.loaded_fn = loaded_fn
+
+    def loaded(self):
+        return self.loaded_fn(len(self.calls)) if self.loaded_fn else []
+
+    def generate(self, model):
+        self.calls.append(model)
+        n = len(self.calls)
+        self.clock.t += 4
+        if self.on_generate:
+            self.on_generate(n)
+        od = open(os.path.join(self.tree.root, "bus/pci/devices", NAVI_ADDR, "pp_od_clk_voltage")).read()
+        tuned = T.parse_od(od)["mclk"].get(1, 1000) > 1000
+        tps = self.tps_fn(tuned, n)
+        if tps is None:
+            return None
+        return int(tps * 4), 4.0
+
+
+def incident(tuned, n):
+    """What was seen: stock 249.5, tuned 148.5."""
+    return 148.5 if tuned else 249.5
+
+
+class TestSlowdownIsNotReverted(Base):
+    """6b372: "answers were slower than stock (148.5 against 249.5 tokens/s)" reverted a card that was
+    fine, while a drive and an engine were failing. A slow figure now needs repeating, in clean conditions."""
+
+    def run_on(self, tps_fn, klog=(), loaded_fn=None, on_generate=None, busy=None):
+        self.tree.navi21()
+        if busy is not None:
+            self.tree.write("bus/pci/devices/%s/gpu_busy_percent" % NAVI_ADDR, "%d\n" % busy)
+        self.klog.extend(klog)
+        self.ollama = ScriptedOllama(self.clock, self.tree, tps_fn, loaded_fn, on_generate=on_generate)
+        t = self.tuner(ollama=self.ollama)
+        t.cmd_on()
+        return t
+
+    def tuned_values_kept(self):
+        self.assertEqual((self.cap(), self.mclk()), (293 * W, 1075))
+
+    def test_a_failing_drive_during_the_measurement_defers_instead_of_reverting(self):
+        t = self.run_on(incident, klog=[NVME_TIMEOUT])
+        st = self.state()
+        self.assertNotIn("reverted", st)
+        self.assertEqual(st["check"]["result"], "deferred")
+        self.assertIn("drive error", st["check"]["note"])
+        self.assertIn("nvme0", st["check"]["note"])
+        self.assertIn("nothing was changed", st["check"]["note"])
+        self.assertIn("148.5", st["check"]["note"])
+        self.assertTrue(t.pending())                  # not marked as checked: it runs again next boot
+        self.assertNotIn("checked", st)
+        self.tuned_values_kept()
+
+    def test_a_deferred_check_runs_again_and_a_clean_one_passes(self):
+        self.run_on(incident, klog=[NVME_TIMEOUT])
+        self.klog.clear()                              # the drive is fine at the next boot
+        self.boot = "bootc"
+        self.tree.navi21()
+        self.tuner(ollama=ScriptedOllama(self.clock, self.tree, lambda tuned, n: 42.0 if tuned else 40.0)).cmd_restore()
+        self.state()
+        t = self.tuner(ollama=ScriptedOllama(self.clock, self.tree, lambda tuned, n: 42.0 if tuned else 40.0))
+        t.cmd_check_pending()
+        self.assertEqual(self.state()["check"]["result"], "passed")
+        self.assertFalse(t.pending())
+
+    def test_a_slow_reading_that_does_not_repeat_passes(self):
+        # slow only in the first tuned load: n 6..20
+        t = self.run_on(lambda tuned, n: (148.5 if 6 <= n <= 20 else 250.0) if tuned else 249.5)
+        st = self.state()
+        self.assertNotIn("reverted", st)
+        self.assertEqual(st["check"]["result"], "passed")
+        self.assertIn("didn't repeat", st["check"]["note"])
+        self.assertIn("median tuned", st["check"]["note"])
+        self.assertFalse(t.pending())
+        self.tuned_values_kept()
+
+    def test_a_slowdown_that_repeats_reverts_and_says_what_was_measured(self):
+        self.run_on(incident)
+        st = self.state()
+        why = st["reverted"]
+        self.assertIn("slower than stock in 2 of 2 repeats", why)
+        self.assertIn("median tuned 148.5 against median stock 249.5", why)
+        self.assertIn("tuned 148.5/148.5/148.5", why)
+        self.assertEqual(st["check"]["result"], "reverted")
+        self.assertEqual((self.cap(), self.mclk()), (255 * W, 1000))
+
+    def test_the_repeats_alternate_stock_and_tuned(self):
+        self.run_on(incident)
+        seq = [w for w in self.driver.card_writes() if w[0] == "pp_od_clk_voltage" and w[1].startswith("m 1")]
+        self.assertGreaterEqual(len(seq), 3)           # tuned set: first, then once per alternation
+        resets = [w for w in self.driver.card_writes() if w == ("pp_od_clk_voltage", "r")]
+        self.assertGreaterEqual(len(resets), 3)        # stock before each repeat (and the final revert)
+        self.assertGreaterEqual(len(self.ollama.calls), 5 + 15 + 4 * 5)   # stock, first load, 2 x (stock + tuned)
+
+    def test_one_slow_alternation_of_two_is_not_enough(self):
+        # second alternation's tuned run (36..40) is fine
+        self.run_on(lambda tuned, n: (148.5 if n <= 30 else 250.0) if tuned else 249.5)
+        st = self.state()
+        self.assertNotIn("reverted", st)
+        self.assertEqual(st["check"]["result"], "passed")
+
+    def test_another_model_loading_makes_the_reading_unreliable(self):
+        t = self.run_on(incident, loaded_fn=lambda n: [{"name": "llama3:8b"}] if n >= 10 else [])
+        st = self.state()
+        self.assertNotIn("reverted", st)
+        self.assertEqual(st["check"]["result"], "deferred")
+        self.assertIn("another model was loaded: llama3:8b", st["check"]["note"])
+        self.assertTrue(t.pending())
+        self.tuned_values_kept()
+
+    def test_a_model_that_was_already_resident_is_not_noise(self):
+        self.run_on(incident, loaded_fn=lambda n: [{"name": "nomic-embed-text"}])
+        self.assertIn("slower than stock in 2 of 2", self.state()["reverted"])
+
+    def test_a_card_busy_with_something_else_defers(self):
+        t = self.run_on(incident, busy=85)
+        st = self.state()
+        self.assertNotIn("reverted", st)
+        self.assertEqual(st["check"]["result"], "deferred")
+        self.assertIn("already 85% busy", st["check"]["note"])
+        self.assertTrue(t.pending())
+
+    def test_an_idle_card_is_no_noise(self):
+        self.run_on(incident, busy=2)
+        self.assertIn("slower than stock in 2 of 2", self.state()["reverted"])
+
+    def test_an_answer_that_fails_partway_defers(self):
+        # the engine falls over in the first tuned load, after a slow answer
+        def fn(tuned, n):
+            if n == 12:
+                return None
+            return incident(tuned, n)
+        self.run_on(fn)
+        st = self.state()
+        self.assertNotIn("reverted", st)
+        self.assertIn(st["check"]["result"], ("deferred", "passed"))
+        if st["check"]["result"] == "deferred":
+            self.assertIn("failed partway", st["check"]["note"])
+
+    def test_a_real_amdgpu_error_in_a_repeat_still_reverts_at_once(self):
+        def hang(n):
+            if n == 27:                                # during the first tuned repeat
+                self.klog.append(RING_TIMEOUT)
+        self.run_on(incident, on_generate=hang)
+        st = self.state()
+        self.assertIn("ring gfx_0.0.0 timeout", st["reverted"])
+        self.assertEqual((self.cap(), self.mclk()), (255 * W, 1000))
+
+    def test_an_amdgpu_error_in_the_first_load_is_not_softened_by_nvme_noise(self):
+        def hang(n):
+            if n == 10:
+                self.klog.append(RING_TIMEOUT)
+        self.run_on(incident, klog=[NVME_TIMEOUT], on_generate=hang)
+        self.assertIn("ring gfx_0.0.0 timeout", self.state()["reverted"])
+
+    def test_ctrl_c_during_the_repeats_puts_the_card_back(self):
+        def stop(n):
+            if n == 27:
+                raise KeyboardInterrupt
+        self.tree.navi21()
+        self.ollama = ScriptedOllama(self.clock, self.tree, incident, on_generate=stop)
+        with self.assertRaises(KeyboardInterrupt):
+            self.tuner(ollama=self.ollama).cmd_on()
+        self.assertIn("stopped before it ended", self.state()["reverted"])
+        self.assertEqual((self.cap(), self.mclk()), (255 * W, 1000))
+
+    def test_a_fast_reading_never_starts_the_repeats(self):
+        self.run_on(lambda tuned, n: 42.0 if tuned else 40.0)
+        self.assertEqual(self.state()["check"]["result"], "passed")
+        self.assertEqual(len(self.ollama.calls), 5 + 15)   # stock measurement and one load, nothing more
+
+    def test_nvme_error_lines(self):
+        bad = ["nvme nvme0: I/O 713 QID 4 timeout, aborting",
+               "nvme nvme0: controller is down; will reset: CSTS=0xffffffff, PCI_STATUS=0xffff",
+               "blk_update_request: I/O error, dev nvme0n1, sector 12345 op 0x0:(READ)",
+               "Buffer I/O error on dev nvme0n1p2, logical block 9, async page read",
+               "nvme nvme1: Device not ready; aborting reset, CSTS=0x1"]
+        for line in bad:
+            self.assertEqual(len(T.nvme_errors([line])), 1, line)
+        good = ["nvme nvme0: pci function 0000:01:00.0", "nvme nvme0: 16/0/0 default/read/poll queues",
+                "amdgpu 0000:0b:00.0: amdgpu: SMU is initialized successfully!", "EXT4-fs (nvme0n1p2): mounted filesystem"]
+        for line in good:
+            self.assertEqual(T.nvme_errors([line]), [], line)
+        self.assertEqual(T.nvme_errors(None), [])
 
 
 class TestSetupChoice(Base):

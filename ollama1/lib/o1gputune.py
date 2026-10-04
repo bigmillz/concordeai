@@ -24,10 +24,16 @@ usually needs it too (without overdrive the driver reports max = default).
 
 Safety: after the values are applied a self-check runs 60 s of answers on
 the card (when a model is installed) while it watches the kernel log for
-amdgpu errors and the card's junction and memory temperatures. Any error, a
-temperature at or past its limit, or answers slower than stock puts the card
-back to stock at once and records why; it then stays at stock, across reboots,
-until the admin runs `ollama1-gpu-tune on` again. Every boot also reads the
+amdgpu errors and the card's junction and memory temperatures. Any error or a
+temperature at or past its limit puts the card back to stock at once and
+records why; it then stays at stock, across reboots, until the admin runs
+`ollama1-gpu-tune on` again. Slow answers are judged more carefully (6b372): a
+first slow reading starts a repeat, stock and tuned measured again,
+alternating twice; only a slowdown that repeats (each alternation and the
+medians) reverts, and the reason gives the figures. If anything made a
+reading unreliable (a drive logging NVMe errors, another model loaded, the
+card already busy for someone else, an answer that failed) nothing is changed
+and the check runs again next boot. Every boot also reads the
 kernel log of the boot the tuning last ran in, and goes back to stock if that
 boot logged an amdgpu error.
 
@@ -55,11 +61,19 @@ MEM_MAX_C = 100
 CHECK_SECONDS = 60
 STOCK_SECONDS = 20
 SLOWER_LIMIT = 0.95             # tuned answers under 95% of stock's speed: back to stock
+# A slow reading alone never reverts (6b372): stock and tuned are measured again, alternating,
+# and the slowdown must repeat; a reading taken while something else was going on is no reading.
+CONFIRM_ROUNDS = 2              # stock/tuned alternations after a slow first reading
+BUSY_OTHER_PCT = 35             # the card already this busy before the load starts: someone else is using it
 GRUB_DROPIN = "/etc/default/grub.d/97-amdgpu-overdrive.cfg"
 OLLAMA = "http://127.0.0.1:11434"
 # what the kernel logs when the card hangs, resets or faults
 ERROR_RX = re.compile(r"(amdgpu|\[drm).*?(ring \S+ timeout|GPU reset|GPU hang|VM fault|page fault|PROTECTION_FAULT)",
                       re.I)
+# what the kernel logs when a drive misbehaves: reads and writes then crawl, and so does everything on the box
+NVME_ERROR_RX = re.compile(r"((nvme\d|nvme nvme).*?(timeout|I/O error|controller is down|not ready|Disabling device|"
+                           r"reset|Removing after probe failure|abort|Unmapped Host Error)|"
+                           r"(blk_update_request|Buffer I/O error).*?dev nvme)", re.I)
 LEVEL_FILE = "power_dpm_force_performance_level"
 
 
@@ -252,6 +266,10 @@ def amdgpu_errors(lines):
     return [l.strip()[:200] for l in (lines or []) if ERROR_RX.search(l)]
 
 
+def nvme_errors(lines):
+    return [l.strip()[:200] for l in (lines or []) if NVME_ERROR_RX.search(l)]
+
+
 def boot_id():
     try:
         with open(os.environ.get("OLLAMA1_PROC", "/proc") + "/sys/kernel/random/boot_id") as f:
@@ -330,8 +348,11 @@ def read_state(path=None):
 
 class Tuner:
     def __init__(self, io=None, ollama=None, journal=journal_lines, clock=time.time, mono=time.monotonic,
-                 boot=boot_id, out=print, check_seconds=None, stock_seconds=None):
+                 boot=boot_id, out=print, check_seconds=None, stock_seconds=None, pause=time.sleep):
         self.io = io or SysfsIO()
+        self.pause = pause
+        self.noise = []                  # what made the last load's speed unreliable (see _load)
+        self.load_failed = False
         self.ollama = ollama or Ollama()
         self.journal = journal
         self.clock = clock
@@ -487,6 +508,16 @@ class Tuner:
         tokens = secs = 0.0
         answers = 0
         hot = {}
+        # Besides what ends the load, it notes (self.noise) what makes its speed no reading of the
+        # card: the card already busy for someone else, another model loaded, a drive logging
+        # errors, an answer that failed partway. A slow figure from such a load is never grounds
+        # to revert (self_check).
+        self.noise = []
+        self.load_failed = False
+        others = self._others(model) if model else set()
+        busy = self._busy(card) if model else None
+        if busy is not None and busy >= BUSY_OTHER_PCT:
+            self.noise.append("the card was already %d%% busy before the load started" % busy)
         end = self.mono() + seconds
         while self.mono() < end:
             r = self.ollama.generate(model) if model else None
@@ -494,6 +525,11 @@ class Tuner:
                 tokens += r[0]
                 secs += r[1]
                 answers += 1
+            if model:
+                new = self._others(model) - others
+                if new:
+                    self.noise.append("another model was loaded: %s" % ", ".join(sorted(new)))
+                    others |= new
             t = card.temps()
             for k, v in t.items():
                 hot[k] = max(hot.get(k, v), v)
@@ -502,12 +538,95 @@ class Tuner:
             if t.get("mem") is not None and t["mem"] >= MEM_MAX_C:
                 return tokens, secs, answers, "the memory reached %d C" % t["mem"], hot
             if since is not None:
-                errs = amdgpu_errors(self.journal(["--since", "@%d" % since]))
+                lines = self.journal(["--since", "@%d" % since])
+                errs = amdgpu_errors(lines)
                 if errs:
                     return tokens, secs, answers, "the kernel logged: " + errs[0], hot
+                for e in nvme_errors(lines)[:1]:
+                    if not any(e in n for n in self.noise):
+                        self.noise.append("the kernel logged a drive error: " + e)
             if not r and model:
+                self.load_failed = True
+                self.noise.append("an answer failed partway through")
                 return tokens, secs, answers, None, hot      # Ollama didn't answer: stop, judged below
         return tokens, secs, answers, None, hot
+
+    def _others(self, model):
+        """The models loaded now other than the one measured."""
+        try:
+            return {m.get("name") for m in self.ollama.loaded() if m.get("name")} - {model}
+        except (OSError, AttributeError):
+            return set()
+
+    def _busy(self, card):
+        """The card's busy percent just before a load, the lowest of three looks (nothing of ours is
+        running then), or None when it can't be read."""
+        vals = []
+        for i in range(3):
+            v = _int(self.io.read(card.dev + "/gpu_busy_percent"))
+            if v is None:
+                return None
+            vals.append(v)
+            if i < 2:
+                self.pause(0.3)
+        return min(vals)
+
+    def _round(self, card, model, since):
+        """One short measurement: (tokens/s or None, what made it unreliable, a hard stop or None)."""
+        tokens, secs, answers, why, hot = self._load(card, model, self.stock_seconds, since)
+        tps = round(tokens / secs, 2) if answers and secs > 0 else None
+        return tps, list(self.noise), why
+
+    def confirm_slowdown(self, card, model, since, first_tps, saved_stock, first_noise):
+        """A slow first reading is not yet a reason to revert (6b372: 148.7 against a stock of 249.5 was
+        measured while a drive and an engine were failing, and reverted a card that was fine). Measure
+        stock and tuned again, alternating CONFIRM_ROUNDS times, in the same conditions:
+          ("defer", text)  anything made a reading unreliable (the first or a repeat): nothing is changed,
+                           and the check runs again next boot;
+          ("revert", text) the slowdown repeated (each alternation, and the medians), or a hard error
+                           (amdgpu, temperature) turned up: back to stock, saying what was measured;
+          ("ok", text)     it didn't repeat: the first reading was an outlier.
+        The tuned values are always left applied, whatever the outcome (a revert puts stock back after)."""
+        import statistics
+        stock, tuned, problems = [], [first_tps], list(first_noise)
+        try:
+            for _ in range(CONFIRM_ROUNDS):
+                self.to_stock(card)
+                s, noise, why = self._round(card, model, since)
+                problems += noise
+                if why:
+                    return "revert", why
+                self.apply_card(card)
+                t, noise, why = self._round(card, model, since)
+                problems += noise
+                if why:
+                    return "revert", why
+                if s is None or t is None:
+                    problems.append("a repeat gave no answer")
+                    break
+                stock.append(s)
+                tuned.append(t)
+        finally:
+            self.apply_card(card)
+        shown = "tuned %s, stock %s tokens/s (first reading %.1f against the earlier stock %.1f)" % (
+            "/".join("%.1f" % x for x in tuned), "/".join("%.1f" % x for x in stock), first_tps, saved_stock)
+        if problems:
+            seen = []
+            for p in problems:
+                if p not in seen:
+                    seen.append(p)
+            return "defer", ("answers looked slower than stock (%s) but the measurement wasn't clean (%s), so "
+                             "nothing was changed; it is checked again next boot" % (shown, "; ".join(seen[:3])))
+        if len(stock) < CONFIRM_ROUNDS:
+            return "defer", "answers looked slower than stock (%s) but the repeats didn't finish; checked again next boot" % shown
+        slow_pairs = sum(1 for s, t in zip(stock, tuned[1:]) if t < SLOWER_LIMIT * s)
+        t_med, s_med = statistics.median(tuned), statistics.median(stock)
+        if slow_pairs == CONFIRM_ROUNDS and t_med < SLOWER_LIMIT * s_med:
+            return "revert", ("answers were slower than stock in %d of %d repeats (median tuned %.1f against median "
+                              "stock %.1f tokens/s, limit %d%%; %s)" % (slow_pairs, CONFIRM_ROUNDS, t_med, s_med,
+                                                                         round(SLOWER_LIMIT * 100), shown))
+        return "ok", ("the first reading was slow but didn't repeat: median tuned %.1f against median stock %.1f "
+                      "tokens/s (%s)" % (t_med, s_med, shown))
 
     def measure_stock(self, card):
         vram = _int(self.io.read(card.dev + "/mem_info_vram_total"))
@@ -557,9 +676,26 @@ class Tuner:
             why = "the memory reached %d C" % hot["mem"]
         tps = round(tokens / secs, 2) if answers and secs > 0 else None
         m = self.st.get("measure") or {}
+        deferred = confirmed = None
         if not why and tps and m.get("model") == model and m.get("stock_tps") \
                 and tps < SLOWER_LIMIT * m["stock_tps"]:
-            why = "answers were slower than stock (%.1f against %.1f tokens/s)" % (tps, m["stock_tps"])
+            # slow against the stock figure taken earlier: that alone is not enough (6b372)
+            noise = list(self.noise)
+            self.say("answers look slower than stock (%.1f against %.1f tokens/s); measuring stock and tuned "
+                     "again, %d alternations" % (tps, m["stock_tps"], CONFIRM_ROUNDS))
+            try:
+                verdict, text = self.confirm_slowdown(card, model, since, tps, m["stock_tps"], noise)
+            except KeyboardInterrupt:
+                self.st["check"] = dict(chk, result="reverted", note="the check was stopped before it ended")
+                self.revert(card, self.st["check"]["note"])
+                self.save()
+                raise
+            if verdict == "revert":
+                why = text
+            elif verdict == "defer":
+                deferred = text
+            else:
+                confirmed = text
         chk.update(model=model, answers=answers, tps=tps, max_c=hot)
         if why:
             chk["result"] = "reverted"
@@ -567,6 +703,12 @@ class Tuner:
             self.st["check"] = chk
             self.revert(card, why)
             return False
+        if deferred:
+            chk["result"] = "deferred"           # not reverted, not passed: pending() stays true, so it runs again
+            chk["note"] = deferred
+            self.st["check"] = chk
+            self.say(deferred)
+            return True
         if model and answers:
             chk["result"] = "passed"
             self.st["checked"] = self.applied_values()
@@ -577,6 +719,8 @@ class Tuner:
                     line += " (stock %.1f, %+.1f%%)" % (m["stock_tps"], 100.0 * (tps / m["stock_tps"] - 1))
             if hot.get("junction") is not None:
                 line += "; hottest: junction %d C, memory %s C" % (hot["junction"], hot.get("mem", "?"))
+            if confirmed:
+                line += "; " + confirmed
         elif model:
             chk["result"] = "no answer"
             line = "Ollama gave no answer, so the load wasn't tested; it is checked again next boot"

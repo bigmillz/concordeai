@@ -1005,6 +1005,23 @@ MUTANTS = [
      "if (state[\"gpu\"] and state[\"models\"]):", ["test_sleep"]),
     ("resume-check: the reason is not recorded", "lib/o1sleep.py", 'detail = "; ".join(parts)',
      'detail = parts[0]', ["test_sleep"]),
+    ("gpu-tune: one slow reading reverts again", "lib/o1gputune.py",
+     "            try:\n                verdict, text = self.confirm_slowdown(card, model, since, tps, m[\"stock_tps\"], noise)",
+     "            try:\n                verdict, text = \"revert\", \"answers were slower than stock\"", ["test_gputune"]),
+    ("gpu-tune: a slowdown that doesn't repeat still reverts", "lib/o1gputune.py",
+     "if slow_pairs == CONFIRM_ROUNDS and t_med < SLOWER_LIMIT * s_med:", "if t_med < SLOWER_LIMIT * s_med:",
+     ["test_gputune"]),
+    ("gpu-tune: a drive error doesn't defer", "lib/o1gputune.py",
+     "                for e in nvme_errors(lines)[:1]:", "                for e in []:", ["test_gputune"]),
+    ("gpu-tune: another model loading doesn't defer", "lib/o1gputune.py",
+     "                new = self._others(model) - others", "                new = set()", ["test_gputune"]),
+    ("gpu-tune: a busy card doesn't defer", "lib/o1gputune.py",
+     "if busy is not None and busy >= BUSY_OTHER_PCT:", "if False:", ["test_gputune"]),
+    ("gpu-tune: the repeats are not alternated", "lib/o1gputune.py", "CONFIRM_ROUNDS = 2", "CONFIRM_ROUNDS = 1",
+     ["test_gputune"]),
+    ("gpu-tune: an amdgpu error in a repeat is ignored", "lib/o1gputune.py",
+     "                problems += noise\n                if why:\n                    return \"revert\", why\n                if s is None",
+     "                problems += noise\n                if s is None", ["test_gputune"]),
 ]
 
 
