@@ -251,7 +251,9 @@ def power_state():
     fresh = time.time() - (live.get("t") or 0) < 60
     return {"watts": live.get("watts") if fresh else None, "src": live.get("src") if fresh else None,
             "kwh_24h": summ.get("kwh_24h"), "cost_24h": summ.get("cost_24h"), "symbol": summ.get("symbol", "$"),
-            "badge": summ.get("badge"), "price": summ.get("price")}
+            "badge": summ.get("badge"), "price": summ.get("price"),
+            "currency": summ.get("currency"), "priced": summ.get("priced"), "since": summ.get("since"),
+            "windows": summ.get("windows") if isinstance(summ.get("windows"), dict) else None}
 
 
 def font_state(path="/run/ollama1/dash-font.json"):

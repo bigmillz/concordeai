@@ -9,6 +9,43 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b381 — Space on the server's keyboard shows only the electricity cost (per Patrick)
+
+- The panel gets a second screen: three large rows, 24 HOURS / 7 DAYS / 30
+  DAYS, each a cost in the tariff's symbol at the largest whole scale that
+  fits (one size for all three), with kWh small beside the label. Space flips
+  to it and back; every other key is ignored (`o1paneld.handle_keys`, with a
+  0.3 s debounce so a held key is one flip). A pairing window takes the screen
+  from either (`render(screen="cost")` is ignored while `st["pairing"]`). The
+  normal footer says "Space: electricity cost".
+- **Same calculation as the admin panel.** The root power service already
+  computes `o1power.window()` for 1 d, 1 w and 1 m (30 d); `compact()` now
+  also publishes those three (`cost`, `kwh`, `measured_h`, `est`) plus
+  `currency`, `priced`, `since` in `/run/ollama1/power/summary.json`, and
+  `o1metrics.power_state()` passes them through. Nothing is recomputed in
+  the panel. `est` = any of the window's hours came from a source other than
+  a plug; those figures get a `*` and a footnote (estimates always do).
+  **The power service must be restarted** after the kit is updated
+  (`sudo systemctl restart ollama1-power`), or 7 d and 30 d say NO DATA (the
+  panel falls back to the 24 h figure of the old summary).
+- Honest empties: no tariff price -> "Set your electricity price in the admin
+  panel"; no readings -> "No data yet"; a window with none -> NO DATA, never a
+  zero; a history shorter than 90% of a window -> "only 3d 4h of data". JPY
+  has no decimals; unknown currencies show their code. The font gained
+  the euro, pound and yen signs.
+- **Keyboard.** `o1paneld.Keys` puts the unit's tty (stdin, tty1) in raw mode
+  (no echo, no ISIG/ICANON), flushes what was typed before, reads with
+  `select` for at most the loop's 0.5 s poll (so a press flips within half a
+  second and the draw loop is never blocked), and restores the attributes in
+  `finally`. A fd that is not a terminal just sleeps. getty is masked on
+  tty1, so no login prompt can see the keys. KD_GRAPHICS does not change the
+  keyboard mode, so the tty still delivers them (unverified on the server).
+- `ollama1-dash --png out.png --screen cost` for the picture. Tests: the keys
+  with a fake termios and select, the loop with a scripted keyboard, the
+  windows, empties, currencies, no overflow of 1234.56 / 123456789012.34 in
+  any symbol at 480x270 to 1280x1024, and the power summary round trip; four
+  new mutants.
+
 ## 6b380 — a graphical information panel for the server's monitor (per Patrick)
 
 Patrick: "annoying trying to read all these hash marks". With a monitor

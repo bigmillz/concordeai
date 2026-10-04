@@ -27,6 +27,7 @@ import math
 import o1dashui as D
 import o1gfx
 import o1pixfont as F
+import o1tariff
 
 # ---- colours -------------------------------------------------------------------
 
@@ -652,11 +653,13 @@ def draw_footer(pm, r, st, ctx):
         pm.text(cx, ty, label, T["dim"])
         pm.text(cx + F.text_width(label) + 5, ty, val, T["text"])
         cx += seg + 16
-    mid = "graphs: last %s" % ctx["rng"]
-    mw = F.text_width(mid)
-    mx = (w - mw) // 2                       # in the middle if there is room between the other two
-    if cx + 8 <= mx and mx + mw + 12 <= w - 10 - (rw if right else 0):
-        pm.text(mx, ty, mid, T["dim"])
+    hint = "Space: electricity cost"
+    free_l, free_r = cx + 8, w - 10 - (rw + 12 if right else 0)
+    for mid in ("graphs: last %s    %s" % (ctx["rng"], hint), hint, "Space: cost"):     # the longest that fits the gap
+        mw = F.text_width(mid)
+        if free_r - free_l >= mw:
+            pm.text(free_l + (free_r - free_l - mw) // 2, ty, mid, T["dim"])
+            break
     if right:
         pm.text_right(w - 10, ty, right, T["dim"], max_w=max(0, w - cx - 20))
 
@@ -695,17 +698,147 @@ def draw_pairing(pm, st, now):
         pm.text_center(w // 2, h - 28, foot, T["title"], 1, max_w=w - 24)
 
 
+# ---- the electricity cost screen (Space on the keyboard, 6b381) ---------------------------
+
+COST_WINDOWS = (("1d", "24 HOURS", 86400), ("1w", "7 DAYS", 7 * 86400), ("1m", "30 DAYS", 30 * 86400))
+MSG_NO_PRICE = "Set your electricity price in the admin panel"
+MSG_NO_DATA = "No data yet"
+
+
+def money(value, symbol, currency=None):
+    """A cost as text: the tariff's symbol and two decimals (none for yen)."""
+    v = D._f(value)
+    if v is None:
+        return "-"
+    return "%s%.*f" % (symbol, 0 if currency == "JPY" else 2, v)
+
+
+def cost_view(st):
+    """What the cost screen shows, from the power summary the root sampler writes
+    (the same window figures as the admin panel): ("message", text) when there is
+    nothing true to show, else ("rows", [(label, money text, kWh text, estimated,
+    note)], any_estimated)."""
+    p = _d(st.get("power"))
+    now = D._f(st.get("time")) or 0
+    if not p:
+        return ("message", MSG_NO_DATA)
+    ws = _d(p.get("windows"))
+    if not ws and D._f(p.get("cost_24h")) is not None:            # a power service from before the cost screen
+        ws = {"1d": {"cost": p.get("cost_24h"), "kwh": p.get("kwh_24h"), "measured_h": 1, "est": True}}
+    priced = p.get("priced")
+    if priced is None:
+        priced = any(D._f(w.get("cost")) is not None for w in ws.values() if isinstance(w, dict))
+    if not priced:
+        return ("message", MSG_NO_PRICE)
+    since = D._f(p.get("since"))
+    if not ws or not any(D._f(_d(w).get("measured_h")) for w in ws.values()):
+        return ("message", MSG_NO_DATA)
+    currency = p.get("currency")
+    symbol = p.get("symbol") or o1tariff.CURRENCY_SYMBOL.get(currency, "%s " % currency if currency else "$")
+    rows, est_any = [], False
+    for key, label, secs in COST_WINDOWS:
+        w = _d(ws.get(key))
+        cost, kwh = D._f(w.get("cost")), D._f(w.get("kwh"))
+        if cost is None or not D._f(w.get("measured_h")):
+            rows.append((label, "NO DATA", "", False, ""))
+            continue
+        est = bool(w.get("est"))
+        est_any = est_any or est
+        note = ""
+        if since and now and now - since < 0.9 * secs:
+            note = "only %s of data" % D.dur(now - since)
+        rows.append((label, money(cost, symbol, currency), "%s kWh" % D.num(kwh, "%.1f" if kwh and kwh >= 10 else "%.2f"), est, note))
+    return ("rows", rows, est_any)
+
+
+def fit_scale(value, star, max_w, max_h, top=12):
+    """The largest whole scale at which the value (and its small *) fits the box."""
+    for s in range(top, 0, -1):
+        w = F.text_width(value, s) + ((F.text_width("*", max(2, s // 3)) + 2) if star else 0)
+        if w <= max_w and 7 * s <= max_h:
+            return s
+    return 1
+
+
+def draw_cost(pm, st, now):
+    """Only the cost over the last 24 hours, 7 days and 30 days, in large print,
+    using the whole screen. Estimated figures carry a * and a footnote."""
+    w, h = pm.w, pm.h
+    pm.fill_rect(0, 0, w, h, T["bg"])
+    view = cost_view(st)
+    m = 8
+    foot_h = 14
+    if view[0] == "message":
+        text = view[1]
+        best = (1, [text])
+        for s in range(10, 0, -1):
+            lines = wrap(text, w - 2 * m - 8, 4, s)
+            if lines and " ".join(lines).replace("...", "") == text and 9 * s * len(lines) + 4 * (len(lines) - 1) <= h - foot_h - 2 * m:
+                best = (s, lines)
+                break
+        s, lines = best
+        total = 9 * s * len(lines) + 4 * (len(lines) - 1)
+        y = (h - foot_h - total) // 2
+        for ln in lines:
+            pm.text_center(w // 2, y, ln, T["warn"] if text == MSG_NO_PRICE else T["dim"], s, max_w=w - 2 * m)
+            y += 9 * s + 4
+    else:
+        _kind, rows, est_any = view
+        gap = 6
+        avail = h - foot_h - m - gap * 2 - m
+        rh = avail // 3
+        area = rh - 7 - 14 - 10
+        common = min([fit_scale(r[1], r[3] and r[1] not in ("NO DATA", "-"), w - 2 * m - 20, area)
+                      for r in rows if r[1] not in ("NO DATA", "-")] or [12])      # one size for all three
+        for i, (label, value, kwh, est, note) in enumerate(rows):
+            y = m + i * (rh + gap)
+            pm.rrect(m, y, w - 2 * m, rh, 4, T["edge"])
+            pm.rrect(m + 1, y + 1, w - 2 * m - 2, rh - 2, 3, T["panel"])
+            ix, iw = m + 10, w - 2 * m - 20
+            pm.text(ix, y + 7, label, T["title"], 2, max_w=iw // 2)
+            right = "  ".join(x for x in (note, kwh) if x)
+            rw = F.text_width(right, 2) if F.text_width(right, 2) <= iw // 2 else 0
+            if right and rw:
+                pm.text_right(ix + iw, y + 7, right, T["warn"] if note and not kwh else T["dim"], 2)
+            elif right:
+                pm.text_right(ix + iw, y + 7, right, T["dim"], 1, max_w=iw // 2)
+            area_h = rh - 7 - 14 - 10
+            star = est and value not in ("NO DATA", "-")
+            s = min(common, fit_scale(value, star, iw, area_h))
+            vy = y + 7 + 14 + 4 + (area_h - 7 * s) // 2
+            colour = T["dim"] if value in ("NO DATA", "-") else T["text"]
+            vw = F.text_width(value, s)
+            ss = max(2, s // 3)
+            sw = F.text_width("*", ss) + 2 if star else 0
+            vx = ix + max(0, (iw - vw - sw) // 2)
+            pm.text(vx, vy, value, colour, s, max_w=iw)
+            if star:
+                pm.text(vx + vw + 2, vy, "*", T["warn"], ss)
+        foot = ("* estimated from the card, processor and a base load, not read from a plug" if est_any else "")
+        if foot:
+            pm.text(m, h - foot_h + 3, foot, T["dim"], 1, max_w=w - 2 * m - 80)
+    pm.text_right(w - m, h - foot_h + 3, "Space: back", T["dim"], 1)
+
+
 # ---- the whole frame ----------------------------------------------------------------
 
-def render(st, w, h, range_s=300, pm=None):
+def render(st, w, h, range_s=300, pm=None, screen="panel"):
     """The whole panel as a Pixmap of w x h (drawn into `pm` if one is
-    given: the caller keeps one buffer and the frame is repainted over it)."""
+    given: the caller keeps one buffer and the frame is repainted over it).
+    screen="cost" shows only the electricity cost (6b381); an open pairing
+    window takes the screen from either."""
     st = st if isinstance(st, dict) else {}
     if pm is None or (pm.w, pm.h) != (w, h):
         pm = o1gfx.Pixmap(w, h, T["bg"])
     else:
         pm.fill_rect(0, 0, w, h, T["bg"])
     now = D._f(st.get("time")) or 0
+    if screen == "cost" and not st.get("pairing"):
+        try:
+            draw_cost(pm, st, now)
+        except Exception as e:
+            ERRORS.append("cost: %r" % (e,))
+        return pm
     boxes = layout(w, h)
     if not boxes:
         pm.text(8, 8, "Screen too small for the panel", T["warn"], 1, max_w=w - 16)

@@ -8,6 +8,7 @@ import contextlib
 import importlib.machinery
 import importlib.util
 import io
+import json
 import os
 import random
 import shutil
@@ -915,6 +916,327 @@ class TestPanel(unittest.TestCase):
         self.assertIn(("/srv/models is not mounted", "bad"), o1dashui.warnings(st, st["time"]))
         pm = o1panel.render(st, 640, 360)
         self.assertGreater(len({v for v in pm.buf}), 8)
+
+
+def power_state(**kw):
+    p = {"watts": 300.0, "src": "est", "kwh_24h": 3.54, "cost_24h": 0.61, "symbol": "$", "badge": None, "price": 0.17,
+         "currency": "USD", "priced": True, "since": 1790000000 - 90 * 86400,
+         "windows": {"1d": {"cost": 0.61, "kwh": 3.54, "measured_h": 24.0, "est": True},
+                     "1w": {"cost": 4.87, "kwh": 27.9, "measured_h": 168.0, "est": False},
+                     "1m": {"cost": 21.34, "kwh": 118.6, "measured_h": 700.0, "est": True}}}
+    p.update(kw)
+    return p
+
+
+def cost_state(**kw):
+    st = dash_sample.sample(now=1790000000.0)
+    st["power"] = power_state(**kw)
+    return st
+
+
+class FakeTermios:
+    """The parts of termios the keyboard reader uses."""
+    ECHO, ICANON, ISIG, IEXTEN, VMIN, VTIME, TCSANOW, TCIFLUSH = 8, 2, 1, 32768, 6, 5, 0, 0
+    error = OSError
+
+    def __init__(self, fail=False):
+        self.attrs = [0, 0, 0, 8 | 2 | 1 | 32768 | 64, 0, 0, [b"\x00"] * 32]
+        self.calls, self.fail = [], fail
+
+    def tcgetattr(self, fd):
+        if self.fail:
+            raise OSError("not a tty")
+        return [list(a) if isinstance(a, list) else a for a in self.attrs]
+
+    def tcsetattr(self, fd, when, attrs):
+        self.calls.append(("set", [list(a) if isinstance(a, list) else a for a in attrs]))
+        self.attrs = attrs
+
+    def tcflush(self, fd, q):
+        self.calls.append(("flush", fd))
+
+
+class TestCostScreen(unittest.TestCase):
+    def setUp(self):
+        del o1panel.ERRORS[:]
+
+    def tearDown(self):
+        self.assertEqual(o1panel.ERRORS, [])
+
+    # -- the keys ---------------------------------------------------------------------
+    def test_space_flips_and_nothing_else_does(self):
+        self.assertEqual(o1paneld.handle_keys(b" ", "panel", 100.0, 0.0), ("cost", 100.0))
+        self.assertEqual(o1paneld.handle_keys(b" ", "cost", 100.0, 0.0), ("panel", 100.0))
+        for junk in (b"", b"a", b"\r", b"\x1b[A", b"t", b"q", b"\x03", b"\x1b", b"1234"):
+            self.assertEqual(o1paneld.handle_keys(junk, "panel", 100.0, 0.0), ("panel", 0.0), junk)
+            self.assertEqual(o1paneld.handle_keys(junk, "cost", 100.0, 0.0), ("cost", 0.0), junk)
+
+    def test_a_held_key_is_one_flip(self):
+        screen, last = o1paneld.handle_keys(b" ", "panel", 100.0, -1e9)
+        screen, last = o1paneld.handle_keys(b" ", screen, 100.1, last)      # key repeat
+        self.assertEqual(screen, "cost")
+        screen, last = o1paneld.handle_keys(b" ", screen, 100.5, last)      # a second, deliberate press
+        self.assertEqual(screen, "panel")
+        self.assertEqual(o1paneld.handle_keys(b"  ", "panel", 200.0, 0.0)[0], "cost")   # two bytes in one read: one flip
+
+    def test_the_keyboard_is_read_raw_without_echo_and_put_back(self):
+        tc = FakeTermios()
+        before = tc.tcgetattr(0)
+        k = o1paneld.Keys(0, tcmod=tc, sel=lambda r, w, x, t: ([], [], []))
+        k.start()
+        raw = tc.attrs
+        self.assertEqual(raw[3] & (tc.ECHO | tc.ICANON | tc.ISIG | tc.IEXTEN), 0)
+        self.assertEqual((raw[6][tc.VMIN], raw[6][tc.VTIME]), (0, 0))
+        self.assertIn(("flush", 0), tc.calls)                       # what was typed before is thrown away
+        k.stop()
+        self.assertEqual(tc.attrs, before)
+        k.stop()                                                    # twice is harmless
+
+    def test_waiting_for_a_key_never_blocks_longer_than_the_timeout(self):
+        asked = []
+
+        def sel(r, w, x, t):
+            asked.append(t)
+            return ([], [], [])
+        k = o1paneld.Keys(0, tcmod=FakeTermios(), sel=sel)
+        k.start()
+        self.assertEqual(k.wait(0.5), b"")
+        self.assertEqual(asked, [0.5])
+        k.sel = lambda r, w, x, t: ([0], [], [])
+        k.read = lambda fd, n: b" "
+        self.assertEqual(k.wait(0.5), b" ")
+
+    def test_a_console_that_is_not_a_terminal_just_sleeps(self):
+        slept = []
+        k = o1paneld.Keys(0, tcmod=FakeTermios(fail=True), sleep=slept.append)
+        k.start()
+        self.assertEqual(k.wait(0.5), b"")
+        self.assertEqual(slept, [0.5])
+        k = o1paneld.Keys(None, tcmod=FakeTermios(), sleep=slept.append)
+        k.start()
+        k.stop()
+
+    def run_loop(self, script, st=None, max_frames=40):
+        """Run the loop with these keyboard reads (one per poll); returns the screens drawn, in order."""
+        seen = []
+        real = o1panel.render
+
+        def spy(st_, w, h, range_s=300, pm=None, screen="panel"):
+            seen.append(screen)
+            return real(st_, w, h, range_s, pm, screen)
+        o1panel.render = spy
+        polls = iter(script)
+        c = Clock()
+
+        class K:
+            def wait(self, timeout):
+                c.sleep(timeout)
+                return next(polls, b"")
+        try:
+            n = [0]
+
+            def stop():
+                n[0] += 1
+                return n[0] > len(script) + 3
+            o1paneld.run(FakeFb(), FakeTty(), FakeSampler(st), clock=c.now, sleep=c.sleep, keys=K(), stop=stop)
+        finally:
+            o1panel.render = real
+        return seen
+
+    def test_the_screen_flips_within_one_poll_and_back(self):
+        seen = self.run_loop([b"", b"", b" ", b"", b"x", b"", b"", b" ", b"", b""])
+        self.assertEqual(seen[0], "panel")
+        first_cost = seen.index("cost")
+        self.assertLessEqual(first_cost, 4)                          # a key at the third poll: drawn at once, not 2 s later
+        self.assertEqual(seen[-1], "panel")
+        self.assertEqual(sorted(set(seen)), ["cost", "panel"])
+        self.assertEqual(seen.count("cost") >= 1, True)
+
+    def test_other_keys_change_nothing(self):
+        seen = self.run_loop([b"a", b"\r", b"\x1b[B", b"t", b"q", b"", b""])
+        self.assertEqual(set(seen), {"panel"})
+
+    def test_pairing_wins_over_the_cost_screen(self):
+        st = dash_sample.sample(now=1790000000.0, pairing=True)
+        st["power"] = power_state()
+        a = o1panel.render(st, 640, 360, screen="panel")
+        b = o1panel.render(st, 640, 360, screen="cost")
+        self.assertEqual(a.buf, b.buf)
+        st["pairing"] = None
+        self.assertNotEqual(o1panel.render(st, 640, 360, screen="panel").buf, o1panel.render(st, 640, 360, screen="cost").buf)
+
+    # -- what it says -----------------------------------------------------------------
+    def test_three_windows_with_the_tariffs_symbol(self):
+        kind, rows, est_any = o1panel.cost_view(cost_state())
+        self.assertEqual(kind, "rows")
+        self.assertEqual([r[0] for r in rows], ["24 HOURS", "7 DAYS", "30 DAYS"])
+        self.assertEqual([r[1] for r in rows], ["$0.61", "$4.87", "$21.34"])
+        self.assertEqual([r[3] for r in rows], [True, False, True])        # the * marks estimated figures
+        self.assertTrue(est_any)
+        self.assertEqual(rows[0][2], "3.54 kWh")
+        self.assertEqual(rows[2][2], "118.6 kWh")
+
+    def test_currency_symbols(self):
+        for cur, sym, text in (("EUR", "€", "€0.61"), ("GBP", "£", "£0.61"), ("CHF", "CHF ", "CHF 0.61")):
+            self.assertEqual(o1panel.cost_view(cost_state(currency=cur, symbol=sym))[1][0][1], text)
+        self.assertEqual(o1panel.cost_view(cost_state(currency="EUR", symbol=None))[1][0][1], "€0.61")   # from the tariff table
+        self.assertEqual(o1panel.cost_view(cost_state(currency="CHF", symbol=None))[1][0][1], "CHF 0.61")
+        jp = power_state(currency="JPY", symbol="¥")
+        jp["windows"]["1d"]["cost"] = 123.4
+        self.assertEqual(o1panel.cost_view(dict(cost_state(), power=jp))[1][0][1], "¥123")       # yen has no decimals
+
+    def test_no_price_says_so_instead_of_showing_zeros(self):
+        st = cost_state(priced=False)
+        st["power"]["windows"]["1d"]["cost"] = None
+        self.assertEqual(o1panel.cost_view(st), ("message", o1panel.MSG_NO_PRICE))
+        self.assertEqual(o1panel.MSG_NO_PRICE, "Set your electricity price in the admin panel")
+        st = cost_state(priced=None)                                       # an older summary: judged by the figures
+        for w in st["power"]["windows"].values():
+            w["cost"] = None
+        self.assertEqual(o1panel.cost_view(st)[0], "message")
+
+    def test_no_data_yet(self):
+        self.assertEqual(o1panel.cost_view({"time": 1.0}), ("message", "No data yet"))
+        st = cost_state()
+        for w in st["power"]["windows"].values():
+            w["measured_h"] = 0
+        self.assertEqual(o1panel.cost_view(st), ("message", "No data yet"))
+        st = cost_state()
+        st["power"]["windows"]["1w"].update(cost=None, measured_h=0)       # one window with none: that row, not a false 0
+        rows = o1panel.cost_view(st)[1]
+        self.assertEqual(rows[1][1], "NO DATA")
+        self.assertEqual(rows[0][1], "$0.61")
+
+    def test_a_short_history_is_labelled(self):
+        st = cost_state(since=1790000000 - 3 * 86400 - 4 * 3600)
+        rows = o1panel.cost_view(st)[1]
+        self.assertEqual(rows[0][4], "")
+        self.assertEqual(rows[1][4], "only 3d 4h of data")
+        self.assertEqual(rows[2][4], "only 3d 4h of data")
+
+    def test_a_power_service_from_before_this_still_shows_the_day(self):
+        st = dash_sample.sample(now=1790000000.0)
+        st["power"] = {"watts": 1.0, "kwh_24h": 3.0, "cost_24h": 0.5, "symbol": "$"}
+        kind, rows, _est = o1panel.cost_view(st)
+        self.assertEqual((kind, rows[0][1], rows[1][1]), ("rows", "$0.50", "NO DATA"))
+
+    # -- how it is drawn --------------------------------------------------------------
+    def texts_drawn(self, fn):
+        seen = []
+        orig = o1gfx.Pixmap.text
+
+        def rec(self_, x, y, s, c, scale=1, max_w=None, ellipsis=True):
+            seen.append((s, scale))
+            return orig(self_, x, y, s, c, scale, max_w, ellipsis)
+        o1gfx.Pixmap.text = rec
+        try:
+            fn()
+        finally:
+            o1gfx.Pixmap.text = orig
+        return seen
+
+    def test_the_figures_are_very_large(self):
+        seen = self.texts_drawn(lambda: o1panel.render(cost_state(), 640, 360, screen="cost"))
+        big = [sc for s, sc in seen if s.startswith("$")]
+        self.assertEqual(len(big), 3)
+        self.assertGreaterEqual(min(big), 8)                               # 8 x 7 px capitals at 640x360: 15% of the screen height
+        self.assertEqual(len(set(big)), 1)                                 # one size for the three
+
+    def test_it_shows_only_the_cost(self):
+        seen = self.texts_drawn(lambda: o1panel.render(cost_state(), 640, 360, screen="cost"))
+        words = " ".join(s for s, _ in seen)
+        for gone in ("GRAPHICS CARD", "PROCESSOR AND MEMORY", "Gateway", "Address", "Tunnel", "VRAM"):
+            self.assertNotIn(gone, words.upper() if gone.isupper() else words)
+        for there in ("24 HOURS", "7 DAYS", "30 DAYS"):
+            self.assertIn(there, words)
+
+    def test_messages_are_drawn_large_and_in_full(self):
+        for text, st in ((o1panel.MSG_NO_PRICE, cost_state(priced=False)), (o1panel.MSG_NO_DATA, {"time": 1790000000.0})):
+            seen = self.texts_drawn(lambda: o1panel.render(st, 640, 360, screen="cost"))
+            lines = [(s, sc) for s, sc in seen if s not in ("Space: back",)]
+            self.assertEqual(" ".join(s for s, _ in lines), text)
+            self.assertGreaterEqual(min(sc for _, sc in lines), 4)
+            self.assertNotIn("$", " ".join(s for s, _ in lines))
+
+    def test_big_numbers_in_any_currency_never_overflow_their_row(self):
+        for sym, cur in (("$", "USD"), ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("CHF ", "CHF"), ("kr ", "SEK"), ("R$ ", "BRL")):
+            for cost in (0.01, 1234.56, 99999.99, 1234567.89, 123456789012.34):
+                st = cost_state(symbol=sym, currency=cur)
+                for w in st["power"]["windows"].values():
+                    w["cost"] = cost
+                pm = o1panel.render(st, 640, 360, screen="cost")
+                rh = (360 - 14 - 8 - 12 - 8) // 3
+                boxes = [(8, 8 + i * (rh + 6), 640 - 16, rh) for i in range(3)]
+                for (x, y, bw, bh) in boxes:
+                    for yy in range(y + 6, y + bh - 6):
+                        for xx in list(range(x + 2, x + 9)) + list(range(x + bw - 9, x + bw - 2)):
+                            self.assertEqual(pm.get(xx, yy), o1panel.T["panel"], (sym, cost, xx, yy))
+                # and in the real row boxes of every size the screen may have
+                for w, h in ((480, 270), (640, 360), (800, 450), (1024, 768), (1280, 1024)):
+                    o1panel.render(st, w, h, screen="cost")
+
+    def test_the_row_sizes_follow_the_screen(self):
+        for w, h in ((480, 270), (640, 360), (640, 480), (1024, 600)):
+            pm = o1panel.render(cost_state(), w, h, screen="cost")
+            self.assertGreater(len({v for v in pm.buf}), 4)
+
+    def test_the_estimate_footnote_only_when_something_is_estimated(self):
+        def foot(st):
+            return " ".join(s for s, _ in self.texts_drawn(lambda: o1panel.render(st, 640, 360, screen="cost")))
+        self.assertIn("estimated", foot(cost_state()))
+        plug = cost_state()
+        for w in plug["power"]["windows"].values():
+            w["est"] = False
+        self.assertNotIn("estimated", foot(plug))
+        self.assertIn("Space: back", foot(plug))
+
+    def test_the_normal_panel_hints_at_the_key(self):
+        seen = self.texts_drawn(lambda: o1panel.render(cost_state(), 640, 360))
+        self.assertIn("Space: electricity cost", " ".join(s for s, _ in seen))
+        seen = self.texts_drawn(lambda: o1panel.render(dash_sample.sample(now=1790000000.0), 480, 270))
+        self.assertTrue(any("Space:" in s for s, _ in seen))
+
+    def test_the_new_glyphs(self):
+        for ch in "€£¥":
+            self.assertIn(ch, F.GLYPHS)
+            self.assertEqual(F.clean(ch), ch)
+            self.assertLessEqual(F.text_width(ch, 1), 5)
+
+    def test_the_png_option_can_show_the_cost_screen(self):
+        dash = load_dash()
+        d = tempfile.mkdtemp(prefix="o1png-")
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        a, b = os.path.join(d, "a.png"), os.path.join(d, "b.png")
+        with contextlib.redirect_stdout(io.StringIO()):
+            dash.png(["--png", a, "--scale", "1"])
+            dash.png(["--png", b, "--scale", "1", "--screen", "cost"])
+        with open(a, "rb") as f, open(b, "rb") as g:
+            self.assertNotEqual(f.read(), g.read())
+
+    def test_the_power_service_publishes_the_three_windows(self):
+        import test_power
+        import o1power
+        now = int(time.time())
+        cut = now - now % 60
+        o1power.append_rows([(cut - 60 * i, 2.0, "est", 60, 0) for i in range(1, 121)])
+        s = o1power.summary(now, test_power.sched(flat_rate=0.2), live=None)
+        c = o1power.compact(s)
+        self.assertEqual(set(c["windows"]), {"1d", "1w", "1m"})
+        self.assertEqual(c["windows"]["1d"]["cost"], s["windows"]["1d"]["cost"])      # the admin panel's own figure
+        self.assertEqual(c["windows"]["1m"]["kwh"], s["windows"]["1m"]["kwh"])
+        self.assertTrue(c["windows"]["1w"]["est"])
+        self.assertTrue(c["priced"])
+        self.assertEqual((c["currency"], c["since"]), ("USD", s["since"]))
+        unpriced = o1power.compact(o1power.summary(now, test_power.sched(), live=None))
+        self.assertFalse(unpriced["priced"])
+        self.assertIsNone(unpriced["windows"]["1d"]["cost"])
+        import o1metrics
+        os.makedirs(os.path.join(o1power.run_dir()), exist_ok=True)
+        with open(os.path.join(o1power.run_dir(), "summary.json"), "w") as f:
+            json.dump(c, f)
+        got = o1metrics.power_state()
+        self.assertEqual(got["windows"], c["windows"])                       # and the dashboard reads them back
+        self.assertEqual((got["priced"], got["currency"]), (True, "USD"))
 
 
 class TestWidgets(unittest.TestCase):

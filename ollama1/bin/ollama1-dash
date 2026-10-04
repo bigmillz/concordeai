@@ -9,7 +9,7 @@
   ollama1-top --once [--size 120x40]   one text frame, then exit
   ollama1-dash --set-font TTY   (root, from the unit) pick a console font for the screen
   ollama1-dash --dash text|graphic|auto   what --console draws (default auto, below)
-  ollama1-dash --png out.png [--size 640x360] [--scale 2] [--pairing] [--live]
+  ollama1-dash --png out.png [--size 640x360] [--scale 2] [--pairing] [--live] [--screen cost]
                                 one frame of the graphical panel as a picture (sample
                                 numbers, or --live ones), to look at the design
 
@@ -21,6 +21,8 @@ the text dashboard below; "graphic" insists on the panel when there is a
 framebuffer. The setting is OLLAMA1_DASH, or /etc/ollama1/dash-mode (setup.sh
 --dash). Any failure of the panel (no permission, an odd pixel format, an
 exception) is logged to the journal and the text dashboard takes over.
+On the panel, Space on the server's keyboard flips to a screen of only the
+electricity cost (24 hours, 7 days, 30 days) and back (6b381); other keys are ignored.
 
 It shows counts, sizes, timings and names in a few fixed boxes: the GPU,
 CPU and memory, requests, loaded models, storage, network and health, each a
@@ -182,7 +184,12 @@ def run_graphic(fb_path=FB_PATH, tty_path=TTY_PATH):
         fd = 1 if os.isatty(1) else os.open(tty_path, os.O_RDWR)       # the unit gives us tty1 as stdout
         tty = o1fb.TtyGraphics(fd)
         sampler = o1metrics.Sampler()
-        o1paneld.run(fb, tty, sampler, vt=o1fb.vt_of(os.ttyname(fd)), stop=lambda: stopping[0], log=log)
+        keys = o1paneld.Keys(0 if os.isatty(0) else fd)               # Space flips to the electricity cost (6b381)
+        keys.start()
+        try:
+            o1paneld.run(fb, tty, sampler, vt=o1fb.vt_of(os.ttyname(fd)), stop=lambda: stopping[0], log=log, keys=keys)
+        finally:
+            keys.stop()
     finally:
         signal.signal(signal.SIGTERM, old)
         fb.close()
@@ -235,7 +242,8 @@ def png(args):
         sampler.tick()
         time.sleep(1.0)
         st = sampler.tick()
-    pm = o1panel.render(st, w, h)
+    screen = args[args.index("--screen") + 1] if "--screen" in args else "panel"
+    pm = o1panel.render(st, w, h, screen=screen if screen in ("panel", "cost") else "panel")
     with open(out, "wb") as f:
         f.write(o1gfx.png_bytes(pm.w, pm.h, pm.buf, upscale=up))
     print("wrote %s (%dx%d, x%d)" % (out, pm.w, pm.h, up))
