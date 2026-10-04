@@ -111,7 +111,7 @@ it asks for any it can't find, at the terminal):
 | `--owner <your-name>` | Your name, used only in the Access policy's name. Default: from your admin email |
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial`, `--hdd1-serial`, `--hdd2-serial` | The four disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything |
-| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for one minute after, otherwise automatic: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
+| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -819,15 +819,26 @@ does the same. With no model installed yet the check runs once one is
 `OLLAMA1_FANS=0`) turns it off, and the choice is saved in
 `/etc/ollama1/setup.env`. The aim is maximum cooling while the server works
 without running the fans flat out for ever, which wears the bearings:
-`ollama1-fan.service` (`bin/ollama1-fan`, `lib/o1fan.py`) puts
+`ollama1-fan.service` (`bin/ollama1-fan`, `lib/o1fan.py`) holds
 
 - the graphics card's fan (amdgpu `pwm1`), and
 - every fan header the motherboard's Super-IO chip lets it control (on an MSI
   MEG X570 ACE, the NCT6797D, hwmon `nct6797`, `pwm1` to `pwm7`)
 
-at 100% in manual mode **while the server is working**, keeps them there for
-**one minute after the work ends** (a new request starts the minute again),
-and then gives them back to automatic, exactly as they were.
+at a level that follows what the server is doing:
+
+| Phase | Level | When |
+|---|---|---|
+| `working` | 100% | a request, the card, a long job or the load says it is working |
+| `hold100` | 100% | for 60 s after the work ends |
+| `hold50` | 50% | for the next 60 s |
+| `idle20` | 20% | from 120 s after the work ended, and from the start |
+
+A new request at any time goes back to 100% and starts the sequence over.
+A level is `pwm = round(percent * 255 / 100)`: 20% is 51, 50% is 128, 100%
+is 255. While the service runs it always holds the outputs; whenever it
+stops, for any reason, they go back to their own control (the BIOS's
+automatic), and that is also what is in force at boot before it starts.
 
 **Working** is what auto sleep already counts as busy, read with the same
 probes and limits: a request in flight (the gateway's activity file), the
@@ -839,21 +850,40 @@ backup is not heat and does not count.
 junction at 90 C or an NVMe drive at 70 C forces 100% whatever the load
 says, until it is 10 C under its limit; then the normal rule follows.
 
+**Never stall a fan or starve a pump.** What is plugged into each header is
+not known, so a low level is checked, never trusted:
+
+- The first start measures each output's rpm at 100% (about 8 s with every
+  fan at full speed) and remembers it in `/var/lib/ollama1/fan.json`.
+- Six seconds after an output is set to a low level its rpm is read. 0, or
+  under the output's own `fanN_min`, means it stalled: it is raised in steps
+  of 10% (30, 40, 50 ...) to the lowest level that spins. That floor is
+  remembered per output and logged once per step.
+- An output still at 60% or more of its 100% rpm when asked for 20% is a
+  probable pump or a fixed header: it is kept at 100% for good, and logged.
+- An output that reads no rpm at 100% (nothing connected, or no reading) is
+  set to 100% only while working, and left to its own control otherwise.
+
+To forget what was learned (a fan was changed), stop the service, delete
+`/var/lib/ollama1/fan.json` and start it again.
+
 **Fail-safe.**
 - Before the first change, each output's `pwmN_enable` (and its `pwmN`, if it
-  was manual) is saved in `/var/lib/ollama1/fan.json` with the boot id. A
-  service that restarts or crashes in the middle of a hold puts back the
-  saved originals, not the manual ones. After a reboot the file is dropped:
-  the hardware is already as it was.
-- The kit never writes a value below 255, except to put an output back as it
-  was. A clean stop (`systemctl stop`, a shutdown) puts everything back at
-  once. A crash leaves the fans at 100%, not stopped; `Restart=always` brings
-  the service back in 2 s, with no start limit.
+  was manual) is saved in `/var/lib/ollama1/fan.json` with the boot id.
+  After a reboot the saved originals are dropped: the hardware is already as
+  it was.
+- A clean stop, **and any other exit** (a crash, a kill, the watchdog), puts
+  every output back as it was: `ExecStopPost` always restores, and
+  `Restart=always` (no start limit) starts the service again. A dead service
+  never leaves a fan at 20%.
+- Watchdog: the service pings systemd on every poll (`sd_notify` over
+  `NOTIFY_SOCKET`, stdlib only; `Type=notify`, `WatchdogSec=10`). A loop that
+  has not run for 10 s is restarted, and restored.
 - An output the kit cannot write is skipped; setup and the service log what
   it controls once, like "controlling GPU fan + 7 case/CPU fan outputs".
 - After a wake, amdgpu resets its fan to automatic: the sleep hook pokes the
   service (`SIGUSR1`), and every tick writes again any output it holds that
-  has changed.
+  has changed, at the current level.
 
 **The motherboard's chip.** The service loads `nct6775` (it covers the
 NCT6797D) when no chip with fan outputs shows, before it starts, outside its
@@ -866,10 +896,11 @@ settings for it (the usual fix is `acpi_enforce_resources=lax` on the kernel
 command line; that is your call). Do not run `fancontrol` or another fan
 daemon beside this one.
 
-**Status.** `ollama1-fan status` (no root) shows the mode (`full - <why>`,
-`hold 42s`, `auto`), which outputs it controls, each fan's setting and rpm,
-and the temperatures. The admin panel's CPU card shows the same one line.
-Logs: `journalctl -u ollama1-fan` (modes and counts only).
+**Status.** `ollama1-fan status` (no root) shows the level and the phase
+(`working`, `hold100 42s`, `hold50 30s`, `idle20`), which outputs it
+controls, each fan's setting, rpm and lowest level, and the temperatures.
+The admin panel's CPU card shows the same in one line. Logs:
+`journalctl -u ollama1-fan` (phases and counts only).
 
 **The hand-pasted `ollama1-gpu-fan.service`** (full speed always) is replaced
 by this. Setup removes it when it finds one, and gives the card's fan back

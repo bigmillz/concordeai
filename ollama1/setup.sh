@@ -31,7 +31,7 @@
 #   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
 #                                    to stock, and the setting saved as off
 #   sudo ./setup.sh --fans on|off    the graphics card's and the case fans at 100% while the server
-#                                    works and for one minute after, else automatic (ollama1-fan).
+#                                    works and for 60 s after, 50% for 60 s, then 20% (ollama1-fan).
 #                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
 #   sudo ./setup.sh --dash text|graphic|auto   what the server's monitor shows (also:
 #                                    OLLAMA1_DASH): auto (the default) draws the graphical panel
@@ -1036,7 +1036,8 @@ fi
 
 # ---- 14b. fans (6b385) ------------------------------------------------------------------------
 # ON unless --fans off (OLLAMA1_FANS=0; saved in setup.env): the service puts the graphics card's and the
-# case fans at 100% while the server works and for a minute after (lib/o1fan.py). The step also removes
+# case fans at 100% while the server works and 60 s after, 50% for 60 s, then 20% (lib/o1fan.py); it
+# gives them back to the BIOS's control whenever it stops. The step also removes
 # the old hand-made full-speed-always fan unit (see the README) when it is there.
 step "Fans"
 "$LIBDIR/bin/ollama1-fan" setup "$FANS" || note "ollama1-fan setup stopped (see above); the fans are left as they were"
