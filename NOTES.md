@@ -9,6 +9,45 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b417 — lights follow the graphics card's load, white through yellow and orange to red (per Patrick)
+
+Patrick, after the 6b395 lights worked on the real server: "have the lights dynamically
+go between white and red depending on GPU load: as it goes down it goes through red to
+orange to yellow to white when it's down to zero; it can fluctuate in between; slow it
+down: from 0% to 100% it should take about two to three seconds to go through the colours
+and hit red." Replaces the fixed white/red state machine of 6b395 (fade to red when
+"working", 3 s hold, fade back). Kit only (`lib/o1leds.py`); `lib/o1work.py`, the fans and
+their tests are untouched.
+
+- **Input.** The card's busy percent, `probes["gpu_busy"]` (the Gpu reader the fans use),
+  every `SAMPLE_S` = 0.25 s; intensity x = percent / 100. No reading (no card, or the read
+  fails): x = 0, white, and status says "no card reading". Requests in flight, tools and
+  the processors are NOT in the colour any more (so a prompt-reading phase with the card
+  partly busy looks weak; accepted).
+- **Slew.** The displayed x rises at most 1.0 per `RISE_S` = 2.5 s and falls at most 1.0
+  per `FALL_S` = 3.5 s; no hold. A jittering reading (99, 0, 99, 0 every 0.25 s) therefore
+  wobbles within about 10% of red. A tick's dt is clamped to 0.5 s, so a long gap (a
+  suspend, a stall) cannot jump the colour.
+- **Ramp** (`STOPS`, piecewise linear in RGB, rounded): 0 white 255,255,255; 1/3 yellow
+  255,255,0; 2/3 orange 255,128,0; 1 red 255,0,0 (0.5 is 255,192,0). At 0 it is exactly the
+  full white of 6b395. Names for the status: white < 1/6, yellow < 1/2, orange < 5/6, red.
+- **Frames.** Only when the rounded RGB changes (20 Hz at most, `FRAME_S`, while moving);
+  every `POLL_S` = 2 s the link is checked and the colour resent (keepalive). A wake's
+  SIGUSR1 now acts at the next tick, not the next poll. Reconnect resends the current colour
+  (unchanged). Idle wakes are 4 a second (the sample), no more.
+- **Status.** `/run/ollama1/leds.json`: `state` (colour name), `rgb`, `target_rgb`,
+  `gpu_pct`, `gpu_reading`, `intensity`, `target_intensity`; line "Lights: orange (card 61%
+  busy)  -  2 devices"; `ollama1-leds status` and the admin line show it. `why`/`target`
+  keys are gone.
+- **Removed:** `FADE_RED_S`, `FADE_WHITE_S`, `HOLD_RED_S`, `Fader`, `smooth`, the work
+  state and its 3 s hold; their tests are replaced (not skipped): ramp at x = 0, .17, .33,
+  .5, .67, .83, 1 and the exact stops, slew 2.5 s / 3.5 s, jitter, no frame without a change,
+  the sampling rate, reconnect/wake resend, status. Mutants: 28 (`leds: ...`), all killed.
+- Still unverified on the real server: that the ramp looks right on the Mystic Light and
+  the pump head (their colour response is not linear), and that 2.5 s / 3.5 s feels right.
+
+---
+
 ## 6b404 — the RAID mirror is gone from the kit (per Patrick: "pointless, it just ties up resources checking and rebuilding")
 
 Kit only (`ollama1/`). The mirror (two 8 TB disks, RAID1 at /srv/data) is no longer built,

@@ -33,8 +33,8 @@
 #   sudo ./setup.sh --fans on|off    the graphics card's and the case fans at 100% while the server
 #                                    works and for 60 s after, 50% for 60 s, then 20% (ollama1-fan).
 #                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
-#   sudo ./setup.sh --leds on|off    the case, board and cooler lights: 100% white when idle, red while the server
-#                                    works, white again 3 s after (ollama1-leds, through the openrgb package, which
+#   sudo ./setup.sh --leds on|off    the case, board and cooler lights: white when the graphics card is idle, through
+#                                    yellow and orange to red as its load rises (ollama1-leds, through the openrgb package, which
 #                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
 #   sudo ./setup.sh --watchdog on|off   the hardware watchdog (ollama1-watchdog): the chipset's timer resets the board
 #                                    when the system disk stops answering (about 60 s), petted only while a real disk probe
@@ -985,8 +985,8 @@ step "Fans"
 
 # ---- 14c. lights (6b395) ----------------------------------------------------------------------
 # OFF unless --leds on (OLLAMA1_LEDS=1; saved in setup.env): installs the openrgb package and runs its server on
-# 127.0.0.1 (ollama1-openrgb) and the service that makes every light white when idle and red while the server
-# works (ollama1-leds, lib/o1leds.py). --leds off stops and disables both and removes nothing else.
+# 127.0.0.1 (ollama1-openrgb) and the service that makes every light follow the graphics card's load, white to red
+# (ollama1-leds, lib/o1leds.py). --leds off stops and disables both and removes nothing else.
 step "Lights"
 "$LIBDIR/bin/ollama1-leds" setup "$LEDS" || note "ollama1-leds setup stopped (see above); the lights are left as they were"
 

@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 """ollama1-leds: lights that follow the server's work (6b395). Every RGB device
-OpenRGB lists is 100% white when idle, fades to red (0.8 s) while the server
-works and, 3 s after the work ends, back to white (2 s). See lib/o1leds.py.
+OpenRGB lists follows the graphics card's load: white at 0%, through yellow and
+orange to red at 100%, slowly (2.5 s up, 3.5 s down). See lib/o1leds.py.
 
-  ollama1-leds status         state (white, fading, red), the colour now, the
-                              devices found, why, and any error (no root needed)
+  ollama1-leds status         colour name, the colour now and its target, the
+                              card's load, the devices found, and any error (no root needed)
 
 Used by the system:
   run             ollama1-leds.service (talks to the OpenRGB server on 127.0.0.1)

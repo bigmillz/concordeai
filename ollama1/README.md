@@ -113,7 +113,7 @@ it asks for any it can't find, at the terminal):
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists 100% white when idle, red while the server works, white again 3 s after it stops (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100% (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -1006,30 +1006,28 @@ saved in `/etc/ollama1/setup.env`. `on` runs `apt-get -y -q install openrgb`
 MSI MEG X570 ACE with a Corsair H115i Platinum: the board's Mystic Light and
 the cooler's pump head) gets the same colour, on all its LEDs:
 
-| State | Colour | When |
-|---|---|---|
-| idle | 100% white, 255,255,255 | at start, and whenever nothing is running |
-| working | red, 255,0,0 | faded to over 0.8 s |
-| ended | red for 3 s, then white | back to white over 2 s |
+The colour follows **the graphics card's busy percent** (`gpu_busy_percent`, the
+same reading the fans use, read every 0.25 s), as a ramp, piecewise linear in RGB:
 
-"Working" is the **same definition as the fans** (`lib/o1work.py`, shared by
-both services): a request in flight (at once), a long job running (`stability-test.sh` and
-the like, at once), the graphics card at 15% or more averaged over 6 s, or the
-processors at 40% or more averaged over 10 s (`/proc/stat` user, nice, system,
-irq and softirq over every field, so time waiting on a disk does not count).
-Once the card or the processors made it work it stays working until the value
-has been under its threshold for 6 s. The 1-minute **load average is not used**:
-it counts tasks blocked on a disk (a RAID check, boot work, apt) and lags by a
-minute, which kept the fans at 100% with nothing running. Status, the admin
-line and the lights' status say which signal made it work ("a request is
-running", "the card is 62% busy", "processors 71% busy", "running
-stability-test.sh"). The 3 s (an anti-flicker pause
-between two requests) count from the poll that first sees the work has ended,
-so the red lasts 3 s to 5 s after it really did. A new request at any point
-turns the fade round from the colour it has reached; nothing jumps. Frames go
-out at 20 Hz only while a fade runs; the rest of the time the service sleeps,
-with a look at the probes every 2 s that also sends the colour again (a
-keepalive: a device that was reset gets it back).
+| Card busy | Colour |
+|---|---|
+| 0% | white, 255,255,255 (full brightness) |
+| 33% | yellow, 255,255,0 |
+| 67% | orange, 255,128,0 |
+| 100% | red, 255,0,0 |
+
+(50% is a golden yellow-orange, 255,192,0.) The colour on show is
+**slew-limited**: it rises at most 100% per 2.5 s and falls at most 100% per
+3.5 s, so 0% to 100% takes about 2.5 s (plus up to one 0.25 s sample to notice),
+100% to 0% takes 3.5 s, and the short 0% gaps between batches of work only dip
+it a little. There is no hold and no state: only the card's load colours the
+lights, not a request in flight or a running tool (a long prompt-reading phase
+with the card only partly busy shows as a weak colour; that is as intended). With
+no card reading (no card, or the read failed) the intensity is 0, so white.
+A frame goes out only when the rounded colour changes (at most 20 a second),
+and every 2 s the connection is looked at and the colour sent again (a
+keepalive: a device that was reset gets it back). The 6b395 rule (white idle,
+red while "working", a 3 s hold, 0.8 s and 2 s fades) is gone.
 
 **How.** Two units. `ollama1-openrgb.service` runs `openrgb --server` with no
 window, bound to `127.0.0.1` (`--server-host` when this build has it, and
@@ -1057,9 +1055,8 @@ sleep hook restarts the OpenRGB server (the USB devices may have come back new)
 and pokes the service (`SIGUSR1`), which connects afresh and sets the colour at
 once. The lights are not turned off for sleep: the board decides.
 
-**Status.** `ollama1-leds status` (no root): the state (`white`, `fading`,
-`red`), the colour now, the devices found and their mode, why it is red, and
-any error. The admin panel's CPU card shows one line, "Lights: ...". Logs:
+**Status.** `ollama1-leds status` (no root): the colour name, the colour now and its target, the card's
+load and the intensity shown, the devices found and their mode, and any error. The admin panel's CPU card shows one line, "Lights: ...". Logs:
 `journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
 
 ## Hardware watchdog

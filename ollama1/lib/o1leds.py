@@ -1,23 +1,22 @@
-"""Lights that follow the server's work (6b395): every RGB device OpenRGB lists
-(on this server: the motherboard's Mystic Light and the AIO cooler's pump head)
-is held at the same colour.
+"""Lights that follow the graphics card's load (6b417; the fixed white/red state machine of
+6b395 is gone): every RGB device OpenRGB lists (on this server: the motherboard's Mystic
+Light and the AIO cooler's pump head) is held at the same colour, which is a continuous
+function of how busy the card is.
 
-  idle      100% white  (255, 255, 255, brightness at its maximum)
-  working   red         (255, 0, 0): faded to over FADE_RED_S (0.8 s)
-  ended     red for HOLD_RED_S (3 s: nothing flickers between two requests),
-            then faded back to white over FADE_WHITE_S (2 s). The 3 s count from the
-            poll that first sees the work has ended, so they are never less than 3 s
-            after it did (and at most POLL_S more).
+  intensity x = the card's busy percent / 100 (sysfs gpu_busy_percent, the reading the fan
+                service and lib/o1work.py use), sampled every SAMPLE_S (0.25 s)
+  displayed   x slew-limited: it rises at most 1.0 per RISE_S (2.5 s) and falls at most 1.0
+              per FALL_S (3.5 s), so 0% to 100% takes 2.5 s, 100% to 0% takes 3.5 s, and
+              the brief 0% gaps between batches of work only dip the colour a little
+  colour      piecewise linear in RGB: 0 white (255,255,255), 1/3 yellow (255,255,0),
+              2/3 orange (255,128,0), 1 red (255,0,0); at 0 exactly full white
 
-A new request in the middle of a fade turns it round from the colour it has
-reached (the position is one number from 0 = white to 1 = red, and the colour
-is a function of it: nothing jumps). Frames go out at FRAME_S (20 Hz) only
-while a fade runs; otherwise the service sleeps, with a POLL_S (2 s) look at
-the probes that also re-sends the colour (a keepalive: a device that was reset
-by a wake or a hot-plug gets it again).
+No card reading (no card, or the read failed): the intensity is 0 (white). A request in
+flight or a running tool does not colour the lights; only the card's load does.
 
-"Working" is lib/o1work.py's, the same as the fan service: a request in flight,
-a long job, the card at 15% (6 s average) or the processors at 40% (10 s average); no load average.
+Frames go out only when the rounded RGB changes, at most FRAME_S (20 Hz) apart while it
+moves; every POLL_S (2 s) the connection is looked at and the colour is sent again (a
+keepalive: a device that was reset by a wake or a hot-plug gets it back).
 
 How it talks to the lights: the sibling unit ollama1-openrgb.service runs
 `openrgb --server` (the OpenRGB package; it owns the USB access), bound to
@@ -51,13 +50,13 @@ PORT = 6742
 CLIENT_NAME = "ollama1-leds"
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
-FADE_RED_S = 0.8                  # white to red
-FADE_WHITE_S = 2.0                # red to white
-HOLD_RED_S = 3.0                  # red this long after the work ends, then back to white
-FRAME_S = 0.05                    # 20 Hz while a fade runs
-POLL_S = 2                        # the probes and the keepalive; nothing else runs while idle
+STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
+SAMPLE_S = 0.25                   # the card's busy percent is read this often
+RISE_S = 2.5                      # 0 to 100% takes this long
+FALL_S = 3.5                      # 100% to 0 takes this long
+FRAME_S = 0.05                    # at most 20 frames a second while the colour moves
+POLL_S = 2                        # the connection and the keepalive
 STATUS_STALE_S = 15               # a status file older than this: the service isn't running
-TOOLS_EVERY_S = 6
 CONNECT_S = 1.0
 IO_S = 2.0
 OPEN_BUDGET_S = 10.0              # one whole connect + enumerate may take this long, no more
@@ -368,28 +367,32 @@ class Client:
 
 # ---- the colour --------------------------------------------------------------------------
 
-def smooth(x):
-    return x * x * (3.0 - 2.0 * x)
+def ramp(x):
+    """The colour for intensity x (0 to 1): piecewise linear in RGB between STOPS."""
+    x = 0.0 if x != x else min(1.0, max(0.0, x))
+    for (x0, c0), (x1, c1) in zip(STOPS, STOPS[1:]):
+        if x <= x1:
+            f = (x - x0) / (x1 - x0)
+            return tuple(int(round(a + (b - a) * f)) for a, b in zip(c0, c1))
+    return STOPS[-1][1]
 
 
-class Fader:
-    """pos: 0 = white, 1 = red. The colour is a function of pos alone, so a turn round is smooth."""
+def color_name(x):
+    return "white" if x < 1 / 6 else "yellow" if x < 0.5 else "orange" if x < 5 / 6 else "red"
+
+
+class Slew:
+    """The displayed intensity: it follows the target no faster than RISE_S / FALL_S allow."""
 
     def __init__(self):
-        self.pos = 0.0
+        self.x = 0.0
 
-    def step(self, dt, to_red):
-        if to_red:
-            self.pos = min(1.0, self.pos + dt / FADE_RED_S)
+    def step(self, dt, target):
+        if target > self.x:
+            self.x = min(target, self.x + dt / RISE_S)
         else:
-            self.pos = max(0.0, self.pos - dt / FADE_WHITE_S)
-
-    def rgb(self):
-        e = smooth(self.pos)
-        return tuple(int(round(w + (r - w) * e)) for w, r in zip(WHITE, RED))
-
-    def state(self):
-        return "white" if self.pos <= 0.0 else "red" if self.pos >= 1.0 else "fading"
+            self.x = max(target, self.x - dt / FALL_S)
+        return self.x
 
 
 def hex_of(c):
@@ -401,22 +404,29 @@ def status_path():
 
 
 class Leds:
-    """One tick() per wake-up; it returns how long to sleep. `probes` as in lib/o1work.py;
-    `clock` is monotonic; `wall` stamps the status file."""
+    """One tick() per wake-up; it returns how long to sleep. `probes` as in lib/o1work.py (only
+    gpu_busy is read); `clock` is monotonic; `wall` stamps the status file."""
 
     def __init__(self, probes, client=None, clock=time.monotonic, wall=time.time, log=print, poll_s=POLL_S,
-                 hold_s=HOLD_RED_S, tools_every=TOOLS_EVERY_S, status=True):
-        self.work = o1work.Work(probes, clock, tools_every)
+                 status=True):
+        self.probes = probes
         self.client = client or Client()
         self.clock, self.wall, self.log = clock, wall, log
-        self.poll_s, self.hold_s, self.status = poll_s, hold_s, status
-        self.fader = Fader()
-        self.working, self.why, self.last_work = False, [], None
-        self.last, self.moving = None, False
+        self.poll_s, self.status = poll_s, status
+        self.slew = Slew()
+        self.gpu = None                           # the last reading, or None: no reading
+        self.target = 0.0
+        self.last, self.next_sample = None, 0.0
         self.next_poll, self.retry_at, self.backoff = 0.0, 0.0, RETRY_FIRST_S
-        self.sent, self.err, self.seen_state = None, None, None
+        self.sent, self.err, self.seen_name = None, None, None
         self.resync = False
-        self.target_red = False
+
+    def read_gpu(self):
+        try:
+            g = self.probes["gpu_busy"]()
+        except Exception:
+            return None
+        return float(g) if isinstance(g, (int, float)) and not isinstance(g, bool) and g == g else None
 
     # -- the link -----------------------------------------------------------------------
     def lost(self, e, now):
@@ -454,37 +464,34 @@ class Leds:
     # -- one tick -----------------------------------------------------------------------
     def tick(self):
         now = self.clock()
-        polled = now >= self.next_poll
+        if now >= self.next_sample:
+            self.next_sample = now + SAMPLE_S
+            self.gpu = self.read_gpu()
+            self.target = 0.0 if self.gpu is None else min(1.0, max(0.0, self.gpu / 100.0))
+        polled = now >= self.next_poll or self.resync          # a wake does not wait for the poll
         if polled:
             self.next_poll = now + self.poll_s
-            was = self.working
-            self.working, self.why = self.work.working(now)
-            if self.working or was:
-                self.last_work = now                  # the end counts from the poll that first sees it: never under 3 s
             self.link(now)
-        self.target_red = self.working or (self.last_work is not None and now - self.last_work < self.hold_s)
-        dt = (now - self.last) if (self.moving and self.last is not None) else 0.0
+        dt = 0.0 if self.last is None else min(max(now - self.last, 0.0), 2 * SAMPLE_S)
         self.last = now
-        self.fader.step(dt, self.target_red)
-        self.moving = self.fader.pos != (1.0 if self.target_red else 0.0)
-        rgb = self.fader.rgb()
+        self.slew.step(dt, self.target)
+        rgb = ramp(self.slew.x)
         if self.client.connected and (rgb != self.sent or polled):
             try:
                 self.client.show(rgb)
                 self.sent = rgb
             except OSError as e:
                 self.lost(e, now)
-        label = self.fader.state()
-        if label == "fading":
-            label += " to red" if self.target_red else " to white"
-        if polled or label != self.seen_state:
-            if label != self.seen_state:
-                self.log(label + (": " + "; ".join(self.why) if self.target_red and self.why else ""))
-            self.seen_state = label
+        name = color_name(self.slew.x)
+        if polled or name != self.seen_name:
+            if name != self.seen_name:
+                self.log("%s%s" % (name, " (card %d%% busy)" % round(self.gpu) if self.gpu is not None else
+                                   " (no card reading)"))
+            self.seen_name = name
             self.write_status(now)
-        if self.moving:
+        if self.slew.x != self.target:
             return FRAME_S
-        return max(0.0, min(self.poll_s, self.next_poll - now))
+        return max(0.0, min(self.next_sample, self.next_poll) - now)
 
     def shutdown(self):
         """A stop must not leave the lights red: white, then the connection closed."""
@@ -500,11 +507,10 @@ class Leds:
         if not self.status:
             return
         c = self.client
-        why = "; ".join(self.why) if self.working else (
-            "the work ended; white again in %d s" % max(0, int(self.hold_s - (now - self.last_work) + 0.999))
-            if self.target_red and self.last_work is not None else "idle")
-        st = {"at": int(self.wall()), "state": self.fader.state(), "target": "red" if self.target_red else "white",
-              "pos": round(self.fader.pos, 3), "rgb": list(self.fader.rgb()), "why": why,
+        st = {"at": int(self.wall()), "state": color_name(self.slew.x), "rgb": list(ramp(self.slew.x)),
+              "target_rgb": list(ramp(self.target)), "gpu_pct": None if self.gpu is None else round(self.gpu, 1),
+              "gpu_reading": self.gpu is not None, "intensity": round(self.slew.x, 3),
+              "target_intensity": round(self.target, 3),
               "connected": c.connected, "error": self.err, "protocol": c.ver if c.connected else None,
               "devices": [{"name": d.name, "vendor": d.vendor, "leds": d.nleds,
                            "mode": d.modes[d.mode].name if d.kind else None, "usable": d.kind is not None}
@@ -526,17 +532,9 @@ def status_line(st):
     devs = st.get("devices") or []
     if not devs:
         return "Lights: OpenRGB lists no devices"
-    state, target = st.get("state"), st.get("target")
-    if state == "fading":
-        head = "fading to red" if target == "red" else "fading back to white"
-    elif state == "red":
-        head = "red" if target == "red" else "red, fading to white soon"
-    else:
-        head = "white" if target == "white" else "white, going red"
-    why = st.get("why")
-    return "Lights: %s%s  -  %d device%s" % (head, " (%s)" % why if why and why != "idle" else
-                                            " (idle)" if state == "white" else "", len(devs),
-                                            "" if len(devs) == 1 else "s")
+    pct = st.get("gpu_pct")
+    why = "card %d%% busy" % round(pct) if pct is not None else "no card reading"
+    return "Lights: %s (%s)  -  %d device%s" % (st.get("state"), why, len(devs), "" if len(devs) == 1 else "s")
 
 
 def read_status(path=None, now=None):
@@ -561,8 +559,12 @@ def render_status(st):
     if st is None:
         return "lights: the service isn't running (the lights are as the board leaves them)"
     rgb = st.get("rgb") or [0, 0, 0]
+    tg = st.get("target_rgb") or [0, 0, 0]
+    pct = st.get("gpu_pct")
     out = ["lights: %s  now %d,%d,%d (%s)" % (st.get("state", "?"), rgb[0], rgb[1], rgb[2], hex_of(rgb)),
-           "target: %s  -  why: %s" % (st.get("target", "?"), st.get("why") or "?")]
+           "target: %d,%d,%d (%s)  -  card: %s  -  shown intensity %s of 1" % (
+               tg[0], tg[1], tg[2], hex_of(tg), "%d%% busy" % round(pct) if pct is not None else
+               "no reading (taken as 0%)", st.get("intensity", "?"))]
     devs = st.get("devices") or []
     if st.get("connected"):
         out.append("openrgb: connected to %s:%d (protocol %s), %d device%s found" % (
@@ -651,7 +653,7 @@ def service_step(leds, notify=o1fan.sd_notify, log=print, first=False):
         wait = leds.tick()
     except Exception as e:                                        # never stop; say what kind, not what it held
         log("tick failed: %s" % type(e).__name__)
-    notify(("READY=1\n" if first else "") + "WATCHDOG=1\nSTATUS=%s" % leds.fader.state())
+    notify(("READY=1\n" if first else "") + "WATCHDOG=1\nSTATUS=%s" % color_name(leds.slew.x))
     return wait
 
 
