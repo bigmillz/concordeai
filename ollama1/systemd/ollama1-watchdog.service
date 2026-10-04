@@ -1,0 +1,60 @@
+# The server's hardware watchdog (6b399): the chipset's timer (sp5100_tco on an
+# AMD board) resets the board when the system disk stops answering. The machine
+# that loses its system NVMe stays up from memory and nothing on disk can be read;
+# only a power cycle brought it back. This pets the timer every 10 s only while a
+# real probe passes (write and read back a token on the root filesystem, a stat on
+# /srv/models, a 4 KB uncached read of a root file), and stops petting after two
+# failed probes in a row (about 20 s). See lib/o1watchdog.py.
+#
+# THE STOP RULES. Only a deliberate `systemctl stop` of a HEALTHY service disarms
+# the timer (it writes 'V' and closes the device). A crash, a kill, a failed
+# restart, the unit's own WatchdogSec, a stop while the probe is failing: the timer
+# stays armed and the board resets. So there is no ExecStopPost, and Restart=always
+# starts it again within 2 s (well inside the timeout) after anything but a clean
+# stop. The sleep hook closes it cleanly before suspend and reopens it after
+# (ollama1-watchdog pause|resume).
+#
+# The sandbox must not be able to kill or starve it: no MemoryMax, no CPU limit,
+# OOMScoreAdjust -900, and no PrivateDevices/ProtectClock/DeviceAllow (any of them
+# would hide or close /dev/watchdog0). ProtectSystem=strict makes everything
+# read-only except what it writes: its status file (/run/ollama1) and its token
+# (/var/lib/ollama1). No network. ProtectKernelModules is on: the driver is loaded
+# by the "+" line below, which runs outside this sandbox.
+[Unit]
+Description=ollama1: hardware watchdog (petted only while the system disk answers)
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=30
+ExecStartPre=-+/usr/local/lib/ollama1/bin/ollama1-watchdog load-modules
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-watchdog run
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+OOMScoreAdjust=-900
+Nice=-5
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1 /var/lib/ollama1
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

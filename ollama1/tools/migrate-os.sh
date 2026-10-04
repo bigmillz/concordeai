@@ -16,6 +16,8 @@
 #   bash migrate-os.sh --status                                          what the run is doing (no sudo needed)
 #   --root-size 300G    size of / on the new drive (default 300G)
 #   --bwlimit KiB/s     copy speed limit (default 200000; 0 = none)
+#   --park-dir DIR      where the models are parked meanwhile (default /var/lib/ollama1/models-parked on the root
+#                       filesystem; give a folder on another disk if / has no room; never on the TO drive)
 #
 # Installing it for a user who has no root: as the account that has sudo,
 #   sudo bash ollama1/tools/migrate-os.sh --install-remote --sudoers-user <admin-user>
@@ -30,7 +32,7 @@
 # between boots; the serial is what identifies a drive). FROM is the drive the
 # system runs from now; TO is the drive that is ERASED. The details, the stages
 # and the rollback are in ollama1/README.md ("Moving the system to the other
-# drive") and in lib/o1migrate.py. Progress: /srv/data/migrate-os.status.
+# drive") and in lib/o1migrate.py. Progress: /var/lib/ollama1/migrate-os.status.
 set -euo pipefail
 SELF="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || readlink -f "${BASH_SOURCE[0]}")"
 HERE="$(dirname "$SELF")"

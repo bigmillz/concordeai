@@ -21,7 +21,7 @@ _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))   # so `python
 
 import o1test_util as U
 from fakecmd import fu
-from migrate_fixture import (DESTRUCTIVE, DISK, FROM, FSTAB, GIB, LIBPY, MDSTAT_DEGRADED, MIB, SERVICES_ACTIVE, TO, WRAPPER,
+from migrate_fixture import (DESTRUCTIVE, DISK, FROM, FSTAB, GIB, LIBPY, MIB, SERVICES_ACTIVE, TO, WRAPPER,
                              Machine, load_lib)
 
 L = load_lib()
@@ -339,12 +339,14 @@ class TestRefusals(Base):
     def test_state_folder_on_the_models_drive_is_refused(self):
         self.refused("must be on", "--run", O1M_STATE_DIR=self.m.models_dir + "/o1migrate")
 
-    def test_the_status_file_is_never_written_on_an_nvme(self):
-        """/srv/data not mounted (or an NVMe): no status, no log, no state folder."""
+    def test_the_status_file_is_never_written_off_the_root_filesystem(self):
+        """The data folder on another filesystem (the TO drive's, say): no status, no log, no state folder."""
         self.m.reload()
-        self.m.fs["mounts"] = [x for x in self.m.fs["mounts"] if x["target"] != self.m.data_dir]
+        self.m.fs["mounts"].append({"target": self.m.data_dir, "source": self.m.dir + "/dev/%sp1" % self.m.names["to"],
+                                    "fstype": "ext4", "options": "rw"})
         self.m.flush()
         self.assertEqual(self.m.run("--run"), 1)
+        self.assertIn("must be on the root filesystem", self.m.out)
         for f in (self.m.status_file, self.m.log_file, self.m.cfg_state):
             self.assertFalse(os.path.exists(f), f)
 
@@ -374,27 +376,58 @@ class TestRefusals(Base):
         self.m.flush()
         self.refused("the FROM drive has other mounted filesystems (/var/lib/other)", "--run")
 
-    def test_a_degraded_raid_refuses(self):
-        self.m.put(self.m.mdstat_file, MDSTAT_DEGRADED)
-        self.refused("is degraded [U_]", "--run")
-        self.m.put(self.m.mdstat_file, "Personalities :\nunused devices: <none>\n")
-        self.refused("is not in /proc/mdstat", "--run")
-        self.m.put(self.m.mdstat_file, MDSTAT_DEGRADED.replace("[2/1] [U_]", "[2/2] [UU]"))
+    def test_no_raid_is_needed_or_mentioned(self):
+        """6b400: the mirror is gone. There is no mdstat to read, no md mount, and nothing in the plan says RAID."""
         self.assertEqual(self.m.run("--plan"), 0, self.m.out)
+        self.assertNotIn("RAID", self.m.out)
+        self.assertNotIn("mirror", self.m.out)
+        self.assertNotIn("/srv/data", self.m.out)
+        self.assertIn("/var/lib/ollama1", L.DATA_DIR)
+        self.assertEqual(L.Cfg({}, euid=0).data, "/var/lib/ollama1")
+        self.assertEqual(L.Cfg({}, euid=0).parked, "/var/lib/ollama1/models-parked")
+        self.assertEqual(L.Cfg({}, euid=0).state_dir, "/var/lib/ollama1/o1migrate")
+        self.assertEqual(L.Cfg({}, euid=0).status, "/var/lib/ollama1/migrate-os.status")
+        self.assertFalse(hasattr(L, "raid_ok"))
 
-    def test_data_that_is_not_a_mirror_or_not_writable_refuses(self):
+    def test_the_data_folder_path_is_the_one_the_rest_of_the_kit_uses(self):
+        import o1common
+        self.assertEqual(o1common.Paths.state[len(o1common.PREFIX):], L.DATA_DIR)
+
+    def test_the_parked_models_may_not_go_on_the_drive_to_be_erased(self):
         self.m.reload()
-        for mt in self.m.fs["mounts"]:
-            if mt["target"] == self.m.data_dir:
-                mt["source"] = "/dev/sdb1"
+        self.m.fs["mounts"].append({"target": self.m.dir + "/elsewhere", "source": self.m.dir + "/dev/%sp1" % self.m.names["to"],
+                                    "fstype": "ext4", "options": "rw"})
         self.m.flush()
-        self.refused("not from the md mirror", "--run")
+        self.refused("the parked models would be on the TO drive", "--run", O1M_PARKED=self.m.dir + "/elsewhere/parked")
+        self.refused("which is erased", "--run", O1M_PARKED=self.m.models_dir + "/parked")
+
+    def test_the_parked_models_may_not_go_on_a_read_only_filesystem(self):
         self.m.reload()
-        for mt in self.m.fs["mounts"]:
-            if mt["target"] == self.m.data_dir:
-                mt["source"], mt["options"] = "/dev/md127", "ro,noatime"
+        self.m.fs["mounts"].append({"target": self.m.dir + "/usb", "source": "/dev/sdz1", "fstype": "ext4", "options": "ro,noatime"})
         self.m.flush()
-        self.refused("is not mounted read-write", "--run")
+        self.refused("mounted read-only", "--run", O1M_PARKED=self.m.dir + "/usb/parked")
+
+    def test_a_park_dir_on_another_disk_is_used_for_the_space_check_and_the_plan(self):
+        m = Machine(models_gib=800, data_avail_tib=0)
+        try:
+            m.reload()
+            m.fs["mounts"].append({"target": m.dir + "/big", "source": "/dev/sdz1", "fstype": "ext4", "options": "rw"})
+            os.makedirs(m.dir + "/big")
+            m.fs["df"][m.dir + "/big"] = {"avail": 5 * (1 << 40)}
+            m.fs["df"][m.data_dir]["avail"] = 10 * GIB
+            m.flush()
+            self.assertEqual(m.run("--plan"), 1, m.out)                        # the root has no room
+            self.assertIn("--park-dir", m.out)
+            self.assertEqual(m.run("--plan", "--park-dir", m.dir + "/big"), 0, m.out)
+            self.assertIn(m.dir + "/big/models-parked", m.out)
+        finally:
+            m.close()
+
+    def test_a_park_dir_must_be_a_plain_absolute_path(self):
+        for bad in ("relative/dir", "/a b", "/x/../y", "/"):
+            code = self.m.run("--plan", "--park-dir", bad)
+            self.assertEqual(code, 2, bad)
+            self.assertIn("--park-dir", self.m.out)
 
     def test_data_and_state_folders_must_belong_to_root_alone(self):
         os.chmod(self.m.data_dir, 0o777)
@@ -409,9 +442,9 @@ class TestRefusals(Base):
         os.symlink(self.m.dir + "/state-elsewhere", self.m.data_dir + "/o1migrate")
         self.refused("is not a plain folder", "--run")
 
-    def test_the_state_folder_is_never_made_on_the_root_filesystem(self):
+    def test_the_state_folder_is_never_made_off_the_root_filesystem(self):
         self.m.reload()
-        self.m.fs["mounts"] = [x for x in self.m.fs["mounts"] if x["target"] != self.m.data_dir]
+        self.m.fs["mounts"].append({"target": self.m.data_dir, "source": "/dev/sdz1", "fstype": "ext4", "options": "rw"})
         self.m.flush()
         with mock.patch.dict(os.environ, self.m.env()):
             mg = L.Migrator(L.Cfg(self.m.env()), L.parse_args(["--from-serial", FROM, "--to-serial", TO, "--run"]))
@@ -757,7 +790,7 @@ class TestRemote(unittest.TestCase):
         """O1M_* folders are honoured for a test user, never for root (a sudo-run copy) unless O1M_TEST=1."""
         e = {"O1M_DATA": "/tmp/elsewhere", "O1M_MNT": "/tmp/x", "O1M_TEST": "1", "O1M_TTY": "/tmp/tty", "O1M_SRC_ROOT": "/tmp/r"}
         root = L.Cfg(e, euid=0)                                    # as root: every override is ignored, O1M_TEST or not
-        self.assertEqual((root.data, root.mnt, root.tty, root.src_root), ("/srv/data", "/run/o1migrate", "/dev/tty", "/"))
+        self.assertEqual((root.data, root.mnt, root.tty, root.src_root), ("/var/lib/ollama1", "/run/o1migrate", "/dev/tty", "/"))
         self.assertFalse(root.honour)
         user = L.Cfg(e, euid=1000)
         self.assertEqual((user.data, user.mnt), ("/tmp/elsewhere", "/tmp/x"))

@@ -51,9 +51,9 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 |---|---|
 | Host name | `<server-name>` (what you give with `--name`). The time zone stays as the machine has it, unless you give `--timezone` |
 | Address | `<server-ip>` on the LAN port (`br0` if you have a bridge over both wired ports, which keeps a second device, like a Raspberry Pi, on the LAN). The kit never changes network settings |
-| OS disk (`--os-serial`) | Kept. The root volume grows into the free space on it, and `/home` moves onto it |
+| OS disk (`--os-serial`) | Kept. The root volume grows into the free space on it. `/home` stays where it is |
 | Models disk (`--models-serial`) | **Wiped**, ext4, `/srv/models`. This is Ollama's model folder |
-| Two mirror disks (`--hdd1-serial`, `--hdd2-serial`) | **Wiped**, RAID1 mirror, ext4, `/srv/data`. Holds backups and bulk storage, including a nightly copy of the settings and the model list |
+| Any other disk (including the two old mirror disks, `--hdd1-serial`, `--hdd2-serial`) | **Never touched.** There is no mirror: the kit builds no RAID and never wipes, assembles or mounts these disks (6b400). The nightly copy of the settings and the model list goes to `/var/backups/ollama1` on the root filesystem. A server that still has the old RAID can remove it with `tools/remove-raid.sh` (below) |
 | Ollama | 127.0.0.1:11434 only, ROCm build, in `/opt/ollama` |
 | Gateway | 127.0.0.1:8431, user `o1gw` |
 | Admin panel | 127.0.0.1:8432, user `o1admin` |
@@ -91,10 +91,10 @@ At the server or over SSH:
 
 ```bash
 git clone https://github.com/bigmillz/concordeai.git ~/concordeai
-cd /                                          # not inside /home: /home is about to move
+cd /                                          # not inside /home
 bash ~/concordeai/ollama1/setup.sh --plan     # optional: shows the plan, changes nothing
 sudo bash ~/concordeai/ollama1/setup.sh --name <server-name> --zone <your-domain> \
-     --os-serial <serial> --models-serial <serial> --hdd1-serial <serial> --hdd2-serial <serial>
+     --os-serial <serial> --models-serial <serial>
 ```
 
 ### What you tell setup
@@ -110,7 +110,8 @@ it asks for any it can't find, at the terminal):
 | `--zone <your-domain>` | Your domain on Cloudflare. Not needed with `--skip-cloudflare` |
 | `--owner <your-name>` | Your name, used only in the Access policy's name. Default: from your admin email |
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
-| `--os-serial`, `--models-serial`, `--hdd1-serial`, `--hdd2-serial` | The four disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything |
+| `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
+| `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--leds on\|off` | The lights: every RGB device OpenRGB lists 100% white when idle, red while the server works, white again 3 s after it stops (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
@@ -148,41 +149,28 @@ Every step skips what is already done, so it is safe to run again.
    It then runs `update-grub` and checks that every `set timeout=` in
    `/boot/grub/grub.cfg` is 5. That includes the recordfail path, which is
    what made it wait 30 seconds on the LVM machine this was built on.
-2. It installs packages: ttyd, python3-nacl, mdadm, nftables, zstd, tmux,
+2. It installs packages: ttyd, python3-nacl, nftables, zstd, tmux,
    and cloudflared from Cloudflare's apt repository. That repository's key
    must have the pinned fingerprint, and only that one key is kept.
 3. It grows the root volume into the free space (online). It reads the free
    space as a count of extents and stops loudly if it can't.
-4. It moves `/home` onto the root filesystem:
-   - Anything already sitting in the root filesystem's own `/home` (hidden
-     under the old mount) is moved aside to `/home.pre-ollama1-<date>`, not
-     deleted.
-   - It copies `/home`, checks the copy file by file (and that
-     `authorized_keys` is intact), then copies once more right before the
-     switch. Only writes in the few seconds after that last copy would be
-     missed, which is why you run setup from `cd /`, not from your home
-     folder.
-   - Only then does it stop mounting the old disk. If a login still has the
-     old `/home` open, it detaches it, and the mirror step waits.
+4. It leaves `/home` where it is (it used to copy it onto the root
+   filesystem so a mirror disk could be wiped; there is no mirror now).
 5. It wipes the models disk and mounts it at `/srv/models` (by UUID,
    noatime). An earlier `o1models` filesystem is kept, never wiped.
-6. It builds the RAID1 mirror of the two mirror disks and mounts it at
-   `/srv/data`. The first sync takes many hours in the background; the mirror
-   is usable meanwhile (`cat /proc/mdstat`). The safety rules for both disk
-   steps are:
+6. (There is no mirror step any more: the plan says "No mirror: not used".)
+   The safety rules for the models disk are:
    - a disk is found by its serial, checked again exactly, and wiped only
      through its `/dev/disk/by-id/…<serial>` path;
    - it stops if fstab, crypttab or swap still uses the disk, or if it
      carries anything other than the ext4 filesystems this machine has now;
-   - a mirror already on the disks (from an earlier run) is reassembled,
-     never wiped;
-   - a filesystem is made only on an array or partition that setup itself
-     just created (it leaves a marker until the format is done), so a stop
-     between building the array and formatting it is picked up next time;
-   - a mirror or partition setup didn't create that has no readable
-     filesystem is never formatted: setup stops and says how to check it
-     (`mke2fs -n` lists the backup superblocks, `e2fsck -b <backup>`
-     repairs). A read error from `blkid` also stops it;
+   - a filesystem is made only on a partition that setup itself just created
+     (it leaves a marker until the format is done), so a stop between
+     partitioning and formatting is picked up next time;
+   - a partition setup didn't create that has no readable filesystem is never
+     formatted: setup stops and says how to check it (`mke2fs -n` lists the
+     backup superblocks, `e2fsck -b <backup>` repairs). A read error from
+     `blkid` also stops it;
    - fstab never gets a line without a UUID.
 7. It creates the service users.
 8. It installs the kit to `/usr/local/lib/ollama1`, along with the systemd
@@ -231,11 +219,6 @@ Every step skips what is already done, so it is safe to run again.
     asks if a key of your own is present, and it removes nothing unless you
     type `yes`. You can also pass `--remove-setup-key`. Your own key(s) always
     stay.
-
-**If it asks you to log out:** the old `/home` disk is still held by an
-earlier login. This happens if a shell was sitting in your home folder.
-Log out of every session (or reboot), log in, and run
-`sudo bash ~/concordeai/ollama1/setup.sh` again. It continues with the mirror.
 
 When it finishes, it lists anything still to do.
 
@@ -646,8 +629,9 @@ around a little from time to time.
     first token; errors by kind (busy, fit, spill, ram, oom, Ollama).
   - **Loaded models:** each model's GPU share, VRAM and time until unload,
     and the last load, unload or refusal.
-  - **Storage:** free space on /, /srv/models and /srv/data; RAID state with
-    resync %; read and write throughput.
+  - **Storage:** free space on / and /srv/models (and on /srv/data and the RAID
+    state with resync %, only on a server that still has the old mirror);
+    read and write throughput.
   - **Network:** throughput in and out, each port's link, the tunnel and its
     round-trip time.
   - **Health:** the problems, worst first, or "All clear"; uptime, updates,
@@ -757,8 +741,8 @@ around a little from time to time.
   - While it sleeps it can't be reached, and anything plugged into its
     second network port (a Raspberry Pi, say) loses its connection.
   - Sleep is refused while a model download or library sync, an update, or
-    setup.sh is running. It is allowed during the mirror's first sync,
-    which pauses and carries on after waking.
+    setup.sh is running. (A RAID resync, on a server that still has the old
+    mirror, is allowed: the md driver pauses it and carries on after waking.)
   - During setup.sh, a model download or library sync, and updates, the
     power button does nothing at all: each holds a logind inhibitor
     (`sleep` and `handle-power-key`, mode block) until it ends, so the
@@ -785,7 +769,7 @@ around a little from time to time.
     rename and flushed, never under `/run`), so it stays across a restart of
     the gateway or `ollama1-idle`, a reboot, and another run of `setup.sh`
     (setup never touches it, whatever its flags). The nightly backup copies it
-    to `/srv/data`. `sudo ollama1-idle status` prints the saved setting.
+    to `/var/backups/ollama1`. `sudo ollama1-idle status` prints the saved setting.
     Wake-on-LAN is set up by setup.sh for each card that can do it.
 - **LAN mode** is off by default. With it on, the gateway also answers on
   `http://<server-ip>:8431` from the home LAN, without Access. Signatures
@@ -1078,6 +1062,147 @@ once. The lights are not turned off for sleep: the board decides.
 any error. The admin panel's CPU card shows one line, "Lights: ...". Logs:
 `journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
 
+## Hardware watchdog
+
+**On unless you say `--watchdog off`**: `sudo ./setup.sh --watchdog on|off` (or
+`OLLAMA1_WATCHDOG=1|0`; saved in `/etc/ollama1/setup.env`). It answers one
+failure: the system NVMe drops off the bus, the machine stays up from memory (it
+pings, nothing on disk can be read, every program gives "Input/output error",
+SSH resets) and only a power cycle brings it back. The chipset's own timer does
+that power cycle by itself: `ollama1-watchdog.service` arms it with a timeout of
+60 s (30 to 90 s if the chip limits it) and pets it every 10 s, but **only while
+a real health probe passes**.
+
+**Hardware only.** The driver is `sp5100_tco` (the AMD chipset's timer; on an
+MSI MEG X570 ACE it is the processor's own), else `wdat_wdt` (a timer described
+by ACPI). `softdog` is never used: it is software, and a frozen kernel cannot
+run it. A watchdog that calls itself "Software Watchdog" is skipped. The service
+loads the driver best effort from `ExecStartPre` (a `+` line, outside its
+sandbox); setup also writes `/etc/modules-load.d/ollama1-watchdog.conf`, and
+only when `/dev/watchdog0` really appeared.
+
+**The probe** (every 10 s, in a thread that is given 8 s, so a read stuck on a
+dead drive cannot stop the loop):
+
+| Check | What it does |
+|---|---|
+| `token` | writes a small token to `/var/lib/ollama1/watchdog.token`, fsyncs it, drops it from the page cache and reads it back |
+| `models` | when something is mounted at `/srv/models`: stats one of its entries and reads 4 KB of it (nothing mounted: skipped) |
+| `rootread` | reads 4 KB of a real file on the root filesystem (the Python program), at a different place each time, after `posix_fadvise(DONTNEED)`, so it is not from the cache |
+
+**Two probes in a row** that fail or time out (about 20 s) and the service
+**stops petting and does not close the device**, for good until it is restarted
+(a machine whose disk answers again is still reset: it has been dead). The board
+resets within the timeout, 60 s after the last pet. What failed goes to the
+journal (best effort: the journal may be on the dead drive) and to
+`/run/ollama1/watchdog.json` (a tmpfs: it is there until the reset). A machine
+that is only slow is not tripped: a probe has 8 s, two must fail one after the
+other, and a load of 20 or more does not do it (`test_watchdog.py` runs 24 busy
+processes). During a heavy copy (`migrate-os`) a probe can in principle take
+longer than 8 s twice; if that ever happens, `sudo systemctl stop
+ollama1-watchdog` for the duration (a clean stop disarms it) and start it again.
+
+**How it is closed.** Writing the magic character `V` and closing disarms the
+timer; closing any other way leaves it running. `V` is written in exactly two
+places: a deliberate `systemctl stop` of a healthy service, and the pause before
+sleep. A crash, a kill, a stop while a probe is failing, the unit's own
+`WatchdogSec=30`: the timer stays armed and `Restart=always` starts the service
+again within 2 s. The unit has no `ExecStopPost`, no memory or CPU limit,
+`OOMScoreAdjust=-900`, `ProtectSystem=strict` (it writes only `/run/ollama1` and
+`/var/lib/ollama1`), no network, and no `PrivateDevices`/`ProtectClock`/
+`DeviceAllow` (any of them would hide `/dev/watchdog0`).
+
+**Sleep.** The sleep hook runs `ollama1-watchdog pause` before suspend (the
+service closes the device with `V` and the hook waits up to 5 s until the status
+says so) and `ollama1-watchdog resume` first thing after the wake: the service
+reopens the device when the first probe passes (the drive may take a moment to
+come back), or 90 s after the wake at the latest, so a drive that never comes
+back still ends in a reset. A machine that slept without the hook (the clock
+that counts sleep runs ahead of the one that does not) has its failure count
+cleared. A pause while the watchdog has already tripped is ignored.
+
+**Status.** `ollama1-watchdog status` (no root; exit 1 when it is not healthy):
+the device and its driver, the timeout, whether it is petting and when it last
+did, the last probe with each check and its time, the failure count, and why it
+stopped if it did. `sudo ollama1-watchdog probe` runs one probe now and prints it.
+
+**In the BIOS.** The board may have a watchdog of its own, or leave the
+chipset's timer off, and both matter:
+
+- *MSI:* Settings, Advanced, **Integrated Peripherals** (some versions have a
+  **Watchdog** or **Watch Dog Timer** entry under Advanced). Leave the BIOS's own
+  watchdog **Disabled**: if the BIOS arms the timer first and keeps it running,
+  the kit's `ollama1-watchdog` still works (it sets the timeout when it opens the
+  device), but a BIOS timer with a short fixed timeout can reset the machine
+  before Linux boots. If `sudo modprobe sp5100_tco` finds no device, look for an
+  option such as "TCO timer" or "AMD fTPM/PSP watchdog" and enable it, and read
+  `journalctl -k | grep -i tco`.
+- *MSI:* Settings, Advanced, Power Management Setup: set
+  **Restore after AC power loss** to `Power On`, so a remote power cycle (a smart
+  plug off and on) brings the machine back by itself instead of waiting for the
+  power button.
+- systemd can use the same timer (`RuntimeWatchdogSec` in `/etc/systemd/system.conf`):
+  leave that off, only one program can hold `/dev/watchdog0` (the service says
+  "held by another program" when it cannot).
+
+**What the kit cannot know from here.** That your board's `sp5100_tco` really
+starts the timer and that the board resets (rather than only logging) on this
+firmware. Test it once, on purpose, with nothing running: stop the service
+(a clean stop, it disarms), open the device from a shell and never pet it:
+`sudo sh -c 'systemctl stop ollama1-watchdog && exec 3>/dev/watchdog0 && sleep 300'`.
+The board must reset about 60 s later (the timeout in `ollama1-watchdog status`);
+the service starts again at boot. Killing the service does not test it: it
+restarts in 2 s and pets again.
+
+## Removing the old RAID mirror
+
+Since 6b400 the kit builds no RAID: a mirror of two big disks only ties up the
+machine with checks and rebuilds, and nothing needs it. A server that was set up
+with one (the array at `/srv/data`, `/dev/md/o1data`) keeps working until you
+take it off, and `setup.sh` no longer looks at it. `tools/remove-raid.sh` is the
+teardown, and it is careful:
+
+```bash
+sudo bash ollama1/tools/remove-raid.sh                        # a DRY RUN: what is on the array, what it would do. Changes nothing
+sudo bash ollama1/tools/remove-raid.sh --yes-erase-the-mirror # does it, after you type  yes  on the terminal
+```
+
+- **Which disks.** The two old RAID disks, by serial: `HDD1_SERIAL`/`HDD2_SERIAL`
+  from `/etc/ollama1/setup.env`, or `--hdd1-serial`/`--hdd2-serial`. The array's
+  members must be **exactly** those two disks, or it refuses. It refuses any
+  NVMe drive, and the OS and models serials from `setup.env`.
+- **The dry run prints** the array and its members (with serials), what is on it
+  (the top level of `/srv/data`, with sizes), the mount, the fstab line, the
+  `mdadm.conf` line, and the nine steps it would take, in order.
+- **It refuses** when `/srv/data` holds anything but what the kit put there
+  (`backups`, `models-parked`, `o1migrate`, the migrate-os status and log, the undo
+  note, `lost+found`) and when a system move (`migrate-os`) is not finished (its
+  state is on the array). The unknown names are printed; `--keep-going` goes on
+  anyway. It will not run without a terminal: `--yes-erase-the-mirror` still asks
+  you to type `yes` on `/dev/tty`.
+- **What it does:** stops the backup units; copies the settings backups to
+  `/var/backups/ollama1` (when under 256 MiB); unmounts `/srv/data`; `mdadm --stop`;
+  `mdadm --zero-superblock` on each member (after reading the disk's serial
+  again); comments out the `/srv/data` line of `/etc/fstab` (the line stays, as a
+  comment; a timestamped copy of fstab is kept); removes the array's `ARRAY` line
+  from `/etc/mdadm/mdadm.conf` (copy kept); turns off the monthly array check
+  (`mdcheck_start.timer`, `mdcheck_continue.timer`, the `/etc/cron.d/mdadm` job)
+  unless another array is in `mdadm.conf`; `update-initramfs -u`. Then it checks
+  each result and says what is true. The log is `/var/log/ollama1-remove-raid.log`.
+- **What it leaves:** the two disks keep their partition tables and partitions
+  (only the RAID superblocks go). It prints the `wipefs` line for later and does
+  not run it. The empty `/srv/data` folder stays; `rmdir` it if you like.
+- **What is lost:** everything on the array. The parked models copy
+  (`models-parked`) goes with it. Copy anything you want first.
+
+Where the things that lived on `/srv/data` are now (one place for each):
+
+| What | Now | Where it is defined |
+|---|---|---|
+| nightly settings backup | `/var/backups/ollama1/<date>` (30 days; skipped under 2 GiB free or over 256 MiB) | `o1common.Paths.backups`, `BACKUP_*`; `setuplib.sh` `BACKUP_DIR` |
+| migrate-os state, status and log | `/var/lib/ollama1/o1migrate/`, `/var/lib/ollama1/migrate-os.{status,log}` on the root filesystem; copied onto the new root at the end | `o1migrate.DATA_DIR` (= `Paths.state`) |
+| migrate-os parked models | `/var/lib/ollama1/models-parked` by default, or `<folder>/models-parked` with `--park-dir <folder on another disk>` | `o1migrate.Cfg.parked` |
+
 ## Power and electricity cost
 
 The panel's **Power and cost** card shows what the server draws now (with
@@ -1214,7 +1339,8 @@ obvious way, `vgextend` and `pvmove`, was rejected: it rewrites the volume
 group's metadata *on the old drive* while it runs, moves every extent of `/`
 off it (the old drive would boot only while the new one is also there, and no
 longer holds the system as it was), and a drive that drops off the bus half way
-leaves a volume group with a missing disk. So the old drive is never written to.
+leaves a volume group with a missing disk. So the old drive's partitions, LVM, boot loader and `fstab` are never written to
+(its root filesystem does get this tool's state and log, and the parked models, below; since 6b400 there is no RAID mirror to put them on).
 `/` and `/boot` are copied file by file (`rsync -aHAXx`) onto plain ext4
 partitions of the other drive, with new UUIDs; the copy gets its own
 `/etc/fstab` (the old one is not touched), initramfs and GRUB, built in a
@@ -1225,9 +1351,10 @@ the new system has booted and been checked, makes the new drive the default;
 until then a power cycle, or a kernel panic (the new system boots with
 `panic=10`), brings the machine back to the old drive.
 
-The other drive is **erased and re-partitioned**. Its models are parked on the
-RAID first (`/srv/data/models-parked`, checked by an `rsync -n` dry run and by
-size) and copied back at the end:
+The other drive is **erased and re-partitioned**. Its models are parked first, on
+the old drive's root filesystem (`/var/lib/ollama1/models-parked`; or `<folder>/models-parked` with `--park-dir <folder>`, on another disk, when `/` has no room: never on the
+drive being erased), checked by an `rsync -n` dry run and by size, and copied back
+at the end:
 
 | | | |
 |---|---|---|
@@ -1302,13 +1429,13 @@ kit's auto sleep can't suspend the server in the middle of a copy.
 ### Watch it
 
 ```bash
-cat /srv/data/migrate-os.status      # anyone can read it: state, stage N of 6, percent, what it is doing, times, next step
+cat /var/lib/ollama1/migrate-os.status      # anyone can read it: state, stage N of 6, percent, what it is doing, times, next step
 bash $M --status                     # the same, plus a diagnosis if it was interrupted (no sudo needed)
 sudo tmux attach -t migrate          # the live screen; Ctrl-b then d leaves it running
-sudo less /srv/data/migrate-os.log   # the whole log (root only)
+sudo less /var/lib/ollama1/migrate-os.log   # the whole log (root only)
 ```
 
-The status file is on the RAID, never on an NVMe, is rewritten at least every
+The state, status and log are in `/var/lib/ollama1` on the old drive's root filesystem (never on the drive being erased); at the end they are copied onto the new root, so `--finish` and `--status` find them after the reboot. The status file is rewritten at least every
 15 seconds while it runs, and ends in `DONE` or `FAILED in stage <name>` with the
 next step. It holds only fixed phrases, stage names and numbers: no serials, no
 paths, none of a command's output (that is in the root-only log, with the
@@ -1318,12 +1445,12 @@ reason). A stage that is part-way through is picked up where it stopped.
 
 | Stage | What it does |
 |---|---|
-| 0 checks | Both serials found (each by exactly one controller, native-multipath names understood) and different; `/` is on FROM and FROM has no mounted filesystem but `/`, `/boot`, `/boot/efi` and swap (`rsync -x` would silently skip another); `/srv/models` is mounted from a partition of TO, TO has exactly that one partition, no LVM/RAID, nothing else mounted; both drives report no critical warning (`nvme smart-log`); FROM is not dead right now (controller state, read-only `/`, the kernel log); UEFI boot; `/srv/data` is a mount point of the md mirror, read-write, `/proc/mdstat` showing `[UU]`, and it and the state folder belong to root and nobody else can write them; room on it for the models; the root and models fit; `apt` is idle. Anything wrong is listed and nothing is changed. Then the model services stop |
-| 1 park | `/srv/models` to `/srv/data/models-parked`; the `rsync -n --itemize-changes` dry run must find nothing left and the sizes must agree, or nothing is erased |
-| 2 partition | Refused unless stage 1 is verified. Immediately before the wipe it looks again: the RAID whole and read-write; the page cache is flushed and dropped (`sync`, `drop_caches`) so the compare reads the disks; the dry run and sizes again; and a content compare of every parked file up to 64 MiB and of 18 MiB spread over each larger one (not a full checksum: reading a terabyte or more twice over disks of 150 MB/s takes hours, and sizes and times of everything are already exact). Then `/srv/models` is unmounted and marked immutable, the TO drive is wiped (`wipefs`, `sgdisk --zap-all`), partitioned, **each new partition is wiped again** (an old filesystem's signature can sit exactly where a new partition starts: the old models partition and the new ESP both begin at 1 MiB), then always formatted and read back |
+| 0 checks | Both serials found (each by exactly one controller, native-multipath names understood) and different; `/` is on FROM and FROM has no mounted filesystem but `/`, `/boot`, `/boot/efi` and swap (`rsync -x` would silently skip another); `/srv/models` is mounted from a partition of TO, TO has exactly that one partition, no LVM/RAID, nothing else mounted; both drives report no critical warning (`nvme smart-log`); FROM is not dead right now (controller state, read-only `/`, the kernel log); UEFI boot; the data folder (`/var/lib/ollama1`) is on the root filesystem and, with the state folder, belongs to root and nobody else can write them; the parked folder is on a filesystem mounted read-write that is not the TO drive, with room for the models (a margin of 10 GiB and 2%); the root and models fit; `apt` is idle. Anything wrong is listed and nothing is changed. Then the model services stop |
+| 1 park | `/srv/models` to `/var/lib/ollama1/models-parked` (or `--park-dir`); the `rsync -n --itemize-changes` dry run must find nothing left and the sizes must agree, or nothing is erased |
+| 2 partition | Refused unless stage 1 is verified. Immediately before the wipe it looks again: the parked folder on a read-write filesystem; the page cache is flushed and dropped (`sync`, `drop_caches`) so the compare reads the disks; the dry run and sizes again; and a content compare of every parked file up to 64 MiB and of 18 MiB spread over each larger one (not a full checksum: reading a terabyte or more twice over disks of 150 MB/s takes hours, and sizes and times of everything are already exact). Then `/srv/models` is unmounted and marked immutable, the TO drive is wiped (`wipefs`, `sgdisk --zap-all`), partitioned, **each new partition is wiped again** (an old filesystem's signature can sit exactly where a new partition starts: the old models partition and the new ESP both begin at 1 MiB), then always formatted and read back |
 | 3 copy | `/` (two passes: the second catches what changed) and `/boot`. Each destination is checked to be the new partition before anything is copied into it. `/swap.img` is made new, not copied |
-| 4 boot | `/etc/fstab` of the **copy** rewritten (`/`, `/boot`, `/boot/efi`, `/srv/models` by their new UUIDs; `/srv/data`, swap and every other line kept); `update-initramfs`, `grub-install --no-nvram`, `update-grub` in a chroot (`/dev`, `/sys`, `/run` bound as slaves so unmounting never reaches the host, and unmounted again even if a command fails). The copy gets `panic=10` (a drop-in, `98-ollama1-migrate.cfg`), so a kernel panic reboots into the default boot, the old drive. The copy's `grub.cfg` must carry every kernel option the running system has (the NVMe settings, and the GPU overdrive switch if the tuning is on) and `panic=10`, the kit's GRUB drop-ins must be on the copy, and `EFI/o1new/grub.cfg` must exist next to the loader |
-| 5 restore | The models are copied back to the new models partition and checked; the parked copy stays |
+| 4 boot | `/etc/fstab` of the **copy** rewritten (`/`, `/boot`, `/boot/efi`, `/srv/models` by their new UUIDs; swap and every other line, a `/srv/data` line of an old mirror included, kept); `update-initramfs`, `grub-install --no-nvram`, `update-grub` in a chroot (`/dev`, `/sys`, `/run` bound as slaves so unmounting never reaches the host, and unmounted again even if a command fails). The copy gets `panic=10` (a drop-in, `98-ollama1-migrate.cfg`), so a kernel panic reboots into the default boot, the old drive. The copy's `grub.cfg` must carry every kernel option the running system has (the NVMe settings, and the GPU overdrive switch if the tuning is on) and `panic=10`, the kit's GRUB drop-ins must be on the copy, and `EFI/o1new/grub.cfg` must exist next to the loader |
+| 5 restore | The models are copied back to the new models partition and checked; the parked copy stays. The parked folder is excluded from the copy of `/`. Afterwards the state, a final status and the log are copied onto the new root (`/var/lib/ollama1`) |
 | 6 firmware | The boot entry is made **last**. The old drive's entry (found by its ESP) stays first in the boot order, the new entry goes last, and `efibootmgr -n <new>` (BootNext) sends the next boot, once, to the new drive. Until `--finish` the old drive is the default boot |
 
 When all of it has passed the tool prints a one-screen summary and, with
@@ -1340,10 +1467,12 @@ sudo $M --finish            # no serials needed; they are in the state file
 TO drive, and that the running kernel command line has the options the old
 system ran with (the NVMe power settings, `amdgpu.ppfeaturemask` when the GPU
 tuning is on) and `panic=10`. Only then does it make the new drive the default
-boot (`efibootmgr -o`: new first, the old drive's entry second). It tells you that the old drive was never written to and how to
+boot (`efibootmgr -o`: new first, the old drive's entry second). It tells you that the old drive's partitions, LVM, `fstab` and boot loader were never written to and how to
 reuse it (that is yours to do, later; the tool never wipes a drive). Options:
 `--delete-parked` (frees the parked models after checking the live copy has
-every file; you type `delete`), `--disable-old-entry` (makes the old drive's
+every file; you type `delete`. After the reboot the parked copy is on the OLD drive's
+root filesystem, not mounted now, so there is usually nothing to delete here: it goes
+when that drive is reused. With a `--park-dir` disk that is mounted, it works), `--disable-old-entry` (makes the old drive's
 firmware entry inactive, not deleted; you type `yes`), `--remove-sudoers`, and
 `--disable-old-boot-files` (**off by default**, below).
 
@@ -1371,7 +1500,7 @@ falls through to the new drive. It is the one step that writes to the old drive
 (only its EFI partition, found by the PARTUUID recorded at the start, never
 guessed, mounted only for this), so the old drive stops being a fallback until
 you undo it. You type `yes`; the way back is written to
-`/srv/data/old-drive-boot-files-undo.txt` before the first rename (mount the
+`/var/lib/ollama1/old-drive-boot-files-undo.txt` before the first rename (mount the
 partition, `mv` the two folders back). It refuses if a `.off` folder is already
 in the way, and repeating it changes nothing. It does not change the firmware
 entries (`--disable-old-entry` does that).
@@ -1413,10 +1542,10 @@ what is on that partition.
   `nofail`, so the boot goes on) and `/srv/models` is an empty folder, so Ollama
   sees no models. Either put them back by hand: `sudo mount LABEL=o1models
   /srv/models` (the new models partition, once stage 5 finished; before that, `sudo mount
-  --bind /srv/data/models-parked /srv/models`), and, to make it stick, change that fstab
+  --bind /var/lib/ollama1/models-parked /srv/models`), and, to make it stick, change that fstab
   line to `LABEL=o1models` (the one change you may want on the old drive; the
   bare folder is immutable, which does not stop a mount, only writes into it); or
-  just re-download the models, or point Ollama at `/srv/data/models-parked`. To
+  just re-download the models, or point Ollama at `/var/lib/ollama1/models-parked`. To
   drop the new entry from the firmware: `sudo efibootmgr` to see its number (label `ollama1-new`), then
   `sudo efibootmgr -B -b <number>`.
 - **Not rebooted into the new drive?** `--finish` says which of `/`, `/boot`,
@@ -1508,7 +1637,10 @@ not apply. The services, timers, tunnel and config keep working: they live in
   - To run it by hand: `sudo systemctl start ollama1-update-ollama`.
 - **Backups:** every night at 02:30, `/etc/ollama1`, the tunnel credential,
   the SSH/apt/GRUB drop-ins and the model list go to
-  `/srv/data/backups/ollama1/<date>` (root-only, 30 days kept).
+  `/var/backups/ollama1/<date>` on the root filesystem (root-only, 30 days kept; 6b400:
+  it was on the mirror). The backup is small: it is skipped, with a message in the
+  panel's action list, when the root filesystem has less than 2 GiB free or the
+  backup would be over 256 MiB.
 
 ## The network
 
@@ -1537,11 +1669,12 @@ With a bridge, the firewall is set so it can't cut the other device off:
 | Services | `systemctl status ollama ollama1-gateway ollama1-admin ollama1-tunnel ollama1-dash` |
 | Logs (counts only) | `journalctl -u ollama1-gateway`, `journalctl -u ollama1-tunnel` |
 | GPU seen by Ollama | `journalctl -u ollama \| grep -i "inference compute"` should say ROCm, gfx1030. The RX 6900 XT is supported as is, so `HSA_OVERRIDE_GFX_VERSION` is not set. If Ollama ever reports no GPU, the gateway refuses every model instead of running it on the CPU |
-| Mirror | `cat /proc/mdstat`, `sudo mdadm --detail /dev/md/o1data` |
+| Old mirror (a server set up before 6b400) | `cat /proc/mdstat`; to remove it: `sudo bash ollama1/tools/remove-raid.sh` (a dry run), see "Removing the old RAID mirror" |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
+| Watchdog | `ollama1-watchdog status`; `journalctl -u ollama1-watchdog`; off: `sudo ./setup.sh --watchdog off`; see "Hardware watchdog" |
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
 | Lights | `ollama1-leds status`; `journalctl -u ollama1-leds -u ollama1-openrgb`; off: `sudo ./setup.sh --leds off` |
-| System move to the other NVMe | `cat /srv/data/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
+| System move to the other NVMe | `cat /var/lib/ollama1/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
 | SSH | `sudo sshd -T -C user=<your-user>,host=x,addr=<a-lan-address> \| grep -E 'password\|permitroot'` |
 
@@ -1566,9 +1699,14 @@ Ed25519 (the server uses PyNaCl). They cover:
 - admin authentication and CSRF, and the match between the polkit rule and
   the panel;
 - the updater's checksum refusals;
-- setup's disk steps against fake disk tools: what gets wiped, the
-  reassembly of an existing mirror, the filesystem after a crash, fstab
-  lines without a UUID;
+- setup's disk steps against fake disk tools: what gets wiped (only the
+  models disk), that no mirror is built or looked at, the filesystem after a
+  crash, fstab lines without a UUID;
+- the old mirror's removal (`tools/remove-raid.sh`, `test_removeraid.py`) against
+  a fake machine: the dry run changes nothing, the typed `yes` on a terminal,
+  the members checked by serial, unknown content refused, the exact fstab and
+  mdadm.conf edits, no NVMe ever touched (`test_noraid.py` has the backup's
+  free-space and size rules and the storage rows);
 - request smuggling after errors, nothing read before authentication, the
   device-switch unload;
 - the Cloudflare helper against a fake Cloudflare API: reruns change

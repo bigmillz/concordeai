@@ -14,6 +14,11 @@ import tempfile
 PREFIX = os.environ.get("OLLAMA1_PREFIX", "").rstrip("/")
 
 
+BACKUP_MAX_BYTES = 256 << 20       # a settings backup bigger than this is skipped, with a message (6b400)
+BACKUP_MIN_FREE_BYTES = 2 << 30    # and none is made when the root filesystem has less than this free
+BACKUP_KEEP_DAYS = 30
+
+
 def p(path):
     """A system path, moved under OLLAMA1_PREFIX when that is set."""
     return PREFIX + path
@@ -37,12 +42,14 @@ class Paths:
     gw_state = p("/var/lib/ollama1-gateway")
     counters = p("/var/lib/ollama1-gateway/counters.json")
     state = p("/var/lib/ollama1")
+    watchdog_status = p("/run/ollama1/watchdog.json")         # tmpfs: it is there until the reset (6b399)
+    watchdog_token = p("/var/lib/ollama1/watchdog.token")     # the hardware watchdog's disk probe writes this
     update_status = p("/var/lib/ollama1/ollama-update.json")
     helper_status = p("/var/lib/ollama1/actions.json")
     admin_state = p("/var/lib/ollama1-admin")
     history = p("/var/lib/ollama1-admin/history.json")
     models = p("/srv/models")
-    data = p("/srv/data")
+    backups = p("/var/backups/ollama1")                       # the nightly settings backup (6b400; it was on the mirror)
     opt = p("/opt/ollama")
     u_stamp = p("/var/lib/apt/periodic/unattended-upgrades-stamp")
     reboot_required = p("/run/reboot-required")

@@ -136,9 +136,9 @@ def rsync(s, args):
     src, dst = pos[-2], pos[-1]
     dry = any(a.startswith("-") and not a.startswith("--") and "n" in a for a in args) or "-n" in args
     excl = [a[len("--exclude="):] for a in args if a.startswith("--exclude=")]
-    top_skip = {e.strip("/").replace("/*", "") for e in excl if e.count("/") <= 2}
+    skip = [e.strip("/").replace("/*", "") for e in excl]
     sfiles = files_of(src)
-    sfiles = {k: v for k, v in sfiles.items() if k.split(os.sep)[0] not in top_skip}
+    sfiles = {k: v for k, v in sfiles.items() if not any(k == e or k.startswith(e + os.sep) for e in skip)}
     if dry:
         dfiles = files_of(dst) if os.path.isdir(dst) else {}
         out = []

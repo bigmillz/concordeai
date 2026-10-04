@@ -9,6 +9,104 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b400 — the RAID mirror is gone from the kit (per Patrick: "pointless, it just ties up resources checking and rebuilding")
+
+Kit only (`ollama1/`). The mirror (two 8 TB disks, RAID1 at /srv/data) is no longer built,
+assembled, mounted or looked at, and a new server needs no md device. For a server that has one,
+`tools/remove-raid.sh` tears it down.
+
+- **setup.sh / setuplib.sh.** No mirror step, no /home move (it existed only to free a mirror disk),
+  no `mdadm` package. `--hdd1-serial`/`--hdd2-serial` are accepted (shape checked) and ignored with
+  a one-line note; they are written to setup.env only when given or already saved, so remove-raid
+  can find the old disks. The plan says "No mirror: not used". `raid_*`, `md_*`, `plan_wipes`'s
+  mirror part and the HDD checks in `check_disks` are deleted with their tests (TestRaid became
+  TestNoMirror; the generic guards TestRaid covered now run on `models_step`).
+- **Where /srv/data's jobs went (one constant each).** Backup: `o1common.Paths.backups` =
+  /var/backups/ollama1 (+ `BACKUP_MAX_BYTES` 256 MiB, `BACKUP_MIN_FREE_BYTES` 2 GiB, 30 days;
+  skipped with a recorded message over either limit); `setuplib.sh` `BACKUP_DIR` mirrors it and a
+  test keeps them equal. migrate-os: `o1migrate.DATA_DIR` = /var/lib/ollama1 (= `Paths.state`,
+  also tested): state, status, log, and by default the parked models. The unit lost
+  `RequiresMountsFor=/srv/data`.
+- **migrate-os without a mirror** (lib/o1migrate.py). The old design needed a disk that survives
+  either NVMe; now the state lives on the FROM root, and four things follow. (1) The parked
+  models are on the FROM root by default; `--park-dir DIR` (kept in the state file) puts them on
+  another disk. The checks: not under /srv/models, not on a TO mount, read-write, room for the
+  models plus a margin (the message names `--park-dir`). `check_data_raid`/`raid_ok` are gone;
+  `check_parked_place` replaces them, also run just before the wipe. (2) The parked folder is
+  excluded from the copy of `/` (`root_excludes`). (3) After stage 6 `hand_over` mounts the new
+  root again and writes the state, a DONE status and the log into /var/lib/ollama1 there, so
+  `--finish` and `--status` work after the reboot (the old drive's copy is not mounted then).
+  (4) `--delete-parked` finds nothing when the copy is on the unmounted old drive and says so;
+  it only deletes the folder the state file names. "The old drive was never written to" now means
+  partitions, LVM, fstab and boot loader: its root filesystem gets state, log and parked models
+  (README and plan text say so). The migrate test fixture puts the data folder under the fake `/`.
+- **Panel/admin.** `o1stats.disks()` lists /srv/data only when something is mounted there or fstab
+  has an active line for it (so a server with a dropped mirror mount still shows it MISSING; one
+  without a mirror shows no row and no "not mounted" warning). `bin/ollama1-admin` line 765 lost
+  `if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn'])`, the only thing that said anything
+  about a RAID that is not there. The mdstat parsing, the HDMI panel's and dashboard's RAID line
+  (drawn only when an array exists) and the sleep code's resync allowance stay for servers that
+  have one.
+- **tools/remove-raid.sh** (dry run by default; `--yes-erase-the-mirror` plus a typed `yes` read
+  from /dev/tty, refuses without a terminal). Members must be exactly the two disks by serial
+  (setup.env or options), never an NVMe, never the OS/models serials; unknown names on the array
+  or an unfinished migrate-os state refuse unless `--keep-going`. Steps: stop the backup units,
+  copy the settings backups to /var/backups/ollama1 (< 256 MiB), umount, `mdadm --stop`, zero each
+  member's superblock after re-reading the disk serial, comment out the /srv/data fstab line
+  (timestamped copy), remove that array's ARRAY line from mdadm.conf (copy), disable the mdcheck
+  timers and comment out the cron job unless another array is left, update-initramfs, then a
+  check of each result and a log in /var/log/ollama1-remove-raid.log. Partition tables are left;
+  the wipefs line is printed, never run. `test_removeraid.py` (fake lsblk/mdadm/... in
+  `tests/fakeraid.py`), `test_noraid.py`, 17 new mutants.
+- **Unverified.** Nothing ran on the real server: not the teardown (real `mdadm --detail --export`
+  and `lsblk -lsnpo` output shapes are assumed from the existing setuplib code), not a migrate-os
+  run with the new data folder.
+
+## 6b399 — hardware watchdog for a server that loses its system NVMe (per Patrick)
+
+The failure: the system NVMe drops off the bus, the machine stays up from memory
+(it pings, every program on disk gives "Input/output error", SSH resets) and only
+a manual power cycle brings it back. Built (kit only, `ollama1/`):
+`systemd/ollama1-watchdog.service`, `bin/ollama1-watchdog`, `lib/o1watchdog.py`
+(stdlib), `setup.sh --watchdog on|off` (default on; `WATCHDOG=` in setup.env, the
+way FANS/LEDS are saved), a pause/resume pair in the sleep hook, README "Hardware
+watchdog", `tests/test_watchdog.py` (82 tests on fakes), 29 mutants.
+
+- **Hardware only.** `sp5100_tco`, else `wdat_wdt`, loaded best effort from
+  `ExecStartPre=-+...load-modules` and kept at boot through
+  `/etc/modules-load.d/ollama1-watchdog.conf`, written by setup only when a device
+  showed up. `softdog` is never loaded and a watchdog whose sysfs identity says
+  "Software" is skipped: a frozen kernel cannot run it.
+- **What pets it.** Every 10 s, only after a probe that passed: write a token on
+  the root fs, fsync, drop it from the cache, read it back; stat (and read 4 KB
+  of) an entry on /srv/models when something is mounted there; read 4 KB of an
+  uncached root file at a different offset each time. The probe runs in a daemon
+  thread with an 8 s limit; a probe still stuck from an earlier turn is not
+  repeated (no pile of threads on a dead drive) and fails the turn at once.
+  Two failures in a row (about 20 s) and it stops petting for good (latched,
+  until restart) without closing the device; timeout 60 s (90 or 30 if the chip
+  refuses; the pet interval is a third of whatever the chip clamps it to).
+- **The close rules.** `V` + close disarms the Linux watchdog; any other close
+  leaves the timer running. `V` is written in one function (`_disarm`), called
+  from a stop of a healthy service and from the sleep pause. A crash, a kill,
+  `WatchdogSec`, a stop while failing or tripped: armed, and `Restart=always`
+  comes back in 2 s. The unit has no `ExecStopPost`, no memory/CPU cap,
+  `OOMScoreAdjust=-900`, and none of PrivateDevices/ProtectClock/DeviceAllow
+  (they would hide or close /dev/watchdog0; this was deliberate: ProtectClock in
+  particular is not used although the fan unit has it).
+- **Sleep.** The hook calls `ollama1-watchdog pause` (SIGUSR2; the service closes
+  with `V`, the hook waits up to 5 s for the status to say so) before suspend and
+  `resume` (SIGUSR1) first thing after waking; the service then waits for a probe
+  to pass before reopening, but at most 90 s, so a drive that never returns still
+  ends in a reset. A pause while tripped is ignored. A clock jump (CLOCK_BOOTTIME
+  ahead of CLOCK_MONOTONIC by more than 25 s) clears the failure count: the same
+  protection if the hook ever does not run. The hook guards on the file existing,
+  not on `systemctl is-active`, so the other hook tests' call logs are unchanged.
+- **Not done / unverified.** Nothing ran on the real board. Whether this board's
+  `sp5100_tco` starts and resets, whether the BIOS has its own timer, and how a
+  heavy `migrate-os` copy interacts with an 8 s fsync limit are for the server.
+  README has the by-hand drill and the MSI BIOS notes (Integrated Peripherals,
+  and "Restore after AC power loss" = Power On for remote power cycles).
 ## 6b402 — the admin page can set auto sleep (per Patrick)
 
 Patrick: "Make the auto-sleep switch changeable from the page." The setting is

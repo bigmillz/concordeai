@@ -43,9 +43,6 @@ OVERDRIVE = "amdgpu.ppfeaturemask=0xfffd7fff"
 OLD_CMDLINE = "BOOT_IMAGE=/vmlinuz-6 root=/dev/mapper/ubuntu--vg-ubuntu--lv ro quiet splash " + " ".join(NVME_OPTS)
 NEW_CMDLINE = "BOOT_IMAGE=/vmlinuz-6 root=UUID=x ro quiet splash " + " ".join(NVME_OPTS) + " " + OVERDRIVE + " panic=10"
 SERVICES_ACTIVE = ["ollama.service", "ollama1-gateway.service", "ollama1-admin.service", "ollama1-pull@llama.service"]
-MDSTAT_OK = ("Personalities : [raid1]\nmd127 : active raid1 sdb1[1] sda1[0]\n      7813894144 blocks super 1.2 [2/2] [UU]\n"
-             "      bitmap: 0/59 pages [0KB], 65536KB chunk\n\nunused devices: <none>\n")
-MDSTAT_DEGRADED = MDSTAT_OK.replace("[2/2] [UU]", "[2/1] [U_]")
 DESTRUCTIVE = {"sgdisk", "wipefs", "mkfs.ext4", "mkfs.vfat", "mkswap", "fallocate", "mount", "umount", "chroot",
                "efibootmgr", "partprobe", "udevadm", "sync", "rsync", "rm", "tmux"}
 WRITES_TO_DRIVE = {"sgdisk", "wipefs", "mkfs.ext4", "mkfs.vfat"}
@@ -68,7 +65,7 @@ class Machine:
         self.names = {"from": "nvme1n1" if swap else "nvme0n1", "to": "nvme0n1" if swap else "nvme1n1"}
         self.ctrl = {"from": self.names["from"][:5], "to": self.names["to"][:5]}
         for sub in ("sys/class/nvme", "dev", "byid", "bin", "src/etc/default/grub.d", "src/usr/bin", "src/var/lib",
-                    "src/home/u", "src/boot/grub", "srv/models", "srv/data", "run", "efi", "state-elsewhere"):
+                    "src/home/u", "src/boot/grub", "srv/models", "src/var/lib/ollama1", "run", "efi", "state-elsewhere"):
             os.makedirs(os.path.join(d, sub), exist_ok=True)
         for role, serial in (("from", FROM), ("to", TO)):
             c = os.path.join(d, "sys/class/nvme", self.ctrl[role])
@@ -98,8 +95,6 @@ class Machine:
         for n, body in (("a.gguf", "aaaa" * 10), ("b/c.gguf", "cc" * 7)):
             self.put(d + "/srv/models/" + n, body)
         self.drop_caches_file = d + "/drop_caches"
-        self.mdstat_file = d + "/mdstat"
-        self.put(self.mdstat_file, MDSTAT_OK)
         self.cmdline_file = d + "/cmdline"
         self.put(self.cmdline_file, OLD_CMDLINE + "\n")
         fp = lambda r, n: os.path.join(d, "dev", "%sp%d" % (self.names[r], n))
@@ -109,7 +104,7 @@ class Machine:
         for n in (1, 2, 3):
             os.symlink(fp("from", n), os.path.join(d, "byid", "nvme-Samsung_SSD_980_PRO_2TB_%s_1-part%d" % (FROM, n)))
         os.symlink(fp("to", 1), os.path.join(d, "byid", "nvme-Samsung_SSD_980_PRO_2TB_%s_1-part1" % TO))
-        self.data_dir, self.models_dir = d + "/srv/data", d + "/srv/models"
+        self.data_dir, self.models_dir = d + "/src/var/lib/ollama1", d + "/srv/models"       # the data folder is on the root (6b400)
         lvm = "/dev/mapper/ubuntu--vg-ubuntu--lv"
         self.fs = {
             "devroot": d + "/dev", "byid": d + "/byid", "log": [],
@@ -129,10 +124,10 @@ class Machine:
                 {"target": "/boot", "source": fp("from", 2), "fstype": "ext4", "options": "rw,relatime"},
                 {"target": "/boot/efi", "source": fp("from", 1), "fstype": "vfat", "options": "rw,relatime"},
                 {"target": self.models_dir, "source": fp("to", 1), "fstype": "ext4", "options": "rw,noatime"},
-                {"target": self.data_dir, "source": "/dev/md127", "fstype": "ext4", "options": "rw,noatime"},
             ],
             "df": {"/": {"used": root_gib * GIB}, self.models_dir: {"used": models_gib * GIB},
-                   self.data_dir: {"avail": data_avail_tib * (1 << 40)}},
+                   self.data_dir: {"avail": data_avail_tib * (1 << 40)},
+                   self.data_dir + "/models-parked": {"avail": data_avail_tib * (1 << 40)}},
             "smart": {self.ctrl["from"]: 0, self.ctrl["to"]: 0}, "klog": "",
             "services_active": list(SERVICES_ACTIVE),
             "efi": {"order": ["0001", "0000"], "entries": {
@@ -145,9 +140,9 @@ class Machine:
         for t in STUBS:
             os.symlink(fake, os.path.join(d, "bin", t))
         self.tty = d + "/tty"
-        self.cfg_state = d + "/srv/data/o1migrate/state.json"
-        self.status_file = d + "/srv/data/migrate-os.status"
-        self.log_file = d + "/srv/data/migrate-os.log"
+        self.cfg_state = self.data_dir + "/o1migrate/state.json"
+        self.status_file = self.data_dir + "/migrate-os.status"
+        self.log_file = self.data_dir + "/migrate-os.log"
         self.sudoers = d + "/sudoers-90-ollama1-migrate"
         self.out = ""
 
@@ -172,7 +167,7 @@ class Machine:
                  O1M_TEST="1", O1M_SETUP_ENV=d + "/setup.env", O1M_SYS=d + "/sys", O1M_DEV=d + "/dev", O1M_BYID=d + "/byid", O1M_DATA=self.data_dir,
                  O1M_MODELS=self.models_dir, O1M_MNT=d + "/run/o1migrate", O1M_SRC_ROOT=d + "/src",
                  O1M_TTY=self.tty, O1M_EFI_SYS=d + "/efi", O1M_ALLOW_NONROOT="1", O1M_CMDLINE=self.cmdline_file,
-                 O1M_COUNTDOWN_SECS="0", O1M_SUDOERS=self.sudoers, O1M_MDSTAT=self.mdstat_file,
+                 O1M_COUNTDOWN_SECS="0", O1M_SUDOERS=self.sudoers,
                  O1M_DROP_CACHES=self.drop_caches_file)
         e.pop("TMUX", None)
         if not tmux:
