@@ -56,8 +56,12 @@ Fail-safe:
     what is in force;
   * the service tells systemd it is alive on every poll (sd_notify,
     WatchdogSec=10): a loop that hangs is restarted, and restored;
-  * a temperature over its limit (CPU 80 C, graphics card junction 90 C, NVMe
-    70 C) forces 100% regardless of load, until it is 10 C under the limit;
+  * a temperature at its limit forces 100% regardless of load, until it is 10 C
+    under it: CPU 80 C; graphics card junction 90, memory 95, edge 85; NVMe 70;
+    DIMMs (jc42) 70; every input of the motherboard's chip (by its label): 70,
+    CPUTIN/PECI/TSI 85, VRM/MOS 90, chipset/PCH 80, any label it doesn't know
+    70. A sensor that reads 0 or less (-128 is an unplugged input), or 120 or
+    more, is disconnected or stuck: ignored, and let go if it was hot;
   * after a wake amdgpu may have reset its fan to automatic: every tick checks
     the outputs it holds and writes them again at the current level.
 
@@ -92,6 +96,13 @@ HYST_C = 10                      # a temperature override ends this far under it
 STATUS_STALE_S = 15              # a status file older than this: the service isn't running
 TOOLS_EVERY_S = 6                # /proc is walked at most this often
 LIMIT_CPU_C, LIMIT_GPU_C, LIMIT_NVME_C = 80, 90, 70
+LIMIT_GPU_EDGE_C, LIMIT_GPU_MEM_C = 85, 95
+LIMIT_BOARD_C = 70               # a motherboard chip input: system, auxiliary and any label it does not know
+LIMIT_CPUTIN_C = 85              # CPUTIN, PECI and TSI: the chip's own view of the CPU
+LIMIT_VRM_C = 90                 # a label with VRM or MOS in it
+LIMIT_CHIPSET_C = 80             # a label with CHIPSET or PCH in it
+LIMIT_DIMM_C = 70                # jc42: the memory modules
+TEMP_LOW_C, TEMP_HIGH_C = 0, 120  # at or under, or at or over, these a sensor is disconnected or stuck: ignored
 OLD_UNIT = "ollama1-gpu-fan.service"          # the hand-made full-speed-always experiment
 MODULES_CONF = "/etc/modules-load.d/ollama1-fan.conf"
 SUPER_IO_RX = re.compile(r"^(nct67\d\d|it8\d\d\d[a-z]?|f718\d\d[a-z]*|w836\d\d[a-z]*)$")   # the motherboard's fan chips
@@ -220,9 +231,42 @@ def min_rpm_of(o, io):
 
 # ---- temperatures -----------------------------------------------------------------
 
+def plausible(c):
+    """A temperature a working sensor can show. 0 or less, 120 or more, and the -128 an unplugged
+    input reads, are a disconnected or stuck sensor: ignored, never a reason for 100%."""
+    return TEMP_LOW_C < c < TEMP_HIGH_C
+
+
+def board_limit(label):
+    """The limit for a motherboard chip input, from its label."""
+    up = (label or "").upper()
+    if re.search(r"VRM|\bMOS", up):
+        return LIMIT_VRM_C
+    if "CHIPSET" in up or "PCH" in up:
+        return LIMIT_CHIPSET_C
+    if up.startswith(("CPU", "PECI")) or "TSI" in up:
+        return LIMIT_CPUTIN_C
+    return LIMIT_BOARD_C
+
+
+def _chip_temps(hw):
+    """[(number, label, celsius)] of a hwmon chip's temp*_input files, raw (unplausible ones too).
+    A file that can't be read is left out: no reading is not a reading."""
+    out = []
+    for f in sorted(glob.glob(glob.escape(hw) + "/temp*_input")):
+        m = re.fullmatch(r".*/temp(\d+)_input", f)
+        c = o1cpu.number(o1cpu.read_text(f), -1000.0, 1000.0, scale=1000.0)
+        if m and c is not None:
+            label = (o1cpu.read_text("%s/temp%s_label" % (hw, m.group(1))) or "").strip() or "temp" + m.group(1)
+            out.append((int(m.group(1)), label, c))
+    return out
+
+
 def read_temps(sysroot=None):
-    """[(key, label, celsius, limit)] for the CPU, the graphics card's junction and
-    each NVMe drive: the sensors that can force the fans to 100%."""
+    """[(key, label, celsius or None, limit)]: every sensor that can force the fans to 100%:
+    the CPU, the graphics card's junction, memory and edge, each NVMe drive, the DIMMs (jc42) and every
+    input of the motherboard's chip. celsius is None for a disconnected or stuck sensor (see
+    plausible()). Labels the kit doesn't know are watched with the board limit, not ignored."""
     base = (sysroot or _sys()) + "/class/hwmon"
     out = []
     try:
@@ -232,28 +276,55 @@ def read_temps(sysroot=None):
     for d in dirs:
         hw = base + "/" + d
         name = (o1cpu.read_text(hw + "/name") or "").strip()
-        if name not in CPU_CHIPS and name not in ("amdgpu", "nvme"):
+        if not (name in CPU_CHIPS or name in ("amdgpu", "nvme", "jc42") or SUPER_IO_RX.match(name)):
             continue
-        sensors = {}
-        for f in sorted(glob.glob(glob.escape(hw) + "/temp*_input")):
-            m = re.fullmatch(r".*/temp(\d+)_input", f)
-            c = o1cpu.number(o1cpu.read_text(f), *o1cpu.TEMP_RANGE, scale=1000.0)
-            if m and c is not None:
-                label = (o1cpu.read_text("%s/temp%s_label" % (hw, m.group(1))) or "").strip() or "temp" + m.group(1)
-                sensors.setdefault(label, c)
+        sensors = _chip_temps(hw)
+        by_label = {}
+        for _n, label, c in sensors:
+            by_label.setdefault(label, c)
+
+        def add(key, label, c, limit):
+            out.append((key, label, c if c is not None and plausible(c) else None, limit))
         if name in CPU_CHIPS:
-            vals = [sensors[k] for k in CPU_LABELS if k in sensors]
+            vals = [by_label[k] for k in CPU_LABELS if k in by_label]
             if vals:
-                out.append(("cpu:" + d, "CPU", max(vals), LIMIT_CPU_C))
+                good = [c for c in vals if plausible(c)]
+                add("cpu:" + d, "CPU", max(good) if good else None, LIMIT_CPU_C)
         elif name == "amdgpu":
-            label = "junction" if "junction" in sensors else "edge" if "edge" in sensors else None
-            if label:
-                out.append(("gpu:" + d, "GPU junction" if label == "junction" else "GPU edge", sensors[label],
-                            LIMIT_GPU_C))
+            for label, show, limit in (("junction", "GPU junction", LIMIT_GPU_C), ("mem", "GPU memory", LIMIT_GPU_MEM_C),
+                                       ("edge", "GPU edge", LIMIT_GPU_EDGE_C)):
+                if label in by_label:
+                    add("gpu-%s:%s" % (label, d), show, by_label[label], limit)
         elif name == "nvme":
-            if "Composite" in sensors:
-                out.append(("nvme:" + d, "NVMe", sensors["Composite"], LIMIT_NVME_C))
+            if "Composite" in by_label:
+                add("nvme:" + d, "NVMe", by_label["Composite"], LIMIT_NVME_C)
+        elif name == "jc42":
+            for n, _label, c in sensors:
+                add("dimm%d:%s" % (n, d), "DIMM", c, LIMIT_DIMM_C)
+        else:
+            for n, label, c in sensors:
+                add("board%d:%s" % (n, d), "%s %s" % (name, label) if label.startswith("temp") else label,
+                    c, board_limit(label))
+    seen = {}
+    for i, row in enumerate(out):                            # two sensors with one name: told apart by number
+        seen.setdefault(row[1], []).append(i)
+    for label, idx in seen.items():
+        if len(idx) > 1:
+            for n, i in enumerate(idx, 1):
+                k, _l, c, limit = out[i]
+                out[i] = (k, "%s %d" % (label, n), c, limit)
     return out
+
+
+def summarize_temps(rows):
+    """From [{"label","c","limit"}]: the highest reading and the sensor closest to its limit."""
+    if not rows:
+        return None, None
+    hottest = max(rows, key=lambda r: r["c"])
+    closest = min(rows, key=lambda r: r["limit"] - r["c"])
+    return ({"label": hottest["label"], "c": hottest["c"]},
+            {"label": closest["label"], "c": closest["c"], "limit": closest["limit"],
+             "margin": round(closest["limit"] - closest["c"], 1)})
 
 
 # ---- the machine ------------------------------------------------------------------
@@ -355,7 +426,9 @@ class Fan:
     def overheated(self):
         """(hot?, the reasons): a sensor over its limit stays hot until HYST_C under it."""
         for key, label, c, limit in read_temps(self.sysroot):
-            if c >= limit:
+            if c is None:
+                self.hot.pop(key, None)              # disconnected or stuck: never a reason, and not a stuck one
+            elif c >= limit:
                 self.hot[key] = "%s %.0f C (limit %d)" % (label, c, limit)
             elif key in self.hot and c < limit - HYST_C:
                 del self.hot[key]
@@ -563,7 +636,7 @@ class Fan:
             row["min_pct"], row["note"] = self.notes(o)
         st = {"at": int(self.wall()), "phase": self.phase, "pct": self.pct, "why": self.why, "hold_left": self.left,
               "controlling": controlling_text(outs), "outputs": live["outputs"], "temps": live["temps"],
-              "hot": sorted(self.hot.values())}
+              "hottest": live["hottest"], "closest": live["closest"], "hot": sorted(self.hot.values())}
         st["line"] = status_line(st)
         try:
             os.makedirs(os.path.dirname(status_path()), exist_ok=True)
@@ -581,8 +654,10 @@ def snapshot(outs, io=None, sysroot=None):
     for o in outs:
         rows.append({"label": o.label, "chip": o.chip, "enable": _int(io.read(o.enable)),
                      "pwm": _int(io.read(o.pwm)), "rpm": rpm_of(o, io)})
-    temps = [{"label": label, "c": round(c, 1)} for _k, label, c, _l in read_temps(sysroot)]
-    return {"outputs": rows, "temps": temps}
+    temps = [{"label": label, "c": round(c, 1), "limit": limit}
+             for _k, label, c, limit in read_temps(sysroot) if c is not None]
+    hottest, closest = summarize_temps(temps)
+    return {"outputs": rows, "temps": temps, "hottest": hottest, "closest": closest}
 
 
 def _rpm_summary(rows):
@@ -604,6 +679,15 @@ def phase_text(st):
     return ph or "?"
 
 
+def temp_summary(st):
+    """"hottest GPU junction 61 C, closest to its limit: NVMe 58 of 70 C", from a status dict."""
+    hot, near = st.get("hottest"), st.get("closest")
+    if not hot or not near:
+        return ""
+    return "hottest %s %.0f C, closest to its limit: %s %.0f of %d C" % (hot["label"], hot["c"], near["label"],
+                                                                         near["c"], near["limit"])
+
+
 def status_line(st):
     """One line for the admin panel's CPU card and the top of `status`."""
     ph = st.get("phase")
@@ -617,7 +701,8 @@ def status_line(st):
     else:
         head = "Fans: 20% (idle)"
     rpm = _rpm_summary(st.get("outputs") or [])
-    return head + ("  -  " + ", ".join(rpm) if rpm else "")
+    t = temp_summary(st)
+    return head + ("  -  " + ", ".join(rpm) if rpm else "") + ("  -  " + t if t else "")
 
 
 def read_status(path=None, now=None):
@@ -634,7 +719,7 @@ def panel_line(path=None, now=None):
     """The one status line, or None (no service, nothing to say) for the admin panel."""
     st = read_status(path, now)
     line = st.get("line") if st else None
-    return line[:200] if isinstance(line, str) and line else None
+    return line[:300] if isinstance(line, str) and line else None
 
 
 def render_status(st, live):
@@ -662,7 +747,11 @@ def render_status(st, live):
     if not rows:
         out.append("  no fan outputs found (a motherboard chip needs: sudo modprobe nct6775)")
     if live["temps"]:
-        out.append("temps: " + ", ".join("%s %.0f C" % (t["label"], t["c"]) for t in live["temps"]))
+        hot, near = live["hottest"], live["closest"]
+        out.append("temps: highest %s %.0f C; closest to its limit: %s %.0f C of %d (%.0f %s)"
+                   % (hot["label"], hot["c"], near["label"], near["c"], near["limit"], abs(near["margin"]),
+                      "under" if near["margin"] >= 0 else "OVER"))
+        out.append("sensors: " + ", ".join("%s %.0f/%d" % (t["label"], t["c"], t["limit"]) for t in live["temps"]))
     else:
         out.append("temps: none read")
     if st is not None and st.get("hot"):

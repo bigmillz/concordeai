@@ -9,6 +9,28 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b387 — more temperature sources for the fan override (per Patrick)
+
+- The override (100% whatever the load, until 10 C under) now watches every
+  temperature input of the Super-IO chip by its `temp*_label`: 70 C for
+  system/board/AUXTIN and any label it does not know (unknown is monitored
+  at the default, never ignored), 85 C for CPUTIN/PECI/TSI/CPU labels, 90 C
+  for VRM/MOS (`\bMOS`, so CMOS stays 70), 80 C for CHIPSET/PCH; the DIMMs
+  (jc42) 70 C; the card's memory 95 C and edge 85 C beside the junction 90 C.
+  Two sensors with one name get a number ("DIMM 1", "DIMM 2").
+- A reading of 0 C or less (-128 is an unplugged input) or 120 C or more is a
+  disconnected or stuck sensor: `read_temps` gives it `None`, it is ignored,
+  and `overheated()` lets go of its key if it was hot. A sensor whose file
+  can't be read at all is left out of the list, so its state is kept (the
+  older "a sensor that stops answering keeps its state" rule).
+- `ollama1-fan status` shows `temps: highest X 60 C; closest to its limit: Y
+  38 C of 70 (32 under)` and a `sensors:` line of all of them with their
+  limits; the admin line ends with the same two facts.
+- Tests: `TestTempSources` (each source and label class at its limit, below
+  it, 9.9 and 10.1 under, implausible values 0, -0.5, -128, 120, 125, 255, 1000,
+  a sensor that sticks while hot, the summary) and 16 `fan:` mutants for the
+  new limits and the plausibility range.
+
 ## 6b386 — fan levels 100 / 50 / 20 instead of automatic after the hold (per Patrick)
 
 Patrick (2026-10-04) changed the 6b385 policy: idle (more than 2 minutes after

@@ -771,9 +771,24 @@ graphics card at 10% or more, a long job running (`stability-test.sh` and
 the like), or a 1-minute load average above 1.5. A download, an update or a
 backup is not heat and does not count.
 
-**Temperature override.** A CPU (k10temp, Tctl) at 80 C, the graphics card's
-junction at 90 C or an NVMe drive at 70 C forces 100% whatever the load
-says, until it is 10 C under its limit; then the normal rule follows.
+**Temperature override.** Any of these at its limit forces 100% whatever the
+load says, until it is 10 C under it; then the normal rule follows:
+
+| Sensor | Limit |
+|---|---|
+| CPU (k10temp, Tctl) | 80 C |
+| Graphics card: junction / memory / edge | 90 / 95 / 85 C |
+| NVMe drives (composite) | 70 C |
+| DIMMs (jc42) | 70 C |
+| Motherboard chip (nct6797) inputs, by `temp*_label`: board, system, AUXTIN and any label it does not know | 70 C |
+| CPUTIN, PECI, TSI | 85 C |
+| a label with VRM or MOS | 90 C |
+| a label with CHIPSET or PCH | 80 C |
+
+An unknown label is watched with the 70 C default, not ignored. A sensor that
+reads 0 C or less (an unplugged input reads -128), or 120 C or more, is
+disconnected or stuck: it is ignored, and let go if it was hot, so it can
+never hold the fans at 100%.
 
 **Never stall a fan or starve a pump.** What is plugged into each header is
 not known, so a low level is checked, never trusted:
@@ -823,8 +838,9 @@ daemon beside this one.
 
 **Status.** `ollama1-fan status` (no root) shows the level and the phase
 (`working`, `hold100 42s`, `hold50 30s`, `idle20`), which outputs it
-controls, each fan's setting, rpm and lowest level, and the temperatures.
-The admin panel's CPU card shows the same in one line. Logs:
+controls, each fan's setting, rpm and lowest level, the highest temperature
+and the sensor closest to its limit (and every sensor with its limit). The
+admin panel's CPU card shows the same in one line. Logs:
 `journalctl -u ollama1-fan` (phases and counts only).
 
 **The hand-pasted `ollama1-gpu-fan.service`** (full speed always) is replaced
