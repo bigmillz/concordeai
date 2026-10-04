@@ -9,7 +9,7 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
-## 6b400 — the RAID mirror is gone from the kit (per Patrick: "pointless, it just ties up resources checking and rebuilding")
+## 6b404 — the RAID mirror is gone from the kit (per Patrick: "pointless, it just ties up resources checking and rebuilding")
 
 Kit only (`ollama1/`). The mirror (two 8 TB disks, RAID1 at /srv/data) is no longer built,
 assembled, mounted or looked at, and a new server needs no md device. For a server that has one,
@@ -62,7 +62,7 @@ assembled, mounted or looked at, and a new server needs no md device. For a serv
   and `lsblk -lsnpo` output shapes are assumed from the existing setuplib code), not a migrate-os
   run with the new data folder.
 
-## 6b399 — hardware watchdog for a server that loses its system NVMe (per Patrick)
+## 6b403 — hardware watchdog for a server that loses its system NVMe (per Patrick)
 
 The failure: the system NVMe drops off the bus, the machine stays up from memory
 (it pings, every program on disk gives "Input/output error", SSH resets) and only
