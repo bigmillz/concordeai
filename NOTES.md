@@ -9,6 +9,41 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b366 — a server benchmark waits for a cold load, and a failed call says what happened
+
+- Found by reading code: `_BenchServer._open()` called `_srv_send(..., SRV_CONNECT_S=12, ...)`,
+  and that one number was also the socket's wait for the reply's headers. A model
+  that loads cold (gemma4:12b/26b, gpt-oss:20b) sends no header until it has
+  loaded, so the load request timed out at 12 s. `_srv_send` then called every
+  OSError "didn't answer. It may be off, asleep or offline" and every SSLError
+  "certificate didn't check out" (a dropped tunnel is an SSLEOFError, not a
+  certificate).
+- `_srv_send(..., timeout, wait=None)`: `timeout` is the connect, the handshake and
+  the send; `wait` is the first byte of the reply (default: the same, so every
+  other caller is unchanged). The connect is its own step, so a timeout while
+  waiting is told apart from one while connecting. The benchmark passes its
+  call's own limit (the load: `BENCH_LOAD_CAP`, 300 s; the run: `BENCH_RUN_CAP`+30;
+  `/api/ps`: 30), and the chat path (`server_stream`) passes its first-word wait
+  (`SRV_FIRST_S`, or the mode's short `server_first_deadline`), so a cold chat
+  load isn't cut at 12 s either.
+- What it says now: a connect that fails or times out, a refusal: "<name> didn't
+  answer. It may be off..." (kind offline, unchanged). A first byte that took too
+  long: `ServerSlow` "<name> took longer than N seconds to start answering."
+  (kind offline for the checks, `.slow` so the callers that look do not mark the
+  server down, as 6b357). A reset, a close before the status line or a TLS EOF:
+  "<name>'s connection dropped before it answered." Only
+  `ssl.SSLCertVerificationError` and a handshake that names the certificate give
+  kind `tls` ("certificate didn't check out"; `_srv_cert_failed`).
+- The cloud benchmark's call has the same split: "the provider didn't answer"
+  (not reached), "the provider took longer than 30 seconds to start answering",
+  "the connection dropped", and the certificate line only for a certificate.
+- Tests: `_svw_wire` (real sockets: late headers with and without `wait`, a closed
+  line, a reset, refused, a TLS handshake that dies, a self-signed certificate,
+  the SSL classifier) with 5 mutants; `_b41_cold_load` (a load whose header comes
+  after 1.6 s on a 0.5 s connect, a provider that drops) with 3 mutants. The
+  signature fakes in the gauntlet take `wait=None`.
+- Not verified: against the real server and a real cold gemma4/gpt-oss load.
+
 ## 6b365 — the stability test runs one load at a time by default (per Patrick)
 
 - `stability-test.sh` with no options ran "all" (cpu, memory and the card at

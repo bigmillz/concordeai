@@ -17791,7 +17791,7 @@ def _sv_fake(ns, script):
     every request is recorded with its body and headers."""
     sent = []
 
-    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0, wait=None):
         h = {}
         if e["access_id"] and e["access_secret"]:
             h["CF-Access-Client-Id"] = e["access_id"].reveal()
@@ -18850,6 +18850,210 @@ for _d34, _o34, _nw34 in _SV_MUT:
     _svm.append((_d34, [n for n, o, _x in _r34 if not o][:1] or "MISSED"))
 check("servers: %d mutations of the servers code, each caught by a check above" % len(_SV_MUT),
       all(isinstance(v, list) for _d, v in _svm), "%r" % [x for x in _svm if not isinstance(x[1], list)])
+
+_SVW_CERT = {}
+
+
+def _svw_cert():
+    """A self-signed certificate for 127.0.0.1 (the system's openssl), or None."""
+    if "p" not in _SVW_CERT:
+        d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+        k, c = os.path.join(d, "k.pem"), os.path.join(d, "c.pem")
+        try:
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", k,
+                            "-out", c, "-days", "2", "-subj", "/CN=127.0.0.1"],
+                           check=True, capture_output=True, timeout=60)
+            _SVW_CERT["p"] = (c, k)
+        except Exception:
+            _SVW_CERT["p"] = None
+    return _SVW_CERT["p"]
+
+
+def _svw_listener(handler, tls=None):
+    """A raw TCP listener on 127.0.0.1: handler(conn) per connection, on its
+    own thread. (port, stop)."""
+    import socket as _s
+    import ssl as _ssl
+    ls = _s.socket()
+    ls.setsockopt(_s.SOL_SOCKET, _s.SO_REUSEADDR, 1)
+    ls.bind(("127.0.0.1", 0))
+    ls.listen(8)
+    ls.settimeout(0.2)
+    stop = _t34.Event()
+
+    def one(c):
+        try:
+            if tls:
+                ctx_ = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+                ctx_.load_cert_chain(*tls)
+                c = ctx_.wrap_socket(c, server_side=True)
+            handler(c)
+        except Exception:
+            pass
+        finally:
+            try:
+                c.close()
+            except Exception:
+                pass
+
+    def loop():
+        while not stop.is_set():
+            try:
+                c, _a = ls.accept()
+            except _s.timeout:
+                continue
+            except OSError:
+                break
+            _t34.Thread(target=one, args=(c,), daemon=True).start()
+        ls.close()
+    _t34.Thread(target=loop, daemon=True).start()
+    return ls.getsockname()[1], stop.set
+
+
+def _svw_read_request(c):
+    buf = b""
+    c.settimeout(5)
+    while b"\r\n\r\n" not in buf:
+        d = c.recv(4096)
+        if not d:
+            break
+        buf += d
+    return buf
+
+
+def _svw_wire(src):
+    """What _srv_send says when a call fails, over real sockets (6b366): a
+    server that answers late is slow and not offline, a line that drops is
+    dropped, only a certificate that did not check out is a certificate,
+    and a first byte may be waited for longer than a connect is."""
+    import struct as _st
+    import socket as _s
+    ns, ctx, d = _sv_ns(src)
+    S, SE = ns["_Secret"], ns["ServerError"]
+    stops, out = [], {}
+
+    def ent(url):
+        return {"id": "0badc0de", "name": "Desktop", "url": url, "access_id": S(""),
+                "access_secret": S(""), "seed": S(""), "device_id": ""}
+
+    def call(url, **kw):
+        try:
+            conn, r = ns["_srv_send"](ent(url), "GET", "/v1/whoami", signed=False, **kw)
+            try:
+                return ("ok", r.status, r.read())
+            finally:
+                conn.close()
+        except SE as se:
+            return (se.kind, str(se), bool(getattr(se, "slow", False)))
+
+    def late(c):
+        _svw_read_request(c)
+        time.sleep(1.6)
+        c.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+
+    def hangup(c):
+        _svw_read_request(c)
+
+    def reset(c):
+        _svw_read_request(c)
+        c.setsockopt(_s.SOL_SOCKET, _s.SO_LINGER, _st.pack("ii", 1, 0))
+
+    try:
+        port, st = _svw_listener(late)
+        stops.append(st)
+        u = "http://127.0.0.1:%d" % port
+        out["slow"] = call(u, timeout=1)
+        out["slow, waited for"] = call(u, timeout=1, wait=6)
+        port, st = _svw_listener(hangup)
+        stops.append(st)
+        out["closed"] = call("http://127.0.0.1:%d" % port, timeout=3)
+        port, st = _svw_listener(reset)
+        stops.append(st)
+        out["reset"] = call("http://127.0.0.1:%d" % port, timeout=3)
+        fp = _sv_free_port()
+        out["refused"] = call("http://127.0.0.1:%d" % fp, timeout=3)
+        # a TLS line that dies in the handshake is not a certificate
+        port, st = _svw_listener(lambda c: None)
+        stops.append(st)
+        out["tls eof"] = call("https://127.0.0.1:%d" % port, timeout=3)
+        cert = _svw_cert()
+        if cert:
+            port, st = _svw_listener(late, tls=cert)
+            stops.append(st)
+            out["tls cert"] = call("https://127.0.0.1:%d" % port, timeout=3)
+        import ssl as _ssl
+        cf = ns["_srv_cert_failed"]
+        unit = (cf(_ssl.SSLCertVerificationError(1, "certificate verify failed: self-signed certificate"))
+                and not cf(_ssl.SSLEOFError(8, "EOF occurred in violation of protocol"))
+                and not cf(_ssl.SSLZeroReturnError(6, "closed"))
+                and not cf(_ssl.SSLError(1, "[SSL] handshake operation timed out"))
+                and cf(_ssl.SSLError(1, "[SSL: TLSV1_ALERT_UNKNOWN_CA] certificate unknown")))
+    finally:
+        for f in stops:
+            f()
+    sl = out["slow"]
+    P = {
+        "slow: offline kind, said as slow, not marked down": sl[0] == "offline" and sl[2] is True
+        and sl[1] == "Desktop took longer than 1 second to start answering.",
+        "a long wait for the first byte, a short connect": out["slow, waited for"][:2] == ("ok", 200),
+        "a closed line": out["closed"][0] == "offline" and out["closed"][2] is False
+        and out["closed"][1] == "Desktop’s connection dropped before it answered.",
+        "a reset": out["reset"][0] == "offline" and "connection dropped" in out["reset"][1],
+        "refused: didn't answer": out["refused"][0] == "offline" and out["refused"][2] is False
+        and out["refused"][1].startswith("Desktop didn’t answer. It may be off"),
+        "a handshake that dies is not a certificate": out["tls eof"][0] == "offline"
+        and "certificate" not in out["tls eof"][1],
+        "a certificate that doesn't check out": (not cert) or (
+            out["tls cert"][0] == "tls" and "certificate didn’t check out" in out["tls cert"][1]),
+        "which SSL errors are the certificate's": unit,
+        "span words": ns["_srv_span"](30) == "30 seconds" and ns["_srv_span"](300) == "5 minutes"
+        and ns["_srv_span"](1) == "1 second",
+        "the app's callers pass the long wait": src.count("SRV_CONNECT_S, skew, wait=") == 2
+        and "wait=_first)" in src}
+    bad = [k for k, v in P.items() if not v]
+    return not bad, {"failed": bad, "seen": out}
+
+
+_SVW_CHECKS = [("servers: a failed call says what happened: slow to begin, a line that dropped, offline, "
+                "and only a bad certificate as a certificate; a first byte can be waited for longer "
+                "than a connect (6b366)", _svw_wire)]
+
+
+def _svw_run(src):
+    out = []
+    for name, fn in _SVW_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n66, _o66, _d66 in _svw_run(_MILLENAI_SRC):
+    check(_n66, _o66, "%r" % (_d66,))
+_SVW_MUT = [
+    ("the first byte waited for no longer than a connect", "            conn.sock.settimeout(wait)     # now the reply's first byte",
+     "            conn.sock.settimeout(timeout)"),
+    ("a late answer read as offline", '    except (TimeoutError, _socket.timeout):\n        conn.close()\n        raise ServerSlow("offline",',
+     '    except (TimeoutError, _socket.timeout):\n        conn.close()\n        raise ServerError("offline",'),
+    ("every SSL error a certificate", "    t = str(exc).lower()\n    return \"certificate\" in t and \"timed out\" not in t",
+     "    return True"),
+    ("a reset read as not answering", "    except (ConnectionError, _hc.HTTPException):\n        # a reset, an aborted line, a close before the status line\n        conn.close()\n        raise ServerError(\"offline\", dropped_text())",
+     "    except (ConnectionError, _hc.HTTPException):\n        conn.close()\n        raise ServerError(\"offline\", off_text())"),
+    ("a bad certificate not said", "            raise ServerError(\"tls\", tls_text()) from None\n        if isinstance(exc, (_ssl.SSLEOFError",
+     "            raise ServerError(\"offline\", off_text()) from None\n        if isinstance(exc, (_ssl.SSLEOFError"),
+]
+_svwm = []
+for _d66, _o66, _nw66 in _SVW_MUT:
+    if _MILLENAI_SRC.count(_o66) != 1:
+        _svwm.append((_d66, "anchor missing"))
+        continue
+    _r66 = _svw_run(_MILLENAI_SRC.replace(_o66, _nw66, 1))
+    _svwm.append((_d66, [n for n, o, _x in _r66 if not o][:1] or "MISSED"))
+check("servers: %d mutations of how a failed call is told, each caught" % len(_SVW_MUT),
+      all(isinstance(v, list) for _d, v in _svwm), "%r" % [x for x in _svwm if not isinstance(x[1], list)])
+
 
 # ---- <server> Only (6b337)
 print("== <server> Only (6b337) ==")
@@ -25039,7 +25243,7 @@ def _m42c_server(src):
         sent = []
         orig = ns["_srv_send"]
 
-        def w(e_, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+        def w(e_, method, path, body=b"", signed=True, timeout=12, skew=0.0, wait=None):
             sent.append((method, path, body, signed, timeout))
             return orig(e_, method, path, body, signed, timeout, skew)
         ns["_srv_send"] = w
@@ -25720,7 +25924,7 @@ _W46_MAC2 = "02:00:5e:10:00:02"
 def _w46_router(ns, routes, log):
     """The stand-in transport: path -> responses (the last one repeats); a
     callable is called (it may raise ServerError)."""
-    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0, wait=None):
         log.append((method, path, body, signed, timeout))
         q = routes.get(path)
         r = (q.pop(0) if len(q) > 1 else q[0]) if q else _SvResp(404, {"error": "no", "code": "not_found"})
@@ -26216,7 +26420,7 @@ def _g56_job(ns, kind="image", states=None, result=None, rtype="image/png", post
                                                                     "type": rtype, "bytes": 90}])
     seq = {"get": list(states)}
 
-    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0, wait=None):
         log.append((method, path, body, signed))
         if method == "POST" and path == "/v1/generate/jobs":
             r = post or _SvResp(202, {"id": _G56_ID})
@@ -26521,7 +26725,7 @@ def _g56c_job(src):
     log2 = _g56_job(ns)
     inner = ns["_srv_send"]
     n = [0]
-    def send2(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+    def send2(e, method, path, body=b"", signed=True, timeout=12, skew=0.0, wait=None):
         if path.endswith("/result") and n[0] == 0:
             n[0] += 1
             return _SvConn(), _SvResp(401, {"error": "skew", "code": "clock_skew", "server_time": int(time.time())})
@@ -26986,6 +27190,7 @@ class _B41Ollama:
                        {"name": "mid:14b", "placement": "gpu", "size": 9 << 30}]
         self.loaded, self.tokens, self.delay = [], 40, 0.0
         self.hang_load = False          # the empty load answers nothing, for ever
+        self.load_delay = 0.0           # the empty load sends no header for this long (a cold model)
         self.final = {"load_duration": 1_500_000_000, "prompt_eval_count": 1000,
                       "prompt_eval_duration": 250_000_000}
         self.fail = {}                  # (path, model) -> (status, body)
@@ -27015,6 +27220,8 @@ class _B41Ollama:
             if self.hang_load:
                 srv.gate.wait(30)
                 return
+            if self.load_delay:
+                time.sleep(self.load_delay)
             if model not in self.loaded:
                 self.loaded.append(model)
             line = dict({"model": model, "done": True, "done_reason": "load", "response": ""},
@@ -27064,6 +27271,7 @@ class _B41Cloud:
         self.tokens, self.delay, self.usage = 40, 0.0, True
         self.status = {}                # path suffix -> (status, body)
         self.hang = False               # no headers, for ever
+        self.drop = False               # the connection closes with no answer
         self.empty = None               # a finish reason with no text
         self.hidden = 0                 # reasoning tokens the usage counts but the stream hid
         self.s = _B41Server(self._h)
@@ -27072,6 +27280,9 @@ class _B41Cloud:
     def _h(self, srv, h, method, path, body):
         if self.hang:
             srv.gate.wait(30)
+            return
+        if self.drop:
+            h.close_connection = True
             return
         for suf, (st, ob) in self.status.items():
             if path.endswith(suf):
@@ -27360,6 +27571,39 @@ def _b41_server_fail(src):
             "nothing on this computer": not W.local_calls,
             "nothing in the cloud": not W.cloud.log}
         return _b41_done(P, out)
+    finally:
+        W.stop()
+
+
+def _b41_cold_load(src):
+    """A model that takes longer than the connect time to load (gemma4:12b,
+    gpt-oss:20b on a cold server) sends no header until it has loaded: the
+    benchmark waits for it (up to BENCH_LOAD_CAP) and the row is done with the
+    server's own load time; a provider that drops the line is told as a
+    dropped line, and a server's slow start is not read as being offline."""
+    W = _b41_world(src)
+    try:
+        ns, o, c = W.ns, W.ollama, W.cloud
+        ns["SRV_CONNECT_S"] = 0.5
+        o.load_delay = 1.6
+        o.loaded = []
+        ok0, run, fin = W.run(W.spec(("small:8b",)))
+        r0 = W.rows()[0]
+        # and the same load, but the server won't answer within the cap
+        o.load_delay = 0.0
+        ns["SRV_CONNECT_S"] = 12
+        c.drop = True
+        ok1, _r1, fin1 = W.run(W.cloud_spec(W.plan((("groq", "openai/gpt-oss-120b"),))))
+        r1 = W.rows()[0]
+        P = {"a load longer than the connect time finished": ok0 and fin and r0["status"] == "done"
+             and r0["load_s"] == 1.5 and r0["gen_tps"] == 50.0,
+             "no 'didn't answer' on the row": "didn’t answer" not in str(r0.get("note")),
+             "the load request waits as long as the load cap": "SRV_CONNECT_S, skew, wait=wait)" in src
+             and "self._open(method, path, obj, read_s)" in src,
+             "a provider that drops the line is said so": ok1 and fin1 and r1["status"] == "failed"
+             and r1["note"] == "Failed: the connection dropped.",
+             "nothing on this computer": not W.local_calls}
+        return _b41_done(P, [r0, r1])
     finally:
         W.stop()
 
@@ -28192,6 +28436,8 @@ _B41_CHECKS += [
      "lists and Run's rules", _b41_node),
     ("benchmark: pinned where it meets the app: the same test, nothing written to the app's provider state or the ledger, "
      "the routes, the hold, the profile's file, the dialog before every cloud run", _b41_pins),
+    ("benchmark servers: a model that loads for longer than the connect time is waited for, and a dropped "
+     "line is said as dropped (6b366)", _b41_cold_load),
 ]
 
 # EACH PROTECTION, MUTATED: every one of these, planted in the source,
@@ -28257,8 +28503,8 @@ _B41_MUT = [
     ("a server's first token not flagged", "    def fix(self, nums: dict):\n        nums[\"network\"] = True", "    def fix(self, nums: dict):\n        nums[\"network\"] = False", [0]),
     ("a cloud row not flagged", "        nums.update(network=True, prompt_tps=None, load_s=None, load_src=None,",
      "        nums.update(network=False, prompt_tps=None, load_s=None, load_src=None,", [5]),
-    ("the server's calls unsigned", "                conn, resp = _srv_send(e, method, path, body, True,\n                                       SRV_CONNECT_S, skew)",
-     "                conn, resp = _srv_send(e, method, path, body, False,\n                                       SRV_CONNECT_S, skew)", [0]),
+    ("the server's calls unsigned", "                conn, resp = _srv_send(e, method, path, body, True,\n                                       SRV_CONNECT_S, skew, wait=wait)",
+     "                conn, resp = _srv_send(e, method, path, body, False,\n                                       SRV_CONNECT_S, skew, wait=wait)", [0]),
     ("a cloud call at the provider's own ceiling", "            body = _openai_body(c, msgs, BENCH_MAX_TOKENS, stream=True)",
      "            body = _openai_body(c, msgs, CLOUD_MAX_OUT.get(self.pid, 4096), stream=True)", [5]),
     ("a cloud call to Claude at 16,000 tokens", "            body = _anthropic_body(c, _anthropic_turns(msgs), \"\",\n                                   BENCH_MAX_TOKENS, stream=True)",
@@ -28295,6 +28541,11 @@ _B41_MUT = [
      "                     for row in r.get(\"models\") or []]", [12]),
     ("a damaged row breaks Compare", "if(!r||r.status!==\"done\")return;", "if(r.status!==\"done\")return;", [13]),
     ("a missing time shown as NaN", "function bmWhen(t){return t!=null&&isFinite(+t)?uWhen(t):\"\";}", "function bmWhen(t){return uWhen(t);}", [13]),
+    ("the load waits only as long as a connect", "                                       SRV_CONNECT_S, skew, wait=wait)\n                if resp.status == 200:\n                    return conn, resp",
+     "                                       SRV_CONNECT_S, skew)\n                if resp.status == 200:\n                    return conn, resp", [15]),
+    ("the load's own cap not passed on", "self._open(method, path, obj, read_s)", "self._open(method, path, obj)", [15]),
+    ("a provider's dropped line read as no answer", "            except (ConnectionError, http.client.HTTPException):\n                conn.close()\n                raise RuntimeError(\"the connection dropped\") from None",
+     "            except (ConnectionError, http.client.HTTPException):\n                conn.close()\n                raise RuntimeError(\"the provider didn\u2019t answer\") from None", [15]),
 ]
 
 

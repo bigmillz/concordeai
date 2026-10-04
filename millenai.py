@@ -17248,12 +17248,42 @@ def _srv_note_skew(e, js: dict) -> float:
     return _srv_skew(e)
 
 
+def _srv_span(seconds) -> str:
+    """"30 seconds", "5 minutes": a wait as words."""
+    n = int(round(float(seconds)))
+    if n >= 120:
+        return "%d minutes" % (n // 60)
+    return "1 second" if n == 1 else "%d seconds" % n
+
+
+def _srv_cert_failed(exc) -> bool:
+    """An SSL error that is about the certificate: a failed check of it, or a
+    handshake the certificate stopped. A dropped line (an EOF, a reset in the
+    handshake) and a timeout are not."""
+    import ssl as _ssl
+    if isinstance(exc, _ssl.SSLCertVerificationError):
+        return True
+    if isinstance(exc, (_ssl.SSLEOFError, _ssl.SSLZeroReturnError, TimeoutError)):
+        return False
+    t = str(exc).lower()
+    return "certificate" in t and "timed out" not in t
+
+
 def _srv_send(e, method: str, path: str, body: bytes = b"", signed=True,
-              timeout: float = SRV_CONNECT_S, skew: float = 0.0):
+              timeout: float = SRV_CONNECT_S, skew: float = 0.0, wait=None):
     """One request to server e: (connection, response). The response is
     open; the caller reads it and closes the connection. A new connection
-    each time: the gateway closes one after every error."""
+    each time: the gateway closes one after every error.
+    timeout is for connecting (and the handshake) and for sending; wait is
+    how long the reply's first byte may take (None: the same as timeout). A
+    model that is loading answers late: a caller that expects that passes a
+    longer wait and keeps the connect short (6b366). Why it failed is said
+    as it was: a server that never answered (offline), one that took too
+    long to begin (ServerSlow, left unmarked by the callers that look), a
+    line that dropped (offline, "dropped"), and only a certificate that did
+    not check out as a certificate (tls)."""
     import http.client as _hc
+    import socket as _socket
     import ssl as _ssl
     h = {"User-Agent": "ConcordeAI/%s" % APP_VERSION,
          "Accept": "application/json, application/x-ndjson"}
@@ -17267,8 +17297,35 @@ def _srv_send(e, method: str, path: str, body: bytes = b"", signed=True,
         h.update(o1_headers(o1_unb64u(e["seed"].reveal()), e["device_id"],
                             method, path, body, int(time.time() + skew),
                             o1_nonce()))
+    wait = timeout if wait is None else max(wait, timeout)
     conn = _srv_conn(e, timeout)
+    name = e["name"]
+
+    def tls_text():
+        return ("%s\u2019s certificate didn\u2019t check out, so nothing more "
+                "was sent." % name)
+
+    def off_text():
+        return ("%s didn\u2019t answer. It may be off, asleep or offline. "
+                "Nothing was sent anywhere else." % name)
+
+    def dropped_text():
+        return "%s\u2019s connection dropped before it answered." % name
     try:
+        conn.connect()                     # the connection and the handshake: the short clock
+    except _ssl.SSLError as exc:
+        conn.close()
+        if _srv_cert_failed(exc):
+            raise ServerError("tls", tls_text()) from None
+        if isinstance(exc, (_ssl.SSLEOFError, _ssl.SSLZeroReturnError)):
+            raise ServerError("offline", dropped_text()) from None
+        raise ServerError("offline", off_text()) from None
+    except (OSError, _hc.HTTPException):
+        conn.close()
+        raise ServerError("offline", off_text()) from None
+    try:
+        if conn.sock is not None:
+            conn.sock.settimeout(wait)     # now the reply's first byte
         conn.request(method, path, body=body if method == "POST" else None,
                      headers=h)
         # the socket itself: http.client hands it to an HTTP/1.0 or
@@ -17276,15 +17333,22 @@ def _srv_send(e, method: str, path: str, body: bytes = b"", signed=True,
         # stream's deadlines are set on it (review of 6b334)
         conn.o1_sock = conn.sock
         return conn, conn.getresponse()
-    except _ssl.SSLError:
+    except (TimeoutError, _socket.timeout):
         conn.close()
-        raise ServerError("tls", "%s\u2019s certificate didn\u2019t check "
-                          "out, so nothing more was sent." % e["name"]) from None
-    except (OSError, _hc.HTTPException):
+        raise ServerSlow("offline", "%s took longer than %s to start "
+                         "answering." % (name, _srv_span(wait))) from None
+    except _ssl.SSLError as exc:
         conn.close()
-        raise ServerError("offline", "%s didn\u2019t answer. It may be off, "
-                          "asleep or offline. Nothing was sent anywhere "
-                          "else." % e["name"]) from None
+        if _srv_cert_failed(exc):
+            raise ServerError("tls", tls_text()) from None
+        raise ServerError("offline", dropped_text()) from None
+    except (ConnectionError, _hc.HTTPException):
+        # a reset, an aborted line, a close before the status line
+        conn.close()
+        raise ServerError("offline", dropped_text()) from None
+    except OSError:
+        conn.close()
+        raise ServerError("offline", off_text()) from None
 
 
 def _srv_js(raw: bytes) -> dict:
@@ -17403,11 +17467,16 @@ def server_stream(label: str, messages: list, emit) -> dict:
                        "stream": True, "options": {"temperature": 0.75}},
                       separators=(",", ":")).encode("utf-8")
     t0, sent, last, got_any = time.time(), [0], {}, [False]
+    # an explicit pick and "<name> Only" wait as long as a model load takes
+    # (minutes); a mode's server seat or a funnel asks for a short first-token
+    # deadline (server_first_deadline), so a server that is slow to start is
+    # left for this Mac's copy. The same wait covers the reply's headers (6b366)
+    _first = getattr(_srv_first, "s", None) or SRV_FIRST_S
     try:
         skew = _srv_skew(e)
         for attempt in (0, 1):
             conn, resp = _srv_send(e, "POST", "/api/chat", body, True,
-                                   SRV_CONNECT_S, skew)
+                                   SRV_CONNECT_S, skew, wait=_first)
             if resp.status == 200:
                 break
             try:
@@ -17427,11 +17496,6 @@ def server_stream(label: str, messages: list, emit) -> dict:
             # without a byte (review of 6b334: a trickle can't hold the
             # answer open for ever)
             _sk = getattr(conn, "o1_sock", None) or conn.sock
-            # an explicit pick and "<name> Only" wait as long as a model
-            # load takes (minutes); a mode's server seat or a funnel asks
-            # for a short first-token deadline (server_first_deadline), so
-            # a server that is slow to start is left for this Mac's copy
-            _first = getattr(_srv_first, "s", None) or SRV_FIRST_S
             if _sk is not None:
                 _sk.settimeout(_first)
             while True:
@@ -21099,7 +21163,7 @@ class _BenchServer:
         return [self.e[k].reveal() for k in ("access_id", "access_secret", "seed")
                 if self.e.get(k)]
 
-    def _open(self, method, path, obj):
+    def _open(self, method, path, obj, wait=None):
         e, model = self.e, self.model
         body = b"" if obj is None else json.dumps(
             obj, separators=(",", ":")).encode("utf-8")
@@ -21107,8 +21171,11 @@ class _BenchServer:
         def open_():
             skew = _srv_skew(e)
             for attempt in (0, 1):
+                # a short connect, but the first byte may take as long as the
+                # call's own limit: a model that loads (gemma4:12b, gpt-oss:20b)
+                # sends its headers when it has loaded (6b366)
                 conn, resp = _srv_send(e, method, path, body, True,
-                                       SRV_CONNECT_S, skew)
+                                       SRV_CONNECT_S, skew, wait=wait)
                 if resp.status == 200:
                     return conn, resp
                 try:
@@ -21127,7 +21194,7 @@ class _BenchServer:
 
     def _lines(self, method, path, obj, read_s):
         try:
-            yield from _bench_remote_lines(self._open(method, path, obj), read_s)
+            yield from _bench_remote_lines(self._open(method, path, obj, read_s), read_s)
         except (TimeoutError, socket.timeout):
             raise ServerError("offline", "%s sent nothing for %d seconds, so the "
                               "run stopped there." % (self.e["name"], read_s)) from None
@@ -21313,16 +21380,37 @@ class _BenchCloud:
                 if u.scheme == "https" else
                 http.client.HTTPConnection(u.hostname, u.port or 80, timeout=30))
             try:
+                conn.connect()           # not reaching it is "didn't answer", a line that drops later is not
+            except _ssl.SSLError as exc:
+                conn.close()
+                if _srv_cert_failed(exc):
+                    raise RuntimeError("its certificate didn\u2019t check out") from None
+                if isinstance(exc, (_ssl.SSLEOFError, _ssl.SSLZeroReturnError)):
+                    raise RuntimeError("the connection dropped") from None
+                raise RuntimeError("the provider didn\u2019t answer") from None
+            except (OSError, http.client.HTTPException):
+                conn.close()
+                raise RuntimeError("the provider didn\u2019t answer") from None
+            try:
                 conn.request("POST", u.path + ("?" + u.query if u.query else ""),
                              body=payload, headers=hdr)
                 # the socket itself: a close-delimited answer (HTTP/1.0, no
                 # length) takes it from the connection (see _bench_cut)
                 conn.o1_sock = conn.sock
                 resp = conn.getresponse()
-            except _ssl.SSLError:
+            except (TimeoutError, socket.timeout):
                 conn.close()
-                raise RuntimeError("its certificate didn\u2019t check out") from None
-            except (OSError, http.client.HTTPException):
+                raise RuntimeError("the provider took longer than %s to start "
+                                   "answering" % _srv_span(30)) from None
+            except _ssl.SSLError as exc:
+                conn.close()
+                if _srv_cert_failed(exc):
+                    raise RuntimeError("its certificate didn\u2019t check out") from None
+                raise RuntimeError("the connection dropped") from None
+            except (ConnectionError, http.client.HTTPException):
+                conn.close()
+                raise RuntimeError("the connection dropped") from None
+            except OSError:
                 conn.close()
                 raise RuntimeError("the provider didn\u2019t answer") from None
             if resp.status != 200:
