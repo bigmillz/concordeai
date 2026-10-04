@@ -56,8 +56,12 @@ Fail-safe:
     what is in force;
   * the service tells systemd it is alive on every poll (sd_notify,
     WatchdogSec=10): a loop that hangs is restarted, and restored;
-  * a temperature over its limit (CPU 80 C, graphics card junction 90 C, NVMe
-    70 C) forces 100% regardless of load, until it is 10 C under the limit;
+  * a temperature at its limit forces 100% regardless of load, until it is 10 C
+    under it: CPU 80 C; graphics card junction 90, memory 95, edge 85; NVMe 70;
+    DIMMs (jc42) 70; every input of the motherboard's chip (by its label): 70,
+    CPUTIN/PECI/TSI 85, VRM/MOS 90, chipset/PCH 80, any label it doesn't know
+    70. A sensor that reads 0 or less (-128 is an unplugged input), or 120 or
+    more, is disconnected or stuck: ignored, and let go if it was hot;
   * after a wake amdgpu may have reset its fan to automatic: every tick checks
     the outputs it holds and writes them again at the current level.
 
@@ -68,6 +72,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -75,6 +80,7 @@ import sys
 import threading
 import time
 
+import o1aio
 import o1common
 import o1cpu
 import o1work
@@ -91,6 +97,14 @@ HYST_C = 10                      # a temperature override ends this far under it
 STATUS_STALE_S = 15              # a status file older than this: the service isn't running
 TOOLS_EVERY_S = 6                # /proc is walked at most this often (lib/o1work.py)
 LIMIT_CPU_C, LIMIT_GPU_C, LIMIT_NVME_C = 80, 90, 70
+LIMIT_GPU_EDGE_C, LIMIT_GPU_MEM_C = 85, 95
+LIMIT_BOARD_C = 70               # a motherboard chip input: system, auxiliary and any label it does not know
+LIMIT_CPUTIN_C = 85              # CPUTIN, PECI and TSI: the chip's own view of the CPU
+LIMIT_VRM_C = 90                 # a label with VRM or MOS in it
+LIMIT_CHIPSET_C = 80             # a label with CHIPSET or PCH in it
+LIMIT_DIMM_C = 70                # jc42: the memory modules
+TEMP_LOW_C, TEMP_HIGH_C = 0, 120  # at or under, or at or over, these a sensor is disconnected or stuck: ignored
+CALL_JOIN_S = 6                  # the cooler's thread is given this long to finish a call at a stop
 OLD_UNIT = "ollama1-gpu-fan.service"          # the hand-made full-speed-always experiment
 MODULES_CONF = "/etc/modules-load.d/ollama1-fan.conf"
 SUPER_IO_RX = re.compile(r"^(nct67\d\d|it8\d\d\d[a-z]?|f718\d\d[a-z]*|w836\d\d[a-z]*)$")   # the motherboard's fan chips
@@ -219,9 +233,42 @@ def min_rpm_of(o, io):
 
 # ---- temperatures -----------------------------------------------------------------
 
+def plausible(c):
+    """A temperature a working sensor can show. 0 or less, 120 or more, and the -128 an unplugged
+    input reads, are a disconnected or stuck sensor: ignored, never a reason for 100%."""
+    return TEMP_LOW_C < c < TEMP_HIGH_C
+
+
+def board_limit(label):
+    """The limit for a motherboard chip input, from its label."""
+    up = (label or "").upper()
+    if re.search(r"VRM|\bMOS", up):
+        return LIMIT_VRM_C
+    if "CHIPSET" in up or "PCH" in up:
+        return LIMIT_CHIPSET_C
+    if up.startswith(("CPU", "PECI")) or "TSI" in up:
+        return LIMIT_CPUTIN_C
+    return LIMIT_BOARD_C
+
+
+def _chip_temps(hw):
+    """[(number, label, celsius)] of a hwmon chip's temp*_input files, raw (unplausible ones too).
+    A file that can't be read is left out: no reading is not a reading."""
+    out = []
+    for f in sorted(glob.glob(glob.escape(hw) + "/temp*_input")):
+        m = re.fullmatch(r".*/temp(\d+)_input", f)
+        c = o1cpu.number(o1cpu.read_text(f), -1000.0, 1000.0, scale=1000.0)
+        if m and c is not None:
+            label = (o1cpu.read_text("%s/temp%s_label" % (hw, m.group(1))) or "").strip() or "temp" + m.group(1)
+            out.append((int(m.group(1)), label, c))
+    return out
+
+
 def read_temps(sysroot=None):
-    """[(key, label, celsius, limit)] for the CPU, the graphics card's junction and
-    each NVMe drive: the sensors that can force the fans to 100%."""
+    """[(key, label, celsius or None, limit)]: every sensor that can force the fans to 100%:
+    the CPU, the graphics card's junction, memory and edge, each NVMe drive, the DIMMs (jc42) and every
+    input of the motherboard's chip. celsius is None for a disconnected or stuck sensor (see
+    plausible()). Labels the kit doesn't know are watched with the board limit, not ignored."""
     base = (sysroot or _sys()) + "/class/hwmon"
     out = []
     try:
@@ -231,28 +278,55 @@ def read_temps(sysroot=None):
     for d in dirs:
         hw = base + "/" + d
         name = (o1cpu.read_text(hw + "/name") or "").strip()
-        if name not in CPU_CHIPS and name not in ("amdgpu", "nvme"):
+        if not (name in CPU_CHIPS or name in ("amdgpu", "nvme", "jc42") or SUPER_IO_RX.match(name)):
             continue
-        sensors = {}
-        for f in sorted(glob.glob(glob.escape(hw) + "/temp*_input")):
-            m = re.fullmatch(r".*/temp(\d+)_input", f)
-            c = o1cpu.number(o1cpu.read_text(f), *o1cpu.TEMP_RANGE, scale=1000.0)
-            if m and c is not None:
-                label = (o1cpu.read_text("%s/temp%s_label" % (hw, m.group(1))) or "").strip() or "temp" + m.group(1)
-                sensors.setdefault(label, c)
+        sensors = _chip_temps(hw)
+        by_label = {}
+        for _n, label, c in sensors:
+            by_label.setdefault(label, c)
+
+        def add(key, label, c, limit):
+            out.append((key, label, c if c is not None and plausible(c) else None, limit))
         if name in CPU_CHIPS:
-            vals = [sensors[k] for k in CPU_LABELS if k in sensors]
+            vals = [by_label[k] for k in CPU_LABELS if k in by_label]
             if vals:
-                out.append(("cpu:" + d, "CPU", max(vals), LIMIT_CPU_C))
+                good = [c for c in vals if plausible(c)]
+                add("cpu:" + d, "CPU", max(good) if good else None, LIMIT_CPU_C)
         elif name == "amdgpu":
-            label = "junction" if "junction" in sensors else "edge" if "edge" in sensors else None
-            if label:
-                out.append(("gpu:" + d, "GPU junction" if label == "junction" else "GPU edge", sensors[label],
-                            LIMIT_GPU_C))
+            for label, show, limit in (("junction", "GPU junction", LIMIT_GPU_C), ("mem", "GPU memory", LIMIT_GPU_MEM_C),
+                                       ("edge", "GPU edge", LIMIT_GPU_EDGE_C)):
+                if label in by_label:
+                    add("gpu-%s:%s" % (label, d), show, by_label[label], limit)
         elif name == "nvme":
-            if "Composite" in sensors:
-                out.append(("nvme:" + d, "NVMe", sensors["Composite"], LIMIT_NVME_C))
+            if "Composite" in by_label:
+                add("nvme:" + d, "NVMe", by_label["Composite"], LIMIT_NVME_C)
+        elif name == "jc42":
+            for n, _label, c in sensors:
+                add("dimm%d:%s" % (n, d), "DIMM", c, LIMIT_DIMM_C)
+        else:
+            for n, label, c in sensors:
+                add("board%d:%s" % (n, d), "%s %s" % (name, label) if label.startswith("temp") else label,
+                    c, board_limit(label))
+    seen = {}
+    for i, row in enumerate(out):                            # two sensors with one name: told apart by number
+        seen.setdefault(row[1], []).append(i)
+    for label, idx in seen.items():
+        if len(idx) > 1:
+            for n, i in enumerate(idx, 1):
+                k, _l, c, limit = out[i]
+                out[i] = (k, "%s %d" % (label, n), c, limit)
     return out
+
+
+def summarize_temps(rows):
+    """From [{"label","c","limit"}]: the highest reading and the sensor closest to its limit."""
+    if not rows:
+        return None, None
+    hottest = max(rows, key=lambda r: r["c"])
+    closest = min(rows, key=lambda r: r["limit"] - r["c"])
+    return ({"label": hottest["label"], "c": hottest["c"]},
+            {"label": closest["label"], "c": closest["c"], "limit": closest["limit"],
+             "margin": round(closest["limit"] - closest["c"], 1)})
 
 
 # ---- the machine ------------------------------------------------------------------
@@ -263,8 +337,10 @@ class Fan:
     monotonic (the levels must not jump); `wall` stamps the status file."""
 
     def __init__(self, probes, clock=time.monotonic, wall=time.time, log=print, io=None, sysroot=None,
-                 boot_id=read_boot_id, tools_every=TOOLS_EVERY_S):
+                 boot_id=read_boot_id, tools_every=TOOLS_EVERY_S, aio=None, aio_inline=False):
         self.p, self.clock, self.wall, self.log = probes, clock, wall, log
+        self.aio, self.aio_inline = aio, aio_inline      # the liquid cooler, if any (lib/o1aio.py)
+        self.plock = threading.Lock()
         self.io = io or SysfsIO()
         self.sysroot = sysroot
         self.boot_id = boot_id
@@ -282,6 +358,8 @@ class Fan:
         self.seen = None               # what it last said it controls
         self.work = o1work.Work(probes, clock, tools_every)
         self._load_state()
+        if self.aio:
+            self.aio.attach(self.learned, self._persist, self.log)
 
     # -- the saved originals and what was learned ------------------------------------
     def _load_state(self):
@@ -309,15 +387,16 @@ class Fan:
         self._persist()                                # another boot's originals go: the hardware is as it was
 
     def _persist(self):
-        if not self.orig and not self.learned:
-            try:
-                os.unlink(state_path())
-            except OSError:
-                pass
-            return
-        os.makedirs(os.path.dirname(state_path()), exist_ok=True)
-        write_json_atomic(state_path(), {"v": 2, "boot": self.boot_id(), "orig": self.orig, "learned": self.learned},
-                          mode=0o600)
+        with self.plock:                                   # the cooler's thread saves what it learns too
+            if not self.orig and not self.learned:
+                try:
+                    os.unlink(state_path())
+                except OSError:
+                    pass
+                return
+            os.makedirs(os.path.dirname(state_path()), exist_ok=True)
+            write_json_atomic(state_path(), {"v": 2, "boot": self.boot_id(), "orig": self.orig,
+                                             "learned": self.learned}, mode=0o600)
 
     # -- what counts as working -----------------------------------------------------
     def working(self, now=None):
@@ -327,7 +406,9 @@ class Fan:
     def overheated(self):
         """(hot?, the reasons): a sensor over its limit stays hot until HYST_C under it."""
         for key, label, c, limit in read_temps(self.sysroot):
-            if c >= limit:
+            if c is None:
+                self.hot.pop(key, None)              # disconnected or stuck: never a reason, and not a stuck one
+            elif c >= limit:
                 self.hot[key] = "%s %.0f C (limit %d)" % (label, c, limit)
             elif key in self.hot and c < limit - HYST_C:
                 del self.hot[key]
@@ -497,7 +578,7 @@ class Fan:
             phase, pct, why = "hot", FULL_PCT, "too warm: " + "; ".join(hwhy)
         elif working:
             phase, pct, why = "working", FULL_PCT, "; ".join(wwhy)
-        elif any(o.lkey not in self.learned for o in usable):
+        elif any(o.lkey not in self.learned for o in usable) or (self.aio and self.aio.needs_calibration()):
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
         elif age is not None and age < HOLD100_S:
             phase, pct, why, left = "hold100", FULL_PCT, "the work ended", int(HOLD100_S - age + 0.999)
@@ -507,6 +588,10 @@ class Fan:
             phase, pct, why = "idle20", LOW_PCT, "idle"
         self.apply(outs, pct, now)
         self.sample(usable, now)
+        if self.aio:
+            self.aio.set_phase(phase, pct)
+            if self.aio_inline:
+                self.aio.step(now)
         if phase != self.phase or (phase in ("working", "hot") and why != self.why):
             self.log("%s: %s" % (phase, why))
         self.phase, self.pct, self.why, self.left = phase, pct, why, left
@@ -514,9 +599,16 @@ class Fan:
         return phase, why
 
     def shutdown(self):
-        """A stop: everything held goes back as it was."""
+        """A stop: everything held goes back as it was, and the cooler is left on its safe curve."""
         if self.engaged:
             self.release()
+        if self.aio and self.aio.active():
+            self.aio.safe_exit()
+
+    def wake(self):
+        """After a suspend: the cooler may have lost what it was told; send it all again."""
+        if self.aio:
+            self.aio.reset()
 
     # -- status ------------------------------------------------------------------------
     def notes(self, o):
@@ -535,7 +627,8 @@ class Fan:
             row["min_pct"], row["note"] = self.notes(o)
         st = {"at": int(self.wall()), "phase": self.phase, "pct": self.pct, "why": self.why, "hold_left": self.left,
               "controlling": controlling_text(outs), "outputs": live["outputs"], "temps": live["temps"],
-              "hot": sorted(self.hot.values())}
+              "aio": self.aio.snapshot() if self.aio else None,
+              "hottest": live["hottest"], "closest": live["closest"], "hot": sorted(self.hot.values())}
         st["line"] = status_line(st)
         try:
             os.makedirs(os.path.dirname(status_path()), exist_ok=True)
@@ -553,8 +646,10 @@ def snapshot(outs, io=None, sysroot=None):
     for o in outs:
         rows.append({"label": o.label, "chip": o.chip, "enable": _int(io.read(o.enable)),
                      "pwm": _int(io.read(o.pwm)), "rpm": rpm_of(o, io)})
-    temps = [{"label": label, "c": round(c, 1)} for _k, label, c, _l in read_temps(sysroot)]
-    return {"outputs": rows, "temps": temps}
+    temps = [{"label": label, "c": round(c, 1), "limit": limit}
+             for _k, label, c, limit in read_temps(sysroot) if c is not None]
+    hottest, closest = summarize_temps(temps)
+    return {"outputs": rows, "temps": temps, "hottest": hottest, "closest": closest}
 
 
 def _rpm_summary(rows):
@@ -576,6 +671,15 @@ def phase_text(st):
     return ph or "?"
 
 
+def temp_summary(st):
+    """"hottest GPU junction 61 C, closest to its limit: NVMe 58 of 70 C", from a status dict."""
+    hot, near = st.get("hottest"), st.get("closest")
+    if not hot or not near:
+        return ""
+    return "hottest %s %.0f C, closest to its limit: %s %.0f of %d C" % (hot["label"], hot["c"], near["label"],
+                                                                         near["c"], near["limit"])
+
+
 def status_line(st):
     """One line for the admin panel's CPU card and the top of `status`."""
     ph = st.get("phase")
@@ -589,7 +693,9 @@ def status_line(st):
     else:
         head = "Fans: 20% (idle)"
     rpm = _rpm_summary(st.get("outputs") or [])
-    return head + ("  -  " + ", ".join(rpm) if rpm else "")
+    t = temp_summary(st)
+    c = o1aio.aio_text(st.get("aio"))
+    return head + ("  -  " + ", ".join(rpm) if rpm else "") + ("  -  " + t if t else "") + ("  -  " + c if c else "")
 
 
 def read_status(path=None, now=None):
@@ -606,7 +712,7 @@ def panel_line(path=None, now=None):
     """The one status line, or None (no service, nothing to say) for the admin panel."""
     st = read_status(path, now)
     line = st.get("line") if st else None
-    return line[:200] if isinstance(line, str) and line else None
+    return line[:400] if isinstance(line, str) and line else None
 
 
 def render_status(st, live):
@@ -634,9 +740,27 @@ def render_status(st, live):
     if not rows:
         out.append("  no fan outputs found (a motherboard chip needs: sudo modprobe nct6775)")
     if live["temps"]:
-        out.append("temps: " + ", ".join("%s %.0f C" % (t["label"], t["c"]) for t in live["temps"]))
+        hot, near = live["hottest"], live["closest"]
+        out.append("temps: highest %s %.0f C; closest to its limit: %s %.0f C of %d (%.0f %s)"
+                   % (hot["label"], hot["c"], near["label"], near["c"], near["limit"], abs(near["margin"]),
+                      "under" if near["margin"] >= 0 else "OVER"))
+        out.append("sensors: " + ", ".join("%s %.0f/%d" % (t["label"], t["c"], t["limit"]) for t in live["temps"]))
     else:
         out.append("temps: none read")
+    a = (st or {}).get("aio")
+    if a and a.get("found"):
+        out.append("cooler: %s - %s" % (a.get("name"), a.get("state")))
+        if a.get("coolant_c") is not None:
+            out.append("  coolant %.1f C%s   pump %s%s" % (
+                a["coolant_c"], " (>= %d C: pump extreme, fans 100%%)" % o1aio.COOLANT_HOT_C if a.get("coolant_hot") else "",
+                a.get("pump_mode") or "?", " %d rpm" % a["pump_rpm"] if a.get("pump_rpm") is not None else ""))
+        for f in a.get("fans", []):
+            out.append("  cooler fan %d  %s  %s%s" % (
+                f["n"], "%d%%" % f["pct"] if f.get("pct") is not None else "?%",
+                "%d rpm" % f["rpm"] if f.get("rpm") is not None else "no rpm reading",
+                "  min %d%%" % f["min_pct"] if f.get("min_pct") is not None else ""))
+    elif a and a.get("state") and a["state"] != "not looked for yet":
+        out.append("cooler: %s" % a["state"])
     if st is not None and st.get("hot"):
         out.append("too warm: " + "; ".join(st["hot"]))
     return "\n".join(out)
@@ -673,10 +797,11 @@ def restore_after_stop(env=None, io=None, sysroot=None, boot_id=read_boot_id, lo
     """ExecStopPost: after ANY exit (a clean stop, a crash, a kill, the watchdog) put
     anything still held back as it was. A fan left at 20% by a dead service would be
     the one outcome that is not acceptable."""
+    cooler = o1aio.safe_exit_if_controlled(log=log)
     fan = Fan({}, io=io, sysroot=sysroot, boot_id=boot_id, log=log)
     if not fan.engaged:
-        return True
-    return fan.release()
+        return cooler
+    return fan.release() and cooler
 
 
 def run_systemctl(*args):
@@ -710,7 +835,35 @@ def release_old_unit(systemctl=run_systemctl, io=None, sysroot=None, log=print):
     return True
 
 
-def setup(choice, systemctl=run_systemctl, sysroot=None, log=print, modules=None):
+def apt_install_liquidctl():
+    env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
+    try:
+        r = subprocess.run(["apt-get", "install", "-y", "liquidctl"], env=env, capture_output=True, text=True,
+                           timeout=900)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def aio_setup(sysroot=None, which=None, installer=None, log=print):
+    """Install liquidctl, only when a Corsair Hydro cooler is on USB and it isn't installed. Never fatal.
+    Returns True when a cooler is there and liquidctl is (now) installed."""
+    which = which or shutil.which
+    if not o1aio.usb_present(sysroot):
+        log("no Corsair Hydro liquid cooler on USB: nothing to install for one")
+        return False
+    if which("liquidctl"):
+        log("a Corsair Hydro liquid cooler is on USB; liquidctl is installed: it is controlled too")
+        return True
+    if (installer or apt_install_liquidctl)():
+        log("a Corsair Hydro liquid cooler is on USB: installed liquidctl (apt); it is controlled too")
+        return True
+    log("a Corsair Hydro liquid cooler is on USB but liquidctl could not be installed (sudo apt install liquidctl); "
+        "the case fans are controlled, the cooler is not")
+    return False
+
+
+def setup(choice, systemctl=run_systemctl, sysroot=None, log=print, modules=None, aio=None):
     """setup.sh's step. on: the old unit out, the chip's module loaded (and kept at boot
     only when a chip showed up), the service enabled and started. off: stopped (which puts
     the fans back), disabled, the boot-time module entry removed."""
@@ -718,6 +871,7 @@ def setup(choice, systemctl=run_systemctl, sysroot=None, log=print, modules=None
     if choice == "on":
         release_old_unit(systemctl, sysroot=sysroot, log=log)
         chip = (modules or load_modules)(sysroot=sysroot, log=log)
+        (aio or aio_setup)(sysroot=sysroot, log=log)
         if chip:
             os.makedirs(os.path.dirname(conf), exist_ok=True)
             with open(conf, "w") as f:
@@ -764,17 +918,35 @@ def service_step(fan, notify=sd_notify, log=print, first=False):
                                                                                     "hold_left": fan.left}))
 
 
+def aio_loop(aio, stop, log=print):
+    """The cooler's own thread: liquidctl calls are slow (a USB transaction, a subprocess), and the poll loop must
+    keep pinging the watchdog whatever they do."""
+    while not stop.is_set():
+        try:
+            aio.step(time.monotonic())
+        except Exception as e:                                    # never stop; say what kind, not what it held
+            log("cooler step failed: %s" % type(e).__name__)
+        stop.wait(1)
+
+
 def run_service(log=print):
-    fan = Fan(probes(), log=log)
-    stop, poke = threading.Event(), threading.Event()
+    aio = o1aio.Aio(log=log)
+    fan = Fan(probes(), log=log, aio=aio)
+    stop, poke, woke = threading.Event(), threading.Event(), threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: (stop.set(), poke.set()))
     signal.signal(signal.SIGINT, lambda *_: (stop.set(), poke.set()))
-    signal.signal(signal.SIGUSR1, lambda *_: poke.set())          # the sleep hook: a wake, look now
+    signal.signal(signal.SIGUSR1, lambda *_: (woke.set(), poke.set()))     # the sleep hook: a wake, look now
+    worker = threading.Thread(target=aio_loop, args=(aio, stop, log), daemon=True)
+    worker.start()
     first = True
     while not stop.is_set():
+        if woke.is_set():
+            woke.clear()
+            fan.wake()
         service_step(fan, log=log, first=first)
         first = False
         poke.wait(POLL_S)
         poke.clear()
+    worker.join(timeout=CALL_JOIN_S)                               # a call in flight ends (its own timeout)
     fan.shutdown()
     return 0

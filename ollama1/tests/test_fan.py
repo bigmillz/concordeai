@@ -38,13 +38,18 @@ class Tree:
         self.base = self.root + "/class/hwmon"
         self.gpu = self.put("hwmon0", "amdgpu", {"pwm1": 80, "pwm1_enable": 2, "fan1_input": 1200,
                                                  "temp1_input": 45000, "temp1_label": "edge",
-                                                 "temp2_input": 52000, "temp2_label": "junction"})
+                                                 "temp2_input": 52000, "temp2_label": "junction",
+                                                 "temp3_input": 60000, "temp3_label": "mem"})
         files = {}
         for n in range(1, 8):
             files.update({"pwm%d" % n: NCT_PWM[n], "pwm%d_enable" % n: NCT_ENABLE[n], "fan%d_input" % n: 500 + n})
+        files.update({"temp1_input": 34000, "temp1_label": "SYSTIN", "temp2_input": 38000, "temp2_label": "CPUTIN",
+                      "temp3_input": -128000, "temp3_label": "AUXTIN0"})          # an unplugged input reads -128
         self.nct = self.put("hwmon1", "nct6797", files)
         self.cpu = self.put("hwmon2", "k10temp", {"temp1_input": 41000, "temp1_label": "Tctl"})
         self.nvme = self.put("hwmon3", "nvme", {"temp1_input": 38000, "temp1_label": "Composite"})
+        self.dimm1 = self.put("hwmon4", "jc42", {"temp1_input": 31000})
+        self.dimm2 = self.put("hwmon5", "jc42", {"temp1_input": 32000})
         self.fn = {}                                          # (dir, n) -> rpm as a function of pwm
 
     def put(self, d, name, files):
@@ -65,6 +70,9 @@ class Tree:
         for d, nums in ((self.gpu, (1,)), (self.nct, range(1, 8))):
             for n in nums:
                 self.set(d, "fan%d_input" % n, self.fn.get((d, n), spins)(self.get(d, "pwm%d" % n)))
+
+    def temp_in(self, d, c, file="temp1_input"):
+        self.set(d, file, int(c * 1000))
 
     def temp(self, which, c, file="temp1_input"):
         self.set({"cpu": self.cpu, "nvme": self.nvme, "gpu": self.gpu}[which], file, int(c * 1000))
@@ -317,6 +325,126 @@ class TestOverride(FanCase):
         self.go(f, self.clock.t + 1)
         os.unlink(self.tree.cpu + "/temp1_input")
         self.assertEqual(self.go(f, self.clock.t + 1)[0], "hot")
+
+
+class TestTempSources(FanCase):
+    """Every temperature that can force 100%: the chip's inputs by label, the DIMMs, the card's memory and edge."""
+
+    def board(self, n, label, c):
+        self.tree.set(self.tree.nct, "temp%d_input" % n, int(c * 1000))
+        if label is not None:
+            self.tree.set(self.tree.nct, "temp%d_label" % n, label)
+
+    def check(self, setter, limit, name):
+        """Below the limit nothing; at it, 100% with nothing running; 9.9 under still; 10.1 under, let go."""
+        f = self.up()
+        setter(limit - 0.1)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20", name)
+        setter(limit)
+        phase, why = self.go(f, self.clock.t + 1)
+        self.assertEqual(phase, "hot", name)
+        self.assertIn("(limit %d)" % limit, why)
+        self.assertTrue(self.tree.at(255), name)
+        setter(limit - 9.9)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "hot", name)
+        setter(limit - 10.1)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20", name)
+
+    def test_the_chips_inputs_by_label(self):
+        for label, limit in (("SYSTIN", 70), ("CPUTIN", 85), ("AUXTIN1", 70), ("PECI Agent 0", 85), ("TSI0_TEMP", 85),
+                             ("VRM", 90), ("MOSFET", 90), ("Chipset", 80), ("PCH_CHIP_TEMP", 80),
+                             ("Mystery sensor", 70), (None, 70)):
+            with self.subTest(label):
+                self.setUp()
+                self.board(5, label or "temp5", 30)
+                if label is None:
+                    os.unlink(self.tree.nct + "/temp5_label")
+                self.check(lambda c: self.board(5, None, c), limit, label)
+
+    def test_the_cpu_input_is_not_held_to_the_board_limit(self):
+        self.setUp()
+        f = self.up()
+        self.board(2, None, 75)                                    # CPUTIN at 75 is fine (85); SYSTIN at 75 is not
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.board(1, None, 75)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "hot")
+
+    def test_the_dimms(self):
+        for d in ("dimm1", "dimm2"):
+            with self.subTest(d):
+                self.setUp()
+                self.check(lambda c: self.tree.temp_in(getattr(self.tree, d), c), 70, d)
+
+    def test_the_cards_memory_and_edge(self):
+        self.check(lambda c: self.tree.temp("gpu", c, "temp3_input"), 95, "mem")
+        self.setUp()
+        self.check(lambda c: self.tree.temp("gpu", c, "temp1_input"), 85, "edge")
+        self.setUp()
+        self.check(lambda c: self.tree.temp("gpu", c, "temp2_input"), 90, "junction")
+
+    def test_a_disconnected_or_stuck_sensor_is_ignored(self):
+        for c in (0, -0.5, -128, 120, 125, 255, 1000):
+            with self.subTest(c):
+                self.setUp()
+                f = self.up()
+                for setter in (lambda v: self.board(5, "SYSTIN", v), lambda v: self.tree.temp_in(self.tree.dimm1, v),
+                               lambda v: self.tree.temp("gpu", v, "temp3_input"), lambda v: self.tree.temp("cpu", v),
+                               lambda v: self.tree.temp("nvme", v)):
+                    setter(c)
+                self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20", c)
+                self.assertTrue(self.tree.at(51))
+                self.assertEqual(f.hot, {})
+
+    def test_a_sensor_that_sticks_while_hot_is_let_go(self):
+        f = self.up()
+        self.board(5, "SYSTIN", 75)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "hot")
+        self.board(5, None, 255)                                   # stuck at an implausible value
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.board(5, None, -128)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+
+    def test_a_plausible_reading_just_inside_the_range_counts(self):
+        f = self.up()
+        self.board(5, "SYSTIN", 119.9)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "hot")
+        self.board(5, None, 0.5)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+
+    def test_a_zero_reading_is_not_shown_as_a_temperature(self):
+        self.board(1, None, 0)
+        names = [t["label"] for t in o1fan.snapshot([], sysroot=self.tree.root)["temps"]]
+        self.assertNotIn("SYSTIN", names)
+        self.assertNotIn("AUXTIN0", names)
+        self.board(1, None, 0.5)
+        names = [t["label"] for t in o1fan.snapshot([], sysroot=self.tree.root)["temps"]]
+        self.assertIn("SYSTIN", names)
+
+    def test_two_sensors_with_one_name_are_numbered(self):
+        names = [t[1] for t in o1fan.read_temps(self.tree.root)]
+        self.assertIn("DIMM 1", names)
+        self.assertIn("DIMM 2", names)
+        self.assertNotIn("DIMM", names)
+
+    def test_the_summary_names_the_sensor_closest_to_its_limit(self):
+        f = self.up()
+        self.board(1, None, 56)                                    # SYSTIN: 14 under its 70
+        self.go(f, self.clock.t + 1)
+        st = o1fan.read_status(now=1_800_000_000)
+        self.assertEqual(st["closest"], {"label": "SYSTIN", "c": 56.0, "limit": 70, "margin": 14.0})
+        self.assertEqual(st["hottest"]["label"], "GPU memory")
+        self.assertIn("closest to its limit: SYSTIN 56 of 70 C", o1fan.panel_line(now=1_800_000_000))
+        text = o1fan.render_status(st, o1fan.snapshot(o1fan.find_outputs(self.tree.root), sysroot=self.tree.root))
+        self.assertIn("closest to its limit: SYSTIN 56 C of 70 (14 under)", text)
+        for part in ("CPU 41/80", "GPU junction 52/90", "GPU memory 60/95", "GPU edge 45/85", "NVMe 38/70", "DIMM 1 31/70",
+                     "CPUTIN 38/85"):
+            self.assertIn(part, text)
+        self.assertNotIn("AUXTIN0", text)                          # unplugged: not shown
+
+    def test_the_label_decides_the_limit(self):
+        for label, limit in (("SYSTIN", 70), ("CPUTIN", 85), ("PECI Agent 0", 85), ("TSI0_TEMP", 85), ("VRM MOS", 90),
+                             ("MOSFET 2", 90), ("CMOS", 70), ("Chipset", 80), ("PCH", 80), ("AUXTIN3", 70), ("x", 70)):
+            self.assertEqual(o1fan.board_limit(label), limit, label)
 
 
 class TestStall(FanCase):
@@ -661,7 +789,7 @@ class TestStatus(FanCase):
         self.assertIn("controlling: GPU fan + 7 case/CPU fan outputs", text)
         self.assertRegex(text, r"GPU fan\s+manual\s+pwm 255/255\s+2550 rpm\s+min 20%")
         self.assertRegex(text, r"case/CPU fan 3\s+manual\s+pwm 255/255\s+2550 rpm")
-        self.assertIn("temps: GPU junction 52 C, CPU 41 C, NVMe 38 C", text)
+        self.assertIn("temps: highest GPU memory 60 C; closest to its limit: NVMe 38 C of 70 (32 under)", text)
 
     def test_the_phases_in_words(self):
         f = self.up()
@@ -684,12 +812,14 @@ class TestStatus(FanCase):
 
     def test_the_panel_line(self):
         f = self.up()
-        self.assertEqual(o1fan.panel_line(now=1_800_000_000), "Fans: 20% (idle)  -  GPU fan 510 rpm, case fans up to 510 rpm")
+        self.assertEqual(o1fan.panel_line(now=1_800_000_000), "Fans: 20% (idle)  -  GPU fan 510 rpm, case fans up to 510 rpm"
+                         "  -  hottest GPU memory 60 C, closest to its limit: NVMe 38 of 70 C")
         self.p["inflight"] = 1
         self.go(f, self.clock.t + 1)
         self.go(f, self.clock.t + 1)
         self.assertEqual(o1fan.panel_line(now=1_800_000_000),
-                         "Fans: 100% (a request is running)  -  GPU fan 2550 rpm, case fans up to 2550 rpm")
+                         "Fans: 100% (a request is running)  -  GPU fan 2550 rpm, case fans up to 2550 rpm"
+                         "  -  hottest GPU memory 60 C, closest to its limit: NVMe 38 of 70 C")
         self.p["inflight"] = 0
         t = self.clock.t
         self.go(f, t + 30)
@@ -703,7 +833,7 @@ class TestStatus(FanCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("level: the service isn't running", r.stdout)
         self.assertIn("GPU fan", r.stdout)
-        self.assertIn("temps: GPU junction 52 C, CPU 41 C", r.stdout)
+        self.assertIn("temps: highest GPU memory 60 C; closest to its limit: NVMe 38 C of 70 (32 under)", r.stdout)
 
     def test_the_other_commands_refuse_without_root(self):
         if os.geteuid() == 0:
@@ -749,15 +879,15 @@ class TestModulesAndSetup(FanCase):
             calls.append(a)
             return True
         self.assertEqual(o1fan.setup("on", systemctl=systemctl, sysroot=self.tree.root, log=self.lines.append,
-                                     modules=lambda **kw: True), 0)
+                                     modules=lambda **kw: True, aio=lambda **kw: False), 0)
         self.assertIn(("enable", "ollama1-fan.service"), calls)
         self.assertIn(("restart", "ollama1-fan.service"), calls)
         self.assertIn("nct6775", open(conf).read())
         self.assertEqual(o1fan.setup("on", systemctl=systemctl, sysroot=self.tree.root, log=self.lines.append,
-                                     modules=lambda **kw: False), 0)
+                                     modules=lambda **kw: False, aio=lambda **kw: False), 0)
         self.assertFalse(os.path.exists(conf))                # no chip: no boot-time entry
         self.assertEqual(o1fan.setup("on", systemctl=lambda *a: False, sysroot=self.tree.root, log=self.lines.append,
-                                     modules=lambda **kw: False), 1)
+                                     modules=lambda **kw: False, aio=lambda **kw: False), 1)
 
     def test_setup_off_stops_the_service_and_drops_the_module_entry(self):
         conf = o1fan.o1common.p(o1fan.MODULES_CONF)
@@ -796,8 +926,8 @@ class TestWiring(unittest.TestCase):
         self.assertIn("\nStartLimitIntervalSec=0\n", u)                      # never gives up: a dead service means stuck fans
         for line in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ReadWritePaths=/run/ollama1 /var/lib/ollama1",
                      "ProtectHome=yes", "PrivateTmp=yes", "PrivateNetwork=yes", "ProtectKernelModules=yes",
-                     "ProtectKernelLogs=yes", "ProtectControlGroups=yes", "RestrictAddressFamilies=AF_UNIX",
-                     "LimitCORE=0", "MemoryMax=64M", "RestrictNamespaces=yes", "SystemCallArchitectures=native"):
+                     "ProtectKernelLogs=yes", "ProtectControlGroups=yes", "RestrictAddressFamilies=AF_UNIX AF_NETLINK",
+                     "LimitCORE=0", "MemoryMax=192M", "RestrictNamespaces=yes", "SystemCallArchitectures=native"):
             self.assertIn("\n" + line + "\n", u, line)
         self.assertNotIn("\nProtectKernelTunables", u)                        # it writes /sys
         self.assertNotIn("IPAddressAllow", u)
