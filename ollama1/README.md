@@ -715,8 +715,12 @@ around a little from time to time.
     for the last hour, 24 h, 7 and 30 days with the hours measured, the
     projection, and the prices editor;
   - **Controls**: Sleep now, Reboot, Restart services, the auto sleep
-    setting and the server's own decision ("Sleeps in 12:34", or why not;
-    the app sets auto sleep), Apply updates now with the updater's last
+    switch and its idle minutes (chips 15 / 30 / 60 / 120 or any number
+    from 5 to 1440; the app sets the same setting and the last change wins)
+    with the server's own decision ("Sleeps in 12:34", or why not; the page
+    says "Saved" until the idle service's next look, within 30 seconds), and
+    a change shows the toast only after the server has read the file back;
+    Apply updates now with the updater's last
     result, LAN mode, Back up now and Open terminal;
   - **Devices**, with Remove and Open pairing window;
   - **Logs**: requests, model loads, actions, updates, the model library,

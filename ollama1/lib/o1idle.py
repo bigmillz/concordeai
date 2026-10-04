@@ -106,6 +106,57 @@ def write_config(cfg, path=None):
     return cfg
 
 
+# ---- the admin panel's way to change it (6b402) -----------------------------------
+
+SLEEPCFG_RX = re.compile(r"^(on|off)-([0-9]{1,4})$")
+
+
+def sleepcfg_result_file():
+    """What the last change from the panel did, for the panel to read back
+    (o1gw writes it in the gateway's stats folder, group o1view)."""
+    return os.path.join(Paths.stats_dir, "sleepcfg.json")
+
+
+def sleepcfg_arg(enabled, minutes):
+    """The unit instance name the panel starts: "on-30" / "off-45"."""
+    return "%s-%d" % ("on" if enabled else "off", minutes)
+
+
+def parse_sleepcfg_arg(arg):
+    """"on-30" -> {"enabled": True, "minutes": 30} (minutes clamped to
+    5..1440), or None for anything else, however it was spelled."""
+    m = SLEEPCFG_RX.fullmatch(arg) if isinstance(arg, str) else None       # fullmatch: no trailing newline
+    if not m:
+        return None
+    return {"enabled": m.group(1) == "on", "minutes": clamp_minutes(int(m.group(2)))}
+
+
+def apply_sleepcfg(arg, path=None, result_path=None, clock=time.time):
+    """Runs as the gateway's own user (ollama1-sleepcfg@.service): the same
+    write_config as the gateway's /v1/sleep-config, so the file keeps its
+    owner, mode and atomic write, and the app and the idle service see it.
+    The saved file is read back and the answer says what it really holds.
+    Returns (ok, result)."""
+    want = parse_sleepcfg_arg(arg)
+    res = {"req": arg if isinstance(arg, str) and len(arg) <= 16 else "", "at": clock()}
+    if want is None:
+        res.update(ok=False, error="not a valid request (on or off, then 5 to 1440 minutes)")
+    else:
+        try:
+            write_config(want, path)
+            back = read_config(path)
+            res.update(ok=back == want, enabled=back["enabled"], minutes=back["minutes"])
+            if back != want:
+                res["error"] = "the file holds something else now (another change landed)"
+        except OSError as e:
+            res.update(ok=False, error="could not write the setting (%s)" % (e.strerror or "error"))
+    try:
+        write_json_atomic(result_path or sleepcfg_result_file(), res, mode=0o640, group="o1view")
+    except OSError:
+        pass
+    return res["ok"], res
+
+
 # ---- what the gateway records ----------------------------------------------------
 
 class Activity:

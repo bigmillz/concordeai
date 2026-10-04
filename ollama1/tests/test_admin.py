@@ -651,6 +651,264 @@ class TestDemoNeverInProduction(unittest.TestCase):
         self.assertEqual(re.findall(r"^Environment=(.*)$", unit, re.M), ["PYTHONDONTWRITEBYTECODE=1"])
 
 
+class SleepCfgBase(unittest.TestCase):
+    """Auto sleep from the panel (6b402): the panel starts ollama1-sleepcfg@<on|off>-<min>.service; here the
+    "unit" is the same o1idle.apply_sleepcfg the real program runs, in-process."""
+
+    def setUp(self):
+        import o1idle
+        self.I = o1idle
+        self.files = (o1idle.config_file(), o1idle.sleepcfg_result_file())
+        self.clean()
+        self.addCleanup(self.clean)
+        self.panel = A["panel"]
+        self.saved = (self.panel.runner, self.panel.nap, self.panel.sleep_wait_s)
+        self.addCleanup(lambda: (setattr(self.panel, "runner", self.saved[0]), setattr(self.panel, "nap", self.saved[1]),
+                                 setattr(self.panel, "sleep_wait_s", self.saved[2])))
+        self.started = []
+
+        def unit_runs(unit):
+            self.started.append(unit)
+            m = re.fullmatch(r"ollama1-sleepcfg@(.+)\.service", unit)
+            self.assertTrue(m, unit)
+            o1idle.apply_sleepcfg(m.group(1))
+            return True, ""
+        self.panel.runner = unit_runs
+        self.panel.sleep_wait_s = 1.0
+        self.panel.state_cache = (0, None)
+
+    def clean(self):
+        for f in self.files:
+            if os.path.exists(f):
+                os.unlink(f)
+
+    def post_sleep(self, obj, **kw):
+        h = {"Content-Type": kw.get("ctype", "application/json"), "Cf-Access-Jwt-Assertion": admin_jwt()}
+        if kw.get("origin", ORIGIN):
+            h["Origin"] = kw.get("origin", ORIGIN)
+        tok = csrf() if kw.get("tok", "auto") == "auto" else kw["tok"]
+        if tok:
+            h["X-O1-CSRF"] = tok
+        h.update(kw.get("extra") or {})
+        raw = obj if isinstance(obj, bytes) else json.dumps(obj).encode()
+        return U.request(A["port"], "POST", "/api/sleep-config", raw, h, host=ADMIN_HOST)
+
+
+class TestSleepConfigRoute(SleepCfgBase):
+    def test_a_change_is_saved_and_read_back(self):
+        st, data, _ = self.post_sleep({"enabled": True, "minutes": 45})
+        self.assertEqual(st, 200, data)
+        d = json.loads(data)
+        self.assertEqual((d["ok"], d["enabled"], d["minutes"], d["confirmed"]), (True, True, 45, True))
+        self.assertEqual(self.started, ["ollama1-sleepcfg@on-45.service"])
+        self.assertEqual(self.I.read_config(), {"enabled": True, "minutes": 45})
+        self.assertEqual(oct(os.stat(self.I.config_file()).st_mode & 0o777), "0o600")
+        s = json.loads(get("/api/state")[1])
+        self.assertEqual((s["sleep_setting"]["enabled"], s["sleep_setting"]["minutes"], s["sleep_setting"]["source"]),
+                         (True, 45, "this page"))
+        self.assertTrue(s["sleepcfg"]["ok"])
+        d = json.loads(get("/api/sleep-config")[1])
+        self.assertEqual(d["setting"]["minutes"], 45)
+        st, data, _ = self.post_sleep({"enabled": False, "minutes": 5})
+        self.assertEqual((st, json.loads(data)["enabled"]), (200, False))
+        self.assertEqual(self.started[-1], "ollama1-sleepcfg@off-5.service")
+
+    def test_the_app_and_the_page_agree_last_writer_wins(self):
+        import test_sleepcfg as TS
+        self.post_sleep({"enabled": True, "minutes": 45})
+        TS.new_gateway().sleep_set({"enabled": True, "minutes": 90})                 # the app, through the gateway
+        self.assertEqual(self.I.read_config(), {"enabled": True, "minutes": 90})
+        # the idle service's next tick publishes what the file holds; it is newer than the page's change
+        from o1common import write_json_atomic
+        write_json_atomic(os.path.join(Paths.run, "idle.json"),
+                          {"at": int(time.time()) + 5, "enabled": True, "minutes": 90, "supported": True, "sleep_ok": False,
+                           "reason": "idle 1 of 90 minutes", "idle_s": 60}, mode=0o644)
+        self.addCleanup(lambda: os.path.exists(os.path.join(Paths.run, "idle.json")) and os.unlink(os.path.join(Paths.run, "idle.json")))
+        self.panel.state_cache = (0, None)
+        s = json.loads(get("/api/state")[1])
+        self.assertEqual((s["sleep_setting"]["minutes"], s["sleep_setting"]["source"]), (90, "idle service"))
+        # and a page change after that wins again
+        self.assertEqual(self.post_sleep({"enabled": False, "minutes": 20})[0], 200)
+        self.assertEqual(TS.new_gateway().sleep_view()["minutes"], 20)               # the app reads the page's value
+
+    def test_same_checks_as_every_other_action(self):
+        good = {"enabled": True, "minutes": 30}
+        for kw in ({"tok": ""}, {"tok": "0" * 64}, {"origin": "https://evil.example"}, {"origin": ""},
+                   {"ctype": "text/plain"}, {"ctype": "application/x-www-form-urlencoded"},
+                   {"extra": {"Sec-Fetch-Site": "cross-site"}}):
+            self.assertEqual(self.post_sleep(good, **kw)[0], 403, kw)
+        h = {"Content-Type": "application/json", "Origin": ORIGIN, "X-O1-CSRF": csrf()}
+        self.assertEqual(U.request(A["port"], "POST", "/api/sleep-config", b"{}", h, host=ADMIN_HOST)[0], 403)   # no JWT
+        self.assertEqual(self.post_sleep(b"not json")[0], 400)
+        self.assertEqual(self.post_sleep(b"[1,2]")[0], 400)
+        big = json.dumps(dict(good, pad="x" * 5000)).encode()
+        self.assertEqual(self.post_sleep(big)[0], 413)
+        self.assertEqual(self.started, [])
+        self.assertFalse(os.path.exists(self.I.config_file()))
+
+    def test_bad_values_are_refused_before_anything_starts(self):
+        for bad in ({"enabled": "yes", "minutes": 30}, {"enabled": 1, "minutes": 30}, {"enabled": None, "minutes": 30},
+                    {"minutes": 30}, {"enabled": True}, {"enabled": True, "minutes": True}, {"enabled": True, "minutes": 30.5},
+                    {"enabled": True, "minutes": "30"}, {"enabled": True, "minutes": None}, {"enabled": True, "minutes": 4},
+                    {"enabled": True, "minutes": 1441}, {"enabled": True, "minutes": 99999}, {"enabled": True, "minutes": -30},
+                    {"enabled": True, "minutes": 30, "extra": 1}, {"enabled": True, "minutes": 30, "action": "reboot"}, {}):
+            st, data, _ = self.post_sleep(bad)
+            self.assertEqual(st, 400, bad)
+            self.assertTrue(json.loads(data)["errors"], bad)
+        for edge in (5, 1440):
+            self.assertEqual(self.post_sleep({"enabled": True, "minutes": edge})[0], 200, edge)
+        self.assertEqual(self.started, ["ollama1-sleepcfg@on-5.service", "ollama1-sleepcfg@on-1440.service"])
+
+    def test_a_failed_write_shows_the_reason_not_success(self):
+        def broken(unit):
+            self.started.append(unit)
+            self.I.apply_sleepcfg(unit.split("@")[1].split(".")[0], path="/nonexistent-dir/sleep.json")
+            return True, ""
+        self.panel.runner = broken
+        st, data, _ = self.post_sleep({"enabled": True, "minutes": 30})
+        d = json.loads(data)
+        self.assertEqual(st, 500)
+        self.assertFalse(d["ok"])
+        self.assertIn("could not write", d["errors"][0])
+        self.assertFalse(os.path.exists(self.I.config_file()))
+
+    def test_a_unit_that_does_not_start_and_one_that_never_answers(self):
+        self.panel.runner = lambda u: (False, "denied")
+        st, data, _ = self.post_sleep({"enabled": True, "minutes": 30})
+        self.assertEqual(st, 500)
+        self.assertIn("denied", data.decode())
+        self.panel.runner = lambda u: (True, "")                     # started, but nothing writes the answer
+        self.panel.sleep_wait_s = 0.3
+        st, data, _ = self.post_sleep({"enabled": True, "minutes": 30})
+        self.assertEqual(st, 504)
+        self.assertNotIn('"ok": true', data.decode())
+
+    def test_an_old_answer_is_not_taken_for_this_one(self):
+        self.I.apply_sleepcfg("on-30", result_path=self.I.sleepcfg_result_file(), clock=lambda: time.time() - 100)
+        self.panel.runner = lambda u: (True, "")
+        self.panel.sleep_wait_s = 0.3
+        self.assertEqual(self.post_sleep({"enabled": True, "minutes": 30})[0], 504)
+
+    def test_the_helper_runs_as_the_gateways_user_only_for_the_polkit_shape(self):
+        # what the panel hands polkit is exactly what the rule allows
+        import re as _re
+        rule = open(os.path.join(U.CONFIG, "50-ollama1.rules")).read()
+        pat = _re.search(r"/\^(ollama1-sleepcfg@\(on\|off\)-\[0-9\]\{1,4\}\\\.service)\$/", rule)
+        self.assertTrue(pat)
+        for obj in ({"enabled": True, "minutes": 5}, {"enabled": False, "minutes": 1440}):
+            self.assertRegex(A["mod"].TEMPLATE_UNITS["sleep-config"] % self.I.sleepcfg_arg(obj["enabled"], obj["minutes"]),
+                             "^" + pat.group(1) + "$")
+
+    def test_effective_setting_takes_the_newer_witness(self):
+        eff = A["mod"].effective_sleep_setting
+        idle = {"at": 100, "enabled": False, "minutes": 30}
+        res = {"at": 200, "ok": True, "enabled": True, "minutes": 60}
+        self.assertEqual((eff(idle, res)["minutes"], eff(idle, res)["source"]), (60, "this page"))
+        self.assertEqual(eff(dict(idle, at=300), res)["source"], "idle service")
+        self.assertEqual(eff(None, res)["minutes"], 60)
+        self.assertEqual(eff(idle, None)["minutes"], 30)
+        self.assertEqual(eff(idle, dict(res, ok=False))["minutes"], 30)       # a failed change is not a setting
+        self.assertIsNone(eff(None, None))
+        self.assertIsNone(eff({"at": 1, "enabled": "yes", "minutes": 30}, None))
+
+
+class TestSleepCfgHelper(SleepCfgBase):
+    def test_the_request_shape(self):
+        P = self.I.parse_sleepcfg_arg
+        self.assertEqual(P("on-30"), {"enabled": True, "minutes": 30})
+        self.assertEqual(P("off-1440"), {"enabled": False, "minutes": 1440})
+        self.assertEqual(P("on-0"), {"enabled": True, "minutes": 5})                 # clamped, not refused
+        self.assertEqual(P("on-9999"), {"enabled": True, "minutes": 1440})
+        for bad in ("", "on", "on-", "on-30\n", " on-30", "on-30 ", "ON-30", "yes-30", "on--5", "on-+5", "on-3.5",
+                    "on-12345", "on-30;id", "on-30/../x", "on-３０", None, 30, ["on-30"], "on-30\x00"):
+            self.assertIsNone(P(bad), repr(bad))
+
+    def test_the_file_is_the_one_the_gateway_writes(self):
+        import test_sleepcfg as TS
+        TS.new_gateway().sleep_set({"enabled": True, "minutes": 45})
+        by_gateway = open(self.I.config_file(), "rb").read()
+        self.clean()
+        ok, res = self.I.apply_sleepcfg("on-45")
+        self.assertTrue(ok)
+        self.assertEqual(open(self.I.config_file(), "rb").read(), by_gateway)        # byte for byte
+        self.assertEqual(oct(os.stat(self.I.config_file()).st_mode & 0o777), "0o600")
+        self.assertEqual(self.I.read_config(), {"enabled": True, "minutes": 45})
+        self.assertEqual(TS.new_gateway().sleep_view()["minutes"], 45)               # the app reads it back
+        self.assertEqual(oct(os.stat(self.I.sleepcfg_result_file()).st_mode & 0o777), "0o640")
+        src = open(os.path.join(U.LIB, "o1idle.py")).read()
+        body = src[src.index("def apply_sleepcfg"):src.index("# ---- what the gateway records")]
+        self.assertIn("write_config(want, path)", body)                              # the same writer, nothing of its own
+
+    def test_a_refused_request_changes_nothing_and_says_why(self):
+        self.I.write_config({"enabled": True, "minutes": 60})
+        ok, res = self.I.apply_sleepcfg("on-30;reboot")
+        self.assertFalse(ok)
+        self.assertIn("not a valid request", res["error"])
+        self.assertEqual(self.I.read_config(), {"enabled": True, "minutes": 60})
+        self.assertFalse(json.load(open(self.I.sleepcfg_result_file()))["ok"])
+
+    def test_a_readback_that_differs_is_not_reported_as_saved(self):
+        from unittest import mock
+        with mock.patch.object(self.I, "read_config", return_value={"enabled": False, "minutes": 30}):
+            ok, res = self.I.apply_sleepcfg("on-45")
+        self.assertFalse(ok)
+        self.assertIn("another change landed", res["error"])
+        self.assertEqual((res["enabled"], res["minutes"]), (False, 30))             # what the file really held
+
+    @unittest.skipIf(os.geteuid() == 0, "the program refuses root")
+    def test_the_program(self):
+        import subprocess
+        import sys
+        prog = os.path.join(U.BIN, "ollama1-sleepcfg")
+        run = lambda *a: subprocess.run([sys.executable, prog, *a], capture_output=True, text=True, timeout=30)  # noqa: E731
+        r = run("off-120")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.I.read_config(), {"enabled": False, "minutes": 120})
+        self.assertEqual(run("on-30;id").returncode, 1)
+        self.assertEqual(run().returncode, 2)
+        self.assertEqual(run("on-30", "extra").returncode, 2)
+        self.assertEqual(self.I.read_config(), {"enabled": False, "minutes": 120})
+        src = open(prog).read()
+        self.assertIn("os.geteuid() == 0", src)
+        for word in ("subprocess", "os.system", "shell"):
+            self.assertNotIn(word, src)
+
+    def test_the_unit_and_the_polkit_rule(self):
+        u = open(os.path.join(U.SYSTEMD, "ollama1-sleepcfg@.service")).read()
+        for want in ("User=o1gw", "Group=o1gw", "Type=oneshot", "ExecStart=/usr/local/lib/ollama1/bin/ollama1-sleepcfg %i",
+                     "StateDirectory=ollama1-gateway", "StateDirectoryMode=0700", "ReadWritePaths=/run/ollama1/stats",
+                     "NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes",
+                     "PrivateNetwork=yes", "CapabilityBoundingSet=\n", "AmbientCapabilities=\n", "MemoryDenyWriteExecute=yes",
+                     "SystemCallFilter=@system-service", "RestrictAddressFamilies=AF_UNIX", "ProtectProc=invisible",
+                     "RestrictSUIDSGID=yes", "LockPersonality=yes"):
+            self.assertIn(want, u)
+        self.assertNotIn("User=root", u)
+        self.assertNotIn("[Install]", u)                                              # started by the panel, never at boot
+        self.assertEqual(len(re.findall(r"^ReadWritePaths=", u, re.M)), 1)
+        self.assertNotIn("ollama1-admin", u)                                          # nothing of the panel's folder
+        rule = open(os.path.join(U.CONFIG, "50-ollama1.rules")).read()
+        self.assertEqual(rule.count("sleepcfg"), 1)                                   # one rule, for this one unit
+        self.assertIn(r"/^ollama1-sleepcfg@(on|off)-[0-9]{1,4}\.service$/", rule)
+        self.assertIn('if (verb !== "start")', rule)
+
+
+class TestSleepControlsOnThePage(unittest.TestCase):
+    def test_the_controls_and_how_they_post(self):
+        st, data, _ = get("/")
+        page = data.decode()
+        for want in ('id="autoswitch"', 'role="switch"', 'id="minchips"', 'id="minbox"', 'id="minset"', 'id="autostate"'):
+            self.assertIn(want, page)
+        self.assertEqual(re.findall(r'data-min="(\d+)"', page), ["15", "30", "60", "120"])
+        js = re.search(r'<script nonce="[^"]+">(.*?)</script>', page, re.S).group(1)
+        self.assertIn("post('/api/sleep-config',{enabled,minutes})", js)
+        self.assertEqual(js.count("method:'POST'"), 1)                                # still the one fetch with the token
+        self.assertIn("Number.isInteger(minutes)||minutes<5||minutes>1440", js)
+        self.assertIn("r.ok&&r.j.confirmed", js)                                      # success only when the server confirmed
+        self.assertIn("Auto sleep not saved", js)
+        self.assertIn("the last change wins", page)
+        self.assertNotIn("The app sets auto sleep", page)
+
+
 class FakeTtyd:
     """ttyd on a UNIX socket, sending its own (weaker) framing headers."""
 
@@ -743,7 +1001,7 @@ class TestPolkitMatchesPanel(unittest.TestCase):
     in systemd/, and the rule allows nothing else."""
 
     def rule(self):
-        return open(os.path.join(U.KIT, "config", "50-ollama1.rules")).read()
+        return open(os.path.join(U.CONFIG, "50-ollama1.rules")).read()
 
     def test_fixed_units(self):
         fixed = set(re.findall(r'"(ollama1-[a-z-]+\.service)"', self.rule()))
@@ -754,10 +1012,16 @@ class TestPolkitMatchesPanel(unittest.TestCase):
     def test_template_units(self):
         rule = self.rule()
         pats = [re.compile(p) for p in re.findall(r"/(\^ollama1-[^/]+\$)/", rule)]
-        self.assertEqual(len(pats), 2)
+        self.assertEqual(len(pats), 3)                         # pull/rmmodel, rmdevice, sleepcfg (6b402)
 
         def allowed(unit):
-            return any(p.match(unit) for p in pats)
+            return any(p.fullmatch(unit) for p in pats)
+        for ok in ("ollama1-sleepcfg@on-30.service", "ollama1-sleepcfg@off-1440.service", "ollama1-sleepcfg@on-5.service"):
+            self.assertTrue(allowed(ok), ok)
+        for bad in ("ollama1-sleepcfg@on-30000.service", "ollama1-sleepcfg@on-.service", "ollama1-sleepcfg@maybe-30.service",
+                    "ollama1-sleepcfg@on-30;id.service", "ollama1-sleepcfg@on-30.service\n", "ollama1-sleepcfg@.service",
+                    "ollama1-sleepcfg@on-3 0.service", "ollama1-sleepcfg@on--5.service", "ollama1-sleepcfg@ON-30.service"):
+            self.assertFalse(allowed(bad), bad)
         self.assertTrue(allowed("ollama1-pull@%s.service" % name_hash("x")))
         self.assertTrue(allowed("ollama1-rmmodel@%s.service" % name_hash("x")))
         self.assertTrue(allowed("ollama1-rmdevice@0123456789abcdef.service"))
@@ -765,14 +1029,15 @@ class TestPolkitMatchesPanel(unittest.TestCase):
                     "ollama1-rmdevice@0123456789abcdef0.service", "ollama.service",
                     "ssh.service", "ollama1-pull@..service"):
             self.assertFalse(allowed(bad), bad)
-        for t in ("ollama1-pull@.service", "ollama1-rmmodel@.service", "ollama1-rmdevice@.service"):
+        for t in ("ollama1-pull@.service", "ollama1-rmmodel@.service", "ollama1-rmdevice@.service",
+                  "ollama1-sleepcfg@.service"):
             self.assertTrue(os.path.exists(os.path.join(U.KIT, "systemd", t)), t)
 
     @unittest.skipUnless(__import__("shutil").which("node"), "node not installed")
     def test_rule_logic_in_js(self):
         import subprocess
         r = subprocess.run(["node", os.path.join(U.HERE, "polkit_check.js"),
-                            os.path.join(U.KIT, "config", "50-ollama1.rules")], capture_output=True, text=True)
+                            os.path.join(U.CONFIG, "50-ollama1.rules")], capture_output=True, text=True)
         self.assertIn("polkit rule ok", r.stdout, r.stdout + r.stderr)
 
     def test_only_start_verb(self):

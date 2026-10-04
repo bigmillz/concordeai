@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 import o1cpu  # noqa: E402
 import o1fan  # noqa: E402
 import o1gputune  # noqa: E402
+import o1idle  # noqa: E402
 import o1leds  # noqa: E402
 import o1library  # noqa: E402
 import o1ollama  # noqa: E402
@@ -65,7 +66,9 @@ TEMPLATE_UNITS = {
     "remove-device": "ollama1-rmdevice@%s.service",
     "pull": "ollama1-pull@%s.service",
     "remove-model": "ollama1-rmmodel@%s.service",
+    "sleep-config": "ollama1-sleepcfg@%s.service",       # %s: on-30 / off-60 (6b402)
 }
+SLEEP_WAIT_S = 8.0     # how long the answer to a sleep-setting change waits for the unit to say what it saved
 HISTORY_COLS = 11     # t, tps, gpu busy, vram, gpu temp, gpu power, active, cpu temp, cpu GHz, cpu %, RAM GiB
 HISTORY_FIELDS = ["t", "tps", "gpu_busy", "vram_gib", "gpu_temp", "power_w", "active", "cpu_temp", "cpu_ghz",
                   "cpu_pct", "ram_gib"]
@@ -183,6 +186,32 @@ def clean_gpu_tune(st):
                       "at": _num(chk.get("at")), "tps": _num(chk.get("tps"))} if chk else None}
 
 
+def clean_sleepres(res):
+    """What the last change from this panel did (/run/ollama1/stats/sleepcfg.json,
+    written by ollama1-sleepcfg as the gateway's user): the request, whether the
+    file read back as asked, and what it held."""
+    if not isinstance(res, dict) or _num(res.get("at")) is None:
+        return None
+    return {"req": _txt(res.get("req"), 16), "at": res["at"], "ok": res.get("ok") is True,
+            "enabled": res.get("enabled") if isinstance(res.get("enabled"), bool) else None,
+            "minutes": _num(res.get("minutes")), "error": _txt(res.get("error"), 160)}
+
+
+def effective_sleep_setting(idle, res):
+    """The setting as best the panel can know it. The file itself is the
+    gateway's (0700 folder), so two witnesses: the idle service's tick, which
+    re-reads it every 30 s (whatever the app or this page set last), and the
+    read-back of this page's own last change. The newer one wins, so a change
+    from the app shows within a tick and one from this page at once."""
+    best = None
+    if idle and isinstance(idle.get("enabled"), bool) and _num(idle.get("minutes")) is not None:
+        best = {"enabled": idle["enabled"], "minutes": idle["minutes"], "at": idle["at"], "source": "idle service"}
+    if res and res.get("ok") and isinstance(res.get("enabled"), bool) and res.get("minutes") is not None:
+        if best is None or res["at"] > best["at"]:
+            best = {"enabled": res["enabled"], "minutes": res["minutes"], "at": res["at"], "source": "this page"}
+    return best
+
+
 def json_bytes(obj):
     """JSON with <, > and & as \\u escapes: the same data to any JSON reader,
     and never markup to anything that sniffs it (6b398)."""
@@ -217,6 +246,8 @@ class Panel:
         self.state_cache = (0, None)
         self.power_cache = (0, None, None)
         self.busy = o1sleep.busy_reasons
+        self.sleep_wait_s = SLEEP_WAIT_S
+        self.nap = time.sleep
         self.lock = threading.Lock()
 
     # -- auth -----------------------------------------------------------
@@ -283,6 +314,11 @@ class Panel:
                     st[key] = read()
                 except Exception:
                     st[key] = None
+            try:
+                st["sleepcfg"] = clean_sleepres(read_json_safe(o1idle.sleepcfg_result_file(), None, max_bytes=4096))
+            except Exception:
+                st["sleepcfg"] = None
+            st["sleep_setting"] = effective_sleep_setting(st.get("idle"), st["sleepcfg"])
             self.state_cache = (now, st)
             return st
 
@@ -364,6 +400,52 @@ class Panel:
         if not ok:
             return 500, {"errors": ["could not start the apply step: %s" % err]}
         return 202, {"ok": True, "schedule_id": o1tariff.schedule_id(clean)}
+
+    def save_sleep_config(self, obj):
+        """Auto sleep, from the page (6b402). Exactly {"enabled": bool,
+        "minutes": whole number 5..1440}, checked here and again by the unit.
+        The panel can't write the gateway's file, so it starts
+        ollama1-sleepcfg@<on|off>-<minutes>.service (the gateway's own user,
+        the same write_config as /v1/sleep-config) and waits for that unit's
+        read-back of the file; the answer is what it holds, never an
+        assumption."""
+        enabled, minutes = obj.get("enabled"), obj.get("minutes")
+        errs = []
+        if set(obj) != {"enabled", "minutes"}:
+            errs.append("send exactly enabled and minutes")
+        if not isinstance(enabled, bool):
+            errs.append("enabled must be true or false")
+        if not (isinstance(minutes, int) and not isinstance(minutes, bool)
+                and o1idle.MIN_MINUTES <= minutes <= o1idle.MAX_MINUTES):
+            errs.append("minutes must be a whole number from %d to %d" % (o1idle.MIN_MINUTES, o1idle.MAX_MINUTES))
+        if errs:
+            return 400, {"errors": errs}
+        arg = o1idle.sleepcfg_arg(enabled, minutes)
+        t0 = self.clock()
+        ok, err = self.runner(TEMPLATE_UNITS["sleep-config"] % arg)
+        log("sleep-config", enabled=enabled, minutes=minutes, started=ok)
+        if not ok:
+            return 500, {"errors": ["could not start the change: %s" % err]}
+        res = None
+        end = time.monotonic() + self.sleep_wait_s
+        while True:
+            r = clean_sleepres(read_json_safe(o1idle.sleepcfg_result_file(), None, max_bytes=4096))
+            if r and r["req"] == arg and r["at"] >= t0:
+                res = r
+                break
+            if time.monotonic() >= end:
+                break
+            self.nap(0.1)
+        with self.lock:
+            self.state_cache = (0, None)
+        if res is None:
+            return 504, {"errors": ["the change was started but the server didn't say it was saved in time; "
+                                    "look at the setting again"]}
+        out = {"ok": res["ok"], "enabled": res["enabled"], "minutes": res["minutes"], "confirmed": True}
+        if not res["ok"]:
+            out["errors"] = [res["error"] or "not saved"]
+            return 500, out
+        return 200, out
 
     def library(self):
         return {"preview": o1library.read_preview(), "sync": read_json(o1library.status_file())}
@@ -508,6 +590,10 @@ def make_handler(panel):
                                  {"Content-Disposition": 'attachment; filename="ollama1-prices.json"'})
             if path == "/api/logs":
                 return self.send(200, panel.logs())
+            if path == "/api/sleep-config":
+                st = panel.state()
+                return self.send(200, {"setting": st.get("sleep_setting"), "last_change": st.get("sleepcfg"),
+                                       "decision": st.get("idle")})
             self.send(404, {"error": "not found"})
 
         def do_POST(self):
@@ -519,7 +605,7 @@ def make_handler(panel):
             except ValueError:
                 n = -1
             path = self.path.split("?", 1)[0]
-            if path not in ("/api/action", "/api/power/schedule"):
+            if path not in ("/api/action", "/api/power/schedule", "/api/sleep-config"):
                 return self.send(404, {"error": "not found"})
             if n < 0 or n > (65536 if path == "/api/power/schedule" else 4096):
                 return self.send(413, {"error": "too large"})
@@ -538,6 +624,13 @@ def make_handler(panel):
                     status, out = panel.save_schedule(obj)
                 except Exception as e:
                     log("power-error", kind=type(e).__name__)
+                    status, out = 500, {"errors": ["internal error"]}
+                return self.send(status, out)
+            if path == "/api/sleep-config":
+                try:
+                    status, out = panel.save_sleep_config(obj)
+                except Exception as e:
+                    log("sleep-config-error", kind=type(e).__name__)
                     status, out = 500, {"errors": ["internal error"]}
                 return self.send(status, out)
             try:
@@ -877,6 +970,9 @@ ul.errs{margin:8px 0 0;padding-left:18px;color:var(--red)}
 .primary.big-act span{color:rgba(255,255,255,.88)}
 #models td:last-child{width:1%}
 .sleepbox{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:12px}
+.sleepbox .switch{background:rgba(255,255,255,.03)}
+.chipbtn[aria-pressed=true]{background:rgba(45,212,239,.16);border-color:rgba(45,212,239,.55);color:var(--ink)}
+#minbox{width:84px}
 .sleepbox .st{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums}
 /* logs */
 .tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
@@ -1072,8 +1168,12 @@ footer{max-width:1680px;margin:0 auto;padding:0 28px 40px;color:var(--muted);fon
    <button type="button" class="big-act" data-act="restart">Restart services<span>Ollama, gateway, terminal, tunnel</span></button>
   </div>
   <div class="sleepbox"><div class="row between"><span class="note">Auto sleep</span><span class="chip" id="autochip">-</span></div>
-   <div class="st" id="autostate">-</div><div class="sub" id="autosub"></div>
-   <div class="note mt" id="autonote">The app sets auto sleep (on or off, and after how many idle minutes); this panel shows the setting and the server's own decision.</div></div>
+   <button type="button" class="switch mt" role="switch" aria-checked="false" id="autoswitch"><span class="lab"><b>Sleep when idle</b><span id="autoswsub">Reading the setting</span></span><span class="knob" aria-hidden="true"></span></button>
+   <div class="mt"><div class="note" id="minlab">After this many idle minutes</div>
+    <div class="row mt" role="group" aria-labelledby="minlab" id="minchips"><button type="button" class="small chipbtn" data-min="15">15</button><button type="button" class="small chipbtn" data-min="30">30</button><button type="button" class="small chipbtn" data-min="60">60</button><button type="button" class="small chipbtn" data-min="120">120</button>
+     <input type="number" id="minbox" min="5" max="1440" step="1" inputmode="numeric" aria-label="Idle minutes (5 to 1440)"><button type="button" class="small" id="minset">Set</button></div></div>
+   <div class="st mt" id="autostate">-</div><div class="sub" id="autosub"></div>
+   <div class="note mt" id="autonote">The app and this page both set it; the last change wins and the server shows what it really saved. The status above is the server's own decision.</div></div>
  </div>
  <div class="card s4"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>Updates</span><span class="chip" id="updchip">-</span></h3>
   <button type="button" class="big-act primary wide" data-act="update">Apply updates now<span>System updates, then Ollama</span></button>
@@ -1171,7 +1271,7 @@ function ask(o){return new Promise(res=>{const d=$('dlg'),ok=$('dlgok'),no=$('dl
  else{const v=o.typed?window.prompt(o.title+'\n'+o.typedLabel):window.confirm(o.title+'\n\n'+(o.body||[]).join('\n'));done(o.typed?v:(v||null));}});}
 
 // ---- the buttons ---------------------------------------------------------------------------
-let lan=false,lastState={};
+let lan=false,lastState={},sleepBusy=false,minDirty=false;
 document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
  if(a==='reboot'){if(await ask({title:'Reboot the server now?',body:['It can\'t be reached until it has started again, and running requests end.'],ok:'Reboot',danger:true}))act('reboot',null,'reboot',b);return;}
  if(a==='sleep'){let t='The server will sleep. Press its power button to wake it. While it sleeps it can\'t be reached, and anything plugged into its second network port loses its connection.';
@@ -1355,11 +1455,35 @@ function renderSvc(s){const gw=s.gateway||{},tun=s.tunnel||{},up=s.updates||{},o
  const u=[['Ollama',(gw.ollama_version||'?')],['Updater',(ou.result||'not run')+(ou.version?' '+ou.version:'')+(ou.last_run?', '+ago(ou.last_run):''),ou.result==='failed'?'bad':''],
   ['Next check',up.next_ollama_update||'?'],['Security updates',up.last_unattended?'last ran '+ago(up.last_unattended):'never'],['Reboot required',up.reboot_required?'yes'+((up.reboot_pkgs||[]).length?' ('+up.reboot_pkgs.join(', ')+')':''):'no',up.reboot_required?'warn':'']];
  if(ou.detail)u.push(['Detail',ou.detail,ou.result==='failed'?'bad':'']);kv($('upd'),u);
- const i=s.idle,sl=sleepSummary(i);chip('autochip',!i?'Unknown':i.enabled?'On':i.enabled===false?'Off':'Unknown',!i?'warn':i.enabled?'ok':'');
- $('autostate').textContent=i&&i.enabled?(sl[0].startsWith('in ')?'Sleeps '+sl[0]:sl[0]):sl[0];$('autostate').className='st'+(sl[1]==='warn'?' warn':'');
- $('autosub').textContent=i?[i.enabled?'after '+i.minutes+' minutes idle':null,i.supported===false?'this machine has no deep sleep':null,i.reason?'now: '+i.reason:null,i.wake_cards?i.wake_cards+' network card'+(i.wake_cards===1?'':'s')+' can wake it':null].filter(Boolean).join('  ·  '):'No word from the idle service.';
+ renderAuto(s);
  lan=!!s.lan_mode;const lb=$('lanbtn');lb.setAttribute('aria-checked',String(lan));$('lansub').textContent=lan?'On: the gateway also answers on the home network':'Off: only through Cloudflare';
  chip('pairchip',s.pairing_open?'Pairing open':'Pairing closed',s.pairing_open?'warn':'');}
+// ---- auto sleep: the setting the server really holds, and changing it ----------------------
+function renderAuto(s){const i=s.idle,st=s.sleep_setting,sl=sleepSummary(i);
+ const en=st?st.enabled:null,mins=st?st.minutes:null;
+ chip('autochip',en==null?'Unknown':en?'On':'Off',en==null?'warn':en?'ok':'');
+ const sw=$('autoswitch');sw.setAttribute('aria-checked',String(!!en));sw.disabled=sleepBusy;$('minset').disabled=sleepBusy;
+ $('autoswsub').textContent=en==null?'No word from the server yet':en?'On: it sleeps after '+mins+' idle minutes':'Off: it stays awake'+(mins!=null?' ('+mins+' minutes when on)':'');
+ document.querySelectorAll('#minchips [data-min]').forEach(b=>{b.setAttribute('aria-pressed',String(mins!=null&&+b.dataset.min===mins));b.disabled=sleepBusy;});
+ const box=$('minbox');if(document.activeElement!==box&&!minDirty)box.value=mins==null?'':String(mins);
+ const stale=!!(i&&st&&st.source==='this page'&&i.at<st.at);       // the idle service has not looked since this change
+ $('autostate').textContent=!i?'-':stale?'Saved':en?(sl[0].startsWith('in ')?'Sleeps '+sl[0]:sl[0]):sl[0];$('autostate').className='st mt'+(!stale&&sl[1]==='warn'?' warn':'');
+ $('autosub').textContent=[stale?'the idle service looks again within 30 seconds':null,!stale&&i&&i.supported===false?'this machine has no deep sleep':null,!stale&&i&&i.reason?'now: '+i.reason:null,i&&i.wake_cards?i.wake_cards+' network card'+(i.wake_cards===1?'':'s')+' can wake it':null,
+  st?'setting read from '+st.source+', '+ago(st.at):null].filter(Boolean).join('  ·  ')||'No word from the idle service.';}
+async function saveSleep(enabled,minutes){
+ if(!Number.isInteger(minutes)||minutes<5||minutes>1440){toast('Not saved','Idle minutes must be a whole number from 5 to 1440.','bad');return;}
+ sleepBusy=true;renderAuto(lastState);
+ const r=await post('/api/sleep-config',{enabled,minutes});
+ sleepBusy=false;
+ if(r.ok&&r.j.confirmed){minDirty=false;toast('Auto sleep saved',(r.j.enabled?'On, after '+r.j.minutes+' idle minutes':'Off ('+r.j.minutes+' minutes when on)')+'. The server read the file back.','ok');}
+ else toast('Auto sleep not saved',r.msg+' ('+(r.status||'no answer')+')','bad');
+ await refreshFast();}
+const curSleep=()=>{const st=lastState.sleep_setting;return {en:st?st.enabled:false,min:st?st.minutes:30};};
+$('autoswitch').addEventListener('click',()=>{const c=curSleep();saveSleep(!c.en,c.min);});
+document.querySelectorAll('#minchips [data-min]').forEach(b=>b.addEventListener('click',()=>saveSleep(curSleep().en,+b.dataset.min)));
+$('minbox').addEventListener('input',()=>{minDirty=true;});
+$('minbox').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveSleep(curSleep().en,Number($('minbox').value));}});
+$('minset').addEventListener('click',()=>saveSleep(curSleep().en,$('minbox').value===''?NaN:Number($('minbox').value)));
 const MODEL_COLORS=['#2dd4ef','#a78bfa','#f472b6','#fbbf24','#34d399','#6f8fff','#fb923c'];
 function renderLoaded(s){const gw=s.gateway||{},g=s.gpu||{},L=$('loaded'),st=$('vstack'),lg=$('vlegend');L.replaceChildren();st.replaceChildren();lg.replaceChildren();
  const vt=g.vram_total||0,used=g.vram_used||0;chip('vramchip',vt?gib(used)+' of '+gib(vt):'no GPU reading','');

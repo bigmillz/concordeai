@@ -9,6 +9,67 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b402 — the admin page can set auto sleep (per Patrick)
+
+Patrick: "Make the auto-sleep switch changeable from the page." The setting is
+the gateway's file (`/var/lib/ollama1-gateway/sleep.json`, 0600, folder 0700
+o1gw); the panel (o1admin, ProtectSystem=strict, polkit starts fixed units
+only) could only show it (6b400).
+- **Smallest safe way: one template unit, no request file.**
+  `ollama1-sleepcfg@<on|off>-<minutes>.service`, the instance name is the whole
+  request (like `ollama1-pull@<hash>`). It runs as **o1gw, not root**
+  (`User=o1gw`, `SupplementaryGroups=o1view`, no capabilities, no network,
+  `StateDirectory=ollama1-gateway`, `ReadWritePaths=/run/ollama1/stats`), so the
+  file keeps the owner the gateway gives it and the app and idle service see it
+  as before. A root helper was rejected: root would own the 0600 file and the
+  gateway could no longer read it. The panel's own folder is 0700 o1admin, so a
+  request file would not even be readable by o1gw: the name carries it.
+- **Same writer as the gateway:** `o1idle.apply_sleepcfg` -> `write_config`
+  (atomic, fsynced, 0600); a test compares the bytes with what the gateway's
+  `sleep_set` writes. `bin/ollama1-sleepcfg` refuses root, takes exactly one
+  argument and validates it again (`^(on|off)-[0-9]{1,4}$`, fullmatch, minutes
+  clamped to 5..1440). It reads the file back and leaves
+  `/run/ollama1/stats/sleepcfg.json` (o1gw, 0640 o1view): request, `ok`, what the
+  file really holds, a fixed-wording error, the time.
+- **Polkit:** one added regex, `^ollama1-sleepcfg@(on|off)-[0-9]{1,4}\.service$`,
+  start verb only, for o1admin only (the rest of the rule is untouched).
+- **Route:** `POST /api/sleep-config` `{"enabled": bool, "minutes": int}` and
+  nothing else: the same CSRF / Origin / Sec-Fetch-Site / JSON-only / 4 KiB
+  checks as `/api/action`, then its own: exactly those two keys, a real bool, a
+  whole number 5..1440 (out of range is refused, not clamped). It starts the
+  unit and waits up to 8 s for a result file whose `req` matches and whose time
+  is not before the request, then answers with what the unit read back: 200
+  `{ok, enabled, minutes, confirmed}`, 500 with the reason (could not write,
+  another change landed), 504 if nothing was reported. `GET /api/sleep-config`
+  gives setting, last change, decision. `/api/state` adds `sleepcfg` and
+  `sleep_setting`.
+- **Page and app agree:** the folder is 0700, so the panel knows the setting
+  from two witnesses and takes the newer: the idle service's tick (re-reads the
+  file every 30 s, so an app change shows within one tick) and the read-back of
+  the page's own last change (shown at once). Until the idle service looks
+  again the page says "Saved" instead of the old decision. Last writer wins.
+- **Page:** a switch, chips 15/30/60/120, a number box with Set (also Enter),
+  applied at once with a toast; success shows only when the server's answer has
+  `confirmed`; a failure shows the reason and the code; the page re-reads the
+  setting after every attempt. Minutes outside 5..1440 are refused in the page
+  before sending, and again by the server.
+- **GPU tuning on/off: not done.** `ollama1-gpu-tune on|off` is root work (sysfs
+  overdrive, a 60 s answer check against Ollama, the kernel log, a revert
+  path): a safe unit would be two more root units with the gpu-tune hardening
+  plus network access to Ollama. Not small; it stays `sudo ollama1-gpu-tune`.
+- Tests: the route's checks (CSRF, Origin, content type, cross-site, no JWT, bad
+  JSON, size, 16 bad bodies, edges 5 and 1440), the read-back, a failed write,
+  a unit that does not start or never answers, a stale answer, the app/page
+  last-writer-wins round trip, the request shape (25 spellings), the program
+  as a subprocess, the unit and polkit text (and the node rule check), the
+  page's controls. 10 new mutants, all killed. The demo runner now applies the
+  unit through the real function and the fake idle service follows the file.
+- Install: `bin/ollama1-admin`, `bin/ollama1-sleepcfg` (new, 0755),
+  `lib/o1idle.py`, `systemd/ollama1-sleepcfg@.service` (new),
+  `config/50-ollama1.rules`; then `systemctl daemon-reload`, reload polkit
+  (`systemctl restart polkit`), `systemctl restart ollama1-admin`. setup.sh
+  copies all of these.
+
 ## 6b400 — the web admin panel is graphical now, same actions and protections (per Patrick)
 
 Patrick: "Rebuild the web interface so that it's much more graphical, but

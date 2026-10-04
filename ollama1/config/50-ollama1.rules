@@ -37,5 +37,10 @@ polkit.addRule(function(action, subject) {
     if (/^ollama1-rmdevice@[0-9a-f]{16}\.service$/.test(unit)) {
         return polkit.Result.YES;
     }
+    // auto sleep (6b402): "on" or "off", a dash, 1 to 4 digits; the unit runs as the
+    // gateway's own user and its program checks the shape and the 5..1440 range again
+    if (/^ollama1-sleepcfg@(on|off)-[0-9]{1,4}\.service$/.test(unit)) {
+        return polkit.Result.YES;
+    }
     return polkit.Result.NO;
 });
