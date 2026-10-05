@@ -9,6 +9,65 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b426 — Fast, Thinking and Pro on one server alone, under "<server> Only" (per Patrick)
+
+Patrick (2026-10-05): "in the pop-up for the models, where you can select Ollama1 only, can
+we add under the option that only runs all the server models, that allows you to select
+Fast, Thinking or Pro that will only use those ones on the server."
+
+- **Tier ids.** `srv:<id>:fast`, `srv:<id>:think`, `srv:<id>:pro`, read in one place on each
+  side: `srv_tier_parse` (Python; `srv_only_id` and the new `srv_only_mode` call it) and
+  `srvTierParse` (page). `srv:<id>` is still "<server> Only", unchanged, so old prefs keep
+  working. Anything else with the `srv:` prefix (a bad suffix, a capital, a bad id) parses to
+  no server: a chat says the server is gone, the page sends the pick back to Fast.
+- **Seats** (`server_mode_seats`, servers section). That server's models only, from its last
+  check: placed "gpu" and fitting the card (`_srv_fits`, "<server> Only"'s looser rule: the
+  card size need not be reported, and the per-server switch "Use for Fast, Thinking and Pro"
+  doesn't apply, since the person picked this server), filtered by the mode's role
+  (`srv_role_ok`: no coder, embedding, guard or picture reader; no reasoning distill for
+  Fast), ranked by `srv_rank` as the modes rank a server's, and as many as the mode seats
+  (`SRV_MODE_SEATS`: Fast 1, Thinking 3, Pro 99, capped by `SRV_SEATS_MAX` 4). When none
+  fits, "<server> Only"'s own pick alone (the smallest), so the mode isn't dead.
+  `SRV_MODE_SEATS` sits in the servers section, which must name no tier table; a gauntlet
+  check holds it equal to `TIERS`' counts.
+- **A chat** (`/api/chat`, the `srv_only_tier` branch). `server_only_resolve` first, exactly as
+  for "<server> Only" (the fresh check, the deferred wake, the "didn't answer" lines); then
+  `server_mode_resolve` gives the seats. A picture goes to the server's reader alone (the first
+  seat, `server_answer`), as in "<server> Only". Fast runs `server_first_answer` with no
+  fallback (`""`) and no first-word deadline, Fast's second pass on the same model. Thinking
+  and Pro run `run_council(..., srv_only=True)`: `bench_allow=[]`, no Advanced pen, reflection
+  (Thinking) or peer review (Pro) on the server's models. In `run_council`, `srv_only` means
+  no cloud bench, no cloud compositor ladder, the merge on the server (`srv_merge` forced),
+  its pen from that server's models only (`server_compositor(..., cands=server_only_named)`),
+  no merger of this computer behind it (`_merge_fb` ""); a server with no model that may
+  write a merge, or a merge that fails before its first word, shows the best draft. Nothing
+  answered raises `ServerError("None of <name>'s models answered. ...")`. The handler adds:
+  no local rescue (`and not _srv_only`), no cloud bench in X-Models, no warm-up (every label is
+  a server's, so the route stays empty), and after a wake the seats are resolved again. The
+  title and the memory pass go to the first seat (as a single server model's turn does), or
+  nowhere when that server just failed.
+- **/api/tiers.** Under each paired server's `srv:<id>` row, its three modes' rows
+  (`server_mode_state`): `title` ("Thinking · <name> only"), `models` (the seats), `note`
+  (what runs, ending "Nothing runs on this computer or in the cloud."), `available`, and
+  "<server> Only"'s `why` when the server can't answer.
+- **The page.** The flyout lists "<name> Only", then Fast, Thinking and Pro (indented,
+  `.engrow.srvsub`, "<name> only" on the right), then the models. Greyed with the server
+  (`srvSyncOff` greys the three ids too), with the same reason in the bubble. The bubble
+  (`srvTierPopHtml`, node-tested) lists the seats with "· your server" and the note; the chip
+  says "Thinking · <name> only". The server's row is marked for any of its modes. The answer's
+  badge comes from the RUN frames: every label is the server's, so it reads its name.
+- Not changed: "<name> Only"'s refusals still say "<name> Only can't run the ... agent" and
+  "<name> Only can't make pictures or videos" in these modes too (the server's name is right).
+- Tests: `_smc_parse`, `_smc_seats`, `_smc_council` (run_council exec'd with a cloud bench, a
+  cloud ladder and a local Gemma all poisoned), `_smc_pins`, `_smc_page` (node); 43 mutants in
+  `_SM_MUT`, each caught. Existing pins moved with the code: the `_srv_only` line, the rescue
+  line, the bubble, the flyout's greying, `srvSyncOff`, `srvMenuRows`; `_soc_state`'s tiers
+  rows now list the three modes; `_sv_ns` execs `_TIER_ROLE` and `SRV_SEATS_MAX`.
+- Unverified: a live chat in each mode against the real gateway (no full gauntlet run; checks
+  ran in isolation), and the flyout in WKWebView.
+
+---
+
 ## 6b421 — fans and lights: the card over 50% or the CPU at 60 C, no hold, a 5 s rise to red (per Patrick)
 
 Kit only (`ollama1/`). Per Patrick, new rules for the fans (case, CPU/radiator and the GPU

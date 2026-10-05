@@ -18818,6 +18818,9 @@ def _sv_ns(src, hooks=("server-http-loopback",)):
                "MODEL_ROUTES": {"Llama 3.2 3B": ("mlx", 8888)}, "NUL": "\0",
                "_USAGE": [], "_RAN": []})
     exec(_sv_sect(src, "cai_crypto"), ns)
+    # the modes' roles and the seat cap (6b426: Fast, Thinking and Pro on one server alone read them)
+    exec(re.search(r"^_TIER_ROLE = .*$", src, re.M).group(0), ns)
+    exec(re.search(r"^SRV_SEATS_MAX = .*$", src, re.M).group(0), ns)
 
     class Ctl(str):
         pass
@@ -20348,7 +20351,8 @@ def _soc_state(src):
     su = ns["server_only_state"](ue)
     got["unpaired"] = (not su["ok"] and su["why"] == "Lab2 isn\u2019t paired with this computer yet.")
     rows = ns["server_only_tiers"](ctx)
-    got["rows"] = (list(rows) == ["srv:" + e["id"]] and rows["srv:" + e["id"]]["available"] is True
+    got["rows"] = (list(rows) == ["srv:" + e["id"]] + ["srv:%s:%s" % (e["id"], k) for k in ("fast", "think", "pro")]
+                   and rows["srv:" + e["id"]]["available"] is True
                    and rows["srv:" + e["id"]]["models"] == ["Pat’s Lab · a:8b"]
                    and rows["srv:" + e["id"]]["desc"] == "strongest that fits its card"
                    and rows["srv:" + e["id"]]["server"] == "Pat’s Lab"
@@ -20527,7 +20531,7 @@ def _soc_pins(src):
         and not re.search(r"resolve_tier|run_council|cloud|MODEL_ROUTES|ensure_mlx|run_model|TIERS|MERGE_RANK", br),
         "a placeholder, never another model": '_so_c0 = _so_lbl or ((_so_name or "Your server") + SERVER_SEP\n'
                                               '                                 + "unavailable")' in br,
-        "an agent takes it over": "        _srv_only = bool(_so_c0) and council == [_so_c0]\n"
+        "an agent takes it over": "        _srv_only = bool(_so_c0) and council == (_so_seats or [_so_c0])\n"
                                   "        if not _srv_only:\n            _so_fail = \"\"" in ch,
         "the one-server-model path": "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n"
                                      "                    and server_label(council[0]) else \"\")" in ch
@@ -20536,7 +20540,7 @@ def _soc_pins(src):
         and ch.index("            elif _srv_lbl:\n                server_answer(_srv_lbl,")
         < ch.index("            elif len(council) > 1:") < ch.index("_fl = gate_ladder(_fl, req_cloud)"),
         # no local rescue for a server pick
-        "no local rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
+        "no local rescue": "            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:" in ch,
         # memory pass: the same server's model, and none after a refusal
         "memory pass": "                    and not _gone and not _so_fail\n"
                        "                    and not (_srv_lbl and not _model_said[0])\n"
@@ -20624,7 +20628,8 @@ def _soc_page(src):
     got = {
         "chip": o["shown"] == ['Desk <b>&" · gpt-oss:20b', "Lab Only", "Your server", "Fast", ""]
         and o["label"] == 'Desk <b>&" · gpt-oss:20b',
-        "greyed": o["off"] == ["Fast", "srv:b1b2c3d4"],
+        "greyed": o["off"] == ["Fast", "srv:b1b2c3d4", "srv:b1b2c3d4:fast", "srv:b1b2c3d4:pro",
+                               "srv:b1b2c3d4:think"],
         "is": o["is"] == [True, False, False, False],
         # only a server that is gone sends it back to Fast; one that is off stays
         "kept": o["kept"] == [],
@@ -20644,7 +20649,8 @@ def _soc_page(src):
         and "  srvModesRefresh();\n  paintServers();\n  paintEngMenuServers();" in src
         and "  srvModesRefresh();\n  paintServers();paintSrvChips();" in src,
         # the hover bubble says why, and what it would run; it stays inside the window
-        "bubble": "  if(isSrvMode(name)){\n    tierPop.innerHTML=\"<b>\"+esc((info.server||\"Your server\")+\" Only\")+\"</b>\"" in src
+        "bubble": "  if(isSrvMode(name)){\n    tierPop.innerHTML=srvTierPopHtml(name,info);" in src
+        and "  return \"<b>\"+esc(info.title||((info.server||\"Your server\")+\" Only\"))+\"</b>\"" in src
         and src.index("  if(isSrvMode(name)){\n    tierPop.innerHTML") < src.index("  if(info.available===false||(info.available!==undefined&&!list.length")
         and "        ?'<div class=\"mline\">'+esc(info.why||\"not answering\")+'</div>'" in src
         and "    +'<span class=\"note\">'+esc(info.note||\"\")+'</span>';" in src
@@ -20983,10 +20989,10 @@ _SO_MUT = [
      '            council = [_so_c0] + resolve_tier("Fast")\n            model_name = _so_c0'),
     ("the placeholder is a local model", '_so_c0 = _so_lbl or ((_so_name or "Your server") + SERVER_SEP\n'
      '                                 + "unavailable")', '_so_c0 = _so_lbl or model_name'),
-    ("an agent keeps the mode's refusal", '        _srv_only = bool(_so_c0) and council == [_so_c0]',
+    ("an agent keeps the mode's refusal", '        _srv_only = bool(_so_c0) and council == (_so_seats or [_so_c0])',
      '        _srv_only = bool(_so_c0)'),
     ("the refusal not handed on", 'step, refuse=_so_fail)', 'step)'),
-    ("a local rescue for a server pick", '            if not sent[0] and not cloud_only and not _srv_lbl:',
+    ("a local rescue for a server pick", '            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:',
      '            if not sent[0] and not cloud_only:'),
     ("a memory pass after a refusal", '                    and not _gone and not _so_fail\n', '                    and not _gone\n'),
     ("a title by a local model", 'make_title(txt, server=_so[0])', 'make_title(txt, conf=_conf, ask_server=not _co)'),
@@ -20999,9 +21005,9 @@ _SO_MUT = [
     ("web search touched", '        bookish = False\n        placey = False\n',
      '        bookish = False\n        placey = _srv_only and False\n'),
     ("the ticket in no profile", '_srv_only_chats = profile_cache("_srv_only_chats", {})', '_srv_only_chats = {}'),
-    ("a row for an unpaired server on the page", '  return srvList.filter(s=>s.paired).map(s=>{\n    const ms=s.models||[],t="srv:"+s.id;',
-     '  return srvList.map(s=>{\n    const ms=s.models||[],t="srv:"+s.id;'),
-    ("a row never greyed", "    +(s.only&&s.only.ok?\"\":\" off\")+'\" data-t=\"'+esc(t)+'\">'", "    +\"\"+'\" data-t=\"'+esc(t)+'\">'"),
+    ("a row for an unpaired server on the page", '  return srvList.filter(s=>s.paired).map(s=>{\n    const ms=s.models||[];',
+     '  return srvList.map(s=>{\n    const ms=s.models||[];'),
+    ("a row never greyed", "    +(ok?\"\":\" off\")+'\" data-t=\"'+esc(t)+'\">'", "    +\"\"+'\" data-t=\"'+esc(t)+'\">'"),
     ("a server's name not escaped", "+'<span class=\"enm\">'+esc(s.name)+' Only</span>'",
      "+'<span class=\"enm\">'+s.name+' Only</span>'"),
     ("the mode not going back to Fast", '  if(agent){tier="Fast";prefSet({tier:"Fast"});paintModels();}\n  else setTier("Fast");',
@@ -21014,7 +21020,7 @@ _SO_MUT = [
     ("a server mode dropped while off", '  if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");\n',
      '  if(tierOff[tier])setTier("Fast");\n'),
     ("the bubble of a mode that says no key", '  if(isSrvMode(name)){\n    tierPop.innerHTML', '  if(false){\n    tierPop.innerHTML'),
-    ("the greyed rows not held", '    tierOff["srv:"+s.id]=1;});', '    });'),
+    ("the greyed rows not held", '    tierOff["srv:"+s.id]=1;\n', '\n'),
     ("the servers not repainted with the menu", '  srvModesRefresh();\n  paintServers();\n  paintEngMenuServers();',
      '  paintServers();\n  paintEngMenuServers();'),
     # the flyout (6b337)
@@ -22630,7 +22636,7 @@ def _p3c_quiet(src):
                                             "                    and not (_srv_lbl and not _model_said[0])\n" in ch,
         "export title": "                or ((make_title(src[:600], server=_srv_lbl)\n" in ch,
         # no local rescue for a server pick (no pre-warm: the live check counts the engines started)
-        "no rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
+        "no rescue": "            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:" in ch,
         # the place-pin pass reads a MODEL's answer, never the app's own error line (which could be 120 characters)
         "no pins from an error": "                    elif (query and sent[0] > 120 and _model_said[0]\n" in ch,
     }
@@ -22883,6 +22889,482 @@ for _d39, _o39, _nw39 in _P2_MUT:
     _p2m.append((_d39, [n for n, o, _x in _r39 if not o][:1] or "MISSED"))
 check("your server first: %d mutations of the modes' code, each caught by a check above" % len(_P2_MUT),
       all(isinstance(v, list) for _d, v in _p2m), "%r" % [x for x in _p2m if not isinstance(x[1], list)])
+
+# ==== 6b426: Fast, Thinking and Pro on one server alone ====
+print("== Fast, Thinking and Pro on one server alone (6b426) ==")
+# Patrick (2026-10-05): "in the pop-up for the models, where you can select Ollama1 only, can we add under the option
+# that only runs all the server models, that allows you to select Fast, Thinking or Pro that will only use those ones
+# on the server." Tier "srv:<id>:fast", ":think", ":pro" ("srv:<id>" stays "<name> Only"): the mode's shape with every
+# seat and the merge on that server, nothing of this computer's and no cloud. In process: the servers section and
+# run_council exec'd, the page's functions in node, the handler pinned; each mutation below caught.
+
+
+def _smc_parse(src):
+    """The tier id, read in one place: old "srv:<id>" unchanged, the three modes, anything else gone."""
+    ns, ctx, d = _sv_ns(src)
+    P = ns["srv_tier_parse"]
+    sid = "a1b2c3d4"
+    tiers_ns = {}
+    exec(src[src.index("TIERS = {"):src.index("\n}\n", src.index("TIERS = {")) + 3], tiers_ns)
+    T = tiers_ns["TIERS"]
+    got = {
+        "old id": P("srv:" + sid) == (sid, "") and ns["srv_only_id"]("srv:" + sid) == sid
+        and ns["srv_only_mode"]("srv:" + sid) == "",
+        "modes": [P("srv:%s:%s" % (sid, k)) for k in ("fast", "think", "pro")]
+        == [(sid, "Fast"), (sid, "Thinking"), (sid, "Pro")]
+        and ns["srv_only_id"]("srv:%s:pro" % sid) == sid and ns["srv_only_mode"]("srv:%s:think" % sid) == "Thinking",
+        # anything else has no server: a chat finds it gone, never another server or this computer
+        "gone": all(P(t) == ("", "") for t in ("srv:%s:bogus" % sid, "srv:%s:" % sid, "srv:zz:fast",
+                                                "srv:%s:Fast" % sid, "srv:%s:fast:x" % sid, "Fast", "", None, 7)),
+        "a server tier": ns["srv_only_tier"]("srv:%s:pro" % sid) and ns["srv_only_tier"]("srv:%s:bogus" % sid),
+        # the counts are the modes' own (Fast one, Thinking three, Pro all), and the roles theirs
+        "counts": all(ns["SRV_MODE_SEATS"][m] == T[m]["count"] for m in ("Fast", "Thinking", "Pro"))
+        and sorted(ns["SRV_MODE_KEYS"].values()) == sorted(ns["_TIER_ROLE"]) == ["Fast", "Pro", "Thinking"],
+    }
+    # a chat in one of the modes takes no benchmark hold (it uses none of this computer's engines); an agent does
+    sor = lambda r_: ns["server_only_request"](r_, ctx)
+    got["no hold"] = (sor({"tier": "srv:%s:pro" % sid, "models": ["Llama 3.2 3B"]})
+                      and sor({"tier": "srv:%s:fast" % sid}) and not sor({"tier": "srv:%s:think" % sid, "agent": "Coding"}))
+    return all(got.values()), got
+
+
+def _smc_seats(src):
+    """What each mode seats on the server: its own models only, the mode's count, the cap, the role rules, the card
+    rule; the bubble's rows; resolved only from this profile's paired servers."""
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx, name="Pat’s Lab")
+    e = ns["_srv_read"](ctx)[0]
+    M = lambda n, pl="gpu", sz=0: _so_model(n, pl, sz, "Pat’s Lab")
+    L = lambda n: "Pat’s Lab · " + n
+    ms = [M("qwen3:14b"), M("gpt-oss:20b"), M("gemma3:27b"), M("llama3.1:8b"), M("deepseek-r1:32b"),
+          M("qwen3-coder:30b"), M("big:70b", "gpu+ram"), M("bge-m3:567m"), M("llava:34b"), M("odd:40b", "unknown")]
+    _so_seen(ns, e, ms)
+    seats = lambda m, ent=None: ns["server_mode_seats"](ent or ns["_srv_read"](ctx)[0], m)
+    st = lambda m: ns["server_mode_state"](ns["_srv_read"](ctx)[0], m)
+    got = {}
+    f, t, p = seats("Fast"), seats("Thinking"), seats("Pro")
+    # Fast: one model, the strongest that may answer fast (no reasoning distill, no coder, nothing that spills)
+    got["fast"] = f == ([L("gemma3:27b")], "fits", 4)
+    # Thinking: three, a reasoning model welcome
+    got["thinking"] = t == ([L("deepseek-r1:32b"), L("gemma3:27b"), L("gpt-oss:20b")], "fits", 5)
+    # Pro: every suitable one, capped at SRV_SEATS_MAX (4 of the 5)
+    got["pro"] = p == ([L("deepseek-r1:32b"), L("gemma3:27b"), L("gpt-oss:20b"), L("qwen3:14b")], "fits", 5) \
+        and ns["SRV_SEATS_MAX"] == 4
+    allseats = f[0] + t[0] + p[0]
+    got["every seat that server's"] = all(ns["server_label"](x) and x.startswith("Pat’s Lab · ") for x in allseats)
+    got["never a spill, an unknown placement, a coder, an embedding or a picture reader"] = not any(
+        w in x for x in allseats for w in ("big:70b", "odd:40b", "coder", "bge", "llava"))
+    # the switch "Use for Fast, Thinking and Pro" is for the modes that pick for you: this pick is the person's
+    got["the switch doesn't apply"] = seats("Thinking", dict(e, prefer=False)) == t
+    # the card's size, when the gateway reports it, rules out what can't fit it
+    _so_seen(ns, e, [M("a:30b", sz=20 << 30), M("b:14b", sz=9 << 30), M("c:8b", sz=5 << 30)],
+             gpu={"vendor": "amd", "name": "Card", "vram_bytes": 16 << 30})
+    got["card size"] = seats("Pro")[0] == [L("b:14b"), L("c:8b")]
+    # nothing fits whole: "<name> Only"'s own pick, alone, so the mode isn't dead
+    _so_seen(ns, e, [M("x:70b", "gpu+ram", 40), M("y:7b", "unknown", 4)])
+    sm = st("Pro")
+    got["smallest, alone"] = (seats("Pro") == ([L("y:7b")], "smallest", 1) and sm["ok"] and sm["models"] == [L("y:7b")]
+                              and "smallest model, alone" in sm["note"])
+    # the bubble: the title, the seats, and the promise
+    _so_seen(ns, e, ms)
+    s3, sf, sp = st("Thinking"), st("Fast"), st("Pro")
+    dry = "Nothing runs on this computer or in the cloud."
+    got["state"] = (s3["ok"] and s3["mode"] == "Thinking" and s3["title"] == "Thinking · Pat’s Lab only"
+                    and s3["models"] == t[0] and s3["label"] == t[0][0] and s3["server"] == "Pat’s Lab"
+                    and s3["note"] == "3 models on Pat’s Lab draft, one double-checks them, then Pat’s Lab writes "
+                                      "the merge there. " + dry
+                    and sf["note"].endswith(dry) and "second pass" in sf["note"] and sf["models"] == f[0]
+                    and "It seats 4 of its 5" in sp["note"] and sp["note"].endswith(dry))
+    # off: the same reason as "<name> Only", no seats
+    _so_seen(ns, e, ms, reachable=False, err="Pat’s Lab didn’t answer.")
+    so = st("Pro")
+    got["off"] = (not so["ok"] and so["models"] == [] and so["why"] == "Pat’s Lab didn’t answer."
+                  and so["why"] == ns["server_only_state"](ns["_srv_read"](ctx)[0])["why"]
+                  and so["note"].startswith("When Pat’s Lab answers") and so["note"].endswith(dry))
+    # the tiers rows: "<name> Only", then its three modes, each with its seats
+    _so_seen(ns, e, ms)
+    rows = ns["server_only_tiers"](ctx)
+    k0 = "srv:" + e["id"]
+    got["tiers rows"] = (list(rows) == [k0, k0 + ":fast", k0 + ":think", k0 + ":pro"]
+                         and rows[k0 + ":think"]["models"] == t[0] and rows[k0 + ":think"]["available"] is True
+                         and rows[k0 + ":pro"]["models"] == p[0] and rows[k0 + ":fast"]["title"] == "Fast · Pat’s Lab only"
+                         and rows[k0 + ":pro"]["desc"] == "Pat’s Lab only" and rows[k0 + ":think"]["skipped"] == [])
+    _so_seen(ns, e, [], reachable=False, err="down")
+    r2 = ns["server_only_tiers"](ctx)
+    got["tiers rows off"] = all(r2[k0 + x]["available"] is False and r2[k0 + x]["models"] == []
+                                and r2[k0 + x]["why"] == "down" for x in (":fast", ":think", ":pro"))
+    # a chat: only this profile's paired servers; another profile, an unknown id or an unpaired server give nothing
+    _so_seen(ns, e, ms)
+    got["resolve"] = ns["server_mode_resolve"](e["id"], "Thinking", ctx) == t[0] \
+        and ns["server_mode_resolve"]("deadbeef", "Thinking", ctx) == [] \
+        and ns["server_mode_resolve"](e["id"], "", ctx) == []
+    _sv_fake(ns, [_sv_unsigned])
+    un = ns["server_add"](ctx, {"url": "https://lab2.example.com", "name": "Lab2"})
+    ue = [x for x in ns["_srv_read"](ctx) if x["id"] == un["id"]][0]
+    _so_seen(ns, ue, [_so_model("a:8b", server="Lab2")])
+    got["unpaired"] = ns["server_mode_resolve"](un["id"], "Fast", ctx) == [] and not any(
+        un["id"] in k for k in ns["server_only_tiers"](ctx))
+    dB = os.path.join(d, "accounts", "b" * 32)
+    os.makedirs(dB)
+    B = ns["ProfileCtx"]("test", dB, "b" * 32)
+    got["profile B"] = ns["server_mode_resolve"](e["id"], "Pro", B) == [] and ns["server_only_tiers"](B) == {}
+    # the merge's pen comes from that server alone
+    got["the merge's models"] = ([m["label"] for m in ns["server_only_named"](ctx, "Pat’s Lab")]
+                                 == [m["label"] for m in ns["server_only_cands"](ns["_srv_read"](ctx)[0])]
+                                 and ns["server_only_named"](ctx, "Lab2") == [] and ns["server_only_named"](ctx, "x") == [])
+    return all(got.values()), got
+
+
+def _smc_council(src):
+    """Thinking and Pro on one server alone (run_council's srv_only): the server's seats draft, the merge is written on
+    that server from that server's models; no cloud voice or compositor, no merger of this computer's, before or after
+    a failure; nothing answered is said, never covered."""
+    R = []
+    poison = []
+
+    def rm(label, msgs, emit, thinking=False):
+        R.append((label, str(msgs[-1].get("content", ""))[:1]))
+        if not str(label).startswith("Desk"):
+            poison.append(label)
+        emit("answer from " + label + " " * 3)
+
+    def bad(*a, **k):
+        poison.append(a[:1])
+        return True
+    named = []
+    CH = {"label": "Desk · b", "name": "b", "server": "Desk"}
+
+    def comp(ctx, drafted=(), cands=None):
+        named.append(cands)
+        return CH if cands == ["DESK-ONLY"] else None
+    kw = dict(merge_pref_label=lambda: "Gemma 4 26B", MODEL_ROUTES={"Gemma 4 26B": ("ollama", "gemma4:26b")},
+              MODEL_INFO={"Gemma 4 26B": {"ollama": "gemma4:26b"}}, MERGE_RANK=["Gemma 4 26B"],
+              cloud_bench=lambda: [("Groq 120B", {"name": "Groq"})], cloud_allowed=lambda: True,
+              cloud_text=lambda *a, **k: (poison.append("cloud draft"), "CLOUD")[1],
+              compositor_ladder=lambda: [{"name": "Claude", "model": "opus"}],
+              cloud_stream_conf=bad, fast_cloud_ladder=lambda: [{"name": "Groq"}],
+              server_only_named=lambda ctx, name: (["DESK-ONLY"] if name == "Desk" else ["OTHER"]),
+              server_compositor=comp)
+    labels = ["Desk · a", "Desk · b", "Desk · c"]
+
+    def go(over_run=None, run_kw=None, **over):
+        o = dict(kw)
+        o.update(over)
+        ns, calls = _p2_council(src, over_run or rm, **o)
+        out, fr, st = [], [], []
+        ns["run_council"](list(labels), [{"role": "user", "content": "q"}],
+                          lambda c: (fr if isinstance(c, _RcCtl) else out).append(c), st.append,
+                          **dict({"srv_only": True}, **(run_kw or {})))
+        return ns, calls, out, fr, st
+    got = {}
+    ns, calls, out, fr, st = go(run_kw={"reflect": True})
+    # the drafts, the double-check and the merge: all on the server; the merge's pen from that server's own models
+    got["thinking"] = (sorted(l for l, k in R if k == "q") == labels and [l for l, k in R if k == "Y"] == ["Desk · b"]
+                       and calls == [("merge", "Desk · b", None)] and "MERGED" in out and named == [["DESK-ONLY"]]
+                       and not poison)
+    got["badge on the server"] = any("RUN:" in f and '"w": "mix"' in f and "Gemma" not in f and "Desk \\u00b7 b" in f
+                                     for f in fr) and not any("Groq" in f or "Claude" in f for f in fr)
+    # Pro's peer review rewrites on the server too
+    R.clear()
+    named.clear()
+    ns, calls, out, fr, st = go(run_kw={"peer": True})
+    got["pro"] = (len([1 for l, k in R if k == "P"]) == 3 and all(l.startswith("Desk") for l, k in R)
+                  and calls == [("merge", "Desk · b", None)] and not poison)
+    # srv_only alone asks for the server merge (the handler also passes srv_merge for a mode)
+    got["merges there by itself"] = named == [["DESK-ONLY"]]
+    # the server merge fails before its first word: the best draft, never this computer's Gemma
+    R.clear()
+    seen = []
+
+    def sg(label, msgs, emit, status, fb, note):
+        seen.append(label)
+        if label.startswith("Desk"):
+            raise box["ns"]["ServerError"]("Desk didn’t answer.")
+        emit("LOCAL MERGE")
+        return True
+    box = {}
+    o2 = dict(kw, _stream_guarded=sg)
+    ns2, calls2 = _p2_council(src, rm, **o2)
+    box["ns"] = ns2
+    out2 = []
+    ns2["run_council"](list(labels), [{"role": "user", "content": "q"}],
+                       lambda c: None if isinstance(c, _RcCtl) else out2.append(c), [].append, srv_only=True)
+    got["merge fails: the best draft"] = (seen == ["Desk · b"] and "LOCAL MERGE" not in out2
+                                          and any(x.startswith("answer from Desk") for x in out2) and not poison)
+    # that server has no model that may write a merge: the best draft, no other pen
+    R.clear()
+    ns, calls, out, fr, st = go(server_compositor=lambda ctx, drafted=(), cands=None: None)
+    got["no pen there: the best draft"] = (calls == [] and len(out) == 1 and out[0].startswith("answer from Desk")
+                                           and not poison)
+    # nothing answered: said as the server's, and nothing else tried
+    def none(label, msgs, emit, thinking=False):
+        raise box["ns3"]["ServerError"]("Desk didn’t answer.")
+    ns3, _c3 = _p2_council(src, none, **kw)
+    box["ns3"] = ns3
+    try:
+        ns3["run_council"](list(labels), [{"role": "user", "content": "q"}], lambda c: None, [].append, srv_only=True)
+        said = ""
+    except ns3["ServerError"] as e_:
+        said = e_.args[-1]
+    except Exception as e_:
+        said = "other: %r" % e_
+    got["none answered"] = said == "None of Desk’s models answered. Desk didn’t answer." and not poison
+
+    def slow(label, msgs, emit, thinking=False):
+        emit("")
+    ns4, _c4 = _p2_council(src, slow, **kw)
+    try:
+        ns4["run_council"](list(labels), [{"role": "user", "content": "q"}], lambda c: None, [].append, srv_only=True)
+        said4 = ""
+    except ns4["ServerError"] as e_:
+        said4 = e_.args[-1]
+    except Exception as e_:
+        said4 = "other: %r" % e_
+    got["none answered, no reason"] = said4 == "None of Desk’s models answered. Nothing was sent anywhere else."
+    # the stand-ins would have caught a cloud voice: without srv_only the same council drafts in the cloud
+    poison.clear()
+    R.clear()
+    named.clear()
+    go(run_kw={"srv_only": False, "srv_merge": True})
+    got["control"] = "cloud draft" in poison
+    return all(got.values()), got
+
+
+def _smc_pins(src):
+    """Where the modes meet /api/chat (pinned): resolved from that server's seats, a picture to its reader alone, Fast
+    with its second pass and no fallback, Thinking and Pro on run_council with no cloud and no Advanced pen, the wake,
+    the header, no rescue, no warm-up, the title."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    br = ch[ch.index("        elif srv_only_tier(tier):"):ch.index('            council = [m for m in req_json.get("models", [])')]
+    rc = src[src.index("def run_council("):src.index("\n\n\nRESEARCH_PLAN = (")]
+    got = {
+        "the mode": "        _so_mode, _so_seats = srv_only_mode(tier), []\n" in ch,
+        "seats from that server": "                _so_seats = (server_mode_resolve(srv_only_id(tier), _so_mode, self.ctx)\n"
+                                  "                             if _so_lbl and _so_mode else [])" in br
+        and "                council = _so_seats = _so_seats[:1] if images else _so_seats\n"
+            "                _so_c0 = model_name = council[0]" in br
+        and not re.search(r"resolve_tier|run_council|cloud|MODEL_ROUTES|ensure_mlx|run_model|TIERS|MERGE_RANK", br),
+        "still the server's": "        _srv_only = bool(_so_c0) and council == (_so_seats or [_so_c0])\n" in ch,
+        "fast": '            elif (_srv_lbl and _srv_only and _so_mode == "Fast" and not _so_fail\n                  and not images):' in ch
+        and '                server_first_answer(\n                    _srv_lbl, "", full_messages, memit, emit, status, step,\n'
+            "                    first_s=None," in ch
+        and ch.index('_so_mode == "Fast" and not _so_fail') < ch.index("            elif _srv_lbl:\n                server_answer(")
+        < ch.index("            elif len(council) > 1:"),
+        "council": "                            bench_allow=[] if _srv_only else req_cloud,\n"
+                   '                            comp="" if _srv_only else req_comp,\n'
+                   "                            hurry=hurry_ev, srv_only=_srv_only," in ch
+        and '_srv_only and _so_mode == "Thinking"' in ch and 'peer=(tier == "Pro" or (_srv_only and _so_mode == "Pro")),' in ch,
+        "run_council": "    _bench = [] if srv_only else cloud_bench()\n" in rc
+        and "    srv_merge = srv_merge or srv_only      # one server's mode merges there (6b426)\n" in rc
+        and "    if comp in MODEL_ROUTES or srv_only:\n" in rc and "    if srv_only and _merge_srv is None:\n" in rc
+        and "model_fits_memory(merger) and not srv_only else \"\")" in rc,
+        "wake": "                _w_seats = (server_mode_resolve(_so_wake, _so_mode, self.ctx)\n"
+                "                            if _so_mode else [])" in ch,
+        "header": "        if (len(council) > 1 and cloud_allowed() and not _srv_only\n" in ch,
+        "no rescue": "            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:" in ch,
+        # a council of server labels warms nothing here (the route stays empty)
+        "no warm-up": "        if (route is None and not cloud_only\n                and not all(server_label(l) for l in council)):" in ch,
+        "title": "            if (_srv_only and not _srv_lbl and council\n"
+                 "                    and not server_label_down(user_base, council[0])):\n"
+                 "                _srv_lbl = council[0]\n"
+                 "            if (_srv_only or _srv_lbl) and _title_cid and not _gone:" in ch,
+        "tiers": "            for k, mode in SRV_MODE_KEYS.items():\n" in src,
+    }
+    return all(got.values()), got
+
+
+def _smc_page(src):
+    """The flyout's three rows under "<name> Only", the chip, the greying, the fall back to Fast, the menu row, the
+    bubble (node)."""
+    i0 = src.index("function esc(s){")
+    js = (src[i0:src.index(";}\n", i0) + 3] + _SO_PRE
+          + src[src.index("function srvWhere(m){"):src.index("function srvStatus(s){")]
+          + src[src.index("function flyClick("):src.index("function paintEngMenuServers(){")]
+          + "const GBM=(n,p)=>({name:n,label:'Desk <b>&\" \\u00b7 '+n,placement:p||'gpu'});"
+          + "let srvList=[{id:'a1b2c3d4',name:'Desk <b>&\"',paired:true,status:{at:1,reachable:true},"
+          + "models:[GBM('gpt-oss:20b'),GBM('qwen3:14b')],only:{ok:true,label:'x',model:'gpt-oss:20b'}},"
+          + "{id:'b1b2c3d4',name:'Lab',paired:true,status:{at:1,err:'Lab didn\\u2019t answer.'},models:[],only:{ok:false}},"
+          + "{id:'d1b2c3d4',name:'New',paired:false,models:[],only:{ok:false}}];"
+          + "const out={};"
+          + "out.parse=['srv:a1b2c3d4','srv:a1b2c3d4:fast','srv:a1b2c3d4:think','srv:a1b2c3d4:pro','srv:a1b2c3d4:bad',"
+          + "'srv:a1b2c3d4:','Fast','',null].map(t=>srvTierParse(t));"
+          + "out.of=[srvModeOf('srv:a1b2c3d4:pro'),srvModeOf('srv:a1b2c3d4:bad'),srvModeOf('srv:d1b2c3d4:pro')].map(s=>s&&s.id);"
+          + "out.shown=[tierShown('srv:a1b2c3d4:fast'),tierShown('srv:a1b2c3d4:think'),tierShown('srv:a1b2c3d4:pro'),"
+          + "tierShown('srv:a1b2c3d4'),tierShown('srv:zzzzzzzz:pro'),tierShown('srv:b1b2c3d4:think')];"
+          + "tier='Fast';out.sub=srvSubRows(srvList[0]);out.subOff=srvSubRows(srvList[1]);"
+          + "tier='srv:a1b2c3d4:pro';out.subOn=srvSubRows(srvList[0]);out.menuOn=srvMenuRows();out.label=tierLabel();"
+          + "advOn=true;out.subAdv=srvSubRows(srvList[0]);advOn=false;"
+          + "tierOff={};srvSyncOff();out.off=Object.keys(tierOff).sort();"
+          # an off server's mode stays; a gone one, or a bad id, goes back to Fast
+          + "calls.length=0;tier='srv:b1b2c3d4:think';srvModeGone();out.kept=calls.slice();"
+          + "calls.length=0;tier='srv:zzzzzzzz:pro';srvModeGone();out.gone=calls.slice();"
+          + "calls.length=0;tier='srv:a1b2c3d4:bad';srvModeGone();out.bad=calls.slice();"
+          + "out.pop=[srvTierPopHtml('srv:a1b2c3d4:think',{title:'Thinking \\u00b7 Desk <b> only',server:'Desk',available:true,"
+          + "models:['Desk \\u00b7 a:8b','Desk \\u00b7 b:14b'],note:'N <i>'}),"
+          + "srvTierPopHtml('srv:a1b2c3d4:pro',{title:'Pro \\u00b7 Desk only',available:false,why:'Desk didn\\u2019t answer.',"
+          + "models:['Desk \\u00b7 a:8b'],note:'When'}),"
+          + "srvTierPopHtml('srv:a1b2c3d4',{server:'Desk',available:true,model:'gpt-oss:20b',note:'O'})];"
+          + "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("sm426.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    sub = o["sub"]
+    got = {
+        "parse": o["parse"] == [{"id": "a1b2c3d4", "mode": ""}, {"id": "a1b2c3d4", "mode": "Fast"},
+                                {"id": "a1b2c3d4", "mode": "Thinking"}, {"id": "a1b2c3d4", "mode": "Pro"},
+                                {"id": "", "mode": ""}, {"id": "", "mode": ""}, {"id": "", "mode": ""},
+                                {"id": "", "mode": ""}, {"id": "", "mode": ""}]
+        and o["of"] == ["a1b2c3d4", None, None],
+        # the chip names the mode and the server
+        "chip": o["shown"] == ['Fast · Desk <b>&" only', 'Thinking · Desk <b>&" only', 'Pro · Desk <b>&" only',
+                               "x", "Your server", "Thinking · Lab only"]
+        and o["label"] == 'Pro · Desk <b>&" only',
+        # three rows under "<name> Only", in order, before its models; the server's name escaped
+        "rows": sub.index(" Only</span>") < sub.index('data-t="srv:a1b2c3d4:fast"') < sub.index('data-t="srv:a1b2c3d4:think"')
+        < sub.index('data-t="srv:a1b2c3d4:pro"') < sub.index('class="engdiv"') < sub.index("data-s=")
+        and sub.count('class="engrow srvmode srvsub"') == 3
+        and '<span class="enm">Fast</span>' in sub and '<span class="enm">Thinking</span>' in sub
+        and '<span class="enm">Pro</span>' in sub and sub.count('<span class="edsc">Desk &lt;b&gt;&amp;&quot; only</span>') == 3
+        and "Desk <b>" not in sub,
+        "greyed with the server": o["subOff"].count('class="engrow srvmode srvsub off"') == 3
+        and 'data-t="srv:b1b2c3d4:pro"' in o["subOff"],
+        "on": 'class="engrow srvmode srvsub on" data-t="srv:a1b2c3d4:pro"' in o["subOn"]
+        and o["subOn"].count(" on\"") == 1 and 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o["menuOn"]
+        and "srvsub on" not in o["subAdv"] and "srvsub on" not in sub,
+        "off": o["off"] == ["srv:b1b2c3d4", "srv:b1b2c3d4:fast", "srv:b1b2c3d4:pro", "srv:b1b2c3d4:think"],
+        "kept while off": o["kept"] == [],
+        "gone": o["gone"] == ["setTier:Fast"] and o["bad"] == ["setTier:Fast"],
+        # the bubble: the seats with "your server", or why not; "<name> Only" keeps its one line
+        "bubble": o["pop"][0] == ('<b>Thinking · Desk &lt;b&gt; only</b><div class="mline">Desk · a:8b <i>· your server</i>'
+                                  '</div><div class="mline">Desk · b:14b <i>· your server</i></div>'
+                                  '<span class="note">N &lt;i&gt;</span>')
+        and o["pop"][1] == ('<b>Pro · Desk only</b><div class="mline">Desk didn’t answer.</div>'
+                            '<span class="note">When</span>')
+        and o["pop"][2] == '<b>Desk Only</b><div class="mline">gpt-oss:20b</div><span class="note">O</span>',
+        "wired": "    tierPop.innerHTML=srvTierPopHtml(name,info);" in src
+        and '  document.querySelectorAll("#engmenu .engrow,#engsub .engrow").forEach(el=>{' in src
+        and "/* Fast, Thinking and Pro on that server alone (6b426): under \"<server> Only\" */\n"
+            ".engrow.srvsub{padding-left:26px}" in src,
+    }
+    return all(got.values()), [got, o]
+
+
+_SM_CHECKS = [
+    ("server modes: the tier id read in one place (\"srv:<id>\" unchanged, :fast/:think/:pro, anything else gone), "
+     "the modes' own counts and roles, no benchmark hold", _smc_parse),
+    ("server modes: each mode seats that server's models only (Fast one, Thinking three, Pro up to the cap), by the "
+     "role and card rules; the bubble's rows and promise; only this profile's paired servers", _smc_seats),
+    ("server modes: Thinking and Pro draft, double-check, review and merge on that server; no cloud and no pen of this "
+     "computer's, before or after a failure; nothing answered is said", _smc_council),
+    ("server modes: where they meet /api/chat (pinned)", _smc_pins),
+    ("server modes: the three rows under \"<name> Only\", the chip, the greying, the bubble (node)", _smc_page),
+]
+
+
+def _sm_run(src):
+    out = []
+    for name, fn in _SM_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n426, _o426, _d426 in _sm_run(_MILLENAI_SRC):
+    check(_n426, _o426, "%r" % (_d426,))
+
+_SM_MUT = [
+    ("the modes not parsed", '_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})(?::(fast|think|pro))?")',
+     '_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})(?::(fast|think|pro))?.*")'),
+    ("a mode read as another", 'SRV_MODE_KEYS = {"fast": "Fast", "think": "Thinking", "pro": "Pro"}',
+     'SRV_MODE_KEYS = {"fast": "Fast", "think": "Fast", "pro": "Pro"}'),
+    ("a count not the mode's", 'SRV_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}',
+     'SRV_MODE_SEATS = {"Fast": 1, "Thinking": 2, "Pro": 99}'),
+    ("no seat cap", "        return ([m[\"label\"] for m in ranked[:min(n, SRV_SEATS_MAX)]],",
+     "        return ([m[\"label\"] for m in ranked[:n]],"),
+    ("the mode's role ignored", '    ranked = srv_rank(server_only_cands(e), role, "normal", speeds)',
+     '    ranked = srv_rank(server_only_cands(e), "code", "normal", speeds)'),
+    ("a spill seated", '            if isinstance(m, dict) and m.get("name") and _srv_fits(m, vram)]',
+     '            if isinstance(m, dict) and m.get("name")]'),
+    ("the card's size ignored", '    vram = (s.get("gpu") or {}).get("vram_bytes")\n    return [dict(m, label=',
+     '    vram = None\n    return [dict(m, label='),
+    ("a dead mode when nothing fits", '    s = _srv_seen.get(e["id"]) or {}\n    pick = server_only_pick(',
+     '    return [], "", 0\n    pick = server_only_pick('),
+    ("seats while the server is off", '    seats, how, of = server_mode_seats(e, mode, speeds) if st["ok"] else ([], "", 0)',
+     '    seats, how, of = server_mode_seats(e, mode, speeds)'),
+    ("the bubble without the promise", '    out["note"] = note + " Nothing runs on this computer or in the cloud."',
+     '    out["note"] = note'),
+    ("no rows for the modes", "            for k, mode in SRV_MODE_KEYS.items():\n", "            for k, mode in ():\n"),
+    ("a mode's row always available", 'desc="%s only" % e["name"], skipped=[], available=ms["ok"])',
+     'desc="%s only" % e["name"], skipped=[], available=True)'),
+    ("an unpaired server resolved", "    if e is None or not _srv_paired(e):\n        return []\n    return server_mode_seats(",
+     "    if e is None:\n        return []\n    return server_mode_seats("),
+    ("the merge's pen from every server", '    return server_only_cands(e) if e is not None else []',
+     '    return []'),
+    ("a cloud voice drafts", "    _bench = [] if srv_only else cloud_bench()\n", "    _bench = cloud_bench()\n"),
+    ("a cloud pen", "    if comp in MODEL_ROUTES or srv_only:\n", "    if comp in MODEL_ROUTES:\n"),
+    ("no merge on the server by itself", "    srv_merge = srv_merge or srv_only      # one server's mode merges there (6b426)\n", ""),
+    ("the merge's pen from any server", "                if srv_only else server_compositor(bound_ctx(), _srv_used))",
+     "                if False else server_compositor(bound_ctx(), _srv_used))"),
+    ("this computer writes the merge when the server has no pen", "    if srv_only and _merge_srv is None:\n",
+     "    if False:\n"),
+    ("this computer writes the merge when the server fails", "model_fits_memory(merger) and not srv_only else \"\")",
+     "model_fits_memory(merger) else \"\")"),
+    ("nothing answered not said as the server's", "    if not good and srv_only:\n", "    if False:\n"),
+    ("no seats for a chat", "                _so_seats = (server_mode_resolve(srv_only_id(tier), _so_mode, self.ctx)\n"
+     "                             if _so_lbl and _so_mode else [])", "                _so_seats = []"),
+    ("a picture to every seat", "                council = _so_seats = _so_seats[:1] if images else _so_seats\n",
+     "                council = _so_seats\n"),
+    ("a council no longer the server's", "        _srv_only = bool(_so_c0) and council == (_so_seats or [_so_c0])\n",
+     "        _srv_only = bool(_so_c0) and council == [_so_c0]\n"),
+    ("Fast without its own path", '            elif (_srv_lbl and _srv_only and _so_mode == "Fast" and not _so_fail\n',
+     '            elif (False and _srv_lbl and _srv_only and _so_mode == "Fast" and not _so_fail\n'),
+    ("Fast with this computer behind it", '                    _srv_lbl, "", full_messages, memit, emit, status, step,\n',
+     '                    _srv_lbl, model_name, full_messages, memit, emit, status, step,\n'),
+    ("the cloud on the council", "                            bench_allow=[] if _srv_only else req_cloud,\n",
+     "                            bench_allow=req_cloud,\n"),
+    ("an Advanced pen on the council", '                            comp="" if _srv_only else req_comp,\n',
+     "                            comp=req_comp,\n"),
+    ("run_council not told", "                            hurry=hurry_ev, srv_only=_srv_only,\n",
+     "                            hurry=hurry_ev,\n"),
+    ("no double-check", '                                _srv_only and _so_mode == "Thinking")),',
+     "                                False)),"),
+    ("the wake without seats", "                _w_seats = (server_mode_resolve(_so_wake, _so_mode, self.ctx)\n"
+     "                            if _so_mode else [])", "                _w_seats = []"),
+    ("the header naming the cloud", "        if (len(council) > 1 and cloud_allowed() and not _srv_only\n",
+     "        if (len(council) > 1 and cloud_allowed()\n"),
+    ("a local rescue", "            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:",
+     "            if not sent[0] and not cloud_only and not _srv_lbl:"),
+    ("a title by a model of this Mac", "                _srv_lbl = council[0]\n            if (_srv_only or _srv_lbl)",
+     "                pass\n            if (_srv_only or _srv_lbl)"),
+    # the page
+    ("the page not reading the modes", "  const m=isSrvMode(t)?/^srv:([^:]+)(?::(fast|think|pro))?$/.exec(t):null;",
+     "  const m=isSrvMode(t)?/^srv:([^:]+)/.exec(t):null;"),
+    ("no rows for the modes in the flyout", "    +srvSubModes().map(([k,n,ic])=>", "    +[].map(([k,n,ic])=>"),
+    ("the rows never greyed", "      +(tier===t+\":\"+k&&!advOn?\" on\":\"\")+(ok?\"\":\" off\")+",
+     "      +(tier===t+\":\"+k&&!advOn?\" on\":\"\")+"),
+    ("the server's name not escaped in a row", "      +'<span class=\"edsc\">'+esc(s.name)+' only</span></div>').join(\"\");",
+     "      +'<span class=\"edsc\">'+s.name+' only</span></div>').join(\"\");"),
+    ("the modes not greyed", '    srvSubModes().forEach(x=>{tierOff["srv:"+s.id+":"+x[0]]=1;});});', "    });"),
+    ("the chip not naming the mode", '  if(s&&mode)return mode+" \\u00b7 "+s.name+" only";', "  if(false)return \"\";"),
+    ("the menu row not marked", "    const here=!advOn&&(srvTierParse(tier).id===s.id||",
+     "    const here=!advOn&&(tier===\"srv:\"+s.id||"),
+    ("the bubble without the seats", "        :mode?(info.models||[]).map(m=>'<div class=\"mline\">'+esc(m)",
+     "        :false?(info.models||[]).map(m=>'<div class=\"mline\">'+esc(m)"),
+    ("the bubble not used", "    tierPop.innerHTML=srvTierPopHtml(name,info);", "    tierPop.innerHTML=\"\";"),
+]
+_smm = []
+for _d426, _o426, _nw426 in _SM_MUT:
+    if _MILLENAI_SRC.count(_o426) != 1:
+        _smm.append((_d426, "anchor missing or not unique"))
+        continue
+    _r426 = _sm_run(_MILLENAI_SRC.replace(_o426, _nw426, 1))
+    _smm.append((_d426, [n for n, o, _x in _r426 if not o][:1] or "MISSED"))
+check("server modes: %d mutations of their code, each caught by a check above" % len(_SM_MUT),
+      all(isinstance(v, list) for _d, v in _smm), "%r" % [x for x in _smm if not isinstance(x[1], list)])
 
 # ---- live: the real gateway, a stand-in for Access, a copy of its own
 _O1_HARNESS_SRC = r'''"""The gauntlet's ollama1 (6b334): the REAL gateway (ollama1/bin/ollama1-gateway)
