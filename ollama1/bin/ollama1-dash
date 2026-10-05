@@ -244,6 +244,10 @@ def png(args):
         sampler.tick()
         time.sleep(1.0)
         st = sampler.tick()
+    if "--state" in args:                                 # --state cpu|gpu|passed|failed|aborted|refused|nogpu: the burn test's banner
+        import dash_sample as _ds
+        kind = args[args.index("--state") + 1]
+        st["burn"] = _ds.burn_state("cpu" if kind == "burn" else kind, st.get("time") or time.time())
     t0 = time.time()
     if cost and not st.get("pairing"):
         pm = o1panel.render_cost(st, w, h)

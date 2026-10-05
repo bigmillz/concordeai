@@ -14,6 +14,7 @@ ollama1-dash logs it and falls back to the text dashboard.
 """
 import os
 import select
+import subprocess
 import time
 
 import o1fb
@@ -40,6 +41,40 @@ def handle_keys(data, screen, now, last_flip, debounce=FLIP_DEBOUNCE_S):
     if b" " in data and now - last_flip >= debounce:
         return ("cost" if screen == "panel" else "panel"), now
     return screen, last_flip
+
+
+BURN_UNIT = "ollama1-quickburn.service"
+BURN_ABORT_FILE = "/run/ollama1/quickburn/abort"
+BURN_START_GRACE_S = 8        # after Enter the progress file may take a few seconds to appear: no second start meanwhile
+
+
+def handle_burn_keys(data, running, now, last, debounce=FLIP_DEBOUNCE_S):
+    """(action, time of the last action) for these keyboard bytes: "start" for Enter when no test is
+    running, "abort" for a lone Esc while one is; anything else (including an arrow key, which begins
+    with Esc) and any key within the debounce of the last one does nothing."""
+    if now - last < debounce:
+        return None, last
+    if (b"\r" in data or b"\n" in data) and not running:
+        return "start", now
+    if data == b"\x1b" and running:
+        return "abort", now
+    return None, last
+
+
+class BurnControl:
+    """What the keys do, with the least privilege: Enter starts the one systemd unit polkit lets this
+    user start; Esc creates an empty file in the one folder this user may write, which the script looks at."""
+
+    def __init__(self, unit=BURN_UNIT, abort_file=BURN_ABORT_FILE, popen=None):
+        self.unit, self.abort_file = unit, abort_file
+        self.popen = popen or subprocess.Popen
+
+    def start(self):
+        self.popen(["systemctl", "start", "--no-block", self.unit], stdin=subprocess.DEVNULL,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def abort(self):
+        os.close(os.open(self.abort_file, os.O_WRONLY | os.O_CREAT, 0o600))
 
 
 class Keys:
@@ -98,7 +133,7 @@ class _Sleeper:
 
 
 def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.sleep,
-        stop=lambda: False, max_frames=None, log=None, keys=None):
+        stop=lambda: False, max_frames=None, log=None, keys=None, burn=None):
     """Draw until stop() is true (or max_frames pictures were drawn, for the
     tests). `keys` has wait(timeout) -> bytes (see Keys); Space flips to the
     electricity cost screen and back. `tty` is an o1fb.TtyGraphics; `vt` the number of the terminal
@@ -126,6 +161,8 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
         on_screen = "panel"
         keys = keys or _Sleeper(sleep)
         screen, last_flip = "panel", -1e9
+        burn = burn or BurnControl()
+        last_burn, starting_until = -1e9, 0.0
         while not stop():
             now = clock()
             if st is None or now >= next_tick:
@@ -134,7 +171,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
             active = tty.vt_active() if vt is not None else None
             mine = vt is None or active is None or active == vt
             if mine and (now >= next_draw or not shown):
-                eff = "panel" if st.get("pairing") else screen          # an open pairing window takes the screen
+                eff = "panel" if (st.get("pairing") or o1panel.burn_view(st, now)) else screen   # a pairing window or the burn test takes the screen
                 if not shown or eff != on_screen:    # another terminal was showing, or the picture's size changes: start from black
                     for off, data in pres_by[eff].clear():
                         fb.write(off, data)
@@ -156,7 +193,19 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
             shown = mine
             typed = keys.wait(POLL_S)
             if typed:
-                new, last_flip = handle_keys(typed, screen, clock(), last_flip)
+                t_ = clock()
+                action, last_burn = handle_burn_keys(typed, o1panel.burn_running(st, t_) or t_ < starting_until, t_, last_burn)
+                if action and not st.get("pairing"):
+                    try:
+                        if action == "start":
+                            burn.start()
+                            starting_until, next_tick, next_draw = t_ + BURN_START_GRACE_S, 0.0, 0.0
+                        else:
+                            burn.abort()
+                    except (OSError, subprocess.SubprocessError) as e:
+                        if log:
+                            log("burn test key: %s" % e)
+                new, last_flip = handle_keys(typed, screen, t_, last_flip)
                 if new != screen:
                     screen, next_draw = new, 0.0      # flip at once, not at the next two-second picture
     finally:

@@ -30,7 +30,8 @@ WAKE_REFRESH_S = 300
 MAX_WAKE = 8
 MAC_RX = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
 VIRTUAL_NICS = re.compile(r"^(lo|veth|docker|br-|virbr|vnet|tap|tun|dummy|ifb|bond|wg|tailscale|zt|cni|flannel|vmnet)")
-TOOL_SCRIPTS = ("stability-test.sh", "ram_model_test.py", "ram-model-test.sh", "setup.sh")   # named anywhere in the command
+TOOL_SCRIPTS = ("stability-test.sh", "ram_model_test.py", "ram-model-test.sh", "setup.sh", "quick-burn.sh",
+                "gpu-burn.sh")   # named anywhere in the command
 TOOL_PROGRAMS = ("apt", "apt-get", "dpkg", "unattended-upgrade", "unattended-upgrades")      # the program itself
 
 

@@ -89,6 +89,18 @@ gpu_tune_choice() { # FLAG ENV SAVED -> "on", "off" or "default" (6b361): the fl
   echo default
 }
 
+gpu_clock_choice() { # FLAG SAVED MAX -> whole MHz 0..MAX (6b420): the flag, else what an earlier run saved, else 0 (off).
+  # The memory and core clock raises of --gpu-tune are opt-in; a value that is not a whole number in range fails.
+  local v max=$3
+  for v in "$1" "$2"; do
+    [ -n "$v" ] || continue
+    [[ "$v" =~ ^[0-9]{1,4}$ ]] || return 1
+    [ "$((10#$v))" -le "$max" ] || return 1
+    echo "$((10#$v))"; return 0
+  done
+  echo 0
+}
+
 fans_choice() { # FLAG ENV SAVED -> "on" or "off" (6b385): the flag, else the environment (OLLAMA1_FANS), else what an
   # earlier run saved, else "on": the fans-at-full-speed-while-working service is on unless turned off.
   # Fails on a value it doesn't know.
@@ -129,7 +141,7 @@ leds_choice() { # FLAG ENV SAVED -> "on" or "off" (6b395): the flag, else the en
 
 leds_plan() { # the plan's line for the lights (6b395)
   if [ "$1" = on ]; then
-    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red as its load rises (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
+    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red as its load rises, dimming to 50% after 5 idle minutes (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
   else
     printf 'Lights OFF (default): nothing installed, the lights stay as the board leaves them. On: --leds on'
   fi

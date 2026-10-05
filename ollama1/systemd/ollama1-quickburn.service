@@ -1,0 +1,41 @@
+# The burn test started from the server's keyboard (6b418): 30 s of processor load, then 30 s of
+# graphics-card load (tools/quick-burn.sh). polkit lets the screen's own user (o1dash) START this one
+# unit and nothing else; Esc makes an empty file in /run/ollama1/quickburn (the one folder o1dash may
+# write into), which the script looks at every second. Not started at boot (no [Install]).
+#
+# Root, because stress-ng, the card's sensors, the kernel log and llama-bench's GPU access need it, but
+# boxed in: it writes only /run/ollama1 (its progress file) and /var/lib/ollama1 (the last result),
+# can read /home only (llama-bench lives in ~/llama-bench), has no network and no way to gain more.
+# DevicePolicy is left at its default (not closed) on purpose: the Vulkan/ROCm load needs the card's
+# render node, /dev/dri/* and /dev/kfd, plus what stress-ng opens, and a closed policy that lists them
+# all would break on a different card; the other limits (no network, read-only system, no new
+# privileges, no kernel tunables, modules or logs written) still hold. MemoryDenyWriteExecute is not
+# set: the Vulkan driver compiles shaders.
+[Unit]
+Description=ollama1: 30 s processor burn, then 30 s graphics-card burn (from the screen's keyboard)
+After=ollama.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/tools/quick-burn.sh
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=300
+KillMode=control-group
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1 /var/lib/ollama1
+ProtectHome=read-only
+PrivateTmp=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022

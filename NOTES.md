@@ -9,6 +9,101 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b420 — graphics tuning: the power limit alone by default; memory and core clocks opt-in, each judged alone (kit)
+
+- Real card (RX 6900 XT): `ollama1-gpu-tune on` reverted every time ("tuned
+  108.5/103.8/102.2 against stock 248.3/247.8 tokens/s, 2 of 2 repeats"). By
+  hand with llama3.2:1b: power 332 W alone with the memory clock at stock =
+  247.3/244.7/246.5 tokens/s (the same as stock); the memory bump to the OD
+  maximum (+75) is what made it 2.4x slower (no kernel error). The old tuner
+  set both, so a harmless power raise was thrown away with the bad bump.
+- `on` now sets ONLY the power limit (the card's maximum, clamped as before).
+  `on --memory N` (whole MHz 0..75) and `on --core N` (0..150 above the current
+  stock top) are opt-in, default 0, saved in the state, restored at boot like
+  power. The OD writes: `m 1 <stock+N>` / `s 1 <stock+N>` then `c`, clamped to
+  the OD_RANGE, read back and verified; stock via the existing `r`/`c` reset.
+  Memory is never touched unless `--memory` is given (a reset to take off an
+  earlier bump of ours is the only other write).
+- Checks run per part, in order power, memory, core (`run_checks`,
+  `pending_part`, `checked_parts`). A real amdgpu error or heat (105 C
+  junction; 100 C while the core is raised) reverts EVERYTHING at once. A power
+  raise slower than stock reverts everything. A memory or core raise slower
+  than the previous stage (power-only / without the core) reverts ONLY that
+  clock (`part_revert`, `memory_reverted` / `core_reverted`) and says "memory
+  +25 MHz was slower, back to stock; power limit kept". The core is also judged
+  on prompt reading (`Ollama.generate_prompt`: ~2000 tokens in, 8 out, a
+  different start each time so Ollama's prompt cache can't flatter it), and
+  always compared with and without the raise (alternating twice).
+- Pat's report on the old version: `on --core 150` applied power AND the
+  memory bump, the check was deferred ("another model was loaded; the card was
+  99% busy") and the bump stayed live. Now: before measuring, wait up to 60 s
+  for the card to be quiet (`wait_quiet`: busy under 10%, no model loading) and
+  say what it waits for; if it never is, nothing is measured or raised and the
+  next run says "core +150 not applied yet: ...; run it again when the server
+  is idle". `ready_parts` applies an experimental clock only once its own check
+  passed (also at boot and after a wake); a deferred, unclean, no-answer or
+  no-load check drops the clock again (`drop_unproven`). The power limit may
+  stay during a deferral.
+- State version 2: an old file (`wanted=on` with a `reverted` record) is
+  migrated on load (`migrate_state`): the revert is dropped (kept as
+  `migrated.old_revert`), memory/core 0, checks cleared, stock figures kept; an
+  old "off" stays off. Status prints the old reason.
+- Printed lines say exactly what was set ("power limit 332 W (maximum)",
+  "core +150 MHz (top 2529 -> 2679)"); nothing about the memory unless asked.
+  Status shows each part ("Now: power 332 W, memory stock, core +50 MHz").
+- setup.sh: `--gpu-tune-memory N` and `--gpu-tune-core N` (validated 0..75 /
+  0..150), saved as GPU_TUNE_MEMORY / GPU_TUNE_CORE in setup.env (written when
+  GPU_TUNE is not "default"), passed to `ollama1-gpu-tune setup on|force-on
+  --memory N --core N`; `gpu_clock_choice` in lib/setuplib.sh; the plan line
+  and the header help changed. The admin page shows power, memory and core as
+  separate facts.
+- Tests: `TestParts`, `TestOldState`, `TestCommandClocks`, new setup-flag tests
+  in `test_gputune.py` (fakes learned the core table, `s`/`m` writes, prompt
+  reading and speeds per raised part); 14 new mutants in `mutate.py`.
+- Unverified on the real card: the core overclock itself, and that the
+  prompt-reading measurement behaves as designed with a real Ollama.
+
+## 6b418 — a NETWORK box, one storage total, and Enter for a 30 s processor + 30 s card burn (per Patrick)
+
+- **Middle column = three boxes** (`layout()`: storage, fans, network, one width, `MID_MIN` = 40/49/59 units, each
+  fits its lines at the design size; extra height is shared; the top row gives up space down to 96 units when the
+  screen is short). The three use `frame(compact=True)` (15 units of title, 4 of padding). Nothing in them is cut with
+  an ellipsis: `parts_line` leaves out the last pieces of a line when it is too wide.
+- **STORAGE**: the filesystems added together (`disk_total`: a mount with the same size, used and free as another
+  counts once) as one bar and "Used 188 GB of 1.8 TB" (`dec_bytes`: decimal GB/TB), then Read/Write rates; a missing
+  mount replaces the rates line, in red. **NETWORK** (`net_lines`): Down/Up, Link (wired + speed, "(1 of 2 up)" amber,
+  "no cable" red, or amber "on Wi-Fi" when `net["wifi"]`: the default route's interface has `/sys/class/net/X/wireless`),
+  address, Tunnel (moved out of Status; DOWN stays a Status warning) with "Errors n  drops n" in amber, totals since
+  boot. `o1metrics` adds `rx_total`, `tx_total`, `errors`, `drops`, `via`, `wifi` to `st["net"]` (four small files and
+  /proc/net/route every 10 s; no new heavy sampling). No graph: the box has no room for one at 360 units.
+- **FANS**: the header is the phase word and level only ("working 100%", "cooling down NN%", "idle 20%"); the cause text
+  is gone; "HOT 100%" in amber when the override is on; the rows are the two bars and the pump/coolant line.
+- **Burn test.** `tools/quick-burn.sh` (root): stress-ng as the stability test's cpu phase (every thread,
+  matrixprod, --verify) for 30 s, then `gpu-burn.sh` (O1_BURN_SECONDS=30; its llama-bench discovery) for 30 s; a card
+  part that cannot start (no llama-bench, no model) is "not run: why" and the run still passes on the processor. Stops
+  on a new hardware-error record, CPU 95 C, junction 105 C or the abort file. Refuses (result "refused", with the
+  reason) for a request in flight (`o1idle.read_activity`), a model download/update (`o1sleep.busy_reasons`), another
+  tool (`o1idle.tools_running`; `quick-burn.sh` and `gpu-burn.sh` are now in `TOOL_SCRIPTS`, so auto sleep and the fans
+  see a burn as work) or a second burn (flock). stress-ng is required, not installed (no network in the unit).
+  Progress every second in `/run/ollama1/quickburn.json`, the last result in `/var/lib/ollama1/quickburn-last.json`.
+- **Privilege.** `ollama1-quickburn.service`: root oneshot, no network, ProtectSystem=strict writing only /run/ollama1
+  and /var/lib/ollama1, home read-only, DevicePolicy left default (the Vulkan/ROCm load needs the render node,
+  /dev/dri/* and /dev/kfd, and a closed policy listing them would break on another card). polkit: `o1dash` may START
+  that one unit and nothing else. Abort without a second unit: tmpfiles makes `/run/ollama1/quickburn` 0730 root:o1dash,
+  Esc creates an empty file there (the dash unit gets `ReadWritePaths=-/run/ollama1/quickburn`), the script looks at its
+  existence only and removes it. Least privilege chosen over a stop verb: o1dash can end a test but never run
+  anything else.
+- **Panel.** Enter starts (`BurnControl.start`: `systemctl start --no-block`), Esc aborts, both with the 0.3 s debounce;
+  Enter is ignored while a test runs and for 8 s after it was pressed (the progress file takes a moment); only a lone Esc
+  aborts (arrow keys begin with Esc); a pairing window wins. The header strip becomes the banner while running (a file
+  not touched for 10 s is a dead script) and for 60 s after the result; the cost screen gives way to a running test. Footer:
+  "Enter: burn test". `ollama1-dash --png out.png --state cpu|gpu|passed|failed|aborted|refused|nogpu`.
+- Install: lib/o1panel.py o1paneld.py o1metrics.py o1idle.py; tools/quick-burn.sh and gpu-burn.sh to
+  /usr/local/lib/ollama1/tools; systemd/ollama1-quickburn.service and ollama1-dash.service; config/50-ollama1.rules and
+  ollama1.tmpfiles (then `systemd-tmpfiles --create`, `systemctl daemon-reload`, restart polkit/ollama1-dash). setup.sh does
+  all of it. Unverified on the server: stress-ng and Vulkan inside the unit's sandbox, polkit allowing o1dash, KD_GRAPHICS
+  Enter/Esc delivery.
+
 ## 6b409 — a server's load time, timed here when Ollama doesn't say
 
 The Benchmark's server rows always said "load not measured: The server didn't report a load
@@ -279,6 +374,47 @@ owner's view.
 - GRAPHICS CARD: the Fan row is gone; in its place Mem, the card's own memory temperature (`temps["mem"]`, already read
   by `o1stats.gpu()`, no new sampling), full bar at 95 C, amber from 85, red from 95. Temp stays the junction/edge one.
 - Install: lib/o1panel.py, lib/o1metrics.py, then restart ollama1-dash. Tests: TestFans; 4 mutants.
+## 6b419 — lights cool down over 180 s and dim to 50% after 5 idle minutes (per Patrick)
+
+Patrick: "When cooling down, have the lights fade from red to orange to yellow to white
+throughout the course of cooling down in a linear fashion. Then after five minutes of being
+idle, fade down to fifty percent brightness. When the GPU starts working again, or if the CPU
+hits 20% usage or higher, bring it back up to 100% brightness and repeat." Kit only
+(`lib/o1leds.py`); `lib/o1work.py` and the fans untouched.
+
+- **Colour fall.** `FALL_S` 10 s -> 180 s (the fans' 60 + 120 s cool-down): the shown
+  intensity falls linearly over the whole cool-down; the rise (2.5 s) and the stops are
+  unchanged; a burst raises it from wherever it is; 99/0/99/0 jitter stays near red.
+- **Brightness b (0.5..1.0)** multiplies each channel of the final RGB, rounded (white 128,128,128;
+  red 128,0,0), independent of the colour. Idle = card < 10% (6 s average) AND processors < 15%
+  (10 s average, o1work's cpu reading: user+nice+system+irq+softirq, no iowait); not idle at the
+  card >= 15% (`o1work.GPU_BUSY_PCT`) OR processors >= 20% (`CPU_WAKE_PCT`); the gaps are the
+  hysteresis (wobbling 14/16 or 19/21 flips nothing). The averages come from `o1work.Work`'s
+  own `_gpu`/`_cpu` (fed with the lights' cached card reading), so they are the fans' code.
+  Idle starts counting `idle_since` at the moment it (re)enters idle; at `IDLE_DIM_S` = 300 s, b
+  falls to 0.5 over `DIM_S` = 10 s; not idle: b returns to 1.0 over `UNDIM_S` = 1.5 s and the timer
+  restarts at the next idle moment. Start and wake (`resync`): b = 1.0, idle, timer from now
+  (and the averages restart). No card reading counts as card idle. A request in flight or a tool does
+  not wake it.
+- **Loop.** 20 Hz while the colour rises or b moves; during the slow fall it wakes with the
+  0.25 s sample (about one colour level a tick), so an idle server still wakes only 4 times a
+  second. Frames only when the rounded RGB changes; keepalive and reconnect resend the shown
+  colour including b (a stop still sets plain white).
+- **Status.** JSON adds `brightness`, `idle`, `idle_s`, `gpu_avg`, `cpu_avg`; `rgb` is the shown
+  colour including b. Line: "Lights: orange, 100% (card 61% busy)", "Lights: white, dimming
+  (idle 5 min)", "Lights: white, dimmed 50% (idle 6 min)". Admin line, `ollama1-leds status`,
+  README and the setup plan/help updated.
+- **Tests.** The 10 s fall test is replaced by the 180 s linear fall (x at 45/90/135/180 s) and a
+  mid-fall burst; `TestDimming` (300 s start and 10 s dim, 1.5 s restore, CPU 19/21 and card 14/16
+  edges with the averaging, a spike averaged away, timer restart, no dimming while a burst's
+  fade is under 300 s old, both-quiet logic, boot/wake state, no flicker, resent/reconnect colour
+  with b, status text). 48 `leds:` mutants (180, 300, 0.5, 10, 1.5, 20/15%, the AND logic, ...), all killed.
+- Unverified on the real server: how 50% looks on the Mystic Light and the pump head (many
+  controllers have their own brightness curve), and that the processors' average behaves
+  as expected with the real /proc/stat.
+
+---
+
 ## 6b417 — lights follow the graphics card's load, white through yellow and orange to red (per Patrick)
 
 Patrick, after the 6b395 lights worked on the real server: "have the lights dynamically

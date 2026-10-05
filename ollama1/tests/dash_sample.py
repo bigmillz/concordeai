@@ -74,6 +74,7 @@ def sample(now=None, pairing=False, marker=None):
                   "progress": 41.3, "finish": "312.4min"}],
         "io": {"read_bps": 52e6, "write_bps": 3.1e6},
         "net": {"name": "br0", "address": "192.168.1.10/24", "state": "up", "rx_bps": 2.4e6, "tx_bps": 3.1e5,
+                "rx_total": 4.2e9, "tx_total": 1.1e9, "errors": 0, "drops": 0, "wifi": False, "via": "br0",
                 "ports": [{"name": "enp5s0", "carrier": True, "speed_mbps": 1000},
                           {"name": "enp6s0", "carrier": True, "speed_mbps": 1000}]},
         "tunnel": {"up": True, "connections": 4, "rtt_ms": 23.4},
@@ -102,3 +103,17 @@ def sample(now=None, pairing=False, marker=None):
         "series": series,
     }
     return st
+
+
+def burn_state(kind, now):
+    """The 30 s burn test's progress file as the panel reads it: "cpu" and "gpu" while running,
+    "passed", "failed", "aborted", "refused" and "nogpu" (passed, the card part not run) afterwards."""
+    base = {"at": int(now), "seconds_each": 30, "cpu_c": 71, "gpu_c": 66, "gpu_busy": 99, "cpu_busy": 100}
+    if kind == "cpu":
+        return dict(base, phase="cpu", seconds_left=18, result="running", reason="")
+    if kind == "gpu":
+        return dict(base, phase="gpu", seconds_left=12, result="running", reason="", cpu_busy=3)
+    reasons = {"passed": "", "failed": "graphics card: FAIL: the card was only 3% busy", "aborted": "stopped from the keyboard",
+               "refused": "a request is running",
+               "nogpu": "processor passed; graphics card not run: llama-bench not found"}
+    return dict(base, phase="done", seconds_left=0, result="passed" if kind == "nogpu" else kind, reason=reasons[kind])
