@@ -3929,10 +3929,13 @@ def _tier_ready(name: str) -> list:
 _TIER_ROLE = {"Fast": "fast", "Thinking": "think", "Pro": "all"}
 # the most server models a mode seats (6b339, final review): Pro seats every
 # model that fits, and a server holding a dozen drafts one after another
-# (one card) past the 240 s the council's loop gets, so only the first
-# four drafts landed. The rest fall to this computer's normal picks or are
-# left out, and the tier's bubble says so
-SRV_SEATS_MAX = 4
+# (one card) past the loop's budget, so only the first drafts landed. It was
+# four against a flat 240 s; now (per Patrick: "why can't it run as many
+# as we want") it is eight, and the server's part of the loop is given
+# SRV_DRAFT_S for each model it seats (run_council), so they all finish. The
+# rest fall to this computer's normal picks or are left out, and the tier's
+# bubble says so
+SRV_SEATS_MAX = 8
 # the agents that may: the Code lane's prefer a coder; Research and Remote
 # run their own flows on this computer and keep them
 _AGENT_ROLE = {"Coding": "code", "Workspace": "code", "Math & Logic": "think",
@@ -23074,6 +23077,7 @@ def run_council(labels: list, messages: list, emit, status,
     # exactly how a failed cloud voice is treated.
     LOCAL_CAP = 120.0            # any single model
     LOCAL_BUDGET = 240.0         # the local loop end to end
+    SRV_DRAFT_S = 45.0           # a server's share of its loop for each model it seats (6b422)
 
     def _capped(label, fn):
         """A step of the council that isn't a draft (peer review, reflection)
@@ -23201,6 +23205,10 @@ def run_council(labels: list, messages: list, emit, status,
         if server_label(_l):
             _groups.setdefault(_l.split(SERVER_SEP, 1)[0], []).append(_l)
     _own = [_l for _l in labels if not server_label(_l)]
+    # the server's models draft one after another on one card, so its loop is
+    # as long as its models need, never shorter than the flat budget
+    _srv_deadline = max(_local_deadline, time.time() + SRV_DRAFT_S
+                        * max((len(_g) for _g in _groups.values()), default=0))
 
     def _run_group(_g):
         for _j, _lbl in enumerate(_g, 1):
@@ -23210,7 +23218,7 @@ def run_council(labels: list, messages: list, emit, status,
             if _j > 1 and server_label_down(bound_ctx(), _lbl):
                 took_part(_lbl, "(no answer \u2014 server down)")
                 continue
-            _draft_one(_j, _lbl, _local_deadline, True)
+            _draft_one(_j, _lbl, _srv_deadline, True)
     _gthreads = []
     for _g in _groups.values():
         _gt = ctx_thread(target=_run_group, args=(_g,), daemon=True)
@@ -23219,7 +23227,7 @@ def run_council(labels: list, messages: list, emit, status,
     for i, label in enumerate(_own, 1):
         _draft_one(i, label, _local_deadline)
     for _gt in _gthreads:
-        _gt.join(timeout=max(1.0, _local_deadline - time.time() + 20))
+        _gt.join(timeout=max(1.0, _srv_deadline - time.time() + 20))
 
     # ONE shared deadline, not 75s EACH: joining N threads with a 75s
     # timeout apiece could hold the answer for 75*N seconds if several

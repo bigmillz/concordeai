@@ -21345,18 +21345,20 @@ def _p2c_seats(src):
         _m("gpt-oss:20b", size=13 * GIB_), _m("mistral-small:24b", size=14 * GIB_)], {})], local=LOCAL)
     got["partly filled"] = [(s["label"], s["fb"]) for s in n2["resolve_tier_seats"]("Thinking", c2)] == [
         ("Desk · mistral-small:24b", "Gemma 4 26B"), ("Desk · gpt-oss:20b", "GPT-OSS 20B"), ("Gemma 4 26B", "")]
-    # THE CAP (final review): Pro seats at most four of a server's models, the rest of the roster is this computer's
-    # normal picks; Thinking and Fast keep their counts; the figure the bubble gives is the cap only where it binds
-    six = [_m("%s:8b" % n_, size=5 * GIB_) for n_ in ("alpha", "beta", "gamma", "delta", "epsilon", "zeta")]
+    # THE CAP (final review; eight since per Patrick "why can't it run as many as we want"): Pro seats at most eight of
+    # a server's models, the rest of the roster is this computer's normal picks; Thinking and Fast keep their counts;
+    # the figure the bubble gives is the cap only where it binds
+    six = [_m("%s:8b" % n_, size=5 * GIB_) for n_ in ("alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta",
+                                                      "theta", "iota", "kappa")]
     n6, c6, e6 = _p2_seat_ns(src, [("Desk", "https://desk.example.com", six, {})], local=LOCAL)
     pro6 = [s_["label"] for s_ in n6["resolve_tier_seats"]("Pro", c6)]
-    got["cap"] = (len([l for l in pro6 if l.startswith("Desk")]) == 4 and pro6[:4] == [l for l in pro6 if l.startswith("Desk")]
-                  and pro6[4:] == ["Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.5 9B", "Llama 3.2 3B"]
+    got["cap"] = (len([l for l in pro6 if l.startswith("Desk")]) == 8 and pro6[:8] == [l for l in pro6 if l.startswith("Desk")]
+                  and pro6[8:] == ["Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.5 9B", "Llama 3.2 3B"]
                   and len([s_ for s_ in n6["resolve_tier_seats"]("Thinking", c6)]) == 3
                   and len(n6["resolve_tier_seats"]("Fast", c6)) == 1)
-    got["cap note"] = (n6["tier_server_cap"]("Pro", c6) == (4, 6) and n6["tier_server_cap"]("Thinking", c6) is None
+    got["cap note"] = (n6["tier_server_cap"]("Pro", c6) == (8, 10) and n6["tier_server_cap"]("Thinking", c6) is None
                        and n6["tier_server_cap"]("Fast", c6) is None and n6["tier_server_cap"]("Cloud Only", c6) is None
-                       and n5_cap(src, six[:4]) is None)
+                       and n5_cap(src, six[:8]) is None)
     # the switch off: this computer's answer, as before; a server that isn't answering too
     base = [(l, "") for l in ns["_tier_ready"]("Thinking")[:3]]
     ns["server_set_prefer"](ctx, ents["Desk"]["id"], False)
@@ -21900,8 +21902,9 @@ def _p2c_pins(src):
         # the council: servers beside this Mac, one thread per server, the same caps; deadlines for a mode's seats
         "council": "    _groups = {}\n    for _l in labels:\n        if server_label(_l):\n            _groups.setdefault(_l.split(SERVER_SEP, 1)[0], []).append(_l)" in rc
         and "        _gt = ctx_thread(target=_run_group, args=(_g,), daemon=True)" in rc
-        and "            _draft_one(_j, _lbl, _local_deadline, True)" in rc
-        and "        _gt.join(timeout=max(1.0, _local_deadline - time.time() + 20))" in rc
+        and "            _draft_one(_j, _lbl, _srv_deadline, True)" in rc
+        and "        _gt.join(timeout=max(1.0, _srv_deadline - time.time() + 20))" in rc
+        and "    SRV_DRAFT_S = 45.0" in rc and "SRV_DRAFT_S\n                        * max((len(_g) for _g in _groups.values()), default=0))" in rc
         and "    LOCAL_CAP = 120.0" in rc and "        _jd = time.time() + min(LOCAL_CAP, max(15.0, _left))" in rc
         and "                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):" in rc
         and "hurry=None, srv_first_s=None, srv_merge=False) -> None:" in rc
@@ -22718,8 +22721,10 @@ _P2_MUT = [
      '    emit(Ctl(NUL + "RUN:" + json.dumps({"r": [fallback]'),
     ("the fallback's badge", '{"r": [fallback], "w": "local",', '{"r": [fallback], "w": "server",'),
     ("servers draft in turn with this Mac", '        _gt.start()\n        _gthreads.append(_gt)', '        _gt.start()\n        _gt.join()\n        _gthreads.append(_gt)'),
-    ("a server's models at once", '            _draft_one(_j, _lbl, _local_deadline, True)',
-     '            threading.Thread(target=_draft_one, args=(_j, _lbl, _local_deadline, True), daemon=True).start()'),
+    ("a server's models at once", '            _draft_one(_j, _lbl, _srv_deadline, True)',
+     '            threading.Thread(target=_draft_one, args=(_j, _lbl, _srv_deadline, True), daemon=True).start()'),
+    ("a server's loop no longer than the flat budget", '    _srv_deadline = max(_local_deadline, time.time() + SRV_DRAFT_S',
+     '    _srv_deadline = min(_local_deadline, time.time() + SRV_DRAFT_S'),
     ("the merge not on the server", '        if _sc is not None:\n            _merge_fb, merger =', '        if False:\n            _merge_fb, merger ='),
     ("a server merge with no fallback", '            if _merge_fb:\n                # the server didn\'t write it', '            if False:\n                # the server didn\'t write it'),
     ("a named pen overridden", '    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES:', '    elif merger in MODEL_ROUTES:'),
@@ -23658,16 +23663,16 @@ def _modes_live39(inst, sid, svn, only=None):
                         for f_ in th["frames"]))
             pr = run("Pro", "say hello in one word 339p")
             # (the council puts the merger last, so the line-up is compared by what is the server's)
-            got["Pro: four server seats draft"] = (
-                pr["status"] == 200 and len(srv("Pro")) == 4
+            got["Pro: all six server models draft"] = (
+                pr["status"] == 200 and len(srv("Pro")) == 6
                 and [m for m in pr["models"] if m.startswith(lab)] == srv("Pro")
                 and sorted(pr["models"]) == sorted(tiers["Pro"]["models"])
                 and {tag(l) for l in srv("Pro")} <= pr["drafted"])
             got["Pro: the merge is written on the server, by a model it already holds, and no local pen writes it"] = (
                 len(pr["merged"]) == 1 and pr["merged"][0] in pr["resident"]
                 and not any(c[0] == "run" and len(c) > 2 and c[2] for c in pr["loc"]))
-            got["Pro: the cap says so, and only where it binds"] = (
-                tiers["Pro"].get("srvcap") == {"seated": 4, "of": 6} and "srvcap" not in tiers["Thinking"]
+            got["Pro: the cap says so, and only where it binds (not for six models)"] = (
+                "srvcap" not in tiers["Pro"] and "srvcap" not in tiers["Thinking"]
                 and "srvcap" not in tiers["Fast"])
             # (Pro also seats this computer's own models, and warms the first of those: nothing else)
             got["Pro: no engine warmed here but a seat of its own"] = (
