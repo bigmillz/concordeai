@@ -9,6 +9,155 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b409 — a server's load time, timed here when Ollama doesn't say
+
+The Benchmark's server rows always said "load not measured: The server didn't report a load
+time." Ollama 0.35.1 answers the empty-prompt load with only {"done":true,"done_reason":"load"}
+(checked on the server). `_BenchServer.load` now times the load itself when the model wasn't
+loaded: monotonic, from the request going out to the done line, so the network is in it.
+`fix()` keeps it as `load_src` "timed" (Ollama's own load_duration is still used when sent; a
+model already loaded is still "not measured"). The row reads "load 4.2 s, timed by this
+computer". Gauntlet: the server-run check expects the timed load; the pane's row in node; four
+mutations.
+
+## 6b408 — the studio cards' Remove is a real button (per Patrick)
+
+The Remove (and Continue in background) buttons on the Image and Video generation cards were
+`ghost slim` without the app's button class: a thin grey box with the browser's own text, under
+the title at the left. They are `about-btn slim ghost` now: the same height, padding, font and
+9 px radius as Add, in the card's action row at its right edge (`.studio .stacts`
+justify-content:flex-end), a subtle border, a hover, a focus ring, and Remove warms to the danger
+tint on hover and while it asks "really remove?". Text and the confirm step unchanged. Gauntlet:
+a CSS/markup substring check. Seen in the Browser pane (dark; the app has no light theme), not
+in WKWebView.
+
+## 6b407 — the same three sets on your server, with the exact lists before anything goes (per Patrick)
+
+Settings › Servers: each paired server's card has "Models on <name>" with the three cards,
+computed by the same `model_sets`, for target `{"vram": the card}`: a catalog row fits when its
+Ollama file (OLLAMA_BYTES, by the tag in its ollama column) fits the card whole by `_srv_fits`'s
+own rule (size × 1.05 + 1.25 GiB), the same roles and nesting, one row per tag, giants only in
+Everything. The card's size: /v1/models/state's `vram_bytes`, else the last check's. A 16 GB card:
+Light = llama3.2:3b, llama3.2:1b, gemma4:12b (10.9 GB); Recommended adds gpt-oss:20b, qwen3.5:9b,
+deepseek-r1:8b (36.5 GB); Everything adds ministral-3:14b, hermes3:8b (50.3 GB).
+
+- **Contract (client side; the kit is being built by another agent).** Signed GET
+  /v1/models/state and POST /v1/models/apply {plan, add, remove, seen}; `seen` is the sha256 of
+  the sorted model names as this app saw them. New section `# ==== server model sets ====`:
+  `_srv_mstate_parse` (field by field), `server_sets_view` (per set: Download with sizes, Remove
+  = models on the server outside the set whose names the gateway takes, at most 40, models not
+  in the catalog included; others unchanged; state yours/installed/download: the set picked
+  there while complete, else the largest complete), `server_models_get`, `server_models_apply`;
+  routes GET /api/servers/models?id= and POST /api/servers/models.
+- **Nothing removed that wasn't on the sheet.** The read keeps, per server, the seen hash and
+  each set's Download and Remove lists (`_srv_mstate`, a profile cache). An apply is sent only
+  when its seen is that read's, add ⊆ the set's downloads and remove ⊆ its Remove list, within
+  15 minutes; a sheet is good for one change. Otherwise nothing is sent and the sheet is read
+  again. Tags are checked against the contract's pattern, at most 40 a list, disjoint.
+- **The sheet** (`#srvset-veil`): "<Set> on <name>", Download and Remove by name and size, "N
+  other models unchanged", the switch "Also remove the N models outside <Set>" (on), the totals,
+  Cancel/Apply. While jobs run the card lists them ("gpt-oss:20b · downloading 40%",
+  "… · removed", "… · couldn't download: <why>") and polls every 1.5 s while the pane is open;
+  then it shows what the server has, "Done." or "Some changes didn't finish.", and refreshes the
+  server's model list (the picker's).
+- **Errors in words:** changed "The server's list changed. Check it again." (the sheet is read
+  again and redrawn); busy "<name> is busy changing its models. Nothing was changed. Try again
+  in a moment."; in_use "<model> is in use on <name>, so nothing was changed. Try again when
+  it's done."; 400 "<name> refused the change: <why>. Nothing was changed."; offline the
+  existing text; an older kit "Update the server kit to manage its models from here."; no card
+  size "<name> didn't say how much graphics memory it has, so the sets can't be sized. Update
+  the server kit."
+- **Gauntlet.** New `== the three sets on your server (6b407) ==`: 5 in-process checks (sizing
+  on 8/16/24/320 GB cards, the view, the signed read, every refusal of the gateway and of this
+  app, the sheet in node) and 16 mutations. The stand-in gateway: the harness wraps the real
+  gateway's handler so /v1/models/* are served (on the stub Ollama's list) behind the real
+  Access and signature checks, until the kit's gateway has its own (`GW_HAS_MODELS`); control
+  /models-reset, /models-fail, /models-loaded. Live (in the 6b334 section): the signed read,
+  unsigned refused, Light applied with the switch off, then a used sheet, a changed list, a
+  model in use, busy and a 400.
+- **Not verified:** against the real kit routes (not built yet), on the real server.
+
+## 6b405 — three model sets, defined once: Light, Recommended, Everything (per Patrick)
+
+The same idea, sets of models to install, was in four places with three vocabularies: the
+wizard's Basic/Pro/Max, the Add models… window's Fast/Pro/Max ("Fast" and "Pro" are also the chat
+modes, with other meanings), Settings' Minimum/Recommended/Full/Max, and the More-models card's
+"max spread". On Patrick's 48 GB Mac with No limits ticked, Full and Max were the same 14 models
+(GPT-OSS 120B, 61 GB, in "every model this Mac's memory can actually run"), Recommended picked
+GPT-OSS 120B too, and the Your models window said "You have every model this machine can run"
+whenever the 6-model max spread was installed (he had 7 of 14).
+
+- **One function.** `model_sets(target=None)` (the catalog block, where `_starter_labels`,
+  `STARTER_LABELS`, `plan_labels`, `_plan_labels` and `_gen_of` were; all deleted). By role, from
+  the ladders the modes use: Light = the quick pair (Llama 3.2 3B, 1B) + ONE everyday model that
+  also merges (the largest Gemma 4 of catalog size <= `EVERYDAY_MAX_GB` 8.5, else the largest
+  non-vision model of that size); Recommended = Light + Fast's first fitting pick + the merger
+  (`MERGE_PREFS`, which `merge_pref_label` now reads) + Thinking's seats (its picks, to its count;
+  a model already in counts) + `CODE_LADDER`'s first (factored out of `remote_driver`) + the
+  vision model; Everything = every supported model `model_fits_machine` allows (so No limits adds
+  the over-memory rows and the second box the giants). Light and Recommended use
+  `fits_by_memory` (model_fits_machine's memory rule, factored out, with No limits set aside) and
+  never hold a giant. One row per download (the MODEL_ROUTES key). `over` lists what Everything
+  holds beyond memory; the card then wears ⚠ and asks twice.
+- **What the rules give** (simulated, real budget code): 48 GB Mac: Light = Llama 3.2 3B, 1B,
+  Gemma 4 12B (9.4 GB); Recommended adds Gemma 4 26B, Qwen 3.8 27B, Qwen 3.6 35B MoE (Thinking's
+  third seat, its ladder order) and Qwen 3.5 Vision 9B (7 models, 66.0 GB); Everything 13 models,
+  110.0 GB; with No limits 14, 171.0 GB, GPT-OSS 120B over memory. 16 GB: Recommended = Light +
+  Qwen 3.5 9B, DeepSeek R1 8B, Vision (26.6 GB). 8 GB: Light's everyday is Hermes 3 8B (no Gemma
+  fits), Recommended adds DeepSeek R1 8B, Everything is the same as Recommended. 128 GB: GPT-OSS
+  120B answers Fast (108.5 GB). A PC with a 24 GB card and 64 GB: GPT-OSS 120B too (its experts
+  in RAM, 6b315).
+- **One status.** `model_sets_status` (in /api/setup as `sets`; `plan_state`, `plans`, `plan_n`
+  are gone): per set its models, GB of the whole and of what is missing, `same` (a smaller set it
+  equals here), and a state: "yours" (the set picked, while all of it is here; else the largest
+  set all here), "installed", "download". `every` is true only while Everything is all here.
+  The pick is kept in prefs `model_set` (a MACHINE key) by POST /api/setup/install, which takes
+  a set's name or an old plan's (basic/min -> light, pro/rec -> recommended, max/full/all ->
+  everything; `model_set_key`), refuses anything else with 400, adds what is missing and deletes
+  nothing. `first_set_labels()` (the pick, else Recommended: the old default "pro") is what the
+  first-run window waits for (`star`), the Ollama engine row and the downloads' default.
+- **The offer card follows the person's set.** `offer_set_labels`: what is missing from the
+  set they picked, else from the largest complete set (nothing). Never a bigger set (6b312's
+  rule); newer versions of what they have as before.
+- **Screens.** One renderer, `setCardsHtml`, draws the same three cards in Settings › Models
+  (the grid), the wizard's step 2, the first-run window (wizard skipped) and each server card
+  (6b407). The Add models… button and its chooser window are gone (the palette's "Add models…"
+  opens Settings › Models with the grid in view, `openModelSets`); the setup window is the
+  first-run download window only, and after a strip-opened download it says "Downloads
+  finished". Updating and clearing out old models stay where they were: the auto-clean bar's
+  button and the MODEL UPDATES chip open the Update models card. No limits and the 512 GB box
+  moved from that window to the grid's fourth cell, beside Everything (`#plan-limits`, static so
+  their listeners and the giants text stay). The risky card's question (`setConfirm`) survives a
+  repaint for 8 s.
+- **Copy (old -> new).** Set names: Basic/Fast/Minimum -> Light; Pro -> Recommended; Max/Full ->
+  Everything. Descriptions: "Quick answers, tiny download" / "the lightest models — smallest
+  footprint that still answers" -> "One everyday model and two quick ones."; "Great everyday
+  quality" / "one of each kind, newest generation, no superseded versions" -> "A model for each
+  job: answers, thinking, code and pictures."; "The best this machine can run" / "every model
+  this Mac's memory can actually run" -> "Every model this Mac can run."; "every model there is,
+  including ones too big for this Mac — they may crash it if memory runs out" -> "Every model,
+  even ones too big for this Mac. They can crash it."; new: "The same as Recommended on this
+  Mac." Count line: "N models · X GB to download" / "· already installed" / "· this is what you
+  have" -> "N models · X GB to download" / "N models · installed"; badge "✓ current" -> "✓
+  yours". Risky click: "this installs models bigger than this Mac's memory and can crash it —
+  click again to go ahead" -> "This adds models bigger than this Mac's memory. They can crash
+  it. Click again to go ahead." No limits: "No limits — offer models beyond this machine's memory
+  (can swap hard)" and the wizard's "Ignore system limits — offer every model in each list even
+  beyond this machine's memory. May swap hard or crash; use at your own risk." -> "No limits:
+  Everything adds models too big for this machine's memory. They can swap hard or crash it."
+  First-run button "Update · N GB" -> "Download <Set> · N GB". Window title (static) "Your
+  models" -> "Downloading models"; after a strip-opened download "Downloads finished" / "Add
+  more, or pick another set, in Settings › Models." with "Done". Gone: "You have every model
+  this machine can run, and they're up to date.", "Newer versions of models you have are ready.
+  Pick your set…", "Your set is up to date. Pick a bigger set…", "Add <name> · N GB", the "Add
+  models…" button.
+- **Gauntlet.** New `== the three model sets (6b405) ==` (5 checks on simulated 8/16/48/128 GB
+  Macs and a PC with a 24 GB card, the status, aliases, the offer card, the wiring, the page; 19
+  mutations), plus rewritten pins: the cards in node, the chooser gone, sets by catalog size,
+  giants only in Everything, plans counting a download once, the manage pane, the live
+  /api/setup status. Ran the sections it touches (see the report).
+- **Not verified.** WKWebView (the Browser pane is Blink); the first-run window and wizard were
+  drawn from a dev copy with models already on disk (forced open), not from a real first run.
 ## 6b415 — the fans ramp down instead of stepping 100 / 50 / 20 (per Patrick)
 
 Replaces the tail of 6b386: work ends -> 100% for 60 s (`hold100`, unchanged) ->

@@ -1805,6 +1805,13 @@ def model_fits_machine(label: str) -> bool:
         # Patrick's "disobey the limits" switch: every supported model is
         # offered. The runtime admission check still referees actual RAM.
         return SUPPORTED.get(label, False)
+    return fits_by_memory(label)
+
+
+def fits_by_memory(label: str) -> bool:
+    """model_fits_machine's memory rule alone, whatever the No limits box
+    says (6b405): Light and Recommended are sized by it, so ticking the box
+    only ever adds to Everything."""
     budget = machine_budget_bytes(moe=label in MOE_ROWS)
     need = MODEL_MEM_BYTES.get(label)
     if budget is None or need is None:
@@ -4033,72 +4040,210 @@ def resolve_agent_seat(name, ctx=None):
     return label, a, ""
 
 
-# First run downloads the AUTOSELECTED set: for each tier, the single best
-# pick this machine can hold — the strongest brain per job, nothing more.
-# A 48 GB Mac gets the 35B MoE; a 16 GB Air lands on Phi-4/Gemma; nobody
-# is asked for 100 GB of also-rans (that was possible when this listed
-# every tier pick).
-def _starter_labels() -> list:
-    """The MAX spread: since the tier merge every tier leads with the same
-    ladder, "best per tier" collapsed to ONE model (seen live: a fresh
-    machine would have installed only the 35B — no merger, no quick
-    path). Build the spread by ROLE instead: flagship, Gemma merger,
-    everyday mid, the quick pair, vision."""
-    # no giant in a preset (6b314): one "Download" on the More-models
-    # card would otherwise start a 300-420 GB pull. Giants are installed
-    # one at a time from the list, which names the size first.
-    fits = [l for l in MODEL_INFO
-            if SUPPORTED.get(l) and model_fits_machine(l)
-            and not model_is_giant(l)]
-    picks = []
+# THE THREE SETS (6b405, per Patrick: "one set of three, defined once,
+# shown the same way everywhere"). Light, Recommended and Everything, each
+# inside the next. They replace seven names in three vocabularies: the
+# wizard's Basic/Pro/Max, the Your models window's Fast/Pro/Max (where
+# "Fast" and "Pro" were also the chat modes, with other meanings) and
+# Settings' Minimum/Recommended/Full/Max, whose Full and Max came out the
+# same with No limits ticked and whose "every model this machine can run"
+# was said while half of them were missing. Built by ROLE from the ladders
+# the modes already use, so no machine is ever written in here:
+#   Light        the quick pair (Llama 3.2 3B and 1B) and ONE everyday
+#                model that also writes merges: the largest Gemma 4 of
+#                catalog size EVERYDAY_MAX_GB or less, else the largest
+#                model of that size that isn't the vision model; pictures
+#                fetch the vision model on first use
+#   Recommended  Light, plus one model for each job a mode reaches for
+#                here: Fast's answer (the first of its picks that fits),
+#                the merger (merge_pref_label's order), Thinking's seats
+#                (its picks, to its count; models already in count), the
+#                code ladder's first and the vision model
+#   Everything   every supported model that fits; with No limits also the
+#                ones bigger than memory, and with the second box the
+#                giants this computer can hold (model_fits_machine decides)
+# Light and Recommended are sized by memory whatever No limits says
+# (fits_by_memory) and never hold a giant. One row per download (the
+# MODEL_ROUTES key, 6b317). target None is this computer; a server is
+# {"vram": bytes} (6b407): a model fits when its Ollama file fits the
+# card whole, by _srv_fits's own rule, and its key is the tag.
+MODEL_SETS = ("light", "recommended", "everything")
+MODEL_SET_NAMES = {"light": "Light", "recommended": "Recommended",
+                   "everything": "Everything"}
+# the old plans' names, as the install route and saved settings may say them
+MODEL_SET_ALIASES = {"basic": "light", "min": "light",
+                     "pro": "recommended", "rec": "recommended",
+                     "max": "everything", "full": "everything",
+                     "all": "everything"}
+QUICK_PAIR = ("Llama 3.2 3B", "Llama 3.2 1B")
+EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
+# who writes the merge, best first: merge_pref_label reads it too
+MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
+# the code lane's local planner, strongest first: remote_driver reads it too
+CODE_LADDER = ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
+               "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B")
+VISION_MODEL = "Qwen 3.5 Vision 9B"
 
-    def add(label):
-        if label and label in fits and label not in picks:
-            picks.append(label)
 
-    by_size = sorted(fits, key=lambda l: -MODEL_INFO[l]["cat_gb"])
-    if no_limits() and HAS_PSUTIL:
-        # unlocked, not unhinged: the flagship stays within what RAM can
-        # plausibly page (~1.6x memory = a 70B on 48GB, never the 235B)
-        # 6b315: plus what the graphics cards hold, or ticking the box
-        # took GPT-OSS 120B away from a 96 GB card in a 64 GB PC
-        cap = psutil.virtual_memory().total + gpu_room_bytes()
-        sized = [l for l in by_size
-                 if MODEL_MEM_BYTES.get(l, 0) <= cap]
-        by_size = sized or by_size
-    add(next((l for l in by_size), None))                      # flagship
-    add(next((l for l in by_size if l.startswith("Gemma 4")), None))
-    add(next((l for l in by_size if MODEL_INFO[l]["cat_gb"] <= 8.5
-              and "Vision" not in l), None))                   # everyday
-    add("Llama 3.2 3B")
-    add("Llama 3.2 1B")
-    add("Qwen 3.5 Vision 9B")
-    return picks
+def model_set_key(name) -> str:
+    """"light", "recommended" or "everything" for a set's name or an old
+    plan's, in any case; '' for anything else."""
+    k = str(name or "").strip().lower()
+    k = MODEL_SET_ALIASES.get(k, k)
+    return k if k in MODEL_SETS else ""
 
 
-STARTER_LABELS = _starter_labels()
+def _set_tag_bytes(tag: str) -> int:
+    """What an Ollama tag downloads: the registry's size, else the
+    catalog's for the row that names it."""
+    if tag in OLLAMA_BYTES:
+        return OLLAMA_BYTES[tag]
+    for i in MODEL_INFO.values():
+        if i["ollama"] == tag:
+            return int(i["cat_gb"] * 1e9)
+    return 0
 
 
-def _gen_of(label: str) -> float:
-    """The GENERATION in a model's name, never its parameter count —
-    'Qwen 2.5 Coder 7B' is generation 2.5 at size 7B. Any token ending
-    in B is a size and skipped; 'Phi-4' hands over its tail. Unknown
-    reads as 0, which simply lets size decide within that family."""
-    best = 0.0
-    for tok in label.split():
-        if tok[-1:] in ("B", "b"):
-            continue
-        try:
-            best = max(best, float(tok))
-            continue
-        except ValueError:
-            pass
-        if "-" in tok:
-            try:
-                best = max(best, float(tok.rsplit("-", 1)[-1]))
-            except ValueError:
-                pass
-    return best
+def model_sets(target=None) -> dict:
+    """{"light": [...], "recommended": [...], "everything": [...],
+    "over": [...]}: catalog labels, each set inside the next, one per
+    download (see above). "over" is what Everything holds beyond this
+    computer's memory (No limits, the giants); a server's is empty."""
+    if target is None:
+        def fits(l):
+            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)
+                    and fits_by_memory(l))
+
+        def key(l):
+            return MODEL_ROUTES.get(l, (None, l))
+        pool = [l for l in MODEL_INFO
+                if SUPPORTED.get(l) and model_fits_machine(l)]
+    else:
+        vram = (target or {}).get("vram")
+
+        def card(l):
+            tag = (MODEL_INFO.get(l) or {}).get("ollama")
+            return bool(tag) and _srv_fits(
+                {"placement": "gpu", "size": _set_tag_bytes(tag)}, vram, True)
+
+        def fits(l):
+            return card(l) and not model_is_giant(l)
+
+        def key(l):
+            return _srv_tag_key(MODEL_INFO[l]["ollama"])
+        pool = [l for l in MODEL_INFO if card(l)]
+    out, keys = [], set()
+
+    def add(l):
+        if l and fits(l) and key(l) not in keys:
+            keys.add(key(l))
+            out.append(l)
+
+    def first(ladder):
+        return next((l for l in ladder if fits(l)), None)
+    small = sorted((l for l in MODEL_INFO if fits(l)
+                    and MODEL_INFO[l]["cat_gb"] <= EVERYDAY_MAX_GB),
+                   key=lambda l: -MODEL_INFO[l]["cat_gb"])
+    everyday = (next((l for l in small if l.startswith("Gemma 4")), None)
+                or next((l for l in small if _family_of(l) != "vision"
+                         and l not in QUICK_PAIR), None))
+    for l in QUICK_PAIR + (everyday,):
+        add(l)
+    light = list(out)
+    add(first(TIERS["Fast"]["picks"]))
+    add(first(MERGE_PREFS))
+    seats = 0
+    for l in TIERS["Thinking"]["picks"]:
+        if seats >= TIERS["Thinking"]["count"]:
+            break
+        if fits(l):
+            add(l)              # a model already in counts as a seat
+            seats += 1
+    add(first(CODE_LADDER))
+    add(VISION_MODEL)
+    rec = list(out)
+    for l in pool:
+        if key(l) not in keys:
+            keys.add(key(l))
+            out.append(l)
+    return {"light": light, "recommended": rec, "everything": list(out),
+            "over": ([l for l in out if not fits_by_memory(l)]
+                     if target is None else [])}
+
+
+def model_set_chosen() -> str:
+    """The set the person picked last (model_set; an old plan's name reads
+    as its set), or ''."""
+    try:
+        return model_set_key(machine_prefs().get("model_set"))
+    except Exception:
+        return ""
+
+
+def model_set_choose(key: str):
+    """Remember the person's set, so the status and the More-models card
+    follow THEIR set (6b405)."""
+    key = model_set_key(key)
+    if key:
+        machine_prefs_update(lambda p: p.__setitem__("model_set", key))
+
+
+def first_set_labels() -> list:
+    """The set a first run downloads and its window waits for: the one the
+    person picked, Recommended until they pick (the wizard's old default,
+    "pro", reads as Recommended)."""
+    return list(model_sets()[model_set_chosen() or "recommended"])
+
+
+def model_sets_status(pulled=None, sets=None) -> dict:
+    """ONE STATUS FOR EVERY SCREEN (6b405). Per set: its models, how many,
+    the GB of the whole set and of what is still missing (only that would
+    download), "same" (the smaller set it equals here, or ''), and a state:
+    "yours" (the set the person picked while all of it is here; until they
+    pick, the largest set all here), "installed" (all here) or "download".
+    "every" is True only while Everything is all here: nothing may say
+    "every model this machine can run" otherwise. Compared by download,
+    not by row (6b317)."""
+    if pulled is None:
+        pulled = ollama_pulled_tags() or set()
+    sets = sets or model_sets()
+
+    def dk(l):
+        return MODEL_ROUTES.get(l, (None, l))
+    have = {dk(l) for l, ok in SUPPORTED.items()
+            if ok and model_cached(l, pulled)}
+    chosen = model_set_chosen()
+    out = {"chosen": chosen, "over": list(sets.get("over") or []),
+           "risky": bool(sets.get("over"))}
+    full = []
+    for i, k in enumerate(MODEL_SETS):
+        ls = list(sets[k])
+        ks = {dk(l) for l in ls}
+        miss = [l for l in ls if dk(l) not in have]
+        same = next((p for p in MODEL_SETS[:i]
+                     if ks and {dk(l) for l in sets[p]} == ks), "")
+        out[k] = {"labels": ls, "n": len(ls), "missing": miss, "same": same,
+                  "gb": round(sum(MODEL_INFO[l]["gb"] for l in ls), 1),
+                  "dl_gb": round(sum(MODEL_INFO[l]["gb"] for l in miss), 1)}
+        if ls and not miss:
+            full.append(k)
+    mine = chosen if chosen in full else next(
+        (k for k in reversed(MODEL_SETS) if k in full and not out[k]["same"]),
+        "")
+    for k in MODEL_SETS:
+        out[k]["state"] = ("yours" if k == mine else
+                           "installed" if k in full else "download")
+    out["mine"], out["every"] = mine, "everything" in full
+    return out
+
+
+def offer_set_labels(pulled=None) -> list:
+    """What the More-models card may offer from the sets (6b405, 6b312's
+    rule): what is missing from the person's own set, the one they picked,
+    else the largest set that is all here (so nothing). Never a bigger set."""
+    st = model_sets_status(pulled)
+    k = st["chosen"] or st["mine"]
+    return list(st[k]["labels"]) if k else []
 
 
 def _family_of(label: str) -> str:
@@ -4114,81 +4259,6 @@ def _family_of(label: str) -> str:
     return base
 
 
-def plan_labels(plan: str) -> list:
-    """The plan's models, one per download (6b317, from the Windows
-    sweep): off Apple silicon Qwen 3.5 9B and its Vision row are the SAME
-    Ollama tag, and plans counted it twice, 6.6 GB too many."""
-    out, seen = [], set()
-    for l in _plan_labels(plan):
-        key = MODEL_ROUTES.get(l, (None, l))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(l)
-    return out
-
-
-def _plan_labels(plan: str) -> list:
-    """Install plans. basic/pro/max belong to the first-run wizard and
-    are unchanged; min/rec/full/all drive the Manage-models selector
-    (6b258, per Patrick):
-
-      min   the lightest footprint that still answers
-      rec   ONE model per family, newest generation — an efficient
-            spread that never spends disk on a superseded version
-      full  everything this machine's memory can actually run
-      all   every model there is, including ones that do NOT fit — the
-            pane warns, because this is how a Mac gets OOM-killed
-    """
-    fits = [l for l in MODEL_INFO
-            if SUPPORTED.get(l) and model_fits_machine(l)]
-    if plan == "min":
-        small = sorted(fits, key=lambda l: MODEL_INFO[l]["cat_gb"])
-        picks = [l for l in ("Llama 3.2 1B", "Llama 3.2 3B") if l in fits]
-        return picks or small[:2]
-    if plan == "rec":
-        # an efficient spread never holds a giant (6b314): with both
-        # boxes ticked, DeepSeek's 400 GB row replaced the 4.6 GB R1 8B
-        groups = {}
-        for l in fits:
-            if model_is_giant(l):
-                continue
-            groups.setdefault(_family_of(l), []).append(l)
-        picks = []
-        for _fam, ls in groups.items():
-            # newest generation first, then the largest of that
-            # generation: the best of the family, exactly once
-            ls.sort(key=lambda l: (_gen_of(l), MODEL_INFO[l]["cat_gb"]),
-                    reverse=True)
-            picks.append(ls[0])
-        # a quick model earns its disk however big the rest are
-        for extra in ("Llama 3.2 3B", "Llama 3.2 1B"):
-            if extra in fits and extra not in picks:
-                picks.append(extra)
-        return picks
-    if plan == "full":
-        return list(fits)
-    if plan == "all":
-        # every model there is, bar the giants unless opted in (6b307):
-        # on a 48 GB Mac "Max" offered 926 GB, 796 of it two models
-        return [l for l in MODEL_INFO if SUPPORTED.get(l)
-                and (giants_on() or not model_is_giant(l))
-                and giant_fits_here(l)]
-    if plan == "basic":
-        # the smallest capable brain: ~1 GB, instant town
-        small = sorted(fits, key=lambda l: MODEL_INFO[l]["cat_gb"])
-        return small[:1]
-    if plan == "pro":
-        # one strong everyday model plus the quick pair — ~10 GB
-        mids = sorted((l for l in fits if MODEL_INFO[l]["cat_gb"] <= 8.5),
-                      key=lambda l: -MODEL_INFO[l]["cat_gb"])
-        picks = mids[:1]
-        for extra in ("Llama 3.2 3B", "Llama 3.2 1B"):
-            if extra in fits and extra not in picks:
-                picks.append(extra)
-        return picks
-    return _starter_labels()
-
 # who merges in combine mode — strongest first
 MERGE_RANK = sorted((l for l in MODEL_ROUTES),
                     key=lambda l: -MODEL_INFO[l]["mem"])
@@ -4201,7 +4271,7 @@ def merge_pref_label() -> str:
     uses it to put the merger LAST in the council roster and run_council
     uses it to pick the merger — if these two ever disagree, the roster
     ordering optimisation warms the wrong engine."""
-    for pref in ("Gemma 4 26B", "Gemma 4 12B"):
+    for pref in MERGE_PREFS:
         if model_cached(pref) and model_fits_memory(pref):
             return pref
     return ""
@@ -9576,7 +9646,7 @@ MACHINE = frozenset((
     "auto_cleanup", "studio_image", "studio_video", "studio_opts",
     "update_channel", "beta_updates", "auto_update_check", "last_ident",
     "last_version", "wizard_done", "seen_models", "remind_models_ts",
-    "remind_models_off"))
+    "remind_models_off", "model_set"))
 # whole families of machine keys: studio_* (the negative prompt, which
 # PROFILE_LOCAL names by path, apart), last_*, seen_*, remind_*, and the
 # retired Contribute keys the boot sweep removes
@@ -14343,7 +14413,7 @@ def start_model_downloads(labels=None) -> list:
         return []
     started, ollama_batch = [], []
     pulled = ollama_pulled_tags() or set()
-    for label in (labels if labels is not None else STARTER_LABELS):
+    for label in (labels if labels is not None else first_set_labels()):
         if not SUPPORTED.get(label):
             continue
         if not giant_fits_here(label):
@@ -14388,13 +14458,13 @@ def _batch_labels() -> list:
     to count the first-run starter set only — every starter was already
     on disk, so a preset that added OTHER models read 100% with a speed
     of nothing while eleven downloads ran unseen. Now: every model that
-    has ever been queued this session, and the starters only until
-    something has."""
+    has ever been queued this session, and the first-run set (the
+    person's, 6b405) only until something has."""
     with _setup_lock:
         batch = [l for l in _setup_jobs
                  if l != ENGINE_ROW and (l in MODEL_ROUTES
                                          or l in _STUDIO_ROWS)]
-    return batch or list(STARTER_LABELS)
+    return batch or first_set_labels()
 
 
 def _downloaded_bytes(pulled, labels=None) -> tuple:
@@ -14760,9 +14830,10 @@ def _offer_reason(label: str, olds: list, seen: set) -> str:
 
 def model_offer_plan(pulled=None) -> dict:
     """What the card's button will do.
-    download: the Max spread's models not on disk, and the replacement
-      of every retired model (on disk, or swept with its offer kept),
-      one row per download, none already in flight;
+    download: what is missing from the person's own set (never a bigger
+      set, offer_set_labels, 6b405), and the replacement of every retired
+      model (on disk, or swept with its offer kept), one row per
+      download, none already in flight;
     remove: exactly what an auto-clean pass would delete now
       (_auto_clean_targets), with the space each frees;
     keep_n: every other model on disk, unchanged.
@@ -14780,7 +14851,7 @@ def model_offer_plan(pulled=None) -> dict:
         moving = {l for l, j in _setup_jobs.items()
                   if (j or {}).get("status") in ("downloading", "queued")}
     download, routes = [], set()
-    for l in list(plan_labels("max")) + list(olds_of):
+    for l in list(offer_set_labels(pulled)) + list(olds_of):
         key = MODEL_ROUTES.get(l, (None, l))
         if (key in routes or not SUPPORTED.get(l) or l in moving
                 or model_cached(l, pulled)):
@@ -15049,9 +15120,14 @@ def setup_status() -> dict:
     pulled = ollama_pulled_tags() or set()
     models = []
 
+    # THE THREE SETS (6b405), sized once for this call: the first-run set
+    # (the person's, Recommended until they pick) is what the welcome
+    # window waits for and what decides whether Ollama is needed at all
+    sets = model_sets()
+    first = sets[model_set_chosen() or "recommended"]
     # engine pseudo-row: shown only while the app still has to fetch Ollama
     starters_need_ollama = any(
-        MODEL_ROUTES[l][0] == "ollama" for l in STARTER_LABELS)
+        MODEL_ROUTES[l][0] == "ollama" for l in first)
     with _setup_lock:
         ejob = dict(_setup_jobs.get(ENGINE_ROW, {}))
     if starters_need_ollama and (ejob or _ollama_bin() is None):
@@ -15066,7 +15142,7 @@ def setup_status() -> dict:
 
     # fit-filtered like the sidebar: the add-models panel never offers a
     # model this machine cannot hold resident
-    stars_now = set(_starter_labels())
+    stars_now = set(first)
     # an INSTALLED model is listed whatever the limits say (6b307): a
     # giant downloaded while opted in, or a 70B from "no limits", must
     # still have a row with a Remove button once the box is unticked
@@ -15120,23 +15196,6 @@ def setup_status() -> dict:
     have, want = _downloaded_bytes(pulled)
     bps = _dl_speed(have)
     busy = any(m["status"] in ("downloading", "queued") for m in models)
-    # WHICH PRESET IS ON DISK (6b290, per Patrick: "highlight that so
-    # the user knows which one they're on"). current = exactly this
-    # set; installed = all of it plus extras; partial = some; none.
-    # compared by download, not by row: two rows can share one (6b317)
-    installed = {MODEL_ROUTES.get(l, (None, l)) for l, ok in SUPPORTED.items()
-                 if ok and model_cached(l, pulled)}
-    plan_state = {}
-    for pl in ("min", "rec", "full", "all"):
-        want_set = {MODEL_ROUTES.get(l, (None, l)) for l in plan_labels(pl)}
-        if want_set and want_set == installed:
-            plan_state[pl] = "current"
-        elif want_set and want_set <= installed:
-            plan_state[pl] = "installed"
-        elif want_set & installed:
-            plan_state[pl] = "partial"
-        else:
-            plan_state[pl] = "none"
     return {
         # the models moving right now, and how many wait behind them —
         # so the bar is never the only sign of life
@@ -15144,7 +15203,10 @@ def setup_status() -> dict:
                  "checking": m.get("checking", False)}
                 for m in models if m["status"] == "downloading"][:4],
         "queued_n": sum(1 for m in models if m["status"] == "queued"),
-        "plan_state": plan_state,
+        # WHICH SET IS YOURS, and what each would download (6b405): one
+        # status that the Settings grid, the wizard and the first-run
+        # window all draw (it replaced plan_state, plans and plan_n)
+        "sets": model_sets_status(pulled, sets),
         "have_gb": round(have / 1e9, 1), "want_gb": round(want / 1e9, 1),
         "have_b": have, "want_b": want,
         "checking": busy and any(m.get("checking") for m in models)
@@ -15160,24 +15222,13 @@ def setup_status() -> dict:
                         max(1, round((want - have) / bps / 60)))
                     if busy and bps > 2e5 and want > have else None),
         "busy": busy,
-        # nag on first run only: once a couple of models work, the welcome
-        # screen is opt-in via "Add models…"
+        # nag on first run only: once a couple of models work, the sets
+        # are in Settings › Models
         "needs_setup": ready_n < 2,
         # the ONE bare psutil call in the file killed /api/setup (and the
         # header download strip with it) on any python without psutil
         "mem_gb": (round(psutil.virtual_memory().total / 1e9)
                    if HAS_PSUTIL else 0),
-        # remaining GB per plan — basic/pro/max for the first-run
-        # wizard, min/rec/full/all for the Manage selector (6b258)
-        "plans": {pl: round(sum(
-            MODEL_INFO[l]["gb"] for l in plan_labels(pl)
-            if not model_cached(l, pulled)), 1)
-            for pl in ("basic", "pro", "max",
-                       "min", "rec", "full", "all")},
-        # how many models each plan ends up with, so the pane can talk
-        # in models ("11 of 20") and not only in gigabytes
-        "plan_n": {pl: len(plan_labels(pl))
-                   for pl in ("min", "rec", "full", "all")},
         # what the auto-clean sweep would reclaim right now (6b265)
         "cleanup": _cleanup_stat(pulled),
         "image": _studios["image"],
@@ -19698,6 +19749,234 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
 
 
 
+# ==== server model sets: begin ====
+# THE SAME THREE SETS ON YOUR SERVER (6b407, per Patrick: "the server gets
+# the same three sets sized for its card, chosen in Settings › Servers,
+# with the exact add/remove list shown before anything is deleted"). The
+# sets are model_sets's own, for target {"vram": the card}: a catalog row
+# fits when its Ollama file fits the card whole (_srv_fits), the roles and
+# the nesting as on this computer. The gateway keeps the list and does the
+# work: signed GET /v1/models/state, and POST /v1/models/apply (removals
+# first, then pulls in the order given). `seen` is the sha256 of the model
+# names as this app saw them, so the gateway refuses a list that changed
+# since the sheet was drawn; this app sends only what its last read put on
+# the sheet (the names it saw, the set's own downloads), so nothing is
+# removed that the person wasn't shown.
+SRV_TAG_RX = re.compile(r"[a-z0-9][a-z0-9._-]{0,79}(?::[a-z0-9][a-z0-9._-]{0,63})?")
+SRV_SETS_MAX = 40               # names per list the gateway takes
+SRV_SETS_FRESH_S = 900          # a sheet older than this is read again
+SRV_SETS_OLD = "Update the server kit to manage its models from here."
+SRV_SETS_CHANGED = "The server\u2019s list changed. Check it again."
+# id -> what the last read of a server's models put on its sheets
+_srv_mstate = profile_cache("_srv_mstate", {})
+
+
+def srv_seen_hash(names) -> str:
+    """The `seen` of /v1/models/apply: sha256 of the sorted names, one a line."""
+    return hashlib.sha256("\n".join(sorted(str(n) for n in names))
+                          .encode("utf-8")).hexdigest()
+
+
+def _srv_text(v, n: int) -> str:
+    return " ".join("".join(ch for ch in str(v or "") if ch.isprintable()).split())[:n]
+
+
+def _srv_jobs_parse(v) -> list:
+    """The gateway's jobs, field by field; anything else is dropped."""
+    out = []
+    for j in (v if isinstance(v, list) else [])[:100]:
+        if not isinstance(j, dict):
+            continue
+        name, act, st = j.get("name"), j.get("action"), j.get("state")
+        if (not isinstance(name, str) or not SRV_TAG_RX.fullmatch(name)
+                or act not in ("pull", "remove")
+                or st not in ("queued", "running", "done", "failed")):
+            continue
+        pct = j.get("pct")
+        pct = (int(pct) if isinstance(pct, (int, float)) and not isinstance(pct, bool)
+               and 0 <= pct <= 100 else 0)
+        out.append({"name": name, "action": act, "state": st, "pct": pct,
+                    "error": _srv_text(j.get("error"), 160)})
+    return out
+
+
+def _srv_mstate_parse(js):
+    """/v1/models/state checked field by field, or None when it isn't that
+    shape: models (name, size, loaded), busy, jobs, the set last picked
+    (name, when, by which device), free disk and the card's size."""
+    if not isinstance(js, dict) or not isinstance(js.get("models"), list):
+        return None
+    models = []
+    for m in js["models"][:400]:
+        n = m.get("name") if isinstance(m, dict) else None
+        if not isinstance(n, str) or not n or len(n) > 200 or not n.isprintable():
+            continue
+        sz = m.get("size")
+        models.append({"name": n, "loaded": m.get("loaded") is True,
+                       "size": sz if isinstance(sz, int) and not isinstance(sz, bool)
+                       and sz >= 0 else 0})
+    p = js.get("plan")
+    plan = None
+    if isinstance(p, dict) and model_set_key(p.get("name")):
+        at = p.get("at")
+        plan = {"name": model_set_key(p["name"]), "by": _srv_text(p.get("by"), 60),
+                "at": at if isinstance(at, (int, float)) and not isinstance(at, bool) else None}
+
+    def num(k):
+        v = js.get(k)
+        return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 1 << 50 else 0
+    return {"models": models, "busy": js.get("busy") is True,
+            "jobs": _srv_jobs_parse(js.get("jobs")), "plan": plan,
+            "disk_free_bytes": num("disk_free_bytes"), "vram_bytes": num("vram_bytes")}
+
+
+def server_sets_view(state: dict, vram) -> dict:
+    """What a server's three cards and their sheets show, from its state:
+    per set the tags, Download (missing, with sizes), Remove (on the
+    server, outside the set, a name the gateway takes; at most 40), how
+    many others stay, the GB both ways, "same" and the state ("yours": the
+    set last picked there while all of it is there, else the largest set
+    all there; "installed"; "download")."""
+    sets = model_sets({"vram": vram}) if vram else {k: [] for k in MODEL_SETS}
+    names = [m["name"] for m in state["models"]]
+    size = {m["name"]: m["size"] for m in state["models"]}
+    have = {_srv_tag_key(n) for n in names}
+    out = {"sets": {}, "seen": srv_seen_hash(names), "n": len(names),
+           "vram": vram or 0}
+    keys, full = {}, []
+    for i, k in enumerate(MODEL_SETS):
+        tags = [MODEL_INFO[l]["ollama"] for l in sets[k]]
+        keys[k] = {_srv_tag_key(t) for t in tags}
+        dl = [{"name": t, "gb": round(_set_tag_bytes(t) / 1e9, 1)}
+              for t in tags if _srv_tag_key(t) not in have]
+        rm = [{"name": n, "gb": round(size.get(n, 0) / 1e9, 1)} for n in names
+              if _srv_tag_key(n) not in keys[k] and SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]
+        same = next((p for p in MODEL_SETS[:i] if keys[k] and keys[p] == keys[k]), "")
+        out["sets"][k] = {"n": len(tags), "tags": tags, "download": dl, "remove": rm,
+                          "keep_n": len(names) - len(rm), "same": same,
+                          "dl_gb": round(sum(d["gb"] for d in dl), 1),
+                          "free_gb": round(sum(r["gb"] for r in rm), 1)}
+        if tags and not dl:
+            full.append(k)
+    plan = (state.get("plan") or {}).get("name") or ""
+    mine = plan if plan in full else next(
+        (k for k in reversed(MODEL_SETS) if k in full and not out["sets"][k]["same"]), "")
+    for k in MODEL_SETS:
+        out["sets"][k]["state"] = ("yours" if k == mine else
+                                   "installed" if k in full else "download")
+    jobs = state.get("jobs") or []
+    out.update(mine=mine, plan=state.get("plan"), jobs=jobs,
+               busy=bool(state.get("busy")),
+               running=any(j["state"] in ("queued", "running") for j in jobs),
+               disk_free_gb=round(state.get("disk_free_bytes", 0) / 1e9, 1))
+    return out
+
+
+def _srv_sets_entry(ctx, sid: str):
+    """(entry, None) for a paired server of ctx, else (None, the reply)."""
+    try:
+        e = _srv_find(_srv_read(ctx), sid)
+    except (StoreReadError, NoProfile):
+        return None, {"ok": False, "kind": "gone", "err": "Couldn\u2019t read your servers."}
+    if e is None:
+        return None, {"ok": False, "kind": "gone", "err": SRV_GONE}
+    if not _srv_paired(e):
+        return None, {"ok": False, "kind": "unpaired",
+                      "err": "%s isn\u2019t paired with this computer." % e["name"]}
+    if not cai_crypto.available():
+        return None, {"ok": False, "kind": "crypto", "err": SRV_NO_CRYPTO}
+    return e, None
+
+
+def server_models_get(ctx, sid: str) -> dict:
+    """GET /api/servers/models: a server's models, its three sets sized for
+    its card, the set it has, and any changes it is making. One signed
+    read; what it put on the sheets is kept for the apply's check."""
+    e, bad = _srv_sets_entry(ctx, sid)
+    if bad:
+        return bad
+    try:
+        st, js = _srv_json(e, "GET", "/v1/models/state", timeout=SRV_CONNECT_S)
+    except ServerError as se:
+        return {"ok": False, "kind": se.kind, "err": str(se)}
+    if st == 404 and js.get("code") == "not_found":
+        return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
+    if st != 200:
+        return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
+    state = _srv_mstate_parse(js)
+    if state is None:
+        return {"ok": False, "kind": "server", "err": "%s answered in a way this app "
+                "doesn\u2019t understand." % e["name"]}
+    # the card's size: the gateway's own, else the last check's
+    vram = state["vram_bytes"] or ((_srv_seen.get(e["id"]) or {}).get("gpu") or {}).get("vram_bytes")
+    view = server_sets_view(state, vram)
+    _srv_mstate[e["id"]] = {
+        "seen": view["seen"], "at": time.time(),
+        "names": [m["name"] for m in state["models"]],
+        "dl": {k: [d["name"] for d in x["download"]] for k, x in view["sets"].items()},
+        "rm": {k: [r["name"] for r in x["remove"]] for k, x in view["sets"].items()}}
+    return dict(view, ok=True, name=e["name"])
+
+
+def _srv_tag_list(v) -> bool:
+    return (isinstance(v, list) and len(v) <= SRV_SETS_MAX
+            and all(isinstance(t, str) and SRV_TAG_RX.fullmatch(t) for t in v)
+            and len(set(v)) == len(v))
+
+
+def server_models_apply(ctx, sid: str, d: dict) -> dict:
+    """POST /api/servers/models {id, plan, add, remove, seen}: the sheet the
+    person confirmed, sent to the gateway as it was shown. add must be the
+    set's own downloads and remove names the last read listed outside the
+    set, both from the read that made `seen`; otherwise nothing is sent and
+    the sheet is read again. The gateway's refusals come back in words."""
+    plan = model_set_key(d.get("plan"))
+    add, rm, seen = d.get("add"), d.get("remove"), d.get("seen")
+    if not plan:
+        return {"ok": False, "kind": "input", "err": "Pick Light, Recommended or Everything."}
+    if (not _srv_tag_list(add) or not _srv_tag_list(rm) or set(add) & set(rm)
+            or not isinstance(seen, str) or not re.fullmatch(r"[0-9a-f]{64}", seen)):
+        return {"ok": False, "kind": "input", "err": "That isn\u2019t a list this app made."}
+    if not add and not rm:
+        return {"ok": False, "kind": "input", "err": "Nothing to change."}
+    e, bad = _srv_sets_entry(ctx, sid)
+    if bad:
+        return bad
+    ms = _srv_mstate.get(e["id"])
+    if (not ms or ms["seen"] != seen or time.time() - ms["at"] > SRV_SETS_FRESH_S
+            or not set(add) <= set(ms["dl"].get(plan) or [])
+            or not set(rm) <= set(ms["rm"].get(plan) or [])):
+        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}
+    body = {"plan": plan, "add": list(add), "remove": list(rm), "seen": seen}
+    try:
+        st, js = _srv_json(e, "POST", "/v1/models/apply", body, timeout=SRV_CONNECT_S)
+    except ServerError as se:
+        return {"ok": False, "kind": se.kind, "err": str(se)}
+    code, name = str(js.get("code") or ""), e["name"]
+    if st == 202 and js.get("ok") is True:
+        _srv_mstate.pop(e["id"], None)      # a sheet is good for one change
+        return {"ok": True, "jobs": _srv_jobs_parse(js.get("jobs"))}
+    if st == 409 and code == "changed":
+        _srv_mstate.pop(e["id"], None)
+        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}
+    if st == 409 and code == "busy":
+        return {"ok": False, "kind": "busy", "err": "%s is busy changing its models. "
+                "Nothing was changed. Try again in a moment." % name}
+    if st == 409 and code == "in_use":
+        return {"ok": False, "kind": "in_use", "err": "%s is in use on %s, so nothing was "
+                "changed. Try again when it\u2019s done." % (_srv_text(js.get("name"), 80)
+                                                          or "A model", name)}
+    if st == 400:
+        return {"ok": False, "kind": "server", "err": "%s refused the change%s. Nothing was "
+                "changed." % (name, (": " + _srv_text(js.get("error"), 160))
+                              if js.get("error") else "")}
+    if st == 404 and code == "not_found":
+        return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
+    return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
+# ==== server model sets: end ====
+
+
+
 def stream_ollama(tag: str, messages: list, emit,
                   giant: bool = False, big: bool = False,
                   label: str = "") -> None:
@@ -21272,8 +21551,10 @@ def _bench_save(rec: dict):
 #     refusal lines as a chat to it), one model at a time, with the
 #     figures in Ollama's own last line, which the gateway passes through
 #     as it is. Nothing is unloaded (the gateway drops keep_alive), so a
-#     load time is the server's own load_duration, and "not measured"
-#     for a model that was already loaded.
+#     load time is the server's own load_duration, else timed here from
+#     the load request to its last line, network included (6b409:
+#     Ollama 0.35 reports none), and "not measured" for a model that was
+#     already loaded.
 #   * The CLOUD is called with the app's own request bodies and headers
 #     (_openai_body, _anthropic_body) at 256 tokens, streamed, so the
 #     first token can be timed. No keys are ever shown, stored or put in
@@ -21672,9 +21953,10 @@ class _BenchServer:
             return [m for m in ps.get("models") or [] if isinstance(m, dict)
                     and (m.get("name") or m.get("model")) == self.model]
         self.was_loaded = bool(mine(self._ps()))
-        final = {}
+        final, t_done = {}, None
         # an empty prompt loads the model and answers nothing; streamed,
         # because Cloudflare ends a plain call that takes over 100 s
+        t0 = time.monotonic()
         for line in self._lines("POST", "/api/generate", {
                 "model": self.model, "prompt": "", "stream": True,
                 "options": {"num_ctx": BENCH_CTX}}, BENCH_LOAD_CAP):
@@ -21682,10 +21964,16 @@ class _BenchServer:
             if obj.get("error"):
                 raise _srv_fail(self.e, 0, obj, self.model)
             if obj.get("done"):
-                final = obj
+                final, t_done = obj, time.monotonic()
         out = {}
         if not self.was_loaded and _bench_pos(final.get("load_duration")):
             out["load_duration"] = final["load_duration"]
+        elif not self.was_loaded and t_done is not None:
+            # TIMED HERE (6b409): Ollama 0.35 answers the empty load with
+            # only {"done": true, "done_reason": "load"}, no load_duration.
+            # From the request going out to that last line, so the network
+            # is in it; fix() labels it so
+            out["load_s"] = t_done - t0
         try:
             for m in mine(self._ps()):
                 self.ps = {"gpu_size": _bench_int(m.get("size")),
@@ -21740,11 +22028,15 @@ class _BenchServer:
         nums["network"] = True
         if nums.get("src") != "engine":
             nums["prompt_tps"] = None        # reads: only from the server's own numbers
-        if nums.get("load_src") != "engine":
-            nums["load_s"], nums["load_src"] = None, "not measured"
-            nums["note"] = ("Already in the server\u2019s memory, so its load time "
-                            "wasn\u2019t measured." if self.was_loaded else
-                            "The server didn\u2019t report a load time.")
+        if nums.get("load_src") == "engine":
+            return
+        if not self.was_loaded and nums.get("load_s") is not None:
+            nums["load_src"] = "timed"       # by this computer, network in it (6b409)
+            return
+        nums["load_s"], nums["load_src"] = None, "not measured"
+        nums["note"] = ("Already in the server\u2019s memory, so its load time "
+                        "wasn\u2019t measured." if self.was_loaded else
+                        "The server didn\u2019t report a load time.")
 
     def close(self, keep):
         pass
@@ -24375,7 +24667,7 @@ def remote_driver():
     if _sd is not None:
         return ("server", _sd["label"])
     pulled = ollama_pulled_tags() or set()
-    for l in ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B"):
+    for l in CODE_LADDER:
         if l in MODEL_ROUTES and model_cached(l, pulled) \
                 and model_fits_memory(l):
             return ("local", l)
@@ -26692,6 +26984,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _sid = (_sq.get("id") or [""])[0]
             self._send_json(server_sleep_get(self.ctx, _sid)
                             if _SRV_ID_RX.fullmatch(_sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+        elif urllib.parse.urlparse(self.path).path == "/api/servers/models":
+            # Settings › Your servers (6b407): its models and the three sets
+            _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            _sid = (_sq.get("id") or [""])[0]
+            self._send_json(server_models_get(self.ctx, _sid)
+                            if _SRV_ID_RX.fullmatch(_sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
         elif urllib.parse.urlparse(self.path).path == "/api/servers/usage":
             # the sidebar meters' read of one server's card (6b342): while
             # a benchmark runs nothing is asked of any server
@@ -27294,6 +27592,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # auto sleep (6b346): this server's setting, in the active profile
                 out = (server_sleep_set(self.ctx, sid, {k: d[k] for k in ("enabled", "minutes") if k in d})
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+            elif op == "models":
+                # a set for this server, as the sheet showed it (6b407)
+                out = (server_models_apply(self.ctx, sid, d)
+                       if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
             elif op not in ("pair", "test", "access", "remove", "prefer"):
                 self.send_error(404)
                 return
@@ -27700,12 +28002,23 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 pass
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
-                plan = (json.loads(self.rfile.read(n)) or {}).get("plan", "max")
+                _d = json.loads(self.rfile.read(n)) if n else {}
             except (ValueError, json.JSONDecodeError):
-                plan = "max"
-            _want = plan_labels(plan)
+                _d = {}
+            # ONE OF THE THREE SETS (6b405), by name or by an old plan's
+            # (basic/min -> light, pro/rec -> recommended, max/full/all ->
+            # everything). It ADDS what is missing and deletes nothing: an
+            # outdated version stays auto-clean's job. The pick is kept, so
+            # the status and the More-models card follow the person's set
+            _key = model_set_key((_d if isinstance(_d, dict) else {}).get("plan"))
+            if not _key:
+                self._send_json({"err": "Pick Light, Recommended or Everything."},
+                                code=400)
+                return
+            _want = model_sets()[_key]
             _started = start_model_downloads(_want)
-            self._send_json({"started": _started, "n": len(_want),
+            model_set_choose(_key)
+            self._send_json({"set": _key, "started": _started, "n": len(_want),
                              "already": len(_want) - len(_started),
                              "gb": round(sum(MODEL_INFO[l]["gb"]
                                              for l in _started), 1)})
@@ -33803,6 +34116,40 @@ body.gen #chip-model{color:var(--accent)}
 .bm-gh{font-family:var(--mono);font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--faint);padding:8px 0 0}
 .bm-gh:first-child{padding-top:6px}
+/* a set for one of your servers (6b407): the cost dialog's look */
+#srvset-veil{position:fixed;inset:0;z-index:66;display:flex;
+  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#srvset-veil[hidden],#srvset-rml[hidden]{display:none}
+#srvset-card{width:min(460px,calc(100vw - 48px));padding:22px 24px 16px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);max-height:min(86vh,720px);
+  overflow:hidden auto;animation:doorPop .4s cubic-bezier(.16,1,.3,1) both}
+#srvset-card .set-h{margin-bottom:4px}
+#srvset-list{margin:10px 0 8px;max-height:46vh;overflow-y:auto}
+#srvset-list .mrow{display:flex;align-items:baseline;justify-content:space-between;
+  gap:14px;padding:6px 2px;border-bottom:1px solid var(--line-soft)}
+#srvset-list .mname{font-family:var(--mono);font-size:12px;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#srvset-list .msize{font-family:var(--mono);font-size:11px;color:var(--faint);flex:none}
+#srvset-list .og{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);padding:12px 2px 2px}
+#srvset-list .og:first-child{padding-top:0}
+#srvset-list .mmore{padding:10px 2px 0;font-size:11.5px;color:var(--faint)}
+#srvset-sum{font-size:11.5px;color:var(--dim);margin:8px 0 0}
+#srvset-note{font-size:12px;color:#d9c08a;margin:6px 0 0;min-height:0}
+#srvset-note:empty{display:none}
+#srvset-card .sh-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+#srvset-card .sh-foot .about-btn{width:auto;margin-top:0;padding:7px 20px}
+#srvset-card .ghost{background:none;border:1px solid var(--line);color:var(--faint)}
+#srvset-card .ghost:hover{color:var(--text);border-color:var(--dim)}
+.srv-sets{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.srv-sh{font-size:12px;color:var(--text);font-weight:600}
+.srv-setrow{margin:8px 0 2px}
+.srv-jobs{margin-top:6px;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  line-height:1.6}
+.srv-job.failed{color:#e8907e}
+.srv-job.done{color:var(--faint)}
 #bmc-veil,#bmv-veil{position:fixed;inset:0;z-index:66;display:flex;
   align-items:center;justify-content:center;background:rgba(6,7,10,.72);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -33941,7 +34288,7 @@ body.gen #chip-model{color:var(--accent)}
 .plan-card b{display:block;font-size:12px}
 .plan-card span{font-size:10.5px;color:var(--faint);line-height:1.4;
   display:block}
-.plan-card .warn{color:#d9a95a}
+.plan-card .warn{color:#d9a95a;display:inline}
 .plan-card.risky:hover{border-color:rgba(217,169,90,.6)}
 .plan-card .gb{font-family:var(--mono);font-size:9.5px;color:var(--dim);
   display:block;margin-top:3px}
@@ -34074,11 +34421,23 @@ body.gen #chip-model{color:var(--accent)}
   transition:width .6s cubic-bezier(.4,0,.2,1)}
 .studio .stnums{display:flex;justify-content:space-between;margin-top:5px;
   font-family:var(--mono);font-size:9.5px;color:var(--faint)}
-.studio .stacts{display:flex;gap:7px;margin-top:9px}
+/* the studio cards' buttons (6b408, per Patrick: Remove looked unfinished,
+   a thin grey box with the browser's own text): the app's about-btn, the
+   same height, padding, font and radius as Add, in the card's action row
+   at its right edge; Remove a quiet ghost that warms to the danger tint */
+.studio .stacts{display:flex;gap:7px;margin-top:10px;justify-content:flex-end;
+  align-items:center}
 .studio .stacts button[hidden]{display:none}
-.studio .ghost.slim{background:none;border:1px solid var(--line);
-  color:var(--faint)}
-.studio .ghost.slim:hover{color:var(--text);border-color:var(--dim)}
+.studio .stacts .about-btn{width:auto;margin-top:0;padding:6px 14px;
+  font-size:12px;line-height:1.2;border-radius:9px}
+.studio .stacts .about-btn.ghost{background:none;border:1px solid var(--line);
+  color:var(--dim)}
+.studio .stacts .about-btn.ghost:hover{color:var(--text);border-color:var(--dim);
+  background:rgba(255,255,255,.04)}
+.studio .stacts .about-btn.strm:hover,.studio .stacts .about-btn.strm[data-sure="1"]{
+  color:#e8907e;border-color:rgba(226,109,90,.5);background:rgba(226,109,90,.06)}
+.studio .stacts .about-btn:focus-visible{outline:2px solid var(--accent-hot);
+  outline-offset:2px}
 .studio .about-btn.slim[disabled]{opacity:.4;cursor:not-allowed}
 .genvid{display:block;max-width:min(100%,640px);border-radius:12px;
   margin:6px 0 10px;background:#000;
@@ -34529,16 +34888,16 @@ body.gen #chip-model{color:var(--accent)}
   text-transform:uppercase;color:#fff;font-weight:400;line-height:1}
 #wiz-ver{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
   text-transform:uppercase;color:var(--faint)}
-#wiz-plans{display:flex;gap:8px;margin:4px 0 12px}
-.wplan{flex:1;padding:12px 10px;border-radius:11px;cursor:pointer;
-  border:1px solid var(--line);background:rgba(255,255,255,.03);
-  text-align:center;transition:border-color .13s,background .13s}
-.wplan:hover{background:rgba(255,255,255,.06)}
-.wplan.on{border-color:rgba(255,255,255,.45);background:var(--accent-dim)}
-.wplan b{display:block;font-size:13.5px;margin-bottom:3px}
-.wplan span{display:block;color:var(--dim);font-size:11px;line-height:1.4}
-.wplan .wgb{font-family:var(--mono);font-size:9.5px;color:var(--faint);
-  letter-spacing:.1em;margin-top:5px;display:block}
+/* the three sets (6b405): the same cards in the wizard, the first-run
+   window and Settings; three across where there is room */
+#wiz-plans,.set-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  margin:4px 0 12px}
+.set-row{margin:14px 0 4px}
+.set-card{padding-right:12px}
+.set-card.current{padding-top:22px}
+.set-card.on{border-color:var(--accent-hot);background:var(--accent-dim)}
+.set-card:focus-visible{outline:2px solid var(--accent-hot);outline-offset:2px}
+.set-card.none{opacity:.5;cursor:default}
 #wiz-autoclean,#wiz-nolimits{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);line-height:1.5;cursor:pointer}
 #wiz-autoclean input,#wiz-nolimits input{margin-top:2px}
@@ -34632,26 +34991,15 @@ body.gen #chip-model{color:var(--accent)}
   transition:all .13s;
 }
 #setup-foot button:hover{color:var(--text);border-color:var(--dim)}
-.plans{display:flex;gap:10px;margin:14px 0 4px}
-.plan{flex:1;border:1px solid var(--line);border-radius:12px;
-  padding:12px 12px 10px;cursor:pointer;transition:all .15s;
-  display:flex;flex-direction:column;gap:4px}
-.plan b{font-size:15px}
-.plan span{font-size:11.5px;color:var(--dim);line-height:1.35}
-.plan em{font-style:normal;font-family:var(--mono);font-size:10.5px;
-  color:var(--faint)}
-.plan:hover{border-color:var(--accent-hot)}
-.plan.on{border-color:var(--accent-hot);background:var(--accent-dim)}
-.plan.done{opacity:.45;cursor:default}
-.plan.done:hover{border-color:var(--line)}
-/* 6b312: in the Your models window the installed set is a real choice
-   (picking it updates what you have), so it isn't greyed out there */
-.plans.mine .plan.done{opacity:1;cursor:pointer}
-.plans.mine .plan.done:hover{border-color:var(--accent-hot)}
-.plans.mine .plan.done em{color:var(--accent-hot)}
 #nolimits-row{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);margin:10px 2px 0;cursor:pointer;
   line-height:1.5;text-align:left}
+/* 6b405: the No limits boxes in the grid's fourth cell, beside Everything */
+#plan-limits{display:flex;flex-direction:column;justify-content:center;
+  padding:4px 2px}
+#plan-limits #nolimits-row{margin:0;padding:0;font-size:10.5px;
+  align-items:flex-start;color:var(--faint)}
+#plan-limits .giants-row{margin:6px 0 0 27px;font-size:10.5px}
 /* 6b307: the giants box hangs under "no limits", greyed until it's on */
 .giants-row{display:flex;gap:8px;align-items:center;font-size:11px;
   color:var(--faint);margin:6px 2px 0 24px;cursor:pointer;line-height:1.5;
@@ -35372,16 +35720,23 @@ __CODE_ROWS__
       <div id="roster"></div>
       <div id="roster-foot">
         <button class="about-btn slim" id="roster-manage">Manage models&hellip;</button>
-        <!-- 6b306: this opens the installer; "updates" now means the
-             Update models card, so the button says what it does -->
-        <button class="about-btn slim" id="open-setup">Add models&hellip;</button>
       </div>
       <div id="manage-box" hidden>
         <dl id="mg-stats">
           <div><dt>models installed</dt><dd id="mg-count">&mdash;</dd></div>
           <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
         </dl>
-        <div id="plan-row"></div>
+        <!-- THE THREE SETS (6b405): Light, Recommended, Everything, drawn by
+             setCardsHtml; the No limits boxes sit beside Everything, the
+             only set they change -->
+        <div id="plan-row"><div id="plan-limits">
+          <label id="nolimits-row"><input type="checkbox" id="nolimits">
+            <span>No limits: Everything adds models too big for this
+            machine&rsquo;s memory. They can swap hard or crash it.</span></label>
+          <label id="giants-row" class="giants-row off"><input type="checkbox"
+            id="giants" disabled><span>__GIANT_LABEL__</span><i
+            class="hint" title="__GIANT_TIP__">i</i></label>
+        </div></div>
         <!-- 6b294, per Patrick: image generation is an extra under the
              presets, not a preset — a smaller box, one button -->
         <!-- 6b297/6b299, per Patrick: no paragraph. Installed is one
@@ -35529,6 +35884,21 @@ __CODE_ROWS__
     </div>
   </div>
 </div>
+<!-- a set for one of your servers (6b407): exactly what will download and
+     what will be removed, before anything is -->
+<div id="srvset-veil" hidden>
+  <div id="srvset-card" role="dialog" aria-modal="true" aria-labelledby="srvset-title">
+    <div class="set-h" id="srvset-title"></div>
+    <div id="srvset-list"></div>
+    <label class="bmc-ck" id="srvset-rml"><input type="checkbox" id="srvset-rm" checked> <span id="srvset-rmt"></span></label>
+    <p id="srvset-sum"></p>
+    <p id="srvset-note"></p>
+    <div class="sh-foot">
+      <button id="srvset-cancel" class="about-btn slim ghost">Cancel</button>
+      <button id="srvset-go" class="about-btn slim">Apply</button>
+    </div>
+  </div>
+</div>
 <!-- "+N servers more" (6b353): every paired server in full; built by script, text only -->
 <div id="srvall-veil" hidden>
   <div id="srvall-card" role="dialog" aria-modal="true" aria-labelledby="srvall-title" tabindex="-1">
@@ -35622,9 +35992,8 @@ __CODE_ROWS__
         Also add video generation &mdash; short video from a description,
         entirely on this Mac (19.6 GB)</label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
-        Ignore system limits &mdash; offer every model in each list even
-        beyond this machine&rsquo;s memory. May swap hard or crash;
-        use at your own risk.</label>
+        No limits: Everything adds models too big for this
+        machine&rsquo;s memory. They can swap hard or crash it.</label>
       <!-- 6b307, per Patrick: the giants sit behind a second box that
            only wakes up once the first is ticked -->
       <label id="wiz-giants" class="giants-row off"><input type="checkbox"
@@ -35660,16 +36029,11 @@ __CODE_ROWS__
 
 <div id="setup-veil" hidden>
   <div id="setup-card">
-    <h2 id="setup-title">Your models</h2>
-    <p class="sub" id="setup-sub">Pick your set to update it, or a bigger
-      set to add models.</p>
+    <!-- 6b405: the first-run download window only; picking a set is
+         Settings \u203a Models (or the wizard), the same three cards -->
+    <h2 id="setup-title">Downloading models</h2>
+    <p class="sub" id="setup-sub"></p>
     <div id="setup-list"></div>
-    <label id="nolimits-row"><input type="checkbox" id="nolimits">
-      No limits — offer models beyond this machine&rsquo;s memory
-      (can swap hard)</label>
-    <label id="giants-row" class="giants-row off"><input type="checkbox"
-      id="giants" disabled><span>__GIANT_LABEL__</span><i
-      class="hint" title="__GIANT_TIP__">i</i></label>
     <div id="setup-note"></div>
     <div id="setup-foot">
       <button id="setup-later">Later</button>
@@ -39984,7 +40348,7 @@ function palActions(){
   const acts=[
     {k:"new",t:"New chat",run:()=>$("#newchat").click()},
     {k:"go",t:"Settings",run:()=>openAbout()},
-    {k:"go",t:"Add models\u2026",run:()=>openSetup()},
+    {k:"go",t:"Add models\u2026",run:()=>openModelSets()},
     {k:"go",t:"Update models\u2026",run:()=>openModelUpdates()},
     {k:"set",t:"Toggle visual effects",
      run:()=>$("#fx-toggle").click()},
@@ -40090,6 +40454,7 @@ document.addEventListener("keydown",e=>{
     if(engMenuEsc()){e.preventDefault();return;}
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
+    if(srvSheetAt){srvSheetClose();e.preventDefault();return;}
     for(const sel of ["#bmc-veil","#bmv-veil","#new-veil","#update-veil",
                       "#about-veil","#setup-veil"]){
       const el=$(sel);
@@ -41475,12 +41840,73 @@ function dlLeftIn(s){
 }
 // a line's " · about 6 min left", or nothing
 function dlTail(t){return t?" \u00b7 "+t:"";}
+/* THE THREE SETS (6b405, per Patrick: "one set of three, defined once,
+   shown the same way everywhere"). Light, Recommended and Everything, each
+   inside the next. The server decides what is in each and where each
+   stands (model_sets and model_sets_status: /api/setup's `sets`; a
+   server's are /api/servers/models'); this one renderer draws the three
+   cards in Settings \u203a Models, the first-run wizard, the first-run window
+   and on each of your servers. */
+const SET_KEYS=["light","recommended","everything"];
+const SET_NAMES={light:"Light",recommended:"Recommended",everything:"Everything"};
+const SET_HERE=IS_PC?"this PC":"this Mac";
+const SET_ASK="This adds models bigger than "+SET_HERE+"\u2019s memory. They can crash it. Click again to go ahead.";
+function setDesc(k,x,where){
+  if(x.same)return "The same as "+SET_NAMES[x.same]+" on "+where+".";
+  if(k==="light")return "One everyday model and two quick ones.";
+  if(k==="recommended")return "A model for each job: answers, thinking, code and pictures.";
+  return x.risky?"Every model, even ones too big for "+where+". They can crash it."
+    :"Every model "+where+" can run.";
+}
+// the count line: what is here already, or what would download
+function setLine(x){
+  const n=x.n+" model"+(x.n===1?"":"s");
+  return x.state==="download"?n+" \u00b7 "+muGB(x.dl_gb)+" to download":n+" \u00b7 installed";
+}
+// THE RISKY CARD ASKS TWICE, in place, naming the risk (6b258): Everything
+// while it holds models over memory. The question is the screen's own for
+// 8 s, so a repaint while it waits keeps it
+const setArm={};
+function setArmed(scr){return setArm[scr]&&Date.now()-setArm[scr].at<8000?setArm[scr].k:"";}
+// true when a click on card c may act; a risky card's first click asks
+function setConfirm(scr,c){
+  if(!c.classList.contains("risky")||setArmed(scr)===c.dataset.set){
+    delete setArm[scr];return true;}
+  setArm[scr]={k:c.dataset.set,at:Date.now()};
+  const d=c.querySelector(".sd");if(d)d.textContent=SET_ASK;
+  return false;
+}
+// sets: {light:{n,dl_gb,state,same}, recommended, everything, risky};
+// o: pick (the card chosen on this screen), where (whose: "this Mac" or a
+// server's name), scr (the screen, for the risky card's question)
+function setCardsHtml(sets,o){
+  o=o||{};sets=sets||{};
+  const where=o.where||SET_HERE,armed=o.scr?setArmed(o.scr):"";
+  return SET_KEYS.map(k=>{
+    const x=sets[k];if(!x)return "";
+    const risky=k==="everything"&&!!sets.risky&&!x.same;
+    return '<div class="plan-card set-card'+(risky?" risky":"")
+      +(x.state==="yours"?" current":"")+(o.pick===k?" on":"")+(x.n?"":" none")
+      +'" data-set="'+k+'" role="button" tabindex="0">'
+      +(x.state==="yours"?'<i class="cur">\u2713 yours</i>':"")
+      +'<b>'+(risky?'<span class="warn">\u26a0</span> ':"")+SET_NAMES[k]+'</b>'
+      +'<span class="sd">'+esc(armed===k?SET_ASK:x.n?setDesc(k,Object.assign({},x,{risky:risky}),where)
+        :"Nothing fits "+where+".")+'</span>'
+      +(x.n?'<span class="gb">'+esc(setLine(x))+'</span>':"")+'</div>';
+  }).join("");
+}
+// a card is a button: Enter and Space press it
+document.addEventListener("keydown",e=>{
+  const c=e.target&&e.target.classList&&e.target.classList.contains("set-card")?e.target:null;
+  if(c&&(e.key==="Enter"||e.key===" ")){e.preventDefault();c.click();}
+});
 function renderSetup(st){
+  setupSt=st;
   const stars=st.models.filter(m=>m.star);
   setupAllReady=stars.every(m=>m.status==="ready");
   const anyDl=st.busy;
   const pct=st.overall_pct;
-  // headline: overall progress across the recommended set
+  // headline: overall progress across the batch
   let html=
     '<div class="big-bar"><i style="width:'+pct+'%"></i></div>'+
     '<div class="big-stat"><span>'+st.have_gb+' / '+st.want_gb+' GB</span>'+
@@ -41489,6 +41915,7 @@ function renderSetup(st){
       (st.speed_mbs>0?st.speed_mbs+' MB/s':'starting\u2026')+
       dlTail(dlLeft("batch",st.have_b,st.want_b,null,st.checking))+'</div>'
       +'<div class="big-now">'+nowLine(st)+'</div>':'');
+  setupLater.hidden=false;
 
   // WHILE DOWNLOADING (first run or updates): one bar, bandwidth,
   // percent — never a wall of per-model rows
@@ -41496,107 +41923,36 @@ function renderSetup(st){
     setTitle("Downloading updates",
       "Keep chatting \u2014 this finishes in the background.");
     setupList.innerHTML=html;
-    $("#setup-later").textContent="Continue in background";
+    setupLater.textContent="Continue in background";
     finishSetupChrome(st,stars,anyDl);
     return;
   }
-  $("#setup-later").textContent="Later";
+  setupLater.textContent="Later";
 
-  // FIRST RUN stays simple: the machine already picked its best brains —
-  // show what it chose and one number, never the catalog. The full list
-  // only exists behind "Add models…" for people who go looking.
+  // FIRST RUN, without the wizard: the same three cards as the wizard and
+  // Settings (6b405), the button downloading the one picked
   if(!setupManual){
     setTitle("Welcome to MillenAI",
       "We\u2019re getting you set up \u2014 private, and entirely on "
       +"this Mac. Start chatting the moment the first piece lands.");
-    html+=planCards(st);
-    setupList.innerHTML=html;
-    wirePlans(st);
+    const sets=st.sets||{};
+    if(!setupPlanPicked){if(sets.chosen)setupPlan=sets.chosen;setupPlanPicked=true;}
+    setupList.innerHTML=html+'<div class="set-row">'
+      +setCardsHtml(sets,{pick:setupPlan,scr:"setup"})+'</div>';
     finishSetupChrome(st,stars,anyDl);
     return;
   }
 
-  // …then every model individually, so anything can be added on its own
-  const state=m=>{
-    if(m.status==="ready")   return TICK;
-    if(m.status==="downloading") return '<span class="st dl">'+dlPct(m)+'</span>';
-    if(m.status==="queued")  return '<span class="st wait">queued</span>';
-    if(m.status==="error")   return '<span class="st err" title="'+esc(m.note)+'">failed</span>';
-    return '<span class="st get">'+m.est_gb+' GB \u2193</span>';
-  };
-  // an installed model gets its name and a tick - a full progress bar on
-  // something already at 100% is just noise on every row you have finished
-  const row=m=>
-    m.status==="ready"
-      ? '<div class="setup-row done"><span class="nm">'+esc(m.label)+'</span>'
-        +TICK+'</div>'
-      : '<div class="setup-row clickable" data-model="'+esc(m.label)+'">'
-        +'<span class="nm">'+esc(m.label)+'</span>'+state(m)
-        +'<div class="bar"><i style="width:'+(m.pct||0)+'%"></i></div></div>';
-  // YOUR MODELS, NOT AN UPSELL (6b312, per Patrick: "why can't they
-  // select the fast preset that they already have installed to update
-  // their library of models without adding more models they may not
-  // want? ... It should be an update and clean out"). This window
-  // called itself "Updates available" whenever ANY model of the biggest
-  // set was missing, greyed out the set you have and preselected the
-  // next one up. Now your set opens selected, picking it updates what
-  // you have and clears out old versions (the Update models run), and
-  // a bigger set is an add that says so. No progress bar until
-  // something actually downloads.
-  if(!setupPlanPicked){
-    const have=currentPlan(st);
-    if(have)setupPlan=have;
-    setupPlanPicked=true;
-  }
-  const cu=st.cleanup||{};
-  const upd=(cu.updates||[]).some(u=>u.new)||(cu.gb||0)>0;
-  const all=((st.plans||{}).max||0)<=0;
-  setTitle("Your models",
-    upd?"Newer versions of models you have are ready. Pick your set to "
-        +"update it and clear out the old ones, or a bigger set to add more."
-    :all?"You have every model this machine can run, and they\u2019re up "
-        +"to date."
-    :"Your set is up to date. Pick a bigger set to add more; it downloads "
-        +"in the background while you keep chatting.");
-  setupList.innerHTML=planCards(st,true);
-  wirePlans(st);
-
-  if(!st.mlx_ok){
-    setupNote.textContent="engine not installed \u2014 reopen the app to finish setup";
-  }else if(stars.some(m=>m.status==="error")){
-    setupNote.textContent="a download failed \u2014 check your connection, then retry";
-  }else{
-    setupNote.textContent="";
-  }
-  paintManualGo(st);
+  // OPENED FROM THE DOWNLOAD STRIP, and the downloads are over. The window
+  // that picked sets here is gone (6b405): adding models, or another set,
+  // is Settings › Models; updates and clean-outs stay its Update models card
+  setTitle("Downloads finished",
+    "Add more, or pick another set, in Settings \u203a Models.");
+  setupList.innerHTML=html;
+  setupLater.hidden=true;
+  finishSetupChrome(st,stars,anyDl);
 }
-// the largest set that's fully installed: the one this person has
-function currentPlan(st){
-  const rem=st.plans||{};
-  return ["max","pro","basic"].find(k=>(rem[k]||0)<=0)||"";
-}
-// the Your models window's one button: your own set updates, a bigger
-// set adds, and nothing to do says so
-function paintManualGo(st){
-  const cu=st.cleanup||{},left=(st.plans||{})[setupPlan]||0;
-  const name={basic:"Fast",pro:"Pro",max:"Max"}[setupPlan]||"models";
-  setupGo.disabled=!st.mlx_ok;
-  if(left>0){
-    setupGo.dataset.act="add";
-    setupGo.textContent="Add "+name+" \u00b7 "+Math.max(1,Math.round(left))+" GB";
-  }else if((cu.updates||[]).some(u=>u.new)){
-    setupGo.dataset.act="update";
-    setupGo.textContent="Update models"
-      +(cu.dl_gb?" \u00b7 "+Math.max(1,Math.round(cu.dl_gb))+" GB":"");
-  }else if((cu.gb||0)>0){
-    setupGo.dataset.act="update";
-    setupGo.textContent="Clear out old models \u00b7 "+muGB(cu.gb);
-  }else{
-    setupGo.dataset.act="";setupGo.disabled=true;
-    setupGo.textContent="Up to date \u2713";
-  }
-}
-// the button quotes the CHOSEN plan, not the whole catalog
+// the button quotes the CHOSEN set, not the whole catalog
 function setTitle(t,s){
   const h=$("#setup-title"),p=$("#setup-sub");
   if(h)h.textContent=t;
@@ -41610,39 +41966,14 @@ function nowLine(st){
   const q=st.queued_n?(st.queued_n+" waiting"):"";
   return [now.join("  \u00b7  "),q].filter(Boolean).join("  \u00b7  ");
 }
-function planCards(st,mine){
-  const rem=st.plans||{};
-  const meta=[["basic","Fast","Quick answers, tiny download"],
-              ["pro","Pro","Great everyday quality"],
-              ["max","Max","The best this machine can run"]];
-  if(!mine&&(rem[setupPlan]||0)<=0){
-    const next=meta.find(([k])=>rem[k]>0);
-    if(next)setupPlan=next[0];
-  }
-  return '<div class="plans'+(mine?' mine':'')+'">'+meta.map(([k,name,desc])=>{
-    const left=rem[k]||0;
-    return '<div class="plan'+(left<=0?' done':'')+'" data-plan="'+k+'">'
-      +'<b>'+name+'</b><span>'+desc+'</span>'
-      +'<em>'+(left<=0?'Installed \u2713':'~'+Math.max(1,Math.round(left))+' GB')+'</em></div>';
-  }).join("")+'</div>';
-}
-function wirePlans(st){
-  setupList.querySelectorAll(".plan").forEach(el=>{
-    el.classList.toggle("on",el.dataset.plan===setupPlan);
-    // your own set is a choice in the Your models window (6b312)
-    if(el.classList.contains("done")&&!setupManual)return;
-    el.addEventListener("click",()=>{
-      setupPlan=el.dataset.plan;setupPlanPicked=true;
-      setupList.querySelectorAll(".plan").forEach(x=>
-        x.classList.toggle("on",x===el));
-      if(setupManual)paintManualGo(st);
-      else setupGo.textContent="Update \u00b7 "+planGB(st)+" GB";
-    });
-  });
-}
-function planGB(st){
-  return Math.max(1,Math.round((st.plans||{})[setupPlan]||0));
-}
+// a card picked in the first-run window: the button re-prices for it
+setupList.addEventListener("click",e=>{
+  const c=e.target.closest&&e.target.closest(".set-card");
+  if(!c||setupManual||!setupSt)return;
+  if(!setConfirm("setup",c))return;
+  setupPlan=c.dataset.set;setupPlanPicked=true;
+  renderSetup(setupSt);
+});
 
 function finishSetupChrome(st,stars,anyDl){
   if(!st.mlx_ok){
@@ -41653,16 +41984,19 @@ function finishSetupChrome(st,stars,anyDl){
   }else{
     setupNote.textContent="";
   }
+  setupGo.dataset.act="";
   if(anyDl){
     setupGo.disabled=true;setupGo.textContent="Downloading\u2026";
+  }else if(setupManual){
+    setupGo.disabled=false;setupGo.dataset.act="close";setupGo.textContent="Done";
   }else if(setupAllReady){
     setupGo.disabled=false;setupGo.textContent="Let\u2019s run it";
   }else{
-    const left=(st.plans||{})[setupPlan]||0;
+    const left=(((st.sets||{})[setupPlan])||{}).dl_gb||0;
     setupGo.disabled=!st.mlx_ok||left<=0;
     setupGo.textContent=left<=0?"Up to date \u2713"
-      :(stars.some(m=>m.status==="error")?"Retry":"Update")+
-       " \u00b7 "+planGB(st)+" GB";
+      :(stars.some(m=>m.status==="error")?"Retry":"Download "+SET_NAMES[setupPlan])
+       +" \u00b7 "+muGB(left);
   }
 }
 
@@ -41762,9 +42096,12 @@ function rainbowWipe(){
 }
 
 let wasDownloading=false;
-// true when the panel was opened to add models rather than by first-run setup
+// true when the window was opened from the download strip (its progress),
+// not by a first run
 let setupManual=false;
-let setupPlan="pro",setupPlanPicked=false;
+// the set picked in the first-run window (6b405): Recommended until one is
+// (the old default, "pro", is Recommended now); the last status it drew
+let setupPlan="recommended",setupPlanPicked=false,setupSt=null;
 function celebrateDownloads(){
   const card=$("#setup-card"),veil=$("#setup-veil");
   // the card grows and dissolves, then the wipe runs
@@ -41847,17 +42184,22 @@ function openSetup(){
 function closeSetup(){veil.hidden=true;if(setupTimer){clearInterval(setupTimer);setupTimer=null;}input.focus();}
 setupLater.addEventListener("click",closeSetup);
 setupGo.addEventListener("click",async()=>{
-  // your own set picked: update what you have, in the Update models card
-  if(setupManual&&setupGo.dataset.act==="update"){
-    closeSetup();runModelUpdate();return;}
-  if(setupAllReady&&!(setupManual&&setupGo.dataset.act==="add")){
-    closeSetup();return;}
+  if(setupGo.dataset.act==="close"||setupAllReady){closeSetup();return;}
+  // a first run: download the set picked (a risky one asked twice already)
   await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:setupPlan})});
   setupTick();
 });
-$("#open-setup").addEventListener("click",()=>{aboutVeil.hidden=true;openSetup();});
+// WHERE MODELS ARE ADDED NOW (6b405): Settings › Models, its three sets in
+// view. The Add models… window that picked sets of its own is gone
+async function openModelSets(){
+  await openAbout();
+  settingsPane("p-models");
+  if(!manageOn)$("#roster-manage").click();
+  const r=$("#plan-row");
+  if(r&&r.scrollIntoView)r.scrollIntoView({block:"center"});
+}
 // THE PROVIDER BOARD (6b218, per Patrick): fixed rows —
 // Gemini / Groq / Claude / Kimi K3 — grey until a key is saved, green ✓
 // when its key works, red ✗ with the reason when it doesn't. The rows
@@ -42013,6 +42355,7 @@ function srvCard(s){
       +'<div class="srv-hint">The Workspace and Coding agents can send the contents of a '
       +'folder you give them to this server.</div>':"")
     +srvSleepHtml(s,srvSleep[s.id])
+    +srvSetsHtml(s,srvSets[s.id])
     +(pairing?'<div class="srv-pair"><input class="srv-code" data-k="code" maxlength="20" '
         +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
         +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
@@ -42200,6 +42543,154 @@ $("#srv-list").addEventListener("click",async ev=>{
     setTimeout(()=>{if(srvTestSeq[id]===seq&&srvMsgs[id]===r.text)srvMsg(id,"");},SRV_TEST_HOLD_MS);
   }else srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
   paintEngMenuServers();
+});
+/* MODELS ON YOUR SERVER (6b407, per Patrick: "the server gets the same
+   three sets sized for its card, chosen in Settings \u203a Servers, with the
+   exact add/remove list shown before anything is deleted"). The three
+   cards are setCardsHtml's, from /api/servers/models (the gateway's list,
+   the sets sized for its card). A card opens the sheet: Download and
+   Remove by name and size, the rest unchanged, a switch for the removals;
+   Apply sends exactly that, and the card follows the server's jobs until
+   they end, then shows what the server really has. Pure helpers first,
+   so the gauntlet runs them in node. */
+const srvSets={};          // server id -> {st:"load"|"ok"|"err", d, msg, kind, line}
+// the sheet's lists for set k of server answer d; rm: the switch is on
+function srvSheet(d,k,rm){
+  const x=((d||{}).sets||{})[k]||{},dl=x.download||[],out=rm?(x.remove||[]):[];
+  return {dl:dl,rm:out,keep:(d.n||0)-out.length,n_rm:(x.remove||[]).length,
+    dl_gb:x.dl_gb||0,free_gb:rm?(x.free_gb||0):0,
+    add:dl.map(m=>m.name),remove:out.map(m=>m.name),
+    empty:!dl.length&&!out.length};
+}
+function srvSheetHtml(sh){
+  const row=m=>'<div class="mrow"><span class="mname">'+esc(m.name)+'</span>'
+    +'<span class="msize">'+muGB(m.gb)+'</span></div>';
+  return (sh.dl.length?'<div class="og">Download</div>'+sh.dl.map(row).join(""):"")
+    +(sh.rm.length?'<div class="og">Remove</div>'+sh.rm.map(row).join(""):"")
+    +(sh.keep>0?'<div class="mmore">'+sh.keep+' other model'+(sh.keep>1?"s":"")+' unchanged</div>':"")
+    +(sh.empty?'<div class="mmore">Nothing to change.</div>':"");
+}
+function srvSheetSum(sh){
+  return [sh.dl_gb?muGB(sh.dl_gb)+" to download":"",sh.free_gb?muGB(sh.free_gb)+" freed":""]
+    .filter(Boolean).join(" \u00b7 ");
+}
+// a job, in words
+function srvJobLine(j){
+  const w=j.action==="remove"?{queued:"to remove",running:"removing",done:"removed",failed:"couldn\u2019t remove"}
+    :{queued:"waiting",running:"downloading "+(j.pct||0)+"%",done:"downloaded",failed:"couldn\u2019t download"};
+  return j.name+" \u00b7 "+w[j.state]+(j.state==="failed"&&j.error?": "+j.error:"");
+}
+// the line under the cards: which set the server has, or what it is doing
+function srvSetsLine(name,d){
+  if(!d.vram)return name+" didn\u2019t say how much graphics memory it has, so the sets can\u2019t be sized. Update the server kit.";
+  if(d.running)return name+" is changing its models\u2026";
+  const by=d.plan&&d.plan.by?" Picked on "+d.plan.by+".":"";
+  return d.mine?name+" has "+SET_NAMES[d.mine]+"."+(d.plan&&d.plan.name===d.mine?by:"")
+    :name+" has "+d.n+" model"+(d.n===1?"":"s")+", not all of any set.";
+}
+function srvSetsHtml(s,z){
+  if(!s.paired)return "";
+  let h='<div class="srv-sets"><div class="srv-sh">Models on '+esc(s.name)+'</div>';
+  if(!z||z.st==="load")return h+'<div class="srv-hint">Reading its models\u2026</div></div>';
+  if(z.st==="err")return h+'<div class="srv-hint">'+esc(z.msg||"")+'</div></div>';
+  const d=z.d;
+  h+='<div class="set-row srv-setrow" data-sid="'+esc(s.id)+'">'
+    +setCardsHtml(d.sets,{where:s.name})+'</div>';
+  h+='<div class="srv-hint">'+esc(srvSetsLine(s.name,d))+'</div>';
+  const jobs=(d.jobs||[]).filter(j=>d.running||j.state==="failed");
+  if(jobs.length)h+='<div class="srv-jobs">'+jobs.map(j=>'<div class="srv-job '+j.state+'">'
+    +esc(srvJobLine(j))+'</div>').join("")+'</div>';
+  if(z.line)h+='<div class="srv-msg'+(z.kind?" "+z.kind:"")+'">'+esc(z.line)+'</div>';
+  return h+'</div>';
+}
+let srvSetsT=0;
+function srvSetsShown(){
+  const p=$("#p-servers");return !aboutVeil.hidden&&!!p&&p.classList.contains("on");}
+async function srvSetsLoad(s){
+  if(!s.paired)return;
+  let d=null;
+  try{const r=await api("/api/servers/models?id="+encodeURIComponent(s.id));if(r.ok)d=await r.json();}
+  catch(e){}
+  const z=srvSets[s.id]||{},was=z.st==="ok"&&z.d&&z.d.running;
+  if(d&&d.ok){
+    srvSets[s.id]={st:"ok",d:d,line:z.line||"",kind:z.kind||""};
+    if(was&&!d.running){
+      // the change ended: what the server really has now, and the picker's list with it
+      const bad=(d.jobs||[]).filter(j=>j.state==="failed");
+      srvSets[s.id].line=bad.length?"Some changes didn\u2019t finish.":"Done.";
+      srvSets[s.id].kind=bad.length?"warn":"ok";
+      try{const t=await srvPost("test",{id:s.id});if(t.server)srvPut(t.server);}catch(e){}
+    }
+  }else srvSets[s.id]={st:"err",msg:(d&&d.err)||"Couldn\u2019t read its models. Try again."};
+}
+async function srvSetsLoadAll(){
+  const gs=srvList.filter(s=>s.paired);
+  gs.forEach(s=>{if(!srvSets[s.id])srvSets[s.id]={st:"load"};});
+  paintServers();
+  await Promise.all(gs.map(srvSetsLoad));
+  Object.keys(srvSets).forEach(k=>{if(!gs.some(s=>s.id===k))delete srvSets[k];});
+  paintServers();
+  srvSetsPoll();
+}
+// while a server changes its models, its card follows the jobs
+function srvSetsPoll(){
+  clearTimeout(srvSetsT);srvSetsT=0;
+  const live=srvList.filter(s=>s.paired&&srvSets[s.id]&&srvSets[s.id].d&&srvSets[s.id].d.running);
+  if(!live.length||!srvSetsShown())return;
+  srvSetsT=setTimeout(async()=>{
+    await Promise.all(live.map(srvSetsLoad));paintServers();srvSetsPoll();},1500);
+}
+// the sheet
+let srvSheetAt=null;      // {sid, k}
+function srvSheetPaint(note){
+  const a=srvSheetAt;if(!a)return;
+  const z=srvSets[a.sid],s=srvList.find(x=>x.id===a.sid);
+  if(!z||!z.d||!s){srvSheetClose();return;}
+  const rmOn=$("#srvset-rm").checked,sh=srvSheet(z.d,a.k,rmOn),n=sh.n_rm;
+  $("#srvset-title").textContent=SET_NAMES[a.k]+" on "+s.name;
+  $("#srvset-list").innerHTML=srvSheetHtml(sh);
+  $("#srvset-rml").hidden=!n;
+  $("#srvset-rmt").textContent="Also remove the "+n+" model"+(n===1?"":"s")+" outside "+SET_NAMES[a.k];
+  $("#srvset-sum").textContent=srvSheetSum(sh);
+  $("#srvset-note").textContent=note||"";
+  $("#srvset-go").disabled=sh.empty;
+}
+function srvSheetOpen(sid,k){
+  srvSheetAt={sid:sid,k:k};$("#srvset-rm").checked=true;
+  $("#srvset-veil").hidden=false;srvSheetPaint();$("#srvset-cancel").focus();
+}
+function srvSheetClose(){srvSheetAt=null;$("#srvset-veil").hidden=true;}
+$("#srv-list").addEventListener("click",ev=>{
+  const c=ev.target.closest(".srv-setrow .set-card");if(!c)return;
+  const sid=c.closest(".srv-setrow").dataset.sid,z=srvSets[sid];
+  if(!z||!z.d||z.d.running)return;
+  srvSheetOpen(sid,c.dataset.set);
+});
+$("#srvset-rm").addEventListener("change",()=>srvSheetPaint());
+$("#srvset-cancel").addEventListener("click",srvSheetClose);
+$("#srvset-veil").addEventListener("click",e=>{if(e.target===$("#srvset-veil"))srvSheetClose();});
+$("#srvset-go").addEventListener("click",async()=>{
+  const a=srvSheetAt;if(!a)return;
+  const z=srvSets[a.sid],s=srvList.find(x=>x.id===a.sid);if(!z||!z.d||!s)return;
+  const sh=srvSheet(z.d,a.k,$("#srvset-rm").checked);
+  const go=$("#srvset-go");go.disabled=true;$("#srvset-note").textContent="Sending\u2026";
+  let r;
+  try{r=await srvPost("models",{id:a.sid,plan:a.k,add:sh.add,remove:sh.remove,seen:z.d.seen});}
+  catch(e){r={ok:false,err:"Couldn\u2019t reach the app. Try again."};}
+  if(r.ok){
+    srvSheetClose();
+    z.d.running=true;z.d.jobs=r.jobs||[];z.line="";z.kind="";
+    paintServers();srvSetsPoll();
+    return;
+  }
+  if(r.kind==="changed"){
+    // the server's list moved: read it again and show the sheet as it is now
+    await srvSetsLoad(s);paintServers();
+    if(srvSheetAt&&srvSets[a.sid]&&srvSets[a.sid].st==="ok")srvSheetPaint(r.err);
+    else srvSheetClose();
+    return;
+  }
+  srvSheetPaint(r.err||"That didn\u2019t work. Try again.");
 });
 $("#srv-add-go").addEventListener("click",async()=>{
   const note=$("#srv-note");
@@ -42656,15 +43147,21 @@ $("#nolimits").addEventListener("change",async()=>{
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(on?{no_limits:true}
       :{no_limits:false,include_giants:false})});
-  setupTick();   // the plans + GB re-price under the new rules
+  plansRefresh();   // Everything re-prices under the new rules
 });
 $("#giants").addEventListener("change",async()=>{
   syncLimits($("#nolimits").checked,$("#giants").checked);
   await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({include_giants:$("#giants").checked})});
-  setupTick();
+  plansRefresh();
 });
+// the grid reads the status again and draws it (6b405)
+async function plansRefresh(){
+  lastSetup=null;
+  try{await ensureSetup();}catch(e){}
+  paintPlans();paintMgStats();
+}
 $("#models-flag").addEventListener("click",()=>{openModelUpdates();});
 
 /* -------------------------------------------------- first-run wizard */
@@ -42673,7 +43170,8 @@ $("#models-flag").addEventListener("click",()=>{openModelUpdates();});
 // start downloads, /api/cloud + /api/cloud/set for keys, and the old
 // setup veil for the progress bar once the wizard hands off.
 const wizVeil=$("#wiz-veil");
-let wizStep=1,wizPlan="pro";
+// the set the wizard installs (6b405): Recommended until one is picked
+let wizStep=1,wizPlan="recommended",wizPicked=false,wizSets=null;
 const WIZ_PROVS=[
   ["gemini","Gemini","free","https://aistudio.google.com/app/apikey"],
   ["groq","Groq","free","https://console.groq.com/keys"],
@@ -42693,27 +43191,22 @@ async function wizPaintPlans(){
   const box=$("#wiz-plans");
   let st={};
   try{st=await(await api("/api/setup")).json();}catch(e){return;}
-  const rem=st.plans||{};
   const ss=st.studios||{};
   const wi=$("#wiz-image");
   if(wi)wi.hidden=!(ss.image&&ss.image.supported&&!ss.image.ready);
   const wv=$("#wiz-video");
   if(wv)wv.hidden=!(ss.video&&ss.video.supported&&!ss.video.ready);
-  const meta=[["basic","Basic","Quick answers, tiny download"],
-              ["pro","Pro","Great everyday quality"],
-              ["max","Max","The best this machine can run"]];
-  box.innerHTML=meta.map(([k,name,d])=>
-    '<div class="wplan'+(wizPlan===k?" on":"")+'" data-plan="'+k+'">'
-    +'<b>'+name+'</b><span>'+d+'</span>'
-    +'<span class="wgb">'+((rem[k]||0)>0
-        ?"~"+rem[k]+" GB":"installed ✓")+'</span></div>').join("");
+  // the same three cards as Settings (6b405)
+  wizSets=st.sets||{};
+  if(!wizPicked&&wizSets.chosen)wizPlan=wizSets.chosen;
+  box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});
 }
 $("#wiz-plans").addEventListener("click",e=>{
-  const c=e.target.closest&&e.target.closest(".wplan");
+  const c=e.target.closest&&e.target.closest(".set-card");
   if(!c)return;
-  wizPlan=c.dataset.plan;
-  $$("#wiz-plans .wplan").forEach(el=>
-    el.classList.toggle("on",el===c));
+  if(!setConfirm("wiz",c))return;
+  wizPlan=c.dataset.set;wizPicked=true;
+  $("#wiz-plans").innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});
 });
 $("#wiz-ac").addEventListener("change",async()=>{
   await api("/api/prefs",{method:"POST",
@@ -42946,6 +43439,7 @@ function settingsPane(id){
   if(id==="p-usage")loadUsage();      // fresh numbers on every visit (6b325)
   if(id==="p-usage")loadBench();      // and the benchmark's runs (6b331)
   if(id==="p-servers")loadServers(true).then(srvSleepLoadAll);   // each server checked (6b334), its sleep setting read (6b346)
+  if(id==="p-servers")srvSetsLoadAll();   // and its models and the three sets (6b407)
 }
 /* ------------------------------------------------ Settings › Usage (6b325)
    The four figures and the chart come from /api/usage (the usage
@@ -43146,7 +43640,8 @@ function bmRow(r,cur,old,max,ow){
     // includes the network; a server's first token does too
     sub=r.provider?"reads - · first token "+bmS(r.ttft_s)+" · load - · total "+bmS(r.total_s)
       :"reads "+bmNM(r,r.prompt_tps,v=>bmTps(v)+" tok/s")+" · first token "+bmS(r.ttft_s)
-      +(r.network?" (incl. network)":"")+" · load "+bmNM(r,r.load_s,v=>bmS(v,1));
+      +(r.network?" (incl. network)":"")+" \u00b7 load "+bmNM(r,r.load_s,v=>bmS(v,1))
+      +(r.load_src==="timed"&&r.load_s!=null?", timed by this computer":"");
     if(r.provider)sub+='<br><span class="bm-f">cloud, includes the network</span>';
     if(r.note)sub+="<br>"+esc(r.note);
   }else if(cur){
@@ -43974,38 +44469,18 @@ function paintMgStats(){
   $("#mg-space").textContent=(gb>=10?Math.round(gb):Math.round(gb*10)/10)
     +" GB";
 }
+// the grid's cards before the No limits boxes, which stay put (their
+// listeners and the server's giants text live in the page) (6b405)
+function planCardsPut(html){
+  const row=$("#plan-row"),lim=$("#plan-limits");if(!row||!lim)return;
+  row.querySelectorAll(".set-card,.plan-wait").forEach(n=>n.remove());
+  lim.insertAdjacentHTML("beforebegin",html);
+}
 function paintPlans(){
   if(!lastSetup)return;
-  // FOUR SIZES, HONESTLY LABELLED (6b258, per Patrick). Only the last
-  // one can hurt: it installs models this machine cannot hold, so it
-  // wears a warning triangle and says what happens.
-  const P=[["min","Minimum",
-            "the lightest models — smallest footprint that still answers",0],
-           ["rec","Recommended",
-            "one of each kind, newest generation, no superseded versions",0],
-           ["full","Full",
-            "every model this Mac's memory can actually run",0],
-           ["all","Max",
-            "every model there is, including ones too big for this Mac — "
-            +"they may crash it if memory runs out",1]];
-  const ps=lastSetup.plan_state||{};
-  $("#plan-row").innerHTML=P.map(p=>{
-    const gb=(lastSetup.plans||{})[p[0]];
-    const n=(lastSetup.plan_n||{})[p[0]];
-    const stt=ps[p[0]]||"";
-    // the set on disk wears a badge (6b290, per Patrick): "current"
-    // is exactly this preset; a preset fully contained in what is
-    // installed reads installed; anything else says what is left
-    return '<div class="plan-card'+(p[3]?" risky":"")
-      +(stt==="current"?" current":"")+'" data-plan="'+p[0]+'">'
-      +(stt==="current"?'<i class="cur">\u2713 current</i>':"")
-      +'<b>'+(p[3]?'<span class="warn">⚠</span> ':"")+p[1]
-      +'</b><span>'+esc(p[2])+'</span>'
-      +'<span class="gb">'+(n?n+" models":"")
-      +(gb?" · "+gb+" GB to download"
-          :(stt==="current"?" · this is what you have":" · already installed"))
-      +'</span></div>';
-  }).join("");
+  // THE THREE SETS (6b405): the same cards as the wizard; the one that is
+  // yours wears the badge, Everything over memory wears the warning
+  planCardsPut(setCardsHtml(lastSetup.sets,{scr:"grid"}));
 }
 // THE SIZE LADDER (6b299, per Patrick: "a slider from small to most
 // accurate … green … yellow … red … notches one for each model"). Built
@@ -44067,8 +44542,9 @@ function studioHTML(key,st){
       +'</span></div></div>';
   }
   h+='<div class="stacts">';
-  if(st.ready) h+='<button class="ghost slim strm">Remove</button>';
-  else if(busy) h+='<button class="ghost slim stbg">Continue in background</button>';
+  // the app's own secondary button (6b408), sat in the card's action row
+  if(st.ready) h+='<button class="about-btn slim ghost strm">Remove</button>';
+  else if(busy) h+='<button class="about-btn slim ghost stbg">Continue in background</button>';
   else h+='<button class="about-btn slim stadd"'
     +(cur.fit==="red"?" disabled":"")+'>'
     +(st.status==="error"?"Retry":"Add")+' \u00b7 '+(cur.gb||0)+' GB</button>';
@@ -44257,7 +44733,7 @@ $("#roster-manage").addEventListener("click",async()=>{
   $("#manage-box").hidden=!manageOn;
   $("#roster").classList.toggle("managing",manageOn);
   if(manageOn){
-    $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
+    planCardsPut('<div class="plan-card plan-wait">reading disk\u2026</div>');
     await ensureSetup();
     paintPlans();paintMgStats();paintCleanNote();paintStudios();
     if(lastSetup&&lastSetup.busy)manageTick();   // a batch is already running
@@ -44437,21 +44913,17 @@ $("#autoclean-toggle").addEventListener("click",async()=>{
   muSettled();
 });
 $("#plan-row").addEventListener("click",async e=>{
-  const c=e.target.closest(".plan-card");if(!c||!c.dataset.plan)return;
+  const c=e.target.closest(".set-card");if(!c||!c.dataset.set)return;
   // the risky one asks twice, in place, naming the risk
-  if(c.classList.contains("risky")&&c.dataset.sure!=="1"){
-    c.dataset.sure="1";
-    c.querySelector("span").textContent=
-      "this installs models bigger than this Mac's memory and can crash "
-      +"it — click again to go ahead";
-    return;
-  }
+  if(!setConfirm("grid",c))return;
+  // a set ADDS what is missing and removes nothing (6b405); it becomes yours
   $("#manage-note").textContent="starting\u2026";
   let r={};
   try{r=await(await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({plan:c.dataset.plan})})).json();}
+    body:JSON.stringify({plan:c.dataset.set})})).json();}
   catch(e2){$("#manage-note").textContent="could not start \u2014 try again";return;}
+  plansRefresh();
   if(!(r.started||[]).length){
     $("#manage-note").textContent=r.n
       ?"already installed \u2014 nothing to download"
