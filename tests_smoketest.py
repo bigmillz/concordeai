@@ -17552,7 +17552,7 @@ _SG_MUT = [
     ("three chips from the biggest topic", "    out = rng.sample(first[\"chips\"], min(2, len(first[\"chips\"])))", "    out = rng.sample(first[\"chips\"], min(3, len(first[\"chips\"])))"),
     ("nothing from the next topic", "    if rest:\n        out += rng.sample(rest[0][\"chips\"], 1)\n", ""),
     ("a tie always to the first", "    first = rng.choice([t for t in tp if t[\"n\"] == tp[0][\"n\"]])", "    first = tp[0]"),
-    ("the server never asked first", "    out = server_side_text(ask, ctx)\n    if out is not None:", "    out = None\n    if out is not None:"),
+    ("the server never asked first", "    out = server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)\n    if out is not None:", "    out = None\n    if out is not None:"),
     ("a server's model asked in Cloud Only", '    if cloud_only:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):', '    if False:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):'),
     ("the cloud asked outside Cloud Only", '    if cloud_only:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):', '    if True:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):'),
     ("Cloud Only falling back to this computer", '                return strip_think(out), "the cloud"\n        return None, ""', '                return strip_think(out), "the cloud"\n        pass'),
@@ -19818,8 +19818,8 @@ _SV_MUT = [
     ("an error line read as text", '                if obj.get("error"):\n                    # a failure after the 200 is the stream\'s last line\n                    raise _srv_fail(e, 0, obj, model)',
      '                if False:\n                    raise _srv_fail(e, 0, obj, model)'),
     ("the whole turn sent", '        t = {"role": m["role"], "content": str(m.get("content") or "")}', '        t = dict(m)'),
-    ("keep_alive sent", '"stream": True, "options": {"temperature": 0.75}},',
-     '"stream": True, "keep_alive": "45s", "options": {"temperature": 0.75}},'),
+    ("keep_alive sent", '"stream": True,\n                       "options": dict({"temperature": 0.75},',
+     '"stream": True, "keep_alive": "45s",\n                       "options": dict({"temperature": 0.75},'),
     ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0)', 'usage_note(label, "local", messages, sent[0], last, t0)'),
     ("a guess for an unknown placement", '"placement": pl if pl in ("gpu", "gpu+ram") else "unknown",', '"placement": pl if pl in ("gpu", "gpu+ram") else "gpu",'),
     ("embeddings offered", ' or "embed" in n.lower() \\\n', ' \\\n'),
@@ -22294,7 +22294,7 @@ def _p7c_side(src):
     ns, ctx, ents = _p2_ns(src, [("Desk", "https://desk.example.com", models, {})])
     calls, mode = [], {"x": None}
 
-    def ss(label, msgs, emit):
+    def ss(label, msgs, emit, cap=0):
         calls.append((label, getattr(ns["_srv_first"], "s", None), msgs[-1]["content"]))
         if mode["x"]:
             raise mode["x"]
@@ -22821,8 +22821,8 @@ _P2_MUT = [
     ("the page ignoring the merge's frame", '                  else if(d.w==="local"||d.w==="mix"){', '                  else if(d.w==="local"){'),
     ("a Stop mid-merge marking the server down", '        except (StaleProfile, BrokenPipeError, ConnectionResetError):\n            # the person stopped, closed the window or switched profiles:',
      '        except ZeroDivisionError:\n            # the person stopped, closed the window or switched profiles:'),
-    ("a side pass with no deadline", '        with server_first_deadline(SRV_SIDE_FIRST_S):\n            server_stream(m["label"], messages, parts.append)',
-     '        if True:\n            server_stream(m["label"], messages, parts.append)'),
+    ("a side pass with no deadline", '        with server_first_deadline(SRV_SIDE_FIRST_S):\n            server_stream(m["label"], messages, parts.append, max_tokens)',
+     '        if True:\n            server_stream(m["label"], messages, parts.append, max_tokens)'),
     ("a failed side pass not marked down", '        server_mark_down(ctx, m["server"], str(exc))\n        return None\n    return strip_think', '        return None\n    return strip_think'),
     ("a Stop in a side pass marking the server down", '    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except Exception as exc:\n        # a first word that took too long',
      '    except Exception as exc:\n        # a first word that took too long'),
