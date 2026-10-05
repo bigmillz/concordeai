@@ -19317,7 +19317,8 @@ def _svc_page(src):
     """The pane's cards and the engine menu's rows, run in node."""
     i0 = src.index("function esc(s){")
     js = (src[i0:src.index(";}\n", i0) + 3]
-          + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={},srvSleep={};'
+          + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={},srvSleep={},srvSets={};'
+          + 'function srvSetsHtml(){return "";}'
           + 'let tier="",advOn=false,agent="",council=["Desktop \\u00b7 gpt-oss:120b"];'
           + src[src.index("function srvWhere(m){"):src.index("function paintServers(){")]
           + src[src.index("function whereBadge(lm,who){"):src.index("function paintEngMenuServers(){")]
@@ -20060,8 +20061,9 @@ def _svc_testbtn(src):
     res = src[src.index("const SRV_TEST_HOLD_MS="):src.index("// SLEEP WHEN IDLE (6b346")]
     card = src[src.index("function srvCard(s){"):src.index("function paintServers(){")]
     js = esc + r"""
-const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvMsgKind={},srvSleep={};
+const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvMsgKind={},srvSleep={},srvSets={};
 function srvSleepHtml(){return "";}
+function srvSetsHtml(){return "";}
 """ + res + card + r"""
 const mk=(paired,st,extra)=>Object.assign({id:"a1",name:"Desk",host:"h",paired:paired,status:st,models:[]},extra||{});
 const R={
@@ -24587,7 +24589,8 @@ except urllib.error.HTTPError as e_:
 _l7p = _svq("/api/servers/models", "POST", {"id": _sid34, "plan": "light", "add": _l7t["light"], "remove": [],
                                             "seen": _l7a["seen"]})[1]
 _l7b = _l7_wait()
-_l7have = {m_["name"] for m_ in (_svq("/api/servers")[1].get("servers") or [{}])[0].get("models") or []}
+# the picker's list, after the check the card asks for when the change ends
+_l7have = {m_["name"] for m_ in (_svq("/api/servers?refresh=1")[1].get("servers") or [{}])[0].get("models") or []}
 check("server sets (live): unsigned is refused; Light with the switch off pulls its three and removes nothing; "
       "the card then shows what the server has",
       _l7u == 401 and _l7p.get("ok") is True and [j_["action"] for j_ in _l7p.get("jobs") or []] == ["pull"] * 3
@@ -28377,8 +28380,9 @@ def _g56c_ui(src):
     esc = src[a:src.index(";}\n", a) + 3]
     card = src[src.index("function srvCard(s){"):src.index("function paintServers(){")]
     js = esc + r'''
-const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvMsgKind={},srvSleep={};
+const srvStatus=s=>"ok",srvWhere=m=>"",srvPairOpen={},srvArmed={},srvTokOpen={},srvMsgs={},srvMsgKind={},srvSleep={},srvSets={};
 function srvSleepHtml(){return "";}
+function srvSetsHtml(){return "";}
 ''' + card + r'''
 const base={id:"a1",name:"Desk",host:"h",paired:true,status:{at:1},models:[]};
 const R=[undefined,null,{image:true,video:true},{image:true,video:false},{image:false,video:true},{image:false,video:false},{}]

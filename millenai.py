@@ -19747,6 +19747,8 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
     return True
 # ==== server pictures: end ====
 
+
+
 # ==== server model sets: begin ====
 # THE SAME THREE SETS ON YOUR SERVER (6b407, per Patrick: "the server gets
 # the same three sets sized for its card, chosen in Settings › Servers,
@@ -19897,7 +19899,7 @@ def server_models_get(ctx, sid: str) -> dict:
         st, js = _srv_json(e, "GET", "/v1/models/state", timeout=SRV_CONNECT_S)
     except ServerError as se:
         return {"ok": False, "kind": se.kind, "err": str(se)}
-    if st == 404 and str(js.get("code") or "") == "not_found":
+    if st == 404 and js.get("code") == "not_found":
         return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
     if st != 200:
         return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
@@ -42461,6 +42463,87 @@ async function srvSleepLoadAll(){
   Object.keys(srvSleep).forEach(k=>{if(!gs.some(s=>s.id===k))delete srvSleep[k];});
   paintServers();
 }
+$("#srv-list").addEventListener("change",async ev=>{
+  const c=ev.target.closest('input[data-a="sleepon"],input[data-a="sleepmin"]');if(!c)return;
+  const id=c.closest(".srv").dataset.id,z=srvSleep[id];
+  if(!z||z.st!=="ok")return;
+  let body;
+  if(c.dataset.a==="sleepon")body={id:id,enabled:c.checked};
+  else{
+    const p=srvSleepParse(c.value);
+    if(!p){c.value=z.minutes;srvMsg(id,"Enter whole minutes, 5 to 1440.");return;}
+    c.value=p.v;
+    if(p.v===z.minutes){srvMsg(id,p.clamped?"Minutes go from 5 to 1440.":"");return;}
+    body={id:id,minutes:p.v};
+  }
+  c.disabled=true;
+  let d;
+  try{d=await srvPost("sleep",body);}
+  catch(e){d={ok:false,kind:"offline",err:"Couldn\u2019t reach the app. Try again."};}
+  srvSleep[id]=srvSleepNext(z,d,true);
+  srvMsgs[id]=d.ok?"Saved.":(d.err||"");
+  paintServers();
+});
+$("#srv-list").addEventListener("click",async ev=>{
+  const b=ev.target.closest("button[data-a]");if(!b)return;
+  const card=b.closest(".srv"),id=card.dataset.id,a=b.dataset.a;
+  const s=srvList.find(x=>x.id===id);if(!s)return;
+  if(a==="tok"||a==="tokcancel"){
+    srvTokOpen[id]=a==="tok";paintServers();
+    const f=document.querySelector('#srv-list .srv[data-id="'+id+'"] input[data-k="aid"]');
+    if(f)f.focus();
+    return;
+  }
+  if(a==="toksave"){
+    const v=k=>(card.querySelector('input[data-k="'+k+'"]')||{}).value||"";
+    b.disabled=true;srvMsg(id,"Saving\u2026");
+    let d={};
+    try{d=await srvPost("access",{id:id,access_id:v("aid").trim(),access_secret:v("asec").trim()});
+      if(d.ok)d=await srvPost("test",{id:id});}
+    catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
+    b.disabled=false;
+    if(d.server){srvPut(d.server);delete srvTokOpen[id];}
+    paintServers();
+    srvMsg(id,d.err||"Access token saved.");
+    return;
+  }
+  if(a==="repair"){
+    srvPairOpen[id]=true;paintServers();
+    const c=document.querySelector('#srv-list .srv[data-id="'+id+'"] .srv-code');
+    if(c)c.focus();
+    return;
+  }
+  if(a==="rm"&&!(srvArmed[id]&&Date.now()-srvArmed[id]<6000)){
+    srvArmed[id]=Date.now();paintServers();
+    setTimeout(paintServers,6100);
+    return;
+  }
+  delete srvArmed[id];
+  b.disabled=true;
+  srvTestSeq[id]=(srvTestSeq[id]||0)+1;
+  srvMsg(id,a==="pair"?"Pairing\u2026":a==="rm"?"Removing\u2026":"Checking\u2026");
+  let d={};
+  try{
+    d=await srvPost(a==="rm"?"remove":a,a==="pair"
+      ?{id:id,code:(card.querySelector(".srv-code")||{}).value||""}:{id:id});
+  }catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
+  b.disabled=false;
+  if(a==="rm"&&d.ok){
+    srvList=srvList.filter(x=>x.id!==id);
+    // a pick of its models goes back to Fast
+    if(!tier&&council.some(l=>l.indexOf(s.name+SRV_SEP)===0))setTier("Fast");
+  }
+  if(d.server){srvPut(d.server);if(a==="pair")delete srvPairOpen[id];}
+  srvModesRefresh();
+  paintServers();paintSrvChips();
+  if(a==="test"){
+    // the result stays: until the next press, or a few seconds
+    const r=d.err?{kind:"bad",text:d.err}:srvTestResult(d.server||s),seq=srvTestSeq[id]=(srvTestSeq[id]||0)+1;
+    srvMsg(id,r.text,r.kind);
+    setTimeout(()=>{if(srvTestSeq[id]===seq&&srvMsgs[id]===r.text)srvMsg(id,"");},SRV_TEST_HOLD_MS);
+  }else srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
+  paintEngMenuServers();
+});
 /* MODELS ON YOUR SERVER (6b407, per Patrick: "the server gets the same
    three sets sized for its card, chosen in Settings \u203a Servers, with the
    exact add/remove list shown before anything is deleted"). The three
@@ -42608,87 +42691,6 @@ $("#srvset-go").addEventListener("click",async()=>{
     return;
   }
   srvSheetPaint(r.err||"That didn\u2019t work. Try again.");
-});
-$("#srv-list").addEventListener("change",async ev=>{
-  const c=ev.target.closest('input[data-a="sleepon"],input[data-a="sleepmin"]');if(!c)return;
-  const id=c.closest(".srv").dataset.id,z=srvSleep[id];
-  if(!z||z.st!=="ok")return;
-  let body;
-  if(c.dataset.a==="sleepon")body={id:id,enabled:c.checked};
-  else{
-    const p=srvSleepParse(c.value);
-    if(!p){c.value=z.minutes;srvMsg(id,"Enter whole minutes, 5 to 1440.");return;}
-    c.value=p.v;
-    if(p.v===z.minutes){srvMsg(id,p.clamped?"Minutes go from 5 to 1440.":"");return;}
-    body={id:id,minutes:p.v};
-  }
-  c.disabled=true;
-  let d;
-  try{d=await srvPost("sleep",body);}
-  catch(e){d={ok:false,kind:"offline",err:"Couldn\u2019t reach the app. Try again."};}
-  srvSleep[id]=srvSleepNext(z,d,true);
-  srvMsgs[id]=d.ok?"Saved.":(d.err||"");
-  paintServers();
-});
-$("#srv-list").addEventListener("click",async ev=>{
-  const b=ev.target.closest("button[data-a]");if(!b)return;
-  const card=b.closest(".srv"),id=card.dataset.id,a=b.dataset.a;
-  const s=srvList.find(x=>x.id===id);if(!s)return;
-  if(a==="tok"||a==="tokcancel"){
-    srvTokOpen[id]=a==="tok";paintServers();
-    const f=document.querySelector('#srv-list .srv[data-id="'+id+'"] input[data-k="aid"]');
-    if(f)f.focus();
-    return;
-  }
-  if(a==="toksave"){
-    const v=k=>(card.querySelector('input[data-k="'+k+'"]')||{}).value||"";
-    b.disabled=true;srvMsg(id,"Saving\u2026");
-    let d={};
-    try{d=await srvPost("access",{id:id,access_id:v("aid").trim(),access_secret:v("asec").trim()});
-      if(d.ok)d=await srvPost("test",{id:id});}
-    catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
-    b.disabled=false;
-    if(d.server){srvPut(d.server);delete srvTokOpen[id];}
-    paintServers();
-    srvMsg(id,d.err||"Access token saved.");
-    return;
-  }
-  if(a==="repair"){
-    srvPairOpen[id]=true;paintServers();
-    const c=document.querySelector('#srv-list .srv[data-id="'+id+'"] .srv-code');
-    if(c)c.focus();
-    return;
-  }
-  if(a==="rm"&&!(srvArmed[id]&&Date.now()-srvArmed[id]<6000)){
-    srvArmed[id]=Date.now();paintServers();
-    setTimeout(paintServers,6100);
-    return;
-  }
-  delete srvArmed[id];
-  b.disabled=true;
-  srvTestSeq[id]=(srvTestSeq[id]||0)+1;
-  srvMsg(id,a==="pair"?"Pairing\u2026":a==="rm"?"Removing\u2026":"Checking\u2026");
-  let d={};
-  try{
-    d=await srvPost(a==="rm"?"remove":a,a==="pair"
-      ?{id:id,code:(card.querySelector(".srv-code")||{}).value||""}:{id:id});
-  }catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
-  b.disabled=false;
-  if(a==="rm"&&d.ok){
-    srvList=srvList.filter(x=>x.id!==id);
-    // a pick of its models goes back to Fast
-    if(!tier&&council.some(l=>l.indexOf(s.name+SRV_SEP)===0))setTier("Fast");
-  }
-  if(d.server){srvPut(d.server);if(a==="pair")delete srvPairOpen[id];}
-  srvModesRefresh();
-  paintServers();paintSrvChips();
-  if(a==="test"){
-    // the result stays: until the next press, or a few seconds
-    const r=d.err?{kind:"bad",text:d.err}:srvTestResult(d.server||s),seq=srvTestSeq[id]=(srvTestSeq[id]||0)+1;
-    srvMsg(id,r.text,r.kind);
-    setTimeout(()=>{if(srvTestSeq[id]===seq&&srvMsgs[id]===r.text)srvMsg(id,"");},SRV_TEST_HOLD_MS);
-  }else srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
-  paintEngMenuServers();
 });
 $("#srv-add-go").addEventListener("click",async()=>{
   const note=$("#srv-note");
