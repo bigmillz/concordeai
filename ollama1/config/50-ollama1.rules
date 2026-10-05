@@ -61,3 +61,19 @@ polkit.addRule(function(action, subject) {
     }
     return polkit.Result.NO;
 });
+
+// The screen's own user (o1dash, the graphical panel on tty1) may START one unit,
+// ollama1-quickburn.service (6b418: Enter on the server's keyboard runs a 30 s processor
+// burn and a 30 s graphics-card burn), and do nothing else through polkit: no other unit,
+// no other verb (it cannot stop it: Esc makes a file instead), no other action.
+polkit.addRule(function(action, subject) {
+    if (subject.user !== "o1dash") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (action.id === "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") === "ollama1-quickburn.service" &&
+        action.lookup("verb") === "start") {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NO;
+});

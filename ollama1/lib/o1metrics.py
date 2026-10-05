@@ -201,11 +201,12 @@ class Sampler:
             "disks": self._slow("disks", 10, o1stats.disks) or [],
             "raid": self._slow("raid", 5, o1stats.raid) or [],
             "io": io,
-            "net": dict(net, **netrate),
+            "net": dict(net, rx_total=rx, tx_total=tx, **dict(netrate, **(self._slow("netx", 10, lambda: net_extra(nname)) or {}))),
             "tunnel": self._slow("tunnel", 10, self._tunnel) or {},
             "updates": self._slow("updates", 30, o1stats.updates) or {},
             "pairing": o1stats.pairing_window(),
             "power": self._slow("power", 5, power_state),
+            "burn": read_json(os.path.join(Paths.run, "quickburn.json")),     # the 30 s burn test's progress (6b418)
             "fan": read_json(os.path.join(Paths.run, "fan.json")),          # the fan service's status (6b416)
             "activity": read_json(os.path.join(Paths.stats_dir, "activity.json")),
             "idle": self._slow("idle", 5, lambda: read_json(os.path.join(Paths.run, "idle.json"))),
@@ -243,6 +244,35 @@ def cpu_clock(probe=[None]):
     if f.get("avg_mhz") is None:
         return None
     return {"mhz": f["avg_mhz"], "max_mhz": f.get("max_mhz") or f.get("rated_mhz")}
+
+
+def default_route_iface(proc=None):
+    """The interface the default route leaves by (the lowest metric), from /proc/net/route, or None."""
+    best = None
+    try:
+        with open((proc or PROC) + "/net/route") as f:
+            next(f, None)
+            for line in f:
+                t = line.split()
+                if len(t) >= 7 and t[1] == "00000000":
+                    m = int(t[6])
+                    if best is None or m < best[0]:
+                        best = (m, t[0])
+    except (OSError, ValueError):
+        return None
+    return best[1] if best else None
+
+
+def net_extra(name):
+    """What the panel's NETWORK box adds to the port and rates: packet errors and drops on the
+    server's interface since boot (four tiny files), and whether the default route leaves by a
+    wireless interface (a Wi-Fi failover). Read every 10 s."""
+    base = SYS + "/class/net/" + str(name)
+    bad = sum(_int(base + "/statistics/" + k) or 0 for k in ("rx_errors", "tx_errors"))
+    drops = sum(_int(base + "/statistics/" + k) or 0 for k in ("rx_dropped", "tx_dropped"))
+    via = default_route_iface()
+    return {"errors": bad, "drops": drops, "via": via,
+            "wifi": bool(via) and os.path.isdir(SYS + "/class/net/" + via + "/wireless")}
 
 
 def device_names():

@@ -610,6 +610,26 @@ around a little from time to time.
     without echo, so keys never reach a login prompt. The seven-day and
     30-day figures come from the power service, so it needs restarting after
     an update of this kit (`sudo systemctl restart ollama1-power`).
+  - **The middle column** is three boxes: STORAGE (the local filesystems added together as one bar, "Used 188 GB
+    of 1.8 TB", and the disk read and write rates; a disk that should be mounted and is not is said in red),
+    FANS (a GPU fan bar and one "Case fans" bar averaging the case and radiator fans, with the pump's rpm and mode
+    and the coolant temperature under them; the header shows the phase and level, amber "HOT 100%" when the
+    temperature override is on, "no fan data" if the fan service has not written for 30 s) and NETWORK (down and up
+    rates, the link: wired with its speed and ports or an amber "on Wi-Fi" when the default route leaves by a wireless
+    interface, the address, the Cloudflare tunnel state, packet errors and drops in amber when there are any, and
+    totals since boot).
+  - **Enter: burn test.** Enter on the server's keyboard runs a 30-second processor burn, then a 30-second
+    graphics-card burn (`tools/quick-burn.sh`, started as `ollama1-quickburn.service`). The top strip of the
+    screen becomes a banner: "BURN TEST  processor 18 s left  71 C  100% busy", then "graphics card 12 s left ...",
+    and for a minute afterwards the result: "Burn test passed" (green), "Burn test failed: ..." (red), "Burn test
+    aborted" or "Not started: <why>" (amber). Esc stops a running test at once; Enter is ignored while one runs.
+    The test refuses to start while a request is running, a model download or update is going or another
+    stability or burn test runs; it stops on a new hardware-error record, 95 C processor or 105 C graphics
+    junction. If llama-bench or the model is missing the card part says "not run: ..." and the processor result
+    stands. It needs `stress-ng` installed (the unit has no network): `sudo apt install stress-ng`. The last result
+    is in `/var/lib/ollama1/quickburn-last.json`, progress in `/run/ollama1/quickburn.json`. Privilege: polkit lets
+    only the screen's own user (`o1dash`) start that one unit (no other unit, no stop verb), and Esc makes an empty
+    file in `/run/ollama1/quickburn`, the one folder that user may write; the script only looks whether it exists.
   - **If anything goes wrong** (the framebuffer can't be opened, an odd
     pixel format, any error while drawing) the reason goes to the journal
     (`journalctl -u ollama1-dash`) and the text dashboard takes over; it

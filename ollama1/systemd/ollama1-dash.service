@@ -31,6 +31,8 @@ Restart=always
 RestartSec=1
 NoNewPrivileges=yes
 ProtectSystem=strict
+# Esc during the burn test makes an empty file here (6b418); nothing else of /run is writable
+ReadWritePaths=-/run/ollama1/quickburn
 ProtectHome=yes
 PrivateTmp=yes
 CapabilityBoundingSet=

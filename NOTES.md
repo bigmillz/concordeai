@@ -9,6 +9,47 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b418 — a NETWORK box, one storage total, and Enter for a 30 s processor + 30 s card burn (per Patrick)
+
+- **Middle column = three boxes** (`layout()`: storage, fans, network, one width, `MID_MIN` = 40/49/59 units, each
+  fits its lines at the design size; extra height is shared; the top row gives up space down to 96 units when the
+  screen is short). The three use `frame(compact=True)` (15 units of title, 4 of padding). Nothing in them is cut with
+  an ellipsis: `parts_line` leaves out the last pieces of a line when it is too wide.
+- **STORAGE**: the filesystems added together (`disk_total`: a mount with the same size, used and free as another
+  counts once) as one bar and "Used 188 GB of 1.8 TB" (`dec_bytes`: decimal GB/TB), then Read/Write rates; a missing
+  mount replaces the rates line, in red. **NETWORK** (`net_lines`): Down/Up, Link (wired + speed, "(1 of 2 up)" amber,
+  "no cable" red, or amber "on Wi-Fi" when `net["wifi"]`: the default route's interface has `/sys/class/net/X/wireless`),
+  address, Tunnel (moved out of Status; DOWN stays a Status warning) with "Errors n  drops n" in amber, totals since
+  boot. `o1metrics` adds `rx_total`, `tx_total`, `errors`, `drops`, `via`, `wifi` to `st["net"]` (four small files and
+  /proc/net/route every 10 s; no new heavy sampling). No graph: the box has no room for one at 360 units.
+- **FANS**: the header is the phase word and level only ("working 100%", "cooling down NN%", "idle 20%"); the cause text
+  is gone; "HOT 100%" in amber when the override is on; the rows are the two bars and the pump/coolant line.
+- **Burn test.** `tools/quick-burn.sh` (root): stress-ng as the stability test's cpu phase (every thread,
+  matrixprod, --verify) for 30 s, then `gpu-burn.sh` (O1_BURN_SECONDS=30; its llama-bench discovery) for 30 s; a card
+  part that cannot start (no llama-bench, no model) is "not run: why" and the run still passes on the processor. Stops
+  on a new hardware-error record, CPU 95 C, junction 105 C or the abort file. Refuses (result "refused", with the
+  reason) for a request in flight (`o1idle.read_activity`), a model download/update (`o1sleep.busy_reasons`), another
+  tool (`o1idle.tools_running`; `quick-burn.sh` and `gpu-burn.sh` are now in `TOOL_SCRIPTS`, so auto sleep and the fans
+  see a burn as work) or a second burn (flock). stress-ng is required, not installed (no network in the unit).
+  Progress every second in `/run/ollama1/quickburn.json`, the last result in `/var/lib/ollama1/quickburn-last.json`.
+- **Privilege.** `ollama1-quickburn.service`: root oneshot, no network, ProtectSystem=strict writing only /run/ollama1
+  and /var/lib/ollama1, home read-only, DevicePolicy left default (the Vulkan/ROCm load needs the render node,
+  /dev/dri/* and /dev/kfd, and a closed policy listing them would break on another card). polkit: `o1dash` may START
+  that one unit and nothing else. Abort without a second unit: tmpfiles makes `/run/ollama1/quickburn` 0730 root:o1dash,
+  Esc creates an empty file there (the dash unit gets `ReadWritePaths=-/run/ollama1/quickburn`), the script looks at its
+  existence only and removes it. Least privilege chosen over a stop verb: o1dash can end a test but never run
+  anything else.
+- **Panel.** Enter starts (`BurnControl.start`: `systemctl start --no-block`), Esc aborts, both with the 0.3 s debounce;
+  Enter is ignored while a test runs and for 8 s after it was pressed (the progress file takes a moment); only a lone Esc
+  aborts (arrow keys begin with Esc); a pairing window wins. The header strip becomes the banner while running (a file
+  not touched for 10 s is a dead script) and for 60 s after the result; the cost screen gives way to a running test. Footer:
+  "Enter: burn test". `ollama1-dash --png out.png --state cpu|gpu|passed|failed|aborted|refused|nogpu`.
+- Install: lib/o1panel.py o1paneld.py o1metrics.py o1idle.py; tools/quick-burn.sh and gpu-burn.sh to
+  /usr/local/lib/ollama1/tools; systemd/ollama1-quickburn.service and ollama1-dash.service; config/50-ollama1.rules and
+  ollama1.tmpfiles (then `systemd-tmpfiles --create`, `systemctl daemon-reload`, restart polkit/ollama1-dash). setup.sh does
+  all of it. Unverified on the server: stress-ng and Vulkan inside the unit's sandbox, polkit allowing o1dash, KD_GRAPHICS
+  Enter/Esc delivery.
+
 ## 6b409 — a server's load time, timed here when Ollama doesn't say
 
 The Benchmark's server rows always said "load not measured: The server didn't report a load
