@@ -22950,7 +22950,10 @@ import hashlib as _hl7
 import re as _re7
 MODELS = {"jobs": [], "plan": None, "lock": threading.Lock(), "fail": set()}
 _TAG7 = _re7.compile(r"[a-z0-9][a-z0-9._-]{0,79}(?::[a-z0-9][a-z0-9._-]{0,63})?")
-GW_HAS_MODELS = "/v1/models/state" in open(os.path.join(KIT, "bin", "ollama1-gateway")).read()
+# ALWAYS THE STAND-IN (6b420): the kit's real routes hand an apply to root helper
+# units a test machine doesn't have (they answer busy), and the kit has its own
+# tests for them (test_modelplan); this section tests the APP's side of the contract
+GW_HAS_MODELS = False
 
 
 def _mstate():
