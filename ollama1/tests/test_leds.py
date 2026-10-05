@@ -4,7 +4,8 @@ modes, colours), the gradient and the ease, the service on a fake clock (the car
 trigger, the 5 s eased rise to red and full brightness, red while working, the 60 s linear cool-down,
 work again mid-cool, white for 300 s then 40%, frames only when the colour changes, a keepalive), a
 server that dies and comes back, the status, setup and the wiring (units, setup.sh, the panel, the
-sleep hook)."""
+sleep hook); zones that list no LEDs (6b422): their size limits parsed, the resize packet, the same frames
+on the new LEDs, a reconnect and a wake resizing again, a failing zone, the saved length."""
 import json
 import os
 import shlex
@@ -724,7 +725,8 @@ class TestDimming(Phases):
 
     def test_the_status_says_what_it_is_doing(self):
         self.client.devices = [type("D", (), {"name": "MSI", "vendor": "MSI", "nleds": 6, "kind": "leds",
-                                              "modes": [type("M", (), {"name": "Direct"})()], "mode": 0})()]
+                                              "modes": [type("M", (), {"name": "Direct"})()], "mode": 0,
+                                              "zones": []})()]
 
         def st():
             with open(o1leds.status_path()) as f:
@@ -895,7 +897,8 @@ class TestStatus(Rig):
 
     def test_the_colour_card_load_and_line_follow_the_card(self):
         self.client.devices = [type("D", (), {"name": "MSI", "vendor": "MSI", "nleds": 6, "kind": "leds",
-                                              "modes": [type("M", (), {"name": "Direct"})()], "mode": 0})()]
+                                              "modes": [type("M", (), {"name": "Direct"})()], "mode": 0,
+                                              "zones": []})()]
         self.leds.tick()
         st = self.read()
         self.assertEqual((st["state"], st["phase"], st["rgb"], st["gpu_pct"], st["intensity"], st["working"]),
@@ -1023,6 +1026,427 @@ class TestOpenrgbAndSetup(unittest.TestCase):
         self.assertEqual(apt, [])
 
 
+# ---- zones with no LEDs (6b422) ----------------------------------------------------------------
+
+def board(jrainbow_max=200, jcorsair_max=40):
+    """The server's board as OpenRGB lists it: JRGB1 and PIPE1 have one LED each, the three addressable headers
+    have none but may grow; the cooler is fixed at 16."""
+    msi = F.device("MSI MEG X570 ACE", 2,
+                   [F.mode_spec("Off", F.FLAG_MODE_COLOR, 0), F.mode_spec("Direct", F.FLAG_PER_LED)], active=0,
+                   vendor="MSI",
+                   zones=[("JRGB1", 1, 1, 1, 1), ("JRAINBOW1", 0, 0, jrainbow_max, 1),
+                          ("JRAINBOW2", 0, 0, jrainbow_max, 1), ("JCORSAIR", 0, 0, jcorsair_max, 1),
+                          ("PIPE1", 1, 1, 1, 1)])
+    cooler = F.device("Corsair Hydro Platinum", 16, [F.mode_spec("Direct", F.FLAG_PER_LED, 1, bri=(0, 100, 100))],
+                      active=0, vendor="Corsair")
+    return [msi, cooler]
+
+
+def resizes(srv):
+    """[(device, zone index, size)] of every RESIZEZONE packet the server got."""
+    return [(d, *struct.unpack("<ii", b)) for d, b in srv.seen(1000)]
+
+
+class TestZoneParsing(unittest.TestCase):
+    def test_a_zone_carries_its_limits_count_and_type(self):
+        for ver in (0, 1, 2, 3, 4):
+            dev = o1leds.Device.parse(0, F.controller_data(board()[0], ver), ver)
+            self.assertEqual([(z.name, z.ztype, z.leds_min, z.leds_max, z.leds) for z in dev.zones],
+                             [("JRGB1", 1, 1, 1, 1), ("JRAINBOW1", 1, 0, 200, 0), ("JRAINBOW2", 1, 0, 200, 0),
+                              ("JCORSAIR", 1, 0, 40, 0), ("PIPE1", 1, 1, 1, 1)], ver)
+            self.assertEqual([z.resizable for z in dev.zones], [False, True, True, True, False])
+            self.assertEqual(dev.nleds, 2)
+
+    def test_the_three_zone_types_are_the_sdks(self):
+        self.assertEqual((o1leds.ZONE_SINGLE, o1leds.ZONE_LINEAR, o1leds.ZONE_MATRIX), (0, 1, 2))
+        d = F.device("X", 0, [F.mode_spec("Direct")], zones=[("S", 0, 0, 1, 0), ("L", 0, 0, 9, 1), ("M", 4, 4, 4, 2)])
+        dev = o1leds.Device.parse(0, F.controller_data(d, 4), 4)
+        self.assertEqual([z.ztype for z in dev.zones], [0, 1, 2])
+
+    def test_the_packet_id_and_body_are_the_sdks(self):
+        self.assertEqual(o1leds.PID_RESIZEZONE, 1000)
+
+
+class TestTargetLength(unittest.TestCase):
+    def z(self, leds=0, lo=0, hi=200, ztype=1):
+        return o1leds.Zone("Z", ztype, lo, hi, leds)
+
+    def test_an_empty_resizable_zone_gets_the_wanted_length(self):
+        self.assertEqual(o1leds.target_length(self.z(), 60), 60)
+
+    def test_it_is_clamped_to_the_zones_maximum_and_minimum(self):
+        self.assertEqual(o1leds.target_length(self.z(hi=40), 60), 40)
+        self.assertEqual(o1leds.target_length(self.z(lo=10, hi=40), 5), 10)
+        self.assertEqual(o1leds.target_length(self.z(lo=10, hi=40), 25), 25)
+
+    def test_a_zone_that_has_leds_is_never_touched(self):
+        self.assertIsNone(o1leds.target_length(self.z(leds=1, lo=1, hi=200), 60))      # never grown
+        self.assertIsNone(o1leds.target_length(self.z(leds=100, lo=0, hi=200), 10))    # never shrunk
+
+    def test_a_zone_that_cannot_grow_is_left(self):
+        self.assertIsNone(o1leds.target_length(self.z(lo=0, hi=0), 60))               # no maximum
+        self.assertIsNone(o1leds.target_length(self.z(lo=5, hi=5), 60))               # fixed
+        self.assertIsNone(o1leds.target_length(self.z(lo=0, hi=200, ztype=o1leds.ZONE_MATRIX), 60))
+
+    def test_the_default_is_60_and_the_option_ceiling_1024(self):
+        self.assertEqual((o1leds.DEFAULT_LENGTH, o1leds.LENGTH_MAX), (60, 1024))
+
+
+class TestLengthSetting(unittest.TestCase):
+    def setUp(self):
+        self.path = os.path.join(U.PREFIX, "leds-length-test.json")
+        self.addCleanup(lambda: os.path.exists(self.path) and os.unlink(self.path))
+
+    def test_no_file_is_the_default(self):
+        self.assertEqual(o1leds.configured_length(self.path), 60)
+
+    def test_a_saved_length_is_read(self):
+        self.assertEqual(o1leds.save_length("90", self.path), 90)
+        self.assertEqual(o1leds.configured_length(self.path), 90)
+        self.assertEqual(o1leds.save_length(1, self.path), 1)
+        self.assertEqual(o1leds.save_length(1024, self.path), 1024)
+        self.assertEqual(o1leds.configured_length(self.path), 1024)
+
+    def test_a_bad_length_is_refused_and_writes_nothing(self):
+        for bad in ("0", "-3", "1025", "ten", "", "6.5", None):
+            self.assertIsNone(o1leds.save_length(bad, self.path), bad)
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_a_damaged_file_is_the_default(self):
+        for text in ("{", "[]", '{"length": "90"}', '{"length": 0}', '{"length": 5000}', '{"length": true}', '{"length": 6.5}'):
+            with open(self.path, "w") as f:
+                f.write(text)
+            self.assertEqual(o1leds.configured_length(self.path), 60, text)
+
+    def test_the_client_reads_the_saved_length_at_each_open(self):
+        o1leds.save_length(25, self.path)
+        srv = F.FakeServer(board()).start()
+        self.addCleanup(srv.stop)
+        c = o1leds.Client(port=srv.port)
+        self.addCleanup(c.close)
+        from unittest import mock
+        with mock.patch.object(o1leds, "config_path", lambda: self.path):
+            c.open()
+        self.assertEqual([n for _d, _z, n in resizes(srv)], [25, 25, 25])
+
+    def test_setup_saves_a_length_and_refuses_a_bad_one(self):
+        from unittest import mock
+        lines = []
+        with mock.patch.object(o1leds, "config_path", lambda: self.path):
+            self.assertEqual(o1leds.setup("on", systemctl=lambda *a: True, which=lambda n: "x", log=lines.append, length="75"), 0)
+            self.assertEqual(o1leds.configured_length(), 75)
+            calls = []
+            self.assertEqual(o1leds.setup("on", systemctl=lambda *a: calls.append(a) or True, which=lambda n: "x",
+                                          log=lines.append, length="0"), 1)
+            self.assertEqual(calls, [])
+            self.assertEqual(o1leds.configured_length(), 75)                     # left as it was
+            self.assertEqual(o1leds.setup("on", systemctl=lambda *a: True, which=lambda n: "x", log=lines.append), 0)
+            self.assertEqual(o1leds.configured_length(), 75)                     # no length given: the saved one stays
+        self.assertTrue(any("1 to 1024" in l for l in lines))
+
+
+class ZoneCase(unittest.TestCase):
+    def setUp(self):
+        self.srv = F.FakeServer(board()).start()
+        self.addCleanup(self.srv.stop)
+        self.client = o1leds.Client(port=self.srv.port, length=60)
+        self.addCleanup(self.client.close)
+
+
+class TestResize(ZoneCase):
+    def test_every_empty_resizable_zone_is_resized_clamped_and_nothing_else(self):
+        self.client.open()
+        self.assertEqual(resizes(self.srv), [(0, 1, 60), (0, 2, 60), (0, 3, 40)])           # JCORSAIR's own maximum is 40
+        msi, cooler = self.client.devices
+        self.assertEqual([(z.name, z.leds) for z in msi.zones],
+                         [("JRGB1", 1), ("JRAINBOW1", 60), ("JRAINBOW2", 60), ("JCORSAIR", 40), ("PIPE1", 1)])
+        self.assertEqual(msi.nleds, 2 + 60 + 60 + 40)
+        self.assertEqual((cooler.nleds, [z.leds for z in cooler.zones]), (16, [16]))
+        self.assertEqual(self.client.notes, ["lights: resized JRAINBOW1 to 60 LEDs", "lights: resized JRAINBOW2 to 60 LEDs",
+                                             "lights: resized JCORSAIR to 40 LEDs"])
+
+    def test_the_packet_is_a_header_for_the_device_and_two_little_endian_ints(self):
+        self.client.open()
+        got = [(d, b) for d, p, b in self.srv.packets if p == 1000]
+        self.assertEqual(got[0], (0, struct.pack("<ii", 1, 60)))
+        self.assertEqual(len(got[0][1]), 8)                                               # no size prefix
+        self.assertEqual(o1leds.packet(0, 1000, struct.pack("<ii", 1, 60)),
+                         b"ORGB" + struct.pack("<IIII", 0, 1000, 8, 1) + struct.pack("<i", 60))
+
+    def test_the_controller_data_is_read_again_after_the_resize(self):
+        self.client.open()
+        order = [(d, p) for d, p, _b in self.srv.packets if p in (1, 1000)]
+        self.assertEqual(order, [(0, 1), (0, 1000), (0, 1000), (0, 1000), (0, 1), (1, 1)])
+
+    def test_a_zone_that_has_leds_is_not_touched_even_when_it_could_grow(self):
+        srv = F.FakeServer([F.device("Board", 5, [F.mode_spec("Direct")], zones=[("Grown", 5, 1, 100, 1)])]).start()
+        self.addCleanup(srv.stop)
+        c = o1leds.Client(port=srv.port, length=60)
+        self.addCleanup(c.close)
+        c.open()
+        self.assertEqual(srv.seen(1000), [])
+        self.assertEqual(c.devices[0].nleds, 5)
+
+    def test_the_wanted_length_is_what_is_asked_for(self):
+        for want, got in ((1, 1), (200, 200), (500, 200)):
+            srv = F.FakeServer(board()).start()
+            self.addCleanup(srv.stop)
+            c = o1leds.Client(port=srv.port, length=want)
+            self.addCleanup(c.close)
+            c.open()
+            self.assertEqual([n for _d, z, n in resizes(srv) if z == 1], [got], want)
+
+    def test_a_zone_the_server_ignores_is_noted_and_the_rest_still_grow(self):
+        self.srv.resize_deaf = {(0, 2)}                                                    # JRAINBOW2
+        self.client.open()
+        msi = self.client.devices[0]
+        self.assertEqual([(z.name, z.leds) for z in msi.zones],
+                         [("JRGB1", 1), ("JRAINBOW1", 60), ("JRAINBOW2", 0), ("JCORSAIR", 40), ("PIPE1", 1)])
+        self.assertEqual(self.client.notes[0], "lights: resized JRAINBOW1 to 60 LEDs")
+        self.assertIn("lights: could not resize JRAINBOW2 on MSI MEG X570 ACE", self.client.notes[1])
+        self.assertEqual(self.client.notes[2], "lights: resized JCORSAIR to 40 LEDs")
+        self.assertTrue(self.client.connected)
+
+    def test_a_send_that_fails_on_one_zone_does_not_stop_the_others(self):
+        real = socket.create_connection
+
+        class Flaky:
+            def __init__(self, s):
+                self.s = s
+
+            def sendall(self, data):
+                if data[8:12] == struct.pack("<I", 1000) and data[16:20] == struct.pack("<i", 1):
+                    raise BrokenPipeError(32, "Broken pipe")
+                return self.s.sendall(data)
+
+            def __getattr__(self, name):
+                return getattr(self.s, name)
+
+        c = o1leds.Client(port=self.srv.port, length=60, connect=lambda *a, **k: Flaky(real(*a, **k)))
+        self.addCleanup(c.close)
+        c.open()
+        self.assertEqual([(z.name, z.leds) for z in c.devices[0].zones],
+                         [("JRGB1", 1), ("JRAINBOW1", 0), ("JRAINBOW2", 60), ("JCORSAIR", 40), ("PIPE1", 1)])
+        self.assertTrue(any(n.startswith("lights: could not resize JRAINBOW1") for n in c.notes))
+
+    def test_a_refusing_server_is_asked_once_not_on_every_device_list_notice(self):
+        self.srv.resize_deaf = {(0, 1), (0, 2), (0, 3)}
+        self.client.open()
+        self.client.poll()
+        self.srv.notify_list_updated()
+        time.sleep(0.1)
+        self.client.poll()
+        self.assertEqual(len(resizes(self.srv)), 3)
+
+    def test_after_a_reopen_it_asks_again(self):
+        self.srv.resize_deaf = {(0, 1), (0, 2), (0, 3)}
+        self.client.open()
+        self.srv.resize_deaf = set()
+        self.client.open()
+        self.assertEqual(len(resizes(self.srv)), 6)
+        self.assertEqual(self.client.devices[0].nleds, 2 + 60 + 60 + 40)
+
+    def test_a_device_that_comes_back_empty_is_resized_again(self):
+        self.client.open()
+        self.srv.clear()
+        for zi in (1, 2, 3):                                                               # the board was re-plugged
+            dev = self.srv.devices[0]
+            name, _n, lo, hi, zt = dev["zones"][zi]
+            dev["zones"][zi] = (name, 0, lo, hi, zt)
+        self.srv.devices[0]["colors"] = [(0, 0, 0)] * 2
+        self.srv.devices[0]["leds"] = 2
+        self.srv.notify_list_updated()
+        end = time.time() + 3
+        while time.time() < end and len(resizes(self.srv)) < 3:
+            time.sleep(0.02)
+            self.client.poll()
+        self.assertEqual(len(resizes(self.srv)), 3)
+
+
+class TestZonesGetTheSameFrames(unittest.TestCase):
+    def setUp(self):
+        self.srv = F.FakeServer(board()).start()
+        self.addCleanup(self.srv.stop)
+        self.clock, self.lines = FakeClock(), []
+        self.probes = Probes(self.clock)
+        self.client = o1leds.Client(port=self.srv.port, length=60)
+        self.addCleanup(self.client.close)
+        self.leds = o1leds.Leds(self.probes.dict(), client=self.client, clock=self.clock, wall=lambda: 1_700_000_000,
+                                log=self.lines.append, poll_s=0.5)
+        self.addCleanup(lambda: os.path.exists(o1leds.status_path()) and os.unlink(o1leds.status_path()))
+
+    def run_for(self, seconds, step=0.05):
+        for _ in range(int(round(seconds / step))):
+            self.leds.tick()
+            self.clock.t += step
+
+    def everywhere(self, color):
+        """Every LED of both devices, in every zone, shows `color`."""
+        end = time.time() + 3
+        while True:
+            seen = {c for d in (0, 1) for c in self.srv.devices[d]["colors"]}
+            if seen == {tuple(color)} or time.time() > end:
+                break
+            time.sleep(0.01)
+        self.assertEqual(seen, {tuple(color)})
+        for zi in range(5):
+            self.assertEqual(set(self.srv.zone_colors(0, zi)), {tuple(color)} if self.srv.zone_colors(0, zi) else set())
+        self.assertEqual(len(self.srv.zone_colors(0, 1)), 60)
+        self.assertEqual(len(self.srv.zone_colors(0, 2)), 60)
+        self.assertEqual(len(self.srv.zone_colors(0, 3)), 40)
+
+    def test_white_red_cooling_and_dim_reach_every_header_led_like_every_other(self):
+        self.run_for(1)
+        self.assertEqual([n for n in self.lines if "resized" in n],
+                         ["lights: resized JRAINBOW1 to 60 LEDs", "lights: resized JRAINBOW2 to 60 LEDs",
+                          "lights: resized JCORSAIR to 40 LEDs"])
+        self.everywhere(WHITE)                                                             # idle
+        self.probes.v["gpu_busy"] = 100
+        self.run_for(3.5)                                                                   # 1.5 s to start, then rising
+        self.assertEqual(self.leds.phase, "rising")
+        self.everywhere(self.leds.rgb())
+        self.run_for(4)
+        self.assertEqual(self.leds.phase, "working")
+        self.everywhere(RED)                                                                # working
+        self.probes.v["gpu_busy"] = 0
+        self.run_for(1.5 + 30)                                                              # cooling, part way down
+        self.assertEqual(self.leds.phase, "cooling")
+        self.assertNotIn(self.leds.rgb(), (WHITE, RED))
+        self.everywhere(self.leds.rgb())
+        self.run_for(100)
+        self.assertEqual(self.leds.phase, "idle")
+        self.everywhere(WHITE)
+        self.run_for(o1leds.IDLE_DIM_S + o1leds.DIM_S + 5, step=0.25)                      # dimmed idle
+        self.assertEqual(self.leds.rgb(), (102, 102, 102))
+        self.everywhere((102, 102, 102))
+
+    def test_the_same_frames_go_to_the_header_leds_and_the_cooler(self):
+        self.run_for(1)
+        self.probes.v["gpu_busy"] = 100
+        self.run_for(8)
+        by = {}
+        for dev, frame in list(self.srv.frames):
+            by.setdefault(dev, []).append(sorted(set(frame)))
+        self.assertEqual(by[0][-1], by[1][-1])
+        self.assertEqual(len(by[0]), len(by[1]))                                           # a frame for one is a frame for the other
+        self.assertTrue(all(len(c) == 1 for c in by[0]))                                   # one colour over all LEDs, every frame
+        self.assertEqual(len(self.srv.frames[0][1]) + len(self.srv.frames[1][1]), 162 + 16)
+
+    def test_the_status_lists_every_zone_with_its_final_size(self):
+        self.run_for(1)
+        with open(o1leds.status_path()) as f:
+            st = json.load(f)
+        self.assertEqual(st["devices"][0]["zones"],
+                         [{"name": "JRGB1", "leds": 1}, {"name": "JRAINBOW1", "leds": 60}, {"name": "JRAINBOW2", "leds": 60},
+                          {"name": "JCORSAIR", "leds": 40}, {"name": "PIPE1", "leds": 1}])
+        self.assertEqual(st["devices"][0]["leds"], 162)
+        self.assertEqual(st["devices"][1]["zones"], [{"name": "Zone", "leds": 16}])
+        out = o1leds.render_status(st)
+        self.assertIn("zones: JRGB1 1, JRAINBOW1 60, JRAINBOW2 60, JCORSAIR 40, PIPE1 1", out)
+        self.assertIn("162 LEDs", out)
+
+    def test_the_log_says_it_once_per_zone_and_the_devices_line_has_the_new_count(self):
+        self.run_for(3)
+        self.assertEqual(len([l for l in self.lines if l.startswith("lights: resized")]), 3)
+        self.assertTrue(any("MSI MEG X570 ACE (162 LEDs)" in l for l in self.lines if l.startswith("connected")))
+
+    def test_a_zone_that_fails_leaves_the_service_up_and_the_others_lit(self):
+        self.srv.resize_deaf = {(0, 2)}
+        self.run_for(1)
+        self.assertTrue(self.client.connected)
+        self.assertTrue(any(l.startswith("lights: could not resize JRAINBOW2") for l in self.lines))
+        self.assertEqual({tuple(c) for c in self.srv.devices[0]["colors"]}, {WHITE})
+        self.assertEqual(len(self.srv.zone_colors(0, 1)), 60)
+        self.assertEqual(len(self.srv.zone_colors(0, 2)), 0)
+        self.assertEqual(len(self.srv.zone_colors(0, 3)), 40)
+        with open(o1leds.status_path()) as f:
+            self.assertEqual([z["leds"] for z in json.load(f)["devices"][0]["zones"]], [1, 60, 0, 40, 1])
+
+    def test_a_server_restart_resizes_again(self):
+        self.probes.v["gpu_busy"] = 100
+        self.run_for(8)
+        port = self.srv.port
+        self.srv.stop()
+        again = F.FakeServer(board(), port=port).start()                                   # OpenRGB restarted: zones empty again
+        self.addCleanup(again.stop)
+        self.run_for(40)
+        self.assertTrue(self.client.connected)
+        self.assertEqual(len(resizes(again)), 3)
+        self.assertEqual(len([l for l in self.lines if l.startswith("lights: resized JRAINBOW1")]), 2)
+        end = time.time() + 3
+        while time.time() < end and {tuple(c) for c in again.devices[0]["colors"]} != {RED}:
+            time.sleep(0.01)
+        self.assertEqual({tuple(c) for c in again.devices[0]["colors"]}, {RED})            # red on the new LEDs too
+
+    def test_a_wake_resizes_again_when_the_server_forgot(self):
+        self.run_for(1)
+        self.srv.clear()
+        for zi in (1, 2, 3):
+            name, _n, lo, hi, zt = self.srv.devices[0]["zones"][zi]
+            self.srv.devices[0]["zones"][zi] = (name, 0, lo, hi, zt)
+        self.srv.devices[0]["colors"] = [(0, 0, 0)] * 2
+        self.srv.devices[0]["leds"] = 2
+        self.leds.resync = True
+        self.run_for(1)
+        self.assertEqual(len(resizes(self.srv)), 3)
+        self.everywhere(WHITE)
+
+
+class TestZoneWiring(unittest.TestCase):
+    def read(self, *p):
+        with open(os.path.join(U.KIT, *p)) as f:
+            return f.read()
+
+    def bash(self, script):
+        r = subprocess.run(["bash", "-c", ". %s; %s" % (shlex.quote(os.path.join(U.LIB, "setuplib.sh")), script)],
+                           capture_output=True, text=True)
+        return r.returncode, r.stdout.strip()
+
+    def test_the_length_choice_is_the_flag_else_the_saved_value_else_nothing(self):
+        for args, want in (('"" ""', ""), ('90 ""', "90"), ('"" 75', "75"), ('90 75', "90"), ('007 ""', "7"),
+                           ('1 ""', "1"), ('1024 ""', "1024")):
+            self.assertEqual(self.bash("leds_length_choice " + args), (0, want), args)
+
+    def test_a_bad_length_fails(self):
+        for args in ('0 ""', '1025 ""', 'ten ""', '-1 ""', '6.5 ""', '"" 0', '"" 5000', '"" ten', '12345 ""'):
+            self.assertEqual(self.bash("leds_length_choice " + args)[0], 1, args)
+
+    def test_the_plan_line_says_the_length(self):
+        self.assertIn("set to 60 LEDs", self.bash('leds_plan on ""')[1])
+        self.assertIn("set to 90 LEDs", self.bash("leds_plan on 90")[1])
+        self.assertIn("--leds-length", self.bash("leds_plan on")[1])
+        self.assertNotIn("LEDs so", self.bash("leds_plan off")[1])
+
+    def test_the_flag_is_in_the_help_validated_and_saved(self):
+        s = self.read("setup.sh")
+        r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh"), "--help"], capture_output=True, text=True)
+        self.assertIn("--leds-length N", r.stdout)
+        self.assertIn("default 60", r.stdout)
+        for args in (["--leds-length", "0"], ["--leds-length", "1025"], ["--leds-length", "lots"], ["--leds-length"]):
+            r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh")] + args + ["--plan"], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 2, args)
+            self.assertIn("--leds-length takes whole LEDs, 1 to 1024", r.stdout)
+        self.assertIn('LEDS_LENGTH=$(leds_length_choice "$A_LEDS_LENGTH" "$(saved LEDS_LENGTH)")', s)
+        self.assertIn("printf 'LEDS_LENGTH=%s\\n' \"$LEDS_LENGTH\"", s)                    # saved, only when there is one
+        self.assertIn('setup "$LEDS" ${LEDS_LENGTH:+--length "$LEDS_LENGTH"}', s)           # and handed to the service's setup
+        self.assertIn("|--leds-length) ;;", s)
+
+    def test_the_cli_takes_length_and_refuses_the_rest(self):
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+        for args in (["setup", "on", "--length"], ["setup", "on", "--len", "5"], ["setup", "on", "5"]):
+            r = subprocess.run([sys.executable, os.path.join(U.BIN, "ollama1-leds")] + args, capture_output=True, text=True, env=env)
+            self.assertEqual(r.returncode, 2, args)
+            self.assertIn("--length N", r.stderr)
+        r = subprocess.run([sys.executable, os.path.join(U.BIN, "ollama1-leds"), "setup", "on", "--length", "0"],
+                           capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("1 to 1024", r.stdout)
+
+    def test_the_lights_unit_still_reads_only_and_writes_only_run(self):
+        u = self.read("systemd", "ollama1-leds.service")
+        self.assertIn("\nReadWritePaths=/run/ollama1\n", u)                                # the length is read from /etc, never written
+
+
 # ---- the wiring -------------------------------------------------------------------------------
 
 class TestWiring(unittest.TestCase):
@@ -1075,7 +1499,7 @@ class TestWiring(unittest.TestCase):
         self.assertIn('ln -sfn "$LIBDIR/bin/ollama1-leds" /usr/local/bin/ollama1-leds', s)
         self.assertIn("printf 'LEDS=%s\\n' \"$LEDS\"", s)
         self.assertIn('LEDS=$(leds_choice "$A_LEDS" "${OLLAMA1_LEDS:-}" "$(saved LEDS)")', s)
-        self.assertIn('$(leds_plan "$LEDS")', s)
+        self.assertIn('$(leds_plan "$LEDS" "$LEDS_LENGTH")', s)
         a = s.index('step "Lights"')
         self.assertLess(s.index('step "Fans"'), a)
         self.assertLess(a, s.index('step "Cloudflare Tunnel and Access"'))

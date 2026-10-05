@@ -4,6 +4,14 @@ negotiation, controller count and data at the client's version, a device-list-
 updated notice), records every packet it receives, and can be stopped and started
 again on the same port. It builds its replies with its own struct code, not the
 kit's, so a mistake in lib/o1leds.py's encoder and parser cannot cancel out.
+
+Zones (6b422) carry a size range: a zone is (name, count) as before, or (name, count, min, max) or
+(name, count, min, max, type) with type 0 single, 1 linear, 2 matrix; a zone with min != max can be resized
+by the SDK's RESIZEZONE packet (id 1000: i32 zone index, i32 new size, the device in the header, no size
+prefix, as OpenRGB's NetworkClient/NetworkServer write and read it). The server follows the real one: a
+size outside min..max, or a zone with min == max, is ignored without an answer; a good one changes the
+zone and the device's LED list. It also records the colour of every LED (device["colors"]), by UPDATELEDS
+and UPDATEZONELEDS, and every UPDATELEDS frame it saw (self.frames).
 """
 import socket
 import struct
@@ -11,6 +19,14 @@ import threading
 import time
 
 FLAG_BRIGHTNESS, FLAG_PER_LED, FLAG_MODE_COLOR = 1 << 4, 1 << 5, 1 << 6
+PID_RESIZEZONE, PID_UPDATELEDS, PID_UPDATEZONELEDS = 1000, 1050, 1051
+
+
+def zone_spec(z):
+    """(name, count, min, max, type) from a 2-, 4- or 5-tuple: a plain (name, count) is fixed at its size."""
+    name, n = z[0], z[1]
+    lo, hi = (z[2], z[3]) if len(z) >= 4 else (n, n)
+    return name, n, lo, hi, z[4] if len(z) >= 5 else 0
 
 
 def s16(text):
@@ -39,7 +55,8 @@ def mode_bytes(m, ver):
 
 def device(name, leds, modes, active=0, vendor="Fake Vendor", zones=None, matrix=False, segments=False):
     return {"name": name, "leds": leds, "modes": modes, "active": active, "vendor": vendor,
-            "zones": zones or [("Zone", leds)], "matrix": matrix, "segments": segments}
+            "zones": zones or [("Zone", leds)], "matrix": matrix, "segments": segments,
+            "colors": [(0, 0, 0)] * leds}
 
 
 def controller_data(d, ver):
@@ -51,8 +68,9 @@ def controller_data(d, ver):
     for m in d["modes"]:
         b += mode_bytes(m, ver)
     b += struct.pack("<H", len(d["zones"]))
-    for zname, n in d["zones"]:
-        b += s16(zname) + struct.pack("<iIII", 1 if d["matrix"] else 0, n, n, n)
+    for z in d["zones"]:
+        zname, n, lo, hi, ztype = zone_spec(z)
+        b += s16(zname) + struct.pack("<iIII", ztype or (1 if d["matrix"] else 0), lo, hi, n)
         if d["matrix"]:
             b += struct.pack("<HII", 8 + 4 * 2 * 2, 2, 2) + struct.pack("<4I", 0, 1, 2, 3)
         else:
@@ -65,7 +83,7 @@ def controller_data(d, ver):
     b += struct.pack("<H", d["leds"])
     for i in range(d["leds"]):
         b += s16("LED %d" % i) + struct.pack("<I", 0)
-    b += struct.pack("<H", d["leds"]) + b"\0\0\0\0" * d["leds"]
+    b += struct.pack("<H", d["leds"]) + b"".join(bytes(c) + b"\0" for c in d["colors"])
     return struct.pack("<I", 4 + len(b)) + b
 
 
@@ -103,11 +121,37 @@ def decode_mode(body, ver):
                  "color_mode": color_mode, "colors": colors}
 
 
+def zone_slices(d):
+    """(start, end) of each zone's LEDs in the device's LED list, zones in order."""
+    out, at = [], 0
+    for z in d["zones"]:
+        out.append((at, at + zone_spec(z)[1]))
+        at += zone_spec(z)[1]
+    return out
+
+
+def resize_zone(d, zi, new):
+    """What the real server does: the size is taken only inside the zone's range and for a resizable zone; the LED
+    list grows or shrinks at that zone and the colours of the others stay. True when it changed."""
+    if not 0 <= zi < len(d["zones"]):
+        return False
+    name, n, lo, hi, ztype = zone_spec(d["zones"][zi])
+    if lo == hi or not lo <= new <= hi:
+        return False
+    start, end = zone_slices(d)[zi]
+    d["colors"][start:end] = [(0, 0, 0)] * new
+    d["zones"][zi] = (name, new, lo, hi, ztype)
+    d["leds"] = len(d["colors"])
+    return True
+
+
 class FakeServer:
     def __init__(self, devices, version=4, port=0, answer_version=True, host="127.0.0.1", garbage=False):
         self.devices, self.version, self.port, self.host = devices, version, port, host
         self.answer_version, self.garbage = answer_version, garbage
         self.packets = []
+        self.frames = []                     # (device, [colours]) of every UPDATELEDS, in order
+        self.resize_deaf = set()             # (device, zone index) the server ignores resizes for, though in range
         self.lock = threading.Lock()
         self.listener, self.conns, self.client_ver = None, [], None
         self.connections = 0
@@ -174,7 +218,26 @@ class FakeServer:
                 elif pid == 1:
                     ver = min(self.version, struct.unpack("<I", body[:4])[0]) if body else 0
                     self.client_ver = ver
-                    self.send(c, dev, 1, controller_data(self.devices[dev], ver))
+                    with self.lock:
+                        data = controller_data(self.devices[dev], ver)
+                    self.send(c, dev, 1, data)
+                elif pid == PID_RESIZEZONE:
+                    zi, new = struct.unpack("<ii", body)           # exactly 8 bytes: a size prefix would not unpack
+                    if (dev, zi) not in self.resize_deaf:
+                        with self.lock:
+                            resize_zone(self.devices[dev], zi, new)
+                elif pid == PID_UPDATELEDS:
+                    colors, _bri = decode_leds(body)
+                    with self.lock:
+                        self.frames.append((dev, list(colors)))
+                        self.devices[dev]["colors"] = list(colors)
+                elif pid == PID_UPDATEZONELEDS:
+                    size, zi, n = struct.unpack("<IIH", body[:10])
+                    assert size == len(body) and len(body) == 10 + 4 * n
+                    d = self.devices[dev]
+                    start, end = zone_slices(d)[zi]
+                    with self.lock:
+                        d["colors"][start:end] = [tuple(body[10 + 4 * i:13 + 4 * i]) for i in range(n)]
         except (OSError, ConnectionError, AssertionError):
             pass
         finally:
@@ -206,3 +269,10 @@ class FakeServer:
     def clear(self):
         with self.lock:
             self.packets.clear()
+            self.frames.clear()
+
+    def zone_colors(self, dev, zi):
+        """The colours of one zone's LEDs now."""
+        with self.lock:
+            a, b = zone_slices(self.devices[dev])[zi]
+            return list(self.devices[dev]["colors"][a:b])

@@ -151,7 +151,11 @@ def clean_leds(st):
     return {"at": _num(st.get("at")), "state": _txt(st.get("state"), 16), "target": _txt(st.get("target"), 16),
             "rgb": rgb, "why": _txt(st.get("why"), 120), "connected": st.get("connected") is True,
             "error": _txt(st.get("error"), 160), "devices": len(devs),
-            "names": [_txt(d.get("name"), 60) for d in devs[:8] if isinstance(d, dict) and isinstance(d.get("name"), str)]}
+            "names": [_txt(d.get("name"), 60) for d in devs[:8] if isinstance(d, dict) and isinstance(d.get("name"), str)],
+            "zones": [{"device": _txt(d.get("name"), 60),
+                       "zones": [{"name": _txt(z.get("name"), 24), "leds": int(_num(z.get("leds")))}
+                                 for z in d["zones"][:16] if isinstance(z, dict) and _num(z.get("leds")) is not None]}
+                      for d in devs[:8] if isinstance(d, dict) and isinstance(d.get("zones"), list)]}
 
 
 def clean_idle(st, now):
@@ -1441,7 +1445,8 @@ function renderLeds(l){const orb=$('orb');
  chip('ledchip',l.connected?'Connected':'Not connected',l.connected?'ok':'warn');
  $('ledstate').textContent=!l.connected?'Waiting':l.state==='fading'?(l.target==='red'?'Fading to red':'Fading to white'):l.state==='red'?'Red':'White';
  $('ledwhy').textContent=l.error?'OpenRGB: '+l.error:(l.why||'');
- $('leddevs').textContent=l.devices?l.devices+' device'+(l.devices===1?'':'s')+(l.names.length?': '+l.names.join(', '):''):'no devices';}
+ const zs=(l.zones||[]).map(d=>d.device+' - '+d.zones.map(z=>z.name+' '+z.leds).join(', ')).join('; ');
+ $('leddevs').textContent=(l.devices?l.devices+' device'+(l.devices===1?'':'s')+(l.names.length?': '+l.names.join(', '):''):'no devices')+(zs?'  ·  LEDs per zone: '+zs:'');}
 function renderStorage(s){const D=$('disks');D.replaceChildren();
  (s.disks||[]).forEach(d=>{const it=el('div',undefined,'item'),hd=el('div',undefined,'hd');hd.append(el('span',d.mount+(d.label&&d.label!=='/'?'  ('+d.label+')':''),'nm'));
   if(!d.mounted){hd.append(el('span','not mounted','chip bad'));it.append(hd);D.append(it);return;}

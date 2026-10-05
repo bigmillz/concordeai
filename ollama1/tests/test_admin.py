@@ -565,6 +565,29 @@ class TestStateForThePage(unittest.TestCase):
         self.assertIn("core", t)
         self.assertIn("sclk", t["applied"])
 
+    def test_the_lights_zone_sizes_are_shown_and_clean(self):
+        evil = "<script>alert(1)</script>"
+        self.write("leds", {"at": int(time.time()), "state": "white", "rgb": [255, 255, 255], "connected": True,
+                            "devices": [{"name": "MSI MEG X570 ACE", "leds": 162,
+                                         "zones": [{"name": "JRGB1", "leds": 1}, {"name": "JRAINBOW1", "leds": 60},
+                                                   {"name": evil, "leds": "many", "x": 1}, {"name": "JCORSAIR", "leds": 40},
+                                                   "junk"]},
+                                        {"name": "Cooler"}, {"name": "Odd", "zones": "no"}]})
+        raw, s = self.state()
+        self.assertNotIn(b"<script", raw)
+        self.assertEqual(s["leds_status"]["zones"],
+                         [{"device": "MSI MEG X570 ACE", "zones": [{"name": "JRGB1", "leds": 1},
+                                                                    {"name": "JRAINBOW1", "leds": 60},
+                                                                    {"name": "JCORSAIR", "leds": 40}]}])
+        self.assertEqual(s["leds_status"]["devices"], 3)
+
+    def test_the_page_shows_the_zone_sizes_with_text_only(self):
+        with open(os.path.join(U.BIN, "ollama1-admin")) as f:
+            src = f.read()
+        self.assertIn("LEDs per zone: ", src)
+        self.assertIn("(l.zones||[]).map(d=>d.device+' - '+d.zones.map(z=>z.name+' '+z.leds).join(', '))", src)
+        self.assertIn("$('leddevs').textContent=", src)                               # textContent, never innerHTML
+
     def test_a_stale_fan_file_is_none(self):
         self.write("fan", {"at": int(time.time()) - 600, "phase": "working", "pct": 100, "line": "x"})
         _, s = self.state()

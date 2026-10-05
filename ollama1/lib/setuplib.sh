@@ -139,9 +139,22 @@ leds_choice() { # FLAG ENV SAVED -> "on" or "off" (6b395): the flag, else the en
   echo off
 }
 
-leds_plan() { # the plan's line for the lights (6b395; the states of 6b421)
+leds_length_choice() { # FLAG SAVED -> whole LEDs 1..1024, or nothing (6b422): the flag, else what an earlier run saved.
+  # Nothing means the service's own default (60): an unset length is not saved, so a later default applies.
+  # A value that is not a whole number in range fails.
+  local v
+  for v in "$1" "$2"; do
+    [ -n "$v" ] || continue
+    [[ "$v" =~ ^[0-9]{1,4}$ ]] || return 1
+    [ "$((10#$v))" -ge 1 ] && [ "$((10#$v))" -le 1024 ] || return 1
+    echo "$((10#$v))"; return 0
+  done
+  echo ""
+}
+
+leds_plan() { # the plan's line for the lights (6b395; the states of 6b421; the length of 6b422): $1 on|off, $2 the length or empty
   if [ "$1" = on ]; then
-    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red in 5 s when it works (over 50%% busy), back to white over 1 minute when it stops, dimming to 40%% after 5 idle minutes (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
+    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red in 5 s when it works (over 50%% busy), back to white over 1 minute when it stops, dimming to 40%% after 5 idle minutes (ollama1-leds, ollama1-openrgb on 127.0.0.1); a board header with no LEDs configured (JRAINBOW, JCORSAIR) is set to %s LEDs so the strips on it light too (--leds-length N). Off: --leds off' "${2:-60}"
   else
     printf 'Lights OFF (default): nothing installed, the lights stay as the board leaves them. On: --leds on'
   fi
