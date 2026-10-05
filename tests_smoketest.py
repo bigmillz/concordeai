@@ -5866,6 +5866,19 @@ def _s5_rules(src):
                                      and len({"Qwen 3.5 9B", "Qwen 3.5 Vision 9B"}
                                              & set(pc["everything"])) == 1
                                      and pc["over"] == [])
+    # the roles' own guards, each shown where a ladder would trip it: a giant
+    # named by a ladder stays out; the code ladder adds its model when
+    # Thinking didn't seat it; two rows of one download count once
+    g = _s5_mac(src, 512, nl=True, gi=True)
+    g["TIERS"] = dict(g["TIERS"], Fast=dict(g["TIERS"]["Fast"], picks=["DeepSeek V3.2 671B"] + g["TIERS"]["Fast"]["picks"]))
+    out["a giant a ladder names stays out"] = "DeepSeek V3.2 671B" not in g["model_sets"]()["recommended"]
+    c1 = _s5_mac(src, 48)
+    c1["TIERS"] = dict(c1["TIERS"], Thinking=dict(c1["TIERS"]["Thinking"], count=1))
+    out["the code ladder's model"] = "Qwen 3.8 27B" in c1["model_sets"]()["recommended"]
+    d1 = _s5_mac(src, 16)
+    d1["MODEL_ROUTES"] = dict(d1["MODEL_ROUTES"], **{"Qwen 3.5 9B": d1["MODEL_ROUTES"]["Qwen 3.5 Vision 9B"]})
+    r1 = d1["model_sets"]()["recommended"]
+    out["one per download"] = "Qwen 3.5 9B" in r1 and "Qwen 3.5 Vision 9B" not in r1
     nested = all(set(x["light"]) <= set(x["recommended"]) <= set(x["everything"])
                  and x["recommended"][:len(x["light"])] == x["light"]
                  for x in list(m.values()) + [nl48, gi512, pc])
