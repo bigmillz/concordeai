@@ -33602,6 +33602,23 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
    under the hero; nothing needed separating, and it read as a
    rendering artefact. */
 body.novideo #composer-wrap{background:var(--bg);padding-top:14px}
+/* the room under the last message is the composer's real height, which
+   grows with what is typed (6b425); --cwh is measured by the page */
+#chat-scroll #chat-inner{padding-bottom:max(150px,calc(var(--cwh,0px) + 24px))}
+/* back to the newest line (6b425): the composer's glass, round, centred
+   just above it */
+#jumpdown{position:absolute;left:50%;bottom:calc(100% + 10px);
+  transform:translateX(-50%);width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;padding:0;
+  font-size:16px;line-height:1;cursor:pointer;pointer-events:auto;
+  color:rgba(255,255,255,.85);background:rgba(15,17,23,.60);
+  -webkit-backdrop-filter:blur(26px) saturate(1.4);
+          backdrop-filter:blur(26px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:0 8px 24px -10px rgba(0,0,0,.85);
+  transition:background .13s ease,color .13s ease}
+#jumpdown:hover{color:#fff;background:rgba(40,44,56,.78)}
+#jumpdown[hidden]{display:none}
 /* the box sits IN FLOW under the greeting — a pinned percentage
    collided with two-line greetings (seen live) */
 #main:has(#hero) #chat-scroll{flex:0 0 auto;overflow:visible}
@@ -35473,6 +35490,9 @@ __CODE_ROWS__
   </div>
 
   <div id="composer-wrap">
+    <!-- back to the newest line: shown only while an answer streams and the
+         reader has scrolled up out of it (6b425) -->
+    <button id="jumpdown" type="button" title="Jump to the newest" aria-label="Jump to the newest" hidden>&#8595;</button>
     <!-- starter prompts: inside composer-wrap so the row is EXACTLY the
          composer's width without having to restate it -->
     <div id="suggest" hidden></div>
@@ -37203,7 +37223,7 @@ function riskCard(t){
     +'<span>Not today</span></button></div>';
   div.querySelector(".body").appendChild(card);
   inner.appendChild(div);
-  scroller.scrollTop=scroller.scrollHeight;
+  chatPin(true);
   card.querySelector(".rkbtn.go").addEventListener("click",()=>{
     card.classList.add("decided");
     card.querySelector(".rkfoot").innerHTML=
@@ -37855,6 +37875,31 @@ function renderMD(raw){
   if(openThink){thinks.push(openThink[1].trim());raw=raw.replace(/<think>[\s\S]*$/,"\u0000THINKOPEN"+(thinks.length-1)+"\u0000");}
 
   let s=esc(raw);
+  // PIPE TABLES, ONE BUILDER FOR BOTH WAYS IN (6b425, per Patrick: "We're
+  // getting these boxes at the bottom of results again that have no
+  // purpose. It's like it's trying to do the top of a chart, but there is
+  // no chart."). 6b349 turned a header with no rows into a line, but three
+  // other shapes still drew a box of one row: the same table inside a code
+  // fence, a blank header over one row, and a header over a blank row. A
+  // row of nothing but empty cells (or a second divider) is dropped; with
+  // fewer than two rows that say anything left, the cells are one line
+  // joined by " · " (nothing at all when every cell is empty); a blank
+  // header over real rows is a table with no head. Rows that lost their
+  // closing pipe still count as rows.
+  const tCells=r=>r.replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
+  const tDiv=r=>/^\|[\s:|-]*-[\s:|-]*\|?$/.test(r);
+  const tBuild=rows=>{
+    const head=tCells(rows[0]),hasHead=head.some(c=>c);
+    const body=rows.slice(2).filter(r=>!tDiv(r)).map(tCells)
+      .filter(cs=>cs.some(c=>c));
+    const all=(hasHead?[head]:[]).concat(body);
+    if(all.length<2)
+      return all.length?"<p>"+all[0].filter(c=>c).join(" · ")+"</p>":"";
+    return "<table>"+(hasHead?"<thead><tr>"
+        +head.map(c=>"<th>"+c+"</th>").join("")+"</tr></thead>":"")
+      +"<tbody>"+body.map(cs=>"<tr>"+cs.map(c=>"<td>"+c+"</td>").join("")
+        +"</tr>").join("")+"</tbody></table>";
+  };
   // the download box (6b295): stashed as a placeholder the instant the
   // text is escaped, so bold/italic/inline-code rules can never touch the
   // filename or the JSON, and restored next to the THINK restores below
@@ -37891,15 +37936,8 @@ function renderMD(raw){
     // as mono soup with $7 highlighted as a number token)
     if(!lang||/^(md|markdown|te?xt|table)$/i.test(lang)){
       const tl=code.trim().split(/\n/).map(l=>l.trim());
-      if(tl.length>=2&&tl.every(l=>/^\|.*\|$/.test(l))
-         &&/^\|[\s:|-]+\|$/.test(tl[1])){
-        const cells=r=>r.replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
-        return "<table><thead><tr>"
-          +cells(tl[0]).map(c=>"<th>"+c+"</th>").join("")
-          +"</tr></thead><tbody>"
-          +tl.slice(2).map(r=>"<tr>"+cells(r).map(c=>"<td>"+c+"</td>")
-            .join("")+"</tr>").join("")+"</tbody></table>";
-      }
+      if(tl.length>=2&&tl.every(l=>/^\|/.test(l))&&tDiv(tl[1]))
+        return "\n\n"+tBuild(tl)+"\n\n";
     }
     // every card carries the bar now — the copy button needs a home
     // even when the model named no language
@@ -37933,19 +37971,16 @@ function renderMD(raw){
     (_,t,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+"</a>");
   // PIPE TABLES — models reach for them constantly and they used to
   // render as raw pipes
-  s=s.replace(/(^|\n)((?:\|.*\|[ \t]*(?:\n|$)){2,})/g,(m,pre,block)=>{
+  // a header and a divider with no rows under them (small models end an answer
+  // with one, 6b349, per Patrick: "why does it ... keep showing that grid along
+  // the bottom?") is a line of its cells, not an empty grid: tBuild above.
+  // Every line that starts with a pipe belongs to the block (6b425), so a
+  // row missing its closing pipe is a row, not stray text under a header.
+  // The block stands as its own paragraph, so no <p> wraps a <table> or <p>.
+  s=s.replace(/(^|\n)((?:\|[^\n]*(?:\n|$)){2,})/g,(m,pre,block)=>{
     const rows=block.trim().split(/\n/).map(r=>r.trim());
-    if(!/^\|[\s:|-]+\|$/.test(rows[1]||""))return m;   // needs a divider
-    const cells=r=>r.replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
-    // a header and a divider with no rows under them (small models end an answer
-    // with one, 6b349, per Patrick: "why does it ... keep showing that grid along
-    // the bottom?") is a line of its cells, not an empty grid
-    if(rows.length<3)return pre+"<p>"+cells(rows[0]).join(" \u00b7 ")+"</p>";
-    const head=cells(rows[0]).map(c=>"<th>"+c+"</th>").join("");
-    const body=rows.slice(2).map(r=>
-      "<tr>"+cells(r).map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");
-    return pre+"<table><thead><tr>"+head+"</tr></thead><tbody>"
-           +body+"</tbody></table>";
+    if(!tDiv(rows[1]||""))return m;   // needs a divider
+    return pre+(pre?"\n":"")+tBuild(rows)+(/\n$/.test(block)?"\n\n":"");
   });
   // setext headers FIRST (small models love them: text over ----- /
   // =====) or the underline renders as a stray <hr> after plain text
@@ -37971,7 +38006,8 @@ function renderMD(raw){
   });
   // paragraphs
   s=s.split(/\n{2,}/).map(p=>{
-    if(/^<(pre|ul|ol|h\d|details|table|blockquote|hr)/.test(p.trim()))return p;
+    if(!p.trim())return "";   // a table's own blank lines make no empty <p>
+    if(/^<(pre|ul|ol|h\d|details|table|blockquote|hr|p>)/.test(p.trim()))return p;
     return "<p>"+p.replace(/\n/g,"<br>")+"</p>";
   }).join("");
   // restore think blocks
@@ -38271,9 +38307,12 @@ function paintSteps(){
     if(performance.now()-runT0<5000)box.classList.add("warm");
     stepHost.insertBefore(box,stepHost.firstChild);
   }
+  // the card has height from here on: a pinned view follows it, so it
+  // never opens behind the composer (6b425); smooth until text streams
+  const follow=()=>{if(inner.contains(stepHost))autoScroll(!answerChars);};
   if(box.classList.contains("warm")
-     &&(performance.now()-runT0>=5000||streamDone))
-    box.classList.remove("warm");
+     &&(performance.now()-runT0>=5000||streamDone)){
+    box.classList.remove("warm");follow();}
   // HONEST PROGRESS (6b226, per Patrick: "not go right to 99% and
   // sit there"): weight the phases this run will ACTUALLY have —
   // known at stream start from the search header and the tier — and
@@ -38365,6 +38404,7 @@ function paintSteps(){
       +'<span class="wtl">'+esc(s.l||"")+'</span>'
       +(s.d?'<span class="wtd">'+esc(s.d)+'</span>':"")
       +'</div>').join("")+'</div>';
+  if(!box.classList.contains("warm"))follow();
 }
 // repaint on a 200ms clock — the tween needs frames even when the
 // server is silent (a big model can load for 20s without a word), and
@@ -38551,7 +38591,8 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
   inner.appendChild(div);
-  scroller.scrollTop=scroller.scrollHeight;
+  // a new message, a send above all, re-pins the view to the end (6b425)
+  chatPin(true);
   return div;
 }
 
@@ -38666,12 +38707,97 @@ input.addEventListener("paste",e=>{
   });
 });
 
-/* stick to the bottom only when the reader is already there — scrolling
-   up mid-answer used to be a losing fight against every chunk */
-function autoScroll(){
-  if(scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<140)
-    scroller.scrollTop=scroller.scrollHeight;
+/* FOLLOW THE ANSWER ONLY WHILE THE READER IS AT THE BOTTOM (6b425, per
+   Patrick: "When the text is streaming in a response, I can't scroll up.
+   It just judders and keeps forcing it to the bottom."). The old rule
+   re-snapped whenever the reader was within 140px of the end, and the
+   drip repaints every frame, so a flick up of less than 140px between two
+   frames was undone at once; the smooth scroll-behavior then animated
+   every snap. Now one flag decides: chatPinned. A wheel or trackpad
+   moving up unpins at once (before the scroll lands); any other upward
+   move (scrollbar drag, keys, touch, find-in-chat) unpins when the
+   scroll event, or the next pin, sees the view higher than where the app
+   last put it while not at the end (content shrinking clamps to the end,
+   so it never counts). Coming back down to the end re-pins, and so do
+   sending a message and the ↓ button. Following a stream is an instant
+   scroll; a send's is smooth. */
+// var, not let: addMsg pins, and a let read before this line runs would
+// throw in the temporal dead zone and take the whole page with it
+var chatPinned=true,chatLastTop=0,CHAT_SLACK=40;
+function chatGap(){return scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight;}
+function chatMoved(){
+  // the reader moved the view up since the app last placed it
+  const top=scroller.scrollTop,gap=chatGap();
+  if(top<chatLastTop-1&&gap>4)chatPinned=false;
+  else if(!chatPinned&&(gap<=4||(top>chatLastTop+1&&gap<=CHAT_SLACK)))
+    chatPinned=true;
+  chatLastTop=top;
 }
+/* THE STATUS CARD CLEARS THE COMPOSER (6b425, per Patrick: "After a
+   request is entered, that little box ... appears showing that it's
+   searching ... and has the progress bar, but it's kind of off the
+   screen."). The card opened at full height 5s into the run (.warm lifts)
+   and nothing followed it, so it sat behind the composer; paintSteps now
+   follows it while pinned. The composer floats over the chat and grows
+   with what is typed, so the room left under the last message is its
+   real height (--cwh, measured here and on resize), not a fixed 150px. */
+function chatRoom(){
+  const cb=$("#composer");if(!cb)return;
+  const r=scroller.getBoundingClientRect(),c=cb.getBoundingClientRect();
+  const h=c.height?Math.round(r.bottom-c.top):0;
+  if(h>0)scroller.style.setProperty("--cwh",h+"px");
+}
+var chatGlideTo=0;
+function chatToBottom(smooth){
+  chatRoom();
+  const top=Math.max(0,scroller.scrollHeight-scroller.clientHeight);
+  // a glide still under way is retargeted, not cut short by a jump; a
+  // hidden window never runs the animation, so it jumps
+  const now=performance.now();
+  if(now<chatGlideTo)smooth=true;
+  if(smooth&&!document.hidden){
+    if(chatGlideTo<=now)chatGlideTo=now+500;
+    scroller.scrollTo({top,behavior:"smooth"});}
+  else{scroller.style.scrollBehavior="auto";scroller.scrollTop=top;
+       scroller.style.scrollBehavior="";}
+  chatLastTop=scroller.scrollTop;
+}
+function chatJumpPaint(){
+  const b=$("#jumpdown");
+  if(b)b.hidden=!(generating&&!chatPinned&&chatGap()>CHAT_SLACK);
+}
+function autoScroll(smooth){
+  chatMoved();                      // a drag that hasn't fired its event yet
+  if(chatPinned)chatToBottom(smooth);
+  chatJumpPaint();
+}
+function chatPin(smooth){chatPinned=true;chatToBottom(smooth);chatJumpPaint();}
+scroller.addEventListener("wheel",e=>{
+  if(!(e.deltaY<0)||scroller.scrollTop<=0||e.defaultPrevented)return;
+  // a box inside the answer that scrolls up itself (a long code card, a
+  // map zooming) keeps the wheel, and the chat stays where it is
+  for(let el=e.target;el&&el!==scroller;el=el.parentElement)
+    if(el.scrollTop>0&&el.scrollHeight>el.clientHeight+1
+       &&/auto|scroll/.test(getComputedStyle(el).overflowY))return;
+  chatPinned=false;chatJumpPaint();
+},{passive:true});
+// the keys that scroll the chat up unpin the same way, when they are the
+// chat's (nothing focused, or something inside it; never a field or a menu)
+addEventListener("keydown",e=>{
+  if(!/^(PageUp|Home|ArrowUp)$/.test(e.key)||scroller.scrollTop<=0)return;
+  const a=document.activeElement;
+  if(a&&a!==document.body&&!scroller.contains(a))return;
+  if(a&&a.closest&&a.closest("input,textarea,select,[contenteditable]"))return;
+  chatPinned=false;chatJumpPaint();
+});
+scroller.addEventListener("scroll",()=>{chatMoved();chatJumpPaint();},{passive:true});
+$("#jumpdown").addEventListener("click",()=>chatPin(true));
+// the composer grew (a long message being typed) or the window changed:
+// the room is measured again and a pinned view keeps the end in sight
+{const room=()=>{chatRoom();if(chatPinned)chatToBottom(false);};
+ if(window.ResizeObserver&&$("#composer-wrap"))
+   new ResizeObserver(room).observe($("#composer-wrap"));
+ addEventListener("resize",room);}
 
 
 // THE BENCHMARK CHECK IS AN AWAIT (6b331): a second Enter, or Try again
@@ -38787,6 +38913,7 @@ async function send(){
   // the pulsing caret is RETIRED (6b257, per Patrick): the first 5s
   // are a quiet pinwheel; machinery only fades in if the run earns it
   body.innerHTML='<span class="statusline"><i class="cspin"></i></span>';
+  autoScroll(true);                // the spinner line in sight too (6b425)
 
   resetSteps(body);
   abortCtl=new AbortController();
@@ -39100,6 +39227,7 @@ async function send(){
   generating=false;abortCtl=null;genChat=null;document.body.classList.remove("gen");
   sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
   if(curChat===myChat)autoScroll();
+  chatJumpPaint();                 // the ↓ is a streaming control only
   input.focus();
   // the chat as saved (the stream has closed, so the answer is on disk)
   const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);

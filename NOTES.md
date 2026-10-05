@@ -9,6 +9,73 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b425 — no stray one-row table boxes; scrolling up during an answer stays put; the status card clears the composer (per Patrick)
+
+Three chat fixes, all in the page.
+
+- **Table boxes.** Patrick (2026-10-05), with a screenshot of an answer ending in a rounded
+  box holding one row of four cells ("NYC3 | ATL1 | ATL1 (~100–120 ms) | NYC3 (~120–140
+  ms)"): "We're getting these boxes at the bottom of results again that have no purpose.
+  It's like it's trying to do the top of a chart, but there is no chart." 6b349 turned a
+  header with a divider and no rows into a line, but three other shapes still drew a
+  one-row box: the same header-only table inside a code fence (the fence path built its own
+  table and had no such rule), a blank header (`| | | | |`) over one real row, and a header
+  over a blank row. Which one the model wrote is not known (the raw reply was not seen).
+  `renderMD` now has one builder, `tBuild`, for both the fence and the bare path: rows made
+  only of empty cells (and a second divider) are dropped; fewer than two rows left that say
+  anything become one line of the cells joined by " · " (nothing when every cell is empty);
+  a blank header over real rows is a table with no `<thead>`. Every line that starts with a
+  pipe now belongs to the block, so a row that lost its closing pipe is a row rather than
+  stray text under a lone header (that also makes a half-streamed row a row). The table or
+  line now stands as its own paragraph, so no `<p>` wraps a `<table>` or a `<p>` any more,
+  and an empty chunk makes no `<p></p>`. Real tables are unchanged.
+- **Scrolling during a stream.** Patrick: "When the text is streaming in a response, I can't
+  scroll up. It just judders and keeps forcing it to the bottom." `autoScroll` re-snapped
+  whenever the view was within 140px of the end, and the drip repaints every frame, so any
+  flick of less than 140px between two frames was undone at once (measured on the dev copy:
+  60px up, back at the end within 50ms); `#chat-scroll`'s `scroll-behavior:smooth` then
+  animated every snap, which is the judder. Now one flag, `chatPinned`, decides. A wheel or
+  trackpad moving up unpins at once, before the scroll lands (not when a box inside the
+  answer, a long code card or a map, takes the wheel itself), and so do PageUp, Home and
+  ArrowUp when they are the chat's (nothing focused or something inside it; never a field
+  or a menu); any other upward move (scrollbar drag, touch, find-in-chat) unpins when the scroll event, or the next pin
+  if it comes first, sees the view higher than where the app last put it while not at the
+  end (content shrinking clamps to the end, so it never counts). Scrolling back to the end
+  re-pins; so does a new message (every `addMsg`, a send above all) and a new **↓ button**
+  (`#jumpdown`, the composer's glass, round, centred just above it), shown only while an
+  answer streams and the reader is more than 40px up. Following a stream is an instant
+  scroll; a send's is a smooth glide, and a pin within 0.5s of one retargets the glide
+  instead of cutting it. Every forced `scroller.scrollTop=scroller.scrollHeight` is gone
+  (addMsg, the risk card). The `chatPinned` state is `var`, not `let`: `addMsg` pins and
+  can run before that line (the TDZ trap).
+- **The status card behind the composer.** Patrick: "After a request is entered, that little
+  box ... appears showing that it's searching ... and has the progress bar, but it's kind
+  of off the screen." The worktree card is `.warm` (no height) for the run's first 5s;
+  when that lifts it opens at full height and nothing followed it, so it sat under the
+  floating composer (measured: card bottom 753, composer top 680). `paintSteps` now follows
+  the card while pinned when it opens and whenever it is rebuilt, `send` follows the spinner
+  line, and the room under the chat is the composer's measured height (`--cwh` on
+  `#chat-scroll`, set on every pin and by a ResizeObserver on `#composer-wrap`;
+  `padding-bottom:max(150px, --cwh + 24px)`), so a composer grown by a long draft no longer
+  covers the end either. After: card 563–639 against the composer at 680; with the
+  composer forced to 260px tall, padding 306px and the card 352–483 against 518.
+
+Verified on a windowless dev copy in the Browser pane (Blink, hidden document: rAF and the
+200ms step clock don't run there, so rAF was shimmed with a 16ms timer and steps were
+driven by STEP frames) with `/api/chat` replaced by a hand-fed stream. Not seen in
+WKWebView: whether a user wheel cancels a smooth glide already under way there (the wheel
+unpins either way, so at worst the glide finishes), and the composer's growth itself (in
+Blink the textarea's `flex:1 1 0%` keeps it one line however much is typed, so the growth
+was forced with `min-height`). Gauntlet: the 6b349 check is folded into a new node check
+that runs the real `renderMD` on eleven tables and every streamed prefix of four (no table
+with fewer than two rows, an empty head or body, or an empty cell; no `<p><p>` or
+`<p><table>`), with four mutations; a node check of the follow rule against a fake scroller
+(wheel then frame, landed wheel, ↓, an unfired drag, back to the end, a shrink, the
+composer's room, the button hiding when the run ends, PageUp in a field and out of one),
+with six mutations; and a page
+check that every pin goes through it (no forced scroll left, `addMsg` re-pins, the card is
+followed, the padding rule, the button), with four.
+
 ## 6b421 — fans and lights: the card over 50% or the CPU at 60 C, no hold, a 5 s rise to red (per Patrick)
 
 Kit only (`ollama1/`). Per Patrick, new rules for the fans (case, CPU/radiator and the GPU
