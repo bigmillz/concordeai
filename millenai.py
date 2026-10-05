@@ -18719,7 +18719,10 @@ def server_answer(label: str, messages: list, memit, emit, status, step,
 SRV_ONLY_PREFIX = "srv:"
 SRV_ONLY_DESC = "strongest that fits its card"
 SRV_ONLY_FRESH_S = 60           # a check older than this is repeated for a chat
-_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})")
+# "srv:<id>" is "<server> Only"; "srv:<id>:fast", ":think" and ":pro" are Fast,
+# Thinking and Pro on that server alone (6b426). Read in one place: srv_tier_parse
+_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})(?::(fast|think|pro))?")
+SRV_MODE_KEYS = {"fast": "Fast", "think": "Thinking", "pro": "Pro"}
 _SRV_PARAMS_RX = re.compile(r"(?<![\w.])e?(?:(\d+)x)?(\d+(?:\.\d+)?)([bm])(?![a-z0-9])", re.I)
 # (profile, chat id) -> (label or "", time): the chat's last answer was
 # "<server> Only", so its title goes to that server or nowhere
@@ -18733,9 +18736,22 @@ def srv_only_tier(tier) -> bool:
     return isinstance(tier, str) and tier.startswith(SRV_ONLY_PREFIX)
 
 
-def srv_only_id(tier) -> str:
+def srv_tier_parse(tier) -> tuple:
+    """(server id, mode) of a server tier: "srv:<id>" is ("<id>", ""), "<server>
+    Only" (6b337); "srv:<id>:fast", ":think" and ":pro" are ("<id>", "Fast" |
+    "Thinking" | "Pro"), that mode on the server alone (6b426). ("", "") for
+    anything else, which a chat finds gone and never runs elsewhere."""
     m = _SRV_ONLY_RX.fullmatch(tier) if isinstance(tier, str) else None
-    return m.group(1) if m else ""
+    return (m.group(1), SRV_MODE_KEYS.get(m.group(2) or "", "")) if m else ("", "")
+
+
+def srv_only_id(tier) -> str:
+    return srv_tier_parse(tier)[0]
+
+
+def srv_only_mode(tier) -> str:
+    """"Fast", "Thinking" or "Pro" for a mode on one server alone, else ""."""
+    return srv_tier_parse(tier)[1]
 
 
 def _srv_params(name: str):
@@ -18828,6 +18844,12 @@ def server_only_state(e) -> dict:
             m, how = pick
             out.update(ok=True, model=m["name"], how=how, label=n + SERVER_SEP + m["name"],
                        placement=m.get("placement") or "unknown")
+    # ASLEEP, NOT BROKEN (6b426, per Patrick: "you can't send it to the server only
+    # when that's not an option because it's not available"): a paired server this
+    # app knows how to wake (_srv_wakeable), last seen offline, stays pickable; a
+    # chat on it wakes it first (server_only_wake) or says it didn't wake
+    out["asleep"] = bool(not out["ok"] and _srv_wakeable(e) and s.get("at")
+                         and (s.get("kind") == "offline" or not s.get("reachable")))
     tail = " Nothing runs on this computer or in the cloud."
     out["note"] = (
         ("The strongest model on %s that fits its card, answering alone." % n + tail)
@@ -18839,20 +18861,31 @@ def server_only_state(e) -> dict:
         ("Nothing on %s fits its card whole, so it is running with what it has: "
          "its smallest model, alone." % n + tail)
         if out["how"] == "smallest" else
+        ("%s is asleep. Picking this wakes it when you ask, then its strongest model "
+         "that fits its card answers, alone." % n + tail)
+        if out["asleep"] else
         ("When %s answers, this runs its strongest model that fits its card, "
          "alone." % n + tail))
     return out
 
 
 def server_only_tiers(ctx) -> dict:
-    """/api/tiers' rows for the modes: one per paired server."""
+    """/api/tiers' rows for the modes: per paired server, "<server> Only" and
+    under it Fast, Thinking and Pro on that server alone (6b426)."""
     out = {}
+    speeds = None
     for e in _srv_read(ctx):
         if _srv_paired(e):
             st = server_only_state(e)
             out[SRV_ONLY_PREFIX + e["id"]] = dict(
                 st, desc=SRV_ONLY_DESC, models=[st["label"]] if st["ok"] else [],
-                skipped=[], available=st["ok"])
+                skipped=[], available=st["ok"] or st["asleep"])
+            if speeds is None:
+                speeds = server_speeds(ctx)
+            for k, mode in SRV_MODE_KEYS.items():
+                ms = server_mode_state(e, mode, speeds)
+                out[SRV_ONLY_PREFIX + e["id"] + ":" + k] = dict(
+                    ms, desc="%s only" % e["name"], skipped=[], available=ms["ok"] or ms["asleep"])
     return out
 
 
@@ -18883,6 +18916,125 @@ def server_only_resolve(sid: str, ctx, defer=False):
         st["why"] = ("%s didn\u2019t answer, and this app doesn\u2019t know how to wake it. "
                      "Open Settings \u203a Servers while it is on." % e["name"])
     return st["label"], e["name"], st["why"]
+
+
+# ---- Fast, Thinking and Pro on "<server> only" (6b426)
+# Patrick (2026-10-05): "in the pop-up for the models, where you can select
+# Ollama1 only, can we add under the option that only runs all the server
+# models, that allows you to select Fast, Thinking or Pro that will only use
+# those ones on the server." Tier "srv:<id>:fast", ":think" or ":pro" (parsed in
+# srv_tier_parse; "srv:<id>" stays "<server> Only"). The mode's own shape (Fast
+# one model and its second pass, Thinking three and a double-checked merge,
+# Pro every suitable model up to SRV_SEATS_MAX, peer review and a merge) with
+# every seat AND the merge on that server: no model of this computer is
+# seated, nothing of this computer stands behind a seat or the merge, no cloud
+# voice or compositor, no warm-up here. "<server> Only"'s promise and its
+# handling of a server that is down or asleep (server_only_resolve,
+# server_only_wake): a line that says so, never an answer from elsewhere.
+# how many each mode seats (Fast one, Thinking three, Pro every model), as the
+# modes themselves do; SRV_SEATS_MAX caps them. Kept equal to the modes' own
+# counts by a gauntlet check (this section names no mode table of its own)
+SRV_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}
+
+
+def server_only_cands(e) -> list:
+    """The models of server e a mode on it alone may seat, from its last
+    check: each a _srv_models row plus server, sid and params, placed "gpu"
+    and fitting its card (_srv_fits, "<server> Only"'s looser rule: the
+    person picked this server, so the switch "Use for Fast, Thinking and
+    Pro" and a card size the gateway didn't report don't stand in the way)."""
+    s = _srv_seen.get(e["id"]) or {}
+    vram = (s.get("gpu") or {}).get("vram_bytes")
+    return [dict(m, label=e["name"] + SERVER_SEP + m["name"], server=e["name"],
+                 sid=e["id"], params=_srv_params(m["name"]))
+            for m in s.get("models") or []
+            if isinstance(m, dict) and m.get("name") and _srv_fits(m, vram)]
+
+
+def server_mode_seats(e, mode: str, speeds=None) -> tuple:
+    """(labels, how, of) for `mode` on server e alone: its suitable models
+    (srv_role_ok, the mode's role) that run whole on its card, ranked as the
+    modes rank a server's (srv_rank), as many as the mode seats (Fast one,
+    Thinking three, Pro all) and never more than SRV_SEATS_MAX; how "fits".
+    With none of those, "<server> Only"'s own pick alone, so the mode isn't
+    dead (how "smallest" when that one doesn't fit whole either). of: how
+    many were suitable. ([], "", 0) when the server lists nothing to run."""
+    n, role = SRV_MODE_SEATS.get(mode), _TIER_ROLE.get(mode)
+    if not n or not role:
+        return [], "", 0
+    ranked = srv_rank(server_only_cands(e), role, "normal", speeds)
+    if ranked:
+        return ([m["label"] for m in ranked[:min(n, SRV_SEATS_MAX)]],
+                "fits", len(ranked))
+    s = _srv_seen.get(e["id"]) or {}
+    pick = server_only_pick(s.get("models") or [], (s.get("gpu") or {}).get("vram_bytes"))
+    if pick is None:
+        return [], "", 0
+    return [e["name"] + SERVER_SEP + pick[0]["name"]], pick[1], 1
+
+
+def srv_mode_title(name: str, mode: str) -> str:
+    """What the chip and the bubble call it: "Thinking · <name> only"."""
+    return "%s · %s only" % (mode, name) if mode else "%s Only" % name
+
+
+def server_mode_state(e, mode: str, speeds=None) -> dict:
+    """What `mode` on server e alone would run now, from its last check:
+    "<server> Only"'s ok and why (server_only_state), plus the mode, its
+    title, the seats (models, label the first) and the bubble's note."""
+    st = server_only_state(e)
+    n = e["name"]
+    seats, how, of = server_mode_seats(e, mode, speeds) if st["ok"] else ([], "", 0)
+    out = dict(st, mode=mode, title=srv_mode_title(n, mode), models=seats,
+               label=seats[0] if seats else "", how=how,
+               model=seats[0].split(SERVER_SEP, 1)[1] if seats else "")
+    if st["ok"] and not seats:
+        out.update(ok=False, why="%s lists no models for general questions." % n)
+    k = len(seats)
+    if out["asleep"]:
+        note = "%s is asleep: it wakes when you ask, then %s runs on its models alone." % (n, mode)
+    elif not out["ok"]:
+        note = "When %s answers, %s runs on its models alone." % (n, mode)
+    elif how == "smallest":
+        note = ("Nothing on %s is known to fit its card whole, so this is its smallest "
+                "model, alone, and it may use system memory." % n)
+    elif mode == "Fast":
+        note = ("The strongest model on %s for a quick answer that fits its card, with a "
+                "second pass on it." % n)
+    elif k == 1:
+        note = "Only one model on %s suits %s, so it answers alone." % (n, mode)
+    else:
+        note = ("%d models on %s draft, %s, then %s writes the merge there."
+                % (k, n, "one double-checks them" if mode == "Thinking"
+                   else "each rewrites its own from all of them", n))
+        if mode == "Pro" and of > k:
+            note += (" It seats %d of its %d: that many fit in the time a blend has."
+                     % (k, of))
+    out["note"] = note + " Nothing runs on this computer or in the cloud."
+    return out
+
+
+def server_mode_resolve(sid: str, mode: str, ctx, speeds=None) -> list:
+    """The seats of `mode` on server sid alone, for a chat, once
+    server_only_resolve (or its wake) found it answering: [] when it isn't
+    one of ctx's paired servers or lists nothing to run."""
+    try:
+        e = _srv_find(_srv_read(ctx), sid)
+    except (StoreReadError, NoProfile):
+        return []
+    if e is None or not _srv_paired(e):
+        return []
+    return server_mode_seats(e, mode, server_speeds(ctx) if speeds is None else speeds)[0]
+
+
+def server_only_named(ctx, name: str) -> list:
+    """server_only_cands of ctx's paired server called `name` ([] if none):
+    the merge of a mode on that server alone is written from these."""
+    try:
+        e = next((x for x in _srv_read(ctx) if x["name"] == name and _srv_paired(x)), None)
+    except (StoreReadError, NoProfile):
+        return []
+    return server_only_cands(e) if e is not None else []
 
 
 # ---- your server first (6b339)
@@ -19052,7 +19204,7 @@ def server_funnel_pick(ctx, effort: str = "normal"):
     return top[0] if top else None
 
 
-def server_compositor(ctx, drafted=()):
+def server_compositor(ctx, drafted=(), cands=None):
     """The model of ctx's server that writes a mode's merge (6b344, per
     Patrick: "it's still using my laptop's GPU here for compositing answers
     ... versus the server when it is available"), or None when no server of
@@ -19068,8 +19220,10 @@ def server_compositor(ctx, drafted=()):
     strongest model is not resident, the strongest of the resident ones
     (the last two drafts, or a row the server says is loaded) takes the pen
     if it is within 70% of the strongest's size; a much smaller one doesn't
-    write the answer for the sake of a load."""
-    cands = server_mode_candidates(ctx)
+    write the answer for the sake of a load. cands: the one server a mode
+    alone runs on (server_only_named, 6b426) in place of ctx's opted-in ones."""
+    if cands is None:
+        cands = server_mode_candidates(ctx)
     if not cands:
         return None
     ranked = srv_rank(cands, "compose", "normal", server_speeds(ctx))
@@ -23533,18 +23687,22 @@ def _cloud_all_down() -> str:
 
 def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
-                cloud_only: bool = False,
+                cloud_only: bool = False, srv_only: bool = False,
                 bench_allow=None, comp: str = "",
                 hurry=None, srv_first_s=None, srv_merge=False) -> None:
     """Ask each selected model in turn, then stream a merged answer.
 
     Sequential on purpose: only one MLX engine can be resident at a time
     (each pins its whole model in RAM), so parallel calls would thrash.
+    srv_only (6b426): a mode on one server alone; labels are that server's,
+    and the merge is written there too: no cloud voice or compositor, no
+    merger of this computer, before or after a failure.
     """
     # reflection and peer review both run LOCAL passes — off the table
     # when the whole point of the tier is that nothing runs here
     if cloud_only:
         reflect = peer = False
+    srv_merge = srv_merge or srv_only      # one server's mode merges there (6b426)
     # skip models that can't actually answer: not downloaded (their weights
     # aren't on disk) or too big for current free RAM (OOM-killed mid-load)
     usable, skipped = [], []
@@ -23624,7 +23782,7 @@ def run_council(labels: list, messages: list, emit, status,
     # ADVANCED run's bench_allow list (6b248) only NARROWS the bench since
     # 6b326 (0a 5.5): it used to engage the named providers with cloud
     # power off. An EMPTY list means explicitly none, turbo or not.
-    _bench = cloud_bench()
+    _bench = [] if srv_only else cloud_bench()
     if bench_allow is not None:
         _bench = [(l, c) for l, c in _bench
                   if _provider_of(c) in bench_allow]
@@ -23854,6 +24012,11 @@ def run_council(labels: list, messages: list, emit, status,
             _deadline = min(_deadline, time.time() + 5)
 
     good = [d for d in drafts if not d[1].startswith("(no answer")]
+    if not good and srv_only:
+        # a mode on one server alone (6b426): said, and nothing else is tried
+        raise ServerError("council", "None of %s\u2019s models answered. %s" % (
+            labels[0].split(SERVER_SEP, 1)[0],
+            _srv_errs[0] if _srv_errs else "Nothing was sent anywhere else."))
     if not good and _srv_errs and all(server_label(l) for l in labels):
         # your own servers only (review of 6b334): their reason, and the
         # handler tries no other model
@@ -23934,12 +24097,20 @@ def run_council(labels: list, messages: list, emit, status,
     _merge_srv = None
     if srv_merge and comp not in MODEL_ROUTES and not cloud_only:
         try:
-            _merge_srv = server_compositor(bound_ctx(), _srv_used)
+            _merge_srv = (server_compositor(
+                bound_ctx(), _srv_used,
+                server_only_named(bound_ctx(), labels[0].split(SERVER_SEP, 1)[0]))
+                if srv_only else server_compositor(bound_ctx(), _srv_used))
         except Exception:
             _merge_srv = None
+    if srv_only and _merge_srv is None:
+        # (6b426) that server has no model that may write a merge (or it can't
+        # be read): its best draft stands, and no other model writes one
+        emit(good[0][1])
+        return
     if _merge_srv is not None:
         _merge_fb = (merger if merger in MODEL_ROUTES and model_cached(merger)
-                     and model_fits_memory(merger) else "")
+                     and model_fits_memory(merger) and not srv_only else "")
         merger = _merge_srv["label"]
     elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES:
         try:
@@ -24094,8 +24265,8 @@ def run_council(labels: list, messages: list, emit, status,
     # the cloud writes the merge only when cloud power is on (6b326, 0a
     # 5.5): a named cloud compositor or the run's own cloud list used to
     # reach the cloud with the switch off; now they only pick WHICH cloud
-    if comp in MODEL_ROUTES:
-        pass          # the user chose a LOCAL pen — no cloud ladder
+    if comp in MODEL_ROUTES or srv_only:
+        pass          # the user chose a LOCAL pen, or one server (6b426) — no cloud ladder
     elif cloud_allowed():
         if _walk_ladder():
             return
@@ -29547,6 +29718,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # council is a placeholder label and `_so_fail` says why: no other
         # model ever answers in its place.
         _so_c0, _so_fail, _so_wake = "", "", ""
+        # Fast, Thinking or Pro on that server alone (6b426): the mode, and
+        # the seats it found there (every one that server's)
+        _so_mode, _so_seats = srv_only_mode(tier), []
         server_take_wake_notes()           # none left from an earlier request on this thread (6b346)
         server_take_wake_pending()
         # a mode's server seats -> what answers in their place (6b339), and
@@ -29580,17 +29754,25 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _so_lbl, _so_name, _so_why = server_only_resolve(
                     srv_only_id(tier), self.ctx, defer=True)
                 _so_wake = server_take_wake_pending()
+                _so_seats = (server_mode_resolve(srv_only_id(tier), _so_mode, self.ctx)
+                             if _so_lbl and _so_mode else [])
             except (StaleProfile, BrokenPipeError, ConnectionResetError):
                 raise
             except Exception:
                 _so_lbl, _so_name, _so_why = "", "", (
                     "Couldn\u2019t check your servers.")
+                _so_seats = []
             _so_c0 = _so_lbl or ((_so_name or "Your server") + SERVER_SEP
                                  + "unavailable")
             _so_fail = "" if _so_lbl else (
                 _so_why or "That server can\u2019t answer right now.")
             council = [_so_c0]
             model_name = _so_c0
+            if _so_seats:
+                # the mode's seats, all on that server; a picture goes to its
+                # reader alone, as in "<name> Only"
+                council = _so_seats = _so_seats[:1] if images else _so_seats
+                _so_c0 = model_name = council[0]
         else:
             council = [m for m in req_json.get("models", [])
                        if (m in MODEL_ROUTES and SUPPORTED.get(m))
@@ -29863,7 +30045,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # local or cloud model. A label of a server removed since lands
         # here too, and says so.
         # still "<server> Only" only if nothing (an agent) took the council
-        _srv_only = bool(_so_c0) and council == [_so_c0]
+        _srv_only = bool(_so_c0) and council == (_so_seats or [_so_c0])
         if not _srv_only:
             _so_fail = ""
         _srv_lbl = (council[0] if len(council) == 1 and not cloud_only
@@ -30635,7 +30817,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._turn["searched"] = bool(query or _links)
             self.send_header("X-Chat-Id", self._turn["id"])
         xm_names = list(council)
-        if (len(council) > 1 and cloud_allowed()
+        if (len(council) > 1 and cloud_allowed() and not _srv_only
                 and not cloud_only):     # the bench IS the council here
             xm_names += [lbl for lbl, _c in cloud_bench()]
         xm = ", ".join(xm_names)[:300]
@@ -30763,6 +30945,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _so_c0, council, model_name = _w_lbl, [_w_lbl], _w_lbl
                 _srv_lbl = route_label = _w_lbl
                 _so_fail = ""
+                # (6b426) a mode on it alone takes its seats now it is awake
+                _w_seats = (server_mode_resolve(_so_wake, _so_mode, self.ctx)
+                            if _so_mode else [])
+                if _w_seats:
+                    council = _so_seats = _w_seats[:1] if images else _w_seats
+                    _so_c0 = model_name = council[0]
+                    _srv_lbl = route_label = council[0] if len(council) == 1 else ""
             elif not _w_why:                 # the reader left
                 hb_stop.set()
                 return
@@ -31176,15 +31365,36 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             elif (TIERS.get(tier, {}).get("research")
                   or ag_research) and not _links_n:
                 run_research(council, full_messages, memit, status)
+            elif (_srv_lbl and _srv_only and _so_mode == "Fast" and not _so_fail
+                  and not images):
+                # Fast on that server alone (6b426): its one model, and Fast's
+                # second pass on it; nothing stands behind it (fallback "")
+                def _so_revise(_d):
+                    _sq = (full_messages[-1]["content"][:5000]
+                           if (query or docs) else prompt)
+                    return [full_messages[0],
+                            {"role": "user", "content":
+                             REVISE_INSTRUCTION + "QUESTION: " + _sq
+                             + "\n\nFIRST DRAFT:\n" + _d[:6000]}]
+                server_first_answer(
+                    _srv_lbl, "", full_messages, memit, emit, status, step,
+                    first_s=None,
+                    polish=(_so_revise if (user_prefs(user_base).get("polish", True)
+                                           and (not query or bookish)
+                                           and _is_substantive(prompt)) else None))
             elif _srv_lbl:
                 server_answer(_srv_lbl, full_messages, memit, emit, status,
                               step, refuse=_so_fail)
             elif len(council) > 1:
+                # Thinking or Pro on one server alone (6b426): its seats, its
+                # merge, no cloud and nothing of this computer's
                 run_council(council, full_messages, memit, status,
-                            reflect=(tier == "Thinking"),
-                            peer=(tier == "Pro"),
-                            bench_allow=req_cloud, comp=req_comp,
-                            hurry=hurry_ev,
+                            reflect=(tier == "Thinking" or (
+                                _srv_only and _so_mode == "Thinking")),
+                            peer=(tier == "Pro" or (_srv_only and _so_mode == "Pro")),
+                            bench_allow=[] if _srv_only else req_cloud,
+                            comp="" if _srv_only else req_comp,
+                            hurry=hurry_ev, srv_only=_srv_only,
                             srv_first_s=(60.0 if _seat_fb else None),
                             srv_merge=(tier in TIERS and not cloud_only))
             else:
@@ -31354,7 +31564,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 emit("\n" + offline_hint(kind, exc))
             except (BrokenPipeError, ConnectionResetError):
                 pass
-            if not sent[0] and not cloud_only and not _srv_lbl:
+            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:
                 # every path stayed silent (engine died mid-answer, a
                 # provider returned nothing). Try the smallest brain on
                 # disk before admitting defeat. Cloud Only opts out: a
@@ -31410,6 +31620,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # model on this Mac, whose graphics card the person kept quiet
             # by choosing the server (Patrick's Buenos Aires hotels chat
             # ran a local title model after a failed server answer)
+            # Thinking or Pro on one server alone (6b426) ran on several of its
+            # models: the turn is the first seat's for its title and its memory
+            # pass, as a single server model's is, unless that server just failed
+            if (_srv_only and not _srv_lbl and council
+                    and not server_label_down(user_base, council[0])):
+                _srv_lbl = council[0]
             if (_srv_only or _srv_lbl) and _title_cid and not _gone:
                 _srv_only_chats[(user_base.name, _title_cid)] = (
                     _srv_lbl if _model_said[0] and not _so_fail else "",
@@ -35440,6 +35656,8 @@ body.gen #chip-model{color:var(--accent)}
 .engrow.srvrow.off{cursor:default}
 /* "<server> Only" rows (6b337): a mode's row, with a roomier description */
 .engrow.srvmode .edsc{max-width:190px}
+/* Fast, Thinking and Pro on that server alone (6b426): under "<server> Only" */
+.engrow.srvsub{padding-left:26px}
 /* a server's row in the engine menu opens a flyout beside it (6b337) */
 .engrow.srvmenu .edsc{max-width:150px}
 .engrow.srvmenu .echev{flex:none;color:var(--faint);margin-left:2px;font-size:15px;line-height:1}
@@ -37310,11 +37528,7 @@ async function showTierPop(el,name){
   const bench=(cloudOn&&list.length>1)?(ci.bench||[]):[];
   // "<server> Only" (6b337): the one model it runs, or why it can't
   if(isSrvMode(name)){
-    tierPop.innerHTML="<b>"+esc((info.server||"Your server")+" Only")+"</b>"
-      +(info.available===false
-        ?'<div class="mline">'+esc(info.why||"not answering")+'</div>'
-        :'<div class="mline">'+esc(info.model||"")+'</div>')
-      +'<span class="note">'+esc(info.note||"")+'</span>';
+    tierPop.innerHTML=srvTierPopHtml(name,info);   // and its Fast, Thinking, Pro (6b426)
   }else
   // Cloud Only owns its bubble: its line-up IS the key bench, and with no
   // key the bubble has to say what to do rather than list nothing
@@ -43640,29 +43854,36 @@ function flyPlace(mr,rr,w,h,iw,ih){
 // Only" are in the flyout it opens (srvSubRows)
 function srvMenuRows(){
   return srvList.filter(s=>s.paired).map(s=>{
-    const ms=s.models||[],t="srv:"+s.id;
-    const here=!advOn&&(tier===t||(!tier&&!agent&&ms.some(m=>m.label===council[0])));
+    const ms=s.models||[];
+    const here=!advOn&&(srvTierParse(tier).id===s.id||(!tier&&!agent&&ms.some(m=>m.label===council[0])));
     return '<div class="engrow srvmenu'+(here?" on":"")+'" data-sv="'+esc(s.id)+'">'
       +'<span class="eico">\ud83d\udda5\ufe0f</span>'
       +'<span class="enm">'+esc(s.name)+'</span>'
-      +'<span class="edsc">'+esc(ms.length?"your server \u00b7 "+ms.length+" model"
+      +'<span class="edsc">'+esc(srvAsleep(s)?"your server \u00b7 asleep \u00b7 wakes when you ask"
+        :ms.length?"your server \u00b7 "+ms.length+" model"
         +(ms.length===1?"":"s"):(s.status||{}).err?"your server \u00b7 not answering"
         :"your server \u00b7 no models listed")+'</span>'
       +'<span class="echev">\u203a</span></div>';
   }).join("");
 }
-// a server's flyout: "<name> Only" first, then each of its models with
-// where it runs; a server that doesn't answer or lists none says so
+// a server's flyout: "<name> Only" first, then Fast, Thinking and Pro on that
+// server alone (6b426), then each of its models with where it runs; a server
+// that doesn't answer or lists none says so
 function srvSubRows(s){
-  const ms=s.models||[],t="srv:"+s.id;
+  const ms=s.models||[],t="srv:"+s.id,ok=srvPickable(s);
   const only='<div class="engrow srvmode'+(tier===t&&!advOn?" on":"")
-    +(s.only&&s.only.ok?"":" off")+'" data-t="'+esc(t)+'">'
+    +(ok?"":" off")+'" data-t="'+esc(t)+'">'
     +'<span class="eico">\ud83d\udda5\ufe0f</span>'
     +'<span class="enm">'+esc(s.name)+' Only</span>'
-    +'<span class="edsc">strongest that fits its card</span></div>';
+    +'<span class="edsc">strongest that fits its card</span></div>'
+    +srvSubModes().map(([k,n,ic])=>'<div class="engrow srvmode srvsub'
+      +(tier===t+":"+k&&!advOn?" on":"")+(ok?"":" off")+'" data-t="'+esc(t+":"+k)+'">'
+      +'<span class="eico">'+ic+'</span><span class="enm">'+n+'</span>'
+      +'<span class="edsc">'+esc(s.name)+' only</span></div>').join("");
   if(!ms.length)
     return only+'<div class="engdiv"></div><div class="engrow srvrow off" data-none="1">'
-      +'<span class="edsc">'+((s.status||{}).err?"not answering":"no models listed")
+      +'<span class="edsc">'+(srvAsleep(s)?"asleep \u00b7 wakes when you ask"
+        :(s.status||{}).err?"not answering":"no models listed")
       +'</span></div>';
   return only+'<div class="engdiv"></div>'+ms.map(m=>'<div class="engrow srvrow'
     +(!tier&&!advOn&&!agent&&council[0]===m.label?" on":"")
@@ -43695,8 +43916,41 @@ function paintSrvChips(){
 // card. The server says which (the `only` of /api/servers); the page only
 // draws it: a row per paired server, greyed while it can't answer
 function isSrvMode(t){return typeof t==="string"&&t.indexOf("srv:")===0;}
+// ASLEEP, NOT BROKEN (6b426, per Patrick): a paired server the app can wake, last
+// seen offline (the server's `only.asleep`), keeps its modes pickable: a chat
+// wakes it. Greyed only when it is unpaired, gone, or neither answering nor wakeable
+function srvAsleep(s){return !!(s&&s.paired&&s.only&&s.only.asleep);}
+function srvPickable(s){return !!(s&&s.paired&&s.only&&(s.only.ok||s.only.asleep));}
+// FAST, THINKING AND PRO ON ONE SERVER ALONE (6b426, per Patrick: "under the
+// option that only runs all the server models, that allows you to select
+// Fast, Thinking or Pro that will only use those ones on the server"):
+// "srv:<id>:fast", ":think", ":pro"; "srv:<id>" stays "<name> Only". Read
+// here and nowhere else: {id, mode}, mode "" for "<name> Only"; a tier that
+// isn't one of these has no id, so its server is "gone". A function, not a
+// const: a boot path that reads it before this line would throw (the TDZ)
+function srvSubModes(){return [["fast","Fast","\u26a1\ufe0f"],["think","Thinking","\ud83e\udde0"],
+  ["pro","Pro","\u2728"]];}
+function srvTierParse(t){
+  const m=isSrvMode(t)?/^srv:([^:]+)(?::(fast|think|pro))?$/.exec(t):null;
+  const k=m&&m[2]?srvSubModes().find(x=>x[0]===m[2]):null;
+  return {id:m?m[1]:"",mode:k?k[1]:""};
+}
 function srvModeOf(t){
-  return isSrvMode(t)?srvList.find(s=>s.paired&&"srv:"+s.id===t)||null:null;}
+  const id=srvTierParse(t).id;
+  return id?srvList.find(s=>s.paired&&s.id===id)||null:null;}
+// the hover bubble of a server's mode: what it runs, or why it can't, and
+// that nothing runs on this computer (the note is the server's)
+function srvTierPopHtml(name,info){
+  const mode=srvTierParse(name).mode;
+  return "<b>"+esc(info.title||((info.server||"Your server")+" Only"))+"</b>"
+    +(info.available===false
+        ?'<div class="mline">'+esc(info.why||"not answering")+'</div>'
+        :info.asleep?'<div class="mline">asleep \u00b7 wakes when you ask</div>'
+        :mode?(info.models||[]).map(m=>'<div class="mline">'+esc(m)
+          +' <i>\u00b7 your server</i></div>').join("")
+        :'<div class="mline">'+esc(info.model||"")+'</div>')
+    +'<span class="note">'+esc(info.note||"")+'</span>';
+}
 // what the composer chip says: the model the mode resolved to
 function tierShown(t){
   if(!isSrvMode(t)){
@@ -43708,7 +43962,8 @@ function tierShown(t){
     const nm=[...new Set(sv.map(m=>m.slice(0,m.indexOf(SRV_SEP))))].join(" + ");
     return t==="Fast"?t+" \u00b7 "+sv[0].replace(SRV_SEP," "):t+" \u00b7 "+nm+(sv.length>1?" \u00d7"+sv.length:"");
   }
-  const s=srvModeOf(t);
+  const s=srvModeOf(t),mode=srvTierParse(t).mode;
+  if(s&&mode)return mode+" \u00b7 "+s.name+" only";   // "Thinking · <name> only" (6b426)
   return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
 }
 function tierLabel(){return tierShown(tier)||model;}
@@ -43716,8 +43971,9 @@ function tierLabel(){return tierShown(tier)||model;}
 // menu's click and paintTierAvail read it)
 function srvSyncOff(){
   Object.keys(tierOff).forEach(k=>{if(isSrvMode(k))delete tierOff[k];});
-  srvList.filter(s=>s.paired&&!(s.only&&s.only.ok)).forEach(s=>{
-    tierOff["srv:"+s.id]=1;});
+  srvList.filter(s=>s.paired&&!srvPickable(s)).forEach(s=>{
+    tierOff["srv:"+s.id]=1;
+    srvSubModes().forEach(x=>{tierOff["srv:"+s.id+":"+x[0]]=1;});});
 }
 // a mode whose server was removed (or unpaired) goes back to Fast, as a
 // mode with nothing behind it does; never to another server. Only once
