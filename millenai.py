@@ -9647,7 +9647,7 @@ SYNCED_SETTINGS = frozenset((
 PROFILE_LOCAL = frozenset((
     "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
     "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
-    "lend", "lend_pick", "studio_opts.*.neg"))
+    "lend", "lend_pick", "studio_opts.*.neg", "mic_warm"))
 MACHINE = frozenset((
     "app_models", "model_offers", "no_limits", "include_giants",
     "auto_cleanup", "studio_image", "studio_video", "studio_opts",
@@ -9661,6 +9661,9 @@ MACHINE_PREFIXES = ("studio_", "last_", "seen_", "remind_", "contrib_",
                     "fleet_")
 # the Studio's negative prompt: text the person typed, so it is theirs
 STUDIO_NEG = "neg"
+# profile-local keys that hold a real boolean and nothing else (6b429): a
+# string "true" or a 1 from a stray client is ignored, not saved
+LOCAL_BOOL = ("mic_warm",)
 
 # KEY-2: every value a synced key may hold. None of them turns on the
 # cloud, cloud-only, the bench or the Remote agent, and no key here is a
@@ -9923,7 +9926,8 @@ def split_prefs(ctx, incoming: dict, old=None) -> dict:
     for k, v in (incoming or {}).items():
         c = pref_class(k)
         if c is None or k == "studio_opts.*.neg" or (
-                c == "synced" and not synced_value_ok(k, v)):
+                c == "synced" and not synced_value_ok(k, v)) or (
+                k in LOCAL_BOOL and not isinstance(v, bool)):
             ignored.append(k)
         else:
             by[c][k] = v
@@ -36347,6 +36351,18 @@ async function storeBoot(){
   // page drawn for an account neither posts nor uses them, and leaves
   // them for root's next boot (the server adopts nothing into an account)
   const rootPage=PROFILE.startsWith("local.");
+  // 6b429: the one-time move of the warm-microphone switch from browser
+  // storage (6b345) to the saved preference. Only "This computer"'s page,
+  // only when it was on, only when no value is saved yet.
+  const micOld=rootPage&&held&&!("mic_warm" in held)&&lsGet("millen.micwarm")==="1";
+  let micMoved=false;                // a failed post leaves the old key for the next boot
+  if(micOld){
+    try{
+      const r=await api("/api/prefs",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:JSON.stringify({mic_warm:true})});
+      if(r.ok){held=Object.assign({},held,{mic_warm:true});micMoved=true;}
+    }catch(e){}
+  }
   Object.keys(PREF_OF).forEach(k=>{
     const v=rootPage?lsGet(k):null;if(v===null)return;
     pend[PREF_OF[k]]=prefVal(k,v);
@@ -36368,7 +36384,8 @@ async function storeBoot(){
     }catch(e){}
   }
   if(after&&rootPage)Object.keys(PREF_OF).forEach(k=>{if(PREF_OF[k] in after)lsDel(k);});
-  lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF))lsDel(k);});
+  lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF)
+    &&!(k==="millen.micwarm"&&micOld&&!micMoved))lsDel(k);});
   // a key whose post failed still counts for this session, read-only;
   // what prefs.json already held wins over it
   const got=Object.assign({},pend,after||{});
@@ -36403,6 +36420,7 @@ function applyPrefs(){
   }
   if(!prefMine.has("remote_autonomy")
      &&["manual","auto","full"].includes(P.remote_autonomy))autonomy=P.remote_autonomy;
+  micWarmPaint();
   prefsReady=true;
   if(uiMode==="ai"&&!agent)setTier(tier,true);
   else{
@@ -41419,8 +41437,11 @@ function dictTrace(what){
         +dictT.voice+" ms, to first sound "+dictT.chunk+" ms, "
         +(dictT.warm?"warm":"cold")})}).catch(()=>{});
 }
+// the warm-microphone setting (6b429): the saved preference "mic_warm", read
+// into P at boot (applyPrefs) and held there, so a keydown never waits on the
+// network. Off unless saved on.
 function micWarmOn(){
-  try{return localStorage.getItem("millen.micwarm")==="1";}catch(e){return false;}
+  return P.mic_warm===true;
 }
 function micLive(){
   return !!(micStream&&micStream.getTracks().some(t=>t.readyState==="live"));
@@ -41608,11 +41629,15 @@ document.addEventListener("visibilitychange",()=>{if(document.hidden)dictAway();
 // (a profile change reloads it, and profileChanged lets go first)
 $("#newchat").addEventListener("click",micGone);
 addEventListener("pagehide",()=>micClose(true));
-// ...and is a setting, off until the user turns it on: localStorage "millen.micwarm"
+// ...and is a setting, off until the user turns it on: the saved preference
+// "mic_warm" (6b429; it was browser storage, which the boot sweep emptied)
 function setMicWarm(on){
-  try{localStorage.setItem("millen.micwarm",on?"1":"0");}catch(e){}
+  prefSet({mic_warm:on});
   const t=$("#micwarm-toggle");if(t)t.classList.toggle("on",on);
   if(!on)micClose();                   // turned off: let go of it now
+}
+function micWarmPaint(){
+  const t=$("#micwarm-toggle");if(t)t.classList.toggle("on",micWarmOn());
 }
 (function(){
   const t=$("#micwarm-toggle");if(!t)return;
