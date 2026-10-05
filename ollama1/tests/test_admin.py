@@ -561,6 +561,9 @@ class TestStateForThePage(unittest.TestCase):
         self.assertGreaterEqual(i["age_s"], 19)                 # by the server's clock, not the browser's
         t = s["gpu_tune"]
         self.assertEqual((t["applied"]["power_w"], t["stock"]["power_w"], t["check"]["result"]), (293, 255, "passed"))
+        self.assertIn("memory", t)                              # each part is its own fact (6b420)
+        self.assertIn("core", t)
+        self.assertIn("sclk", t["applied"])
 
     def test_a_stale_fan_file_is_none(self):
         self.write("fan", {"at": int(time.time()) - 600, "phase": "working", "pct": 100, "line": "x"})
