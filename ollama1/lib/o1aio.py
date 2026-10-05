@@ -15,7 +15,7 @@ The policy follows the fans' phases (lib/o1fan.py):
   working, hot          100%            extreme
   hold100               100%            extreme
   calibrating           100%            balanced   (first start: measuring rpm)
-  hold50                50%             balanced
+  ramp                  the fans' %, falling from 100 to 20 over 120 s   balanced
   idle20                20%, or higher  quiet
                         for a fan that stalls (the same learning as the case fans)
 
@@ -243,12 +243,12 @@ class Aio:
             phase, fans = self.phase, sorted(self.status["fans"]) or [1, 2]
         if self.coolant_hot or phase in ("working", "hot", "hold100"):
             pump = "extreme"
-        elif phase in ("hold50", "calibrating"):
+        elif phase in ("ramp", "calibrating"):
             pump = "balanced"
         else:
             pump = "quiet"
         base = 100 if (self.coolant_hot or phase in ("working", "hot", "hold100", "calibrating")) else \
-            50 if phase == "hold50" else 20
+            self.pct if phase == "ramp" else 20
         out = {}
         for n in fans:
             L = self.learned.get("aio/fan%d" % n)

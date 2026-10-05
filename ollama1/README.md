@@ -112,6 +112,8 @@ it asks for any it can't find, at the terminal):
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
+| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, then a ramp down to 20% over 2 minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists 100% white when idle, red while the server works, white again 3 s after it stops (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100% (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
@@ -689,7 +691,7 @@ around a little from time to time.
     temperature and power, CPU busy, temperature and speed, and memory,
     with a crosshair that reads out any moment;
   - **Hardware**: the CPU card below, the fans (the phase: working, hold100,
-    hold50 or idle20, the level, each fan's rpm and the pump), the lights
+    ramp or idle20, the level, each fan's rpm and the pump), the lights
     (their colour now and why), storage (each disk's use, the RAID mirror
     and its check's progress), the services, the network, and GPU tuning
     (what is applied and the last check; it is changed at the server only);
@@ -920,11 +922,11 @@ at a level that follows what the server is doing:
 |---|---|---|
 | `working` | 100% | a request, a long job, the card or the processors say it is working |
 | `hold100` | 100% | for 60 s after the work ends |
-| `hold50` | 50% | for the next 60 s |
-| `idle20` | 20% | from 120 s after the work ended, and from the start |
+| `ramp` | 100% down to 20% | a straight line over the next 120 s, written in whole 2% steps |
+| `idle20` | 20% | from 180 s after the work ended, and from the start |
 
 A new request at any time goes back to 100% and starts the sequence over.
-A level is `pwm = round(percent * 255 / 100)`: 20% is 51, 50% is 128, 100%
+A level is `pwm = round(percent * 255 / 100)`: 20% is 51, 60% is 153, 100%
 is 255. While the service runs it always holds the outputs; whenever it
 stops, for any reason, they go back to their own control (the BIOS's
 automatic), and that is also what is in force at boot before it starts.
@@ -1009,7 +1011,7 @@ with the case fans. The cooler follows the same phases:
 |---|---|---|
 | `working`, temperature override, `hold100` | 100% | extreme |
 | first start (measuring) | 100% | balanced |
-| `hold50` | 50% | balanced |
+| `ramp` | the same percent as the fans (100% falling to 20%) | balanced |
 | `idle20` | 20% (or higher for a fan that stalls) | quiet |
 
 The pump is at extreme only while working and for the 60 s after, and when the
@@ -1043,7 +1045,7 @@ command line; that is your call). Do not run `fancontrol` or another fan
 daemon beside this one.
 
 **Status.** `ollama1-fan status` (no root) shows the level and the phase
-(`working`, `hold100 42s`, `hold50 30s`, `idle20`), which outputs it
+(`working`, `hold100 42s`, `ramp 60%`, `idle20`), which outputs it
 controls, each fan's setting, rpm and lowest level, the highest temperature
 and the sensor closest to its limit (and every sensor with its limit). The
 admin panel's CPU card shows the same in one line. Logs:

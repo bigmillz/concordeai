@@ -133,7 +133,7 @@ class TestPolicy(AioCase):
     def test_each_phase_maps_to_fans_and_pump(self):
         t = self.settle()
         for phase, pct, fans, pump in (("working", 100, 100, "extreme"), ("hot", 100, 100, "extreme"),
-                                       ("hold100", 100, 100, "extreme"), ("hold50", 50, 50, "balanced"),
+                                       ("hold100", 100, 100, "extreme"), ("ramp", 50, 50, "balanced"),
                                        ("idle20", 20, 20, "quiet"), ("calibrating", 100, 100, "balanced")):
             with self.subTest(phase):
                 t += 6
@@ -143,7 +143,7 @@ class TestPolicy(AioCase):
 
     def test_the_pump_is_extreme_only_while_working_or_just_after(self):
         t = self.settle()
-        for phase, pct in (("hold50", 50), ("idle20", 20), ("calibrating", 100)):
+        for phase, pct in (("ramp", 50), ("idle20", 20), ("calibrating", 100)):
             t += 6
             self.ago(t, phase, pct)
             self.assertNotEqual(self.aio.applied_pump, "extreme", phase)
@@ -227,16 +227,44 @@ class TestRateLimit(AioCase):
         self.assertTrue(rounds)
         self.assertTrue(all(b - a >= 5 for a, b in zip(rounds, rounds[1:])), rounds)
 
+    def test_during_the_ramp_the_cooler_fans_follow_the_same_percent_at_most_every_5_s(self):
+        t = self.settle("hold100", 100)
+        self.times.clear()
+        pcts = []
+        for s in range(0, 181):                              # the fan service's phase every second, the ramp's % in 2% steps
+            p = o1fan.ramp_pct(s) if s <= 120 else 20
+            self.ago(t + s, "ramp" if s < 120 else "idle20", p)
+            pcts.append(self.aio.applied[1])
+        sets = [(when, a) for when, a in self.times if "set" in a]
+        rounds = sorted({when for when, a in sets})
+        self.assertTrue(all(b - a >= 5 for a, b in zip(rounds, rounds[1:])), rounds)
+        fan1 = [int(a[-1]) for _w, a in sets if a[-3:-1] == ["fan1", "speed"]]
+        self.assertTrue(all(b < a for a, b in zip(fan1, fan1[1:])))              # only on change, only down
+        self.assertTrue(all(v % 2 == 0 for v in fan1))
+        self.assertEqual(fan1[-1], 20)
+        self.assertLessEqual(len(fan1), 25)                                       # about every 5 s, not every 2%
+        pumps = [a[-1] for _w, a in sets if a[-3:-1] == ["pump", "mode"]]
+        self.assertEqual(pumps, ["balanced", "quiet"])                           # balanced in the ramp, quiet at idle
+        self.assertEqual(pcts[0], 100)
+
+    def test_a_cooler_fan_floor_holds_in_the_ramp(self):
+        self.fan_rpm[2] = lambda p: 0 if p < 40 else p * 10
+        t = self.settle("hold100", 100)
+        for s in range(0, 140, 1):
+            self.ago(t + 10 + s, "ramp", o1fan.ramp_pct(s))
+        self.assertEqual(self.aio.applied[2], 40)
+        self.assertEqual(self.aio.applied[1], 20)
+
     def test_only_what_changed_is_sent(self):
         t = self.settle()
         self.times.clear()
-        self.ago(t + 6, "hold50", 50)                        # fans 50, pump quiet -> balanced
+        self.ago(t + 6, "ramp", 50)                        # fans 50, pump quiet -> balanced
         words = [" ".join(a) for _t, a in self.times if "set" in a]
         self.assertEqual(sorted(words), sorted(["--match %s set fan1 speed 50" % DEVICE,
                                                 "--match %s set fan2 speed 50" % DEVICE,
                                                 "--match %s set pump mode balanced" % DEVICE]))
         self.times.clear()
-        self.ago(t + 12, "hold50", 50)
+        self.ago(t + 12, "ramp", 50)
         self.assertEqual([a for _t, a in self.times if "set" in a], [])
         self.ago(t + 18, "idle20", 20)                        # a quiet pump again: only the fans' 20 and the pump
         self.assertIn("set pump mode quiet", " ".join(" ".join(a) for _t, a in self.times).replace("--match %s " % DEVICE, ""))

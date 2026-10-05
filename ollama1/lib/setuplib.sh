@@ -108,7 +108,7 @@ fans_plan() { # the plan's line for the fans (6b385)
   if [ "$1" = off ]; then
     printf 'Fans OFF (--fans off): the graphics card and case fans stay automatic (BIOS control). On: --fans on'
   else
-    printf 'Fans ON: graphics card and case fans at 100%% while the server works and 60 s after, 50%% for 60 s, then 20%%; a Corsair Hydro liquid cooler on USB is controlled too (installs liquidctl) (ollama1-fan). Off: --fans off'
+    printf 'Fans ON: graphics card and case fans at 100%% while the server works and 60 s after, then down to 20%% over 2 minutes; a Corsair Hydro liquid cooler on USB is controlled too (installs liquidctl) (ollama1-fan). Off: --fans off'
   fi
 }
 

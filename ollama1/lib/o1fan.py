@@ -5,8 +5,8 @@ bearings, when it does not:
 
   working     100%   a request, a long job, the card or the processors say so
   hold100     100%   for 60 s after the work ends
-  hold50       50%   for the next 60 s
-  idle20       20%   from 120 s after the work ended (and from the start)
+  ramp     100->20%  falling in a straight line over the next 120 s, in 2% steps
+  idle20       20%   from 180 s after the work ended (and from the start)
 
 A new request at any time goes back to 100% and starts the sequence again.
 A level is pwm = round(percent * 255 / 100): 20% is 51, 50% is 128. The
@@ -88,8 +88,9 @@ from o1common import read_json_safe, write_json_atomic
 
 POLL_S = 2
 HOLD100_S = 60                   # 100% for this long after the work ends
-HOLD50_S = 60                    # then 50% for this long, then idle
-FULL_PCT, HALF_PCT, LOW_PCT = 100, 50, 20
+RAMP_S = 120                     # then a straight ramp down to the idle level over this long
+QUANT_PCT = 2                    # the ramp is written in whole steps of this many percent
+FULL_PCT, LOW_PCT = 100, 20
 STEP_PCT = 10                    # a stalled output is raised by this much
 SETTLE_S = 6                     # a level is judged by rpm only after this long
 PUMP_RATIO = 0.6                 # at 20% still this share of its 100% rpm: a pump or a fixed header
@@ -582,8 +583,9 @@ class Fan:
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
         elif age is not None and age < HOLD100_S:
             phase, pct, why, left = "hold100", FULL_PCT, "the work ended", int(HOLD100_S - age + 0.999)
-        elif age is not None and age < HOLD100_S + HOLD50_S:
-            phase, pct, why, left = "hold50", HALF_PCT, "the work ended", int(HOLD100_S + HOLD50_S - age + 0.999)
+        elif age is not None and age < HOLD100_S + RAMP_S:
+            pct = ramp_pct(age - HOLD100_S)
+            phase, why, left = "ramp", "the work ended", int(HOLD100_S + RAMP_S - age + 0.999)
         else:
             phase, pct, why = "idle20", LOW_PCT, "idle"
         self.apply(outs, pct, now)
@@ -663,11 +665,20 @@ def _rpm_summary(rows):
     return parts
 
 
+def ramp_pct(t):
+    """The level `t` seconds into the ramp: a straight line from 100% to LOW_PCT over RAMP_S, in whole steps of
+    QUANT_PCT, never under LOW_PCT."""
+    p = FULL_PCT - (FULL_PCT - LOW_PCT) * min(max(t, 0), RAMP_S) / RAMP_S
+    return max(LOW_PCT, min(FULL_PCT, int(round(p / QUANT_PCT)) * QUANT_PCT))
+
+
 def phase_text(st):
-    """The phase in words: working / hold100 Ns / hold50 Ns / idle20 (and the two that force 100%)."""
+    """The phase in words: working / hold100 Ns / ramp NN% / idle20 (and the two that force 100%)."""
     ph = st.get("phase")
-    if ph in ("hold100", "hold50"):
+    if ph == "hold100":
         return "%s %ds" % (ph, st.get("hold_left", 0))
+    if ph == "ramp":
+        return "ramp %d%%" % st.get("pct", 0)
     return ph or "?"
 
 
@@ -687,9 +698,9 @@ def status_line(st):
     if ph in ("working", "hot", "calibrating"):
         head = "Fans: %d%% (%s)" % (pct, st.get("why") or ph)
     elif ph == "hold100":
-        head = "Fans: 100%% for %d s more, then 50%%" % st.get("hold_left", 0)
-    elif ph == "hold50":
-        head = "Fans: 50%% for %d s more, then 20%%" % st.get("hold_left", 0)
+        head = "Fans: 100%% for %d s more, then down to 20%%" % st.get("hold_left", 0)
+    elif ph == "ramp":
+        head = "Fans: ramping down, %d%% (20%% in %d s)" % (pct, st.get("hold_left", 0))
     else:
         head = "Fans: 20% (idle)"
     rpm = _rpm_summary(st.get("outputs") or [])
