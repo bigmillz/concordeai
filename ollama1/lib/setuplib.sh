@@ -129,7 +129,7 @@ leds_choice() { # FLAG ENV SAVED -> "on" or "off" (6b395): the flag, else the en
 
 leds_plan() { # the plan's line for the lights (6b395)
   if [ "$1" = on ]; then
-    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red as its load rises (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
+    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red as its load rises, dimming to 50% after 5 idle minutes (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
   else
     printf 'Lights OFF (default): nothing installed, the lights stay as the board leaves them. On: --leds on'
   fi

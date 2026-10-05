@@ -115,7 +115,7 @@ it asks for any it can't find, at the terminal):
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, then a ramp down to 20% over 2 minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--leds on\|off` | The lights: every RGB device OpenRGB lists 100% white when idle, red while the server works, white again 3 s after it stops (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100% (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100%, and dims to 50% after 5 idle minutes (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -1078,17 +1078,36 @@ same reading the fans use, read every 0.25 s), as a ramp, piecewise linear in RG
 | 100% | red, 255,0,0 |
 
 (50% is a golden yellow-orange, 255,192,0.) The colour on show is
-**slew-limited**: it rises at most 100% per 2.5 s and falls at most 100% per
-10 s, so 0% to 100% takes about 2.5 s (plus up to one 0.25 s sample to notice),
-100% to 0% takes 10 s, and the short 0% gaps between batches of work only dip
-it a little. There is no hold and no state: only the card's load colours the
-lights, not a request in flight or a running tool (a long prompt-reading phase
-with the card only partly busy shows as a weak colour; that is as intended). With
-no card reading (no card, or the read failed) the intensity is 0, so white.
-A frame goes out only when the rounded colour changes (at most 20 a second),
-and every 2 s the connection is looked at and the colour sent again (a
-keepalive: a device that was reset gets it back). The 6b395 rule (white idle,
-red while "working", a 3 s hold, 0.8 s and 2 s fades) is gone.
+**slew-limited**: it rises at most 100% per 2.5 s, so 0% to 100% takes about
+2.5 s (plus up to one 0.25 s sample to notice), and it **falls linearly over
+180 s** (the fans' 60 s + 120 s cool-down), so from red the colour goes through
+orange and yellow to white across the whole cool-down; a new burst raises it
+again from wherever it is, and a reading that jitters 99, 0, 99, 0 stays near
+red. Only the card's load colours the lights, not a request in flight or a
+running tool. With no card reading (no card, or the read failed) the intensity
+is 0, so white.
+
+**Brightness.** Separately from the colour, a brightness b between 50% and 100%
+multiplies each channel (white at 50% is 128,128,128, red is 128,0,0). The
+machine is **idle** when the card is under 10% (6 s average) AND the
+processors are under 15% (10 s average of user, nice, system, irq and softirq
+over every thread; iowait does not count). It stops being idle when the card
+reaches 15% (6 s average) or the processors 20% (10 s average); the gap is a
+hysteresis so a value wobbling around a limit does not flicker the lights. After
+**5 minutes idle**, counted from the moment it became idle (so the 3-minute
+colour fade is part of the 5), b fades from 100% to 50% over 10 s. The moment it
+is not idle, b returns to 100% over 1.5 s, and the 5 minutes start again at the
+next idle moment. At service start, and after a wake from sleep, b is 100% and the
+5 minutes start from then (so an idle server dims 5 minutes after boot). The
+card's reading and the processors' are the ones the fan service uses
+(`lib/o1work.py`); a request in flight or a running tool does not brighten the
+lights.
+
+A frame goes out only when the rounded colour (with brightness) changes (at most
+20 a second), and every 2 s the connection is looked at and the colour sent
+again (a keepalive: a device that was reset gets it back; it includes the
+brightness). The status line reads "Lights: orange, 100% (card 61% busy)",
+"Lights: white, dimming (idle 5 min)" or "Lights: white, dimmed 50% (idle 6 min)".
 
 **How.** Two units. `ollama1-openrgb.service` runs `openrgb --server` with no
 window, bound to `127.0.0.1` (`--server-host` when this build has it, and
