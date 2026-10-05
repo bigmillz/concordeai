@@ -5998,7 +5998,7 @@ def _s5_page(src):
             and '<div id="plan-row"><div id="plan-limits">' in pg
             and pg.index('id="plan-limits"') < pg.index('id="nolimits"') < pg.index('id="giants"')
             and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<div id="zito">')]
-            and "No limits: Everything adds models too big for this" in pg
+            and "No limits: also let Everything hold any models" in pg
             and not re.search(r'"(Basic|Minimum|Full|Max)"', src[src.index("const SET_KEYS="):
                                                                 src.index("function renderSetup(")])
             and "Basic" not in pg[pg.index('<div id="wiz-veil"'):pg.index('<div id="setup-veil"')]

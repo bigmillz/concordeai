@@ -35742,8 +35742,8 @@ __CODE_ROWS__
              only set they change -->
         <div id="plan-row"><div id="plan-limits">
           <label id="nolimits-row"><input type="checkbox" id="nolimits">
-            <span>No limits: Everything adds models too big for this
-            machine&rsquo;s memory. They can swap hard or crash it.</span></label>
+            <span>No limits: also let Everything hold any models
+            bigger than this machine&rsquo;s memory. Those can swap hard or crash it.</span></label>
           <label id="giants-row" class="giants-row off"><input type="checkbox"
             id="giants" disabled><span>__GIANT_LABEL__</span><i
             class="hint" title="__GIANT_TIP__">i</i></label>
@@ -36001,8 +36001,8 @@ __CODE_ROWS__
       <label id="wiz-video"><input type="checkbox" id="wiz-vid">
         <span>Add video generation <i class="wsz">(19.6 GB)</i></span></label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
-        No limits: Everything adds models too big for this
-        machine&rsquo;s memory. They can swap hard or crash it.</label>
+        No limits: also let Everything hold any models
+        bigger than this machine&rsquo;s memory. Those can swap hard or crash it.</label>
       <!-- 6b307, per Patrick: the giants sit behind a second box that
            only wakes up once the first is ticked -->
       <label id="wiz-giants" class="giants-row off"><input type="checkbox"
