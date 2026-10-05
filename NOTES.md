@@ -9,6 +9,14 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b429 — setup.sh no longer asks "type yes" unless a disk would be erased (per the owner)
+Asked: "can we remove the type yes when we run the install or update script?" The general
+"Type yes to go ahead" is gone. Two questions stay, because each guards something that can't be
+undone: the list of disks to ERASE (still needs a typed yes) and an SSH session from outside the
+LAN (which setup would cut off). The password-login and "remove the setup key" questions in the
+SSH step stay too (they change security settings). With nothing to erase, setup prints
+"No disk is erased. Going ahead." and carries on.
+
 ## 6b428 — lights: the headers that list no LEDs are resized so every strip gets the colours (per Patrick)
 
 Kit only (`ollama1/`). The owner: the case lights were not all lit. `ollama1-leds` saw two devices,

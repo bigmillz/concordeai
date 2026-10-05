@@ -525,7 +525,13 @@ if ssh_outside_lan "$CLIENT_IP" "$HOME_LAN"; then
   printf 'session, and any login from where you are now, stops working. Use the console or a machine on %s afterwards.\n' "$HOME_LAN"
   ask_yes "Type yes to continue anyway: " || { echo "Nothing changed."; exit 1; }
 fi
-ask_yes "Type yes to go ahead: " || { echo "Nothing changed."; exit 1; }
+# The general "type yes" is gone (per the owner): nothing here is destructive unless a disk is on the
+# erase list above (asked) or the session is outside the LAN (asked above), so those two still need a yes
+if [ "${#WIPES[@]}" -gt 0 ]; then
+  ask_yes "Type yes to go ahead: " || { echo "Nothing changed."; exit 1; }
+else
+  echo "No disk is erased. Going ahead."
+fi
 save_settings
 
 # ---- 1. identity ----------------------------------------------------------------
