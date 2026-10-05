@@ -9115,27 +9115,151 @@ check("sidebar meters: the chip, memory and server labels share one size, tracki
       "%r %r" % (_lab_ok(page), [_lab_ok(m_) for m_ in _lab_mut]))
 
 # A pipe table with a header and no rows is a line of its cells, not an empty grid (6b349, per
-# Patrick: "why does it, for a lot of answers, keep showing that grid along the bottom?")
-_pt0 = page.index("s=s.replace(/(^|\\n)((?:\\|.*\\|[ \\t]*(?:\\n|$)){2,})/g")
-_pt1 = page.index("// setext headers FIRST", _pt0)
-def _pt_run(code):
-    cases = ["Intro line\n| What you\u2019ll need to do | Transfer the funds | Show income |\n|---|---|---|\n",
-             "| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n", "| A | B |\n| 1 | 2 |\n"]
-    js = ("const out=[];for(let s of %s){" % json.dumps(cases) + code + ";out.push(s);}"
-          "process.stdout.write(JSON.stringify(out));")
-    return _node_json(js, "pipetable.js")
-try:
-    _pt = _pt_run(page[_pt0:_pt1])
-except Exception as _e:
-    _pt = [str(_e)]
+# Patrick: "why does it, for a lot of answers, keep showing that grid along the bottom?"), and
+# so is every other table with fewer than two rows that say anything: the same table in a code
+# fence, a blank header over one row, a header over a blank row (6b425, per Patrick: "We're
+# getting these boxes at the bottom of results again that have no purpose."). The page's own
+# renderMD runs in node (the harness the XSS check above built), whole answers and every
+# streamed prefix of them.
+_PT_ROW = "| NYC3 | ATL1 | ATL1 (~100\u2013120 ms) | NYC3 (~120\u2013140 ms) |"
+_PT_LINE = "<p>NYC3 \u00b7 ATL1 \u00b7 ATL1 (~100\u2013120 ms) \u00b7 NYC3 (~120\u2013140 ms)</p>"
+_PT_CASES = [
+    "Intro line\n| What you\u2019ll need to do | Transfer the funds | Show income |\n|---|---|---|\n",
+    "| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n",
+    "| A | B |\n| 1 | 2 |\n",
+    "Use NYC3.\n```\n" + _PT_ROW + "\n|---|---|---|---|\n```\n",            # 3 fenced, header only
+    "Use NYC3.\n| | | | |\n|---|---|---|---|\n" + _PT_ROW + "\n",          # 4 blank header, one row
+    "Use NYC3.\n" + _PT_ROW + "\n|---|---|---|---|\n| | | | |\n",          # 5 header, blank row
+    "| Region | Fallback |\n|---|---|\n| NYC3 | ATL1\n| SFO3 | NYC3\n",    # 6 rows lost their last pipe
+    "| | |\n|---|---|\n| a | b |\n| c | d |\n",                          # 7 blank header, real rows
+    "```\n| A | B |\n|---|---|\n| 1 | 2 |\n```",                         # 8 a fenced real table
+    "Intro\n| A | B |\n|:--|--:|\n| 1 | 2 |\nAfter.",                     # 9 tight, prose either side
+    "x\n| | |\n|---|---|\n| | |\n",                                      # 10 nothing at all
+]
+_PT_STREAM = [_PT_CASES[3], _PT_CASES[4], _PT_CASES[5], "Done.\n" + _PT_ROW + "\n|---|---|---|---|\n"]
+def _pt_run(js):
+    try:
+        cases = _PT_CASES + [s_[:i_] for s_ in _PT_STREAM for i_ in range(1, len(s_) + 1)]
+        _f = os.path.join(_si_dir, "pipetable.js")
+        open(_f, "w").write(js)
+        return json.loads(subprocess.run(["node", _f], input=json.dumps(cases), capture_output=True,
+                                         text=True, timeout=60).stdout)
+    except Exception as _e:
+        return ["ERR %s" % _e]
+def _pt_lone(h):
+    # a <table> with fewer than two rows, or an empty head or body, is the stray box
+    return any(t_.count("<tr>") < 2 or "<tbody></tbody>" in t_ or "<th></th>" in t_ or "<td></td>" in t_
+               for t_ in re.findall(r"<table>.*?</table>", h, re.S))
 def _pt_ok(r):
-    return (isinstance(r, list) and len(r) == 3 and "<table" not in r[0]
-            and r[0].startswith("Intro line\n<p>What you\u2019ll need to do \u00b7 Transfer the funds \u00b7 Show income</p>")
-            and r[1].count("<tr>") == 3 and "<td>3</td>" in r[1] and "<th>A</th>" in r[1]
-            and "<table" not in r[2])
-_pt_mut = page[_pt0:_pt1].replace('if(rows.length<3)return', 'if(false)return', 1)
-check("a header-only pipe table is a line of its cells; a table with rows still renders (node)",
-      _pt_ok(_pt) and _pt_mut != page[_pt0:_pt1] and not _pt_ok(_pt_run(_pt_mut)), "%r" % _pt)
+    if not (isinstance(r, list) and len(r) > len(_PT_CASES)):
+        return False
+    c = r[:len(_PT_CASES)]
+    return ("<table" not in c[0]
+            and "<p>What you\u2019ll need to do \u00b7 Transfer the funds \u00b7 Show income</p>" in c[0]
+            and c[1].count("<tr>") == 3 and "<td>3</td>" in c[1] and "<th>A</th>" in c[1]
+            and "<table" not in c[2]
+            and all("<table" not in c[i_] and _PT_LINE in c[i_] and "<p>Use NYC3.</p>" in c[i_] for i_ in (3, 4, 5))
+            and c[6].count("<tr>") == 3 and "<td>SFO3</td>" in c[6] and "| NYC3" not in c[6]
+            and "<thead>" not in c[7] and c[7].count("<tr>") == 2 and "<td>c</td>" in c[7]
+            and c[8].count("<tr>") == 2 and "<th>A</th>" in c[8] and "codecard" not in c[8]
+            and c[9].startswith("<p>Intro</p><table>") and c[9].endswith("</table><p>After.</p>")
+            and "<table" not in c[10] and "<p></p>" not in c[10]
+            and not any("<p><p>" in h_ or "<p><table" in h_ for h_ in c)
+            and not any(_pt_lone(h_) for h_ in r))
+_pt = _pt_run(_js)
+_pt_mut = [_js.replace("if(all.length<2)", "if(all.length<1)", 1),
+           _js.replace("      .filter(cs=>cs.some(c=>c));", "      ;", 1),
+           _js.replace(r"s=s.replace(/(^|\n)((?:\|[^\n]*(?:\n|$)){2,})/g",
+                       r"s=s.replace(/(^|\n)((?:\|.*\|[ \t]*(?:\n|$)){2,})/g", 1),
+           _js.replace('return "\\n\\n"+tBuild(tl)+"\\n\\n";', 'return "\\n\\n<table><tbody></tbody></table>\\n\\n";', 1)]
+check("a pipe table with under two rows that say anything is a line, fenced or not, whole or streaming (node)",
+      _pt_ok(_pt) and all(m_ != _js for m_ in _pt_mut) and not any(_pt_ok(_pt_run(m_)) for m_ in _pt_mut),
+      "%r" % (_pt[:len(_PT_CASES)] if isinstance(_pt, list) else _pt,))
+
+# Following a streaming answer stops the moment the reader scrolls up, and starts again only at
+# the end, on a send or on the jump button (6b425, per Patrick: "When the text is streaming in a
+# response, I can't scroll up. It just judders and keeps forcing it to the bottom."). The page's
+# own scroll block runs in node against a fake scroller: a wheel up before the scroll lands, a
+# scrollbar drag a frame beats to its event, the way back down, a shrink, the composer's room.
+_FS0 = _MILLENAI_SRC.index("var chatPinned=true,")
+_FS1 = _MILLENAI_SRC.index("// the composer grew", _FS0)
+_FS_DRIVER = r"""
+const H={};let SH=2000;const CH=800;
+const scroller={_t:0,get scrollTop(){return this._t},set scrollTop(v){this._t=Math.max(0,Math.min(v,SH-CH))},
+  get scrollHeight(){return SH},clientHeight:CH,style:{scrollBehavior:"",props:{},setProperty(k,v){this.props[k]=v}},
+  getBoundingClientRect(){return {top:0,bottom:800}},scrollTo(o){this.scrollTop=o.top},
+  addEventListener(t,f){H["s_"+t]=f},contains:()=>false};
+const jb={hidden:true,addEventListener(t,f){H["j_"+t]=f}};
+const comp={getBoundingClientRect(){return {top:680,height:98}}};
+const $=s=>s==="#jumpdown"?jb:s==="#composer"?comp:null;
+function addEventListener(t,f){H["w_"+t]=f}
+const document={hidden:true,body:{},activeElement:null};let generating=true;
+const getComputedStyle=()=>({overflowY:"visible"});
+const R={},snap=()=>[scroller.scrollTop,chatPinned,jb.hidden];
+""" + "%s" + r"""
+const wheelUp=()=>H.s_wheel({deltaY:-60,target:{parentElement:null},defaultPrevented:false});
+SH=2100;autoScroll();R.follow=snap();                        // [1300,true,true]
+wheelUp();SH+=50;autoScroll();R.wheelFirst=snap();           // the wheel, then a frame: [1300,false,false]
+scroller.scrollTop=1240;H.s_scroll();SH+=50;autoScroll();R.wheelLanded=snap();   // [1240,false,false]
+H.j_click();R.jump=snap();                                   // [1400,true,true]
+scroller.scrollTop=1370;SH+=40;autoScroll();R.drag=snap();   // a drag, its event not fired yet: [1370,false,false]
+scroller.scrollTop=SH;H.s_scroll();SH+=40;autoScroll();R.back=snap();            // [1480,true,true]
+SH-=200;scroller._t=Math.min(scroller._t,SH-CH);H.s_scroll();autoScroll();R.shrink=snap();   // [1280,true,true]
+R.room=scroller.style.props["--cwh"];
+wheelUp();scroller.scrollTop=1000;H.s_scroll();generating=false;autoScroll();R.done=snap();  // [1000,false,true]
+generating=true;H.j_click();document.activeElement={closest:()=>({})};H.w_keydown({key:"PageUp"});
+R.keyInField=snap();                                         // a field's key: [1280,true,true]
+document.activeElement=null;H.w_keydown({key:"PageUp"});SH+=50;autoScroll();R.key=snap();   // [1280,false,false]
+process.stdout.write(JSON.stringify(R));
+"""
+def _fs_run(block):
+    try:
+        return _node_json(_FS_DRIVER % block, "follow6b425.js")
+    except Exception as _e:
+        return {"err": str(_e)}
+def _fs_ok(r):
+    return (r.get("follow") == [1300, True, True] and r.get("wheelFirst") == [1300, False, False]
+            and r.get("wheelLanded") == [1240, False, False] and r.get("jump") == [1400, True, True]
+            and r.get("drag") == [1370, False, False] and r.get("back") == [1480, True, True]
+            and r.get("shrink") == [1280, True, True] and r.get("room") == "120px"
+            and r.get("done") == [1000, False, True] and r.get("keyInField") == [1280, True, True]
+            and r.get("key") == [1280, False, False])
+_fs_src = _MILLENAI_SRC[_FS0:_FS1]
+_fs = _fs_run(_fs_src)
+_fs_mut = [_fs_src.replace("  chatPinned=false;chatJumpPaint();\n},{passive:true});", "  chatJumpPaint();\n},{passive:true});", 1),
+           _fs_src.replace("if(top<chatLastTop-1&&gap>4)chatPinned=false;", "if(false)chatPinned=false;", 1),
+           _fs_src.replace("  if(chatPinned)chatToBottom(smooth);", "  if(chatGap()<140)chatToBottom(smooth);", 1),
+           _fs_src.replace("function chatPin(smooth){chatPinned=true;", "function chatPin(smooth){", 1),
+           _fs_src.replace('if(h>0)scroller.style.setProperty("--cwh",h+"px");', "", 1),
+           _fs_src.replace("  chatPinned=false;chatJumpPaint();\n});", "  chatJumpPaint();\n});", 1)]
+check("a streaming answer is followed only while the reader is at the end; scrolling up stops it (node)",
+      _fs_ok(_fs) and all(m_ != _fs_src for m_ in _fs_mut) and not any(_fs_ok(_fs_run(m_)) for m_ in _fs_mut),
+      "%r %r" % (_fs, [_fs_ok(_fs_run(m_)) for m_ in _fs_mut]))
+
+# ...and every pin goes through that block: no forced scroll is left, a new message (a send) re-pins,
+# the status card is followed when it opens and grows, the room under the chat is the composer's
+# measured height, and the jump button exists and hides (6b425, per Patrick: "that little box ...
+# appears showing that it's searching ... and has the progress bar, but it's kind of off the screen")
+def _fp_ok(p):
+    return ("scroller.scrollTop=scroller.scrollHeight" not in p and "clientHeight<140" not in p
+            and "var chatPinned=true," in p and "let chatPinned" not in p
+            and "inner.appendChild(div);\n  // a new message, a send above all, re-pins the view to the end (6b425)\n  chatPin(true);" in p
+            and "const follow=()=>{if(inner.contains(stepHost))autoScroll(!answerChars);};" in p
+            and 'box.classList.remove("warm");follow();}' in p
+            and 'if(!box.classList.contains("warm"))follow();\n}' in p
+            and '<span class="statusline"><i class="cspin"></i></span>\';\n  autoScroll(true);' in p
+            and "#chat-scroll #chat-inner{padding-bottom:max(150px,calc(var(--cwh,0px) + 24px))}" in p
+            and '<button id="jumpdown" type="button" title="Jump to the newest" aria-label="Jump to the newest" hidden>' in p
+            and "#jumpdown[hidden]{display:none}" in p and "chatJumpPaint();                 // the ↓" in p)
+_fp_mut = [page.replace('box.classList.remove("warm");follow();}', 'box.classList.remove("warm");}', 1),
+           page.replace("#chat-scroll #chat-inner{padding-bottom:max(150px,calc(var(--cwh,0px) + 24px))}",
+                        "#chat-scroll #chat-inner{padding-bottom:150px}", 1),
+           page.replace("  // a new message, a send above all, re-pins the view to the end (6b425)\n  chatPin(true);",
+                        "  // a new message, a send above all, re-pins the view to the end (6b425)\n  scroller.scrollTop=scroller.scrollHeight;", 1),
+           page.replace("#jumpdown[hidden]{display:none}", "", 1)]
+check("every chat pin goes through the follow rule; the status card and the composer's room are followed",
+      _fp_ok(page) and all(m_ != page for m_ in _fp_mut) and not any(_fp_ok(m_) for m_ in _fp_mut),
+      "%r" % ([_fp_ok(m_) for m_ in _fp_mut],))
 
 # Settings rail (6b350, per Patrick: "consolidate these three settings tabs under one that says models and has
 # an arrow next to it to the left of it to expand it into local, cloud, and servers")
