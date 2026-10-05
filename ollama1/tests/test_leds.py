@@ -380,7 +380,7 @@ class TestRamp(unittest.TestCase):
 
 
 class TestSlew(unittest.TestCase):
-    def test_up_takes_2_5_s_and_down_3_5_s(self):
+    def test_up_takes_2_5_s_and_down_10_s(self):
         z = o1leds.Slew()
         n = 0
         while z.x < 1.0 and n < 1000:
@@ -391,8 +391,8 @@ class TestSlew(unittest.TestCase):
         while z.x > 0.0 and n < 1000:
             z.step(0.05, 0.0)
             n += 1
-        self.assertIn(n, (70, 71))
-        self.assertEqual((o1leds.RISE_S, o1leds.FALL_S), (2.5, 3.5))
+        self.assertIn(n, (200, 201))
+        self.assertEqual((o1leds.RISE_S, o1leds.FALL_S), (2.5, 10.0))
 
     def test_a_target_in_between_is_reached_and_not_passed(self):
         z = o1leds.Slew()
@@ -422,12 +422,12 @@ class TestBehaviour(Rig):
         self.assertNotIn(RED, [c for t, c in seq if t < 2.4])
         self.assertEqual(self.last_shown(), RED)
 
-    def test_100_to_0_percent_takes_3_5_s_to_reach_white(self):
+    def test_100_to_0_percent_takes_10_s_to_reach_white(self):
         self.run_for(4, gpu=100)
-        seq = self.run_for(5, gpu=0)
+        seq = self.run_for(12, gpu=0)
         first_white = min(t for t, c in seq if c == WHITE)
-        self.assertTrue(3.45 <= first_white <= 3.7, first_white)
-        self.assertNotIn(WHITE, [c for t, c in seq if t < 3.4])
+        self.assertTrue(9.95 <= first_white <= 10.2, first_white)
+        self.assertNotIn(WHITE, [c for t, c in seq if t < 9.9])
         self.assertEqual(self.last_shown(), WHITE)
 
     def test_the_colour_never_moves_faster_than_the_limits_even_with_a_coarse_clock(self):

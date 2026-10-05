@@ -6,7 +6,7 @@ function of how busy the card is.
   intensity x = the card's busy percent / 100 (sysfs gpu_busy_percent, the reading the fan
                 service and lib/o1work.py use), sampled every SAMPLE_S (0.25 s)
   displayed   x slew-limited: it rises at most 1.0 per RISE_S (2.5 s) and falls at most 1.0
-              per FALL_S (3.5 s), so 0% to 100% takes 2.5 s, 100% to 0% takes 3.5 s, and
+              per FALL_S (10 s), so 0% to 100% takes 2.5 s, 100% to 0% takes 10 s, and
               the brief 0% gaps between batches of work only dip the colour a little
   colour      piecewise linear in RGB: 0 white (255,255,255), 1/3 yellow (255,255,0),
               2/3 orange (255,128,0), 1 red (255,0,0); at 0 exactly full white
@@ -53,7 +53,7 @@ RED = (255, 0, 0)
 STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
 RISE_S = 2.5                      # 0 to 100% takes this long
-FALL_S = 3.5                      # 100% to 0 takes this long
+FALL_S = 10.0                     # 100% to 0 takes this long
 FRAME_S = 0.05                    # at most 20 frames a second while the colour moves
 POLL_S = 2                        # the connection and the keepalive
 STATUS_STALE_S = 15               # a status file older than this: the service isn't running

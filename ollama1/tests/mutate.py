@@ -1696,8 +1696,8 @@ MUTANTS = [
     # the lights (6b395)
     ('leds: 0 to 100% takes 1 s, not 2.5', 'lib/o1leds.py', 'RISE_S = 2.5 ', 'RISE_S = 1.0 ', ['test_leds']),
     ('leds: 0 to 100% takes 6 s', 'lib/o1leds.py', 'RISE_S = 2.5 ', 'RISE_S = 6.0 ', ['test_leds']),
-    ('leds: 100% to 0 takes 1 s, not 3.5', 'lib/o1leds.py', 'FALL_S = 3.5 ', 'FALL_S = 1.0 ', ['test_leds']),
-    ('leds: 100% to 0 takes 2.5 s like the rise', 'lib/o1leds.py', 'FALL_S = 3.5 ', 'FALL_S = 2.5 ', ['test_leds']),
+    ('leds: 100% to 0 takes 1 s, not 10', 'lib/o1leds.py', 'FALL_S = 10.0 ', 'FALL_S = 1.0 ', ['test_leds']),
+    ('leds: 100% to 0 takes 2.5 s like the rise', 'lib/o1leds.py', 'FALL_S = 10.0 ', 'FALL_S = 2.5 ', ['test_leds']),
     ('leds: the fall is not limited', 'lib/o1leds.py',
      'self.x = max(target, self.x - dt / FALL_S)', 'self.x = target', ['test_leds']),
     ('leds: the rise is not limited', 'lib/o1leds.py',

@@ -1079,8 +1079,8 @@ same reading the fans use, read every 0.25 s), as a ramp, piecewise linear in RG
 
 (50% is a golden yellow-orange, 255,192,0.) The colour on show is
 **slew-limited**: it rises at most 100% per 2.5 s and falls at most 100% per
-3.5 s, so 0% to 100% takes about 2.5 s (plus up to one 0.25 s sample to notice),
-100% to 0% takes 3.5 s, and the short 0% gaps between batches of work only dip
+10 s, so 0% to 100% takes about 2.5 s (plus up to one 0.25 s sample to notice),
+100% to 0% takes 10 s, and the short 0% gaps between batches of work only dip
 it a little. There is no hold and no state: only the card's load colours the
 lights, not a request in flight or a running tool (a long prompt-reading phase
 with the card only partly busy shows as a weak colour; that is as intended). With
