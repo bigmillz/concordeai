@@ -1849,7 +1849,7 @@ MUTANTS = [
      'DevicePolicy=closed', 'DevicePolicy=auto', ['test_leds']),
     ('leds: the server is not bound to the loopback', 'lib/o1leds.py',
      '(["--server-host", HOST] if bound else [])', '(["--server-host", "0.0.0.0"] if bound else [])', ['test_leds']),
-    # zones with no LEDs (6b422)
+    # zones with no LEDs (6b428)
     ('leds: zones: min and max are read swapped', 'lib/o1leds.py',
      'zmin = r.u32()\n            zmax = r.u32()', 'zmax = r.u32()\n            zmin = r.u32()', ['test_leds']),
     ('leds: zones: the resize packet id is wrong', 'lib/o1leds.py', 'PID_RESIZEZONE = 1000 ', 'PID_RESIZEZONE = 1001 ', ['test_leds']),

@@ -4,7 +4,7 @@ modes, colours), the gradient and the ease, the service on a fake clock (the car
 trigger, the 5 s eased rise to red and full brightness, red while working, the 60 s linear cool-down,
 work again mid-cool, white for 300 s then 40%, frames only when the colour changes, a keepalive), a
 server that dies and comes back, the status, setup and the wiring (units, setup.sh, the panel, the
-sleep hook); zones that list no LEDs (6b422): their size limits parsed, the resize packet, the same frames
+sleep hook); zones that list no LEDs (6b428): their size limits parsed, the resize packet, the same frames
 on the new LEDs, a reconnect and a wake resizing again, a failing zone, the saved length."""
 import json
 import os
@@ -1026,7 +1026,7 @@ class TestOpenrgbAndSetup(unittest.TestCase):
         self.assertEqual(apt, [])
 
 
-# ---- zones with no LEDs (6b422) ----------------------------------------------------------------
+# ---- zones with no LEDs (6b428) ----------------------------------------------------------------
 
 def board(jrainbow_max=200, jcorsair_max=40):
     """The server's board as OpenRGB lists it: JRGB1 and PIPE1 have one LED each, the three addressable headers

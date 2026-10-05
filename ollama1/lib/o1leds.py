@@ -31,7 +31,7 @@ every POLL_S (2 s) the connection is looked at and the colour sent again (a keep
 a device that was reset by a wake or a hot-plug gets it back). At start, and after a
 wake (the sleep hook's SIGUSR1), it is white at 100% and the 300 s start then.
 
-Zones with no LEDs (6b422, per the owner: "just send the same lighting signals to all of those
+Zones with no LEDs (6b428, per the owner: "just send the same lighting signals to all of those
 headers"): an MSI Mystic Light board lists its addressable headers (JRAINBOW1, JRAINBOW2,
 JCORSAIR) with ZERO LEDs until a length is configured, so nothing is ever sent to the strips
 behind them. At connect time (and after every reconnect or wake) each zone that has no LEDs

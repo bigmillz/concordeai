@@ -5,7 +5,7 @@ updated notice), records every packet it receives, and can be stopped and starte
 again on the same port. It builds its replies with its own struct code, not the
 kit's, so a mistake in lib/o1leds.py's encoder and parser cannot cancel out.
 
-Zones (6b422) carry a size range: a zone is (name, count) as before, or (name, count, min, max) or
+Zones (6b428) carry a size range: a zone is (name, count) as before, or (name, count, min, max) or
 (name, count, min, max, type) with type 0 single, 1 linear, 2 matrix; a zone with min != max can be resized
 by the SDK's RESIZEZONE packet (id 1000: i32 zone index, i32 new size, the device in the header, no size
 prefix, as OpenRGB's NetworkClient/NetworkServer write and read it). The server follows the real one: a
