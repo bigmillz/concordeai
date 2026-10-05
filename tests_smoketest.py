@@ -16955,6 +16955,11 @@ check("without ACCOUNTS (the shipped app) nothing new runs or shows: no boot inv
 # ==== 6b331 benchmark: begin ====
 # ==== starter chips: begin ====
 print("== starter chips from your chats (6b390) ==")
+check("topic chips: the pass is capped at what a server may write, in the request itself",
+      "SUGGEST_MAX_TOKENS = 1200" in _MILLENAI_SRC
+      and "server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)" in _MILLENAI_SRC
+      and '{"num_predict": int(max_tokens)} if max_tokens else {}' in _MILLENAI_SRC
+      and "server_stream(m[\"label\"], messages, parts.append, max_tokens)" in _MILLENAI_SRC)
 # THE THREE CHIPS FOLLOW WHAT THE PERSON ASKS (6b390). Only a topic summary
 # (chat titles, scrubbed and cut) is sent, in the background, to the server
 # first, else a loaded model here, in Cloud Only the cloud; the summary is
@@ -17107,7 +17112,7 @@ def _sg_unit(src):
             gate_ladder=lambda lad, req=None, only=False: lad if only else [],
             fast_cloud_ladder=lambda utility=False: cloud[0],
             cloud_text=lambda c, m, **k: (calls.append("cloud") or "<think>x</think>CLOUD " + c["id"]),
-            server_side_text=lambda m, ctx=None, role="fast": (calls.append("server") or srv[0]),
+            server_side_text=lambda m, ctx=None, role="fast", max_tokens=0: (calls.append("server") or srv[0]),
             _suggest_local_label=lambda: loc[0],
             run_model=lambda lb_, m, emit: (calls.append("local") or emit("LOCAL " + lb_)),
             strip_think=lambda t: t.replace("<think>x</think>", ""), strip_special=lambda t: t)
@@ -17378,11 +17383,6 @@ def _sg_asks(inst):
     return _sg_q(inst, "/api/test/suggest")[1]
 
 
-check("topic chips: the pass is capped at what a server may write, in the request itself",
-      "SUGGEST_MAX_TOKENS = 1200" in _MILLENAI_SRC
-      and "server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)" in _MILLENAI_SRC
-      and '{"num_predict": int(max_tokens)} if max_tokens else {}' in _MILLENAI_SRC
-      and "server_stream(m[\"label\"], messages, parts.append, max_tokens)" in _MILLENAI_SRC)
 _SG = Instance(9903, "SG", seed=_sg_seed(_sg_chats()), env={"MILLENAI_TEST_HOOKS": "suggest-fake"}).start()
 _sg_s0 = _sg_q(_SG, "/api/suggest")
 _sg_d1 = _sg_wait(_SG, lambda d: d.get("chips"))
