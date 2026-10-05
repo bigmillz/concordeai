@@ -2810,6 +2810,7 @@ _mjs = ("const IS_PC=false;function esc(s){return String(s).replace(/&/g,'&amp;'
         'everything:{n:4,dl_gb:11.8,state:"download",same:"recommended"},risky:false};'
         'const out={a:setCardsHtml(S,{pick:"light"}),b:setCardsHtml(T,{where:"Desk"})};'
         'setArm.grid={k:"everything",at:Date.now()};out.c=setCardsHtml(S,{scr:"grid"});'
+        'out.d=setCardsHtml(Object.assign({},S,{danger:true}),{});'
         'process.stdout.write(JSON.stringify(out));')
 try:
     open(os.path.join(_si_dir, "mw.js"), "w").write(_mjs)
@@ -2820,6 +2821,11 @@ except Exception as _e:
 _mcard = lambda h, k: (h.split('data-set="%s"' % k)[1].split("</div>")[0] if 'data-set="%s"' % k in h else "")
 _ma, _mb, _mc = _mo.get("a", ""), _mo.get("b", ""), _mo.get("c", "")
 _flag = _MILLENAI_SRC.split("function paintModelsFlag(st){")[1].split("\n}\n")[0]
+check("Everything's triangle: yellow over memory, red once a giant is in, none when nothing is over (node)",
+      "danger" not in _ma and "danger" not in _mb
+      and _mo.get("d", "").count("set-card risky danger") == 1
+      and ".plan-card.danger .warn{color:#e5534b}" in _MILLENAI_SRC
+      and '"danger": bool(sets.get("giants"))' in _MILLENAI_SRC)
 check("the three sets' cards: yours, installed, to download, the same-as line, the risky one warned (node)",
       "✓ yours" in _mcard(_ma, "recommended") and "3 models · installed" in _mcard(_ma, "light")
       and "14 models · 61 GB to download" in _mcard(_ma, "everything")
@@ -5857,7 +5863,10 @@ def _s5_rules(src):
         {"GLM 5.3", "DeepSeek V3.2 671B"} <= set(gi512["everything"])
         and not {"GLM 5.3", "DeepSeek V3.2 671B"} & set(gi512["recommended"])
         and not any(_s5_mac(src, 512)["model_is_giant"](l) for l in
-                    _s5_mac(src, 512, nl=True)["model_sets"]()["everything"]))
+                    _s5_mac(src, 512, nl=True)["model_sets"]()["everything"])
+        # the red triangle: giants listed only with both boxes
+        and set(gi512["giants"]) >= {"GLM 5.3", "DeepSeek V3.2 671B"}
+        and m[48]["giants"] == [] and nl48["giants"] == [])
     # 24 GB on the card and 64 GB beside it: GPT-OSS 120B's experts sit in
     # RAM (6b315), so it answers Fast; Qwen 3.5 9B and its Vision row are one
     # Ollama download, listed once

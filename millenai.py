@@ -4170,7 +4170,11 @@ def model_sets(target=None) -> dict:
             out.append(l)
     return {"light": light, "recommended": rec, "everything": list(out),
             "over": ([l for l in out if not fits_by_memory(l)]
-                     if target is None else [])}
+                     if target is None else []),
+            # the giants box's models: Everything holding one is red, not
+            # yellow (per Patrick)
+            "giants": ([l for l in out if model_is_giant(l)]
+                       if target is None else [])}
 
 
 def model_set_chosen() -> str:
@@ -4216,7 +4220,8 @@ def model_sets_status(pulled=None, sets=None) -> dict:
             if ok and model_cached(l, pulled)}
     chosen = model_set_chosen()
     out = {"chosen": chosen, "over": list(sets.get("over") or []),
-           "risky": bool(sets.get("over"))}
+           "risky": bool(sets.get("over")),
+           "danger": bool(sets.get("giants"))}
     full = []
     for i, k in enumerate(MODEL_SETS):
         ls = list(sets[k])
@@ -34291,7 +34296,9 @@ body.gen #chip-model{color:var(--accent)}
 .plan-card span{font-size:10.5px;color:var(--faint);line-height:1.4;
   display:block}
 .plan-card .warn{color:#d9a95a;display:inline}
+.plan-card.danger .warn{color:#e5534b}
 .plan-card.risky:hover{border-color:rgba(217,169,90,.6)}
+.plan-card.risky.danger:hover{border-color:rgba(229,83,75,.6)}
 .plan-card .gb{font-family:var(--mono);font-size:9.5px;color:var(--dim);
   display:block;margin-top:3px}
 .dlbox{display:flex;align-items:center;gap:11px;margin:10px 0;
@@ -41887,7 +41894,8 @@ function setCardsHtml(sets,o){
   return SET_KEYS.map(k=>{
     const x=sets[k];if(!x)return "";
     const risky=k==="everything"&&!!sets.risky&&!x.same;
-    return '<div class="plan-card set-card'+(risky?" risky":"")
+    const danger=risky&&!!sets.danger;   // a giant is in: red, not yellow
+    return '<div class="plan-card set-card'+(risky?" risky":"")+(danger?" danger":"")
       +(x.state==="yours"?" current":"")+(o.pick===k?" on":"")+(x.n?"":" none")
       +'" data-set="'+k+'" role="button" tabindex="0">'
       +(x.state==="yours"?'<i class="cur">\u2713 yours</i>':"")
