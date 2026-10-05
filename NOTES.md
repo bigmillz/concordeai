@@ -9,6 +9,39 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b430 — the Mac's "local network" prompt asked for at a moment you can see, plus a Test wake-up button (per Patrick)
+
+Patrick: "still no pop-up to allow the app to access devices on the local network." The Wake-on-LAN
+packet (6b346) works from Terminal but not from the app. macOS (Sequoia and later) keeps an app off the
+LAN until the person allows it, and the build already declares `NSLocalNetworkUsageDescription`
+(6b420). But the prompt appears only when the app FIRST touches the LAN, and this app talks to the server
+through the internet (Cloudflare): nothing touched the LAN until a wake was needed, a rare moment, and the
+wake path swallowed the refusal. macOS app only (`IS_MAC`); Windows has no such gate and gets no button.
+
+- **Test wake-up** (Settings > Your servers, the Sleep section, any server with wake addresses, asleep or
+  not): `POST /api/servers/wake-test {id}` sends the same magic packets and waits for nothing; the
+  five-minute gap (`_srv_wake_at`) is untouched. Reply `{ok, tried, failed, blocked, err}`. The id must be one
+  of the person's servers (`_srv_find` in the active profile). The send loop of `server_wake` moved, shape
+  and ports 9/7 unchanged, into `_srv_wake_send(e)` -> `(tried, failed, first (errno, strerror))`.
+  Page: "Wake-up sent to <name>." when one went out; when every send raised, "macOS isn't letting ConcordeAI
+  use the local network. Open System Settings > Privacy & Security > Local Network and turn ConcordeAI on."
+  with a button (`POST /api/servers/lan-settings`, one fixed argument list:
+  `open x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork`, nothing from the request).
+- **First touch where you can see it**: one harmless 1-byte datagram to port 9 of each broadcast address a
+  wake goes to (not a magic packet: wakes nothing), from a thread of its own, (a) the first time the page reads
+  the servers on a computer that has a paired server with wake addresses, once per computer (machine pref
+  `last_lan_touch`, a `last_` key so no new set entry; `_lan_boot` is the per-launch guard, in MACHINE_STATE),
+  and (b) whenever the Sleep switch is turned on. No TCP probe: the app doesn't know a LAN address.
+- **State**: `_srv_wake_blocked` (already set by `server_wake`) is now also set by the test and the touch, and
+  shown as `lan_blocked` on the card (macOS app only): a small amber line "This computer isn't allowing
+  local-network access (Settings > Privacy & Security > Local Network)". Only when EVERY send raised OSError;
+  a later send that goes out clears it.
+- **Tests** (`6b430 local network prompt` block): helper counts, the test's replies and refusals (stranger's id,
+  no card, not the Mac), the touch's once-flag and thread, the route and the constant command line, the page's
+  strings in node, 17 mutants. The 6b346 node harness now declares `srvLan`; the public-view key set gained `lan_blocked`.
+- **Not verified from here**: the macOS prompt itself cannot be seen without the signed app on a Mac that has
+  never been asked. After install: Settings > Your servers > Test wake-up must show either the sent line or the blocked line.
+
 ## 6b429 — setup.sh no longer asks "type yes" unless a disk would be erased (per the owner)
 Asked: "can we remove the type yes when we run the install or update script?" The general
 "Type yes to go ahead" is gone. Two questions stay, because each guards something that can't be
