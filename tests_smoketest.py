@@ -7324,7 +7324,7 @@ _mac_page = _pw["pc_words"](_page_src)
 _mac_left = re.findall(r"\b(?:[Tt]his|[Yy]our|[Tt]he) [Mm]ac\b", _pc_page)
 check("off a Mac the app says PC; on a Mac nothing changes",
       not _mac_left and _mac_page == _page_src
-      and "entirely on this PC" in _pc_page
+      and '+"this PC. Start chatting the moment the first piece lands."' in _pc_page
       and "ready \u00b7 this pc" in _pc_page
       and "HTML_CONTENT = pc_words(HTML_CONTENT)" in _MILLENAI_SRC
       and "Making pictures on this computer needs an Apple" in _MILLENAI_SRC
