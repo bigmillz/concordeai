@@ -5775,7 +5775,7 @@ _S5_NAMES = {"GIANT_GB", "model_is_giant", "giant_fits_here", "machine_budget_by
              "TIERS", "MODEL_SETS", "MODEL_SET_NAMES", "MODEL_SET_ALIASES", "QUICK_PAIR",
              "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_set_key",
              "_set_tag_bytes", "model_sets", "_family_of", "model_set_chosen", "model_sets_status",
-             "offer_set_labels", "first_set_labels", "_srv_fits", "_srv_tag_key"}
+             "offer_set_labels", "first_set_labels", "FIRST_RUN_SET", "_srv_fits", "_srv_tag_key"}
 
 
 class _S5VM:
@@ -5883,6 +5883,15 @@ def _s5_rules(src):
                  and x["recommended"][:len(x["light"])] == x["light"]
                  for x in list(m.values()) + [nl48, gi512, pc])
     out["nested everywhere"] = nested
+    # the first-run default: Light with nothing picked, the pick otherwise (an old
+    # name too); nothing installed means no set is "yours"
+    f0 = _s5_mac(src, 48)
+    f1 = _s5_mac(src, 48, prefs={"model_set": "pro"})
+    out["first run: Light, the pick when there is one"] = (
+        f0["first_set_labels"]() == f0["model_sets"]()["light"]
+        and f1["first_set_labels"]() == f1["model_sets"]()["recommended"]
+        and f0["model_sets_status"](set())["mine"] == ""
+        and round(f0["model_sets_status"](set())["light"]["dl_gb"]) == 9)
     return all(out.values()), {"failed": [k for k, v in out.items() if not v],
                                "48": m[48], "16": m[16], "8": m[8], "pc": pc}
 
@@ -5956,7 +5965,10 @@ def _s5_wiring(src):
             < route.index("start_model_downloads(_want)") < route.index("model_set_choose(_key)")
             and "_remove_models" not in route
             and '"sets": model_sets_status(pulled, sets),' in ss and "sets = model_sets()\n" in ss
-            and 'first = sets[model_set_chosen() or "recommended"]' in ss
+            and 'first = sets[model_set_chosen() or FIRST_RUN_SET]' in ss
+            and '\nFIRST_RUN_SET = "light"\n' in src
+            and 'let wizStep=1,wizPlan="light",wizPicked=false,wizSets=null;' in src
+            and 'let setupPlan="light",setupPlanPicked=false,setupSt=null;' in src
             and "    stars_now = set(first)\n" in ss
             and "    for label in (labels if labels is not None else first_set_labels()):\n" in src
             and "    for pref in MERGE_PREFS:\n" in src and "    for l in CODE_LADDER:\n" in src
@@ -6037,6 +6049,7 @@ _S5_MUT = [
     ("the pick not kept", "            model_set_choose(_key)\n", "", [3]),
     ("an unknown name installs something", "            if not _key:\n                self._send_json({\"err\": \"Pick Light, Recommended or Everything.\"},",
      "            if not _key:\n                _key = \"everything\"\n            if False:\n                self._send_json({\"err\": \"Pick Light, Recommended or Everything.\"},", [3]),
+    ("first run defaults to Recommended", 'FIRST_RUN_SET = "light"\n', 'FIRST_RUN_SET = "recommended"\n', [0, 3]),
     ("the wizard with its own cards", 'box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});', 'box.innerHTML="";', [4]),
 ]
 _s5m = []
@@ -6048,6 +6061,16 @@ for _d5, _o5, _n5, _w5 in _S5_MUT:
     _s5m.append((_d5, [i for i, _n, o, _x in _r5 if not o] or "MISSED"))
 check("the three sets: %d mutations of their rules, each caught by the check that guards it" % len(_S5_MUT),
       all(isinstance(v, list) for _d, v in _s5m), "%r" % [x for x in _s5m if not isinstance(x[1], list)])
+# the wizard's studio options: two one-line rows in the autoclean row's own look, no description (Patrick)
+_wz = page[page.index('<label id="wiz-image">'):page.index('<label id="wiz-nolimits">')]
+check("wizard: image and video options are two short rows styled like the autoclean row",
+      '<span>Add image generation <i class="wsz">(9.6 GB)</i></span>' in _wz
+      and '<span>Add video generation <i class="wsz">(19.6 GB)</i></span>' in _wz
+      and "make pictures" not in _wz and "short video" not in _wz and "Also add" not in _wz
+      and "#wiz-autoclean,#wiz-nolimits,#wiz-image,#wiz-video{display:flex;" in page
+      and "#wiz-autoclean input,#wiz-nolimits input,#wiz-image input,#wiz-video input{margin-top:2px}" in page
+      and 'z.textContent="("+t.gb+" GB)"' in page
+      and "make pictures from a description, on this Mac" in page)     # the studio card's own line stays
 # ==== 6b405 model sets: end ====
 # 6b408, per Patrick: the studio cards' Remove looked unfinished (a thin grey
 # box with the browser's own text). It and "Continue in background" are the
