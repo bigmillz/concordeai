@@ -20972,7 +20972,7 @@ _SO_MUT = [
      '    if False:\n        out["why"] = "%s isn\\u2019t paired with this computer yet." % n'),
     ("a row for an unpaired server", '        if _srv_paired(e):\n            st = server_only_state(e)\n            out[SRV_ONLY_PREFIX',
      '        if True:\n            st = server_only_state(e)\n            out[SRV_ONLY_PREFIX'),
-    ("a row always available", 'skipped=[], available=st["ok"])', 'skipped=[], available=True)'),
+    ("a row always available", 'skipped=[], available=st["ok"] or st["asleep"])', 'skipped=[], available=True)'),
     ("an old check believed for ever", '                and time.time() - float(s.get("at") or 0) < SRV_ONLY_FRESH_S):',
      '                and True):'),
     ("another profile's servers", '        e = _srv_find(_srv_read(ctx), sid)\n    except (StoreReadError, NoProfile):\n        return "", "", "Couldn',
@@ -21049,8 +21049,8 @@ _SO_MUT = [
     ("the Only item not first", "  return only+'<div class=\"engdiv\"></div>'+ms.map(m=>'<div class=\"engrow srvrow'",
      "  return '<div class=\"engdiv\"></div>'+only+ms.map(m=>'<div class=\"engrow srvrow'"),
     ("no treatment for a server with no models", "  if(!ms.length)\n    return only+", "  if(false)\n    return only+"),
-    ("a server's name not escaped in its row", "      +'<span class=\"enm\">'+esc(s.name)+'</span>'\n      +'<span class=\"edsc\">'+esc(ms.length?",
-     "      +'<span class=\"enm\">'+s.name+'</span>'\n      +'<span class=\"edsc\">'+esc(ms.length?"),
+    ("a server's name not escaped in its row", "      +'<span class=\"enm\">'+esc(s.name)+'</span>'\n      +'<span class=\"edsc\">'+esc(srvAsleep(s)?",
+     "      +'<span class=\"enm\">'+s.name+'</span>'\n      +'<span class=\"edsc\">'+esc(srvAsleep(s)?"),
     ("the bubble off the window", "  const pl=r.right+10+pw>innerWidth-8?Math.max(8,r.left-10-pw):r.right+10;",
      "  const pl=r.right+10;"),
     # Advanced (6b337)
@@ -23008,6 +23008,38 @@ def _smc_seats(src):
     os.makedirs(dB)
     B = ns["ProfileCtx"]("test", dB, "b" * 32)
     got["profile B"] = ns["server_mode_resolve"](e["id"], "Pro", B) == [] and ns["server_only_tiers"](B) == {}
+    # ASLEEP, NOT BROKEN (Patrick: "you can't send it to the server only when that's not an option because
+    # it's not available"): paired, the card that wakes it known and sleep on, last seen offline -> pickable
+    def _ent(**kw):
+        return dict(ns["_srv_read"](ctx)[0], **kw)
+    wk = dict(wake=[{"mac": "aa:bb:cc:dd:ee:ff"}], sleep={"enabled": True, "minutes": 30})
+    _so_seen(ns, e, [], reachable=False, auth=False, err="Pat’s Lab didn’t answer.", kind="offline")
+    a0, a1 = ns["server_only_state"](_ent(**wk)), ns["server_mode_state"](_ent(**wk), "Thinking")
+    got["asleep: pickable"] = (a0["asleep"] is True and not a0["ok"] and a1["asleep"] is True and a1["models"] == []
+                               and "asleep" in a0["note"] and a0["note"].endswith(dry)
+                               and a1["note"].startswith("Pat’s Lab is asleep: it wakes when you ask"))
+    # not wakeable (no card known, or sleep off): greyed with the reason, as before
+    nw = [ns["server_only_state"](_ent(**kw_)) for kw_ in (
+        {}, dict(wk, wake=[]), dict(wk, sleep={"enabled": False}))]
+    got["not wakeable: greyed"] = all(x["asleep"] is False and x["why"] == "Pat’s Lab didn’t answer." for x in nw)
+    # answering, or never checked: not "asleep"
+    _so_seen(ns, e, ms)
+    got["answering: not asleep"] = ns["server_only_state"](_ent(**wk))["asleep"] is False
+    ns["_srv_seen"].pop(e["id"], None)
+    got["never checked: not asleep"] = ns["server_only_state"](_ent(**wk))["asleep"] is False
+    # the tiers rows: available while asleep, for "<name> Only" and the three modes
+    _so_seen(ns, e, [], reachable=False, auth=False, err="x", kind="offline")
+    _rd = ns["_srv_read"]
+    ns["_srv_read"] = lambda c: [dict(x, **wk) for x in _rd(c)]
+    try:
+        ra = ns["server_only_tiers"](ctx)
+    finally:
+        ns["_srv_read"] = _rd
+    got["asleep rows available"] = all(ra[k0 + x]["available"] is True and ra[k0 + x]["asleep"] is True
+                                       for x in ("", ":fast", ":think", ":pro"))
+    rn = ns["server_only_tiers"](ctx)
+    got["unwakeable rows off"] = all(rn[k0 + x]["available"] is False for x in ("", ":fast", ":think", ":pro"))
+    _so_seen(ns, e, ms)
     # the merge's pen comes from that server alone
     got["the merge's models"] = ([m["label"] for m in ns["server_only_named"](ctx, "Pat’s Lab")]
                                  == [m["label"] for m in ns["server_only_cands"](ns["_srv_read"](ctx)[0])]
@@ -23184,8 +23216,13 @@ def _smc_page(src):
           + "let srvList=[{id:'a1b2c3d4',name:'Desk <b>&\"',paired:true,status:{at:1,reachable:true},"
           + "models:[GBM('gpt-oss:20b'),GBM('qwen3:14b')],only:{ok:true,label:'x',model:'gpt-oss:20b'}},"
           + "{id:'b1b2c3d4',name:'Lab',paired:true,status:{at:1,err:'Lab didn\\u2019t answer.'},models:[],only:{ok:false}},"
-          + "{id:'d1b2c3d4',name:'New',paired:false,models:[],only:{ok:false}}];"
+          + "{id:'d1b2c3d4',name:'New',paired:false,models:[],only:{ok:false}},"
+          + "{id:'e1b2c3d4',name:'Zzz',paired:true,wakeable:true,status:{at:1,err:'Zzz didn\\u2019t answer.',kind:'offline'},"
+          + "models:[],only:{ok:false,asleep:true}}];"
           + "const out={};"
+          + "tier='Fast';out.asleepMenu=srvMenuRows();out.asleepSub=srvSubRows(srvList[3]);"
+          + "out.asleepPop=srvTierPopHtml('srv:e1b2c3d4:think',{title:'Thinking \\u00b7 Zzz only',available:true,asleep:true,"
+          + "models:[],note:'Zzz is asleep'});"
           + "out.parse=['srv:a1b2c3d4','srv:a1b2c3d4:fast','srv:a1b2c3d4:think','srv:a1b2c3d4:pro','srv:a1b2c3d4:bad',"
           + "'srv:a1b2c3d4:','Fast','',null].map(t=>srvTierParse(t));"
           + "out.of=[srvModeOf('srv:a1b2c3d4:pro'),srvModeOf('srv:a1b2c3d4:bad'),srvModeOf('srv:d1b2c3d4:pro')].map(s=>s&&s.id);"
@@ -23233,6 +23270,15 @@ def _smc_page(src):
         and o["subOn"].count(" on\"") == 1 and 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o["menuOn"]
         and "srvsub on" not in o["subAdv"] and "srvsub on" not in sub,
         "off": o["off"] == ["srv:b1b2c3d4", "srv:b1b2c3d4:fast", "srv:b1b2c3d4:pro", "srv:b1b2c3d4:think"],
+        # asleep and wakeable: "asleep · wakes when you ask", never greyed, never "not answering"
+        "asleep": '<span class="enm">Zzz</span><span class="edsc">your server · asleep · wakes when you ask</span>'
+        in o["asleepMenu"] and "Lab</span><span class=\"edsc\">your server · not answering" in o["asleepMenu"]
+        and " off" not in o["asleepSub"].split('class="engdiv"')[0]
+        and o["asleepSub"].count('class="engrow srvmode srvsub"') == 3
+        and 'data-none="1"><span class="edsc">asleep · wakes when you ask</span>' in o["asleepSub"]
+        and "not answering" not in o["asleepSub"]
+        and o["asleepPop"] == ('<b>Thinking · Zzz only</b><div class="mline">asleep · wakes when you ask</div>'
+                               '<span class="note">Zzz is asleep</span>'),
         "kept while off": o["kept"] == [],
         "gone": o["gone"] == ["setTier:Fast"] and o["bad"] == ["setTier:Fast"],
         # the bubble: the seats with "your server", or why not; "<name> Only" keeps its one line
@@ -23298,7 +23344,7 @@ _SM_MUT = [
     ("the bubble without the promise", '    out["note"] = note + " Nothing runs on this computer or in the cloud."',
      '    out["note"] = note'),
     ("no rows for the modes", "            for k, mode in SRV_MODE_KEYS.items():\n", "            for k, mode in ():\n"),
-    ("a mode's row always available", 'desc="%s only" % e["name"], skipped=[], available=ms["ok"])',
+    ("a mode's row always available", 'desc="%s only" % e["name"], skipped=[], available=ms["ok"] or ms["asleep"])',
      'desc="%s only" % e["name"], skipped=[], available=True)'),
     ("an unpaired server resolved", "    if e is None or not _srv_paired(e):\n        return []\n    return server_mode_seats(",
      "    if e is None:\n        return []\n    return server_mode_seats("),
@@ -23355,6 +23401,17 @@ _SM_MUT = [
     ("the bubble without the seats", "        :mode?(info.models||[]).map(m=>'<div class=\"mline\">'+esc(m)",
      "        :false?(info.models||[]).map(m=>'<div class=\"mline\">'+esc(m)"),
     ("the bubble not used", "    tierPop.innerHTML=srvTierPopHtml(name,info);", "    tierPop.innerHTML=\"\";"),
+    # asleep, not broken
+    ("an asleep server greyed", '    out["asleep"] = bool(not out["ok"] and _srv_wakeable(e) and s.get("at")',
+     '    out["asleep"] = bool(False and _srv_wakeable(e) and s.get("at")'),
+    ("any offline server called asleep", '    out["asleep"] = bool(not out["ok"] and _srv_wakeable(e) and s.get("at")',
+     '    out["asleep"] = bool(not out["ok"] and s.get("at")'),
+    ("an asleep mode's row off", 'skipped=[], available=ms["ok"] or ms["asleep"])', 'skipped=[], available=ms["ok"])'),
+    ("an asleep Only row off", 'skipped=[], available=st["ok"] or st["asleep"])', 'skipped=[], available=st["ok"])'),
+    ("the page greying an asleep server", "function srvPickable(s){return !!(s&&s.paired&&s.only&&(s.only.ok||s.only.asleep));}",
+     "function srvPickable(s){return !!(s&&s.paired&&s.only&&s.only.ok);}"),
+    ("asleep shown as not answering", "function srvAsleep(s){return !!(s&&s.paired&&s.only&&s.only.asleep);}",
+     "function srvAsleep(s){return false;}"),
 ]
 _smm = []
 for _d426, _o426, _nw426 in _SM_MUT:

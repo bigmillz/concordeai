@@ -18230,6 +18230,12 @@ def server_only_state(e) -> dict:
             m, how = pick
             out.update(ok=True, model=m["name"], how=how, label=n + SERVER_SEP + m["name"],
                        placement=m.get("placement") or "unknown")
+    # ASLEEP, NOT BROKEN (6b426, per Patrick: "you can't send it to the server only
+    # when that's not an option because it's not available"): a paired server this
+    # app knows how to wake (_srv_wakeable), last seen offline, stays pickable; a
+    # chat on it wakes it first (server_only_wake) or says it didn't wake
+    out["asleep"] = bool(not out["ok"] and _srv_wakeable(e) and s.get("at")
+                         and (s.get("kind") == "offline" or not s.get("reachable")))
     tail = " Nothing runs on this computer or in the cloud."
     out["note"] = (
         ("The strongest model on %s that fits its card, answering alone." % n + tail)
@@ -18241,6 +18247,9 @@ def server_only_state(e) -> dict:
         ("Nothing on %s fits its card whole, so it is running with what it has: "
          "its smallest model, alone." % n + tail)
         if out["how"] == "smallest" else
+        ("%s is asleep. Picking this wakes it when you ask, then its strongest model "
+         "that fits its card answers, alone." % n + tail)
+        if out["asleep"] else
         ("When %s answers, this runs its strongest model that fits its card, "
          "alone." % n + tail))
     return out
@@ -18256,13 +18265,13 @@ def server_only_tiers(ctx) -> dict:
             st = server_only_state(e)
             out[SRV_ONLY_PREFIX + e["id"]] = dict(
                 st, desc=SRV_ONLY_DESC, models=[st["label"]] if st["ok"] else [],
-                skipped=[], available=st["ok"])
+                skipped=[], available=st["ok"] or st["asleep"])
             if speeds is None:
                 speeds = server_speeds(ctx)
             for k, mode in SRV_MODE_KEYS.items():
                 ms = server_mode_state(e, mode, speeds)
                 out[SRV_ONLY_PREFIX + e["id"] + ":" + k] = dict(
-                    ms, desc="%s only" % e["name"], skipped=[], available=ms["ok"])
+                    ms, desc="%s only" % e["name"], skipped=[], available=ms["ok"] or ms["asleep"])
     return out
 
 
@@ -18368,7 +18377,9 @@ def server_mode_state(e, mode: str, speeds=None) -> dict:
     if st["ok"] and not seats:
         out.update(ok=False, why="%s lists no models for general questions." % n)
     k = len(seats)
-    if not out["ok"]:
+    if out["asleep"]:
+        note = "%s is asleep: it wakes when you ask, then %s runs on its models alone." % (n, mode)
+    elif not out["ok"]:
         note = "When %s answers, %s runs on its models alone." % (n, mode)
     elif how == "smallest":
         note = ("Nothing on %s is known to fit its card whole, so this is its smallest "
@@ -42996,7 +43007,8 @@ function srvMenuRows(){
     return '<div class="engrow srvmenu'+(here?" on":"")+'" data-sv="'+esc(s.id)+'">'
       +'<span class="eico">\ud83d\udda5\ufe0f</span>'
       +'<span class="enm">'+esc(s.name)+'</span>'
-      +'<span class="edsc">'+esc(ms.length?"your server \u00b7 "+ms.length+" model"
+      +'<span class="edsc">'+esc(srvAsleep(s)?"your server \u00b7 asleep \u00b7 wakes when you ask"
+        :ms.length?"your server \u00b7 "+ms.length+" model"
         +(ms.length===1?"":"s"):(s.status||{}).err?"your server \u00b7 not answering"
         :"your server \u00b7 no models listed")+'</span>'
       +'<span class="echev">\u203a</span></div>';
@@ -43006,7 +43018,7 @@ function srvMenuRows(){
 // server alone (6b426), then each of its models with where it runs; a server
 // that doesn't answer or lists none says so
 function srvSubRows(s){
-  const ms=s.models||[],t="srv:"+s.id,ok=!!(s.only&&s.only.ok);
+  const ms=s.models||[],t="srv:"+s.id,ok=srvPickable(s);
   const only='<div class="engrow srvmode'+(tier===t&&!advOn?" on":"")
     +(ok?"":" off")+'" data-t="'+esc(t)+'">'
     +'<span class="eico">\ud83d\udda5\ufe0f</span>'
@@ -43018,7 +43030,8 @@ function srvSubRows(s){
       +'<span class="edsc">'+esc(s.name)+' only</span></div>').join("");
   if(!ms.length)
     return only+'<div class="engdiv"></div><div class="engrow srvrow off" data-none="1">'
-      +'<span class="edsc">'+((s.status||{}).err?"not answering":"no models listed")
+      +'<span class="edsc">'+(srvAsleep(s)?"asleep \u00b7 wakes when you ask"
+        :(s.status||{}).err?"not answering":"no models listed")
       +'</span></div>';
   return only+'<div class="engdiv"></div>'+ms.map(m=>'<div class="engrow srvrow'
     +(!tier&&!advOn&&!agent&&council[0]===m.label?" on":"")
@@ -43051,6 +43064,11 @@ function paintSrvChips(){
 // card. The server says which (the `only` of /api/servers); the page only
 // draws it: a row per paired server, greyed while it can't answer
 function isSrvMode(t){return typeof t==="string"&&t.indexOf("srv:")===0;}
+// ASLEEP, NOT BROKEN (6b426, per Patrick): a paired server the app can wake, last
+// seen offline (the server's `only.asleep`), keeps its modes pickable: a chat
+// wakes it. Greyed only when it is unpaired, gone, or neither answering nor wakeable
+function srvAsleep(s){return !!(s&&s.paired&&s.only&&s.only.asleep);}
+function srvPickable(s){return !!(s&&s.paired&&s.only&&(s.only.ok||s.only.asleep));}
 // FAST, THINKING AND PRO ON ONE SERVER ALONE (6b426, per Patrick: "under the
 // option that only runs all the server models, that allows you to select
 // Fast, Thinking or Pro that will only use those ones on the server"):
@@ -43075,6 +43093,7 @@ function srvTierPopHtml(name,info){
   return "<b>"+esc(info.title||((info.server||"Your server")+" Only"))+"</b>"
     +(info.available===false
         ?'<div class="mline">'+esc(info.why||"not answering")+'</div>'
+        :info.asleep?'<div class="mline">asleep \u00b7 wakes when you ask</div>'
         :mode?(info.models||[]).map(m=>'<div class="mline">'+esc(m)
           +' <i>\u00b7 your server</i></div>').join("")
         :'<div class="mline">'+esc(info.model||"")+'</div>')
@@ -43100,7 +43119,7 @@ function tierLabel(){return tierShown(tier)||model;}
 // menu's click and paintTierAvail read it)
 function srvSyncOff(){
   Object.keys(tierOff).forEach(k=>{if(isSrvMode(k))delete tierOff[k];});
-  srvList.filter(s=>s.paired&&!(s.only&&s.only.ok)).forEach(s=>{
+  srvList.filter(s=>s.paired&&!srvPickable(s)).forEach(s=>{
     tierOff["srv:"+s.id]=1;
     srvSubModes().forEach(x=>{tierOff["srv:"+s.id+":"+x[0]]=1;});});
 }

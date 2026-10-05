@@ -56,11 +56,22 @@ Fast, Thinking or Pro that will only use those ones on the server."
   (`srvTierPopHtml`, node-tested) lists the seats with "· your server" and the note; the chip
   says "Thinking · <name> only". The server's row is marked for any of its modes. The answer's
   badge comes from the RUN frames: every label is the server's, so it reads its name.
+- **Asleep, not broken** (Patrick, of a sleeping server: "you can't send it to the server only
+  when that's not an option because it's not available"). `server_only_state` gains `asleep`:
+  not answering, last checked, last seen offline, and `_srv_wakeable` (paired, the wake card
+  known, sleep on). The tiers rows of "<server> Only" and its three modes stay `available`
+  while asleep; the page (`srvAsleep`, `srvPickable`) keeps them pickable, says "your server ·
+  asleep · wakes when you ask" on the server's row and in the flyout and bubble instead of
+  "not answering". A chat then goes through the existing deferred wake (`server_only_wake`:
+  "Waking <name>... 12 s", then runs, or "didn't wake up in 60 s"). Greyed, with the reason,
+  only when the server is unpaired, gone, or neither answering nor wakeable. A wake already
+  sent within `SRV_WAKE_GAP_S` (five minutes) is not sent again, so such a chat gets the
+  "didn't answer" line, as before.
 - Not changed: "<name> Only"'s refusals still say "<name> Only can't run the ... agent" and
   "<name> Only can't make pictures or videos" in these modes too (the server's name is right).
 - Tests: `_smc_parse`, `_smc_seats`, `_smc_council` (run_council exec'd with a cloud bench, a
-  cloud ladder and a local Gemma all poisoned), `_smc_pins`, `_smc_page` (node); 43 mutants in
-  `_SM_MUT`, each caught. Existing pins moved with the code: the `_srv_only` line, the rescue
+  cloud ladder and a local Gemma all poisoned; the asleep cases in `_smc_seats`), `_smc_pins`, `_smc_page` (node); mutants in
+  `_SM_MUT` (49 with the asleep ones), each caught. Existing pins moved with the code: the `_srv_only` line, the rescue
   line, the bubble, the flyout's greying, `srvSyncOff`, `srvMenuRows`; `_soc_state`'s tiers
   rows now list the three modes; `_sv_ns` execs `_TIER_ROLE` and `SRV_SEATS_MAX`.
 - Unverified: a live chat in each mode against the real gateway (no full gauntlet run; checks
