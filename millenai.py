@@ -17326,7 +17326,7 @@ SRV_WAKE_POLL_S = 2
 _SRV_MAC_RX = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}")
 _srv_wake_at = profile_cache("_srv_wake_at", {})
 _srv_wake_tl = threading.local()
-_srv_wake_blocked = {}          # server id -> every wake packet was refused by this computer
+_srv_wake_blocked = profile_cache("_srv_wake_blocked", {})   # server id -> every wake packet was refused by this computer
 SRV_WAKE_BLOCKED = (" This computer wouldn\u2019t let the app send the wake-up call. "
                     "Allow ConcordeAI in System Settings \u203a Privacy & Security \u203a Local Network.")
 SRV_USAGE_S = 3                 # one read of a server's card usage: short, the meter polls
