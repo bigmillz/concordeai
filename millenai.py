@@ -12975,6 +12975,7 @@ SUGGEST_AGE_S = 6 * 3600         # a kept summary is looked at again after this
 SUGGEST_RETRY_S = 15 * 60        # a pass that gave nothing is not repeated sooner
 SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 48
 SUGGEST_TOPICS = 4               # topics kept
+SUGGEST_MAX_TOKENS = 1200        # the most a pass may make a server write
 SUGGEST_PROMPT = (
     "Below are the topics a person chatted about recently, one per line, "
     "newest first. Group them into at most 4 topics and count how many lines "
@@ -13210,7 +13211,10 @@ def suggest_ask(ctx, prompt: str):
             if out:
                 return strip_think(out), "the cloud"
         return None, ""
-    out = server_side_text(ask, ctx)
+    # CAPPED (6b420, per Patrick: "it wasn't me chatting"): a few chips took
+    # a 12B model 6,500-7,800 tokens, two minutes of the card, on every
+    # start. The cloud's call above is capped at 700.
+    out = server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)
     if out is not None:
         return out, "your server"
     label = _suggest_local_label()
@@ -17882,7 +17886,7 @@ def _srv_messages(messages: list) -> list:
     return out
 
 
-def server_stream(label: str, messages: list, emit) -> dict:
+def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict:
     """Stream one answer from the thread's profile's server model `label`,
     signed, calling emit(text) as it arrives. Ollama's last line comes
     back (the benchmark's hook). ServerError says why it couldn't."""
@@ -17898,7 +17902,9 @@ def server_stream(label: str, messages: list, emit) -> dict:
     import http.client as _hc
     import socket as _socket
     body = json.dumps({"model": model, "messages": _srv_messages(messages),
-                       "stream": True, "options": {"temperature": 0.75}},
+                       "stream": True,
+                       "options": dict({"temperature": 0.75},
+                                       **({"num_predict": int(max_tokens)} if max_tokens else {}))},
                       separators=(",", ":")).encode("utf-8")
     t0, sent, last, got_any = time.time(), [0], {}, [False]
     # an explicit pick and "<name> Only" wait as long as a model load takes
@@ -18475,7 +18481,7 @@ def server_side_pick(ctx, role: str = "fast", effort: str = "fast"):
     return top[0] if top else None
 
 
-def server_side_text(messages: list, ctx=None, role: str = "fast"):
+def server_side_text(messages: list, ctx=None, role: str = "fast", max_tokens: int = 0):
     """A side pass on ctx's server first (6b357): the text it wrote, or
     None when no server qualifies or the one asked failed (marked down),
     and the caller runs its own model as before."""
@@ -18486,7 +18492,7 @@ def server_side_text(messages: list, ctx=None, role: str = "fast"):
     parts = []
     try:
         with server_first_deadline(SRV_SIDE_FIRST_S):
-            server_stream(m["label"], messages, parts.append)
+            server_stream(m["label"], messages, parts.append, max_tokens)
     except (StaleProfile, BrokenPipeError, ConnectionResetError):
         raise
     except Exception as exc:

@@ -17378,6 +17378,11 @@ def _sg_asks(inst):
     return _sg_q(inst, "/api/test/suggest")[1]
 
 
+check("topic chips: the pass is capped at what a server may write, in the request itself",
+      "SUGGEST_MAX_TOKENS = 1200" in _MILLENAI_SRC
+      and "server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)" in _MILLENAI_SRC
+      and '{"num_predict": int(max_tokens)} if max_tokens else {}' in _MILLENAI_SRC
+      and "server_stream(m[\"label\"], messages, parts.append, max_tokens)" in _MILLENAI_SRC)
 _SG = Instance(9903, "SG", seed=_sg_seed(_sg_chats()), env={"MILLENAI_TEST_HOOKS": "suggest-fake"}).start()
 _sg_s0 = _sg_q(_SG, "/api/suggest")
 _sg_d1 = _sg_wait(_SG, lambda d: d.get("chips"))
