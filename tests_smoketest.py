@@ -19501,7 +19501,7 @@ def _svc_secrets(src):
                     and set(ns["_srv_public"](e)) == {"id", "name", "url", "host", "access", "paired",
                                                      "paired_at", "device_name", "device_id",
                                                      "status", "models", "gpu", "only", "prefer", "sleep", "wakeable", "gen",
-                                                     "lan_blocked"})
+                                                     "lan_blocked", "relay"})
     out["entry repr"] = seed not in repr(e) and secret not in repr(e)
     out["error text"] = all(secret not in str(ns["_srv_fail"](e, st, {"error": "x"}))
                             for st in (403, 401, 500, 530))
@@ -19841,7 +19841,7 @@ def _svc_page(src):
     """The pane's cards and the engine menu's rows, run in node."""
     i0 = src.index("function esc(s){")
     js = (src[i0:src.index(";}\n", i0) + 3]
-          + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={},srvSleep={},srvSets={};'
+          + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={},srvSleep={},srvSets={},srvRelayOpen={};let srvLan=false;'
           + 'function srvSetsHtml(){return "";}'
           + 'let tier="",advOn=false,agent="",council=["Desktop \\u00b7 gpt-oss:120b"];'
           + src[src.index("function srvWhere(m){"):src.index("function paintServers(){")]
@@ -25706,19 +25706,40 @@ check("server sets (live): a used sheet, a list that changed, a model in use, bu
 _o1("/restore", {})
 _o1("/models-reset", {})
 # ==== 6b407 server model sets (live): end ====
-# the Access secret and the device key: in servers.json only
+# the wake relay's token (6b431) is a secret of the same kind: set live, tried live (a relay-only
+# test against a port nobody listens on), then it must be in servers.json and nowhere else
+_RELAYTOK = _canary("RelayToken")
+_rl1 = _svq("/api/servers/relay", "POST", {"id": _sid34, "url": "http://127.0.0.1:9/", "token": _RELAYTOK})
+_rl2 = _svq("/api/servers/wake-test", "POST", {"id": _sid34, "relay_only": True})
+_rl3 = _svq("/api/servers")
+_rl4 = _svq("/api/servers/relay", "POST", {"id": _sid34, "url": "ftp://x", "token": _RELAYTOK})
+check("servers (live): the wake relay is set with its token write-only (the reply says only the address and that a token is kept), "
+      "tried through the route and refused when the address is wrong",
+      _rl1[1].get("ok") is True and (_rl1[1].get("server") or {}).get("relay") == {"url": "http://127.0.0.1:9", "has_token": True}
+      and ((_rl3[1].get("servers") or [{}])[0].get("relay") == {"url": "http://127.0.0.1:9", "has_token": True})
+      and _rl2[1].get("ok") is False and _rl2[1].get("kind") in ("nowake", "unreachable")
+      and "err" in _rl4[1] and _RELAYTOK not in json.dumps([_rl1, _rl2, _rl3, _rl4]),
+      "%r" % [_rl1, _rl2, _rl4])
+# the Access secret, the device key and the relay token: in servers.json only
 _rowA = json.load(open(_sfile34))["servers"][0]
 _seed34 = _rowA.get("seed", "")
 _SV.stop()
-_hits34 = [p for n_ in (_O1SEC, _seed34) for p in _bytegrep(_SV.home, n_)]
-_loghits = [n_ for n_ in (_O1SEC, _seed34) if n_ in open(os.path.join(_SMOKE_TMP, "SRV.log"),
-                                                          errors="replace").read()]
+_hits34 = [p for n_ in (_O1SEC, _seed34, _RELAYTOK) for p in _bytegrep(_SV.home, n_)]
+_loghits = [n_ for n_ in (_O1SEC, _seed34, _RELAYTOK) if n_ in open(os.path.join(_SMOKE_TMP, "SRV.log"),
+                                                                    errors="replace").read()]
 check("servers (live): the Access secret and the device key are in no /api reply, no log and no file "
       "but servers.json",
       len(_seed34) == 43 and not any(_O1SEC.encode() in b_ or _seed34.encode() in b_
                                      for b_ in _SVREPLIES)
       and sorted(set(_hits34)) == [_sfile34] and not _loghits and len(_SVREPLIES) > 25,
       "%r" % [sorted(set(_hits34)), _loghits])
+check("servers (live): the wake relay token is saved in servers.json and is in no /api reply, no log and no other file",
+      _rowA.get("relay_token") == _RELAYTOK and _rowA.get("relay") == {"url": "http://127.0.0.1:9"}
+      and not any(_RELAYTOK.encode() in b_ for b_ in _SVREPLIES)
+      and {p for p in _hits34 if open(p, "rb").read().find(_RELAYTOK.encode()) >= 0} == {_sfile34}
+      and not [_p for _p in _bytegrep(_SV.home, _RELAYTOK) if _p != _sfile34]
+      and _RELAYTOK not in open(os.path.join(_SMOKE_TMP, "SRV.log"), errors="replace").read(),
+      "%r" % [_rowA.get("relay"), _bytegrep(_SV.home, _RELAYTOK)])
 _SV.start()
 _vR34 = _svq("/api/servers")[1].get("servers") or [{}]
 _rm34 = _svq("/api/servers/remove", "POST", {"id": _sid34})
@@ -28697,7 +28718,7 @@ def _w46_node(src):
     esc = src[i0:src.index(";}\n", i0) + 3]
     a = src.index("function srvSleepParse(raw){")
     b = src.index("function srvCard(s){")
-    js = esc + "let srvLan=false;\n" + src[a:b] + r'''
+    js = esc + "let srvLan=false;let srvRelayOpen={};\n" + src[a:b] + r'''
 const R={};
 const P=srvSleepParse;
 R.parse=[P("30"),P("5"),P("1440"),P("4"),P("0"),P("1441"),P("99999"),P(""),P("abc"),P("3.5"),P("-5"),P("1e3"),P(" 45 "),
@@ -28774,7 +28795,8 @@ def _w46c_ui(src):
                                 '<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
                                 'data-a="sleepmin" data-k="smin" value="45" aria-label="Minutes with no questions before it sleeps">'
                                 '<span>minutes</span></span></div><div class="srv-hint">Sleeps after this long with no questions, '
-                                'and wakes when you ask.</div></div>')
+                                'and wakes when you ask.</div><div class="srv-relay"><button class="about-btn slim" '
+                                'data-a="relayopen" aria-expanded="false">Advanced ▾</button></div></div>')
                    and "<input" not in h[2] and "Reading it from the server\u2026" in h[2] and "Sleep when idle" in h[2]
                    and "&lt;b&gt;x&lt;/b&gt; &amp; y" in h[3] and "<b>x</b>" not in h[3] and "<input" not in h[3]
                    and "<input" not in h[4] and 'value="30"' not in h[4] and "checked" not in h[4])
@@ -29212,8 +29234,8 @@ def _l30c_text(src):
     i0 = src.index('            elif op == "wake-test":')
     i1 = src.index('            elif op == "models":', i0)
     seg = src[i0:i1]
-    out["route"] = ("server_wake_test(self.ctx, sid)" in seg and "_SRV_ID_RX.fullmatch(sid)" in seg
-                    and "def server_wake_test(ctx, sid: str) -> dict:" in src
+    out["route"] = ('server_wake_test(self.ctx, sid, d.get("relay_only") is True)' in seg and "_SRV_ID_RX.fullmatch(sid)" in seg
+                    and "def server_wake_test(ctx, sid: str, relay_only: bool = False) -> dict:" in src
                     and "e = _srv_find(_srv_read(ctx), sid)" in src[src.index("def server_wake_test("):src.index("def server_wake(e,")])
     j = seg.index('elif op == "lan-settings":')
     cmd = seg[j:]
@@ -29283,13 +29305,13 @@ for _n30, _o30, _d30 in _l30_run(_MILLENAI_SRC):
 _L30_MUT = [
     ("a refusal not counted", "                except OSError as oe:\n                    failed_n += 1\n",
      "                except OSError as oe:\n                    failed_n += 0\n"),
-    ("blocked on any refusal", "    blocked = bool(tried_n and failed_n == tried_n)\n    _srv_wake_blocked[e[\"id\"]] = blocked\n",
+    ("blocked on any refusal", "    blocked = bool(tried_n and failed_n == tried_n) and not rl[\"ok\"]\n    _srv_wake_blocked[e[\"id\"]] = blocked\n",
      "    blocked = bool(failed_n)\n    _srv_wake_blocked[e[\"id\"]] = blocked\n"),
-    ("the test eating the gap", "    tried_n, failed_n, first = _srv_wake_send(e)\n    blocked",
-     "    _srv_wake_at[e[\"id\"]] = time.monotonic()\n    tried_n, failed_n, first = _srv_wake_send(e)\n    blocked"),
+    ("the test eating the gap", "    tried_n, failed_n, first = _srv_wake_send(e)\n    rl = ",
+     "    _srv_wake_at[e[\"id\"]] = time.monotonic()\n    tried_n, failed_n, first = _srv_wake_send(e)\n    rl = "),
     ("the test open to any id", "        e = _srv_find(_srv_read(ctx), sid)\n    except (StoreReadError, NoProfile):\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": \"Couldn\\u2019t read your servers.\"}\n    if e is None:\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": SRV_GONE}\n    if not e.get(\"wake\"):",
      "        e = _srv_find(_srv_read(ctx), sid) or _srv_read(ctx)[0]\n    except (StoreReadError, NoProfile):\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": \"Couldn\\u2019t read your servers.\"}\n    if e is None:\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": SRV_GONE}\n    if not e.get(\"wake\"):"),
-    ("the test off the Mac", "    if not IS_MAC:\n        return {\"ok\": False, \"kind\": \"unsupported\"", "    if False:\n        return {\"ok\": False, \"kind\": \"unsupported\""),
+    ("the test off the Mac", "    if not IS_MAC and not relay_only:\n        return {\"ok\": False, \"kind\": \"unsupported\"", "    if False:\n        return {\"ok\": False, \"kind\": \"unsupported\""),
     ("the command line from the request", 'subprocess.Popen(["open", LAN_SETTINGS_URL])', 'subprocess.Popen(["open", d.get("url")])'),
     ("the probe a magic packet", '_srv_udp(b"\\0", (tgt, 9))', '_srv_udp(srv_magic_packet("aa:bb:cc:dd:ee:ff"), (tgt, 9))'),
     ("the touch every launch", 'if machine_prefs().get("last_lan_touch"):\n        return\n', 'if False:\n        return\n'),
@@ -29313,6 +29335,512 @@ for _d30, _o30, _n30 in _L30_MUT:
 check("local network: %d mutations, each caught by a check above" % len(_L30_MUT),
       all(isinstance(v, list) for _d, v in _l30m), "%r" % [x for x in _l30m if not isinstance(x[1], list)])
 # ==== 6b430 local network prompt: end ====
+
+
+# ==== 6b431 wake relay: begin ====
+print("== the wake relay (6b431) ==")
+# Patrick: "outside of my home network, let's also set it up so that we can use the Raspberry Pi
+# running the VPN to wake the server... over the VPN, but remember, this won't translate into our
+# instructions/scripts for others to set up their own LLM server because it's custom for my RPi VPN
+# setup." An optional, advanced, per-server setting: a tiny HTTP service the app asks to send the
+# wake-up when the local broadcast can't reach the server. In process on a real stub relay on
+# 127.0.0.1 (headers, body, 401/403/429, a redirect that must not be followed, a refused port, a
+# slow one), the servers section exec'd alone; the page's card in node; the source pinned; then each
+# protection mutated and shown caught. The live leak check lives with the other servers checks.
+import threading as _th31
+_L31_TOK = "RELAYTOK-" + os.urandom(6).hex()
+
+
+def _l31_stub(mode="ok", sleep=0.0, events=None, loc=""):
+    import http.server as _hs31
+    st = {"hits": [], "mode": mode, "sleep": sleep, "loc": loc}
+
+    class H(_hs31.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(n)
+            st["hits"].append({"method": "POST", "path": self.path, "h": dict(self.headers), "body": body})
+            if events is not None:
+                events.append("relay")
+            if st["sleep"]:
+                time.sleep(st["sleep"])
+            m = st["mode"]
+            try:
+                if m == "redirect":
+                    self.send_response(302)
+                    self.send_header("Location", st["loc"])
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                code, out = 200, {"ok": True, "sent": 1}
+                if m in ("401", "403", "429"):
+                    code, out = int(m), {"error": "no"}
+                elif m == "echo":
+                    code, out = 500, {"error": "the token was " + self.headers.get("X-Relay-Token", "")}
+                elif m == "html":
+                    code, out = 200, None
+                elif m == "notok":
+                    code, out = 200, {"ok": False}
+                data = b"<html>" if out is None else json.dumps(out).encode()
+                self.send_response(code)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            except OSError:
+                pass
+
+        def do_GET(self):
+            st["hits"].append({"method": "GET", "path": self.path, "h": dict(self.headers), "body": b""})
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+    srv = _hs31.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    srv.daemon_threads = True
+    _th31.Thread(target=srv.serve_forever, daemon=True).start()
+    st["srv"] = srv
+    st["url"] = "http://127.0.0.1:%d" % srv.server_address[1]
+    return st
+
+
+def _l31_stop(*stubs):
+    for st in stubs:
+        st["srv"].shutdown()
+        st["srv"].server_close()
+
+
+def _l31_dead_url():
+    import socket as _so31
+    s_ = _so31.socket()
+    s_.bind(("127.0.0.1", 0))
+    port = s_.getsockname()[1]
+    s_.close()
+    return "http://127.0.0.1:%d" % port
+
+
+def _l31_ns(src, mac=True, relay=None, token=_L31_TOK):
+    ns, ctx, sid = _l30_ns(src, mac=mac)
+    if relay:
+        r = ns["server_set_relay"](ctx, sid, {"url": relay, "token": token})
+        assert r.get("ok"), r
+    return ns, ctx, sid
+
+
+def _l31_wait(ns, sid, secs=6.0):
+    t0 = time.time()
+    while time.time() - t0 < secs:
+        if ns["_srv_relay_state"].get(sid):
+            return ns["_srv_relay_state"].get(sid)
+        time.sleep(0.02)
+    return None
+
+
+def _l31c_url(src):
+    out = {}
+    ns, ctx, sid = _l30_ns(src)
+    U = ns["_srv_relay_url"]
+    good = {"http://10.0.0.5:8080": "http://10.0.0.5:8080", "https://Pi.Example.com:443/": "https://pi.example.com:443",
+            "http://host": "http://host", "  http://192.168.1.7:1  ": "http://192.168.1.7:1",
+            "https://relay.example.com:65535": "https://relay.example.com:65535"}
+    out["good"] = {k: U(k) for k in good} == {k: (v, "") for k, v in good.items()}
+    bad = ["", "10.0.0.5:8080", "ftp://h:21", "http://", "http://h:0", "http://h:65536", "http://h:abc", "http://u:p@h:80",
+           "http://u@h", "http://@h", "http://h/path", "http://h/?x=1", "http://h#f", "http://h?", "file:///etc/passwd",
+           "http://a b", "http://h:8080/v1/wake", "javascript:alert(1)", "//h:80", "http://h:-1", "http://[::1]:80",
+           "http://h/%2e%2e", "http:h", None, 5]
+    out["bad"] = [b for b in bad if U(b)[0] != "" or not U(b)[1]] == []
+    out["clean"] = (ns["_srv_clean_relay"]({"url": "http://h:80"}) == {"url": "http://h:80"}
+                    and ns["_srv_clean_relay"]({"url": "ftp://h"}) is None and ns["_srv_clean_relay"]("x") is None
+                    and ns["_srv_clean_relay"](None) is None and ns["_srv_clean_relay"]({"url": "http://u:p@h"}) is None)
+    return all(out.values()), out
+
+
+def _l31c_store(src):
+    out = {}
+    ns, ctx, home = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    ns["IS_MAC"] = True
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    S = ns["server_set_relay"]
+    e = ns["_srv_read"](ctx)[0]
+    out["default off"] = (e["relay"] is None and not e["relay_token"]
+                          and ns["_srv_public"](e)["relay"] == {"url": "", "has_token": False})
+    bad = S(ctx, sid, {"url": "http://u:p@h:80", "token": "t"})
+    out["bad url"] = "err" in bad and ns["_srv_read"](ctx)[0]["relay"] is None
+    out["no token yet"] = "err" in S(ctx, sid, {"url": "http://10.0.0.5:8080", "token": ""}) and ns["_srv_read"](ctx)[0]["relay"] is None
+    out["token chars"] = "err" in S(ctx, sid, {"url": "http://10.0.0.5:8080", "token": "a b"})
+    out["stranger"] = S(ctx, "deadbeef", {"url": "http://10.0.0.5:8080", "token": "t"}) == {"err": ns["SRV_GONE"]}
+    r = S(ctx, sid, {"url": "http://10.0.0.5:8080/", "token": _L31_TOK})
+    pub = r.get("server") or {}
+    out["saved"] = r.get("ok") is True and pub.get("relay") == {"url": "http://10.0.0.5:8080", "has_token": True}
+    out["no token in a reply"] = (_L31_TOK not in json.dumps(r) and _L31_TOK not in json.dumps(ns["servers_view"](ctx))
+                                  and _L31_TOK not in repr(ns["_srv_read"](ctx)) and _L31_TOK not in str(ns["_srv_read"](ctx)[0])
+                                  and _L31_TOK not in "%s" % (ns["_srv_read"](ctx)[0]["relay_token"],))
+    hits = {os.path.basename(p_) for p_ in _bytegrep(home, _L31_TOK)}
+    out["on disk in servers.json only"] = hits == {"servers.json"}
+    # blank token: the saved one stays; a new address keeps working
+    r2 = S(ctx, sid, {"url": "https://relay.example.com:8443", "token": ""})
+    e2 = ns["_srv_read"](ctx)[0]
+    out["blank keeps"] = r2.get("ok") is True and e2["relay"] == {"url": "https://relay.example.com:8443"} and e2["relay_token"].reveal() == _L31_TOK
+    r3 = S(ctx, sid, {"url": "https://relay.example.com:8443", "token": "NEW-" + _L31_TOK})
+    out["replaced"] = ns["_srv_read"](ctx)[0]["relay_token"].reveal() == "NEW-" + _L31_TOK
+    ns["_srv_relay_state"][sid] = {"ok": False, "err": "x"}
+    r4 = S(ctx, sid, {"clear": True})
+    e4 = ns["_srv_read"](ctx)[0]
+    out["cleared"] = (r4.get("ok") is True and e4["relay"] is None and not e4["relay_token"]
+                      and r4["server"]["relay"] == {"url": "", "has_token": False}
+                      and not ns["_srv_relay_state"].get(sid) and ns["_srv_public"](e4)["status"]["relay_ok"] is None)
+    # a secret's other lists
+    out["in the redaction list"] = 'self.e[k].reveal() for k in ("access_id", "access_secret", "seed", "relay_token")' in src
+    out["kept servers drop it"] = '"paired_at", "device_name", "relay", "relay_token")' in src
+    out["not a plain key"] = '"gen", "relay")\n_SRV_SECRET = ("access_id", "access_secret", "seed", "relay_token")' in src
+    return all(out.values()), out
+
+
+def _l31c_post(src):
+    out = {}
+    other = _l31_stub()
+    st = _l31_stub(mode="redirect", loc=other["url"] + "/stolen")
+    try:
+        ns, ctx, sid = _l31_ns(src, relay=st["url"])
+        e = ns["_srv_read"](ctx)[0]
+        # redirected: not followed, said so
+        r = ns["_srv_relay_post"](e)
+        out["redirect"] = (r["ok"] is False and r["kind"] == "redirect" and not other["hits"] and len(st["hits"]) == 1
+                           and "isn’t followed" in r["err"])
+        # the request
+        st["mode"] = "ok"
+        r = ns["_srv_relay_post"](e)
+        h = st["hits"][-1]
+        hh = {k.lower(): v for k, v in h["h"].items()}
+        out["request"] = (r == {"ok": True, "kind": "ok", "err": "", "sent": 1} and h["method"] == "POST" and h["path"] == "/v1/wake"
+                          and hh.get("x-relay-token") == _L31_TOK and hh.get("content-type") == "application/json"
+                          and json.loads(h["body"]) == {"macs": [_L30_MAC]} and "?" not in h["path"]
+                          and _L31_TOK.encode() not in h["body"]
+                          and ns["_srv_relay_state"].get(sid) == {"ok": True, "err": ""})
+        for mode, kind, err in (("401", "token", "Relay refused the token."),
+                                ("403", "denied", "Relay doesn’t allow this server."),
+                                ("429", "limited", "Relay is limiting wake-ups. Try again in a moment.")):
+            st["mode"] = mode
+            r = ns["_srv_relay_post"](e)
+            out[mode] = r["ok"] is False and r["kind"] == kind and r["err"] == err and ns["_srv_relay_state"][sid] == {"ok": False, "err": err}
+        for mode in ("echo", "html", "notok"):
+            st["mode"] = mode
+            r = ns["_srv_relay_post"](e)
+            out[mode] = r["ok"] is False and r["kind"] == "bad" and _L31_TOK not in json.dumps(r) and _L31_TOK not in json.dumps(ns["_srv_relay_state"][sid])
+        # a refused port, a slow relay, a name that is not there: said plainly, never raised
+        ns2, ctx2, sid2 = _l31_ns(src, relay=_l31_dead_url())
+        r = ns2["_srv_relay_post"](ns2["_srv_read"](ctx2)[0])
+        out["refused"] = r["ok"] is False and r["kind"] == "unreachable" and r["err"] == "Relay not reachable: connection refused"
+        slow = _l31_stub(sleep=2.0)
+        try:
+            ns3, ctx3, sid3 = _l31_ns(src, relay=slow["url"])
+            ns3["SRV_RELAY_S"] = 0.4
+            t0 = time.time()
+            r = ns3["_srv_relay_post"](ns3["_srv_read"](ctx3)[0])
+            out["timeout"] = (r["ok"] is False and r["err"] == "Relay not reachable: timed out" and time.time() - t0 < 1.8)
+        finally:
+            _l31_stop(slow)
+        ns4, ctx4, sid4 = _l31_ns(src, relay="http://relay.invalid:8080")
+        r = ns4["_srv_relay_post"](ns4["_srv_read"](ctx4)[0])
+        out["dns"] = r["ok"] is False and r["kind"] == "unreachable" and r["err"].startswith("Relay not reachable: ")
+        # nothing set: nothing asked, nothing recorded
+        ns5, ctx5, sid5 = _l30_ns(src)
+        r = ns5["_srv_relay_post"](ns5["_srv_read"](ctx5)[0])
+        out["none"] = r["kind"] == "none" and not ns5["_srv_relay_state"].get(sid5)
+        # a poisoned entry (bad scheme saved by hand) is not spoken to
+        ee = dict(e)
+        ee["relay"] = {"url": "file:///etc/passwd"}
+        out["revalidated"] = ns["_srv_relay_post"](ee)["kind"] == "none"
+        out["https verified"] = ("context=_ssl.create_default_context())\n        else:\n            conn = _hc.HTTPConnection("
+                                 in src and "_create_unverified_context" not in src and "CERT_NONE" not in src[src.index("def _srv_relay_post("):src.index("def server_set_relay(")])
+        body = src[src.index("def _srv_relay_post("):src.index("def server_set_relay(")]
+        out["no redirects, one host"] = ("HTTPRedirectHandler" not in body and "urlopen" not in body and 'conn.request("POST", "/v1/wake"' in body
+                                         and "Location" not in body and "getheader" not in body)
+    finally:
+        _l31_stop(st, other)
+    return all(out.values()), out
+
+
+def _l31_wakeable(ns, ctx):
+    def fn(entries):
+        entries[0]["sleep"] = {"enabled": True, "minutes": 30}
+        return {"ok": True}
+    ns["_srv_update"](ctx, fn)
+    ns["_srv_wake_sleep"] = lambda s_: None
+    ns["server_check"] = lambda e_: None
+    ns["_srv_json"] = lambda *a, **k: (200, {})
+
+
+def _l31c_wake(src):
+    out = {}
+    events = []
+    st = _l31_stub(events=events)
+    try:
+        ns, ctx, sid = _l31_ns(src, relay=st["url"])
+        _l31_wakeable(ns, ctx)
+
+        def refuse(pkt, addr):
+            events.append("udp")
+            raise OSError(65, "No route to host")
+        ns["_srv_udp"] = refuse
+        e = ns["_srv_read"](ctx)[0]
+        out["wakeable"] = ns["_srv_wakeable"](e) is True
+        r = ns["server_wake"](e)
+        s1 = _l31_wait(ns, sid)
+        out["after the broadcast"] = (r == "woke" and events == ["udp"] * 4 + ["relay"] and len(st["hits"]) == 1
+                                      and json.loads(st["hits"][0]["body"]) == {"macs": [_L30_MAC]})
+        time.sleep(0.1)
+        out["counts as sent"] = (ns["_srv_wake_blocked"].get(sid) is False and s1 == {"ok": True, "err": ""}
+                                 and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is False
+                                 and ns["_srv_public"](ns["_srv_read"](ctx)[0])["status"]["relay_ok"] is True)
+        # the five-minute gap stands: the next call asks nobody
+        r2 = ns["server_wake"](ns["_srv_read"](ctx)[0])
+        out["gap kept"] = r2 == "" and len(st["hits"]) == 1 and events.count("udp") == 4
+        # the relay says no too: now the computer is called blocked, and the card says why
+        st["mode"] = "401"
+        ns["_srv_wake_at"].clear()
+        ns["_srv_relay_state"].clear()
+        ns["server_wake"](ns["_srv_read"](ctx)[0])
+        s2 = _l31_wait(ns, sid)
+        time.sleep(0.1)
+        pv = ns["_srv_public"](ns["_srv_read"](ctx)[0])
+        out["both refused"] = (ns["_srv_wake_blocked"].get(sid) is True and s2 == {"ok": False, "err": "Relay refused the token."}
+                               and pv["lan_blocked"] is True and pv["status"]["relay_ok"] is False
+                               and pv["status"]["relay_err"] == "Relay refused the token.")
+        # a slow relay is not waited for
+        st["mode"], st["sleep"] = "ok", 1.5
+        ns["_srv_wake_at"].clear()
+        ns["_srv_relay_state"].clear()
+        t0 = time.time()
+        r3 = ns["server_wake"](ns["_srv_read"](ctx)[0])
+        took = time.time() - t0
+        out["not waited for"] = r3 == "woke" and took < 0.8
+        _l31_wait(ns, sid)
+        st["sleep"] = 0
+    finally:
+        _l31_stop(st)
+    # a relay that cannot be reached never breaks the wake or raises
+    ns, ctx, sid = _l31_ns(src, relay=_l31_dead_url())
+    _l31_wakeable(ns, ctx)
+    sent = []
+    ns["_srv_udp"] = lambda pkt, addr: sent.append(addr)
+    got = []
+    try:
+        got.append(ns["server_wake"](ns["_srv_read"](ctx)[0]))
+        s3 = _l31_wait(ns, sid)
+    except Exception as ex:
+        got.append("raised %r" % ex)
+        s3 = None
+    out["failure is quiet"] = (got == ["woke"] and len(sent) == 4 and s3 is not None and s3["ok"] is False
+                               and s3["err"] == "Relay not reachable: connection refused")
+    # no relay, every send refused: blocked as before (6b420)
+    ns, ctx, sid = _l30_ns(src)
+    _l31_wakeable(ns, ctx)
+
+    def refuse2(pkt, addr):
+        raise OSError(65, "No route to host")
+    ns["_srv_udp"] = refuse2
+    ns["server_wake"](ns["_srv_read"](ctx)[0])
+    out["unrelayed unchanged"] = ns["_srv_wake_blocked"].get(sid) is True and not ns["_srv_relay_state"].get(sid)
+    # a relay with no token is not "relayed": the blocked line shows
+    ns, ctx, sid = _l30_ns(src)
+    _l31_wakeable(ns, ctx)
+    ns["_srv_udp"] = refuse2
+
+    def fn(entries):
+        entries[0]["relay"] = {"url": "http://127.0.0.1:9"}
+        return {"ok": True}
+    ns["_srv_update"](ctx, fn)
+    ns["server_wake"](ns["_srv_read"](ctx)[0])
+    out["no token, no relay"] = ns["_srv_wake_blocked"].get(sid) is True
+    return all(out.values()), out
+
+
+def _l31c_test(src):
+    out = {}
+    events = []
+    st = _l31_stub(events=events)
+    try:
+        ns, ctx, sid = _l31_ns(src, relay=st["url"])
+
+        def refuse(pkt, addr):
+            events.append("udp")
+            raise OSError(65, "No route to host")
+        ns["_srv_udp"] = refuse
+        ns["_srv_wake_at"][sid] = 123.0
+        r = ns["server_wake_test"](ctx, sid)
+        out["both"] = (r["ok"] is True and r["blocked"] is False and r["tried"] == r["failed"] == 4
+                       and r["relay"] == {"ok": True, "err": ""} and events == ["udp"] * 4 + ["relay"]
+                       and ns["_srv_wake_at"].get(sid) == 123.0
+                       and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is False)
+        st["mode"] = "401"
+        r = ns["server_wake_test"](ctx, sid)
+        out["both refused"] = (r["ok"] is False and r["blocked"] is True and r["relay"] == {"ok": False, "err": "Relay refused the token."}
+                               and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is True)
+        # relay only: no broadcast, no Mac needed, the card's words
+        events.clear()
+        st["mode"] = "ok"
+        ns["IS_MAC"] = False
+        ns["_srv_udp"] = lambda pkt, addr: events.append("UDP")
+        r = ns["server_wake_test"](ctx, sid, True)
+        out["relay only ok"] = (r == {"ok": True, "kind": "ok", "err": "Relay answered: wake-up sent."} and events == ["relay"])
+        for mode, kind, err in (("401", "token", "Relay refused the token."), ("403", "denied", "Relay doesn’t allow this server.")):
+            st["mode"] = mode
+            r = ns["server_wake_test"](ctx, sid, True)
+            out["relay only " + mode] = r == {"ok": False, "kind": kind, "err": err}
+        out["off the Mac without the flag"] = ns["server_wake_test"](ctx, sid)["kind"] == "unsupported"
+        out["stranger"] = ns["server_wake_test"](ctx, "deadbeef", True)["kind"] == "gone"
+        ns["server_set_relay"](ctx, sid, {"clear": True})
+        r = ns["server_wake_test"](ctx, sid, True)
+        out["no relay"] = r["ok"] is False and r["kind"] == "norelay" and "Save the relay" in r["err"]
+    finally:
+        _l31_stop(st)
+    ns, ctx, sid = _l31_ns(src, relay=_l31_dead_url())
+    r = ns["server_wake_test"](ctx, sid, True)
+    out["unreachable"] = r == {"ok": False, "kind": "unreachable", "err": "Relay not reachable: connection refused"}
+    return all(out.values()), out
+
+
+def _l31c_text(src):
+    out = {}
+    i0 = src.index('            elif op == "relay":')
+    seg = src[i0:src.index('            elif op not in ("pair"', i0)]
+    out["route"] = ("server_set_relay(self.ctx, sid, d)" in seg and "_SRV_ID_RX.fullmatch(sid)" in seg
+                    and "def server_set_relay(ctx, sid: str, d: dict) -> dict:" in src
+                    and "e = _srv_find(entries, sid)" in src[src.index("def server_set_relay("):src.index("def _srv_wake_send(")])
+    w = src[src.index("def server_wake(e,"):src.index("def server_take_wake_pending(")]
+    out["off the lock"] = w.index("with _srv_lock:") < w.index("_srv_wake_send(e)") < w.index("_srv_relay_post(e)") \
+        and "_ask" in w and "ctx_thread(target=_ask, daemon=True).start()" in w
+    out["kept apart"] = ("relay_token" not in src[src.index("def _srv_public("):src.index("def servers_view(")].replace(
+        '"has_token": bool(e.get("relay_token"))', ""))
+    out["token only in the header"] = src[src.index("def _srv_relay_post("):src.index("def server_set_relay(")].count("tok.reveal()") == 1
+    out["words"] = ('"Relay answered: wake-up sent."' in src and '"Relay refused the token."' in src
+                    and '"Relay not reachable: %s" % _srv_relay_reason(ex)' in src
+                    and 'const SRV_RELAY_HINT="Wake relay (advanced): a small service on your network that sends the wake-up '
+                        'for you when you\\u2019re away. Address and token.";' in src)
+    out["page"] = ('srvPost("wake-test",{id:id,relay_only:true})' in src and 'srvPost("relay",' in src
+                   and src.count("srvWakeHtml(s)+srvRelayHtml(s)+'</div>'") == 2
+                   and 'type="password" data-k="rtok"' in src
+                   and src.index("function srvRelayHtml(s){") < src.index("function srvSleepHtml(s,z){")
+                   and "innerHTML" not in src[src.index('if(a==="relaysave"'):src.index('if(a==="waketest"')])
+    # for the owner's own setup: not in the kit, its docs, or the wizard's text
+    leaks = []
+    for root in ("docs", "ollama1", "packaging"):
+        for dp, dn, fns in os.walk(root):
+            for fn in fns:
+                try:
+                    t = open(os.path.join(dp, fn), errors="ignore").read().lower()
+                except OSError:
+                    continue
+                if "x-relay-token" in t or "wake relay" in t or "/v1/wake" in t:
+                    leaks.append(os.path.join(dp, fn))
+    out["not in the kit docs"] = not leaks
+    return all(out.values()), [out, leaks]
+
+
+def _l31c_ui(src):
+    i0 = src.index("function esc(s){")
+    esc = src[i0:src.index(";}\n", i0) + 3]
+    a = src.index('const SRV_RELAY_HINT="')
+    b = src.index("function srvSleepHtml(s,z){")
+    js = esc + "let srvRelayOpen={};\n" + src[a:b] + r'''
+const R={};
+const s0={id:"a1",paired:true,name:"Desk"};
+R.collapsed=srvRelayHtml(s0);
+R.unpaired=srvRelayHtml({id:"a1",paired:false});
+srvRelayOpen.a1=true;
+R.open=srvRelayHtml(s0);
+R.set=srvRelayHtml(Object.assign({relay:{url:'http://x"><img src=x onerror=1>',has_token:true}},s0));
+R.saved=srvRelayHtml(Object.assign({relay:{url:"http://10.0.0.5:8080",has_token:true}},s0));
+process.stdout.write(JSON.stringify(R));
+'''
+    pth = os.path.join(_si_dir, "relay431.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    R = json.loads(p.stdout)
+    out = {}
+    out["collapsed"] = ('data-a="relayopen" aria-expanded="false"' in R["collapsed"] and "<input" not in R["collapsed"]
+                        and "Wake relay" not in R["collapsed"] and R["unpaired"] == "")
+    o = R["open"]
+    out["open"] = ('aria-expanded="true"' in o and "Wake relay (advanced): a small service on your network that sends the wake-up for you when you’re away. Address and token." in o
+                   and 'type="text" data-k="rurl"' in o and 'type="password" data-k="rtok"' in o and 'placeholder="Token"' in o
+                   and 'data-a="relaysave">Save</button>' in o and '<button class="about-btn slim" data-a="relayclear" disabled>Clear</button>' in o
+                   and '<button class="about-btn slim" data-a="relaytest" disabled>Test relay</button>' in o)
+    out["saved"] = ('value="http://10.0.0.5:8080"' in R["saved"] and 'placeholder="Token saved"' in R["saved"]
+                    and 'data-a="relayclear">Clear' in R["saved"] and 'data-a="relaytest">Test relay' in R["saved"]
+                    and 'type="password" data-k="rtok" autocomplete="off"' in R["saved"] and 'value=""' not in R["saved"].split('data-k="rtok"')[1].split(">")[0])
+    out["escaped"] = "<img" not in R["set"] and "&lt;img" in R["set"]
+    return all(out.values()), [out, p.stderr[:300]]
+
+
+_L31_CHECKS = [
+    ("wake relay: the address is http or https with a host and a port 1 to 65535, no login, path or query; nothing else is saved", _l31c_url),
+    ("wake relay: off by default; set, replaced and cleared in servers.json; the token write-only (a blank keeps it, no reply, repr or "
+     "view carries it); a stranger's id and a bad address change nothing", _l31c_store),
+    ("wake relay: the request is POST /v1/wake with the token header and the card addresses; 401, 403, 429, a redirect (never followed), "
+     "a refused port, a timeout and a bad answer are each said plainly, never raised, never carry the token", _l31c_post),
+    ("wake relay: server_wake asks the relay after the broadcast on a thread of its own (not waited for), keeps the five-minute gap, "
+     "calls the computer blocked only when the relay refuses too, and a dead relay never breaks the wake", _l31c_wake),
+    ("wake relay: Test wake-up asks the relay as well; the relay-only test sends no broadcast, works off the Mac and answers in the card's words", _l31c_test),
+    ("wake relay: the route, the one place the token is used, the words, the page's calls, and nothing of it in the kit, its docs or the wizard", _l31c_text),
+    ("wake relay: the card's Advanced section is collapsed, neutral, write-only for the token and escapes what it shows (node)", _l31c_ui),
+]
+
+
+def _l31_run(src):
+    out = []
+    for name, fn in _L31_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n31, _o31, _d31 in _l31_run(_MILLENAI_SRC):
+    check(_n31, _o31, "%r" % (_d31,))
+
+_L31_MUT = [
+    ("the token in the view", '"has_token": bool(e.get("relay_token"))}', '"has_token": e["relay_token"].reveal()}'),
+    ("any scheme", '    if u.scheme not in ("http", "https"):\n        return "", "Start the address', '    if False:\n        return "", "Start the address'),
+    ("any port", '    if port is not None and not 1 <= port <= 65535:', '    if False:'),
+    ("a login in the address", 'if ("@" in u.netloc or "?" in s or', 'if ("?" in s or'),
+    ("a path in the address", 'u.path not in ("", "/")):\n        return "", "Type the address only, like http://10.0.0.5:8080."',
+     'False):\n        return "", "Type the address only, like http://10.0.0.5:8080."'),
+    ("the wrong header", '"X-Relay-Token": tok.reveal()', '"X-Relay-Token": "x"'),
+    ("the wrong path", 'conn.request("POST", "/v1/wake"', 'conn.request("POST", "/wake"'),
+    ("no cards in the body", 'json.dumps({"macs": list(e.get("wake") or [])})', 'json.dumps({"macs": []})'),
+    ("a redirect not named", '        if 300 <= st < 400:\n', '        if False:\n'),
+    ("the token in an answer", 'return done(False, "token", "Relay refused the token.")', 'return done(False, "token", "Relay refused the token %s." % tok.reveal())'),
+    ("a relay never asked", '        ctx_thread(target=_ask, daemon=True).start()\n', '        pass\n'),
+    ("the relay waited for", '        ctx_thread(target=_ask, daemon=True).start()\n', '        _ask()\n'),
+    ("blocked though the relay answered (wake)", '_srv_wake_blocked[e["id"]] = refused and not r["ok"]', '_srv_wake_blocked[e["id"]] = refused'),
+    ("blocked though the relay answered (test)", 'and not rl["ok"]\n    _srv_wake_blocked[e["id"]] = blocked\n    out = {', '\n    _srv_wake_blocked[e["id"]] = blocked\n    out = {'),
+    ("a failing relay raising", '    except Exception as ex:\n        return done(False, "unreachable"', '    except ZeroDivisionError as ex:\n        return done(False, "unreachable"'),
+    ("the certificate not checked", 'context=_ssl.create_default_context())\n        else:', 'context=_ssl._create_unverified_context())\n        else:'),
+    ("relay-only sending the broadcast", '    if relay_only:\n        r = _srv_relay_post(e)', '    if False:\n        r = _srv_relay_post(e)'),
+    ("the relay with no timeout", 'conn = _hc.HTTPConnection(u.hostname, u.port or 80, timeout=SRV_RELAY_S)', 'conn = _hc.HTTPConnection(u.hostname, u.port or 80, timeout=60)'),
+    ("a clear that keeps the token", 'e["relay"], e["relay_token"] = None, _Secret("")', 'e["relay"] = None'),
+    ("the token left in the log scrub", '("access_id", "access_secret", "seed", "relay_token")\n                if self.e.get(k)]', '("access_id", "access_secret", "seed")\n                if self.e.get(k)]'),
+    ("an old address not revalidated", '        url, why = _srv_relay_url(rel.get("url"))\n        if why or not tok:', '        url, why = rel.get("url"), ""\n        if why or not tok:'),
+    ("the relay open to any id", '        e = _srv_find(entries, sid)\n        if e is None:\n            return {"err": SRV_GONE}\n        if clear:', '        e = _srv_find(entries, sid) or entries[0]\n        if e is None:\n            return {"err": SRV_GONE}\n        if clear:'),
+    ("the token field readable", 'type="password" data-k="rtok"', 'type="text" data-k="rtok"'),
+    ("the address shown unescaped", "value=\"'+esc(r.url||\"\")+'\">'", "value=\"'+(r.url||\"\")+'\">'"),
+    ("the box open by default", "const r=s.relay||{},open=!!srvRelayOpen[s.id];", "const r=s.relay||{},open=true;"),
+]
+_l31m = []
+for _d31, _o31, _n31 in _L31_MUT:
+    if _MILLENAI_SRC.count(_o31) != 1:
+        _l31m.append((_d31, "anchor missing %d" % _MILLENAI_SRC.count(_o31)))
+        continue
+    _r31 = _l31_run(_MILLENAI_SRC.replace(_o31, _n31, 1))
+    _l31m.append((_d31, [n for n, o, _x in _r31 if not o][:1] or "MISSED"))
+check("wake relay: %d mutations, each caught by a check above" % len(_l31m),
+      len(_l31m) >= 12 and all(isinstance(v, list) for _d, v in _l31m), "%r" % [x for x in _l31m if not isinstance(x[1], list)])
+# ==== 6b431 wake relay: end ====
 
 
 # ==== 6b356 server pictures: begin ====

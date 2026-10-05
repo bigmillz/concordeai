@@ -9,6 +9,48 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b431 — an optional "wake relay" per server, for waking it from away (per Patrick; his own setup, not the kit's)
+
+Patrick: "outside of my home network, let's also set it up so that we can use the Raspberry Pi running the
+VPN to wake the server... over the VPN, but remember, this won't translate into our instructions/scripts for
+others to set up their own LLM server because it's custom for my RPi VPN setup."
+
+**This is for the owner's own network. It is absent from the kit, its docs (`docs/your-own-server.md`,
+`ollama1/`), the wizard and every install line, on purpose** (a gauntlet check greps the kit and docs for
+`X-Relay-Token`, `/v1/wake` and "wake relay"). In the app it is one collapsed "Advanced" button in the
+server card's Sleep section, off until someone fills it in, in neutral words ("Wake relay (advanced): a small
+service on your network that sends the wake-up for you when you're away. Address and token.").
+
+- **What it is**: a tiny HTTP service on Patrick's Pi (written separately). `POST <url>/v1/wake`, header
+  `X-Relay-Token: <token>`, body `{"macs": [...]}` (the server's own `wake` cards), answer `{"ok": true,
+  "sent": N}`; 401 wrong token, 403 a card it doesn't allow, 429 rate-limited.
+- **Setting** (`servers.json`, per server): `relay` = `{url}` and `relay_token`. The address is `http://` or
+  `https://` + host + optional port 1-65535, nothing else (no login, path, query; `_srv_relay_url`); it is
+  re-validated each time it is used. `POST /api/servers/relay {id, url, token}` sets it (a blank token keeps
+  the saved one, for a changed address), `{id, clear: true}` removes both. The id must be one of the person's
+  servers.
+- **The token is a secret like the Access secret and the device key**: a `_Secret` in `_SRV_SECRET`, written
+  only to servers.json (0600), in `ServerModel.secrets()` (so the log scrub knows it), dropped by
+  `_kept_servers_raw`, and never in a reply: the public view says only `relay: {url, has_token}`. Errors say
+  fixed words, never what the relay sent back. The live leak check now includes it.
+- **Use**: after the local broadcast, `server_wake` asks the relay on a thread of its own (the poll of the
+  server starts at once; the five-minute gap is unchanged) and `Test wake-up` asks it too. `_srv_relay_post`
+  never raises; `http.client` straight to the configured host only, 4 s connect and read, no proxy, https
+  verified, and a redirect is NEVER followed (it is reported). It records `relay_ok` / `relay_err` in the
+  server's status for the card.
+- **The amber "isn't allowing local-network access" line** now needs the relay to have failed too (not set,
+  not answering, or refused): a relay that answers counts as the wake having been sent.
+- **Test relay** (the card): `POST /api/servers/wake-test {id, relay_only: true}` asks the relay alone, no
+  broadcast, on any computer. Reply text: "Relay answered: wake-up sent." / "Relay refused the token." /
+  "Relay doesn't allow this server." / "Relay is limiting wake-ups. Try again in a moment." / "Relay not
+  reachable: connection refused | timed out | name not found | ...". All shown with `textContent`.
+- **Tests**: a real stub relay on 127.0.0.1 (headers, body, 401/403/429, a redirect to a second stub that must
+  not be hit, a refused port, a slow relay), the order broadcast-then-relay, not waiting on it, the gap, the
+  blocked logic, the card in node, the live leak check; 25 mutants. `_w46_node` and the pane's node harness
+  gained `srvRelayOpen`; the exact-markup check of the sleep section gained the collapsed Advanced button.
+
+---
+
 ## 6b430 — the Mac's "local network" prompt asked for at a moment you can see, plus a Test wake-up button (per Patrick)
 
 Patrick: "still no pop-up to allow the app to access devices on the local network." The Wake-on-LAN
