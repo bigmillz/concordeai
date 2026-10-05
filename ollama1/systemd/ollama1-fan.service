@@ -1,7 +1,7 @@
 # Fan levels that follow the server's work (6b385, 6b386): the graphics card's
 # fan and every fan header the motherboard's chip lets the kit control go to
 # 100% while a request, a long job, the card or the processors say it is working
-# and for 60 s after, then 50% for 60 s, then 20%. A sensor over its limit
+# and for 60 s after, then a ramp down to 20% over 2 minutes. A sensor over its limit
 # forces 100%. Root, because it writes the fans' sysfs files; no network;
 # writes only its own state and status files.
 #
@@ -22,7 +22,7 @@
 # ProtectKernelModules is on: the module (nct6775, the motherboard's chip) is
 # loaded by the "+" line below, which runs outside this sandbox.
 [Unit]
-Description=ollama1: fan levels that follow the server's work (100%, 50%, 20%)
+Description=ollama1: fan levels that follow the server's work (100%, ramp, 20%)
 After=ollama1-gateway.service
 StartLimitIntervalSec=0
 

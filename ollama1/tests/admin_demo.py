@@ -257,7 +257,7 @@ class Fake:
         elif cyc < 70:
             phase, pct, left = "hold100", 100, 70 - cyc
         elif cyc < 85:
-            phase, pct, left = "hold50", 50, 85 - cyc
+            phase, pct, left = "ramp", 50, 85 - cyc
         else:
             phase, pct, left = "idle20", 20, 0
         rpm = lambda full: int(full * pct / 100.0 + random.random() * 20)  # noqa: E731

@@ -9,6 +9,35 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b415 — the fans ramp down instead of stepping 100 / 50 / 20 (per Patrick)
+
+Replaces the tail of 6b386: work ends -> 100% for 60 s (`hold100`, unchanged) ->
+a straight ramp from 100% down to 20% over the next 120 s (new phase `ramp`,
+status `ramp NN%`) -> `idle20` from 180 s after the work ended. Work, or the
+temperature override, at any time returns to 100% at once and restarts it.
+
+- `o1fan.ramp_pct(t)` = 100 - 80 * t / 120, rounded to whole 2% steps and never
+  under 20: 0/30/60/90/119/120 s in = 100/80/60/40/20/20. (119 s is 20.67, which
+  rounds to 20, within one step.) The one percentage goes to every controlled
+  output through the existing `target()`: each case/CPU output is
+  max(percent, its learned minimum), an always-100 output stays 100, an output
+  with no rpm is released as before; the GPU fan is one of them. A level is judged by rpm only after it has held 6 s, and a ramp step lasts about 3 s,
+  so stalls are caught where the level settles (the end of the ramp, or a floor), as before.
+- Cooler (`o1aio`): fans follow the same percent (`plan()` uses `self.pct`
+  in the ramp, floors from `aio/fanN`); the pump is extreme only in working /
+  hot / hold100 (and the coolant >= 40 C override), balanced in the ramp and in
+  calibrating, quiet at idle. Commands still go out only on change and no more
+  often than every 5 s, so during the ramp the cooler fans step about every 5 s.
+- Status: phase text `ramp 60%`; the line is `Fans: ramping down, 60% (20% in
+  90 s)`; `hold100` says `then down to 20%`; the admin chip shows the percent.
+  `hold50` is gone from code, README, setup text and the demo.
+- Tests: the 59/60 s edge of hold100 and ramp points 0/30/60/90/119 s and 120/121
+  s (idle), a request mid-ramp, override mid-ramp and its hysteresis, floors from
+  learned minimums, always-100 outputs, write cadence of the ramp, the cooler's
+  5 s limit and de-duplication during it. The old hold50 mutants are replaced by
+  mutants for the hold time, the ramp length, the endpoints, the quantization
+  and the cooler's ramp rules.
+
 ## 6b404 — the RAID mirror is gone from the kit (per Patrick: "pointless, it just ties up resources checking and rebuilding")
 
 Kit only (`ollama1/`). The mirror (two 8 TB disks, RAID1 at /srv/data) is no longer built,

@@ -1390,15 +1390,15 @@ function renderCpu(c,s){c=c||{};const f=c.freq||{},t=c.temp,th=c.thresholds||{},
  spark('cspeedspark','cspark2',8,typeof f.avg_mhz==='number'?f.avg_mhz/1000:null,1,0.5);}
 
 // ---- fans, lights, storage, network, GPU tuning, services ----------------------------------
-const PHASE={working:['Working','info'],hold100:['Cooling down','info'],hold50:['Cooling down','info'],idle20:['Idle',''],idle:['Idle',''],hot:['Hot','bad'],calibrating:['Calibrating','warn']};
+const PHASE={working:['Working','info'],hold100:['Cooling down','info'],ramp:['Cooling down','info'],idle20:['Idle',''],idle:['Idle',''],hot:['Hot','bad'],calibrating:['Calibrating','warn']};
 function fanIcon(){const s=sv('svg',{viewBox:'0 0 32 32','aria-hidden':'true'});const g=sv('g',{class:'blades',fill:'currentColor'});
  for(let i=0;i<4;i++)g.append(sv('path',{d:'M16 16 C14 10 15 5 19 4 C22 4 21 10 16 16Z',transform:'rotate('+i*90+' 16 16)',opacity:.85}));
  s.append(sv('circle',{cx:16,cy:16,r:14.5,fill:'none',stroke:'currentColor','stroke-opacity':.25,'stroke-width':1.5}),g,sv('circle',{cx:16,cy:16,r:2.6,fill:'#0b1220',stroke:'currentColor','stroke-width':1.2}));return s;}
 function renderFans(f){const box=$('fans');box.replaceChildren();
  if(!f){chip('fanphase','Not reporting','');$('fanpct').textContent='-';$('fanwhy').textContent='The fan service isn\'t reporting: the fans are under the board\'s own control (or the kit doesn\'t manage them here).';$('fanhold').hidden=true;$('fantemps').textContent='';return;}
- const p=PHASE[f.phase]||[f.phase||'?',''];chip('fanphase',p[0]+(f.phase==='hold100'||f.phase==='hold50'?' · '+f.phase.slice(4)+'%':''),p[1]);
+ const p=PHASE[f.phase]||[f.phase||'?',''];chip('fanphase',p[0]+(f.phase==='hold100'?' · 100%':f.phase==='ramp'?' · '+f.pct+'%':''),p[1]);
  const pc=$('fanpct');pc.replaceChildren(document.createTextNode(isNum(f.pct)?String(Math.round(f.pct)):'-'));pc.append(el('small','%'));
- const hold=f.phase==='hold100'||f.phase==='hold50';$('fanwhy').textContent=hold?(f.phase==='hold100'?'100% for '+(f.hold_left||0)+' s more, then 50%':'50% for '+(f.hold_left||0)+' s more, then 20%'):(f.why||(f.phase==='idle20'?'idle: 20%':''));
+ const hold=f.phase==='hold100'||f.phase==='ramp';$('fanwhy').textContent=hold?(f.phase==='hold100'?'100% for '+(f.hold_left||0)+' s more, then down to 20%':'ramping down: '+f.pct+'%, 20% in '+(f.hold_left||0)+' s'):(f.why||(f.phase==='idle20'?'idle: 20%':''));
  const hb=$('fanhold');hb.hidden=!hold;if(hold){const span=Math.max(f.hold_left||0,hb._max&&hb._phase===f.phase?hb._max:0);hb._max=span;hb._phase=f.phase;hb.firstChild.style.width=(span?100*(f.hold_left||0)/span:0)+'%';}
  (f.outputs||[]).forEach(o=>{const t=el('div',undefined,'fan'+(isNum(o.rpm)&&o.rpm>0?' on':''));const ic=fanIcon();
   if(isNum(o.rpm)&&o.rpm>0)ic.querySelector('.blades').style.animationDuration=clamp(600/o.rpm,0.18,3).toFixed(2)+'s';
