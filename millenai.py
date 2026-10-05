@@ -19584,11 +19584,11 @@ def server_wake(e, progress=None, alive=None) -> str:
         pkt = srv_magic_packet(mac)
         for tgt in _srv_bcast_addrs():
             for port in (9, 7):
-                tried_n += 1
                 try:
                     _srv_udp(pkt, (tgt, port))
                 except OSError:
                     failed_n += 1
+                tried_n += 1
     # EVERY send refused (6b420, per Patrick: the same packet wakes it from
     # Terminal but not from the app): macOS keeps an app off the local
     # network until it is allowed, and says nothing; the answer below says it
