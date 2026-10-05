@@ -1,8 +1,10 @@
-"""Lights that follow the graphics card's load (6b395, reworked in 6b417): the OpenRGB SDK
+"""Lights that follow the graphics card's work (6b395, 6b417; the states of 6b421): the OpenRGB SDK
 protocol against a fake server on a local socket (framing, version negotiation, device lists,
-modes, colours), the colour ramp, the slew limits, the service on a fake clock (a jittering card
-reading, frames only when the colour changes, a keepalive), a server that dies and comes back,
-the status, setup and the wiring (units, setup.sh, the panel, the sleep hook)."""
+modes, colours), the gradient and the ease, the service on a fake clock (the card's 50% / 1.5 s
+trigger, the 5 s eased rise to red and full brightness, red while working, the 120 s linear cool-down,
+work again mid-cool, white for 300 s then 40%, frames only when the colour changes, a keepalive), a
+server that dies and comes back, the status, setup and the wiring (units, setup.sh, the panel, the
+sleep hook)."""
 import json
 import os
 import shlex
@@ -41,19 +43,11 @@ class FakeClock:
 
 
 class Probes:
-    """gpu_busy is the card's percent; cpu_pct drives a /proc/stat-like (busy, total) counter on the fake clock."""
+    """gpu_busy is the card's percent; the rest is offered and must not matter."""
 
     def __init__(self, clock=None):
-        self.clock, self.cpu_pct, self.cpu_t, self.cpu_busy, self.cpu_total = clock, 0.0, None, 0.0, 0.0
-        self.v = {"inflight": 0, "gpu_busy": 0, "tools": [], "cpu": self.cpu}      # inflight and tools must not matter
-
-    def cpu(self):
-        t = self.clock.t
-        if self.cpu_t is not None:
-            self.cpu_total += (t - self.cpu_t) * 1000
-            self.cpu_busy += (t - self.cpu_t) * 1000 * self.cpu_pct / 100.0
-        self.cpu_t = t
-        return (self.cpu_busy, self.cpu_total)
+        self.clock = clock
+        self.v = {"inflight": 0, "gpu_busy": 0, "tools": [], "cpu": (0, 0), "cpu_c": 40}
 
     def dict(self):
         return {k: (lambda k=k: self.v[k]()) if callable(self.v[k]) else (lambda k=k: self.v[k]) for k in self.v}
@@ -107,7 +101,7 @@ class Rig(unittest.TestCase):
         for _ in range(int(round(seconds / step))):
             self.leds.tick()
             self.clock.t += step
-            out.append((round(self.clock.t - t0, 6), o1leds.ramp(self.leds.slew.x)))
+            out.append((round(self.clock.t - t0, 6), self.leds.rgb()))
         return out
 
     def last_shown(self):
@@ -350,7 +344,7 @@ class TestClient(ServerCase):
         self.assertEqual(seen, [("127.0.0.1", 6742)])
 
 
-# ---- the colour and the slew -------------------------------------------------------------
+# ---- the colour -----------------------------------------------------------------------------
 
 class TestRamp(unittest.TestCase):
     def test_the_ramp_at_the_seven_points(self):
@@ -389,421 +383,389 @@ class TestRamp(unittest.TestCase):
         self.assertEqual([o1leds.color_name(x) for x in (0, .1, .2, .49, .5, .8, .84, 1)],
                          ["white", "white", "yellow", "yellow", "orange", "orange", "red", "red"])
 
+    def test_the_ease_is_smooth_at_both_ends_and_half_way_at_the_middle(self):
+        e = o1leds.ease
+        self.assertEqual((e(0), e(0.5), e(1)), (0.0, 0.5, 1.0))
+        self.assertEqual((e(-1), e(2)), (0.0, 1.0))
+        self.assertLess(e(0.1), 0.05)                             # slow to start ...
+        self.assertGreater(e(0.9), 0.95)                          # ... and slow to arrive
+        vals = [e(i / 100) for i in range(101)]
+        self.assertTrue(all(b >= a for a, b in zip(vals, vals[1:])))
+        self.assertAlmostEqual(e(0.25) + e(0.75), 1.0)            # symmetric
 
-class TestSlew(unittest.TestCase):
-    def test_up_takes_2_5_s_and_down_180_s(self):
-        z = o1leds.Slew()
-        n = 0
-        while z.x < 1.0 and n < 1000:
-            z.step(0.05, 1.0)
-            n += 1
-        self.assertEqual(n, 50)
-        n = 0
-        while z.x > 0.0 and n < 10000:
-            z.step(0.05, 0.0)
-            n += 1
-        self.assertIn(n, (3600, 3601))
-        self.assertEqual((o1leds.RISE_S, o1leds.FALL_S), (2.5, 180.0))
+    def test_brightness_multiplies_each_channel(self):
+        self.assertEqual(o1leds.scale(WHITE, 0.4), (102, 102, 102))
+        self.assertEqual(o1leds.scale(RED, 0.4), (102, 0, 0))
+        self.assertEqual(o1leds.scale((255, 128, 0), 0.5), (128, 64, 0))
+        self.assertEqual(o1leds.scale(RED, 1.0), RED)
 
-    def test_a_target_in_between_is_reached_and_not_passed(self):
-        z = o1leds.Slew()
-        for _ in range(100):
-            z.step(0.05, 0.4)
-        self.assertEqual(z.x, 0.4)
-        for _ in range(100):
-            z.step(0.05, 0.4)
-        self.assertEqual(z.x, 0.4)
-        for _ in range(1200):
-            z.step(0.05, 0.1)
-        self.assertEqual(z.x, 0.1)
+
+class TestTheNumbers(unittest.TestCase):
+    def test_the_lights_use_the_shared_numbers_so_they_agree_with_the_fans(self):
+        self.assertEqual((o1leds.RISE_S, o1leds.COOL_S, o1leds.IDLE_DIM_S, o1leds.DIM_S, o1leds.DIM_MIN),
+                         (5.0, 120, 300.0, 10.0, 0.4))
+        self.assertEqual(o1leds.COOL_S, o1fan.RAMP_S)            # lights and fans finish together
+        self.assertEqual((o1leds.SAMPLE_S, o1leds.FRAME_S), (0.25, 0.04))
 
 
 # ---- the service on a fake clock ----------------------------------------------------------------
 
-class TestBehaviour(Rig):
-    def test_it_starts_white_at_full_value(self):
+class Phases(Rig):
+    def until(self, cond, limit=600.0, step=0.05):
+        """Tick every `step` s until cond() holds; the time it did."""
+        end = self.clock.t + limit
+        while self.clock.t < end:
+            self.leds.tick()
+            if cond():
+                return self.clock.t
+            self.clock.t += step
+        self.fail("never")
+
+    def start_rise(self, gpu=100):
+        self.probes.v["gpu_busy"] = gpu
+        return self.until(lambda: self.leds.phase == "rising")
+
+    def to_red(self):
+        self.start_rise()
+        return self.until(lambda: self.leds.phase == "working")
+
+    def start_cool(self):
+        self.probes.v["gpu_busy"] = 0
+        return self.until(lambda: self.leds.phase == "cooling")
+
+    def at(self, t, step=0.05):
+        """Tick on to time `t` (the last tick exactly at t)."""
+        while self.clock.t + step < t - 1e-9:
+            self.clock.t += step
+            self.leds.tick()
+        self.clock.t = t
+        self.leds.tick()
+
+
+class TestBehaviour(Phases):
+    def test_it_starts_white_at_full_brightness_and_idle(self):
         self.leds.tick()
         self.assertEqual(self.client.shown, [(self.clock.t, WHITE)])
+        self.assertEqual((self.leds.phase, self.leds.bright, self.leds.idle_since), ("idle", 1.0, self.clock.t))
 
-    def test_0_to_100_percent_takes_2_5_s_to_reach_red(self):
-        self.leds.tick()
-        seq = self.run_for(4, gpu=100)
-        first_red = min(t for t, c in seq if c == RED)
-        self.assertTrue(2.45 <= first_red <= 2.85, first_red)          # 2.5 s, and up to one 0.25 s sample to notice
-        self.assertNotIn(RED, [c for t, c in seq if t < 2.4])
+    def test_the_card_over_50_percent_for_1_5_s_starts_the_rise(self):
+        t0 = self.clock.t
+        t = self.start_rise()
+        self.assertAlmostEqual(t - t0, 1.5, delta=0.11)
+        self.assertEqual(self.last_shown(), WHITE)                 # the rise starts from where it is
+
+    def test_a_blip_over_50_or_50_itself_does_nothing(self):
+        seq = self.run_for(1.2, gpu=100)                           # 1.2 s: under the 1.5 s
+        seq += self.run_for(10, gpu=0)
+        seq += self.run_for(10, gpu=50)
+        self.assertTrue(all(c == WHITE for _t, c in seq))
+        self.assertEqual(self.leds.phase, "idle")
+
+    def test_the_rise_takes_5_s_through_yellow_and_orange_eased_with_full_brightness(self):
+        t0 = self.start_rise()
+        names, xs = [], []
+        while self.clock.t < t0 + 6:
+            self.clock.t += 0.05
+            self.leds.tick()
+            xs.append((self.clock.t - t0, self.leds.x))
+            names.append(o1leds.color_name(self.leds.x))
+        x_at = lambda s: min(xs, key=lambda p: abs(p[0] - s))[1]
+        self.assertLess(x_at(0.5), 0.05)                           # eased in
+        self.assertAlmostEqual(x_at(2.5), 0.5, delta=0.03)         # half way at half time
+        self.assertGreater(x_at(4.5), 0.95)                        # eased out
+        self.assertNotEqual(o1leds.ramp(x_at(4.8)), RED)
+        self.assertEqual(o1leds.ramp(x_at(5.0)), RED)
+        self.assertEqual(self.leds.phase, "working")
+        order = [n for i, n in enumerate(names) if i == 0 or names[i - 1] != n]
+        self.assertEqual(order, ["white", "yellow", "orange", "red"])
+        self.assertTrue(all(b >= a for (_s, a), (_t, b) in zip(xs, xs[1:])))     # never back
         self.assertEqual(self.last_shown(), RED)
 
-    def test_the_colour_falls_linearly_over_the_whole_180_s_cool_down(self):
-        self.leds.slew.x = 1.0
-        self.probes.v["gpu_busy"] = 0
-        t, got = 0.0, {}
-        for _ in range(720):
-            self.leds.tick()
-            self.clock.t += 0.25
-            t += 0.25
-            if t in (45.0, 90.0, 135.0, 180.0):
-                got[t] = self.leds.slew.x
-        for t, x in ((45.0, 0.75), (90.0, 0.5), (135.0, 0.25), (180.0, 0.0)):
-            self.assertAlmostEqual(got[t], x, delta=0.003, msg=t)
-        self.assertAlmostEqual(o1leds.ramp(got[45.0])[1], 96, delta=2)        # a quarter of the way from orange to red
-        self.assertEqual(o1leds.ramp(got[90.0])[0:3:2], (255, 0))
-        self.run_for(2, step=0.25)
-        self.assertEqual(self.client.shown[-1][1], WHITE)
+    def test_from_dimmed_the_brightness_comes_back_over_the_same_5_s(self):
+        self.run_for(312, step=0.25)
+        self.assertEqual(self.last_shown(), (102, 102, 102))       # dimmed idle: white at 40%
+        t0 = self.start_rise()
+        self.at(t0 + 2.5)
+        self.assertAlmostEqual(self.leds.bright, 0.7, delta=0.02)  # 0.4 + 0.6 * ease(0.5)
+        self.at(t0 + 5.0)
+        self.assertEqual((self.leds.bright, self.last_shown()), (1.0, RED))
 
-    def test_a_burst_in_the_middle_of_the_fall_raises_it_again_from_where_it_is(self):
-        self.leds.slew.x = 1.0
-        self.run_for(90, step=0.25, gpu=0)
-        mid = self.leds.slew.x
-        self.assertAlmostEqual(mid, 0.5, delta=0.01)
-        self.run_for(1, step=0.25, gpu=100)
-        self.assertGreater(self.leds.slew.x, mid + 0.3)               # 1 s of rise is 40%
-        self.run_for(3, step=0.25)
-        self.assertEqual(self.leds.slew.x, 1.0)
+    def test_working_holds_red_at_100_and_sends_only_the_keepalive(self):
+        self.to_red()
+        self.client.shown.clear()
+        self.run_for(10)
+        self.assertEqual(len(self.client.shown), 5)                # one per 2 s poll
+        self.assertTrue(all(c == RED for _t, c in self.client.shown))
 
-    def test_the_colour_never_moves_faster_than_the_limits_even_with_a_coarse_clock(self):
-        self.run_for(1, step=0.5, gpu=100)
-        self.assertLess(self.leds.slew.x, 0.5)                    # 1 s of rise: 40%, not a jump
-        self.run_for(1, step=1.0, gpu=0)
-        self.assertGreater(self.leds.slew.x, 0.0)                 # a long gap counts as at most 0.5 s a tick
-
-    def test_a_card_reading_that_jitters_99_0_99_0_stays_near_red_without_flicker(self):
-        self.run_for(3, gpu=100)
-        seq = []
-        for i in range(40):                                       # every sample 0.25 s: 99, 0, 99, 0 ...
+    def test_a_card_that_jitters_99_0_while_working_stays_red(self):
+        self.to_red()
+        for i in range(40):                                        # every 0.25 s sample: 99, 0, 99, 0 ...
             self.probes.v["gpu_busy"] = 99 if i % 2 == 0 else 0
-            seq += self.run_for(0.25)
-        greens = [c[1] for _t, c in seq]
-        self.assertLessEqual(max(greens), 40)                     # always deep orange to red
-        self.assertGreaterEqual(self.leds.slew.x, 0.9)
-        self.assertLessEqual(max(abs(a - b) for a, b in zip(greens, greens[1:])), 9)     # never faster than the rise limit allows
-        sent = [c for _t, c in self.client.shown[-8:]]
-        self.assertLessEqual(max(c[1] for c in sent) - min(c[1] for c in sent), 12)
+            self.run_for(0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("working", RED))
 
-    def test_a_brief_gap_between_batches_only_dips_the_colour_a_little(self):
-        self.run_for(4, gpu=100)
-        self.run_for(0.5, gpu=0)
-        self.assertGreater(self.leds.slew.x, 0.85)                # 0.5 s of fall: 14%, still deep red
+    def test_the_cool_down_is_120_s_linear_in_time_red_orange_yellow_white(self):
+        self.to_red()
+        t0 = self.start_cool()
+        for s, want in ((0, RED), (30, o1leds.ramp(0.75)), (40, (255, 128, 0)), (60, o1leds.ramp(0.5)),
+                        (80, (255, 255, 0)), (119, o1leds.ramp(1 / 120)), (120, WHITE)):
+            self.at(t0 + s, step=0.25)
+            self.assertEqual(self.leds.rgb(), want, s)
+            self.assertAlmostEqual(self.leds.x, max(0.0, 1 - s / 120.0), delta=1e-6)
+        self.assertEqual(self.leds.phase, "idle")
+        self.assertEqual(self.last_shown(), WHITE)
 
-    def test_a_steady_load_gives_the_colour_for_it(self):
-        self.run_for(6, gpu=40)
-        self.assertEqual(o1leds.ramp(self.leds.slew.x), (255, 230, 0))
-        self.run_for(6, gpu=61)
-        self.assertEqual(o1leds.color_name(self.leds.slew.x), "orange")
-        self.assertEqual(self.last_shown(), o1leds.ramp(0.61))
+    def test_the_cool_down_starts_1_5_s_after_the_card_drops(self):
+        self.to_red()
+        self.probes.v["gpu_busy"] = 0
+        t0 = self.clock.t
+        t = self.until(lambda: self.leds.phase == "cooling")
+        self.assertAlmostEqual(t - t0, 1.5, delta=0.26)
 
-    def test_a_request_or_a_tool_without_the_card_busy_does_not_colour_the_lights(self):
-        self.probes.v.update(inflight=3, tools=["stability-test.sh"], cpu=(900, 1000))
-        seq = self.run_for(6, gpu=0)
+    def test_work_again_mid_cool_goes_back_to_red_in_5_s_from_where_it_is(self):
+        self.to_red()
+        t0 = self.start_cool()
+        self.at(t0 + 60, step=0.25)
+        self.assertEqual(self.leds.rgb(), o1leds.ramp(0.5))
+        t1 = self.start_rise()
+        x0 = self.leds.x0
+        self.assertAlmostEqual(x0, 0.5 - (t1 - t0 - 60) / 120.0, delta=0.002)
+        self.at(t1 + 2.5)
+        self.assertAlmostEqual(self.leds.x, x0 + (1 - x0) * 0.5, delta=0.002)
+        self.at(t1 + 4.5)
+        self.assertNotEqual(self.leds.rgb(), RED)
+        self.at(t1 + 5.0)
+        self.assertEqual((self.leds.phase, self.leds.rgb()), ("working", RED))
+        t2 = self.start_cool()                                     # and the next cool-down is the whole 120 s again
+        self.at(t2 + 119.5, step=0.25)
+        self.assertEqual(self.leds.phase, "cooling")
+        self.at(t2 + 120, step=0.25)
+        self.assertEqual(self.leds.phase, "idle")
+
+    def test_work_that_ends_mid_rise_cools_from_where_it_got_to(self):
+        t0 = self.start_rise()
+        self.at(t0 + 2.5)
+        x = self.leds.x
+        t1 = self.start_cool()
+        self.assertLess(self.leds.x0, 1.0)
+        self.assertGreater(self.leds.x0, x)
+        self.at(t1 + 30, step=0.25)
+        self.assertAlmostEqual(self.leds.x, self.leds.x0 - 0.25, delta=1e-6)
+        self.at(t1 + self.leds.x0 * 120 + 0.25, step=0.25)
+        self.assertEqual((self.leds.phase, self.leds.rgb()), ("idle", WHITE))
+
+    def test_lights_follow_the_card_only_not_a_request_a_tool_or_the_processors(self):
+        self.probes.v.update(inflight=3, tools=["stability-test.sh", "setup.sh"], cpu=(900, 1000), cpu_c=75)
+        seq = self.run_for(20, gpu=0)
         self.assertTrue(all(c == WHITE for _t, c in seq))
 
     def test_no_card_reading_is_white_and_says_so(self):
-        for bad in (None, "x", True):
+        for bad in (None, "x", True, float("nan")):
             self.probes.v["gpu_busy"] = bad
-            seq = self.run_for(1)
+            seq = self.run_for(3)
             self.assertTrue(all(c == WHITE for _t, c in seq), bad)
         self.assertIsNone(self.leds.gpu)
-        self.probes.v["gpu_busy"] = lambda: 1 / 0
         self.leds.probes["gpu_busy"] = lambda: 1 / 0
-        self.assertTrue(all(c == WHITE for _t, c in self.run_for(1)))
+        self.assertTrue(all(c == WHITE for _t, c in self.run_for(3)))
 
-    def test_no_frame_when_the_colour_does_not_change(self):
-        self.run_for(4, gpu=100)
-        self.client.shown.clear()
-        self.run_for(10)                                          # steady red: only the keepalive
-        self.assertEqual(len(self.client.shown), 5)               # one per 2 s poll
-        self.assertTrue(all(c == RED for _t, c in self.client.shown))
-        self.client.shown.clear()
-        self.run_for(10, gpu=100)
-        self.assertEqual(len(self.client.shown), 5)
+    def test_a_lost_reading_while_working_cools_down(self):
+        self.to_red()
+        self.probes.v["gpu_busy"] = None
+        self.until(lambda: self.leds.phase == "cooling", limit=3)
 
-    def test_while_the_colour_moves_a_frame_goes_out_only_when_the_rounded_colour_changes_and_at_most_20_a_second(self):
+    def test_frames_go_out_only_on_a_change_and_at_most_25_a_second_during_the_rise(self):
         self.leds.tick()
+        t0 = self.start_rise()
         self.client.shown.clear()
-        self.run_for(2.5, gpu=100)
-        cols = [c for _t, c in self.client.shown]
-        self.assertGreater(len(cols), 20)
-        self.assertLessEqual(len(self.client.shown), 2.5 * 20 + 2)
-        keepalive = len([1 for a, b in zip(cols, cols[1:]) if a == b])
-        self.assertLessEqual(keepalive, 2)                        # at most the 2 s poll's resend
+        self.at(t0 + 5.0, step=0.01)                               # a fast clock: the loop would tick at 100 Hz
+        frames = [c for t, c in self.client.shown]
+        self.assertGreater(len(frames), 60)                        # continuous: a frame for each change
+        dup = len([1 for a, b in zip(frames, frames[1:]) if a == b])
+        self.assertLessEqual(dup, 3)                               # only the 2 s keepalive repeats one
 
-    def test_the_loop_sleeps_at_20_hz_only_while_moving(self):
+    def test_the_loop_ticks_at_25_hz_while_moving_and_slowly_otherwise(self):
         self.leds.tick()
-        self.probes.v["gpu_busy"] = 100
-        self.clock.t += 0.25
+        self.assertGreater(self.leds.tick(), o1leds.FRAME_S)       # idle white: the sample's pace
+        self.start_rise()
         self.assertEqual(self.leds.tick(), o1leds.FRAME_S)
-        self.run_for(3)
+        self.until(lambda: self.leds.phase == "working")
+        self.clock.t += 0.01
         w = self.leds.tick()
-        self.assertNotEqual(w, o1leds.FRAME_S)
+        self.assertGreater(w, o1leds.FRAME_S)
         self.assertLessEqual(w, o1leds.SAMPLE_S)
-        self.assertEqual(o1leds.FRAME_S, 0.05)
+        self.start_cool()
+        self.assertEqual(self.leds.tick(), o1leds.FRAME_S)         # the cool-down moves the whole 120 s
+
+    def test_the_cool_down_sends_each_change_without_repeats(self):
+        self.to_red()
+        self.start_cool()
+        self.client.shown.clear()
+        while self.leds.phase == "cooling":
+            self.clock.t += self.leds.tick()
+        cols = [c for _t, c in self.client.shown]
+        self.assertGreater(len(cols), 300)                         # red -> white is about 510 RGB steps
+        self.assertLessEqual(len([1 for a, b in zip(cols, cols[1:]) if a == b]), 61)  # the keepalives only
+        self.assertEqual(cols[-1], WHITE)
 
     def test_the_card_is_sampled_every_quarter_second_not_every_tick(self):
         calls = []
         self.leds.probes["gpu_busy"] = lambda: calls.append(self.clock.t) or 0
         self.run_for(2)
         self.assertIn(len(calls), (7, 8))                           # 0, .25, ... (a float step may slip one)
-        self.assertEqual(o1leds.SAMPLE_S, 0.25)
+
+    def test_the_sampling_keeps_its_beat_under_25_hz_frames(self):
+        calls = []
+        self.leds.probes["gpu_busy"] = lambda: calls.append(self.clock.t) or 0
+        self.run_for(10, step=0.04)
+        self.assertGreaterEqual(len(calls), 39)                     # 4 a second, not one per 0.28 s
 
     def test_a_stop_sets_white_first(self):
-        self.run_for(4, gpu=100)
-        self.assertEqual(self.last_shown(), RED)
+        self.to_red()
         self.leds.shutdown()
         self.assertEqual(self.last_shown(), WHITE)
         self.assertFalse(self.client.connected)
 
-    def test_a_wake_connects_afresh_and_sends_the_current_colour_at_once(self):
-        self.run_for(4, gpu=100)
+    def test_a_wake_connects_afresh_and_starts_white_at_full_brightness(self):
+        self.run_for(312, step=0.25)
+        self.assertEqual(self.leds.bright, 0.4)
         self.assertEqual(self.client.opens, 1)
         self.leds.resync = True
-        self.run_for(0.1)
+        self.leds.tick()
         self.assertEqual((self.client.opens, self.client.closes), (2, 1))
-        self.assertEqual(self.last_shown(), RED)
-
-    def test_a_reconnect_sends_the_colour_it_has_now(self):
-        self.run_for(1.5, gpu=100)
-        mid = o1leds.ramp(self.leds.slew.x)
-        self.client.connected = False                              # the link dropped
-        self.leds.retry_at = 0
-        self.run_for(2.1)
-        self.assertGreaterEqual(self.client.opens, 2)
-        self.assertNotEqual(self.last_shown(), WHITE)
-        self.assertNotEqual(mid, WHITE)
-
-
-class TestDimming(Rig):
-    """Brightness: 5 idle minutes, then 1.0 to 0.5 over 10 s; back to 1.0 in 1.5 s; the idle test is
-    the card under 15% (6 s) AND the processors under 20% (10 s), with hysteresis."""
-
-    def settle(self, seconds=0.0):
-        self.run_for(seconds, step=0.25)
-
-    def dim_fully(self):
-        self.run_for(312, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)
-
-    def test_it_starts_at_full_brightness_with_the_timer_running(self):
-        self.assertEqual((self.leds.bright, self.leds.idle, self.leds.idle_since), (1.0, True, self.clock.t))
-        self.leds.tick()
-        self.assertEqual(self.last_shown(), WHITE)
-
-    def test_dimming_starts_at_300_s_idle_and_takes_10_s(self):
-        self.run_for(300, step=0.25)                                  # the last tick is at 299.75 s
-        self.assertEqual(self.leds.bright, 1.0)
-        self.assertEqual(self.last_shown(), WHITE)
-        self.run_for(0.25, step=0.25)                                 # the tick at exactly 300 s
-        self.assertLess(self.leds.bright, 1.0)
-        self.run_for(5, step=0.25)
-        self.assertAlmostEqual(self.leds.bright, 0.75, delta=0.02)
-        self.run_for(5, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)
-        self.assertEqual(self.last_shown(), (128, 128, 128))
-        self.run_for(60, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)                       # and no further
-
-    def test_brightness_multiplies_each_channel_and_is_independent_of_the_colour(self):
-        self.assertEqual(o1leds.scale(WHITE, 0.5), (128, 128, 128))
-        self.assertEqual(o1leds.scale(RED, 0.5), (128, 0, 0))
-        self.assertEqual(o1leds.scale((255, 128, 0), 0.5), (128, 64, 0))
-        self.assertEqual(o1leds.scale(RED, 1.0), RED)
-        self.dim_fully()
-        self.run_for(10, step=0.25, gpu=0)
-        self.probes.v["gpu_busy"] = 0
-        self.assertEqual(self.last_shown(), (128, 128, 128))
-
-    def test_the_card_at_16_percent_wakes_it_and_at_14_does_not(self):
-        self.probes.v["gpu_busy"] = 14
-        self.run_for(400, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)                       # 14% is still idle: it dimmed
-        self.assertTrue(self.leds.idle)
-        self.probes.v["gpu_busy"] = 16
-        self.run_for(2, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)                       # the 6 s average (14.7) has not got there
-        self.run_for(8, step=0.25)
-        self.assertFalse(self.leds.idle)
-        self.assertEqual(self.leds.bright, 1.0)
-
-    def test_the_processors_at_21_percent_wake_it_and_at_19_do_not(self):
-        self.probes.cpu_pct = 19
-        self.run_for(400, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)
-        self.assertTrue(self.leds.idle)
-        self.probes.cpu_pct = 21
-        self.run_for(5, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)                       # the 10 s average is still under 20
-        self.run_for(10, step=0.25)
-        self.assertFalse(self.leds.idle)
-        self.assertEqual(self.leds.bright, 1.0)
-
-    def test_a_short_processor_spike_is_averaged_away(self):
-        self.dim_fully()
-        self.probes.cpu_pct = 100
-        self.run_for(1, step=0.25)
-        self.probes.cpu_pct = 0
-        self.run_for(20, step=0.25)
-        self.assertTrue(self.leds.idle)
-        self.assertEqual(self.leds.bright, 0.5)
-
-    def test_brightness_comes_back_in_1_5_s(self):
-        self.dim_fully()
-        self.probes.v["gpu_busy"] = 100
-        for _ in range(100):
-            self.leds.tick()
-            self.clock.t += 0.05
-            if not self.leds.idle:
-                break
-        woke = self.clock.t
-        self.assertLess(self.leds.bright, 1.0)
-        while self.leds.bright < 1.0 and self.clock.t - woke < 5:
-            self.leds.tick()
-            self.clock.t += 0.05
-        self.assertAlmostEqual(self.clock.t - woke, 1.5, delta=0.15)
-
-    def test_the_timer_restarts_at_the_next_idle_moment(self):
-        self.dim_fully()
-        self.probes.v["gpu_busy"] = 100
-        self.run_for(20, step=0.25)
-        self.assertEqual(self.leds.bright, 1.0)
-        self.probes.v["gpu_busy"] = 0
-        self.run_for(20, step=0.25)
-        self.assertTrue(self.leds.idle)
-        start = self.leds.idle_since
-        self.assertGreater(start, self.clock.t - 20)                  # counted from the moment it became idle
-        while self.clock.t < start + 299.5:
-            self.run_for(0.25, step=0.25)
-        self.assertEqual(self.leds.bright, 1.0)
-        while self.clock.t < start + 300.75:
-            self.run_for(0.25, step=0.25)
-        self.assertLess(self.leds.bright, 1.0)
-
-    def test_no_dimming_while_a_burst_that_ended_less_than_300_s_ago_is_still_fading(self):
-        self.run_for(10, step=0.25, gpu=100)
-        self.run_for(0.25, step=0.25, gpu=0)
-        end = self.clock.t
-        while self.clock.t < end + 270:
-            self.run_for(0.25, step=0.25)
-            self.assertEqual(self.leds.bright, 1.0)
-        self.assertEqual(self.leds.slew.x, 0.0)                       # the colour is white long before
-        while self.clock.t < end + 400:
-            self.run_for(0.25, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)
-
-    def test_both_must_be_quiet_to_be_idle(self):
-        self.probes.v["gpu_busy"] = 50
-        self.run_for(420, step=0.25)
-        self.assertEqual(self.leds.bright, 1.0)
-        self.probes.v["gpu_busy"] = 0
-        self.probes.cpu_pct = 50
-        self.run_for(420, step=0.25)
-        self.assertEqual(self.leds.bright, 1.0)
-        self.probes.cpu_pct = 0
-        self.run_for(420, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)
-
-    def test_a_request_or_a_tool_does_not_restore_brightness(self):
-        self.dim_fully()
-        self.probes.v.update(inflight=2, tools=["stability-test.sh"])
-        self.run_for(20, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)
-
-    def test_a_wake_from_sleep_gives_full_brightness_and_restarts_the_timer(self):
-        self.dim_fully()
-        self.leds.resync = True
-        self.leds.tick()
-        self.assertEqual(self.leds.bright, 1.0)
-        self.assertEqual(self.leds.idle_since, self.clock.t)
+        self.assertEqual((self.leds.phase, self.leds.bright, self.leds.idle_since), ("idle", 1.0, self.clock.t))
         self.assertEqual(self.last_shown(), WHITE)
         self.clock.t += 0.25
         self.run_for(298, step=0.25)
         self.assertEqual(self.leds.bright, 1.0)
         self.run_for(20, step=0.25)
-        self.assertEqual(self.leds.bright, 0.5)
+        self.assertEqual(self.leds.bright, 0.4)
 
-    def test_no_flicker_around_the_processor_threshold(self):
-        self.probes.cpu_pct = 30
-        self.run_for(40, step=0.25)
-        self.assertFalse(self.leds.idle)
-        flips, was = 0, self.leds.idle
-        for i in range(120):                                          # 19%, 21%, 19% ... every second
-            self.probes.cpu_pct = 19 if i % 2 == 0 else 21
-            self.run_for(1, step=0.25)
-            flips += self.leds.idle != was
-            was = self.leds.idle
-        self.assertEqual(flips, 0)                                    # busy until it is UNDER 15%
+    def test_a_wake_while_working_goes_red_again_through_the_rise(self):
+        self.to_red()
+        self.leds.resync = True
+        self.leds.tick()
+        self.assertEqual(self.last_shown(), WHITE)                 # afresh
+        self.until(lambda: self.leds.phase == "working", limit=8)
+        self.assertEqual(self.last_shown(), RED)
+
+    def test_a_reconnect_sends_the_colour_it_has_now(self):
+        t0 = self.start_rise()
+        self.at(t0 + 2.5)
+        mid = self.leds.rgb()
+        self.client.connected = False                              # the link dropped
+        self.leds.retry_at = 0
+        self.run_for(2.1)
+        self.assertGreaterEqual(self.client.opens, 2)
+        self.assertNotEqual(mid, WHITE)
+        self.assertEqual(self.last_shown(), self.leds.rgb())
+
+
+class TestDimming(Phases):
+    """White for 300 s, then 1.0 to 0.4 over 10 s; the 300 s count from the moment it is white."""
+
+    def test_dimming_starts_at_300_s_idle_and_takes_10_s(self):
+        self.run_for(300, step=0.25)                                  # the last tick is at 299.75 s
         self.assertEqual(self.leds.bright, 1.0)
-        self.probes.cpu_pct = 12
-        self.run_for(15, step=0.25)
-        self.assertTrue(self.leds.idle)
-        flips, was = 0, self.leds.idle
-        for i in range(120):                                          # 14%, 16% around 15 while idle
-            self.probes.cpu_pct = 14 if i % 2 == 0 else 16
-            self.run_for(1, step=0.25)
-            flips += self.leds.idle != was
-            was = self.leds.idle
-        self.assertEqual(flips, 0)
+        self.run_for(0.25, step=0.25)                                 # the tick at exactly 300 s
+        self.assertLess(self.leds.bright, 1.0)
+        self.run_for(5, step=0.25)
+        self.assertAlmostEqual(self.leds.bright, 0.7, delta=0.02)
+        self.run_for(5, step=0.25)
+        self.assertEqual(self.leds.bright, 0.4)
+        self.assertEqual(self.last_shown(), (102, 102, 102))
+        self.run_for(60, step=0.25)
+        self.assertEqual(self.leds.bright, 0.4)                       # and no further
 
-    def test_no_flicker_around_the_card_threshold(self):
-        self.probes.v["gpu_busy"] = 30
-        self.run_for(20, step=0.25)
-        self.assertFalse(self.leds.idle)
-        flips, was = 0, False
-        for i in range(120):                                          # 9% / 13%: under 15 but not under 10 on average
-            self.probes.v["gpu_busy"] = 9 if i % 2 == 0 else 13
+    def test_the_300_s_count_from_the_end_of_the_cool_down_not_from_the_end_of_the_work(self):
+        self.to_red()
+        t0 = self.start_cool()
+        self.at(t0 + 120, step=0.25)
+        self.assertEqual(self.leds.phase, "idle")
+        self.assertAlmostEqual(self.leds.idle_since, t0 + 120, delta=1e-6)
+        self.at(t0 + 120 + 299.75, step=0.25)
+        self.assertEqual(self.leds.bright, 1.0)
+        self.at(t0 + 120 + 300.25, step=0.25)
+        self.assertLess(self.leds.bright, 1.0)
+
+    def test_no_dimming_while_working_or_cooling(self):
+        self.to_red()
+        self.run_for(400, step=0.25)
+        self.assertEqual(self.leds.bright, 1.0)
+        t0 = self.start_cool()
+        while self.clock.t < t0 + 119:
             self.run_for(1, step=0.25)
-            flips += self.leds.idle != was
-            was = self.leds.idle
-        self.assertEqual(flips, 0)
+            self.assertEqual(self.leds.bright, 1.0)
+
+    def test_nothing_but_the_card_brightens_it_again(self):
+        self.run_for(312, step=0.25)
+        self.probes.v.update(inflight=2, tools=["stability-test.sh"], cpu=(990, 1000))
+        self.run_for(20, step=0.25, gpu=40)
+        self.assertEqual(self.leds.bright, 0.4)
+        self.run_for(1, step=0.25, gpu=100)                          # a 1 s blip: not yet
+        self.run_for(1, step=0.25, gpu=0)
+        self.assertEqual(self.leds.bright, 0.4)
 
     def test_the_resent_colour_includes_the_brightness(self):
-        self.dim_fully()
+        self.run_for(312, step=0.25)
         self.client.shown.clear()
         self.run_for(6, step=0.25)
         self.assertGreaterEqual(len(self.client.shown), 2)            # the keepalive
-        self.assertTrue(all(c == (128, 128, 128) for _t, c in self.client.shown))
+        self.assertTrue(all(c == (102, 102, 102) for _t, c in self.client.shown))
 
     def test_a_reconnect_sends_the_dimmed_colour(self):
-        self.dim_fully()
+        self.run_for(312, step=0.25)
         self.client.connected = False
         self.leds.retry_at = 0
         self.client.shown.clear()
         self.run_for(3, step=0.25)
-        self.assertEqual(self.last_shown(), (128, 128, 128))
+        self.assertEqual(self.last_shown(), (102, 102, 102))
 
     def test_the_status_says_what_it_is_doing(self):
         self.client.devices = [type("D", (), {"name": "MSI", "vendor": "MSI", "nleds": 6, "kind": "leds",
                                               "modes": [type("M", (), {"name": "Direct"})()], "mode": 0})()]
-        self.run_for(8, step=0.25, gpu=61)
-        with open(o1leds.status_path()) as f:
-            st = json.load(f)
-        self.assertEqual(st["brightness"], 1.0)
-        self.assertEqual(st["line"], "Lights: orange, 100% (card 61% busy)  -  1 device")
-        self.probes.v["gpu_busy"] = 0
-        self.run_for(10, step=0.25)
-        self.assertEqual(self.leds.bright, 1.0)
-        self.leds.slew.x = 0.0
-        self.leds.idle, self.leds.idle_since = True, self.clock.t - 305
-        self.run_for(2, step=0.25)
-        with open(o1leds.status_path()) as f:
-            st = json.load(f)
-        self.assertLess(st["brightness"], 1.0)
-        self.assertIn(st["idle_s"], (305, 306))
-        self.assertEqual(st["line"], "Lights: white, dimming (idle 5 min)  -  1 device")
-        self.run_for(10, step=0.25)
-        self.leds.idle_since = self.clock.t - 355
-        self.run_for(2, step=0.25)
-        with open(o1leds.status_path()) as f:
-            st = json.load(f)
-        self.assertEqual((st["brightness"], st["rgb"]), (0.5, [128, 128, 128]))
-        self.assertEqual(st["line"], "Lights: white, dimmed 50% (idle 6 min)  -  1 device")
+
+        def st():
+            with open(o1leds.status_path()) as f:
+                return json.load(f)
+        self.leds.tick()
+        self.assertEqual(st()["line"], "Lights: white, idle (card 0% busy)  -  1 device")
+        self.probes.v["gpu_busy"] = 87
+        self.until(lambda: self.leds.phase == "rising")
+        self.assertEqual(st()["line"], "Lights: white, turning red (card 87% busy)  -  1 device")
+        self.until(lambda: self.leds.phase == "working")
+        self.assertEqual((st()["phase"], st()["working"]), ("working", True))
+        self.assertEqual(st()["line"], "Lights: red, working (card 87% busy)  -  1 device")
+        t0 = self.start_cool()
+        self.at(t0 + 58, step=0.25)
+        self.leds.write_status(self.clock.t)
+        self.assertEqual(st()["line"], "Lights: orange, cooling down (white in 62 s)  -  1 device")
+        self.assertEqual(st()["cool_left"], 62)
+        self.at(t0 + 120 + 305, step=0.25)
+        self.run_for(1, step=0.25)
+        s = st()
+        self.assertLess(s["brightness"], 1.0)
+        self.assertEqual(s["line"], "Lights: white, dimming (idle 5 min)  -  1 device")
+        self.run_for(60, step=0.25)
+        s = st()
+        self.assertEqual((s["brightness"], s["rgb"]), (0.4, [102, 102, 102]))
+        self.assertEqual(s["line"], "Lights: white, dimmed 40% (idle 6 min)  -  1 device")
 
 
 class TestTheCardReadingIsTheSharedOne(unittest.TestCase):
     def test_the_service_reads_the_card_through_the_probes_the_fans_use(self):
-        self.assertEqual(set(o1work.probes()), {"inflight", "gpu_busy", "tools", "cpu"})
+        self.assertEqual(set(o1work.probes()), {"gpu_busy"})
         self.assertIs(o1fan.Gpu, o1work.Gpu)
         with open(os.path.join(U.LIB, "o1leds.py")) as f:
             src = f.read()
         self.assertIn("Leds(o1work.probes(), log=log)", src)
         self.assertIn('self.probes["gpu_busy"]()', src)
+        self.assertIn("self.trigger = o1work.GpuTrigger()", src)    # the fans' own trigger, not a copy
+
+    def test_the_cpu_temperature_does_not_turn_the_lights_red(self):
+        with open(os.path.join(U.LIB, "o1leds.py")) as f:
+            src = f.read()
+        self.assertNotIn("CpuTrigger", src)
+        self.assertNotIn("read_temps", src)
 
 
 # ---- the server dying and coming back -----------------------------------------------------
@@ -840,17 +802,17 @@ class TestReconnect(unittest.TestCase):
         self.assertEqual([d["mode"] for d in st["devices"]], ["Direct", "Direct"])
         self.assertIn("2 devices", st["line"])
         self.probes.v["gpu_busy"] = 100
-        self.run_for(4)
+        self.run_for(7)                                                    # 1.5 s to start, 5 s to red
         self.srv.clear()
         self.run_for(1)
         self.assertEqual(set(F.decode_leds(self.srv.wait_for(1050)[-1][1])[0]), {RED})
         st = self.status()
-        self.assertEqual((st["rgb"], st["state"], st["gpu_pct"]), ([255, 0, 0], "red", 100))
-        self.assertEqual(st["line"], "Lights: red, 100% (card 100% busy)  -  2 devices")
+        self.assertEqual((st["rgb"], st["state"], st["gpu_pct"], st["phase"]), ([255, 0, 0], "red", 100, "working"))
+        self.assertEqual(st["line"], "Lights: red, working (card 100% busy)  -  2 devices")
 
     def test_when_the_server_dies_it_says_so_keeps_going_and_reconnects_with_the_current_colour(self):
         self.probes.v["gpu_busy"] = 100
-        self.run_for(4)
+        self.run_for(7)
         self.srv.stop()
         self.run_for(1.5)
         st = self.status()
@@ -858,7 +820,7 @@ class TestReconnect(unittest.TestCase):
         self.assertTrue(st["error"])
         self.assertTrue(st["line"].startswith("Lights: OpenRGB:"))
         self.assertTrue(any(l.startswith("OpenRGB:") for l in self.lines))
-        self.assertEqual(o1leds.ramp(self.leds.slew.x), RED)               # the colour ran on, unharmed
+        self.assertEqual(self.leds.rgb(), RED)                             # the colour ran on, unharmed
         again = F.FakeServer(two_devices(), port=self.srv.port).start()
         self.addCleanup(again.stop)
         self.run_for(40)                                                   # past any pause
@@ -895,9 +857,12 @@ class TestNeverCrashLoops(Rig):
     def test_a_failed_send_drops_the_link_and_retries_later(self):
         self.leds.tick()
         self.client.fail_show = True
-        self.clock.t += 0.25
         self.probes.v["gpu_busy"] = 100
-        self.leds.tick()
+        for _ in range(100):                                     # the rise sends a frame: it fails
+            self.clock.t += 0.05
+            self.leds.tick()
+            if not self.client.connected:
+                break
         self.assertFalse(self.client.connected)
         self.assertIn("Broken pipe", self.leds.err)
         self.client.fail_show = False
@@ -909,7 +874,7 @@ class TestNeverCrashLoops(Rig):
         sent, lines = [], []
 
         class Bad:
-            slew = o1leds.Slew()
+            phase = "idle"
 
             def tick(self):
                 raise ValueError("secret request text")
@@ -931,43 +896,37 @@ class TestStatus(Rig):
                                               "modes": [type("M", (), {"name": "Direct"})()], "mode": 0})()]
         self.leds.tick()
         st = self.read()
-        self.assertEqual((st["state"], st["rgb"], st["gpu_pct"], st["intensity"]), ("white", [255, 255, 255], 0, 0))
-        self.assertEqual(st["line"], "Lights: white, 100% (card 0% busy)  -  1 device")
-        self.run_for(8, gpu=61)
-        self.leds.tick()
-        st = self.read()
-        self.assertEqual((st["state"], st["gpu_pct"], st["target_intensity"]), ("orange", 61, 0.61))
-        self.assertEqual(st["rgb"], list(o1leds.ramp(0.61)))
-        self.assertEqual(st["target_rgb"], list(o1leds.ramp(0.61)))
-        self.assertEqual(st["line"], "Lights: orange, 100% (card 61% busy)  -  1 device")
-        self.run_for(0.5, gpu=100)
-        st = self.read()
-        self.assertGreater(st["target_intensity"], st["intensity"])           # the target is ahead of what is shown
-        self.assertEqual(st["target_rgb"], [255, 0, 0])
+        self.assertEqual((st["state"], st["phase"], st["rgb"], st["gpu_pct"], st["intensity"], st["working"]),
+                         ("white", "idle", [255, 255, 255], 0, 0, False))
+        self.assertEqual(st["line"], "Lights: white, idle (card 0% busy)  -  1 device")
+        self.assertEqual(st["why"], "idle (card 0% busy)")
         self.probes.v["gpu_busy"] = None
         self.run_for(2.5)
         self.leds.tick()
-        self.assertEqual(self.read()["line"].split("  -  ")[0].split(" (")[1], "no card reading)")
+        self.assertEqual(self.read()["line"], "Lights: white, idle (no card reading)  -  1 device")
         self.assertFalse(self.read()["gpu_reading"])
 
     def test_the_text_for_a_person(self):
-        st = {"at": 1, "state": "red", "rgb": [255, 0, 0], "target_rgb": [255, 128, 0], "gpu_pct": 87.4,
-              "intensity": 0.95, "connected": True, "protocol": 4, "error": None,
+        st = {"at": 1, "state": "orange", "phase": "cooling", "rgb": [255, 128, 0], "gpu_pct": 3.4, "intensity": 0.67,
+              "brightness": 1.0, "cool_left": 80, "working": False, "idle_s": 0, "connected": True, "protocol": 4,
+              "error": None,
               "devices": [{"name": "MSI MYSTIC LIGHT", "vendor": "MSI", "leds": 6, "mode": "Direct", "usable": True},
                           {"name": "Odd", "vendor": "", "leds": 3, "mode": None, "usable": False}]}
         out = o1leds.render_status(st)
-        self.assertIn("lights: red  now 255,0,0 (FF0000)", out)
-        self.assertIn("target: 255,128,0 (FF8000)  -  card: 87% busy  -  shown intensity 0.95 of 1", out)
+        self.assertIn("lights: orange  now 255,128,0 (FF8000)  -  cooling down (white in 80 s)", out)
+        self.assertIn("card: 3% busy  -  not working  -  position 0.67 of 1 (0 white, 1 red)", out)
+        self.assertIn("brightness: 100%  -  idle 0 s (dims to 40% after 300 s)", out)
         self.assertIn("2 devices found", out)
         self.assertIn("MSI MYSTIC LIGHT", out)
         self.assertIn("mode Direct, 6 LEDs", out)
         self.assertIn("no usable mode", out)
         self.assertIn("errors: none", out)
-        st.update(connected=False, error="Connection refused", devices=[], gpu_pct=None)
+        st.update(connected=False, error="Connection refused", devices=[], gpu_pct=None, phase="working", working=True)
         out = o1leds.render_status(st)
         self.assertIn("not connected", out)
         self.assertIn("errors: Connection refused", out)
-        self.assertIn("no reading (taken as 0%)", out)
+        self.assertIn("no reading (taken as not working)", out)
+        self.assertIn("working (over 50%)", out)
         self.assertIn("isn't running", o1leds.render_status(None))
 
     def test_the_panel_line_only_while_the_service_is_fresh(self):

@@ -116,11 +116,11 @@ fans_choice() { # FLAG ENV SAVED -> "on" or "off" (6b385): the flag, else the en
   echo on
 }
 
-fans_plan() { # the plan's line for the fans (6b385)
+fans_plan() { # the plan's line for the fans (6b385; the triggers of 6b421)
   if [ "$1" = off ]; then
     printf 'Fans OFF (--fans off): the graphics card and case fans stay automatic (BIOS control). On: --fans on'
   else
-    printf 'Fans ON: graphics card and case fans at 100%% while the server works and 60 s after, then down to 20%% over 2 minutes; a Corsair Hydro liquid cooler on USB is controlled too (installs liquidctl) (ollama1-fan). Off: --fans off'
+    printf 'Fans ON: graphics card and case fans at 100%% while the graphics card is over 50%% busy or the CPU is at 60 C or more, then down to 20%% over 2 minutes; a Corsair Hydro liquid cooler on USB is controlled too (installs liquidctl) (ollama1-fan). Off: --fans off'
   fi
 }
 
@@ -139,9 +139,9 @@ leds_choice() { # FLAG ENV SAVED -> "on" or "off" (6b395): the flag, else the en
   echo off
 }
 
-leds_plan() { # the plan's line for the lights (6b395)
+leds_plan() { # the plan's line for the lights (6b395; the states of 6b421)
   if [ "$1" = on ]; then
-    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red as its load rises, dimming to 50% after 5 idle minutes (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
+    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red in 5 s when it works (over 50%% busy), back to white over 2 minutes when it stops, dimming to 40%% after 5 idle minutes (ollama1-leds, ollama1-openrgb on 127.0.0.1). Off: --leds off'
   else
     printf 'Lights OFF (default): nothing installed, the lights stay as the board leaves them. On: --leds on'
   fi
