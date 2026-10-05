@@ -112,8 +112,9 @@ it asks for any it can't find, at the terminal):
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
-| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 2 minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 2-minute ramp when it stops, and dims to 40% after 5 minutes of white (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 1 minute: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 1-minute ramp when it stops, and dims to 40% after 5 minutes of white (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--leds-length N` | LEDs given to a board header that lists none, 1 to 1024 (default **60**): see "Lights" below. Saved in `setup.env` (`LEDS_LENGTH=`, only when you give it), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 150 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -961,8 +962,8 @@ at a level that follows what the server is doing:
 | Phase | Level | When |
 |---|---|---|
 | `working` | 100% | the graphics card is over 50% busy, or the CPU is at 60 C or more |
-| `ramp` | 100% down to 20% | from the moment that ends: a straight line over 120 s, written in whole 2% steps (no hold at 100% first) |
-| `idle20` | 20% | from 120 s after the work ended, and from the start |
+| `ramp` | 100% down to 20% | from the moment that ends: a straight line over 60 s, written in whole 2% steps (no hold at 100% first) |
+| `idle20` | 20% | from 60 s after the work ended, and from the start |
 
 Work at any time, the ramp included, goes back to 100% at once; when it ends
 again the ramp starts over from 100%. A level is `pwm = round(percent * 255 /
@@ -976,7 +977,7 @@ of two triggers:
 
 - **The graphics card** (sysfs `gpu_busy_percent`) **over 50%** for 1.5 s in a
   row. The fans look every 2 s, so that is two looks in a row: a single 1 s
-  blip over 50% never starts a 2-minute ramp. It ends when the card has been at
+  blip over 50% never starts a 1-minute ramp. It ends when the card has been at
   or under 50% for 1.5 s in a row (a short dip between two answers keeps it
   working). No card reading counts as not busy.
 - **The CPU's temperature** (k10temp `Tctl`/`Tdie`, the "CPU" sensor below)
@@ -1133,7 +1134,7 @@ in a row at or under 50% (`lib/o1work.py`; a 1 s blip does nothing):
   so it starts and lands softly.
 - **While working**: red at 100%.
 - **Work ends**: the colour goes back from red through orange and yellow to
-  white over **120 s**, linear in time along the gradient: exactly the fans'
+  white over **60 s**, linear in time along the gradient: exactly the fans'
   ramp, so the lights and the fans finish together. Work again in the middle
   of it: the 5 s rise again, from wherever it is.
 - **After 5 minutes of white** (counted from the moment the cool-down reached
@@ -1176,6 +1177,30 @@ network but the loopback; it reads the card's busy percent and writes only
 `/run/ollama1/leds.json`. If you want OpenRGB to drive more than USB lights,
 that is your call, not the kit's.
 
+**Headers with no LEDs listed.** OpenRGB lists some boards' addressable headers
+with **zero LEDs** until a length is set: on the MSI MEG X570 ACE, JRAINBOW1,
+JRAINBOW2 and JCORSAIR (JRGB1 and PIPE1 have one LED each), so nothing was ever
+sent to the strips behind them (the under-case strips on a splitter included).
+When the service connects (and after every reconnect, and after a wake) it looks
+at each zone of each device: a zone that has **no LEDs** and can be resized
+(its maximum is above 0 and differs from its minimum, and it is not a matrix) is
+sent OpenRGB's `RESIZEZONE` command (packet 1000: the zone index and the new
+size, two little-endian integers; the device is the packet header's) with the
+**default length of 60**, clamped to what the zone allows, and the controller's
+data is read again so those LEDs are in the list. From then on they get exactly
+the same colour and brightness frames as every other LED. A zone that already
+has LEDs is never touched (JRGB1, PIPE1 and the cooler's 16 stay as they are),
+and nothing is ever shrunk. One line is logged per zone ("lights: resized
+JRAINBOW1 to 60 LEDs"); a zone that fails is logged and skipped and does not
+stop the others or the service, and one OpenRGB refuses is asked once per
+connection, not over and over. 60 is a splitter feeding several strips: writing
+past the end of a strip is harmless, writing too few leaves its tail dark. To
+change it, `sudo ./setup.sh --leds-length N` (1 to 1024; a zone's own maximum
+still clamps it). The value is saved in `setup.env` as `LEDS_LENGTH` and handed to
+`ollama1-leds setup on --length N`, which keeps it in `/etc/ollama1/leds.json`
+(read by the service at each connect; it only reads `/etc`, it still writes
+nowhere but `/run/ollama1`).
+
 **A stop** (including `--leds off`) sets the lights white first, so they are
 never left red; after that they are as the board leaves them. After a wake the
 sleep hook restarts the OpenRGB server (the USB devices may have come back new)
@@ -1184,8 +1209,8 @@ and pokes the service (`SIGUSR1`), which connects afresh and starts white at 100
 
 **Status.** `ollama1-leds status` (no root): the colour name, the colour now and what the lights
 are doing, the card's load and whether it counts as working, the brightness, the devices found
-and their mode, and any error. `/run/ollama1/leds.json` has `state` (the colour), `phase` (idle,
-rising, working, cooling), `rgb`, `brightness`, `working`, `cool_left`, `idle_s` and `gpu_pct`. The admin panel's CPU card shows one line, "Lights: ...". Logs:
+and their mode (and, under each, its zones with the LEDs each has after the resize), and any error. `/run/ollama1/leds.json` has `state` (the colour), `phase` (idle,
+rising, working, cooling), `rgb`, `brightness`, `working`, `cool_left`, `idle_s` and `gpu_pct`, and per device `zones` (`name`, `leds`). The admin page's lights card lists the same zones. The admin panel's CPU card shows one line, "Lights: ...". Logs:
 `journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
 
 ## Hardware watchdog

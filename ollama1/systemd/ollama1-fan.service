@@ -1,7 +1,7 @@
 # Fan levels that follow the server's work (6b385, 6b421): the graphics card's
 # fan and every fan header the motherboard's chip lets the kit control go to
 # 100% while the card is over 50% busy or the CPU is at 60 C or more, then at
-# once a ramp down to 20% over 2 minutes. A sensor over its limit
+# once a ramp down to 20% over 1 minute. A sensor over its limit
 # forces 100%. Root, because it writes the fans' sysfs files; no network;
 # writes only its own state and status files.
 #

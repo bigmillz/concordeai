@@ -9,6 +9,84 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b429 — setup.sh no longer asks "type yes" unless a disk would be erased (per the owner)
+Asked: "can we remove the type yes when we run the install or update script?" The general
+"Type yes to go ahead" is gone. Two questions stay, because each guards something that can't be
+undone: the list of disks to ERASE (still needs a typed yes) and an SSH session from outside the
+LAN (which setup would cut off). The password-login and "remove the setup key" questions in the
+SSH step stay too (they change security settings). With nothing to erase, setup prints
+"No disk is erased. Going ahead." and carries on.
+
+## 6b428 — lights: the headers that list no LEDs are resized so every strip gets the colours (per Patrick)
+
+Kit only (`ollama1/`). The owner: the case lights were not all lit. `ollama1-leds` saw two devices,
+the Corsair H115i (16 LEDs, fine) and the MSI MEG X570 ACE (Mystic Light) whose zones are JRGB1,
+JRAINBOW1, JRAINBOW2, JCORSAIR and PIPE1, but its LED list held only JRGB1 and PIPE1 (one LED each):
+the three addressable headers have ZERO LEDs configured, so nothing was ever sent to them, and the
+under-case strips (on a splitter, header unknown) stayed dark. The owner: "just send the same
+lighting signals to all of those headers."
+
+- **Parse** (`lib/o1leds.py`): each zone's type (single 0 / linear 1 / matrix 2), `leds_min`,
+  `leds_max` and `leds_count` are now read into `Zone` (they were skipped). Resizable = min != max.
+- **Resize** at connect time (`Client.enumerate` -> `grow_zones`, so also after a reconnect and
+  after a wake's fresh connection): every zone with 0 LEDs, a maximum above 0, resizable and not a
+  matrix gets OpenRGB's `NET_PACKET_ID_RGBCONTROLLER_RESIZEZONE` (1000; body = i32 zone index,
+  i32 new size, little-endian, no size prefix; the device index is in the packet header), to
+  `DEFAULT_LENGTH` (60) clamped to [min, max]; then that controller's data is requested again so
+  the LEDs are in the list, and `show()` drives them with the same frame as every other LED. A zone
+  that already has LEDs is never touched (JRGB1, PIPE1, the Corsair), nothing is shrunk. Why 60: a
+  splitter feeding several strips; writing past a strip's end is harmless, too few leaves its tail
+  dark.
+- **Failures** never stop the rest: a send that fails on one zone is logged and skipped; a zone the
+  server ignores (still 0 after the re-read) is logged ("could not resize ... still no LEDs") and
+  asked once per connection (`Client.tried`; a success, a reconnect or a re-plugged device clears it),
+  so a server that refuses and sends a device-list notice each time cannot make a loop. One line per
+  resized zone: "lights: resized JRAINBOW1 to 60 LEDs" (`Client.notes`, drained into the log by
+  `Leds.link`). The re-read clears the list-changed flag its own resize raised.
+- **Option**: `setup.sh --leds-length N` (1..1024; the zone's own maximum clamps it), validated by
+  `leds_length_choice` (flag, else the saved `LEDS_LENGTH`, else nothing; the default is not saved so a
+  later default applies), saved in `setup.env` only when given, shown in the plan line, passed as
+  `ollama1-leds setup on --length N`, which writes `/etc/ollama1/leds.json` for the service
+  (`configured_length()`, read at each connect; a damaged file is the default; the unit still writes
+  only `/run/ollama1`). A re-run without the flag keeps the saved value.
+- **Status**: `/run/ollama1/leds.json` devices carry `zones` (`name`, `leds`, the final sizes);
+  `ollama1-leds status` prints a `zones:` line per device; the admin page's lights card shows
+  "LEDs per zone" (`clean_leds` re-types every field; the page sets `textContent`; no CSP/nonce
+  change).
+- **Tests**: `tests/fakeopenrgb.py` models zones (min/max/count/type), takes the resize packet
+  like the real server (a size outside the range or a fixed zone is ignored), can be deaf to a
+  zone, and records every LED's colour and every frame. Mutants: `python3 tests/mutate.py leds`
+  ("leds: zones: ...").
+- **Not verified on the hardware**: that the Mystic Light driver accepts a resize of the three
+  headers (it should: its zones are `leds_min 0`, `leds_max` 200 or so), that the under-case strips
+  hang off one of them, and that a length of 60 is right for the splitter.
+
+---
+## 6b427 — the cool-down is one minute, not two, for the fans and the lights (per Patrick)
+
+Kit only (`ollama1/`). Per Patrick: "speed the cooling up process from two minutes to one
+minute". `COOL_S` in `lib/o1work.py`, the one number the fans (`o1fan.RAMP_S`) and the lights
+(`o1leds.COOL_S`) both read, went from 120 to 60. So:
+
+- **Fans.** At once when the work ends, 100% -> 20% over 60 s, a straight line written in whole
+  2% steps (40 steps, one every 1.5 s; the rounding is the same `round(p / 2) * 2`, so it is
+  still straight to within one step). `idle20` starts 60 s after the work ended. At the fans' 2 s
+  poll that is one or two steps a poll (the old 120 s ramp was zero or one), so the write test
+  now allows a drop of up to two steps. A ramp tick 1 s in is now 98%, not 100% (100% holds
+  only the first 0.75 s).
+- **Lights.** Red -> orange -> yellow -> white over the same 60 s, linear in time along the
+  gradient (orange at 20 s, yellow at 40 s); the 300 s of white before the 40% dim still count
+  from the moment it reaches white.
+- **Unchanged.** New work mid-cool still sends the lights back to red over the 5 s rise from
+  wherever they are, and the fans to 100% at once.
+- Docs and text moved with it: `o1work`/`o1fan`/`o1leds`/`o1aio` docstrings, `bin/ollama1-fan`,
+  `bin/ollama1-leds`, the two unit comments, `setup.sh` help and comments, the `fans_plan` and
+  `leds_plan` lines in `lib/setuplib.sh`, and `README.md` (`--fans`, `--leds`, the Fans phase
+  table, the Lights section). The admin page and panel read the countdown from the status file,
+  so they needed no change. Tests (`test_fan`, `test_aio`, `test_leds`, `test_work`) follow
+  `COOL_S` where natural, with a hard 60 in `test_work` and `test_fan`; `mutate.py`'s cool-down
+  mutants now break 60 into 120, 30 and 300, and the fan's own `RAMP_S` mutant uses 90.
+
 ## 6b421 — fans and lights: the card over 50% or the CPU at 60 C, no hold, a 5 s rise to red (per Patrick)
 
 Kit only (`ollama1/`). Per Patrick, new rules for the fans (case, CPU/radiator and the GPU

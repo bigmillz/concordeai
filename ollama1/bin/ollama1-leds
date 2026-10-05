@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """ollama1-leds: lights that follow the server's work (6b395, 6b421). Every RGB device
 OpenRGB lists: white when idle; when the graphics card works (over 50% busy) through
-yellow and orange to red at full brightness in 5 s; back to white over 120 s when it
+yellow and orange to red at full brightness in 5 s; back to white over 60 s when it
 stops (with the fans' ramp); dimmed to 40% after 5 minutes of white. See lib/o1leds.py.
 
   ollama1-leds status         the colour, what it is doing, the card's load, the
@@ -10,7 +10,9 @@ stops (with the fans' ramp); dimmed to 40% after 5 minutes of white. See lib/o1l
 Used by the system:
   run             ollama1-leds.service (talks to the OpenRGB server on 127.0.0.1)
   openrgb         ollama1-openrgb.service: starts `openrgb --server`, local only
-  setup on|off    setup.sh's step (--leds on|off)
+  setup on|off [--length N]
+                  setup.sh's step (--leds on|off; --leds-length N is what a zone with no
+                  LEDs, such as an addressable header, is resized to; default 60)
 """
 import os
 import sys
@@ -49,9 +51,15 @@ def main(argv):
         return o1leds.run_openrgb(log)
     choice = argv[2] if len(argv) > 2 else ""
     if choice not in ("on", "off"):
-        print("usage: ollama1-leds setup on|off", file=sys.stderr)
+        print("usage: ollama1-leds setup on|off [--length N]", file=sys.stderr)
         return 2
-    return o1leds.setup(choice, log=log)
+    length = None
+    if len(argv) > 3:
+        if len(argv) != 5 or argv[3] != "--length":
+            print("usage: ollama1-leds setup on|off [--length N]", file=sys.stderr)
+            return 2
+        length = argv[4]
+    return o1leds.setup(choice, log=log, length=length)
 
 
 if __name__ == "__main__":

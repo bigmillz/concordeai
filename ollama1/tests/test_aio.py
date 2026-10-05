@@ -231,9 +231,10 @@ class TestRateLimit(AioCase):
         t = self.settle("working", 100)
         self.times.clear()
         pcts = []
-        for s in range(0, 181):                              # the fan service's phase every second, the ramp's % in 2% steps
-            p = o1fan.ramp_pct(s) if s <= 120 else 20
-            self.ago(t + s, "ramp" if s < 120 else "idle20", p)
+        C = o1fan.RAMP_S
+        for s in range(0, 3 * C // 2 + 1):                   # the fan service's phase every second, the ramp's % in 2% steps
+            p = o1fan.ramp_pct(s) if s <= C else 20
+            self.ago(t + s, "ramp" if s < C else "idle20", p)
             pcts.append(self.aio.applied[1])
         sets = [(when, a) for when, a in self.times if "set" in a]
         rounds = sorted({when for when, a in sets})
@@ -242,7 +243,7 @@ class TestRateLimit(AioCase):
         self.assertTrue(all(b < a for a, b in zip(fan1, fan1[1:])))              # only on change, only down
         self.assertTrue(all(v % 2 == 0 for v in fan1))
         self.assertEqual(fan1[-1], 20)
-        self.assertLessEqual(len(fan1), 25)                                       # about every 5 s, not every 2%
+        self.assertLessEqual(len(fan1), 13)                                       # about every 5 s, not every 2%
         pumps = [a[-1] for _w, a in sets if a[-3:-1] == ["pump", "mode"]]
         self.assertEqual(pumps, ["balanced", "quiet"])                           # balanced in the ramp, quiet at idle
         self.assertEqual(pcts[0], 100)
@@ -250,7 +251,7 @@ class TestRateLimit(AioCase):
     def test_a_cooler_fan_floor_holds_in_the_ramp(self):
         self.fan_rpm[2] = lambda p: 0 if p < 40 else p * 10
         t = self.settle("working", 100)
-        for s in range(0, 140, 1):
+        for s in range(0, o1fan.RAMP_S + 20, 1):
             self.ago(t + 10 + s, "ramp", o1fan.ramp_pct(s))
         self.assertEqual(self.aio.applied[2], 40)
         self.assertEqual(self.aio.applied[1], 20)

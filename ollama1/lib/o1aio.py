@@ -14,7 +14,7 @@ The policy follows the fans' phases (lib/o1fan.py):
   phase                 fans            pump
   working, hot          100%            extreme    (the card over 50%, the CPU at 60 C, a sensor at its limit)
   calibrating           100%            balanced   (first start: measuring rpm)
-  ramp                  the fans' %, falling from 100 to 20 over 120 s   balanced
+  ramp                  the fans' %, falling from 100 to 20 over 60 s    balanced
                         (from the moment the work ends; there is no hold at 100% any more, 6b421)
   idle20                20%, or higher  quiet
                         for a fan that stalls (the same learning as the case fans)

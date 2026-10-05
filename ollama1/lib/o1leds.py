@@ -9,7 +9,7 @@ cooler's pump head) is held at the same colour.
              and eased in and out (smoothstep), the brightness on the same curve
   working    red at 100% while the card works
   cooling    the work ended: from red back through orange and yellow to white over
-             COOL_S (120 s), linear in time along the gradient: the fans' 120 s ramp
+             COOL_S (60 s), linear in time along the gradient: the fans' 60 s ramp
              (lib/o1fan.py), so the two finish together. Work again mid-cool: the 5 s
              rise again, from wherever it is.
 
@@ -30,6 +30,16 @@ while anything moves; when nothing moves the loop wakes only for the 0.25 s samp
 every POLL_S (2 s) the connection is looked at and the colour sent again (a keepalive:
 a device that was reset by a wake or a hot-plug gets it back). At start, and after a
 wake (the sleep hook's SIGUSR1), it is white at 100% and the 300 s start then.
+
+Zones with no LEDs (6b428, per the owner: "just send the same lighting signals to all of those
+headers"): an MSI Mystic Light board lists its addressable headers (JRAINBOW1, JRAINBOW2,
+JCORSAIR) with ZERO LEDs until a length is configured, so nothing is ever sent to the strips
+behind them. At connect time (and after every reconnect or wake) each zone that has no LEDs
+and can be resized is resized to DEFAULT_LENGTH (60; `setup.sh --leds-length N`), clamped to
+what the zone allows, and the controller's data is read again so those LEDs are in the list
+and get the very same frames as every other LED. A zone that already has LEDs is never
+touched. A length longer than the strip is harmless (what is written past its end goes
+nowhere); one that is too short leaves the strip's tail dark, so the default errs long.
 """
 import os
 import select
@@ -55,7 +65,7 @@ RED = (255, 0, 0)
 STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
 RISE_S = o1work.RISE_S            # to red and full brightness takes this long (5 s)
-COOL_S = o1work.COOL_S            # red to white takes this long: the fans' ramp (120 s)
+COOL_S = o1work.COOL_S            # red to white takes this long: the fans' ramp (60 s)
 IDLE_DIM_S = o1work.IDLE_DIM_S    # white this long, then dim (300 s)
 DIM_S = o1work.DIM_S              # 1.0 down to DIM_MIN takes this long (10 s)
 DIM_MIN = o1work.DIM_PCT / 100.0  # the dimmed brightness (0.4)
@@ -67,13 +77,17 @@ CONNECT_S = 1.0
 IO_S = 2.0
 OPEN_BUDGET_S = 10.0              # one whole connect + enumerate may take this long, no more
 RETRY_FIRST_S, RETRY_MAX_S = 2, 30
+DEFAULT_LENGTH = 60               # LEDs given to a zone that has none: a splitter feeding several strips
+LENGTH_MAX = 1024                 # the most `--leds-length N` may ask for (a zone's own maximum clamps it further)
 NO_SERVER_WAIT_S = 60             # openrgb missing: wait this long before the unit tries again
 
 # ---- the OpenRGB SDK network protocol ---------------------------------------------------
 MAGIC = b"ORGB"
 PROTO_MAX = 4                     # the highest version this client understands (segments came in 4)
 PID_COUNT, PID_DATA, PID_VERSION, PID_NAME, PID_LIST_UPDATED = 0, 1, 40, 50, 51
+PID_RESIZEZONE = 1000              # body: i32 zone index, i32 new size (no size prefix); the device is the header's
 PID_UPDATELEDS, PID_UPDATEZONELEDS, PID_UPDATEMODE = 1050, 1051, 1101
+ZONE_SINGLE, ZONE_LINEAR, ZONE_MATRIX = 0, 1, 2
 MODE_FLAG_BRIGHTNESS, MODE_FLAG_PER_LED, MODE_FLAG_MODE_COLOR = 1 << 4, 1 << 5, 1 << 6
 MAX_BODY = 1 << 20
 MAX_ITEMS = 4096                  # a count above this in a reply is a broken reply
@@ -180,6 +194,40 @@ class Mode:
         return m
 
 
+class Zone:
+    """One zone as the controller data lists it: its size limits and how many LEDs it has now."""
+
+    def __init__(self, name, ztype, leds_min, leds_max, leds):
+        self.name, self.ztype, self.leds_min, self.leds_max, self.leds = name, ztype, leds_min, leds_max, leds
+
+    @property
+    def resizable(self):
+        return self.leds_min != self.leds_max
+
+    def __repr__(self):
+        return "Zone(%r, type %d, %d..%d, %d LEDs)" % (self.name, self.ztype, self.leds_min, self.leds_max, self.leds)
+
+
+def target_length(z, want):
+    """What to resize zone z to, or None to leave it: only a zone with no LEDs that can grow, never a matrix,
+    to `want` clamped to its own minimum and maximum."""
+    if z.leds != 0 or z.leds_max <= 0 or z.ztype == ZONE_MATRIX or not z.resizable:
+        return None
+    n = min(max(want, z.leds_min), z.leds_max)
+    return n if n > 0 else None
+
+
+def config_path():
+    return o1common.p("/etc/ollama1/leds.json")
+
+
+def configured_length(path=None):
+    """The length setup.sh saved (`--leds-length N`, LEDS_LENGTH), else DEFAULT_LENGTH; a bad file is the default."""
+    v = read_json_safe(path or config_path(), {}, max_bytes=4096)
+    n = v.get("length") if isinstance(v, dict) else None
+    return n if isinstance(n, int) and not isinstance(n, bool) and 1 <= n <= LENGTH_MAX else DEFAULT_LENGTH
+
+
 class Device:
     def __init__(self, idx):
         self.idx, self.name, self.vendor, self.nleds = idx, "", "", 0
@@ -201,9 +249,9 @@ class Device:
         d.modes = [Mode.read(r, ver) for _ in range(nmodes)]
         for _ in range(r.count()):               # zones
             zname = r.str()
-            r.i32()
-            r.u32()
-            r.u32()
+            ztype = r.i32()
+            zmin = r.u32()
+            zmax = r.u32()
             zleds = r.u32()
             if r.u16() > 0:                      # a matrix: height, width, then the map
                 h, w = r.u32(), r.u32()
@@ -214,7 +262,7 @@ class Device:
                     r.i32()
                     r.u32()
                     r.u32()
-            d.zones.append((zname, zleds))
+            d.zones.append(Zone(zname, ztype, zmin, zmax, zleds))
         d.nleds = r.count()                      # leds: name, value
         for _ in range(d.nleds):
             r.str()
@@ -241,10 +289,13 @@ class Device:
 class Client:
     """One connection to the SDK server. Everything raises OSError (the socket) or ProtocolError."""
 
-    def __init__(self, host=HOST, port=PORT, connect=socket.create_connection):
+    def __init__(self, host=HOST, port=PORT, connect=socket.create_connection, length=None):
         self.host, self.port, self.connect = host, port, connect
         self.sock, self.ver, self.devices = None, 0, []
         self.list_changed = False
+        self.length = length                      # LEDs for a zone with none; None: read the saved setting at each open
+        self.tried = set()                        # (device, zone) a resize was already asked for on this connection
+        self.notes = []                           # one line per resize, for the service's log (Leds.link takes them)
 
     @property
     def connected(self):
@@ -262,6 +313,7 @@ class Client:
         """Connect, say who we are, agree on a version, list the devices, put them in a mode."""
         self.close()
         deadline = time.monotonic() + OPEN_BUDGET_S
+        self.tried = set()
         try:
             self.sock = self.connect((self.host, self.port), timeout=CONNECT_S)
             self.sock.settimeout(IO_S)
@@ -323,8 +375,41 @@ class Client:
             if deadline is not None and time.monotonic() > deadline:
                 raise socket.timeout("the server is too slow")
             self.sock.sendall(packet(i, PID_DATA, struct.pack("<I", self.ver)))
-            devs.append(Device.parse(i, self.wait_for(PID_DATA, i), self.ver))
+            d = Device.parse(i, self.wait_for(PID_DATA, i), self.ver)
+            devs.append(self.grow_zones(d))
         self.devices = devs
+
+    def grow_zones(self, d):
+        """Give each zone of d that has no LEDs (and can grow) the configured length, then read the controller's
+        data again so the LEDs are in its list. A zone that fails is noted and skipped; the others go on."""
+        want = self.length if self.length is not None else configured_length()
+        asked = []
+        for zi, z in enumerate(d.zones):
+            n = target_length(z, want)
+            key = (d.name, zi, z.name)
+            if z.leds > 0:
+                self.tried.discard(key)           # it has LEDs: if it is ever empty again (a re-plug), ask again
+            if n is None or key in self.tried:
+                continue
+            self.tried.add(key)
+            try:
+                self.sock.sendall(packet(d.idx, PID_RESIZEZONE, struct.pack("<ii", zi, n)))
+            except OSError as e:
+                self.notes.append("lights: could not resize %s on %s (%s)" % (z.name, d.name, e.strerror or type(e).__name__))
+                continue
+            asked.append((zi, z, n))
+        if not asked:
+            return d
+        self.sock.sendall(packet(d.idx, PID_DATA, struct.pack("<I", self.ver)))
+        fresh = Device.parse(d.idx, self.wait_for(PID_DATA, d.idx), self.ver)
+        self.list_changed = False                 # our own resize's notices are in this read already
+        for zi, z, n in asked:
+            now = fresh.zones[zi].leds if zi < len(fresh.zones) and fresh.zones[zi].name == z.name else 0
+            if now > 0:
+                self.tried.discard((d.name, zi, z.name))      # it worked: only a refusal is remembered
+            self.notes.append("lights: resized %s to %d LEDs" % (z.name, now) if now > 0 else
+                              "lights: could not resize %s on %s (still no LEDs after asking for %d)" % (z.name, d.name, n))
+        return fresh
 
     def prepare(self):
         """Each device into its mode, at the highest brightness it has."""
@@ -496,6 +581,11 @@ class Leds:
         self.sent = None
         self.retry_at, self.backoff = now + self.backoff, min(self.backoff * 2, RETRY_MAX_S)
 
+    def drain_notes(self):
+        notes = getattr(self.client, "notes", None)
+        while notes:
+            self.log(notes.pop(0))
+
     def link(self, now):
         c = self.client
         if self.resync:
@@ -509,12 +599,15 @@ class Leds:
                     self.log("devices: " + ", ".join("%s (%d LEDs)" % (d.name, d.nleds) for d in c.devices))
             except (OSError, ProtocolError) as e:
                 self.lost(e, now)
+            self.drain_notes()
         if not c.connected and now >= self.retry_at:
             try:
                 c.open()
             except (OSError, ProtocolError) as e:
                 self.lost(e, now)
+                self.drain_notes()
             else:
+                self.drain_notes()
                 self.err, self.backoff, self.sent = None, RETRY_FIRST_S, None
                 self.log("connected to OpenRGB (protocol %d): %s" % (
                     c.ver, ", ".join("%s (%d LEDs)" % (d.name, d.nleds) for d in c.devices) or "no devices yet"))
@@ -579,7 +672,8 @@ class Leds:
               "gpu_reading": self.gpu is not None,
               "connected": c.connected, "error": self.err, "protocol": c.ver if c.connected else None,
               "devices": [{"name": d.name, "vendor": d.vendor, "leds": d.nleds,
-                           "mode": d.modes[d.mode].name if d.kind else None, "usable": d.kind is not None}
+                           "mode": d.modes[d.mode].name if d.kind else None, "usable": d.kind is not None,
+                           "zones": [{"name": z.name, "leds": z.leds} for z in d.zones]}
                           for d in c.devices] if c.connected else []}
         st["why"] = what_text(st)
         st["line"] = status_line(st)
@@ -662,6 +756,9 @@ def render_status(st):
         for d in devs:
             out.append("  %-34s %s, %d LEDs%s" % (d.get("name"), "mode " + d["mode"] if d.get("mode") else "no usable mode",
                                                   d.get("leds", 0), "  (" + d["vendor"] + ")" if d.get("vendor") else ""))
+            zs = d.get("zones") or []
+            if zs:
+                out.append("    zones: " + ", ".join("%s %d" % (z.get("name"), z.get("leds", 0)) for z in zs))
     else:
         out.append("openrgb: not connected (%s:%d)" % (HOST, PORT))
     out.append("errors: " + (st.get("error") or "none"))
@@ -714,11 +811,29 @@ def run_apt_install(package):
         return False
 
 
-def setup(choice, systemctl=run_systemctl, which=shutil.which, apt=run_apt_install, log=print):
+def save_length(length, path=None):
+    """setup.sh's --leds-length N: kept for the service (/etc/ollama1/leds.json). Returns the length, or None when
+    it is not a whole number from 1 to LENGTH_MAX (nothing is written then)."""
+    try:
+        n = int(str(length), 10)
+    except ValueError:
+        return None
+    if not 1 <= n <= LENGTH_MAX:
+        return None
+    path = path or config_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    write_json_atomic(path, {"length": n}, mode=0o644)
+    return n
+
+
+def setup(choice, systemctl=run_systemctl, which=shutil.which, apt=run_apt_install, log=print, length=None):
     """setup.sh's step. on: the openrgb package (only if it isn't there), both units enabled and
     (re)started. off: both stopped (the lights go white as the service stops) and disabled; the
     package and everything else stay."""
     if choice == "on":
+        if length is not None and save_length(length) is None:
+            log("the lights: --leds-length takes a whole number from 1 to %d; left as it was" % LENGTH_MAX)
+            return 1
         if not which("openrgb") and not apt("openrgb"):
             log("the lights: apt could not install openrgb; left off")
             return 1
