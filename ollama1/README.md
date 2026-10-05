@@ -116,7 +116,7 @@ it asks for any it can't find, at the terminal):
 | `--leds on\|off` | The lights: every RGB device OpenRGB lists 100% white when idle, red while the server works, white again 3 s after it stops (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100% (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
-| `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
+| `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 150 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
 server's name and domain in `/etc/ollama1/config.json`, so a re-run needs
@@ -844,27 +844,36 @@ turns it on, and the choice is saved in `/etc/ollama1/setup.env`, so a later
 run of setup without the flag keeps it. It is for an AMD Navi 21 card
 (RX 6800, 6800 XT, 6900 XT, 6950 XT); any other card is left alone, with a
 one-line note. It runs a card past its stock limits, which is the owner's call
-to make: read this section first. Writing an answer reads
-the whole model from the card's memory for every word, so the memory clock
-sets the pace; the power limit keeps the clocks up under load. **The aim is
-about 5% faster token generation on models that fit the card. Only a
-measurement on your card proves it**: `sudo ollama1-gpu-tune status` shows
-the stock and tuned speeds it measured. Back to stock at any time:
+to make: read this section first. By default it raises the power limit to
+the card's own maximum and nothing else (the memory and core clocks are
+opt-in below). **Only a measurement on your card shows what it buys**:
+`sudo ollama1-gpu-tune status` shows the stock and tuned speeds it measured.
+Back to stock at any time:
 `sudo ollama1-gpu-tune off`.
 
 What it sets (`ollama1-gpu-tune`, `lib/o1gputune.py`), always within what the
 driver reports for the card, which it finds by its PCI ids (not by `cardN`):
 
-- **Power limit:** `power1_cap` = `power1_cap_max`, the most the driver
-  allows this card (never more). On an RX 6900 XT that is roughly 15% above
-  stock, up to about 330 W depending on the board. That means more power
-  drawn, more heat and more fan noise under load; check that your power
-  supply has the headroom.
-- **Memory clock:** the top state in `pp_od_clk_voltage` raised by 100 in the
-  driver's units (GDDR6 runs at twice that: a 6900 XT's stock 1000 is 2000 MHz
-  effective), and never past the `OD_RANGE` limit the card reports (on many
-  6900 XTs 1075, so 2150 MHz effective: +7.5%).
-- Core clocks and voltages: untouched.
+- **Power limit** (what `--gpu-tune` does): `power1_cap` = `power1_cap_max`, the
+  most the driver allows this card (never more). On an RX 6900 XT that is
+  roughly 15% above stock, up to about 330 W depending on the board. That
+  means more power drawn, more heat and more fan noise under load; check that
+  your power supply has the headroom. Measured on a 6900 XT: answers as fast
+  as stock, so it is harmless there.
+- **Memory clock, opt-in** (`--gpu-tune-memory N`, or `ollama1-gpu-tune on
+  --memory N`; N whole MHz, 0 to 75, default 0 = off): the top state in
+  `pp_od_clk_voltage` raised by N in the driver's units (GDDR6 runs at twice
+  that), never past the card's `OD_RANGE` limit. **The memory bump is off by
+  default because on this card it made answers 2.4x slower** (no kernel
+  error; most likely the GDDR6 retrying past what this card's memory holds).
+- **Core clock, opt-in, experimental** (`--gpu-tune-core N`, or `on --core N`;
+  N whole MHz above the card's current stock top, 0 to 150, default 0 = off):
+  the shader clock's top state, written with the overdrive table, read back
+  and verified, never past the card's `OD_RANGE` limit. It helps mostly long
+  prompts (prompt reading), much less answering, and **may crash the card**
+  (a hang resets the GPU; the next boot then puts everything back). The check
+  uses 100 C junction as its limit while the core is raised.
+- Voltages: untouched.
 
 The memory clock needs the kernel's overdrive switch: setup adds only the
 overdrive bit (`0x4000`) to the `amdgpu.ppfeaturemask` the driver runs with
@@ -874,28 +883,41 @@ the higher power limit waits for it too (until then the driver allows no more
 than stock). With overdrive on, the kernel says so in its log and marks
 itself tainted; that is expected.
 
-**Safety.** After the values are set, a check runs 60 seconds of answers on
-the card with a model already installed, while it watches the kernel log for
+**Safety.** Each part is checked on its own, in order: the power limit, then
+the memory clock, then the core clock. A check is 60 seconds of answers on the
+card with a model already installed, while it watches the kernel log for
 amdgpu errors (a ring timeout, a GPU reset, a page fault) and the card's
-temperatures. Any error, the junction at 105 C or the memory at 100 C puts
-the card back to stock at once. Slow answers (more than 5% under the stock
-speed measured when it was turned on, with the same model) are not enough on
-their own: the check measures stock and tuned again, alternating twice, and
-only a slowdown that repeats (each alternation and the medians) puts the card
-back, with the figures in the reason. If anything made a reading unreliable,
-the check changes nothing and runs again next boot: a drive logging NVMe
-errors, another model loaded, the card already busy for someone else, an
-answer that failed partway (`status` shows "deferred" and why). A revert
-stays at stock, across reboots, until
-you run `sudo ollama1-gpu-tune on`; `status` says why. Every boot also reads
-the kernel log of the boot the tuning last ran in, and an amdgpu error there
-does the same. With no model installed yet the check runs once one is
-(`ollama1-gpu-tune-check.service`, after Ollama starts).
+temperatures. Any error, the junction at 105 C (100 C with the core raised) or
+the memory at 100 C puts **everything** back to stock at once. Slow answers
+(more than 5% under the baseline) are not enough on their own: the check
+measures the baseline and the tuned state again, alternating twice, and only a
+slowdown that repeats (each alternation and the medians) counts, with the
+figures in the reason. What it puts back depends on the part: a power raise
+that is slower than stock puts everything back; a **memory or core raise that
+is slower goes back alone and the power limit stays** ("memory +25 MHz was
+slower, back to stock; power limit kept"); the core is also judged on prompt
+reading (about 2000 tokens in, 8 out), and goes back if that is slower too.
+Before it measures anything, it waits up to 60 s for the card to be quiet
+(under 10% busy, no other model loading) and says what it waits for. If a
+reading could not be trusted (a drive logging NVMe errors, another model
+loaded, the card busy for someone else, an answer that failed) nothing is
+changed and the check runs again next boot; **an experimental clock is never
+left applied unverified** ("core +150 not applied yet: ...; run it again when
+the server is idle"), while the harmless power limit stays. A full revert
+stays at stock, across reboots, until you run `sudo ollama1-gpu-tune on`;
+`status` says why. Every boot also reads the kernel log of the boot the
+tuning last ran in, and an amdgpu error there does the same. With no model
+installed yet the check runs once one is (`ollama1-gpu-tune-check.service`,
+after Ollama starts). A state file from before this version keeps working:
+its old revert (made when the memory clock was bumped with the power limit)
+is dropped and the power limit alone is tried again.
 
 - `sudo ollama1-gpu-tune status`: stock and current values, temperatures,
   the last check.
-- `sudo ollama1-gpu-tune on`: turn it on (or on again after a revert):
-  measures stock, sets the values, runs the check.
+- `sudo ollama1-gpu-tune on [--memory N] [--core N]`: turn it on (or on again
+  after a revert): measures stock, sets the power limit, runs the check, then
+  each clock asked for with its own check. Status shows each part
+  ("power 332 W, memory stock, core +50 MHz").
 - `sudo ollama1-gpu-tune off`: back to stock, and kept there. A re-run of
   setup keeps it off; `setup.sh --gpu-tune` turns it on.
 - `sudo setup.sh --no-gpu-tune`: off, saved as off, and the GRUB drop-in

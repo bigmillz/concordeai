@@ -181,8 +181,13 @@ def clean_gpu_tune(st):
     watts = (lambda uw: round(uw / 1e6) if _num(uw) else None)
     return {"wanted": _txt(st.get("wanted"), 8), "reverted": _txt(st.get("reverted"), 200),
             "reverted_at": _num(st.get("reverted_at")),
-            "applied": {"power_w": watts(ap.get("power_uw")), "mclk": _num(ap.get("mclk")), "at": _num(ap.get("at"))},
-            "stock": {"power_w": watts(stock.get("power_uw")), "mclk": _num(stock.get("mclk"))},
+            "applied": {"power_w": watts(ap.get("power_uw")), "mclk": _num(ap.get("mclk")),
+                        "sclk": _num(ap.get("sclk")), "at": _num(ap.get("at"))},
+            "stock": {"power_w": watts(stock.get("power_uw")), "mclk": _num(stock.get("mclk")),
+                      "sclk": _num(stock.get("sclk"))},
+            # what was asked (whole MHz above stock, 0 = off) and a clock put back alone (the power limit kept)
+            "memory": _num(st.get("memory")), "core": _num(st.get("core")),
+            "memory_reverted": _txt(st.get("memory_reverted"), 200), "core_reverted": _txt(st.get("core_reverted"), 200),
             "check": {"result": _txt(chk.get("result"), 20), "note": _txt(chk.get("note"), 300),
                       "at": _num(chk.get("at")), "tps": _num(chk.get("tps"))} if chk else None}
 
@@ -1455,16 +1460,19 @@ function renderNet(s){const n=s.network,tun=s.tunnel||{},pairs=[];chip('tunchip'
   (n.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+(p.speed_mbps>=1000?(p.speed_mbps/1000)+' Gb/s':p.speed_mbps+' Mb/s'):''):'no link'),p.carrier?'ok':'dim']));}
  else pairs.push(['LAN','no wired port found','warn']);
  pairs.push(['LAN mode',s.lan_mode?'on: answers on the home network too':'off',s.lan_mode?'warn':'']);kv($('net'),pairs);}
-function renderTune(t,g){g=g||{};const pairs=[];
+function renderTune(t,g){g=g||{};const pairs=[];const clk=(label,ask,now,stock,rev,eff)=>{
+  const bump=(now&&stock)?now-stock:0;
+  pairs.push([label,rev?'stock  ·  its raise was slower and is off (power limit kept)':ask?(bump>0?'+'+bump+' MHz ('+now+(eff?', '+now*2+' MHz effective':'')+')':'+'+ask+' MHz asked, not applied yet')+(stock?'  ·  stock '+stock:''):'stock (raise off)'+(stock?'  ·  '+stock:''),rev?'warn':bump>0?'ok':'']);};
  if(!t){chip('tunechip','Not set up','');pairs.push(['Power limit',g.power_cap_w?g.power_cap_w+' W':'?']);if(g.sclk_mhz)pairs.push(['Core clock now',g.sclk_mhz+' MHz']);
-  kv($('tune'),pairs);$('tunenote').textContent='Off unless you opt in at the server: sudo ./setup.sh --gpu-tune (an AMD Navi 21 card only).';return;}
+  kv($('tune'),pairs);$('tunenote').textContent='Off unless you opt in at the server: sudo ./setup.sh --gpu-tune (an AMD Navi 21 card only; the power limit alone).';return;}
  chip('tunechip',t.reverted?'Back at stock':t.wanted==='on'?'On':t.wanted==='off'?'Off':'Not set up',t.reverted?'warn':t.wanted==='on'?'ok':'');
  pairs.push(['Power limit',(g.power_cap_w?g.power_cap_w+' W now':'?')+(t.stock.power_w?'  ·  stock '+t.stock.power_w+' W':'')]);
- if(t.applied.mclk||t.stock.mclk)pairs.push(['Memory clock',(t.applied.mclk?t.applied.mclk+' ('+t.applied.mclk*2+' MHz effective)':'stock')+(t.stock.mclk?'  ·  stock '+t.stock.mclk:'')]);
+ clk('Memory clock',t.memory,t.applied.mclk,t.stock.mclk,t.memory_reverted,true);
+ clk('Core clock',t.core,t.applied.sclk,t.stock.sclk,t.core_reverted,false);
  if(t.applied.at)pairs.push(['Applied',ago(t.applied.at)]);
  if(t.check)pairs.push(['Last check',(t.check.result||'?')+(t.check.at?', '+ago(t.check.at):''),t.check.result==='passed'?'ok':t.check.result==='reverted'?'bad':'']);
  if(t.reverted)pairs.push(['Kept at stock after',t.reverted,'warn']);kv($('tune'),pairs);
- $('tunenote').textContent=(t.check&&t.check.note?t.check.note+'. ':'')+'Change it at the server: sudo ollama1-gpu-tune on, off or status.';}
+ $('tunenote').textContent=(t.check&&t.check.note?t.check.note+'. ':'')+'Change it at the server: sudo ollama1-gpu-tune on [--memory N] [--core N], off or status.';}
 function renderSvc(s){const gw=s.gateway||{},tun=s.tunnel||{},up=s.updates||{},ou=up.ollama||{};
  kv($('svc'),[['Tunnel',tun.up?'connected ('+tun.connections+')':'down',tun.up?'ok':'bad'],
   ['Gateway',gw.time&&!gw.stale?'running':'not running',gw.time&&!gw.stale?'ok':'bad'],

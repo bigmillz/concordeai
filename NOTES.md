@@ -9,6 +9,60 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b420 — graphics tuning: the power limit alone by default; memory and core clocks opt-in, each judged alone (kit)
+
+- Real card (RX 6900 XT): `ollama1-gpu-tune on` reverted every time ("tuned
+  108.5/103.8/102.2 against stock 248.3/247.8 tokens/s, 2 of 2 repeats"). By
+  hand with llama3.2:1b: power 332 W alone with the memory clock at stock =
+  247.3/244.7/246.5 tokens/s (the same as stock); the memory bump to the OD
+  maximum (+75) is what made it 2.4x slower (no kernel error). The old tuner
+  set both, so a harmless power raise was thrown away with the bad bump.
+- `on` now sets ONLY the power limit (the card's maximum, clamped as before).
+  `on --memory N` (whole MHz 0..75) and `on --core N` (0..150 above the current
+  stock top) are opt-in, default 0, saved in the state, restored at boot like
+  power. The OD writes: `m 1 <stock+N>` / `s 1 <stock+N>` then `c`, clamped to
+  the OD_RANGE, read back and verified; stock via the existing `r`/`c` reset.
+  Memory is never touched unless `--memory` is given (a reset to take off an
+  earlier bump of ours is the only other write).
+- Checks run per part, in order power, memory, core (`run_checks`,
+  `pending_part`, `checked_parts`). A real amdgpu error or heat (105 C
+  junction; 100 C while the core is raised) reverts EVERYTHING at once. A power
+  raise slower than stock reverts everything. A memory or core raise slower
+  than the previous stage (power-only / without the core) reverts ONLY that
+  clock (`part_revert`, `memory_reverted` / `core_reverted`) and says "memory
+  +25 MHz was slower, back to stock; power limit kept". The core is also judged
+  on prompt reading (`Ollama.generate_prompt`: ~2000 tokens in, 8 out, a
+  different start each time so Ollama's prompt cache can't flatter it), and
+  always compared with and without the raise (alternating twice).
+- Pat's report on the old version: `on --core 150` applied power AND the
+  memory bump, the check was deferred ("another model was loaded; the card was
+  99% busy") and the bump stayed live. Now: before measuring, wait up to 60 s
+  for the card to be quiet (`wait_quiet`: busy under 10%, no model loading) and
+  say what it waits for; if it never is, nothing is measured or raised and the
+  next run says "core +150 not applied yet: ...; run it again when the server
+  is idle". `ready_parts` applies an experimental clock only once its own check
+  passed (also at boot and after a wake); a deferred, unclean, no-answer or
+  no-load check drops the clock again (`drop_unproven`). The power limit may
+  stay during a deferral.
+- State version 2: an old file (`wanted=on` with a `reverted` record) is
+  migrated on load (`migrate_state`): the revert is dropped (kept as
+  `migrated.old_revert`), memory/core 0, checks cleared, stock figures kept; an
+  old "off" stays off. Status prints the old reason.
+- Printed lines say exactly what was set ("power limit 332 W (maximum)",
+  "core +150 MHz (top 2529 -> 2679)"); nothing about the memory unless asked.
+  Status shows each part ("Now: power 332 W, memory stock, core +50 MHz").
+- setup.sh: `--gpu-tune-memory N` and `--gpu-tune-core N` (validated 0..75 /
+  0..150), saved as GPU_TUNE_MEMORY / GPU_TUNE_CORE in setup.env (written when
+  GPU_TUNE is not "default"), passed to `ollama1-gpu-tune setup on|force-on
+  --memory N --core N`; `gpu_clock_choice` in lib/setuplib.sh; the plan line
+  and the header help changed. The admin page shows power, memory and core as
+  separate facts.
+- Tests: `TestParts`, `TestOldState`, `TestCommandClocks`, new setup-flag tests
+  in `test_gputune.py` (fakes learned the core table, `s`/`m` writes, prompt
+  reading and speeds per raised part); 14 new mutants in `mutate.py`.
+- Unverified on the real card: the core overclock itself, and that the
+  prompt-reading measurement behaves as designed with a real Ollama.
+
 ## 6b415 — the fans ramp down instead of stepping 100 / 50 / 20 (per Patrick)
 
 Replaces the tail of 6b386: work ends -> 100% for 60 s (`hold100`, unchanged) ->
