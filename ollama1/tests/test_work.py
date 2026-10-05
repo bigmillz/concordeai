@@ -1,4 +1,4 @@
-"""What makes the fans and the lights work (lib/o1work.py, 6b421, per Patrick): the card over 50%
+"""What makes the fans and the lights work (lib/o1work.py, 6b421, per the owner): the card over 50%
 for 1.5 s in a row (and at or under it 1.5 s in a row to end), the processor's temperature from
 60 C until it is under 55 C, and the shared numbers (120 s cool-down, 5 s rise, 300 s then 40%)."""
 import unittest

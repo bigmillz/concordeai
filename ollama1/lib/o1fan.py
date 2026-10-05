@@ -1,4 +1,4 @@
-"""Fan levels for the server (6b385; the levels of 6b421, per Patrick): the graphics
+"""Fan levels for the server (6b385; the levels of 6b421, per the owner): the graphics
 card's fan and every fan header the motherboard's chip lets the kit control (the
 case fans, the CPU/radiator fans) follow what the server is doing, so it is cool
 when it works and quiet, and easy on the bearings, when it does not:

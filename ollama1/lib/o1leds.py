@@ -1,4 +1,4 @@
-"""Lights that follow the graphics card's work (6b417, 6b419; the states of 6b421, per Patrick):
+"""Lights that follow the graphics card's work (6b417, 6b419; the states of 6b421, per the owner):
 every RGB device OpenRGB lists (on this server: the motherboard's Mystic Light and the AIO
 cooler's pump head) is held at the same colour.
 

@@ -1,5 +1,5 @@
 """What makes the server's fans and lights work, defined ONCE for both services
-(6b385, moved here in 6b395; rewritten in 6b421, per Patrick). The fan service
+(6b385, moved here in 6b395; rewritten in 6b421, per the owner). The fan service
 (lib/o1fan.py) and the lights (lib/o1leds.py) both read these numbers, so they
 agree on when the work starts and how long the cool-down takes.
 

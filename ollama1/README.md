@@ -971,7 +971,7 @@ holds the outputs; whenever it stops, for any reason, they go back to their own
 control (the BIOS's automatic), and that is also what is in force at boot
 before it starts.
 
-**Working** (`lib/o1work.py`, shared with the lights; per Patrick, 6b421) is one
+**Working** (`lib/o1work.py`, shared with the lights; per the owner, 6b421) is one
 of two triggers:
 
 - **The graphics card** (sysfs `gpu_busy_percent`) **over 50%** for 1.5 s in a
@@ -1114,7 +1114,7 @@ saved in `/etc/ollama1/setup.env`. `on` runs `apt-get -y -q install openrgb`
 MSI MEG X570 ACE with a Corsair H115i Platinum: the board's Mystic Light and
 the cooler's pump head) gets the same colour, on all its LEDs:
 
-The lights have four states (per Patrick, 6b421), driven by **the same trigger
+The lights have four states (per the owner, 6b421), driven by **the same trigger
 that sends the fans to 100% for the graphics card**: busy over 50%
 (`gpu_busy_percent`, read every 0.25 s) for 1.5 s in a row, ending after 1.5 s
 in a row at or under 50% (`lib/o1work.py`; a 1 s blip does nothing):
