@@ -9950,7 +9950,7 @@ function paintModels(){}
 function setAgent(n){agent=n;}
 function isSrvMode(){return false;}
 function srvModeGone(){}
-function advPrune(){}
+function advPrune(){}function micWarmPaint(){}
 """ % (json.dumps(INST.base), json.dumps(INST.headers)) + _sbseg + r"""
 storeBoot().then(async()=>{if(run.after)prefSet(run.after);await prefQ;
   console.log(JSON.stringify({ls:Object.fromEntries(store),tier,adv,advOn,autonomy,council,reloaded,calls}));});
@@ -10033,7 +10033,7 @@ let adv=null,advOn=false,autonomy="auto",tierOff={},agent="",uiMode="ai",council
     council=["Llama 3.2 3B"],tier="Fast";
 function paintAgents(){} function paintModels(){} function advChip(){} function paintAutonomy(){}
 function modeShow(w){uiMode=w;}
-function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}
+function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}function micWarmPaint(){}
 """ + _sbseg + _jsfn(page, "function setTier(name,quiet){") + _jsfn(page, "function switchLane(m){")
              + _jsfn(page, "function setAgent(name,guess){") + r"""
 const boot=storeBoot();
@@ -16517,7 +16517,7 @@ function paintModels(){}
 function setAgent(n){agent=n;}
 function isSrvMode(){return false;}
 function srvModeGone(){}
-function advPrune(){}
+function advPrune(){}function micWarmPaint(){}
 """ + _pg9 + r"""
 storeBoot().then(()=>console.log(JSON.stringify({ls:Object.fromEntries(store),tier,calls})));
 """)
@@ -17079,7 +17079,10 @@ check("without ACCOUNTS (the shipped app) nothing new runs or shows: no boot inv
 # ==== 6b331 benchmark: begin ====
 # ==== starter chips: begin ====
 check("wake: every packet refused by this computer says so, naming Local Network; the app declares why it needs it",
-      "_srv_wake_blocked[e[\"id\"]] = bool(tried_n and failed_n == tried_n)" in _MILLENAI_SRC
+      "refused = bool(tried_n and failed_n == tried_n)" in _MILLENAI_SRC
+      and "tried_n, failed_n, _first = _srv_wake_send(e)" in _MILLENAI_SRC
+      and "failed_n += 1" in _MILLENAI_SRC[_MILLENAI_SRC.index("def _srv_wake_send(e):"):]
+      and "_srv_wake_blocked[e[\"id\"]] = refused and not relayed" in _MILLENAI_SRC
       and "Privacy & Security \\u203a Local Network" in _MILLENAI_SRC
       and "SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e[\"id\"]) else" in _MILLENAI_SRC
       and "NSLocalNetworkUsageDescription" in open("build_macos_app.sh").read())
@@ -23414,9 +23417,9 @@ def _smc_seats(src):
     got["fast"] = f == ([L("gemma3:27b")], "fits", 4)
     # Thinking: three, a reasoning model welcome
     got["thinking"] = t == ([L("deepseek-r1:32b"), L("gemma3:27b"), L("gpt-oss:20b")], "fits", 5)
-    # Pro: every suitable one, capped at SRV_SEATS_MAX (4 of the 5)
-    got["pro"] = p == ([L("deepseek-r1:32b"), L("gemma3:27b"), L("gpt-oss:20b"), L("qwen3:14b")], "fits", 5) \
-        and ns["SRV_SEATS_MAX"] == 4
+    # Pro: every suitable one, up to SRV_SEATS_MAX (8): all 5 here, none left out (the cap is tried below)
+    got["pro"] = p == ([L("deepseek-r1:32b"), L("gemma3:27b"), L("gpt-oss:20b"), L("qwen3:14b"), L("llama3.1:8b")],
+                       "fits", 5) and ns["SRV_SEATS_MAX"] == 8
     allseats = f[0] + t[0] + p[0]
     got["every seat that server's"] = all(ns["server_label"](x) and x.startswith("Pat’s Lab · ") for x in allseats)
     got["never a spill, an unknown placement, a coder, an embedding or a picture reader"] = not any(
@@ -23441,7 +23444,14 @@ def _smc_seats(src):
                     and s3["note"] == "3 models on Pat’s Lab draft, one double-checks them, then Pat’s Lab writes "
                                       "the merge there. " + dry
                     and sf["note"].endswith(dry) and "second pass" in sf["note"] and sf["models"] == f[0]
-                    and "It seats 4 of its 5" in sp["note"] and sp["note"].endswith(dry))
+                    and "It seats" not in sp["note"] and sp["note"].startswith("5 models on Pat’s Lab draft")
+                    and sp["note"].endswith(dry))
+    # past the cap: ten suitable models, Pro seats eight and says so
+    _so_seen(ns, e, ms + [M(x) for x in ("qwen3:8b", "gemma3:12b", "mistral:7b", "phi4:14b", "llama3.2:3b")])
+    pc = seats("Pro")
+    got["the cap"] = (len(pc[0]) == ns["SRV_SEATS_MAX"] == 8 and pc[2] == 10 and pc[0][:3] == p[0][:3]
+                      and "It seats 8 of its 10" in st("Pro")["note"] and len(seats("Thinking")[0]) == 3)
+    _so_seen(ns, e, ms)
     # off: the same reason as "<name> Only", no seats
     _so_seen(ns, e, ms, reachable=False, err="Pat’s Lab didn’t answer.")
     so = st("Pro")
@@ -24538,7 +24548,8 @@ check("servers (live): Cloud Only never seats a server model; Pro seats the serv
       len([r for r in _o1("/log")["log"][_nlog34:] if r["path"] == "/api/chat"]) == 0
       and _SVN not in json.dumps(_tiers34["Cloud Only"], ensure_ascii=False)
       and _tiers34["Cloud Only"]["models"] == []
-      and [k_ for k_ in _tiers34 if k_.startswith("srv:")] == ["srv:" + _sid34]
+      and [k_ for k_ in _tiers34 if k_.startswith("srv:")] == ["srv:" + _sid34] + [
+          "srv:%s:%s" % (_sid34, m_) for m_ in ("fast", "think", "pro")]   # (6b426) "<server> Only" and its three modes
       and any(_SVN in m_ for m_ in _tiOn["Pro"]["models"])
       and _pf0[1].get("ok") is True and _pf0[1]["server"]["prefer"] is False
       and not any(_SVN in m_ for k_ in ("Fast", "Thinking", "Pro") for m_ in _tiOff[k_]["models"])
@@ -27927,7 +27938,7 @@ def _m42c_text(src):
     seg = src[a:b]
     c = src.index("/* a paired server's graphics card and memory, under this computer's chip")
     css = src[c:src.index(".meter-label{", c)]
-    srv = src[src.index("def _srv_usage_gpu(js)"):src.index("# ==== servers: end ====")]
+    srv = src[src.index("def _srv_usage_gpu(js)"):src.index("# ---- sleep when idle and waking (6b346)")]   # the meter code only; the sleep, wake and relay code after it holds a token of its own
     out = {}
     out["words"] = not re.search(r"(?i)ollama1|secret|seed|device_key|access_id|console\.", seg + css + srv)
     out["hook"] = ("  if(box)box.innerHTML=srvChipsHtml(srvList);\n  srvMetersRefresh();\n}" in src

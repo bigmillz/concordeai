@@ -11,6 +11,13 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ## 6b431 — an optional "wake relay" per server, for waking it from away (per Patrick; his own setup, not the kit's)
 
+*Merge fixes (round 2, five branches on main): eight gauntlet checks adjusted, no app code changed.
+The storeBoot node harnesses (ISO-10, the race check, Q10's page half, adopt) gained a `micWarmPaint`
+stub (micwarm's `applyPrefs` calls it); the wake check anchors on `_srv_wake_send` and `refused`;
+the server-modes seats check expects the cap of 8 (Pro seats all 5 of 5) and a ten-model case seating
+8 of 10; the live tiers check expects the four `srv:` rows ("<server> Only" and its three modes);
+the server-meters word scan now stops where the meter code ends instead of sweeping the relay's token.*
+
 Patrick: "outside of my home network, let's also set it up so that we can use the Raspberry Pi running the
 VPN to wake the server... over the VPN, but remember, this won't translate into our instructions/scripts for
 others to set up their own LLM server because it's custom for my RPi VPN setup."
