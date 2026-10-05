@@ -12,10 +12,10 @@ never more often than every MIN_WRITE_S seconds.
 The policy follows the fans' phases (lib/o1fan.py):
 
   phase                 fans            pump
-  working, hot          100%            extreme
-  hold100               100%            extreme
+  working, hot          100%            extreme    (the card over 50%, the CPU at 60 C, a sensor at its limit)
   calibrating           100%            balanced   (first start: measuring rpm)
   ramp                  the fans' %, falling from 100 to 20 over 120 s   balanced
+                        (from the moment the work ends; there is no hold at 100% any more, 6b421)
   idle20                20%, or higher  quiet
                         for a fan that stalls (the same learning as the case fans)
 
@@ -241,13 +241,13 @@ class Aio:
         """(pump mode, {fan: percent}) for now."""
         with self.lock:
             phase, fans = self.phase, sorted(self.status["fans"]) or [1, 2]
-        if self.coolant_hot or phase in ("working", "hot", "hold100"):
+        if self.coolant_hot or phase in ("working", "hot"):
             pump = "extreme"
         elif phase in ("ramp", "calibrating"):
             pump = "balanced"
         else:
             pump = "quiet"
-        base = 100 if (self.coolant_hot or phase in ("working", "hot", "hold100", "calibrating")) else \
+        base = 100 if (self.coolant_hot or phase in ("working", "hot", "calibrating")) else \
             self.pct if phase == "ramp" else 20
         out = {}
         for n in fans:

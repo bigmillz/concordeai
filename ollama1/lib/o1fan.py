@@ -1,28 +1,31 @@
-"""Fan levels for the server (6b385, changed in 6b386): the graphics card's fan
-and every fan header the motherboard's chip lets the kit control follow what
-the server is doing, so it is cool when it works and quiet, and easy on the
-bearings, when it does not:
+"""Fan levels for the server (6b385; the levels of 6b421, per the owner): the graphics
+card's fan and every fan header the motherboard's chip lets the kit control (the
+case fans, the CPU/radiator fans) follow what the server is doing, so it is cool
+when it works and quiet, and easy on the bearings, when it does not:
 
-  working     100%   a request, a long job, the card or the processors say so
-  hold100     100%   for 60 s after the work ends
-  ramp     100->20%  falling in a straight line over the next 120 s, in 2% steps
-  idle20       20%   from 180 s after the work ended (and from the start)
+  working     100%   the card over 50% busy, or the processor at 60 C or more
+  ramp     100->20%  from the moment that ends, a straight line down over 120 s,
+                     in 2% steps (no hold at 100% first)
+  idle20       20%   from 120 s after the work ended (and from the start)
 
-A new request at any time goes back to 100% and starts the sequence again.
-A level is pwm = round(percent * 255 / 100): 20% is 51, 50% is 128. The
-service always holds the outputs while it runs; it gives them back to their
-own control (the BIOS's automatic) whenever it stops, for any reason.
+Work at any time, the ramp included, goes back to 100% at once; when it ends
+again the ramp starts again from 100%. A level is pwm = round(percent * 255 /
+100): 20% is 51, 50% is 128. The service always holds the outputs while it
+runs; it gives them back to their own control (the BIOS's automatic) whenever
+it stops, for any reason.
 
-What counts as "working" is what auto sleep already counts as busy
-(lib/o1idle.py), read with the same probes and the same limits:
+What counts as work is lib/o1work.py's, shared with the lights (which follow the
+card only):
 
-  * a request in flight (the gateway's activity file);
-  * the graphics card at 15% or more, averaged over 6 s;
-  * a long job running (stability-test.sh and the like: o1idle.tools_running);
-  * the processors at 40% or more, averaged over 10 s (no load average, 6b401).
+  * the card's busy percent over 50% for 1.5 s in a row (two 2 s polls in a
+    row), ending when it has been at or under 50% for 1.5 s in a row: one
+    sample over 50% does not start a two-minute ramp;
+  * the processor's temperature (k10temp Tctl/Tdie, the "CPU" reading below)
+    at 60 C or more, ending under 55 C.
 
-o1sleep.busy_reasons (a download, an update, a backup) is not used: those keep
-the server awake but are not heat.
+The processors' utilisation, a request in flight and running tools or setup.sh /
+apt-get / unattended-upgrade are NOT work any more: only heat or the card's load
+turns the fans up.
 
 Which outputs (sysfs, found by chip name, never by hwmonN number):
 
@@ -87,8 +90,7 @@ import o1work
 from o1common import read_json_safe, write_json_atomic
 
 POLL_S = 2
-HOLD100_S = 60                   # 100% for this long after the work ends
-RAMP_S = 120                     # then a straight ramp down to the idle level over this long
+RAMP_S = o1work.COOL_S           # when the work ends, a straight ramp down to the idle level over this long
 QUANT_PCT = 2                    # the ramp is written in whole steps of this many percent
 FULL_PCT, LOW_PCT = 100, 20
 STEP_PCT = 10                    # a stalled output is raised by this much
@@ -96,7 +98,6 @@ SETTLE_S = 6                     # a level is judged by rpm only after this long
 PUMP_RATIO = 0.6                 # at 20% still this share of its 100% rpm: a pump or a fixed header
 HYST_C = 10                      # a temperature override ends this far under its limit
 STATUS_STALE_S = 15              # a status file older than this: the service isn't running
-TOOLS_EVERY_S = 6                # /proc is walked at most this often (lib/o1work.py)
 LIMIT_CPU_C, LIMIT_GPU_C, LIMIT_NVME_C = 80, 90, 70
 LIMIT_GPU_EDGE_C, LIMIT_GPU_MEM_C = 85, 95
 LIMIT_BOARD_C = 70               # a motherboard chip input: system, auxiliary and any label it does not know
@@ -333,23 +334,23 @@ def summarize_temps(rows):
 # ---- the machine ------------------------------------------------------------------
 
 class Fan:
-    """One tick every POLL_S seconds. `probes` supplies inflight (an int, or None
-    when it can't be told), gpu_busy, tools (a list) and loadavg; `clock` is
-    monotonic (the levels must not jump); `wall` stamps the status file."""
+    """One tick every POLL_S seconds. `probes` supplies gpu_busy (the card's busy percent, or None); the
+    processor's temperature comes from the sensors (read_temps); `clock` is monotonic (the levels must not
+    jump); `wall` stamps the status file."""
 
     def __init__(self, probes, clock=time.monotonic, wall=time.time, log=print, io=None, sysroot=None,
-                 boot_id=read_boot_id, tools_every=TOOLS_EVERY_S, aio=None, aio_inline=False):
+                 boot_id=read_boot_id, aio=None, aio_inline=False):
         self.p, self.clock, self.wall, self.log = probes, clock, wall, log
         self.aio, self.aio_inline = aio, aio_inline      # the liquid cooler, if any (lib/o1aio.py)
         self.plock = threading.Lock()
         self.io = io or SysfsIO()
         self.sysroot = sysroot
         self.boot_id = boot_id
-        self.tools_every = tools_every
         self.orig = {}                 # key -> {"enable": int, "pwm": int | None}: as it was before the kit touched it
         self.learned = {}              # lkey -> {"rpm100", "min_pct", "always100", "pump_checked"}
         self.engaged = False           # True while the kit holds any output
-        self.last_work = None
+        self.was_working = False
+        self.cool_from = None          # when the work last ended: the ramp is counted from here
         self.hot = {}                  # temperature key -> label, while over its limit
         self.failed = set()
         self.level = {}                # key -> the percent it was last set to
@@ -357,7 +358,9 @@ class Fan:
         self.checked = {}              # key -> the level whose rpm was judged
         self.phase, self.pct, self.why, self.left = "idle20", LOW_PCT, "idle", 0
         self.seen = None               # what it last said it controls
-        self.work = o1work.Work(probes, clock, tools_every)
+        self.kinds = self.said_kinds = ()   # which triggers hold it working (the log says when that changes)
+        self.gpu = o1work.GpuTrigger()
+        self.cpu = o1work.CpuTrigger()
         self._load_state()
         if self.aio:
             self.aio.attach(self.learned, self._persist, self.log)
@@ -382,7 +385,7 @@ class Fan:
                     good[k] = {"enable": v["enable"], "pwm": v["pwm"] if isinstance(v.get("pwm"), int) else None}
             if good:
                 self.orig, self.engaged = good, True
-                self.last_work = self.clock()          # found still held: the whole sequence from the start
+                self.cool_from = self.clock()          # found still held: the ramp from 100%, in case it was working
                 self.log("found fans still held by an earlier run: %d output%s, put back when it stops"
                          % (len(good), "" if len(good) == 1 else "s"))
         self._persist()                                # another boot's originals go: the hardware is as it was
@@ -400,13 +403,28 @@ class Fan:
                                              "learned": self.learned}, mode=0o600)
 
     # -- what counts as working -----------------------------------------------------
-    def working(self, now=None):
-        """(working?, the reasons): lib/o1work.py, the probes and limits auto sleep uses."""
-        return self.work.working(self.clock() if now is None else now)
+    def _gpu_busy(self):
+        try:
+            return self.p["gpu_busy"]()
+        except Exception:
+            return None
 
-    def overheated(self):
+    def working(self, now=None, temps=None):
+        """(working?, the reasons): the card over 50% (debounced) or the processor at 60 C (lib/o1work.py)."""
+        now = self.clock() if now is None else now
+        temps = read_temps(self.sysroot) if temps is None else temps
+        why, self.kinds = [], ()
+        if self.gpu.update(now, self._gpu_busy()):
+            why.append("the card is %d%% busy" % round(self.gpu.pct or 0))
+            self.kinds += ("card",)
+        if self.cpu.update(c for key, _l, c, _lim in temps if key.startswith("cpu:")):
+            why.append("CPU %.0f C" % self.cpu.c)
+            self.kinds += ("cpu",)
+        return bool(why), why
+
+    def overheated(self, temps=None):
         """(hot?, the reasons): a sensor over its limit stays hot until HYST_C under it."""
-        for key, label, c, limit in read_temps(self.sysroot):
+        for key, label, c, limit in (read_temps(self.sysroot) if temps is None else temps):
             if c is None:
                 self.hot.pop(key, None)              # disconnected or stuck: never a reason, and not a stuck one
             elif c >= limit:
@@ -563,8 +581,9 @@ class Fan:
     # -- one tick --------------------------------------------------------------------
     def tick(self):
         now = self.clock()
-        working, wwhy = self.working(now)
-        hot, hwhy = self.overheated()
+        temps = read_temps(self.sysroot)
+        working, wwhy = self.working(now, temps)
+        hot, hwhy = self.overheated(temps)
         outs = find_outputs(self.sysroot)
         usable = [o for o in outs if o.key not in self.failed]
         text = controlling_text(usable)
@@ -572,8 +591,10 @@ class Fan:
             self.log("controlling " + text)
             self.seen = text
         if working:
-            self.last_work = now
-        age = None if self.last_work is None else now - self.last_work
+            self.was_working, self.cool_from = True, None
+        elif self.was_working:
+            self.was_working, self.cool_from = False, now          # the work just ended: the ramp starts now
+        age = None if self.cool_from is None else now - self.cool_from
         left = 0
         if hot:
             phase, pct, why = "hot", FULL_PCT, "too warm: " + "; ".join(hwhy)
@@ -581,11 +602,9 @@ class Fan:
             phase, pct, why = "working", FULL_PCT, "; ".join(wwhy)
         elif any(o.lkey not in self.learned for o in usable) or (self.aio and self.aio.needs_calibration()):
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
-        elif age is not None and age < HOLD100_S:
-            phase, pct, why, left = "hold100", FULL_PCT, "the work ended", int(HOLD100_S - age + 0.999)
-        elif age is not None and age < HOLD100_S + RAMP_S:
-            pct = ramp_pct(age - HOLD100_S)
-            phase, why, left = "ramp", "the work ended", int(HOLD100_S + RAMP_S - age + 0.999)
+        elif age is not None and age < RAMP_S:
+            pct = ramp_pct(age)
+            phase, why, left = "ramp", "the work ended", int(RAMP_S - age + 0.999)
         else:
             phase, pct, why = "idle20", LOW_PCT, "idle"
         self.apply(outs, pct, now)
@@ -594,8 +613,10 @@ class Fan:
             self.aio.set_phase(phase, pct)
             if self.aio_inline:
                 self.aio.step(now)
-        if phase != self.phase or (phase in ("working", "hot") and why != self.why):
+        if phase != self.phase or (phase == "hot" and why != self.why) or (phase == "working" and
+                                                                             self.kinds != self.said_kinds):
             self.log("%s: %s" % (phase, why))
+            self.said_kinds = self.kinds
         self.phase, self.pct, self.why, self.left = phase, pct, why, left
         self.write_status(usable)
         return phase, why
@@ -673,10 +694,8 @@ def ramp_pct(t):
 
 
 def phase_text(st):
-    """The phase in words: working / hold100 Ns / ramp NN% / idle20 (and the two that force 100%)."""
+    """The phase in words: working / ramp NN% / idle20 (and the two that force 100%)."""
     ph = st.get("phase")
-    if ph == "hold100":
-        return "%s %ds" % (ph, st.get("hold_left", 0))
     if ph == "ramp":
         return "ramp %d%%" % st.get("pct", 0)
     return ph or "?"
@@ -697,8 +716,6 @@ def status_line(st):
     pct = st.get("pct", 0)
     if ph in ("working", "hot", "calibrating"):
         head = "Fans: %d%% (%s)" % (pct, st.get("why") or ph)
-    elif ph == "hold100":
-        head = "Fans: 100%% for %d s more, then down to 20%%" % st.get("hold_left", 0)
     elif ph == "ramp":
         head = "Fans: ramping down, %d%% (20%% in %d s)" % (pct, st.get("hold_left", 0))
     else:

@@ -1,38 +1,43 @@
-"""What counts as "working" for the server (6b385, moved here in 6b395 so the fan
-service and the lights share ONE definition; the load average dropped in 6b401).
+"""What makes the server's fans and lights work, defined ONCE for both services
+(6b385, moved here in 6b395; rewritten in 6b421, per the owner). The fan service
+(lib/o1fan.py) and the lights (lib/o1leds.py) both read these numbers, so they
+agree on when the work starts and how long the cool-down takes.
 
-  * a request in flight (the gateway's activity file): at once;
-  * a long job running (stability-test.sh, ram_model_test.py and the others
-    o1idle.scan_tools knows): at once;
-  * the graphics card at GPU_BUSY_PCT (15%) or more, averaged over GPU_WINDOW_S (6 s);
-  * the processors at CPU_BUSY_PCT (40%) or more, averaged over CPU_WINDOW_S (10 s),
-    from /proc/stat deltas: user + nice + system + irq + softirq over every field,
-    so time waiting on a disk (iowait) and idle time do not count.
+  the card        busy over GPU_BUSY_PCT (50%; sysfs gpu_busy_percent, strictly
+                  over) for GPU_CONFIRM_S (1.5 s) in a row starts the work; at
+                  or under it for GPU_CONFIRM_S in a row ends it. Every sample on
+                  the other side restarts the count, so one blip over 50% (or one
+                  dip under it) changes nothing. At the fans' 2 s poll that is two
+                  samples in a row; at the lights' 0.25 s sampling, seven. No card
+                  reading counts as not busy. Fans AND lights.
+  the processor   its temperature (k10temp Tctl/Tdie, the reading lib/o1fan.py's
+                  read_temps gives as "CPU") at CPU_HOT_C (60 C) or more starts the
+                  work; under CPU_COOL_C (55 C) ends it (the 5 C gap keeps it from
+                  flapping). FANS ONLY: the lights follow the card alone.
 
-Once a card or processor signal has made it work, it stays working until that
-value has been under its threshold for RELEASE_S (6 s).
+Nothing else is work any more: not the processors' utilisation, not a request in
+flight, not a running tool or setup.sh / apt-get / unattended-upgrade (a burn test
+or a model answering shows up as the card over 50%, which is what heats it).
 
-The 1-minute load average is NOT used here any more: it counts tasks blocked
-on a disk (a RAID check, boot-time work, apt, snapd) and lags by a minute, so
-it kept the fans at 100% for minutes with nothing running. Auto sleep keeps
-its own load rule (o1idle.decide); that is a different decision and untouched.
-
-The averages are taken at the poll rate of whoever calls working() (the fan
-service and the lights both look every 2 s); a window needs samples spanning
-nearly all of it (within a second) before it says anything, so the first
-seconds after a start say nothing.
+  COOL_S       120 s   when the work ends the fans fall 100% -> 20% and the lights
+                       red -> orange -> yellow -> white over this, both linear in time
+  RISE_S       5 s     the lights' way back to red and full brightness when work starts
+  IDLE_DIM_S   300 s   the lights at white this long, then dimmed ...
+  DIM_PCT      40%     ... to this brightness, over DIM_S (10 s)
 """
-import collections
 import time
 
 import o1gpu
-import o1idle
 
-GPU_BUSY_PCT, GPU_WINDOW_S = 15, 6
-CPU_BUSY_PCT, CPU_WINDOW_S = 40, 10
-RELEASE_S = 6                    # under its threshold this long before a card or processor signal lets go
-SPAN_SLACK_S = 1.0               # a window must span its length less this
-KEEP_SLACK_S = 0.5               # and keeps samples this much older (a tick that came a little late)
+GPU_BUSY_PCT = 50                 # the card over this (strictly) is work
+GPU_CONFIRM_S = 1.5               # ... for this long in a row; and at/under it this long in a row to end it
+CLOCK_SLACK_S = 1e-6              # a sample due at exactly 1.5 s that a float clock puts a hair early still counts
+CPU_HOT_C, CPU_COOL_C = 60, 55    # the processor's temperature: work from 60 C, until it is under 55 C (fans only)
+COOL_S = 120                      # the cool-down: fans 100 -> 20%, lights red -> white
+RISE_S = 5.0                      # the lights: to red and 100% brightness
+IDLE_DIM_S = 300.0                # the lights: white this long, then dim
+DIM_PCT = 40                      # ... to this brightness
+DIM_S = 10.0                      # ... over this long
 
 
 class Gpu:
@@ -48,113 +53,61 @@ class Gpu:
         return o1gpu.usage(self.vendor)["busy_pct"] if self.vendor else None
 
 
-def cpu_times(proc="/proc"):
-    """(busy, total) jiffies of the whole machine from /proc/stat's "cpu" line: busy is user + nice + system +
-    irq + softirq; total is every field of user..steal, so iowait and idle are in the total and not in busy.
-    None when it can't be read."""
-    try:
-        with open(proc + "/stat") as f:
-            for line in f:
-                parts = line.split()
-                if parts and parts[0] == "cpu":
-                    v = [int(x) for x in parts[1:9]]
-                    v += [0] * (8 - len(v))
-                    user, nice, system, idle, iowait, irq, softirq, steal = v
-                    return user + nice + system + irq + softirq, sum(v)
-    except (OSError, ValueError):
-        pass
-    return None
-
-
 def probes():
-    gpu = Gpu()
-    return {"inflight": lambda: o1idle.read_activity(time.time())["inflight"], "gpu_busy": gpu.busy,
-            "tools": o1idle.tools_running, "cpu": cpu_times}
+    """The one probe both services read: the card's busy percent."""
+    return {"gpu_busy": Gpu().busy}
 
 
-class Work:
-    """`probes` supplies inflight (an int, or None when it can't be told), gpu_busy (percent), tools (a
-    list) and cpu ((busy, total) jiffies); `clock` is monotonic; /proc is walked for tools at most every
-    `tools_every` s."""
+def number(v):
+    """A percent reading as a float, or None (no reading: a bool, a string, NaN, an error's None)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:
+        return None
+    return float(v)
 
-    def __init__(self, probes, clock=time.monotonic, tools_every=6):
-        self.p, self.clock, self.tools_every = probes, clock, tools_every
-        self.tools_at, self.tools = -1e9, []
-        self.gpu_s = collections.deque()          # (t, percent)
-        self.cpu_s = collections.deque()          # (t, busy, total)
-        self.on = {"gpu": False, "cpu": False}
-        self.below = {"gpu": None, "cpu": None}
-        self.gpu_avg = self.cpu_avg = None
 
-    def _probe(self, name):
-        try:
-            return self.p[name]()
-        except Exception:
-            return None
+class GpuTrigger:
+    """The card's work trigger, debounced: `update(now, percent)` on every sample, True while working.
+    `since` is when the state last changed (None until it first does)."""
 
-    def _tools(self, now):
-        """The long jobs running; /proc is walked at most every tools_every seconds."""
-        if now - self.tools_at >= self.tools_every:
-            self.tools_at = now
-            self.tools = self._probe("tools") or []
-        return self.tools
+    def __init__(self):
+        self.on = False
+        self.run_from = None             # the first sample, in a row, on the other side of the line
+        self.since = None
+        self.pct = None                  # the last reading (None: none)
 
-    @staticmethod
-    def _trim(q, now, window):
-        while q and q[0][0] < now - window - KEEP_SLACK_S:
-            q.popleft()
-        return bool(q) and q[-1][0] - q[0][0] >= window - SPAN_SLACK_S
+    def update(self, now, pct):
+        self.pct = number(pct)
+        busy = self.pct is not None and self.pct > GPU_BUSY_PCT
+        if busy == self.on:
+            self.run_from = None
+        else:
+            if self.run_from is None or now < self.run_from:
+                self.run_from = now
+            if now - self.run_from >= GPU_CONFIRM_S - CLOCK_SLACK_S:
+                self.on, self.run_from, self.since = busy, None, now
+        return self.on
 
-    def _gpu(self, now):
-        g = self._probe("gpu_busy")
-        if isinstance(g, (int, float)) and not isinstance(g, bool):
-            if self.gpu_s and self.gpu_s[-1][0] >= now:
-                self.gpu_s.pop()
-            self.gpu_s.append((now, float(g)))
-        if not self._trim(self.gpu_s, now, GPU_WINDOW_S):
-            return None
-        return sum(v for _t, v in self.gpu_s) / len(self.gpu_s)
 
-    def _cpu(self, now):
-        c = self._probe("cpu")
-        if isinstance(c, (tuple, list)) and len(c) == 2 and all(isinstance(x, (int, float)) for x in c):
-            if self.cpu_s and self.cpu_s[-1][0] >= now:
-                self.cpu_s.pop()
-            self.cpu_s.append((now, c[0], c[1]))
-        if not self._trim(self.cpu_s, now, CPU_WINDOW_S):
-            return None
-        (_t0, b0, t0), (_t1, b1, t1) = self.cpu_s[0], self.cpu_s[-1]
-        if t1 <= t0 or b1 < b0:
-            return None
-        return 100.0 * (b1 - b0) / (t1 - t0)
+class CpuTrigger:
+    """The processor's temperature trigger (the fans only): `update(readings)` with the CPU sensors'
+    readings in C (None for a disconnected or stuck sensor). Work from CPU_HOT_C; it ends under CPU_COOL_C.
+    No CPU sensor at all keeps the state; one that went implausible lets go (a stuck sensor is never a
+    reason for 100%, the same rule as the overheat override)."""
 
-    def _latch(self, name, avg, threshold, now):
-        """On at the threshold; off only when it has been under it for RELEASE_S."""
-        if avg is None:
-            return self.on[name]
-        if avg >= threshold:
-            self.on[name], self.below[name] = True, None
-        elif self.on[name]:
-            if self.below[name] is None:
-                self.below[name] = now
-            elif now - self.below[name] >= RELEASE_S:
-                self.on[name], self.below[name] = False, None
-        return self.on[name]
+    def __init__(self):
+        self.on = False
+        self.c = None
 
-    def working(self, now=None):
-        """(working?, the reasons: which signal made it work)."""
-        now = self.clock() if now is None else now
-        why = []
-        n = self._probe("inflight")
-        if isinstance(n, int) and not isinstance(n, bool) and n > 0:
-            why.append("a request is running")
-        t = self._tools(now)
-        if t:
-            why.append("running " + ", ".join(sorted(str(x) for x in t)))
-        self.gpu_avg = self._gpu(now)
-        if self._latch("gpu", self.gpu_avg, GPU_BUSY_PCT, now):
-            why.append("the card is %d%% busy" % round(self.gpu_avg if self.gpu_avg is not None else GPU_BUSY_PCT))
-        self.cpu_avg = self._cpu(now)
-        if self._latch("cpu", self.cpu_avg, CPU_BUSY_PCT, now):
-            why.append("processors %d%% busy" % round(self.cpu_avg if self.cpu_avg is not None else CPU_BUSY_PCT))
-        return bool(why), why
+    def update(self, readings):
+        readings = list(readings)
+        if not readings:
+            return self.on                       # no sensor this time: nothing new
+        good = [c for c in readings if c is not None]
+        self.c = max(good) if good else None
+        if self.c is None:
+            self.on = False
+        elif self.c >= CPU_HOT_C:
+            self.on = True
+        elif self.on and self.c < CPU_COOL_C:
+            self.on = False
+        return self.on
