@@ -1,6 +1,6 @@
 """What makes the fans and the lights work (lib/o1work.py, 6b421, per the owner): the card over 50%
 for 1.5 s in a row (and at or under it 1.5 s in a row to end), the processor's temperature from
-60 C until it is under 55 C, and the shared numbers (120 s cool-down, 5 s rise, 300 s then 40%)."""
+60 C until it is under 55 C, and the shared numbers (60 s cool-down, 5 s rise, 300 s then 40%)."""
 import unittest
 
 import o1test_util as U  # noqa: F401  (sets OLLAMA1_PREFIX first)
@@ -21,7 +21,7 @@ class TestNumbers(unittest.TestCase):
         self.assertEqual(o1work.GPU_BUSY_PCT, 50)
         self.assertEqual(o1work.GPU_CONFIRM_S, 1.5)
         self.assertEqual((o1work.CPU_HOT_C, o1work.CPU_COOL_C), (60, 55))
-        self.assertEqual(o1work.COOL_S, 120)
+        self.assertEqual(o1work.COOL_S, 60)
         self.assertEqual(o1work.RISE_S, 5.0)
         self.assertEqual((o1work.IDLE_DIM_S, o1work.DIM_PCT, o1work.DIM_S), (300.0, 40, 10.0))
 

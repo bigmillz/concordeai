@@ -9,6 +9,31 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b422 — the cool-down is one minute, not two, for the fans and the lights (per Patrick)
+
+Kit only (`ollama1/`). Per Patrick: "speed the cooling up process from two minutes to one
+minute". `COOL_S` in `lib/o1work.py`, the one number the fans (`o1fan.RAMP_S`) and the lights
+(`o1leds.COOL_S`) both read, went from 120 to 60. So:
+
+- **Fans.** At once when the work ends, 100% -> 20% over 60 s, a straight line written in whole
+  2% steps (40 steps, one every 1.5 s; the rounding is the same `round(p / 2) * 2`, so it is
+  still straight to within one step). `idle20` starts 60 s after the work ended. At the fans' 2 s
+  poll that is one or two steps a poll (the old 120 s ramp was zero or one), so the write test
+  now allows a drop of up to two steps. A ramp tick 1 s in is now 98%, not 100% (100% holds
+  only the first 0.75 s).
+- **Lights.** Red -> orange -> yellow -> white over the same 60 s, linear in time along the
+  gradient (orange at 20 s, yellow at 40 s); the 300 s of white before the 40% dim still count
+  from the moment it reaches white.
+- **Unchanged.** New work mid-cool still sends the lights back to red over the 5 s rise from
+  wherever they are, and the fans to 100% at once.
+- Docs and text moved with it: `o1work`/`o1fan`/`o1leds`/`o1aio` docstrings, `bin/ollama1-fan`,
+  `bin/ollama1-leds`, the two unit comments, `setup.sh` help and comments, the `fans_plan` and
+  `leds_plan` lines in `lib/setuplib.sh`, and `README.md` (`--fans`, `--leds`, the Fans phase
+  table, the Lights section). The admin page and panel read the countdown from the status file,
+  so they needed no change. Tests (`test_fan`, `test_aio`, `test_leds`, `test_work`) follow
+  `COOL_S` where natural, with a hard 60 in `test_work` and `test_fan`; `mutate.py`'s cool-down
+  mutants now break 60 into 120, 30 and 300, and the fan's own `RAMP_S` mutant uses 90.
+
 ## 6b421 — fans and lights: the card over 50% or the CPU at 60 C, no hold, a 5 s rise to red (per Patrick)
 
 Kit only (`ollama1/`). Per Patrick, new rules for the fans (case, CPU/radiator and the GPU

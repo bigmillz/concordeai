@@ -1,7 +1,7 @@
 """Fan levels that follow the server's work (6b385, 6b386; the triggers and the ramp of 6b421): the
 service's machine on a fake sysfs tree (fans whose rpm follows their pwm) and a fake clock.
 Working 100% (the card over 50% for 1.5 s in a row, or the CPU at 60 C until under 55 C), then at once
-a straight ramp down to 20% over 120 s, then 20%; work again at any time; requests, tools and setup.sh /
+a straight ramp down to 20% over 60 s, then 20%; work again at any time; requests, tools and setup.sh /
 apt-get are not work; a stalled fan raised to the lowest level that spins; a probable pump kept
 at 100%; an output with no rpm left alone; originals restored after any exit;
 the watchdog; the temperature override; a wake; the status text; the unit and
@@ -291,9 +291,9 @@ class TestCpuTemperature(FanCase):
         self.assertEqual(self.go(f, self.clock.t + 1)[0], "ramp")
         self.assertTrue(self.tree.at(255))                             # the ramp's first tick: 100%
         self.tree.temp("cpu", 58)                                     # warmer again, but not 60: the ramp goes on
-        self.assertEqual(self.go(f, self.clock.t + 60)[0], "ramp")
+        self.assertEqual(self.go(f, self.clock.t + o1fan.RAMP_S / 2)[0], "ramp")
         self.assertTrue(self.tree.at(o1fan.pwm_of(60)))
-        self.assertEqual(self.go(f, self.clock.t + 60)[0], "idle20")
+        self.assertEqual(self.go(f, self.clock.t + o1fan.RAMP_S / 2)[0], "idle20")
 
     def test_no_flapping_around_60(self):
         f = self.up()
@@ -324,10 +324,10 @@ class TestCpuTemperature(FanCase):
         f = self.up()
         self.busy(f)
         t0 = self.quiet(f)
-        self.go(f, t0 + 60)
+        self.go(f, t0 + o1fan.RAMP_S / 2)
         self.assertTrue(self.tree.at(o1fan.pwm_of(60)))
         self.tree.temp("cpu", 61)
-        self.assertEqual(self.go(f, t0 + 61)[0], "working")
+        self.assertEqual(self.go(f, t0 + o1fan.RAMP_S / 2 + 1)[0], "working")
         self.assertTrue(self.tree.at(255))
 
     def test_the_card_and_the_cpu_together_say_both(self):
@@ -342,12 +342,12 @@ class TestCpuTemperature(FanCase):
 
     def test_the_numbers_are_the_shared_ones(self):
         w = o1fan.o1work
-        self.assertEqual((w.GPU_BUSY_PCT, w.CPU_HOT_C, w.CPU_COOL_C, w.COOL_S), (50, 60, 55, 120))
+        self.assertEqual((w.GPU_BUSY_PCT, w.CPU_HOT_C, w.CPU_COOL_C, w.COOL_S), (50, 60, 55, 60))
         self.assertEqual(o1fan.RAMP_S, w.COOL_S)
 
 
 class TestSequence(FanCase):
-    """After the work ends: at once a ramp from 100% down to 20% over 120 s (whole 2% steps), then 20%."""
+    """After the work ends: at once a ramp from 100% down to 20% over 60 s (whole 2% steps), then 20%."""
 
     def after_work(self, seconds):
         f = self.up()
@@ -358,8 +358,8 @@ class TestSequence(FanCase):
 
     def test_exact_boundaries(self):
         P = o1fan.pwm_of
-        for dt, phase, pwm in ((0, "ramp", 255), (2, "ramp", P(98)), (30, "ramp", P(80)), (60, "ramp", P(60)),
-                               (90, "ramp", P(40)), (119, "ramp", P(20)), (120, "idle20", 51), (121, "idle20", 51)):
+        for dt, phase, pwm in ((0, "ramp", 255), (2, "ramp", P(98)), (15, "ramp", P(80)), (30, "ramp", P(60)),
+                               (45, "ramp", P(40)), (59, "ramp", P(22)), (60, "idle20", 51), (61, "idle20", 51)):
             with self.subTest(dt):
                 self.setUp()
                 f, t, got = self.after_work(dt)
@@ -378,8 +378,8 @@ class TestSequence(FanCase):
         self.assertTrue(self.tree.at(o1fan.pwm_of(98)))              # 2 s later it is already coming down
 
     def test_the_ramp_is_straight_and_in_whole_2_percent_steps(self):
-        self.assertEqual([o1fan.ramp_pct(t) for t in (0, 30, 60, 90, 119, 120, 121)], [100, 80, 60, 40, 20, 20, 20])
-        seen = [o1fan.ramp_pct(t / 2.0) for t in range(0, 241)]
+        self.assertEqual([o1fan.ramp_pct(t) for t in (0, 15, 30, 45, 59, 60, 61)], [100, 80, 60, 40, 22, 20, 20])
+        seen = [o1fan.ramp_pct(t / 2.0) for t in range(0, 121)]
         self.assertTrue(all(p % 2 == 0 and 20 <= p <= 100 for p in seen))
         self.assertTrue(all(b <= a for a, b in zip(seen, seen[1:])))                          # never up
         self.assertEqual(len(set(seen)), 41)                                                  # every step from 100 to 20
@@ -388,14 +388,14 @@ class TestSequence(FanCase):
     def test_the_ramp_is_written_at_the_poll_rate_in_steps_not_in_jumps(self):
         f, t, _ = self.after_work(0)
         f.io.writes.clear()
-        self.run_for(f, 125, step=2)
+        self.run_for(f, 65, step=2)
         vals = [int(v) for p, v in f.io.writes if p.endswith("hwmon1/pwm1")]
         self.assertEqual(vals[-1], 51)
-        self.assertTrue(all(a - b <= 6 for a, b in zip(vals, vals[1:])), vals)                # 2% = 5 pwm, 1.33% a poll
-        self.assertTrue(30 <= len(vals) <= 41, len(vals))
+        self.assertTrue(all(a - b <= 11 for a, b in zip(vals, vals[1:])), vals)               # 2% = 5 pwm, 2.67% a poll: one or two steps
+        self.assertTrue(25 <= len(vals) <= 41, len(vals))
 
     def test_work_in_the_ramp_goes_back_to_100_and_the_ramp_starts_again_from_100(self):
-        f, t, _ = self.after_work(60)
+        f, t, _ = self.after_work(30)
         self.assertEqual(f.phase, "ramp")
         self.assertTrue(self.tree.at(o1fan.pwm_of(60)))
         self.busy(f)
@@ -403,29 +403,29 @@ class TestSequence(FanCase):
         t2 = self.quiet(f)
         self.assertEqual(f.phase, "ramp")
         self.assertTrue(self.tree.at(255))
-        self.assertEqual(self.go(f, t2 + 60)[0], "ramp")
+        self.assertEqual(self.go(f, t2 + 30)[0], "ramp")
         self.assertTrue(self.tree.at(o1fan.pwm_of(60)))
-        self.assertEqual(self.go(f, t2 + 119)[0], "ramp")
-        self.assertEqual(self.go(f, t2 + 120)[0], "idle20")
+        self.assertEqual(self.go(f, t2 + o1fan.RAMP_S - 1)[0], "ramp")
+        self.assertEqual(self.go(f, t2 + o1fan.RAMP_S)[0], "idle20")
         self.assertTrue(self.tree.at(51))
 
     def test_the_temperature_override_in_the_ramp_and_its_hysteresis(self):
-        f, t, _ = self.after_work(60)
+        f, t, _ = self.after_work(30)
         self.tree.temp("nvme", 72)
-        self.assertEqual(self.go(f, t + 61)[0], "hot")
+        self.assertEqual(self.go(f, t + 31)[0], "hot")
         self.assertTrue(self.tree.at(255))
         self.tree.temp("nvme", 65)
-        self.assertEqual(self.go(f, t + 62)[0], "hot")
+        self.assertEqual(self.go(f, t + 32)[0], "hot")
         self.tree.temp("nvme", 59)
-        self.assertEqual(self.go(f, t + 63)[0], "ramp")                    # the ramp goes on by the clock
-        self.assertTrue(self.tree.at(o1fan.pwm_of(o1fan.ramp_pct(63))))
+        self.assertEqual(self.go(f, t + 33)[0], "ramp")                    # the ramp goes on by the clock
+        self.assertTrue(self.tree.at(o1fan.pwm_of(o1fan.ramp_pct(33))))
 
     def test_floors_from_learned_minimums_hold_through_the_ramp(self):
         self.tree.fn[(self.tree.nct, 2)] = lambda pwm: 0 if pwm < 100 else spins(pwm)       # stalls under 40%: floor 40
         f, t, _ = self.after_work(0)
-        for dt in (0.5, 30, 90, 100, 119, 121):
+        for dt in (0.5, 15, 45, 50, 59, 61):
             self.go(f, t + dt)
-            want = o1fan.ramp_pct(dt) if dt < 120 else 20
+            want = o1fan.ramp_pct(dt) if dt < o1fan.RAMP_S else 20
             self.assertEqual(self.tree.get(self.tree.nct, "pwm2"), o1fan.pwm_of(max(want, 40)), dt)
             self.assertEqual(self.tree.get(self.tree.nct, "pwm1"), o1fan.pwm_of(want), dt)
 
@@ -435,7 +435,7 @@ class TestSequence(FanCase):
         self.assertTrue(f.learned["nct6797/pwm3"]["always100"])
         self.busy(f)
         t = self.quiet(f)
-        for dt in (1, 40, 90, 119, 140):
+        for dt in (1, 20, 45, 59, 70):
             self.go(f, t + dt)
             self.assertEqual(self.tree.get(self.tree.nct, "pwm3"), 255, dt)
         self.assertEqual(self.tree.get(self.tree.nct, "pwm1"), 51)
@@ -451,10 +451,10 @@ class TestSequence(FanCase):
     def test_the_countdown_is_in_the_status(self):
         f, t, _ = self.after_work(0)
         st = o1fan.read_status(now=1_800_000_000)
-        self.assertEqual((st["phase"], st["hold_left"], st["pct"]), ("ramp", 120, 100))
-        self.go(f, t + 10)                                          # 10 s into the ramp: 93.3 -> 94
+        self.assertEqual((st["phase"], st["hold_left"], st["pct"]), ("ramp", 60, 100))
+        self.go(f, t + 10)                                          # 10 s into the ramp: 86.7 -> 86
         st = o1fan.read_status(now=1_800_000_000)
-        self.assertEqual((st["phase"], st["hold_left"], st["pct"]), ("ramp", 110, 94))
+        self.assertEqual((st["phase"], st["hold_left"], st["pct"]), ("ramp", 50, 86))
 
     def test_only_the_levels_are_ever_written(self):
         f = self.fan()
@@ -820,8 +820,8 @@ class TestRestart(FanCase):
         self.assertTrue(b.engaged)
         self.assertIn("found fans still held by an earlier run: 8 outputs, put back when it stops", self.lines)
         self.assertEqual(self.go(b, self.clock.t + 1)[0], "ramp")          # the ramp from 100%, in case it was working
-        self.assertTrue(self.tree.at(255))
-        self.run_for(b, 125)
+        self.assertTrue(self.tree.at(o1fan.pwm_of(o1fan.ramp_pct(1))))   # one second into it: 98% in whole 2% steps
+        self.run_for(b, 65)
         self.assertEqual(b.phase, "idle20")
         b.shutdown()
         self.assertTrue(self.tree.as_before())                             # the first run's originals, not the manual ones
@@ -862,12 +862,12 @@ class TestRestart(FanCase):
 class TestWake(FanCase):
     def test_after_a_wake_that_reset_the_card_the_current_level_is_written_again(self):
         f = self.up()
-        for pwm, setup in ((51, None), (255, "work"), (o1fan.pwm_of(o1fan.ramp_pct(31)), "ramp")):
+        for pwm, setup in ((51, None), (255, "work"), (o1fan.pwm_of(o1fan.ramp_pct(16)), "ramp")):
             if setup == "work":
                 self.busy(f)
             elif setup == "ramp":
                 t = self.quiet(f)
-                self.go(f, t + 30)
+                self.go(f, t + 15)
             self.tree.set(self.tree.gpu, "pwm1_enable", 2)        # amdgpu on resume
             self.tree.set(self.tree.gpu, "pwm1", 80)
             for n in range(1, 8):
@@ -997,7 +997,7 @@ class TestStatus(FanCase):
         t = self.quiet(f)
         self.assertIn("level: 100%  phase: ramp 100%", self.text())
         self.go(f, t + 10)
-        self.assertIn("level: 94%  phase: ramp 94%", self.text())
+        self.assertIn("level: 86%  phase: ramp 86%", self.text())
         self.assertIn("isn't running", o1fan.render_status(None, self.snap()))
 
     def test_the_status_file_goes_stale(self):
@@ -1016,8 +1016,8 @@ class TestStatus(FanCase):
                          "Fans: 100% (the card is 100% busy)  -  GPU fan 2550 rpm, case fans up to 2550 rpm"
                          "  -  hottest GPU memory 60 C, closest to its limit: NVMe 38 of 70 C")
         t = self.quiet(f)
-        self.go(f, t + 30)
-        self.assertIn("Fans: ramping down, 80% (20% in 90 s)", o1fan.panel_line(now=1_800_000_000))
+        self.go(f, t + 15)
+        self.assertIn("Fans: ramping down, 80% (20% in 45 s)", o1fan.panel_line(now=1_800_000_000))
 
     def test_the_status_command_needs_no_root_and_reads_the_tree(self):
         r = subprocess.run([sys.executable, os.path.join(U.BIN, "ollama1-fan"), "status"], capture_output=True,

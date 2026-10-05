@@ -9,7 +9,7 @@ cooler's pump head) is held at the same colour.
              and eased in and out (smoothstep), the brightness on the same curve
   working    red at 100% while the card works
   cooling    the work ended: from red back through orange and yellow to white over
-             COOL_S (120 s), linear in time along the gradient: the fans' 120 s ramp
+             COOL_S (60 s), linear in time along the gradient: the fans' 60 s ramp
              (lib/o1fan.py), so the two finish together. Work again mid-cool: the 5 s
              rise again, from wherever it is.
 
@@ -55,7 +55,7 @@ RED = (255, 0, 0)
 STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
 RISE_S = o1work.RISE_S            # to red and full brightness takes this long (5 s)
-COOL_S = o1work.COOL_S            # red to white takes this long: the fans' ramp (120 s)
+COOL_S = o1work.COOL_S            # red to white takes this long: the fans' ramp (60 s)
 IDLE_DIM_S = o1work.IDLE_DIM_S    # white this long, then dim (300 s)
 DIM_S = o1work.DIM_S              # 1.0 down to DIM_MIN takes this long (10 s)
 DIM_MIN = o1work.DIM_PCT / 100.0  # the dimmed brightness (0.4)

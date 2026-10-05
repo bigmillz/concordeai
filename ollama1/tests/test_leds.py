@@ -1,7 +1,7 @@
 """Lights that follow the graphics card's work (6b395, 6b417; the states of 6b421): the OpenRGB SDK
 protocol against a fake server on a local socket (framing, version negotiation, device lists,
 modes, colours), the gradient and the ease, the service on a fake clock (the card's 50% / 1.5 s
-trigger, the 5 s eased rise to red and full brightness, red while working, the 120 s linear cool-down,
+trigger, the 5 s eased rise to red and full brightness, red while working, the 60 s linear cool-down,
 work again mid-cool, white for 300 s then 40%, frames only when the colour changes, a keepalive), a
 server that dies and comes back, the status, setup and the wiring (units, setup.sh, the panel, the
 sleep hook)."""
@@ -403,7 +403,7 @@ class TestRamp(unittest.TestCase):
 class TestTheNumbers(unittest.TestCase):
     def test_the_lights_use_the_shared_numbers_so_they_agree_with_the_fans(self):
         self.assertEqual((o1leds.RISE_S, o1leds.COOL_S, o1leds.IDLE_DIM_S, o1leds.DIM_S, o1leds.DIM_MIN),
-                         (5.0, 120, 300.0, 10.0, 0.4))
+                         (5.0, 60, 300.0, 10.0, 0.4))
         self.assertEqual(o1leds.COOL_S, o1fan.RAMP_S)            # lights and fans finish together
         self.assertEqual((o1leds.SAMPLE_S, o1leds.FRAME_S), (0.25, 0.04))
 
@@ -504,14 +504,15 @@ class TestBehaviour(Phases):
             self.run_for(0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("working", RED))
 
-    def test_the_cool_down_is_120_s_linear_in_time_red_orange_yellow_white(self):
+    def test_the_cool_down_is_60_s_linear_in_time_red_orange_yellow_white(self):
         self.to_red()
         t0 = self.start_cool()
-        for s, want in ((0, RED), (30, o1leds.ramp(0.75)), (40, (255, 128, 0)), (60, o1leds.ramp(0.5)),
-                        (80, (255, 255, 0)), (119, o1leds.ramp(1 / 120)), (120, WHITE)):
+        C = o1leds.COOL_S
+        for s, want in ((0, RED), (C / 4, o1leds.ramp(0.75)), (C / 3, (255, 128, 0)), (C / 2, o1leds.ramp(0.5)),
+                        (2 * C / 3, (255, 255, 0)), (C - 1, o1leds.ramp(1 / C)), (C, WHITE)):
             self.at(t0 + s, step=0.25)
             self.assertEqual(self.leds.rgb(), want, s)
-            self.assertAlmostEqual(self.leds.x, max(0.0, 1 - s / 120.0), delta=1e-6)
+            self.assertAlmostEqual(self.leds.x, max(0.0, 1 - s / float(C)), delta=1e-6)
         self.assertEqual(self.leds.phase, "idle")
         self.assertEqual(self.last_shown(), WHITE)
 
@@ -525,21 +526,21 @@ class TestBehaviour(Phases):
     def test_work_again_mid_cool_goes_back_to_red_in_5_s_from_where_it_is(self):
         self.to_red()
         t0 = self.start_cool()
-        self.at(t0 + 60, step=0.25)
+        self.at(t0 + o1leds.COOL_S / 2, step=0.25)
         self.assertEqual(self.leds.rgb(), o1leds.ramp(0.5))
         t1 = self.start_rise()
         x0 = self.leds.x0
-        self.assertAlmostEqual(x0, 0.5 - (t1 - t0 - 60) / 120.0, delta=0.002)
+        self.assertAlmostEqual(x0, 0.5 - (t1 - t0 - o1leds.COOL_S / 2) / float(o1leds.COOL_S), delta=0.002)
         self.at(t1 + 2.5)
         self.assertAlmostEqual(self.leds.x, x0 + (1 - x0) * 0.5, delta=0.002)
         self.at(t1 + 4.5)
         self.assertNotEqual(self.leds.rgb(), RED)
         self.at(t1 + 5.0)
         self.assertEqual((self.leds.phase, self.leds.rgb()), ("working", RED))
-        t2 = self.start_cool()                                     # and the next cool-down is the whole 120 s again
-        self.at(t2 + 119.5, step=0.25)
+        t2 = self.start_cool()                                     # and the next cool-down is the whole cool-down again
+        self.at(t2 + o1leds.COOL_S - 0.5, step=0.25)
         self.assertEqual(self.leds.phase, "cooling")
-        self.at(t2 + 120, step=0.25)
+        self.at(t2 + o1leds.COOL_S, step=0.25)
         self.assertEqual(self.leds.phase, "idle")
 
     def test_work_that_ends_mid_rise_cools_from_where_it_got_to(self):
@@ -549,9 +550,9 @@ class TestBehaviour(Phases):
         t1 = self.start_cool()
         self.assertLess(self.leds.x0, 1.0)
         self.assertGreater(self.leds.x0, x)
-        self.at(t1 + 30, step=0.25)
+        self.at(t1 + o1leds.COOL_S / 4, step=0.25)
         self.assertAlmostEqual(self.leds.x, self.leds.x0 - 0.25, delta=1e-6)
-        self.at(t1 + self.leds.x0 * 120 + 0.25, step=0.25)
+        self.at(t1 + self.leds.x0 * o1leds.COOL_S + 0.25, step=0.25)
         self.assertEqual((self.leds.phase, self.leds.rgb()), ("idle", WHITE))
 
     def test_lights_follow_the_card_only_not_a_request_a_tool_or_the_processors(self):
@@ -594,7 +595,7 @@ class TestBehaviour(Phases):
         self.assertGreater(w, o1leds.FRAME_S)
         self.assertLessEqual(w, o1leds.SAMPLE_S)
         self.start_cool()
-        self.assertEqual(self.leds.tick(), o1leds.FRAME_S)         # the cool-down moves the whole 120 s
+        self.assertEqual(self.leds.tick(), o1leds.FRAME_S)         # the cool-down moves the whole cool-down
 
     def test_the_cool_down_sends_each_change_without_repeats(self):
         self.to_red()
@@ -679,12 +680,13 @@ class TestDimming(Phases):
     def test_the_300_s_count_from_the_end_of_the_cool_down_not_from_the_end_of_the_work(self):
         self.to_red()
         t0 = self.start_cool()
-        self.at(t0 + 120, step=0.25)
+        C = o1leds.COOL_S
+        self.at(t0 + C, step=0.25)
         self.assertEqual(self.leds.phase, "idle")
-        self.assertAlmostEqual(self.leds.idle_since, t0 + 120, delta=1e-6)
-        self.at(t0 + 120 + 299.75, step=0.25)
+        self.assertAlmostEqual(self.leds.idle_since, t0 + C, delta=1e-6)
+        self.at(t0 + C + 299.75, step=0.25)
         self.assertEqual(self.leds.bright, 1.0)
-        self.at(t0 + 120 + 300.25, step=0.25)
+        self.at(t0 + C + 300.25, step=0.25)
         self.assertLess(self.leds.bright, 1.0)
 
     def test_no_dimming_while_working_or_cooling(self):
@@ -692,7 +694,7 @@ class TestDimming(Phases):
         self.run_for(400, step=0.25)
         self.assertEqual(self.leds.bright, 1.0)
         t0 = self.start_cool()
-        while self.clock.t < t0 + 119:
+        while self.clock.t < t0 + o1leds.COOL_S - 1:
             self.run_for(1, step=0.25)
             self.assertEqual(self.leds.bright, 1.0)
 
@@ -736,11 +738,11 @@ class TestDimming(Phases):
         self.assertEqual((st()["phase"], st()["working"]), ("working", True))
         self.assertEqual(st()["line"], "Lights: red, working (card 87% busy)  -  1 device")
         t0 = self.start_cool()
-        self.at(t0 + 58, step=0.25)
+        self.at(t0 + 28, step=0.25)
         self.leds.write_status(self.clock.t)
-        self.assertEqual(st()["line"], "Lights: orange, cooling down (white in 62 s)  -  1 device")
-        self.assertEqual(st()["cool_left"], 62)
-        self.at(t0 + 120 + 305, step=0.25)
+        self.assertEqual(st()["line"], "Lights: orange, cooling down (white in 32 s)  -  1 device")
+        self.assertEqual(st()["cool_left"], 32)
+        self.at(t0 + o1leds.COOL_S + 305, step=0.25)
         self.run_for(1, step=0.25)
         s = st()
         self.assertLess(s["brightness"], 1.0)

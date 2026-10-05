@@ -4,9 +4,9 @@ case fans, the CPU/radiator fans) follow what the server is doing, so it is cool
 when it works and quiet, and easy on the bearings, when it does not:
 
   working     100%   the card over 50% busy, or the processor at 60 C or more
-  ramp     100->20%  from the moment that ends, a straight line down over 120 s,
+  ramp     100->20%  from the moment that ends, a straight line down over 60 s,
                      in 2% steps (no hold at 100% first)
-  idle20       20%   from 120 s after the work ended (and from the start)
+  idle20       20%   from 60 s after the work ended (and from the start)
 
 Work at any time, the ramp included, goes back to 100% at once; when it ends
 again the ramp starts again from 100%. A level is pwm = round(percent * 255 /
@@ -19,7 +19,7 @@ card only):
 
   * the card's busy percent over 50% for 1.5 s in a row (two 2 s polls in a
     row), ending when it has been at or under 50% for 1.5 s in a row: one
-    sample over 50% does not start a two-minute ramp;
+    sample over 50% does not start a one-minute ramp;
   * the processor's temperature (k10temp Tctl/Tdie, the "CPU" reading below)
     at 60 C or more, ending under 55 C.
 

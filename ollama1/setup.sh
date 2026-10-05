@@ -36,10 +36,10 @@
 #   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
 #                                    to stock, and the setting saved as off
 #   sudo ./setup.sh --fans on|off    the graphics card's and the case fans at 100% while the card is over 50%
-#                                    busy or the CPU is at 60 C or more, then down to 20% over 2 minutes (ollama1-fan).
+#                                    busy or the CPU is at 60 C or more, then down to 20% over 1 minute (ollama1-fan).
 #                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
 #   sudo ./setup.sh --leds on|off    the case, board and cooler lights: white when the graphics card is idle, through
-#                                    yellow and orange to red in 5 s when it works, white again over 2 minutes, 40% dim after 5 idle minutes (ollama1-leds, through the openrgb package, which
+#                                    yellow and orange to red in 5 s when it works, white again over 1 minute, 40% dim after 5 idle minutes (ollama1-leds, through the openrgb package, which
 #                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
 #   sudo ./setup.sh --watchdog on|off   the hardware watchdog (ollama1-watchdog): the chipset's timer resets the board
 #                                    when the system disk stops answering (about 60 s), petted only while a real disk probe
@@ -1004,7 +1004,7 @@ fi
 
 # ---- 14b. fans (6b385) ------------------------------------------------------------------------
 # ON unless --fans off (OLLAMA1_FANS=0; saved in setup.env): the service puts the graphics card's and the
-# case fans at 100% while the card is over 50% busy or the CPU is at 60 C, then down to 20% over 2 minutes (lib/o1fan.py); it
+# case fans at 100% while the card is over 50% busy or the CPU is at 60 C, then down to 20% over 1 minute (lib/o1fan.py); it
 # gives them back to the BIOS's control whenever it stops. The step also removes
 # the old hand-made full-speed-always fan unit (see the README) when it is there.
 step "Fans"

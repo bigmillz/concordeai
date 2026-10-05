@@ -112,8 +112,8 @@ it asks for any it can't find, at the terminal):
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
-| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 2 minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 2-minute ramp when it stops, and dims to 40% after 5 minutes of white (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 1 minute: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 1-minute ramp when it stops, and dims to 40% after 5 minutes of white (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 150 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -961,8 +961,8 @@ at a level that follows what the server is doing:
 | Phase | Level | When |
 |---|---|---|
 | `working` | 100% | the graphics card is over 50% busy, or the CPU is at 60 C or more |
-| `ramp` | 100% down to 20% | from the moment that ends: a straight line over 120 s, written in whole 2% steps (no hold at 100% first) |
-| `idle20` | 20% | from 120 s after the work ended, and from the start |
+| `ramp` | 100% down to 20% | from the moment that ends: a straight line over 60 s, written in whole 2% steps (no hold at 100% first) |
+| `idle20` | 20% | from 60 s after the work ended, and from the start |
 
 Work at any time, the ramp included, goes back to 100% at once; when it ends
 again the ramp starts over from 100%. A level is `pwm = round(percent * 255 /
@@ -976,7 +976,7 @@ of two triggers:
 
 - **The graphics card** (sysfs `gpu_busy_percent`) **over 50%** for 1.5 s in a
   row. The fans look every 2 s, so that is two looks in a row: a single 1 s
-  blip over 50% never starts a 2-minute ramp. It ends when the card has been at
+  blip over 50% never starts a 1-minute ramp. It ends when the card has been at
   or under 50% for 1.5 s in a row (a short dip between two answers keeps it
   working). No card reading counts as not busy.
 - **The CPU's temperature** (k10temp `Tctl`/`Tdie`, the "CPU" sensor below)
@@ -1133,7 +1133,7 @@ in a row at or under 50% (`lib/o1work.py`; a 1 s blip does nothing):
   so it starts and lands softly.
 - **While working**: red at 100%.
 - **Work ends**: the colour goes back from red through orange and yellow to
-  white over **120 s**, linear in time along the gradient: exactly the fans'
+  white over **60 s**, linear in time along the gradient: exactly the fans'
   ramp, so the lights and the fans finish together. Work again in the middle
   of it: the 5 s rise again, from wherever it is.
 - **After 5 minutes of white** (counted from the moment the cool-down reached
