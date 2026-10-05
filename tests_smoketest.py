@@ -16963,7 +16963,7 @@ check("the composer grows with its text: typing, pasting and code that fills it 
       "function fitInput(){" in _MILLENAI_SRC and 'input.addEventListener("input",fitInput);' in _MILLENAI_SRC
       and 'set(v){d.set.call(this,v);fitInput();}' in _MILLENAI_SRC
       and "Math.round(innerHeight*0.45)" in _MILLENAI_SRC and "max-height:45vh;" in _MILLENAI_SRC
-      and "max-height:180px;\n  padding:6px 4px;" not in _MILLENAI_SRC)
+      and "#input{\n  flex:0 0 auto;background:none;" in _MILLENAI_SRC)   # flex:1 in the column ignored its height
 print("== starter chips from your chats (6b390) ==")
 check("topic chips: the pass is capped at what a server may write, in the request itself",
       "SUGGEST_MAX_TOKENS = 1200" in _MILLENAI_SRC

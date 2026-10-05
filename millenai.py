@@ -33664,7 +33664,7 @@ body.gen #composer{
 }
 body.gen #chip-model{color:var(--accent)}
 #input{
-  flex:1;background:none;border:none;outline:none;resize:none;
+  flex:0 0 auto;background:none;border:none;outline:none;resize:none;
   color:var(--text);font:14.5px/1.5 var(--sans);max-height:45vh;
   padding:6px 4px;
 }
