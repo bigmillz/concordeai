@@ -19500,7 +19500,8 @@ def _svc_secrets(src):
                     and secret not in views and "id34.access" not in views
                     and set(ns["_srv_public"](e)) == {"id", "name", "url", "host", "access", "paired",
                                                      "paired_at", "device_name", "device_id",
-                                                     "status", "models", "gpu", "only", "prefer", "sleep", "wakeable", "gen"})
+                                                     "status", "models", "gpu", "only", "prefer", "sleep", "wakeable", "gen",
+                                                     "lan_blocked"})
     out["entry repr"] = seed not in repr(e) and secret not in repr(e)
     out["error text"] = all(secret not in str(ns["_srv_fail"](e, st, {"error": "x"}))
                             for st in (403, 401, 500, 530))
@@ -28696,7 +28697,7 @@ def _w46_node(src):
     esc = src[i0:src.index(";}\n", i0) + 3]
     a = src.index("function srvSleepParse(raw){")
     b = src.index("function srvCard(s){")
-    js = esc + src[a:b] + r'''
+    js = esc + "let srvLan=false;\n" + src[a:b] + r'''
 const R={};
 const P=srvSleepParse;
 R.parse=[P("30"),P("5"),P("1440"),P("4"),P("0"),P("1441"),P("99999"),P(""),P("abc"),P("3.5"),P("-5"),P("1e3"),P(" 45 "),
@@ -28723,6 +28724,13 @@ R.htmlErr=srvSleepHtml({id:"a1",paired:true,name:"Desk"},{st:"err",msg:"Couldn\u
 const sv={id:"a1",paired:true,name:"Desk"};
 R.html=[srvSleepHtml({id:"a1",paired:false},{st:"ok"}),srvSleepHtml(sv,{st:"ok",enabled:true,minutes:45,supported:true,wakeable:true}),
   srvSleepHtml(sv,{st:"load"}),srvSleepHtml(sv,{st:"err",msg:"<b>x</b> & y"}),srvSleepHtml(sv,undefined)];
+srvLan=true;
+const wk={id:"a1",paired:true,name:"Desk",wakeable:true};
+R.wake=[srvWakeHtml(wk),srvWakeHtml({id:"a1",wakeable:false}),srvWakeHtml(Object.assign({lan_blocked:true},wk)),
+  srvSleepHtml(wk,{st:"off"}),srvSleepHtml(wk,{st:"ok",enabled:false,minutes:30,supported:true,wakeable:true}),
+  srvSleepHtml({id:"a1",paired:true,name:"Desk",wakeable:false},{st:"ok",enabled:false,minutes:30,supported:true})];
+srvLan=false;
+R.wakeOff=[srvWakeHtml(Object.assign({lan_blocked:true},wk)),srvSleepHtml(wk,{st:"ok",enabled:false,minutes:30,supported:true})];
 process.stdout.write(JSON.stringify(R));
 '''
     pth = os.path.join(_si_dir, "sleep46.js")
@@ -29035,6 +29043,276 @@ for _d46, _o46, _n46 in _W46_MUT:
 check("auto sleep: %d mutations, each caught by a check above" % len(_W46_MUT),
       all(isinstance(v, list) for _d, v in _w46m), "%r" % [x for x in _w46m if not isinstance(x[1], list)])
 # ==== 6b346 auto sleep: end ====
+
+
+# ==== 6b430 local network prompt: begin ====
+print("== the Mac's Local Network prompt (6b430) ==")
+# Patrick: "still no pop-up to allow the app to access devices on the local network."
+# macOS asks only when an app first touches the LAN; this app talks to the server over the
+# internet, so nothing did until a wake was needed, and the wake path swallowed the refusal.
+# In process: the servers section on stand-ins for the sockets (every send refused, some
+# refused, none), the once-flag, the route's refusal of a stranger's id; the page's strings in
+# node; the command line pinned as constants. Then each protection mutated and shown caught.
+_L30_MAC = "aa:bb:cc:dd:ee:ff"
+
+
+def _l30_ns(src, mac=True, wake=(_L30_MAC,)):
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    ns["IS_MAC"] = mac
+    sid = ns["_srv_read"](ctx)[0]["id"]
+
+    def fn(entries):
+        entries[0]["wake"] = list(wake)
+        return {"ok": True}
+    ns["_srv_update"](ctx, fn)
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255", "192.168.1.255"]
+
+    def nojson(*a, **k):
+        raise AssertionError("a test wake-up asked the server")
+    ns["_srv_json"] = nojson
+    return ns, ctx, sid
+
+
+def _l30c_send(src):
+    out = {}
+    ns, ctx, sid = _l30_ns(src)
+    e = ns["_srv_read"](ctx)[0]
+    sent = []
+
+    def refuse(pkt, addr):
+        raise OSError(65, "No route to host")
+    ns["_srv_udp"] = refuse
+    out["all refused"] = ns["_srv_wake_send"](e) == (4, 4, (65, "No route to host"))
+    ns["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+    t = ns["_srv_wake_send"](e)
+    out["none refused"] = (t == (4, 0, None) and sorted(a for _p, a in sent) == [
+        ("192.168.1.255", 7), ("192.168.1.255", 9), ("255.255.255.255", 7), ("255.255.255.255", 9)] or
+        sorted(a for _p, a in sent) == sorted([("255.255.255.255", 9), ("255.255.255.255", 7),
+                                               ("192.168.1.255", 9), ("192.168.1.255", 7)]))
+    out["magic"] = all(p == ns["srv_magic_packet"](_L30_MAC) for p, _a in sent)
+
+    def half(pkt, addr):
+        if addr[0] == "255.255.255.255":
+            raise OSError(1, "Operation not permitted")
+        sent.append((pkt, addr))
+    sent.clear()
+    ns["_srv_udp"] = half
+    out["some refused"] = ns["_srv_wake_send"](e) == (4, 2, (1, "Operation not permitted"))
+    return all(out.values()), out
+
+
+def _l30c_test(src):
+    out = {}
+    ns, ctx, sid = _l30_ns(src)
+    sent = []
+    ns["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+    ns["_srv_wake_at"][sid] = 123.0
+    r = ns["server_wake_test"](ctx, sid)
+    out["sent"] = (r == {"ok": True, "tried": 4, "failed": 0, "blocked": False, "err": ""} and len(sent) == 4)
+    out["gap kept"] = ns["_srv_wake_at"].get(sid) == 123.0 and not ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"]
+
+    def refuse(pkt, addr):
+        raise OSError(65, "No route to host")
+    ns["_srv_udp"] = refuse
+    r = ns["server_wake_test"](ctx, sid)
+    out["blocked"] = (r["ok"] is False and r["blocked"] is True and r["tried"] == r["failed"] == 4
+                      and "No route to host" in r["err"]
+                      and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is True)
+
+    def half(pkt, addr):
+        if addr[0] == "255.255.255.255":
+            raise OSError(65, "No route to host")
+    ns["_srv_udp"] = half
+    r = ns["server_wake_test"](ctx, sid)
+    out["half"] = (r["ok"] is True and r["blocked"] is False and r["failed"] == 2
+                   and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is False)
+    # an id that is not one of this person's servers sends nothing
+    sent.clear()
+    ns["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+    g = ns["server_wake_test"](ctx, "deadbeef")
+    out["stranger"] = g["ok"] is False and g["kind"] == "gone" and not sent
+    # no cards, no packets
+    ns2, ctx2, sid2 = _l30_ns(src, wake=())
+    ns2["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+    n = ns2["server_wake_test"](ctx2, sid2)
+    out["no card"] = n["ok"] is False and n["kind"] == "nowake" and not sent
+    # off the Mac: nothing, and the card never says it
+    ns3, ctx3, sid3 = _l30_ns(src, mac=False)
+    ns3["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+    ns3["_srv_wake_blocked"][sid3] = True
+    w = ns3["server_wake_test"](ctx3, sid3)
+    out["not a Mac"] = (w["ok"] is False and w["kind"] == "unsupported" and not sent
+                        and ns3["_srv_public"](ns3["_srv_read"](ctx3)[0])["lan_blocked"] is False
+                        and ns3["servers_view"](ctx3)["lan"] is False)
+    out["view says"] = ns["servers_view"](ctx)["lan"] is True
+    return all(out.values()), out
+
+
+def _l30c_touch(src):
+    out = {}
+    ns, ctx, sid = _l30_ns(src)
+    sent = []
+    ns["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+    out["probe"] = (ns["_srv_lan_touch"]() == (2, 0)
+                    and sent == [(b"\0", ("255.255.255.255", 9)), (b"\0", ("192.168.1.255", 9))])
+
+    class _Th:
+        def __init__(self, target, **kw):
+            self.t = target
+
+        def start(self):
+            self.t()
+    ns["ctx_thread"] = _Th
+    prefs = {}
+
+    class _P(dict):
+        pass
+    ns["machine_prefs"] = lambda: prefs
+    ns["machine_prefs_update"] = lambda f: f(prefs)
+    ns["_lan_boot"][0] = False
+    sent.clear()
+    ns["srv_lan_touch_boot"](ctx)
+    first = len(sent)
+    out["boot once"] = first == 2 and prefs.get("last_lan_touch")
+    ns["srv_lan_touch_boot"](ctx)
+    out["not again"] = len(sent) == first
+    ns["_lan_boot"][0] = False
+    ns["srv_lan_touch_boot"](ctx)
+    out["not on a flagged computer"] = len(sent) == first      # the pref, across launches
+    # refused: the card says so; a later one that goes out clears it
+    ns["_srv_wake_blocked"].clear()
+
+    def refuse(pkt, addr):
+        raise OSError(65, "No route to host")
+    ns["_srv_udp"] = refuse
+    ns["srv_lan_touch_bg"](ctx, [sid])
+    out["marked"] = ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is True
+    ns["_srv_udp"] = lambda pkt, addr: None
+    ns["srv_lan_touch_bg"](ctx, [sid])
+    out["cleared"] = ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is False
+    # no card to wake it, off the Mac: no touch
+    sent.clear()
+    ns["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+    for kw in ({"wake": ()}, {"mac": False}):
+        n2, c2, s2 = _l30_ns(src, **kw)
+        n2["ctx_thread"] = _Th
+        pr = {}
+        n2["machine_prefs"] = lambda: pr
+        n2["machine_prefs_update"] = lambda f: f(pr)
+        n2["_srv_udp"] = lambda pkt, addr: sent.append((pkt, addr))
+        n2["_lan_boot"][0] = False
+        n2["srv_lan_touch_boot"](c2)
+    out["no card, no Mac"] = not sent
+    return all(out.values()), out
+
+
+def _l30c_text(src):
+    out = {}
+    i0 = src.index('            elif op == "wake-test":')
+    i1 = src.index('            elif op == "models":', i0)
+    seg = src[i0:i1]
+    out["route"] = ("server_wake_test(self.ctx, sid)" in seg and "_SRV_ID_RX.fullmatch(sid)" in seg
+                    and "def server_wake_test(ctx, sid: str) -> dict:" in src
+                    and "e = _srv_find(_srv_read(ctx), sid)" in src[src.index("def server_wake_test("):src.index("def server_wake(e,")])
+    j = seg.index('elif op == "lan-settings":')
+    cmd = seg[j:]
+    out["argv"] = (cmd.count("Popen(") == 1 and 'subprocess.Popen(["open", LAN_SETTINGS_URL])' in cmd
+                   and not re.search(r"\b(sid|d\b|d\[|d\.|self\.|format|%|\+|f\")", cmd.split("Popen(")[1].split("\n")[0]))
+    out["fixed url"] = ('LAN_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"\n' in src)
+    out["not elsewhere"] = src.count("LAN_SETTINGS_URL") == 2      # its definition and the argument
+    wt = src[src.index("def server_wake_test("):src.index("def server_wake(e,")]
+    out["gap"] = "_srv_wake_at" not in wt and "_srv_wake_sleep" not in wt and "_srv_json" not in wt
+    out["sleep switch"] = ('if op == "sleep" and IS_MAC and d.get("enabled") is True and out.get("ok"):\n'
+                           '                srv_lan_touch_bg(self.ctx, [sid])' in src)
+    out["page's first read"] = ("            srv_lan_touch_boot(self.ctx)        # the Mac's Local Network prompt, once (6b430)\n"
+                                "            self._send_json(servers_view(" in src)
+    out["once flag"] = ('if machine_prefs().get("last_lan_touch"):\n        return\n'
+                        '    machine_prefs_update(lambda p: p.__setitem__("last_lan_touch", int(time.time())))' in src
+                        and "def srv_lan_touch_boot(ctx):\n    \"\"\"Once per computer" in src)
+    out["thread"] = "    ctx_thread(target=run, daemon=True).start()\n" in src[src.index("def srv_lan_touch_bg("):src.index("def srv_lan_touch_boot(")]
+    out["words"] = (
+        "macOS isn\\u2019t letting ConcordeAI use the local network. Open System Settings \\u203a Privacy & Security "
+        "\\u203a Local Network and turn ConcordeAI on." in src
+        and "This computer isn\\u2019t allowing local-network access (Settings \\u203a Privacy & Security \\u203a Local Network)" in src
+        and 'srvMsg(id,"Wake-up sent to "+s.name+".","ok")' in src
+        and 'srvPost("wake-test",{id:id})' in src and 'srvPost("lan-settings",{id:id})' in src
+        and 'data-a="waketest">Test wake-up</button>' in src)
+    return all(out.values()), out
+
+
+def _l30c_ui(src):
+    R, err = _w46_node(src)
+    w = R["wake"]
+    wo = R["wakeOff"]
+    out = {}
+    out["button"] = ('data-a="waketest">Test wake-up</button>' in w[0] and w[1] == "" and 'data-a="lansettings"' not in w[0])
+    out["amber"] = ("isn’t allowing local-network access" in w[2] and 'data-a="lansettings"' in w[2]
+                    and "srv-amber" in w[2])
+    out["in the card"] = ('data-a="waketest"' in w[3] and 'data-a="waketest"' in w[4] and 'data-a="waketest"' not in w[5]
+                          and '<input type="checkbox" data-a="sleepon"' in w[4])
+    out["only the Mac app"] = (wo[0] == "" and 'data-a="waketest"' not in wo[1])
+    return all(out.values()), [out, err]
+
+
+_L30_CHECKS = [
+    ("local network: the wake send is one helper returning (tried, failed, first error), shared with server_wake", _l30c_send),
+    ("local network: Test wake-up sends the same packets, waits for nothing, leaves the five-minute gap, reports blocked only "
+     "when every send raised, refuses a stranger's id, a server with no card, and the Windows app", _l30c_test),
+    ("local network: the first touch is one harmless byte to port 9, once per computer, on a thread, marks the card only when "
+     "every send raised, and never without a card or off the Mac", _l30c_touch),
+    ("local network: the route, the fixed argument list that opens the pane, the once-flag, the sleep switch, the wording", _l30c_text),
+    ("local network: the page shows Test wake-up (macOS app, server with a card) and the amber line only after a refusal (node)", _l30c_ui),
+]
+
+
+def _l30_run(src):
+    out = []
+    for name, fn in _L30_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n30, _o30, _d30 in _l30_run(_MILLENAI_SRC):
+    check(_n30, _o30, "%r" % (_d30,))
+
+_L30_MUT = [
+    ("a refusal not counted", "                except OSError as oe:\n                    failed_n += 1\n",
+     "                except OSError as oe:\n                    failed_n += 0\n"),
+    ("blocked on any refusal", "    blocked = bool(tried_n and failed_n == tried_n)\n    _srv_wake_blocked[e[\"id\"]] = blocked\n",
+     "    blocked = bool(failed_n)\n    _srv_wake_blocked[e[\"id\"]] = blocked\n"),
+    ("the test eating the gap", "    tried_n, failed_n, first = _srv_wake_send(e)\n    blocked",
+     "    _srv_wake_at[e[\"id\"]] = time.monotonic()\n    tried_n, failed_n, first = _srv_wake_send(e)\n    blocked"),
+    ("the test open to any id", "        e = _srv_find(_srv_read(ctx), sid)\n    except (StoreReadError, NoProfile):\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": \"Couldn\\u2019t read your servers.\"}\n    if e is None:\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": SRV_GONE}\n    if not e.get(\"wake\"):",
+     "        e = _srv_find(_srv_read(ctx), sid) or _srv_read(ctx)[0]\n    except (StoreReadError, NoProfile):\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": \"Couldn\\u2019t read your servers.\"}\n    if e is None:\n        return {\"ok\": False, \"kind\": \"gone\", \"err\": SRV_GONE}\n    if not e.get(\"wake\"):"),
+    ("the test off the Mac", "    if not IS_MAC:\n        return {\"ok\": False, \"kind\": \"unsupported\"", "    if False:\n        return {\"ok\": False, \"kind\": \"unsupported\""),
+    ("the command line from the request", 'subprocess.Popen(["open", LAN_SETTINGS_URL])', 'subprocess.Popen(["open", d.get("url")])'),
+    ("the probe a magic packet", '_srv_udp(b"\\0", (tgt, 9))', '_srv_udp(srv_magic_packet("aa:bb:cc:dd:ee:ff"), (tgt, 9))'),
+    ("the touch every launch", 'if machine_prefs().get("last_lan_touch"):\n        return\n', 'if False:\n        return\n'),
+    ("the touch never flagged", 'machine_prefs_update(lambda p: p.__setitem__("last_lan_touch", int(time.time())))', "pass"),
+    ("the touch on the page's thread", "    ctx_thread(target=run, daemon=True).start()\n", "    run()\n"),
+    ("the touch with no card", "    if not ids:\n        return\n    _lan_boot[0] = True", "    _lan_boot[0] = True"),
+    ("the touch off the Mac", "    if not IS_MAC or _lan_boot[0]:", "    if _lan_boot[0]:"),
+    ("a card marked from a clear send", "                _srv_wake_blocked[i] = blocked\n", "                _srv_wake_blocked[i] = True\n"),
+    ("the sleep switch not asking", "                srv_lan_touch_bg(self.ctx, [sid])    # the switch", "                pass    # the switch"),
+    ("the button on every card", "  if(!srvLan||!s.wakeable)return \"\";", "  if(false)return \"\";"),
+    ("the amber line always", "(s.lan_blocked?'<div class=\"srv-hint srv-amber\">'", "(true?'<div class=\"srv-hint srv-amber\">'"),
+    ("the blocked wording lost", "isn\\u2019t letting ConcordeAI use the local network.", "isn\\u2019t working."),
+]
+_l30m = []
+for _d30, _o30, _n30 in _L30_MUT:
+    if _MILLENAI_SRC.count(_o30) != 1:
+        _l30m.append((_d30, "anchor missing %d" % _MILLENAI_SRC.count(_o30)))
+        continue
+    _r30 = _l30_run(_MILLENAI_SRC.replace(_o30, _n30, 1))
+    _l30m.append((_d30, [n for n, o, _x in _r30 if not o][:1] or "MISSED"))
+check("local network: %d mutations, each caught by a check above" % len(_L30_MUT),
+      all(isinstance(v, list) for _d, v in _l30m), "%r" % [x for x in _l30m if not isinstance(x[1], list)])
+# ==== 6b430 local network prompt: end ====
 
 
 # ==== 6b356 server pictures: begin ====

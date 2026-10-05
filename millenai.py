@@ -89,7 +89,7 @@ MACHINE_STATE = frozenset((
     "_TEST_LATE", "READ_FAIL", "_INSTANCE_HELD",
     # the instance, the window, the boot code, the updater
     "_INSTANCE_LOCK", "_BOOT", "_CHROME", "_WINDOW", "_WIN_STATE",
-    "_JUST_UPDATED", "_UPDATE_LANDED", "_update", "_chk_cache",
+    "_JUST_UPDATED", "_UPDATE_LANDED", "_update", "_chk_cache", "_lan_boot",
     "_whatsnew_cache", "_webstore_keep", "_webstore_reloaded",
     "_QT_CLEAR_CACHE", "_RELOCATED", "_BOOT_HEALS",
     # models, engines, hardware and installs
@@ -19656,6 +19656,8 @@ def _srv_public(e) -> dict:
             # sleep when idle (6b346): the last setting the server gave, and
             # whether it has a card to wake it with (the addresses stay here)
             "sleep": e.get("sleep"), "wakeable": bool(e.get("wake")),
+            # every wake packet refused by this Mac (6b430): the card says so
+            "lan_blocked": bool(IS_MAC and _srv_wake_blocked.get(e["id"])),
             # what it can make (6b356): {image, video}, or None until asked
             "gen": e.get("gen"),
             "models": list(s.get("models") or [])}
@@ -19672,7 +19674,7 @@ def servers_view(ctx, refresh=False) -> dict:
         with ctx_executor(min(4, len(entries))) as pool:
             list(pool.map(_chk, entries))
     return {"servers": [_srv_public(e) for e in entries],
-            "crypto": cai_crypto.available(), "max": SERVER_MAX}
+            "crypto": cai_crypto.available(), "max": SERVER_MAX, "lan": IS_MAC}
 
 
 # ---- images and video on your server (6b356)
@@ -20343,6 +20345,103 @@ def _srv_wake_due(e) -> bool:
     return _srv_wakeable(e) and not (last is not None and 0 <= _srv_wake_clock() - last < SRV_WAKE_GAP_S)
 
 
+def _srv_wake_send(e):
+    """Send e's magic packets (the loop server_wake and the Test wake-up
+    button share): (tried, failed, first) where first is (errno, strerror) of
+    the first send that raised OSError, or None. Waits for nothing and does
+    not touch the five-minute gap."""
+    tried_n = failed_n = 0
+    first = None
+    for mac in e["wake"]:
+        pkt = srv_magic_packet(mac)
+        for tgt in _srv_bcast_addrs():
+            for port in (9, 7):
+                try:
+                    _srv_udp(pkt, (tgt, port))
+                except OSError as oe:
+                    failed_n += 1
+                    if first is None:
+                        first = (oe.errno, str(oe.strerror or oe))
+                tried_n += 1
+    return tried_n, failed_n, first
+
+
+# The Local Network gate (6b430, per Patrick: "still no pop-up to allow the app
+# to access devices on the local network"). macOS asks the person only when an
+# app first touches the LAN; this app talks to the server over the internet, so
+# nothing did until a wake was needed. The first touch is made at a moment the
+# person can see: the app opening with a server to wake, and the Sleep switch
+# turned on. Mac only; Windows has no such gate.
+LAN_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"
+_lan_boot = [False]
+
+
+def _srv_lan_touch():
+    """One harmless 1-byte datagram to port 9 (discard) of each broadcast
+    address a wake goes to: (tried, failed). Not a magic packet: wakes nothing."""
+    tried_n = failed_n = 0
+    for tgt in _srv_bcast_addrs():
+        try:
+            _srv_udp(b"\0", (tgt, 9))
+        except OSError:
+            failed_n += 1
+        tried_n += 1
+    return tried_n, failed_n
+
+
+def srv_lan_touch_bg(ctx, ids):
+    """The touch, on a thread of its own (never the page's request). Every
+    send refused marks those servers' cards; one that went out clears them."""
+    def run():
+        try:
+            tried_n, failed_n = _srv_lan_touch()
+            blocked = bool(tried_n and failed_n == tried_n)
+            for i in ids:
+                _srv_wake_blocked[i] = blocked
+        except Exception:
+            pass
+    ctx_thread(target=run, daemon=True).start()
+
+
+def srv_lan_touch_boot(ctx):
+    """Once per computer (the machine pref last_lan_touch), when a paired
+    server has wake addresses: the page's first read of the servers."""
+    if not IS_MAC or _lan_boot[0]:
+        return
+    try:
+        ids = [e["id"] for e in _srv_read(ctx) if _srv_paired(e) and e.get("wake")]
+    except (StoreReadError, NoProfile):
+        return
+    if not ids:
+        return
+    _lan_boot[0] = True
+    if machine_prefs().get("last_lan_touch"):
+        return
+    machine_prefs_update(lambda p: p.__setitem__("last_lan_touch", int(time.time())))
+    srv_lan_touch_bg(ctx, ids)
+
+
+def server_wake_test(ctx, sid: str) -> dict:
+    """Settings' Test wake-up: the same magic packets, none waited for, the
+    gap untouched. {ok (one at least went out), tried, failed, blocked (every
+    send raised OSError), err}."""
+    if not IS_MAC:
+        return {"ok": False, "kind": "unsupported", "err": "This test is for the Mac app."}
+    try:
+        e = _srv_find(_srv_read(ctx), sid)
+    except (StoreReadError, NoProfile):
+        return {"ok": False, "kind": "gone", "err": "Couldn\u2019t read your servers."}
+    if e is None:
+        return {"ok": False, "kind": "gone", "err": SRV_GONE}
+    if not e.get("wake"):
+        return {"ok": False, "kind": "nowake", "err": "%s has no wake-up address yet." % _srv_plain(e["name"])}
+    tried_n, failed_n, first = _srv_wake_send(e)
+    blocked = bool(tried_n and failed_n == tried_n)
+    _srv_wake_blocked[e["id"]] = blocked
+    return {"ok": tried_n > failed_n, "tried": tried_n, "failed": failed_n, "blocked": blocked,
+            "err": ("%s (%s)" % (first[1], first[0])) if first else ""}
+
+
 def server_wake(e, progress=None, alive=None) -> str:
     """Wake server e with a magic packet and wait for it to answer. "woke",
     "tried" (no answer in SRV_WAKE_WAIT_S), "stopped" (alive() said the reader
@@ -20360,16 +20459,7 @@ def server_wake(e, progress=None, alive=None) -> str:
         if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:
             return ""
         _srv_wake_at[e["id"]] = t0
-    tried_n = failed_n = 0
-    for mac in e["wake"]:
-        pkt = srv_magic_packet(mac)
-        for tgt in _srv_bcast_addrs():
-            for port in (9, 7):
-                try:
-                    _srv_udp(pkt, (tgt, port))
-                except OSError:
-                    failed_n += 1
-                tried_n += 1
+    tried_n, failed_n, _first = _srv_wake_send(e)
     # EVERY send refused (6b420, per Patrick: the same packet wakes it from
     # Terminal but not from the app): macOS keeps an app off the local
     # network until it is allowed, and says nothing; the answer below says it
@@ -27803,6 +27893,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # Settings › Your servers (6b334): this profile's servers,
             # never a token or a key; ?refresh=1 checks each one first
             _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            srv_lan_touch_boot(self.ctx)        # the Mac's Local Network prompt, once (6b430)
             self._send_json(servers_view(
                 self.ctx, (_sq.get("refresh") or [""])[0] == "1"))
         elif urllib.parse.urlparse(self.path).path == "/api/servers/sleep":
@@ -28419,6 +28510,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # auto sleep (6b346): this server's setting, in the active profile
                 out = (server_sleep_set(self.ctx, sid, {k: d[k] for k in ("enabled", "minutes") if k in d})
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+            elif op == "wake-test":
+                # Test wake-up (6b430): the packets, none waited for
+                out = (server_wake_test(self.ctx, sid)
+                       if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+            elif op == "lan-settings":
+                # the Local Network pane, a fixed argument list (6b430)
+                if IS_MAC:
+                    subprocess.Popen(["open", LAN_SETTINGS_URL])
+                out = {"ok": bool(IS_MAC)}
             elif op == "models":
                 # a set for this server, as the sheet showed it (6b407)
                 out = (server_models_apply(self.ctx, sid, d)
@@ -28444,6 +28544,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     if (_srv_seen.get(_se["id"]) or {}).get("auth"):
                         server_gen_refresh(_se)
                     out = {"ok": True, "server": _srv_public(_se)}
+            if op == "sleep" and IS_MAC and d.get("enabled") is True and out.get("ok"):
+                srv_lan_touch_bg(self.ctx, [sid])    # the switch is the moment to ask (6b430)
             self._send_json(out)
             return
         if self.path == "/api/cloud/set":
@@ -35725,6 +35827,8 @@ body.gen #chip-model{color:var(--accent)}
 .srv-msg,#srv-note{font-size:11px;color:var(--faint);margin-top:6px;
   line-height:1.45}
 .srv-msg:empty,#srv-note:empty{display:none}
+.srv-amber{color:#d9c08a}
+.srv-waketest{margin-top:8px}
 .srv-msg.ok{color:#9fd8b4;font-size:12px}
 .srv-msg.bad{color:#e8907e;font-size:12px}
 .srv-msg.warn{color:#d9c08a;font-size:12px}
@@ -37382,7 +37486,7 @@ let lastModels="";  // line-up the backend actually used
 // Settings › Your servers (6b334): this profile's servers as
 // /api/servers says (no token, no key), when they were last checked,
 // a Remove clicked once, a Pair again opened
-let srvList=[],srvAt=0,srvLoaded=false;
+let srvList=[],srvAt=0,srvLoaded=false,srvLan=false;
 // the sidebar meters' server rows (6b342): each paired server's last read of its
 // card {ok, gpu, ram, fails, due, busy}; a timer; and a flag a profile switch sets
 const srvUse={};let srvUseT=0,srvUseDead=false;
@@ -43419,18 +43523,28 @@ function srvSleepNext(prev,d,write){
   if(k==="offline"||!k)return {st:"off"};
   return {st:"err",msg:"Couldn\u2019t read the setting. "+msg};
 }
+// macOS keeps an app off the local network until it is allowed (6b430, per Patrick: "still no
+// pop-up to allow the app to access devices on the local network"). Only in the macOS app
+// (srvLan), only for a server with wake addresses; the amber line only after every send failed
+const SRV_LAN_BLOCKED="macOS isn\u2019t letting ConcordeAI use the local network. Open System Settings \u203a Privacy & Security \u203a Local Network and turn ConcordeAI on.";
+const SRV_LAN_LINE="This computer isn\u2019t allowing local-network access (Settings \u203a Privacy & Security \u203a Local Network)";
+function srvWakeHtml(s){
+  if(!srvLan||!s.wakeable)return "";
+  return '<div class="srv-row srv-waketest"><button class="about-btn slim" data-a="waketest">Test wake-up</button></div>'
+    +(s.lan_blocked?'<div class="srv-hint srv-amber">'+esc(SRV_LAN_LINE)+' <button class="about-btn slim" data-a="lansettings">Open Local Network settings</button></div>':"");
+}
 function srvSleepHtml(s,z){
   if(!s.paired)return "";
   const v=srvSleepView(z),dis=v.disabled?" disabled":"";
   // nothing read back yet: the name of the setting and why, no controls to mislead
   if(v.unknown)return '<div class="srv-sleep"><div class="srv-row"><span class="srv-pref"><span>Sleep when idle</span></span></div>'
-    +'<div class="srv-hint">'+esc(v.hint)+'</div></div>';
+    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+'</div>';
   return '<div class="srv-sleep"><div class="srv-row"><label class="srv-pref">'
     +'<input type="checkbox" data-a="sleepon"'+(v.checked?" checked":"")+dis+'><span>Sleep when idle</span></label>'
     +'<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
     +'data-a="sleepmin" data-k="smin" value="'+esc(String(v.minutes))+'"'+dis
     +' aria-label="Minutes with no questions before it sleeps"><span>minutes</span></span></div>'
-    +'<div class="srv-hint">'+esc(v.hint)+'</div></div>';
+    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+'</div>';
 }
 function srvCard(s){
   const st=s.status||{};
@@ -43509,6 +43623,7 @@ async function loadServers(refresh){
   try{
     const d=await(await api("/api/servers"+(refresh?"?refresh=1":""))).json();
     srvList=Array.isArray(d.servers)?d.servers:[];
+    srvLan=!!d.lan;
     srvLoaded=true;
     if(refresh)srvAt=Date.now();
   }catch(e){return;}
@@ -43611,6 +43726,23 @@ $("#srv-list").addEventListener("click",async ev=>{
     if(d.server){srvPut(d.server);delete srvTokOpen[id];}
     paintServers();
     srvMsg(id,d.err||"Access token saved.");
+    return;
+  }
+  if(a==="lansettings"){
+    try{await srvPost("lan-settings",{id:id});}catch(e){}
+    return;
+  }
+  if(a==="waketest"){
+    b.disabled=true;srvMsg(id,"Sending\u2026");
+    let d;
+    try{d=await srvPost("wake-test",{id:id});}
+    catch(e){d={ok:false,err:"Couldn\u2019t reach the app. Try again."};}
+    b.disabled=false;
+    s.lan_blocked=!!(d&&d.blocked);
+    paintServers();
+    if(d&&d.blocked)srvMsg(id,SRV_LAN_BLOCKED,"warn");
+    else if(d&&d.ok)srvMsg(id,"Wake-up sent to "+s.name+".","ok");
+    else srvMsg(id,(d&&d.err)||"Couldn\u2019t send the wake-up.","bad");
     return;
   }
   if(a==="repair"){
