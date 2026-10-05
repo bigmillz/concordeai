@@ -10726,7 +10726,7 @@ def _kept_servers_raw(folder: str):
         _trash_file(p)
         return
     gone = ("access_id", "access_secret", "seed", "device_id", "public_key",
-            "paired_at", "device_name")
+            "paired_at", "device_name", "relay", "relay_token")
     clean = [{k: v for k, v in r.items() if k not in gone}
              for r in rows if isinstance(r, dict)]
     if clean != rows:
@@ -17340,6 +17340,8 @@ _SRV_MAC_RX = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}")
 _srv_wake_at = profile_cache("_srv_wake_at", {})
 _srv_wake_tl = threading.local()
 _srv_wake_blocked = profile_cache("_srv_wake_blocked", {})   # server id -> every wake packet was refused by this computer
+_srv_relay_state = profile_cache("_srv_relay_state", {})     # server id -> {ok, err}: the wake relay's last answer (6b431)
+SRV_RELAY_S = 4                 # connect and read, each, of a wake sent through the relay
 SRV_WAKE_BLOCKED = (" This computer wouldn\u2019t let the app send the wake-up call. "
                     "Allow ConcordeAI in System Settings \u203a Privacy & Security \u203a Local Network.")
 SRV_USAGE_S = 3                 # one read of a server's card usage: short, the meter polls
@@ -17488,8 +17490,8 @@ def o1_pair_proof(key: bytes, device_id: str, pub: str, nonce: str) -> bytes:
 
 # ---- the profile's servers.json
 _SRV_PLAIN = ("id", "name", "url", "device_id", "public_key", "device_name",
-              "paired_at", "added_at", "models", "prefer", "wake", "sleep", "gen")
-_SRV_SECRET = ("access_id", "access_secret", "seed")
+              "paired_at", "added_at", "models", "prefer", "wake", "sleep", "gen", "relay")
+_SRV_SECRET = ("access_id", "access_secret", "seed", "relay_token")
 
 
 def _srv_read(ctx) -> list:
@@ -17504,6 +17506,7 @@ def _srv_read(ctx) -> list:
         e["name"], e["url"] = str(e["name"] or ""), str(e["url"] or "")
         e["wake"], e["sleep"] = _srv_clean_wake(e.get("wake")), _srv_clean_sleep(e.get("sleep"))
         e["gen"] = _srv_clean_gen(e.get("gen"))          # what it can make (6b356)
+        e["relay"] = _srv_clean_relay(e.get("relay"))    # the wake relay (6b431)
         for k in _SRV_SECRET:
             e[k] = _Secret(s.get(k))
         out.append(e)
@@ -18878,9 +18881,16 @@ def _srv_public(e) -> dict:
             "paired": _srv_paired(e), "paired_at": e.get("paired_at"),
             "device_name": str(e.get("device_name") or ""),
             "device_id": str(e.get("device_id") or ""),
-            "status": {k: s.get(k) for k in ("at", "reachable", "auth",
-                                             "latency_ms", "version", "err",
-                                             "kind")},
+            "status": dict({k: s.get(k) for k in ("at", "reachable", "auth",
+                                                  "latency_ms", "version", "err",
+                                                  "kind")},
+                           # the wake relay's last answer (6b431)
+                           relay_ok=(_srv_relay_state.get(e["id"]) or {}).get("ok"),
+                           relay_err=(_srv_relay_state.get(e["id"]) or {}).get("err") or ""),
+            # the wake relay (6b431): the address, and only whether a token is
+            # kept; the token itself never leaves servers.json
+            "relay": {"url": (e.get("relay") or {}).get("url") or "",
+                      "has_token": bool(e.get("relay_token"))},
             "gpu": s.get("gpu"),
             "only": server_only_state(e),
             # "Use for Fast, Thinking and Pro" (6b339): on unless turned off
@@ -19577,6 +19587,157 @@ def _srv_wake_due(e) -> bool:
     return _srv_wakeable(e) and not (last is not None and 0 <= _srv_wake_clock() - last < SRV_WAKE_GAP_S)
 
 
+# ---- the wake relay (6b431)
+# Patrick (2026-10-05): "outside of my home network, let's also set it up so
+# that we can use the Raspberry Pi running the VPN to wake the server... over
+# the VPN, but remember, this won't translate into our instructions/scripts
+# for others to set up their own LLM server because it's custom for my RPi
+# VPN setup." An OPTIONAL, advanced, per-server setting: a small HTTP service
+# on the person's own network that sends the magic packet when the broadcast
+# from here can't reach the server. It is in no kit doc, no wizard and no
+# install line. POST <url>/v1/wake, header X-Relay-Token, body {"macs": [..]};
+# it answers {"ok": true, "sent": N}, or 401 (token), 403 (a card it doesn't
+# allow), 429 (too often). The token is a secret like the Access secret: in
+# servers.json only, never in a reply, a log or an error.
+def _srv_relay_url(raw) -> tuple:
+    """(the normalised address, '') or ('', why): http:// or https://, a host,
+    an optional port 1 to 65535, nothing else (no login, path, query)."""
+    s = str(raw or "").strip()
+    try:
+        u = urllib.parse.urlsplit(s)
+        port = u.port
+    except ValueError:
+        return "", "That isn\u2019t a web address, or its port isn\u2019t 1 to 65535."
+    host = u.hostname or ""
+    if u.scheme not in ("http", "https"):
+        return "", "Start the address with http:// or https://."
+    if not _SRV_HOST_RX.fullmatch(host):
+        return "", "The address needs a host name or number, like http://10.0.0.5:8080."
+    if port is not None and not 1 <= port <= 65535:
+        return "", "The port has to be 1 to 65535."
+    if ("@" in u.netloc or "?" in s or "#" in s or u.query or u.fragment
+            or u.path not in ("", "/")):
+        return "", "Type the address only, like http://10.0.0.5:8080."
+    return "%s://%s%s" % (u.scheme, host.lower(), ":%d" % port if port is not None else ""), ""
+
+
+def _srv_clean_relay(v):
+    """{url} as saved, or None: only an address that passes is believed."""
+    if not isinstance(v, dict):
+        return None
+    url, why = _srv_relay_url(v.get("url"))
+    return None if why else {"url": url}
+
+
+def _srv_relay_reason(ex) -> str:
+    """Why a relay could not be reached, in words that carry no address and
+    no token."""
+    import socket as _so
+    import ssl as _ssl
+    if isinstance(ex, ConnectionRefusedError):
+        return "connection refused"
+    if isinstance(ex, (_so.timeout, TimeoutError)):
+        return "timed out"
+    if isinstance(ex, _so.gaierror):
+        return "name not found"
+    if isinstance(ex, _ssl.SSLError):
+        return "its certificate wasn\u2019t accepted"
+    if isinstance(ex, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+        return "connection dropped"
+    if isinstance(ex, OSError) and ex.strerror:
+        return str(ex.strerror)[:80]
+    return "no answer"
+
+
+def _srv_relay_post(e) -> dict:
+    """Ask e's relay to send the wake-up: {ok, kind, err, sent}; kind is one of
+    ok, none (not set), token (401), denied (403), limited (429), redirect,
+    bad, unreachable. Never raises. Only the configured address is spoken to,
+    a redirect is never followed, https is verified, no proxy, SRV_RELAY_S to
+    connect and to read. Called off every lock. Records relay_ok / relay_err
+    for the card."""
+    def done(ok, kind, err="", sent=0):
+        if kind != "none":
+            _srv_relay_state[e["id"]] = {"ok": ok, "err": err}
+        return {"ok": ok, "kind": kind, "err": err, "sent": sent}
+    try:
+        rel, tok = e.get("relay") or {}, e.get("relay_token")
+        url, why = _srv_relay_url(rel.get("url"))
+        if why or not tok:
+            return done(False, "none")
+        import http.client as _hc
+        u = urllib.parse.urlsplit(url)
+        body = json.dumps({"macs": list(e.get("wake") or [])}).encode("utf-8")
+        if u.scheme == "https":
+            import ssl as _ssl
+            conn = _hc.HTTPSConnection(u.hostname, u.port or 443, timeout=SRV_RELAY_S,
+                                       context=_ssl.create_default_context())
+        else:
+            conn = _hc.HTTPConnection(u.hostname, u.port or 80, timeout=SRV_RELAY_S)
+        try:
+            conn.request("POST", "/v1/wake", body=body, headers={
+                "Content-Type": "application/json", "Content-Length": str(len(body)),
+                "X-Relay-Token": tok.reveal(), "User-Agent": "ConcordeAI/" + APP_VERSION})
+            resp = conn.getresponse()
+            st, raw = resp.status, resp.read(65536)
+        finally:
+            conn.close()
+        try:
+            js = json.loads(raw.decode("utf-8", "replace"))
+        except ValueError:
+            js = {}
+        if not isinstance(js, dict):
+            js = {}
+        if st == 200 and js.get("ok") is True:
+            return done(True, "ok", "", int(js.get("sent") or 0))
+        if st == 401:
+            return done(False, "token", "Relay refused the token.")
+        if st == 403:
+            return done(False, "denied", "Relay doesn\u2019t allow this server.")
+        if st == 429:
+            return done(False, "limited", "Relay is limiting wake-ups. Try again in a moment.")
+        if 300 <= st < 400:
+            return done(False, "redirect", "Relay not reachable: it sent the app somewhere else, which isn\u2019t followed.")
+        return done(False, "bad", "Relay answered something unexpected (%d)." % st)
+    except Exception as ex:
+        return done(False, "unreachable", "Relay not reachable: %s" % _srv_relay_reason(ex))
+
+
+def server_set_relay(ctx, sid: str, d: dict) -> dict:
+    """Save or clear e's wake relay. {url, token}: both set it (the token
+    write-only; a blank token keeps the one saved, for a changed address);
+    {clear: true} (or a blank url) removes both. The reply is the public view."""
+    clear = d.get("clear") is True or not str(d.get("url") or "").strip()
+    url, tok = "", ""
+    if not clear:
+        url, why = _srv_relay_url(d.get("url"))
+        if why:
+            return {"err": why}
+        tok = str(d.get("token") or "").strip()
+        if tok and not _SRV_TOKEN_RX.fullmatch(tok):
+            return {"err": "That token has characters a token never has."}
+
+    def fn(entries):
+        e = _srv_find(entries, sid)
+        if e is None:
+            return {"err": SRV_GONE}
+        if clear:
+            e["relay"], e["relay_token"] = None, _Secret("")
+        else:
+            if not tok and not e.get("relay_token"):
+                return {"err": "Type the relay\u2019s token too."}
+            e["relay"] = {"url": url}
+            if tok:
+                e["relay_token"] = _Secret(tok)
+        return {"ok": True}
+    out = _srv_update(ctx, fn)
+    if out.get("ok"):
+        _srv_relay_state.pop(sid, None)
+        e = _srv_find(_srv_read(ctx), sid)
+        out["server"] = _srv_public(e) if e else None
+    return out
+
+
 def _srv_wake_send(e):
     """Send e's magic packets (the loop server_wake and the Test wake-up
     button share): (tried, failed, first) where first is (errno, strerror) of
@@ -19653,11 +19814,13 @@ def srv_lan_touch_boot(ctx):
     srv_lan_touch_bg(ctx, ids)
 
 
-def server_wake_test(ctx, sid: str) -> dict:
+def server_wake_test(ctx, sid: str, relay_only: bool = False) -> dict:
     """Settings' Test wake-up: the same magic packets, none waited for, the
     gap untouched. {ok (one at least went out), tried, failed, blocked (every
-    send raised OSError), err}."""
-    if not IS_MAC:
+    send raised OSError), err}. A wake relay set for the server is asked as
+    well and its answer comes back as relay (the card's words); relay_only
+    asks it alone (the Test relay button: no broadcast, any computer)."""
+    if not IS_MAC and not relay_only:
         return {"ok": False, "kind": "unsupported", "err": "This test is for the Mac app."}
     try:
         e = _srv_find(_srv_read(ctx), sid)
@@ -19667,11 +19830,21 @@ def server_wake_test(ctx, sid: str) -> dict:
         return {"ok": False, "kind": "gone", "err": SRV_GONE}
     if not e.get("wake"):
         return {"ok": False, "kind": "nowake", "err": "%s has no wake-up address yet." % _srv_plain(e["name"])}
+    if relay_only:
+        r = _srv_relay_post(e)
+        if r["kind"] == "none":
+            return {"ok": False, "kind": "norelay", "err": "Save the relay\u2019s address and token first."}
+        return {"ok": r["ok"], "kind": r["kind"],
+                "err": "Relay answered: wake-up sent." if r["ok"] else r["err"]}
     tried_n, failed_n, first = _srv_wake_send(e)
-    blocked = bool(tried_n and failed_n == tried_n)
+    rl = _srv_relay_post(e)        # the broadcast is out; a relay is asked as well
+    blocked = bool(tried_n and failed_n == tried_n) and not rl["ok"]
     _srv_wake_blocked[e["id"]] = blocked
-    return {"ok": tried_n > failed_n, "tried": tried_n, "failed": failed_n, "blocked": blocked,
-            "err": ("%s (%s)" % (first[1], first[0])) if first else ""}
+    out = {"ok": tried_n > failed_n or rl["ok"], "tried": tried_n, "failed": failed_n, "blocked": blocked,
+           "err": ("%s (%s)" % (first[1], first[0])) if first else ""}
+    if rl["kind"] != "none":
+        out["relay"] = {"ok": rl["ok"], "err": rl["err"]}
+    return out
 
 
 def server_wake(e, progress=None, alive=None) -> str:
@@ -19695,7 +19868,20 @@ def server_wake(e, progress=None, alive=None) -> str:
     # EVERY send refused (6b420, per Patrick: the same packet wakes it from
     # Terminal but not from the app): macOS keeps an app off the local
     # network until it is allowed, and says nothing; the answer below says it
-    _srv_wake_blocked[e["id"]] = bool(tried_n and failed_n == tried_n)
+    refused = bool(tried_n and failed_n == tried_n)
+    relayed = bool((e.get("relay") or {}).get("url") and e.get("relay_token"))
+    _srv_wake_blocked[e["id"]] = refused and not relayed
+    if relayed:
+        # the wake relay (6b431): asked as well, on a thread of its own, so
+        # the poll below starts at once; only if it says no too is the
+        # computer called blocked
+        def _ask(e=e, refused=refused):
+            try:
+                r = _srv_relay_post(e)
+                _srv_wake_blocked[e["id"]] = refused and not r["ok"]
+            except Exception:
+                pass
+        ctx_thread(target=_ask, daemon=True).start()
     if progress is not None:
         progress(0)
     while True:
@@ -22019,7 +22205,7 @@ class _BenchServer:
                 self.place = m.get("placement") or ""
 
     def secrets(self):
-        return [self.e[k].reveal() for k in ("access_id", "access_secret", "seed")
+        return [self.e[k].reveal() for k in ("access_id", "access_secret", "seed", "relay_token")
                 if self.e.get(k)]
 
     def _open(self, method, path, obj, wait=None):
@@ -27722,7 +27908,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
             elif op == "wake-test":
                 # Test wake-up (6b430): the packets, none waited for
-                out = (server_wake_test(self.ctx, sid)
+                out = (server_wake_test(self.ctx, sid, d.get("relay_only") is True)
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
             elif op == "lan-settings":
                 # the Local Network pane, a fixed argument list (6b430)
@@ -27733,6 +27919,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # a set for this server, as the sheet showed it (6b407)
                 out = (server_models_apply(self.ctx, sid, d)
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+            elif op == "relay":
+                # the wake relay (6b431): its address and token, set or cleared;
+                # the token is write-only
+                out = (server_set_relay(self.ctx, sid, d)
+                       if _SRV_ID_RX.fullmatch(sid) else {"err": SRV_GONE})
             elif op not in ("pair", "test", "access", "remove", "prefer"):
                 self.send_error(404)
                 return
@@ -34867,6 +35058,8 @@ body.gen #chip-model{color:var(--accent)}
   padding:6px 9px;outline:none;font-family:var(--helv)}
 .srv-tokf input:focus{border-color:rgba(143,157,255,.6)}
 .srv-tokf .about-btn.slim{margin-top:0}
+.srv-relay{margin-top:8px}
+.srv-relay .srv-tokf{flex-wrap:wrap}
 .srv-st{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.45}
 .srv.ok .srv-st{color:#9fd8b4}
 .srv.warn .srv-st{color:#d9c08a}
@@ -36557,7 +36750,7 @@ let srvAllFrom=null,cloudSt=null;
 // minutes, supported, wakeable, msg}
 const srvSleep={};
 // a card's line and its open Access form survive a repaint (review)
-const srvArmed={},srvPairOpen={},srvMsgs={},srvMsgKind={},srvTestSeq={},srvTokOpen={};
+const srvArmed={},srvPairOpen={},srvMsgs={},srvMsgKind={},srvTestSeq={},srvTokOpen={},srvRelayOpen={};
 const SRV_SEP=" \u00b7 ";
 let councilManual=false;
 // declared up here: setCombine() runs during boot and reads it, which would
@@ -42467,18 +42660,36 @@ function srvWakeHtml(s){
   return '<div class="srv-row srv-waketest"><button class="about-btn slim" data-a="waketest">Test wake-up</button></div>'
     +(s.lan_blocked?'<div class="srv-hint srv-amber">'+esc(SRV_LAN_LINE)+' <button class="about-btn slim" data-a="lansettings">Open Local Network settings</button></div>':"");
 }
+// the wake relay (6b431): Advanced, collapsed and off until set up. Written for the owner's own
+// network; the words are neutral and the token field is write-only (a saved one only says so)
+const SRV_RELAY_HINT="Wake relay (advanced): a small service on your network that sends the wake-up for you when you\u2019re away. Address and token.";
+function srvRelayHtml(s){
+  if(!s.paired)return "";
+  const r=s.relay||{},open=!!srvRelayOpen[s.id];
+  return '<div class="srv-relay"><button class="about-btn slim" data-a="relayopen" aria-expanded="'+(open?"true":"false")+'">Advanced'
+    +(open?" \u25b4":" \u25be")+'</button>'
+    +(open?'<div class="srv-relay-body"><div class="srv-hint">'+esc(SRV_RELAY_HINT)+'</div>'
+      +'<div class="srv-tokf"><input type="text" data-k="rurl" autocomplete="off" spellcheck="false" placeholder="http://10.0.0.5:8080" '
+      +'aria-label="Wake relay address" value="'+esc(r.url||"")+'">'
+      +'<input type="password" data-k="rtok" autocomplete="off" placeholder="'+(r.has_token?"Token saved":"Token")
+      +'" aria-label="Wake relay token">'
+      +'<button class="about-btn slim" data-a="relaysave">Save</button>'
+      +'<button class="about-btn slim" data-a="relayclear"'+(r.url||r.has_token?"":" disabled")+'>Clear</button>'
+      +'<button class="about-btn slim" data-a="relaytest"'+(r.url&&r.has_token?"":" disabled")+'>Test relay</button></div></div>':"")
+    +'</div>';
+}
 function srvSleepHtml(s,z){
   if(!s.paired)return "";
   const v=srvSleepView(z),dis=v.disabled?" disabled":"";
   // nothing read back yet: the name of the setting and why, no controls to mislead
   if(v.unknown)return '<div class="srv-sleep"><div class="srv-row"><span class="srv-pref"><span>Sleep when idle</span></span></div>'
-    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+'</div>';
+    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+srvRelayHtml(s)+'</div>';
   return '<div class="srv-sleep"><div class="srv-row"><label class="srv-pref">'
     +'<input type="checkbox" data-a="sleepon"'+(v.checked?" checked":"")+dis+'><span>Sleep when idle</span></label>'
     +'<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
     +'data-a="sleepmin" data-k="smin" value="'+esc(String(v.minutes))+'"'+dis
     +' aria-label="Minutes with no questions before it sleeps"><span>minutes</span></span></div>'
-    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+'</div>';
+    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+srvRelayHtml(s)+'</div>';
 }
 function srvCard(s){
   const st=s.status||{};
@@ -42664,6 +42875,26 @@ $("#srv-list").addEventListener("click",async ev=>{
   }
   if(a==="lansettings"){
     try{await srvPost("lan-settings",{id:id});}catch(e){}
+    return;
+  }
+  if(a==="relayopen"){
+    srvRelayOpen[id]=!srvRelayOpen[id];paintServers();
+    return;
+  }
+  if(a==="relaysave"||a==="relayclear"||a==="relaytest"){
+    const v=k=>(card.querySelector('input[data-k="'+k+'"]')||{}).value||"";
+    b.disabled=true;srvMsg(id,a==="relaytest"?"Asking the relay\u2026":"Saving\u2026");
+    let d={};
+    try{
+      if(a==="relaytest")d=await srvPost("wake-test",{id:id,relay_only:true});
+      else d=await srvPost("relay",a==="relayclear"?{id:id,clear:true}:{id:id,url:v("rurl").trim(),token:v("rtok").trim()});
+    }catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
+    b.disabled=false;
+    if(d.server)srvPut(d.server);
+    paintServers();
+    // the answer is shown as text, never as markup (srvMsg sets textContent)
+    srvMsg(id,d.err||(a==="relayclear"?"Wake relay cleared.":a==="relaysave"?"Wake relay saved.":""),
+           a==="relaytest"?(d.ok?"ok":"bad"):(d.err?"bad":"ok"));
     return;
   }
   if(a==="waketest"){
