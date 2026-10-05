@@ -17109,7 +17109,7 @@ def _sg_unit(src):
         "Mail about or" in lb and "A" * 60 in lb and all(len(x) <= 60 for x in lb))
     # the model asked
     calls = []
-    srv, loc, cloud = [None], [None], [[]]
+    srv, loc, cloud, up = [None], [None], [[]], [True]
 
     def _stubs(tier="Fast"):
         return dict(
@@ -17119,6 +17119,7 @@ def _sg_unit(src):
             cloud_text=lambda c, m, **k: (calls.append("cloud") or "<think>x</think>CLOUD " + c["id"]),
             server_side_text=lambda m, ctx=None, role="fast", max_tokens=0: (calls.append("server") or srv[0]),
             _suggest_local_label=lambda: loc[0],
+            server_mode_candidates=lambda ctx: [{"loaded": up[0]}],
             run_model=lambda lb_, m, emit: (calls.append("local") or emit("LOCAL " + lb_)),
             strip_think=lambda t: t.replace("<think>x</think>", ""), strip_special=lambda t: t)
 
@@ -17128,8 +17129,12 @@ def _sg_unit(src):
         return r, list(calls)
     cloud[0] = [{"id": "g"}]
     srv[0], loc[0] = "SERVER", "Phi"
+    up[0] = True
     ns2 = _sg_ns(src, **_stubs())
     o["the server first"] = ask(ns2) == (("SERVER", "your server"), ["server"])
+    up[0] = False
+    o["a server with no model loaded is not asked, and not woken to load one"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["local"])
+    up[0] = True
     srv[0] = None
     o["then a loaded model of this computer"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["server", "local"])
     loc[0] = None
@@ -17557,7 +17562,8 @@ _SG_MUT = [
     ("three chips from the biggest topic", "    out = rng.sample(first[\"chips\"], min(2, len(first[\"chips\"])))", "    out = rng.sample(first[\"chips\"], min(3, len(first[\"chips\"])))"),
     ("nothing from the next topic", "    if rest:\n        out += rng.sample(rest[0][\"chips\"], 1)\n", ""),
     ("a tie always to the first", "    first = rng.choice([t for t in tp if t[\"n\"] == tp[0][\"n\"]])", "    first = tp[0]"),
-    ("the server never asked first", "    out = server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)\n    if out is not None:", "    out = None\n    if out is not None:"),
+    ("the server never asked first", "    out = (server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)\n           if _suggest_server_up(ctx) else None)\n    if out is not None:", "    out = None\n    if out is not None:"),
+    ("a server with nothing loaded asked", "if _suggest_server_up(ctx) else None)", "if True else None)"),
     ("a server's model asked in Cloud Only", '    if cloud_only:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):', '    if False:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):'),
     ("the cloud asked outside Cloud Only", '    if cloud_only:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):', '    if True:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):'),
     ("Cloud Only falling back to this computer", '                return strip_think(out), "the cloud"\n        return None, ""', '                return strip_think(out), "the cloud"\n        pass'),

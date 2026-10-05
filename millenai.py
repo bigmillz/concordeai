@@ -13188,6 +13188,15 @@ def _suggest_hooked() -> bool:
     return "suggest-fake" in TEST_HOOKS or bool(_hook_arg("suggest-fake"))
 
 
+def _suggest_server_up(ctx) -> bool:
+    """Whether a server of this profile has a model loaded right now, as its
+    last check saw it."""
+    try:
+        return any(m.get("loaded") for m in server_mode_candidates(ctx))
+    except Exception:
+        return False
+
+
 def suggest_ask(ctx, prompt: str):
     """(the reply, who wrote it) or (None, ""): the server first, else a
     loaded model here; in Cloud Only the cloud's quick model and nothing
@@ -13214,7 +13223,11 @@ def suggest_ask(ctx, prompt: str):
     # CAPPED (6b420, per Patrick: "it wasn't me chatting"): a few chips took
     # a 12B model 6,500-7,800 tokens, two minutes of the card, on every
     # start. The cloud's call above is capped at 700.
-    out = server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)
+    # ONLY A SERVER THAT IS AWAKE AND HAS A MODEL UP (6b420, per Patrick: a
+    # woken server ran its card flat out for two minutes): the pass never
+    # loads a model there, as it never loads one here
+    out = (server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)
+           if _suggest_server_up(ctx) else None)
     if out is not None:
         return out, "your server"
     label = _suggest_local_label()
