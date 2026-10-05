@@ -33665,7 +33665,7 @@ body.gen #composer{
 body.gen #chip-model{color:var(--accent)}
 #input{
   flex:1;background:none;border:none;outline:none;resize:none;
-  color:var(--text);font:14.5px/1.5 var(--sans);max-height:180px;
+  color:var(--text);font:14.5px/1.5 var(--sans);max-height:45vh;
   padding:6px 4px;
 }
 #input::placeholder{color:var(--faint)}
@@ -38562,7 +38562,22 @@ function setToks(){}
 
 /* --------------------------------------------------------------- send */
 const input=$("#input"),sendBtn=$("#send");
-input.addEventListener("input",()=>{input.style.height="auto";input.style.height=Math.min(input.scrollHeight,180)+"px";});
+// THE BOX GROWS WITH WHAT IS IN IT (per Patrick: a long dictated question
+// sat cut off in two lines): every way the text changes refits it, typing,
+// pasting and the code that fills it (dictation, edit and resend, chips), up
+// to 45% of the window, then it scrolls
+function fitInput(){
+  input.style.height="auto";
+  input.style.height=Math.min(input.scrollHeight,Math.max(180,Math.round(innerHeight*0.45)))+"px";
+}
+input.addEventListener("input",fitInput);
+(function(){
+  const d=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value");
+  Object.defineProperty(input,"value",{configurable:true,
+    get(){return d.get.call(this);},
+    set(v){d.set.call(this,v);fitInput();}});
+})();
+addEventListener("resize",fitInput);
 // NEVER a silent dead send button: a runtime error inside send() (a
 // dangling identifier killed every send in 2.0.0, seen live) surfaces in
 // the composer instead of eating the click.

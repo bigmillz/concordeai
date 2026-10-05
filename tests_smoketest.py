@@ -16959,6 +16959,11 @@ check("wake: every packet refused by this computer says so, naming Local Network
       and "Privacy & Security \\u203a Local Network" in _MILLENAI_SRC
       and "SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e[\"id\"]) else" in _MILLENAI_SRC
       and "NSLocalNetworkUsageDescription" in open("build_macos_app.sh").read())
+check("the composer grows with its text: typing, pasting and code that fills it refit it, to 45% of the window",
+      "function fitInput(){" in _MILLENAI_SRC and 'input.addEventListener("input",fitInput);' in _MILLENAI_SRC
+      and 'set(v){d.set.call(this,v);fitInput();}' in _MILLENAI_SRC
+      and "Math.round(innerHeight*0.45)" in _MILLENAI_SRC and "max-height:45vh;" in _MILLENAI_SRC
+      and "max-height:180px;\n  padding:6px 4px;" not in _MILLENAI_SRC)
 print("== starter chips from your chats (6b390) ==")
 check("topic chips: the pass is capped at what a server may write, in the request itself",
       "SUGGEST_MAX_TOKENS = 1200" in _MILLENAI_SRC
