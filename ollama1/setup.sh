@@ -41,6 +41,8 @@
 #   sudo ./setup.sh --leds on|off    the case, board and cooler lights: white when the graphics card is idle, through
 #                                    yellow and orange to red in 5 s when it works, white again over 2 minutes, 40% dim after 5 idle minutes (ollama1-leds, through the openrgb package, which
 #                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
+#   sudo ./setup.sh --leds-length N  LEDs given to a board header that lists none (an addressable header such as
+#                                    JRAINBOW1, so the strips on it light too), 1 to 1024; default 60; saved in setup.env
 #   sudo ./setup.sh --watchdog on|off   the hardware watchdog (ollama1-watchdog): the chipset's timer resets the board
 #                                    when the system disk stops answering (about 60 s), petted only while a real disk probe
 #                                    passes. Default on; also OLLAMA1_WATCHDOG=1|0; saved in setup.env
@@ -131,6 +133,7 @@ A_GPU_MEMORY=""
 A_GPU_CORE=""
 A_FANS=""
 A_LEDS=""
+A_LEDS_LENGTH=""
 A_WATCHDOG=""
 A_DASH=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
@@ -139,6 +142,7 @@ prev=""
 for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
   if [ "$prev" = --leds ]; then A_LEDS=$a; leds_choice "$A_LEDS" "" "" >/dev/null || { echo "--leds takes on or off"; exit 2; }; prev=""; continue; fi
+  if [ "$prev" = --leds-length ]; then A_LEDS_LENGTH=$a; leds_length_choice "$A_LEDS_LENGTH" "" >/dev/null || { echo "--leds-length takes whole LEDs, 1 to 1024"; exit 2; }; prev=""; continue; fi
   if [ "$prev" = --watchdog ]; then A_WATCHDOG=$a; watchdog_choice "$A_WATCHDOG" "" "" >/dev/null || { echo "--watchdog takes on or off"; exit 2; }; prev=""; continue; fi
   if [ "$prev" = --fans ]; then A_FANS=$a; fans_choice "$A_FANS" "" "" >/dev/null || { echo "--fans takes on or off"; exit 2; }; prev=""; continue; fi
   case "$prev" in
@@ -165,7 +169,7 @@ for a in "$@"; do
   case "$a" in
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
-    --vg-reserve|--fans|--leds|--watchdog|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --vg-reserve|--fans|--leds|--watchdog|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial|--leds-length) ;;
     --gpu-tune-memory|--gpu-tune-core|--dash|--vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
@@ -198,6 +202,7 @@ fans_choice "" "${OLLAMA1_FANS:-}" "" >/dev/null || { echo "OLLAMA1_FANS takes 1
 [ "$prev" != --watchdog ] || { echo "--watchdog takes on or off"; exit 2; }
 watchdog_choice "" "${OLLAMA1_WATCHDOG:-}" "" >/dev/null || { echo "OLLAMA1_WATCHDOG takes 1 or 0 (on or off)"; exit 2; }
 [ "$prev" != --leds ] || { echo "--leds takes on or off"; exit 2; }
+[ "$prev" != --leds-length ] || { echo "--leds-length takes whole LEDs, 1 to 1024"; exit 2; }
 leds_choice "" "${OLLAMA1_LEDS:-}" "" >/dev/null || { echo "OLLAMA1_LEDS takes 1 or 0 (on or off)"; exit 2; }
 case "$prev" in --dash) echo "--dash takes text, graphic or auto"; exit 2 ;; esac
 dash_mode_choice "" "${OLLAMA1_DASH:-}" "" >/dev/null || { echo "OLLAMA1_DASH takes text, graphic or auto"; exit 2; }
@@ -285,6 +290,7 @@ resolve_settings() {
     || die "the saved GPU_TUNE_CORE in $SAVED is not a number of MHz from 0 to 150; give --gpu-tune-core"
   FANS=$(fans_choice "$A_FANS" "${OLLAMA1_FANS:-}" "$(saved FANS)") || die "the saved FANS in $SAVED is not on or off; give --fans on or --fans off"
   LEDS=$(leds_choice "$A_LEDS" "${OLLAMA1_LEDS:-}" "$(saved LEDS)") || die "the saved LEDS in $SAVED is not on or off; give --leds on or --leds off"
+  LEDS_LENGTH=$(leds_length_choice "$A_LEDS_LENGTH" "$(saved LEDS_LENGTH)") || die "the saved LEDS_LENGTH in $SAVED is not a number of LEDs from 1 to 1024; give --leds-length"
   WATCHDOG=$(watchdog_choice "$A_WATCHDOG" "${OLLAMA1_WATCHDOG:-}" "$(saved WATCHDOG)") || die "the saved WATCHDOG in $SAVED is not on or off; give --watchdog on or --watchdog off"
   DASH=$(dash_mode_choice "$A_DASH" "${OLLAMA1_DASH:-}" "$(saved DASH)") \
     || die "the saved DASH in $SAVED is not text, graphic or auto; give --dash"
@@ -325,6 +331,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE_MEMORY=%s\nGPU_TUNE_CORE=%s\n' "$GPU_TUNE_MEMORY" "$GPU_TUNE_CORE"; fi
       printf 'FANS=%s\n' "$FANS"
       printf 'LEDS=%s\n' "$LEDS"
+      if [ -n "$LEDS_LENGTH" ]; then printf 'LEDS_LENGTH=%s\n' "$LEDS_LENGTH"; fi   # only when asked: otherwise the service's default (60)
       printf 'WATCHDOG=%s\n' "$WATCHDOG"
       if [ "$DASH" != auto ]; then printf 'DASH=%s\n' "$DASH"; fi
     } >"$t" )
@@ -388,7 +395,7 @@ print_plan() {
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen (big console font), timers
    $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
    $(state 'systemctl is-active ollama1-fan')     $(fans_plan "$FANS")
-   $(state 'systemctl is-active ollama1-leds')    $(leds_plan "$LEDS")
+   $(state 'systemctl is-active ollama1-leds')    $(leds_plan "$LEDS" "$LEDS_LENGTH")
    $(state 'systemctl is-active ollama1-watchdog')    $(watchdog_plan "$WATCHDOG")
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
@@ -1014,8 +1021,10 @@ step "Fans"
 # OFF unless --leds on (OLLAMA1_LEDS=1; saved in setup.env): installs the openrgb package and runs its server on
 # 127.0.0.1 (ollama1-openrgb) and the service that makes every light follow the graphics card's work, white to red
 # (ollama1-leds, lib/o1leds.py). --leds off stops and disables both and removes nothing else.
+# --leds-length N (saved as LEDS_LENGTH) travels as `setup on --length N`, which keeps it in
+# /etc/ollama1/leds.json for the service; a re-run without the flag passes the saved value again.
 step "Lights"
-"$LIBDIR/bin/ollama1-leds" setup "$LEDS" || note "ollama1-leds setup stopped (see above); the lights are left as they were"
+"$LIBDIR/bin/ollama1-leds" setup "$LEDS" ${LEDS_LENGTH:+--length "$LEDS_LENGTH"} || note "ollama1-leds setup stopped (see above); the lights are left as they were"
 
 # ---- 14d. hardware watchdog (6b399) -----------------------------------------------------------
 # ON unless --watchdog off (OLLAMA1_WATCHDOG=0; saved in setup.env): the chipset's timer resets the board when
