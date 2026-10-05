@@ -133,7 +133,7 @@ class TestPolicy(AioCase):
     def test_each_phase_maps_to_fans_and_pump(self):
         t = self.settle()
         for phase, pct, fans, pump in (("working", 100, 100, "extreme"), ("hot", 100, 100, "extreme"),
-                                       ("hold100", 100, 100, "extreme"), ("ramp", 50, 50, "balanced"),
+                                       ("ramp", 50, 50, "balanced"),
                                        ("idle20", 20, 20, "quiet"), ("calibrating", 100, 100, "balanced")):
             with self.subTest(phase):
                 t += 6
@@ -141,13 +141,13 @@ class TestPolicy(AioCase):
                 self.assertEqual(self.aio.applied, {1: fans, 2: fans}, phase)
                 self.assertEqual(self.aio.applied_pump, pump, phase)
 
-    def test_the_pump_is_extreme_only_while_working_or_just_after(self):
+    def test_the_pump_is_extreme_only_while_working_or_hot_and_the_ramp_starts_balanced(self):
         t = self.settle()
-        for phase, pct in (("ramp", 50), ("idle20", 20), ("calibrating", 100)):
+        for phase, pct in (("ramp", 100), ("ramp", 50), ("idle20", 20), ("calibrating", 100)):
             t += 6
             self.ago(t, phase, pct)
             self.assertNotEqual(self.aio.applied_pump, "extreme", phase)
-        for phase in ("working", "hold100", "hot"):
+        for phase in ("working", "hot"):
             t += 6
             self.ago(t, phase, 100)
             self.assertEqual(self.aio.applied_pump, "extreme", phase)
@@ -228,7 +228,7 @@ class TestRateLimit(AioCase):
         self.assertTrue(all(b - a >= 5 for a, b in zip(rounds, rounds[1:])), rounds)
 
     def test_during_the_ramp_the_cooler_fans_follow_the_same_percent_at_most_every_5_s(self):
-        t = self.settle("hold100", 100)
+        t = self.settle("working", 100)
         self.times.clear()
         pcts = []
         for s in range(0, 181):                              # the fan service's phase every second, the ramp's % in 2% steps
@@ -249,7 +249,7 @@ class TestRateLimit(AioCase):
 
     def test_a_cooler_fan_floor_holds_in_the_ramp(self):
         self.fan_rpm[2] = lambda p: 0 if p < 40 else p * 10
-        t = self.settle("hold100", 100)
+        t = self.settle("working", 100)
         for s in range(0, 140, 1):
             self.ago(t + 10 + s, "ramp", o1fan.ramp_pct(s))
         self.assertEqual(self.aio.applied[2], 40)
@@ -272,7 +272,7 @@ class TestRateLimit(AioCase):
     def test_a_single_changed_part_is_the_only_one_sent(self):
         t = self.settle("calibrating", 100)                 # fans 100, pump balanced
         self.times.clear()
-        self.ago(t + 6, "hold100", 100)                     # the pump only
+        self.ago(t + 6, "working", 100)                     # the pump only
         self.assertEqual([" ".join(a[2:]) for _t, a in self.times if "set" in a], ["set pump mode extreme"])
 
     def test_a_raised_fan_is_sent_alone(self):
@@ -328,7 +328,7 @@ class TestFailures(AioCase):
     def test_the_case_fans_carry_on_when_the_cooler_fails(self):
         open(os.path.join(self.d, "fail"), "w").close()
         f = self.fan(aio=self.aio, aio_inline=True)
-        self.p["inflight"] = 1
+        self.p["gpu_busy"] = 100
         self.run_for(f, 60, step=2)
         self.assertTrue(self.aio.disabled)
         self.assertEqual(f.phase, "working")

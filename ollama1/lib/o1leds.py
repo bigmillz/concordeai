@@ -1,43 +1,35 @@
-"""Lights that follow the graphics card's load (6b417), cool down slowly and dim after 5 idle
-minutes (6b419): every RGB device OpenRGB lists (on this server: the motherboard's Mystic
-Light and the AIO cooler's pump head) is held at the same colour.
+"""Lights that follow the graphics card's work (6b417, 6b419; the states of 6b421, per Patrick):
+every RGB device OpenRGB lists (on this server: the motherboard's Mystic Light and the AIO
+cooler's pump head) is held at the same colour.
 
-  intensity x = the card's busy percent / 100 (sysfs gpu_busy_percent, the reading the fan
-                service and lib/o1work.py use), sampled every SAMPLE_S (0.25 s)
-  displayed   x slew-limited: it rises at most 1.0 per RISE_S (2.5 s) and FALLS linearly
-              over FALL_S (180 s: the fans' 60 s + 120 s cool-down), so red to white takes
-              the whole cool-down, a new burst raises it again from where it is, and a
-              reading that jitters 99, 0, 99, 0 stays near red
-  colour      piecewise linear in RGB: 0 white (255,255,255), 1/3 yellow (255,255,0),
-              2/3 orange (255,128,0), 1 red (255,0,0); at 0 exactly full white
-  brightness  b in 0.5..1.0, multiplied into each channel (white at 0.5 is 128,128,128),
-              independent of the colour. The machine is IDLE when the card (6 s average)
-              is under 10% and the processors (10 s average of user+nice+system+irq+softirq,
-              no iowait; lib/o1work.py's reading) are under 15%; it stops being idle at
-              15% (card) or 20% (processors): the gap is the hysteresis. After IDLE_DIM_S
-              (300 s) of idle, counted from the moment it became idle (so the 3-minute
-              colour fade is part of it), b falls linearly to 0.5 over DIM_S (10 s).
-              When it is not idle b goes back up to 1.0 over UNDIM_S (1.5 s), and the 300 s
-              start again at the next idle moment. At start, and after a wake, b is 1.0 and
-              the 300 s start then.
+  idle       white at 100%; after IDLE_DIM_S (300 s) of white, the brightness fades to
+             DIM_PCT (40%) over DIM_S (10 s): "dimmed idle"
+  rising     the card starts working: over RISE_S (5 s) from the colour and brightness it
+             has now to red at 100%, along the gradient (so through yellow and orange)
+             and eased in and out (smoothstep), the brightness on the same curve
+  working    red at 100% while the card works
+  cooling    the work ended: from red back through orange and yellow to white over
+             COOL_S (120 s), linear in time along the gradient: the fans' 120 s ramp
+             (lib/o1fan.py), so the two finish together. Work again mid-cool: the 5 s
+             rise again, from wherever it is.
 
-No card reading (no card, or the read failed): the intensity is 0 (white) and the card counts
-as idle. A request in flight or a running tool does not colour or brighten the lights.
+"The card works" is lib/o1work.py's GpuTrigger, the very rule that sends the fans to
+100%: busy over 50% (sysfs gpu_busy_percent) for 1.5 s in a row, ending after 1.5 s in
+a row at or under 50%; it is sampled every SAMPLE_S (0.25 s), so a 1 s blip does
+nothing. The fans' other trigger, the processor at 60 C, does NOT turn the lights red:
+the lights follow the card's work only. A request in flight, a running tool or a busy
+processor changes nothing; no card reading counts as not working.
 
-Frames go out only when the rounded RGB changes, at most FRAME_S (20 Hz) apart while it
-moves; every POLL_S (2 s) the connection is looked at and the colour is sent again (a
-keepalive: a device that was reset by a wake or a hot-plug gets it back).
+  gradient   piecewise linear in RGB: 0 white (255,255,255), 1/3 yellow (255,255,0),
+             2/3 orange (255,128,0), 1 red (255,0,0)
+  brightness b multiplies each channel of the final RGB, rounded (white at 0.4 is
+             102,102,102), independent of the colour
 
-How it talks to the lights: the sibling unit ollama1-openrgb.service runs
-`openrgb --server` (the OpenRGB package; it owns the USB access), bound to
-127.0.0.1 only. This service speaks OpenRGB's SDK network protocol to it with
-the standard library (little-endian packets "ORGB", device index, packet id,
-size; the protocol version is negotiated, capped at PROTO_MAX), so a fade
-costs no process per frame. When the server is gone or answers badly the
-service says so in its status and tries again with a growing pause; it never
-exits for that. It sets each device to Direct mode (else Static, else Custom)
-and, where a mode has a brightness, to its maximum; the device list is
-re-read when the server says it changed.
+Frames go out only when the rounded RGB changes, at most FRAME_S apart (25 a second)
+while anything moves; when nothing moves the loop wakes only for the 0.25 s sample and
+every POLL_S (2 s) the connection is looked at and the colour sent again (a keepalive:
+a device that was reset by a wake or a hot-plug gets it back). At start, and after a
+wake (the sleep hook's SIGUSR1), it is white at 100% and the 300 s start then.
 """
 import os
 import select
@@ -62,15 +54,13 @@ WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
-RISE_S = 2.5                      # 0 to 100% takes this long
-FALL_S = 180.0                    # red to white takes this long: the whole cool-down (60 s + 120 s)
-IDLE_DIM_S = 300.0                # this long idle, then dim
-DIM_S = 10.0                      # 1.0 down to DIM_MIN takes this long
-UNDIM_S = 1.5                     # DIM_MIN up to 1.0 takes this long
-DIM_MIN = 0.5
-GPU_WAKE_PCT, GPU_IDLE_PCT = o1work.GPU_BUSY_PCT, 10     # card (6 s average): not idle at 15%, idle again under 10%
-CPU_WAKE_PCT, CPU_IDLE_PCT = 20, 15                      # processors (10 s average): the same, 20% and 15%
-FRAME_S = 0.05                    # at most 20 frames a second while the colour moves
+RISE_S = o1work.RISE_S            # to red and full brightness takes this long (5 s)
+COOL_S = o1work.COOL_S            # red to white takes this long: the fans' ramp (120 s)
+IDLE_DIM_S = o1work.IDLE_DIM_S    # white this long, then dim (300 s)
+DIM_S = o1work.DIM_S              # 1.0 down to DIM_MIN takes this long (10 s)
+DIM_MIN = o1work.DIM_PCT / 100.0  # the dimmed brightness (0.4)
+FRAME_S = 0.04                    # at most 25 frames a second while anything moves
+MAX_DT_S = 0.5                    # a tick's brightness step counts at most this long (a stall can't jump it)
 POLL_S = 2                        # the connection and the keepalive
 STATUS_STALE_S = 15               # a status file older than this: the service isn't running
 CONNECT_S = 1.0
@@ -384,7 +374,7 @@ class Client:
 # ---- the colour --------------------------------------------------------------------------
 
 def ramp(x):
-    """The colour for intensity x (0 to 1): piecewise linear in RGB between STOPS."""
+    """The colour at position x along the gradient (0 white to 1 red): piecewise linear in RGB between STOPS."""
     x = 0.0 if x != x else min(1.0, max(0.0, x))
     for (x0, c0), (x1, c1) in zip(STOPS, STOPS[1:]):
         if x <= x1:
@@ -402,18 +392,10 @@ def scale(c, b):
     return tuple(int(round(v * b)) for v in c)
 
 
-class Slew:
-    """The displayed intensity: it follows the target no faster than RISE_S / FALL_S allow."""
-
-    def __init__(self):
-        self.x = 0.0
-
-    def step(self, dt, target):
-        if target > self.x:
-            self.x = min(target, self.x + dt / RISE_S)
-        else:
-            self.x = max(target, self.x - dt / FALL_S)
-        return self.x
+def ease(u):
+    """Ease in and out (smoothstep): 0 at 0, 1 at 1, flat at both ends, 0.5 halfway."""
+    u = min(1.0, max(0.0, u))
+    return u * u * (3.0 - 2.0 * u)
 
 
 def hex_of(c):
@@ -425,8 +407,13 @@ def status_path():
 
 
 class Leds:
-    """One tick() per wake-up; it returns how long to sleep. `probes` as in lib/o1work.py (only
-    gpu_busy is read); `clock` is monotonic; `wall` stamps the status file."""
+    """One tick() per wake-up; it returns how long to sleep. `probes` as in lib/o1work.py (gpu_busy);
+    `clock` is monotonic; `wall` stamps the status file.
+
+    phase  idle      white; `idle_since` counts towards the dim (brightness b falls to DIM_MIN)
+           rising    RISE_S from (x0, b0) to red at 1.0, eased; started by the card's work trigger
+           working   red at 1.0 while the trigger holds
+           cooling   x falls 1/COOL_S a second from where it was (red to white in COOL_S), b back to 1.0"""
 
     def __init__(self, probes, client=None, clock=time.monotonic, wall=time.time, log=print, poll_s=POLL_S,
                  status=True):
@@ -434,46 +421,70 @@ class Leds:
         self.client = client or Client()
         self.clock, self.wall, self.log = clock, wall, log
         self.poll_s, self.status = poll_s, status
-        self.slew = Slew()
         self.gpu = None                           # the last reading, or None: no reading
-        self.target = 0.0
         self.last, self.next_sample = None, 0.0
         self.next_poll, self.retry_at, self.backoff = 0.0, 0.0, RETRY_FIRST_S
-        self.sent, self.err, self.seen_name = None, None, None
+        self.sent, self.err, self.seen_name, self.seen_phase = None, None, None, None
         self.resync = False
-        self.bright = 1.0
-        self.reset_idle(self.clock())
+        self.reset(self.clock())
 
-    def reset_idle(self, now):
-        """Start (and a wake): full brightness, idle, the 300 s from now; the averages begin again."""
-        self.bright = 1.0
-        self.idle, self.idle_since = True, now
-        self.work = o1work.Work({"gpu_busy": lambda: self.gpu, "cpu": self.probes.get("cpu", lambda: None)},
-                                self.clock)
-        self.gpu_avg = self.cpu_avg = None
-
-    def judge_idle(self, now):
-        """Hysteresis on the two averages: busy at 15% card or 20% processors, idle again under 10% and 15%."""
-        w = self.work
-        self.gpu_avg, self.cpu_avg = w._gpu(now), w._cpu(now)
-        g = self.gpu_avg if self.gpu_avg is not None else (0.0 if self.gpu is None else None)   # no card: idle
-        c = self.cpu_avg
-        if (g is not None and g >= GPU_WAKE_PCT) or (c is not None and c >= CPU_WAKE_PCT):
-            if self.idle:
-                self.idle = False
-        elif g is not None and c is not None and g < GPU_IDLE_PCT and c < CPU_IDLE_PCT:
-            if not self.idle:
-                self.idle, self.idle_since = True, now
+    def reset(self, now):
+        """Start (and a wake): white at full brightness, idle, the 300 s from now; the trigger begins again."""
+        self.trigger = o1work.GpuTrigger()
+        self.phase, self.x, self.bright = "idle", 0.0, 1.0
+        self.idle_since = now
+        self.t0, self.x0, self.b0 = now, 0.0, 1.0   # where the current rise or cool-down started
 
     def idle_s(self, now):
-        return now - self.idle_since if self.idle else 0.0
+        return max(0.0, now - self.idle_since) if self.phase == "idle" else 0.0
 
     def read_gpu(self):
         try:
             g = self.probes["gpu_busy"]()
         except Exception:
             return None
-        return float(g) if isinstance(g, (int, float)) and not isinstance(g, bool) and g == g else None
+        return o1work.number(g)
+
+    # -- the machine -----------------------------------------------------------------------
+    def follow(self, now, working):
+        """The phase from the trigger: work starts a rise from wherever it is; its end starts the cool-down."""
+        if working and self.phase in ("idle", "cooling"):
+            self.phase, self.t0, self.x0, self.b0 = "rising", now, self.x, self.bright
+        elif not working and self.phase in ("rising", "working"):
+            self.phase, self.t0, self.x0 = "cooling", now, self.x
+
+    def move(self, now, dt):
+        """x and b for now."""
+        if self.phase == "rising":
+            e = ease((now - self.t0) / RISE_S)
+            self.x = self.x0 + (1.0 - self.x0) * e
+            self.bright = self.b0 + (1.0 - self.b0) * e
+            if e >= 1.0:
+                self.phase, self.x, self.bright = "working", 1.0, 1.0
+        elif self.phase == "working":
+            self.x, self.bright = 1.0, 1.0
+        elif self.phase == "cooling":
+            self.x = max(0.0, self.x0 - (now - self.t0) / COOL_S)
+            self.bright = min(1.0, self.bright + dt / RISE_S)          # a rise cut short: up the rest of the way
+            if self.x <= 0.0:
+                self.phase, self.idle_since = "idle", self.t0 + self.x0 * COOL_S       # white from that moment
+        if self.phase == "idle":
+            self.x = 0.0
+            if self.idle_s(now) >= IDLE_DIM_S:
+                self.bright = max(DIM_MIN, self.bright - dt * (1.0 - DIM_MIN) / DIM_S)
+            else:
+                self.bright = min(1.0, self.bright + dt / RISE_S)
+
+    def moving(self):
+        """True while the colour or the brightness is on its way somewhere: frames at FRAME_S."""
+        if self.phase in ("rising", "cooling"):
+            return True
+        if self.phase == "idle":
+            return self.bright != (DIM_MIN if self.idle_s(self.clock()) >= IDLE_DIM_S else 1.0)
+        return False
+
+    def rgb(self):
+        return scale(ramp(self.x), self.bright)
 
     # -- the link -----------------------------------------------------------------------
     def lost(self, e, now):
@@ -512,42 +523,37 @@ class Leds:
     def tick(self):
         now = self.clock()
         if self.resync:
-            self.reset_idle(now)                  # a wake: full brightness, the 5 minutes start again
+            self.reset(now)                       # a wake: white, full brightness, the 5 minutes start again
         if now >= self.next_sample:
-            self.next_sample = now + SAMPLE_S
+            self.next_sample += SAMPLE_S                        # on the 0.25 s beat, not drifting with the frames
+            if self.next_sample <= now:
+                self.next_sample = now + SAMPLE_S
             self.gpu = self.read_gpu()
-            self.target = 0.0 if self.gpu is None else min(1.0, max(0.0, self.gpu / 100.0))
-            self.judge_idle(now)
+            self.follow(now, self.trigger.update(now, self.gpu))
         polled = now >= self.next_poll or self.resync          # a wake does not wait for the poll
         if polled:
             self.next_poll = now + self.poll_s
             self.link(now)
-        dt = 0.0 if self.last is None else min(max(now - self.last, 0.0), 2 * SAMPLE_S)
+        dt = 0.0 if self.last is None else min(max(now - self.last, 0.0), MAX_DT_S)
         self.last = now
-        self.slew.step(dt, self.target)
-        dimming = self.idle and self.idle_s(now) >= IDLE_DIM_S
-        if dimming:
-            self.bright = max(DIM_MIN, self.bright - dt * (1.0 - DIM_MIN) / DIM_S)
-        else:
-            self.bright = min(1.0, self.bright + dt * (1.0 - DIM_MIN) / UNDIM_S)
-        rgb = scale(ramp(self.slew.x), self.bright)
+        self.move(now, dt)
+        rgb = self.rgb()
         if self.client.connected and (rgb != self.sent or polled):
             try:
                 self.client.show(rgb)
                 self.sent = rgb
             except OSError as e:
                 self.lost(e, now)
-        name = color_name(self.slew.x)
-        if polled or name != self.seen_name:
-            if name != self.seen_name:
-                self.log("%s%s" % (name, " (card %d%% busy)" % round(self.gpu) if self.gpu is not None else
+        name = color_name(self.x)
+        if polled or name != self.seen_name or self.phase != self.seen_phase:
+            if self.phase != self.seen_phase:
+                self.log("%s%s" % (self.phase, " (card %d%% busy)" % round(self.gpu) if self.gpu is not None else
                                    " (no card reading)"))
-            self.seen_name = name
+            self.seen_name, self.seen_phase = name, self.phase
             self.write_status(now)
-        fast = self.slew.x < self.target or self.bright != (DIM_MIN if dimming else 1.0)
-        if fast:
-            return FRAME_S                        # rising, dimming or brightening: 20 Hz
-        return max(0.0, min(self.next_sample, self.next_poll) - now)     # a slow fall changes a level a tick
+        if self.moving():
+            return FRAME_S                        # a rise, a cool-down, a dim or a brighten: 25 frames a second
+        return max(0.0, min(self.next_sample, self.next_poll) - now)
 
     def shutdown(self):
         """A stop must not leave the lights red: white, then the connection closed."""
@@ -559,22 +565,23 @@ class Leds:
         self.client.close()
 
     # -- status ---------------------------------------------------------------------------
+    def cool_left(self, now):
+        return int(max(0.0, self.x0 * COOL_S - (now - self.t0)) + 0.999) if self.phase == "cooling" else 0
+
     def write_status(self, now):
         if not self.status:
             return
         c = self.client
-        st = {"at": int(self.wall()), "state": color_name(self.slew.x),
-              "rgb": list(scale(ramp(self.slew.x), self.bright)), "brightness": round(self.bright, 3),
-              "idle": self.idle, "idle_s": int(self.idle_s(now)),
-              "gpu_avg": None if self.gpu_avg is None else round(self.gpu_avg, 1),
-              "cpu_avg": None if self.cpu_avg is None else round(self.cpu_avg, 1),
-              "target_rgb": list(ramp(self.target)), "gpu_pct": None if self.gpu is None else round(self.gpu, 1),
-              "gpu_reading": self.gpu is not None, "intensity": round(self.slew.x, 3),
-              "target_intensity": round(self.target, 3),
+        st = {"at": int(self.wall()), "state": color_name(self.x), "phase": self.phase,
+              "rgb": list(self.rgb()), "brightness": round(self.bright, 3), "intensity": round(self.x, 3),
+              "idle": self.phase == "idle", "idle_s": int(self.idle_s(now)), "cool_left": self.cool_left(now),
+              "working": self.trigger.on, "gpu_pct": None if self.gpu is None else round(self.gpu, 1),
+              "gpu_reading": self.gpu is not None,
               "connected": c.connected, "error": self.err, "protocol": c.ver if c.connected else None,
               "devices": [{"name": d.name, "vendor": d.vendor, "leds": d.nleds,
                            "mode": d.modes[d.mode].name if d.kind else None, "usable": d.kind is not None}
                           for d in c.devices] if c.connected else []}
+        st["why"] = what_text(st)
         st["line"] = status_line(st)
         try:
             os.makedirs(os.path.dirname(status_path()), exist_ok=True)
@@ -585,6 +592,28 @@ class Leds:
 
 # ---- status text ----------------------------------------------------------------------------
 
+def card_text(st):
+    pct = st.get("gpu_pct")
+    return "card %d%% busy" % round(pct) if pct is not None else "no card reading"
+
+
+def what_text(st):
+    """What the lights are doing, in words: "working (card 87% busy)", "cooling down (white in 64 s)", ..."""
+    ph, b = st.get("phase"), st.get("brightness", 1.0)
+    idle_min = int(st.get("idle_s", 0) / 60.0 + 0.5)
+    if ph == "rising":
+        return "turning red (%s)" % card_text(st)
+    if ph == "working":
+        return "working (%s)" % card_text(st)
+    if ph == "cooling":
+        return "cooling down (white in %d s)" % st.get("cool_left", 0)
+    if b <= DIM_MIN:
+        return "dimmed %d%% (idle %d min)" % (round(b * 100), idle_min)
+    if b < 1.0:
+        return "dimming (idle %d min)" % idle_min
+    return "idle (%s)" % card_text(st)
+
+
 def status_line(st):
     """One line for the admin panel's CPU card and the top of `status`."""
     if not st.get("connected"):
@@ -592,16 +621,7 @@ def status_line(st):
     devs = st.get("devices") or []
     if not devs:
         return "Lights: OpenRGB lists no devices"
-    pct = st.get("gpu_pct")
-    b = st.get("brightness", 1.0)
-    idle_min = int(st.get("idle_s", 0) / 60.0 + 0.5)
-    if b <= DIM_MIN:
-        how = "dimmed %d%% (idle %d min)" % (round(b * 100), idle_min)
-    elif b < 1.0 and st.get("idle"):
-        how = "dimming (idle %d min)" % idle_min
-    else:
-        how = "%d%% (%s)" % (round(b * 100), "card %d%% busy" % round(pct) if pct is not None else "no card reading")
-    return "Lights: %s, %s  -  %d device%s" % (st.get("state"), how, len(devs), "" if len(devs) == 1 else "s")
+    return "Lights: %s, %s  -  %d device%s" % (st.get("state"), what_text(st), len(devs), "" if len(devs) == 1 else "s")
 
 
 def read_status(path=None, now=None):
@@ -626,16 +646,15 @@ def render_status(st):
     if st is None:
         return "lights: the service isn't running (the lights are as the board leaves them)"
     rgb = st.get("rgb") or [0, 0, 0]
-    tg = st.get("target_rgb") or [0, 0, 0]
     pct = st.get("gpu_pct")
-    out = ["lights: %s  now %d,%d,%d (%s)" % (st.get("state", "?"), rgb[0], rgb[1], rgb[2], hex_of(rgb)),
-           "target: %d,%d,%d (%s)  -  card: %s  -  shown intensity %s of 1" % (
-               tg[0], tg[1], tg[2], hex_of(tg), "%d%% busy" % round(pct) if pct is not None else
-               "no reading (taken as 0%)", st.get("intensity", "?")),
-           "brightness: %d%%  -  %s (%d s)  -  card avg %s, processors avg %s" % (
-               round(st.get("brightness", 1.0) * 100), "idle" if st.get("idle") else "not idle",
-               st.get("idle_s", 0), "?" if st.get("gpu_avg") is None else "%d%%" % round(st["gpu_avg"]),
-               "?" if st.get("cpu_avg") is None else "%d%%" % round(st["cpu_avg"]))]
+    out = ["lights: %s  now %d,%d,%d (%s)  -  %s" % (st.get("state", "?"), rgb[0], rgb[1], rgb[2], hex_of(rgb),
+                                                    what_text(st)),
+           "card: %s  -  %s  -  position %s of 1 (0 white, 1 red)" % (
+               "%d%% busy" % round(pct) if pct is not None else "no reading (taken as not working)",
+               "working (over %d%%)" % o1work.GPU_BUSY_PCT if st.get("working") else "not working",
+               st.get("intensity", "?")),
+           "brightness: %d%%  -  idle %d s (dims to %d%% after %d s)" % (
+               round(st.get("brightness", 1.0) * 100), st.get("idle_s", 0), o1work.DIM_PCT, IDLE_DIM_S)]
     devs = st.get("devices") or []
     if st.get("connected"):
         out.append("openrgb: connected to %s:%d (protocol %s), %d device%s found" % (
@@ -724,7 +743,7 @@ def service_step(leds, notify=o1fan.sd_notify, log=print, first=False):
         wait = leds.tick()
     except Exception as e:                                        # never stop; say what kind, not what it held
         log("tick failed: %s" % type(e).__name__)
-    notify(("READY=1\n" if first else "") + "WATCHDOG=1\nSTATUS=%s" % color_name(leds.slew.x))
+    notify(("READY=1\n" if first else "") + "WATCHDOG=1\nSTATUS=%s" % leds.phase)
     return wait
 
 

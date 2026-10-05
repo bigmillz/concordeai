@@ -112,8 +112,8 @@ it asks for any it can't find, at the terminal):
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
-| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, then a ramp down to 20% over 2 minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100%, and dims to 50% after 5 idle minutes (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 2 minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 2-minute ramp when it stops, and dims to 40% after 5 minutes of white (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 150 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
@@ -708,8 +708,8 @@ around a little from time to time.
   - 1 h / 24 h area graphs of tokens per second, GPU busy, VRAM, GPU
     temperature and power, CPU busy, temperature and speed, and memory,
     with a crosshair that reads out any moment;
-  - **Hardware**: the CPU card below, the fans (the phase: working, hold100,
-    ramp or idle20, the level, each fan's rpm and the pump), the lights
+  - **Hardware**: the CPU card below, the fans (the phase: working, ramp
+    or idle20, the level, each fan's rpm and the pump), the lights
     (their colour now and why), storage (each disk's use, the RAID mirror
     and its check's progress), the services, the network, and GPU tuning
     (what is applied and the last check; it is changed at the server only);
@@ -960,30 +960,36 @@ at a level that follows what the server is doing:
 
 | Phase | Level | When |
 |---|---|---|
-| `working` | 100% | a request, a long job, the card or the processors say it is working |
-| `hold100` | 100% | for 60 s after the work ends |
-| `ramp` | 100% down to 20% | a straight line over the next 120 s, written in whole 2% steps |
-| `idle20` | 20% | from 180 s after the work ended, and from the start |
+| `working` | 100% | the graphics card is over 50% busy, or the CPU is at 60 C or more |
+| `ramp` | 100% down to 20% | from the moment that ends: a straight line over 120 s, written in whole 2% steps (no hold at 100% first) |
+| `idle20` | 20% | from 120 s after the work ended, and from the start |
 
-A new request at any time goes back to 100% and starts the sequence over.
-A level is `pwm = round(percent * 255 / 100)`: 20% is 51, 60% is 153, 100%
-is 255. While the service runs it always holds the outputs; whenever it
-stops, for any reason, they go back to their own control (the BIOS's
-automatic), and that is also what is in force at boot before it starts.
+Work at any time, the ramp included, goes back to 100% at once; when it ends
+again the ramp starts over from 100%. A level is `pwm = round(percent * 255 /
+100)`: 20% is 51, 60% is 153, 100% is 255. While the service runs it always
+holds the outputs; whenever it stops, for any reason, they go back to their own
+control (the BIOS's automatic), and that is also what is in force at boot
+before it starts.
 
-**Working** (`lib/o1work.py`, shared with the lights) is a request in flight (at once), a long job running (`stability-test.sh` and
-the like, at once), the graphics card at 15% or more averaged over 6 s, or the
-processors at 40% or more averaged over 10 s (`/proc/stat` user, nice, system,
-irq and softirq over every field, so time waiting on a disk does not count).
-Once the card or the processors made it work it stays working until the value
-has been under its threshold for 6 s. The 1-minute **load average is not used**:
-it counts tasks blocked on a disk (a RAID check, boot work, apt) and lags by a
-minute, which kept the fans at 100% with nothing running. Status, the admin
-line and the lights' status say which signal made it work ("a request is
-running", "the card is 62% busy", "processors 71% busy", "running
-stability-test.sh"). A
-download, an update or a backup is not heat and does not count. Auto sleep keeps
-its own idle rules, load average included.
+**Working** (`lib/o1work.py`, shared with the lights; per Patrick, 6b421) is one
+of two triggers:
+
+- **The graphics card** (sysfs `gpu_busy_percent`) **over 50%** for 1.5 s in a
+  row. The fans look every 2 s, so that is two looks in a row: a single 1 s
+  blip over 50% never starts a 2-minute ramp. It ends when the card has been at
+  or under 50% for 1.5 s in a row (a short dip between two answers keeps it
+  working). No card reading counts as not busy.
+- **The CPU's temperature** (k10temp `Tctl`/`Tdie`, the "CPU" sensor below)
+  **at 60 C or more**. It ends when the CPU is **under 55 C**: the 5 C gap keeps a
+  temperature hovering around 60 from flapping the fans. A CPU sensor that goes
+  implausible (0 C or less, 120 C or more) lets go; one that stops answering
+  keeps the state it had.
+
+Nothing else is work: **not the CPU's utilisation, not a request in flight, not
+a running tool, setup.sh, apt-get or unattended-upgrade** (a model answering, a
+benchmark or a burn test shows up as the card over 50%, which is what makes the
+heat). Status and the admin line say which trigger holds it ("the card is 87%
+busy", "CPU 63 C", or both). Auto sleep keeps its own idle rules.
 
 **Temperature override.** Any of these at its limit forces 100% whatever the
 load says, until it is 10 C under it; then the normal rule follows:
@@ -1049,13 +1055,14 @@ with the case fans. The cooler follows the same phases:
 
 | Phase | Cooler fans | Pump |
 |---|---|---|
-| `working`, temperature override, `hold100` | 100% | extreme |
+| `working`, temperature override | 100% | extreme |
 | first start (measuring) | 100% | balanced |
 | `ramp` | the same percent as the fans (100% falling to 20%) | balanced |
 | `idle20` | 20% (or higher for a fan that stalls) | quiet |
 
-The pump is at extreme only while working and for the 60 s after, and when the
-coolant is hot: a coolant at 40 C or more forces the pump to extreme and the
+The pump is at extreme only while working (the card over 50% or the CPU at
+60 C), during the temperature override, and when the coolant is hot; it is
+balanced from the first second of the ramp: a coolant at 40 C or more forces the pump to extreme and the
 fans to 100% until it is under 35 C. A cooler fan is measured at 100% on the
 first start and raised in steps if it stalls at a low level, like the case
 fans; one that reads no rpm stays at 100%. The cooler's status is read at
@@ -1085,7 +1092,7 @@ command line; that is your call). Do not run `fancontrol` or another fan
 daemon beside this one.
 
 **Status.** `ollama1-fan status` (no root) shows the level and the phase
-(`working`, `hold100 42s`, `ramp 60%`, `idle20`), which outputs it
+(`working`, `ramp 60%`, `idle20`), which outputs it
 controls, each fan's setting, rpm and lowest level, the highest temperature
 and the sensor closest to its limit (and every sensor with its limit). The
 admin panel's CPU card shows the same in one line. Logs:
@@ -1107,47 +1114,47 @@ saved in `/etc/ollama1/setup.env`. `on` runs `apt-get -y -q install openrgb`
 MSI MEG X570 ACE with a Corsair H115i Platinum: the board's Mystic Light and
 the cooler's pump head) gets the same colour, on all its LEDs:
 
-The colour follows **the graphics card's busy percent** (`gpu_busy_percent`, the
-same reading the fans use, read every 0.25 s), as a ramp, piecewise linear in RGB:
+The lights have four states (per Patrick, 6b421), driven by **the same trigger
+that sends the fans to 100% for the graphics card**: busy over 50%
+(`gpu_busy_percent`, read every 0.25 s) for 1.5 s in a row, ending after 1.5 s
+in a row at or under 50% (`lib/o1work.py`; a 1 s blip does nothing):
 
-| Card busy | Colour |
-|---|---|
-| 0% | white, 255,255,255 (full brightness) |
-| 33% | yellow, 255,255,0 |
-| 67% | orange, 255,128,0 |
-| 100% | red, 255,0,0 |
+| State | Colour | Brightness |
+|---|---|---|
+| idle | white, 255,255,255 | 100% |
+| working | red, 255,0,0 | 100% |
+| cooling | red, then orange, yellow, white | 100% |
+| dimmed idle | white | 40% (102,102,102) |
 
-(50% is a golden yellow-orange, 255,192,0.) The colour on show is
-**slew-limited**: it rises at most 100% per 2.5 s, so 0% to 100% takes about
-2.5 s (plus up to one 0.25 s sample to notice), and it **falls linearly over
-180 s** (the fans' 60 s + 120 s cool-down), so from red the colour goes through
-orange and yellow to white across the whole cool-down; a new burst raises it
-again from wherever it is, and a reading that jitters 99, 0, 99, 0 stays near
-red. Only the card's load colours the lights, not a request in flight or a
-running tool. With no card reading (no card, or the read failed) the intensity
-is 0, so white.
+- **Work starts** (a request, a benchmark, a burn test: anything that keeps the
+  card over 50%): over **5 s** the colour goes from wherever it is to red,
+  along the gradient (so through yellow and orange), and the brightness comes
+  back to 100% on the same curve. The curve is eased in and out (smoothstep),
+  so it starts and lands softly.
+- **While working**: red at 100%.
+- **Work ends**: the colour goes back from red through orange and yellow to
+  white over **120 s**, linear in time along the gradient: exactly the fans'
+  ramp, so the lights and the fans finish together. Work again in the middle
+  of it: the 5 s rise again, from wherever it is.
+- **After 5 minutes of white** (counted from the moment the cool-down reached
+  white, or from start/wake), the brightness fades to **40%** over 10 s.
+  Only the card's work brings it back (the 5 s rise).
 
-**Brightness.** Separately from the colour, a brightness b between 50% and 100%
-multiplies each channel (white at 50% is 128,128,128, red is 128,0,0). The
-machine is **idle** when the card is under 10% (6 s average) AND the
-processors are under 15% (10 s average of user, nice, system, irq and softirq
-over every thread; iowait does not count). It stops being idle when the card
-reaches 15% (6 s average) or the processors 20% (10 s average); the gap is a
-hysteresis so a value wobbling around a limit does not flicker the lights. After
-**5 minutes idle**, counted from the moment it became idle (so the 3-minute
-colour fade is part of the 5), b fades from 100% to 50% over 10 s. The moment it
-is not idle, b returns to 100% over 1.5 s, and the 5 minutes start again at the
-next idle moment. At service start, and after a wake from sleep, b is 100% and the
-5 minutes start from then (so an idle server dims 5 minutes after boot). The
-card's reading and the processors' are the ones the fan service uses
-(`lib/o1work.py`); a request in flight or a running tool does not brighten the
-lights.
+The gradient is piecewise linear in RGB between white 0, yellow 255,255,0 at
+1/3, orange 255,128,0 at 2/3 and red 1; the brightness multiplies each
+channel. **The CPU's temperature does not turn the lights red**: it is a fan
+trigger only; the lights follow the card's work alone. A request in flight, a
+running tool or a busy processor changes nothing; with no card reading it is
+not working.
 
-A frame goes out only when the rounded colour (with brightness) changes (at most
-20 a second), and every 2 s the connection is looked at and the colour sent
-again (a keepalive: a device that was reset gets it back; it includes the
-brightness). The status line reads "Lights: orange, 100% (card 61% busy)",
-"Lights: white, dimming (idle 5 min)" or "Lights: white, dimmed 50% (idle 6 min)".
+While anything moves (the rise, the cool-down, a dim) the service draws at up to
+**25 frames a second**, but a frame goes out only when the rounded colour (with
+brightness) changes; when nothing moves it wakes only for the 0.25 s sample, and
+every 2 s the connection is looked at and the colour sent again (a keepalive: a
+device that was reset gets it back; it includes the brightness). The status
+line reads "Lights: red, working (card 87% busy)", "Lights: orange, cooling down
+(white in 62 s)", "Lights: white, idle (card 0% busy)" or "Lights: white, dimmed
+40% (idle 6 min)".
 
 **How.** Two units. `ollama1-openrgb.service` runs `openrgb --server` with no
 window, bound to `127.0.0.1` (`--server-host` when this build has it, and
@@ -1165,18 +1172,20 @@ allows only `hidraw` and USB nodes: the I2C/SMBus scans OpenRGB can do for
 memory modules and graphics cards (which can write to the wrong chip) find no
 `/dev/i2c-*` to open, so DIMM sensors and the card are not touched. It has no
 network but the loopback. The lights service has no device access and no
-network but the loopback; it reads what the fan service reads and writes only
+network but the loopback; it reads the card's busy percent and writes only
 `/run/ollama1/leds.json`. If you want OpenRGB to drive more than USB lights,
 that is your call, not the kit's.
 
 **A stop** (including `--leds off`) sets the lights white first, so they are
 never left red; after that they are as the board leaves them. After a wake the
 sleep hook restarts the OpenRGB server (the USB devices may have come back new)
-and pokes the service (`SIGUSR1`), which connects afresh and sets the colour at
-once. The lights are not turned off for sleep: the board decides.
+and pokes the service (`SIGUSR1`), which connects afresh and starts white at 100%
+(and goes red through the 5 s rise if the card is still working). The lights are not turned off for sleep: the board decides.
 
-**Status.** `ollama1-leds status` (no root): the colour name, the colour now and its target, the card's
-load and the intensity shown, the devices found and their mode, and any error. The admin panel's CPU card shows one line, "Lights: ...". Logs:
+**Status.** `ollama1-leds status` (no root): the colour name, the colour now and what the lights
+are doing, the card's load and whether it counts as working, the brightness, the devices found
+and their mode, and any error. `/run/ollama1/leds.json` has `state` (the colour), `phase` (idle,
+rising, working, cooling), `rgb`, `brightness`, `working`, `cool_left`, `idle_s` and `gpu_pct`. The admin panel's CPU card shows one line, "Lights: ...". Logs:
 `journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
 
 ## Hardware watchdog

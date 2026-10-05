@@ -9,6 +9,68 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b421 — fans and lights: the card over 50% or the CPU at 60 C, no hold, a 5 s rise to red (per Patrick)
+
+Kit only (`ollama1/`). Per Patrick, new rules for the fans (case, CPU/radiator and the GPU
+fan alike) and the lights; the thresholds live once in `lib/o1work.py` (rewritten: the old
+`Work` class, its CPU-utilisation/request/tool signals and `cpu_times` are gone) and both
+services read them: `GPU_BUSY_PCT` 50, `GPU_CONFIRM_S` 1.5, `CPU_HOT_C`/`CPU_COOL_C` 60/55,
+`COOL_S` 120, `RISE_S` 5, `IDLE_DIM_S` 300, `DIM_PCT` 40, `DIM_S` 10.
+
+- **Triggers (fans).** Work = the card (`gpu_busy_percent`) strictly over 50% for 1.5 s in a
+  row (`GpuTrigger`; at the fans' 2 s poll that is two polls in a row, so a single 1 s blip
+  never starts a 2-minute ramp), ending after 1.5 s in a row at or under 50% (a dip between
+  two answers doesn't end it); OR the CPU temperature (k10temp Tctl/Tdie, `read_temps`'s "CPU"
+  row) at 60 C or more, ending under 55 C (`CpuTrigger`; the 5 C gap is the hysteresis; an
+  implausible CPU reading lets go, a missing one keeps the state). Nothing else: CPU
+  utilisation, requests in flight, `tools_running` (setup.sh, apt-get, unattended-upgrade,
+  stability-test.sh) no longer turn the fans up. No card reading = not busy.
+- **Levels.** `working` 100%; when the trigger ends the `ramp` starts AT ONCE (no `hold100`,
+  gone from code, aio, README, setup text): 100 -> 20% linear over 120 s in 2% steps, then
+  `idle20`. A trigger mid-ramp -> 100% at once; when it ends the ramp restarts from 100%
+  (`cool_from` is set on the tick the work ends). The overheat override (`hot`), the stale
+  sensor rules, stall/pump learning, restore-on-exit, watchdog and wake re-write are unchanged;
+  a restart that finds the fans held starts the ramp from 100%. Log: a line on each phase
+  change and when the set of triggers changes (not every degree). Status keys unchanged
+  (`hold_left` is now the ramp's seconds left), so the panel's FANS box phase words
+  ("working 100%", "cooling down NN%", "idle 20%") and the admin chip still work.
+- **Cooler (o1aio).** Pump extreme in `working`/`hot` (and coolant >= 40 C), balanced in the
+  ramp from its first second and while calibrating, quiet at idle; fans follow the percent.
+- **Lights.** States idle (white 100%), rising, working (red 100%), cooling, dimmed idle.
+  They follow the card's trigger ONLY (the same `GpuTrigger` class and numbers, sampled every
+  0.25 s); the CPU-temperature trigger does NOT turn them red (Patrick: no). Work starts ->
+  over 5 s from the current colour/brightness to red at 100%, along the white-yellow-orange-red
+  gradient stops, eased with smoothstep (brightness on the same curve). Work ends -> x falls
+  1/120 per second from where it is (red to white in exactly the fans' 120 s, linear in time).
+  Work mid-cool -> the 5 s rise from wherever it is. White for 300 s (counted from the moment
+  the cool-down reached white, or start/wake) -> brightness to 40% over 10 s; only the card's
+  trigger brings it back. Frames at up to 25/s (`FRAME_S` 0.04) while rising, cooling or
+  dimming, sent only when the rounded RGB changes; otherwise the 0.25 s sample and the 2 s
+  keepalive. The 0.25 s sample is kept on its beat (`next_sample += SAMPLE_S`) instead of
+  drifting with the frames. The old Slew, the processor/card idle averages and their
+  hysteresis are gone. Status JSON adds `phase`, `working`, `cool_left`, `why`; drops
+  `target_rgb`, `target_intensity`, `gpu_avg`, `cpu_avg`. Reconnect, the wake resync
+  (white at 100%, then the rise if still working) and the stop-to-white are unchanged.
+- There was no blue-channel/white calibration in `o1leds.py` on main to keep; white is still
+  255,255,255.
+- Setup plan/help text, `bin/ollama1-fan`/`ollama1-leds` docstrings, unit comments, README
+  (option rows, Fans, Lights, the cooler table, the admin list) updated. `leds_plan`'s
+  printf had a bare `50%` (a format directive); now `%%`.
+- Tests: `test_work` rewritten for the triggers; `test_fan` (new `TestCpuTemperature`, 50 vs
+  50.5, 1.5 s / two polls, blips, dips, no hold, ramp restart from 100, requests/tools/
+  setup/apt/CPU load not work, override tests moved off the CPU sensor where 60 C now
+  triggers); `test_aio` hold100 cases removed; `test_leds` behaviour rewritten (rise timing,
+  easing, colour order, from dimmed, 120 s linear cool-down points, mid-cool rise, mid-rise
+  cool, 300 s from white, 40%, frames, wake). Mutants: the fan/leds/work entries replaced to
+  guard each rule; the pre-existing broken `fan: a saved off is not kept by a re-run` anchor
+  (matched two functions) made unique.
+- Unverified on the real server: how the eased 5 s rise and 40% look on the Mystic Light and
+  pump head, whether real inference holds `gpu_busy_percent` over 50% without 1.5 s dips (a
+  prompt-reading phase with the card partly busy may not count), and the k10temp values under
+  a CPU-only load.
+
+---
+
 ## 6b420 — graphics tuning: the power limit alone by default; memory and core clocks opt-in, each judged alone (kit)
 
 - Real card (RX 6900 XT): `ollama1-gpu-tune on` reverted every time ("tuned
