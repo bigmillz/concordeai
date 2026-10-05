@@ -17326,6 +17326,9 @@ SRV_WAKE_POLL_S = 2
 _SRV_MAC_RX = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}")
 _srv_wake_at = profile_cache("_srv_wake_at", {})
 _srv_wake_tl = threading.local()
+_srv_wake_blocked = {}          # server id -> every wake packet was refused by this computer
+SRV_WAKE_BLOCKED = (" This computer wouldn\u2019t let the app send the wake-up call. "
+                    "Allow ConcordeAI in System Settings \u203a Privacy & Security \u203a Local Network.")
 SRV_USAGE_S = 3                 # one read of a server's card usage: short, the meter polls
 SRV_MAX_CHARS = 2_000_000       # an answer longer than this is cut there
 # an Ollama cloud model's tag ("gpt-oss:120b-cloud", "kimi-k2:cloud"): the
@@ -19576,14 +19579,20 @@ def server_wake(e, progress=None, alive=None) -> str:
         if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:
             return ""
         _srv_wake_at[e["id"]] = t0
+    tried_n = failed_n = 0
     for mac in e["wake"]:
         pkt = srv_magic_packet(mac)
         for tgt in _srv_bcast_addrs():
             for port in (9, 7):
+                tried_n += 1
                 try:
                     _srv_udp(pkt, (tgt, port))
                 except OSError:
-                    pass
+                    failed_n += 1
+    # EVERY send refused (6b420, per Patrick: the same packet wakes it from
+    # Terminal but not from the app): macOS keeps an app off the local
+    # network until it is allowed, and says nothing; the answer below says it
+    _srv_wake_blocked[e["id"]] = bool(tried_n and failed_n == tried_n)
     if progress is not None:
         progress(0)
     while True:
@@ -19657,7 +19666,9 @@ def server_only_wake(sid: str, ctx, status, alive=None):
     if r == "tried":
         server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
         return "", ("%s didn\u2019t wake up in %d seconds. It may be off or offline. "
-                    "Nothing was sent anywhere else." % (name, SRV_WAKE_WAIT_S))
+                    "Nothing was sent anywhere else.%s" % (
+                        name, SRV_WAKE_WAIT_S,
+                        SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e["id"]) else ""))
     st = server_only_state(e)
     if r == "woke":
         status("%s is awake." % name)

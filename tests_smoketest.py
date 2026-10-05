@@ -16954,6 +16954,11 @@ check("without ACCOUNTS (the shipped app) nothing new runs or shows: no boot inv
 
 # ==== 6b331 benchmark: begin ====
 # ==== starter chips: begin ====
+check("wake: every packet refused by this computer says so, naming Local Network; the app declares why it needs it",
+      "_srv_wake_blocked[e[\"id\"]] = bool(tried_n and failed_n == tried_n)" in _MILLENAI_SRC
+      and "Privacy & Security \\u203a Local Network" in _MILLENAI_SRC
+      and "SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e[\"id\"]) else" in _MILLENAI_SRC
+      and "NSLocalNetworkUsageDescription" in open("build_macos_app.sh").read())
 print("== starter chips from your chats (6b390) ==")
 check("topic chips: the pass is capped at what a server may write, in the request itself",
       "SUGGEST_MAX_TOKENS = 1200" in _MILLENAI_SRC

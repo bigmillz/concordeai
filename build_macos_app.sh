@@ -82,6 +82,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>     <string>APPL</string>
   <key>NSHighResolutionCapable</key> <true/>
   <key>LSMinimumSystemVersion</key>  <string>11.0</string>
+  <key>NSLocalNetworkUsageDescription</key> <string>ConcordeAI wakes your own server over your home network and talks to it there.</string>
   <key>NSMicrophoneUsageDescription</key> <string>ConcordeAI uses the microphone for voice input — audio never leaves this Mac.</string>
 </dict>
 </plist>
