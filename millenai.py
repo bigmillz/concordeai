@@ -4076,6 +4076,8 @@ MODEL_SET_ALIASES = {"basic": "light", "min": "light",
                      "max": "everything", "full": "everything",
                      "all": "everything"}
 QUICK_PAIR = ("Llama 3.2 3B", "Llama 3.2 1B")
+# what a first run installs until the person picks another (per Patrick)
+FIRST_RUN_SET = "light"
 EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
 # who writes the merge, best first: merge_pref_label reads it too
 MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
@@ -4190,9 +4192,9 @@ def model_set_choose(key: str):
 
 def first_set_labels() -> list:
     """The set a first run downloads and its window waits for: the one the
-    person picked, Recommended until they pick (the wizard's old default,
+    person picked, Light until they pick (Patrick: the default is the small one;
     "pro", reads as Recommended)."""
-    return list(model_sets()[model_set_chosen() or "recommended"])
+    return list(model_sets()[model_set_chosen() or FIRST_RUN_SET])
 
 
 def model_sets_status(pulled=None, sets=None) -> dict:
@@ -15121,10 +15123,10 @@ def setup_status() -> dict:
     models = []
 
     # THE THREE SETS (6b405), sized once for this call: the first-run set
-    # (the person's, Recommended until they pick) is what the welcome
+    # (the person's, Light until they pick) is what the welcome
     # window waits for and what decides whether Ollama is needed at all
     sets = model_sets()
-    first = sets[model_set_chosen() or "recommended"]
+    first = sets[model_set_chosen() or FIRST_RUN_SET]
     # engine pseudo-row: shown only while the app still has to fetch Ollama
     starters_need_ollama = any(
         MODEL_ROUTES[l][0] == "ollama" for l in first)
@@ -34898,10 +34900,12 @@ body.gen #chip-model{color:var(--accent)}
 .set-card.on{border-color:var(--accent-hot);background:var(--accent-dim)}
 .set-card:focus-visible{outline:2px solid var(--accent-hot);outline-offset:2px}
 .set-card.none{opacity:.5;cursor:default}
-#wiz-autoclean,#wiz-nolimits{display:flex;gap:8px;align-items:flex-start;
+#wiz-autoclean,#wiz-nolimits,#wiz-image,#wiz-video{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);line-height:1.5;cursor:pointer}
-#wiz-autoclean input,#wiz-nolimits input{margin-top:2px}
-#wiz-autoclean{margin-bottom:6px}
+#wiz-autoclean input,#wiz-nolimits input,#wiz-image input,#wiz-video input{margin-top:2px}
+#wiz-autoclean,#wiz-image,#wiz-video{margin-bottom:6px}
+#wiz-image[hidden],#wiz-video[hidden]{display:none}
+#wiz-image .wsz,#wiz-video .wsz{font-style:normal;opacity:.6}
 .wprov{border:1px solid var(--line);border-radius:11px;
   padding:10px 12px;margin-bottom:8px;background:rgba(255,255,255,.03)}
 .wprov-row{display:flex;align-items:center;gap:9px;font-size:13px}
@@ -35986,11 +35990,9 @@ __CODE_ROWS__
         Remove outdated models automatically when an update replaces
         them</label>
       <label id="wiz-image"><input type="checkbox" id="wiz-img">
-        Also add image generation &mdash; make pictures from a description,
-        entirely on this Mac (9.6 GB)</label>
+        <span>Add image generation <i class="wsz">(9.6 GB)</i></span></label>
       <label id="wiz-video"><input type="checkbox" id="wiz-vid">
-        Also add video generation &mdash; short video from a description,
-        entirely on this Mac (19.6 GB)</label>
+        <span>Add video generation <i class="wsz">(19.6 GB)</i></span></label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
         No limits: Everything adds models too big for this
         machine&rsquo;s memory. They can swap hard or crash it.</label>
@@ -41996,7 +41998,7 @@ function finishSetupChrome(st,stars,anyDl){
     setupGo.disabled=!st.mlx_ok||left<=0;
     setupGo.textContent=left<=0?"Up to date \u2713"
       :(stars.some(m=>m.status==="error")?"Retry":"Download "+SET_NAMES[setupPlan])
-       +" \u00b7 "+muGB(left);
+       +" \u00b7 "+Math.max(1,Math.round(left))+" GB";
   }
 }
 
@@ -42099,9 +42101,9 @@ let wasDownloading=false;
 // true when the window was opened from the download strip (its progress),
 // not by a first run
 let setupManual=false;
-// the set picked in the first-run window (6b405): Recommended until one is
+// the set picked in the first-run window (6b405): Light until one is
 // (the old default, "pro", is Recommended now); the last status it drew
-let setupPlan="recommended",setupPlanPicked=false,setupSt=null;
+let setupPlan="light",setupPlanPicked=false,setupSt=null;
 function celebrateDownloads(){
   const card=$("#setup-card"),veil=$("#setup-veil");
   // the card grows and dissolves, then the wipe runs
@@ -43170,8 +43172,8 @@ $("#models-flag").addEventListener("click",()=>{openModelUpdates();});
 // start downloads, /api/cloud + /api/cloud/set for keys, and the old
 // setup veil for the progress bar once the wizard hands off.
 const wizVeil=$("#wiz-veil");
-// the set the wizard installs (6b405): Recommended until one is picked
-let wizStep=1,wizPlan="recommended",wizPicked=false,wizSets=null;
+// the set the wizard installs (6b405): Light until one is picked
+let wizStep=1,wizPlan="light",wizPicked=false,wizSets=null;
 const WIZ_PROVS=[
   ["gemini","Gemini","free","https://aistudio.google.com/app/apikey"],
   ["groq","Groq","free","https://console.groq.com/keys"],
@@ -43196,6 +43198,11 @@ async function wizPaintPlans(){
   if(wi)wi.hidden=!(ss.image&&ss.image.supported&&!ss.image.ready);
   const wv=$("#wiz-video");
   if(wv)wv.hidden=!(ss.video&&ss.video.supported&&!ss.video.ready);
+  // the size from the studio's own default tier, as its card in Settings says it
+  [["image",wi],["video",wv]].forEach(([k,el])=>{
+    const s=ss[k]||{},t=(s.tiers||[]).find(x=>x.id===s.tier)||(s.tiers||[])[0];
+    const z=el&&el.querySelector(".wsz");if(z&&t&&t.gb)z.textContent="("+t.gb+" GB)";
+  });
   // the same three cards as Settings (6b405)
   wizSets=st.sets||{};
   if(!wizPicked&&wizSets.chosen)wizPlan=wizSets.chosen;
