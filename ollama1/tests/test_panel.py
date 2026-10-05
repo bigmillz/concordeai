@@ -764,7 +764,7 @@ class TestLayout(unittest.TestCase):
     def test_boxes_are_inside_the_screen_and_never_overlap(self):
         for w, h in SIZES:
             boxes = o1panel.layout(w, h)
-            self.assertEqual(set(boxes), {"header", "gpu", "cpu", "models", "storage", "fans", "status", "footer"}, (w, h))
+            self.assertEqual(set(boxes), {"header", "gpu", "cpu", "models", "storage", "fans", "network", "status", "footer"}, (w, h))
             items = list(boxes.items())
             for name, (x, y, bw, bh) in items:
                 self.assertTrue(x >= 0 and y >= 0 and x + bw <= w and y + bh <= h and bw > 0 and bh > 0, (w, h, name))
@@ -1933,33 +1933,6 @@ class TestRaidLine(unittest.TestCase):
         st["raid"] = self.parse(mdstat("U_"))
         self.assertEqual([(t, k) for t, k in o1dashui.warnings(st, st["time"]) if t.startswith("RAID")], [("RAID md127 degraded", "bad")])
 
-    def test_the_panel_shows_it_at_every_resolution_without_overflow(self):
-        for sw, sh in ((1920, 1080), (2560, 1440), (3840, 2160)):
-            k, lw, lh = o1fb.choose_scale(sw, sh)
-            for md, kind in ((mdstat("UU", MD_CHECK), "info"), (mdstat("U_"), "bad"), (mdstat("UU"), "ok")):
-                st = dash_sample.sample(now=1790000000.0)
-                st["raid"] = self.parse(md)
-                st["disks"] = st["disks"][:1]                                     # the box is shorter now: one disk leaves room for the line
-                seen = []
-                orig = o1hipix.HiPixmap.text
-
-                def rec(self_, tx, ty, s_, c, scale=1, max_w=None, ellipsis=True):
-                    seen.append((s_, c, tx, max_w))
-                    return orig(self_, tx, ty, s_, c, scale, max_w, ellipsis)
-                o1hipix.HiPixmap.text = rec
-                try:
-                    o1panel.render(st, lw, lh, scale=k)
-                finally:
-                    o1hipix.HiPixmap.text = orig
-                lines = [t for t in seen if t[0].startswith("RAID md127")]
-                self.assertTrue(lines, (sw, kind))
-                x, y, w, h = o1panel.layout(lw, lh)["storage"]
-                for s_, c, tx, mw in lines:
-                    if s_.startswith("RAID md127 DEGRADED") or "check" in s_ or s_.endswith("healthy"):
-                        self.assertLessEqual(tx + mw, x + w - 8 + 1, (s_, sw))      # the line is cut to the box, not drawn past it
-                        if "check" in s_:
-                            self.assertEqual(c, o1panel.T["text"])
-
 
 class TestFans(unittest.TestCase):
     """The FANS box (6b416): /run/ollama1/fan.json, and the memory temperature in the card box."""
@@ -1973,7 +1946,7 @@ class TestFans(unittest.TestCase):
 
     def test_two_bars_and_one_average(self):
         kind, head, warn, rows, cool = o1panel.fan_view(self.st(), self.NOW)
-        self.assertEqual((kind, head, warn), ("rows", "working 100% - gpu busy", False))
+        self.assertEqual((kind, head, warn), ("rows", "working 100%", False))
         self.assertEqual([r[0] for r in rows], ["GPU fan", "Case fans"])
         self.assertEqual(rows[0][1:3], ("2310 rpm", 1.0))
         # fan1 1180, fan2 1150 and the radiator fans 1180, 1175: the average of four (fan3: no rpm, not controlled)
@@ -2117,18 +2090,322 @@ class TestFans(unittest.TestCase):
                     self.assertLessEqual(tx + min(mw, o1vtext.text_width(s_)) + o1vtext.text_width(right) + 10, x + w - 8 + 1)
                 self.assertIn(right, [t[0] for t in seen])                           # the right-hand text is still there
 
-    def test_the_middle_column_is_two_boxes_of_one_width(self):
-        for w, h in ((640, 360), (800, 450), (1024, 768), (480, 270)):
+    def test_the_middle_column_is_three_boxes_of_one_width(self):
+        for w, h in ((640, 360), (800, 450), (1024, 768), (480, 270), (683, 384)):
             b = o1panel.layout(w, h)
-            self.assertEqual((b["storage"][0], b["storage"][2]), (b["fans"][0], b["fans"][2]))
-            self.assertLess(b["storage"][1] + b["storage"][3], b["fans"][1])
-            self.assertEqual(b["fans"][1] + b["fans"][3], b["models"][1] + b["models"][3])
+            names = ("storage", "fans", "network")
+            self.assertEqual(len({b[n][0] for n in names}), 1)
+            self.assertEqual(len({b[n][2] for n in names}), 1)
+            for up, down in zip(names, names[1:]):
+                self.assertLess(b[up][1] + b[up][3], b[down][1])
+            self.assertEqual(b["network"][1] + b["network"][3], b["models"][1] + b["models"][3])
             self.assertEqual(b["storage"][1], b["models"][1])
+        b = o1panel.layout(640, 360)
+        for n, need in zip(("storage", "fans", "network"), o1panel.MID_MIN):
+            self.assertGreaterEqual(b[n][3], need)                              # each fits its content at the design size
+
+    def test_the_fan_header_has_no_cause_and_hot_is_a_word(self):
+        v = o1panel.fan_view(self.st(why="running stability-test.sh"), self.NOW)
+        self.assertEqual(v[1], "working 100%")
+        v = o1panel.fan_view(self.st(phase="hot", pct=100, why="too warm"), self.NOW)
+        self.assertEqual((v[1], v[2]), ("HOT 100%", True))
 
     def test_the_sampler_reads_the_file(self):
         import o1metrics
         src = open(os.path.join(U.LIB, "o1metrics.py")).read()
         self.assertIn('"fan.json"', src)
+
+
+class TestStorageAndNetwork(unittest.TestCase):
+    NOW = 1790000000.0
+    SCREENS = ((1920, 1080), (2560, 1440), (3840, 2160), (1366, 768))
+
+    def texts(self, st, lw, lh, k):
+        seen = []
+        orig = o1hipix.HiPixmap.text
+
+        def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+            seen.append((s_, x, y, max_w, c))
+            return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+        o1hipix.HiPixmap.text = rec
+        try:
+            o1panel.render(st, lw, lh, scale=k)
+        finally:
+            o1hipix.HiPixmap.text = orig
+        return seen
+
+    def test_the_filesystems_are_one_total(self):
+        d = [{"mount": "/", "mounted": True, "total": 1.8e12, "used": 1.88e11, "free": 1.6e12},
+             {"mount": "/srv/models", "mounted": True, "total": 1.0e11, "used": 4.0e10, "free": 6.0e10}]
+        used, total, missing = o1panel.disk_total(d)
+        self.assertEqual((used, total, missing), (2.28e11, 1.9e12, []))
+        self.assertEqual(o1panel.disk_total(d + [dict(d[0])]), (used, total, []))          # one filesystem mounted twice counts once
+        self.assertEqual(o1panel.disk_total(d + [{"mount": "/srv/data", "mounted": False}])[2], ["/srv/data"])
+        self.assertEqual(o1panel.dec_bytes(188e9), "188 GB")
+        self.assertEqual(o1panel.dec_bytes(1.8e12), "1.8 TB")
+        self.assertEqual(o1panel.disk_total([]), (0.0, 0.0, []))
+
+    def test_storage_says_used_of_total_and_no_network_lines(self):
+        st = dash_sample.sample(now=self.NOW)
+        st["disks"] = st["disks"][:1]
+        st["disks"][0].update(total=1.8e12, used=1.88e11, free=1.6e12)
+        seen = [t[0] for t in self.texts(st, 640, 360, 1)]
+        self.assertIn("188 GB of 1.8 TB", seen)
+        self.assertIn("STORAGE", seen)
+        self.assertNotIn("STORAGE AND NETWORK", seen)
+        self.assertIn("Read", seen)
+
+    def test_a_missing_disk_is_said(self):
+        st = dash_sample.sample(now=self.NOW)
+        st["disks"][2]["mounted"] = False
+        seen = [t[0] for t in self.texts(st, 640, 360, 1)]
+        self.assertIn("/srv/data MISSING", seen)
+
+    def test_network_lines(self):
+        st = dash_sample.sample(now=self.NOW)
+        lines = o1panel.net_lines(st, self.NOW)
+        flat = [[t for t, _c in l] for l in lines]
+        self.assertEqual(flat[0], ["Down", "2.3M/s", "  Up", "302.7K/s"])
+        self.assertEqual(flat[1], ["Link", "wired 1000 Mb/s", "192.168.1.10"])
+        self.assertEqual(flat[2], ["Tunnel", "up (4)"])
+        self.assertEqual(flat[3], ["Since boot", "in 3.9G", "out 1.0G"])
+
+    def test_wifi_errors_and_a_dead_tunnel_are_amber_or_red(self):
+        st = dash_sample.sample(now=self.NOW)
+        st["net"].update(wifi=True, errors=3, drops=12)
+        st["tunnel"] = {"up": False, "connections": 0}
+        lines = o1panel.net_lines(st, self.NOW)
+        self.assertEqual(lines[1][1], ("on Wi-Fi", o1panel.T["warn"]))
+        self.assertEqual(lines[2][1], ("DOWN", o1panel.T["bad"]))
+        self.assertEqual(lines[2][2], ("Errors 3  drops 12", o1panel.T["warn"]))
+        st["net"]["ports"][1]["carrier"] = False
+        st["net"]["wifi"] = False
+        self.assertIn("(1 of 2 up)", [t for t, _c in o1panel.net_lines(st, self.NOW)[1]])
+
+    def test_the_tunnel_is_shown_once(self):
+        st = dash_sample.sample(now=self.NOW)
+        seen = [t[0] for t in self.texts(st, 640, 360, 1)]
+        self.assertEqual(sum(1 for t in seen if t == "Tunnel"), 1)
+
+    def test_nothing_in_the_middle_column_is_cut_off_or_overruns(self):
+        for sw, sh in self.SCREENS:
+            k, lw, lh = o1fb.choose_scale(sw, sh)
+            st = dash_sample.sample(now=self.NOW)
+            st["net"].update(address="255.255.255.255/24", rx_total=9.99e14, tx_total=9.99e14, rx_bps=9.9e9, tx_bps=9.9e9,
+                             errors=123456, drops=654321, wifi=True)
+            st["disks"][0].update(total=9.9e14, used=9.8e14, free=1e12)
+            boxes = o1panel.layout(lw, lh)
+            seen = self.texts(st, lw, lh, k)
+            for name in ("storage", "fans", "network"):
+                x, y, w, h = boxes[name]
+                inside = [t for t in seen if x <= t[1] < x + w and y <= t[2] < y + h]
+                self.assertTrue(inside, (name, sw))
+                for s_, tx, ty, mw, c in inside:
+                    width = o1vtext.text_width(s_)
+                    self.assertLessEqual(tx + (width if mw is None else min(width, mw)), x + w - 8 + 1, (name, s_, sw))
+                    self.assertLessEqual(ty + 7, y + h - 3, (name, s_, sw))          # no line below the box's bottom padding
+                    self.assertFalse(s_.endswith("...") and name != "fans" and mw is not None and width > mw, (name, s_))
+
+    def test_each_middle_box_keeps_every_line_at_the_design_size(self):
+        st = dash_sample.sample(now=self.NOW)
+        seen = [t[0] for t in self.texts(st, 640, 360, 1)]
+        for want in ("Down", "Link", "Tunnel", "Since boot", "GPU fan", "Case fans", "Used", "Read"):
+            self.assertIn(want, seen)
+        self.assertTrue(any(t.startswith("Pump 2400") for t in seen))
+
+
+BURN_NOW = 1790000000.0
+
+
+class TestBurnBanner(unittest.TestCase):
+    def st(self, kind, age=0):
+        st = dash_sample.sample(now=BURN_NOW)
+        st["burn"] = dash_sample.burn_state(kind, BURN_NOW - age)
+        return st
+
+    def view(self, kind, age=0, now=BURN_NOW):
+        return o1panel.burn_view(self.st(kind, age), now)
+
+    def test_running_text(self):
+        self.assertEqual(self.view("cpu"), ("run", "BURN TEST  processor 18 s left  71\u00b0C  100% busy"))
+        self.assertEqual(self.view("gpu"), ("run", "BURN TEST  graphics card 12 s left  66\u00b0C  99% busy"))
+
+    def test_results(self):
+        self.assertEqual(self.view("passed"), ("result", "Burn test passed", "ok"))
+        self.assertEqual(self.view("failed"), ("result", "Burn test failed: graphics card: FAIL: the card was only 3% busy", "bad"))
+        self.assertEqual(self.view("aborted"), ("result", "Burn test aborted", "warn"))
+        self.assertEqual(self.view("refused"), ("result", "Not started: a request is running", "warn"))
+        v = self.view("nogpu")
+        self.assertEqual((v[2], v[1][:18]), ("warn", "Burn test: process"))
+
+    def test_a_result_shows_for_a_minute_and_a_dead_script_for_ten_seconds(self):
+        self.assertIsNotNone(self.view("passed", age=59))
+        self.assertIsNone(self.view("passed", age=61))
+        self.assertIsNotNone(self.view("cpu", age=9))
+        self.assertIsNone(self.view("cpu", age=11))                             # a running file nobody updates is not a running test
+        self.assertIsNone(o1panel.burn_view({}, BURN_NOW))
+        self.assertIsNone(o1panel.burn_view({"burn": {"phase": "weird", "at": BURN_NOW}}, BURN_NOW))
+        self.assertIsNone(o1panel.burn_view({"burn": "x"}, BURN_NOW))
+        self.assertTrue(o1panel.burn_running(self.st("cpu"), BURN_NOW))
+        self.assertFalse(o1panel.burn_running(self.st("passed"), BURN_NOW))
+
+    def drawn(self, st, sw, sh):
+        seen = []
+        orig = o1hipix.HiPixmap.text
+
+        def rec(self_, x, y, s_, c, scale=1, max_w=None, ellipsis=True):
+            seen.append((s_, x, max_w, scale))
+            return orig(self_, x, y, s_, c, scale, max_w, ellipsis)
+        o1hipix.HiPixmap.text = rec
+        try:
+            k, lw, lh = o1fb.choose_scale(sw, sh)
+            pm = o1panel.render(st, lw, lh, scale=k)
+        finally:
+            o1hipix.HiPixmap.text = orig
+        return pm, seen, lw, lh, k
+
+    def test_the_banner_takes_the_header_and_fits_at_every_resolution(self):
+        for kind in ("cpu", "gpu", "passed", "failed", "aborted", "refused", "nogpu"):
+            for sw, sh in ((1920, 1080), (2560, 1440), (3840, 2160)):
+                st = self.st(kind)
+                st["burn"]["reason"] = (st["burn"]["reason"] + " and a very long reason " * 6)[:200] if kind in ("failed", "refused") else st["burn"]["reason"]
+                pm, seen, lw, lh, k = self.drawn(st, sw, sh)
+                view = o1panel.burn_view(st, BURN_NOW)
+                line = [t for t in seen if t[0] and view[1].startswith(t[0].rstrip(".")[:30]) and len(t[0]) > 12]
+                self.assertTrue(line, (kind, sw))
+                s_, x, mw, scale = line[0]
+                self.assertEqual(o1panel.layout(lw, lh)["header"][2], lw)
+                self.assertLessEqual(o1vtext.text_width(s_, scale), lw - 12 if o1vtext.text_width(s_, 1) <= lw - 12 else 10 ** 6)
+                fill = o1panel.BANNER_FILL["run" if view[0] == "run" else view[2]]
+                self.assertEqual(pm.get(3, 3), fill)
+                self.assertEqual(pm.get(lw - 4, 3), fill)
+                self.assertNotIn("1 TO CHECK", [t[0] for t in seen])                  # the badge is covered, not drawn under
+
+    def test_no_banner_means_the_normal_header(self):
+        st = dash_sample.sample(now=BURN_NOW)
+        pm, seen, lw, lh, k = self.drawn(st, 1920, 1080)
+        self.assertIn("1 TO CHECK", [t[0] for t in seen])
+
+    def test_the_footer_hints_at_enter(self):
+        st = dash_sample.sample(now=BURN_NOW)
+        for w, h in ((640, 360), (480, 270)):
+            seen = " ".join(t[0] for t in self.drawn(st, w, h)[1])
+            self.assertIn("Enter: burn", seen)
+        self.assertIn("Enter: burn test", " ".join(t[0] for t in self.drawn(st, 1920, 1080)[1]))
+
+    def test_the_banner_is_gone_after_the_minute_and_the_header_comes_back_when_drawn_again(self):
+        r = o1panel.PanelRenderer(640, 360, 1)
+        st = self.st("passed")
+        pm = r.draw(st, incremental=True)
+        self.assertEqual(pm.get(3, 3), o1panel.BANNER_FILL["ok"])
+        st2 = dash_sample.sample(now=BURN_NOW + 100)
+        st2["burn"] = st["burn"]
+        pm = r.draw(st2, incremental=True)
+        self.assertEqual(pm.get(3, 3), o1panel.T["head"])
+
+
+class TestBurnKeys(unittest.TestCase):
+    def test_enter_starts_once_and_esc_aborts_only_while_running(self):
+        h = o1paneld.handle_burn_keys
+        self.assertEqual(h(b"\r", False, 100.0, 0.0), ("start", 100.0))
+        self.assertEqual(h(b"\n", False, 100.0, 0.0), ("start", 100.0))
+        self.assertEqual(h(b"\r", True, 100.0, 0.0), (None, 0.0))              # ignored while running
+        self.assertEqual(h(b"\x1b", True, 100.0, 0.0), ("abort", 100.0))
+        self.assertEqual(h(b"\x1b", False, 100.0, 0.0), (None, 0.0))           # nothing to abort
+        for junk in (b"", b" ", b"a", b"\x1b[A", b"\x1b[B", b"\x1bOP", b"q", b"\x03", b"\t", b"1"):
+            self.assertEqual(h(junk, False, 100.0, 0.0)[0], None, junk)
+            self.assertEqual(h(junk, True, 100.0, 0.0)[0], None, junk)
+
+    def test_debounce(self):
+        h = o1paneld.handle_burn_keys
+        self.assertEqual(h(b"\r", False, 100.1, 100.0), (None, 100.0))
+        self.assertEqual(h(b"\r", False, 100.4, 100.0), ("start", 100.4))
+        self.assertEqual(h(b"\x1b", True, 100.2, 100.0), (None, 100.0))
+
+    def run_loop(self, script, st=None, steps=14, cost_first=False):
+        c = Clock()
+        c.t = 1790000000.0                                                          # the clock the fake machine's files are written in
+        calls = []
+
+        class Burn:
+            def start(self_):
+                calls.append("start")
+
+            def abort(self_):
+                calls.append("abort")
+        polls = iter(script)
+
+        class K:
+            def wait(self_, t):
+                c.sleep(t)
+                return next(polls, b"")
+        n = [0]
+
+        def stop():
+            n[0] += 1
+            return n[0] > steps
+        sampler = FakeSampler(st)
+        o1paneld.run(FakeFb(), FakeTty(), sampler, clock=c.now, sleep=c.sleep, keys=K(), stop=stop, burn=Burn())
+        return calls
+
+    def test_enter_starts_the_unit_once_even_when_pressed_again_and_again(self):
+        st = dash_sample.sample(now=1790000000.0)
+        self.assertEqual(self.run_loop([b"\r", b"", b"\r", b"\r", b"\r"], st), ["start"])      # the grace until the file appears
+
+    def test_while_running_enter_does_nothing_and_esc_aborts(self):
+        st = dash_sample.sample(now=1790000000.0)
+        st["burn"] = dash_sample.burn_state("cpu", 1790000000.0)
+        calls = self.run_loop([b"\r", b"", b"\x1b", b"", b"\r"], st)
+        self.assertEqual(calls, ["abort"])
+
+    def test_pairing_wins_and_other_keys_do_nothing(self):
+        st = dash_sample.sample(now=1790000000.0, pairing=True)
+        self.assertEqual(self.run_loop([b"\r", b"", b"\x1b"], st), [])
+        st = dash_sample.sample(now=1790000000.0)
+        self.assertEqual(self.run_loop([b"a", b"\x1b[A", b"x", b"\x1b"], st), [])
+
+    def test_space_still_flips_the_cost_screen(self):
+        st = dash_sample.sample(now=1790000000.0)
+        seen = []
+        real = o1panel.render_cost
+
+        def spy(st_, w, h):
+            seen.append("cost")
+            return real(st_, w, h)
+        o1panel.render_cost = spy
+        try:
+            self.run_loop([b"", b" ", b"", b""], st)
+        finally:
+            o1panel.render_cost = real
+        self.assertIn("cost", seen)
+
+    def test_the_cost_screen_gives_way_to_a_running_burn_test(self):
+        st = dash_sample.sample(now=1790000000.0)
+        st["burn"] = dash_sample.burn_state("gpu", 1790000000.0)
+        seen = []
+        real = o1panel.render_cost
+
+        def spy(st_, w, h):
+            seen.append("cost")
+            return real(st_, w, h)
+        o1panel.render_cost = spy
+        try:
+            self.run_loop([b" ", b"", b"", b""], st)
+        finally:
+            o1panel.render_cost = real
+        self.assertEqual(seen, [])
+
+    def test_the_real_control_starts_one_unit_and_makes_one_empty_file(self):
+        d = tempfile.mkdtemp(prefix="o1bc-")
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        ran = []
+        bc = o1paneld.BurnControl(abort_file=os.path.join(d, "abort"), popen=lambda argv, **kw: ran.append(argv))
+        bc.start()
+        self.assertEqual(ran, [["systemctl", "start", "--no-block", "ollama1-quickburn.service"]])
+        bc.abort()
+        self.assertEqual(os.path.getsize(os.path.join(d, "abort")), 0)
+        self.assertEqual(oct(os.stat(os.path.join(d, "abort")).st_mode & 0o777), "0o600")
+        bc.abort()                                                                  # twice is harmless
 
 
 class TestWidgets(unittest.TestCase):

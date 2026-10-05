@@ -472,7 +472,7 @@ prompt_settings
 find_disks
 derive_hosts
 for f in lib/o1common.py lib/setuplib.sh bin/ollama1-gateway bin/ollama1-modelplan systemd/ollama.service \
-         systemd/ollama1-modelplan.service config/50-ollama1.rules; do
+         systemd/ollama1-modelplan.service config/50-ollama1.rules tools/quick-burn.sh systemd/ollama1-quickburn.service; do
   [ -f "$KIT/$f" ] || die "the kit is incomplete: $f is missing"
 done
 check_disks
@@ -625,6 +625,7 @@ step "Install the kit"
 install -d -m 0755 "$LIBDIR" "$LIBDIR/bin" "$LIBDIR/lib"
 install -m 0644 "$KIT"/lib/*.py "$LIBDIR/lib/"
 install -m 0755 "$KIT"/bin/* "$LIBDIR/bin/"
+install -d -m 0755 "$LIBDIR/tools" && install -m 0755 "$KIT/tools/quick-burn.sh" "$KIT/tools/gpu-burn.sh" "$LIBDIR/tools/"   # the screen's Enter key (6b418)
 ln -sfn "$LIBDIR/bin/ollama1-pair" /usr/local/sbin/ollama1-pair
 ln -sfn "$LIBDIR/bin/ollama1-cf-access" /usr/local/sbin/ollama1-cf-access
 ln -sfn "$LIBDIR/bin/ollama1-lan" /usr/local/sbin/ollama1-lan
