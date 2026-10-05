@@ -25583,7 +25583,7 @@ function setTimeout(fn,ms){const t={fn,ms,cancelled:false};timers.push(t);return
 function clearTimeout(t){if(t)t.cancelled=true;}
 function setInterval(){return 1;}
 function clearInterval(){}
-const localStorage={v:{},getItem(k){return k in this.v?this.v[k]:null;},setItem(k,x){this.v[k]=String(x);}};
+let P={};
 function mkStream(){const t={readyState:"live",stop(){this.readyState="ended";}};
   const s={tracks:[t],getTracks(){return this.tracks;}};streams.push(s);return s;}
 class FakeCtx{
@@ -25625,7 +25625,7 @@ const reset=()=>{
   dictKey({type:"end"},0);recording=false;dictPend=false;recBuf=[];recHeard=false;
   calls.length=0;gumLog.length=0;streams.length=0;timers.length=0;
   ctxMade=srcMade=resumes=suspends=0;gumImpl=null;resumeImpl=null;apiImpl=null;srcThrow=false;
-  localStorage.v={"millen.micwarm":"1"};voiceReady=true;voiceChat=false;sent=0;input.placeholder="";
+  P={mic_warm:true};voiceReady=true;voiceChat=false;sent=0;input.placeholder="";
   for(const k of Object.keys(dictT))delete dictT[k];
 };
 const delayedGum=()=>{let rel;gumImpl=()=>new Promise(r=>{rel=()=>r(mkStream());});return ()=>rel();};
@@ -25662,7 +25662,7 @@ await sec("constraints",async()=>{
 });
 // 4. the AudioContext is made once, with the microphone let go each time
 await sec("ctxonce",async()=>{
-  reset();localStorage.v["millen.micwarm"]="0";
+  reset();P={mic_warm:false};
   for(let i=0;i<3;i++){await dictStart();feed(1);await stopRec();}
   o.ctxonce=ctxMade===1&&gumLog.length===3&&resumes===3&&suspends===3;
 });
@@ -25688,7 +25688,7 @@ await sec(["warmtimer","warmblur","warmnew","warmpage"],async()=>{
 });
 // 7. the setting off: nothing is kept
 await sec("warmoff",async()=>{
-  reset();localStorage.v["millen.micwarm"]="0";await dictStart();feed(1);await stopRec();
+  reset();P={mic_warm:false};await dictStart();feed(1);await stopRec();
   o.warmoff=!live(0)&&pending().length===0&&micStream===null;
 });
 // ...a clip too short to use still keeps the warm window
@@ -25721,7 +25721,7 @@ await sec("blurstart",async()=>{
 // 10b. the warm microphone is OFF until the user turns it on (6b345 review): a first
 // dictation lets the microphone go at once
 await sec("warmdefault",async()=>{
-  reset();delete localStorage.v["millen.micwarm"];
+  reset();P={};
   const d=micWarmOn()===false;
   await dictStart();feed(1);await stopRec();
   o.warmdefault=d&&!live(0)&&micStream===null;
@@ -25857,7 +25857,7 @@ _FS_MUT = [
     ("constraints", "noiseSuppression:false,", "noiseSuppression:true,"),
     ("ctxonce", "if(!micCtx){", "if(true){"),
     ("warmoff", "if(keep!==false&&micWarmOn()&&micLive()){", "if(keep!==false&&micLive()){"),
-    ("warmdefault", 'localStorage.getItem("millen.micwarm")==="1"', 'localStorage.getItem("millen.micwarm")!=="0"'),
+    ("warmdefault", "return P.mic_warm===true;", "return P.mic_warm!==false;"),
     ("warmreuse", 'if(micLive()){dictTrace("gum");return Promise.resolve(micStream);}   // warm: at once', ""),
     ("warmreuse", "if(micTimer){clearTimeout(micTimer);micTimer=null;}\n  if(micLive()){",
      "if(micLive()){"),
@@ -25919,7 +25919,7 @@ def _fs_pins(src):
                   "  autoGainControl:false}};" in src
                   and "navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS)" in src)
     _p["warm"] = ("const MIC_WARM_S=15;" in src
-                  and 'localStorage.getItem("millen.micwarm")==="1"' in src)
+                  and "return P.mic_warm===true;" in src)
     _p["toggle"] = ('id="micwarm-toggle"' in src
                     and "<span>Keep the microphone ready for 15 seconds after dictating</span>" in src
                     and "The next hold starts at once. macOS shows its microphone indicator while it's ready." in src)
@@ -25939,7 +25939,7 @@ check("dictation fast: the capture order, the constraints, the warm window and i
       all(_FSP.values()) and all(_FSP_PAGE.values()), "%r %r" % (_FSP, _FSP_PAGE))
 _fsp_bad = []
 for _k, _a in [("gum", "const cap=micAttach();"), ("cons", "autoGainControl:false}};"),
-               ("warm", 'localStorage.getItem("millen.micwarm")'), ("toggle", "Keep the microphone ready"),
+               ("warm", "return P.mic_warm===true;"), ("toggle", "Keep the microphone ready"),
                ("close", '$("#newchat").addEventListener("click",micGone);'),
                ("close", 'addEventListener("pagehide",()=>micClose(true));'),
                ("close", "try{micClose(true);}catch(e){}"),
@@ -25959,6 +25959,188 @@ check("dictation fast: the timing line exists only with the dict-trace hook (pag
       and 'if self.path == "/api/test/trace" and "dict-trace" in TEST_HOOKS:' in _MILLENAI_SRC
       and req("/api/test/trace", "POST", {"line": "x"})[0] in (404, 403, 405),
       "%r" % (req("/api/test/trace", "POST", {"line": "x"})[0],))
+# ---- 6b429: the warm-microphone switch is a saved preference, not browser storage
+# 6b429, per Patrick: "Keep this setting persistent. It keeps turning itself off when the app is
+# restarted." The page's boot sweep deletes every browser-storage key not on its allow-list, so
+# "millen.micwarm" (6b345) was emptied at each start. Now: prefs.json key "mic_warm", this
+# profile's own (PROFILE_LOCAL), a real boolean only; the page reads it at boot with the call it
+# already makes, and the switch posts on click.
+def _mw_server(src_prof=None):
+    ns, d, root = _pm8(src_prof)
+    r = {}
+    r["class"] = ns["pref_class"]("mic_warm") == "local" and "mic_warm" in ns["PROFILE_LOCAL"]
+    o = ns["split_prefs"](root, {"mic_warm": True})
+    r["saved"] = (o["changed"] == ["mic_warm"] and json.load(open(os.path.join(d, "prefs.json"))).get("mic_warm") is True
+                  and ns["prefs_view"](root).get("mic_warm") is True)
+    bad = [ns["split_prefs"](root, {"mic_warm": x}) for x in ("true", 1, 0, None, "", [], {"a": 1})]
+    r["bool"] = (all(b["ignored"] == ["mic_warm"] and b["changed"] == [] for b in bad)
+                 and json.load(open(os.path.join(d, "prefs.json"))).get("mic_warm") is True)
+    r["off"] = ns["split_prefs"](root, {"mic_warm": False})["changed"] == ["mic_warm"] \
+        and ns["prefs_view"](root).get("mic_warm") is False
+    return r
+
+
+_MW_BASE = _mw_server()
+check("mic warm pref: classified profile-local, saved as a real boolean, anything else ignored, off saves too",
+      all(_MW_BASE.get(k) is True for k in ("class", "saved", "bool", "off")), "%r" % _MW_BASE)
+
+
+def _mw_acct():
+    ns, d, root = _pm8(None, hooks=frozenset({"profiles"}))
+    fresh = ns["test_profile_create"]()
+    ns["profile_switch"](fresh)
+    ns["split_prefs"](fresh, {"mic_warm": True})
+    mine = (json.load(open(os.path.join(fresh.dir, "local.json"))).get("mic_warm") is True
+            and not os.path.exists(os.path.join(d, "prefs.json")))
+    ns["profile_switch"](root)
+    return mine and "mic_warm" not in ns["prefs_view"](root)
+
+
+check("mic warm pref: an account's choice sits in its own local.json and never reaches 'This computer' (profile rules)",
+      _mw_acct())
+_MW_PROF = _prof_sect("profile")
+_mw_mut = [
+    ("class", "local", '"lend", "lend_pick", "studio_opts.*.neg", "mic_warm"))', '"lend", "lend_pick", "studio_opts.*.neg"))'),
+    ("bool", "bool", "                k in LOCAL_BOOL and not isinstance(v, bool)):", "                False):"),
+]
+_mw_bad = []
+for _nm, _, _a, _b in _mw_mut:
+    # the settings split lives in the profile section: run the mutated section
+    _sect = _prof_sect("profile")
+    if _sect.count(_a) != 1:
+        _mw_bad.append("not in section " + _a[:30])
+        continue
+    try:
+        _mr = _mw_server(_sect.replace(_a, _b))
+    except Exception:
+        _mr = {_nm: False}      # the mutant broke the scenario so hard it raised
+    if _mr.get(_nm) is not False:
+        _mw_bad.append("%s survived" % _nm)
+check("mic warm pref: dropping the class or the boolean check breaks its test (mutants)",
+      not _mw_bad, "%r" % _mw_bad)
+
+# the page, in node: a fake server keeps prefs.json; the real storeBoot, prefSet, micWarmOn, setMicWarm run
+_MW_JS = r'''
+const IS_PC=false;
+let PROFILE="local.x";
+const store={};            // browser storage, emptied by the boot sweep
+let disk={};               // prefs.json
+const calls=[];
+function applyPrefs(){micWarmPaint();}
+const toggle={on:false,classList:{toggle(_,v){toggle.on=v;}}};
+const $=(s)=>s==="#micwarm-toggle"?toggle:null;
+function micClose(){}
+async function api(u,o){calls.push(u+(o&&o.body?" "+o.body:""));
+  if(u==="/api/prefs"&&!o)return{ok:true,json:async()=>JSON.parse(JSON.stringify(disk))};
+  if(u==="/api/prefs"){const b=JSON.parse(o.body);Object.assign(disk,b);return{ok:true,json:async()=>({ok:true})};}
+  if(u==="/api/prefs/adopt")return{ok:true,json:async()=>({prefs:{}})};
+  return{ok:true,json:async()=>({})};}
+const localStorage={getItem(k){return k in store?store[k]:null;},setItem(k,v){store[k]=String(v);},
+  removeItem(k){delete store[k];},get length(){return Object.keys(store).length;},key(i){return Object.keys(store)[i]||null;}};
+'''
+_MW_SCEN = r'''
+const out={};
+const boot=async(first)=>{
+  P={};prefMine.clear();toggle.on=false;      // a fresh page: nothing held in memory
+  await storeBoot();
+};
+(async()=>{
+  // a first ever start: off, nothing saved, nothing posted
+  await boot();
+  out.default=toggle.on===false&&micWarmOn()===false&&!("mic_warm" in disk);
+  // the person turns it on; the click posts the value
+  setMicWarm(true);await prefQ;
+  out.click=toggle.on===true&&disk.mic_warm===true&&micWarmOn()===true;
+  // a restart: the page forgets everything but what prefs.json holds (browser storage is swept)
+  for(const k of Object.keys(store))delete store[k];
+  await boot();
+  out.restart=toggle.on===true&&micWarmOn()===true;
+  // turning it off survives a restart too
+  setMicWarm(false);await prefQ;await boot();
+  out.off=toggle.on===false&&micWarmOn()===false&&disk.mic_warm===false;
+  // the one-time move: on in browser storage (6b345), nothing saved yet
+  disk={};store["millen.micwarm"]="1";await boot();
+  out.migrate=disk.mic_warm===true&&micWarmOn()===true&&toggle.on===true&&!("millen.micwarm" in store);
+  // ...but a saved off is never overruled by an old browser value
+  disk={mic_warm:false};store["millen.micwarm"]="1";await boot();
+  out.noover=disk.mic_warm===false&&micWarmOn()===false;
+  // a browser value of 0 or none turns nothing on
+  disk={};store["millen.micwarm"]="0";await boot();
+  out.nomig=!("mic_warm" in disk)&&micWarmOn()===false;
+  // an account's page never migrates browser storage into its own file
+  PROFILE="acct.1";disk={};store["millen.micwarm"]="1";await boot();
+  out.acct=!("mic_warm" in disk)&&micWarmOn()===false;
+  PROFILE="local.x";
+  // a failed post of the move keeps the old key for the next start
+  disk={};store["millen.micwarm"]="1";
+  const realApi=api;api=async(u,o)=>{if(u==="/api/prefs"&&o)throw new Error("down");return realApi(u,o);};
+  await boot();api=realApi;
+  out.retry=("millen.micwarm" in store)&&!("mic_warm" in disk);
+  // a keydown never waits on the network: micWarmOn is a plain read
+  out.sync=micWarmOn.toString().includes("P.mic_warm===true")&&!/await|api\(/.test(micWarmOn.toString());
+  console.log(JSON.stringify(out));
+})();
+'''
+
+
+def _mw_page(mut=None):
+    src = _MILLENAI_SRC
+    parts = [
+        src[src.index("const PREF_OF={"):src.index("let P={};")],
+        "let P={};const prefMine=new Set();let prefQ=Promise.resolve();let prefsReady=false;\n",
+        _jsfn(src, "function prefSet(o){"), _jsfn(src, "function lsGet(k){"), _jsfn(src, "function lsDel(k){"),
+        _jsfn(src, "function lsKeys(){"), _jsfn(src, "function prefVal(k,v){"),
+        _jsfn(src, "async function storeBoot(){"),
+        _jsfn(src, "function micWarmOn(){"), _jsfn(src, "function setMicWarm(on){"),
+        _jsfn(src, "function micWarmPaint(){"),
+    ]
+    js = _MW_JS.replace("async function api(u,o){", "var api=async function(u,o){", 1).replace(
+        "return{ok:true,json:async()=>({})};}\nconst localStorage", "return{ok:true,json:async()=>({})};};\nconst localStorage", 1)
+    js += "".join(parts)
+    if mut:
+        for a, b in mut:
+            if js.count(a) != 1:
+                return {"err": "anchor " + a[:30]}
+            js = js.replace(a, b)
+    try:
+        return _node_json(js + _MW_SCEN, "micwarm.js")
+    except Exception as e:
+        return {"err": str(e)}
+
+
+_MW_PAGE = _mw_page()
+_MW_NAMES = ["default", "click", "restart", "off", "migrate", "noover", "nomig", "acct", "retry", "sync"]
+check("mic warm pref (node): off by default, the click saves it, a simulated restart (browser storage "
+      "swept, page memory fresh) still has it on, off survives too, no network wait at keydown",
+      all(_MW_PAGE.get(k) is True for k in ("default", "click", "restart", "off", "sync")), "%r" % _MW_PAGE)
+check("mic warm pref (node): the one-time move of an old browser 'on' is saved once, never overrules a "
+      "saved choice, never turns it on from 0, never runs on an account's page, retries after a failed post",
+      all(_MW_PAGE.get(k) is True for k in ("migrate", "noover", "nomig", "acct", "retry")), "%r" % _MW_PAGE)
+_MW_MUT = [
+    ("click", 'prefSet({mic_warm:on});', 'localStorage.setItem("millen.micwarm",on?"1":"0");'),
+    ("restart", "return P.mic_warm===true;", "return localStorage.getItem(\"millen.micwarm\")===\"1\";"),
+    ("default", "return P.mic_warm===true;", "return P.mic_warm!==false;"),
+    ("migrate", 'JSON.stringify({mic_warm:true})', 'JSON.stringify({})'),
+    ("noover", '!("mic_warm" in held)&&lsGet', 'lsGet'),
+    ("nomig", 'lsGet("millen.micwarm")==="1"', 'lsGet("millen.micwarm")!==null'),
+    ("acct", "const micOld=rootPage&&held", "const micOld=held"),
+    ("retry", '&&!(k==="millen.micwarm"&&micOld&&!micMoved)', ''),
+]
+_mw_bad2 = []
+for _nm, _a, _b in _MW_MUT:
+    _mr = _mw_page([(_a, _b)])
+    if _mr.get(_nm) is not False:
+        _mw_bad2.append("%s survived %r %r" % (_nm, _a[:30], _mr.get("err")))
+check("mic warm pref (node): each mutation (stay in browser storage, default on, no save, migrate "
+      "without 'on', overrule a saved value, migrate on 0, migrate on an account, no retry) breaks its scenario",
+      not _mw_bad2, "%r" % _mw_bad2)
+_mw_src_ok = ("micWarmPaint();\n  prefsReady=true;" in _MILLENAI_SRC
+              and "function micWarmPaint(){" in _MILLENAI_SRC
+              and 'LOCAL_BOOL = ("mic_warm",)' in _MILLENAI_SRC
+              and "prefSet({mic_warm:on});" in _MILLENAI_SRC
+              and 'localStorage.setItem("millen.micwarm"' not in _MILLENAI_SRC)
+check("mic warm pref: applyPrefs paints the switch from the saved value; no write to browser storage remains",
+      _mw_src_ok and "prefSet({mic_warm:on});" in page)
 # ==== 6b345 dictation fast: end ====
 
 

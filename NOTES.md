@@ -9,6 +9,37 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b429 — the warm-microphone switch is a saved setting (per Patrick)
+
+Patrick: "Keep this setting persistent. It keeps turning itself off when the app is restarted." The
+switch "Keep the microphone ready for 15 seconds after dictating" (6b345) lived only in the web
+view's localStorage key `millen.micwarm`. The real cause is not the origin or port: `storeBoot`
+(0b 5.10, 6b324) deletes every browser-storage key that is not on its allow-list at EVERY start, and
+`millen.micwarm` was never on it, so the switch was emptied at each launch.
+
+- **The setting** is now `mic_warm` in prefs.json, a real boolean, in `PROFILE_LOCAL` (it is about
+  this computer's microphone and this profile's habit: not synced to an account's other computers, not
+  the machine's). So it follows the profile rules: "This computer" keeps it in prefs.json, an account
+  in its own local.json, and a switch of profile never carries it across. `LOCAL_BOOL` makes
+  `split_prefs` ignore anything but true/false for it (as KEY-2 does for synced keys).
+- **The page** reads it from the `/api/prefs` call `storeBoot` already makes (no new round trip) into
+  `P.mic_warm`; `applyPrefs` repaints the switch (`micWarmPaint`); the click is `prefSet({mic_warm:on})`.
+  `micWarmOn()` is a plain `P.mic_warm===true`: a dictation keydown never waits on the network, and
+  until prefs answer it is off. Browser storage is no longer written at all.
+- **One-time move**: if prefs.json has no `mic_warm`, the page is "This computer"'s, and browser
+  storage still says `"1"`, the page posts `mic_warm:true` and lets the sweep take the old key. A
+  failed post keeps the old key for the next start. A saved value (even off) always wins; "0" or
+  nothing never turns it on; an account's page never migrates. Default stays off.
+- **Tests** (6b345 block): node runs the real `storeBoot`, `prefSet`, `micWarmOn`, `setMicWarm`
+  against a fake prefs.json; a restart is "browser storage swept, page memory reset, boot again"
+  (on survives, off survives); server checks on `split_prefs`; eight page mutants and two server
+  mutants. The 6b345 scenarios now read `P` instead of localStorage.
+- **Other settings living only in browser storage** (not changed): see the report; `millen.video`
+  (backgrounds on/off) and `millen.sky*`/`millen.sbw`/`millen.voice` are on `KEEP_LS`, so they
+  survive the sweep, but they are web-store only; `millen.usage.range` is NOT on `KEEP_LS` and is
+  swept at every start like the mic key was.
+
+---
 ## 6b425 — no stray one-row table boxes; scrolling up during an answer stays put; the status card clears the composer (per Patrick)
 
 Three chat fixes, all in the page.
