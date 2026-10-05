@@ -39,7 +39,7 @@
 #                                    works and for 60 s after, then down to 20% over 2 minutes (ollama1-fan).
 #                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
 #   sudo ./setup.sh --leds on|off    the case, board and cooler lights: white when the graphics card is idle, through
-#                                    yellow and orange to red as its load rises (ollama1-leds, through the openrgb package, which
+#                                    yellow and orange to red as its load rises, 50% dim after 5 idle minutes (ollama1-leds, through the openrgb package, which
 #                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
 #   sudo ./setup.sh --watchdog on|off   the hardware watchdog (ollama1-watchdog): the chipset's timer resets the board
 #                                    when the system disk stops answering (about 60 s), petted only while a real disk probe

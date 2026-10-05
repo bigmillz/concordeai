@@ -374,6 +374,47 @@ owner's view.
 - GRAPHICS CARD: the Fan row is gone; in its place Mem, the card's own memory temperature (`temps["mem"]`, already read
   by `o1stats.gpu()`, no new sampling), full bar at 95 C, amber from 85, red from 95. Temp stays the junction/edge one.
 - Install: lib/o1panel.py, lib/o1metrics.py, then restart ollama1-dash. Tests: TestFans; 4 mutants.
+## 6b419 — lights cool down over 180 s and dim to 50% after 5 idle minutes (per Patrick)
+
+Patrick: "When cooling down, have the lights fade from red to orange to yellow to white
+throughout the course of cooling down in a linear fashion. Then after five minutes of being
+idle, fade down to fifty percent brightness. When the GPU starts working again, or if the CPU
+hits 20% usage or higher, bring it back up to 100% brightness and repeat." Kit only
+(`lib/o1leds.py`); `lib/o1work.py` and the fans untouched.
+
+- **Colour fall.** `FALL_S` 10 s -> 180 s (the fans' 60 + 120 s cool-down): the shown
+  intensity falls linearly over the whole cool-down; the rise (2.5 s) and the stops are
+  unchanged; a burst raises it from wherever it is; 99/0/99/0 jitter stays near red.
+- **Brightness b (0.5..1.0)** multiplies each channel of the final RGB, rounded (white 128,128,128;
+  red 128,0,0), independent of the colour. Idle = card < 10% (6 s average) AND processors < 15%
+  (10 s average, o1work's cpu reading: user+nice+system+irq+softirq, no iowait); not idle at the
+  card >= 15% (`o1work.GPU_BUSY_PCT`) OR processors >= 20% (`CPU_WAKE_PCT`); the gaps are the
+  hysteresis (wobbling 14/16 or 19/21 flips nothing). The averages come from `o1work.Work`'s
+  own `_gpu`/`_cpu` (fed with the lights' cached card reading), so they are the fans' code.
+  Idle starts counting `idle_since` at the moment it (re)enters idle; at `IDLE_DIM_S` = 300 s, b
+  falls to 0.5 over `DIM_S` = 10 s; not idle: b returns to 1.0 over `UNDIM_S` = 1.5 s and the timer
+  restarts at the next idle moment. Start and wake (`resync`): b = 1.0, idle, timer from now
+  (and the averages restart). No card reading counts as card idle. A request in flight or a tool does
+  not wake it.
+- **Loop.** 20 Hz while the colour rises or b moves; during the slow fall it wakes with the
+  0.25 s sample (about one colour level a tick), so an idle server still wakes only 4 times a
+  second. Frames only when the rounded RGB changes; keepalive and reconnect resend the shown
+  colour including b (a stop still sets plain white).
+- **Status.** JSON adds `brightness`, `idle`, `idle_s`, `gpu_avg`, `cpu_avg`; `rgb` is the shown
+  colour including b. Line: "Lights: orange, 100% (card 61% busy)", "Lights: white, dimming
+  (idle 5 min)", "Lights: white, dimmed 50% (idle 6 min)". Admin line, `ollama1-leds status`,
+  README and the setup plan/help updated.
+- **Tests.** The 10 s fall test is replaced by the 180 s linear fall (x at 45/90/135/180 s) and a
+  mid-fall burst; `TestDimming` (300 s start and 10 s dim, 1.5 s restore, CPU 19/21 and card 14/16
+  edges with the averaging, a spike averaged away, timer restart, no dimming while a burst's
+  fade is under 300 s old, both-quiet logic, boot/wake state, no flicker, resent/reconnect colour
+  with b, status text). 48 `leds:` mutants (180, 300, 0.5, 10, 1.5, 20/15%, the AND logic, ...), all killed.
+- Unverified on the real server: how 50% looks on the Mystic Light and the pump head (many
+  controllers have their own brightness curve), and that the processors' average behaves
+  as expected with the real /proc/stat.
+
+---
+
 ## 6b417 — lights follow the graphics card's load, white through yellow and orange to red (per Patrick)
 
 Patrick, after the 6b395 lights worked on the real server: "have the lights dynamically
