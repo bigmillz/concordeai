@@ -16108,8 +16108,8 @@ def _ld_lines(t: dict, page: dict, seen: set) -> list:
 # house rules and notes, the category ratings and any review comments
 _ABNB_HOST_RX = re.compile(r"(?:^|\.)airbnb\.[a-z]{2,3}(?:\.[a-z]{2})?$", re.I)
 _ABNB_FACTS = (("roomType", "room type"), ("propertyType", "property type"),
-               ("personCapacity", "guests"), ("maxGuestCapacity", "max guests"),
-               ("isSuperhost", "Superhost"), ("isGuestFavorite", "Guest favourite"),
+               ("personCapacity", "sleeps"), ("maxGuestCapacity", "sleeps at most"),
+               ("isSuperhost", "Superhost"), ("isGuestFavorite", "Favourite of past visitors"),
                ("guestSatisfactionOverall", "overall rating"),
                ("visibleReviewCount", "reviews"), ("reviewCount", "reviews"),
                ("cleanlinessRating", "cleanliness"), ("accuracyRating", "accuracy"),
@@ -39256,7 +39256,7 @@ function fitInput(){
 }
 input.addEventListener("input",fitInput);
 (function(){
-  const d=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value");
+  const d=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),"value");
   Object.defineProperty(input,"value",{configurable:true,
     get(){return d.get.call(this);},
     set(v){d.set.call(this,v);fitInput();}});

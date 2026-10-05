@@ -17821,7 +17821,7 @@ def _pl_unit(src):
         and "JavaScript" in us(ns["link_read"]("<html><body><script>app()</script></body></html>", "https://x.com/", "text/html"))[1])
     dg = ns["link_digest"](p)
     o["the digest: facts, the missing price and reviews said, sections once, the review"] = (
-        "Listing facts: room type Entire home/apt; guests 5; Superhost yes; overall rating 4.88; reviews 41; "
+        "Listing facts: room type Entire home/apt; sleeps 5; Superhost yes; overall rating 4.88; reviews 41; "
         "cleanliness 4.7; accuracy 4.9; check-in 4.8; communication 5.0; location 4.95; value 4.6" in dg
         and "Price for the dates asked: NOT in the page as read" in dg
         and "[The space] Two bedrooms" in dg and "[About this space]" not in dg
@@ -22236,6 +22236,7 @@ def _p2c_pins(src):
         and "            _draft_one(_j, _lbl, _srv_deadline, True)" in rc
         and "        _gt.join(timeout=max(1.0, _srv_deadline - time.time() + 20))" in rc
         and "    SRV_DRAFT_S = 45.0" in rc and "SRV_DRAFT_S\n                        * max((len(_g) for _g in _groups.values()), default=0))" in rc
+        and "    _srv_deadline = max(_local_deadline, time.time() + SRV_DRAFT_S" in rc
         and "    LOCAL_CAP = 120.0" in rc and "        _jd = time.time() + min(LOCAL_CAP, max(15.0, _left))" in rc
         and "                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):" in rc
         and "hurry=None, srv_first_s=None, srv_merge=False) -> None:" in rc
