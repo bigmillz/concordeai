@@ -4,15 +4,19 @@ memory-clock bump on an AMD Navi 21 card (RX 6800/6900 series), for faster
 token generation (6b361). setup.sh turns it on; see lib/o1gputune.py.
 
   sudo ollama1-gpu-tune status   stock and current values, the last check
-  sudo ollama1-gpu-tune on       turn on: stock speed measured, the values set, a
-                                 60 s check under load (back to stock on any error)
+  sudo ollama1-gpu-tune on [--memory N] [--core N]
+                                 turn on: stock speed measured, the power limit set to the
+                                 card's maximum, a 60 s check under load (back to stock on any
+                                 error). The memory clock (N whole MHz, 0..75) and the core
+                                 clock (N, 0..150) are opt-in, 0 = off: each is checked on its own
+                                 and, if slower, only it is taken off (the power limit is kept)
   sudo ollama1-gpu-tune off      turn off: the card back to stock, and kept there
   sudo ollama1-gpu-tune apply    the saved choice, now (and its check, if due)
 
 Used by the system:
   restore         ollama1-gpu-tune.service: at boot (before Ollama) and after a wake
   check-pending   ollama1-gpu-tune-check.service: the load check once Ollama is up
-  setup on|off|force-on   setup.sh's step
+  setup on|off|force-on [--memory N] [--core N]   setup.sh's step
   grub-cfg        prints the GRUB drop-in setup.sh installs (exit 1: no card for it)
 """
 import fcntl
@@ -38,6 +42,25 @@ def grub_cfg():
     return 0
 
 
+def clock_options(args):
+    """--memory N / --core N (also --memory=N) -> ({"memory": N, "core": N} for those given, the rest of the words)."""
+    opts, rest, i = {}, [], 0
+    while i < len(args):
+        a = args[i]
+        name, eq, val = a.partition("=")
+        if name in ("--memory", "--core"):
+            if not eq:
+                i += 1
+                if i >= len(args):
+                    raise ValueError("%s takes a number of MHz" % name)
+                val = args[i]
+            opts[name[2:]] = (o1gputune.parse_memory if name == "--memory" else o1gputune.parse_core)(val)
+        else:
+            rest.append(a)
+        i += 1
+    return opts, rest
+
+
 def main(argv):
     cmd = argv[1] if len(argv) > 1 else "status"
     if cmd in ("-h", "--help", "help"):
@@ -47,6 +70,14 @@ def main(argv):
         return grub_cfg()
     if cmd not in ("status", "on", "off", "apply", "restore", "check-pending", "setup"):
         print("usage: ollama1-gpu-tune status|on|off|apply", file=sys.stderr)
+        return 2
+    try:
+        opts, rest = clock_options(argv[2:] if cmd == "on" else argv[3:] if cmd == "setup" else [])
+    except ValueError as e:
+        print("ollama1-gpu-tune: %s" % e, file=sys.stderr)
+        return 2
+    if rest:
+        print("ollama1-gpu-tune: unexpected: %s" % " ".join(rest), file=sys.stderr)
         return 2
     if cmd != "status" and os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
         print("Run it with sudo: sudo ollama1-gpu-tune " + cmd, file=sys.stderr)
@@ -59,7 +90,7 @@ def main(argv):
     fcntl.flock(lock, fcntl.LOCK_EX)
     t = o1gputune.Tuner()
     if cmd == "on":
-        return t.cmd_on()
+        return t.cmd_on(**opts)
     if cmd == "off":
         return t.cmd_off()
     if cmd == "apply":
@@ -70,9 +101,9 @@ def main(argv):
         return t.cmd_check_pending()
     choice = argv[2] if len(argv) > 2 else ""
     if choice not in ("on", "off", "force-on"):
-        print("usage: ollama1-gpu-tune setup on|off|force-on", file=sys.stderr)
+        print("usage: ollama1-gpu-tune setup on|off|force-on [--memory N] [--core N]", file=sys.stderr)
         return 2
-    return t.cmd_setup(choice)
+    return t.cmd_setup(choice, **opts)
 
 
 if __name__ == "__main__":

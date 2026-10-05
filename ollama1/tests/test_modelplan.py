@@ -1052,8 +1052,8 @@ class TestBoundary(unittest.TestCase):
         rule = RULES_TEXT()
         first = rule.index("polkit.addRule(")
         second = rule.index("polkit.addRule(", first + 1)
-        self.assertEqual(rule.count("polkit.addRule("), 2)
-        return rule[second:]
+        self.assertEqual(rule.count("polkit.addRule("), 3)                    # the panel's, the gateway's, the screen's (6b418)
+        return rule[second:rule.index("\n});", second) + 4]
 
     def test_polkit_lets_the_gateway_start_that_one_unit(self):
         r = self.gw_rule()

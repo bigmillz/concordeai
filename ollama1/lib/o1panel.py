@@ -50,6 +50,7 @@ def col(style):
 
 ERRORS = []       # panels that raised (the tests assert this stays empty)
 MIN_W, MIN_H = 480, 270
+MID_MIN = (40, 49, 59)     # the middle column's boxes: storage, fans, network (title, padding and their lines)
 
 
 # ---- layout -------------------------------------------------------------------
@@ -65,7 +66,10 @@ def layout(w, h):
     top = head_h + m
     bottom = h - foot_h - m
     body = bottom - top
-    top_h = (body - m) * 53 // 100
+    top_h = (body - m) * 47 // 100
+    needed = sum(MID_MIN) + 2 * m                       # what the three middle boxes need to show everything
+    if body - m - top_h < needed:
+        top_h = max(min(top_h, 96), body - m - needed)
     bot_h = body - m - top_h
     col_w = (w - 2 * m - m) // 2
     avail = w - 2 * m - 2 * m
@@ -73,14 +77,26 @@ def layout(w, h):
     w2 = avail * 32 // 100
     w3 = avail - w1 - w2
     y2 = top + top_h + m
-    st_h = (bot_h - m) * 46 // 100                     # the middle column: storage over fans
+    room = bot_h - 2 * m                                # the three boxes share this (the minimum each, then a third of the rest)
+    mins = list(MID_MIN)
+    if room < sum(mins):
+        mins = [room * v // sum(MID_MIN) for v in MID_MIN]
+    spare = max(0, room - sum(mins))
+    hs = [mins[0] + spare // 3, mins[1] + spare // 3, 0]
+    hs[2] = room - hs[0] - hs[1]
+    ys = y2
+    mid = {}
+    for name, hh in zip(("storage", "fans", "network"), hs):
+        mid[name] = (m + w1 + m, ys, w2, hh)
+        ys += hh + m
     return {
         "header": (0, 0, w, head_h),
         "gpu": (m, top, col_w, top_h),
         "cpu": (m + col_w + m, top, w - 2 * m - col_w - m, top_h),
         "models": (m, y2, w1, bot_h),
-        "storage": (m + w1 + m, y2, w2, st_h),
-        "fans": (m + w1 + m, y2 + st_h + m, w2, bot_h - st_h - m),
+        "storage": mid["storage"],
+        "fans": mid["fans"],
+        "network": mid["network"],
         "status": (m + w1 + m + w2 + m, y2, w3, bot_h),
         "footer": (0, h - foot_h, w, foot_h),
     }
@@ -129,7 +145,7 @@ def gb(v):
 
 # ---- widgets: each draws inside the box it is given -------------------------------
 
-def frame(pm, r, title, right="", accent=None, right_colour=None):
+def frame(pm, r, title, right="", accent=None, right_colour=None, compact=False):
     """A panel: border, fill, title. Returns the inside box, and narrows the
     clip to it (the caller's clipped() block restores the old one)."""
     x, y, w, h = r
@@ -141,7 +157,8 @@ def frame(pm, r, title, right="", accent=None, right_colour=None):
         room = w - 16 - tw - 10
         if room > 12:
             pm.text_right(x + w - 8, y + 5, right, right_colour if right_colour is not None else T["dim"], max_w=room)
-    inner = (x + 8, y + 18, w - 16, h - 18 - 6)
+    top, bottom = (15, 4) if compact else (18, 6)       # the middle column's boxes keep their padding small
+    inner = (x + 8, y + top, w - 16, max(0, h - top - bottom))
     c = pm.clip                                   # from here on the widgets cannot reach the border or the title
     pm.clip = (max(c[0], inner[0]), max(c[1], inner[1]), min(c[2], inner[0] + inner[2]), min(c[3], inner[1] + inner[3]))
     return inner
@@ -495,60 +512,89 @@ def draw_models(pm, r, st, ctx):
               "")
 
 
+def dec_bytes(b):
+    """"188 GB", "1.8 TB": decimal units, the way a disk is sold."""
+    b = D._f(b) or 0.0
+    return ("%.1f TB" % (b / 1e12)) if b >= 1e12 else ("%d GB" % round(b / 1e9))
+
+
+def disk_total(disks):
+    """(used, total, [mounts that are missing]) over the local filesystems added together; two
+    mounts of one filesystem (the same size and free space) count once."""
+    seen, used, total, missing = set(), 0.0, 0.0, []
+    for d in disks:
+        t = D._f(d.get("total"))
+        if not d.get("mounted") or not t:
+            missing.append(str(d.get("mount") or "?"))
+            continue
+        key = (t, D._f(d.get("free")), D._f(d.get("used")))
+        if key in seen:
+            continue
+        seen.add(key)
+        used += D._f(d.get("used")) or 0.0
+        total += t
+    return used, total, missing
+
+
 def draw_storage(pm, r, st, ctx):
-    inner = frame(pm, r, "Storage and network")
+    inner = frame(pm, r, "Storage", compact=True)
     x, y, w, h = inner
     disks = [d for d in _l(st.get("disks")) if isinstance(d, dict)]
-    raid = [a for a in _l(st.get("raid")) if isinstance(a, dict)]
-    io, net = _d(st.get("io")), _d(st.get("net"))
-    rows = []
-    for d in disks:
-        label = str(d.get("mount") or "?")
-        total = D._f(d.get("total"))
-        if d.get("mounted") and total:
-            f = (D._f(d.get("used")) or 0) / total
-            rows.append((label, "%s free" % D.human_bytes(d.get("free")), f, col(D.pct_style(100 * f, 80, 92))))
-        else:
-            rows.append((label, "MISSING", None, T["bad"]))
-    # the lines under the disks, most important first; the last ones go when the box is short
-    tail = []
-    for a in raid[:1]:
-        txt, kind = raid_status(a)
-        tail.append(("raid", txt, kind))
-    tail.append(("Disk", "read %s  write %s" % (D.rate(io.get("read_bps")), D.rate(io.get("write_bps"))), True))
-    tail.append(("Net", "in %s  out %s" % (D.rate(net.get("rx_bps")), D.rate(net.get("tx_bps"))), True))
-    ports = [p for p in _l(net.get("ports")) if isinstance(p, dict)]
-    if ports:
-        up = [p for p in ports if p.get("carrier")]
-        sp = {D._f(p.get("speed_mbps")) for p in up}
-        if len(up) == len(ports) and len(sp) == 1 and None not in sp:
-            tail.append(("Link", "%d port%s %d Mb/s" % (len(ports), "" if len(ports) == 1 else "s", sp.pop()), True))
-        else:
-            tail.append(("Link", "%d of %d ports up" % (len(up), len(ports)), False))
-    while tail and 11 * len(rows) - 4 + 3 + 10 * len(tail) > h:        # every disk first, then the lines under them
-        tail.pop()
-    keep = max(1, (h - 3 - 10 * len(tail) + 4) // 11)
-    if len(rows) > keep:
-        rows.sort(key=lambda r: 0 if r[1] == "MISSING" else 1)           # a missing disk is never the one left out
-        more = len(rows) - keep + 1
-        rows = rows[:keep - 1] + [("+%d more" % more, "", None, T["dim"])]
-    used = bar_rows(pm, (x, y, w, h), rows, 11)
-    for i, row in enumerate(rows):
-        if row[1] == "MISSING":
-            pm.text_right(x + w, y + i * 11, row[1], T["bad"], max_w=w // 2)
-    yy = y + used + 2
-    lw = widest([t[0] for t in tail if t[0] != "raid"])
-    for label, text, ok in tail:
-        if yy + 8 > y + h:
-            break
-        if label == "raid":
-            colour = RAID_COLOURS[ok]
-            dot(pm, x, yy, colour)
-            pm.text(x + 10, yy, text, T["text"] if ok in ("ok", "info") else colour, max_w=w - 10)
-        else:
-            pm.text(x, yy, label, T["dim"], max_w=lw)
-            pm.text(x + lw + 6, yy, text, T["text"] if ok else T["warn"], max_w=w - lw - 6)
+    io = _d(st.get("io"))
+    used, total, missing = disk_total(disks)
+    yy = y
+    if total:
+        f = used / total
+        bar_rows(pm, (x, y, w, h), [("Used", "%s of %s" % (dec_bytes(used), dec_bytes(total)), f, col(D.pct_style(100 * f, 80, 92)))], 10)
         yy += 10
+    elif not missing:
+        pm.text(x, y, "no disk data", T["dim"], max_w=w)
+        return
+    if missing and yy + 8 <= y + h:                        # a disk that should be there is not: more important than the rates
+        parts_line(pm, x, yy, w, [("%s MISSING" % missing[0], T["bad"]), (" +%d more" % (len(missing) - 1) if len(missing) > 1 else "", T["bad"])])
+    elif yy + 8 <= y + h:
+        parts_line(pm, x, yy, w, [("Read", T["dim"]), (D.rate(io.get("read_bps")), T["text"]),
+                                  ("  Write", T["dim"]), (D.rate(io.get("write_bps")), T["text"])])
+
+
+def net_lines(st, now):
+    """The NETWORK box's lines, most important first: [[(text, colour)...]]."""
+    n, t = _d(st.get("net")), _d(st.get("tunnel"))
+    ports = [p for p in _l(n.get("ports")) if isinstance(p, dict)]
+    up = [p for p in ports if p.get("carrier")]
+    addr = str(n.get("address") or "").split("/")[0]
+    speeds = {D._f(p.get("speed_mbps")) for p in up}
+    lines = [[("Down", T["dim"]), (D.rate(n.get("rx_bps")), T["text"]), ("  Up", T["dim"]), (D.rate(n.get("tx_bps")), T["text"])]]
+    if n.get("wifi"):
+        link = [("Link", T["dim"]), ("on Wi-Fi", T["warn"])]
+    elif ports and not up:
+        link = [("Link", T["dim"]), ("no cable", T["bad"])]
+    else:
+        sp = ("%d Mb/s" % list(speeds)[0]) if len(speeds) == 1 and None not in speeds else ""
+        link = [("Link", T["dim"]), ("wired " + sp if sp else "wired", T["text"])]
+        if ports and len(up) < len(ports):
+            link.append(("(%d of %d up)" % (len(up), len(ports)), T["warn"]))
+    if addr:
+        link.append((addr, T["text"]))
+    lines.append(link)
+    tun = [("Tunnel", T["dim"]), (("up (%d)" % (D._f(t.get("connections")) or 0)) if t.get("up") else "DOWN", T["ok"] if t.get("up") else T["bad"])]
+    bad, drops = int(D._f(n.get("errors")) or 0), int(D._f(n.get("drops")) or 0)
+    if bad or drops:
+        tun += [("Errors %d  drops %d" % (bad, drops), T["warn"])]
+    lines.append(tun)
+    if D._f(n.get("rx_total")) is not None:
+        lines.append([("Since boot", T["dim"]), ("in " + D.human_bytes(n.get("rx_total")), T["text"]),
+                      ("out " + D.human_bytes(n.get("tx_total")), T["text"])])
+    return lines
+
+
+def draw_network(pm, r, st, ctx):
+    inner = frame(pm, r, "Network", compact=True)
+    x, y, w, h = inner
+    for i, parts in enumerate(net_lines(st, ctx["now"])):
+        if 10 * i + 8 > h:
+            break
+        parts_line(pm, x, y + 10 * i, w, parts)
 
 
 RAID_COLOURS = {"ok": T["ok"], "info": T["gpu"], "warn": T["warn"], "bad": T["bad"]}
@@ -591,10 +637,9 @@ def fan_view(st, now):
     word = {"working": "working", "hot": "working", "calibrating": "measuring", "idle20": "idle",
             "hold100": "cooling down", "hold50": "cooling down", "ramp": "cooling down"}.get(phase, "")
     head = ("%s %d%%" % (word, pct)) if word else ("%d%%" % pct)
-    why = fan.get("why")
-    if phase in ("working", "hot") and isinstance(why, str) and why:
-        head += " - " + why
     warn = phase == "hot" or bool(fan.get("hot"))
+    if warn:
+        head = "HOT %d%%" % pct
     outs = [o for o in _l(fan.get("outputs")) if isinstance(o, dict)]
     top_rpm = max([D._f(o.get("rpm")) or 0 for o in outs] + [1])
 
@@ -630,22 +675,35 @@ def fan_view(st, now):
     return ("rows", head, warn, rows, cool)
 
 
+def parts_line(pm, x, y, w, parts):
+    """One line of (text, colour) pieces, one after another; when they are wider than w the
+    last pieces are left out (never cut in the middle)."""
+    parts = [(t, c) for t, c in parts if t]
+    while parts and sum(F.text_width(t) for t, _c in parts) + 4 * len(parts) > w:
+        parts.pop()
+    for t, c in parts:
+        pm.text(x, y, t, c)
+        x += F.text_width(t) + 4
+    return bool(parts)
+
+
 def draw_fans(pm, r, st, ctx):
     view = fan_view(st, ctx["now"])
     if view[0] == "none":
-        inner = frame(pm, r, "Fans")
-        pm.text(inner[0], inner[1] + 3, "no fan data", T["dim"], max_w=inner[2])
+        inner = frame(pm, r, "Fans", compact=True)
+        pm.text(inner[0], inner[1] + 1, "no fan data", T["dim"], max_w=inner[2])
         return
     _k, head, warn, rows, cool = view
-    inner = frame(pm, r, "Fans", head, accent=T["warn"] if warn else None, right_colour=T["warn"] if warn else None)
+    inner = frame(pm, r, "Fans", head, accent=T["warn"] if warn else None, right_colour=T["warn"] if warn else None, compact=True)
     x, y, w, h = inner
     brows = [(label, value, f, T["warn"] if warn else (T["net"] if kind == "fan" else T["gpu2"])) for label, value, f, kind in rows]
-    keep = max(1, (h + 3 - 7) // 10)
+    line = 1 if cool else 0
+    keep = max(0, (h - 10 * line + 3) // 10)
     if len(brows) > keep:
-        brows = brows[:keep - 1] + [("+%d more" % (len(brows) - keep + 1), "", None, T["dim"])]
-    used = bar_rows(pm, (x, y, w, h), brows, 10)
-    if cool and len(brows) == len(rows) and used + 8 <= h:          # only when every row is shown
-        pm.text(x, y + used + 1, cool, T["dim"], max_w=w)
+        brows = brows[:keep]
+    used = bar_rows(pm, (x, y, w, h), brows, 10) if brows else 0
+    if cool and used + 8 <= h:
+        pm.text(x, y + used + 1, F.fit(cool, w), T["dim"], max_w=w)
 
 
 SLEEP_STALE_S = 180
@@ -723,8 +781,6 @@ def draw_status(pm, r, st, ctx):
     t = _d(st.get("tunnel"))
     gw = _d(st.get("gw"))
     extra = [("Gateway", "running" if gw and not gw.get("stale") else "DOWN", "ok" if gw and not gw.get("stale") else "bad")]
-    extra.append(("Tunnel", ("up (%d)" % (D._f(t.get("connections")) or 0)) if t.get("up") else "DOWN",
-                  "ok" if t.get("up") else "bad"))
     if D._f(up.get("last_unattended")):
         extra.append(("Updated", D.ago(up.get("last_unattended"), now), "text"))
     pw = _d(st.get("power"))
@@ -740,8 +796,72 @@ def draw_status(pm, r, st, ctx):
         yy += 11
 
 
+BURN_FRESH_S, BURN_RESULT_S = 10, 60
+BURN_NAMES = {"cpu": "processor", "gpu": "graphics card"}
+
+
+def burn_view(st, now):
+    """The burn test as the banner shows it: None (nothing to show), ("run", text) while it runs, or
+    ("result", text, kind) for a minute after, kind "ok", "bad" or "warn". From
+    /run/ollama1/quickburn.json: a running file the script has not touched for 10 s is a dead script."""
+    b = _d(st.get("burn"))
+    at = D._f(b.get("at"))
+    if not b or at is None or now - at < -5:
+        return None
+    phase, result = b.get("phase"), str(b.get("result") or "")
+    reason = str(b.get("reason") or "").strip()
+    if phase in BURN_NAMES and result == "running":
+        if now - at > BURN_FRESH_S:
+            return None
+        parts = ["BURN TEST", "%s %d s left" % (BURN_NAMES[phase], int(D._f(b.get("seconds_left")) or 0))]
+        t = D._f(b.get("cpu_c" if phase == "cpu" else "gpu_c"))
+        busy = D._f(b.get("cpu_busy" if phase == "cpu" else "gpu_busy"))
+        if t is not None:
+            parts.append("%d\u00b0C" % t)
+        if busy is not None:
+            parts.append("%d%% busy" % busy)
+        return ("run", "  ".join(parts))
+    if phase == "done" and now - at <= BURN_RESULT_S:
+        if result == "passed":
+            return ("result", ("Burn test: " + reason) if reason else "Burn test passed", "warn" if reason else "ok")
+        if result == "failed":
+            return ("result", "Burn test failed: " + (reason or "see the log"), "bad")
+        if result == "aborted":
+            return ("result", "Burn test aborted" + ((": " + reason) if reason and reason != "stopped from the keyboard" else ""), "warn")
+        if result == "refused":
+            return ("result", "Not started: " + (reason or "the server is busy"), "warn")
+    return None
+
+
+def burn_running(st, now):
+    v = burn_view(st, now)
+    return bool(v and v[0] == "run")
+
+
+BANNER_FILL = {"run": 0x12325c, "ok": 0x0f3d2a, "bad": 0x4a1417, "warn": 0x4a3410}
+BANNER_TEXT = {"run": 0xcfe3ff, "ok": T["ok"], "bad": T["bad"], "warn": T["warn"]}
+
+
+def draw_banner(pm, r, view):
+    x, y, w, h = r
+    kind = "run" if view[0] == "run" else view[2]
+    pm.fill_rect(x, y, w, h, BANNER_FILL[kind])
+    pm.hline(x, y + h - 1, w, T["edge"])
+    text = view[1]
+    scale = 1
+    for sc in (2, 1.6, 1.3, 1):
+        scale = sc
+        if F.text_width(text, sc) <= w - 20:
+            break
+    pm.text_center(x + w // 2, y + (h - 1 - 7 * scale) / 2.0, text, BANNER_TEXT[kind], scale, max_w=w - 12)
+
+
 def draw_header(pm, r, st, ctx):
     x, y, w, h = r
+    banner = burn_view(st, ctx["now"])
+    if banner:                                          # the burn test takes the top strip while it runs and for a minute after
+        draw_banner(pm, r, banner)
+        return
     pm.fill_rect(x, y, w, h, T["head"])
     pm.hline(x, y + h - 1, w, T["edge"])
     warns, now = ctx["warns"], ctx["now"]
@@ -813,7 +933,8 @@ def draw_footer(pm, r, st, ctx):
         cx += seg + 16
     hint = "Space: electricity cost"
     free_l, free_r = cx + 8, w - 10 - (rw + 12 if right else 0)
-    for mid in ("graphs: last %s    %s" % (ctx["rng"], hint), hint, "Space: cost"):     # the longest that fits the gap
+    hint = hint + "    Enter: burn test"
+    for mid in ("graphs: last %s    %s" % (ctx["rng"], hint), hint, "Space: cost  Enter: burn", "Enter: burn test"):     # the longest that fits the gap
         mw = F.text_width(mid)
         if free_r - free_l >= mw:
             pm.text(free_l + (free_r - free_l - mw) // 2, ty, mid, T["dim"])
@@ -1039,7 +1160,8 @@ class PanelRenderer:
     machine costs almost nothing to show."""
 
     BOXES = (("header", "draw_header"), ("gpu", "draw_gpu"), ("cpu", "draw_cpu"), ("models", "draw_models"),
-             ("storage", "draw_storage"), ("fans", "draw_fans"), ("status", "draw_status"), ("footer", "draw_footer"))
+             ("storage", "draw_storage"), ("fans", "draw_fans"), ("network", "draw_network"),
+             ("status", "draw_status"), ("footer", "draw_footer"))
 
     def __init__(self, w, h, scale=1, pm=None):
         self.w, self.h, self.scale = w, h, scale
@@ -1055,7 +1177,7 @@ class PanelRenderer:
             return tuple(last_value(series(st, n, 5)) for n in names)
         g = (ctx["graph"], ctx["shift"])
         if name == "header":
-            return (st.get("host"), int(ctx["now"]), D.dur(st.get("uptime")), repr(ctx["warns"]))
+            return (st.get("host"), int(ctx["now"]), D.dur(st.get("uptime")), repr(ctx["warns"]), repr(st.get("burn")))
         if name == "footer":
             return (repr(_d(st.get("net")).get("address")), repr(D.dig(st, "updates", "ollama")),
                     repr(_d(st.get("power"))), ctx["rng"], repr(D.dig(st, "gw", "ollama_version")))
@@ -1067,7 +1189,9 @@ class PanelRenderer:
         if name == "models":
             return (repr(st.get("gw")), tail("tps"), g, int(ctx["now"] // 60))
         if name == "storage":
-            return (repr(st.get("disks")), repr(st.get("raid")), repr(st.get("io")), repr(st.get("net")))
+            return (repr(st.get("disks")), repr(st.get("io")))
+        if name == "network":
+            return (repr(st.get("net")), repr(st.get("tunnel")))
         if name == "fans":
             return (repr(st.get("fan")), fan_fresh(st, ctx["now"]))
         return (repr(ctx["warns"]), sleep_summary(st, ctx["now"]), repr(st.get("tunnel")), repr(st.get("updates")),

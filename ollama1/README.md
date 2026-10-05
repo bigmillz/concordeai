@@ -113,10 +113,8 @@ it asks for any it can't find, at the terminal):
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, then a ramp down to 20% over 2 minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists 100% white when idle, red while the server works, white again 3 s after it stops (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
-| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the server works and for 60 s after, 50% for the next 60 s, then 20%: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100% (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
-| `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists follows the graphics card's load, white at 0% through yellow and orange to red at 100%, and dims to 50% after 5 idle minutes (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 150 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
 server's name and domain in `/etc/ollama1/config.json`, so a re-run needs
@@ -610,6 +608,26 @@ around a little from time to time.
     without echo, so keys never reach a login prompt. The seven-day and
     30-day figures come from the power service, so it needs restarting after
     an update of this kit (`sudo systemctl restart ollama1-power`).
+  - **The middle column** is three boxes: STORAGE (the local filesystems added together as one bar, "Used 188 GB
+    of 1.8 TB", and the disk read and write rates; a disk that should be mounted and is not is said in red),
+    FANS (a GPU fan bar and one "Case fans" bar averaging the case and radiator fans, with the pump's rpm and mode
+    and the coolant temperature under them; the header shows the phase and level, amber "HOT 100%" when the
+    temperature override is on, "no fan data" if the fan service has not written for 30 s) and NETWORK (down and up
+    rates, the link: wired with its speed and ports or an amber "on Wi-Fi" when the default route leaves by a wireless
+    interface, the address, the Cloudflare tunnel state, packet errors and drops in amber when there are any, and
+    totals since boot).
+  - **Enter: burn test.** Enter on the server's keyboard runs a 30-second processor burn, then a 30-second
+    graphics-card burn (`tools/quick-burn.sh`, started as `ollama1-quickburn.service`). The top strip of the
+    screen becomes a banner: "BURN TEST  processor 18 s left  71 C  100% busy", then "graphics card 12 s left ...",
+    and for a minute afterwards the result: "Burn test passed" (green), "Burn test failed: ..." (red), "Burn test
+    aborted" or "Not started: <why>" (amber). Esc stops a running test at once; Enter is ignored while one runs.
+    The test refuses to start while a request is running, a model download or update is going or another
+    stability or burn test runs; it stops on a new hardware-error record, 95 C processor or 105 C graphics
+    junction. If llama-bench or the model is missing the card part says "not run: ..." and the processor result
+    stands. It needs `stress-ng` installed (the unit has no network): `sudo apt install stress-ng`. The last result
+    is in `/var/lib/ollama1/quickburn-last.json`, progress in `/run/ollama1/quickburn.json`. Privilege: polkit lets
+    only the screen's own user (`o1dash`) start that one unit (no other unit, no stop verb), and Esc makes an empty
+    file in `/run/ollama1/quickburn`, the one folder that user may write; the script only looks whether it exists.
   - **If anything goes wrong** (the framebuffer can't be opened, an odd
     pixel format, any error while drawing) the reason goes to the journal
     (`journalctl -u ollama1-dash`) and the text dashboard takes over; it
@@ -844,27 +862,36 @@ turns it on, and the choice is saved in `/etc/ollama1/setup.env`, so a later
 run of setup without the flag keeps it. It is for an AMD Navi 21 card
 (RX 6800, 6800 XT, 6900 XT, 6950 XT); any other card is left alone, with a
 one-line note. It runs a card past its stock limits, which is the owner's call
-to make: read this section first. Writing an answer reads
-the whole model from the card's memory for every word, so the memory clock
-sets the pace; the power limit keeps the clocks up under load. **The aim is
-about 5% faster token generation on models that fit the card. Only a
-measurement on your card proves it**: `sudo ollama1-gpu-tune status` shows
-the stock and tuned speeds it measured. Back to stock at any time:
+to make: read this section first. By default it raises the power limit to
+the card's own maximum and nothing else (the memory and core clocks are
+opt-in below). **Only a measurement on your card shows what it buys**:
+`sudo ollama1-gpu-tune status` shows the stock and tuned speeds it measured.
+Back to stock at any time:
 `sudo ollama1-gpu-tune off`.
 
 What it sets (`ollama1-gpu-tune`, `lib/o1gputune.py`), always within what the
 driver reports for the card, which it finds by its PCI ids (not by `cardN`):
 
-- **Power limit:** `power1_cap` = `power1_cap_max`, the most the driver
-  allows this card (never more). On an RX 6900 XT that is roughly 15% above
-  stock, up to about 330 W depending on the board. That means more power
-  drawn, more heat and more fan noise under load; check that your power
-  supply has the headroom.
-- **Memory clock:** the top state in `pp_od_clk_voltage` raised by 100 in the
-  driver's units (GDDR6 runs at twice that: a 6900 XT's stock 1000 is 2000 MHz
-  effective), and never past the `OD_RANGE` limit the card reports (on many
-  6900 XTs 1075, so 2150 MHz effective: +7.5%).
-- Core clocks and voltages: untouched.
+- **Power limit** (what `--gpu-tune` does): `power1_cap` = `power1_cap_max`, the
+  most the driver allows this card (never more). On an RX 6900 XT that is
+  roughly 15% above stock, up to about 330 W depending on the board. That
+  means more power drawn, more heat and more fan noise under load; check that
+  your power supply has the headroom. Measured on a 6900 XT: answers as fast
+  as stock, so it is harmless there.
+- **Memory clock, opt-in** (`--gpu-tune-memory N`, or `ollama1-gpu-tune on
+  --memory N`; N whole MHz, 0 to 75, default 0 = off): the top state in
+  `pp_od_clk_voltage` raised by N in the driver's units (GDDR6 runs at twice
+  that), never past the card's `OD_RANGE` limit. **The memory bump is off by
+  default because on this card it made answers 2.4x slower** (no kernel
+  error; most likely the GDDR6 retrying past what this card's memory holds).
+- **Core clock, opt-in, experimental** (`--gpu-tune-core N`, or `on --core N`;
+  N whole MHz above the card's current stock top, 0 to 150, default 0 = off):
+  the shader clock's top state, written with the overdrive table, read back
+  and verified, never past the card's `OD_RANGE` limit. It helps mostly long
+  prompts (prompt reading), much less answering, and **may crash the card**
+  (a hang resets the GPU; the next boot then puts everything back). The check
+  uses 100 C junction as its limit while the core is raised.
+- Voltages: untouched.
 
 The memory clock needs the kernel's overdrive switch: setup adds only the
 overdrive bit (`0x4000`) to the `amdgpu.ppfeaturemask` the driver runs with
@@ -874,28 +901,41 @@ the higher power limit waits for it too (until then the driver allows no more
 than stock). With overdrive on, the kernel says so in its log and marks
 itself tainted; that is expected.
 
-**Safety.** After the values are set, a check runs 60 seconds of answers on
-the card with a model already installed, while it watches the kernel log for
+**Safety.** Each part is checked on its own, in order: the power limit, then
+the memory clock, then the core clock. A check is 60 seconds of answers on the
+card with a model already installed, while it watches the kernel log for
 amdgpu errors (a ring timeout, a GPU reset, a page fault) and the card's
-temperatures. Any error, the junction at 105 C or the memory at 100 C puts
-the card back to stock at once. Slow answers (more than 5% under the stock
-speed measured when it was turned on, with the same model) are not enough on
-their own: the check measures stock and tuned again, alternating twice, and
-only a slowdown that repeats (each alternation and the medians) puts the card
-back, with the figures in the reason. If anything made a reading unreliable,
-the check changes nothing and runs again next boot: a drive logging NVMe
-errors, another model loaded, the card already busy for someone else, an
-answer that failed partway (`status` shows "deferred" and why). A revert
-stays at stock, across reboots, until
-you run `sudo ollama1-gpu-tune on`; `status` says why. Every boot also reads
-the kernel log of the boot the tuning last ran in, and an amdgpu error there
-does the same. With no model installed yet the check runs once one is
-(`ollama1-gpu-tune-check.service`, after Ollama starts).
+temperatures. Any error, the junction at 105 C (100 C with the core raised) or
+the memory at 100 C puts **everything** back to stock at once. Slow answers
+(more than 5% under the baseline) are not enough on their own: the check
+measures the baseline and the tuned state again, alternating twice, and only a
+slowdown that repeats (each alternation and the medians) counts, with the
+figures in the reason. What it puts back depends on the part: a power raise
+that is slower than stock puts everything back; a **memory or core raise that
+is slower goes back alone and the power limit stays** ("memory +25 MHz was
+slower, back to stock; power limit kept"); the core is also judged on prompt
+reading (about 2000 tokens in, 8 out), and goes back if that is slower too.
+Before it measures anything, it waits up to 60 s for the card to be quiet
+(under 10% busy, no other model loading) and says what it waits for. If a
+reading could not be trusted (a drive logging NVMe errors, another model
+loaded, the card busy for someone else, an answer that failed) nothing is
+changed and the check runs again next boot; **an experimental clock is never
+left applied unverified** ("core +150 not applied yet: ...; run it again when
+the server is idle"), while the harmless power limit stays. A full revert
+stays at stock, across reboots, until you run `sudo ollama1-gpu-tune on`;
+`status` says why. Every boot also reads the kernel log of the boot the
+tuning last ran in, and an amdgpu error there does the same. With no model
+installed yet the check runs once one is (`ollama1-gpu-tune-check.service`,
+after Ollama starts). A state file from before this version keeps working:
+its old revert (made when the memory clock was bumped with the power limit)
+is dropped and the power limit alone is tried again.
 
 - `sudo ollama1-gpu-tune status`: stock and current values, temperatures,
   the last check.
-- `sudo ollama1-gpu-tune on`: turn it on (or on again after a revert):
-  measures stock, sets the values, runs the check.
+- `sudo ollama1-gpu-tune on [--memory N] [--core N]`: turn it on (or on again
+  after a revert): measures stock, sets the power limit, runs the check, then
+  each clock asked for with its own check. Status shows each part
+  ("power 332 W, memory stock, core +50 MHz").
 - `sudo ollama1-gpu-tune off`: back to stock, and kept there. A re-run of
   setup keeps it off; `setup.sh --gpu-tune` turns it on.
 - `sudo setup.sh --no-gpu-tune`: off, saved as off, and the GRUB drop-in
@@ -1078,17 +1118,36 @@ same reading the fans use, read every 0.25 s), as a ramp, piecewise linear in RG
 | 100% | red, 255,0,0 |
 
 (50% is a golden yellow-orange, 255,192,0.) The colour on show is
-**slew-limited**: it rises at most 100% per 2.5 s and falls at most 100% per
-10 s, so 0% to 100% takes about 2.5 s (plus up to one 0.25 s sample to notice),
-100% to 0% takes 10 s, and the short 0% gaps between batches of work only dip
-it a little. There is no hold and no state: only the card's load colours the
-lights, not a request in flight or a running tool (a long prompt-reading phase
-with the card only partly busy shows as a weak colour; that is as intended). With
-no card reading (no card, or the read failed) the intensity is 0, so white.
-A frame goes out only when the rounded colour changes (at most 20 a second),
-and every 2 s the connection is looked at and the colour sent again (a
-keepalive: a device that was reset gets it back). The 6b395 rule (white idle,
-red while "working", a 3 s hold, 0.8 s and 2 s fades) is gone.
+**slew-limited**: it rises at most 100% per 2.5 s, so 0% to 100% takes about
+2.5 s (plus up to one 0.25 s sample to notice), and it **falls linearly over
+180 s** (the fans' 60 s + 120 s cool-down), so from red the colour goes through
+orange and yellow to white across the whole cool-down; a new burst raises it
+again from wherever it is, and a reading that jitters 99, 0, 99, 0 stays near
+red. Only the card's load colours the lights, not a request in flight or a
+running tool. With no card reading (no card, or the read failed) the intensity
+is 0, so white.
+
+**Brightness.** Separately from the colour, a brightness b between 50% and 100%
+multiplies each channel (white at 50% is 128,128,128, red is 128,0,0). The
+machine is **idle** when the card is under 10% (6 s average) AND the
+processors are under 15% (10 s average of user, nice, system, irq and softirq
+over every thread; iowait does not count). It stops being idle when the card
+reaches 15% (6 s average) or the processors 20% (10 s average); the gap is a
+hysteresis so a value wobbling around a limit does not flicker the lights. After
+**5 minutes idle**, counted from the moment it became idle (so the 3-minute
+colour fade is part of the 5), b fades from 100% to 50% over 10 s. The moment it
+is not idle, b returns to 100% over 1.5 s, and the 5 minutes start again at the
+next idle moment. At service start, and after a wake from sleep, b is 100% and the
+5 minutes start from then (so an idle server dims 5 minutes after boot). The
+card's reading and the processors' are the ones the fan service uses
+(`lib/o1work.py`); a request in flight or a running tool does not brighten the
+lights.
+
+A frame goes out only when the rounded colour (with brightness) changes (at most
+20 a second), and every 2 s the connection is looked at and the colour sent
+again (a keepalive: a device that was reset gets it back; it includes the
+brightness). The status line reads "Lights: orange, 100% (card 61% busy)",
+"Lights: white, dimming (idle 5 min)" or "Lights: white, dimmed 50% (idle 6 min)".
 
 **How.** Two units. `ollama1-openrgb.service` runs `openrgb --server` with no
 window, bound to `127.0.0.1` (`--server-host` when this build has it, and

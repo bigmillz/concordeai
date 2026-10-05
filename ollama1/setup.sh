@@ -24,17 +24,22 @@
 #   sudo ./setup.sh --vg-reserve 64G  when growing / the first time, leave 64G free
 #                                    in ubuntu-vg (e.g. for --encrypted-swap); default 0
 #   sudo ./setup.sh --gpu-tune       opt in (also: OLLAMA1_GPU_TUNE=1): tune an AMD Navi 21
-#                                    card (ollama1-gpu-tune): its highest power limit and a
-#                                    small memory-clock bump. OFF unless asked. Saved in
-#                                    setup.env, so a re-run keeps it; --gpu-tune also tries
-#                                    again after a safety revert
+#                                    card (ollama1-gpu-tune): its highest power limit, and
+#                                    nothing else. OFF unless asked. Saved in setup.env, so a
+#                                    re-run keeps it; --gpu-tune also tries again after a
+#                                    safety revert
+#   sudo ./setup.sh --gpu-tune --gpu-tune-memory 25   also raise the memory clock 25 MHz (0..75, default 0 =
+#                                    off: on one RX 6900 XT the bump made answers 2.4x slower)
+#   sudo ./setup.sh --gpu-tune --gpu-tune-core 50     also raise the core clock 50 MHz (0..150, default 0;
+#                                    experimental, helps mostly long prompts, may crash the card). Each is
+#                                    checked on its own and, if slower, only it is taken off; saved in setup.env
 #   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
 #                                    to stock, and the setting saved as off
 #   sudo ./setup.sh --fans on|off    the graphics card's and the case fans at 100% while the server
 #                                    works and for 60 s after, then down to 20% over 2 minutes (ollama1-fan).
 #                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
 #   sudo ./setup.sh --leds on|off    the case, board and cooler lights: white when the graphics card is idle, through
-#                                    yellow and orange to red as its load rises (ollama1-leds, through the openrgb package, which
+#                                    yellow and orange to red as its load rises, 50% dim after 5 idle minutes (ollama1-leds, through the openrgb package, which
 #                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
 #   sudo ./setup.sh --watchdog on|off   the hardware watchdog (ollama1-watchdog): the chipset's timer resets the board
 #                                    when the system disk stops answering (about 60 s), petted only while a real disk probe
@@ -122,6 +127,8 @@ SWAP_ACTION=""
 SWAP_SIZE=""
 VG_RESERVE_GIB=0
 A_GPU_TUNE=""
+A_GPU_MEMORY=""
+A_GPU_CORE=""
 A_FANS=""
 A_LEDS=""
 A_WATCHDOG=""
@@ -142,6 +149,14 @@ for a in "$@"; do
     dash_mode_choice "$a" "" "" >/dev/null || { echo "--dash takes text, graphic or auto"; exit 2; }
     A_DASH=$a; prev=""; continue
   fi
+  if [ "$prev" = --gpu-tune-memory ]; then
+    gpu_clock_choice "$a" "" 75 >/dev/null || { echo "--gpu-tune-memory takes whole MHz, 0 to 75 (0 = leave the memory clock at stock)"; exit 2; }
+    A_GPU_MEMORY=$a; prev=""; continue
+  fi
+  if [ "$prev" = --gpu-tune-core ]; then
+    gpu_clock_choice "$a" "" 150 >/dev/null || { echo "--gpu-tune-core takes whole MHz, 0 to 150 (0 = leave the core clock at stock)"; exit 2; }
+    A_GPU_CORE=$a; prev=""; continue
+  fi
   if [ "$prev" = --vg-reserve ]; then
     [[ "$a" =~ ^[0-9]{1,6}G$ ]] || { echo "--vg-reserve takes a size in GiB, like 64G (at most 999999G)"; exit 2; }
     VG_RESERVE_GIB=$((10#${a%G})); prev=""; continue   # 10#: "08G" is decimal, not octal
@@ -151,7 +166,7 @@ for a in "$@"; do
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
     --vg-reserve|--fans|--leds|--watchdog|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
-    --dash|--vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
+    --gpu-tune-memory|--gpu-tune-core|--dash|--vg-reserve|--name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
@@ -176,6 +191,8 @@ fi
 gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_TUNE takes 1 or 0 (on or off)"; exit 2; }
 # a flag left waiting for its value (the size forgotten) must not mean "no reserve"
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
+[ "$prev" != --gpu-tune-memory ] || { echo "--gpu-tune-memory takes whole MHz, 0 to 75"; exit 2; }
+[ "$prev" != --gpu-tune-core ] || { echo "--gpu-tune-core takes whole MHz, 0 to 150"; exit 2; }
 [ "$prev" != --fans ] || { echo "--fans takes on or off"; exit 2; }
 fans_choice "" "${OLLAMA1_FANS:-}" "" >/dev/null || { echo "OLLAMA1_FANS takes 1 or 0 (on or off)"; exit 2; }
 [ "$prev" != --watchdog ] || { echo "--watchdog takes on or off"; exit 2; }
@@ -262,6 +279,10 @@ resolve_settings() {
   pick HDD2_SERIAL "$A_HDD2" HDD2_SERIAL "" valid_serial
   GPU_TUNE=$(gpu_tune_choice "$A_GPU_TUNE" "${OLLAMA1_GPU_TUNE:-}" "$(saved GPU_TUNE)") \
     || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
+  GPU_TUNE_MEMORY=$(gpu_clock_choice "$A_GPU_MEMORY" "$(saved GPU_TUNE_MEMORY)" 75) \
+    || die "the saved GPU_TUNE_MEMORY in $SAVED is not a number of MHz from 0 to 75; give --gpu-tune-memory"
+  GPU_TUNE_CORE=$(gpu_clock_choice "$A_GPU_CORE" "$(saved GPU_TUNE_CORE)" 150) \
+    || die "the saved GPU_TUNE_CORE in $SAVED is not a number of MHz from 0 to 150; give --gpu-tune-core"
   FANS=$(fans_choice "$A_FANS" "${OLLAMA1_FANS:-}" "$(saved FANS)") || die "the saved FANS in $SAVED is not on or off; give --fans on or --fans off"
   LEDS=$(leds_choice "$A_LEDS" "${OLLAMA1_LEDS:-}" "$(saved LEDS)") || die "the saved LEDS in $SAVED is not on or off; give --leds on or --leds off"
   WATCHDOG=$(watchdog_choice "$A_WATCHDOG" "${OLLAMA1_WATCHDOG:-}" "$(saved WATCHDOG)") || die "the saved WATCHDOG in $SAVED is not on or off; give --watchdog on or --watchdog off"
@@ -301,6 +322,7 @@ save_settings() { # after "yes": so a re-run needs no arguments
       # kept only if an earlier run or the command line had them: never used here, tools/remove-raid.sh reads them
       [ -z "$HDD1_SERIAL$HDD2_SERIAL" ] || printf 'HDD1_SERIAL=%s\nHDD2_SERIAL=%s\n' "$HDD1_SERIAL" "$HDD2_SERIAL"
       if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE=%s\n' "$GPU_TUNE"; fi   # asked for, on or off
+      if [ "$GPU_TUNE" != default ]; then printf 'GPU_TUNE_MEMORY=%s\nGPU_TUNE_CORE=%s\n' "$GPU_TUNE_MEMORY" "$GPU_TUNE_CORE"; fi
       printf 'FANS=%s\n' "$FANS"
       printf 'LEDS=%s\n' "$LEDS"
       printf 'WATCHDOG=%s\n' "$WATCHDOG"
@@ -334,7 +356,9 @@ policy_line() { # which Access policy name the admin panel's access uses, and wh
 
 gpu_tune_plan() { # the plan's line for the graphics card (6b361)
   if [ "$GPU_TUNE" = on ]; then
-    printf 'Graphics card tuning ON (AMD Navi 21 only): its highest power limit, memory clock +100 (within its range), a 60 s check; kernel overdrive switch, so a reboot. Off: --no-gpu-tune'
+    printf 'Graphics card tuning ON (AMD Navi 21 only): its highest power limit, memory clock %s, core clock %s, a 60 s check on each; kernel overdrive switch, so a reboot. Off: --no-gpu-tune' \
+      "$([ "${GPU_TUNE_MEMORY:-0}" -gt 0 ] && echo "+${GPU_TUNE_MEMORY} MHz (opt-in)" || echo 'left at stock')" \
+      "$([ "${GPU_TUNE_CORE:-0}" -gt 0 ] && echo "+${GPU_TUNE_CORE} MHz (opt-in, experimental)" || echo 'left at stock')"
   elif [ "$GPU_TUNE" = off ]; then
     printf 'Graphics card tuning OFF (--no-gpu-tune): the card stays at stock. On: --gpu-tune'
   else
@@ -472,7 +496,7 @@ prompt_settings
 find_disks
 derive_hosts
 for f in lib/o1common.py lib/setuplib.sh bin/ollama1-gateway bin/ollama1-modelplan systemd/ollama.service \
-         systemd/ollama1-modelplan.service config/50-ollama1.rules; do
+         systemd/ollama1-modelplan.service config/50-ollama1.rules tools/quick-burn.sh systemd/ollama1-quickburn.service; do
   [ -f "$KIT/$f" ] || die "the kit is incomplete: $f is missing"
 done
 check_disks
@@ -625,6 +649,7 @@ step "Install the kit"
 install -d -m 0755 "$LIBDIR" "$LIBDIR/bin" "$LIBDIR/lib"
 install -m 0644 "$KIT"/lib/*.py "$LIBDIR/lib/"
 install -m 0755 "$KIT"/bin/* "$LIBDIR/bin/"
+install -d -m 0755 "$LIBDIR/tools" && install -m 0755 "$KIT/tools/quick-burn.sh" "$KIT/tools/gpu-burn.sh" "$LIBDIR/tools/"   # the screen's Enter key (6b418)
 ln -sfn "$LIBDIR/bin/ollama1-pair" /usr/local/sbin/ollama1-pair
 ln -sfn "$LIBDIR/bin/ollama1-cf-access" /usr/local/sbin/ollama1-cf-access
 ln -sfn "$LIBDIR/bin/ollama1-lan" /usr/local/sbin/ollama1-lan
@@ -929,8 +954,9 @@ ok "the gateway's user can't read the pairing window (o1gw: $(id -nG o1gw))"
 
 # ---- 14. graphics card tuning (6b361) ---------------------------------------------------------
 # OFF unless asked (--gpu-tune or OLLAMA1_GPU_TUNE=1; the choice is saved in setup.env, so a re-run
-# keeps it). For an AMD Navi 21 card (RX 6800/6900 series): its highest power limit and the
-# memory clock +100 in the driver's units, clamped to what the card reports, checked under load
+# keeps it). For an AMD Navi 21 card (RX 6800/6900 series): its highest power limit (6b420: only that;
+# the memory clock and the core clock are opt-in with --gpu-tune-memory N and --gpu-tune-core N, each in
+# whole MHz, clamped to what the card reports), checked under load
 # (lib/o1gputune.py). The memory clock needs the kernel's overdrive switch: only the overdrive
 # bit (0x4000) is added to the amdgpu feature mask the driver runs with now, in a GRUB drop-in,
 # so it takes a reboot. --no-gpu-tune (or OLLAMA1_GPU_TUNE=0) puts the card back to stock and
@@ -952,7 +978,7 @@ if [ "$GPU_TUNE" = on ]; then
     ok "kernel overdrive switch: amdgpu.ppfeaturemask=$od_mask (the running mask plus the overdrive bit only)"
     run systemctl enable ollama1-gpu-tune.service ollama1-gpu-tune-check.service
     if [ "$A_GPU_TUNE" = on ]; then tune_how=force-on; else tune_how=on; fi
-    "$TUNE" setup "$tune_how" || note "ollama1-gpu-tune stopped (see above); the card is left as it was"
+    "$TUNE" setup "$tune_how" --memory "$GPU_TUNE_MEMORY" --core "$GPU_TUNE_CORE" || note "ollama1-gpu-tune stopped (see above); the card is left as it was"
     if ! grep -q "amdgpu.ppfeaturemask=$od_mask" /proc/cmdline; then
       note "the memory clock (and, on most Navi 21 cards, the higher power limit) start after a reboot: the kernel's overdrive switch. The check under load then runs by itself"
       later "Reboot for the graphics card tuning (sudo reboot), then: sudo ollama1-gpu-tune status"
