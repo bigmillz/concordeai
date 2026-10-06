@@ -17449,7 +17449,8 @@ def _sg_unit(src):
             cloud_text=lambda c, m, **k: (calls.append("cloud") or "<think>x</think>CLOUD " + c["id"]),
             server_side_text=lambda m, ctx=None, role="fast", max_tokens=0: (calls.append("server") or srv[0]),
             _suggest_local_label=lambda: loc[0],
-            server_mode_candidates=lambda ctx: [{"loaded": up[0]}],
+            server_mode_candidates=lambda ctx: ([{"sid": "s"}] if up[0] else []),
+            _srv_seen={"s": {"at": time.time()}},
             run_model=lambda lb_, m, emit: (calls.append("local") or emit("LOCAL " + lb_)),
             strip_think=lambda t: t.replace("<think>x</think>", ""), strip_special=lambda t: t)
 
@@ -17463,7 +17464,7 @@ def _sg_unit(src):
     ns2 = _sg_ns(src, **_stubs())
     o["the server first"] = ask(ns2) == (("SERVER", "your server"), ["server"])
     up[0] = False
-    o["a server with no model loaded is not asked, and not woken to load one"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["local"])
+    o["a server that is not answering is not asked, and never woken"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["local"])
     up[0] = True
     srv[0] = None
     o["then a loaded model of this computer"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["server", "local"])
@@ -17988,6 +17989,7 @@ _SG_MUT = [
     ("topics not ordered by their count", "    topics.sort(key=lambda t: -t[\"n\"])\n", ""),
     ("the server never asked first", "    out = (server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)\n           if _suggest_server_up(ctx) else None)\n    if out is not None:", "    out = None\n    if out is not None:"),
     ("a server with nothing loaded asked", "if _suggest_server_up(ctx) else None)", "if True else None)"),
+    ("a stale server check counts as up", "< SUGGEST_SERVER_FRESH_S for m in server_mode_candidates(ctx))", "< 1e18 for m in server_mode_candidates(ctx))"),
     ("a server's model asked in Cloud Only", '    if cloud_only:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):', '    if False:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):'),
     ("the cloud asked outside Cloud Only", '    if cloud_only:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):', '    if True:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):'),
     ("Cloud Only falling back to this computer", '                return strip_think(out), "the cloud"\n        return None, ""', '                return strip_think(out), "the cloud"\n        pass'),
