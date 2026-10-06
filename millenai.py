@@ -17771,21 +17771,23 @@ def usage_note(model, where, messages, chars, reported=None, t0=None):
 #
 # PRICES: ONE PLACE, CHECK THEM. USD per million tokens:
 # (input, output, cache read, cache write). Source: Anthropic's published
-# first-party API rates as cached in the claude-api skill on 2026-09-25;
-# NOT checked against the live pricing page. Cache writes are taken as 1.25x
-# input (the 5-minute rate), cache reads as 0.1x input except where the
-# source lists them. Update here when Anthropic's prices move.
+# first-party API rates, checked against platform.claude.com/docs/en/about-claude/pricing
+# on 2026-10-06. Cache writes are the 5-minute rate (1.25x input); cache
+# reads are 0.1x input except Fable 5.1 (0.025x) and Opus 5.5 (0.05x).
+# Update here when Anthropic's prices move.
 CLAUDE_PRICES = {
     "claude-fable-5-1": (10.0, 50.0, 0.25, 12.5),
-    "claude-fable-5": (10.0, 50.0, 0.25, 12.5),
+    "claude-fable-5": (10.0, 50.0, 1.0, 12.5),
     "claude-opus-5-5": (4.0, 20.0, 0.20, 5.0),
     "claude-opus-5": (5.0, 25.0, 0.50, 6.25),
     "claude-opus-4-8": (5.0, 25.0, 0.50, 6.25),
     "claude-opus-4-7": (5.0, 25.0, 0.50, 6.25),
     "claude-opus-4-6": (5.0, 25.0, 0.50, 6.25),
+    "claude-opus-4-5": (5.0, 25.0, 0.50, 6.25),
     "claude-sonnet-5-5": (2.0, 10.0, 0.20, 2.5),
     "claude-sonnet-5": (2.0, 10.0, 0.20, 2.5),
     "claude-sonnet-4-6": (3.0, 15.0, 0.30, 3.75),
+    "claude-sonnet-4-5": (3.0, 15.0, 0.30, 3.75),
     "claude-haiku-4-5": (1.0, 5.0, 0.10, 1.25),
 }
 PRICES_BY_PROVIDER = {"claude": CLAUDE_PRICES}

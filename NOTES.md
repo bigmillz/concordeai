@@ -25,11 +25,10 @@ with a * everywhere with a visible footnote.
   only; kept through rollups via `USAGE_ROLL_KEYS`, not added to the stats sums). Cost of a record = plain input x input
   price + cache read x read price + `cw` x write price + output x output price. Only calls with `w == "claude"` that
   STARTED at or after `set_at` count; a rollup straddling it counts its later share. Prompt text is never stored.
-- **Prices** live in ONE place, `CLAUDE_PRICES` (segment `balance: begin/end`). Source: the claude-api skill's cached
-  first-party table of 2026-09-25 (Opus 5.5 $4/$20, Opus 5 and 4.6 to 4.8 $5/$25, Sonnet 5.5 and 5 $2/$10, Sonnet 4.6
-  $3/$15, Haiku 4.5 $1/$5, Fable $10/$50). NOT checked against the live pricing page: check them. Cache reads 0.1x input
-  except where that source lists one (Opus 5.5 and Sonnet 5.5 $0.20, Fable $0.25); cache writes 1.25x input (5-minute
-  rate), an assumption. A model with no entry (or a newer one, "-5-6" is not "-5") is counted at the highest known price
+- **Prices** live in ONE place, `CLAUDE_PRICES` (segment `balance: begin/end`). Checked against Anthropic's live pricing
+  page on 2026-10-06 (Opus 5.5 $4/$20, Opus 5 and 4.5 to 4.8 $5/$25, Sonnet 5.5 and 5 $2/$10, Sonnet 4.5 and 4.6
+  $3/$15, Haiku 4.5 $1/$5, Fable $10/$50). Cache reads 0.1x input except Opus 5.5 ($0.20) and Fable 5.1 ($0.25);
+  cache writes are the 5-minute rate, 1.25x input. A model with no entry (or a newer one, "-5-6" is not "-5") is counted at the highest known price
   and the row says "Unpriced calls included at the highest price*".
 - **Row.** "Balance ≈ $12.34*", "set $20.00 on Oct 7", an Update balance field, the footnote (also: web search and tool
   costs on Anthropic's side are not counted). Under $2.00: amber "Low balance ≈ $1.50*". At or under $0: amber "Balance
