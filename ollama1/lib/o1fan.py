@@ -734,6 +734,8 @@ class Fan:
         aio = self.aio.snapshot() if self.aio else None
         pump_rpm = aio["pump_rpm"] if aio and aio.get("found") and aio.get("state") == "controlling" else None
         rows, gone, pump = [], [], None
+        for u in (aio or {}).get("unconnected") or []:           # a cooler fan port with nothing on it (6b435)
+            gone.append({"label": u["label"], "chip": "cooler", "pwm": u.get("pct")})
         for row, o in zip(live["outputs"], outs):
             row["min_pct"], row["note"] = self.notes(o)
             if self.unconnected(o, row["rpm"]):

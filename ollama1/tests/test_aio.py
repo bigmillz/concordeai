@@ -23,9 +23,22 @@ import os, sys
 d = os.environ["FAKE_LC_DIR"]
 args = sys.argv[1:]
 open(d + "/calls", "a").write(" ".join(args) + "\\n")
-if os.path.exists(d + "/fail") and "list" not in args:
-    sys.stderr.write("device not responding")
+if os.path.exists(d + "/failinit") and "initialize" in args:
+    sys.stderr.write(open(d + "/failinit").read())
     sys.exit(1)
+if os.path.exists(d + "/fail") and "list" not in args:
+    sys.stderr.write(open(d + "/fail").read() or "device not responding")
+    sys.exit(1)
+if "pump" in args:      # the Hydro Platinum driver's real behaviour: pump is no channel of `set` (ValueError, then usage)
+    sys.stderr.write("Usage: liquidctl [options] <command> [<args> ...]\\n" + "  more usage text\\n" * 30)
+    sys.exit(1)
+if "initialize" in args:
+    if "--pump-mode" in args:
+        mode = args[args.index("--pump-mode") + 1:][:1]
+        if mode not in (["quiet"], ["balanced"], ["extreme"]):
+            sys.stderr.write("Error: invalid pump mode\\n")
+            sys.exit(2)
+        open(d + "/pump", "w").write(mode[0])
 if "list" in args:
     sys.stdout.write(open(d + "/list.json").read())
 elif "status" in args:
@@ -128,7 +141,7 @@ class TestPolicy(AioCase):
         self.assertTrue(self.persisted)
         c = self.calls()
         self.assertEqual(c[0], "list --json")
-        self.assertIn("--match %s initialize" % DEVICE, c)
+        self.assertIn("--match %s initialize --pump-mode balanced" % DEVICE, c)
 
     def test_each_phase_maps_to_fans_and_pump(self):
         t = self.settle()
@@ -276,7 +289,7 @@ class TestRateLimit(AioCase):
         self.assertTrue(all(v % 2 == 0 for v in fan1))
         self.assertEqual(fan1[-1], 20)
         self.assertLessEqual(len(fan1), 13)                                       # about every 5 s, not every 2%
-        pumps = [a[-1] for _w, a in sets if a[-3:-1] == ["pump", "mode"]]
+        pumps = [a[-1] for _w, a in self.times if "initialize" in a]
         self.assertEqual(pumps, ["balanced", "quiet"])                           # balanced in the ramp, quiet at idle
         self.assertEqual(pcts[0], 100)
 
@@ -292,21 +305,22 @@ class TestRateLimit(AioCase):
         t = self.settle()
         self.times.clear()
         self.ago(t + 6, "ramp", 50)                        # fans 50, pump quiet -> balanced
-        words = [" ".join(a) for _t, a in self.times if "set" in a]
-        self.assertEqual(sorted(words), sorted(["--match %s set fan1 speed 50" % DEVICE,
-                                                "--match %s set fan2 speed 50" % DEVICE,
-                                                "--match %s set pump mode balanced" % DEVICE]))
+        words = [" ".join(a) for _t, a in self.times if "set" in a or "initialize" in a]
+        self.assertEqual(words, ["--match %s initialize --pump-mode balanced" % DEVICE,
+                                 "--match %s set fan1 speed 50" % DEVICE,
+                                 "--match %s set fan2 speed 50" % DEVICE])
         self.times.clear()
         self.ago(t + 12, "ramp", 50)
         self.assertEqual([a for _t, a in self.times if "set" in a], [])
         self.ago(t + 18, "idle20", 20)                        # a quiet pump again: only the fans' 20 and the pump
-        self.assertIn("set pump mode quiet", " ".join(" ".join(a) for _t, a in self.times).replace("--match %s " % DEVICE, ""))
+        self.assertIn("initialize --pump-mode quiet", " ".join(" ".join(a) for _t, a in self.times))
 
     def test_a_single_changed_part_is_the_only_one_sent(self):
         t = self.settle("calibrating", 100)                 # fans 100, pump balanced
         self.times.clear()
-        self.ago(t + 6, "working", 100)                     # the pump only
-        self.assertEqual([" ".join(a[2:]) for _t, a in self.times if "set" in a], ["set pump mode extreme"])
+        self.ago(t + 6, "working", 100)                     # the pump, then the fans again (initialising may reset them)
+        self.assertEqual([" ".join(a[2:]) for _t, a in self.times if "status" not in a],
+                         ["initialize --pump-mode extreme", "set fan1 speed 100", "set fan2 speed 100"])
 
     def test_a_raised_fan_is_sent_alone(self):
         self.fan_rpm[2] = lambda p: 0 if p < 40 else p * 10
@@ -320,12 +334,151 @@ class TestRateLimit(AioCase):
 
     def test_a_wake_sends_everything_again(self):
         t = self.settle()
-        n = len([c for c in self.calls() if c.endswith("initialize")])
+        n = len([c for c in self.calls() if " initialize" in c])
         self.aio.reset()
         self.times.clear()
         self.ago(t + 6)
-        self.assertEqual(len([c for c in self.calls() if c.endswith("initialize")]), n + 1)
-        self.assertEqual(len([1 for _t, a in self.times if "set" in a]), 3)
+        self.assertEqual(len([c for c in self.calls() if " initialize" in c]), n + 1)
+        self.assertEqual(len([1 for _t, a in self.times if "set" in a or "initialize" in a]), 3)
+
+
+class TestPumpMode(AioCase):
+    def test_the_old_set_pump_form_is_rejected_by_the_fake(self):
+        r = subprocess.run([self.exe, "--match", DEVICE, "set", "pump", "mode", "quiet"], env=self.env,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        r = subprocess.run([self.exe, "--match", DEVICE, "initialize", "--pump-mode", "quiet"], env=self.env,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0)
+
+    def test_no_set_pump_is_ever_sent_and_the_mode_is_applied(self):
+        self.settle()
+        self.ago(T0 + 26, "working", 100)
+        self.ago(T0 + 32, "idle20", 20)
+        self.assertFalse(any(" pump" in " " + c and " set " in " " + c for c in self.calls()), self.calls())
+        self.assertEqual(open(os.path.join(self.d, "pump")).read(), "quiet")
+        self.assertEqual(self.aio.fails, 0)
+
+    def test_the_pump_mode_is_sent_only_when_it_changes(self):
+        t = self.settle()
+        n = len([c for c in self.calls() if " initialize" in c])
+        for s in range(1, 6):
+            self.ago(t + 6 * s)
+        self.assertEqual(len([c for c in self.calls() if " initialize" in c]), n)
+
+    def test_the_fans_are_sent_again_after_the_pump_initialise(self):
+        t = self.settle()
+        self.times.clear()
+        self.ago(t + 6, "working", 100)
+        names = [a[2] for _t, a in self.times if "status" not in a]
+        self.assertEqual(names, ["initialize", "set", "set"])
+        self.assertEqual(self.aio.applied, {1: 100, 2: 100})
+
+    def test_a_failing_pump_command_backs_off_and_logs_one_line_without_the_usage_text(self):
+        t = self.settle()
+        open(os.path.join(self.d, "failinit"), "w").write("Usage: liquidctl [options] <command>\n" + "  more usage text\n" * 30)
+        self.times.clear()
+        self.aio.set_phase("working", 100)
+        for s in range(1, 300):
+            self.ago(t + s)
+            if self.aio.disabled:
+                break
+        tries = [when for when, a in self.times if "initialize" in a]
+        if self.aio.disabled:
+            tries.pop()                                                     # (the safe-exit call is not a retry)
+        self.assertGreaterEqual(len(tries), 2)
+        gaps = [b - a for a, b in zip(tries, tries[1:])]
+        self.assertTrue(all(g >= 10 for g in gaps), gaps)                    # 10, 20 ... s: never every 5 s
+        self.assertTrue(all(b > a for a, b in zip(gaps, gaps[1:])), gaps)             # 10, 20, 40: it grows
+        lines = [l for l in self.lines if "initialize --pump-mode" in l and "failed" in l]
+        self.assertEqual(len(lines), 1, self.lines)
+        self.assertNotIn("\n", lines[0])
+        self.assertIn("Usage: liquidctl [options] <command>", lines[0])
+        self.assertNotIn("more usage text", lines[0])
+        self.assertLess(len(lines[0]), 300)
+
+    def test_a_wake_clears_the_back_off(self):
+        t = self.settle()
+        fail = os.path.join(self.d, "failinit")
+        open(fail, "w").write("boom")
+        self.ago(t + 6, "working", 100)                                     # fails: the next try is not before t + 16
+        self.assertGreater(self.aio.pump_retry_at, t + 6)
+        os.unlink(fail)
+        self.ago(t + 8)
+        self.assertEqual(self.aio.applied_pump, "quiet")                    # still backing off
+        self.aio.reset()
+        self.ago(t + 14)
+        self.assertEqual(self.aio.applied_pump, "extreme")
+
+    def test_a_usage_text_on_stderr_is_cut_to_its_first_line(self):
+        self.assertEqual(o1aio.first_line("\n  Usage: liquidctl [options]\n second\n" * 5), "Usage: liquidctl [options]")
+        self.assertEqual(o1aio.first_line(None), "")
+        self.assertEqual(len(o1aio.first_line("x" * 500)), 100)
+
+    def test_a_failure_is_logged_again_after_a_success(self):
+        t = self.settle()
+        fail = os.path.join(self.d, "fail")
+        open(fail, "w").close()
+        self.aio.call(["set", "fan1", "speed", "30"])
+        self.aio.call(["set", "fan1", "speed", "30"])
+        os.unlink(fail)
+        self.aio.call(["set", "fan1", "speed", "30"])
+        open(fail, "w").close()
+        self.aio.call(["set", "fan1", "speed", "30"])
+        self.assertEqual(len([l for l in self.lines if "set fan1 failed" in l]), 2)
+
+
+class TestUnconnectedFans(AioCase):
+    def test_a_cooler_fan_port_with_no_rpm_at_100_is_not_listed(self):
+        self.fan_rpm = {1: lambda p: 0, 2: lambda p: 0}
+        self.settle()
+        s = self.aio.snapshot()
+        self.assertEqual(s["fans"], [])
+        self.assertEqual([(u["n"], u["label"]) for u in s["unconnected"]], [(1, "cooler fan 1"), (2, "cooler fan 2")])
+        self.assertEqual(sorted(self.aio.applied), [1, 2])
+        self.assertNotIn("fans", o1aio.aio_text(dict(s, state="controlling")))
+
+    def test_a_port_with_a_learned_none_but_an_rpm_now_is_listed(self):
+        self.settle()
+        self.aio.learned["aio/fan1"]["rpm100"] = None
+        self.aio.status["fans"][1] = 640
+        self.assertEqual([f["n"] for f in self.aio.snapshot()["fans"]], [1, 2])
+        self.aio.status["fans"][1] = 0
+        self.assertEqual([u["n"] for u in self.aio.snapshot()["unconnected"]], [1])
+
+    def test_one_port_without_a_fan_hides_only_that_one(self):
+        self.fan_rpm = {2: lambda p: 0}
+        self.settle()
+        self.assertEqual([f["n"] for f in self.aio.snapshot()["fans"]], [1])
+        self.assertEqual([u["n"] for u in self.aio.snapshot()["unconnected"]], [2])
+
+    def test_a_port_that_reads_a_fan_shows_again(self):
+        self.fan_rpm = {2: lambda p: 0}
+        t = self.settle()
+        self.fan_rpm = {}
+        self.ago(t + 7)
+        s = self.aio.snapshot()
+        self.assertEqual([f["n"] for f in s["fans"]], [1, 2])
+        self.assertEqual(s["unconnected"], [])
+
+    def test_before_it_is_measured_nothing_is_hidden(self):
+        self.fan_rpm = {1: lambda p: 0, 2: lambda p: 0}
+        self.ago(T0, "calibrating", 100)
+        self.assertEqual(self.aio.snapshot()["unconnected"], [])
+
+    def test_the_status_the_panel_line_and_the_text_do_not_say_fans_100(self):
+        self.fan_rpm = {1: lambda p: 0, 2: lambda p: 0}
+        self.settle()
+        f = self.fan(aio=self.aio, aio_inline=True)
+        self.run_for(f, 60, step=2)
+        st = o1fan.read_status(now=1_800_000_000)
+        self.assertEqual(st["aio"]["fans"], [])
+        self.assertEqual([u["label"] for u in st["unconnected"] if u["chip"] == "cooler"], ["cooler fan 1", "cooler fan 2"])
+        text = o1fan.render_status(st, o1fan.snapshot([], sysroot=self.tree.root))
+        self.assertNotIn("cooler fan 1  ", text)
+        self.assertNotIn("fans 100%", st["line"])
+        self.assertNotIn("fans 20%", st["line"])
+        self.assertIn("pump", st["line"])
 
 
 class TestFailures(AioCase):
@@ -407,8 +560,9 @@ class TestExit(AioCase):
         self.times.clear()
         self.assertTrue(self.aio.safe_exit())
         words = sorted(" ".join(a).replace("--match %s " % DEVICE, "") for _t, a in self.times if "set" in a)
-        self.assertEqual(words, sorted(["set fan1 speed " + self.CURVE, "set fan2 speed " + self.CURVE,
-                                        "set pump mode balanced"]))
+        self.assertEqual(words, sorted(["set fan1 speed " + self.CURVE, "set fan2 speed " + self.CURVE]))
+        self.assertEqual([" ".join(a[2:]) for _t, a in self.times if "status" not in a][0],
+                         "initialize --pump-mode balanced")   # first
         self.assertFalse(os.path.exists(self.marker))
 
     def test_a_clean_stop_does_it_through_the_fan_service(self):
@@ -417,7 +571,7 @@ class TestExit(AioCase):
         self.assertTrue(os.path.exists(self.marker))
         self.times.clear()
         f.shutdown()
-        self.assertTrue(any("set pump mode balanced" in " ".join(a) for _t, a in self.times))
+        self.assertTrue(any("initialize --pump-mode balanced" in " ".join(a) for _t, a in self.times))
         self.assertTrue(self.tree.as_before())
 
     def test_after_a_crash_stop_post_does_it_from_the_marker(self):
@@ -426,8 +580,9 @@ class TestExit(AioCase):
         self.times.clear()
         self.assertTrue(o1aio.safe_exit_if_controlled(log=self.lines.append, run=self.run_fake, which=lambda n: self.exe))
         words = sorted(" ".join(a).replace("--match %s " % DEVICE, "") for _t, a in self.times if "set" in a)
-        self.assertEqual(words, sorted(["set fan1 speed " + self.CURVE, "set fan2 speed " + self.CURVE,
-                                        "set pump mode balanced"]))
+        self.assertEqual(words, sorted(["set fan1 speed " + self.CURVE, "set fan2 speed " + self.CURVE]))
+        self.assertEqual([" ".join(a[2:]) for _t, a in self.times if "status" not in a][0],
+                         "initialize --pump-mode balanced")   # first
         self.assertFalse(os.path.exists(self.marker))
         self.times.clear()
         self.assertTrue(o1aio.safe_exit_if_controlled(log=self.lines.append, run=self.run_fake, which=lambda n: self.exe))
@@ -536,10 +691,10 @@ class TestStatus(AioCase):
     def test_a_wake_resets_the_cooler(self):
         f = self.fan(aio=self.aio, aio_inline=True)
         self.run_for(f, 60, step=2)
-        n = len([c for c in self.calls() if c.endswith("initialize")])
+        n = len([c for c in self.calls() if " initialize" in c])
         f.wake()
         self.run_for(f, 12, step=2)
-        self.assertEqual(len([c for c in self.calls() if c.endswith("initialize")]), n + 1)
+        self.assertEqual(len([c for c in self.calls() if " initialize" in c]), n + 1)
 
 
 class TestParse(unittest.TestCase):

@@ -1121,14 +1121,14 @@ class TestOpenrgbAndSetup(unittest.TestCase):
 
 # ---- zones with no LEDs (6b428) ----------------------------------------------------------------
 
-def board(jrainbow_max=200, jcorsair_max=40):
+def board(jrainbow_max=200, jcorsair_max=40, placeholder=0):
     """The server's board as OpenRGB lists it: JRGB1 and PIPE1 have one LED each, the three addressable headers
     have none but may grow; the cooler is fixed at 16."""
-    msi = F.device("MSI MEG X570 ACE", 2,
+    msi = F.device("MSI MEG X570 ACE", 2 + 3 * placeholder,
                    [F.mode_spec("Off", F.FLAG_MODE_COLOR, 0), F.mode_spec("Direct", F.FLAG_PER_LED)], active=0,
                    vendor="MSI",
-                   zones=[("JRGB1", 1, 1, 1, 1), ("JRAINBOW1", 0, 0, jrainbow_max, 1),
-                          ("JRAINBOW2", 0, 0, jrainbow_max, 1), ("JCORSAIR", 0, 0, jcorsair_max, 1),
+                   zones=[("JRGB1", 1, 1, 1, 1), ("JRAINBOW1", placeholder, 0, jrainbow_max, 1),
+                          ("JRAINBOW2", placeholder, 0, jrainbow_max, 1), ("JCORSAIR", placeholder, 0, jcorsair_max, 1),
                           ("PIPE1", 1, 1, 1, 1)])
     cooler = F.device("Corsair Hydro Platinum", 16, [F.mode_spec("Direct", F.FLAG_PER_LED, 1, bri=(0, 100, 100))],
                       active=0, vendor="Corsair")
@@ -1173,7 +1173,8 @@ class TestTargetLength(unittest.TestCase):
         self.assertEqual(o1leds.target_length(self.z(lo=10, hi=40), 25), 25)
 
     def test_a_zone_that_has_leds_is_never_touched(self):
-        self.assertIsNone(o1leds.target_length(self.z(leds=1, lo=1, hi=200), 60))      # never grown
+        self.assertEqual(o1leds.target_length(self.z(leds=1, lo=0, hi=200), 60), 60)   # (1 LED is the placeholder, 6b435)
+        self.assertIsNone(o1leds.target_length(self.z(leds=2, lo=0, hi=200), 60))      # never grown
         self.assertIsNone(o1leds.target_length(self.z(leds=100, lo=0, hi=200), 10))    # never shrunk
 
     def test_a_zone_that_cannot_grow_is_left(self):
@@ -1244,6 +1245,54 @@ class ZoneCase(unittest.TestCase):
         self.addCleanup(self.srv.stop)
         self.client = o1leds.Client(port=self.srv.port, length=60)
         self.addCleanup(self.client.close)
+
+
+class TestPlaceholderZones(unittest.TestCase):
+    """The live MSI MEG X570 ACE lists JRAINBOW1, JRAINBOW2 and JCORSAIR with ONE LED each (min 0), not zero (6b435)."""
+
+    def setUp(self):
+        self.srv = F.FakeServer(board(placeholder=1)).start()
+        self.addCleanup(self.srv.stop)
+        self.client = o1leds.Client(port=self.srv.port, length=60)
+        self.addCleanup(self.client.close)
+
+    def test_the_one_led_placeholder_zones_are_resized_and_the_fixed_ones_are_not(self):
+        self.client.open()
+        self.assertEqual(resizes(self.srv), [(0, 1, 60), (0, 2, 60), (0, 3, 40)])
+        msi = self.client.devices[0]
+        self.assertEqual([(z.name, z.leds) for z in msi.zones],
+                         [("JRGB1", 1), ("JRAINBOW1", 60), ("JRAINBOW2", 60), ("JCORSAIR", 40), ("PIPE1", 1)])
+        self.assertEqual(self.client.notes, ["lights: resized JRAINBOW1 to 60 LEDs", "lights: resized JRAINBOW2 to 60 LEDs",
+                                             "lights: resized JCORSAIR to 40 LEDs"])
+
+    def test_a_zone_that_already_has_a_real_length_is_left_alone(self):
+        srv = F.FakeServer(board(placeholder=1)).start()
+        self.addCleanup(srv.stop)
+        F.resize_zone(srv.devices[0], 2, 30)                        # JRAINBOW2 was configured at 30 LEDs
+        c = o1leds.Client(port=srv.port, length=60)
+        self.addCleanup(c.close)
+        c.open()
+        self.assertEqual([z for _d, z, _n in resizes(srv)], [1, 3])
+        self.assertEqual([z.leds for z in c.devices[0].zones], [1, 60, 30, 40, 1])
+
+    def test_a_refusing_server_is_asked_once_for_a_placeholder_zone(self):
+        self.srv.resize_deaf = {(0, 1), (0, 2), (0, 3)}
+        self.client.open()
+        self.assertTrue(any("could not resize JRAINBOW1 on MSI MEG X570 ACE (still 1 LEDs" in n for n in self.client.notes))
+        self.client.poll()
+        self.srv.notify_list_updated()
+        time.sleep(0.1)
+        self.client.poll()
+        self.assertEqual(len(resizes(self.srv)), 3)
+
+    def test_target_length_rules(self):
+        Z = o1leds.Zone                                                       # Zone(name, type, min, max, leds)
+        self.assertEqual(o1leds.target_length(Z("a", 1, 0, 200, 1), 60), 60)
+        self.assertEqual(o1leds.target_length(Z("a", 1, 0, 200, 0), 60), 60)
+        self.assertIsNone(o1leds.target_length(Z("a", 1, 0, 200, 2), 60))     # already above 1
+        self.assertIsNone(o1leds.target_length(Z("a", 1, 1, 1, 1), 60))       # single-LED fixed zone
+        self.assertIsNone(o1leds.target_length(Z("a", 2, 0, 200, 1), 60))     # a matrix
+        self.assertIsNone(o1leds.target_length(Z("a", 1, 0, 1, 1), 60))       # cannot grow past 1
 
 
 class TestResize(ZoneCase):

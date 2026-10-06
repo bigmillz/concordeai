@@ -1003,7 +1003,7 @@ to the board's own control except while working. A header that ever reads a fan 
 cooler present, the lowest-numbered header kept at 100% as "a pump or a fixed header" (the CPU_FAN header) is shown
 as **Pump**, with the cooler's own steady rpm from liquidctl instead of the header's noisy tach (the raw tach is kept
 as `tach_raw` in the status file); other fixed headers are listed as they are, with their own rpm. If liquidctl reports
-no rpm for the cooler's fans, the panel shows "Cooler fans" at their duty and no rpm figure.
+no rpm for the cooler's fans, no "Cooler fans" figure is shown at all (a cooler fan port that reads no rpm is `unconnected`, as `cooler fan 1`/`2`); the cooler line is only the pump and the coolant.
 
 **Working** (`lib/o1work.py`, shared with the lights; per the owner, 6b421) is one
 of two triggers:
@@ -1104,7 +1104,23 @@ fans; one that reads no rpm stays at 100%. The cooler's status is read at
 most every 5 s (a USB transaction), a command is sent only when its target
 changes and no more often than every 5 s, and every `liquidctl` call has a
 4 s timeout and runs in a thread of its own so the watchdog is never starved.
-Five failed calls in a row leave the cooler on its safe curve, log it, and
+
+**How the pump mode is set (6b435).** A Hydro Platinum has no `set pump` channel (liquidctl 1.15 answers
+`unknown channel, should be one of: 'fan', 'fan1', 'fan2'` and prints its usage text): the pump mode is part of
+`liquidctl --match "<cooler>" initialize --pump-mode quiet|balanced|extreme`, so that is the one command the service
+sends, the first time and again only when the wanted mode differs from the last one applied (never more often than
+every 5 s). `initialize` may reset the cooler's fan duty, so after each one the fans' duty is sent again (`set fan1
+speed N`, `set fan2 speed N`; `status --json` is unaffected). A failing command is retried after 10, 20, 40 ... s
+(at most 300 s), never in a tight loop, and is logged once per kind of failure with only liquidctl's first line of
+stderr, not its usage text. The exit and the crash path (`ExecStopPost`) set the balanced pump the same way, before the
+safe fan curves. **Unverified on the cooler**: that `initialize` leaves the running fans alone, and that it is accepted
+repeatedly while the cooler is in use (the service tolerates either).
+
+**The cooler's own fan ports (6b435).** Nothing is plugged into them (the radiator fans are on the motherboard
+headers), and liquidctl reports 100% duty with 0 rpm. A port that read no rpm at 100% (and reads none now) is not
+listed: not in `ollama1-fan status`, the panel, the admin page or the status line; it is under `unconnected` in the
+status file as `cooler fan 1` / `cooler fan 2`, and is still driven as before. A port that ever reads a nonzero rpm
+shows again. Five failed calls in a row leave the cooler on its safe curve, log it, and
 the case fans carry on.
 
 **The cooler is safe without the service.** When the service stops for any
@@ -1218,19 +1234,19 @@ network but the loopback; it reads the card's busy percent and writes only
 `/run/ollama1/leds.json`. If you want OpenRGB to drive more than USB lights,
 that is your call, not the kit's.
 
-**Headers with no LEDs listed.** OpenRGB lists some boards' addressable headers
-with **zero LEDs** until a length is set: on the MSI MEG X570 ACE, JRAINBOW1,
-JRAINBOW2 and JCORSAIR (JRGB1 and PIPE1 have one LED each), so nothing was ever
+**Headers with no real length yet (0 or 1 LED).** OpenRGB lists some boards' addressable headers
+with **zero LEDs**, or a placeholder of **one**, until a length is set: on the MSI MEG X570 ACE, JRAINBOW1,
+JRAINBOW2 and JCORSAIR (one LED each, minimum 0; JRGB1 and PIPE1 are single-LED zones that cannot be resized), so nothing was ever
 sent to the strips behind them (the under-case strips on a splitter included).
 When the service connects (and after every reconnect, and after a wake) it looks
-at each zone of each device: a zone that has **no LEDs** and can be resized
+at each zone of each device: a zone that has **0 or 1 LED** and can be resized
 (its maximum is above 0 and differs from its minimum, and it is not a matrix) is
 sent OpenRGB's `RESIZEZONE` command (packet 1000: the zone index and the new
 size, two little-endian integers; the device is the packet header's) with the
 **default length of 60**, clamped to what the zone allows, and the controller's
 data is read again so those LEDs are in the list. From then on they get exactly
 the same colour and brightness frames as every other LED. A zone that already
-has LEDs is never touched (JRGB1, PIPE1 and the cooler's 16 stay as they are),
+has more than one LED is never touched (JRGB1, PIPE1 and the cooler's 16 stay as they are),
 and nothing is ever shrunk. One line is logged per zone ("lights: resized
 JRAINBOW1 to 60 LEDs"); a zone that fails is logged and skipped and does not
 stop the others or the service, and one OpenRGB refuses is asked once per

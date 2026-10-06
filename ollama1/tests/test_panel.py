@@ -1981,19 +1981,38 @@ class TestFans(unittest.TestCase):
             for head in ("working 100%", "cooling down 100%", "measuring 100%", "deep idle 10%", "idle 17%", "HOT 100%"):
                 self.assertLessEqual(F.text_width("FANS") + F.text_width(head) + 10, fw - 16, (w, h, head))
 
-    def test_the_cooler_pump_row_is_never_in_the_case_average_and_the_cooler_fans_without_rpm_show_duty(self):
+    def test_the_cooler_pump_row_is_never_in_the_case_average_and_the_cooler_fans_without_rpm_are_not_shown(self):
         outs = [{"label": "Pump", "enable": 1, "pwm": 255, "rpm": 2357, "tach_raw": 4383},
                 {"label": "case/CPU fan 2", "enable": 1, "pwm": 51, "rpm": 500}]
         aio = {"found": True, "state": "controlling", "pump_rpm": 2357, "pump_mode": "quiet", "coolant_c": 31,
                "fans": [{"n": 1, "rpm": 0, "pct": 20}, {"n": 2, "rpm": None, "pct": 20}]}
         v = o1panel.fan_view(self.st(outputs=outs, aio=aio), self.NOW)
-        self.assertEqual([(r[0], r[1]) for r in v[3]], [("Cooler fans", "20%"), ("Case fans", "500 rpm avg")])
+        self.assertEqual([(r[0], r[1]) for r in v[3]], [("Case fans", "500 rpm avg")])
         self.assertAlmostEqual(v[3][0][2], 0.2)
         self.assertEqual(v[4], "Pump 2357 rpm, quiet, coolant 31\u00b0C")
         aio["fans"][0]["rpm"] = 520                                              # one reports: they average in as before
         v = o1panel.fan_view(self.st(outputs=outs, aio=aio), self.NOW)
         self.assertEqual([r[0] for r in v[3]], ["Case fans"])
         self.assertEqual(v[3][0][1], "510 rpm avg")
+
+    def test_at_idle_the_fans_box_never_shows_the_cooler_ports_100(self):
+        outs = [{"label": "Pump", "enable": 1, "pwm": 255, "rpm": 2357, "tach_raw": 4383},
+                {"label": "case/CPU fan 2", "enable": 1, "pwm": 51, "rpm": 500},
+                {"label": "case/CPU fan 3", "enable": 1, "pwm": 51, "rpm": 520}]
+        aio = {"found": True, "state": "controlling", "pump_rpm": 2357, "pump_mode": "quiet", "coolant_c": 31,
+               "fans": [{"n": 1, "rpm": 0, "pct": 100}, {"n": 2, "rpm": None, "pct": 100}]}   # nothing on the cooler's ports
+        v = o1panel.fan_view(self.st(phase="idle20", pct=20, why="idle", outputs=outs, aio=aio), self.NOW)
+        text = " | ".join([v[1]] + ["%s %s" % (r[0], r[1]) for r in v[3]] + [v[4]])
+        self.assertNotIn("100%", text)
+        self.assertNotIn("Cooler fans", text)
+        self.assertIn("20%", text)
+        self.assertEqual([r[0] for r in v[3]], ["Case fans"])
+        self.assertAlmostEqual(v[3][0][2], 0.2)                     # the bar is the connected fans' commanded level
+        self.assertEqual(v[4], "Pump 2357 rpm, quiet, coolant 31\u00b0C")      # the only cooler line
+        aio["fans"][0]["rpm"] = 520                                  # a port that reads a fan: its own level, not 100%
+        aio["fans"][0]["pct"] = 20
+        v = o1panel.fan_view(self.st(phase="idle20", pct=20, why="idle", outputs=outs, aio=aio), self.NOW)
+        self.assertAlmostEqual(v[3][0][2], 0.2)
 
     def test_controlled_output_without_rpm_is_shown_an_idle_unreadable_one_is_not(self):
         outs = [{"label": "fan1", "enable": 1, "pwm": 128, "rpm": None}, {"label": "fan2", "enable": 2, "pwm": 0, "rpm": 0}]

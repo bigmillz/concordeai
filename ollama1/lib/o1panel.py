@@ -659,17 +659,10 @@ def fan_view(st, now):
     a = _d(fan.get("aio"))
     cool = ""
     if a.get("found") and a.get("state") == "controlling":
-        unreported = []
-        for f in _l(a.get("fans")):                    # the radiator fans count with the case fans
-            if isinstance(f, dict):
-                pc = D._f(f.get("pct"))
-                if D._f(f.get("rpm")):
-                    case.append((pc / 100.0 if pc is not None else None, D._f(f.get("rpm"))))
-                elif pc is not None:
-                    unreported.append(pc)
-        if unreported and not any(isinstance(f, dict) and D._f(f.get("rpm")) for f in _l(a.get("fans"))):
-            rows.append(("Cooler fans", "%d%%" % round(sum(unreported) / len(unreported)),   # no rpm from liquidctl: the duty only
-                         sum(unreported) / len(unreported) / 100.0, "fan"))
+        for f in _l(a.get("fans")):                    # a radiator fan on the cooler's own port that reads an rpm counts
+            if isinstance(f, dict) and D._f(f.get("rpm")):      # with the case fans, at its own commanded level; a port
+                pc = D._f(f.get("pct"))                         # with no rpm is never shown (6b435: no "Cooler fans 100%")
+                case.append((pc / 100.0 if pc is not None else None, D._f(f.get("rpm"))))
         parts = []
         pr = D._f(a.get("pump_rpm"))
         if pr is not None:                             # the pump is not averaged in: a line of its own

@@ -34,13 +34,13 @@ every POLL_S (2 s) the connection is looked at and the colour sent again (a keep
 a device that was reset by a wake or a hot-plug gets it back). At start, and after a
 wake (the sleep hook's SIGUSR1), it is white and the 300 s start then.
 
-Zones with no LEDs (6b428, per the owner: "just send the same lighting signals to all of those
+Zones with no real length yet (6b428, per the owner: "just send the same lighting signals to all of those
 headers"): an MSI Mystic Light board lists its addressable headers (JRAINBOW1, JRAINBOW2,
-JCORSAIR) with ZERO LEDs until a length is configured, so nothing is ever sent to the strips
-behind them. At connect time (and after every reconnect or wake) each zone that has no LEDs
-and can be resized is resized to DEFAULT_LENGTH (60; `setup.sh --leds-length N`), clamped to
+JCORSAIR) with ZERO LEDs, or (the MEG X570 ACE, 6b435) a placeholder of ONE, until a length is configured, so
+nothing is sent to the strips behind them. At connect time (and after every reconnect or wake) each zone that
+has 0 or 1 LEDs and can be resized (its minimum differs from its maximum; JRGB1 and PIPE1 cannot) is resized to DEFAULT_LENGTH (60; `setup.sh --leds-length N`), clamped to
 what the zone allows, and the controller's data is read again so those LEDs are in the list
-and get the very same frames as every other LED. A zone that already has LEDs is never
+and get the very same frames as every other LED. A zone that already has more than one LED is never
 touched. A length longer than the strip is harmless (what is written past its end goes
 nowhere); one that is too short leaves the strip's tail dark, so the default errs long.
 """
@@ -211,13 +211,17 @@ class Zone:
         return "Zone(%r, type %d, %d..%d, %d LEDs)" % (self.name, self.ztype, self.leds_min, self.leds_max, self.leds)
 
 
+PLACEHOLDER_LEDS = 1        # a resizable zone with this many LEDs or fewer has no real length yet (6b435)
+
+
 def target_length(z, want):
-    """What to resize zone z to, or None to leave it: only a zone with no LEDs that can grow, never a matrix,
-    to `want` clamped to its own minimum and maximum."""
-    if z.leds != 0 or z.leds_max <= 0 or z.ztype == ZONE_MATRIX or not z.resizable:
+    """What to resize zone z to, or None to leave it: only a resizable zone with no real length yet (0 LEDs, or the
+    1 LED OpenRGB lists as a placeholder, as the MSI board's JRAINBOW1/2 and JCORSAIR do), never a matrix or a
+    fixed one (JRGB1, PIPE1), never one that already has more, and never to a size that is not larger than now."""
+    if z.leds > PLACEHOLDER_LEDS or z.leds_max <= 0 or z.ztype == ZONE_MATRIX or not z.resizable:
         return None
     n = min(max(want, z.leds_min), z.leds_max)
-    return n if n > 0 else None
+    return n if n > max(z.leds, 0) else None
 
 
 def config_path():
@@ -390,7 +394,7 @@ class Client:
         for zi, z in enumerate(d.zones):
             n = target_length(z, want)
             key = (d.name, zi, z.name)
-            if z.leds > 0:
+            if z.leds > PLACEHOLDER_LEDS or not z.resizable:
                 self.tried.discard(key)           # it has LEDs: if it is ever empty again (a re-plug), ask again
             if n is None or key in self.tried:
                 continue
@@ -400,18 +404,18 @@ class Client:
             except OSError as e:
                 self.notes.append("lights: could not resize %s on %s (%s)" % (z.name, d.name, e.strerror or type(e).__name__))
                 continue
-            asked.append((zi, z, n))
+            asked.append((zi, z, n, z.leds))
         if not asked:
             return d
         self.sock.sendall(packet(d.idx, PID_DATA, struct.pack("<I", self.ver)))
         fresh = Device.parse(d.idx, self.wait_for(PID_DATA, d.idx), self.ver)
         self.list_changed = False                 # our own resize's notices are in this read already
-        for zi, z, n in asked:
+        for zi, z, n, before in asked:
             now = fresh.zones[zi].leds if zi < len(fresh.zones) and fresh.zones[zi].name == z.name else 0
-            if now > 0:
+            if now > before:
                 self.tried.discard((d.name, zi, z.name))      # it worked: only a refusal is remembered
-            self.notes.append("lights: resized %s to %d LEDs" % (z.name, now) if now > 0 else
-                              "lights: could not resize %s on %s (still no LEDs after asking for %d)" % (z.name, d.name, n))
+            self.notes.append("lights: resized %s to %d LEDs" % (z.name, now) if now > before else
+                              "lights: could not resize %s on %s (still %d LEDs after asking for %d)" % (z.name, d.name, before, n))
         return fresh
 
     def prepare(self):

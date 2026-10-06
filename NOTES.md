@@ -9,6 +9,35 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b435 — pump mode through `initialize`, 1-LED header placeholders resized, the cooler's empty fan ports hidden (per the live server)
+
+Kit only (`ollama1/`), found on the live server after the last install (liquidctl 1.15.0, Corsair Hydro H115i Platinum,
+MSI MEG X570 ACE with OpenRGB).
+- **Pump mode.** `lib/o1aio.py` ran `liquidctl set pump mode X`; the Hydro Platinum driver has no pump channel (its
+  channels are fan, fan1, fan2), so every call failed with liquidctl's usage text, logged every 5 s as "liquidctl set
+  pump failed (Usage: ...)", and the mode was never applied. The pump mode is an `initialize` option:
+  `initialize --pump-mode quiet|balanced|extreme`. Now `write()` sends that when the wanted mode differs from the last
+  applied one (or on the first start / after a wake), then sends the fans' duty again (initialising may reset it).
+  Failure: `pump_retry_at` back-off 10, 20, 40 ... 300 s; the log is one line per (command, first line of stderr)
+  kind (`first_line()`), again only after a success. `safe_exit()` initialises with SAFE_PUMP first, then the fan
+  curves. The fake liquidctl in `tests/test_aio.py` implements the initialize form and rejects any `pump` argument.
+  Mutants for the form, the first initialize, the resend, the back-off and the log.
+- **Header zones.** The MSI board reports JRAINBOW1, JRAINBOW2 and JCORSAIR with ONE LED each (min 0, max 200/40),
+  not zero, so the "zones with 0 LEDs" rule never fired (only the Corsair 'Fans' zone grew). `target_length()` now
+  resizes a resizable, non-matrix zone with `leds <= PLACEHOLDER_LEDS` (1) to the default length, only to a size above
+  its current one; JRGB1/PIPE1 (min == max) and zones above 1 LED are never touched; a refused placeholder zone is
+  asked once per connection (the "tried" memory is cleared only for zones above 1 LED). `board(placeholder=1)` in
+  `test_leds.py` models the live board; the 0-LED case stays. A resizable zone that someone really wants at 1 LED
+  would be grown to the default (nothing is lost: writes past a strip's end go nowhere).
+- **The cooler's own fan ports.** Nothing is plugged in (the radiator fans are on the board headers); liquidctl reports
+  100% duty, 0 rpm. A port with `rpm100` learned as none and no rpm now is not in the cooler snapshot's `fans`; it is in
+  `unconnected` (`cooler fan 1`/`2`) and in the status file's `unconnected`. Control is unchanged. The panel no longer
+  has a "Cooler fans" row at the duty at all (the owner: the FANS box said 100% at idle; it must show what the fans do,
+  20%): the box shows the connected fans' average bar at the commanded level and the cooler line (pump, coolant). A port
+  that reads an rpm joins the case average at its own commanded level.
+- Not verified on hardware: that `initialize` is accepted repeatedly and leaves fan duty alone; that OpenRGB accepts the
+  resize on the three headers (it is the same packet that already grew 'Fans').
+
 ## 6b433 — the GPU core raise may go to +300 MHz, with a tighter check above +150 (per the owner)
 Owner: "Can we try to add 300 megahertz to the core for the GPU?" `CORE_MAX_MHZ` 150 -> 300 (memory stays 0..75);
 the CLI refusal ("--core takes 0 to 300 MHz"), setup.sh help, validation, saved-value messages (the 150 passed to

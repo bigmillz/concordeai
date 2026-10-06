@@ -21,6 +21,11 @@ The policy follows the fans' phases (lib/o1fan.py):
   deepen, deep          the fans' %, 20 falling to 10 over 30 s, then 10 (6b434)   quiet
                         a fan that stalls below 20% is held at 20% (`no_deep`); the pump stays quiet
 
+The pump mode is set when the cooler is initialised, not by a `set pump` command (a Hydro Platinum has no such
+channel): `liquidctl initialize --pump-mode quiet|balanced|extreme` (6b435). It is sent only when the wanted mode
+differs from the last one applied, then the fans' duty is sent again (initialising may reset it), and a failing
+command is retried after 10, 20, 40 ... s (never in a tight loop) and logged once.
+
 A coolant at COOLANT_HOT_C or more forces the pump to extreme and the fans to
 100% until it is COOLANT_HYST_C under that, so the pump is at full speed only
 while it is needed. A fan that reads no rpm at 100% is kept at 100%: its low
@@ -54,6 +59,7 @@ CALL_TIMEOUT_S = 4               # every liquidctl call (the service's watchdog 
 FAILS_MAX = 5                    # this many failed calls in a row: the cooler is left on its safe curve
 COOLANT_HOT_C, COOLANT_HYST_C = 40, 5
 SETTLE_S = 6
+PUMP_BACKOFF_MAX_S = 300         # a failing pump-mode command is retried after 10, 20, 40 ... s, never faster
 SAFE_PUMP = "balanced"
 SAFE_CURVE = ((25, 30), (35, 60), (45, 100))     # (coolant C, fan %): 30% @ 25 C, 60% @ 35 C, 100% @ 45 C
 VENDOR_CORSAIR = 0x1b1c
@@ -85,6 +91,14 @@ def usb_present(sysroot=None):
         if (v << 16 | pid) in HYDRO_IDS:
             return True
     return False
+
+
+def first_line(text, n=100):
+    """liquidctl's stderr in one short line: its first line, cut (a usage text is dozens of lines)."""
+    for ln in (text or "").splitlines():
+        if ln.strip():
+            return ln.strip()[:n]
+    return ""
 
 
 def parse_status(text):
@@ -136,6 +150,8 @@ class Aio:
         self.disabled = False
         self.said = set()
         self.initialized = False
+        self.pump_fails = 0              # pump-mode commands that failed in a row (the back-off)
+        self.pump_retry_at = -1e9
 
     def attach(self, learned, persist, log):
         """Share the fan service's learned table (and how to save it) and its log."""
@@ -155,6 +171,7 @@ class Aio:
         """After a wake: the cooler may have lost its settings, so initialize and send everything again."""
         with self.lock:
             self.initialized = False
+            self.pump_fails, self.pump_retry_at = 0, -1e9
             self.applied_pump, self.applied, self.since, self.checked = None, {}, {}, {}
             self.write_at = -1e9
             self.status_at = -1e9
@@ -177,16 +194,21 @@ class Aio:
         try:
             r = self.run(cmd, capture_output=True, text=True, timeout=timeout)
             ok, out = r.returncode == 0, r.stdout or ""
-            why = (r.stderr or "").strip()[:120]
+            why = first_line(r.stderr)
         except (OSError, subprocess.SubprocessError) as e:
             ok, out, why = False, "", type(e).__name__
         if match:
             if ok:
                 self.fails = 0
+                kind = " ".join(args[:2])
+                self.said = {k for k in self.said if not (isinstance(k, tuple) and k[:2] == ("fail", kind))}
             else:
                 self.fails += 1
-                self.log("liquidctl %s failed (%s): %d of %d" % (" ".join(args[:2]), why or "no reason", self.fails,
-                                                                 FAILS_MAX))
+                # one line per kind of failure (6b435): liquidctl's usage text, every 5 s, filled the journal
+                self.say(("fail", " ".join(args[:2]), why),
+                         "liquidctl %s failed (%s): %d of %d, then the cooler is left on its safe curve; "
+                         "the same failure is not logged again" % (" ".join(args[:2]), why or "no reason", self.fails,
+                                                                   FAILS_MAX))
         return ok, out
 
     def detect(self, now):
@@ -264,11 +286,19 @@ class Aio:
     def write(self, now, pump, fans):
         """Only what changed. Fans first when going up is not needed: each is its own command."""
         self.write_at = now
-        if not self.initialized:
-            ok, _ = self.call(["initialize"])
-            if not ok:
+        if not self.initialized or self.applied_pump != pump:
+            # On a Hydro Platinum the pump mode is set when the cooler is initialised (6b435): `set pump mode` is
+            # not a command of that driver. Initialising may reset the fans' duty, so they are sent again after it.
+            if now < self.pump_retry_at:
                 return
-            self.initialized = True
+            ok, _ = self.call(["initialize", "--pump-mode", pump])
+            if not ok:
+                self.pump_fails += 1
+                self.pump_retry_at = now + min(PUMP_BACKOFF_MAX_S, MIN_WRITE_S * 2 ** self.pump_fails)
+                return
+            self.pump_fails = 0
+            self.initialized, self.applied_pump = True, pump
+            self.applied, self.since, self.checked = {}, {}, {}
         for n, pct in sorted(fans.items()):
             if self.applied.get(n) != pct:
                 ok, _ = self.call(["set", "fan%d" % n, "speed", str(pct)])
@@ -276,11 +306,6 @@ class Aio:
                     return
                 self.applied[n], self.since[n] = pct, now
                 self.checked.pop(n, None)
-        if self.applied_pump != pump:
-            ok, _ = self.call(["set", "pump", "mode", pump])
-            if not ok:
-                return
-            self.applied_pump = pump
         self.mark(True)
 
     def learn(self, now):
@@ -359,10 +384,9 @@ class Aio:
             return False
         fans = sorted(self.status["fans"]) or [1, 2]
         flat = [str(x) for pair in SAFE_CURVE for x in pair]
-        ok = True
+        ok = self.call(["initialize", "--pump-mode", SAFE_PUMP])[0]     # first: it may reset the fans' duty
         for n in fans:
             ok = self.call(["set", "fan%d" % n, "speed"] + flat)[0] and ok
-        ok = self.call(["set", "pump", "mode", SAFE_PUMP])[0] and ok
         self.applied_pump, self.applied = None, {}
         if ok:
             self.mark(False)
@@ -374,11 +398,16 @@ class Aio:
     def snapshot(self):
         with self.lock:
             st = dict(self.status)
-            fans = []
+            fans, gone = [], []
             for n in sorted(st["fans"]):
                 L = self.learned.get("aio/fan%d" % n) or {}
+                if "aio/fan%d" % n in self.learned and not L.get("rpm100") and not st["fans"][n]:
+                    # nothing is plugged into that port (6b435): it read no rpm at 100% and reads none now, so it is
+                    # not shown (no figure that isn't backed by a speed); it is still driven as before
+                    gone.append({"n": n, "label": "cooler fan %d" % n, "pct": self.applied.get(n)})
+                    continue
                 fans.append({"n": n, "rpm": st["fans"][n], "pct": self.applied.get(n), "min_pct": L.get("min_pct")})
-            return {"found": self.match is not None, "name": self.name, "state": self.state,
+            return {"unconnected": gone, "found": self.match is not None, "name": self.name, "state": self.state,
                     "coolant_c": st["coolant_c"], "coolant_hot": self.coolant_hot, "pump_rpm": st["pump_rpm"],
                     "pump_mode": self.applied_pump or st["pump_mode"], "fans": fans}
 
