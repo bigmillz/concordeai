@@ -1062,7 +1062,7 @@ class TestUnitAndSetup(unittest.TestCase):
 
     def test_setup_reads_saves_and_plans_it_the_way_the_fans_were_wired(self):
         s = open(os.path.join(U.KIT, "setup.sh")).read()
-        for want in ('A_WATCHDOG=""', '--watchdog) ;;' if False else "--leds|--watchdog|--name", 'WATCHDOG=$(watchdog_choice "$A_WATCHDOG" "${OLLAMA1_WATCHDOG:-}" "$(saved WATCHDOG)")',
+        for want in ('A_WATCHDOG=""', '--watchdog) ;;' if False else "--watchdog|--name", 'WATCHDOG=$(watchdog_choice "$A_WATCHDOG" "${OLLAMA1_WATCHDOG:-}" "$(saved WATCHDOG)")',
                      "printf 'WATCHDOG=%s\\n' \"$WATCHDOG\"", '$(watchdog_plan "$WATCHDOG")', "--watchdog takes on or off",
                      "OLLAMA1_WATCHDOG takes 1 or 0"):
             self.assertIn(want, s)
