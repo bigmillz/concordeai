@@ -17692,6 +17692,9 @@ def _sg_unit(src):
     up[0] = False
     o["a server that is not answering is not asked, and never woken"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["local"])
     up[0] = True
+    ns2["_srv_seen"]["s"]["at"] = time.time() - 99999
+    o["a server last heard from long ago is not asked either"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["local"])
+    ns2["_srv_seen"]["s"]["at"] = time.time()
     srv[0] = None
     o["then a loaded model of this computer"] = ask(ns2) == (("LOCAL Phi", "this computer"), ["server", "local"])
     loc[0] = None
