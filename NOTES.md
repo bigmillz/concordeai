@@ -47,6 +47,13 @@ wake on a magic packet (WoWLAN); it was unconfigured, with PCI wakeup disabled. 
 - **Unverified on hardware.** Real WoWLAN wake from S3 on the AX200 with iwlwifi (kernel 7.0), whether the access point
   delivers the packet to a sleeping card (many do not), `netplan apply` leaving the bridge alone on the live
   machine, and `networkctl reconfigure` after the wake. Docs say so plainly (README "Wi-Fi backup").
+## 6b439 — personal chips need only an awake server, not a loaded model (per Patrick)
+Patrick: "Most of these chips aren't much better as far as the topics they're picking" (screenshots: "How do adults learn
+to swim?", "Books that changed people's lives", "Knife skills every beginner should know"). Those are the FIXED starters:
+the personal pass (6b438) never produced anything, because 6b420's rule "only a server that already has a model loaded"
+meant it asked nobody (the gateway showed no model loaded at pass time; `suggest.json` v2: tried now, topics 0, pool 0).
+The pass now runs on a server that answered a check in the last 10 minutes (SUGGEST_SERVER_FRESH_S), loaded or not;
+a sleeping or unreachable server is still never asked and never woken, and the answer stays capped (1600 tokens).
 
 ## 6b438 — starter chips are whole, relevant questions and change at every new chat (per Patrick)
 

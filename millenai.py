@@ -12988,6 +12988,7 @@ SUGGEST_TOPIC_MIN = 2            # a topic with fewer good chips is dropped
 SUGGEST_SHOW = 3                 # personal chips per painting
 SUGGEST_AVOID = 2                # paintings back that a chip is not shown again
 SUGGEST_MAX_TOKENS = 1600        # the most a pass may make a server write
+SUGGEST_SERVER_FRESH_S = 600        # a server counts as up when it answered a check this recently
 # (6b438, per Patrick: "the chips ... aren't really relevant. And some of them
 # aren't really questions. Like one just said 'vehicle performance' with a
 # question mark. And every time a new chat is opened, they're not changing at
@@ -13327,10 +13328,16 @@ def _suggest_hooked() -> bool:
 
 
 def _suggest_server_up(ctx) -> bool:
-    """Whether a server of this profile has a model loaded right now, as its
-    last check saw it."""
+    """Whether a server of this profile ANSWERED a check in the last
+    SUGGEST_SERVER_FRESH_S: awake, paired, a model of it fits. It need not
+    have one loaded (6b439, per Patrick: no personal chips ever came, because
+    a model is rarely loaded at the moment the pass is due). A sleeping or
+    unreachable server is not here (its last check errored), and the pass
+    never wakes one."""
     try:
-        return any(m.get("loaded") for m in server_mode_candidates(ctx))
+        now = time.time()
+        return any(now - float((_srv_seen.get(m.get("sid")) or {}).get("at") or 0)
+                   < SUGGEST_SERVER_FRESH_S for m in server_mode_candidates(ctx))
     except Exception:
         return False
 
