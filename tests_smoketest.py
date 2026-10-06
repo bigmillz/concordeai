@@ -5669,6 +5669,37 @@ check("models roster + manage flow",
       and '"/api/model/remove"' in _MILLENAI_SRC
       and '"still downloading"' in _MILLENAI_SRC
       and _MILLENAI_SRC.count("/api/model/remove") >= 2)
+# 6b436 (per Patrick: "hide cloud models in the local section"): the Manage
+# roster lists only what runs on this Mac; cloud stays under Cloud power and
+# in the pickers. paintRoster runs in node over a fake host.
+def _ros_run(src):
+    _i = src.index("function paintRoster(")
+    _j = src.index("function paintMgStats(")
+    _js = ("const ROS_SKIP=new Set([]);const esc=s=>String(s);const $=s=>host;"
+           "let host={innerHTML:''};function paintMgStats(){}function rosTick(){}\n"
+           "const ADV_CLOUD={gemini:['Gemini','fast'],groq:['Groq','quick']};\n"
+           "function rosRow(m,ok){return '<ROW '+m.label+'>';}\n"
+           + src[_i:_j] +
+           "\npaintRoster({models:[{label:'Qwen',status:'ready'},{label:'Gemma',status:'missing'}]},"
+           "{providers:{gemini:{status:'ok'}}});process.stdout.write(host.innerHTML);")
+    _f = os.path.join(tempfile.mkdtemp(), "ros.js")
+    open(_f, "w").write(_js)
+    return subprocess.run(["node", _f], capture_output=True, text=True, timeout=30).stdout
+_ros_ok = _ros_run(_MILLENAI_SRC)
+check("manage roster: this-mac models only, no cloud group or rows",
+      "ready · this mac" in _ros_ok and "<ROW Qwen>" in _ros_ok
+      and "not downloaded" in _ros_ok and "<ROW Gemma>" in _ros_ok
+      and "cloud" not in _ros_ok.lower() and "Gemini" not in _ros_ok
+      and "Groq" not in _ros_ok, _ros_ok[:200])
+_ros_mut = _MILLENAI_SRC.replace(
+    """  if(miss.length)h+='<div class="ros-gh">not downloaded</div>'""",
+    """  h+='<div class="ros-gh">ready · cloud ☁</div>';\n  if(miss.length)h+='<div class="ros-gh">not downloaded</div>'""", 1)
+check("manage roster: re-adding a cloud group is caught (mutant)",
+      _ros_mut != _MILLENAI_SRC
+      and "cloud" in _ros_run(_ros_mut).lower())
+check("cloud still lives where cloud is chosen (cloud power, picker, tier pop)",
+      "Cloud power" in _MILLENAI_SRC and "const ADV_CLOUD={" in _MILLENAI_SRC
+      and "advCompList" in _MILLENAI_SRC and "mline mcloud" in _MILLENAI_SRC)
 # 6b257: the Updates pane wears the version, the release date, and
 # the release notes (the gh release body now rides /api/update/check)
 check("updates: version, date, notes",

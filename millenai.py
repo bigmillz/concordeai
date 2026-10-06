@@ -45947,26 +45947,14 @@ function paintRoster(st,cloud){
   const rows=(st.models||[]).filter(m=>!ROS_SKIP.has(m.label));
   const rdy=rows.filter(m=>m.status==="ready");
   const miss=rows.filter(m=>m.status!=="ready");
-  const provs=(cloud&&cloud.providers)||{};
-  const up=[],down=[];
-  Object.keys(ADV_CLOUD).forEach(k=>{
-    ((provs[k]||{}).status==="ok"?up:down).push(k);
-  });
+  // THIS MAC ONLY (6b436, per Patrick: "hide cloud models in the local
+  // section"): the cloud providers have their own home in Settings >
+  // Cloud power; the roster is what is on this computer
   let h="";
   if(rdy.length)h+='<div class="ros-gh">ready · this mac</div>'
     +rdy.map(m=>rosRow(m,true)).join("");
-  if(up.length)h+='<div class="ros-gh">ready · cloud ☁</div>'
-    +up.map(k=>'<div class="ros-row"><span class="rs rok">✓☁</span>'
-      +'<span class="rn">'+esc(ADV_CLOUD[k][0])+'</span>'
-      +'<span class="rg"></span>'
-      +'<span class="rd">'+esc(ADV_CLOUD[k][1])+'</span></div>').join("");
   if(miss.length)h+='<div class="ros-gh">not downloaded</div>'
     +miss.map(m=>rosRow(m,false)).join("");
-  if(down.length)h+='<div class="ros-gh">no key · cloud ☁</div>'
-    +down.map(k=>'<div class="ros-row"><span class="rs rno">✕☁</span>'
-      +'<span class="rn">'+esc(ADV_CLOUD[k][0])+'</span>'
-      +'<span class="rg"></span>'
-      +'<span class="rd">'+esc(ADV_CLOUD[k][1])+'</span></div>').join("");
   host.innerHTML=h;
   paintMgStats();
   // the list follows any download in flight, whoever started it (6b314)

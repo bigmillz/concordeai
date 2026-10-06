@@ -9,6 +9,21 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b436 — the Manage list shows only models on this computer; cloud rows are gone from it (per Patrick)
+
+Patrick, from a screenshot of the Manage models list with a "READY · CLOUD ☁"
+group (Gemini, Groq, Claude, Kimi K3 each with a green check): "hide cloud
+models in the local section."
+
+`paintRoster` drew four groups: ready · this mac, ready · cloud, not
+downloaded, no key · cloud. The two cloud groups are gone, so the list is
+only what runs on this computer. Cloud is untouched where it is chosen:
+Settings > Cloud power, the Advanced picker's cloud section and compositor
+list, and the tier hover. Gauntlet: the roster is run in node and must hold no
+cloud word or provider name; a mutant that puts a cloud group back is caught.
+
+---
+
 ## 6b435 — pump mode through `initialize`, 1-LED header placeholders resized, the cooler's empty fan ports hidden (per the live server)
 
 Kit only (`ollama1/`), found on the live server after the last install (liquidctl 1.15.0, Corsair Hydro H115i Platinum,
