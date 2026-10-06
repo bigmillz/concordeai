@@ -314,18 +314,22 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(T.mclk_target(1000, 1000, 75), None)     # nothing above stock
         self.assertEqual(T.mclk_target(1100, 1075, 75), None)     # stock already past the range: never lowered
         self.assertEqual(T.mclk_target(None, 1075, 75), None)
-        self.assertEqual(T.mclk_target(2660, 3150, 150, T.CORE_MAX_MHZ), 2810)    # the core clock: +150 at most
-        self.assertEqual(T.mclk_target(2660, 3150, 900, T.CORE_MAX_MHZ), 2810)
-        self.assertEqual(T.mclk_target(2660, 2700, 150, T.CORE_MAX_MHZ), 2700)
+        self.assertEqual(T.mclk_target(2660, 3150, 300, T.CORE_MAX_MHZ), 2960)    # the core clock: +300 at most
+        self.assertEqual(T.mclk_target(2660, 3150, 900, T.CORE_MAX_MHZ), 2960)
+        self.assertEqual(T.mclk_target(2660, 3150, 301, T.CORE_MAX_MHZ), 2960)
+        self.assertEqual(T.mclk_target(2660, 2700, 300, T.CORE_MAX_MHZ), 2700)
 
     def test_the_command_line_values(self):
         self.assertEqual(T.parse_memory("0"), 0)
         self.assertEqual(T.parse_memory("75"), 75)
         self.assertEqual(T.parse_core("150"), 150)
+        self.assertEqual(T.parse_core("300"), 300)
+        with self.assertRaises(ValueError):
+            T.parse_core("301")
         for bad in ("76", "-1", "x", "", "1.5", None):
             with self.assertRaises(ValueError):
                 T.parse_memory(bad)
-        for bad in ("151", "-1", "x"):
+        for bad in ("301", "-1", "x"):
             with self.assertRaises(ValueError):
                 T.parse_core(bad)
         self.assertEqual(T.clamp_mhz(True, 75), 0)
@@ -485,9 +489,9 @@ class TestApply(Base):
         self.assertTrue(any("core +50 MHz (top 2660 -> 2710)" in l for l in self.out), self.out)
         self.assertFalse(any("memory" in l.lower() and "clock" in l.lower() for l in self.out), self.out)
 
-    def test_core_is_clamped_to_150_and_to_the_cards_range(self):
+    def test_core_is_clamped_to_300_and_to_the_cards_range(self):
         self.tree.navi21(od=NAVI21_OD.replace("3150Mhz", "2700Mhz"))
-        self.tuner().cmd_on(core=150)
+        self.tuner().cmd_on(core=300)
         self.assertEqual(self.sclk(), 2700)                    # the OD range's maximum
         st = self.state()
         st["core"] = 9999
@@ -495,7 +499,7 @@ class TestApply(Base):
             json.dump(st, f)
         self.tree.navi21(od=NAVI21_OD)
         self.tuner().cmd_apply()
-        self.assertEqual(self.sclk(), 2810)                    # +150 and no more
+        self.assertEqual(self.sclk(), 2960)                    # +300 and no more
 
     def test_memory_and_core_together(self):
         self.tree.navi21()
@@ -1109,6 +1113,46 @@ class TestParts(Base):
         self.assertNotIn("reverted", self.state())
         self.assertEqual(self.cap(), 293 * W)
 
+    def test_a_core_raise_over_150_has_a_95_c_junction_limit(self):
+        def hot(c):
+            return lambda n: self.tree.temp("junction", c) if n > 25 else None
+        self.go(core=200, ollama=FakeOllama(self.clock, self.tree, on_generate=hot(95)))
+        self.assertIn("junction reached 95 C", self.state()["reverted"])
+        self.assertEqual(self.values(), (255 * W, 1000, 2660))
+        self.setUp()
+        self.go(core=200, ollama=FakeOllama(self.clock, self.tree, on_generate=hot(94)))      # just under: passes
+        self.assertNotIn("reverted", self.state())
+        self.assertEqual(self.sclk(), 2860)
+        # 150 or less keeps the 100 C limit: 95 C is fine there
+        self.setUp()
+        self.go(core=150, ollama=FakeOllama(self.clock, self.tree, on_generate=hot(95)))
+        self.assertNotIn("reverted", self.state())
+        self.assertEqual(self.sclk(), 2810)
+
+    def draw(self, watts):
+        self.tree.write("bus/pci/devices/%s/hwmon/hwmon3/power1_average" % NAVI_ADDR, "%d\n" % int(watts * W))
+
+    def test_a_core_raise_over_150_is_reverted_by_a_power_draw_over_the_cap_plus_5_percent(self):
+        def pull(w):
+            return lambda n: self.draw(w) if n > 25 else None
+        self.go(core=200, ollama=FakeOllama(self.clock, self.tree, on_generate=pull(293 * 1.06)))
+        self.assertIn("the card drew 310 W, over its 293 W cap +5%", self.state()["reverted"])
+        self.assertEqual(self.values(), (255 * W, 1000, 2660))                  # everything back, like heat
+        # at the cap +4% it passes
+        self.setUp()
+        self.go(core=200, ollama=FakeOllama(self.clock, self.tree, on_generate=pull(293 * 1.04)))
+        self.assertNotIn("reverted", self.state())
+        self.assertEqual(self.sclk(), 2860)
+        # the same draw with a raise of 150 or less is not looked at
+        self.setUp()
+        self.go(core=150, ollama=FakeOllama(self.clock, self.tree, on_generate=pull(293 * 1.2)))
+        self.assertNotIn("reverted", self.state())
+        # no reading from the card (no power1_average, no power1_input): the sub-check is skipped
+        self.setUp()
+        self.go(core=200)
+        self.assertNotIn("reverted", self.state())
+        self.assertEqual(self.sclk(), 2860)
+
     def test_a_kernel_error_during_the_core_check_reverts_everything(self):
         def hang(n):
             if n == 28:
@@ -1318,7 +1362,7 @@ class TestCommandClocks(Base):
                               capture_output=True, text=True, env=env, timeout=30)
 
     def test_out_of_range_and_bad_values_are_refused(self):
-        for args in (("on", "--memory", "76"), ("on", "--memory", "-1"), ("on", "--core", "151"), ("on", "--core", "x"),
+        for args in (("on", "--memory", "76"), ("on", "--memory", "-1"), ("on", "--core", "301"), ("on", "--core", "x"),
                      ("on", "--memory"), ("on", "--bogus"), ("setup", "on", "--memory", "99"), ("setup", "on", "--core=999")):
             r = self.run_bin(*args)
             self.assertEqual(r.returncode, 2, (args, r.stdout, r.stderr))
@@ -1465,9 +1509,9 @@ class TestSetupFlags(unittest.TestCase):
         code, out = self.plan("--gpu-tune", "--gpu-tune-memory", "25", "--gpu-tune-core", "50")
         self.assertEqual(code, 0, out)
         self.assertIn("memory clock +25 MHz (opt-in), core clock +50 MHz (opt-in, experimental)", out)
-        saved = self.saved_file("GPU_TUNE=on\nGPU_TUNE_MEMORY=75\nGPU_TUNE_CORE=150\n")        # kept by a re-run
-        self.assertIn("memory clock +75 MHz (opt-in), core clock +150 MHz", self.plan(SAVED=saved)[1])
-        self.assertIn("memory clock +10 MHz (opt-in), core clock +150 MHz", self.plan("--gpu-tune-memory", "10", SAVED=saved)[1])
+        saved = self.saved_file("GPU_TUNE=on\nGPU_TUNE_MEMORY=75\nGPU_TUNE_CORE=300\n")        # kept by a re-run
+        self.assertIn("memory clock +75 MHz (opt-in), core clock +300 MHz", self.plan(SAVED=saved)[1])
+        self.assertIn("memory clock +10 MHz (opt-in), core clock +300 MHz", self.plan("--gpu-tune-memory", "10", SAVED=saved)[1])
         self.assertIn("memory clock left at stock", self.plan("--gpu-tune-memory", "0", SAVED=saved)[1])
         s = open(os.path.join(U.KIT, "setup.sh")).read()
         self.assertIn("printf 'GPU_TUNE_MEMORY=%s\\nGPU_TUNE_CORE=%s\\n'", s)       # saved in setup.env
@@ -1475,10 +1519,10 @@ class TestSetupFlags(unittest.TestCase):
 
     def test_the_clock_options_are_range_checked(self):
         for args in (("--gpu-tune-memory", "76"), ("--gpu-tune-memory", "-1"), ("--gpu-tune-memory", "x"),
-                     ("--gpu-tune-core", "151"), ("--gpu-tune-core", "1.5"), ("--gpu-tune-core",), ("--gpu-tune-memory",)):
+                     ("--gpu-tune-core", "301"), ("--gpu-tune-core", "1.5"), ("--gpu-tune-core",), ("--gpu-tune-memory",)):
             code, out = self.plan("--gpu-tune", *args)
             self.assertEqual(code, 2, (args, out))
-        for args in (("--gpu-tune-memory", "75"), ("--gpu-tune-core", "150"), ("--gpu-tune-memory", "0")):
+        for args in (("--gpu-tune-memory", "75"), ("--gpu-tune-core", "300"), ("--gpu-tune-memory", "0")):
             self.assertEqual(self.plan("--gpu-tune", *args)[0], 0)
         code, out = self.plan(SAVED=self.saved_file("GPU_TUNE=on\nGPU_TUNE_CORE=999\n"))
         self.assertNotEqual(code, 0)

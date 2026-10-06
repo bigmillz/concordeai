@@ -9,6 +9,19 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b433 — the GPU core raise may go to +300 MHz, with a tighter check above +150 (per the owner)
+Owner: "Can we try to add 300 megahertz to the core for the GPU?" `CORE_MAX_MHZ` 150 -> 300 (memory stays 0..75);
+the CLI refusal ("--core takes 0 to 300 MHz"), setup.sh help, validation, saved-value messages (the 150 passed to
+`gpu_clock_choice`), `ollama1-gpu-tune` help and the README follow. Every safety behaviour is unchanged: the raise is
+applied only inside its own check and kept only if it passes, a slow raise goes back alone with the power limit kept,
+it is never left applied unverified after a deferral, and a machine stopped during the check reverts at next boot.
+Because 300 is a bigger step, a core raise above 150 MHz has a tighter check: junction limit 95 C (not 100 C), and the
+card's power draw (`power1_average`, else `power1_input`) must not exceed the power cap +5%, else everything goes back
+at once like any heat or kernel error; no reading from the card, no power check. Not verified on the card: whether a
+6900 XT holds +300 at all, and whether it reports power1_average on this kernel. Tests: clamp tests at 300, new
+tests for the 95 C and the draw limit (with the 150 MHz and no-reading cases), and mutants for each. (Pre-existing on
+main, unrelated: `test_choice` and two `mutate.py gpu-tune` entries reporting BROKEN.)
+
 ## 6b432 — boot no longer waits two minutes for unplugged network links (per the owner)
 Pat's photo of the console stuck at "Job systemd-networkd-wait-online.service/start running (1min 27s / no limit)".
 The server boots with the bridge up in a second, but the stock wait-online waits for EVERY link: the second wired

@@ -115,7 +115,7 @@ it asks for any it can't find, at the terminal):
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 1 minute: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 1-minute ramp when it stops, and dims to 40% after 5 minutes of white (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--leds-length N` | LEDs given to a board header that lists none, 1 to 1024 (default **60**): see "Lights" below. Saved in `setup.env` (`LEDS_LENGTH=`, only when you give it), so a re-run without the flag keeps it |
-| `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 150 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
+| `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 300 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
 server's name and domain in `/etc/ollama1/config.json`, so a re-run needs
@@ -886,12 +886,15 @@ driver reports for the card, which it finds by its PCI ids (not by `cardN`):
   default because on this card it made answers 2.4x slower** (no kernel
   error; most likely the GDDR6 retrying past what this card's memory holds).
 - **Core clock, opt-in, experimental** (`--gpu-tune-core N`, or `on --core N`;
-  N whole MHz above the card's current stock top, 0 to 150, default 0 = off):
+  N whole MHz above the card's current stock top, 0 to 300, default 0 = off):
   the shader clock's top state, written with the overdrive table, read back
   and verified, never past the card's `OD_RANGE` limit. It helps mostly long
   prompts (prompt reading), much less answering, and **may crash the card**
   (a hang resets the GPU; the next boot then puts everything back). The check
-  uses 100 C junction as its limit while the core is raised.
+  uses 100 C junction as its limit while the core is raised; for a raise of more than
+  150 MHz (up to 300) it is tighter, **95 C junction**, and the check also reads the
+  card's power draw (`power1_average`, else `power1_input`) and puts everything back if it is
+  above the power cap plus 5% (no reading from the card, no power check).
 - Voltages: untouched.
 
 The memory clock needs the kernel's overdrive switch: setup adds only the
@@ -906,7 +909,7 @@ itself tainted; that is expected.
 the memory clock, then the core clock. A check is 60 seconds of answers on the
 card with a model already installed, while it watches the kernel log for
 amdgpu errors (a ring timeout, a GPU reset, a page fault) and the card's
-temperatures. Any error, the junction at 105 C (100 C with the core raised) or
+temperatures. Any error, the junction at 105 C (100 C with the core raised, 95 C when raised by more than 150 MHz), a power draw over the cap +5% (core raise past 150 MHz only, when the card reports it) or
 the memory at 100 C puts **everything** back to stock at once. Slow answers
 (more than 5% under the baseline) are not enough on their own: the check
 measures the baseline and the tuned state again, alternating twice, and only a
