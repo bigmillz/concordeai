@@ -9,6 +9,45 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b439 — Wi-Fi backup for the server kit: a spare connection and a second way to wake it (per the owner; opt-in)
+
+Owner: "Let's take a look into having Wi-Fi as a backup connection. Can we do wake on LAN with that? If it's on the
+motherboard", then "Yes, build it". The server's board has an Intel Wi-Fi 6 AX200 (iwlwifi) that `iw phy` shows can
+wake on a magic packet (WoWLAN); it was unconfigured, with PCI wakeup disabled. Kit only (`ollama1/`); the app and
+`millenai.py` are untouched. Not run on hardware yet (see "Unverified").
+
+- **Opt-in, like `--leds`.** `setup.sh --wifi on|off` (`OLLAMA1_WIFI=1|0`, saved as `WIFI=` in `setup.env`, default
+  off): `wifi_choice` / `wifi_plan` in `lib/setuplib.sh`, the help, the plan, a step "Wi-Fi backup" after the watchdog.
+  `on` installs `iw` (and `wpasupplicant` only if missing), links `ollama1-wifi` into `/usr/local/sbin`, writes
+  `50-ollama1-wifi.link` (Type=wlan; names kept; `MACAddressPolicy=persistent`, so the card keeps its real MAC, the
+  one the wake list publishes), `70-ollama1-wifi.rules` (PCI class 0x0280 `power/wakeup` = enabled) and the state file
+  `/etc/ollama1/wifi.json`. It configures **no network and touches no netplan file**. `off` removes those, the link and
+  the netplan file `set` wrote, and leaves the user's own files.
+- **`ollama1-wifi` (`bin/ollama1-wifi`, `lib/o1wifi.py`).** `set` asks for the SSID and, twice, the password with
+  getpass (no echo); an argument is refused and not repeated back; the environment is never read. SSID 1..32 bytes,
+  passphrase 8..63 printable ASCII. It writes `/etc/netplan/70-ollama1-wifi.yaml` (0600 from the first byte): networkd,
+  the card found by its sysfs type (not a fixed name), `dhcp4` with `route-metric: 600` (the wired bridge is 100, so
+  the cable always wins), `optional: true` (the 6b432 wait-online drop-in already waits for one link),
+  `regulatory-domain` only when zone1970.tab gives the time zone exactly one country. Then `netplan generate` (a
+  refusal ends it), `netplan apply`, and a check that no wired cable that was up went down; any failure puts the
+  previous file back (or removes ours) and applies again. The bridge file is never opened. `status` and `remove` as
+  asked. The password is only ever in that file: not in an argument, an environment, a log, `status`, or an error
+  (netplan's text is redacted with the password and SSID blanked).
+- **Wake.** Sleep hook: `pre` runs `ollama1-wifi wowlan enable` (PCI wake on, `iw phy <phy> wowlan enable
+  magic-packet disconnect`, phy from `/sys/class/net/<if>/phy80211/name`); `post` runs `wowlan disable` and
+  `networkctl reconfigure <if>`. Quiet and always exit 0 (`|| true`, then the hook's own `exit 0`); the tool does
+  nothing when off, nothing is set, or there is no card. `o1idle.wake_list` appends the Wi-Fi MAC (after the wired
+  ones, under `MAX_WAKE`) only with the feature on, a network set, a permanent address (`addr_assign_type` 0, else not
+  locally administered) and "wake up on magic packet" in `iw phy <phy> info`. `physical_nics` still skips wireless
+  cards: the Wi-Fi card is a separate probe (`o1idle.wifi_wake`), so the ethernet `.link` setup is unchanged.
+  The gateway's `/v1/sleep-config` `wake` list and the panel's "N network cards can wake it" follow with no change.
+- **Tests.** `tests/test_wifi.py` (39) with `tests/fakewifi.py` (fake `iw`, `netplan`, `ip`, `apt-get`, `udevadm`,
+  `networkctl`, `systemctl`, logging every argument and environment) and a fake sysfs; includes a real pty run of the
+  command. 26 mutants (`mutate.py wifi:`).
+- **Unverified on hardware.** Real WoWLAN wake from S3 on the AX200 with iwlwifi (kernel 7.0), whether the access point
+  delivers the packet to a sleeping card (many do not), `netplan apply` leaving the bridge alone on the live
+  machine, and `networkctl reconfigure` after the wake. Docs say so plainly (README "Wi-Fi backup").
+
 ## 6b438 — starter chips are whole, relevant questions and change at every new chat (per Patrick)
 
 Patrick (2026-10-06), about the empty-composer chips ("Past era details?", "New culture facts?", "Best travel tips?",

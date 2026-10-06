@@ -50,7 +50,7 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 | | |
 |---|---|
 | Host name | `<server-name>` (what you give with `--name`). The time zone stays as the machine has it, unless you give `--timezone` |
-| Address | `<server-ip>` on the LAN port (`br0` if you have a bridge over both wired ports, which keeps a second device, like a Raspberry Pi, on the LAN). The kit never changes network settings |
+| Address | `<server-ip>` on the LAN port (`br0` if you have a bridge over both wired ports, which keeps a second device, like a Raspberry Pi, on the LAN). The kit never changes network settings, except the optional Wi-Fi backup's own netplan file (see "Wi-Fi backup") |
 | OS disk (`--os-serial`) | Kept. The root volume grows into the free space on it. `/home` stays where it is |
 | Models disk (`--models-serial`) | **Wiped**, ext4, `/srv/models`. This is Ollama's model folder |
 | Any other disk (including the two old mirror disks, `--hdd1-serial`, `--hdd2-serial`) | **Never touched.** There is no mirror: the kit builds no RAID and never wipes, assembles or mounts these disks (6b400). The nightly copy of the settings and the model list goes to `/var/backups/ollama1` on the root filesystem. A server that still has the old RAID can remove it with `tools/remove-raid.sh` (below) |
@@ -114,6 +114,7 @@ it asks for any it can't find, at the terminal):
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 1 minute, and 10% after 5 idle minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
 | `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 1-minute ramp when it stops, and goes from white to blue over 30 s after 5 minutes of white, always at full brightness (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--wifi on\|off` | Wi-Fi as a backup connection and a second way to wake the server (see "Wi-Fi backup" below). **Off unless you say `--wifi on`** (or `OLLAMA1_WIFI=1`); `on` installs `iw` (and `wpasupplicant` if missing) and the `ollama1-wifi` tool, and sets up no network: `sudo ollama1-wifi set` does. Saved in `setup.env` (`WIFI=`), so a re-run without the flag keeps it |
 | `--leds-length N` | LEDs given to a board header that lists none, 1 to 1024 (default **60**): see "Lights" below. Saved in `setup.env` (`LEDS_LENGTH=`, only when you give it), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 300 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
 
@@ -1852,7 +1853,8 @@ not apply. The services, timers, tunnel and config keep working: they live in
 
 ## The network
 
-The kit never touches your network settings. It works with a plain wired
+The kit never touches your network settings (the one exception is the optional
+"Wi-Fi backup" below, which writes a netplan file of its own and nothing else). It works with a plain wired
 port, and also with a bridge. If your server has a bridge `br0` over its
 two wired ports (one to the router, one to another device, like a
 Raspberry Pi), at `<server-ip>`, that comes from your own bridge script
@@ -1870,6 +1872,108 @@ With a bridge, the firewall is set so it can't cut the other device off:
 - **Interface rules use `br0`.** SSH is allowed in on `br0`, from
   `<lan-cidr>`.
 
+## Wi-Fi backup
+
+If the server's board has a Wi-Fi card, it can be a spare connection, and a
+second way for the app to wake the server. **Off unless you say
+`sudo ./setup.sh --wifi on`** (or `OLLAMA1_WIFI=1`; saved in `setup.env` as
+`WIFI=`). `--wifi off` takes it out again.
+
+**What `--wifi on` does.** It installs `iw` (and `wpasupplicant`, which
+networkd needs for Wi-Fi, if it is missing) with apt, links the
+`ollama1-wifi` tool into `/usr/local/sbin`, and adds two small files: a udev
+rule (`/etc/udev/rules.d/70-ollama1-wifi.rules`) that lets a network card on
+the PCI bus wake the machine, and a `.link` file
+(`/etc/systemd/network/50-ollama1-wifi.link`) so the card keeps its real MAC
+address and its name (the wake list is made of MAC addresses; a random one
+would wake nothing). It sets up **no network** and touches **none of your
+netplan files**, your bridge included. It prints how to give it the network:
+
+```bash
+sudo ollama1-wifi set
+```
+
+**`ollama1-wifi set`.** Asks for the network name, then the password twice,
+with the terminal's no-echo prompt. It checks them (a name of 1 to 32 bytes; a
+WPA2/WPA3 passphrase of 8 to 63 characters; open networks and 64-digit keys
+are not handled) and writes `/etc/netplan/70-ollama1-wifi.yaml` (mode 0600,
+root): renderer networkd, the card found by its type (not a name the kit
+guesses), `dhcp4: true` with `route-metric: 600`, `optional: true`, the
+access point, and the regulatory domain when the server's time zone belongs to
+exactly one country. Then:
+
+- **The cable always wins.** A wired bridge's DHCP route has metric 100; this
+  one has 600, so Wi-Fi carries traffic only while the wired link is down, and
+  `ollama1-wifi status` shows which link has the default route.
+- **Boot never waits for it** (`optional: true`; the kit's wait-online drop-in
+  already waits for one link, 30 s at most).
+- **It cannot cut the wired link.** The new file is checked with
+  `netplan generate` before `netplan apply` (a refusal stops there), and if
+  the apply fails, or a wired cable that was up is down after it, the previous
+  file (or none) is put back and applied again. Your bridge file is never
+  opened.
+- **The password is never anywhere else.** It is not an argument or an
+  environment variable (`ollama1-wifi set <anything>` is refused, and is not
+  repeated back), is not printed by `status`, is not in any log line or error
+  message (netplan's own text is shown with it blanked), is not in a command
+  line, and is written only into the 0600 netplan file, which is created with
+  that mode. Anyone who can read that file as root can read it; that is the
+  nature of a Wi-Fi password on a server.
+
+`sudo ollama1-wifi status` shows whether Wi-Fi is set, connected (the network,
+the signal), its address, the wired cards' links, which link carries the
+default route, whether the card can wake on a magic packet and has PCI wake
+on, and which MAC addresses the server publishes to the app.
+`sudo ollama1-wifi remove` deletes the netplan file and applies that.
+
+```text
+Wi-Fi backup: on
+Wi-Fi card: wlan0, MAC 02:00:5e:10:00:77
+Network: set ("<your-network>")
+Link: connected to "<your-network>", signal -52 dBm
+Address: <wifi-ip>/24
+Wired: eth0 up, eth1 down
+Default route: br0 (metric 100)
+Card can wake on a magic packet (WoWLAN): yes
+PCI wake enabled: yes
+Published to the app as a wake card: 02:00:5e:10:00:77
+```
+
+**Waking over Wi-Fi.** The app wakes a server by sending a magic packet to
+every address in the server's wake list (`/v1/sleep-config`, "N network cards
+can wake it" in the panel). Once Wi-Fi backup is on and a network is set, and
+`iw phy <phy> info` lists "wake up on magic packet" for the card, its MAC joins
+that list after the wired cards'. Before a suspend, the sleep hook enables
+the card's PCI wake and runs `iw phy <phy> wowlan enable magic-packet
+disconnect` (the phy is found from the card, not assumed); after the wake it
+runs `wowlan disable` and has networkd look at the card again. All of that does
+nothing when Wi-Fi backup is off, no network is set or there is no card, and
+never delays or stops a suspend. The BIOS must allow wake from a PCI-E device
+(MSI: Settings > Advanced > Wake Up Event Setup > "Resume by PCI-E device").
+
+**Honest limits.**
+
+- Waking over Wi-Fi is **less reliable than the cable**. The card is asleep, so
+  the router or access point has to deliver the packet to a sleeping station:
+  many hold broadcast frames until the card's next wake-up window, some drop
+  them, some (with client isolation or a guest network) never pass them. Try
+  it before you rely on it.
+- A Wi-Fi card wakes the machine **only from sleep (S3)**, which is what auto
+  sleep and "Sleep now" do. It cannot power the machine on from a full
+  shutdown, the way a wired card on standby power can.
+- The wake needs the app (or a relay) to send the packet **on a network the
+  access point is part of**. A wired cable and Wi-Fi are on the same LAN only if
+  your router bridges them, which most home routers do.
+- With the cable in, the wired card is the one that should wake it; the Wi-Fi
+  card is a second chance, and a way back when the cable is out.
+- `wake up on disconnect` is also switched on, so the machine may wake when the
+  access point drops it.
+
+**To try it with the cable unplugged**: `sudo ollama1-wifi set`, check
+`sudo ollama1-wifi status` shows it connected, unplug the cable, and see that
+the server still answers (its address on Wi-Fi is in `status`). Then put it to
+sleep from the panel and wake it from the app.
+
 ## Troubleshooting
 
 | | |
@@ -1881,6 +1985,7 @@ With a bridge, the firewall is set so it can't cut the other device off:
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
 | Watchdog | `ollama1-watchdog status`; `journalctl -u ollama1-watchdog`; off: `sudo ./setup.sh --watchdog off`; see "Hardware watchdog" |
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
+| Wi-Fi backup | `sudo ollama1-wifi status`; `iw dev`; off: `sudo ./setup.sh --wifi off`; see "Wi-Fi backup" |
 | Lights | `ollama1-leds status`; `journalctl -u ollama1-leds -u ollama1-openrgb`; off: `sudo ./setup.sh --leds off` |
 | System move to the other NVMe | `cat /var/lib/ollama1/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
@@ -1943,6 +2048,16 @@ Ed25519 (the server uses PyNaCl). They cover:
   error or heat, a slower answer only when it repeats in stock/tuned
   alternations (and not while a drive logs errors, another model loads or the
   card is busy), and a revert never re-applied;
+- Wi-Fi backup (`test_wifi.py`) against fake `iw`, `netplan`, `ip`, `apt-get` and a
+  fake sysfs: the password reaches nothing but the 0600 netplan file (not an
+  argument, the environment, a log line, the status or an error message; typed
+  on a real pseudo-terminal with no echo), the file's contents (networkd,
+  metric 600, optional, the card found by type), `netplan generate` before
+  `apply`, the old file back after a refusal, a failed apply or a dropped
+  cable, the bridge file untouched, the hook's wake-on-magic-packet and
+  disable with the right phy and a hook that never fails a suspend, and the
+  Wi-Fi card's address in the wake list only when it is on, set up, permanent
+  and able;
 - the auto sleep setting across a gateway restart, the idle service's, a
   reboot and a setup.sh run (`test_sleepcfg.py`), and the check after a wake
   waiting, bounded, for the card and the models drive (`test_sleep.py`,

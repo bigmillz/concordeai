@@ -1,0 +1,37 @@
+#!/usr/bin/python3
+"""ollama1-wifi: the server's Wi-Fi as a backup connection (6b439). Opt-in: sudo ./setup.sh --wifi on.
+See lib/o1wifi.py and the README's "Wi-Fi backup".
+
+  sudo ollama1-wifi set       asks for the network name and the password (no echo; the password is never taken
+                              as an argument or from the environment) and sets the network up as a backup: the
+                              wired link keeps the default route, Wi-Fi takes over only when it is down
+  sudo ollama1-wifi status    the card, the network, the link, the address, the wired link, which link carries
+                              the default route, wake over Wi-Fi, and the cards published to the app
+  sudo ollama1-wifi remove    takes the Wi-Fi network out again
+
+Used by the system:
+  setup on|off                setup.sh's step (--wifi on|off)
+  wowlan enable|disable       the suspend hook: wake on a magic packet before sleeping, off after waking
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1wifi  # noqa: E402
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__)
+        return 0
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("Run it with sudo: sudo ollama1-wifi " + (cmd if cmd in ("set", "status", "remove") else "status"), file=sys.stderr)
+        return 1
+    return o1wifi.main(argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

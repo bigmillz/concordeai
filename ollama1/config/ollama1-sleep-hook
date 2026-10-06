@@ -12,12 +12,17 @@
 # suspending it closes the device cleanly ('V') and waits (at most 5 s) until that
 # is done; after waking it reopens as soon as the system disk answers (or 90 s at
 # the latest, so a drive that never comes back still ends in a reset).
+# Wi-Fi backup (6b439): before suspending, the Wi-Fi card is set to wake the machine on a magic packet (or a
+# disconnect); after waking that is switched off again and networkd re-associates. The tool does nothing when
+# Wi-Fi backup is off, no network is set or there is no card, and whatever it does or says, the hook still exits 0.
 HELPER=${OLLAMA1_HELPER:-/usr/local/lib/ollama1/bin/ollama1-helper}
+WIFI=${OLLAMA1_WIFI_TOOL:-/usr/local/lib/ollama1/bin/ollama1-wifi}
 WATCHDOG=${OLLAMA1_WATCHDOG:-/usr/local/lib/ollama1/bin/ollama1-watchdog}
 case "$1" in
   pre)
     [ ! -x "$WATCHDOG" ] || "$WATCHDOG" pause    # does nothing when the service is not running
-    "$HELPER" stamp sleep ;;
+    "$HELPER" stamp sleep
+    [ ! -x "$WIFI" ] || "$WIFI" wowlan enable >/dev/null 2>&1 || true ;;
   post)
     [ ! -x "$WATCHDOG" ] || "$WATCHDOG" resume
     "$HELPER" stamp wake
@@ -34,6 +39,7 @@ case "$1" in
     if systemctl is-active --quiet ollama1-leds.service 2>/dev/null; then
       systemctl restart --no-block ollama1-openrgb.service
       systemctl kill --kill-whom=main --signal=USR1 ollama1-leds.service
-    fi ;;
+    fi
+    [ ! -x "$WIFI" ] || "$WIFI" wowlan disable >/dev/null 2>&1 || true ;;
 esac
 exit 0

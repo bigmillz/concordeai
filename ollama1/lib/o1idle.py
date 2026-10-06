@@ -449,12 +449,27 @@ def read_wol(nic):
     return None if t is None else parse_wol(t)
 
 
-def wake_list(nics=None, wol=read_wol):
-    """MACs of the cards with magic-packet wake switched on (at most 8)."""
+def wifi_wake():
+    """The Wi-Fi card's MAC, when Wi-Fi backup is on and set up and the card can wake on a magic packet (6b439)."""
+    try:
+        import o1wifi
+        return o1wifi.wake_macs()
+    except Exception:
+        return []
+
+
+def wake_list(nics=None, wol=read_wol, wifi=None):
+    """MACs of the cards with magic-packet wake switched on (at most 8): the wired ones first, then the Wi-Fi card
+    (only on the real machine's list, or when a `wifi` probe is given)."""
     out = []
+    if wifi is None and nics is None:
+        wifi = wifi_wake
     for name, mac in (physical_nics() if nics is None else nics):
         w = wol(name)
         if w and w[1] and mac not in out:
+            out.append(mac)
+    for mac in (wifi() if wifi else []):
+        if MAC_RX.match(mac) and mac not in out:
             out.append(mac)
     return out[:MAX_WAKE]
 

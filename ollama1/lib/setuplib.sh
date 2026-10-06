@@ -139,6 +139,29 @@ leds_choice() { # FLAG ENV SAVED -> "on" or "off" (6b395): the flag, else the en
   echo off
 }
 
+wifi_choice() { # FLAG ENV SAVED -> "on" or "off" (6b439): the flag, else the environment (OLLAMA1_WIFI), else what an
+  # earlier run saved, else "off": Wi-Fi backup installs packages and a root tool, so it is opt-in. Fails on a value it
+  # doesn't know.
+  local v
+  for v in "$1" "$2" "$3"; do
+    case "$v" in
+      "") ;;
+      on|1|yes|true) echo on; return 0 ;;
+      off|0|no|false) echo off; return 0 ;;
+      *) return 1 ;;
+    esac
+  done
+  echo off
+}
+
+wifi_plan() { # the plan's line for the Wi-Fi backup (6b439): $1 on|off
+  if [ "$1" = on ]; then
+    printf 'Wi-Fi backup ON: installs iw (and wpasupplicant if missing) with apt-get, the ollama1-wifi tool, a udev rule and a .link file so the Wi-Fi card keeps its real MAC and may wake the server, and the suspend hook turns on wake over Wi-Fi (magic packet); it does not configure any network or touch your netplan files. Give it the network afterwards: sudo ollama1-wifi set. Off: --wifi off'
+  else
+    printf 'Wi-Fi backup OFF (default): nothing installed. On: --wifi on'
+  fi
+}
+
 leds_length_choice() { # FLAG SAVED -> whole LEDs 1..1024, or nothing (6b428): the flag, else what an earlier run saved.
   # Nothing means the service's own default (60): an unset length is not saved, so a later default applies.
   # A value that is not a whole number in range fails.
