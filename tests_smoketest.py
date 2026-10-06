@@ -8536,7 +8536,7 @@ _STORE_NAMES = {"StoreReadError", "READ_FAIL", "_read_json", "_write_json",
                 "chat_ops", "chat_append_turn", "_chats_lock", "MEMORY_KEEP",
                 "_load_memory", "_save_memory", "memory_text", "_TURN_TAGS",
                 "_TURN_FRAME", "_TURN_PART", "_TURN_RESET", "_TURN_BOLD_SKIP",
-                "turn_text", "turn_record", "_chat_late", "chat_append_late",
+                "turn_text", "turn_record", "_places_worth_showing", "_chat_late", "chat_append_late",
                 "_turns_live", "_turns_lock", "_turns_settle", "_turn_rec",
                 "_Unread", "load_prefs", "store_prefs",
                 "CHATS_FILE", "MEMORY_FILE", "LEGACY_CHATS", "LEGACY_MEMORY",
@@ -8758,14 +8758,77 @@ _tr = _cs["turn_record"]
 _x1 = _tr("hello \x00DRAFT:" + json.dumps({"m": "A", "t": "d1"}) + "\x00world")
 _x2 = _tr("\x00DRAFT:" + json.dumps({"m": "A", "t": "rescued"}) + "\x00")
 _x3 = _tr("⚠️ the engine fell over")
-_x4 = _tr("Go to **Joe's Pizza** and **Lucali**.\n[[PLACES]] " + json.dumps([{"n": "Joe's"}]))
-_x5 = _tr("Try **Katz's Deli** or **Russ & Daughters**.", searched=True)
+_x4 = _tr("\x00CTX:{\"loc\": \"New York\"}\x00Go to **Joe's Pizza** and **Lucali**.\n[[PLACES]] " + json.dumps([{"n": "Joe's"}]))
+_x5 = _tr("\x00PLACEHINT:[\"Katz's Deli\"]\x00\x00CTX:{\"loc\": \"New York\"}\x00"
+          "Try **Katz's Deli** or **Russ & Daughters**.", searched=True)
 check("a saved answer is the page's: drafts kept, an empty one rescued, errors not saved, places read",
       _x1 == {"role": "assistant", "content": "hello world", "drafts": [{"m": "A", "t": "d1"}]}
       and _x2["content"] == "rescued" and _x3 is None
       and _x4["content"] == "Go to **Joe's Pizza** and **Lucali**." and _x4["places"] == [{"n": "Joe's"}]
       and [p_["n"] for p_ in _x5["places"]] == ["Katz's Deli", "Russ & Daughters"],
       "%r" % [_x1, _x2, _x3, _x4, _x5])
+
+# STRAY BLACK BOXES (6b437, per Patrick, the third time: "the pointless and stray black boxes at the bottom").
+# The bold lead-ins of a searched car answer were saved as "places" and drawn as a dark three-cell box.
+_pb_ans = ("**Chevrolet's 2026 performance lineup** is wide.\n**Hennessey Performance upgrades** go further.\n"
+           "**FastestLaps.com** has the numbers.")
+_pb1 = _tr(_pb_ans, searched=True)                                    # searched, not a place question
+_pb2 = _tr("\x00PLACEHINT:[\"x\"]\x00" + _pb_ans, searched=True)          # a hint but no location to pin in
+_pb3 = _tr("\x00PLACEHINT:[\"x\"]\x00\x00CTX:{\"loc\": \"Brooklyn\"}\x00" + _pb_ans, searched=True)
+_pb4 = _tr("\x00PLACES2:" + json.dumps([{"n": "Lucali", "d": "Pizza", "h": "5pm-10pm"}]) + "\x00Go to **Lucali**.")
+_pb5 = _tr("\x00PLACES2:" + json.dumps([{"n": "A", "d": "", "h": ""}]) + "\x00Go to A.")
+check("a searched answer's bold phrases are not saved as places; real places and pinnable names are",
+      "places" not in _pb1 and "places" not in _pb2 and "places" not in _pb5
+      and len(_pb3.get("places", [])) == 3 and _pb3["loc"] == "Brooklyn"
+      and _pb4["places"][0]["h"] == "5pm-10pm",
+      "%r" % [_pb1, _pb2, _pb3, _pb4, _pb5])
+_pw = _cs["_places_worth_showing"]
+_pm_ = _MILLENAI_SRC.replace('if not places and got.get("PLACEHINT"):', 'if not places and (searched or got.get("PLACEHINT")):', 1)
+_pm2_ = _MILLENAI_SRC.replace('    return ps if (loc or "").strip() else []\n', '    return ps\n', 1)
+check("the places keep-rule: details or a location; the mutants (a searched answer's bold, bare names with no location) are caught",
+      _pw([{"n": "A", "d": "", "h": ""}], "") == [] and _pw([{"n": "A", "d": "", "h": ""}], "NYC") != []
+      and _pw([{"n": "A", "d": "x", "h": ""}], "") != [] and _pw([{"n": "A", "lat": 1, "lon": 2}], "") != []
+      and _pm_ != _MILLENAI_SRC and _pm2_ != _MILLENAI_SRC
+      and '    if not places and got.get("PLACEHINT"):' in _MILLENAI_SRC
+      and '    return ps if (loc or "").strip() else []\n' in _MILLENAI_SRC
+      and 'if names and getattr(_tl_search, "locq", ""):' in _MILLENAI_SRC)
+
+# the page's strip: bare names never draw a box (6b437); real places do; an old saved chat is filtered too
+_PB_JS = ("let LMAP_SEQ=0;const esc=s=>String(s);const mapCard=m=>'MAPCARD';const setTimeout=()=>0;"
+          "function mountPlaces(){}\n"
+          + _jsfn(_MILLENAI_SRC, "function placesUsable(places,loc){")
+          + _jsfn(_MILLENAI_SRC, "function placesModule(places,loc,mapd){")
+          + r'''
+const bare=[{n:"Chevrolet's 2026 performance lineup",d:"",h:""},{n:"Hennessey Performance upgrades",d:"",h:""},{n:"FastestLaps.com",d:"",h:""}];
+const R={};
+R.bare=placesModule(bare,"",null);
+R.bareLoc=placesModule(bare,"Brooklyn",null);
+R.real=placesModule([{n:"Lucali",d:"Pizza",h:"5pm"},{n:"X",d:"",h:""}],"",null);
+R.pin=placesModule([{n:"Pinned",lat:40.7,lon:-74}],"",null);
+R.none=placesModule([],"",null);
+process.stdout.write(JSON.stringify(R));
+''')
+def _pb_run(js):
+    try:
+        return _node_json(js, "places6b437.js")
+    except Exception as _e:
+        return {"err": str(_e)}
+def _pb_ok(r):
+    return (r.get("bare") == "MAPCARD" and r.get("none") == "MAPCARD"
+            and "prail" not in (r.get("bareLoc") or "") and "norail" in (r.get("bareLoc") or "")
+            and r.get("real", "").count('class="pcard"') == 2 and 'class="prail"' in r.get("real", "")
+            and 'class="prail"' in r.get("pin", ""))
+_pb_r = _pb_run(_PB_JS)
+_pb_muts = [_PB_JS.replace('ok:real||(ps.length>0&&!!String(loc||"").trim())', "ok:ps.length>0", 1),
+            _PB_JS.replace("rail:real,", "rail:true,", 1),
+            _PB_JS.replace('p.d||p.h||typeof p.lat==="number"||typeof p.lon==="number"', "true", 1)]
+check("bare names draw no strip (the page, node); real places and pins do; an old saved list is filtered at render",
+      _pb_ok(_pb_r) and all(m_ != _PB_JS for m_ in _pb_muts) and not any(_pb_ok(_pb_run(m_)) for m_ in _pb_muts),
+      "%r" % [_pb_r, [_pb_ok(_pb_run(m_)) for m_ in _pb_muts]])
+check("the page mines bold names only on a place hint, and an unpinnable map is hidden",
+      "if((!places||!places.length)&&placeHint){" in _MILLENAI_SRC and "(searched||placeHint)" not in _MILLENAI_SRC
+      and ".placesmod.norail.nomap{display:none}" in _MILLENAI_SRC
+      and _MILLENAI_SRC.replace("&&placeHint){", "&&(searched||placeHint)){", 1) != _MILLENAI_SRC)
 
 # ids: "c" + 26 base32, random on both sides (0b 5.3), so two computers
 # starting a chat in the same millisecond can't collide

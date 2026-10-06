@@ -27418,6 +27418,21 @@ def turn_text(raw: str) -> str:
     return t[cut + len(_TURN_RESET):] if cut >= 0 else t
 
 
+def _places_worth_showing(places, loc=""):
+    """The places a message may keep (6b437, per Patrick: stray black
+    boxes under an answer). A place with a description, hours or
+    coordinates is worth a card. A bare name is only worth keeping when
+    there is a location to pin it in (the page geocodes it into a map);
+    a bare name with no location is a bold phrase, not a place."""
+    if not isinstance(places, list):
+        return []
+    ps = [p for p in places if isinstance(p, dict) and p.get("n")]
+    if any(p.get("d") or p.get("h") or p.get("lat") is not None
+           or p.get("lon") is not None for p in ps):
+        return ps
+    return ps if (loc or "").strip() else []
+
+
 def turn_record(raw: str, searched: bool = False, aborted: bool = False):
     """The assistant message the page builds at the end of a stream
     (content, and drafts, sources, photos, map, places and loc when
@@ -27451,7 +27466,10 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
         except ValueError:
             places = None
     full = re.sub(r"\n?\[\[PLACES\]\][\s\S]*\Z", "", full).strip()
-    if not places and (searched or got.get("PLACEHINT")):
+    # bold phrases are venue names only when the server said the question
+    # was a place lookup (PLACEHINT); a searched answer's bold lead-ins
+    # are not places (6b437, per Patrick)
+    if not places and got.get("PLACEHINT"):
         bold = [m.strip() for m in re.findall(r"\*\*([^*\n]{3,42})\*\*",
                                               full)]
         bold = [re.sub(r"[.,;:!?]+$", "", b) for b in bold]
@@ -27474,7 +27492,8 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
         rec["photos"] = got["PHOTOS"]
     if got.get("MAP"):
         rec["map"] = got["MAP"]
-    if isinstance(places, list) and places:
+    places = _places_worth_showing(places, got.get("CTX", ""))
+    if places:
         rec["places"] = places
         rec["loc"] = got.get("CTX", "")
     return rec
@@ -32038,7 +32057,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                      if 2 < len(x) < 42 and x.lower() in low]
                             step("places", "Found the places", "done",
                                  "%d pinned" % len(names))
-                            if names:
+                            # bare names with no location to pin them in
+                            # are bold phrases, not places (6b437)
+                            if names and getattr(_tl_search, "locq", ""):
                                 _write((NUL + "PLACES2:" + json.dumps(
                                     [{"n": x, "d": "", "h": ""} for x in names])
                                     + NUL).encode("utf-8"))
@@ -34764,6 +34785,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
              0 16px 44px -20px rgba(0,0,0,.85)}
 .placesmod .lmap{height:250px;background:#0d0f14}
 .placesmod.nomap .lmap{display:none}
+.placesmod.norail.nomap{display:none}
 .prail{display:grid;
   grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
   gap:1px;background:rgba(255,255,255,.08)}
@@ -39322,15 +39344,26 @@ function srcBox(srcs){
 // places in a [[PLACES]] trailer, pins geocode through /api/geo, and
 // Leaflet + OpenFreeMap's dark style (keyless) draw the city.
 let LMAP_SEQ=0;
+// A place with nothing to show (no description, hours or coordinates) is
+// a bold phrase, not a place (6b437, per Patrick). Bare names only count
+// when there is a location to pin them in; then the map is drawn
+// without a rail of empty cards. Old saved chats pass through here too.
+function placesUsable(places,loc){
+  const ps=(places||[]).filter(p=>p&&p.n);
+  const real=ps.some(p=>p.d||p.h||typeof p.lat==="number"||typeof p.lon==="number");
+  return {ps:ps,rail:real,ok:real||(ps.length>0&&!!String(loc||"").trim())};
+}
 function placesModule(places,loc,mapd){
-  if(!places||!places.length)return mapCard(mapd);
+  const u=placesUsable(places,loc);
+  if(!u.ok)return mapCard(mapd);
+  places=u.ps;
   const id="lmap"+(++LMAP_SEQ);
-  const cards=places.map(p=>'<div class="pcard"><b>'+esc(p.n||"")+'</b>'
+  const cards=!u.rail?"":places.map(p=>'<div class="pcard"><b>'+esc(p.n||"")+'</b>'
     +(p.d?'<span class="pd">'+esc(p.d)+'</span>':"")
     +(p.h?'<span class="ph">'+esc(p.h)+'</span>':"")+'</div>').join("");
   setTimeout(()=>mountPlaces(id,places,loc,mapd),40);
-  return '<div class="placesmod"><div class="lmap" id="'+id+'"></div>'
-    +'<div class="prail">'+cards+'</div></div>';
+  return '<div class="placesmod'+(u.rail?'':' norail')+'"><div class="lmap" id="'+id+'"></div>'
+    +(u.rail?'<div class="prail">'+cards+'</div>':'')+'</div>';
 }
 // THE BASEMAP (6b322): on 2026-09-27 CARTO started answering every
 // tile with an "API KEY REQUIRED" picture, so every map was blank grey.
@@ -40378,7 +40411,7 @@ async function send(){
   // names, so mine those. Anything that fails to geocode into the right
   // neighborhood is dropped later by mountPlaces, so a bolded price or
   // verdict costs nothing.
-  if((!places||!places.length)&&(searched||placeHint)){
+  if((!places||!places.length)&&placeHint){
     const bold=[...full.matchAll(/\*\*([^*\n]{3,42})\*\*/g)]
       .map(m=>m[1].trim().replace(/[.,;:!?]+$/,""))
       .filter(s=>/^[A-Z\u00c0-\u017f]/.test(s)          // a proper noun
