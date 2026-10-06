@@ -8,7 +8,7 @@ token generation (6b361). setup.sh turns it on; see lib/o1gputune.py.
                                  turn on: stock speed measured, the power limit set to the
                                  card's maximum, a 60 s check under load (back to stock on any
                                  error). The memory clock (N whole MHz, 0..75) and the core
-                                 clock (N, 0..150) are opt-in, 0 = off: each is checked on its own
+                                 clock (N, 0..300) are opt-in, 0 = off: each is checked on its own
                                  and, if slower, only it is taken off (the power limit is kept)
   sudo ollama1-gpu-tune off      turn off: the card back to stock, and kept there
   sudo ollama1-gpu-tune apply    the saved choice, now (and its check, if due)

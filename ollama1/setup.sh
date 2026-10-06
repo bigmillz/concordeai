@@ -30,7 +30,7 @@
 #                                    safety revert
 #   sudo ./setup.sh --gpu-tune --gpu-tune-memory 25   also raise the memory clock 25 MHz (0..75, default 0 =
 #                                    off: on one RX 6900 XT the bump made answers 2.4x slower)
-#   sudo ./setup.sh --gpu-tune --gpu-tune-core 50     also raise the core clock 50 MHz (0..150, default 0;
+#   sudo ./setup.sh --gpu-tune --gpu-tune-core 50     also raise the core clock 50 MHz (0..300, default 0;
 #                                    experimental, helps mostly long prompts, may crash the card). Each is
 #                                    checked on its own and, if slower, only it is taken off; saved in setup.env
 #   sudo ./setup.sh --no-gpu-tune    the explicit off (also: OLLAMA1_GPU_TUNE=0): the card back
@@ -158,7 +158,7 @@ for a in "$@"; do
     A_GPU_MEMORY=$a; prev=""; continue
   fi
   if [ "$prev" = --gpu-tune-core ]; then
-    gpu_clock_choice "$a" "" 150 >/dev/null || { echo "--gpu-tune-core takes whole MHz, 0 to 150 (0 = leave the core clock at stock)"; exit 2; }
+    gpu_clock_choice "$a" "" 300 >/dev/null || { echo "--gpu-tune-core takes whole MHz, 0 to 300 (0 = leave the core clock at stock)"; exit 2; }
     A_GPU_CORE=$a; prev=""; continue
   fi
   if [ "$prev" = --vg-reserve ]; then
@@ -196,7 +196,7 @@ gpu_tune_choice "" "${OLLAMA1_GPU_TUNE:-}" "" >/dev/null || { echo "OLLAMA1_GPU_
 # a flag left waiting for its value (the size forgotten) must not mean "no reserve"
 case "$prev" in --vg-reserve|--encrypted-swap) echo "$prev takes a size, like 64G"; exit 2 ;; esac
 [ "$prev" != --gpu-tune-memory ] || { echo "--gpu-tune-memory takes whole MHz, 0 to 75"; exit 2; }
-[ "$prev" != --gpu-tune-core ] || { echo "--gpu-tune-core takes whole MHz, 0 to 150"; exit 2; }
+[ "$prev" != --gpu-tune-core ] || { echo "--gpu-tune-core takes whole MHz, 0 to 300"; exit 2; }
 [ "$prev" != --fans ] || { echo "--fans takes on or off"; exit 2; }
 fans_choice "" "${OLLAMA1_FANS:-}" "" >/dev/null || { echo "OLLAMA1_FANS takes 1 or 0 (on or off)"; exit 2; }
 [ "$prev" != --watchdog ] || { echo "--watchdog takes on or off"; exit 2; }
@@ -286,8 +286,8 @@ resolve_settings() {
     || die "the saved GPU_TUNE in $SAVED is not on or off; give --gpu-tune or --no-gpu-tune"   # "default": nothing asked
   GPU_TUNE_MEMORY=$(gpu_clock_choice "$A_GPU_MEMORY" "$(saved GPU_TUNE_MEMORY)" 75) \
     || die "the saved GPU_TUNE_MEMORY in $SAVED is not a number of MHz from 0 to 75; give --gpu-tune-memory"
-  GPU_TUNE_CORE=$(gpu_clock_choice "$A_GPU_CORE" "$(saved GPU_TUNE_CORE)" 150) \
-    || die "the saved GPU_TUNE_CORE in $SAVED is not a number of MHz from 0 to 150; give --gpu-tune-core"
+  GPU_TUNE_CORE=$(gpu_clock_choice "$A_GPU_CORE" "$(saved GPU_TUNE_CORE)" 300) \
+    || die "the saved GPU_TUNE_CORE in $SAVED is not a number of MHz from 0 to 300; give --gpu-tune-core"
   FANS=$(fans_choice "$A_FANS" "${OLLAMA1_FANS:-}" "$(saved FANS)") || die "the saved FANS in $SAVED is not on or off; give --fans on or --fans off"
   LEDS=$(leds_choice "$A_LEDS" "${OLLAMA1_LEDS:-}" "$(saved LEDS)") || die "the saved LEDS in $SAVED is not on or off; give --leds on or --leds off"
   LEDS_LENGTH=$(leds_length_choice "$A_LEDS_LENGTH" "$(saved LEDS_LENGTH)") || die "the saved LEDS_LENGTH in $SAVED is not a number of LEDs from 1 to 1024; give --leds-length"

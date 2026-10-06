@@ -13,7 +13,7 @@ from one boot to the next:
            state raised by N in the driver's units, never past the OD_RANGE
            MCLK maximum. On one 6900 XT the +75 bump made answers 2.4x slower
            (no kernel error), which is why it is off by default.
-  core     (opt-in, `on --core N`, N whole MHz 0..150, default 0 = off,
+  core     (opt-in, `on --core N`, N whole MHz 0..300, default 0 = off,
            experimental) "s 1 <clock>" then "c": the shader clock's top state
            raised by N above the card's current stock top, never past the
            OD_RANGE SCLK maximum, read back and verified. It helps long prompts
@@ -26,7 +26,8 @@ reboot); on Navi 21 the power limit above the default usually needs it too.
 Safety: each part is checked on its own, in order (power, memory, core): 60 s
 of answers on the card while it watches the kernel log for amdgpu errors and
 the temperatures. Any amdgpu error or a temperature at or past its limit (105
-C junction, 100 C while the core is raised, 100 C memory) puts EVERYTHING back
+C junction, 100 C while the core is raised, 95 C when it is raised by more than 150 MHz, 100 C memory;
+in that bigger step also a power draw over the cap +5%, when the card reports one) puts EVERYTHING back
 to stock at once and records why; it stays at stock, across reboots, until the
 admin runs `ollama1-gpu-tune on` again. Slow answers are judged more carefully
 (6b372): a first slow reading starts a repeat, the baseline and the tuned
@@ -67,8 +68,11 @@ NAVI21 = frozenset(("0x73a0", "0x73a1", "0x73a2", "0x73a3", "0x73a5", "0x73a8", 
                     "0x73ad", "0x73ae", "0x73af", "0x73bf"))
 OD_BIT = 0x4000                 # PP_OVERDRIVE_MASK in amdgpu.ppfeaturemask
 MEMORY_MAX_MHZ = 75             # the most `--memory N` may ask for (the driver's units, x2 for GDDR6's effective rate)
-CORE_MAX_MHZ = 150              # the most `--core N` may ask for, above the card's current stock top clock
+CORE_MAX_MHZ = 300              # the most `--core N` may ask for, above the card's current stock top clock
 CORE_JUNCTION_MAX_C = 100       # while the core clock is raised the check's limit is 100 C junction, not 105
+CORE_BIG_MHZ = 150              # a core raise above this is a bigger step (6b433): tighter heat, and the power draw watched
+CORE_BIG_JUNCTION_MAX_C = 95    # junction limit of a check with the core raised by more than CORE_BIG_MHZ
+CORE_BIG_POWER_PCT = 105        # ... and the card must not draw more than this percent of its power cap
 PROMPT_RUNS = 2                 # long prompts read per prompt-reading measurement
 PROMPT_WORDS = 1800             # about 2000 tokens in, 8 out
 CLOCK_PARTS = {"memory": {"max": MEMORY_MAX_MHZ}, "core": {"max": CORE_MAX_MHZ}}
@@ -271,6 +275,16 @@ class Card:
                 out[k] = _int(self.io.read(self.hwmon + "/" + f))
         return out
 
+    def draw(self):
+        """The card's power draw in microwatts (power1_average, else power1_input); None when it reports none."""
+        if not self.hwmon:
+            return None
+        for f in ("power1_average", "power1_input"):
+            v = _int(self.io.read(self.hwmon + "/" + f))
+            if v:
+                return v
+        return None
+
     def temps(self):
         """{"edge"|"junction"|"mem": whole degrees C} from the card's hwmon."""
         out = {}
@@ -456,6 +470,7 @@ class Tuner:
         self.io = io or SysfsIO()
         self.pause = pause
         self.junction_max = JUNCTION_MAX_C
+        self.power_watch = False         # set by self_check for a core raise past CORE_BIG_MHZ
         self.noise = []                  # what made the last load's speed unreliable (see _load)
         self.load_failed = False
         self.ollama = ollama or Ollama()
@@ -753,6 +768,9 @@ class Tuner:
                 return tokens, secs, answers, "the junction reached %d C" % t["junction"], hot
             if t.get("mem") is not None and t["mem"] >= MEM_MAX_C:
                 return tokens, secs, answers, "the memory reached %d C" % t["mem"], hot
+            over = self._over_power(card)
+            if over:
+                return tokens, secs, answers, over, hot
             if since is not None:
                 lines = self.journal(["--since", "@%d" % since])
                 errs = amdgpu_errors(lines)
@@ -766,6 +784,18 @@ class Tuner:
                 self.noise.append("an answer failed partway through")
                 return tokens, secs, answers, None, hot      # Ollama didn't answer: stop, judged below
         return tokens, secs, answers, None, hot
+
+    def _over_power(self, card):
+        """Why the draw is too high (a core raise past CORE_BIG_MHZ only), or None; no reading, no check."""
+        if not self.power_watch:
+            return None
+        cap = (card.power() or {}).get("cap")
+        draw = card.draw()
+        if not cap or draw is None:
+            return None
+        if draw * 100 > cap * CORE_BIG_POWER_PCT:
+            return "the card drew %d W, over its %d W cap +%d%%" % (draw // 10 ** 6, cap // 10 ** 6, CORE_BIG_POWER_PCT - 100)
+        return None
 
     def _others(self, model):
         """The models loaded now other than the one measured."""
@@ -913,7 +943,10 @@ class Tuner:
         vram = _int(self.io.read(card.dev + "/mem_info_vram_total"))
         prefer = (self.st.get("measure") or {}).get("model")
         model = pick_model(self.ollama, vram, prefer) if self.ollama.up() else None
-        self.junction_max = CORE_JUNCTION_MAX_C if "core" in tuned_parts else JUNCTION_MAX_C
+        big = "core" in tuned_parts and self.mhz("core") > CORE_BIG_MHZ
+        self.power_watch = big
+        self.junction_max = (CORE_BIG_JUNCTION_MAX_C if big else CORE_JUNCTION_MAX_C) if "core" in tuned_parts \
+            else JUNCTION_MAX_C
         chk = {"at": int(self.clock()), "values": self.applied_values(), "part": part}
         if model:
             self.say("checking %s: %d s of answers with %s, watching the kernel log and temperatures"
