@@ -2003,6 +2003,38 @@ KEY_SHAPE = {
     "kimi": ("sk-", 40, False),
 }
 
+# WHAT EACH PROVIDER COSTS, AND WHAT CLOUD ONLY'S MODES SEAT (6b440, per
+# Patrick: "So fast doesn't gobble up all your API money and usage"). One
+# table, one place to tune. The class is about the provider's CHEAPEST way
+# of answering, not its best model:
+#   "free"  a free tier answers (Gemini, Groq): used first in every mode.
+#   "cheap" a paid key that has a small, low-priced model (Claude's
+#           Haiku): in Fast and Thinking only that small model is ever
+#           used (CLOUD_CHEAP_MODEL says which ids count), never Sonnet
+#           or Opus.
+#   "paid"  a paid key with no small model (Kimi K3): never in Fast; in
+#           Thinking only after the free and cheap ones; in Pro as today.
+# A rule, not a price list: nothing here reads usage.jsonl or the cost
+# screen, those only show what a model cost afterwards.
+CLOUD_COST = {"gemini": "free", "groq": "free", "claude": "cheap", "kimi": "paid"}
+CLOUD_COST_RANK = {"free": 0, "cheap": 1, "paid": 2}
+CLOUD_COST_WORDS = {"free": "free tier", "cheap": "low cost", "paid": "paid"}
+CLOUD_CHEAP_MODEL = {"claude": re.compile(r"haiku", re.I)}
+CLOUD_NAMES = {"gemini": "Gemini", "groq": "Groq", "claude": "Claude", "kimi": "Kimi K3"}
+# the order the providers are tried in within one cost class: the strength
+# order the compositor ladder has always used
+CLOUD_STRENGTH = ("claude", "kimi", "gemini", "groq")
+# how many models each mode seats: Fast one, Thinking three (from different
+# providers), Pro every available provider as Cloud Only always did
+CLOUD_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}
+CLOUD_MODE_KEYS = {"fast": "Fast", "think": "Thinking", "pro": "Pro"}
+CLOUD_PROMISE = "Only cloud models answer. Nothing runs on this computer."
+CLOUD_ADD_KEY = "Add a key under Settings › Cloud power"
+# "cloud:fast", ":think", ":pro" and "cloud:m:<provider>" are Cloud Only's
+# modes and picks; plain "Cloud Only" keeps its old meaning. Read in one
+# place: cloud_tier_parse
+_CLOUD_TIER_RX = re.compile(r"cloud:(?:(fast|think|pro)|m:(%s))" % "|".join(PROVIDER_BASES))
+
 
 # NO KEYLESS CLOUD (6b310, per Patrick: remove it). Pollinations, the
 # free public service that used to answer when cloud power was on with
@@ -3329,6 +3361,365 @@ def vision_ladder(tier: str = "") -> list:
     return _cloud_ladder(role, ("claude", "gemini"), vision=True)
 
 
+# ---- CLOUD ONLY'S MODES AND PICKS (6b440)
+# Patrick (2026-10-07): "Let's also have an option under cloud only, similar to
+# what we have for the server pop out menu to pick fast, thinking, or pro. And
+# based on that, it determines which models and how many models to use. So fast
+# doesn't gobble up all your API money and usage, etc. And under that, similar
+# to the servers pop out, the option to pick a specific model that it uses from
+# the available ones. If one of the cloud models is unavailable for any reason,
+# just have it gray out." Tier ids "cloud:fast", "cloud:think", "cloud:pro" and
+# "cloud:m:<provider>" (cloud_tier_parse); plain "Cloud Only" is unchanged.
+# Fast: ONE model, the cheapest that answers (a free tier first, a paid key only
+# through its small model). Thinking: up to three from different providers, free
+# first, and the cheapest capable one writes the merge. Pro: every available
+# provider, the strongest merge: what Cloud Only has always done. A pick runs
+# that one model alone. No local model, no server, in any of them.
+
+
+def cloud_tier_parse(tier) -> tuple:
+    """(mode, provider id) of a Cloud Only mode or pick: ("Fast" | "Thinking" |
+    "Pro", "") for "cloud:fast", ":think", ":pro"; ("Model", "<id>") for
+    "cloud:m:<id>"; ("", "") for anything else, plain "Cloud Only" included."""
+    m = _CLOUD_TIER_RX.fullmatch(tier) if isinstance(tier, str) else None
+    if not m:
+        return "", ""
+    return (CLOUD_MODE_KEYS[m.group(1)], "") if m.group(1) else ("Model", m.group(2))
+
+
+def cloud_only_tier(tier) -> bool:
+    """Plain Cloud Only, or one of its modes or picks: the tiers on which only
+    cloud models answer."""
+    return bool(isinstance(tier, str) and (TIERS.get(tier, {}).get("cloud_only")
+                                           or cloud_tier_parse(tier)[0]))
+
+
+def cloud_tier_pid(tier) -> str:
+    """The provider a "cloud:m:<id>" pick names, else ''."""
+    return cloud_tier_parse(tier)[1]
+
+
+def _cloud_clock(ts: float) -> str:
+    return time.strftime("%I:%M", time.localtime(ts)).lstrip("0")
+
+
+def cloud_provider_state(pid: str, v, now=None) -> dict:
+    """One provider as the Cloud power pane sees it: {id, name, cost, ok, why,
+    until, model}. Unavailable for any reason is ok False with the reason in a
+    few words: no key, a key the provider rejected, resting (quota, glitch, out
+    of credit: until when) or no current model (every one retired or resting).
+    model: what a pick of it would ask ("work" role)."""
+    now = time.time() if now is None else now
+    out = {"id": pid, "name": CLOUD_NAMES.get(pid) or pid.title(),
+           "cost": CLOUD_COST.get(pid, "paid"), "ok": False, "why": "",
+           "until": 0, "model": ""}
+    if not (isinstance(v, dict) and v.get("key")):
+        out["why"] = "no key yet"
+    elif v.get("status", "ok") != "ok":
+        out["why"] = "key rejected"
+    elif not (v.get("base") and v.get("model")):
+        out["why"] = "not set up"
+    else:
+        try:
+            left = int(cloud_rest_left(pid, v))
+        except Exception:
+            left = 0
+        if left > 0:
+            out["until"] = int(now + left)
+            try:
+                broke = float(v.get("cool") or 0) > now and bool(
+                    _NO_CREDIT_RX.search(str(v.get("note") or "")) or "out of credit" in str(v.get("note") or ""))
+            except (TypeError, ValueError):
+                broke = False
+            out["why"] = "out of credit" if broke else "resting until " + _cloud_clock(now + left)
+        else:
+            m = cloud_role_model(pid, v, "work")
+            if m:
+                out.update(ok=True, model=m)
+            else:
+                out["why"] = "no current model"
+    return out
+
+
+def cloud_provider_states() -> list:
+    """cloud_provider_state of every provider, in the Cloud power pane's order
+    (the four of PROVIDER_BASES), a provider with no entry as "no key yet"."""
+    _cloud_repair()
+    pv = _cloud_all().get("providers") or {}
+    now = time.time()
+    return [cloud_provider_state(pid, pv.get(pid), now) for pid in PROVIDER_BASES]
+
+
+def _cloud_cheap(pid: str, c):
+    """c when it is a model cheap enough for Fast and Thinking: any model of a
+    free provider, only a small one of a "cheap" provider (CLOUD_CHEAP_MODEL),
+    none of a "paid" one."""
+    cls = CLOUD_COST.get(pid, "paid")
+    if not c or cls == "paid":
+        return None
+    rx = CLOUD_CHEAP_MODEL.get(pid)
+    return c if cls == "free" or (rx and rx.search(str(c.get("model") or ""))) else None
+
+
+def _cloud_by_pid(role: str, order) -> dict:
+    return {_provider_of(c): c for c in _cloud_ladder(role, order)}
+
+
+def cloud_mode_plan(mode: str, pid: str = "") -> dict:
+    """What a Cloud Only mode seats right now: {mode, seats [(label, conf)],
+    comp [conf, cheapest first for Thinking, strongest first for Pro], spare
+    [conf], why}. Fast: the first of the speed-first quick ladder, free
+    providers before the low-cost ones and a paid provider's only ever through
+    its small model; the rest of that list is `spare`, what answers if the
+    first doesn't. Thinking: up to CLOUD_MODE_SEATS, one per provider, free
+    first, a low-cost provider through its small model; the merge by the
+    cheapest capable. Pro: today's whole bench and the strength ladder. Model
+    (pid): that provider's quality model alone. `why` says what to do when
+    there is no seat."""
+    rank = lambda p: (CLOUD_COST_RANK.get(CLOUD_COST.get(p, "paid"), 2),
+                      CLOUD_STRENGTH.index(p) if p in CLOUD_STRENGTH else 9)
+    plan = {"mode": mode, "pid": pid, "seats": [], "comp": [], "spare": [], "why": ""}
+    if mode == "Fast":
+        fl = [c for c in fast_cloud_ladder() if _cloud_cheap(_provider_of(c), c)]
+        fl.sort(key=lambda c: CLOUD_COST_RANK.get(CLOUD_COST.get(_provider_of(c), "paid"), 2))
+        n = CLOUD_MODE_SEATS["Fast"]
+        plan["seats"] = [(c["name"], c) for c in fl[:n]]
+        plan["spare"] = fl[n:]
+    elif mode == "Thinking":
+        seat, fast = _cloud_by_pid("seat", CLOUD_STRENGTH), _cloud_by_pid("fast", CLOUD_STRENGTH)
+        comp = _cloud_by_pid("composite", CLOUD_STRENGTH)
+        seats, merge = [], []
+        for p in sorted(CLOUD_STRENGTH, key=rank):
+            cheap = CLOUD_COST.get(p) == "cheap"
+            c = _cloud_cheap(p, fast.get(p)) if cheap else seat.get(p)
+            if c:
+                seats.append((c["name"], c))
+            m = _cloud_cheap(p, fast.get(p)) if cheap else comp.get(p)
+            if m:
+                merge.append(m)
+        plan["seats"] = seats[:CLOUD_MODE_SEATS["Thinking"]]
+        plan["comp"] = merge
+    elif mode == "Pro":
+        plan["seats"] = cloud_bench()[:CLOUD_MODE_SEATS["Pro"]]
+        plan["comp"] = compositor_ladder()
+    elif mode == "Model":
+        c = _cloud_by_pid("work", (pid,)).get(pid)
+        plan["seats"] = [(c["name"], c)] if c else []
+    if not plan["seats"]:
+        plan["why"] = cloud_plan_why(mode, pid)
+    return plan
+
+
+def cloud_plan_why(mode: str, pid: str = "") -> str:
+    """The sentence for a mode with nothing to seat: what to do about it."""
+    sts = cloud_provider_states()
+    keyed = [s for s in sts if s["why"] != "no key yet"]
+    if mode == "Model":
+        s = next((x for x in sts if x["id"] == pid), None)
+        n = s["name"] if s else "That model"
+        return ("%s has no key yet. %s." % (n, CLOUD_ADD_KEY) if s and s["why"] == "no key yet"
+                else "%s is unavailable: %s." % (n, s["why"] if s else "unknown"))
+    if not keyed:
+        return "%s: Gemini and Groq both have free tiers." % CLOUD_ADD_KEY
+    if mode in ("Fast", "Thinking") and any(s["ok"] for s in sts):
+        return ("%s uses only free or low-cost models, and none is available. "
+                "%s: Gemini and Groq both have free tiers." % (mode, CLOUD_ADD_KEY))
+    bits = ["%s (%s)" % (s["name"], s["why"]) for s in keyed]
+    return "Every cloud model is unavailable: %s." % ", ".join(bits)
+
+
+def cloud_mode_state(mode: str, pid: str = "", plan=None) -> dict:
+    """/api/tiers' row for a Cloud Only mode or pick: {ok, available, title,
+    mode, models [labels], detail ["Groq · model"], note, why, short}. why is
+    the sentence, short the few words a greyed row shows."""
+    plan = plan or cloud_mode_plan(mode, pid)
+    seats = plan["seats"]
+    title = ("%s only" % CLOUD_NAMES.get(pid, pid.title()) if mode == "Model"
+             else "%s · cloud only" % mode)
+    out = {"ok": bool(seats), "available": bool(seats), "mode": mode, "title": title,
+           "models": [l for l, _c in seats],
+           "detail": ["%s · %s" % (c.get("name", ""), c.get("model", "")) for _l, c in seats],
+           "skipped": [], "why": plan["why"], "short": "", "note": "",
+           # who writes the blend: the plan's first merge rung, with two or more seats
+           "blend": (blend_text((plan["comp"] or [{}])[0].get("name", ""))
+                     if mode in ("Thinking", "Pro") and len(seats) > 1 else "")}
+    if not seats:
+        w = plan["why"]
+        out["short"] = ("no key yet" if "no key yet" in w or "Add a key" in w
+                        else "no free or low-cost model" if "free or low-cost" in w else "unavailable")
+        return out
+    out["note"] = {
+        "Fast": "One model, the cheapest and fastest you have (a free tier first; a paid key only "
+                "through its small model): %s. " % out["detail"][0],
+        "Thinking": "%d model%s draft, free ones first, then the cheapest that can writes the "
+                    "final answer. " % (len(seats), "" if len(seats) == 1 else "s"),
+        "Pro": "Every available cloud model drafts, then the strongest writes the final "
+               "answer. ",
+        "Model": "%s answers alone, with no other model and no blend. " % out["detail"][0],
+    }[mode] + CLOUD_PROMISE
+    return out
+
+
+def cloud_mode_tiers() -> dict:
+    """/api/tiers' rows for Cloud Only's modes ("cloud:fast", ":think", ":pro")
+    and one pick per provider ("cloud:m:<id>"), each with its availability and
+    the reason it is off; a pick's row carries the provider's own state."""
+    out = {}
+    for k, mode in CLOUD_MODE_KEYS.items():
+        out["cloud:" + k] = dict(cloud_mode_state(mode), desc="cloud only")
+    for s in cloud_provider_states():
+        st = cloud_mode_state("Model", s["id"])
+        row = dict(st, desc=CLOUD_COST_WORDS.get(s["cost"], ""), model=s["model"], name=s["name"],
+                   until=s["until"], cost=s["cost"], ok=s["ok"], available=s["ok"])
+        if not s["ok"]:
+            row.update(short=s["why"], why=s["why"][:1].upper() + s["why"][1:] + ".", models=[], detail=[])
+        else:
+            row["short"] = s["model"]
+        out["cloud:m:" + s["id"]] = row
+    return out
+
+
+# ---- MAX, AND WHO WRITES EACH MODE'S BLEND (6b440)
+# Patrick (2026-10-07), confirmed: a new "Max" under Pro that uses every
+# available model, and under each mode's row a small line naming the model that
+# will write the blend. The merge of Max is written by the first AVAILABLE AND
+# HEALTHY of this list (the owner's order): Claude, Kimi K3, Gemini, Groq, then
+# the largest model of the person's server that fits, then the largest model of
+# this computer that fits. Provider ids are cloud providers; "server" and
+# "local" are the two last resorts. Resolved in ONE function (max_compositor),
+# which the chat and /api/tiers both read, so the label cannot disagree with
+# what runs.
+MAX_COMPOSITOR_ORDER = ["claude", "kimi", "gemini", "groq", "server", "local"]
+BLEND_NONE = "blend: none available"
+
+
+def blend_text(label: str) -> str:
+    """The small line under a mode's row: who writes its blend."""
+    return ("blend: " + label) if label else BLEND_NONE
+
+
+def max_tier_seats(ctx) -> list:
+    """The seats of Max that are not cloud: [{label, fb, params}]. Every model
+    of ctx's paired servers that may take a general question (srv_role_ok
+    "all", strongest first, no seat cap: the loop budget grows with the seats,
+    run_council's SRV_DRAFT_S), then every model of this computer that fits,
+    EXCEPT one a server also holds (the same Ollama tag, _srv_tag_key): the
+    server's copy runs faster, so the local one is dropped; it stays behind the
+    server's seat as its fallback (`fb`), as in resolve_tier_seats."""
+    ready = _tier_ready("Max")
+    cands = []
+    if ctx is not None:
+        try:
+            cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m["name"], "all")]
+        except Exception:
+            cands = []
+    seats = []
+    if cands:
+        for m in srv_rank(cands, "all", "normal", server_speeds(ctx)):
+            seats.append({"label": m["label"], "fb": "", "params": m.get("params"),
+                          "tag": _srv_tag_key(m["name"])})
+    taken = {st["tag"] for st in seats}
+    local_tag = {_srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")): l for l in ready}
+    for l in ready:
+        if _srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) in taken:
+            continue
+        seats.append({"label": l, "fb": "", "params": _label_params(l)})
+    first_local = next((st["label"] for st in seats if not server_label(st["label"])), "")
+    for st in seats:
+        if server_label(st["label"]):
+            st["fb"] = local_tag.get(st.pop("tag", ""), "") or first_local
+    return seats
+
+
+def max_cloud_ladder() -> list:
+    """Max's cloud merge rungs, in MAX_COMPOSITOR_ORDER, each at its composite
+    model; a resting, rejected or keyless provider is left out."""
+    pids = [p for p in MAX_COMPOSITOR_ORDER if p in PROVIDER_BASES]
+    by = _cloud_by_pid("composite", pids)
+    return [by[p] for p in pids if p in by]
+
+
+def max_compositor(ctx, seat_labels=None) -> dict:
+    """{kind, label} of whoever writes Max's blend: the first available and
+    healthy of MAX_COMPOSITOR_ORDER. kind is the provider id, "server" or
+    "local"; "" with no label when nothing at all can. seat_labels: the seats
+    Max actually runs, so a local model dropped for its server copy is not
+    named; None looks at every local model."""
+    by = {_provider_of(c): c for c in max_cloud_ladder()}
+    for k in MAX_COMPOSITOR_ORDER:
+        if k in PROVIDER_BASES:
+            if k in by:
+                return {"kind": k, "label": by[k]["name"]}
+        elif k == "server":
+            try:
+                m = server_compositor(ctx) if ctx is not None else None
+            except Exception:
+                m = None
+            if m:
+                return {"kind": "server", "label": m["label"]}
+        elif k == "local":
+            pulled = ollama_pulled_tags() or set()
+            for l in MERGE_RANK:
+                if (l in MODEL_ROUTES and model_cached(l, pulled) and model_fits_memory(l)
+                        and l not in BLEND_EXCLUDE and not slow_giant(l)
+                        and (seat_labels is None or l in seat_labels)):
+                    return {"kind": "local", "label": l}
+    return {"kind": "", "label": ""}
+
+
+def max_tier_row(ctx) -> dict:
+    """/api/tiers' row for Max: every model it would use (this computer's and
+    the servers', then the cloud's), whether any exists, the blend's writer and
+    the plain warning that paid cloud keys are used."""
+    try:
+        seats = max_tier_seats(ctx)
+    except Exception:
+        seats = []
+    labels = [s["label"] for s in seats]
+    cloud = [l for l, _c in cloud_bench()]
+    n = len(labels) + len(cloud)
+    comp = max_compositor(ctx, labels)
+    return {"desc": TIERS["Max"]["desc"], "models": labels, "cloud": cloud, "skipped": [],
+            "available": n > 0, "count": n,
+            "why": "" if n else ("Nothing is available: download a model under Settings › "
+                                 "Models, pair a server, or add a key under Settings › "
+                                 "Cloud power."),
+            "blend": blend_text(comp["label"]) if n > 1 else "",
+            "warn": "Uses every model, including paid cloud keys. Each question can spend money "
+                    "on every key you have."}
+
+
+def mode_blend(ctx, chosen: list, bench_n: int) -> str:
+    """The blend line of Thinking or Pro: who writes the merge, by the same
+    rules run_council follows: the cloud ladder when cloud power is on, else
+    the strongest suitable model of the person's server, else the largest
+    Gemma this computer holds (or the strongest seat that fits), its server
+    copy standing in when there is one. "" when fewer than two models answer."""
+    if len(chosen) + (bench_n if cloud_allowed() else 0) < 2:
+        return ""
+    if cloud_allowed():
+        lad = compositor_ladder()
+        if lad:
+            return blend_text(lad[0]["name"])
+    try:
+        m = server_compositor(ctx)
+    except Exception:
+        m = None
+    if m:
+        return blend_text(m["label"])
+    merger = merge_pref_label() or next(
+        (l for l in MERGE_RANK if l in chosen and model_fits_memory(l)), "")
+    if merger in MODEL_ROUTES:
+        try:
+            sc = server_copy((MODEL_INFO.get(merger) or {}).get("ollama"),
+                             server_mode_candidates(ctx), server_speeds(ctx))
+        except Exception:
+            sc = None
+        if sc is not None:
+            merger = sc["label"]
+    return blend_text(merger)
+
+
 def claude_refusal_conf(c: dict):
     """One more try after a Claude REFUSAL (6b308): the newest Opus of
     the previous generation. Opus 5.x runs safety classifiers that can
@@ -3610,6 +4001,16 @@ TIERS = {
         "count": 99,
         # no quality filtering — if it can run, it takes part
         "all": True,
+    },
+    # MAX (6b440, per Patrick: the all-in mode under Pro): EVERY model there is.
+    # This computer's models that fit, every model of the person's paired
+    # servers (a local model that a server also holds is dropped: the server's
+    # copy runs faster), and the cloud models of every healthy key, paid ones
+    # included. Choosing it is the opt-in, as for Cloud Only. The merge is
+    # written by the first available and healthy of MAX_COMPOSITOR_ORDER.
+    "Max": {
+        "icon": "\U0001f680", "desc": "every model: here, your servers, the cloud",
+        "picks": [], "count": 99, "all": True, "max": True,
     },
     # CLOUD ONLY (6b233, per Patrick): the frontier keys answer and this
     # machine stays cold — no Ollama, no MLX engine load, no local merge,
@@ -13349,11 +13750,15 @@ def suggest_ask(ctx, prompt: str):
         return (_SUGGEST_UNSAFE if mode == "unsafe" else _SUGGEST_FAKE), "test"
     ask = [{"role": "user", "content": prompt}]
     try:
-        cloud_only = profile_local(ctx).get("tier") == "Cloud Only"
+        _tier = profile_local(ctx).get("tier")
+        cloud_only = cloud_only_tier(_tier)
+        _only_pid = cloud_tier_pid(_tier)       # a pick: its provider's model alone (6b440)
     except Exception:
-        cloud_only = False
+        cloud_only, _only_pid = False, ""
     if cloud_only:
         for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):
+            if _only_pid and _provider_of(conf) != _only_pid:
+                continue
             out = cloud_text(conf, ask, timeout=40, max_tokens=SUGGEST_MAX_TOKENS, quiet=True)
             if out:
                 return strip_think(out), "the cloud"
@@ -19029,6 +19434,15 @@ def server_only_tiers(ctx) -> dict:
                 ms = server_mode_state(e, mode, speeds)
                 out[SRV_ONLY_PREFIX + e["id"] + ":" + k] = dict(
                     ms, desc="%s only" % e["name"], skipped=[], available=ms["ok"] or ms["asleep"])
+                # who writes that mode's blend (6b440): the server's own pen, as run_council
+                # picks it for a mode on one server alone; none for Fast
+                if mode in ("Thinking", "Pro") and len(ms.get("models") or []) > 1:
+                    try:
+                        _bc = server_compositor(ctx, (), server_only_named(ctx, e["name"]))
+                    except Exception:
+                        _bc = None
+                    out[SRV_ONLY_PREFIX + e["id"] + ":" + k]["blend"] = blend_text(
+                        _bc["label"] if _bc else "")
     return out
 
 
@@ -24001,10 +24415,13 @@ PEER_INSTRUCTION = (
     "Never mention the drafts or this process.\n\n")
 
 
-def run_cloud_only(messages: list, emit, status, step) -> None:
+def run_cloud_only(messages: list, emit, status, step, plan=None) -> None:
     """CLOUD ONLY: answer entirely off the API keys. One key streams
     straight through; several draft in parallel and the compositor
     ladder writes the final answer. Nothing here loads a local engine."""
+    if plan is not None:
+        run_cloud_plan(messages, emit, status, step, plan)
+        return
     bench = cloud_bench()
     if not bench:
         emit(_cloud_all_down())
@@ -24062,6 +24479,63 @@ def run_cloud_only(messages: list, emit, status, step) -> None:
         emit(_cloud_all_down())
 
 
+def cloud_plan_title(plan: dict) -> str:
+    """What a Cloud Only mode or pick is called to the reader."""
+    return ("%s only" % CLOUD_NAMES.get(plan.get("pid"), str(plan.get("pid") or "").title())
+            if plan.get("mode") == "Model" else "%s · cloud only" % plan.get("mode"))
+
+
+def _cloud_plan_down(plan: dict, tried: bool = False) -> str:
+    """What to say when a Cloud Only mode or pick has nothing to ask (or what
+    it asked didn't answer): why, and what to do. Never an answer from another
+    model, and nothing about this computer answering for it."""
+    why = (cloud_plan_why(plan.get("mode"), plan.get("pid") or "")
+           if not tried or not plan.get("seats") else
+           "That model didn’t answer this one. Try again in a moment.")
+    return AppText("☁️ **%s** has no working model right now.\n\n%s\n\n"
+                   "Pick another cloud model, or switch to **Cloud Only** to try "
+                   "every key. %s" % (cloud_plan_title(plan), why, CLOUD_PROMISE))
+
+
+def run_cloud_plan(messages: list, emit, status, step, plan: dict) -> None:
+    """A Cloud Only mode or pick (6b440). One seat streams straight through:
+    Fast, a pick, or a mode with one usable provider. Fast has `spare`
+    models behind its seat (the next cheapest, said in the status line); a
+    pick has none, so it never turns into another model. Several seats
+    draft in parallel and the plan's merge ladder writes the answer
+    (run_council). Nothing here loads a local engine or asks a server."""
+    seats = plan.get("seats") or []
+    if not seats:
+        emit(_cloud_plan_down(plan))
+        return
+    if len(seats) == 1:
+        tries = [seats[0]] + [(x["name"], x) for x in plan.get("spare") or []]
+        for i, (lbl, c) in enumerate(tries):
+            status("%s · cloud" % lbl)
+            step("draft", "Drafting the answer", "run", lbl)
+            try:
+                emit(Ctl(NUL + "RUN:" + json.dumps({"r": [lbl]}) + NUL))
+            except Exception:
+                pass
+            if cloud_stream_conf(c, messages, emit):
+                step("draft", "Drafted the answer", "done", lbl)
+                return
+            if c.get("_stop") == "refusal":
+                step("draft", "That provider declined", "done", lbl)
+                emit(AppText("☁️ **%s** declined to answer that one. Pick "
+                             "another cloud model, or switch to **Cloud Only**." % lbl))
+                return
+            if i + 1 < len(tries):
+                status("%s didn’t answer, so %s is asked" % (lbl, tries[i + 1][0]))
+        step("draft", "That provider dropped out", "done", seats[0][0])
+        emit(_cloud_plan_down(plan, tried=True))
+        return
+    try:
+        run_council([], messages, emit, status, cloud_only=True, cloud_plan=plan)
+    except Exception:
+        emit(_cloud_plan_down(plan, tried=True))
+
+
 def _cloud_all_down() -> str:
     """What to say when Cloud Only has nothing left to ask. Names which
     providers are resting and for how long, because 'try again later' is
@@ -24105,6 +24579,7 @@ def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
                 cloud_only: bool = False, srv_only: bool = False,
                 bench_allow=None, comp: str = "",
+                cloud_plan=None, max_mode=False,
                 hurry=None, srv_first_s=None, srv_merge=False) -> None:
     """Ask each selected model in turn, then stream a merged answer.
 
@@ -24113,6 +24588,11 @@ def run_council(labels: list, messages: list, emit, status,
     srv_only (6b426): a mode on one server alone; labels are that server's,
     and the merge is written there too: no cloud voice or compositor, no
     merger of this computer, before or after a failure.
+    cloud_plan (6b440): a Cloud Only mode's seats and merge ladder
+    (cloud_mode_plan); None is plain Cloud Only, the whole bench and the
+    strength ladder. max_mode (Max, 6b440): every model drafts, so the roster
+    is not cut to 12 and the merge is the largest local model that fits, not
+    the Gemma preference; the cloud plan opens the cloud as Cloud Only does.
     """
     # reflection and peer review both run LOCAL passes — off the table
     # when the whole point of the tier is that nothing runs here
@@ -24132,7 +24612,7 @@ def run_council(labels: list, messages: list, emit, status,
         else:
             usable.append(l)
     # sequential generation — cap the roster so a run stays minutes, not hours
-    labels = (usable or labels[:1])[:12]
+    labels = (usable or labels[:1])[:(40 if max_mode else 12)]
 
     drafts = []
     _srv_used = []           # the server models this council used, in order (6b344)
@@ -24199,10 +24679,12 @@ def run_council(labels: list, messages: list, emit, status,
     # 6b326 (0a 5.5): it used to engage the named providers with cloud
     # power off. An EMPTY list means explicitly none, turbo or not.
     _bench = [] if srv_only else cloud_bench()
+    if cloud_plan is not None:        # a mode's own seats (6b440)
+        _bench = cloud_plan["seats"]
     if bench_allow is not None:
         _bench = [(l, c) for l, c in _bench
                   if _provider_of(c) in bench_allow]
-    if cloud_only or (bool(_bench) and cloud_allowed()):
+    if cloud_only or (max_mode and cloud_plan is not None) or (bool(_bench) and cloud_allowed()):
         def _cloud_draft(lbl, conf):
             # WHOLE BODY GUARDED (6b236). status() writes to the client
             # socket, so a reader who closes the tab raises in here \u2014 and
@@ -24490,7 +24972,7 @@ def run_council(labels: list, messages: list, emit, status,
     # choice; the handler uses the same one to seat the merger LAST in
     # the roster, so its engine is usually still resident right here.
     _mp = merge_pref_label()
-    if _mp:
+    if _mp and not max_mode:         # Max: the largest model that fits, as MERGE_RANK has it (6b440)
         merger = _mp
     # ADVANCED (6b248): a hand-picked LOCAL compositor beats policy —
     # the user chose who holds the pen
@@ -24645,7 +25127,8 @@ def run_council(labels: list, messages: list, emit, status,
         return False
     # ADVANCED (6b248): a named CLOUD compositor narrows the ladder to
     # that one provider; a named LOCAL one skips the cloud ladder cold.
-    _ladder = compositor_ladder()
+    _ladder = (cloud_plan["comp"] if cloud_plan is not None
+               else compositor_ladder())
     _comp_cloud = bool(comp) and comp not in MODEL_ROUTES
     if _comp_cloud:
         _ladder = [c for c in _ladder if _provider_of(c) == comp]
@@ -24653,7 +25136,8 @@ def run_council(labels: list, messages: list, emit, status,
     # speed is what the button promised (6b257). An empty fast ladder
     # (no keys, everyone resting) keeps the strength ladder, and the
     # local-merger floor below still catches everything.
-    _hurry_fast = _hurried() and len(good) >= 2
+    # (a mode's merge ladder is already its cheapest, 6b440)
+    _hurry_fast = _hurried() and len(good) >= 2 and cloud_plan is None
     if _hurry_fast and not _comp_cloud:
         _fast = fast_cloud_ladder()
         if _fast:
@@ -24683,6 +25167,11 @@ def run_council(labels: list, messages: list, emit, status,
     # reach the cloud with the switch off; now they only pick WHICH cloud
     if comp in MODEL_ROUTES or srv_only:
         pass          # the user chose a LOCAL pen, or one server (6b426) — no cloud ladder
+    elif max_mode and cloud_plan is not None:
+        # Max opens the cloud whatever cloud power says: its own rungs first
+        # (Claude, Kimi K3, Gemini, Groq), then the server's, then this computer's
+        if _walk_ladder():
+            return
     elif cloud_allowed():
         if _walk_ladder():
             return
@@ -28431,6 +28920,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # tier is unusable — the UI greys it out on this flag
                     out[name] = {"desc": t["desc"], "models": bench,
                                  "skipped": [], "available": bool(bench)}
+                    if len(bench) > 1:          # who writes the blend (6b440)
+                        _lad = compositor_ladder()
+                        out[name]["blend"] = blend_text(_lad[0]["name"] if _lad else "")
+                    continue
+                if t.get("max"):
+                    # every model there is (6b440): its own row
+                    out[name] = max_tier_row(self.ctx)
                     continue
                 try:
                     chosen = [x["label"] for x in resolve_tier_seats(name, self.ctx)]
@@ -28457,11 +28953,24 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _cap = None
                 if _cap:
                     out[name]["srvcap"] = {"seated": _cap[0], "of": _cap[1]}
+                # who writes the blend of Thinking and Pro (6b440), from the rules the
+                # merge itself follows; Fast has no blend
+                if name in ("Thinking", "Pro"):
+                    try:
+                        out[name]["blend"] = mode_blend(self.ctx, chosen, len(bench))
+                    except Exception:
+                        pass
             # "<server> Only" (6b337): one row per paired server, from its
             # last check; greyed on the page while it can't answer
             try:
                 out.update(server_only_tiers(self.ctx))
             except (StoreReadError, NoProfile):
+                pass
+            # Cloud Only's modes and one pick per provider (6b440): their
+            # availability and the reason each one that is off is off
+            try:
+                out.update(cloud_mode_tiers())
+            except Exception:
                 pass
             self._send_json(out)
         elif self.path == "/api/prefs":
@@ -30146,7 +30655,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             tier = "Fast"   # Best retired (5.3) — it was Fast in a crown
         if tier == "Power":
             tier = "Pro"    # Pro absorbed Power (5.3)
-        cloud_only = bool(TIERS.get(tier, {}).get("cloud_only"))
+        # Cloud Only, or one of its modes or picks (6b440): "cloud:fast",
+        # ":think", ":pro", "cloud:m:<provider>"
+        _cl_mode, _cl_pid = cloud_tier_parse(tier)
+        cloud_only = cloud_only_tier(tier)
+        # MAX (6b440): every model; choosing it opens the cloud as Cloud Only does
+        _max = bool(TIERS.get(tier, {}).get("max")) if isinstance(tier, str) else False
+        _max_bench = cloud_bench() if _max else []
         if cloud_only and _title_cid:
             _cloud_only_chats[(self.ctx.name, _title_cid)] = time.time()
         # ADVANCED overrides (6b248, per Patrick): a custom run names its
@@ -30189,7 +30704,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 raise
             except Exception:
                 pass
-            _seats = resolve_tier_seats(tier, self.ctx)
+            # Max (6b440): every server model, then this computer's that fit and
+            # have no server copy; its cloud models are added to the roster below
+            _seats = (max_tier_seats(self.ctx) if _max
+                      else resolve_tier_seats(tier, self.ctx))
             council = [x["label"] for x in _seats]
             _seat_fb = {x["label"]: x["fb"] for x in _seats if server_label(x["label"])}
             # THE PAGE'S `model` IS NOT THE MODE'S (6b339, final review: the page
@@ -30240,9 +30758,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # the line-up IS the bench — and it may legitimately be empty
             # (no keys), which run_cloud_only answers with instructions
             # rather than by quietly falling back to local silicon
+            # a mode or a pick seats what its plan says (6b440); plain Cloud
+            # Only the whole bench, as always
+            _cplan = cloud_mode_plan(_cl_mode, _cl_pid) if _cl_mode else None
             council = [lbl for lbl, _c in cloud_bench()]
+            if _cplan is not None:
+                council = [lbl for lbl, _c in _cplan["seats"]]
             model_name = council[0] if council else ""
-        elif not council:
+        elif not council and not (_max and _max_bench):   # Max with only cloud keys has none here
             council = [model_name or _page_model]
         # THE MERGER DRAFTS LAST (6b243). The council's local loop leaves
         # the LAST engine resident, and the merge stage wants the biggest
@@ -30502,6 +31025,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _so_fail = ""
         _srv_lbl = (council[0] if len(council) == 1 and not cloud_only
                     and server_label(council[0]) else "")
+        if _max and _max_bench:     # Max with cloud models is a council, never one server model (6b440)
+            _srv_lbl = ""
         # a mode's own server seat is not an explicit pick (6b339): it may
         # fall back to this computer's copy, and Fast asks the cloud first
         _srv_seat = bool(_srv_lbl) and _srv_lbl in _seat_fb
@@ -31270,8 +31795,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("X-Chat-Id", self._turn["id"])
         xm_names = list(council)
         if (len(council) > 1 and cloud_allowed() and not _srv_only
-                and not cloud_only):     # the bench IS the council here
+                and not cloud_only and not _max):     # the bench IS the council here
             xm_names += [lbl for lbl, _c in cloud_bench()]
+        if _max:                                  # Max names every cloud model it asks (6b440)
+            xm_names += [lbl for lbl, _c in _max_bench]
         xm = ", ".join(xm_names)[:300]
         # a server's name may be anything ("Sam’s server", "サーバー"),
         # and http.server writes headers as latin-1 (review of 6b334):
@@ -31710,6 +32237,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                                 else req_tier),
                                   req_cloud, cloud_only)
                       if images and not _srv_lbl else [])
+        if _cl_mode and _vis_cloud:
+            # a Cloud Only mode or pick reads a picture with its own kind of
+            # model (6b440): Fast and Thinking only the cheap ones (the quick
+            # ladder, a small model), Pro the strong one, a pick only its own
+            # provider; never a paid model the mode would not seat
+            _vis_cloud = [c for c in (
+                vision_ladder("Pro" if _cl_mode == "Pro" else
+                              "Cloud Only" if _cl_mode == "Model" else "Fast"))
+                if (_provider_of(c) == _cl_pid if _cl_mode == "Model"
+                    else _cl_mode == "Pro" or _cloud_cheap(_provider_of(c), c))]
         _vis_local = bool(images) and not _srv_lbl and model_cached(
             "Qwen 3.5 Vision 9B", ollama_pulled_tags() or set())
 
@@ -31775,7 +32312,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "power**, or switch to Fast, Thinking or Pro and "
                          "the local vision engine will look at it.")
             elif cloud_only:
-                run_cloud_only(full_messages, memit, status, step)
+                run_cloud_only(full_messages, memit, status, step, _cplan)
             elif ag_remote:
                 # THE REMOTE AGENT (6b249): drive the user's VPS over
                 # SSH. await_approval blocks on the approval channel —
@@ -31817,6 +32354,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             elif (TIERS.get(tier, {}).get("research")
                   or ag_research) and not _links_n:
                 run_research(council, full_messages, memit, status)
+            elif _max and (_max_bench or len(council) > 1) and not images:
+                # MAX (6b440): every local and server seat drafts as in Pro, every
+                # cloud model drafts beside them, and the merge is written by
+                # the first available of MAX_COMPOSITOR_ORDER (cloud rungs
+                # first, then the server's strongest, then this computer's
+                # largest). No review pass: every model already drafts.
+                run_council(council, full_messages, memit, status,
+                            hurry=hurry_ev,
+                            srv_first_s=(60.0 if _seat_fb else None),
+                            srv_merge=True, max_mode=True,
+                            cloud_plan={"mode": "Max", "seats": _max_bench,
+                                        "comp": max_cloud_ladder(), "spare": [],
+                                        "why": "", "pid": ""})
             elif (_srv_lbl and _srv_only and _so_mode == "Fast" and not _so_fail
                   and not images):
                 # Fast on that server alone (6b426): its one model, and Fast's
@@ -34116,11 +34666,17 @@ mark.find-hit.cur{background:#ffd60a;color:#101013}
   background:var(--panel2);border:1px solid var(--line);border-radius:10px;
   padding:11px 13px;box-shadow:0 14px 40px rgba(0,0,0,.55);
   font-size:12px;color:var(--dim);line-height:1.6;
+  overflow-y:auto;overscroll-behavior:contain;   /* taller than the window: scrolls inside (6b440) */
 }
 #tierpop[hidden]{display:none}
+#tier-note{position:fixed;z-index:75;width:300px;padding:9px 12px;border-radius:10px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:12px;
+  line-height:1.5;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+#tier-note[hidden]{display:none}
 #tierpop b{color:var(--text);display:block;margin-bottom:5px;font-size:12.5px}
 #tierpop .mline{font-family:var(--mono);font-size:11px;color:var(--accent)}
 #tierpop .note{color:var(--faint);font-size:10.5px;margin-top:7px;display:block}
+#tierpop .note.warn{color:#e8a08f}
 .model.active{
   color:var(--text);background:var(--accent-dim);
   border-color:rgba(255,255,255,.22);
@@ -36120,6 +36676,13 @@ body.gen #chip-model{color:var(--accent)}
 .engrow.srvmode .edsc{max-width:190px}
 /* Fast, Thinking and Pro on that server alone (6b426): under "<server> Only" */
 .engrow.srvsub{padding-left:26px}
+/* Cloud Only's Fast, Thinking, Pro and model rows sit indented under it (6b440) */
+.engrow.cloudsub{padding-left:26px}
+/* who writes a mode's blend: one small grey line under its row (6b440) */
+.engblend{font-size:10.5px;color:var(--faint);padding:0 10px 3px 37px;margin-top:-4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.engrow.cloudmode .edsc{max-width:190px}
+.engrow.cloudmode.off{cursor:default}
 /* a server's row in the engine menu opens a flyout beside it (6b337) */
 .engrow.srvmenu .edsc{max-width:150px}
 .engrow.srvmenu .echev{flex:none;color:var(--faint);margin-left:2px;font-size:15px;line-height:1}
@@ -37805,6 +38368,7 @@ function applyPrefs(){
     let t=typeof P.tier==="string"?P.tier:"Fast";
     if(t==="Smart"||t==="Best")t="Fast";   // merged (1.20) and retired (5.3)
     if(t==="Power")t="Pro";                // Pro absorbed Power (5.3)
+    if(isCloudMode(t)&&!cloudTierParse(t).mode)t="Fast";   // an unknown cloud id (6b440)
     if(tierOff[t]&&!isSrvMode(t))t="Fast";   // a server mode stays while it is off (6b337)
     tier=t;
   }
@@ -37994,6 +38558,14 @@ async function showTierPop(el,name){
   }catch(e){}
   const list=(info.models||[]);
   const bench=(cloudOn&&list.length>1)?(ci.bench||[]):[];
+  // Max (6b440): every model, said plainly, with the cost warning
+  if(name==="Max"){
+    tierPop.innerHTML=maxTierPopHtml(info);
+  }else
+  // Cloud Only's modes and picks (6b440): the models it would ask, or why it can't
+  if(cloudTierParse(name).mode){
+    tierPop.innerHTML=cloudTierPopHtml(name,info);
+  }else
   // "<server> Only" (6b337): the one model it runs, or why it can't
   if(isSrvMode(name)){
     tierPop.innerHTML=srvTierPopHtml(name,info);   // and its Fast, Thinking, Pro (6b426)
@@ -38035,15 +38607,47 @@ async function showTierPop(el,name){
     ((info.skipped||[]).length
       ? '<span class="note">skipped, needs more memory: '+
         esc(info.skipped.join(", "))+'</span>' : "");
-  const r=el.getBoundingClientRect();
+  placeTierPop(el);
+}
+// WHERE THE POP-OUT GOES (6b440, per Patrick: it must never be clipped by the
+// window; a page can't draw outside it). rr: the hovered row's box, w and h the
+// pop-out's size, iw and ih the window's. Right of the row when it fits, else
+// left, else below or above the row; always shifted so all of it is inside the
+// window with an 8 px margin; taller than the window: capped (maxH) so it
+// scrolls inside. A pure function, so the gauntlet can run it with fake boxes
+function popPlace(rr,w,h,iw,ih){
+  const M=8,maxH=Math.max(80,ih-2*M),hh=Math.min(h,maxH);
+  const ww=Math.min(w,Math.max(0,iw-2*M));
+  const clampY=y=>Math.max(M,Math.min(y,ih-M-hh));
+  let left,top;
+  if(rr.right+10+ww<=iw-M){left=rr.right+10;top=clampY(rr.top-4);}
+  else if(rr.left-10-ww>=M){left=rr.left-10-ww;top=clampY(rr.top-4);}
+  else{
+    left=Math.max(M,Math.min(rr.left,iw-M-ww));
+    top=rr.bottom+6+hh<=ih-M?rr.bottom+6:rr.top-6-hh>=M?rr.top-6-hh:clampY(rr.top-4);
+  }
+  return {left:Math.round(left),top:Math.round(top),maxH:h>maxH?Math.floor(maxH):0};
+}
+function placeTierPop(el){
   tierPop.hidden=false;
-  // to the right of its row, or to its left when the window is out of room
-  const pw=tierPop.offsetWidth;
-  const pl=r.right+10+pw>innerWidth-8?Math.max(8,r.left-10-pw):r.right+10;
-  tierPop.style.left=Math.round(pl)+"px";
-  tierPop.style.top=Math.round(r.top-4)+"px";
+  tierPop.style.maxHeight="";
+  const p=popPlace(el.getBoundingClientRect(),tierPop.offsetWidth,tierPop.offsetHeight,innerWidth,innerHeight);
+  if(p.maxH)tierPop.style.maxHeight=p.maxH+"px";
+  tierPop.style.left=p.left+"px";tierPop.style.top=p.top+"px";
 }
 function hideTierPop(){tierPop.hidden=true;}
+// a one-line note under the composer chip that goes by itself (6b440): a chosen
+// cloud model that stopped answering says where the pick went
+let tierNoteEl=null,tierNoteT=0;
+function tierNote(msg){
+  if(!tierNoteEl){tierNoteEl=document.createElement("div");tierNoteEl.id="tier-note";
+    document.body.appendChild(tierNoteEl);}
+  tierNoteEl.textContent=msg;tierNoteEl.hidden=false;
+  const r=$("#model-chip").getBoundingClientRect();
+  tierNoteEl.style.left=Math.round(Math.max(8,Math.min(r.left,innerWidth-308)))+"px";
+  tierNoteEl.style.top=Math.round(Math.max(8,r.top-tierNoteEl.offsetHeight-8))+"px";
+  clearTimeout(tierNoteT);tierNoteT=setTimeout(()=>{tierNoteEl.hidden=true;},9000);
+}
 /* ------------------------------------------------- advanced council */
 // 6b248, per Patrick: hand-pick which minds draft and who composites.
 // Stored in prefs.json (adv, advon; 6b324); the request carries models
@@ -38315,7 +38919,9 @@ function openEngMenu(){
       +(tierOff[n]?" off":"")+'" data-t="'+n+'">'
       +'<span class="eico">'+m.icon+'</span>'
       +'<span class="enm">'+esc(n)+'</span>'
-      +'<span class="edsc">'+esc(m.desc)+'</span></div>';
+      +'<span class="edsc">'+esc(m.desc)+'</span></div>'+blendHtml(n)
+      // Fast, Thinking, Pro and one row per cloud model, under Cloud Only (6b440)
+      +(n==="Cloud Only"?cloudMenuRows():"");
   }).join("")
   // one row per paired server, under Cloud Only: its "Only" mode and its
   // models open in a flyout beside it (6b337)
@@ -38325,7 +38931,9 @@ function openEngMenu(){
   +'<div class="engdiv"></div>'
   +'<div class="engrow'+(advOn?" on":"")+'" data-t="__adv__">'
   +'<span class="eico">⚙️</span><span class="enm">Advanced</span>'
-  +'<span class="edsc">hand-pick models &amp; compositor</span></div>';
+  +'<span class="edsc">hand-pick models &amp; compositor</span></div>'
+  // Advanced names its own compositor when it has one (6b440)
+  +(adv&&adv.comp?'<div class="engblend">'+esc("blend: "+adv.comp)+'</div>':"");
   engMenu.hidden=false;
   // fit the window (6b336): open on the side with room; when neither
   // side holds the whole list, take the roomier one and scroll
@@ -38387,6 +38995,7 @@ $("#model-chip").addEventListener("click",ev=>{
   ev.stopPropagation();hideTierPop();
   if(engMenu.hidden){
     openEngMenu();
+    paintTierAvail();     // the cloud rows' reasons and compositor lines are read fresh (6b440)
     // a server's model list older than a minute is checked again (6b334)
     if(srvList.some(s=>s.paired)&&Date.now()-srvAt>60000){
       srvAt=Date.now();loadServers(true);}
@@ -38413,7 +39022,7 @@ function cloudChipOn(cs,t){
   if(!cs)return false;
   const pv=cs.providers||{};
   const has=!!cs.configured||Object.keys(pv).some(k=>(pv[k]||{}).status==="ok");
-  return has&&(!!cs.turbo||t==="Cloud Only");
+  return has&&(!!cs.turbo||t==="Cloud Only"||/^cloud:(fast|think|pro|m:)/.test(t||""));
 }
 function paintCloudChip(){
   const c=document.getElementById("cloud-chip");if(!c)return;
@@ -38451,7 +39060,20 @@ async function paintTierAvail(){
   // the saved mode may have lost its keys since the last launch — never
   // leave the composer pointing at something that cannot answer
   // (a server mode that is only off stays: it goes when its server is removed)
+  // a chosen cloud mode or model that can't answer now stays shown, greyed, and the
+  // pick goes back to plain Cloud Only, said out loud; never to another model
+  // (6b440). Plain Cloud Only off too: the line below sends it to Fast as before
+  if(isCloudMode(tier)){
+    if(!cloudTierParse(tier).mode){setTier("Fast");}
+    else if(tierOff[tier]&&!tierOff["Cloud Only"]){
+      const was=tier,inf=tierInfo[was]||{};
+      setTier("Cloud Only");
+      tierNote((inf.title||"That cloud model")+" can’t answer right now"
+        +(inf.short?" ("+inf.short+")":"")+", so this is back on Cloud Only.");
+    }
+  }
   if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");
+  if(!engMenu.hidden)openEngMenu();       // the rows' reasons follow the keys (6b440)
   if(typeof fnCloudLoad==="function")fnCloudLoad();
   if(typeof paintModels==="function")paintModels();     // the chip names the seat
 }
@@ -38721,10 +39343,7 @@ function showAgentPop(el,name){
     +'<div class="mline">'+esc(m.desc)+'</div>'
     +(m.picks&&m.picks.length
       ?'<span class="note">runs: '+esc(m.picks.join(", "))+'</span>':"");
-  const r=el.getBoundingClientRect();
-  tierPop.hidden=false;
-  tierPop.style.left=Math.round(r.right+10)+"px";
-  tierPop.style.top=Math.round(r.top-4)+"px";
+  placeTierPop(el);
 }
 $$("#code-wrap .agent").forEach(el=>{
   const nm=el.dataset.agent;if(!nm)return;
@@ -44414,6 +45033,14 @@ function flyPlace(mr,rr,w,h,iw,ih){
 // the engine menu's server rows (6b337): ONE per paired server, its own
 // name, how many models it lists and a chevron; the models and "<name>
 // Only" are in the flyout it opens (srvSubRows)
+// the small grey line under a mode's row naming who writes its blend (6b440, per
+// Patrick); the words come from /api/tiers ("blend: Gemma 4 26B", "blend: none
+// available"), computed by the same resolver the merge uses. A mode with one
+// model has none. typeof: the pieces are also run apart from the page
+function blendHtml(t){
+  const i=typeof tierInfo==="undefined"?null:tierInfo[t];
+  return i&&i.blend?'<div class="engblend">'+esc(i.blend)+'</div>':"";
+}
 function srvMenuRows(){
   return srvList.filter(s=>s.paired).map(s=>{
     const ms=s.models||[];
@@ -44441,7 +45068,7 @@ function srvSubRows(s){
     +srvSubModes().map(([k,n,ic])=>'<div class="engrow srvmode srvsub'
       +(tier===t+":"+k&&!advOn?" on":"")+(ok?"":" off")+'" data-t="'+esc(t+":"+k)+'">'
       +'<span class="eico">'+ic+'</span><span class="enm">'+n+'</span>'
-      +'<span class="edsc">'+esc(s.name)+' only</span></div>').join("");
+      +'<span class="edsc">'+esc(s.name)+' only</span></div>'+blendHtml(t+":"+k)).join("");
   if(!ms.length)
     return only+'<div class="engdiv"></div><div class="engrow srvrow off" data-none="1">'
       +'<span class="edsc">'+(srvAsleep(s)?"asleep \u00b7 wakes when you ask"
@@ -44513,8 +45140,72 @@ function srvTierPopHtml(name,info){
         :'<div class="mline">'+esc(info.model||"")+'</div>')
     +'<span class="note">'+esc(info.note||"")+'</span>';
 }
+// CLOUD ONLY'S MODES AND PICKS (6b440, per Patrick: "an option under cloud only,
+// similar to what we have for the server pop out menu to pick fast, thinking,
+// or pro ... and under that ... the option to pick a specific model ... If one
+// of the cloud models is unavailable for any reason, just have it gray out."):
+// "cloud:fast", ":think", ":pro" and "cloud:m:<provider>"; plain "Cloud Only"
+// stays what it was. Read here and nowhere else (the server has its own one
+// parser, cloud_tier_parse): {mode, pid}, mode "" for anything that is not one
+// of these. Functions, not consts, for the same TDZ reason as the server's.
+function cloudSubModes(){return [["fast","Fast","⚡️"],["think","Thinking","🧠"],
+  ["pro","Pro","✨"]];}
+function cloudProvs(){return [["gemini","Gemini"],["groq","Groq"],["claude","Claude"],["kimi","Kimi K3"]];}
+function isCloudMode(t){return typeof t==="string"&&t.indexOf("cloud:")===0;}
+function cloudTierParse(t){
+  const m=isCloudMode(t)?/^cloud:(?:(fast|think|pro)|m:([a-z]+))$/.exec(t):null;
+  const k=m&&m[1]?cloudSubModes().find(x=>x[0]===m[1]):null;
+  const p=m&&m[2]?cloudProvs().find(x=>x[0]===m[2]):null;
+  return {mode:k?k[1]:p?"Model":"",pid:p?p[0]:""};
+}
+// the sub-rows under "Cloud Only" in the engine menu: Fast, Thinking and Pro, then
+// one row per cloud model with the model it runs. A row that can't answer is
+// greyed (tierOff, from /api/tiers) and says why in a few words, the whole
+// sentence in its tooltip
+function cloudMenuRows(){
+  const row=(t,ic,nm,dsc)=>{
+    const inf=tierInfo[t]||{},off=!!tierOff[t];
+    return '<div class="engrow cloudmode cloudsub'+(tier===t&&!advOn?" on":"")+(off?" off":"")
+      +'" data-t="'+esc(t)+'"'+(off&&inf.why?' title="'+esc(inf.why)+'"':"")+'>'
+      +'<span class="eico">'+ic+'</span><span class="enm">'+esc(nm)+'</span>'
+      +'<span class="edsc">'+esc(off?(inf.short||"unavailable"):dsc)+'</span></div>'+(off?"":blendHtml(t));};
+  return cloudSubModes().map(x=>row("cloud:"+x[0],x[2],x[1],"cloud only")).join("")
+    +'<div class="engdiv"></div>'
+    +cloudProvs().map(p=>{const inf=tierInfo["cloud:m:"+p[0]]||{};
+      return row("cloud:m:"+p[0],"☁️",p[1],(inf.desc?inf.desc+" · ":"")+(inf.model||""));}).join("");
+}
+// the hover bubble: the models it would ask, or why it can't; always that only
+// cloud models answer
+function cloudTierPopHtml(name,info){
+  return "<b>"+esc(info.title||"Cloud Only")+"</b>"
+    +(info.available===false
+        ?'<div class="mline">'+esc(info.why||"unavailable")+'</div>'
+        :(info.detail||[]).map(m=>'<div class="mline mcloud">'+esc(m)+' <i>· cloud</i></div>').join(""))
+    +'<span class="note">'+esc(info.note||"")+'</span>';
+}
+// Max's bubble: every model it would use (this computer's and servers', then the
+// cloud's), who writes the blend, and the cost warning; or why it is off
+function maxTierPopHtml(info){
+  const loc=info.models||[],cl=info.cloud||[];
+  return "<b>Max</b>"
+    +(info.available===false
+      ?'<div class="mline">'+esc(info.why||"nothing is available")+'</div>'
+      :loc.map(m=>'<div class="mline">'+esc(m)+(m.indexOf(SRV_SEP)>=0?' <i>· your server</i>':"")+'</div>').join("")
+        +cl.map(m=>'<div class="mline mcloud">'+esc(m)+' <i>· cloud</i></div>').join(""))
+    +(info.blend?'<span class="note">'+esc(info.blend)+'</span>':"")
+    +'<span class="note warn">'+esc(info.warn||"Uses every model, including paid cloud keys.")+'</span>';
+}
+// the chip: "Fast · Claude", "Gemini only", "Thinking · cloud only"
+function cloudTierShown(t){
+  const p=cloudTierParse(t),inf=tierInfo[t]||{};
+  if(p.mode==="Model")return inf.name?inf.name+" only":((cloudProvs().find(x=>x[0]===p.pid)||[0,"Cloud"])[1]+" only");
+  if(!p.mode)return "Cloud Only";
+  return p.mode==="Fast"&&(inf.models||[])[0]?"Fast · "+inf.models[0]:p.mode+" · cloud only";
+}
 // what the composer chip says: the model the mode resolved to
 function tierShown(t){
+  if(cloudTierParse(t).mode)return cloudTierShown(t);
+  if(t==="Max")return "Max";            // every model: the chip names no seat (6b440)
   if(!isSrvMode(t)){
     // Fast, Thinking or Pro routed to a server says so: "Fast · <your server's name> gpt-oss:20b"
     const sv=((tierInfo[t]||{}).models||[]).filter(m=>m.indexOf(SRV_SEP)>=0);

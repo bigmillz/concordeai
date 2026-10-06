@@ -9,6 +9,58 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b440 — Cloud Only gets Fast, Thinking, Pro and a pick per model; a blend line under each mode; Max; the pop-out never clips (per Patrick)
+
+Patrick (2026-10-07): "Let's also have an option under cloud only, similar to what we have for the server pop out menu to
+pick fast, thinking, or pro. And based on that, it determines which models and how many models to use. So fast doesn't
+gobble up all your API money and usage, etc. And under that, similar to the servers pop out, the option to pick a
+specific model that it uses from the available ones. If one of the cloud models is unavailable for any reason, just have
+it gray out." Then, confirmed by him: the pop-out is never clipped by the window; a small line under each mode names the
+model that writes its blend; a new "Max" under Pro uses every model, its blend written by the first available of Claude,
+Kimi K3, Gemini, Groq, the server's largest model that fits, this computer's largest that fits.
+
+- **Tier ids**, one parser each side (`cloud_tier_parse`, `cloudTierParse`): `cloud:fast`, `cloud:think`, `cloud:pro`,
+  `cloud:m:<provider>`; plain `Cloud Only` is untouched (old prefs, `X-Models`). An unknown `cloud:` id is Fast on the
+  page; the server finds it in no tier, as any unknown string. `cloud_only_tier` makes every one of them "cloud only" in the
+  handler, titles, memory and chips; a pick keeps even the chips and titles inside its provider (`suggest_ask`).
+- **Cost classes** (`CLOUD_COST`, next to `KEY_SHAPE`; the one table to tune): Gemini and Groq `free`, Claude `cheap` (only
+  its Haiku-class model, `CLOUD_CHEAP_MODEL`, in Fast and Thinking, never Sonnet/Opus), Kimi K3 `paid` (no small model: never
+  in Fast; in Thinking only after the others). A rule, not prices: usage.jsonl and the cost screen are not read.
+  **Seats** (`CLOUD_MODE_SEATS`): Fast 1, Thinking 3 (different providers, free first, then cheap, then paid; its merge by the
+  cheapest capable: free, Haiku, Kimi), Pro every provider (today's bench, the strength ladder, so Pro == plain Cloud Only
+  plus the name). Fast is the first of `fast_cloud_ladder` that is free or cheap, free before cheap; the rest of that list
+  is `spare`, asked if the first fails, said in the status line (never a paid non-cheap model). A pick runs that provider's
+  "work" model alone, no spare, no merge, and says so when it can't answer (never another model).
+- **Availability** (`cloud_provider_state`, the Cloud power pane's own facts: no key, key rejected, resting until HH:MM or out
+  of credit, no current model): `/api/tiers` has a row per mode and per pick with `available`, `why` and `short`; the page
+  greys the row and shows the short reason (tooltip: the sentence). A mode with no usable key says "Add a key under Settings
+  › Cloud power". A chosen cloud mode that goes dark is shown greyed and sent back to plain Cloud Only with a note
+  (`tierNote`), to Fast only when Cloud Only is off too.
+- **Menu**: under the Cloud Only row, indented, Fast, Thinking, Pro, a rule, then Gemini, Groq, Claude, Kimi K3 with the model
+  each runs and its cost word. Inline in the menu, not a flyout (the server's flyout is keyed to a server id and pinned by
+  many tests). The chip: "Fast · Claude", "Gemini only", "Thinking · cloud only". The bubble: the models, the promise "Only
+  cloud models answer. Nothing runs on this computer."
+- **Blend line** (`blend_text`, `mode_blend`, `max_compositor`, rows' `blend`): from the same choosers the merge uses (cloud
+  ladder when cloud power is on, else `server_compositor`, else the Gemma preference or strongest seat, its server copy
+  standing in); "blend: none available" when nothing can; none for a single model. Cloud modes use their plan's first merge
+  rung, a server's Thinking/Pro its own `server_compositor`, Advanced its named compositor.
+- **Max** (`TIERS["Max"]`, right under Pro): `max_tier_seats` = every server model (role "all", no seat cap) then this
+  computer's that fit, minus a local model whose Ollama tag a server holds (the server copy runs faster; the local one stays
+  as that seat's fallback); plus every healthy key's cloud bench. Choosing it opens the cloud as Cloud Only does. Merge:
+  `MAX_COMPOSITOR_ORDER` (one list), `max_compositor` the one resolver; run_council walks `max_cloud_ladder` first, then the
+  server's pen, then this computer's largest (the Gemma preference is skipped, `max_mode`; the 12-seat cap is 40). No review
+  pass. The server loop budget (SRV_DRAFT_S per seat) is unchanged. Grey with a reason when nothing at all is available. The
+  bubble says "Uses every model, including paid cloud keys" with the cost warning.
+- **Pop-out placement** (`popPlace`, `placeTierPop`): right of the row if it fits, else left, else below or above; shifted
+  into the window with an 8 px margin; taller than the window: capped and scrolls. Used by the model bubble and the agent card.
+- **Tests**: a new block at the end of the gauntlet (94 checks, 67 mutants): resolvers exec'd against fake provider files
+  (only free; free+paid; only paid; Kimi only; Claude without Haiku; none; resting; rejected), the parsers, rows, Max's seats,
+  duplicate, compositor order and grey-out, the blend labels, the page's rows/chip/bubbles and the placement math in node
+  with fake boxes. Existing pins moved with the code: the placement line, `_stubs` of the suggestion test, "every tier
+  resolves" (the `cloud:` rows are off with no key).
+- Not verified: no real provider was called (keys can't be used here), so the mode seats and merges are tested on fakes; the
+  menu and pop-out were run in node, not in WKWebView; the full gauntlet was not run.
+
 ## 6b438 — starter chips are whole, relevant questions and change at every new chat (per Patrick)
 
 Patrick (2026-10-06), about the empty-composer chips ("Past era details?", "New culture facts?", "Best travel tips?",

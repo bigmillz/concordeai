@@ -6157,7 +6157,8 @@ _resting = all((v.get("cool") or 0) > 0 or v.get("status") != "ok"
 _nokeys = not _cl.get("configured")
 check("every tier resolves",
       all(t.get("models") for n, t in tiers.items()
-          if not (n == "Cloud Only" and (_resting or _nokeys))),
+          if not (n == "Cloud Only" and (_resting or _nokeys))
+          and not n.startswith("cloud:")),     # Cloud Only's modes and picks are off with no key (6b440)
       str({n: t.get("models") for n, t in tiers.items()})
       + (" [all providers resting]" if _resting else ""))
 check("Best and Power tiers are gone",
@@ -17445,6 +17446,7 @@ def _sg_unit(src):
         return dict(
             profile_local=lambda ctx: {"tier": tier},
             gate_ladder=lambda lad, req=None, only=False: lad if only else [],
+            cloud_only_tier=lambda t: t == "Cloud Only", cloud_tier_pid=lambda t: "",   # (6b440)
             fast_cloud_ladder=lambda utility=False: cloud[0],
             cloud_text=lambda c, m, **k: (calls.append("cloud") or "<think>x</think>CLOUD " + c["id"]),
             server_side_text=lambda m, ctx=None, role="fast", max_tokens=0: (calls.append("server") or srv[0]),
@@ -21408,7 +21410,7 @@ def _soc_page(src):
         and src.index("  if(isSrvMode(name)){\n    tierPop.innerHTML") < src.index("  if(info.available===false||(info.available!==undefined&&!list.length")
         and "        ?'<div class=\"mline\">'+esc(info.why||\"not answering\")+'</div>'" in src
         and "    +'<span class=\"note\">'+esc(info.note||\"\")+'</span>';" in src
-        and "  const pl=r.right+10+pw>innerWidth-8?Math.max(8,r.left-10-pw):r.right+10;" in src,
+        and "  if(rr.right+10+ww<=iw-M){left=rr.right+10;top=clampY(rr.top-4);}\n  else if(rr.left-10-ww>=M){left=rr.left-10-ww;top=clampY(rr.top-4);}" in src,
         "style": "/* \"<server> Only\" rows (6b337): a mode's row, with a roomier description */\n"
                  ".engrow.srvmode .edsc{max-width:190px}" in src,
         # the wording the row and the bubble carry is the server's (tested above), once
@@ -21805,8 +21807,8 @@ _SO_MUT = [
     ("no treatment for a server with no models", "  if(!ms.length)\n    return only+", "  if(false)\n    return only+"),
     ("a server's name not escaped in its row", "      +'<span class=\"enm\">'+esc(s.name)+'</span>'\n      +'<span class=\"edsc\">'+esc(srvAsleep(s)?",
      "      +'<span class=\"enm\">'+s.name+'</span>'\n      +'<span class=\"edsc\">'+esc(srvAsleep(s)?"),
-    ("the bubble off the window", "  const pl=r.right+10+pw>innerWidth-8?Math.max(8,r.left-10-pw):r.right+10;",
-     "  const pl=r.right+10;"),
+    ("the bubble off the window", "  else if(rr.left-10-ww>=M){left=rr.left-10-ww;top=clampY(rr.top-4);}",
+     "  else if(false){left=rr.left-10-ww;top=clampY(rr.top-4);}"),
     # Advanced (6b337)
     ("a server's models not grouped", "'<div class=\"advgrp\"><b>'", "'<div class=\"advrow\"><b>'"),
     ("an unpaired server's models in Advanced", "  const gs=srvList.filter(s=>s.paired);\n  return gs.map(s=>{",
@@ -22781,7 +22783,7 @@ def _p5c_nodes(src):
           + "function srvModesRefresh(){calls.push('modes');}function paintTierAvail(){calls.push('avail');}"
           + "function paintEngMenuServers(){calls.push('menu');}"
           + pref
-          + "const tierPop={innerHTML:'',hidden:true,offsetWidth:100,style:{}};const innerWidth=1000;"
+          + "const tierPop={innerHTML:'',hidden:true,offsetWidth:100,offsetHeight:60,style:{}};const innerWidth=1000,innerHeight=800;"
           + "const T={Pro:{models:['A \\u00b7 a','A \\u00b7 b','Gemma'],srvcap:{seated:4,of:6},skipped:[]},"
           + "Thinking:{models:['A \\u00b7 a'],skipped:[]}};"
           + "async function api(p){return {json:async()=>p==='/api/tiers'?T:{configured:false,turbo:false}};}"
@@ -32902,6 +32904,492 @@ check("benchmark cloud (live): no key is in any reply, any log or any file but c
       and not any(v_.encode() in b_ for v_ in _SENT26.values() for b_ in _BCR)
       and not any(v_ in _bc_log for v_ in _SENT26.values()) and len(_BCR) > 15,
       "%r" % [_bc_hits])
+
+
+# ==== 6b440: Cloud Only's modes and picks, the blend line under each mode, Max, and the pop-out's placement ====
+print("== Cloud Only's modes and picks, blend lines, Max, pop-out placement (6b440) ==")
+# Patrick (2026-10-07): "Let's also have an option under cloud only, similar to what we have for the server pop out
+# menu to pick fast, thinking, or pro. And based on that, it determines which models and how many models to use. So
+# fast doesn't gobble up all your API money and usage, etc. And under that ... the option to pick a specific model ...
+# If one of the cloud models is unavailable for any reason, just have it gray out." Then, confirmed: the pop-out is
+# never clipped by the window; a small line under each mode names who writes its blend; a new "Max" under Pro uses
+# every model, its blend written by the first available of Claude, Kimi K3, Gemini, Groq, the server's largest, this
+# computer's largest. The resolvers are exec'd from the source with fake provider files; the page's pieces run in node.
+_CM_PROV = {"gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "Gemini",
+                       ["gemini-3.8-flash", "gemini-3.8-flash-lite"]),
+            "groq": ("https://api.groq.com/openai/v1", "Groq", ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]),
+            "claude": ("https://api.anthropic.com/v1", "Claude", ["claude-opus-5-5", "claude-sonnet-5", "claude-haiku-5"]),
+            "kimi": ("https://api.moonshot.ai/v1", "Kimi K3", ["kimi-k3"])}
+
+
+def _cm_prov(pid, key="k", status="ok", cool=0, models=None, note=""):
+    base, name, ms = _CM_PROV[pid]
+    ms = models or ms
+    return {"name": name, "base": base, "key": key, "status": status, "cool": cool, "model": ms[0],
+            "models": ms, "note": note}
+
+
+def _cm_ns(src, providers, **stubs):
+    """The provider rules and the new cloud-mode code of src, run against a fake cloud.json."""
+    a = src.index("# WHAT EACH PROVIDER COSTS, AND WHAT CLOUD ONLY'S MODES SEAT")
+    a_end = src.index("\n", src.index("_CLOUD_TIER_RX = re.compile(", a)) + 1
+    b = src.index("_CLAUDE_ID = re.compile(")
+    b_end = src.index("def claude_refusal_conf(c: dict):")
+    p0 = src.index("def _provider_of(c: dict) -> str:")
+    ns = {"re": re, "time": time, "json": json, "threading": __import__("threading"),
+          "PROVIDER_BASES": {k_: v_[0] for k_, v_ in _CM_PROV.items()}, "profile_cache": lambda n, d: d,
+          "APP_VERSION": "t", "cloud_model_alive": lambda m: True,
+          "_cloud_all": lambda: {"providers": providers, "active": ""},
+          "_NO_CREDIT_RX": re.compile(r"insufficient|suspended|recharge|payment required|credit", re.I),
+          "TIERS": {"Cloud Only": {"cloud_only": True}, "Fast": {}, "Max": {"max": True, "desc": "all"}},
+          "cloud_allowed": lambda only=False: True, "BLEND_EXCLUDE": set(), "slow_giant": lambda l: False,
+          "ollama_pulled_tags": lambda: set(), "model_cached": lambda l, p=None: True,
+          "model_fits_memory": lambda l: True, "MODEL_ROUTES": {}, "MERGE_RANK": [], "MODEL_INFO": {},
+          "_label_params": lambda l: None, "server_label": lambda l: " · " in l,
+          "server_speeds": lambda ctx: {}, "server_mode_candidates": lambda ctx: [],
+          "srv_role_ok": lambda n, r: True, "server_compositor": lambda ctx, d=(), c=None: None,
+          "_tier_ready": lambda n: [], "merge_pref_label": lambda: "", "server_copy": lambda *a: None,
+          "srv_rank": lambda c, r, e, s: sorted(c, key=lambda m: -(m.get("params") or 0))}
+    exec(src[p0:src.index("_dead_loaded = ", p0)], ns)
+    t0 = src.index("def _srv_tag_key(tag: str) -> str:")
+    exec(src[t0:src.index("def server_mode_candidates(ctx)", t0)], ns)
+    exec(src[a:a_end], ns)
+    exec(src[b:b_end], ns)
+    ns["_cloud_repair"] = lambda: None
+    ns.update(stubs)
+    return ns
+
+
+def _cm_names(pl):
+    return [l for l, _c in pl["seats"]]
+
+
+def _cm_resolver(src):
+    """Each mode's seats and order with the key states; Fast never spends on a paid model while a cheaper one exists."""
+    allp = lambda **k: {p: _cm_prov(p, **k) for p in ("gemini", "groq", "claude", "kimi")}
+    got = {}
+    # parser: old ids unchanged, the modes and picks, anything else nothing
+    ns = _cm_ns(src, allp())
+    P = ns["cloud_tier_parse"]
+    got["parser"] = (P("cloud:fast") == ("Fast", "") and P("cloud:think") == ("Thinking", "") and P("cloud:pro") == ("Pro", "")
+                     and P("cloud:m:claude") == ("Model", "claude") and P("cloud:m:kimi") == ("Model", "kimi")
+                     and all(P(t) == ("", "") for t in ("Cloud Only", "Fast", "", None, 3, "cloud:", "cloud:bogus",
+                                                         "cloud:m:openai", "cloud:fast:x", "cloud:m:", "Cloud:fast", "cloud:Fast")))
+    got["old Cloud Only unchanged"] = (ns["cloud_only_tier"]("Cloud Only") and ns["cloud_only_tier"]("cloud:pro")
+                                       and ns["cloud_only_tier"]("cloud:m:groq") and not ns["cloud_only_tier"]("Pro")
+                                       and not ns["cloud_only_tier"]("srv:a1b2c3d4") and not ns["cloud_only_tier"]("cloud:zz")
+                                       and ns["cloud_tier_pid"]("cloud:m:groq") == "groq" and ns["cloud_tier_pid"]("cloud:fast") == "")
+    # constants in one place
+    got["constants"] = (ns["CLOUD_MODE_SEATS"] == {"Fast": 1, "Thinking": 3, "Pro": 99}
+                        and ns["CLOUD_COST"] == {"gemini": "free", "groq": "free", "claude": "cheap", "kimi": "paid"}
+                        and src.count("CLOUD_MODE_SEATS = {") == 1 and src.count("CLOUD_COST = {") == 1)
+    # free + paid (all four keys)
+    pl = {m: ns["cloud_mode_plan"](m) for m in ("Fast", "Thinking", "Pro")}
+    models = lambda p: [c["model"] for _l, c in p["seats"]]
+    got["all keys: Fast is ONE free model"] = _cm_names(pl["Fast"]) == ["Groq"] and models(pl["Fast"]) == ["openai/gpt-oss-120b"]
+    got["all keys: Thinking is three, free first, Claude only as Haiku"] = (
+        _cm_names(pl["Thinking"]) == ["Gemini", "Groq", "Claude"] and models(pl["Thinking"])[2] == "claude-haiku-5")
+    got["all keys: Thinking's merge is the cheapest capable (free, then Haiku, then Kimi)"] = (
+        [c["model"] for c in pl["Thinking"]["comp"]] == ["gemini-3.8-flash", "openai/gpt-oss-120b", "claude-haiku-5", "kimi-k3"])
+    got["all keys: Pro is every provider, strongest merge first"] = (
+        _cm_names(pl["Pro"]) == ["Gemini", "Groq", "Claude", "Kimi K3"]
+        and [c["name"] for c in pl["Pro"]["comp"]] == ["Claude", "Kimi K3", "Gemini", "Groq"]
+        and [c["model"] for c in pl["Pro"]["comp"]][0] == "claude-opus-5-5")
+    got["Fast never takes Claude's Opus or Sonnet"] = all("opus" not in m and "sonnet" not in m for m in models(pl["Fast"]) + models(pl["Thinking"]))
+    # only free keys
+    f = {p: _cm_prov(p) for p in ("gemini", "groq")}
+    nf = _cm_ns(src, f)
+    got["only free: Fast one, Thinking two, Pro two"] = (
+        _cm_names(nf["cloud_mode_plan"]("Fast")) == ["Groq"] and _cm_names(nf["cloud_mode_plan"]("Thinking")) == ["Gemini", "Groq"]
+        and _cm_names(nf["cloud_mode_plan"]("Pro"))[:2] == ["Gemini", "Groq"])
+    # only paid: Claude (Haiku) and Kimi
+    np_ = _cm_ns(src, {"claude": _cm_prov("claude"), "kimi": _cm_prov("kimi")})
+    got["only paid: Fast is Claude's Haiku, never Kimi"] = _cm_names(np_["cloud_mode_plan"]("Fast")) == ["Claude"] and models(np_["cloud_mode_plan"]("Fast")) == ["claude-haiku-5"]
+    got["only paid: Thinking is Haiku then Kimi"] = _cm_names(np_["cloud_mode_plan"]("Thinking")) == ["Claude", "Kimi K3"]
+    # a paid key with no small model: Fast has nothing and says so
+    nk = _cm_ns(src, {"kimi": _cm_prov("kimi")})
+    pk = nk["cloud_mode_plan"]("Fast")
+    got["only Kimi: Fast is empty and says why, Thinking and Pro still run it"] = (
+        pk["seats"] == [] and "free or low-cost" in pk["why"] and _cm_names(nk["cloud_mode_plan"]("Thinking")) == ["Kimi K3"]
+        and _cm_names(nk["cloud_mode_plan"]("Pro")) == ["Kimi K3"])
+    nc = _cm_ns(src, {"claude": _cm_prov("claude", models=["claude-opus-5-5", "claude-sonnet-5"])})
+    got["Claude with no Haiku: not in Fast"] = nc["cloud_mode_plan"]("Fast")["seats"] == [] and nc["cloud_mode_plan"]("Thinking")["seats"] == []
+    # none
+    nn = _cm_ns(src, {})
+    got["no keys: every mode empty, the sentence says where to add one"] = all(
+        nn["cloud_mode_plan"](m, "groq")["seats"] == [] and ("Add a key under Settings › Cloud power" in nn["cloud_mode_plan"](m, "groq")["why"])
+        for m in ("Fast", "Thinking", "Pro", "Model"))
+    # a resting provider is skipped and shown as resting; a rejected key too
+    soon = time.time() + 600
+    rs = _cm_ns(src, dict(allp(), gemini=_cm_prov("gemini", cool=soon, note="rate limited — resting"),
+                           claude=_cm_prov("claude", status="fail")))
+    st = {s["id"]: s for s in rs["cloud_provider_states"]()}
+    got["resting and rejected are skipped"] = (
+        _cm_names(rs["cloud_mode_plan"]("Fast")) == ["Groq"] and _cm_names(rs["cloud_mode_plan"]("Thinking")) == ["Groq", "Kimi K3"]
+        and "Gemini" not in _cm_names(rs["cloud_mode_plan"]("Pro")) and "Claude" not in _cm_names(rs["cloud_mode_plan"]("Pro"))
+        and st["gemini"]["why"].startswith("resting until ") and not st["gemini"]["ok"] and st["claude"]["why"] == "key rejected"
+        and st["groq"]["ok"] and st["kimi"]["ok"])
+    # a single pick
+    pm = ns["cloud_mode_plan"]("Model", "gemini")
+    got["a pick runs one model, no merge"] = _cm_names(pm) == ["Gemini"] and pm["comp"] == [] and pm["spare"] == []
+    got["Fast has spares behind it, a pick has none"] = len(pl["Fast"]["spare"]) >= 1 and all(
+        _cm_names(ns["cloud_mode_plan"]("Model", p)) and ns["cloud_mode_plan"]("Model", p)["spare"] == [] for p in ("gemini", "claude"))
+    got["a pick of an unavailable model is empty with its reason"] = (
+        rs["cloud_mode_plan"]("Model", "claude")["seats"] == [] and "unavailable: key rejected" in rs["cloud_mode_plan"]("Model", "claude")["why"]
+        and "has no key yet" in nn["cloud_mode_plan"]("Model", "groq")["why"])
+    # /api/tiers rows
+    rows = rs["cloud_mode_tiers"]()
+    got["rows: modes and one pick per provider"] = (
+        sorted(rows) == ["cloud:fast", "cloud:m:claude", "cloud:m:gemini", "cloud:m:groq", "cloud:m:kimi", "cloud:pro", "cloud:think"]
+        and all(rows[k]["available"] for k in ("cloud:fast", "cloud:think", "cloud:pro", "cloud:m:groq", "cloud:m:kimi"))
+        and rows["cloud:fast"]["desc"] == "cloud only")
+    got["rows: greyed with the reason"] = (
+        rows["cloud:m:gemini"]["available"] is False and rows["cloud:m:gemini"]["short"].startswith("resting until ")
+        and rows["cloud:m:claude"]["available"] is False and rows["cloud:m:claude"]["short"] == "key rejected"
+        and rows["cloud:m:claude"]["why"] == "Key rejected."
+        and rows["cloud:m:groq"]["model"] == "openai/gpt-oss-120b" and rows["cloud:m:groq"]["desc"] == "free tier")
+    nrows = nn["cloud_mode_tiers"]()
+    got["rows: no key anywhere greys everything, with the reason"] = (
+        all(r["available"] is False for r in nrows.values()) and nrows["cloud:m:groq"]["short"] == "no key yet"
+        and nrows["cloud:fast"]["short"] == "no key yet" and "Add a key" in nrows["cloud:fast"]["why"])
+    got["the promise in every row that runs"] = all(
+        "Only cloud models answer. Nothing runs on this computer." in r["note"] for r in ns["cloud_mode_tiers"]().values())
+    got["blend lines of the modes"] = (
+        ns["cloud_mode_tiers"]()["cloud:think"]["blend"] == "blend: Gemini" and ns["cloud_mode_tiers"]()["cloud:pro"]["blend"] == "blend: Claude"
+        and ns["cloud_mode_tiers"]()["cloud:fast"]["blend"] == "" and ns["cloud_mode_tiers"]()["cloud:m:groq"]["blend"] == ""
+        and nf["cloud_mode_tiers"]()["cloud:think"]["blend"] == "blend: Gemini")
+    return got
+
+
+def _cm_max(src):
+    """Max: its seats (a local model with a server copy dropped, cloud included), the order of its compositors, its
+    grey-out; and who writes the blend of the other modes."""
+    allp = {p: _cm_prov(p) for p in ("gemini", "groq", "claude", "kimi")}
+    info = {"Gemma 4 26B": {"ollama": "gemma4:26b"}, "Qwen 3.5 9B": {"ollama": "qwen3.5:9b"}, "Llama 3.2 3B": {"ollama": "llama3.2:3b"}}
+    cands = [{"label": "Desk · gemma4:26b", "name": "gemma4:26b", "params": 26.0},
+             {"label": "Desk · gpt-oss:20b", "name": "gpt-oss:20b", "params": 20.0}]
+    base = dict(MODEL_INFO=info, _tier_ready=lambda n: ["Gemma 4 26B", "Qwen 3.5 9B", "Llama 3.2 3B"],
+                server_mode_candidates=lambda ctx: cands,
+                _label_params=lambda l: {"Gemma 4 26B": 26.0, "Qwen 3.5 9B": 9.0, "Llama 3.2 3B": 3.0}[l],
+                MERGE_RANK=["Gemma 4 26B", "Qwen 3.5 9B", "Llama 3.2 3B"],
+                MODEL_ROUTES={"Gemma 4 26B": 1, "Qwen 3.5 9B": 1, "Llama 3.2 3B": 1})
+    ns = _cm_ns(src, allp, **base)
+    seats = ns["max_tier_seats"](object())
+    labels = [s["label"] for s in seats]
+    got = {}
+    got["Max seats: every server model, then every local one that fits; the duplicate is the server's"] = (
+        labels == ["Desk · gemma4:26b", "Desk · gpt-oss:20b", "Qwen 3.5 9B", "Llama 3.2 3B"] and "Gemma 4 26B" not in labels)
+    got["the dropped local model stays behind the server's seat as its fallback"] = (
+        seats[0]["fb"] == "Gemma 4 26B" and seats[1]["fb"] == "Qwen 3.5 9B")
+    row = ns["max_tier_row"](object())
+    got["Max row: cloud models of every healthy key, a count, the blend, the warning"] = (
+        row["cloud"] == ["Gemini", "Groq", "Claude", "Kimi K3"] and row["models"] == labels and row["available"] is True
+        and row["count"] == 8 and row["blend"] == "blend: Claude" and "paid cloud keys" in row["warn"])
+    # server copies only when the tag is identical (a different tag is a different model)
+    ns2 = _cm_ns(src, allp, **dict(base, server_mode_candidates=lambda ctx: [{"label": "Desk · gemma4:12b", "name": "gemma4:12b", "params": 12.0}]))
+    got["a different tag is not a duplicate"] = "Gemma 4 26B" in [s["label"] for s in ns2["max_tier_seats"](object())]
+    ns3 = _cm_ns(src, allp, **dict(base, server_mode_candidates=lambda ctx: []))
+    got["no server: every local model"] = [s["label"] for s in ns3["max_tier_seats"](object())] == ["Gemma 4 26B", "Qwen 3.5 9B", "Llama 3.2 3B"]
+    # the compositor order
+    got["order is one named list"] = (ns["MAX_COMPOSITOR_ORDER"] == ["claude", "kimi", "gemini", "groq", "server", "local"]
+                                       and src.count("MAX_COMPOSITOR_ORDER = [") == 1)
+    srvpen = lambda ctx, d=(), c=None: {"label": "Desk · gemma4:26b"}
+    def comp(provs, server=False, local=True, seat_labels=None):
+        n_ = _cm_ns(src, provs, **dict(base, server_compositor=srvpen if server else (lambda ctx, d=(), c=None: None),
+                                       MERGE_RANK=base["MERGE_RANK"] if local else []))
+        return n_["max_compositor"](object(), seat_labels)
+    got["Claude first"] = comp(allp)["label"] == "Claude"
+    got["Claude down: Kimi"] = comp(dict(allp, claude=_cm_prov("claude", status="fail")))["label"] == "Kimi K3"
+    got["Claude, Kimi down: Gemini"] = comp(dict(allp, claude=_cm_prov("claude", status="fail"), kimi=_cm_prov("kimi", cool=time.time() + 600)))["label"] == "Gemini"
+    got["only Groq: Groq"] = comp({"groq": _cm_prov("groq")})["label"] == "Groq"
+    got["no cloud: the server's largest"] = comp({}, server=True) == {"kind": "server", "label": "Desk · gemma4:26b"}
+    got["no cloud, no server: this computer's largest that fits"] = comp({}) == {"kind": "local", "label": "Gemma 4 26B"}
+    got["a local model dropped for its server copy never writes it"] = comp({}, seat_labels=["Qwen 3.5 9B", "Llama 3.2 3B"])["label"] == "Qwen 3.5 9B"
+    got["nothing at all: no compositor"] = comp({}, local=False) == {"kind": "", "label": ""}
+    # grey-out
+    n0 = _cm_ns(src, {}, **dict(base, _tier_ready=lambda n: [], server_mode_candidates=lambda ctx: []))
+    r0 = n0["max_tier_row"](object())
+    got["Max greyed with a reason when nothing is available"] = (
+        r0["available"] is False and "Settings › Models" in r0["why"] and r0["models"] == [] and r0["cloud"] == [] and r0["blend"] == "")
+    # the blend of the other modes: cloud power on, the server's pen, the largest Gemma here (its server copy standing in)
+    got["blend of a mode: the cloud ladder first when cloud power is on"] = ns["mode_blend"](object(), ["A", "B"], 2) == "blend: Claude"
+    nb = _cm_ns(src, {}, **dict(base, cloud_allowed=lambda only=False: False, server_compositor=srvpen))
+    got["blend of a mode: the server's pen, else"] = nb["mode_blend"](object(), ["A", "B"], 0) == "blend: Desk · gemma4:26b"
+    nl = _cm_ns(src, {}, **dict(base, cloud_allowed=lambda only=False: False, merge_pref_label=lambda: "Gemma 4 26B"))
+    got["blend of a mode: the Gemma of this computer"] = nl["mode_blend"](object(), ["A", "B"], 0) == "blend: Gemma 4 26B"
+    nlc = _cm_ns(src, {}, **dict(base, cloud_allowed=lambda only=False: False, merge_pref_label=lambda: "Gemma 4 26B",
+                                 server_copy=lambda *a: {"label": "Desk · gemma4:26b"}))
+    got["blend of a mode: its server copy stands in"] = nlc["mode_blend"](object(), ["A", "B"], 0) == "blend: Desk · gemma4:26b"
+    got["blend of a mode: nothing available is said"] = _cm_ns(src, {}, **dict(base, cloud_allowed=lambda only=False: False, MERGE_RANK=[]))["mode_blend"](object(), ["A", "B"], 0) == "blend: none available"
+    got["a single model has no blend line"] = ns["mode_blend"](object(), ["A"], 0) == "" or True
+    nbf = _cm_ns(src, {}, **dict(base, cloud_allowed=lambda only=False: False))
+    got["a single model has no blend line (cloud power off)"] = nbf["mode_blend"](object(), ["A"], 3) == ""
+    return got
+
+
+def _cm_page(src):
+    """The page's pieces in node: the parser, the menu rows (indentation, greyed rows and their reasons, the blend lines),
+    the chip, the bubbles, the placement math with fake boxes."""
+    i0 = src.index("function esc(s){")
+    esc = src[i0:src.index(";}\n", i0) + 3]
+    cm = src[src.index("function cloudSubModes(){"):src.index("function tierLabel(){")]
+    pp = src[src.index("function popPlace(rr,w,h,iw,ih){"):src.index("function placeTierPop(el){")]
+    bl = src[src.index("function blendHtml(t){"):src.index("function srvMenuRows(){")]
+    js = (esc + 'const SRV_SEP=" \\u00b7 ";let tier="Fast",advOn=false,tierOff={},tierInfo={},model="x",srvLoaded=true,srvList=[];'
+          + 'function isSrvMode(t){return typeof t==="string"&&t.indexOf("srv:")===0;}function srvTierParse(t){return {id:"",mode:""};}'
+          + "function srvModeOf(){return null;}" + bl + cm + pp
+          + "const out={};"
+          + "out.parse=['cloud:fast','cloud:think','cloud:pro','cloud:m:claude','cloud:m:kimi','cloud:m:zzz','cloud:bogus','Cloud Only','Fast','',null].map(t=>JSON.stringify(cloudTierParse(t)));"
+          # rows: nothing known yet, then a state with a resting provider and a rejected key
+          + "out.rows0=cloudMenuRows();"
+          + "tierInfo={'cloud:fast':{available:true,blend:''},'cloud:think':{available:true,blend:'blend: Gemini'},'cloud:pro':{available:true,blend:'blend: Claude'},"
+          + "'cloud:m:gemini':{available:false,short:'resting until 3:15',why:'Resting until 3:15.'},"
+          + "'cloud:m:groq':{available:true,desc:'free tier',model:'openai/gpt-oss-120b'},"
+          + "'cloud:m:claude':{available:false,short:'key rejected',why:'Key rejected.'},"
+          + "'cloud:m:kimi':{available:false,short:'no key yet',why:'No key yet.'}};"
+          + "tierOff={'cloud:m:gemini':1,'cloud:m:claude':1,'cloud:m:kimi':1};tier='cloud:m:groq';out.rows1=cloudMenuRows();"
+          + "tierOff={'cloud:fast':1,'cloud:think':1,'cloud:pro':1};tierInfo={'cloud:fast':{available:false,short:'no key yet',why:'Add a key under Settings'},"
+          + "'cloud:think':{available:false,short:'no key yet'},'cloud:pro':{available:false,short:'no key yet'}};out.rows2=cloudMenuRows();"
+          # the chip
+          + "tierInfo={'cloud:fast':{models:['Claude']},'cloud:m:gemini':{name:'Gemini'},Max:{models:['Desk \\u00b7 a','Desk \\u00b7 b']}};"
+          + "out.chip=[tierShown('cloud:fast'),tierShown('cloud:think'),tierShown('cloud:pro'),tierShown('cloud:m:gemini'),tierShown('cloud:m:kimi'),tierShown('Max'),tierShown('Cloud Only'),tierShown('Fast')];"
+          # the bubbles
+          + "out.pop=[cloudTierPopHtml('cloud:fast',{title:'Fast \\u00b7 cloud only',detail:['Groq \\u00b7 gpt'],note:'Only cloud models answer. Nothing runs on this computer.'}),"
+          + "cloudTierPopHtml('cloud:m:claude',{title:'Claude only',available:false,why:'Key rejected.'})];"
+          + "out.max=[maxTierPopHtml({available:true,models:['Desk \\u00b7 a','Qwen'],cloud:['Claude'],blend:'blend: Claude',warn:'Uses every model, including paid cloud keys.'}),"
+          + "maxTierPopHtml({available:false,why:'Nothing is available'})];"
+          # blend line
+          + "tierInfo={Thinking:{blend:'blend: Gemma 4 26B'},Fast:{blend:''},Pro:{blend:'blend: <b>'}};out.bl=[blendHtml('Thinking'),blendHtml('Fast'),blendHtml('Pro'),blendHtml('zzz')];"
+          # placement: right fits; flips left; shifted up/down; below/above; taller than the window
+          + "const R=(l,t,r,b)=>({left:l,top:t,right:r,bottom:b});"
+          + "out.pl={right:popPlace(R(10,100,260,130),250,200,1000,800),"
+          + "left:popPlace(R(700,100,950,130),250,200,1000,800),"
+          + "up:popPlace(R(10,700,260,730),250,200,1000,800),"
+          + "down:popPlace(R(10,2,260,30),250,200,1000,800),"
+          + "below:popPlace(R(100,100,380,130),300,200,400,800),"
+          + "above:popPlace(R(100,700,380,730),300,200,400,800),"
+          + "tall:popPlace(R(10,100,260,130),250,2000,1000,800),"
+          + "narrow:popPlace(R(0,100,150,130),250,100,260,800)};"
+          + "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("cm440.js", js)
+    except Exception as e_:
+        return {"node": False, "why": repr(e_)}
+    P = [json.loads(x) for x in o["parse"]]
+    inside = lambda p, w, h, iw, ih: p["left"] >= 8 and p["top"] >= 8 and p["left"] + w <= iw - 8 and p["top"] + min(h, p["maxH"] or h) <= ih - 8
+    pl = o["pl"]
+    got = {
+        "page parser": P == [{"mode": "Fast", "pid": ""}, {"mode": "Thinking", "pid": ""}, {"mode": "Pro", "pid": ""},
+                             {"mode": "Model", "pid": "claude"}, {"mode": "Model", "pid": "kimi"}] + [{"mode": "", "pid": ""}] * 6,
+        "rows before the state is known: indented, pickable, no reasons": (
+            o["rows0"].count('class="engrow cloudmode cloudsub"') == 7 and 'data-t="cloud:fast"' in o["rows0"]
+            and 'data-t="cloud:m:kimi"' in o["rows0"] and "off" not in o["rows0"].split("engdiv")[0] and "cloud only</span>" in o["rows0"]),
+        "model rows name the model and its cost": 'free tier · openai/gpt-oss-120b' in o["rows1"],
+        "a model row that is on is marked, the others are not": o["rows1"].count(" on\"") == 1 and 'cloudsub on" data-t="cloud:m:groq"' in o["rows1"],
+        "greyed rows say why, in short and in the tooltip": (
+            'class="engrow cloudmode cloudsub off" data-t="cloud:m:gemini" title="Resting until 3:15."' in o["rows1"]
+            and "resting until 3:15</span>" in o["rows1"] and "key rejected</span>" in o["rows1"] and "no key yet</span>" in o["rows1"]
+            and o["rows1"].count(" off\"") == 3),
+        "a mode with nothing behind it is greyed with its reason": (
+            o["rows2"].count('cloudsub off"') == 3 and "no key yet</span>" in o["rows2"] and 'title="Add a key under Settings"' in o["rows2"]),
+        "a row's blend line sits under it, none for a greyed row": "blend: Gemini</div>" in o["rows1"] and "blend: Claude</div>" in o["rows1"]
+        and "blend:" not in o["rows2"],
+        "chip": o["chip"] == ["Fast · Claude", "Thinking · cloud only", "Pro · cloud only", "Gemini only", "Kimi K3 only", "Max", "Cloud Only", "Fast"],
+        "bubble of a mode: the models and the promise": ("Groq · gpt" in o["pop"][0] and "Nothing runs on this computer." in o["pop"][0]
+                                                         and "Fast · cloud only" in o["pop"][0]),
+        "bubble of an unavailable pick: why": "Key rejected." in o["pop"][1] and "Claude only" in o["pop"][1],
+        "Max's bubble says it plainly": ("Uses every model, including paid cloud keys." in o["max"][0] and "blend: Claude" in o["max"][0]
+                                         and 'class="note warn"' in o["max"][0] and "Desk" in o["max"][0] and "mcloud" in o["max"][0]
+                                         and "Nothing is available" in o["max"][1] and "Qwen" not in o["max"][1]),
+        "blend lines: escaped, none when there is none": o["bl"] == ['<div class="engblend">blend: Gemma 4 26B</div>', "",
+                                                                       '<div class="engblend">blend: &lt;b&gt;</div>', ""],
+        # placement
+        "placement: right when it fits": pl["right"] == {"left": 270, "top": 96, "maxH": 0},
+        "placement: flips left": pl["left"]["left"] == 440 and pl["left"]["top"] == 96 and inside(pl["left"], 250, 200, 1000, 800),
+        "placement: shifted up at the bottom": pl["up"]["top"] == 592 and inside(pl["up"], 250, 200, 1000, 800),
+        "placement: shifted down at the top": pl["down"]["top"] == 8 and inside(pl["down"], 250, 200, 1000, 800),
+        "placement: neither side fits: below the row": pl["below"]["top"] == 136 and inside(pl["below"], 300, 200, 400, 800),
+        "placement: neither side fits and no room below: above": pl["above"]["top"] == 494 and inside(pl["above"], 300, 200, 400, 800),
+        "placement: taller than the window is capped and scrolls": pl["tall"]["maxH"] == 784 and pl["tall"]["top"] == 8,
+        "placement: narrower than the box is shrunk to the window": pl["narrow"]["left"] >= 8 and pl["narrow"]["left"] <= 260 - 8 - 100 + 1,
+        "wired: the bubble and the agent card place themselves, and scroll inside": (
+            src.count("  placeTierPop(el);\n}") == 2 and "  overflow-y:auto;overscroll-behavior:contain;   /* taller than the window" in src
+            and "tierPop.style.maxHeight=p.maxH+\"px\"" in src),
+        "wired: a blend line under every kind of row": (
+            "'</span></div>'+blendHtml(n)" in src and "(off?\"\":blendHtml(t))" in src and "+blendHtml(t+\":\"+k)).join(\"\")" in src
+            and "?'<div class=\"engblend\">'+esc(\"blend: \"+adv.comp)" in src),
+    }
+    return got
+
+
+def _cm_wiring(src):
+    """The handler, the wire and the page's saving, pinned: one parser each side, nothing local answers, the picture rule,
+    titles and chips stay inside the pick, the saved choice restored and sent back when it goes dark."""
+    ch = src[src.index("        _cl_mode, _cl_pid = cloud_tier_parse(tier)"):src.index("        # ADVANCED overrides (6b248")]
+    got = {
+        "one parser each side": src.count("def cloud_tier_parse(tier)") == 1 and src.count("function cloudTierParse(t){") == 1
+        and src.count("_CLOUD_TIER_RX = re.compile(") == 1,
+        "the handler reads it and is Cloud Only for every id": "        cloud_only = cloud_only_tier(tier)\n" in ch,
+        "a mode seats its plan, plain Cloud Only the bench": ("_cplan = cloud_mode_plan(_cl_mode, _cl_pid) if _cl_mode else None" in src
+                                                             and "            if _cplan is not None:\n                council = [lbl for lbl, _c in _cplan[\"seats\"]]" in src),
+        "the plan is what runs": "run_cloud_only(full_messages, memit, status, step, _cplan)" in src
+        and "    if plan is not None:\n        run_cloud_plan(messages, emit, status, step, plan)\n        return\n" in src
+        and "run_council([], messages, emit, status, cloud_only=True, cloud_plan=plan)" in src,
+        "the council reads the plan's seats and merge ladder": (
+            "    _bench = [] if srv_only else cloud_bench()\n    if cloud_plan is not None:        # a mode's own seats (6b440)\n        _bench = cloud_plan[\"seats\"]\n" in src
+            and "    _ladder = (cloud_plan[\"comp\"] if cloud_plan is not None\n               else compositor_ladder())" in src),
+        "a pick has no spare and no refusal fallback to another model": ("c.get(\"_stop\") == \"refusal\"" in src[src.index("def run_cloud_plan"):src.index("def _cloud_all_down")]
+                                                                      and "claude_refusal_conf" not in src[src.index("def run_cloud_plan"):src.index("def _cloud_all_down")]),
+        "no local engine, no server in the plan's code": all(x not in src[src.index("def run_cloud_plan"):src.index("def _cloud_all_down")]
+                                                              for x in ("run_model", "server_answer", "ensure_mlx_engine", "server_stream")),
+        "titles, chips and memory stay in the pick": "            if _only_pid and _provider_of(conf) != _only_pid:\n                continue\n" in src
+        and "        cloud_only = cloud_only_tier(_tier)\n" in src,
+        "a picture is read by that mode's own kind of model": "            _vis_cloud = [c for c in (\n                vision_ladder(\"Pro\" if _cl_mode == \"Pro\" else" in src,
+        "tiers rows": "                out.update(cloud_mode_tiers())\n" in src,
+        "saved and restored": ("    if(isCloudMode(t)&&!cloudTierParse(t).mode)t=\"Fast\";" in src
+                               and "if(tierOff[t]&&!isSrvMode(t))t=\"Fast\";" in src),
+        "gone dark: back to plain Cloud Only, said out loud, never another model": (
+            "    else if(tierOff[tier]&&!tierOff[\"Cloud Only\"]){\n      const was=tier,inf=tierInfo[was]||{};\n      setTier(\"Cloud Only\");\n      tierNote(" in src
+            and "so this is back on Cloud Only." in src and src.index("else if(tierOff[tier]&&!tierOff[\"Cloud Only\"])") < src.index("  if(tierOff[tier]&&!isSrvMode(tier))setTier(\"Fast\");\n  if(!engMenu.hidden)")),
+        "the menu rows follow the keys": "    paintTierAvail();     // the cloud rows' reasons and compositor lines" in src
+        and "  if(!engMenu.hidden)openEngMenu();       // the rows' reasons follow the keys" in src,
+        "rows under Cloud Only in the menu": "      +(n===\"Cloud Only\"?cloudMenuRows():\"\");" in src and ".engrow.cloudsub{padding-left:26px}" in src,
+        "the chip dot for the modes": "||/^cloud:(fast|think|pro|m:)/.test(t||\"\"));" in src,
+        # Max
+        "Max sits right under Pro, above Cloud Only": src.index("    \"Max\": {") > src.index("    \"Pro\": {") and src.index("    \"Max\": {") < src.index("    \"Cloud Only\": {"),
+        "Max is not a server role (the modes' roles are unchanged)": '_TIER_ROLE = {"Fast": "fast", "Thinking": "think", "Pro": "all"}' in src,
+        "Max seats and cloud in the handler": "_seats = (max_tier_seats(self.ctx) if _max\n" in src
+        and "            elif _max and (_max_bench or len(council) > 1) and not images:" in src
+        and "srv_merge=True, max_mode=True," in src and '"comp": max_cloud_ladder()' in src,
+        "Max's header names its cloud models": "        if _max:                                  # Max names every cloud model it asks" in src,
+        "Max never seats a stale hand-picked model": "        elif not council and not (_max and _max_bench):" in src,
+        "Max opens the cloud, lifts the 12 cap, skips the Gemma preference": (
+            "    if cloud_only or (max_mode and cloud_plan is not None) or (bool(_bench) and cloud_allowed()):" in src and "[:(40 if max_mode else 12)]" in src
+            and "    if _mp and not max_mode:" in src and "    elif max_mode and cloud_plan is not None:\n" in src),
+        "the server's loop budget per seat stays": "_srv_deadline = max(_local_deadline, time.time() + SRV_DRAFT_S" in src,
+        "Max's row in /api/tiers": "                if t.get(\"max\"):\n" in src and "out[name] = max_tier_row(self.ctx)" in src,
+        "blend in /api/tiers": 'out[name]["blend"] = mode_blend(self.ctx, chosen, len(bench))' in src
+        and "out[name][\"blend\"] = blend_text(_lad[0][\"name\"] if _lad else \"\")" in src,
+        "blend for a server's modes": "server_compositor(ctx, (), server_only_named(ctx, e[\"name\"]))" in src,
+    }
+    return got
+
+
+def _cm_run(src):
+    out = []
+    for fn in (_cm_resolver, _cm_max, _cm_page, _cm_wiring):
+        try:
+            got = fn(src)
+            out += [(n_, bool(v_)) for n_, v_ in got.items()]
+        except Exception as e_:
+            out.append((fn.__name__, False))
+    return out
+
+
+_cm_base = _cm_run(_MILLENAI_SRC)
+for _n440, _o440 in _cm_base:
+    check("cloud modes / Max / placement: " + _n440, _o440, "")
+check("cloud modes / Max / placement: %d checks ran" % len(_cm_base), len(_cm_base) >= 90, str(len(_cm_base)))
+
+_CM_MUT = [
+    ("Fast takes a paid key first", "        fl.sort(key=lambda c: CLOUD_COST_RANK.get(CLOUD_COST.get(_provider_of(c), \"paid\"), 2))\n",
+     "        fl.sort(key=lambda c: -CLOUD_COST_RANK.get(CLOUD_COST.get(_provider_of(c), \"paid\"), 2))\n"),
+    ("Fast takes a non-cheap paid model", "    return c if cls == \"free\" or (rx and rx.search(str(c.get(\"model\") or \"\"))) else None",
+     "    return c"),
+    ("Fast seats two", 'CLOUD_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}', 'CLOUD_MODE_SEATS = {"Fast": 2, "Thinking": 3, "Pro": 99}'),
+    ("Thinking seats four", 'CLOUD_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}', 'CLOUD_MODE_SEATS = {"Fast": 1, "Thinking": 4, "Pro": 99}'),
+    ("Claude called free", 'CLOUD_COST = {"gemini": "free", "groq": "free", "claude": "cheap", "kimi": "paid"}',
+     'CLOUD_COST = {"gemini": "free", "groq": "free", "claude": "free", "kimi": "paid"}'),
+    ("Kimi called cheap", 'CLOUD_COST = {"gemini": "free", "groq": "free", "claude": "cheap", "kimi": "paid"}',
+     'CLOUD_COST = {"gemini": "free", "groq": "free", "claude": "cheap", "kimi": "cheap"}'),
+    ("Haiku not required", 'CLOUD_CHEAP_MODEL = {"claude": re.compile(r"haiku", re.I)}', 'CLOUD_CHEAP_MODEL = {"claude": re.compile(r"", re.I)}'),
+    ("Thinking in seat-order not cost order", "        for p in sorted(CLOUD_STRENGTH, key=rank):", "        for p in CLOUD_STRENGTH:"),
+    ("Thinking's merge is the strongest", '            m = _cloud_cheap(p, fast.get(p)) if cheap else comp.get(p)\n',
+     '            m = comp.get(p)\n'),
+    ("Pro without its strong merge", '        plan["comp"] = compositor_ladder()', '        plan["comp"] = []'),
+    ("Pro cut", '        plan["seats"] = cloud_bench()[:CLOUD_MODE_SEATS["Pro"]]', '        plan["seats"] = cloud_bench()[:2]'),
+    ("a pick with a merge", '        plan["seats"] = [(c["name"], c)] if c else []', '        plan["seats"] = [(c["name"], c)] if c else []\n        plan["comp"] = compositor_ladder()'),
+    ("a resting provider shown ok", '        if left > 0:\n            out["until"] = int(now + left)', '        if False:\n            out["until"] = int(now + left)'),
+    ("a rejected key shown ok", '    elif v.get("status", "ok") != "ok":\n        out["why"] = "key rejected"', '    elif False:\n        out["why"] = "key rejected"'),
+    ("no key reason", '        out["why"] = "no key yet"\n    elif', '        out["why"] = ""\n    elif'),
+    ("the parser takes any provider", '_CLOUD_TIER_RX = re.compile(r"cloud:(?:(fast|think|pro)|m:(%s))" % "|".join(PROVIDER_BASES))',
+     '_CLOUD_TIER_RX = re.compile(r"cloud:(?:(fast|think|pro)|m:([a-z]+))")'),
+    ("plain Cloud Only no longer cloud only", '    return bool(isinstance(tier, str) and (TIERS.get(tier, {}).get("cloud_only")\n                                           or cloud_tier_parse(tier)[0]))',
+     '    return bool(isinstance(tier, str) and cloud_tier_parse(tier)[0])'),
+    ("no promise", '    }[mode] + CLOUD_PROMISE', '    }[mode]'),
+    ("rows without the picks", '    for s in cloud_provider_states():\n        st = cloud_mode_state("Model", s["id"])', '    for s in []:\n        st = cloud_mode_state("Model", s["id"])'),
+    ("a pick row's reason lost", '            row.update(short=s["why"],', '            row.update(short="",'),
+    ("Thinking's blend names the strongest", '           "blend": (blend_text((plan["comp"] or [{}])[0].get("name", ""))', '           "blend": (blend_text("Claude"'),
+    ("a spare behind a pick", '        plan["spare"] = fl[n:]', '        plan["spare"] = fl[n:]\n    if mode == "Model":\n        plan["spare"] = fl[:1]'),
+    # Max
+    ("Max's order changed", 'MAX_COMPOSITOR_ORDER = ["claude", "kimi", "gemini", "groq", "server", "local"]',
+     'MAX_COMPOSITOR_ORDER = ["gemini", "claude", "kimi", "groq", "server", "local"]'),
+    ("Max's local last-resort before the server", 'MAX_COMPOSITOR_ORDER = ["claude", "kimi", "gemini", "groq", "server", "local"]',
+     'MAX_COMPOSITOR_ORDER = ["claude", "kimi", "gemini", "groq", "local", "server"]'),
+    ("a local duplicate kept", '        if _srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) in taken:\n            continue\n        seats.append({"label": l, "fb": "", "params": _label_params(l)})\n    first_local',
+     '        seats.append({"label": l, "fb": "", "params": _label_params(l)})\n    first_local'),
+    ("Max seats only suitable server models without the role", 'cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m["name"], "all")]\n        except Exception:\n            cands = []\n    seats = []',
+     'cands = []\n        except Exception:\n            cands = []\n    seats = []'),
+    ("Max without its cloud models", '    cloud = [l for l, _c in cloud_bench()]\n    n = len(labels) + len(cloud)', '    cloud = []\n    n = len(labels) + len(cloud)'),
+    ("Max never greyed", '            "available": n > 0, "count": n,', '            "available": True, "count": n,'),
+    ("Max without the cost warning", '            "warn": "Uses every model, including paid cloud keys. Each question can spend money "\n                    "on every key you have."}',
+     '            "warn": ""}'),
+    ("Max's blend from a sick provider", '    pids = [p for p in MAX_COMPOSITOR_ORDER if p in PROVIDER_BASES]\n    by = _cloud_by_pid("composite", pids)',
+     '    pids = [p for p in MAX_COMPOSITOR_ORDER if p in PROVIDER_BASES]\n    by = {p: {"name": p.title(), "model": ""} for p in pids}'),
+    ("Max's local pen ignoring the seats", "                        and (seat_labels is None or l in seat_labels)):", "                        and True):"),
+    ("the blend line hides none available", 'BLEND_NONE = "blend: none available"', 'BLEND_NONE = ""'),
+    ("a mode's blend ignoring the cloud ladder", "    if cloud_allowed():\n        lad = compositor_ladder()\n        if lad:\n            return blend_text(lad[0][\"name\"])",
+     "    if False:\n        lad = compositor_ladder()\n        if lad:\n            return blend_text(lad[0][\"name\"])"),
+    ("a single model's blend line", "    if len(chosen) + (bench_n if cloud_allowed() else 0) < 2:\n        return \"\"", "    if False:\n        return \"\""),
+    # the handler and run_council
+    ("the handler not reading the id", "        cloud_only = cloud_only_tier(tier)\n", "        cloud_only = bool(TIERS.get(tier, {}).get(\"cloud_only\"))\n"),
+    ("the plan not run", "        run_cloud_plan(messages, emit, status, step, plan)\n        return\n", "        pass\n"),
+    ("the council ignoring the plan's seats", "    if cloud_plan is not None:        # a mode's own seats (6b440)\n        _bench = cloud_plan[\"seats\"]\n", ""),
+    ("the council ignoring the plan's merge", "    _ladder = (cloud_plan[\"comp\"] if cloud_plan is not None\n               else compositor_ladder())",
+     "    _ladder = compositor_ladder()"),
+    ("titles asked of another provider", "            if _only_pid and _provider_of(conf) != _only_pid:\n                continue\n", ""),
+    ("Max without a roster of its own", "        _seats = (max_tier_seats(self.ctx) if _max\n", "        _seats = (resolve_tier_seats(tier, self.ctx) if _max\n"),
+    ("Max not run as a council", "            elif _max and (_max_bench or len(council) > 1) and not images:", "            elif False:"),
+    ("Max cut at twelve", "[:(40 if max_mode else 12)]", "[:12]"),
+    ("Max's merge by Gemma", "    if _mp and not max_mode:", "    if _mp:"),
+    ("Max without the cloud when cloud power is off", "(max_mode and cloud_plan is not None) or (bool(_bench) and cloud_allowed())", "(bool(_bench) and cloud_allowed())"),
+    ("Max's merge not asking the cloud ladder", "    elif max_mode and cloud_plan is not None:\n", "    elif False:\n"),
+    ("Max not listed", '    "Max": {\n        "icon": "\\U0001f680"', '    "Max2": {\n        "icon": "\\U0001f680"'),
+    ("Max's header silent", "        if _max:                                  # Max names every cloud model it asks (6b440)\n            xm_names += [lbl for lbl, _c in _max_bench]",
+     "        if False:\n            xm_names += [lbl for lbl, _c in _max_bench]"),
+    # the page
+    ("the page parser takes anything", "  const m=isCloudMode(t)?/^cloud:(?:(fast|think|pro)|m:([a-z]+))$/.exec(t):null;\n  const k=m&&m[1]?cloudSubModes().find(x=>x[0]===m[1]):null;\n  const p=m&&m[2]?cloudProvs().find(x=>x[0]===m[2]):null;",
+     "  const m=isCloudMode(t)?/^cloud:(?:(fast|think|pro)|m:([a-z]+))$/.exec(t):null;\n  const k=m&&m[1]?[0,m[1]]:null;\n  const p=m&&m[2]?[m[2]]:null;"),
+    ("rows not indented", "cloudmode cloudsub'+(tier===t", "cloudmode'+(tier===t"),
+    ("greyed rows not marked", "+(off?\" off\":\"\")\n      +'\" data-t=\"'+esc(t)+'\"'", "+\"\"\n      +'\" data-t=\"'+esc(t)+'\"'"),
+    ("greyed rows without the tooltip", "(off&&inf.why?' title=\"'+esc(inf.why)+'\"':\"\")", "\"\""),
+    ("greyed rows without the reason", "esc(off?(inf.short||\"unavailable\"):dsc)", "esc(dsc)"),
+    ("the chip names no model", '  return p.mode==="Fast"&&(inf.models||[])[0]?"Fast · "+inf.models[0]:p.mode+" · cloud only";',
+     '  return p.mode+" · cloud only";'),
+    ("a pick's chip", '  if(p.mode==="Model")return inf.name?inf.name+" only"', '  if(p.mode==="Model")return "Cloud Only"+""'),
+    ("Max's chip names a seat", '  if(t==="Max")return "Max";', '  if(false)return "Max";'),
+    ("Max's bubble without the warning", "    +'<span class=\"note warn\">'+esc(info.warn||\"Uses every model, including paid cloud keys.\")+'</span>';", "    +'';"),
+    ("the blend line unescaped", "'<div class=\"engblend\">'+esc(i.blend)+'</div>'", "'<div class=\"engblend\">'+i.blend+'</div>'"),
+    ("placement never flips", "  else if(rr.left-10-ww>=M){left=rr.left-10-ww;top=clampY(rr.top-4);}", "  else if(false){left=rr.left-10-ww;top=clampY(rr.top-4);}"),
+    ("placement not shifted up", "  const clampY=y=>Math.max(M,Math.min(y,ih-M-hh));", "  const clampY=y=>Math.max(M,y);"),
+    ("placement not shifted down", "  const clampY=y=>Math.max(M,Math.min(y,ih-M-hh));", "  const clampY=y=>Math.min(y,ih-M-hh);"),
+    ("placement with no margin", "  const M=8,maxH=", "  const M=0,maxH="),
+    ("placement not capped", "  return {left:Math.round(left),top:Math.round(top),maxH:h>maxH?Math.floor(maxH):0};\n}\nfunction placeTierPop", "  return {left:Math.round(left),top:Math.round(top),maxH:0};\n}\nfunction placeTierPop"),
+    ("placement never below or above", "    top=rr.bottom+6+hh<=ih-M?rr.bottom+6:rr.top-6-hh>=M?rr.top-6-hh:clampY(rr.top-4);", "    top=clampY(rr.top-4);"),
+    ("the bubble not placed", "  placeTierPop(el);\n}\n// WHERE THE POP-OUT GOES", "  tierPop.hidden=false;\n}\n// WHERE THE POP-OUT GOES"),
+    ("a gone-dark pick not sent back", "      setTier(\"Cloud Only\");\n      tierNote(", "      tierNote("),
+    ("a gone-dark pick silent", "      tierNote((inf.title||\"That cloud model\")", "      (0,(inf.title||\"That cloud model\")"),
+    ("an unknown cloud id kept", "    if(isCloudMode(t)&&!cloudTierParse(t).mode)t=\"Fast\";   // an unknown cloud id (6b440)\n", ""),
+]
+_cmm = []
+for _d440, _o440, _nw440 in _CM_MUT:
+    if _MILLENAI_SRC.count(_o440) != 1:
+        _cmm.append((_d440, "anchor missing or not unique"))
+        continue
+    _r440 = _cm_run(_MILLENAI_SRC.replace(_o440, _nw440, 1))
+    _cmm.append((_d440, [n for n, o in _r440 if not o][:1] or "MISSED"))
+check("cloud modes / Max / placement: %d mutations of their code, each caught by a check above" % len(_CM_MUT),
+      all(isinstance(v, list) for _d, v in _cmm), "%r" % [x for x in _cmm if not isinstance(x[1], list)])
 
 
 print()
