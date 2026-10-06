@@ -742,6 +742,456 @@ class TestStall(FanCase):
         return o1fan.snapshot(o1fan.find_outputs(self.tree.root), sysroot=self.tree.root)
 
 
+class StubAio:
+    """The cooler's face for the status tests: a steady pump reading and two fans."""
+
+    def __init__(self, pump_rpm=2357, fans=None, state="controlling"):
+        self.pump_rpm, self.state = pump_rpm, state
+        self.fans = fans if fans is not None else [{"n": 1, "rpm": 0, "pct": 20, "min_pct": 20},
+                                                   {"n": 2, "rpm": 0, "pct": 20, "min_pct": 20}]
+        self.phases = []
+
+    def attach(self, learned, persist, log):
+        pass
+
+    def needs_calibration(self):
+        return False
+
+    def set_phase(self, phase, pct):
+        self.phases.append((phase, pct))
+
+    def step(self, now):
+        pass
+
+    def active(self):
+        return False
+
+    def reset(self):
+        pass
+
+    def snapshot(self):
+        return {"found": True, "name": "Corsair H115i", "state": self.state, "coolant_c": 31.0, "coolant_hot": False,
+                "pump_rpm": self.pump_rpm, "pump_mode": "quiet", "fans": self.fans}
+
+
+class DeepCase(FanCase):
+    base = None
+
+    def fan(self, **kw):
+        """A service started and run long enough to measure: `base` is when its idle began."""
+        f = super().fan(**kw)
+        self.run_for(f, 40)
+        self.base = f.idle_base()
+        return f
+
+    def idle_to(self, f, t):
+        """Tick every second to `t` seconds after the idle began; returns the last (phase, why)."""
+        r = None
+        while self.clock.t < self.base + t - 1e-9:
+            r = self.go(f, self.clock.t + 1)
+        return r
+
+    def pwm(self, n):
+        return self.tree.get(self.tree.nct, "pwm%d" % n)
+
+
+class TestDeepIdle(DeepCase):
+    """After 300 s of idle the fans go 20% -> 10% over 30 s, in 1% steps, and stay at 10% (6b434)."""
+
+    def test_the_numbers_and_the_old_ones(self):
+        self.assertEqual((o1fan.DEEP_PCT, o1fan.LOW_PCT, o1fan.FULL_PCT), (10, 20, 100))
+        self.assertEqual((o1fan.o1work.IDLE_DEEP_S, o1fan.o1work.BLUE_S), (300.0, 30.0))
+        self.assertEqual((o1fan.o1work.DEEP_LIMIT_MARGIN_C, o1fan.o1work.DEEP_CPU_C, o1fan.o1work.DEEP_GPU_C,
+                          o1fan.o1work.DEEP_REENTER_C), (10, 50, 60, 3))
+
+    def test_20_percent_until_300_s_then_a_straight_line_to_10_over_30_s(self):
+        f = self.fan()
+        self.assertEqual(f.phase, "idle20")
+        self.assertGreater(self.base, T0 + 5)                        # measuring at full speed comes first
+        self.assertEqual(self.idle_to(f, 299)[0], "idle20")
+        self.assertEqual((self.pwm(1), self.tree.get(self.tree.gpu, "pwm1")), (51, 51))
+        seen = {}
+        for dt in range(300, 336):
+            ph = self.idle_to(f, dt)[0]
+            seen[dt] = (ph, f.pct, self.pwm(1))
+        self.assertEqual(seen[300], ("deepen", 20, 51))
+        self.assertEqual(seen[315], ("deepen", 15, o1fan.pwm_of(15)))
+        self.assertEqual(seen[329][0], "deepen")
+        self.assertEqual(seen[330], ("deep", 10, 26))
+        self.assertEqual(seen[335], ("deep", 10, 26))
+        pcts = [seen[t][1] for t in range(300, 331)]
+        self.assertTrue(all(b <= a for a, b in zip(pcts, pcts[1:])))              # only ever down
+        self.assertTrue(all(a - b <= 1 for a, b in zip(pcts, pcts[1:])))          # in steps of 1%
+        self.assertEqual(set(self.run_for(f, 200)), {"deep"})                     # and stays
+        self.assertEqual(self.tree.get(self.tree.gpu, "pwm1"), 26)
+
+    def test_the_status_says_it(self):
+        f = self.fan()
+        self.idle_to(f, 310)
+        st = o1fan.read_status(now=1_800_000_000)
+        self.assertEqual((st["phase"], st["pct"], st["hold_left"]), ("deepen", 17, 20))
+        self.assertEqual(o1fan.phase_text(st), "deepen 17%")
+        self.assertIn("Fans: going quieter, 17% (10% in 20 s)", st["line"])
+        self.assertEqual(st["why"], "idle, going quieter")
+        self.idle_to(f, 340)
+        st = o1fan.read_status(now=1_800_000_000)
+        self.assertEqual((st["phase"], st["pct"]), ("deep", 10))
+        self.assertEqual(o1fan.phase_text(st), "deep")
+        self.assertIn("Fans: 10% (deep idle)", st["line"])
+        self.assertIn("phase: deep", o1fan.render_status(st, self.snap()))
+
+    def snap(self):
+        return o1fan.snapshot(o1fan.find_outputs(self.tree.root), sysroot=self.tree.root)
+
+    def test_the_idle_clock_counts_from_the_end_of_the_ramp(self):
+        f = self.fan()
+        self.busy(f)
+        t = self.quiet(f)                                            # the work ends here: the ramp starts
+        self.assertEqual(self.go(f, t + 59)[0], "ramp")
+        self.assertEqual(self.go(f, t + 60 + 299)[0], "idle20")
+        self.assertEqual(self.go(f, t + 60 + 300)[0], "deepen")
+        self.assertEqual(self.go(f, t + 60 + 331)[0], "deep")
+
+    def test_work_any_time_goes_to_100_at_once_and_drops_deep_idle(self):
+        for when in (310, 340):                                     # in the fall, and deep
+            with self.subTest(when):
+                self.setUp()
+                f = self.fan()
+                self.idle_to(f, when)
+                self.busy(f)
+                self.assertEqual(f.phase, "working")
+                self.assertTrue(self.tree.at(255))
+                self.assertIsNone(f.deep_start)
+                t = self.quiet(f)
+                self.assertEqual(self.go(f, t + 61)[0], "idle20")             # a whole new idle: 20% again
+                self.assertEqual(self.go(f, t + 60 + 299)[0], "idle20")
+                self.assertEqual(self.go(f, t + 60 + 300)[0], "deepen")
+
+    def test_the_temperature_override_drops_it_at_once_too(self):
+        f = self.fan()
+        self.idle_to(f, 340)
+        self.tree.temp("nvme", 70)
+        ph = self.go(f, self.clock.t + 1)[0]
+        self.assertEqual(ph, "hot")
+        self.assertTrue(self.tree.at(255))
+        self.tree.temp("nvme", 50)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "deepen")        # cooled: the fall starts again from 20%
+        self.assertEqual(f.pct, 20)
+
+    def test_the_cpu_at_60_c_is_work_and_goes_to_100(self):
+        f = self.fan()
+        self.idle_to(f, 340)
+        self.tree.temp("cpu", 60)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "working")
+        self.assertTrue(self.tree.at(255))
+
+    def test_a_wake_starts_the_idle_clock_again(self):
+        f = self.fan()
+        self.idle_to(f, 340)
+        f.wake()
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.assertEqual(self.go(f, self.clock.t + 290)[0], "idle20")
+        self.assertEqual(self.go(f, self.clock.t + 20)[0], "deepen")
+
+
+class TestDeepIdleFloors(DeepCase):
+    """10% only for outputs that can run that low; each output's own floor wins."""
+
+    def test_every_output_that_can_goes_to_10_percent(self):
+        f = self.fan()
+        self.idle_to(f, 340)
+        self.assertTrue(self.tree.at(26))
+        self.assertEqual(self.learned()["nct6797/pwm1"]["min_pct"], 20)
+
+    def test_a_fan_that_stalls_under_20_is_held_at_20_and_it_is_remembered(self):
+        self.tree.fn[(self.tree.nct, 2)] = lambda pwm: 0 if pwm < 45 else spins(pwm)       # spins at 20%, not at 10%
+        f = self.fan()
+        self.idle_to(f, 340)
+        self.assertEqual(f.phase, "deep")
+        self.idle_to(f, 350)                                          # the level has settled for 6 s: judged
+        self.assertEqual(self.pwm(2), 51)                             # back to 20%
+        self.assertEqual(self.pwm(1), 26)                             # the others stay at 10%
+        L = self.learned()["nct6797/pwm2"]
+        self.assertTrue(L["no_deep"])
+        self.assertEqual(L["min_pct"], 20)                            # the idle level is not lowered or raised
+        said = [x for x in self.lines if "deep idle keeps it at 20%" in x]
+        self.assertEqual(len(said), 1)
+        self.run_for(f, 60)
+        self.assertEqual(len([x for x in self.lines if "deep idle keeps it" in x]), 1)
+        self.assertEqual(self.pwm(2), 51)
+        row = [r for r in o1fan.read_status(now=1_800_000_000)["outputs"] if r["label"] == "case/CPU fan 2"][0]
+        self.assertIn("kept at 20% in deep idle", row["note"])
+        g = self.fan()                                                # a restart remembers it
+        self.idle_to(g, 333)                                          # at 10% for 3 s: before it could be judged again
+        self.assertEqual((self.pwm(2), self.pwm(1)), (51, 26))
+
+    def test_a_fan_raised_by_the_stall_check_keeps_its_own_floor(self):
+        self.tree.fn[(self.tree.nct, 2)] = lambda pwm: 0 if pwm < 100 else spins(pwm)     # floor 40%
+        f = self.fan()
+        self.idle_to(f, 400)
+        self.assertEqual(f.phase, "deep")
+        self.assertEqual(self.pwm(2), 102)                           # 40% still
+        self.assertEqual(self.pwm(1), 26)
+
+    def test_a_pump_or_fixed_header_stays_at_100(self):
+        self.tree.fn[(self.tree.nct, 3)] = lambda pwm: 2000
+        f = self.fan()
+        self.idle_to(f, 400)
+        self.assertEqual((f.phase, self.pwm(3), self.pwm(1)), ("deep", 255, 26))
+
+    def test_an_output_with_no_rpm_is_still_left_to_its_own_control(self):
+        self.tree.fn[(self.tree.nct, 5)] = lambda pwm: 0
+        f = self.fan()
+        self.idle_to(f, 400)
+        self.assertEqual(self.tree.get(self.tree.nct, "pwm5_enable"), 5)
+        self.assertEqual(self.pwm(1), 26)
+
+    def test_the_card_fan_under_its_minimum_is_held_at_20(self):
+        self.tree.fn[(self.tree.gpu, 1)] = lambda pwm: 0 if pwm < 45 else spins(pwm)
+        f = self.fan()
+        self.idle_to(f, 355)
+        self.assertEqual(self.tree.get(self.tree.gpu, "pwm1"), 51)
+        self.assertEqual(self.pwm(1), 26)
+
+    def test_a_fan_under_its_own_fan_min_counts_as_stalled_at_10(self):
+        self.tree.set(self.tree.nct, "fan4_min", 400)                # 510 rpm at 20% is fine, 260 at 10% is not
+        f = self.fan()
+        self.idle_to(f, 355)
+        self.assertEqual((self.pwm(4), self.pwm(1)), (51, 26))
+
+    def test_fan_level_is_the_one_rule(self):
+        L = {"min_pct": 20, "always100": False}
+        self.assertEqual(o1fan.o1work.fan_level(L, 10), 10)
+        self.assertEqual(o1fan.o1work.fan_level(dict(L, no_deep=True), 10), 20)
+        self.assertEqual(o1fan.o1work.fan_level(dict(L, min_pct=40), 10), 40)
+        self.assertEqual(o1fan.o1work.fan_level(dict(L, min_pct=40), 15), 40)
+        self.assertEqual(o1fan.o1work.fan_level(L, 20), 20)
+        self.assertEqual(o1fan.o1work.fan_level(L, 60), 60)
+        self.assertEqual(o1fan.o1work.fan_level(dict(L, no_deep=True), 60), 60)
+
+
+class TestDeepIdleGuard(DeepCase):
+    """Out of deep idle (back to 20%) when anything is warm; back in only 3 C lower."""
+
+    def deep(self):
+        f = self.fan()
+        self.idle_to(f, 345)
+        self.assertEqual((f.phase, f.pct), ("deep", 10))
+        return f
+
+    def test_the_cpu_at_50_leaves_deep_idle_and_47_is_not_enough_to_return(self):
+        f = self.deep()
+        self.tree.temp("cpu", 50)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.assertTrue(self.tree.at(51))
+        self.tree.temp("cpu", 47)                                    # 3 C lower is not "under": still out
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.tree.temp("cpu", 46.9)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "deepen")  # back in: the fall starts again from 20%
+        self.assertEqual(f.pct, 20)
+        self.assertEqual(self.go(f, self.clock.t + 31)[0], "deep")
+
+    def test_the_cpu_at_49_does_not_leave(self):
+        f = self.deep()
+        self.tree.temp("cpu", 49.9)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "deep")
+
+    def test_the_card_junction_at_60_leaves_and_57_is_not_enough(self):
+        f = self.deep()
+        self.tree.temp("gpu", 60, "temp2_input")
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.tree.temp("gpu", 57, "temp2_input")
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.tree.temp("gpu", 56.9, "temp2_input")
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "deepen")
+
+    def test_the_junction_at_59_does_not_leave(self):
+        f = self.deep()
+        self.tree.temp("gpu", 59.9, "temp2_input")
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "deep")
+
+    def test_any_sensor_within_10_c_of_its_limit_leaves(self):
+        for which, limit, setter in (("nvme", 70, lambda v: self.tree.temp("nvme", v)),
+                                     ("gpu memory", 95, lambda v: self.tree.temp("gpu", v, "temp3_input")),
+                                     ("gpu edge", 85, lambda v: self.tree.temp("gpu", v, "temp1_input")),
+                                     ("dimm", 70, lambda v: self.tree.temp_in(self.tree.dimm1, v))):
+            with self.subTest(which):
+                self.setUp()
+                f = self.deep()
+                setter(limit - 10.5)
+                self.assertEqual(self.go(f, self.clock.t + 1)[0], "deep")
+                setter(limit - 10)
+                self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+                setter(limit - 13)                                   # exactly 3 C lower is still not enough
+                self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+                setter(limit - 13.1)
+                self.assertEqual(self.go(f, self.clock.t + 1)[0], "deepen")
+
+    def test_the_motherboard_chip_input_within_10_c_leaves(self):
+        f = self.deep()
+        self.tree.temp_in(self.tree.nct, 60, "temp1_input")          # SYSTIN: limit 70
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+
+    def test_a_cpu_or_card_sensor_that_reads_nothing_plausible_does_not_count_as_cool(self):
+        f = self.deep()
+        self.tree.temp("cpu", 130)                                  # stuck: ignored by the override, but not "cool"
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.tree.temp("cpu", 40)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "deepen")
+
+    def test_no_sensors_at_all_keeps_it_out(self):
+        f = self.fan()
+        self.assertTrue(f.deep_guard([]))                            # nothing read: cannot be shown to be cool
+        self.assertFalse(f.deep_guard([("nvme:x", "NVMe", 40.0, 70)]))
+
+    def test_heat_during_the_fall_pauses_it_and_the_fall_starts_over(self):
+        f = self.fan()
+        self.idle_to(f, 315)
+        self.assertEqual((f.phase, f.pct), ("deepen", 15))
+        self.tree.temp("cpu", 52)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.tree.temp("cpu", 40)
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "deepen")
+        self.assertEqual(f.pct, 20)
+
+    def test_the_guard_is_a_hysteresis_with_named_constants(self):
+        f = self.fan()
+        rows = [("cpu:h", "CPU", 49.0, 80)]
+        self.assertFalse(f.deep_guard(rows))
+        self.assertTrue(f.deep_guard([("cpu:h", "CPU", 50.0, 80)]))
+        self.assertTrue(f.deep_guard(rows))                          # 49 is not 3 C under 50
+        self.assertFalse(f.deep_guard([("cpu:h", "CPU", 46.5, 80)]))
+
+
+class TestPumpAndUnconnected(DeepCase):
+    """The cooler's pump is shown with the cooler's own rpm, and headers with nothing on them are not listed."""
+
+    def aio_fan(self, **kw):
+        self.stub = StubAio(**kw)
+        return self.fan(aio=self.stub)
+
+    def noisy_cpu_fan_header(self):
+        self.tree.fn[(self.tree.nct, 1)] = lambda pwm: 4383            # a noisy tach on the pump header, whatever the pwm
+
+    def test_the_pump_header_shows_as_pump_with_the_coolers_rpm_and_the_raw_tach_kept(self):
+        self.noisy_cpu_fan_header()
+        f = self.aio_fan()
+        self.run_for(f, 40)
+        st = o1fan.read_status(now=1_800_000_000)
+        labels = [r["label"] for r in st["outputs"]]
+        self.assertIn("Pump", labels)
+        self.assertNotIn("case/CPU fan 1", labels)
+        row = [r for r in st["outputs"] if r["label"] == "Pump"][0]
+        self.assertEqual((row["rpm"], row["tach_raw"]), (2357, 4383))
+        self.assertEqual(st["pump"], "case/CPU fan 1")
+        self.assertEqual(len([r for r in st["outputs"] if r["label"] == "Pump"]), 1)
+        text = o1fan.render_status(st, self.snap())
+        self.assertRegex(text, r"Pump\s+manual\s+pwm 255/255\s+2357 rpm")
+        self.assertNotIn("4383", text)
+        self.assertNotIn("case/CPU fan 1 ", text)
+
+    def snap(self):
+        return o1fan.snapshot(o1fan.find_outputs(self.tree.root), sysroot=self.tree.root)
+
+    def test_only_the_lowest_always100_header_is_the_pump_the_others_stay_fixed_headers(self):
+        self.tree.fn[(self.tree.nct, 1)] = lambda pwm: 4383
+        self.tree.fn[(self.tree.nct, 3)] = lambda pwm: 2000
+        f = self.aio_fan()
+        self.run_for(f, 40)
+        st = o1fan.read_status(now=1_800_000_000)
+        labels = [r["label"] for r in st["outputs"]]
+        self.assertEqual((labels.count("Pump"), "case/CPU fan 3" in labels), (1, True))
+        row3 = [r for r in st["outputs"] if r["label"] == "case/CPU fan 3"][0]
+        self.assertEqual(row3["rpm"], 2000)
+        self.assertNotIn("tach_raw", row3)
+
+    def test_no_cooler_no_pump_label(self):
+        self.noisy_cpu_fan_header()
+        f = self.fan()
+        self.run_for(f, 40)
+        st = o1fan.read_status(now=1_800_000_000)
+        self.assertNotIn("Pump", [r["label"] for r in st["outputs"]])
+        self.assertIsNone(st["pump"])
+
+    def test_a_cooler_that_is_not_controlling_or_has_no_pump_reading_changes_nothing(self):
+        self.noisy_cpu_fan_header()
+        for kw in (dict(state="no liquidctl"), dict(pump_rpm=None)):
+            with self.subTest(kw):
+                self.setUp()
+                self.noisy_cpu_fan_header()
+                f = self.aio_fan(**kw)
+                self.run_for(f, 40)
+                st = o1fan.read_status(now=1_800_000_000)
+                self.assertNotIn("Pump", [r["label"] for r in st["outputs"]])
+
+    def test_a_header_that_read_no_rpm_at_100_is_not_listed_but_kept_in_the_json(self):
+        self.tree.fn[(self.tree.nct, 4)] = lambda pwm: 0
+        self.tree.fn[(self.tree.nct, 6)] = lambda pwm: 0
+        f = self.fan()
+        self.run_for(f, 40)
+        st = o1fan.read_status(now=1_800_000_000)
+        labels = [r["label"] for r in st["outputs"]]
+        self.assertNotIn("case/CPU fan 4", labels)
+        self.assertNotIn("case/CPU fan 6", labels)
+        self.assertEqual(sorted(u["label"] for u in st["unconnected"]), ["case/CPU fan 4", "case/CPU fan 6"])
+        self.assertEqual(set(st["unconnected"][0]), {"label", "chip", "pwm"})
+        self.assertEqual(st["controlling"], o1fan.controlling_text([o for o in o1fan.find_outputs(self.tree.root)
+                                                                    if o.n not in (4, 6) or o.kind == "gpu"]))
+        text = o1fan.render_status(st, self.snap())
+        self.assertNotIn("case/CPU fan 4", text)
+        self.assertNotIn("case/CPU fan 6", text)
+        self.assertIn("case/CPU fan 2", text)
+        self.assertEqual(self.tree.get(self.tree.nct, "pwm4_enable"), 0)             # control is unchanged: left alone
+
+    def test_a_header_stopped_at_10_percent_or_briefly_at_0_is_never_hidden(self):
+        self.tree.fn[(self.tree.nct, 2)] = lambda pwm: 0 if pwm < 45 else spins(pwm)       # stalls at 10%, spins at 100%
+        f = self.fan()
+        self.idle_to(f, 333)                                          # at 10% for 3 s: reading 0, not yet judged
+        self.assertEqual(self.tree.get(self.tree.nct, "fan2_input"), 0)
+        st = o1fan.read_status(now=1_800_000_000)
+        self.assertIn("case/CPU fan 2", [r["label"] for r in st["outputs"]])
+        self.assertEqual(st["unconnected"], [])
+
+    def test_a_header_that_reads_a_fan_again_shows_again(self):
+        self.tree.fn[(self.tree.nct, 4)] = lambda pwm: 0
+        f = self.fan()
+        self.run_for(f, 40)
+        self.assertEqual([u["label"] for u in o1fan.read_status(now=1_800_000_000)["unconnected"]], ["case/CPU fan 4"])
+        self.tree.fn.pop((self.tree.nct, 4))
+        self.go(f, self.clock.t + 1)
+        st = o1fan.read_status(now=1_800_000_000)
+        self.assertIn("case/CPU fan 4", [r["label"] for r in st["outputs"]])
+        self.assertEqual(st["unconnected"], [])
+
+    def test_the_card_fan_is_never_hidden(self):
+        self.tree.fn[(self.tree.gpu, 1)] = lambda pwm: 0
+        f = self.fan()
+        self.run_for(f, 40)
+        self.assertIn("GPU fan", [r["label"] for r in o1fan.read_status(now=1_800_000_000)["outputs"]])
+
+    def test_the_text_helper_hides_and_relabels_from_the_status(self):
+        rows = [{"label": "case/CPU fan 1", "enable": 1, "pwm": 255, "rpm": 3000},
+                {"label": "case/CPU fan 4", "enable": 0, "pwm": 255, "rpm": 0},
+                {"label": "case/CPU fan 5", "enable": 1, "pwm": 255, "rpm": 800}]
+        st = {"pump": "case/CPU fan 1", "aio": {"pump_rpm": 2357},
+              "unconnected": [{"label": "case/CPU fan 4"}, {"label": "case/CPU fan 5"}]}
+        out = o1fan.present(rows, st)
+        self.assertEqual([(r["label"], r["rpm"]) for r in out], [("Pump", 2357), ("case/CPU fan 5", 800)])
+        self.assertEqual(out[0]["tach_raw"], 3000)
+        self.assertEqual([r["label"] for r in o1fan.present(rows, None)], [r["label"] for r in rows])
+
+    def test_the_coolers_own_fans_are_not_hidden_and_without_an_rpm_show_their_duty(self):
+        text = o1fan.render_status({"at": 1, "pct": 20, "phase": "idle20", "controlling": "x", "outputs": [],
+                                    "aio": StubAio().snapshot()}, {"outputs": [], "temps": []})
+        self.assertIn("cooler fan 1  20%  min 20%", text)
+        self.assertNotIn("0 rpm", text)
+        self.assertNotIn("no rpm reading", text)
+        import o1aio
+        self.assertIn("fans 20%", o1aio.aio_text(StubAio().snapshot()))
+        self.assertIn("fans 520/530 rpm", o1aio.aio_text(StubAio(fans=[{"n": 1, "rpm": 520, "pct": 20},
+                                                                       {"n": 2, "rpm": 530, "pct": 20}]).snapshot()))
+
+
 class TestSkipAndFailures(FanCase):
     @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root can write anything")
     def test_an_output_it_cannot_write_is_left_alone(self):
@@ -1153,6 +1603,7 @@ class TestWiring(unittest.TestCase):
         self.assertIn("100%", on)
         self.assertIn("down to 20%", on)
         self.assertIn("over 50% busy", on)
+        self.assertIn("10% after 5 idle minutes", on)
         self.assertIn("60 C", on)
         self.assertNotIn("60 s", on)
         self.assertIn("Fans OFF", self.bash("fans_plan off")[1])

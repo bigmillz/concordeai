@@ -1,5 +1,5 @@
 # Lights that follow the graphics card's work (6b395, 6b421): white when idle, through
-# yellow and orange to red in 5 s when the card works, back to white over 60 s, dimmed to 40% after 5 idle minutes (lib/o1leds.py). It only talks to the OpenRGB server of
+# yellow and orange to red in 5 s when the card works, back to white over 60 s, then blue over 30 s after 5 idle minutes (lib/o1leds.py). It only talks to the OpenRGB server of
 # ollama1-openrgb.service on 127.0.0.1 and reads what the fan service reads
 # (the card's busy percent); it writes
 # only its own status file. Root, like the fan service, for those reads; no

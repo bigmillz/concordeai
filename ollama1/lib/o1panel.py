@@ -635,7 +635,8 @@ def fan_view(st, now):
         return ("none", None)
     phase, pct = fan.get("phase"), int(D._f(fan.get("pct")) or 0)
     word = {"working": "working", "hot": "working", "calibrating": "measuring", "idle20": "idle",
-            "hold100": "cooling down", "hold50": "cooling down", "ramp": "cooling down"}.get(phase, "")
+            "hold100": "cooling down", "hold50": "cooling down", "ramp": "cooling down",
+            "deepen": "idle", "deep": "deep idle"}.get(phase, "")
     head = ("%s %d%%" % (word, pct)) if word else ("%d%%" % pct)
     warn = phase == "hot" or bool(fan.get("hot"))
     if warn:
@@ -651,15 +652,24 @@ def fan_view(st, now):
         rpm = D._f(o.get("rpm"))
         if o.get("label") == "GPU fan":
             rows.insert(0, ("GPU fan", ("%d rpm" % rpm) if rpm is not None else "-", bar_of(o), "fan"))
+        elif o.get("label") == "Pump":                  # the cooler's pump: shown on the cooler line, never averaged in
+            continue
         elif rpm or o.get("enable") == 1:
             case.append((bar_of(o), rpm))
     a = _d(fan.get("aio"))
     cool = ""
     if a.get("found") and a.get("state") == "controlling":
+        unreported = []
         for f in _l(a.get("fans")):                    # the radiator fans count with the case fans
-            if isinstance(f, dict) and D._f(f.get("rpm")) is not None:
+            if isinstance(f, dict):
                 pc = D._f(f.get("pct"))
-                case.append((pc / 100.0 if pc is not None else None, D._f(f.get("rpm"))))
+                if D._f(f.get("rpm")):
+                    case.append((pc / 100.0 if pc is not None else None, D._f(f.get("rpm"))))
+                elif pc is not None:
+                    unreported.append(pc)
+        if unreported and not any(isinstance(f, dict) and D._f(f.get("rpm")) for f in _l(a.get("fans"))):
+            rows.append(("Cooler fans", "%d%%" % round(sum(unreported) / len(unreported)),   # no rpm from liquidctl: the duty only
+                         sum(unreported) / len(unreported) / 100.0, "fan"))
         parts = []
         pr = D._f(a.get("pump_rpm"))
         if pr is not None:                             # the pump is not averaged in: a line of its own

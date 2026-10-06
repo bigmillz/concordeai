@@ -9,6 +9,54 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b434 — no more dimming: idle goes white -> blue over 30 s while the fans drop to 10%; the pump and unplugged headers tidied (per the owner)
+
+Kit only (`ollama1/`). Owner: "instead of dropping white light brightness to 40%, keep the lights at 100% but
+transition from white to blue over 30 seconds, while lowering the fans to 10%. obviously raise the fans still if
+needed to prevent overheating. when there's activity again, we fade quickly to white then begin the exiting
+white->yellow->orange->red etc". Then, on the status: "yes, tidy it up with the pump reading", and "Including hiding
+the fans that show zero RPM. In other words, ones that our header is not connected to anything."
+
+- **Lights** (`lib/o1leds.py`). The brightness is gone (`DIM_PCT`, `DIM_S`, `IDLE_DIM_S`, `bright`, `scale()`; the
+  status key `brightness` stays, always 1.0). New phases: `bluing` (white to `BLUE` over `BLUE_S` 30 s, linear in
+  RGB and time, from `IDLE_DEEP_S` 300 s after the cool-down reaches white, or the start or a wake), `blue` (held),
+  `waking` (z falls at 1/`WAKE_FADE_S` a second: 2 s from full blue, proportionally less from part way), then the
+  normal 5 s rise from white. Work while white, or mid-cool, rises at once as before. Work that ends during the
+  wake fade lets the fade finish, then idle white again. Status adds `blue` (0..1); states "white to blue", "blue",
+  "blue to white".
+- **The blue.** `BLUE = (0, 0, 255)`, a named constant in `lib/o1work.py`. There is no white/blue calibration in the
+  history (6b421 says so too), but the owner's earlier remark was that white looks yellow-green on these strips, i.e.
+  the blue channel is the weak one: so the target gives it everything and the others nothing. A teal like
+  (0, 60, 255) would read green on this hardware. Not judged on the hardware yet.
+- **Fans** (`lib/o1fan.py`). After `IDLE_DEEP_S` of idle (from the end of the ramp, the start after the first
+  measuring, or a wake) phase `deepen` (20% to `FAN_DEEP_PCT` 10% over 30 s, whole 1% steps) then `deep` (10%).
+  Per-output floors win (`o1work.fan_level`): `min_pct` stall floors, always-100 pumps and fixed headers, outputs with
+  no rpm (left to the board), the cooler's fans. The stall check judges a header 6 s after it reaches a level under
+  20%; a stall there is remembered as `no_deep` (held at 20%, not raised by 10 steps as an ordinary stall is, since
+  `min_pct` starts at 20). The cooler (`lib/o1aio.py`) follows the same rules and its pump stays quiet.
+- **Guard.** Deep idle is left at once (to 20%) when any sensor is within `DEEP_LIMIT_MARGIN_C` 10 C of its limit, the
+  CPU is at `DEEP_CPU_C` 50 C or more, the card's junction at `DEEP_GPU_C` 60 C or more, or nothing can be read (a CPU
+  or junction sensor that reads implausibly counts as not cool). Back in only when all are `DEEP_REENTER_C` 3 C lower,
+  and the fall then starts over from 20%. The hot override, the 60 C CPU and the card's work raise the fans at once
+  and drop deep idle; a wake restarts the idle clock.
+- **Pump.** With a Corsair cooler controlling, the lowest-numbered always-100 header is written to the status as
+  "Pump" with the cooler's own `pump_rpm`; its raw tach is kept as `tach_raw`. Other fixed headers keep their label and
+  rpm. Panel (FANS box), admin (the cooler's own tile is the pump), `ollama1-fan status` all follow `present()`.
+- **Unconnected headers.** A header whose learned `rpm100` is 0/None and that reads 0 now is left out of the status
+  `outputs`, the text status, the panel, the admin list and the "controlling" count; it is in `unconnected`
+  (`label`, `chip`, `pwm`) and control is unchanged. It comes back as soon as it reads an rpm; the card fan is never
+  hidden; a fan stalled at 10% is never hidden (it is judged by the learned 100% reading). The cooler's own fans are
+  not hidden: with no rpm from liquidctl the panel shows "Cooler fans" at their duty, the text status and the
+  cooler line show the duty without an rpm figure.
+- **Panel and admin.** FANS box words add "deep idle 10%" (and "idle 17%" for the fall); a fit test checks every head
+  word against the box width at four sizes. Admin: phases `deepen`/`deep`, light state words.
+- **Tests and mutants.** `test_leds` (TestDeepIdle replaces TestDimming), `test_fan` (TestDeepIdle, ...Floors, ...Guard,
+  TestPumpAndUnconnected), `test_aio`, `test_work`, `test_panel`, `test_admin`; `mutate.py` loses the dimming mutants
+  and gains `leds:` blue/wake/frame mutants and `deep:`, `pump:`, `unconnected:` ones.
+- **Unverified on hardware.** How the blue looks; that 10% keeps each real fan spinning (the stall check will find
+  out, one 6 s dip at most per fan, once); that the liquidctl pump reading is steady; the fall's timing against
+  the real polls.
+
 ## 6b432 — boot no longer waits two minutes for unplugged network links (per the owner)
 Pat's photo of the console stuck at "Job systemd-networkd-wait-online.service/start running (1min 27s / no limit)".
 The server boots with the bridge up in a second, but the stock wait-online waits for EVERY link: the second wired

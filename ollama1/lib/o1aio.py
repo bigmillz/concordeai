@@ -18,6 +18,8 @@ The policy follows the fans' phases (lib/o1fan.py):
                         (from the moment the work ends; there is no hold at 100% any more, 6b421)
   idle20                20%, or higher  quiet
                         for a fan that stalls (the same learning as the case fans)
+  deepen, deep          the fans' %, 20 falling to 10 over 30 s, then 10 (6b434)   quiet
+                        a fan that stalls below 20% is held at 20% (`no_deep`); the pump stays quiet
 
 A coolant at COOLANT_HOT_C or more forces the pump to extreme and the fans to
 100% until it is COOLANT_HYST_C under that, so the pump is at full speed only
@@ -42,6 +44,7 @@ import subprocess
 import threading
 
 import o1common
+import o1work
 from o1common import read_json_safe, write_json_atomic
 
 STATUS_S = 5                     # the cooler's status at most this often
@@ -248,14 +251,14 @@ class Aio:
         else:
             pump = "quiet"
         base = 100 if (self.coolant_hot or phase in ("working", "hot", "calibrating")) else \
-            self.pct if phase == "ramp" else 20
+            self.pct if phase in ("ramp", "deepen", "deep") else 20
         out = {}
         for n in fans:
             L = self.learned.get("aio/fan%d" % n)
             if base >= 100 or L is None or not L["rpm100"]:
                 out[n] = 100                       # (no rpm at 100%: its low levels can't be checked)
             else:
-                out[n] = min(100, max(base, L["min_pct"]))
+                out[n] = o1work.fan_level(L, base)
         return pump, out
 
     def write(self, now, pump, fans):
@@ -299,7 +302,11 @@ class Aio:
                     self.persist()
             elif self.checked.get(n) != pct:
                 self.checked[n] = pct
-                if L and L["rpm100"] and rpm == 0:
+                if L and L["rpm100"] and rpm == 0 and pct < 20:
+                    L["no_deep"] = True            # it stalls below the idle level: held at 20% in deep idle
+                    self.log("cooler fan %d: 0 rpm at %d%%, stalled: deep idle keeps it at 20%%" % (n, pct))
+                    self.persist()
+                elif L and L["rpm100"] and rpm == 0:
                     L["min_pct"] = min(100, pct + 10)
                     self.log("cooler fan %d: 0 rpm at %d%%, stalled: its lowest level is now %d%%" % (n, pct, L["min_pct"]))
                     self.persist()
@@ -404,7 +411,10 @@ def aio_text(a):
         parts.append("cooler %.0f C" % a["coolant_c"])
     pump = ("pump %s" % a["pump_mode"] if a.get("pump_mode") else "pump") + (" %d rpm" % a["pump_rpm"] if a.get("pump_rpm") is not None else "")
     parts.append(pump)
-    rpms = [str(f["rpm"]) for f in a.get("fans", []) if f.get("rpm") is not None]
+    rpms = [str(f["rpm"]) for f in a.get("fans", []) if f.get("rpm")]
+    duty = [f["pct"] for f in a.get("fans", []) if f.get("pct") is not None]
     if rpms:
         parts.append("fans %s rpm" % "/".join(rpms))
+    elif duty:                                   # liquidctl gave no fan rpm (or 0): the duty we set, no rpm figure
+        parts.append("fans %d%%" % duty[0])
     return ", ".join(parts)

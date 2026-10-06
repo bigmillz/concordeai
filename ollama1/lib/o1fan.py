@@ -7,6 +7,16 @@ when it works and quiet, and easy on the bearings, when it does not:
   ramp     100->20%  from the moment that ends, a straight line down over 60 s,
                      in 2% steps (no hold at 100% first)
   idle20       20%   from 60 s after the work ended (and from the start)
+  deepen   20->10%   after 300 s of idle (6b434, per the owner; the lights go white to
+                     blue at the same moment), a straight line over 30 s, in 1% steps
+  deep         10%   while deeply idle. Only outputs that can run that low go to 10%: an
+                     output's own floor wins (the lowest level it was found to spin at, the
+                     fan the stall check kept at 20%, a pump or fixed header kept at 100%,
+                     one that reads no rpm, left to its own control, the cooler's pump rules).
+                     Deep idle is left at once, back to 20%, when any temperature is within
+                     10 C of its limit, the CPU is at 50 C or more or the card's junction at
+                     60 C or more (and not entered again until all are 3 C lower); any
+                     override, the 60 C CPU or the card's work, raises the fans at once.
 
 Work at any time, the ramp included, goes back to 100% at once; when it ends
 again the ramp starts again from 100%. A level is pwm = round(percent * 255 /
@@ -92,7 +102,8 @@ from o1common import read_json_safe, write_json_atomic
 POLL_S = 2
 RAMP_S = o1work.COOL_S           # when the work ends, a straight ramp down to the idle level over this long
 QUANT_PCT = 2                    # the ramp is written in whole steps of this many percent
-FULL_PCT, LOW_PCT = 100, 20
+FULL_PCT, LOW_PCT = 100, o1work.IDLE_PCT
+DEEP_PCT = o1work.FAN_DEEP_PCT   # the deep-idle level (an output's own floor wins)
 STEP_PCT = 10                    # a stalled output is raised by this much
 SETTLE_S = 6                     # a level is judged by rpm only after this long
 PUMP_RATIO = 0.6                 # at 20% still this share of its 100% rpm: a pump or a fixed header
@@ -352,6 +363,11 @@ class Fan:
         self.was_working = False
         self.cool_from = None          # when the work last ended: the ramp is counted from here
         self.hot = {}                  # temperature key -> label, while over its limit
+        self.born = self.clock()       # the start, or the last wake: the idle clock counts from here at the earliest
+        self.calib_at = None           # the last time it was measuring at full speed
+        self.deep_block = False        # a temperature keeps deep idle off (see deep_guard)
+        self.deep_start = None         # when the fall to the deep level began (None: not in deep idle)
+        self.deep_again = False        # deep idle was left for heat: the next fall starts from 20% when it is entered
         self.failed = set()
         self.level = {}                # key -> the percent it was last set to
         self.since = {}                # key -> when that level was set
@@ -376,6 +392,8 @@ class Fan:
                 learned[k] = {"rpm100": v["rpm100"] if isinstance(v["rpm100"], int) else None,
                               "min_pct": v["min_pct"] if isinstance(v.get("min_pct"), int) else LOW_PCT,
                               "always100": v.get("always100") is True, "pump_checked": v.get("pump_checked") is True}
+                if v.get("no_deep") is True:
+                    learned[k]["no_deep"] = True
         self.learned = learned
         orig = st.get("orig")
         if isinstance(orig, dict) and orig and st.get("boot") and st.get("boot") == self.boot_id():
@@ -450,7 +468,7 @@ class Fan:
             return FULL_PCT
         if not L["rpm100"]:
             return None                      # no rpm at 100%: nothing to check a low level against
-        return min(FULL_PCT, max(pct, L["min_pct"]))
+        return o1work.fan_level(L, pct, LOW_PCT)
 
     def apply(self, outs, pct, now):
         """Every output to its level for `pct`, checked again every tick (a wake may have reset it)."""
@@ -571,6 +589,11 @@ class Fan:
                 self._persist()
                 return
             self._persist()
+        if pct < LOW_PCT and (rpm == 0 or rpm < min_rpm_of(o, self.io)):
+            L["no_deep"] = True                  # it stalls below the idle level: held at 20% in deep idle
+            self.log("%s: %d rpm at %d%%, stalled: deep idle keeps it at %d%%" % (o.label, rpm, pct, LOW_PCT))
+            self._persist()
+            return
         if rpm == 0 or rpm < min_rpm_of(o, self.io):
             L["min_pct"] = min(FULL_PCT, pct + STEP_PCT)
             if L["min_pct"] >= FULL_PCT:
@@ -578,12 +601,57 @@ class Fan:
             self.log("%s: %d rpm at %d%%, stalled: its lowest level is now %d%%" % (o.label, rpm, pct, L["min_pct"]))
             self._persist()
 
+    # -- deep idle --------------------------------------------------------------------
+    def deep_guard(self, temps):
+        """True while a temperature keeps deep idle off: any sensor within DEEP_LIMIT_MARGIN_C of its limit, the CPU
+        at DEEP_CPU_C, the card's junction at DEEP_GPU_C, or no reading at all (no sensors, or the CPU's or the
+        junction's reads nothing plausible: it can't be shown to be cool). Once on, it stays on until every figure
+        is DEEP_REENTER_C lower (a hysteresis)."""
+        m = o1work.DEEP_REENTER_C if self.deep_block else 0
+        block = not temps
+        for key, _label, c, limit in temps:
+            cpu, junction = key.startswith("cpu:"), key.startswith("gpu-junction:")
+            if c is None:
+                block = block or cpu or junction
+                continue
+            if c >= limit - o1work.DEEP_LIMIT_MARGIN_C - m or (cpu and c >= o1work.DEEP_CPU_C - m) or \
+                    (junction and c >= o1work.DEEP_GPU_C - m):
+                block = True
+        self.deep_block = block
+        return block
+
+    def idle_base(self):
+        """When the idle began: 60 s after the work ended, or the start or wake, or the end of the measuring."""
+        base = self.born
+        if self.cool_from is not None:
+            base = max(base, self.cool_from + RAMP_S)
+        if self.calib_at is not None:
+            base = max(base, self.calib_at)
+        return base
+
+    def deep_level(self, now):
+        """(phase, pct, why, seconds left) for an idle fan whose deep idle may begin: 20% until IDLE_DEEP_S of idle, then
+        a straight line to DEEP_PCT over BLUE_S, then DEEP_PCT; the 20% idle level while a temperature says no."""
+        base = self.idle_base()
+        if self.deep_block or now - base < o1work.IDLE_DEEP_S:
+            if self.deep_start is not None:                      # left deep idle for heat: the next fall starts over
+                self.deep_start, self.deep_again = None, True
+            return "idle20", LOW_PCT, "idle", 0
+        if self.deep_start is None:
+            self.deep_start = now if self.deep_again else base + o1work.IDLE_DEEP_S
+        d = min(1.0, max(0.0, (now - self.deep_start) / o1work.BLUE_S))
+        if d >= 1.0:
+            return "deep", DEEP_PCT, "deep idle", 0
+        pct = int(round(LOW_PCT - (LOW_PCT - DEEP_PCT) * d))
+        return "deepen", pct, "idle, going quieter", int(o1work.BLUE_S * (1.0 - d) + 0.999)
+
     # -- one tick --------------------------------------------------------------------
     def tick(self):
         now = self.clock()
         temps = read_temps(self.sysroot)
         working, wwhy = self.working(now, temps)
         hot, hwhy = self.overheated(temps)
+        self.deep_guard(temps)
         outs = find_outputs(self.sysroot)
         usable = [o for o in outs if o.key not in self.failed]
         text = controlling_text(usable)
@@ -602,11 +670,19 @@ class Fan:
             phase, pct, why = "working", FULL_PCT, "; ".join(wwhy)
         elif any(o.lkey not in self.learned for o in usable) or (self.aio and self.aio.needs_calibration()):
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
+            self.calib_at = now
         elif age is not None and age < RAMP_S:
             pct = ramp_pct(age)
             phase, why, left = "ramp", "the work ended", int(RAMP_S - age + 0.999)
         else:
-            phase, pct, why = "idle20", LOW_PCT, "idle"
+            phase, pct, why, left = self.deep_level(now)
+        if phase in ("hot", "working", "calibrating", "ramp"):
+            if phase == "hot":                                   # anything that raises the fans drops deep idle
+                if self.deep_start is not None:
+                    self.deep_again = True                       # (heat: the next fall starts over from 20%)
+            else:
+                self.deep_again = False                          # (work: a whole new idle)
+            self.deep_start = None
         self.apply(outs, pct, now)
         self.sample(usable, now)
         if self.aio:
@@ -630,6 +706,7 @@ class Fan:
 
     def wake(self):
         """After a suspend: the cooler may have lost what it was told; send it all again."""
+        self.born, self.deep_start, self.deep_again = self.clock(), None, False      # the idle clock starts again
         if self.aio:
             self.aio.reset()
 
@@ -642,15 +719,39 @@ class Fan:
             return L["min_pct"], "kept at 100%: a pump or a fixed header"
         if not L["rpm100"]:
             return None, "no rpm at 100%: left to its own control except while working"
+        if L.get("no_deep"):
+            return L["min_pct"], "stalls under %d%%: kept at %d%% in deep idle" % (LOW_PCT, LOW_PCT)
         return L["min_pct"], ""
+
+    def unconnected(self, o, rpm):
+        """True for a header with nothing on it: its rpm read nothing when measured at 100% (what is learned) and
+        reads nothing now. One that ever reads a fan again shows again. The card's fan is never hidden."""
+        L = self.learned.get(o.lkey)
+        return o.kind == "case" and L is not None and not L["rpm100"] and not rpm
 
     def write_status(self, outs):
         live = snapshot(outs, self.io, self.sysroot)
+        aio = self.aio.snapshot() if self.aio else None
+        pump_rpm = aio["pump_rpm"] if aio and aio.get("found") and aio.get("state") == "controlling" else None
+        rows, gone, pump = [], [], None
         for row, o in zip(live["outputs"], outs):
             row["min_pct"], row["note"] = self.notes(o)
+            if self.unconnected(o, row["rpm"]):
+                gone.append({"label": o.label, "chip": o.chip, "pwm": row["pwm"]})
+                continue
+            rows.append((row, o))
+        if pump_rpm is not None:                               # the cooler's own steady reading, not the header's tach
+            fixed = [(o.n, row, o) for row, o in rows if o.kind == "case" and (self.learned.get(o.lkey) or {}).get("always100")]
+            if fixed:
+                _n, row, o = min(fixed, key=lambda t: t[0])
+                pump = o.label
+                row["tach_raw"], row["rpm"], row["label"] = row["rpm"], pump_rpm, "Pump"
+                row["note"] = "the cooler's pump (its own rpm reading); the header's tach is in tach_raw"
+        shown = [o for _row, o in rows]
         st = {"at": int(self.wall()), "phase": self.phase, "pct": self.pct, "why": self.why, "hold_left": self.left,
-              "controlling": controlling_text(outs), "outputs": live["outputs"], "temps": live["temps"],
-              "aio": self.aio.snapshot() if self.aio else None,
+              "controlling": controlling_text(shown), "outputs": [row for row, _o in rows], "temps": live["temps"],
+              "unconnected": gone, "pump": pump,
+              "aio": aio,
               "hottest": live["hottest"], "closest": live["closest"], "hot": sorted(self.hot.values())}
         st["line"] = status_line(st)
         try:
@@ -693,11 +794,28 @@ def ramp_pct(t):
     return max(LOW_PCT, min(FULL_PCT, int(round(p / QUANT_PCT)) * QUANT_PCT))
 
 
+def present(rows, st):
+    """The live rows of a snapshot as the status shows them: headers with nothing on them are left out (unless they
+    read a fan now), and the header the cooler's pump is on is "Pump", with the cooler's own rpm."""
+    st = st or {}
+    gone = {u.get("label") for u in (st.get("unconnected") or []) if isinstance(u, dict)}
+    a = st.get("aio") or {}
+    out = []
+    for r in rows:
+        r = dict(r)
+        if r["label"] in gone and not r.get("rpm"):
+            continue
+        if st.get("pump") and r["label"] == st["pump"] and a.get("pump_rpm") is not None:
+            r["tach_raw"], r["rpm"], r["label"] = r["rpm"], a["pump_rpm"], "Pump"
+        out.append(r)
+    return out
+
+
 def phase_text(st):
-    """The phase in words: working / ramp NN% / idle20 (and the two that force 100%)."""
+    """The phase in words: working / ramp NN% / idle20 / deepen NN% / deep (and the two that force 100%)."""
     ph = st.get("phase")
-    if ph == "ramp":
-        return "ramp %d%%" % st.get("pct", 0)
+    if ph in ("ramp", "deepen"):
+        return "%s %d%%" % (ph, st.get("pct", 0))
     return ph or "?"
 
 
@@ -718,6 +836,10 @@ def status_line(st):
         head = "Fans: %d%% (%s)" % (pct, st.get("why") or ph)
     elif ph == "ramp":
         head = "Fans: ramping down, %d%% (20%% in %d s)" % (pct, st.get("hold_left", 0))
+    elif ph == "deepen":
+        head = "Fans: going quieter, %d%% (%d%% in %d s)" % (pct, DEEP_PCT, st.get("hold_left", 0))
+    elif ph == "deep":
+        head = "Fans: %d%% (deep idle)" % pct
     else:
         head = "Fans: 20% (idle)"
     rpm = _rpm_summary(st.get("outputs") or [])
@@ -753,7 +875,7 @@ def render_status(st, live):
         out.append("level: %d%%  phase: %s%s" % (st.get("pct", 0), phase_text(st), " - " + why if why else ""))
         out.append("controlling: " + st.get("controlling", "?"))
     meta = {r.get("label"): r for r in (st or {}).get("outputs", []) if isinstance(r, dict)}
-    rows = live["outputs"]
+    rows = present(live["outputs"], st)
     for r in rows:
         m = {1: "manual", 2: "auto"}.get(r["enable"], "chip control %s" % r["enable"])
         extra = meta.get(r["label"], {})
@@ -783,10 +905,10 @@ def render_status(st, live):
                 a["coolant_c"], " (>= %d C: pump extreme, fans 100%%)" % o1aio.COOLANT_HOT_C if a.get("coolant_hot") else "",
                 a.get("pump_mode") or "?", " %d rpm" % a["pump_rpm"] if a.get("pump_rpm") is not None else ""))
         for f in a.get("fans", []):
-            out.append("  cooler fan %d  %s  %s%s" % (
-                f["n"], "%d%%" % f["pct"] if f.get("pct") is not None else "?%",
-                "%d rpm" % f["rpm"] if f.get("rpm") is not None else "no rpm reading",
-                "  min %d%%" % f["min_pct"] if f.get("min_pct") is not None else ""))
+            out.append("  cooler fan %d  " % f["n"] + "  ".join(x for x in (
+                "%d%%" % f["pct"] if f.get("pct") is not None else "?%",
+                "%d rpm" % f["rpm"] if f.get("rpm") else "",
+                "min %d%%" % f["min_pct"] if f.get("min_pct") is not None else "") if x))
     elif a and a.get("state") and a["state"] != "not looked for yet":
         out.append("cooler: %s" % a["state"])
     if st is not None and st.get("hot"):

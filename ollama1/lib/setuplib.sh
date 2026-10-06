@@ -120,7 +120,7 @@ fans_plan() { # the plan's line for the fans (6b385; the triggers of 6b421)
   if [ "$1" = off ]; then
     printf 'Fans OFF (--fans off): the graphics card and case fans stay automatic (BIOS control). On: --fans on'
   else
-    printf 'Fans ON: graphics card and case fans at 100%% while the graphics card is over 50%% busy or the CPU is at 60 C or more, then down to 20%% over 1 minute; a Corsair Hydro liquid cooler on USB is controlled too (installs liquidctl) (ollama1-fan). Off: --fans off'
+    printf 'Fans ON: graphics card and case fans at 100%% while the graphics card is over 50%% busy or the CPU is at 60 C or more, then down to 20%% over 1 minute, and to 10%% after 5 idle minutes where a fan can run that low; a Corsair Hydro liquid cooler on USB is controlled too (installs liquidctl) (ollama1-fan). Off: --fans off'
   fi
 }
 
@@ -154,7 +154,7 @@ leds_length_choice() { # FLAG SAVED -> whole LEDs 1..1024, or nothing (6b428): t
 
 leds_plan() { # the plan's line for the lights (6b395; the states of 6b421; the length of 6b428): $1 on|off, $2 the length or empty
   if [ "$1" = on ]; then
-    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red in 5 s when it works (over 50%% busy), back to white over 1 minute when it stops, dimming to 40%% after 5 idle minutes (ollama1-leds, ollama1-openrgb on 127.0.0.1); a board header with no LEDs configured (JRAINBOW, JCORSAIR) is set to %s LEDs so the strips on it light too (--leds-length N). Off: --leds off' "${2:-60}"
+    printf 'Lights ON: installs the openrgb package (apt-get install openrgb); every light white when the graphics card is idle, through yellow and orange to red in 5 s when it works (over 50%% busy), back to white over 1 minute when it stops, then from white to blue over 30 s after 5 idle minutes, full brightness always (ollama1-leds, ollama1-openrgb on 127.0.0.1); a board header with no LEDs configured (JRAINBOW, JCORSAIR) is set to %s LEDs so the strips on it light too (--leds-length N). Off: --leds off' "${2:-60}"
   else
     printf 'Lights OFF (default): nothing installed, the lights stay as the board leaves them. On: --leds on'
   fi

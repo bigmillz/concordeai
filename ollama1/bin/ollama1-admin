@@ -1422,7 +1422,7 @@ function renderCpu(c,s){c=c||{};const f=c.freq||{},t=c.temp,th=c.thresholds||{},
  spark('cspeedspark','cspark2',8,typeof f.avg_mhz==='number'?f.avg_mhz/1000:null,1,0.5);}
 
 // ---- fans, lights, storage, network, GPU tuning, services ----------------------------------
-const PHASE={working:['Working','info'],hold100:['Cooling down','info'],ramp:['Cooling down','info'],idle20:['Idle',''],idle:['Idle',''],hot:['Hot','bad'],calibrating:['Calibrating','warn']};
+const PHASE={deepen:['Idle',''],deep:['Deep idle',''],working:['Working','info'],hold100:['Cooling down','info'],ramp:['Cooling down','info'],idle20:['Idle',''],idle:['Idle',''],hot:['Hot','bad'],calibrating:['Calibrating','warn']};
 function fanIcon(){const s=sv('svg',{viewBox:'0 0 32 32','aria-hidden':'true'});const g=sv('g',{class:'blades',fill:'currentColor'});
  for(let i=0;i<4;i++)g.append(sv('path',{d:'M16 16 C14 10 15 5 19 4 C22 4 21 10 16 16Z',transform:'rotate('+i*90+' 16 16)',opacity:.85}));
  s.append(sv('circle',{cx:16,cy:16,r:14.5,fill:'none',stroke:'currentColor','stroke-opacity':.25,'stroke-width':1.5}),g,sv('circle',{cx:16,cy:16,r:2.6,fill:'#0b1220',stroke:'currentColor','stroke-width':1.2}));return s;}
@@ -1432,7 +1432,7 @@ function renderFans(f){const box=$('fans');box.replaceChildren();
  const pc=$('fanpct');pc.replaceChildren(document.createTextNode(isNum(f.pct)?String(Math.round(f.pct)):'-'));pc.append(el('small','%'));
  const hold=f.phase==='hold100'||f.phase==='ramp';$('fanwhy').textContent=hold?(f.phase==='hold100'?'100% for '+(f.hold_left||0)+' s more, then down to 20%':'ramping down: '+f.pct+'%, 20% in '+(f.hold_left||0)+' s'):(f.why||(f.phase==='idle20'?'idle: 20%':''));
  const hb=$('fanhold');hb.hidden=!hold;if(hold){const span=Math.max(f.hold_left||0,hb._max&&hb._phase===f.phase?hb._max:0);hb._max=span;hb._phase=f.phase;hb.firstChild.style.width=(span?100*(f.hold_left||0)/span:0)+'%';}
- (f.outputs||[]).forEach(o=>{const t=el('div',undefined,'fan'+(isNum(o.rpm)&&o.rpm>0?' on':''));const ic=fanIcon();
+ (f.outputs||[]).filter(o=>!(o.label==='Pump'&&f.aio)).forEach(o=>{const t=el('div',undefined,'fan'+(isNum(o.rpm)&&o.rpm>0?' on':''));const ic=fanIcon();
   if(isNum(o.rpm)&&o.rpm>0)ic.querySelector('.blades').style.animationDuration=clamp(600/o.rpm,0.18,3).toFixed(2)+'s';
   const d=el('div');d.append(el('div',o.label||'fan','fl'),el('div',isNum(o.rpm)?Math.round(o.rpm)+' rpm':'no rpm','fr'),el('div',isNum(o.pwm)?Math.round(o.pwm/2.55)+'% duty':(o.note||''),'fp'));
   t.title=o.note||'';t.append(ic,d);box.append(t);});
@@ -1443,7 +1443,7 @@ function renderLeds(l){const orb=$('orb');
  if(!l){chip('ledchip','Not reporting','');$('ledstate').textContent='-';$('ledwhy').textContent='The lights service isn\'t reporting (it is off unless setup.sh --leds on).';$('leddevs').textContent='';orb.style.background='#1a2030';orb.style.boxShadow='none';return;}
  const rgb=l.rgb||[40,48,64],c='rgb('+rgb.join(',')+')';orb.style.background='radial-gradient(circle at 35% 30%,#fff8,'+c+' 45%,'+c+')';orb.style.boxShadow='0 0 34px 6px rgba('+rgb.join(',')+',.45)';
  chip('ledchip',l.connected?'Connected':'Not connected',l.connected?'ok':'warn');
- $('ledstate').textContent=!l.connected?'Waiting':l.state==='fading'?(l.target==='red'?'Fading to red':'Fading to white'):l.state==='red'?'Red':'White';
+ $('ledstate').textContent=!l.connected?'Waiting':l.state==='fading'?(l.target==='red'?'Fading to red':'Fading to white'):l.state==='blue to white'?'Fading to white':(l.state?l.state.charAt(0).toUpperCase()+l.state.slice(1):'White');
  $('ledwhy').textContent=l.error?'OpenRGB: '+l.error:(l.why||'');
  const zs=(l.zones||[]).map(d=>d.device+' - '+d.zones.map(z=>z.name+' '+z.leds).join(', ')).join('; ');
  $('leddevs').textContent=(l.devices?l.devices+' device'+(l.devices===1?'':'s')+(l.names.length?': '+l.names.join(', '):''):'no devices')+(zs?'  ·  LEDs per zone: '+zs:'');}

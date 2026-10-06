@@ -141,6 +141,25 @@ class TestPolicy(AioCase):
                 self.assertEqual(self.aio.applied, {1: fans, 2: fans}, phase)
                 self.assertEqual(self.aio.applied_pump, pump, phase)
 
+    def test_deep_idle_takes_the_cooler_fans_to_10_unless_they_stall_there(self):
+        t = self.settle()
+        for phase, pct, fans in (("deepen", 15, 15), ("deep", 10, 10)):
+            t += 6
+            self.ago(t, phase, pct)
+            self.assertEqual(self.aio.applied, {1: fans, 2: fans}, phase)
+            self.assertEqual(self.aio.applied_pump, "quiet", phase)               # the pump stays quiet
+        self.aio.learned["aio/fan2"]["no_deep"] = True
+        t += 6
+        self.ago(t, "deep", 10)
+        t += 6
+        self.ago(t, "deep", 10)
+        self.assertEqual(self.aio.applied, {1: 10, 2: 20})                       # the one that stalls below 20 stays at 20
+        self.aio.learned["aio/fan1"]["min_pct"] = 40
+        t += 6
+        self.aio.reset()
+        self.ago(t, "deep", 10)
+        self.assertEqual(self.aio.applied[1], 40)                                # its own floor wins
+
     def test_the_pump_is_extreme_only_while_working_or_hot_and_the_ramp_starts_balanced(self):
         t = self.settle()
         for phase, pct in (("ramp", 100), ("ramp", 50), ("idle20", 20), ("calibrating", 100)):
@@ -195,6 +214,19 @@ class TestLearning(AioCase):
         self.assertEqual(self.aio.applied, {1: 20, 2: 40})
         self.assertEqual(self.aio.learned["aio/fan1"]["min_pct"], 20)
         self.assertEqual(len([l for l in self.lines if "cooler fan 2" in l and "stalled" in l]), 2)
+
+    def test_a_cooler_fan_that_stalls_at_10_is_held_at_20_in_deep_idle_and_remembered(self):
+        self.fan_rpm[2] = lambda p: 0 if p < 20 else p * 10
+        t = self.settle()
+        self.ago(t + 7, "deep", 10)
+        for _ in range(6):
+            t += 7
+            self.ago(t + 7)
+        L = self.aio.learned["aio/fan2"]
+        self.assertEqual((L.get("no_deep"), L["min_pct"]), (True, 20))
+        self.assertIsNone(self.aio.learned["aio/fan1"].get("no_deep"))
+        self.assertEqual(self.aio.applied, {1: 10, 2: 20})
+        self.assertEqual(len([l for l in self.lines if "cooler fan 2" in l and "deep idle keeps it at 20%" in l]), 1)
 
     def test_a_fan_with_no_rpm_at_100_stays_at_100(self):
         self.fan_rpm[1] = lambda p: 0

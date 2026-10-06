@@ -530,6 +530,25 @@ class TestStateForThePage(unittest.TestCase):
             self.assertIn(k, s)
             self.assertIsNone(s[k], k)
 
+    def test_the_deep_idle_phases_and_the_pump_row_come_through_and_the_page_knows_them(self):
+        now = int(time.time())
+        self.write("fan", {"at": now, "phase": "deep", "pct": 10, "why": "deep idle", "unconnected": [{"label": "x"}],
+                           "outputs": [{"label": "Pump", "rpm": 2357, "pwm": 255, "tach_raw": 4383}],
+                           "aio": {"found": True, "name": "AIO", "pump_rpm": 2357, "coolant_c": 31.5}})
+        self.write("leds", {"at": now, "state": "blue", "phase": "blue", "rgb": [0, 0, 255], "connected": True,
+                            "devices": []})
+        _, s = self.state()
+        self.assertEqual((s["fan_status"]["phase"], s["fan_status"]["pct"]), ("deep", 10))
+        self.assertEqual(s["fan_status"]["outputs"][0]["label"], "Pump")
+        self.assertNotIn("tach_raw", s["fan_status"]["outputs"][0])          # the raw tach stays in the status file
+        self.assertEqual((s["leds_status"]["state"], s["leds_status"]["rgb"]), ("blue", [0, 0, 255]))
+        with open(os.path.join(U.BIN, "ollama1-admin")) as f:
+            page = f.read()
+        self.assertIn("deepen:['Idle','']", page)
+        self.assertIn("deep:['Deep idle','']", page)
+        self.assertIn("o.label==='Pump'&&f.aio", page)                       # the cooler's own tile is the pump
+        self.assertIn("l.state.charAt(0).toUpperCase()", page)
+
     def test_shapes_and_hostile_text(self):
         now = int(time.time())
         evil = "<script>alert(1)</script>"

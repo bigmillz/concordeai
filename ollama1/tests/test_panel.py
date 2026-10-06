@@ -1968,11 +1968,32 @@ class TestFans(unittest.TestCase):
     def test_phases(self):
         for phase, pct, why, want in (("idle20", 20, "idle", "idle 20%"), ("hold100", 100, "the work ended", "cooling down 100%"),
                                       ("hold50", 50, "x", "cooling down 50%"), ("ramp", 73, "x", "cooling down 73%"),
-                                      ("calibrating", 100, "x", "measuring 100%"), (None, 40, None, "40%")):
+                                      ("calibrating", 100, "x", "measuring 100%"), (None, 40, None, "40%"),
+                                      ("deepen", 17, "x", "idle 17%"), ("deep", 10, "deep idle", "deep idle 10%")):
             self.assertEqual(o1panel.fan_view(self.st(phase=phase, pct=pct, why=why), self.NOW)[1], want)
         v = o1panel.fan_view(self.st(phase="hot", pct=100, why="too warm: GPU junction"), self.NOW)
         self.assertTrue(v[2])
         self.assertTrue(o1panel.fan_view(self.st(hot=["x"]), self.NOW)[2])
+
+    def test_every_phase_word_fits_the_fans_title_bar_at_every_size(self):
+        for w, h in ((480, 270), (640, 360), (800, 480), (1024, 600)):
+            fw = o1panel.layout(w, h)["fans"][2]
+            for head in ("working 100%", "cooling down 100%", "measuring 100%", "deep idle 10%", "idle 17%", "HOT 100%"):
+                self.assertLessEqual(F.text_width("FANS") + F.text_width(head) + 10, fw - 16, (w, h, head))
+
+    def test_the_cooler_pump_row_is_never_in_the_case_average_and_the_cooler_fans_without_rpm_show_duty(self):
+        outs = [{"label": "Pump", "enable": 1, "pwm": 255, "rpm": 2357, "tach_raw": 4383},
+                {"label": "case/CPU fan 2", "enable": 1, "pwm": 51, "rpm": 500}]
+        aio = {"found": True, "state": "controlling", "pump_rpm": 2357, "pump_mode": "quiet", "coolant_c": 31,
+               "fans": [{"n": 1, "rpm": 0, "pct": 20}, {"n": 2, "rpm": None, "pct": 20}]}
+        v = o1panel.fan_view(self.st(outputs=outs, aio=aio), self.NOW)
+        self.assertEqual([(r[0], r[1]) for r in v[3]], [("Cooler fans", "20%"), ("Case fans", "500 rpm avg")])
+        self.assertAlmostEqual(v[3][0][2], 0.2)
+        self.assertEqual(v[4], "Pump 2357 rpm, quiet, coolant 31\u00b0C")
+        aio["fans"][0]["rpm"] = 520                                              # one reports: they average in as before
+        v = o1panel.fan_view(self.st(outputs=outs, aio=aio), self.NOW)
+        self.assertEqual([r[0] for r in v[3]], ["Case fans"])
+        self.assertEqual(v[3][0][1], "510 rpm avg")
 
     def test_controlled_output_without_rpm_is_shown_an_idle_unreadable_one_is_not(self):
         outs = [{"label": "fan1", "enable": 1, "pwm": 128, "rpm": None}, {"label": "fan2", "enable": 2, "pwm": 0, "rpm": 0}]

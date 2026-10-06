@@ -21,9 +21,25 @@ or a model answering shows up as the card over 50%, which is what heats it).
 
   COOL_S       60 s    when the work ends the fans fall 100% -> 20% and the lights
                        red -> orange -> yellow -> white over this, both linear in time
-  RISE_S       5 s     the lights' way back to red and full brightness when work starts
-  IDLE_DIM_S   300 s   the lights at white this long, then dimmed ...
-  DIM_PCT      40%     ... to this brightness, over DIM_S (10 s)
+  RISE_S       5 s     the lights' way from white to red when work starts
+
+Deep idle (6b434, per the owner: no more dimming; the lights stay at 100% brightness always):
+
+  IDLE_DEEP_S  300 s   idle (counted from when the cool-down reaches white, from the start,
+                       or from a wake) this long, then, over BLUE_S (30 s) together:
+  BLUE_S       30 s      the lights go from white to BLUE, a straight line in RGB and in time,
+                         and stay blue at 100% while idle; the fans fall from the idle 20%
+                         to FAN_DEEP_PCT (10%), a straight line, and stay there
+  FAN_DEEP_PCT 10%       only for outputs that can run that low; every output's own floor wins
+  WAKE_FADE_S  2 s     work while the lights are blue (or part way): back to white in this
+                       long (full blue; proportionally less from part way), only THEN the
+                       5 s rise to red. Work while white: the rise starts at once. The fans
+                       go to 100% at once and deep idle is dropped.
+  deep idle's temperature guard (fans): out of deep idle, back to 20%, when any monitored
+  temperature is within DEEP_LIMIT_MARGIN_C (10 C) of its limit, or the CPU is at
+  DEEP_CPU_C (50 C) or more, or the card's junction at DEEP_GPU_C (60 C) or more; back in
+  only when all are DEEP_REENTER_C (3 C) under those figures. Any safety override
+  (the over-limit "hot" one, the 60 C CPU trigger, the card trigger) raises the fans at once.
 """
 import time
 
@@ -34,10 +50,29 @@ GPU_CONFIRM_S = 1.5               # ... for this long in a row; and at/under it 
 CLOCK_SLACK_S = 1e-6              # a sample due at exactly 1.5 s that a float clock puts a hair early still counts
 CPU_HOT_C, CPU_COOL_C = 60, 55    # the processor's temperature: work from 60 C, until it is under 55 C (fans only)
 COOL_S = 60                       # the cool-down: fans 100 -> 20%, lights red -> white
-RISE_S = 5.0                      # the lights: to red and 100% brightness
-IDLE_DIM_S = 300.0                # the lights: white this long, then dim
-DIM_PCT = 40                      # ... to this brightness
-DIM_S = 10.0                      # ... over this long
+RISE_S = 5.0                      # the lights: white to red
+IDLE_PCT = 20                     # the fans' idle level
+IDLE_DEEP_S = 300.0               # idle this long, then the lights go blue and the fans go deeper
+BLUE_S = 30.0                     # ... over this long (both)
+FAN_DEEP_PCT = 10                 # the fans' deep-idle level (an output's own floor wins)
+BLUE = (0, 0, 255)                # the lights' deep-idle colour: pure blue (see README, Lights)
+WAKE_FADE_S = 2.0                 # blue back to white in this long when work starts (proportional from part way)
+DEEP_LIMIT_MARGIN_C = 10          # deep idle needs every temperature this far under its limit ...
+DEEP_CPU_C = 50                   # ... the CPU under this ...
+DEEP_GPU_C = 60                   # ... and the card's junction under this
+DEEP_REENTER_C = 3                # after leaving, all of those must be this much lower again
+
+
+def fan_level(L, pct, low=IDLE_PCT):
+    """The percent an output with learned record `L` gets while the fans' level is `pct`: its own floor wins.
+    min_pct is the stall floor (it starts at the idle level, which only says 20% was assumed fine); an output
+    that stalled below the idle level (`no_deep`) is held at the idle level instead of the deep one."""
+    floor = L["min_pct"]
+    if floor <= low and L.get("no_deep") is True:
+        floor = low
+    elif floor <= low:
+        floor = 0
+    return min(100, max(pct, floor))
 
 
 class Gpu:

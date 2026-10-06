@@ -1,6 +1,6 @@
 """What makes the fans and the lights work (lib/o1work.py, 6b421, per the owner): the card over 50%
 for 1.5 s in a row (and at or under it 1.5 s in a row to end), the processor's temperature from
-60 C until it is under 55 C, and the shared numbers (60 s cool-down, 5 s rise, 300 s then 40%)."""
+60 C until it is under 55 C, and the shared numbers (60 s cool-down, 5 s rise, 300 s idle then 30 s to blue and 10% fans, 2 s wake fade)."""
 import unittest
 
 import o1test_util as U  # noqa: F401  (sets OLLAMA1_PREFIX first)
@@ -23,7 +23,13 @@ class TestNumbers(unittest.TestCase):
         self.assertEqual((o1work.CPU_HOT_C, o1work.CPU_COOL_C), (60, 55))
         self.assertEqual(o1work.COOL_S, 60)
         self.assertEqual(o1work.RISE_S, 5.0)
-        self.assertEqual((o1work.IDLE_DIM_S, o1work.DIM_PCT, o1work.DIM_S), (300.0, 40, 10.0))
+        self.assertEqual((o1work.IDLE_DEEP_S, o1work.BLUE_S, o1work.FAN_DEEP_PCT, o1work.WAKE_FADE_S),
+                         (300.0, 30.0, 10, 2.0))
+        self.assertEqual((o1work.IDLE_PCT, o1work.BLUE), (20, (0, 0, 255)))
+        self.assertEqual((o1work.DEEP_LIMIT_MARGIN_C, o1work.DEEP_CPU_C, o1work.DEEP_GPU_C, o1work.DEEP_REENTER_C),
+                         (10, 50, 60, 3))
+        for gone in ("IDLE_DIM_S", "DIM_PCT", "DIM_S"):
+            self.assertFalse(hasattr(o1work, gone), gone)
 
     def test_the_probes_the_services_build_read_only_the_card(self):
         self.assertEqual(set(o1work.probes()), {"gpu_busy"})
