@@ -17093,8 +17093,9 @@ check("the composer grows with its text: typing, pasting and code that fills it 
       and "#input{\n  flex:0 0 auto;background:none;" in _MILLENAI_SRC)   # flex:1 in the column ignored its height
 print("== starter chips from your chats (6b390) ==")
 check("topic chips: the pass is capped at what a server may write, in the request itself",
-      "SUGGEST_MAX_TOKENS = 1200" in _MILLENAI_SRC
+      "SUGGEST_MAX_TOKENS = 1600" in _MILLENAI_SRC
       and "server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)" in _MILLENAI_SRC
+      and "max_tokens=SUGGEST_MAX_TOKENS, quiet=True" in _MILLENAI_SRC
       and '{"num_predict": int(max_tokens)} if max_tokens else {}' in _MILLENAI_SRC
       and "server_stream(m[\"label\"], messages, parts.append, max_tokens)" in _MILLENAI_SRC)
 # THE THREE CHIPS FOLLOW WHAT THE PERSON ASKS (6b390). Only a topic summary
@@ -17155,12 +17156,18 @@ def _sgc(cid, title, q, lane="ai", ts=0):
 
 
 _SG_CAR = ["\U0001F527 How do I change my brake pads?", "\U0001F697 Why is my car shaking at speed?",
-           "\U0001F6E0\uFE0F How often should I change oil?"]
-_SG_EAT = ["\U0001F957 What are easy healthy dinners?", "\U0001F34E How do I cut down on sugar?",
-           "\U0001F966 Meal prep ideas for a week"]
+           "\U0001F6E0\uFE0F How often should I change oil?", "\U0001F6DE When should I rotate my tires again?",
+           "\U0001F50B How can I tell a weak battery from a bad alternator?",
+           "\U0001F4A1 Why does my check engine light keep coming back?"]
+_SG_EAT = ["\U0001F957 What are easy healthy dinners for busy weeknights?",
+           "\U0001F34E How do I cut down on sugar without cravings?",
+           "\U0001F966 Which vegetables keep best for a week of meal prep?"]
+# the reply as a model writes it: a fragment among the good ones, and a topic with one good chip
 _SG_REPLY = ("TOPIC: car repairs | COUNT: 6\n- " + "\n- ".join(_SG_CAR)
-             + "\nTOPIC: healthy eating | COUNT: 2\n- " + "\n- ".join(_SG_EAT) + "\n")
-_SG_B48 = "How do I change my brake pads " + "a" * 17 + "?"      # 48 characters exactly
+             + "\nTOPIC: healthy eating | COUNT: 2\n- " + "\n- ".join(_SG_EAT) + "\n- Meal prep ideas\n"
+             + "TOPIC: sourdough | COUNT: 1\n- \U0001F35E Why is my sourdough starter not rising?\n")
+_SG_B90 = "How do I change my brake pads " + "a" * 59 + "?"      # 90 characters exactly
+_SG_CAR2 = ["\U0001F697 Why is my car so loud at low speed?", "\U0001F527 Why is my car slow to accelerate lately?"]
 
 
 def _sg_unit(src):
@@ -17172,58 +17179,155 @@ def _sg_unit(src):
     o["a good chip kept as written"] = chip("\U0001F527 How do I change my brake pads?") == "\U0001F527 How do I change my brake pads?"
     o["a bullet and quotes stripped, a missing emoji supplied, the first letter raised"] = (
         chip('- "how do I bleed brakes?"') == "\U0001F4A1 How do I bleed brakes?")
-    o["too short, one word or too long refused"] = (
-        chip("\U0001F527 Brakes?") is None and chip("\U0001F527 Why?!") is None and chip("\U0001F527 Brakes brakes") is not None
-        and chip("\U0001F527 " + "How do I change my brake pads " * 3) is None and chip("\U0001F527 Brakesbrakesbrakes") is None)
-    o["48 characters kept, 49 refused"] = (len(_SG_B48) == 48 and chip("\U0001F527 " + _SG_B48) is not None
-                                           and chip("\U0001F527 " + _SG_B48[:-1] + "a?") is None)
+    o["too short, too few words or too long refused"] = (
+        chip("\U0001F527 Brakes?") is None and chip("\U0001F527 Why?!") is None and chip("\U0001F527 Why brake pads wear?") is None
+        and chip("\U0001F527 How do brakes work?") is None and chip("\U0001F527 How is it?") is None
+        and chip("\U0001F527 " + "How do I change my brake pads " * 4 + "?") is None and chip("\U0001F527 Brakesbrakesbrakes") is None
+        and chip("\U0001F527 How is it that I can do so much on my own if it is not a big deal at all?") is None)
+    o["90 characters kept, 91 refused"] = (len(_SG_B90) == 90 and chip("\U0001F527 " + _SG_B90) is not None
+                                           and chip("\U0001F527 " + _SG_B90[:-1] + "a?") is None)
+    o["20 characters kept, 19 refused"] = (chip("\U0001F527 How do I fry an egg?") is not None
+                                           and chip("\U0001F527 How do I fry an eg?") is None)
+    o["fragments and labels with a question mark refused"] = all(chip(x) is None for x in (
+        "\U0001F697 Vehicle performance?", "\U0001F30D New culture facts?", "\U0001F570\uFE0F Past era details?",
+        "\u2708\uFE0F Best travel tips?", "\U0001F9D8 Does meditation actually work?",
+        "\u2708\uFE0F Best travel tips for first timers?", "\U0001F697 Vehicle performance and engine upgrade options?"))
+    o["no question mark, or no question word, refused"] = (
+        chip("\U0001F527 How do I change my brake pads") is None and chip("\U0001F527 How do I change my brake pads.") is None
+        and chip("\U0001F527 Replace the brake pads on my own car?") is None
+        and chip("\U0001F527 My brake pads wear fast, why?") is None
+        and chip("\U0001F527 Brake pad prices in my own town?") is None)
+    o["real questions kept"] = all(chip(x) == x for x in (
+        "\U0001F30D Which cities in Portugal are best for a first trip?",
+        "\U0001F373 Can learning to cook at home really save money?",
+        "\U0001F6D2 Should I buy a heat pump or a gas furnace this year?",
+        "\U0001F4D6 Explain how compound interest works in simple terms?",
+        "\U0001F4BB Tell me which laptop suits video editing best?",
+        "\U0001F4C8 Isn't a slow start to the day worth fixing first?"))
     o["an address, a link or a long number refused"] = all(chip(x) is None for x in (
-        "\U0001F527 Email me at pat@example.com please", "\U0001F527 See www.example.org for pads",
-        "\U0001F527 Call 5551234567 about brakes", "\U0001F527 Read https://example.com now",
-        "\U0001F527 Is it example.com for pads?"))
+        "\U0001F527 Can I email me at pat@example.com about brakes?", "\U0001F527 Should I see www.example.org for brake pads?",
+        "\U0001F527 Can I call 5551234567 about brake pads?", "\U0001F527 Should I read https://example.com for brake pads?",
+        "\U0001F527 Is it example.com for brake pads, then?"))
     o["a tender topic refused"] = all(chip(x) is None for x in (
-        "\U0001F9E0 How do I deal with my anxiety?", "\U0001F494 Should I leave my marriage?",
-        "\U0001F48A Which medications mix badly?", "\U0001FAC2 What do I say when grieving?"))
+        "\U0001F9E0 How do I deal with my anxiety at work?", "\U0001F494 Should I leave my marriage this year?",
+        "\U0001F48A Which medications mix badly with coffee?", "\U0001FAC2 What do I say when grieving a friend?"))
     o["a word of the person's own name or place refused"] = (
-        chip("\U0001F697 How do I fix a car in Denver?", hide={"denver"}) is None
-        and chip("\U0001F697 How do I fix a car in Denver?") is not None)
+        chip("\U0001F697 How do I fix a car in Denver today?", hide={"denver"}) is None
+        and chip("\U0001F697 How do I fix a car in Denver today?") is not None)
     o["a copy of a chat they already have refused"] = (
-        chip("\U0001F527 Replacing front brake pads") is None
-        and chip("\U0001F527 Replacing the front brake pads") is None
-        and chip("\U0001F527 How do I change spark plugs?") is not None)
-    o["collapsed text refused"] = chip("\U0001F527 " + "go go " * 7 + "go") is None
+        chip("\U0001F527 How do I do replacing front brake pads?") is None
+        and chip("\U0001F527 Is replacing front brake pads hard?") is None
+        and chip("\U0001F527 How do I change spark plugs myself?") is not None)
+    o["collapsed text refused"] = chip("\U0001F527 Why " + "go " * 12 + "go?") is None
     parse = lambda t, lb=labels, hide=frozenset(): ns["suggest_parse"](t, lb, set(hide))
     tp = parse(_SG_REPLY, labels * 4)
-    o["a reply read into topics, the biggest first, three chips each"] = (
+    o["a reply read into topics, the biggest first, six and three chips, a fragment and a one-chip topic dropped"] = (
         [t["topic"] for t in tp] == ["car repairs", "healthy eating"] and [t["n"] for t in tp] == [6, 2]
         and [t["chips"] for t in tp] == [_SG_CAR, _SG_EAT])
-    tp2 = parse("TOPIC: cooking | COUNT: 1\n- \U0001F373 How do I fry an egg?\nTOPIC: cars | COUNT: 9\n"
-                "- \U0001F697 Why is my car loud?\n- \U0001F697 Why is my car loud?\n- \U0001F527 Why is my car slow?\n")
+    tp2 = parse("TOPIC: cooking | COUNT: 1\n- \U0001F373 How do I fry an egg without sticking?\n- \U0001F373 Why does my omelette turn out rubbery?\n"
+                "TOPIC: cars | COUNT: 9\n- \U0001F697 Why is my car so loud at low speed?\n- \U0001F697 Why is my car so loud at low speed?\n"
+                "- \U0001F527 Why is my car slow to accelerate lately?\n")
     o["biggest first whatever the order written, a repeat once, counts held to the lines sent"] = (
-        [t["topic"] for t in tp2] == ["cars", "cooking"] and len(tp2[0]["chips"]) == 2 and tp2[0]["n"] == 2)
-    o["fewer than two good chips is nothing"] = (
-        parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Brakes?\n- \U0001F527 Why is my car loud?\n") == []
-        and parse("") == [] and parse("no topics here, sorry") == [])
+        [t["topic"] for t in tp2] == ["cars", "cooking"] and tp2[0]["chips"] == _SG_CAR2 and tp2[0]["n"] == 2)
+    o["a near copy of another chip is dropped"] = (
+        len(parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Why is my car so loud at low speed?\n- \U0001F697 Why is my car so loud at low speed now?\n"
+                  "- \U0001F527 Why is my car slow to accelerate lately?\n")[0]["chips"]) == 2)
+    o["no more than six chips a topic"] = len(parse("TOPIC: cars | COUNT: 3\n" + "".join(
+        "- \U0001F697 Why does the %s keep failing so often?\n" % w for w in
+        ("brakes", "engine", "gearbox", "clutch", "exhaust", "radiator", "starter", "alternator")))[0]["chips"]) == 6
+    o["fewer than two good chips in a topic: the topic dropped; none left is nothing"] = (
+        parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Brakes?\n- \U0001F527 Why is my car loud at low speed?\n") == []
+        and parse("") == [] and parse("no topics here, sorry") == []
+        and parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Vehicle performance?\n- \U0001F30D New culture facts?\n") == [])
     o["a topic with no safe chip is left out, the rest kept"] = (
-        [t["topic"] for t in parse("TOPIC: mail | COUNT: 4\n- \U0001F4E7 Mail pat@example.com now\nTOPIC: cars | COUNT: 3\n"
-                                   "- \U0001F697 Why is my car loud?\n- \U0001F527 Why is my car slow?\n")] == ["cars"])
+        [t["topic"] for t in parse("TOPIC: mail | COUNT: 4\n- \U0001F4E7 Can I mail pat@example.com now?\nTOPIC: cars | COUNT: 3\n"
+                                   "- \U0001F697 Why is my car so loud at low speed?\n- \U0001F527 Why is my car slow to accelerate lately?\n")] == ["cars"])
+    _ws = ("brakes", "engine", "gearbox", "clutch", "exhaust", "radiator")
     o["at most four topics"] = len(parse("".join(
-        "TOPIC: t%d | COUNT: %d\n- \U0001F697 Why is car number %s loud?\n- \U0001F527 Why is car %s slow today?\n"
-        % (i, 9 - i, "abcdef"[i], "ghijkl"[i]) for i in range(6)), labels * 6)) == 4
+        "TOPIC: t%d | COUNT: %d\n- \U0001F697 Why do the %s wear out so quickly?\n- \U0001F527 How should I check the %s before a trip?\n"
+        % (i, 9 - i, _ws[i], _ws[i]) for i in range(6)), labels * 6)) == 4
+    # the prompt: whole questions, 6 a topic, bad and good examples
+    pr = ns["SUGGEST_PROMPT"]
+    o["the prompt asks for 6 whole questions of 5 to 12 words a topic, shows bad and good, and ends at the labels"] = (
+        "6 different follow-up questions" in pr and "5 to 12 words" in pr and "ends with a question mark" in pr
+        and "at most 4 topics" in pr and "Bad (labels and fragments)" in pr and "Vehicle performance?" in pr
+        and "New culture facts?" in pr and "Good (whole questions" in pr and "one step further" in pr
+        and "never a person's name" in pr and pr.endswith("\nCHATS:\n") and pr.count("- <emoji> <question>") == 6
+        and ns["SUGGEST_MAX_TOKENS"] == 1600 and ns["SUGGEST_CHIP_MIN"] == 20 and ns["SUGGEST_CHIP_MAX"] == 90)
+    # the picking
     pick = ns["suggest_pick"]
     cache = {"topics": tp}
     rng = _sg_random.Random(7)
     draws = [pick(cache, rng) for _ in range(60)]
-    o["two from the biggest topic and one from the next, always"] = all(
-        len(d) == 3 and sum(c in _SG_CAR for c in d) == 2 and sum(c in _SG_EAT for c in d) == 1 for d in draws)
-    o["each painting draws afresh from the three"] = len({tuple(sorted(d)) for d in draws}) >= 4
+    o["three chips a painting, from both topics, none twice"] = all(
+        len(d) == 3 and len(set(d)) == 3 and any(c in _SG_CAR for c in d) and any(c in _SG_EAT for c in d) for d in draws)
+    o["each painting draws afresh"] = len({tuple(sorted(d)) for d in draws}) >= 8
+    big = {"topics": [{"topic": "a", "n": 9, "chips": ["a0 ?", "a1 ?", "a2 ?"]}, {"topic": "b", "n": 1, "chips": ["b0 ?", "b1 ?", "b2 ?"]}]}
+    first_b = sum(pick(big, _sg_random.Random(i))[0].startswith("b") for i in range(400))
+    o["a bigger topic is likelier but not always"] = 4 <= first_b <= 120
+    pool12 = {"topics": [{"topic": "a", "n": 6, "chips": ["a%d ?" % i for i in range(6)]},
+                         {"topic": "b", "n": 4, "chips": ["b%d ?" % i for i in range(4)]},
+                         {"topic": "c", "n": 2, "chips": ["c%d ?" % i for i in range(2)]}]}
+    pool12["pool"] = ns["suggest_pool"](pool12["topics"])
+    o["the pool lists every chip with its topic"] = len(pool12["pool"]) == 12 and pool12["pool"][6] == {"c": "b0 ?", "t": 1, "n": 4}
+    o["a first painting takes one chip from each of three topics"] = all(
+        sorted(c[0] for c in pick(pool12, _sg_random.Random(i))) == ["a", "b", "c"] for i in range(30))
+
+    def run10(cache_, seed, n=10):
+        r_, shown_, outs = _sg_random.Random(seed), [], []
+        for _ in range(n):
+            ch = pick(dict(cache_, shown=list(shown_)), r_)
+            outs.append(ch)
+            shown_ = (shown_ + [ch])[-2:]
+        return outs
+    runs = [run10(pool12, sd) for sd in range(40)]
+    o["10 paintings from a pool of 12: three chips each, none repeating within the last two paintings"] = all(
+        all(len(o_[i]) == 3 and len(set(o_[i])) == 3 for i in range(10))
+        and all(not (set(o_[i]) & set(o_[j])) for i in range(10) for j in (i - 1, i - 2) if j >= 0) for o_ in runs)
+    o["...and between them they cover most of the pool"] = all(len({c for d in o_ for c in d}) >= 10 for o_ in runs)
+    o["the next painting differs from the last as far as the pool allows"] = all(
+        len(set(o_[i]) & set(o_[i - 1])) == 0 for o_ in runs for i in range(1, 10))
+    small = {"topics": [{"topic": "a", "n": 2, "chips": ["a0 ?", "a1 ?", "a2 ?"]}, {"topic": "b", "n": 1, "chips": ["b0 ?"]}]}
+    sm = pick(dict(small, shown=[["a0 ?", "a1 ?", "a2 ?"]]), _sg_random.Random(1))
+    o["a pool too small to avoid: still three chips, the fresh one among them"] = len(sm) == 3 and "b0 ?" in sm
+    sm2 = pick(dict(small, shown=[["a0 ?", "a1 ?"], ["a2 ?", "b0 ?"]]), _sg_random.Random(1))
+    o["a small pool gives back the older painting's chips before the last one's"] = (
+        len(sm2) == 3 and set(sm2) >= {"a0 ?", "a1 ?"} and len(set(sm2)) == 3)
     tie = {"topics": [dict(tp[0], n=3), dict(tp[1], n=3)]}
-    td = [pick(tie, _sg_random.Random(i)) for i in range(40)]
-    o["a tie for the biggest is by lot"] = (any(sum(c in _SG_CAR for c in d) == 2 for d in td)
-                                            and any(sum(c in _SG_EAT for c in d) == 2 for d in td))
+    td = [pick(tie, _sg_random.Random(i)) for i in range(60)]
+    o["a tie for the biggest is by lot"] = (any(td[i][0] in _SG_CAR for i in range(60))
+                                            and any(td[i][0] in _SG_EAT for i in range(60)))
     one = pick({"topics": [tp[0]]}, rng)
-    o["one topic gives two, none gives nothing"] = (len(one) == 2 and all(c in _SG_CAR for c in one)
-                                                    and pick({}, rng) == [] and pick({"topics": []}, rng) == [])
+    o["one topic gives three, none gives nothing, a short pool what it has"] = (
+        len(one) == 3 and all(c in _SG_CAR for c in one) and pick({}, rng) == [] and pick({"topics": []}, rng) == []
+        and len(pick({"topics": [{"topic": "a", "n": 1, "chips": ["a0 ?", "a1 ?"]}]}, rng)) == 2)
+    # the kept file: v2 as written, and a v1 file upgraded in the reading
+    store = {}
+    nsr = _sg_ns(src, _read_json=lambda f, ctx, t: store["d"], StoreReadError=OSError, NoProfile=KeyError)
+    v1 = {"v": 1, "sig": "abc", "n": 9, "tried": 5, "at": 6, "checked": 7, "made": "test",
+          "topics": [{"topic": "car repairs", "n": 6, "chips": ["\U0001F527 How do I change my brake pads?",
+                                                                  "\U0001F697 Why is my car shaking at speed?",
+                                                                  "\U0001F6E0 Vehicle performance?"]},
+                     {"topic": "healthy eating", "n": 2, "chips": ["\U0001F957 What are easy healthy dinners?",
+                                                                    "\U0001F34E How do I cut down on sugar?",
+                                                                    "\U0001F966 Meal prep ideas for a week"]},
+                     {"topic": "travel", "n": 1, "chips": ["\U0001F30D New culture facts?", "\u2708\uFE0F Best travel tips?",
+                                                            "\U0001F4CD Why is my car so loud at low speed?"]}]}
+    store["d"] = v1
+    up = nsr["suggest_read"](None)
+    o["a v1 file is read as v2: fragments dropped, a topic with fewer than two good chips dropped, a pool built, a new pass due"] = (
+        up["v"] == 2 and up["upgraded"] is True and up["sig"] == "" and up["shown"] == []
+        and [t["topic"] for t in up["topics"]] == ["car repairs", "healthy eating"]
+        and up["topics"][0]["chips"] == v1["topics"][0]["chips"][:2]
+        and len(up["topics"][1]["chips"]) == 2 and "\U0001F966 Meal prep ideas for a week" not in str(up)
+        and [e["c"] for e in up["pool"]] == up["topics"][0]["chips"] + up["topics"][1]["chips"]
+        and nsr["suggest_due"](dict(up, tried=time.time() - 3600, at=time.time(), checked=time.time())) is True
+        and nsr["suggest_due"](dict(up, tried=time.time() - 60)) is False
+        and len(nsr["suggest_pick"](up, rng)) == 3 and all(c in str(up["pool"]) for c in nsr["suggest_pick"](up, rng)))
+    store["d"] = {"v": 2, "topics": tp, "pool": [{"c": "x ?", "t": 0, "n": 1}], "shown": [["x ?"]]}
+    o["a v2 file is read as it is, anything else as nothing"] = (
+        nsr["suggest_read"](None) == store["d"] and not (store.update(d=[1]) or nsr["suggest_read"](None))
+        and not (store.update(d={"v": 3}) or nsr["suggest_read"](None)))
     # the labels
     chats = [_sgc("a%d" % i, "Brakes %d topic" % i, "q", ts=1000 - i) for i in range(40)]
     lb, n = ns["suggest_labels"](chats)
@@ -17351,19 +17455,27 @@ def _sg_unit(src):
         len(w) == 1 and len(a) == 1 and a[0] == nsx["SUGGEST_PROMPT"] + "\n".join(
             ["Replacing front brake pads", "Car shaking", "Oil change interval", "Easy weeknight pasta", "Spark plugs"])
         and [t["topic"] for t in w[0]["topics"]] == ["car repairs", "healthy eating"] and w[0]["made"] == "test"
-        and w[0]["v"] == 1 and w[0]["n"] == 5 and abs(w[0]["at"] - time.time()) < 30 and len(w[0]["sig"]) == 40)
+        and w[0]["v"] == 2 and w[0]["n"] == 5 and abs(w[0]["at"] - time.time()) < 30 and len(w[0]["sig"]) == 40
+        and [e["c"] for e in w[0]["pool"]] == _SG_CAR + _SG_EAT and w[0]["upgraded"] is False)
     o["a pass always ends: the running flag is cleared"] = nsx["_suggest_state"].get("running") is False
     w, a, nsx = run_pass(five[:2])
     o["fewer than three chats: kept as none, no model asked"] = (
         a == [] and len(w) == 1 and w[0]["topics"] == [] and w[0]["n"] == 2 and w[0]["at"] == 0)
     sig = _sg_hash.sha1("\n".join(["Replacing front brake pads", "Car shaking", "Oil change interval",
                                    "Easy weeknight pasta", "Spark plugs"]).encode()).hexdigest()
-    oldc = {"v": 1, "sig": sig, "topics": [{"topic": "x", "n": 1, "chips": ["a b"]}], "at": 5, "checked": 5, "made": "z"}
+    oldc = {"v": 2, "sig": sig, "topics": [{"topic": "x", "n": 1, "chips": ["zzz yyy"]}], "pool": [{"c": "zzz yyy", "t": 0, "n": 1}],
+            "at": 5, "checked": 5, "made": "z", "shown": [["zzz yyy"]]}
     w, a, nsx = run_pass(five, old=oldc)
     o["nothing new: only looked at, not asked"] = (a == [] and len(w) == 1 and w[0]["checked"] > time.time() - 30
                                                    and w[0]["topics"] == oldc["topics"] and w[0]["at"] == 5)
     w, a, nsx = run_pass(five, old=oldc, force=True)
     o["a refresh asks though nothing is new"] = len(a) == 1 and w[0]["made"] == "test"
+    o["a pass replaces the pool wholesale: no old chip lingers; what was shown is kept"] = (
+        [e["c"] for e in w[0]["pool"]] == _SG_CAR + _SG_EAT and "zzz yyy" not in str(w[0]["topics"]) + str(w[0]["pool"]) and w[0]["shown"] == [["zzz yyy"]]
+        and w[0]["sig"] == sig)
+    w, a, nsx = run_pass(five, old=dict(oldc, upgraded=True))
+    o["an upgraded v1 summary is asked again though the titles are as they were"] = (
+        len(a) == 1 and w[0]["made"] == "test" and w[0]["upgraded"] is False and len(w[0]["pool"]) == 9)
     w, a, nsx = run_pass(five, busy_=True)
     o["busy: nothing asked, nothing written, held back"] = (
         a == [] and w == [] and nsx["_suggest_state"].get("hold", 0) > time.time() + 30)
@@ -17372,11 +17484,15 @@ def _sg_unit(src):
     w, a, nsx = run_pass(five, old=oldc, answer=(None, ""), force=True)
     o["no answer: the old topics stay, the try is noted"] = (
         len(a) == 1 and len(w) == 1 and w[0]["topics"] == oldc["topics"] and w[0]["at"] == 5 and w[0]["tried"] > time.time() - 30)
+    w, a, nsx = run_pass(five, old=dict(oldc, sig="oldsig", pool=oldc["pool"]), answer=(None, ""))
+    o["a pass that fails keeps the old sig and pool, so the next look asks again"] = (
+        len(w) == 1 and w[0]["sig"] == "oldsig" and w[0]["pool"] == oldc["pool"])
     w, a, nsx = run_pass(five, answer=("I cannot help with that.", "test"))
     o["an answer that is no list: the try is noted, no topics"] = w[0]["topics"] == [] and w[0]["tried"] > time.time() - 30
     w, a, nsx = run_pass(five, user={"user_name": "Dana Whitfield"},
-                         answer=("TOPIC: cars | COUNT: 3\n- \U0001F697 Why is Dana's car loud?\n- \U0001F527 Why is my car slow?\n"
-                                 "- \U0001F527 Why is my car loud?\n", "test"))
+                         answer=("TOPIC: cars | COUNT: 3\n- \U0001F697 Why is Dana's car so loud at low speed?\n"
+                                 "- \U0001F527 Why is my car slow to accelerate lately?\n"
+                                 "- \U0001F527 Why is my car so loud at low speed?\n", "test"))
     o["a word of the person's own name keeps a chip out"] = (
         len(w) == 1 and w[0]["topics"] and not any("Dana" in c for c in w[0]["topics"][0]["chips"])
         and len(w[0]["topics"][0]["chips"]) == 2)
@@ -17400,12 +17516,14 @@ def _sg_unit(src):
     # what the route answers
     def view(on_=True, busy_=False, cache=None, refresh=False):
         forgot, forced = [], []
-        nsx = _sg_ns(src, suggest_on=lambda c: on_, suggest_busy=lambda c: busy_, suggest_read=lambda c: cache or {},
-                     suggest_forget=lambda c: forgot.append(1),
+        kept = {"d": cache or {}}
+        nsx = _sg_ns(src, suggest_on=lambda c: on_, suggest_busy=lambda c: busy_, suggest_read=lambda c: dict(kept["d"]),
+                     suggest_forget=lambda c: forgot.append(1), _write_json=lambda n_, d, ctx, **k: kept.update(d=dict(d)),
                      suggest_start=lambda c, force=False: (forced.append(force) or True))
         nsx["_suggest_state"].clear()
+        nsx["_kept"] = kept
         return nsx["suggest_view"](None, refresh), forgot, forced
-    good = {"v": 1, "topics": tp, "at": 5, "made": "test", "n": 9}
+    good = {"v": 2, "topics": tp, "at": 5, "made": "test", "n": 9}
     r, f, g = view(cache=good)
     o["the route gives three chips at once, and starts a pass if one is due"] = (
         len(r["chips"]) == 3 and r["on"] is True and r["n"] == 9 and r["topics"] == ["car repairs", "healthy eating"]
@@ -17419,6 +17537,22 @@ def _sg_unit(src):
     o["busy: the kept chips, no pass, and it says why"] = r["busy"] is True and r["started"] is False and g == [] and len(r["chips"]) == 3
     r, f, g = view(cache=good, refresh=True)
     o["Refresh forces a pass"] = g == [True] and r["started"] is True
+    # every look a different set, remembered in the profile's own file, two paintings deep
+    kept = {"d": dict(good, pool=ns["suggest_pool"](tp))}
+    nsv = _sg_ns(src, suggest_on=lambda c: True, suggest_busy=lambda c: False, suggest_read=lambda c: dict(kept["d"]),
+                 _write_json=lambda n_, d, ctx, **k: kept.update(d=dict(d)), suggest_start=lambda c, force=False: False)
+    nsv["_suggest_state"].clear()
+    seq = [nsv["suggest_view"](None)["chips"] for _ in range(10)]
+    o["each look of the route gives a new set: three chips, none repeating within two looks, most of the pool seen"] = (
+        all(len(x) == 3 for x in seq) and all(not (set(seq[i]) & set(seq[j])) for i in range(10) for j in (i - 1, i - 2) if j >= 0)
+        and len({c for x in seq for c in x}) >= 8)
+    o["what was shown is written to the profile's file, the last two looks only, the rest of the summary kept"] = (
+        kept["d"]["shown"] == seq[-2:] and kept["d"]["topics"] == tp and kept["d"]["v"] == 2)
+    kept = {"d": {"v": 2, "topics": [], "pool": []}}
+    nsv = _sg_ns(src, suggest_on=lambda c: True, suggest_busy=lambda c: False, suggest_read=lambda c: dict(kept["d"]),
+                 _write_json=lambda n_, d, ctx, **k: kept.update(d=dict(d)), suggest_start=lambda c, force=False: False)
+    nsv["_suggest_state"].clear()
+    o["nothing to show writes nothing"] = nsv["suggest_view"](None)["chips"] == [] and kept["d"] == {"v": 2, "topics": [], "pool": []}
     return o
 
 
@@ -17430,14 +17564,20 @@ check("starter chips: the topic labels, the chip filter, the picking, the model'
 _SG_PAGE = _ireq(INST, "/", token=False)[1].decode("utf-8", "replace")
 _SG_STATIC = [
     ("the pool still the fallback", lambda p, s: "const SUGG_SETS=[" in p and "const pick=SUGG_SETS.map(" in p),
-    ("chat-lane chips from the server first", lambda p, s: "  suggLoad();\n  const own=suggOwn.slice().sort(()=>Math.random()-0.5);\n"
-     "  box.innerHTML=own.map(q=>'<button class=\"sugg\" type=\"button\" data-own=\"1\">'" in p),
-    ("the personal chips ahead of the fixed ones", lambda p, s: "      +esc(q)+'</button>').join(\"\")\n    +pick.map(q=>" in p),
+    ("chat-lane chips from the server first", lambda p, s: "  const own=suggOwn.slice().sort(()=>Math.random()-0.5);\n"
+     "  box.innerHTML=own.map(q=>'<button class=\"sugg\" type=\"button\" data-own=\"1\" title=\"'" in p),
+    ("the personal chips ahead of the fixed ones", lambda p, s: "+esc(q)+'</button>').join(\"\")\n    +pick.map(q=>" in p),
+    ("only whole questions painted", lambda p, s: "?suggOk(c)" not in p and "d.chips.filter(suggOk).slice(0,3)" in p
+     and 'return typeof c==="string"&&c.length>=20&&/\\?\\s*$/.test(c)' in p),
+    ("the set shown is spent and the next one asked for", lambda p, s: "  suggFresh=false;suggLoad();" in p
+     and "  if(suggFlight)return;" in p and "suggFresh=suggOwn.length>0;" in p),
+    ("long chips cut with an ellipsis, three to a row", lambda p, s: ".sugg[data-own]{max-width:calc((100% - 14px)/3)}" in p
+     and "@media (max-width:640px){.sugg[data-own]{max-width:100%}}" in p and ".sugg{max-width:100%}" in p
+     and "min-width:0;overflow:hidden;text-overflow:ellipsis;" in p),
     ("a fetch that never holds a painting", lambda p, s: 'api("/api/suggest").then(r=>r.json()).then(d=>{' in p),
-    ("the page's state declared with var", lambda p, s: "var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0;" in p),
+    ("the page's state declared with var", lambda p, s: "var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0,suggFlight=false,suggFresh=false;" in p),
     ("a few looks while a pass runs", lambda p, s: "const wait=!suggOwn.length&&d&&d.refreshing&&suggWaits++<8;" in p
      and "    if(wait)setTimeout(()=>{suggAsked=0;suggLoad();},4000);" in p),
-    ("a look at most every five minutes", lambda p, s: "  if(Date.now()-suggAsked<300000)return;" in p),
     ("only the first answer repaints", lambda p, s: 'if(first&&suggOwn.length&&uiMode==="ai"&&$("#hero")&&!generating)paintSuggest();' in p),
     ("the switch in Personality, on by default", lambda p, s: '<div class="toggle-row on" id="sugg-toggle"' in p
      and p.index('id="sugg-toggle"') > p.index('id="p-persona"') and p.index('id="sugg-toggle"') < p.index('id="p-cloud"')),
@@ -17455,6 +17595,7 @@ _SG_STATIC = [
     ("Refresh forcing a pass", lambda p, s: '            self._send_json(suggest_view(self.ctx, refresh=True))' in s),
     ("the summary erased with the chats", lambda p, s: '                suggest_forget(base)    # the summary of them goes too (6b390)' in s),
     ("a pass started on the asker's own ctx, a daemon", lambda p, s: "    ctx_thread(target=_suggest_thread, args=(ctx, force), daemon=True).start()" in s),
+    ("the cloud's call capped", lambda p, s: "max_tokens=SUGGEST_MAX_TOKENS, quiet=True" in s),
     ("the model asked with the labels only", lambda p, s: 'suggest_ask(ctx, SUGGEST_PROMPT + "\\n".join(labels))' in s),
     ("the test route only with its hook", lambda p, s: 'if self.path == "/api/test/suggest" and _suggest_hooked():' in s),
 ]
@@ -17535,8 +17676,8 @@ _sg_lines = _sg_prompt.split("CHATS:\n", 1)[-1].split("\n")
 check("starter chips (live): the first look answers at once and starts a pass in the background; then two chips of the "
       "biggest topic and one of the next, asked of the model once",
       _sg_s0[0] == 200 and _sg_s0[1].get("on") is True and _sg_s0[1].get("started") is True
-      and len(_sg_d1.get("chips") or []) == 3
-      and sum(c in _SG_CAR for c in _sg_d1["chips"]) == 2 and sum(c in _SG_EAT for c in _sg_d1["chips"]) == 1
+      and len(_sg_d1.get("chips") or []) == 3 and all(c in _SG_CAR + _SG_EAT for c in _sg_d1["chips"])
+      and any(c in _SG_CAR for c in _sg_d1["chips"]) and any(c in _SG_EAT for c in _sg_d1["chips"])
       and _sg_d1.get("topics") == ["car repairs", "healthy eating"] and _sg_d1.get("made") == "test"
       and _sg_a1.get("asks") == 1, "%r" % [_sg_s0, _sg_d1, _sg_a1.get("asks")])
 check("starter chips (live): only a topic summary is sent: the newest 30 chat titles, scrubbed and cut, no question, no "
@@ -17547,10 +17688,18 @@ check("starter chips (live): only a topic summary is sent: the newest 30 chat ti
       and any(len(x) == 60 for x in _sg_lines) and all(len(x) <= 60 for x in _sg_lines),
       "%r" % [len(_sg_lines), _sg_lines[:3]])
 check("starter chips (live): the summary is kept in the profile's own folder, and later looks ask no model",
-      _sg_c1 is not None and _sg_c1.get("v") == 1 and _sg_c1.get("n") == 36
+      _sg_c1 is not None and _sg_c1.get("v") == 2 and _sg_c1.get("n") == 36 and len(_sg_c1.get("pool") or []) == 9
       and [t["topic"] for t in _sg_c1.get("topics") or []] == ["car repairs", "healthy eating"]
-      and [_sg_q(_SG, "/api/suggest")[1].get("n") for _ in range(3)] == [36] * 3 and _sg_asks(_SG).get("asks") == 1,
+      and [_sg_q(_SG, "/api/suggest")[1].get("n") for _ in range(3)] == [36] * 3 and _sg_asks(_SG).get("asks") == 1
+      and (_sg_c1.get("shown") or []) != [],
       "%r" % [_sg_c1 and _sg_c1.get("n"), _sg_asks(_SG)])
+# EVERY LOOK A NEW SET (6b438)
+_sg_seq = [_sg_q(_SG, "/api/suggest")[1].get("chips") for _ in range(8)]
+check("starter chips (live): every look gives a different set of three, none repeating within two looks, the whole pool of nine seen, "
+      "all of them whole questions",
+      all(len(x or []) == 3 for x in _sg_seq) and all(not (set(_sg_seq[i]) & set(_sg_seq[j])) for i in range(8) for j in (i - 1, i - 2) if j >= 0)
+      and {c for x in _sg_seq for c in x} == set(_SG_CAR[:6] + _SG_EAT) and all(c.endswith("?") for x in _sg_seq for c in x)
+      and (_sg_cache(_SG) or {}).get("shown") == _sg_seq[-2:] and _sg_asks(_SG).get("asks") == 1, "%r" % [_sg_seq, _sg_asks(_SG)])
 check("starter chips (live): the routes answer only with the launch key and the API token, the test route only to its hook",
       [_ireq(_SG, p, token=False, method=m)[0] for p, m in (("/api/suggest", "GET"), ("/api/suggest/refresh", "POST"))] == [403, 403]
       and _ireq(_SG, "/api/suggest", cookie="millen_key_9903=" + "y" * 43)[0] == 403
@@ -17603,6 +17752,20 @@ _sg_d4 = _sg_wait(_SG, lambda d: _sg_asks(_SG).get("asks") == 4)
 check("starter chips (live): Refresh runs a pass now, inside the six hours",
       _sg_r[0] == 200 and _sg_r[1].get("started") is True and _sg_asks(_SG).get("asks") == 4 and len(_sg_d4.get("chips") or []) == 3,
       "%r" % [_sg_r, _sg_asks(_SG).get("asks")])
+# an old v1 file: its fragments never shown, a new pass at once, then a v2 file with a pool
+_sg_v1 = {"v": 1, "sig": (_sg_cache(_SG) or {}).get("sig"), "n": 36, "tried": time.time() - 3600, "at": time.time(), "checked": time.time(),
+          "made": "test", "topics": [{"topic": "car repairs", "n": 6, "chips": [_SG_CAR[0], _SG_CAR[1], "\U0001F6E0 Vehicle performance?"]},
+                                     {"topic": "culture", "n": 2, "chips": ["\U0001F30D New culture facts?", "\U0001F570 Past era details?"]}]}
+json.dump(_sg_v1, open(os.path.join(_SG.home, "suggest.json"), "w"))
+_sg_u0 = _sg_q(_SG, "/api/suggest")[1]
+_sg_u1 = _sg_wait(_SG, lambda d: _sg_asks(_SG).get("asks") == 5)
+_sg_cu = _sg_cache(_SG) or {}
+check("starter chips (live): an old file with three chips a topic and no pool shows only what the new rules accept, starts a new pass at once, "
+      "and is replaced by a file with a pool",
+      _sg_u0.get("started") is True and set(_sg_u0.get("chips") or []) == set(_SG_CAR[:2])
+      and _sg_asks(_SG).get("asks") == 5 and _sg_cu.get("v") == 2 and len(_sg_cu.get("pool") or []) == 9
+      and "Vehicle performance?" not in json.dumps(_sg_cu) and "New culture facts?" not in json.dumps(_sg_cu),
+      "%r" % [_sg_u0, _sg_cu])
 # a new person: fewer than three chats is the pool, and no model is asked
 with open(os.path.join(_SG.home, "chats.v2.json"), "w") as _fh:
     json.dump({"v": 2, "chats": [_sgc("n1", "Brakes", "q", ts=_SG_NOW), _sgc("n2", "Oil", "q", ts=_SG_NOW - 1)], "gone": []}, _fh)
@@ -17611,7 +17774,7 @@ time.sleep(1.2)
 _sg_new = _sg_q(_SG, "/api/suggest")[1]
 _sg_cn = _sg_cache(_SG)
 check("starter chips (live): fewer than three chats is the fixed pool, and no model is asked",
-      _sg_new.get("chips") == [] and _sg_cn and _sg_cn.get("n") == 2 and _sg_cn.get("topics") == [] and _sg_asks(_SG).get("asks") == 4,
+      _sg_new.get("chips") == [] and _sg_cn and _sg_cn.get("n") == 2 and _sg_cn.get("topics") == [] and _sg_asks(_SG).get("asks") == 5,
       "%r" % [_sg_new, _sg_cn, _sg_asks(_SG).get("asks")])
 # Forget my chats takes the summary too
 _sg_fg = _sg_q(_SG, "/api/forget", "POST", {"scopes": ["chats"]})
@@ -17671,13 +17834,53 @@ _SG4.stop()
 
 # ---- the same checks on a MUTATED copy of the code must fail: (what, anchor, replacement)
 _SG_MUT = [
+    ("a chip of any length or word count", '    if not (SUGGEST_CHIP_MIN <= len(body) <= SUGGEST_CHIP_MAX) \\\n            or not (SUGGEST_WORDS_MIN <= len(body.split()) <= SUGGEST_WORDS_MAX) \\\n            or not emoji:',
+     '    if not body:'),
+    ("a chip longer than 90 characters", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 90", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 140"),
+    ("a chip shorter than 20 characters", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 90", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 90"),
+    ("a chip of two words", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 16", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 2, 16"),
+    ("a chip of any number of words", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 16", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 40"),
+    ("a chip with no question mark", '    if not body.endswith("?") or not _SUGGEST_Q_RX.match(body):', '    if not _SUGGEST_Q_RX.match(body):'),
+    ("a chip with no question word", '    if not body.endswith("?") or not _SUGGEST_Q_RX.match(body):', '    if not body.endswith("?"):'),
+    ("a question word list without how", "    r\"^(?:what|why|how|which", "    r\"^(?:what|why|which"),
+    ("a topic with one good chip kept", 'len(t["chips"]) >= SUGGEST_TOPIC_MIN]', 'len(t["chips"]) >= 1]'),
+    ("every topic kept", "    return topics[:SUGGEST_TOPICS]", "    return topics"),
+    ("more than six chips a topic", 'if not c or len(cur["chips"]) >= SUGGEST_PER_TOPIC:', 'if not c:'),
+    ("a repeated question kept", "            if any(len(cw & o) / len(cw | o) >= 0.8 for o in seen if cw | o):\n                continue                    # the same question again\n", ""),
+    ("the prompt asking for three", "write 6 different follow-up", "write 3 different follow-up"),
+    ("the prompt allowing any length", "a full sentence of 5 to 12 words", "a short phrase of 2 to 12 words"),
+    ("the prompt without its examples", '"Bad (labels and fragments): ', '"Note: '),
+    ("the pass allowed to write more", "SUGGEST_MAX_TOKENS = 1600", "SUGGEST_MAX_TOKENS = 6000"),
+    ("the cloud's call uncapped", "max_tokens=SUGGEST_MAX_TOKENS, quiet=True", "max_tokens=9000, quiet=True"),
+    ("a painting ignoring the last two", '    tiers = [[e for e in pool if e["c"] not in any_shown],', '    tiers = [list(pool),'),
+    ("only the last painting avoided", "    any_shown = set().union(*shown) if shown else set()", "    any_shown = set(newest)"),
+    ("one painting back avoided", "SUGGEST_AVOID = 2 ", "SUGGEST_AVOID = 1 "),
+    ("a small pool giving fewer than three", "        avail = next((t for t in tiers if t), None)", "        avail = tiers[0] or None"),
+    ("the last painting's chips before the older ones", "        avail = next((t for t in tiers if t), None)", "        avail = next((t for t in reversed(tiers) if t), None)"),
+    ("chips from one topic", '        fresh = [e for e in avail if e.get("t") not in used] or avail', '        fresh = avail'),
+    ("topics drawn without weight", 'max(1, max(int(e.get("n") or 1) for e in fresh\n                            if e.get("t") == t))', '1'),
+    ("always the biggest topic first", "        r, t = rng.random() * sum(wt.values()), ts[-1]", "        r, t = -1, ts[0]"),
+    ("always the same chip of a topic", '        e = rng.choice([e for e in fresh if e.get("t") == t])', '        e = [e for e in fresh if e.get("t") == t][0]'),
+    ("a painting not remembered", "                _write_json(SUGGEST_FILE, c, ctx)\n            except StaleProfile:", "                pass\n            except StaleProfile:"),
+    ("a history kept for ever", "                              + [chips])[-SUGGEST_AVOID:]", "                              + [chips])[-99:]"),
+    ("the route not taking a new painting", "    chips, c = suggest_take(ctx)       # a different painting each look (6b438)", "    c = suggest_read(ctx)\n    chips = suggest_pick(c)"),
+    ("a pool built from nothing", "    return [{\"c\": c, \"t\": i, \"n\": int(t.get(\"n\") or 1)}", "    return [{\"c\": c, \"t\": 0, \"n\": 1}"),
+    ("the old pool kept after a pass", "            base.update(topics=topics, pool=suggest_pool(topics), sig=sig,", "            base.update(topics=topics, sig=sig,"),
+    ("a pass undoing what was shown", "        base[\"shown\"] = (suggest_read(ctx).get(\"shown\")\n                         or base.get(\"shown\") or [])", "        base[\"shown\"] = []"),
+    ("a v1 file trusted as it is", "            ch = [c for c in (_suggest_chip(x, [], set()) for x in\n                              (t.get(\"chips\") or []) if isinstance(x, str)) if c]", "            ch = [x for x in (t.get(\"chips\") or []) if isinstance(x, str)]"),
+    ("a v1 file not upgraded", '    if d.get("v") == 1:\n        tps = []', '    if False:\n        tps = []'),
+    ("a v1 file not marked for a new pass", "shown=[], upgraded=True)", "shown=[], upgraded=False)"),
+    ("an upgraded file not due at once", '    if cache.get("upgraded") or not cache.get("topics"):', '    if not cache.get("topics"):'),
+    ("an upgraded file left alone by its sig", 'and old.get("sig") == sig \\\n                and not old.get("upgraded"):', 'and old.get("sig") == sig:'),
+    ("a failed pass writing the new sig", '        base = {"v": 2, "sig": old.get("sig", ""), "n": n, "tried": now,', '        base = {"v": 2, "sig": sig, "n": n, "tried": now,'),
+    ("an unchanged list asked again", '        if not force and old.get("topics") and old.get("sig") == sig \\\n                and not old.get("upgraded"):', '        if False:'),
+    ("a failed pass leaving no try", "                        upgraded=False)\n        suggest_save(base, ctx)", "                        upgraded=False)\n            suggest_save(base, ctx)"),
+    ("a failed pass erasing the old topics", '                "topics": old.get("topics") or [],\n                "pool": old.get("pool") or [],', '                "topics": [],\n                "pool": old.get("pool") or [],'),
+    ("a failed pass erasing the old pool", '                "pool": old.get("pool") or [], "made"', '                "pool": [], "made"'),
     ("the filter letting an address through", '    if re.search(r"https?:|www\\.|@|\\.com\\b|\\d{4,}|[<>{}|\\\\]", body) \\\n            or _TENDER_RX.search(body)',
      '    if _TENDER_RX.search(body)'),
     ("the filter letting a tender topic through", '            or _TENDER_RX.search(body) or _looks_degenerate(body):', '            or _looks_degenerate(body):'),
     ("collapsed text let through", '            or _TENDER_RX.search(body) or _looks_degenerate(body):', '            or _TENDER_RX.search(body):'),
-    ("a chip of any length", '    if not (SUGGEST_CHIP_MIN <= len(body) <= SUGGEST_CHIP_MAX) \\\n            or len(body.split()) < 2 or not emoji:',
-     '    if not body:'),
-    ("a chip at 49 characters", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 48", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 60"),
     ("the person's own words not refused", "    if w & hide:\n        return None\n", ""),
     ("a copy of a chat shown", "        if lw and w and len(w & lw) / len(w | lw) >= 0.7:\n            return None\n", "        pass\n"),
     ("a missing emoji left bare", '("\\U0001F4A1", s)', '("", s)'),
@@ -17688,12 +17891,7 @@ _SG_MUT = [
     ("every label sent", "        if len(out) >= SUGGEST_LABELS:\n            break\n", ""),
     ("a copied title kept", '        if not t or t.endswith("(copy)"):', '        if not t:'),
     ("counts not held to the lines sent", '"n": max(1, min(int(m.group(2) or 1), len(labels) or 1)),', '"n": int(m.group(2) or 1) or 1,'),
-    ("a single good chip accepted", "    return topics if sum(len(t[\"chips\"]) for t in topics) >= 2 else []", "    return topics"),
     ("topics not ordered by their count", "    topics.sort(key=lambda t: -t[\"n\"])\n", ""),
-    ("every topic kept", "    topics = topics[:SUGGEST_TOPICS]\n", ""),
-    ("three chips from the biggest topic", "    out = rng.sample(first[\"chips\"], min(2, len(first[\"chips\"])))", "    out = rng.sample(first[\"chips\"], min(3, len(first[\"chips\"])))"),
-    ("nothing from the next topic", "    if rest:\n        out += rng.sample(rest[0][\"chips\"], 1)\n", ""),
-    ("a tie always to the first", "    first = rng.choice([t for t in tp if t[\"n\"] == tp[0][\"n\"]])", "    first = tp[0]"),
     ("the server never asked first", "    out = (server_side_text(ask, ctx, max_tokens=SUGGEST_MAX_TOKENS)\n           if _suggest_server_up(ctx) else None)\n    if out is not None:", "    out = None\n    if out is not None:"),
     ("a server with nothing loaded asked", "if _suggest_server_up(ctx) else None)", "if True else None)"),
     ("a server's model asked in Cloud Only", '    if cloud_only:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):', '    if False:\n        for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):'),
@@ -17718,14 +17916,9 @@ _SG_MUT = [
     ("a pass that doesn't look at busy", "        if suggest_busy(ctx):\n            st[\"hold\"]", "        if False:\n            st[\"hold\"]"),
     ("the route ignoring a busy moment", "    if not busy:\n        started = suggest_start(ctx, refresh)", "    if True:\n        started = suggest_start(ctx, refresh)"),
     ("fewer than three chats asked", "        if n < SUGGEST_MIN_CHATS or len(labels) < SUGGEST_MIN_CHATS:", "        if False:"),
-    ("an unchanged list asked again", "        if not force and old.get(\"topics\") and old.get(\"sig\") == sig:", "        if False:"),
     ("a switched-off person asked", "        if not suggest_on(ctx) or not suggest_due(", "        if not suggest_due("),
     ("a pass not marked running", "        _suggest_state[\"running\"] = True\n    ctx_thread(", "        pass\n    ctx_thread("),
     ("a pass that isn't due started", "or not suggest_due(suggest_read(ctx), force):\n            return False", ":\n            return False"),
-    ("a failed pass leaving no try", "        if topics:\n            base.update(topics=topics, at=time.time(), checked=time.time(),\n                        made=who)\n        _write_json(SUGGEST_FILE, base, ctx)",
-     "        if topics:\n            base.update(topics=topics, at=time.time(), checked=time.time(),\n                        made=who)\n            _write_json(SUGGEST_FILE, base, ctx)"),
-    ("a failed pass erasing the old topics", "        base = {\"v\": 1, \"sig\": sig, \"n\": n, \"tried\": now,\n                \"at\": old.get(\"at\", 0), \"checked\": old.get(\"checked\", 0),\n                \"topics\": old.get(\"topics\") or [],",
-     "        base = {\"v\": 1, \"sig\": sig, \"n\": n, \"tried\": now,\n                \"at\": old.get(\"at\", 0), \"checked\": old.get(\"checked\", 0),\n                \"topics\": [],"),
     ("a pass written after the switch went off", "        if not suggest_on(ctx):\n            return                         # switched off while it ran", "        if False:\n            return                         # switched off while it ran"),
     ("the person's own name not read", '        for k in ("user_name", "home_area"):\n            hide |= _suggest_words(user.get(k, ""))', '        for k in ():\n            pass'),
     ("the switch off unless saved on", '        return user_prefs(ctx).get("suggest_own", True) is not False', '        return user_prefs(ctx).get("suggest_own", False) is not False'),
@@ -17736,16 +17929,20 @@ _SG_MUT = [
     ("Refresh not forcing", "        started = suggest_start(ctx, refresh)", "        started = suggest_start(ctx)"),
     # the page and its wiring
     ("the page never asking", 'api("/api/suggest").then(r=>r.json())', 'api("/api/prefs").then(r=>r.json())'),
-    ("the personal chips never painted", "  box.innerHTML=own.map(q=>'<button class=\"sugg\" type=\"button\" data-own=\"1\">'", "  box.innerHTML=pick.map(q=>'<button class=\"sugg\" type=\"button\" data-own=\"1\">'"),
-    ("a state in a let (a dead page)", "var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0;", "let suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0;"),
     ("the switch not saved", "body:JSON.stringify({suggest_own:on})", "body:JSON.stringify({})"),
     ("the switch off by default", '<div class="toggle-row on" id="sugg-toggle"', '<div class="toggle-row" id="sugg-toggle"'),
     ("the file not the profile's own", '"bench_targets.jsonl", "suggest.json", "images"', '"bench_targets.jsonl", "images"'),
     ("the switch not a setting", '"funnel_cloud", "polish", "suggest_own"))', '"funnel_cloud", "polish"))'),
     ("the chats erased and the summary kept", "                suggest_forget(base)    # the summary of them goes too (6b390)\n", ""),
     ("Refresh not forced by the route", "            self._send_json(suggest_view(self.ctx, refresh=True))", "            self._send_json(suggest_view(self.ctx))"),
-    ("a look at every painting", "  if(Date.now()-suggAsked<300000)return;", "  if(false)return;"),
+    ("a state in a let (a dead page)", "var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0,suggFlight=false,suggFresh=false;", "let suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0,suggFlight=false,suggFresh=false;"),
+    ("the personal chips never painted", "  box.innerHTML=own.map(q=>'<button class=\"sugg\" type=\"button\" data-own=\"1\" title=\"'", "  box.innerHTML=pick.map(q=>'<button class=\"sugg\" type=\"button\" data-own=\"1\" title=\"'"),
+    ("a painting that never asks for the next set", "  suggFresh=false;suggLoad();", "  suggFresh=false;"),
+    ("looks piling up", "  if(suggFlight)return;", "  if(false)return;"),
+    ("a fragment painted", "d.chips.filter(suggOk).slice(0,3)", 'd.chips.filter(c=>typeof c==="string").slice(0,3)'),
+    ("a long chip overflowing", ".sugg[data-own]{max-width:calc((100% - 14px)/3)}", ".sugg[data-own]{}"),
 ]
+
 _sg_mm = []
 for _what, _a, _b in _SG_MUT:
     if _MILLENAI_SRC.count(_a) != 1:

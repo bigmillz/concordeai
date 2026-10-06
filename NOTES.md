@@ -9,6 +9,55 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b438 — starter chips are whole, relevant questions and change at every new chat (per Patrick)
+
+Patrick (2026-10-06), about the empty-composer chips ("Past era details?", "New culture facts?", "Best travel tips?",
+"Does meditation actually work?"): "the chips that are supposed to come from AI coming up with ideas based on previous
+chats aren't really relevant. And some of them aren't really questions. Like one just said 'vehicle performance' with a
+question mark. And every time a new chat is opened, they're not changing at all. Maybe one changes." Builds on 6b390.
+His earlier guidance still holds: chips may be MORE specific to his own chat topics (stored per profile, sent only to
+his own server or loaded model); names of people and his home area stay filtered (`hide`).
+
+- **Relevance and real questions.** `SUGGEST_PROMPT` now asks for 6 follow-up questions per topic (up to 4 topics),
+  each a complete sentence of 5 to 12 words that starts with a question word and ends with "?", clearly about the topic
+  and specific (it may name a product kind, a city, a subject; never a person, address, link or number), one step
+  further (a deeper angle or the next thing to ask), never a label and never a repeat of a title. It shows a bad
+  pair ("Vehicle performance?", "New culture facts?") and a good pair. `_suggest_chip` now also needs: 20 to 90
+  characters (was 8 to 48), 5 to 16 words, a trailing "?", and an opening question word (what, why, how, which, who,
+  when, where, auxiliaries, "tell me", "explain", "show me", "give me", "compare", "help me", "recommend"). The older
+  rules stay (no address, link, 4+ digits, tender topic, collapsed text, hidden own-name/place words, near copy of a
+  title at 0.7). `suggest_parse` keeps at most 6 per topic, drops near-duplicates across the whole reply (word overlap
+  0.8), drops a topic with fewer than 2 good chips (`SUGGEST_TOPIC_MIN`), keeps 4 topics. `SUGGEST_MAX_TOKENS` is 1600
+  (4 x 6 chips of this length); the Cloud Only call used a hard 700 and now uses the same constant.
+- **Rotation.** suggest.json is now v2: `{v:2, sig, n, tried, at, checked, topics, pool, made, upgraded, shown}`. `pool`
+  is every chip of every topic (`{c, t, n}`); `shown` is the last two paintings (`SUGGEST_AVOID`), kept in the file so it
+  survives a restart. `suggest_pick(cache, rng, k=3)` takes 3 chips: a chip not in either of the last two paintings;
+  from different topics while the pool allows; the topic drawn by weight (its count) so the big topic is likelier
+  but not always first; if the pool is too small it falls back to the older painting's chips, then the last one's
+  (always 3 while the pool has 3). The `rng` argument stays, so it is testable. `suggest_view` (GET /api/suggest, which
+  the page calls) takes a pick and records it (`suggest_take`, under `_suggest_file_lock`; `suggest_save` keeps the
+  recorded `shown` when a pass writes, so neither undoes the other). It stays cheap: a small file read and write, a pass
+  only by the old due-logic (6 h, 15 min back-off, busy hold, a model already loaded).
+- **Page.** `suggLoad` is one look at a time (no 5 minute throttle). A painting shows the set the last look brought,
+  then asks for the next (`suggFresh=false;suggLoad()`), so opening a new chat never waits on the network and shows
+  a different set (the first answer still repaints once). Only chips that pass `suggOk` (20+ characters, ends with
+  "?", 6+ words counting the emoji) are painted. CSS: `.sugg{max-width:100%}`, the personal chips
+  `max-width:calc((100% - 14px)/3)` so three share the one row with an ellipsis (the full text is the title and what a
+  click sends); under 640 px each may take the row and the one-row trim keeps the first. The fixed pool still follows
+  the personal chips, whichever fit.
+- **Freshness.** A pass that works replaces topics AND pool wholesale (no old chip lingers). A failed pass keeps the old
+  topics, pool and sig (before, the new sig was stored with the old topics, so the next look believed the summary
+  current). An old v1 file (3 chips a topic, no pool) is upgraded when read: chips that still pass the new rules stay
+  (a topic with under 2 goes), `upgraded:true`, `sig:""`, so a new pass is due at once (still behind the 15 min
+  back-off) and the pass does not skip it on an unchanged title list.
+- **Gauntlet** ("starter chips"): 84 unit checks (fragments "Vehicle performance?", "New culture facts?", "Past era
+  details?", "Best travel tips?", "Does meditation actually work?" refused; real questions kept; 10 paintings from a
+  pool of 12 over 40 seeds, never a repeat within two paintings and 10+ of 12 seen; v1 upgrade; the route's recorded
+  history), 25 page/source checks, 16 live checks (rotation over eight looks, v1 file upgraded), 101 mutants.
+- Not verified: how a real 3B to 12B model answers the new prompt (the fakes only prove the parsing and picking); it
+  may well give fewer than 6 good chips a topic, in which case a smaller pool just rotates less. A 90 character chip
+  is cut with an ellipsis in a 780 px row; measured nowhere but by the CSS (not seen in WKWebView).
+
 ## 6b435 — pump mode through `initialize`, 1-LED header placeholders resized, the cooler's empty fan ports hidden (per the live server)
 
 Kit only (`ollama1/`), found on the live server after the last install (liquidctl 1.15.0, Corsair Hydro H115i Platinum,

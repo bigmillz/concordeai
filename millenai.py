@@ -12962,10 +12962,10 @@ def _extract_memory(label: str, user_msg: str, base, conf=None,
 # Only a TOPIC SUMMARY is ever read: the titles of the newest chats (the
 # chat's own headline, or its first question cut short when it has none),
 # scrubbed and cut to SUGGEST_LABEL_MAX characters, never a message. One
-# model groups the labels into topics, counts them and writes three starter
-# questions for each; the result is kept in the profile's own suggest.json
-# and the page picks from it (the biggest topic two chips, the next one, the
-# fixed pool for the rest). The pass runs in the BACKGROUND, only when the
+# model groups the labels into topics, counts them and writes six starter
+# questions for each (6b438); the result is kept in the profile's own
+# suggest.json with a pool, and the page gets three chips from it per painting
+# (a different set each time; the fixed pool fills the rest). The pass runs in the BACKGROUND, only when the
 # page asks for the chips (never to load a page or open a chat), at most
 # every SUGGEST_AGE_S and only when the titles changed; never while an
 # answer is being written or a download or benchmark runs; and every failure
@@ -12980,20 +12980,43 @@ SUGGEST_LABELS = 30              # the newest this many topic labels
 SUGGEST_LABEL_MAX = 60           # a label is cut here
 SUGGEST_AGE_S = 6 * 3600         # a kept summary is looked at again after this
 SUGGEST_RETRY_S = 15 * 60        # a pass that gave nothing is not repeated sooner
-SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 48
+SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 90   # characters, the emoji not counted
+SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 16  # a chip is a sentence, not a label
 SUGGEST_TOPICS = 4               # topics kept
-SUGGEST_MAX_TOKENS = 1200        # the most a pass may make a server write
+SUGGEST_PER_TOPIC = 6            # chips kept per topic
+SUGGEST_TOPIC_MIN = 2            # a topic with fewer good chips is dropped
+SUGGEST_SHOW = 3                 # personal chips per painting
+SUGGEST_AVOID = 2                # paintings back that a chip is not shown again
+SUGGEST_MAX_TOKENS = 1600        # the most a pass may make a server write
+# (6b438, per Patrick: "the chips ... aren't really relevant. And some of them
+# aren't really questions. Like one just said 'vehicle performance' with a
+# question mark. And every time a new chat is opened, they're not changing at
+# all.") A chip is a whole question about what the chats were about, a next
+# step; the pool the page draws from is every good chip of every topic, and
+# each painting avoids what the last two showed.
 SUGGEST_PROMPT = (
     "Below are the topics a person chatted about recently, one per line, "
     "newest first. Group them into at most 4 topics and count how many lines "
-    "each topic covers. For every topic write 3 short starter questions the "
-    "person might want to ask next: each under 32 characters, one fitting "
-    "emoji at the start, general (no names, places, numbers or personal "
-    "details) and different from every line below. Answer in exactly this "
-    "form and nothing else:\n"
+    "each topic covers. For every topic write 6 different follow-up "
+    "questions this person might type to a chatbot next. Each one must be a "
+    "complete, natural question: a full sentence of 5 to 12 words that starts "
+    "with a question word (what, why, how, which, can, should, is, does...) "
+    "and ends with a question mark, with one fitting emoji at the start. "
+    "Each must clearly be about that topic and specific: it may name the "
+    "thing the chats were about (a kind of product, a city, a subject), but "
+    "never a person's name, an email address, a link or a number. Each must "
+    "take the person one step further, a deeper angle or the next thing to "
+    "ask, and must never be a topic label or a repeat of a line below.\n"
+    "Bad (labels and fragments): \"\U0001F697 Vehicle performance?\", "
+    "\"\U0001F30D New culture facts?\"\n"
+    "Good (whole questions, one step further): "
+    "\"\U0001F527 How do I tell when brake rotors need replacing too?\", "
+    "\"\U0001F35D What can I cook ahead for a week of busy dinners?\"\n"
+    "Answer in exactly this form and nothing else:\n"
     "TOPIC: <the topic in one to three words> | COUNT: <number of lines>\n"
-    "- <emoji> <starter question>\n- <emoji> <starter question>\n"
-    "- <emoji> <starter question>\n\nCHATS:\n")
+    "- <emoji> <question>\n- <emoji> <question>\n- <emoji> <question>\n"
+    "- <emoji> <question>\n- <emoji> <question>\n- <emoji> <question>\n"
+    "\nCHATS:\n")
 # the pass's state: whether one runs, when to look again, and (for the test
 # hook) what it asked; a profile's own, emptied at a switch
 _suggest_state = profile_cache("_suggest_state", {})
@@ -13044,19 +13067,32 @@ def _suggest_words(s: str) -> set:
     return set(re.findall(r"[a-z]{3,}", str(s).lower()))
 
 
+# a chip is a QUESTION: it opens with a question word, an auxiliary or an
+# imperative that asks, and (checked below) ends with "?"
+_SUGGEST_Q_RX = re.compile(
+    r"^(?:what|why|how|which|who|whom|whose|when|where|is|are|am|was|were|do|"
+    r"does|did|can|could|should|would|will|shall|may|might|has|have|had|"
+    r"isn't|aren't|don't|doesn't|didn't|can't|won't|wouldn't|shouldn't|"
+    r"tell me|explain|show me|give me|compare|help me|recommend)\b", re.I)
+
+
 def _suggest_chip(raw: str, labels: list, hide: set):
     """One starter question as the page shows it ("🔧 How do I ..."), or
-    None when it isn't safe to show: not 8 to 48 characters, with an
-    address, a link, a long number or a tender topic in it, a word of the
-    person's own name or place, collapsed text, or the same as a chat they
-    already have."""
+    None when it isn't safe or good to show: not 20 to 90 characters or 5 to
+    16 words, not a question (no question word first, no "?" last: a label
+    like "Vehicle performance?" is out), with an address, a link, a long
+    number or a tender topic in it, a word of the person's own name or
+    place, collapsed text, or the same as a chat they already have."""
     s = " ".join(str(raw or "").split())
     s = re.sub(r"^(?:[-*•]|\d+[.)])\s*", "", s).strip("\"'*` ")
     m = re.match(r"^([^\w\"'(]{1,8})\s*(.+)$", s)
     emoji, body = (m.group(1).strip(), m.group(2)) if m else ("\U0001F4A1", s)
     body = body.strip("\"'*` ")
     if not (SUGGEST_CHIP_MIN <= len(body) <= SUGGEST_CHIP_MAX) \
-            or len(body.split()) < 2 or not emoji:
+            or not (SUGGEST_WORDS_MIN <= len(body.split()) <= SUGGEST_WORDS_MAX) \
+            or not emoji:
+        return None
+    if not body.endswith("?") or not _SUGGEST_Q_RX.match(body):
         return None
     if re.search(r"https?:|www\.|@|\.com\b|\d{4,}|[<>{}|\\]", body) \
             or _TENDER_RX.search(body) or _looks_degenerate(body):
@@ -13073,9 +13109,10 @@ def _suggest_chip(raw: str, labels: list, hide: set):
 
 def suggest_parse(text: str, labels: list, hide: set) -> list:
     """The model's reply as [{"topic", "n", "chips"}], the biggest first.
-    Anything it wrote that isn't safe is dropped; a reply with fewer than
-    two good starter questions is nothing at all."""
-    topics, cur = [], None
+    Anything it wrote that isn't a safe, whole question is dropped, so is a
+    chip that repeats another; a topic left with fewer than two is dropped;
+    nothing left is nothing at all."""
+    topics, cur, seen = [], None, []
     for ln in str(text or "").splitlines():
         ln = ln.strip()
         m = re.match(r"^(?:\*\*)?TOPIC:?(?:\*\*)?\s*(.+?)\s*"
@@ -13087,35 +13124,122 @@ def suggest_parse(text: str, labels: list, hide: set) -> list:
             topics.append(cur)
         elif cur is not None and re.match(r"^(?:[-*•]|\d+[.)])\s", ln):
             c = _suggest_chip(ln, labels, hide)
-            if c and c not in cur["chips"] and len(cur["chips"]) < 3:
-                cur["chips"].append(c)
-    topics = [t for t in topics if t["topic"] and t["chips"]]
+            if not c or len(cur["chips"]) >= SUGGEST_PER_TOPIC:
+                continue
+            cw = _suggest_words(c)
+            if any(len(cw & o) / len(cw | o) >= 0.8 for o in seen if cw | o):
+                continue                    # the same question again
+            seen.append(cw)
+            cur["chips"].append(c)
+    topics = [t for t in topics
+              if t["topic"] and len(t["chips"]) >= SUGGEST_TOPIC_MIN]
     topics.sort(key=lambda t: -t["n"])
-    topics = topics[:SUGGEST_TOPICS]
-    return topics if sum(len(t["chips"]) for t in topics) >= 2 else []
+    return topics[:SUGGEST_TOPICS]
 
 
-def suggest_pick(cache: dict, rng=random) -> list:
-    """The personal chips for one painting: two from the biggest topic and
-    one from the next. Each painting draws afresh from the three each topic
-    kept; a topic tied for biggest is chosen by lot."""
-    tp = [t for t in (cache.get("topics") or []) if t.get("chips")]
-    if not tp:
+def suggest_pool(topics: list) -> list:
+    """Every chip of every topic, [{"c", "t" (the topic's place), "n"}]: what
+    a painting draws from."""
+    return [{"c": c, "t": i, "n": int(t.get("n") or 1)}
+            for i, t in enumerate(topics or []) for c in t.get("chips") or []
+            if isinstance(c, str)]
+
+
+def suggest_pick(cache: dict, rng=random, k: int = SUGGEST_SHOW) -> list:
+    """The personal chips for one painting: k chips, from different topics
+    while the pool allows, a bigger topic likelier but never always; none that
+    either of the last SUGGEST_AVOID paintings showed (cache["shown"], the
+    newest last) unless the pool is too small, and then the oldest first."""
+    pool = [e for e in (cache.get("pool")
+                        or suggest_pool(cache.get("topics")))
+            if isinstance(e, dict) and isinstance(e.get("c"), str)]
+    if not pool:
         return []
-    first = rng.choice([t for t in tp if t["n"] == tp[0]["n"]])
-    rest = [t for t in tp if t is not first]
-    out = rng.sample(first["chips"], min(2, len(first["chips"])))
-    if rest:
-        out += rng.sample(rest[0]["chips"], 1)
+    shown = [set(x) for x in (cache.get("shown") or [])[-SUGGEST_AVOID:]
+             if isinstance(x, list)]
+    newest = shown[-1] if shown else set()
+    any_shown = set().union(*shown) if shown else set()
+    # three tiers: never shown lately, shown by the older painting only, then
+    # the last painting's; a tier is touched only when those before it ran out
+    tiers = [[e for e in pool if e["c"] not in any_shown],
+             [e for e in pool if e["c"] in any_shown and e["c"] not in newest],
+             [e for e in pool if e["c"] in newest]]
+    out, used = [], set()
+    while len(out) < k:
+        avail = next((t for t in tiers if t), None)
+        if avail is None:
+            break
+        fresh = [e for e in avail if e.get("t") not in used] or avail
+        ts = sorted({e.get("t") for e in fresh}, key=lambda x: (x is None, x))
+        wt = {t: max(1, max(int(e.get("n") or 1) for e in fresh
+                            if e.get("t") == t)) for t in ts}
+        r, t = rng.random() * sum(wt.values()), ts[-1]
+        for x in ts:
+            r -= wt[x]
+            if r < 0:
+                t = x
+                break
+        e = rng.choice([e for e in fresh if e.get("t") == t])
+        out.append(e["c"])
+        used.add(t)
+        tiers = [[a for a in tr if a["c"] != e["c"]] for tr in tiers]
     return out
 
 
 def suggest_read(ctx) -> dict:
+    """The kept summary. A v1 file (three chips a topic, no pool) is upgraded
+    in the reading: the chips the present rules still accept stay (a topic
+    with fewer than two goes), and it is marked so a new pass is due at once."""
     try:
         d = _read_json(SUGGEST_FILE, ctx, dict)
     except (StoreReadError, NoProfile, StaleProfile):
         return {}
-    return d if isinstance(d, dict) and d.get("v") == 1 else {}
+    if not isinstance(d, dict):
+        return {}
+    if d.get("v") == 2:
+        return d
+    if d.get("v") == 1:
+        tps = []
+        for t in d.get("topics") or []:
+            if not isinstance(t, dict):
+                continue
+            ch = [c for c in (_suggest_chip(x, [], set()) for x in
+                              (t.get("chips") or []) if isinstance(x, str)) if c]
+            if len(ch) >= SUGGEST_TOPIC_MIN:
+                tps.append(dict(t, chips=ch[:SUGGEST_PER_TOPIC]))
+        return dict(d, v=2, sig="", topics=tps, pool=suggest_pool(tps),
+                    shown=[], upgraded=True)
+    return {}
+
+
+_suggest_file_lock = threading.Lock()
+
+
+def suggest_save(base: dict, ctx):
+    """Write the summary, keeping what the pickers recorded meanwhile (the
+    paintings shown), so a pass never undoes them and they never undo a pass."""
+    with _suggest_file_lock:
+        base["shown"] = (suggest_read(ctx).get("shown")
+                         or base.get("shown") or [])
+        _write_json(SUGGEST_FILE, base, ctx)
+
+
+def suggest_take(ctx, rng=random) -> tuple:
+    """(the chips for this painting, the summary): picks and remembers them
+    as shown, in the profile's own file, so the next painting differs."""
+    with _suggest_file_lock:
+        c = suggest_read(ctx)
+        chips = suggest_pick(c, rng)
+        if chips:
+            try:
+                c["shown"] = ((c.get("shown") or [])
+                              + [chips])[-SUGGEST_AVOID:]
+                _write_json(SUGGEST_FILE, c, ctx)
+            except StaleProfile:
+                raise
+            except Exception:
+                pass                         # not remembered: only a repeat risked
+        return chips, c
 
 
 def suggest_forget(ctx):
@@ -13177,17 +13301,24 @@ _SUGGEST_FAKE = (
     "TOPIC: car repairs | COUNT: 6\n"
     "- \U0001F527 How do I change my brake pads?\n"
     "- \U0001F697 Why is my car shaking at speed?\n"
-    "- \U0001F6E0️ How often should I change oil?\n"
+    "- \U0001F6E0\uFE0F How often should I change oil?\n"
+    "- \U0001F6DE When should I rotate my tires again?\n"
+    "- \U0001F50B How can I tell a weak battery from a bad alternator?\n"
+    "- \U0001F4A1 Why does my check engine light keep coming back?\n"
     "TOPIC: healthy eating | COUNT: 2\n"
-    "- \U0001F957 What are easy healthy dinners?\n"
-    "- \U0001F34E How do I cut down on sugar?\n"
-    "- \U0001F966 Meal prep ideas for a week\n")
+    "- \U0001F957 What are easy healthy dinners for busy weeknights?\n"
+    "- \U0001F34E How do I cut down on sugar without cravings?\n"
+    "- \U0001F966 Which vegetables keep best for a week of meal prep?\n"
+    "- Meal prep ideas\n"
+    "TOPIC: sourdough | COUNT: 1\n"
+    "- \U0001F35E Why is my sourdough starter not rising?\n")
 _SUGGEST_UNSAFE = (
     "TOPIC: car repairs | COUNT: 5\n"
     "- \U0001F527 Email me at pat@example.com about brakes\n"
     "- \U0001F697 See https://example.com/brakes for pads\n"
     "- \U0001F6E0 How do I deal with my anxiety about cars?\n"
-    "- \U0001F527 How do I change my brake pads and also fix the engine?\n"
+    "- \U0001F527 Vehicle performance?\n"
+    "- \U0001F30D New culture facts?\n"
     "- \U0001F527 Brakes?\n")
 
 
@@ -13223,7 +13354,7 @@ def suggest_ask(ctx, prompt: str):
         cloud_only = False
     if cloud_only:
         for conf in gate_ladder(fast_cloud_ladder(utility=True), None, True):
-            out = cloud_text(conf, ask, timeout=40, max_tokens=700, quiet=True)
+            out = cloud_text(conf, ask, timeout=40, max_tokens=SUGGEST_MAX_TOKENS, quiet=True)
             if out:
                 return strip_think(out), "the cloud"
         return None, ""
@@ -13259,16 +13390,23 @@ def suggest_pass(ctx, force: bool = False):
         labels, n = suggest_labels(chats)
         sig = hashlib.sha1("\n".join(labels).encode("utf-8")).hexdigest()
         old = suggest_read(ctx)
-        base = {"v": 1, "sig": sig, "n": n, "tried": now,
+        # a pass that fails keeps the old topics AND the old sig, so the
+        # next look still sees a summary of other chats and asks again
+        base = {"v": 2, "sig": old.get("sig", ""), "n": n, "tried": now,
                 "at": old.get("at", 0), "checked": old.get("checked", 0),
-                "topics": old.get("topics") or [], "made": old.get("made", "")}
+                "topics": old.get("topics") or [],
+                "pool": old.get("pool") or [], "made": old.get("made", ""),
+                "upgraded": bool(old.get("upgraded")),
+                "shown": old.get("shown") or []}
         if n < SUGGEST_MIN_CHATS or len(labels) < SUGGEST_MIN_CHATS:
-            base.update(topics=[], at=0, made="")
-            _write_json(SUGGEST_FILE, base, ctx)
+            base.update(topics=[], pool=[], at=0, made="", sig=sig,
+                        upgraded=False)
+            suggest_save(base, ctx)
             return
-        if not force and old.get("topics") and old.get("sig") == sig:
+        if not force and old.get("topics") and old.get("sig") == sig \
+                and not old.get("upgraded"):
             base["checked"] = now          # nothing new: left as it is
-            _write_json(SUGGEST_FILE, base, ctx)
+            suggest_save(base, ctx)
             return
         if suggest_busy(ctx):
             st["hold"] = now + 90          # the page asks again later
@@ -13282,9 +13420,11 @@ def suggest_pass(ctx, force: bool = False):
         if not suggest_on(ctx):
             return                         # switched off while it ran
         if topics:
-            base.update(topics=topics, at=time.time(), checked=time.time(),
-                        made=who)
-        _write_json(SUGGEST_FILE, base, ctx)
+            # the pool is replaced wholesale: no old chip lingers
+            base.update(topics=topics, pool=suggest_pool(topics), sig=sig,
+                        at=time.time(), checked=time.time(), made=who,
+                        upgraded=False)
+        suggest_save(base, ctx)
     except StaleProfile:
         raise           # a profile switch mid-write is not swallowed (6b356)
     except Exception:
@@ -13302,7 +13442,7 @@ def suggest_due(cache: dict, force: bool = False) -> bool:
     if now < _suggest_state.get("hold", 0) \
             or now - float(cache.get("tried") or 0) < SUGGEST_RETRY_S:
         return False
-    if not cache.get("topics"):
+    if cache.get("upgraded") or not cache.get("topics"):
         return True
     return now - max(float(cache.get("at") or 0),
                      float(cache.get("checked") or 0)) >= SUGGEST_AGE_S
@@ -13337,8 +13477,8 @@ def suggest_view(ctx, refresh: bool = False) -> dict:
     started = False
     if not busy:
         started = suggest_start(ctx, refresh)
-    c = suggest_read(ctx)
-    return {"on": True, "chips": suggest_pick(c),
+    chips, c = suggest_take(ctx)       # a different painting each look (6b438)
+    return {"on": True, "chips": chips,
             "at": c.get("at") or 0, "made": c.get("made") or "",
             "n": c.get("n") or 0,
             "topics": [t["topic"] for t in c.get("topics") or []],
@@ -34959,6 +35099,13 @@ body.gen #chip-model{color:var(--accent)}
   transition:background .15s,border-color .15s,color .15s;
   animation:suggIn .3s ease both;
 }
+/* the chips from the person's chats are whole questions, longer than the
+   fixed ones (6b438): three share the row and a long one is cut with an
+   ellipsis, the full text kept for the click and the tooltip; on a narrow
+   window each may take the whole row and the one-row trim keeps the first */
+.sugg{max-width:100%}
+.sugg[data-own]{max-width:calc((100% - 14px)/3)}
+@media (max-width:640px){.sugg[data-own]{max-width:100%}}
 .sugg:hover{background:rgba(255,255,255,.09);
   border-color:rgba(255,255,255,.2);color:var(--text)}
 .sugg:focus-visible{outline:2px solid rgba(255,255,255,.35);
@@ -41113,13 +41260,24 @@ function startFunnel(text){
 // fails. A fetch never holds a painting up: the pool shows first and the
 // first answer repaints once. var, not let: no temporal dead zone for a
 // painting that runs before this line.
-var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0;
+// EVERY PAINTING A NEW SET (6b438, per Patrick: "every time a new chat is
+// opened, they're not changing at all"): the server hands out a different
+// set at every look (it remembers the last two); a painting shows the set
+// the last look brought and then asks for the next, so a new chat never
+// waits on the network and never repeats. Only whole questions are shown.
+var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0,suggFlight=false,suggFresh=false;
+function suggOk(c){
+  return typeof c==="string"&&c.length>=20&&/\?\s*$/.test(c)
+    &&c.split(/\s+/).length>=6;               // the emoji counts as a word
+}
 function suggLoad(){
-  if(Date.now()-suggAsked<300000)return;     // the server's own copy moves slowly
-  suggAsked=Date.now();
+  if(suggFlight)return;
+  suggAsked=Date.now();suggFlight=true;
   api("/api/suggest").then(r=>r.json()).then(d=>{
+    suggFlight=false;
     suggOwn=(d&&d.on&&Array.isArray(d.chips))
-      ?d.chips.filter(c=>typeof c==="string").slice(0,3):[];
+      ?d.chips.filter(suggOk).slice(0,3):[];
+    suggFresh=suggOwn.length>0;
     const wait=!suggOwn.length&&d&&d.refreshing&&suggWaits++<8;
     const first=!suggGot&&!wait;if(!wait)suggGot=true;
     if(typeof suggPane==="function")suggPane(d);
@@ -41127,7 +41285,7 @@ function suggLoad(){
     // a pass is under way: look again in a few seconds, a few times, so
     // the first chips come in without a reload
     if(wait)setTimeout(()=>{suggAsked=0;suggLoad();},4000);
-  }).catch(()=>{suggAsked=0;});
+  }).catch(()=>{suggAsked=0;suggFlight=false;});
 }
 function paintSuggest(){
   const box=$("#suggest"); if(!box)return;
@@ -41220,13 +41378,14 @@ function paintSuggest(){
   }
   // the chips that follow the person's chats (6b390) come first, so the
   // one-row trim below drops the fixed ones before them
-  suggLoad();
   const own=suggOwn.slice().sort(()=>Math.random()-0.5);
-  box.innerHTML=own.map(q=>'<button class="sugg" type="button" data-own="1">'
-      +esc(q)+'</button>').join("")
+  box.innerHTML=own.map(q=>'<button class="sugg" type="button" data-own="1" title="'
+      +esc(q)+'">'+esc(q)+'</button>').join("")
     +pick.map(q=>'<button class="sugg" type="button">'
       +esc(q)+'</button>').join("");
   box.hidden=false;
+  // the set just shown is spent: ask for the next one now
+  suggFresh=false;suggLoad();
   // HOW MANY FIT IS MEASURED, NOT GUESSED: lay them out, then drop
   // anything that wrapped past the FIRST row (6b248, per Patrick: one
   // row only, even if that means 3-4 chips). Chip widths vary with
