@@ -9,6 +9,26 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b436 — "Wake up server" beside Advanced, and a rule above "Sleep when idle" (per Patrick)
+
+Patrick, after the button woke his server: "change test wake-up to just wake up server, then put advanced
+to the right of that button. put another dark fine dividing line above sleep when idle."
+
+- The button reads **Wake up server** (title "Send the wake-up to this server now"). Ids and routes are
+  unchanged (`data-a="waketest"`, `/api/servers/wake-test`); the messages after a press are unchanged.
+- `srvWakeHtml` is split into `srvWakeBtn` (the button, no row of its own) and `srvWakeNote` (the amber
+  Local Network line). `srvRelayHtml` now opens with `<div class="srv-wakerow">` holding the wake button and
+  then Advanced, one `display:flex;flex-wrap:wrap;gap:8px` row that wraps to two only when the card is
+  narrow (measured: both 31 px tall at the same top in a 420 px card; wrapped at 220 px). The amber line and
+  the opened relay panel come below that row. A server with no wake addresses (or the Windows app) shows
+  Advanced alone in the row.
+- `.srv-sleep` gets `margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)`, the same
+  hairline as `.srv-sets` above "Models on <name>" (`rgb(30,31,35)` computed), so the two match.
+- Gauntlet: the 6b346 exact-markup check, the 6b430 label/words checks and the 6b431 node harness follow the
+  new markup; a new 6b436 block checks the label, wake before Advanced in the one container, the panel and
+  amber line below it, the rule, and five mutants.
+- Not verified: WKWebView (checked in the Blink pane on a static copy of the page's CSS with the real markup).
+
 ## 6b435 — pump mode through `initialize`, 1-LED header placeholders resized, the cooler's empty fan ports hidden (per the live server)
 
 Kit only (`ollama1/`), found on the live server after the last install (liquidctl 1.15.0, Corsair Hydro H115i Platinum,

@@ -20507,7 +20507,7 @@ def server_set_relay(ctx, sid: str, d: dict) -> dict:
 
 
 def _srv_wake_send(e):
-    """Send e's magic packets (the loop server_wake and the Test wake-up
+    """Send e's magic packets (the loop server_wake and the Wake up server
     button share): (tried, failed, first) where first is (errno, strerror) of
     the first send that raised OSError, or None. Waits for nothing and does
     not touch the five-minute gap."""
@@ -20583,7 +20583,7 @@ def srv_lan_touch_boot(ctx):
 
 
 def server_wake_test(ctx, sid: str, relay_only: bool = False) -> dict:
-    """Settings' Test wake-up: the same magic packets, none waited for, the
+    """Settings' Wake up server: the same magic packets, none waited for, the
     gap untouched. {ok (one at least went out), tried, failed, blocked (every
     send raised OSError), err}. A wake relay set for the server is asked as
     well and its answer comes back as relay (the card's words); relay_only
@@ -28697,7 +28697,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 out = (server_sleep_set(self.ctx, sid, {k: d[k] for k in ("enabled", "minutes") if k in d})
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
             elif op == "wake-test":
-                # Test wake-up (6b430): the packets, none waited for
+                # Wake up server (6b430): the packets, none waited for
                 out = (server_wake_test(self.ctx, sid, d.get("relay_only") is True)
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
             elif op == "lan-settings":
@@ -36008,7 +36008,8 @@ body.gen #chip-model{color:var(--accent)}
   color:var(--dim);cursor:pointer}
 .srv-pref input{margin:0;flex:none}
 /* sleep when idle (6b346): the switch and the minutes box on one line */
-.srv-sleep .srv-pref{margin-top:10px}
+.srv-sleep{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.srv-sleep .srv-pref{margin-top:2px}
 .srv-sleep .srv-mins{margin-left:auto;display:inline-flex;align-items:center;gap:6px;
   font-size:11.5px;color:var(--dim)}
 .srv-sleep .srv-mins input{width:64px;background:rgba(255,255,255,.05);color:var(--text);
@@ -36021,7 +36022,8 @@ body.gen #chip-model{color:var(--accent)}
   line-height:1.45}
 .srv-msg:empty,#srv-note:empty{display:none}
 .srv-amber{color:#d9c08a}
-.srv-waketest{margin-top:8px}
+.srv-wakerow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.srv-wakerow .about-btn.slim{margin-top:0}
 .srv-msg.ok{color:#9fd8b4;font-size:12px}
 .srv-msg.bad{color:#e8907e;font-size:12px}
 .srv-msg.warn{color:#d9c08a;font-size:12px}
@@ -43721,10 +43723,14 @@ function srvSleepNext(prev,d,write){
 // (srvLan), only for a server with wake addresses; the amber line only after every send failed
 const SRV_LAN_BLOCKED="macOS isn\u2019t letting ConcordeAI use the local network. Open System Settings \u203a Privacy & Security \u203a Local Network and turn ConcordeAI on.";
 const SRV_LAN_LINE="This computer isn\u2019t allowing local-network access (Settings \u203a Privacy & Security \u203a Local Network)";
-function srvWakeHtml(s){
+// "Wake up server" and Advanced share one row (6b436); the amber line goes under that row
+function srvWakeBtn(s){
   if(!srvLan||!s.wakeable)return "";
-  return '<div class="srv-row srv-waketest"><button class="about-btn slim" data-a="waketest">Test wake-up</button></div>'
-    +(s.lan_blocked?'<div class="srv-hint srv-amber">'+esc(SRV_LAN_LINE)+' <button class="about-btn slim" data-a="lansettings">Open Local Network settings</button></div>':"");
+  return '<button class="about-btn slim" data-a="waketest" title="Send the wake-up to this server now">Wake up server</button>';
+}
+function srvWakeNote(s){
+  if(!srvLan||!s.wakeable)return "";
+  return (s.lan_blocked?'<div class="srv-hint srv-amber">'+esc(SRV_LAN_LINE)+' <button class="about-btn slim" data-a="lansettings">Open Local Network settings</button></div>':"");
 }
 // the wake relay (6b431): Advanced, collapsed and off until set up. Written for the owner's own
 // network; the words are neutral and the token field is write-only (a saved one only says so)
@@ -43732,8 +43738,9 @@ const SRV_RELAY_HINT="Wake relay (advanced): a small service on your network tha
 function srvRelayHtml(s){
   if(!s.paired)return "";
   const r=s.relay||{},open=!!srvRelayOpen[s.id];
-  return '<div class="srv-relay"><button class="about-btn slim" data-a="relayopen" aria-expanded="'+(open?"true":"false")+'">Advanced'
-    +(open?" \u25b4":" \u25be")+'</button>'
+  return '<div class="srv-relay"><div class="srv-wakerow">'+srvWakeBtn(s)
+    +'<button class="about-btn slim" data-a="relayopen" aria-expanded="'+(open?"true":"false")+'">Advanced'
+    +(open?" \u25b4":" \u25be")+'</button></div>'+srvWakeNote(s)
     +(open?'<div class="srv-relay-body"><div class="srv-hint">'+esc(SRV_RELAY_HINT)+'</div>'
       +'<div class="srv-tokf"><input type="text" data-k="rurl" autocomplete="off" spellcheck="false" placeholder="http://10.0.0.5:8080" '
       +'aria-label="Wake relay address" value="'+esc(r.url||"")+'">'
@@ -43749,13 +43756,13 @@ function srvSleepHtml(s,z){
   const v=srvSleepView(z),dis=v.disabled?" disabled":"";
   // nothing read back yet: the name of the setting and why, no controls to mislead
   if(v.unknown)return '<div class="srv-sleep"><div class="srv-row"><span class="srv-pref"><span>Sleep when idle</span></span></div>'
-    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+srvRelayHtml(s)+'</div>';
+    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvRelayHtml(s)+'</div>';
   return '<div class="srv-sleep"><div class="srv-row"><label class="srv-pref">'
     +'<input type="checkbox" data-a="sleepon"'+(v.checked?" checked":"")+dis+'><span>Sleep when idle</span></label>'
     +'<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
     +'data-a="sleepmin" data-k="smin" value="'+esc(String(v.minutes))+'"'+dis
     +' aria-label="Minutes with no questions before it sleeps"><span>minutes</span></span></div>'
-    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvWakeHtml(s)+srvRelayHtml(s)+'</div>';
+    +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvRelayHtml(s)+'</div>';
 }
 function srvCard(s){
   const st=s.status||{};

@@ -28758,11 +28758,11 @@ R.html=[srvSleepHtml({id:"a1",paired:false},{st:"ok"}),srvSleepHtml(sv,{st:"ok",
   srvSleepHtml(sv,{st:"load"}),srvSleepHtml(sv,{st:"err",msg:"<b>x</b> & y"}),srvSleepHtml(sv,undefined)];
 srvLan=true;
 const wk={id:"a1",paired:true,name:"Desk",wakeable:true};
-R.wake=[srvWakeHtml(wk),srvWakeHtml({id:"a1",wakeable:false}),srvWakeHtml(Object.assign({lan_blocked:true},wk)),
+R.wake=[srvWakeBtn(wk)+srvWakeNote(wk),srvWakeBtn({id:"a1",wakeable:false})+srvWakeNote({id:"a1",wakeable:false}),srvWakeBtn(wk)+srvWakeNote(Object.assign({lan_blocked:true},wk)),
   srvSleepHtml(wk,{st:"off"}),srvSleepHtml(wk,{st:"ok",enabled:false,minutes:30,supported:true,wakeable:true}),
   srvSleepHtml({id:"a1",paired:true,name:"Desk",wakeable:false},{st:"ok",enabled:false,minutes:30,supported:true})];
 srvLan=false;
-R.wakeOff=[srvWakeHtml(Object.assign({lan_blocked:true},wk)),srvSleepHtml(wk,{st:"ok",enabled:false,minutes:30,supported:true})];
+R.wakeOff=[srvWakeBtn(wk)+srvWakeNote(Object.assign({lan_blocked:true},wk)),srvSleepHtml(wk,{st:"ok",enabled:false,minutes:30,supported:true})];
 process.stdout.write(JSON.stringify(R));
 '''
     pth = os.path.join(_si_dir, "sleep46.js")
@@ -28806,8 +28806,8 @@ def _w46c_ui(src):
                                 '<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
                                 'data-a="sleepmin" data-k="smin" value="45" aria-label="Minutes with no questions before it sleeps">'
                                 '<span>minutes</span></span></div><div class="srv-hint">Sleeps after this long with no questions, '
-                                'and wakes when you ask.</div><div class="srv-relay"><button class="about-btn slim" '
-                                'data-a="relayopen" aria-expanded="false">Advanced ▾</button></div></div>')
+                                'and wakes when you ask.</div><div class="srv-relay"><div class="srv-wakerow"><button class="about-btn slim" '
+                                'data-a="relayopen" aria-expanded="false">Advanced ▾</button></div></div></div>')
                    and "<input" not in h[2] and "Reading it from the server\u2026" in h[2] and "Sleep when idle" in h[2]
                    and "&lt;b&gt;x&lt;/b&gt; &amp; y" in h[3] and "<b>x</b>" not in h[3] and "<input" not in h[3]
                    and "<input" not in h[4] and 'value="30"' not in h[4] and "checked" not in h[4])
@@ -29270,7 +29270,8 @@ def _l30c_text(src):
         and "This computer isn\\u2019t allowing local-network access (Settings \\u203a Privacy & Security \\u203a Local Network)" in src
         and 'srvMsg(id,"Wake-up sent to "+s.name+".","ok")' in src
         and 'srvPost("wake-test",{id:id})' in src and 'srvPost("lan-settings",{id:id})' in src
-        and 'data-a="waketest">Test wake-up</button>' in src)
+        and 'data-a="waketest" title="Send the wake-up to this server now">Wake up server</button>' in src
+        and "Test wake-up" not in src)
     return all(out.values()), out
 
 
@@ -29279,7 +29280,7 @@ def _l30c_ui(src):
     w = R["wake"]
     wo = R["wakeOff"]
     out = {}
-    out["button"] = ('data-a="waketest">Test wake-up</button>' in w[0] and w[1] == "" and 'data-a="lansettings"' not in w[0])
+    out["button"] = ('data-a="waketest" title="Send the wake-up to this server now">Wake up server</button>' in w[0] and w[1] == "" and 'data-a="lansettings"' not in w[0])
     out["amber"] = ("isn’t allowing local-network access" in w[2] and 'data-a="lansettings"' in w[2]
                     and "srv-amber" in w[2])
     out["in the card"] = ('data-a="waketest"' in w[3] and 'data-a="waketest"' in w[4] and 'data-a="waketest"' not in w[5]
@@ -29290,12 +29291,12 @@ def _l30c_ui(src):
 
 _L30_CHECKS = [
     ("local network: the wake send is one helper returning (tried, failed, first error), shared with server_wake", _l30c_send),
-    ("local network: Test wake-up sends the same packets, waits for nothing, leaves the five-minute gap, reports blocked only "
+    ("local network: Wake up server sends the same packets, waits for nothing, leaves the five-minute gap, reports blocked only "
      "when every send raised, refuses a stranger's id, a server with no card, and the Windows app", _l30c_test),
     ("local network: the first touch is one harmless byte to port 9, once per computer, on a thread, marks the card only when "
      "every send raised, and never without a card or off the Mac", _l30c_touch),
     ("local network: the route, the fixed argument list that opens the pane, the once-flag, the sleep switch, the wording", _l30c_text),
-    ("local network: the page shows Test wake-up (macOS app, server with a card) and the amber line only after a refusal (node)", _l30c_ui),
+    ("local network: the page shows Wake up server (macOS app, server with a card) and the amber line only after a refusal (node)", _l30c_ui),
 ]
 
 
@@ -29732,7 +29733,7 @@ def _l31c_text(src):
                     and 'const SRV_RELAY_HINT="Wake relay (advanced): a small service on your network that sends the wake-up '
                         'for you when you\\u2019re away. Address and token.";' in src)
     out["page"] = ('srvPost("wake-test",{id:id,relay_only:true})' in src and 'srvPost("relay",' in src
-                   and src.count("srvWakeHtml(s)+srvRelayHtml(s)+'</div>'") == 2
+                   and src.count("srvRelayHtml(s)+'</div>'") == 2
                    and 'type="password" data-k="rtok"' in src
                    and src.index("function srvRelayHtml(s){") < src.index("function srvSleepHtml(s,z){")
                    and "innerHTML" not in src[src.index('if(a==="relaysave"'):src.index('if(a==="waketest"')])
@@ -29754,9 +29755,9 @@ def _l31c_text(src):
 def _l31c_ui(src):
     i0 = src.index("function esc(s){")
     esc = src[i0:src.index(";}\n", i0) + 3]
-    a = src.index('const SRV_RELAY_HINT="')
+    a = src.index('const SRV_LAN_LINE="')
     b = src.index("function srvSleepHtml(s,z){")
-    js = esc + "let srvRelayOpen={};\n" + src[a:b] + r'''
+    js = esc + "let srvRelayOpen={};let srvLan=false;\n" + src[a:b] + r'''
 const R={};
 const s0={id:"a1",paired:true,name:"Desk"};
 R.collapsed=srvRelayHtml(s0);
@@ -29794,7 +29795,7 @@ _L31_CHECKS = [
      "a refused port, a timeout and a bad answer are each said plainly, never raised, never carry the token", _l31c_post),
     ("wake relay: server_wake asks the relay after the broadcast on a thread of its own (not waited for), keeps the five-minute gap, "
      "calls the computer blocked only when the relay refuses too, and a dead relay never breaks the wake", _l31c_wake),
-    ("wake relay: Test wake-up asks the relay as well; the relay-only test sends no broadcast, works off the Mac and answers in the card's words", _l31c_test),
+    ("wake relay: Wake up server asks the relay as well; the relay-only test sends no broadcast, works off the Mac and answers in the card's words", _l31c_test),
     ("wake relay: the route, the one place the token is used, the words, the page's calls, and nothing of it in the kit, its docs or the wizard", _l31c_text),
     ("wake relay: the card's Advanced section is collapsed, neutral, write-only for the token and escapes what it shows (node)", _l31c_ui),
 ]
@@ -29852,6 +29853,83 @@ for _d31, _o31, _n31 in _L31_MUT:
 check("wake relay: %d mutations, each caught by a check above" % len(_l31m),
       len(_l31m) >= 12 and all(isinstance(v, list) for _d, v in _l31m), "%r" % [x for x in _l31m if not isinstance(x[1], list)])
 # ==== 6b431 wake relay: end ====
+
+# ==== 6b436 wake row: begin ====
+print("== Wake up server beside Advanced, a rule above Sleep when idle (6b436) ==")
+# Patrick: "change test wake-up to just wake up server, then put advanced to the right of that
+# button. put another dark fine dividing line above sleep when idle."
+def _l36_run(src):
+    i0 = src.index("function esc(s){")
+    esc = src[i0:src.index(";}\n", i0) + 3]
+    a = src.index("function srvSleepParse(raw){")
+    b = src.index("function srvCard(s){")
+    js = esc + "let srvLan=true;let srvRelayOpen={};\n" + src[a:b] + r'''
+const R={};
+const wk={id:"a1",paired:true,name:"Desk",wakeable:true};
+const z={st:"ok",enabled:false,minutes:30,supported:true,wakeable:true};
+R.closed=srvSleepHtml(wk,z);
+R.unknown=srvSleepHtml(wk,{st:"off"});
+srvRelayOpen.a1=true;
+R.open=srvSleepHtml(wk,z);
+srvRelayOpen.a1=false;
+R.blocked=srvSleepHtml(Object.assign({lan_blocked:true},wk),z);
+R.nowake=srvSleepHtml({id:"a1",paired:true,name:"Desk",wakeable:false},z);
+srvLan=false;
+R.nolan=srvSleepHtml(wk,z);
+process.stdout.write(JSON.stringify(R));
+'''
+    pth = os.path.join(_si_dir, "wakerow436.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    R = json.loads(p.stdout)
+    out = {}
+    row = '<div class="srv-wakerow"><button class="about-btn slim" data-a="waketest"'
+    out["label"] = ('>Wake up server</button>' in R["closed"] and "Test wake-up" not in R["closed"]
+                    and "Test wake" not in src and "Wake up server" in src)
+    for k in ("closed", "unknown", "open", "blocked"):
+        c = R[k]
+        wb = c.index('data-a="waketest"')
+        out["one row " + k] = (row in c and wb < c.index('data-a="relayopen"')
+                               and c.index("</button>", wb) + len("</button>") == c.index('<button class="about-btn slim" data-a="relayopen"')
+                               and c.count('<div class="srv-wakerow">') == 1
+                               and c.index('data-a="relayopen"') < c.index("</div>", c.index('<div class="srv-wakerow">')))
+    out["panel below the row"] = (R["open"].index("</div>", R["open"].index('<div class="srv-wakerow">')) < R["open"].index('class="srv-relay-body"'))
+    out["amber under the row"] = (R["blocked"].index("</div>", R["blocked"].index('<div class="srv-wakerow">')) < R["blocked"].index("srv-amber")
+                                  and 'data-a="lansettings"' in R["blocked"])
+    out["advanced alone"] = ('<div class="srv-wakerow"><button class="about-btn slim" data-a="relayopen"' in R["nowake"]
+                             and 'data-a="waketest"' not in R["nowake"] and 'data-a="waketest"' not in R["nolan"])
+    out["rule"] = ('.srv-sleep{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}' in src
+                   and '.srv-sets{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}' in src
+                   and R["closed"].startswith('<div class="srv-sleep">'))
+    out["row css"] = ".srv-wakerow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}" in src
+    return [(k, bool(v), "") for k, v in out.items()] + [("node", p.returncode == 0, p.stderr[:200])]
+
+
+for _n36, _o36, _d36 in _l36_run(_MILLENAI_SRC):
+    check("wake row: " + _n36, _o36, _d36)
+
+_L36_MUT = [
+    ("old label", '>Wake up server</button>', '>Test wake-up</button>'),
+    ("advanced first", "return '<div class=\"srv-relay\"><div class=\"srv-wakerow\">'+srvWakeBtn(s)\n    +'<button class=\"about-btn slim\" data-a=\"relayopen\"",
+     "return '<div class=\"srv-relay\"><div class=\"srv-wakerow\">'\n    +'<button class=\"about-btn slim\" data-a=\"relayopen\""),
+    ("own row again", "return '<button class=\"about-btn slim\" data-a=\"waketest\" title", "return '<div class=\"srv-row\"><button class=\"about-btn slim\" data-a=\"waketest\" title"),
+    ("no rule", ".srv-sleep{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}", ".srv-sleep{margin-top:12px}"),
+    ("row never wraps", ".srv-wakerow{display:flex;flex-wrap:wrap;", ".srv-wakerow{display:flex;"),
+]
+_l36m = []
+for _d36, _o36, _n36 in _L36_MUT:
+    if _MILLENAI_SRC.count(_o36) != 1:
+        _l36m.append((_d36, "anchor missing %d" % _MILLENAI_SRC.count(_o36)))
+        continue
+    try:
+        _r36 = _l36_run(_MILLENAI_SRC.replace(_o36, _n36, 1))
+        _l36m.append((_d36, [n for n, o, _x in _r36 if not o][:1] or "MISSED"))
+    except Exception as _e36:
+        _l36m.append((_d36, ["raised"]))
+check("wake row: %d mutations, each caught by a check above" % len(_L36_MUT),
+      all(isinstance(v, list) for _d, v in _l36m), "%r" % [x for x in _l36m if not isinstance(x[1], list)])
+# ==== 6b436 wake row: end ====
+
 
 
 # ==== 6b356 server pictures: begin ====
