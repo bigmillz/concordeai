@@ -9,6 +9,31 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b437 — bold phrases are not places: the stray black box under a searched answer is gone (per Patrick, the third time)
+
+Patrick: "the pointless and stray black boxes at the bottom... that would make sense if there was a chart or other form of
+media or diagram." Under a car-performance answer (Chevrolet's 2026 lineup, Hennessey upgrades, FastestLaps.com) the app drew
+a dark box split into three cells, one per bold phrase. 6b349 and 6b425 had fixed table boxes; this was a different source.
+- **Cause.** The saved message had `places: [{n:"Chevrolet's 2026 performance lineup", d:"", h:""}, ...]` and `loc: ""`. Both
+  the page (`send`, after the stream) and the server's turn writer (`turn_record`) mined every bold phrase of a *searched*
+  answer as a venue name when no `[[PLACES]]` trailer came (`searched||placeHint`), whatever the question was; the page then
+  drew them as the card rail of `placesModule`, and when the geocode failed (no location) only the map was hidden, the
+  rail of name-only cards stayed.
+- **Server.** Bold mining needs the server's own `PLACEHINT` (a place question), not just a search. New
+  `_places_worth_showing(places, loc)`: a list is kept when any place has a description, hours or coordinates, or when it is
+  bare names AND there is a location to pin them in; bare names with no location are dropped (no `places`/`loc` on the
+  message). The tiny-model pin pass (`PLACES2` with `d:""`) now emits only when the search had a location.
+- **Page.** `placesUsable()`: with no detail and no location `placesModule` draws nothing (the plain map card, if any);
+  bare names with a location draw the map only, no rail (`.norail`, hidden if nothing geocodes). The bold mining needs
+  `placeHint`. Every render path (live, a reopened chat, a synced one) goes through `placesModule`, so Patrick's already saved
+  bare list stops drawing the box when the chat is reopened.
+- **Looked for the same thing elsewhere.** The sources/related chips and the table renderer draw no bordered multi-cell
+  boxes of bare names; the other `.mapcard` path needs real coordinates. Nothing else found.
+- **Checks.** Server extraction (searched answer with bold, hint without location, hint with location, real places, bare
+  PLACES2), the keep-rule with mutants, a node run of the page strip with Patrick's three names (no box), real places and a
+  pin (box), and mutants of each page rule.
+
+---
 ## 6b436 — the Manage list shows only models on this computer; cloud rows are gone from it (per Patrick)
 
 Patrick, from a screenshot of the Manage models list with a "READY · CLOUD ☁"
