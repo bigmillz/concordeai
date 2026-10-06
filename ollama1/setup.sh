@@ -691,6 +691,10 @@ install -m 0644 "$KIT/config/ollama1.tmpfiles" /etc/tmpfiles.d/ollama1.conf
 systemd-tmpfiles --create /etc/tmpfiles.d/ollama1.conf
 install -m 0644 "$KIT/config/60-ollama1-bridge.conf" /etc/sysctl.d/60-ollama1-bridge.conf
 sysctl -q -p /etc/sysctl.d/60-ollama1-bridge.conf 2>/dev/null || true
+# boot must not wait for links that are unplugged (the second wired port, a Wi-Fi spare): one link is enough
+install -d -m 0755 /etc/systemd/system/systemd-networkd-wait-online.service.d
+install -m 0644 "$KIT/config/10-ollama1-wait-online.conf" /etc/systemd/system/systemd-networkd-wait-online.service.d/10-ollama1.conf
+systemctl daemon-reload
 install -d -m 0755 /etc/ollama1 /var/lib/ollama1 /opt/ollama
 sed -e "s/@UID_OLLAMA@/$(id -u ollama)/g" -e "s/@UID_O1GW@/$(id -u o1gw)/g" \
     -e "s/@UID_O1ADMIN@/$(id -u o1admin)/g" -e "s/@UID_CLOUDFLARED@/$(id -u cloudflared)/g" \

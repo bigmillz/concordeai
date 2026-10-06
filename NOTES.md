@@ -9,6 +9,14 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b432 — boot no longer waits two minutes for unplugged network links (per the owner)
+Pat's photo of the console stuck at "Job systemd-networkd-wait-online.service/start running (1min 27s / no limit)".
+The server boots with the bridge up in a second, but the stock wait-online waits for EVERY link: the second wired
+port (enp38s0) and the Wi-Fi spare (wlo1) had no carrier, so each boot sat 2 minutes (systemd-analyze: userspace
+2min 4s, 2min 0.2s of it that one unit). setup.sh now installs a drop-in that waits for one link, 30 s at most
+(`--any --timeout=30`). On the live server the same fix was applied by hand first (br0 only), with sudo, at the
+owner's request.
+
 ## 6b431 — an optional "wake relay" per server, for waking it from away (per Patrick; his own setup, not the kit's)
 
 *Merge fixes (round 2, five branches on main): eight gauntlet checks adjusted, no app code changed.

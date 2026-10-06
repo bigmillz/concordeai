@@ -444,6 +444,13 @@ class TestSetupArgs(unittest.TestCase):
         self.assertEqual(setup.count('ask_yes "Type yes to go ahead: "'), 1)       # only on the erase branch
         self.assertIn('ask_yes "Type yes to continue anyway: "', setup)            # outside the LAN: still asked
 
+    def test_boot_waits_for_one_link_not_all(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        conf = open(os.path.join(U.KIT, "config", "10-ollama1-wait-online.conf")).read()
+        self.assertIn("ExecStart=\nExecStart=/usr/lib/systemd/systemd-networkd-wait-online --any --timeout=30", conf)
+        self.assertIn('install -m 0644 "$KIT/config/10-ollama1-wait-online.conf" '
+                      '/etc/systemd/system/systemd-networkd-wait-online.service.d/10-ollama1.conf', setup)
+
     def test_a_setting_without_its_value_is_refused(self):
         for flag in ("--name", "--user", "--lan", "--zone", "--owner", "--timezone", "--os-serial",
                      "--models-serial", "--hdd1-serial", "--hdd2-serial"):
