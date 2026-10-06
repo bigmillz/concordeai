@@ -3438,6 +3438,28 @@ def cloud_balance(pid: str, c: dict) -> str:
     return text
 
 
+def cloud_balance_est(ctx) -> dict:
+    """{provider: estimate} for each provider this profile typed a balance
+    for (6b441). A ledger that can't be read leaves the estimate out
+    rather than showing the typed amount as if nothing was spent."""
+    out = {}
+    try:
+        bals = profile_local(ctx).get("cloud_balance")
+        if not isinstance(bals, dict):
+            return out
+        recs = None
+        for pid in BALANCE_PROVIDERS:
+            if isinstance(bals.get(pid), dict):
+                if recs is None:
+                    recs = usage_read(ctx)
+                e = balance_estimate(pid, bals[pid], recs)
+                if e:
+                    out[pid] = e
+    except Exception:
+        pass
+    return out
+
+
 def cloud_stream(messages: list, emit) -> bool:
     """Stream from the configured cloud endpoint. False = fall back local."""
     return cloud_stream_conf(cloud_conf(), messages, emit)
@@ -9650,7 +9672,8 @@ SYNCED_SETTINGS = frozenset((
 PROFILE_LOCAL = frozenset((
     "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
     "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
-    "lend", "lend_pick", "studio_opts.*.neg", "mic_warm"))
+    "lend", "lend_pick", "studio_opts.*.neg", "mic_warm",
+    "cloud_balance"))
 MACHINE = frozenset((
     "app_models", "model_offers", "no_limits", "include_giants",
     "auto_cleanup", "studio_image", "studio_video", "studio_opts",
@@ -17595,6 +17618,7 @@ def run_search(query: str) -> str:
 #   o  output tokens        d  milliseconds
 #   x  calls estimated      a  answers (one per /api/chat answer)
 #   q  calls from the old answer log (quality.jsonl, estimated)
+#   cw input written to the provider's cache (Anthropic only; part of i)
 # Calls stay one per line for 14 days, then roll up into hours, and after
 # 120 days into local days, so "All time" stays small for years.
 USAGE_FILE = "usage.jsonl"
@@ -17603,6 +17627,9 @@ USAGE_RAW_DAYS = 14
 USAGE_HOURLY_DAYS = 120
 USAGE_COMPACT_BYTES = 1_500_000
 USAGE_SUM_KEYS = ("n", "i", "c", "ri", "o", "d", "x", "a", "q")
+# what a rollup keeps: the sums above, and "cw" (6b441), input tokens
+# written to the provider's cache, which the balance estimate prices apart
+USAGE_ROLL_KEYS = USAGE_SUM_KEYS + ("cw",)
 # range -> (seconds back, bucket); "all" picks its bucket from the data
 USAGE_RANGES = {"1h": (3600, "5m"), "1d": (86400, "1h"),
                 "1w": (7 * 86400, "6h"), "1m": (30 * 86400, "1d"),
@@ -17718,6 +17745,13 @@ def usage_note(model, where, messages, chars, reported=None, t0=None):
             rec["c"] = min(c, i)
         if cache:
             rec["ri"] = i
+        try:                         # Anthropic's cache writes (6b441)
+            cw = reported.get("cache_creation_input_tokens") \
+                if isinstance(reported, dict) else None
+            if _usage_num(cw):
+                rec["cw"] = min(int(cw), i)
+        except Exception:
+            pass
         if t0:
             rec["d"] = int(max(0.0, time.time() - t0) * 1000)
         if est:
@@ -17725,6 +17759,127 @@ def usage_note(model, where, messages, chars, reported=None, t0=None):
         usage_put(rec)
     except Exception:
         pass
+
+
+# ==== balance: begin ====
+# AN ESTIMATED PREPAID BALANCE (6b441, per Patrick: "for the Claude balance,
+# yes, let's try to estimate it for now because I have a personal account
+# and I assume most users would not have an organization account").
+# Anthropic offers no balance endpoint to a personal account. The person
+# types their real balance once; the app subtracts what ITS OWN calls to
+# that provider cost since. Always shown with a * and a footnote.
+#
+# PRICES: ONE PLACE, CHECK THEM. USD per million tokens:
+# (input, output, cache read, cache write). Source: Anthropic's published
+# first-party API rates as cached in the claude-api skill on 2026-09-25;
+# NOT checked against the live pricing page. Cache writes are taken as 1.25x
+# input (the 5-minute rate), cache reads as 0.1x input except where the
+# source lists them. Update here when Anthropic's prices move.
+CLAUDE_PRICES = {
+    "claude-fable-5-1": (10.0, 50.0, 0.25, 12.5),
+    "claude-fable-5": (10.0, 50.0, 0.25, 12.5),
+    "claude-opus-5-5": (4.0, 20.0, 0.20, 5.0),
+    "claude-opus-5": (5.0, 25.0, 0.50, 6.25),
+    "claude-opus-4-8": (5.0, 25.0, 0.50, 6.25),
+    "claude-opus-4-7": (5.0, 25.0, 0.50, 6.25),
+    "claude-opus-4-6": (5.0, 25.0, 0.50, 6.25),
+    "claude-sonnet-5-5": (2.0, 10.0, 0.20, 2.5),
+    "claude-sonnet-5": (2.0, 10.0, 0.20, 2.5),
+    "claude-sonnet-4-6": (3.0, 15.0, 0.30, 3.75),
+    "claude-haiku-4-5": (1.0, 5.0, 0.10, 1.25),
+}
+PRICES_BY_PROVIDER = {"claude": CLAUDE_PRICES}
+# only providers that charge by the token and have no balance of their own
+# to ask: Gemini and Groq are free tiers, Kimi reports its real balance
+BALANCE_PROVIDERS = ("claude",)
+BALANCE_LOW_USD = 2.0
+BALANCE_MAX_USD = 100000.0
+
+
+def price_for(provider, model):
+    """((in, out, cache read, cache write), priced). A model with no entry
+    is counted at the provider's most expensive known price, priced False.
+    An id matches an entry by name, or by name plus a date suffix; "-5-6"
+    is not "-5"."""
+    table = PRICES_BY_PROVIDER.get(provider) or {}
+    m = str(model or "").strip().lower()
+    for k in sorted(table, key=len, reverse=True):
+        if m == k:
+            return table[k], True
+        if m.startswith(k + "-"):
+            rest = m[len(k) + 1:]
+            if not (rest.isdigit() and len(rest) <= 2):
+                return table[k], True
+    top = max(table.values(), key=lambda v: (v[1], v[0])) if table \
+        else (0.0, 0.0, 0.0, 0.0)
+    return top, False
+
+
+def call_cost(provider, rec):
+    """(dollars, priced) for one ledger record or rollup: input not read
+    from or written to the cache at the input price, cache reads and writes
+    at theirs, output at the output price."""
+    pr, ok = price_for(provider, rec.get("m"))
+
+    def n(k):
+        v = rec.get(k)
+        return v if isinstance(v, (int, float)) \
+            and not isinstance(v, bool) and v > 0 else 0
+    i, c, w, o = n("i"), n("c"), n("cw"), n("o")
+    plain = max(0, i - c - w)
+    return (plain * pr[0] + c * pr[2] + w * pr[3] + o * pr[1]) / 1e6, ok
+
+
+def balance_valid(v):
+    """The typed balance as dollars to the cent, or None."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    v = float(v)
+    if v != v or v in (float("inf"), float("-inf")) \
+            or v < 0 or v > BALANCE_MAX_USD:
+        return None
+    return round(v + 1e-9, 2)
+
+
+def balance_estimate(provider, bal, recs):
+    """None when no balance was set or the provider isn't one; else
+    {amount, set_at, spent, est, level, unpriced, calls}. Only calls to
+    this provider that started at or after set_at count; a rollup that
+    straddles it counts the share after it."""
+    if provider not in BALANCE_PROVIDERS or not isinstance(bal, dict):
+        return None
+    amt = balance_valid(bal.get("amount_usd"))
+    t0 = bal.get("set_at")
+    if amt is None or isinstance(t0, bool) \
+            or not isinstance(t0, (int, float)) or t0 <= 0:
+        return None
+    spent, calls, unpriced = 0.0, 0, False
+    for r in recs or []:
+        if not isinstance(r, dict) or r.get("w") != provider:
+            continue
+        t, s = r.get("t"), r.get("s")
+        if not isinstance(t, (int, float)) or isinstance(t, bool):
+            continue
+        s = s if isinstance(s, (int, float)) and s > 0 else 0
+        if t >= t0:
+            share = 1.0
+        elif s and t + s > t0:
+            share = (t + s - t0) / s
+        else:
+            continue
+        cost, ok = call_cost(provider, r)
+        spent += cost * share
+        k = r.get("n")
+        calls += int(k * share) if isinstance(k, (int, float)) and k > 0 \
+            else 1
+        unpriced = unpriced or not ok
+    left = round(amt - spent + 1e-9, 2)
+    return {"amount": left, "set_at": t0, "set_usd": amt,
+            "spent": round(spent, 2), "est": True, "calls": calls,
+            "unpriced": unpriced,
+            "level": "used" if left <= 0 else
+            "low" if left < BALANCE_LOW_USD else "ok"}
+# ==== balance: end ====
 
 
 def usage_put(rec: dict):
@@ -17927,7 +18082,7 @@ def usage_compact(now=None, base=None) -> bool:
                     a["m"] = k[2]
                 if k[3]:
                     a["w"] = k[3]
-            for f in USAGE_SUM_KEYS:
+            for f in USAGE_ROLL_KEYS:
                 v = _usage_num(r.get(f))
                 if v:
                     a[f] = a.get(f, 0) + v
@@ -28290,7 +28445,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "active": d.get("active", ""),
                              "turbo": bool(profile_local(self.ctx).get("turbo")),
                              "bench": [lbl for lbl, _c in cloud_bench()],
-                             "providers": provs})
+                             "providers": provs,
+                             # ESTIMATED balances (6b441): only a provider
+                             # the person set one for; never a key
+                             "balance": cloud_balance_est(self.ctx)})
         elif self.path == "/api/stats":
             self._send_stats()
         elif urllib.parse.urlparse(self.path).path == "/api/usage":
@@ -28897,6 +29055,47 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if op == "sleep" and IS_MAC and d.get("enabled") is True and out.get("ok"):
                 srv_lan_touch_bg(self.ctx, [sid])    # the switch is the moment to ask (6b430)
             self._send_json(out)
+            return
+        if self.path == "/api/cloud/balance":
+            # THE TYPED BALANCE (6b441): {provider, amount} sets it, now;
+            # {provider, clear: true} forgets it. Not a secret, but never
+            # a key either way.
+            n2 = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n2)) if n2 else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            if not isinstance(d, dict):
+                d = {}
+            which = str(d.get("provider", "")).strip().lower()
+            if which not in BALANCE_PROVIDERS:
+                self._send_json({"ok": False,
+                                 "err": "no balance estimate for that provider"})
+                return
+            profile_local(self.ctx, strict=True)
+            if d.get("clear") is True:
+                def _clr(p):
+                    cur = p.get("cloud_balance")
+                    if isinstance(cur, dict):
+                        cur = {k: v for k, v in cur.items() if k != which}
+                        p["cloud_balance"] = cur
+                profile_local_update(self.ctx, _clr)
+                self._send_json({"ok": True, "balance": cloud_balance_est(self.ctx)})
+                return
+            amt = balance_valid(d.get("amount"))
+            if amt is None:
+                self._send_json({"ok": False,
+                                 "err": "type an amount from 0 to %d" % BALANCE_MAX_USD})
+                return
+            now = round(time.time(), 1)
+
+            def _set(p):
+                cur = p.get("cloud_balance")
+                cur = dict(cur) if isinstance(cur, dict) else {}
+                cur[which] = {"amount_usd": amt, "set_at": now}
+                p["cloud_balance"] = cur
+            profile_local_update(self.ctx, _set)
+            self._send_json({"ok": True, "balance": cloud_balance_est(self.ctx)})
             return
         if self.path == "/api/cloud/set":
             # KEY SETUP IN-APP, per Patrick ("no extra user effort"):
@@ -34916,6 +35115,19 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .ckm.rest{color:var(--dim)}
 .ckm .ckz{color:#e3b341;font-weight:700}
 .ckm.rest i{font-style:normal;color:#a8935f}
+/* the estimated balance under a paid provider's row (6b441) */
+.ckbal{font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;
+  color:var(--faint);display:flex;flex-wrap:wrap;align-items:center;
+  gap:3px 10px;margin:0 0 5px 18px}
+.ckbal .ckbal-fig{color:var(--dim)}
+.ckbal.low .ckbal-fig,.ckbal.used .ckbal-fig{color:#e3b341;font-weight:700}
+.ckbal .ckbal-set{display:inline-flex;gap:5px;align-items:center}
+.ckbal .ckbal-in{width:84px;background:rgba(18,20,26,.7);color:var(--text);
+  border:1px solid rgba(255,255,255,.12);border-radius:7px;font-size:11px;
+  padding:3px 7px;outline:none}
+.ckbal .ckbal-un,.ckbal .ckbal-note{flex-basis:100%;font-size:10px;
+  line-height:1.45;color:var(--faint);letter-spacing:0}
+.ckbal.low .ckbal-un,.ckbal .ckbal-un{color:#a8935f}
 #ck-note,#turbo-note{font-size:11px;color:var(--faint);margin-top:7px;
   line-height:1.5;min-height:14px}
 /* the places module: dark multi-pin map + card rail */
@@ -43804,8 +44016,49 @@ async function openModelSets(){
 // board fill in.
 const CK_PROVS=[["gemini","Gemini"],["groq","Groq"],["claude","Claude"],
                 ["kimi","Kimi K3"]];
-function ckBoard(provs,active){
+// THE ESTIMATED BALANCE (6b441, per Patrick: "for the Claude balance, yes,
+// let's try to estimate it for now because I have a personal account"). Only
+// the paid providers with no balance of their own to ask (Claude): never a
+// free tier, and Kimi shows the figure Moonshot itself reports. Every figure
+// carries a * and the footnote is always on the row. Pure, so node runs it.
+const CK_BAL_IDS=["claude"];
+const CK_BAL_NOTE="* Estimated from this app\u2019s own calls since you set it. "
+  +"Anthropic doesn\u2019t offer a balance API for personal accounts; use "
+  +"console.anthropic.com for the real figure. Spending elsewhere isn\u2019t "
+  +"counted, and neither are web search or tool costs on Anthropic\u2019s side.";
+function ckBalUsd(n){
+  const v=Math.round((+n||0)*100)/100;
+  return (v<0?"-":"")+"$"+Math.abs(v).toFixed(2);
+}
+function ckBalDate(t){
+  try{return new Date(t*1000).toLocaleDateString(undefined,{month:"short",day:"numeric"});}
+  catch(e){return "";}
+}
+function ckBalHtml(id,est){
+  if(CK_BAL_IDS.indexOf(id)<0)return "";
+  const fld='<span class="ckbal-set"><input type="text" inputmode="decimal" '
+    +'autocomplete="off" class="ckbal-in" placeholder="$ balance" '
+    +'aria-label="Your real balance in dollars">'
+    +'<button type="button" class="about-btn slim ckbal-go" data-p="'+id+'">';
+  if(!est||typeof est.amount!=="number")
+    return '<div class="ckbal" data-p="'+id+'"><span class="ckbal-add">'
+      +'Add your balance to track it</span>'+fld+'Set</button></span></div>';
+  const lvl=est.level==="used"?"used":est.level==="low"?"low":"ok";
+  const head=lvl==="used"?"Balance used up*"
+    :(lvl==="low"?"Low balance \u2248 ":"Balance \u2248 ")+ckBalUsd(est.amount)+"*";
+  return '<div class="ckbal '+lvl+'" data-p="'+id+'">'
+    +'<span class="ckbal-fig">'+head+'</span>'
+    +'<span class="ckbal-when">set '+ckBalUsd(est.set_usd)+" on "
+      +esc(ckBalDate(est.set_at))+'</span>'
+    +fld+'Update balance</button></span>'
+    +(est.unpriced?'<div class="ckbal-un">Unpriced calls included at the '
+      +'highest price*</div>':"")
+    +'<div class="ckbal-note">'+esc(CK_BAL_NOTE)+'</div></div>';
+}
+let ckBalLast={};
+function ckBoard(provs,active,bal){
   const box=$("#ck-models");if(!box)return;
+  if(bal)ckBalLast=bal;
   provs=provs||{};
   box.innerHTML=CK_PROVS.map(([id,label])=>{
     const st=(provs[id]||{}).status||"";
@@ -43826,10 +44079,27 @@ function ckBoard(provs,active){
           :' <i>· resting '+Math.ceil(cool/60)+'m</i>')
         :st==="ok"&&id===active?' <i>· in use</i>':"")
       +(st==="ok"&&bal?' <i>· '+esc(bal)+'</i>':"")
-      +(st==="fail"&&note?' <i>· '+esc(note)+'</i>':"")+'</div>';
+      +(st==="fail"&&note?' <i>· '+esc(note)+'</i>':"")+'</div>'
+      +(st==="ok"?ckBalHtml(id,(ckBalLast||{})[id]):"");
   }).join("");
 }
 ckBoard(null,"");
+$("#ck-models").addEventListener("click",async e=>{
+  const b=e.target.closest&&e.target.closest(".ckbal-go");
+  if(!b)return;
+  const row=b.closest(".ckbal"),inp=row.querySelector(".ckbal-in");
+  const raw=String(inp.value||"").replace(/[$,\s]/g,"");
+  const n=/^\d{1,6}(\.\d{1,2})?$/.test(raw)?parseFloat(raw):NaN;
+  if(!(n>=0&&n<=100000)){inp.value="";inp.placeholder="0 to 100000";return;}
+  try{
+    const d=await(await api("/api/cloud/balance",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({provider:b.dataset.p,amount:n})})).json();
+    if(!d.ok){inp.value="";inp.placeholder=d.err||"didn\u2019t save";return;}
+    const cs=await(await api("/api/cloud")).json();
+    ckBoard(cs.providers,cs.active,cs.balance||{});
+  }catch(e2){inp.placeholder="network error";}
+});
 /* ------------------------------------------ Settings › Your servers (6b334)
    Model servers the person owns. /api/servers gives each one's
    name, address, pairing, last check and models; never the Access token
@@ -44828,7 +45098,7 @@ $("#ck-save").addEventListener("click",async()=>{
       $("#turbo-row").hidden=false;$("#turbo").checked=true;}
     else note.textContent=d.err||"that didn't work";
     try{const cs2=await(await api("/api/cloud")).json();
-        ckBoard(cs2.providers,cs2.active);}catch(e){}
+        ckBoard(cs2.providers,cs2.active,cs2.balance||{});}catch(e){}
     paintTierAvail();   // a new key may have just switched Cloud Only on
   }catch(e){note.textContent="network error — try again";}
 });
@@ -45799,7 +46069,7 @@ async function openAbout(){
         // pasted or replaced without switching chats to the cloud first
         $("#cloudkey-box").hidden=false;
         if(typeof ckBoard==="function")
-          ckBoard(cs.providers,cs.active);
+          ckBoard(cs.providers,cs.active,cs.balance||{});
         paintTierAvail();
       }catch(e){}
     }catch(e){}
