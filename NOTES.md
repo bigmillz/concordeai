@@ -105,6 +105,40 @@ Kimi K3, Gemini, Groq, the server's largest model that fits, this computer's lar
   resolves" (the `cloud:` rows are off with no key).
 - Not verified: no real provider was called (keys can't be used here), so the mode seats and merges are tested on fakes; the
   menu and pop-out were run in node, not in WKWebView; the full gauntlet was not run.
+## 6b441 — an estimated Claude balance in Settings › Cloud power (per Patrick)
+
+Patrick (2026-10-06), a personal Anthropic account with no organization: "for the Claude balance, yes, let's try to
+estimate it for now because I have a personal account and I assume most users would not have an organization account."
+Anthropic has no balance endpoint for a personal key (cost reports need an Admin key), so this is an ESTIMATE, marked
+with a * everywhere with a visible footnote.
+
+- **How.** The person types their real balance once on the Claude row (`Set`, later `Update balance`, which restarts the
+  estimate). `POST /api/cloud/balance {provider, amount}` (or `{provider, clear:true}`) stores `{amount_usd, set_at}` in
+  the profile-local pref `cloud_balance` (PROFILE_LOCAL: it is this profile's money, beside a per-profile ledger; not a
+  secret, not synced). `GET /api/cloud` gains top-level `balance: {claude: {amount, set_at, set_usd, spent, est:true,
+  calls, unpriced, level}}`; never a key. Amount: a finite number 0 to 100000, to the cent.
+- **Cost.** Reuses `usage.jsonl`. The ledger now also records `cw` (input written to the cache, part of `i`; Anthropic
+  only; kept through rollups via `USAGE_ROLL_KEYS`, not added to the stats sums). Cost of a record = plain input x input
+  price + cache read x read price + `cw` x write price + output x output price. Only calls with `w == "claude"` that
+  STARTED at or after `set_at` count; a rollup straddling it counts its later share. Prompt text is never stored.
+- **Prices** live in ONE place, `CLAUDE_PRICES` (segment `balance: begin/end`). Checked against Anthropic's live pricing
+  page on 2026-10-06 (Opus 5.5 $4/$20, Opus 5 and 4.5 to 4.8 $5/$25, Sonnet 5.5 and 5 $2/$10, Sonnet 4.5 and 4.6
+  $3/$15, Haiku 4.5 $1/$5, Fable $10/$50). Cache reads 0.1x input except Opus 5.5 ($0.20) and Fable 5.1 ($0.25);
+  cache writes are the 5-minute rate, 1.25x input. A model with no entry (or a newer one, "-5-6" is not "-5") is counted at the highest known price
+  and the row says "Unpriced calls included at the highest price*".
+- **Row.** "Balance ≈ $12.34*", "set $20.00 on Oct 7", an Update balance field, the footnote (also: web search and tool
+  costs on Anthropic's side are not counted). Under $2.00: amber "Low balance ≈ $1.50*". At or under $0: amber "Balance
+  used up*". Nothing is ever blocked. No balance set: only "Add your balance to track it" and the field. Gemini and
+  Groq (free tiers) never show one; Kimi keeps the real balance Moonshot reports, so it gets no estimate.
+- **Not done.** The amber chip in the model picker's Cloud Only/Claude rows: the tier pop-up is being edited on
+  cloudmodes-1007, so it is only on the Cloud power pane. Follow-up once that lands.
+- Tests (before the access-control section): price math per token kind, since-set_at (before, at, rollup straddle,
+  other providers), unpriced, levels, no-balance, free tiers, input validation, the row in node (asterisk and footnote
+  in every state), the ledger `cw`, the settings-split class, the live route, and 11 mutants (price swap, output
+  dropped, early calls counted, unpriced at zero, threshold moved, free tier shown, bad amount, no asterisk, no
+  footnote, every provider, no amber).
+
+---
 
 ## 6b438 — starter chips are whole, relevant questions and change at every new chat (per Patrick)
 

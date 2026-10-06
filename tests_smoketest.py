@@ -414,6 +414,230 @@ def req(path, method="GET", data=None, headers=None, cookie=None, timeout=30,
         return e.code, dict(e.headers), e.read()
 
 
+# ---- 6b441, per Patrick: an ESTIMATED prepaid Claude balance in Settings > Cloud power.
+# The price math, the since-set_at filter, the unpriced path and the low/used-up levels run for
+# real out of the source; the page's row renders in node; the route runs live; each rule has a
+# mutant the checks must catch.
+import tempfile as _tf441
+_BALDIR = _tf441.mkdtemp()
+
+
+def _bal_seg(src=None):
+    src = src or _MILLENAI_SRC
+    return src[src.index("# ==== balance: begin ===="):src.index("# ==== balance: end ====")]
+
+
+def _bal_ns(src=None):
+    ns = {}
+    exec(_bal_seg(src), ns)
+    return ns
+
+
+def _bal_checks(ns):
+    """Every rule, as a dict of name -> bool, against one copy of the segment."""
+    out = {}
+    try:
+        cc, be = ns["call_cost"], ns["balance_estimate"]
+        # price math: plain input, cache read, cache write and output, each at its own price
+        rec = {"m": "claude-opus-5-5", "w": "claude", "t": 100, "i": 1_000_000, "c": 200_000,
+               "cw": 100_000, "o": 100_000}
+        out["price math, every token kind"] = abs(cc("claude", rec)[0] - 5.34) < 1e-9 \
+            and abs(cc("claude", {"m": "claude-sonnet-5-5", "i": 1_000_000})[0] - 2.0) < 1e-9 \
+            and abs(cc("claude", {"m": "claude-sonnet-5-5", "o": 1_000_000})[0] - 10.0) < 1e-9
+        out["output tokens are counted"] = abs(cc("claude", {"m": "claude-haiku-4-5", "o": 1_000_000})[0] - 5.0) < 1e-9
+        out["input and output are priced apart"] = cc("claude", {"m": "claude-opus-5", "i": 1000})[0] \
+            != cc("claude", {"m": "claude-opus-5", "o": 1000})[0]
+        # a dated id is the same model; "-5-6" is not "-5"
+        out["dated ids price, a newer unknown does not"] = \
+            ns["price_for"]("claude", "claude-opus-5-5-20260401")[1] is True \
+            and ns["price_for"]("claude", "claude-opus-5-6")[1] is False \
+            and ns["price_for"]("claude", "claude-sonnet-5-5")[0][0] == 2.0
+        # unpriced: the most expensive price, flagged
+        pr, ok = ns["price_for"]("claude", "claude-mystery-9")
+        est = be("claude", {"amount_usd": 20, "set_at": 100},
+                 [{"m": "claude-mystery-9", "w": "claude", "t": 200, "i": 1_000_000, "o": 0}])
+        out["unpriced model: highest price, flagged"] = ok is False and pr[0] == 10.0 and pr[1] == 50.0 \
+            and est["unpriced"] is True and est["spent"] == 10.0
+        # since set_at
+        recs = [{"m": "claude-opus-5-5", "w": "claude", "t": 99.9, "i": 1_000_000},
+                {"m": "claude-opus-5-5", "w": "claude", "t": 100.0, "i": 1_000_000},
+                {"m": "claude-opus-5-5", "w": "claude", "t": 150, "i": 1_000_000},
+                {"m": "claude-opus-5-5", "w": "local", "t": 150, "i": 1_000_000},
+                {"m": "gemini-x", "w": "gemini", "t": 150, "i": 1_000_000}]
+        e = be("claude", {"amount_usd": 20, "set_at": 100.0}, recs)
+        out["calls before set_at don't count, at it do, other providers never"] = \
+            e["spent"] == 8.0 and e["amount"] == 12.0 and e["calls"] == 2 and e["est"] is True
+        roll = [{"m": "claude-opus-5-5", "w": "claude", "t": 0, "s": 3600, "n": 10, "i": 3_600_000}]
+        e2 = be("claude", {"amount_usd": 20, "set_at": 1800}, roll)
+        out["a rollup that straddles set_at counts its later share"] = abs(e2["spent"] - 7.2) < 0.01 \
+            and be("claude", {"amount_usd": 20, "set_at": 3600}, roll)["spent"] == 0
+        # levels
+        def lv(spent_amount):
+            return be("claude", {"amount_usd": spent_amount, "set_at": 1}, [])["level"]
+        out["levels: ok, low under $2, used up at $0 or less"] = \
+            lv(2.0) == "ok" and lv(1.99) == "low" and lv(0.01) == "low" and lv(0) == "used" \
+            and be("claude", {"amount_usd": 1, "set_at": 1},
+                   [{"m": "claude-opus-5-5", "w": "claude", "t": 5, "o": 1_000_000}])["level"] == "used"
+        out["no balance, or a bad one: no estimate"] = \
+            be("claude", None, recs) is None and be("claude", {}, recs) is None \
+            and be("claude", {"amount_usd": -1, "set_at": 5}, recs) is None \
+            and be("claude", {"amount_usd": 5, "set_at": 0}, recs) is None
+        out["free-tier and self-reporting providers get none"] = all(
+            be(p, {"amount_usd": 20, "set_at": 1}, recs) is None for p in ("gemini", "groq", "kimi", "local"))
+        bv = ns["balance_valid"]
+        out["typed amount: finite, 0 to 100000, cents"] = bv(12.345) in (12.35, 12.34) and bv(0) == 0.0 \
+            and bv(100000) == 100000.0 and bv(100000.01) is None and bv(-0.01) is None \
+            and bv(float("nan")) is None and bv(float("inf")) is None and bv("5") is None \
+            and bv(True) is None and bv(None) is None
+    except Exception as exc:
+        out["segment ran: %s" % exc] = False
+    return out
+
+
+_BAL_OK = _bal_checks(_bal_ns())
+check("balance estimate: price math, since-set_at, unpriced, levels, no-balance, free tier, input check",
+      all(_BAL_OK.values()), "%r" % [k for k, v in _BAL_OK.items() if not v])
+
+# the page's row, in node
+_jsb441 = lambda nm: _MILLENAI_SRC[_MILLENAI_SRC.index("function %s(" % nm):
+                                   _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index("function %s(" % nm)) + 3]
+
+
+def _bal_node(src=None):
+    src = src or _MILLENAI_SRC
+    j = src[src.index("const CK_BAL_IDS="):src.index("let ckBalLast=")]
+    body = "const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');\n" + j
+    body += ('const C=[["claude",{amount:12.344,set_at:1790000000,set_usd:20,level:"ok",unpriced:false}],'
+             '["claude",{amount:1.5,set_at:1790000000,set_usd:20,level:"low",unpriced:false}],'
+             '["claude",{amount:-3,set_at:1790000000,set_usd:20,level:"used",unpriced:true}],'
+             '["claude",null],["gemini",{amount:9,set_at:1,set_usd:9,level:"ok"}],'
+             '["groq",null],["kimi",{amount:9,set_at:1,set_usd:9,level:"ok"}]];'
+             'process.stdout.write(JSON.stringify(C.map(c=>ckBalHtml(c[0],c[1]))));')
+    f = os.path.join(_BALDIR, "bal441.js")
+    open(f, "w").write(body)
+    return json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=30).stdout)
+
+
+def _bal_page_checks(rows):
+    ok, low, used, none, gem, groq, kimi = rows
+    star_note = lambda h: "* Estimated from this app" in h and "console.anthropic.com" in h
+    return {"ok row: figure with *, set date, update field, footnote":
+            "Balance ≈ $12.34*" in ok and "set $20.00 on" in ok and "Update balance" in ok and star_note(ok),
+            "low row: amber, Low balance with *, footnote":
+            "Low balance ≈ $1.50*" in low and 'class="ckbal low"' in low and star_note(low),
+            "used row: Balance used up*, unpriced line with *, footnote":
+            "Balance used up*" in used and "highest price*" in used and star_note(used),
+            "no balance: only the prompt and the field, no figure or footnote":
+            "Add your balance to track it" in none and "ckbal-in" in none and "Estimated from" not in none
+            and "≈" not in none,
+            "free tiers and Kimi show nothing, even with an estimate": gem == "" and groq == "" and kimi == ""}
+
+
+try:
+    _BALP = _bal_page_checks(_bal_node())
+except Exception as _e441:
+    _BALP = {"node: %s" % _e441: False}
+check("balance row (node): * and footnote on every figure, amber when low, prompt only with none, "
+      "nothing for Gemini, Groq or Kimi", all(_BALP.values()), "%r" % [k for k, v in _BALP.items() if not v])
+
+# the ledger writes cache creation, never prompt text
+_us441 = _MILLENAI_SRC[_MILLENAI_SRC.index("def _usage_num(v):"):_MILLENAI_SRC.index("def usage_put(rec: dict):")]
+_us441 = _us441[:_us441.index("# ==== balance: begin ====")]
+_got441 = []
+_ns441 = {"time": time, "usage_put": _got441.append}
+exec(_us441, _ns441)
+_ns441["usage_note"]("claude-opus-5-5", "claude", [{"role": "user", "content": "SECRET PROMPT"}], 40,
+                     {"input_tokens": 10, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 50,
+                      "output_tokens": 7}, time.time())
+check("ledger: an Anthropic call records cache writes (cw) and read, no prompt text",
+      len(_got441) == 1 and _got441[0].get("cw") == 50 and _got441[0].get("c") == 100
+      and _got441[0].get("i") == 160 and _got441[0].get("o") == 7
+      and "SECRET" not in json.dumps(_got441) and "USAGE_ROLL_KEYS" in _MILLENAI_SRC
+      and "for f in USAGE_ROLL_KEYS:" in _MILLENAI_SRC)
+
+# the settings split: the typed balance is this profile's own, on this computer
+_pl441 = re.search(r"^PROFILE_LOCAL = frozenset\(\((.*?)\)\)", _MILLENAI_SRC, re.M | re.S).group(1)
+_sy441 = re.search(r"^SYNCED_SETTINGS = frozenset\(\((.*?)\)\)", _MILLENAI_SRC, re.M | re.S).group(1)
+_ma441 = re.search(r"^MACHINE = frozenset\(\((.*?)\)\)", _MILLENAI_SRC, re.M | re.S).group(1)
+check("settings split: cloud_balance is PROFILE_LOCAL, not synced, not machine",
+      '"cloud_balance"' in _pl441 and '"cloud_balance"' not in _sy441 and '"cloud_balance"' not in _ma441
+      and not "cloud_balance".startswith(("studio_", "last_", "seen_", "remind_", "contrib_", "fleet_")))
+
+# the route, live
+_b0 = req("/api/cloud/balance", "POST", {"provider": "claude", "amount": 20})
+_b0j = json.loads(_b0[2] or b"{}")
+_bg = json.loads(req("/api/cloud")[2])
+_bad = [(v_, json.loads(req("/api/cloud/balance", "POST", {"provider": "claude", "amount": v_})[2]).get("ok"))
+        for v_ in (-1, 100001, "x", None, True)]
+_bgem = json.loads(req("/api/cloud/balance", "POST", {"provider": "gemini", "amount": 5})[2])
+_bnt = req("/api/cloud/balance", "POST", {"provider": "claude", "amount": 5}, token=False)[0]
+_bnk = req("/api/cloud/balance", "POST", {"provider": "claude", "amount": 5}, cookie=False)[0]
+_pf441 = json.loads(req("/api/prefs")[2])
+_bclr = json.loads(req("/api/cloud/balance", "POST", {"provider": "claude", "clear": True})[2])
+check("balance route (live): set shows in /api/cloud as est, bad amounts and free tiers refused, "
+      "token and key required, cleared again",
+      _b0[0] == 200 and _b0j.get("ok") is True
+      and (_bg.get("balance") or {}).get("claude", {}).get("amount") == 20.0
+      and (_bg.get("balance") or {}).get("claude", {}).get("est") is True
+      and "key" not in json.dumps(_bg.get("balance")).lower()
+      and all(b_[1] is False for b_ in _bad) and _bgem.get("ok") is False
+      and _bnt == 403 and _bnk == 403
+      and _pf441.get("cloud_balance", {}).get("claude", {}).get("amount_usd") == 20.0
+      and _bclr.get("ok") is True and (_bclr.get("balance") or {}) == {},
+      "%r" % [_b0[0], _bg.get("balance"), _bad, _bgem, _bnt, _bnk, _bclr])
+
+# mutants: each rule's break must turn its check red
+_BM = _MILLENAI_SRC
+_mut441 = [
+    ("a swapped input and output price", "(plain * pr[0] + c * pr[2] + w * pr[3] + o * pr[1])",
+     "(plain * pr[1] + c * pr[2] + w * pr[3] + o * pr[0])", "price math, every token kind"),
+    ("output tokens dropped", " + o * pr[1]) / 1e6", ") / 1e6", "output tokens are counted"),
+    ("calls before set_at counted", "        elif s and t + s > t0:\n            share = (t + s - t0) / s\n        else:\n            continue",
+     "        elif s and t + s > t0:\n            share = (t + s - t0) / s\n        else:\n            share = 1.0",
+     "calls before set_at don't count, at it do, other providers never"),
+    ("unpriced counted at zero", "    top = max(table.values(), key=lambda v: (v[1], v[0])) if table \\\n        else (0.0, 0.0, 0.0, 0.0)",
+     "    top = (0.0, 0.0, 0.0, 0.0)", "unpriced model: highest price, flagged"),
+    ("low threshold off", '"low" if left < BALANCE_LOW_USD else "ok"', '"low" if left < 0.5 else "ok"',
+     "levels: ok, low under $2, used up at $0 or less"),
+    ("free tier gets an estimate", 'BALANCE_PROVIDERS = ("claude",)', 'BALANCE_PROVIDERS = ("claude", "gemini", "groq", "kimi")',
+     "free-tier and self-reporting providers get none"),
+    ("any amount accepted", "or v < 0 or v > BALANCE_MAX_USD:", "or v < -5:", "typed amount: finite, 0 to 100000, cents"),
+]
+_mfail441 = []
+for _nm441, _old441, _new441, _key441 in _mut441:
+    if _BM.count(_old441) != 1:
+        _mfail441.append("anchor: " + _nm441)
+        continue
+    try:
+        _r441 = _bal_checks(_bal_ns(_BM.replace(_old441, _new441)))
+    except Exception:
+        _r441 = {_key441: False}
+    if _r441.get(_key441) is not False:
+        _mfail441.append("survived: " + _nm441)
+_pm441 = [
+    ("no asterisk on the figure", 'ckBalUsd(est.amount)+"*"', 'ckBalUsd(est.amount)', "ok row: figure with *, set date, update field, footnote"),
+    ("no footnote", "+'<div class=\"ckbal-note\">'+esc(CK_BAL_NOTE)+'</div></div>'", "+'</div>'",
+     "ok row: figure with *, set date, update field, footnote"),
+    ("shown for every provider", 'if(CK_BAL_IDS.indexOf(id)<0)return "";', "",
+     "free tiers and Kimi show nothing, even with an estimate"),
+    ("not amber when low", 'const lvl=est.level==="used"?"used":est.level==="low"?"low":"ok";', 'const lvl="ok";',
+     "low row: amber, Low balance with *, footnote"),
+]
+for _nm441, _old441, _new441, _key441 in _pm441:
+    if _BM.count(_old441) != 1:
+        _mfail441.append("anchor: " + _nm441)
+        continue
+    try:
+        _r441 = _bal_page_checks(_bal_node(_BM.replace(_old441, _new441)))
+    except Exception:
+        _r441 = {_key441: False}
+    if _r441.get(_key441) is not False:
+        _mfail441.append("survived: " + _nm441)
+check("balance mutants: swapped prices, dropped output, early calls counted, unpriced at zero, low line moved, "
+      "free tier shown, bad amount, no asterisk, no footnote, every provider, no amber all caught",
+      not _mfail441, "%r" % _mfail441)
+
+
 print("== access control ==")
 # 6b310, per Patrick: nobody's chats may reach another user. Only this
 # launch's own window gets in: the right Host AND the launch key.
