@@ -29624,7 +29624,8 @@ _L30_MUT = [
     ("the touch off the Mac", "    if not IS_MAC or _lan_boot[0]:", "    if _lan_boot[0]:"),
     ("a card marked from a clear send", "                _srv_wake_blocked[i] = blocked\n", "                _srv_wake_blocked[i] = True\n"),
     ("the sleep switch not asking", "                srv_lan_touch_bg(self.ctx, [sid])    # the switch", "                pass    # the switch"),
-    ("the button on every card", "  if(!srvLan||!s.wakeable)return \"\";", "  if(false)return \"\";"),
+    ("the button on every card", "function srvWakeBtn(s){\n  if(!srvLan||!s.wakeable)return \"\";", "function srvWakeBtn(s){\n  if(false)return \"\";"),
+    ("the amber line on every card", "function srvWakeNote(s){\n  if(!srvLan||!s.wakeable)return \"\";", "function srvWakeNote(s){\n  if(false)return \"\";"),
     ("the amber line always", "(s.lan_blocked?'<div class=\"srv-hint srv-amber\">'", "(true?'<div class=\"srv-hint srv-amber\">'"),
     ("the blocked wording lost", "isn\\u2019t letting ConcordeAI use the local network.", "isn\\u2019t working."),
 ]
