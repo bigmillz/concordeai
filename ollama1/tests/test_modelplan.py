@@ -157,7 +157,8 @@ class Base(unittest.TestCase):
         self.addCleanup(self.cleanup)
 
     def wipe(self):
-        for f in (M.answer_file(), M.status_file(), M.record_file(), M.request_file(), M.lock_file(), Paths.allow):
+        for f in (M.answer_file(), M.status_file(), M.record_file(), M.request_file(), M.lock_file(), Paths.allow,
+                  M.managed_file()):
             if os.path.lexists(f):
                 os.unlink(f)
 
@@ -323,10 +324,13 @@ class TestStateRoute(Base):
         G["gw"].gpu_info = {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968}
         st, d = call("GET", "/v1/models/state")
         self.assertEqual(st, 200, d)
-        self.assertEqual(sorted(d), ["allow", "busy", "disk_free_bytes", "jobs", "models", "plan", "vram_bytes"])
-        self.assertEqual(d["models"], [{"name": "byhand:2b", "size": 2 * GIB, "loaded": False},
-                                       {"name": "keep:1b", "size": 1 * GIB, "loaded": False},
-                                       {"name": "old:7b", "size": 4 * GIB, "loaded": True}])     # no cloud entries
+        self.assertEqual(sorted(d), ["allow", "busy", "disk_free_bytes", "jobs", "managed", "models", "plan",
+                                     "vram_bytes"])
+        # the stub's digests aren't sha256 hex: "" (6b445)
+        self.assertEqual(d["models"], [{"name": "byhand:2b", "size": 2 * GIB, "digest": "", "loaded": False},
+                                       {"name": "keep:1b", "size": 1 * GIB, "digest": "", "loaded": False},
+                                       {"name": "old:7b", "size": 4 * GIB, "digest": "", "loaded": True}])     # no cloud entries
+        self.assertEqual(d["managed"], [])
         self.assertEqual(d["allow"], ["keep:1b", "old:7b", "qwen3:14b"])
         self.assertIs(d["busy"], False)
         self.assertEqual((d["jobs"], d["plan"]), ([], None))
@@ -1024,6 +1028,92 @@ class TestRoot(Base):
 
 
 # ---- the privilege line: unit, polkit, tmpfiles, setup ------------------------------
+
+class TestManaged(Base):
+    """The models a set brought (6b445): what the app may clear unasked once
+    they are retired, and nothing the person pulled themselves."""
+
+    def apply(self, **over):
+        st, d = call("POST", "/v1/models/apply", self.body(**over))
+        self.assertEqual(st, 202, d)
+        return self.wait_done()
+
+    def state(self):
+        st, d = call("GET", "/v1/models/state")
+        self.assertEqual(st, 200, d)
+        return d
+
+    def test_a_set_s_downloads_are_managed_and_its_removals_are_not(self):
+        self.assertEqual(self.state()["managed"], [])
+        self.apply(add=["new:4b", "fresh:2b"], remove=["old:7b"])
+        self.assertEqual(self.state()["managed"], ["fresh:2b", "new:4b"])
+        self.assertEqual(M.read_managed(), ["fresh:2b", "new:4b"])
+        st = os.stat(M.managed_file())
+        self.assertEqual(stat.S_IMODE(st.st_mode), 0o640)
+        # a later set that removes one takes it off; the other stays
+        self.apply(add=[], remove=["new:4b"])
+        self.assertEqual(self.state()["managed"], ["fresh:2b"])
+
+    def test_a_refresh_keeps_the_owner(self):
+        # keep:1b was pulled by the person: a set pulling it again (newer
+        # weights) does not make it the app's
+        self.apply(add=["keep:1b", "new:4b"], remove=[])
+        self.assertEqual(self.changes(), [("POST", "/api/pull", "keep:1b"), ("POST", "/api/pull", "new:4b")])
+        self.assertEqual(self.state()["managed"], ["new:4b"])
+
+    def test_a_failed_pull_is_not_managed(self):
+        with self.stub.lock:
+            self.stub.pull_fail = 5
+        self.apply(add=["new:4b"], remove=[])
+        self.assertEqual(self.state()["managed"], [])
+
+    def test_ollama_unsure_means_not_managed(self):
+        root = G["root"]
+        saved = root.on_disk
+        root.on_disk = lambda name, base: None
+        try:
+            self.apply(add=["new:4b"], remove=[])
+        finally:
+            root.on_disk = saved
+        self.assertEqual(self.state()["managed"], [])
+
+    def test_the_last_set_before_the_ledger_is_kept(self):
+        # a server whose last set ran on an older kit: its finished pulls are the app's
+        rec = {"v": 1, "request": "0123456789abcdef", "state": "done",
+               "plan": {"name": "light", "at": 1791100000, "by": "Alice's Mac"},
+               "add": ["old:7b", "lost:1b"], "remove": [], "started": 1791100000, "finished": 1791100100,
+               "jobs": [{"name": "old:7b", "action": "pull", "state": "done", "pct": 100, "error": ""},
+                        {"name": "lost:1b", "action": "pull", "state": "failed", "pct": 0, "error": "x"}]}
+        write_json_atomic(M.record_file(), rec, mode=0o640)
+        self.assertFalse(os.path.exists(M.managed_file()))
+        self.assertEqual(self.state()["managed"], ["old:7b"])
+        self.apply(add=["new:4b"], remove=[])
+        self.assertEqual(self.state()["managed"], ["new:4b", "old:7b"])
+        with open(M.managed_file()) as f:
+            self.assertEqual(json.load(f), {"v": 1, "names": ["new:4b", "old:7b"]})
+
+    def test_a_broken_ledger_lists_only_good_tags(self):
+        os.makedirs(Paths.modelplan_state, exist_ok=True)
+        for body, want in (({"names": ["a:1b", "BAD", "a:1b", 5, "b", "b:latest", "../x"]}, ["a:1b", "b"]),
+                           ({"names": "a:1b"}, []), ({"v": 1}, [])):
+            write_json_atomic(M.managed_file(), body, mode=0o640)
+            self.assertEqual(M.read_managed(), want, body)
+        with open(M.managed_file(), "w") as f:
+            f.write("not json")
+        self.assertEqual(M.read_managed(), [])
+
+    def test_the_digest_ollama_gives(self):
+        hx = "ab" * 32
+        with self.stub.lock:
+            self.stub.models["keep:1b"]["digest"] = "sha256:" + hx
+            self.stub.models["old:7b"]["digest"] = hx.upper()
+        got = {m["name"]: m["digest"] for m in self.state()["models"]}
+        self.assertEqual(got, {"byhand:2b": "", "keep:1b": hx, "old:7b": ""})
+        for bad in (None, 5, "", "sha256:", "ab" * 31, "zz" * 32, "sha256:" + "ab" * 33):
+            self.assertEqual(M.model_digest({"digest": bad}), "", bad)
+        self.assertEqual(M.model_digest({"digest": hx}), hx)
+        self.assertEqual(M.model_digest(None), "")
+
 
 class TestBoundary(unittest.TestCase):
     def test_the_unit_is_root_sandboxed_and_loopback_only(self):

@@ -231,12 +231,38 @@ def pull_job(job, base, allow_path, sleep, tries, progress):
     return err
 
 
+def on_disk(name, base):
+    """True / False: is the model on the disk now; None when Ollama can't say."""
+    try:
+        st, tags = o1ollama.call(base, "GET", "/api/tags", timeout=20)
+    except OSError:
+        return None
+    if st != 200 or not isinstance(tags, dict):
+        return None
+    return any(o1ollama.same_model(m["name"], name) for m in M.local_models(tags))
+
+
+def note_managed(job, was_here, log):
+    """managed.json follows the jobs that worked (6b445): a pull of a model
+    that wasn't here before is the app's; a removal takes it off. A model
+    already here (a refresh) or one Ollama couldn't vouch for is left as it
+    was. A file that can't be written never stops the work."""
+    try:
+        if job["action"] == "pull" and was_here is False:
+            M.managed_change(add=[job["name"]])
+        elif job["action"] == "remove":
+            M.managed_change(drop=[job["name"]])
+    except (OSError, ValueError) as e:
+        log("modelplan: could not note %s in managed.json (%s)" % (job["name"], getattr(e, "strerror", None) or e))
+
+
 def execute(rec, base, allow_path, sleep, tries, log):
     """Every job in its order (the removals were put first), whatever the
     one before did."""
     for job in rec["jobs"]:
         job["state"] = "running"
         save(rec, keep=True)
+        was_here = on_disk(job["name"], base) if job["action"] == "pull" else None
         last = [0.0]
 
         def progress(done, total, job=job):
@@ -255,6 +281,7 @@ def execute(rec, base, allow_path, sleep, tries, log):
         job["state"], job["error"] = ("failed", err) if err else ("done", "")
         if not err:
             job["pct"] = 100
+            note_managed(job, was_here, log)
         save(rec, keep=True)
         log("modelplan: %s %s: %s" % (job["action"], job["name"], "failed: " + err if err else "done"))
 
@@ -319,6 +346,13 @@ def run(owner_uid=None, base=None, allow_path=None, active_units=o1sleep._active
     rec = {"v": 1, "request": rid, "state": "running", "plan": {"name": clean["plan"], "at": now, "by": by},
            "device": req["device"], "add": clean["add"], "remove": clean["remove"], "jobs": jobs,
            "started": now, "finished": None}
+    if not os.path.exists(M.managed_file()):
+        # the first set since managed.json (6b445): the last set's pulls are
+        # the app's, so they are kept before its record is replaced
+        try:
+            M.managed_change()
+        except (OSError, ValueError) as e:
+            log("modelplan: could not start managed.json (%s)" % (getattr(e, "strerror", None) or e))
     save(rec, keep=True)
     answer(rid, True)
     log("modelplan: applying the %s set for %s (device %s, request %s): add %s; remove %s; allow-list: %d line(s) "

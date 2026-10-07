@@ -2539,8 +2539,10 @@ def _fake_dl(labels):
     return list(labels)
 
 
-_mns.update(_remove_models=_fake_remove, start_model_downloads=_fake_dl,
-            _sweep_leftovers=lambda: 0)
+_mns.update(_remove_models=_fake_remove,
+            start_model_downloads=lambda labels, refresh=(): _fake_dl(list(labels) + list(refresh)),
+            _sweep_leftovers=lambda: 0, _fresh={"local": {}},
+            fresh_refresh_list=lambda pulled=None: [], update_added=lambda pulled=None: [])
 for _n in _ctree.body:
     if isinstance(_n, (_ast.FunctionDef, _ast.Assign)) and (
             getattr(_n, "name", "") in (
@@ -3623,7 +3625,7 @@ _ep = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
            SUPPORTED=_plat["windows"]["SUPPORTED"],
            _setup_lock=__import__("threading").RLock(), _setup_jobs={},
            ollama_pulled_tags=lambda: set(), model_cached=lambda l, pulled=None: False,
-           STARTER_LABELS=[], _download_model=lambda l: None,
+           STARTER_LABELS=[], _download_model=lambda l: None, _fresh={"local": {}},
            giant_fits_here=lambda l: l not in _WG,
            _ollama_install_worker=lambda b: _ep_started.append(list(b)))
 _ep_started = []
@@ -3649,7 +3651,7 @@ def _worker_run(ours, stage="staging"):
              _keep_awake=lambda on: None, _app_models_add=lambda l: None,
              _pull_ollama_model=lambda l, t: _wr_pulled.append(t),
              _stage_engine_update=lambda: _wr_staged.append(1) or stage)
-    _exec_names(z, {"_STAGE_SAY", "_ollama_too_old", "_ollama_install_worker"})
+    _exec_names(z, {"_STAGE_SAY", "_ollama_too_old", "_ollama_install_worker", "_refresh_keep"})
     z["_ollama_install_worker"](["Qwen 3.8 27B", "Llama 3.2 3B"])
     return {l: (j["status"], j.get("note", "")) for l, j in z["_setup_jobs"].items()}
 _wr_pulled, _wr_staged = [], []
@@ -5427,10 +5429,11 @@ def _of_ns(src):
             st["disk"].discard(ns["RETIRED_MODELS"][l][0] or l)
         return list(want), {}
 
-    def _dl(labels):
-        st["dl"].append(list(labels))
-        return list(labels)
-    ns.update(_remove_models=_rm, start_model_downloads=_dl)
+    def _dl(labels, refresh=()):
+        st["dl"].append(list(labels) + list(refresh))
+        return list(labels) + list(refresh)
+    ns.update(_remove_models=_rm, start_model_downloads=_dl,
+              fresh_refresh_list=lambda pulled=None: list(st.get("fresh") or []))
     for n in tree.body:
         if isinstance(n, _ast.FunctionDef) and n.name in (
                 "_retired_on_disk", "model_updates", "superseded_installed",
@@ -6051,7 +6054,8 @@ _S5_NAMES = {"GIANT_GB", "model_is_giant", "giant_fits_here", "machine_budget_by
              "TIERS", "MODEL_SETS", "MODEL_SET_NAMES", "MODEL_SET_ALIASES", "QUICK_PAIR",
              "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_set_key",
              "_set_tag_bytes", "model_sets", "_family_of", "model_set_chosen", "model_sets_status",
-             "offer_set_labels", "first_set_labels", "FIRST_RUN_SET", "_srv_fits", "_srv_tag_key"}
+             "offer_set_labels", "first_set_labels", "FIRST_RUN_SET", "_srv_fits", "_srv_tag_key",
+             "local_set_news", "set_news", "_set_had_get", "_set_had_put"}
 
 
 class _S5VM:
@@ -6249,9 +6253,9 @@ def _s5_wiring(src):
             and 'let wizStep=1,wizPlan="light",wizPicked=false,wizSets=null;' in src
             and 'let setupPlan="light",setupPlanPicked=false,setupSt=null;' in src
             and "    stars_now = set(first)\n" in ss
-            and "    for label in (labels if labels is not None else first_set_labels()):\n" in src
+            and "    for label in (list(labels) if labels is not None else first_set_labels()) + [\n" in src
             and "    for pref in MERGE_PREFS:\n" in src and "    for l in CODE_LADDER:\n" in src
-            and '"remind_models_off", "model_set"))' in src
+            and '"remind_models_off", "model_set", "model_set_had"))' in src
             and src.count("def model_sets(") == 1), route[-200:]
 
 
@@ -6322,8 +6326,8 @@ _S5_MUT = [
      '                  "dl_gb": round(sum(MODEL_INFO[l]["gb"] for l in ls), 1)}', [1]),
     ("no same-as", '        same = next((p for p in MODEL_SETS[:i]\n', '        same = next((p for p in ()\n', [1]),
     ("old names not read", "    k = MODEL_SET_ALIASES.get(k, k)\n", "", [1]),
-    ("the card offers Everything", "    k = st[\"chosen\"] or st[\"mine\"]\n    return list(st[k][\"labels\"]) if k else []",
-     "    return list(st[\"everything\"][\"labels\"])", [2]),
+    ("the card offers Everything", "    k = st[\"chosen\"] or st[\"mine\"]\n    out = list(st[k][\"labels\"]) if k else []",
+     "    out = list(st[\"everything\"][\"labels\"])", [2]),
     ("the card offers a set nobody picked", "    k = st[\"chosen\"] or st[\"mine\"]\n", "    k = st[\"chosen\"] or \"recommended\"\n", [2]),
     ("the pick not kept", "            model_set_choose(_key)\n", "", [3]),
     ("an unknown name installs something", "            if not _key:\n                self._send_json({\"err\": \"Pick Light, Recommended or Everything.\"},",
@@ -7718,7 +7722,7 @@ _db.update(MODEL_INFO={"Llama 3.2 3B": {"gb": 1.8}}, ENGINE_ROW="Ollama engine",
            # (6b315) the worker asks every model's Ollama floor now
            _ollama_version=lambda: (0, 40, 0), _managed_serve=lambda: None,
            OLLAMA_REQUIRES={}, _stage_engine_update=lambda: None)
-_exec_names(_db, {"_ollama_install_worker", "_ollama_too_old"})
+_exec_names(_db, {"_ollama_install_worker", "_ollama_too_old", "_refresh_keep"})
 _db["_ollama_install_worker"](["Llama 3.2 3B"])
 _db["model_cached"] = lambda l, p=None: True
 _hw2 = _db["_downloaded_bytes"](set())
@@ -34335,6 +34339,373 @@ for _d442, _o442, _nw442 in _MC_MUT:
     _mcm.append((_d442, [n for n, o in _r442 if not o][:1] or "MISSED"))
 check("model menu (6b442): %d mutations of its code, each caught by a check above" % len(_MC_MUT),
       all(isinstance(v, list) for _d, v in _mcm), "%r" % [x for x in _mcm if not isinstance(x[1], list)])
+
+print("== an app update brings model updates: newer weights, new set models, retired ones cleared on servers too (6b445) ==")
+# Per Patrick: "these models should be included when the app itself updates
+# ... it should bring in updates to models, the newest models that we add,
+# and clear out the ones that are deprecated." In process, on the real code:
+# set_news (what a set gained); the registry readers and the byte counts on a
+# temporary hub cache and Ollama folder; the once-a-day check; a refresh
+# download's job and its bar; a server's update view (add, refresh, retire,
+# kept) and the signed apply and auto-clean through the stand-in transport,
+# each protection then broken and shown caught.
+_GB45 = 10 ** 9
+
+
+def _u45_news(src):
+    ns = dict(_LH)
+    exec(re.search(r"^MODEL_SETS = .*$", src, re.M).group(0), ns)
+    _s5_exec(src, ns, {"set_news"})
+    sn = ns["set_news"]
+    S = {"light": ["a", "b"], "recommended": ["a", "b", "c", "x"], "everything": ["a", "b", "c", "x", "d", "y"]}
+    out = {}
+    # first look after the build: Recommended was complete but for the new row x
+    n, h = sn(S, {"a", "b", "c"}, {"x", "y"}, None)
+    out["a new row in the set it had"] = n == ["x"] and h == {"k": "recommended", "ids": ["a", "b", "c"]}
+    out["never a bigger set's"] = "y" not in n
+    # the record holds: the next look offers x again until it is here
+    n2, h2 = sn(S, {"a", "b", "c"}, set(), h)
+    out["kept until taken"] = n2 == ["x"] and h2 is None
+    n3, h3 = sn(S, {"a", "b", "c", "x"}, set(), h)
+    out["taken: the record moves on"] = n3 == [] and h3 == {"k": "recommended", "ids": ["a", "b", "c", "x"]}
+    # a tier change: an old row joins the set (not unseen)
+    S2 = dict(S, recommended=["a", "b", "c", "x", "d"])
+    out["a tier change"] = sn(S2, {"a", "b", "c", "x"}, set(), h3)[0] == ["d"]
+    out["a removed model stays removed"] = sn(S, {"a", "b", "x"}, set(), h3)[0] == []
+    out["a picked set"] = sn(S, {"a"}, {"x"}, None, "recommended") == ([], None)
+    out["nothing seen yet"] = sn(S, {"a", "b"}, set(), None)[0] == []
+    out["not a set it never had"] = sn(S, {"a", "b"}, {"x"}, None)[0] == []
+    return all(out.values()), out
+
+
+def _u45_ns(src):
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    ns = dict(_LH, APP_VERSION="9.9", hashlib=_h34, urllib=urllib, threading=_t34)
+    exec(re.search(r"^MODEL_SETS = .*$", src, re.M).group(0), ns)
+    exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
+    ns.update(IS_ARM=True, IS_WIN=False)
+    exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
+    ns["MLX_REPOS"] = {l: i["mlx"] for l, i in ns["MODEL_INFO"].items() if i.get("mlx")}
+    exec(_sv_sect(src, "model freshness"), ns)
+    hub = os.path.join(d, "hub")
+    st = {"fetch": {}, "asked": [], "disk": set(), "digests": {}, "prefs": {}, "dirs": [os.path.join(d, "ollama")]}
+
+    def fetch(url, accept=""):
+        st["asked"].append(url)
+        return st["fetch"].get(url, b"")
+    ns.update(_fresh_fetch=fetch, _hf_model_dir=lambda repo: os.path.join(hub, "models--" + repo.replace("/", "--")),
+              _ollama_models_dirs=lambda: st["dirs"], ollama_local_digests=lambda: dict(st["digests"]),
+              SUPPORTED={l: True for l in ns["MODEL_INFO"]},
+              MODEL_ROUTES={"Qwen 3.5 9B": ("mlx", 8934), "Qwen 3.5 Vision 9B": ("ollama", "qwen3.5:9b"),
+                            "Llama 3.2 3B": ("mlx", 8888)},
+              model_cached=lambda l, pulled=None: l in st["disk"], ollama_pulled_tags=lambda: set(),
+              _setup_lock=threading.RLock(), _setup_jobs={},
+              ctx_executor=_ctx_exec34, machine_prefs=lambda strict=False: st["prefs"],
+              machine_prefs_update=lambda fn: fn(st["prefs"]))
+    return ns, st, hub
+
+
+def _u45_manifest(layers):
+    return json.dumps({"schemaVersion": 2, "config": {"digest": "sha256:" + "c" * 64, "size": 500},
+                       "layers": [{"digest": "sha256:" + dg * 64, "size": sz} for dg, sz in layers]}).encode()
+
+
+def _u45_fresh(src):
+    ns, st, hub = _u45_ns(src)
+    out = {}
+    raw = _u45_manifest([("a", 6 * _GB45), ("b", 13)])
+    st["fetch"]["https://registry.ollama.ai/v2/library/qwen3.5/manifests/9b"] = raw
+    m = ns["ollama_registry_manifest"]("qwen3.5:9b")
+    out["a manifest: its digest is the sha256 of its bytes"] = (
+        m is not None and m[0] == _h34.sha256(raw).hexdigest() and m[1]["sha256:" + "a" * 64] == 6 * _GB45
+        and len(m[1]) == 3)
+    out["only Ollama's own library, a sane manifest"] = (
+        ns["ollama_registry_manifest"]("hf.co/x/y:q4") is None
+        and ns["ollama_registry_manifest"]("a/../b") is None
+        and ns["ollama_registry_manifest"]("gemma4:12b") is None)        # no answer
+    st["fetch"]["https://registry.ollama.ai/v2/library/bad/manifests/1b"] = json.dumps(
+        {"layers": [{"digest": "sha256:../../etc", "size": 1}]}).encode()
+    out["a broken digest refused"] = ns["ollama_registry_manifest"]("bad:1b") is None
+    # Ollama: the digest it holds against the registry's; only layers not on the disk count
+    blobs = os.path.join(st["dirs"][0], "blobs")
+    os.makedirs(blobs)
+    open(os.path.join(blobs, "sha256-" + "b" * 64), "w").close()
+    open(os.path.join(blobs, "sha256-" + "c" * 64), "w").close()
+    ob = ns["ollama_refresh_bytes"]
+    out["ollama: same digest, nothing"] = ob(m[0], m) == 0 and ob("sha256:" + m[0], m) == 0
+    out["ollama: newer, the layers not here"] = ob("f" * 64, m) == 6 * _GB45
+    out["ollama: no answer or no digest, nothing"] = ob("f" * 64, None) == 0 and ob("", m) == 0
+    # MLX: the hub cache's revision against main's; README-only is no update
+    repo = "mlx-community/Qwen3.5-9B-4bit"
+    md = ns["_hf_model_dir"](repo)
+    os.makedirs(os.path.join(md, "refs"))
+    os.makedirs(os.path.join(md, "blobs"))
+    with open(os.path.join(md, "refs", "main"), "w") as f:
+        f.write("1" * 40)
+    for b in ("e" * 64, "9" * 40):
+        open(os.path.join(md, "blobs", b), "w").close()
+    files = [{"rfilename": "model.safetensors", "blobId": "8" * 40,
+              "lfs": {"sha256": "d" * 64, "size": 5 * _GB45}},
+             {"rfilename": "tokenizer.json", "blobId": "7" * 40, "lfs": {"sha256": "e" * 64, "size": 20}},
+             {"rfilename": "config.json", "blobId": "9" * 40, "size": 3000},
+             {"rfilename": "README.md", "blobId": "6" * 40, "size": 600}]
+    url = "https://huggingface.co/api/models/" + repo + "/revision/main?blobs=true"
+    st["fetch"][url] = json.dumps({"sha": "2" * 40, "siblings": files}).encode()
+    hr = ns["hf_repo_files"](repo)
+    mb = ns["mlx_refresh_bytes"]
+    out["hf: the file list"] = (hr is not None and hr["sha"] == "2" * 40
+                                and hr["files"]["model.safetensors"] == ("d" * 64, 5 * _GB45))
+    out["mlx: the new weights only"] = mb(repo, hr) == 5 * _GB45 + 600 - 600
+    out["mlx: same revision, nothing"] = mb(repo, dict(hr, sha="1" * 40)) == 0
+    doc = {"sha": "3" * 40, "files": {"README.md": ("6" * 40, 600), "config.json": ("9" * 40, 3000)}}
+    out["mlx: a README-only commit is no update"] = mb(repo, doc) == 0
+    out["hf: a bad repo name is never asked"] = ns["hf_repo_files"]("../etc") is None
+    # the check: both kinds, a day's cache, a download in flight skipped
+    st["disk"] = {"Qwen 3.5 9B", "Qwen 3.5 Vision 9B", "Llama 3.2 3B"}
+    st["digests"] = {"qwen3.5:9b": "f" * 64}
+    r = ns["model_fresh_check"](force=True, now=1000.0)
+    out["the check finds both"] = (set(r) == {"Qwen 3.5 9B", "Qwen 3.5 Vision 9B"}
+                                   and r["Qwen 3.5 9B"]["b"] == 5 * _GB45 and r["Qwen 3.5 9B"]["gb"] == 5.0
+                                   and r["Qwen 3.5 Vision 9B"]["kind"] == "ollama")
+    n = len(st["asked"])
+    ns["model_fresh_check"](now=2000.0)
+    ns["model_fresh_check"](force=True, now=3000.0)
+    out["asked at most once a day"] = len(st["asked"]) == n
+    ns["_setup_jobs"]["Qwen 3.5 9B"] = {"status": "downloading"}
+    out["a download in flight is skipped"] = (
+        "Qwen 3.5 9B" not in ns["model_fresh_check"](force=True, now=3000.0)
+        and [x["label"] for x in ns["fresh_refresh_list"]()] == ["Qwen 3.5 Vision 9B"])
+    ns["_fresh_forget"]("Qwen 3.5 Vision 9B")
+    out["landed: forgotten"] = ns["fresh_refresh_list"]() == []
+    return all(out.values()), out
+
+
+def _u45_dl(src):
+    """A refresh download: a model already here is fetched again, its job
+    says so, and the bar counts only the bytes that change."""
+    ns = dict(_LH, TEST_HOOKS=frozenset())
+    _s5_exec(src, ns, {"start_model_downloads", "_downloaded_bytes"})
+    started = []
+    ns.update(SUPPORTED={"A": True, "B": True}, MODEL_ROUTES={"A": ("mlx", 1), "B": ("ollama", "b:1")},
+              MLX_REPOS={"A": "x/a"}, giant_fits_here=lambda l: True,
+              model_cached=lambda l, pulled=None: True, ollama_pulled_tags=lambda: set(),
+              _setup_lock=threading.RLock(), _setup_jobs={},
+              _fresh={"local": {"A": {"b": 4 * _GB45}, "B": {"b": 2 * _GB45}}},
+              _dir_bytes_real=lambda p: 7 * _GB45, _hf_model_dir=lambda r: r,
+              _download_model=lambda l: started.append(l),
+              _ollama_install_worker=lambda b: started.append(tuple(b)),
+              MLX_EST_BYTES={"A": 5 * _GB45, "B": 3 * _GB45}, _STUDIO_ROWS={},
+              ctx_thread=lambda target, args=(), daemon=True: _t34.Thread(target=target, args=args, daemon=True))
+    out = {}
+    out["cached and not asked: nothing"] = ns["start_model_downloads"](["A", "B"]) == []
+    got = ns["start_model_downloads"]([], refresh=["A", "B", "C"])
+    time.sleep(0.1)
+    j = ns["_setup_jobs"]
+    out["asked: both again, nothing the check didn't find"] = (
+        got == ["A", "B"] and j["A"]["refresh"] is True and j["A"]["want_b"] == 4 * _GB45
+        and j["A"]["base_b"] == 7 * _GB45 and j["B"]["want_b"] == 2 * _GB45 and "C" not in j)
+    j["A"].update(status="downloading")
+    j["B"].update(status="downloading", done_b=int(2.5 * _GB45), total_b=3 * _GB45)
+    ns["_dir_bytes_real"] = lambda p: 8 * _GB45
+    have, want = ns["_downloaded_bytes"](set(), ["A", "B"])
+    out["the bar: only what changes"] = want == 6 * _GB45 and have == 1 * _GB45 + int(1.5 * _GB45)
+    j["A"]["status"] = j["B"]["status"] = "done"
+    out["done: all of it"] = ns["_downloaded_bytes"](set(), ["A", "B"]) == (6 * _GB45, 6 * _GB45)
+    w = src[src.index("def _download_model("):src.index("TITLE_PROMPT = (")]
+    k = src[src.index("def _ollama_install_worker("):src.index("def start_model_downloads(")]
+    out["the owner stays; the old revision goes"] = (
+        "        if not _refresh_keep(label):\n            # newer weights keep their owner" in w
+        and "            _hf_prune_old(repo)\n" in w
+        and "                if _refresh_keep(label):\n" in k and "                    _app_models_add(label)" in k)
+    return all(out.values()), out
+
+
+_U45_RET = [("phi4:14b", True, False), ("mistral-nemo:12b", False, False), ("qwen2.5-coder:14b", True, True)]
+
+
+def _u45_state(plan=None, managed=True, digest=True):
+    ms = [{"name": "llama3.2:3b", "size": 2019393189, "loaded": False, "digest": "1" * 64 if digest else ""},
+          {"name": "gemma4:12b", "size": 7556508396, "loaded": False, "digest": "2" * 64},
+          {"name": "custom:1b", "size": 1 << 30, "loaded": False, "digest": "3" * 64}]
+    ms += [{"name": n, "size": 8 * _GB45, "loaded": ld, "digest": ""} for n, _m, ld in _U45_RET]
+    js = {"models": ms, "busy": False, "jobs": [], "plan": plan, "disk_free_bytes": 400 * _GB45,
+          "vram_bytes": 16 * _GI7, "allow": []}
+    if managed:
+        js["managed"] = ["llama3.2:3b"] + [n for n, m, _l in _U45_RET if m]
+    return js
+
+
+def _u45_srvns(src):
+    ns, ctx, d = _s7_ns(src)
+    exec(_sv_sect(src, "model freshness"), ns)
+    ns.update(SUGGEST_SERVER_FRESH_S=600, auto_cleanup_on=lambda: ns.get("_U45_AUTO", True))
+    return ns, ctx, d
+
+
+def _u45_view(src):
+    ns, ctx, d = _u45_srvns(src)
+    out = {}
+    st = ns["_srv_mstate_parse"](_u45_state())
+    out["parsed: digests and the managed list"] = (
+        st["managed_known"] is True and "phi4:14b" in st["managed"]
+        and st["models"][0]["digest"] == "1" * 64
+        and ns["_srv_mstate_parse"](dict(_u45_state(), managed="x"))["managed_known"] is False
+        and ns["_srv_mstate_parse"](_u45_state(managed=False))["managed"] == [])
+    remote = {"llama3.2:3b": ("9" * 64, {"sha256:" + "a" * 64: 2 * _GB45}),
+              "gemma4:12b": ("2" * 64, {}), "custom:1b": ("0" * 64, {})}
+    v = ns["server_update_view"](st, 16 * _GI7, lambda t: remote.get(t), None, set())
+    out["retire: only what this app brought, never a loaded one"] = [r["name"] for r in v["retire"]] == ["phi4:14b"]
+    out["kept: what the person put there"] = v["kept"] == ["mistral-nemo:12b"]
+    out["refresh: a catalog model whose digest moved, nothing else"] = (
+        v["refresh"] == [{"name": "llama3.2:3b", "gb": 2.0}])
+    adds = {a["name"]: a["why"] for a in v["add"]}
+    out["a retired model's replacement"] = adds.get("ministral-3:14b") == "replaces Phi-4 14B"
+    out["no set, nothing new seen: no other add"] = set(adds) <= {"ministral-3:14b", "qwen3.5:9b"}
+    v2 = ns["server_update_view"](ns["_srv_mstate_parse"](_u45_state(plan={"name": "light", "at": 1, "by": "x"})),
+                                  16 * _GI7, None, None, set())
+    out["a set applied there: its missing models"] = {"llama3.2:1b"} <= {a["name"] for a in v2["add"]}
+    out["no registry asked when not wanted"] = v2["refresh"] == []
+    v3 = ns["server_update_view"](st, 16 * _GI7, None, None, {"deepseek-r1:8b"})
+    out["the offer names what it does"] = (v3["offer"] != v["offer"] and len(v["offer"]) == 16
+                                           and v["seen"] == ns["srv_seen_hash"]([m["name"] for m in st["models"]]))
+    return all(out.values()), out
+
+
+def _u45_wire(src):
+    """Auto-clean and the click through the real servers section, signed."""
+    ns, ctx, d = _u45_srvns(src)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    sid = e["id"]
+    ns["_srv_seen"][sid] = {"at": time.time()}
+    ns["_fresh_remote"] = lambda key, fn, now: None
+    out = {}
+    sent = _sv_fake(ns, [_SvResp(200, _u45_state()), _SvResp(202, {"ok": True, "jobs": []})])
+    r = ns["servers_autoclean"](ctx)
+    out["auto-clean: the retired model this app brought, nothing else"] = (
+        r == [{"id": sid, "name": "Desktop", "removed": ["phi4:14b"]}] and len(sent) == 2
+        and json.loads(sent[1]["body"])["remove"] == ["phi4:14b"] and json.loads(sent[1]["body"])["add"] == []
+        and sent[1]["path"] == "/v1/models/apply")
+    sent = _sv_fake(ns, [_SvResp(200, _u45_state(managed=False))])
+    out["an older kit: nothing removed"] = ns["servers_autoclean"](ctx) == [] and len(sent) == 1
+    sent = _sv_fake(ns, [_SvResp(200, dict(_u45_state(), busy=True))])
+    out["busy: nothing"] = ns["servers_autoclean"](ctx) == [] and len(sent) == 1
+    ns["_U45_AUTO"] = False
+    sent = _sv_fake(ns, [])
+    out["the switch off: not even asked"] = ns["servers_autoclean"](ctx) == [] and not sent
+    ns["_U45_AUTO"] = True
+    ns["_srv_seen"][sid] = {"at": time.time() - 3600}
+    sent = _sv_fake(ns, [])
+    out["asleep: never asked, never woken"] = (ns["servers_autoclean"](ctx) == []
+                                               and ns["servers_updates"](ctx) == [] and not sent)
+    ns["_srv_seen"][sid] = {"at": time.time()}
+    _sv_fake(ns, [_SvResp(200, _u45_state())])
+    ups = ns["servers_updates"](ctx)
+    off = ups[0]["offer"] if ups else ""
+    sent = _sv_fake(ns, [_SvResp(200, _u45_state()), _SvResp(202, {"ok": True, "jobs": []})])
+    r = ns["server_update_apply"](ctx, sid, off)
+    body = json.loads(sent[1]["body"]) if len(sent) > 1 else {}
+    out["the click: what the card listed"] = (
+        r.get("ok") is True and body.get("remove") == ["phi4:14b"]
+        and "ministral-3:14b" in body.get("add", []) and body.get("plan") in ("light", "recommended", "everything"))
+    st2 = _u45_state()
+    st2["models"] = st2["models"][:-1]
+    sent = _sv_fake(ns, [_SvResp(200, st2)])
+    r = ns["server_update_apply"](ctx, sid, off)
+    out["changed since: nothing sent"] = r["kind"] == "changed" and len(sent) == 1
+    sent = _sv_fake(ns, [])
+    out["a bad offer: nothing read"] = ns["server_update_apply"](ctx, sid, "x")["kind"] == "input" and not sent
+    return all(out.values()), out
+
+
+def _u45_tiers(src):
+    """The presets name current rows only (6b305, 6b440's catalog); flags,
+    not picks: the tiers are re-picked by Patrick after the candidate test."""
+    ns = _s5_mac(src, 48)
+    T, R, I = ns["TIERS"], ns["RETIRED_MODELS"], ns["MODEL_INFO"]
+    out = {"every pick is a current catalog row": all(l in I and l not in R for t in T.values() for l in t["picks"]),
+           "Pro and Max take every model": bool(T["Pro"].get("all") and T["Max"].get("all") and T["Max"].get("max")),
+           "no retired tag is a catalog tag": not ({r[1] for r in R.values() if r[1]}
+                                                   & {i["ollama"] for i in I.values() if i.get("ollama")}),
+           "the sets read the tiers": 'TIERS["Thinking"]["picks"]' in src[src.index("def model_sets("):
+                                                                          src.index("def model_set_chosen(")]}
+    return all(out.values()), out
+
+
+def _u45_page(src):
+    h = src[src.index("function muRows("):src.index("async function muFetch(")]
+    g = src[src.index("async function announceModels("):src.index("async function announceModels(") + 4000]
+    out = {"one list": "newer weights" in h and "up to " in h and "s.add" in h,
+           "the click sends each server's offer": "body:JSON.stringify(srv.length?{servers:srv}:{})" in src,
+           "server auto-clean asked": 'api("/api/servers/autoclean"' in src and 'elif op == "autoclean":' in src,
+           "a server's updates nudge daily": "muSrvGo(muSrv).some(" in g,
+           "routes": ('st["servers"] = servers_updates(self.ctx)' in src
+                      and "server_update_apply(self.ctx," in src),
+           "the post-update sweep checks weights": "        model_fresh_check(force=True)\n" in src,
+           "the janitor: the real app only": ('            if DEFAULT_APP and not os.environ.get("MILLENAI_TESTBUILD"):\n'
+                                              "                try:\n                    model_fresh_check()") in src}
+    return all(out.values()), out
+
+
+_U45 = [("what a set gained", _u45_news), ("newer weights, found and sized", _u45_fresh),
+        ("a refresh download", _u45_dl), ("a server's update", _u45_view),
+        ("auto-clean and the click on a server", _u45_wire), ("the presets", _u45_tiers),
+        ("the page and routes", _u45_page)]
+for _n45, _f45 in _U45:
+    try:
+        _ok45, _d45 = _f45(_MILLENAI_SRC)
+    except Exception as _x45:
+        import traceback as _tb45
+        _ok45, _d45 = False, _tb45.format_exc()[-600:]
+    check("model updates (6b445): " + _n45, _ok45, "%r" % (_d45,))
+
+
+def _u45_run(src):
+    res = []
+    for n, f in _U45:
+        try:
+            res.append((n, f(src)[0]))
+        except Exception:
+            res.append((n, False))
+    return res
+
+
+_U45_MUT = [
+    ("a person's retired model removed",
+     "    retire = [n for n in on_retired if _srv_tag_key(n) in managed\n              and _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]",
+     "    retire = [n for n in on_retired if _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]"),
+    ("a loaded model removed",
+     "    retire = [n for n in on_retired if _srv_tag_key(n) in managed\n              and _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]",
+     "    retire = [n for n in on_retired if _srv_tag_key(n) in managed][:SRV_SETS_MAX]"),
+    ("an older kit cleaned", '        if not state["managed_known"] or state["busy"]:\n', '        if state["busy"]:\n'),
+    ("the switch ignored", "    if not auto_cleanup_on():\n        return out\n    try:\n        entries = _srv_read(ctx)",
+     "    try:\n        entries = _srv_read(ctx)"),
+    ("a sleeping server asked", "    return now - float((_srv_seen.get(e[\"id\"]) or {}).get(\"at\") or 0) < SUGGEST_SERVER_FRESH_S",
+     "    return True"),
+    ("the offer not checked", '    if v["offer"] != offer:\n        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}\n', ""),
+    ("a README commit is an update", "               if blob not in blobs and not _FRESH_DOC_RX.search(path))",
+     "               if blob not in blobs)"),
+    ("every layer counted", "    return sum(sz for dg, sz in remote[1].items() if not _ollama_blob_here(dg))",
+     "    return sum(remote[1].values())"),
+    ("asked every time", "        if not force and now - _fresh[\"at\"] < FRESH_CHECK_S:", "        if False:"),
+    ("a download in flight checked", "        if not route or not SUPPORTED.get(label) or label in moving:",
+     "        if not route or not SUPPORTED.get(label):"),
+    ("the bar counts the whole model", "        if job.get(\"refresh\"):\n            # newer weights", "        if False:\n            # newer weights"),
+    ("a removed model offered again", "        news = [i for i in sets[hk] if i not in hids and i not in have]",
+     "        news = [i for i in sets[hk] if i not in have]"),
+    ("a bigger set's new rows", "            if sets[k] and miss and all(i in unseen for i in miss):",
+     "            if sets[k] and miss and any(i in unseen for i in miss):"),
+    ("a refresh not asked again", "        re_get = label in again and model_cached(label, pulled)", "        re_get = False"),
+]
+_m45 = []
+for _d, _o, _nw in _U45_MUT:
+    if _MILLENAI_SRC.count(_o) != 1:
+        _m45.append((_d, "anchor missing or not unique"))
+        continue
+    _r = _u45_run(_MILLENAI_SRC.replace(_o, _nw, 1))
+    _m45.append((_d, [n for n, o in _r if not o][:1] or "MISSED"))
+check("model updates (6b445): %d mutations of its code, each caught by a check above" % len(_U45_MUT),
+      all(isinstance(v, list) for _d, v in _m45), "%r" % [x for x in _m45 if not isinstance(x[1], list)])
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

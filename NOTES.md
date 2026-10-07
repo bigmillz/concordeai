@@ -253,6 +253,79 @@ empty while the card was full. App only; the kit is untouched.
   shown as the fallback. Verified in a windowless dev copy on 9896 with a stubbed `srvUse`: the label reads
   "OLLAMA1 VRAM" and the bar's width is the card's share.
 
+## 6b445 — an app update brings model updates: newer weights, the set's new models, retired ones cleared on servers too (per Patrick)
+
+Patrick (2026-10-07): "these models should be included when the app itself updates ... it should bring in updates to
+models, the newest models that we add, and clear out the ones that are deprecated. Also make sure that the ideal
+models are placed under each of the presets like fast, thinking, pro, and obviously max is every model."
+
+BEFORE, after an app update: (a) a Mac swept RETIRED models it had downloaded (6b306) and offered their
+replacements; a new catalog row reached the More-models card only if it was in the set the person PICKED, or in the
+largest set still complete here (a new row in Recommended made Recommended incomplete, so it was never offered);
+nothing ever noticed newer weights under the same name. (b) Windows: the same, through Ollama. (c) A paired server:
+nothing. The app touched a server's models only when the person applied a set in Settings › Servers; retired models
+stayed on its disk and allow-list (the 2026-10-07 audit: gemma3:12b, qwen3-vl:8b, mistral-nemo:12b,
+qwen2.5-coder:14b, phi4:14b), and a stale tag (qwen3.5:9b) stayed stale. The kit's own `ollama1-models` CLI could see
+digest updates, but only when run by hand at the server.
+
+NOW:
+- **Newer weights** (`# ==== model freshness ====`). `model_fresh_check` compares, for each catalog model here, the
+  Ollama digest with the registry's manifest (`ollama_registry_manifest`; Ollama's digest IS the sha256 of the manifest
+  bytes, checked against this Mac's qwen3.5:9b) and an MLX model's cached `refs/main` with the hub's main
+  (`hf_repo_files`, `?blobs=true`); only files whose blob isn't in the cache count, and a README/licence-only commit is
+  no update. Sizes are exact here (layers or blobs not on disk). Asked by the real app at the first launch after an
+  update (inside `_post_update_cleanup`, before the card asks) and on the janitor's tick, at most once a day
+  (FRESH_CHECK_S; a failed registry FRESH_RETRY_S); never by a dev or test copy on its own. Found models are OFFERED:
+  the Update models card ("Qwen 3.5 9B · newer weights · 5 GB") and the More-models card ("newer weights"). A click
+  runs `start_model_downloads(..., refresh=[...])`: the job carries refresh/want_b/base_b so the bars count only what
+  changes; an MLX refresh then prunes the old revision (`_hf_prune_old`, the hub's own deleter); Ollama drops the old
+  layers itself. A refreshed model keeps its owner: it is not added to `app_models`.
+- **The set's new models** (`set_news`, `local_set_news`, `update_added`, pref `model_set_had`, MACHINE). The set last
+  complete here is remembered; whatever it holds now that it didn't (a new catalog row, a tier change) is offered,
+  never a bigger set's, never a model the person removed. The first look after this build (no record yet) uses
+  `seen_models`: the largest set whose only missing rows are unseen ones. They join the Update models card
+  ("· new") and the More-models card. So a future catalog or tier change flows out with no other code.
+- **Servers** (end of `# ==== server model sets ====`). For each paired server that answered a check in the last 10
+  minutes (never woken), one signed GET /v1/models/state, then `server_update_view`: add (the set applied there, its
+  missing models; else set_news on the server's sets; a retired model's replacement that fits its card), refresh
+  (its digest vs the registry; sized "up to" the whole manifest, since which layers changed can't be seen from here),
+  retire (retired AND on the kit's new `managed` list AND not loaded) and kept (retired, put there by the person:
+  named, never touched). `servers_autoclean` (POST /api/servers/autoclean, the page 90 s after load and every 6 h;
+  the auto-clean switch governs it) removes `retire` unasked through POST /v1/models/apply (signed, `seen`, the
+  allow-list line goes with it). add and refresh go only on the Update models click (`server_update_apply`, checked
+  against the offer the card showed). An older kit (no `managed`) gets nothing removed. The page shows a server's rows
+  in the same card and the daily More-models nudge opens it when only servers have updates.
+- **Kit** (`ollama1/`): `/var/lib/ollama1-modelplan/managed.json` (root:o1view 0640): each set pull of a model that
+  wasn't on the disk is added, each set removal taken off; a pull of a model already there (a refresh) leaves the
+  owner; the first set after this kit seeds it from the last set's finished pulls. GET /v1/models/state gains
+  `managed` and each model's `digest` (PROTOCOL.md). Nothing else changes: the root program, the unit and polkit
+  are as they were.
+
+PRESETS (checked, not re-picked; the candidate test will change them): every TIERS pick is a current catalog row
+(a new gauntlet check keeps it so); Pro and Max take every model. Flags for Patrick: the Thinking tier's comments
+still talk about the 235B, Phi-4 and two R1 rows (all retired); the giants (GLM 5.3, DeepSeek V3.2, the two Windows
+giants) are only in Pro and Max, never Fast or Thinking; Fast still ends on Llama 3.2 3B and 1B (the swap is the
+running test's question); Hermes 4 14B has no Ollama tag, so Windows and servers never get it; on a Mac, Qwen 3.5 9B
+(MLX) and Qwen 3.5 Vision 9B (Ollama qwen3.5:9b) are two downloads of the same weights. gemma3:12b and qwen3-vl:8b
+were never catalog rows, so they are not RETIRED_MODELS and nothing removes them.
+
+COPY, old → new (for Patrick): the update card's heading, when it has more than retired-model replacements:
+"Newer versions of N of your models are ready" → "Updates for N of your models are ready" (one: "An update for one
+of your models is ready"); the Manage pane line likewise. New rows: "<model> · newer weights", "<model> · new",
+"<server> · <tag> · new | in its set | replaces <old>", "<server> · <tag> · newer weights  up to N GB", "Retired,
+added outside the app, so kept: …", after the click "Your server is updating too · Settings › Servers shows it".
+
+Tests: a block at the end of the gauntlet `== an app update brings model updates … (6b445) ==` (7 checks of 50-odd
+assertions, 14 mutants); old checks moved with the code (the download endpoint's namespace, the Update models
+stubs, the offer card's stubs, two 6b405 pins). Kit: `tests/test_modelplan.py` TestManaged (7) and the state route's
+key list.
+
+NOT VERIFIED: no real server was touched (it is mid stress test), so managed.json, the digest field and a refresh
+pull are tested on the stub Ollama only; Ollama pruning the old layers after a re-pull is its documented behaviour,
+not observed here; an MLX refresh against the real hub was not run (the API shape and blob naming were checked
+against this Mac's cache); WKWebView not opened; no metered-line detection exists in the app, so the consent is the
+click.
+
 ## 6b446 — nothing stays loaded on the card across a sleep; the idle clock counts a busy card (kit, per Patrick)
 
 What happened on the server (Ubuntu 26.04, RX 6900 XT, Ollama v0.40.0, ROCm): `ollama1-idle` suspended it at
