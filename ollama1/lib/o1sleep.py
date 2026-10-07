@@ -144,9 +144,124 @@ def record(**kw):
 
 
 def last():
-    """{"last_sleep", "last_wake", "resume_check": {"ok", "detail", "at"}} or {}."""
+    """{"last_sleep", "last_wake", "pre_sleep": {...}, "resume_check": {"ok", "detail", "at"}} or {}."""
     st = read_json(sleep_file(), {})
     return st if isinstance(st, dict) else {}
+
+
+# ---- before sleeping (6b446) ----------------------------------------------------
+# A model left loaded on the card across a suspend came back answering junk
+# ("<unused49>" over and over) after amdgpu logged "Failed to set manual fan
+# control mode" and "Fence fallback timer expired on ring kiq" on the wake;
+# unloading it and loading it again fixed it at once. So nothing stays loaded
+# across a sleep: the sleep hook unloads every model before every suspend (the
+# kit's own, the power button's, anyone's), and if Ollama won't let go, stops it.
+
+OLLAMA_URL = "http://127.0.0.1:11434"
+UNLOAD_TIMEOUT_S = 8      # one unload call (Ollama answers a keep_alive 0 at once)
+UNLOAD_WAIT_S = 15        # the unloads and /api/ps showing nothing loaded, together
+STOP_TIMEOUT_S = 30       # systemctl stop ollama.service (the stop goes on in systemd if this gives up). Worst
+                          # case in all, about 5 + 15 + 2 x 8 + 5 + 30 = 71 s: under the 90 s systemd-sleep gives
+                          # its hooks, with the watchdog's 5 s before it (the hook does this last)
+
+
+def ollama_base():
+    """The local Ollama. In a test (OLLAMA1_PREFIX set) only OLLAMA1_OLLAMA_URL, else a port nothing answers on:
+    a test run must never unload the models of an Ollama running on the machine it runs on."""
+    if os.environ.get("OLLAMA1_PREFIX"):
+        return os.environ.get("OLLAMA1_OLLAMA_URL") or "http://127.0.0.1:1"
+    return OLLAMA_URL
+
+
+def _call(method, path, obj=None, timeout=10):
+    import http.client
+    import o1ollama
+    try:
+        return o1ollama.call(ollama_base(), method, path, obj, timeout=timeout)
+    except (OSError, http.client.HTTPException, ValueError):
+        return None, None
+
+
+def loaded_models(call=_call):
+    """The names of the models Ollama has loaded ([] = none), or None when it doesn't answer."""
+    st, data = call("GET", "/api/ps", timeout=5)
+    if st != 200 or not isinstance(data, dict):
+        return None
+    ms = data.get("models")
+    out = []
+    for m in ms if isinstance(ms, list) else []:
+        n = (m.get("name") or m.get("model")) if isinstance(m, dict) else None
+        if isinstance(n, str) and n and n not in out:
+            out.append(n)
+    return out
+
+
+def unload(name, call=_call):
+    """keep_alive 0 for one model: generate, else embed (an embedding model has no generate)."""
+    for path, body in (("/api/generate", {"model": name, "keep_alive": 0}),
+                       ("/api/embed", {"model": name, "input": [], "keep_alive": 0})):
+        st, _ = call("POST", path, body, timeout=UNLOAD_TIMEOUT_S)
+        if st == 200:
+            return True
+    return False
+
+
+def unload_all(call=_call, sleep=time.sleep, clock=time.monotonic, wait_s=UNLOAD_WAIT_S):
+    """Unload every loaded model and wait until /api/ps shows none, all within wait_s (and one last look).
+    Returns (ok, how many were loaded, what happened)."""
+    names = loaded_models(call)
+    if names is None:
+        return False, 0, "Ollama didn't say what is loaded"
+    if not names:
+        return True, 0, "nothing was loaded"
+    end = clock() + wait_s
+    for n in names:
+        if clock() >= end:
+            break
+        unload(n, call)
+    while True:
+        left = loaded_models(call)
+        if left == []:
+            return True, len(names), "unloaded %d model%s" % (len(names), "" if len(names) == 1 else "s")
+        if clock() >= end:
+            break
+        sleep(1)
+    if left is None:
+        return False, len(names), "Ollama stopped answering while %d model%s unloaded" % (
+            len(names), " was" if len(names) == 1 else "s were")
+    return False, len(names), "%d model%s still loaded after %d s" % (len(left), "" if len(left) == 1 else "s", wait_s)
+
+
+def _ollama_active():
+    try:
+        return subprocess.run(["systemctl", "is-active", "--quiet", "ollama.service"], timeout=10).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return True                                  # can't tell: try to unload
+
+
+def _stop_ollama():
+    try:
+        return subprocess.run(["systemctl", "stop", "ollama.service"], timeout=STOP_TIMEOUT_S).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def before_sleep(unload_fn=None, active=_ollama_active, stop=_stop_ollama, log=print):
+    """From the sleep hook, before every suspend: nothing may stay loaded on the card. Unload every model; if
+    that can't be confirmed, stop Ollama (the check after the wake starts it again). The record says which."""
+    unload_fn = unload_fn or unload_all
+    stopped = False
+    if not active():
+        ok, n, detail = True, 0, "Ollama wasn't running"
+    else:
+        ok, n, detail = unload_fn()
+        if not ok:
+            log("before sleep: %s; stopping Ollama" % detail)
+            stopped = bool(stop())
+            detail += "; stopped Ollama" if stopped else "; stopping Ollama failed too"
+    log("before sleep: " + detail)
+    return record(pre_sleep={"ok": ok, "unloaded": n, "stopped_ollama": stopped, "detail": detail,
+                             "at": int(time.time())})
 
 
 # ---- after waking -------------------------------------------------------------
@@ -232,17 +347,36 @@ def _missing(st):
 
 
 def resume_check(ollama=ollama_ok, gpu=gpu_ok, restart=None, log=print, models=models_ok, gpu_needed=gpu_expected,
-                 sleep=time.sleep, clock=time.monotonic, wait_s=WAIT_S):
+                 sleep=time.sleep, clock=time.monotonic, wait_s=WAIT_S, pre=None, clear=None):
     """After waking: if Ollama or the GPU isn't healthy, wait (at most wait_s)
     for the card's driver and the models drive to be back, then restart Ollama
     and the tunnel, and once more if Ollama still doesn't answer. The record
     says what it saw: how long it waited, what was missing, how many restarts.
     (6b371: after a wake it once recorded "Ollama STILL NOT ANSWERING" having
-    restarted Ollama straight away, while the card's driver was not back.)"""
+    restarted Ollama straight away, while the card's driver was not back.)
+
+    6b446: if the sleep hook had to stop Ollama (`pre`, the pre_sleep record, says so) it is started first. When
+    the record doesn't show this sleep's hook leaving the card empty (it unloaded everything or stopped Ollama),
+    whatever /api/ps shows once Ollama answers may be from before the sleep: it is unloaded (`clear`, default
+    unload_all), and a model that won't go gets Ollama restarted. When it does, anything loaded now was loaded
+    after the wake (a request from the relay's wake, say) and is left alone."""
     restart = restart or (lambda units: subprocess.run(["systemctl", "restart"] + units, timeout=300))
+    clear = clear or unload_all
+    pre = last().get("pre_sleep") if pre is None else pre
+    pre = pre if isinstance(pre, dict) else {}
+    slept_at = last().get("last_sleep")
+    at = pre.get("at")
+    emptied = (bool(pre.get("ok") or pre.get("stopped_ollama")) and isinstance(at, (int, float))
+               and at >= (slept_at if isinstance(slept_at, (int, float)) else 0))
     t0 = clock()
-    o, g = ollama(), (gpu() or not gpu_needed())
     facts = {"restarts": 0}
+    started = []
+    if pre.get("stopped_ollama") and not pre.get("resumed"):
+        log("resume: Ollama was stopped before the sleep; starting it")
+        restart(["ollama.service"])
+        started.append("Ollama was stopped before the sleep: started it")
+        facts["started_ollama"] = True
+    o, g = ollama(), (gpu() or not gpu_needed())
     if o and g:
         detail, ok = "Ollama and the GPU answered", True
     else:
@@ -279,5 +413,31 @@ def resume_check(ollama=ollama_ok, gpu=gpu_ok, restart=None, log=print, models=m
             if ok:
                 break
         detail = "; ".join(parts)
+    if ok and not emptied:
+        detail = "; ".join([detail] + after_wake_clear(clear, restart, ollama, facts, log))
+        ok = facts.get("cleared", True)
+    detail = "; ".join(started + [detail])
     log("resume: " + detail)
-    return record(resume_check=dict(facts, ok=ok, detail=detail, at=int(time.time())))
+    extra = {"pre_sleep": dict(pre, resumed=True)} if pre else {}
+    return record(resume_check=dict(facts, ok=ok, detail=detail, at=int(time.time())), **extra)
+
+
+def after_wake_clear(clear, restart, ollama, facts, log):
+    """Nothing loaded from before the sleep: unload whatever /api/ps still shows; if that can't be confirmed,
+    restart Ollama once. Returns the phrases for the record; sets facts["cleared"] (False: still not sure)."""
+    try:
+        ok, n, why = clear()
+    except Exception as e:                           # never let this end the check without a record
+        ok, n, why = False, 0, "the after-wake unload failed (%s)" % type(e).__name__
+    if ok and not n:
+        return []
+    if ok:
+        log("resume: %s that was still loaded after the wake" % why)
+        facts["unloaded_after_wake"] = n
+        return ["%s that %s still loaded after the wake" % (why, "was" if n == 1 else "were")]
+    log("resume: %s; restarting Ollama" % why)
+    restart(["ollama.service"])
+    facts["restarts"] = facts.get("restarts", 0) + 1
+    up = bool(ollama())
+    facts["cleared"] = up
+    return ["%s: restarted Ollama, %s" % (why, "it answers now" if up else "it is STILL NOT ANSWERING")]

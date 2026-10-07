@@ -78,6 +78,13 @@ class TestDecide(unittest.TestCase):
         self.assertTrue(d(last_activity=0, boot_time=NOW - 3600)[0])
         self.assertFalse(d(last_activity=0, boot_time=None)[0])           # and an unknown boot time blocks
 
+    def test_a_busy_tick_counts_as_activity(self):
+        # 6b446: work sent straight to Ollama never passes the gateway; the last busy tick restarts the clock
+        self.assertEqual(d(last_busy=NOW - 600), (False, "idle 10 of 30 minutes"))
+        self.assertTrue(d(last_busy=NOW - 31 * 60)[0])
+        self.assertTrue(d(last_busy=None)[0])
+        self.assertFalse(d(last_busy=NOW + 99999)[0])                    # from the future: now
+
     def test_minutes_are_clamped(self):
         self.assertFalse(d(minutes=1, last_activity=NOW - 3 * 60)[0])      # 1 acts as 5
         self.assertTrue(d(minutes=1, last_activity=NOW - 5 * 60)[0])
@@ -658,8 +665,48 @@ class TestTick(unittest.TestCase):
         self.assertEqual(o1idle.idle_seconds(i), 100)
         i["last_activity"] = 20000.0                                  # from the future: capped at now
         self.assertEqual(o1idle.idle_seconds(i), 0)
+        i["last_activity"], i["last_busy"] = 9000.0, 9950.0             # 6b446: the last busy tick counts
+        self.assertEqual(o1idle.idle_seconds(i), 50)
         self.assertIsNone(o1idle.idle_seconds({"now": 1.0}))
         self.assertIsNone(o1idle.idle_seconds({"now": 1.0, "boot_time": None}))
+
+    def test_work_straight_to_ollama_keeps_the_clock_at_zero(self):
+        # 6b446, the report: half an hour of prompts sent to 127.0.0.1:11434 (the gateway saw nothing), the card
+        # busy, the load up; the clock said "idle 36 minutes" and it slept 90 s after the load fell
+        self.act(NOW - 3600)
+        self.box.p["gpu_busy"] = lambda: 97
+        self.box.p["loadavg"] = lambda: 2.4
+        for _ in range(60):                                         # 30 minutes of it
+            self.assertFalse(self.box.idle.tick()[0])
+            self.box.advance(30)
+            self.act(NOW - 3600, at=self.box.wall)
+        self.box.p["gpu_busy"] = lambda: 1                          # the work ends
+        self.box.p["loadavg"] = lambda: 0.2
+        self.assertEqual(self.box.idle.tick(), (False, "idle 0 of 30 minutes"))
+        self.box.advance(29 * 60)
+        self.act(NOW - 3600, at=self.box.wall)
+        self.assertEqual(self.box.idle.tick(), (False, "idle 29 of 30 minutes"))
+        self.assertEqual(self.published()["idle_s"], 29 * 60 + 30)
+        self.box.advance(31)
+        self.act(NOW - 3600, at=self.box.wall)
+        self.assertTrue(self.box.idle.tick()[0])
+        self.assertEqual(self.box.slept, 1)
+
+    def test_load_alone_or_the_card_alone_counts(self):
+        for probe, busy, quiet in (("loadavg", 1.6, 0.1), ("gpu_busy", 10, 9)):
+            box = FakeBox()
+            self.act(NOW - 3600)
+            box.p[probe] = lambda v=busy: v
+            box.idle.tick()
+            box.p[probe] = lambda v=quiet: v
+            box.advance(60)
+            self.act(NOW - 3600, at=box.wall)
+            self.assertEqual(box.idle.tick(), (False, "idle 1 of 30 minutes"), probe)
+        box = FakeBox()                                             # quiet all along: the old idle time stands
+        self.act(NOW - 3600)
+        box.p["gpu_busy"] = lambda: 9
+        box.p["loadavg"] = lambda: 1.5
+        self.assertTrue(box.idle.tick()[0])
 
     def test_the_log_has_reasons_only(self):
         self.act(NOW - 3600)

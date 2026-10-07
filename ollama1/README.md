@@ -774,6 +774,17 @@ around a little from time to time.
     button can't suspend the server mid-job. The inhibitor goes with its
     job however the job ends, even if it is killed. Holding the button down
     still forces it off. `systemd-inhibit --list` shows who holds one.
+  - **Nothing stays loaded across a sleep.** A model left on the graphics
+    card through a suspend once came back answering junk (`<unused49>` over
+    and over) until it was unloaded and loaded again. So before every
+    suspend (Sleep now, auto sleep, the power button, `systemctl suspend`:
+    the sleep hook runs for all of them), every model in `/api/ps` is
+    unloaded (`keep_alive` 0), and `/api/ps` must then show none. If that
+    can't be confirmed within about 15 s, Ollama is stopped instead. This is
+    the hook's last step, bounded so the whole hook stays well inside the
+    90 s systemd gives it; it never stops the suspend. What happened is in
+    `pre_sleep` in `/var/lib/ollama1/sleep.json`. The first request after a
+    wake loads its model fresh (a few seconds).
   - After every wake a check runs. Ollama must answer (`/api/version`,
     `/api/ps`) and the GPU must report through sysfs. If not, it first waits
     (at most 90 s) for the card's driver and the models drive (`/srv/models`)
@@ -782,14 +793,23 @@ around a little from time to time.
     answer. The record says why: how long it waited, what was still missing,
     how many restarts (`resume_check` in `/var/lib/ollama1/sleep.json`, shown
     on the dashboard and the panel). A server with no AMD card isn't held up
-    waiting for one.
+    waiting for one. If Ollama had to be stopped before the sleep, the check
+    starts it first. If the record doesn't show the hook emptying the card
+    for this sleep (it was cut off, say), anything `/api/ps` shows once
+    Ollama answers is unloaded, and if it won't go, Ollama is restarted.
+    When the hook did empty it, a model loaded since is from after the wake
+    (a request that woke the server) and is left alone.
   - The dashboard and the panel show the last sleep and wake times, and the
     result of that check.
   - **Untested until someone tries it by hand.** AMD GPU compute (ROCm)
     after a suspend is a known weak spot.
   - **Auto sleep** (the app's Settings > Your servers) suspends the server
     after the minutes you pick with no real work (a request, a download or
-    tool, load, a busy card). The setting is one small file,
+    tool, load, a busy card). The idle minutes count from the latest of: the
+    last request through the gateway, the boot, the last wake, and the last
+    check (every 30 s) that found the card at 10% or more or the load
+    average over 1.5. That last one counts work sent straight to Ollama on
+    `127.0.0.1:11434`, which the gateway never sees. The setting is one small file,
     `/var/lib/ollama1-gateway/sleep.json` (mode 0600, written whole through a
     rename and flushed, never under `/run`), so it stays across a restart of
     the gateway or `ollama1-idle`, a reboot, and another run of `setup.sh`
@@ -2063,7 +2083,12 @@ Ed25519 (the server uses PyNaCl). They cover:
 - the auto sleep setting across a gateway restart, the idle service's, a
   reboot and a setup.sh run (`test_sleepcfg.py`), and the check after a wake
   waiting, bounded, for the card and the models drive (`test_sleep.py`,
-  fake clock);
+  fake clock); every model unloaded before a suspend (through the real hook
+  and helper against a stub Ollama), Ollama stopped when an unload can't be
+  confirmed, the whole step bounded under systemd's hook limit, Ollama
+  started again and leftovers unloaded after the wake, and no test ever
+  reaching a real Ollama on the machine running the tests; the idle clock
+  counting a busy card or load as work (`test_idle.py`);
 - the move of the OS to the other NVMe (`tools/migrate-os.sh`) against a fake
   server (fake sysfs and /dev, stand-ins for lsblk, sgdisk, rsync, mount,
   chroot, efibootmgr, tmux; `test_migrate*.py`): drives found by serial with

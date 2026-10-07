@@ -226,7 +226,7 @@ def decide(i):
     hold; a probe that couldn't answer (None) blocks rather than guesses.
 
     Inputs: enabled, supported, minutes, now, last_activity, boot_time,
-    last_resume (epoch seconds, or None), inflight,
+    last_resume and last_busy (epoch seconds, or None), inflight,
     gpu_busy (percent) and gpu_present (False only on a machine with no
     graphics card: a card with no reading blocks), loadavg (1-minute; above
     LOAD_BUSY something is running), busy (reasons from o1sleep.busy_reasons),
@@ -269,9 +269,7 @@ def decide(i):
             return False, "the graphics card is busy (%d%%)" % g
         if i.get("boot_time") is None:
             return False, "couldn't tell when it started"
-        last = min(float(i.get("last_activity") or 0), now)
-        since = max(last, float(i["boot_time"]), float(i.get("last_resume") or 0))
-        idle = now - since
+        idle = now - _since(i, now)
         if idle < minutes * 60:
             return False, "idle %d of %d minutes" % (idle // 60, minutes)
         return True, "idle %d minutes" % (idle // 60)
@@ -279,15 +277,23 @@ def decide(i):
         return False, "couldn't read the inputs"
 
 
+def _since(i, now):
+    """The latest of: the last request through the gateway, the boot, the last resume, and the last tick that
+    found the card or the machine busy (6b446: work sent straight to Ollama on 127.0.0.1:11434 never passes the
+    gateway, so after a half-hour of it the clock read "idle 36 minutes" and the server slept 90 s after the load
+    average fell). A time in the future (a clock that stepped back) counts as now."""
+    last = min(float(i.get("last_activity") or 0), now)
+    busy = min(float(i.get("last_busy") or 0), now)
+    return max(last, busy, float(i["boot_time"]), float(i.get("last_resume") or 0))
+
+
 def idle_seconds(i):
-    """Seconds counted since the latest of the last real work, the boot and
-    the last resume (what decide() compares with the idle time), or None when
-    the inputs don't say."""
+    """Seconds counted since the latest of the last real work, the boot,
+    the last resume and the last busy tick (what decide() compares with the
+    idle time), or None when the inputs don't say."""
     try:
         now = float(i["now"])
-        last = min(float(i.get("last_activity") or 0), now)
-        since = max(last, float(i["boot_time"]), float(i.get("last_resume") or 0))
-        return int(max(0, now - since))
+        return int(max(0, now - _since(i, now)))
     except (KeyError, TypeError, ValueError):
         return None
 
@@ -550,6 +556,15 @@ def published_wake(path=None):
 
 # ---- the root service's tick ------------------------------------------------------
 
+def _num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _busy_now(gpu_busy, loadavg):
+    """The card at GPU_IDLE_PCT or more, or a load average over LOAD_BUSY: work, whoever sent it."""
+    return (_num(gpu_busy) and gpu_busy >= GPU_IDLE_PCT) or (_num(loadavg) and loadavg > LOAD_BUSY)
+
+
 class Idle:
     """One tick every TICK_S seconds. `probes` supplies inhibitors,
     tools, gpu_busy, busy, supported, wake; `suspend` is called when the
@@ -559,6 +574,7 @@ class Idle:
         self.p, self.suspend, self.log, self.clock, self.mono = probes, suspend, log, clock, mono
         self.prev = None
         self.last_resume = None
+        self.last_busy = None             # the last tick that found the card or the machine busy (6b446)
         self.last_reason = None
         self.wake = []
         self.wake_at = -1e9
@@ -589,6 +605,9 @@ class Idle:
             "gpu_busy": self._probe("gpu_busy"),
             "busy": self._probe("busy"), "tools": self._probe("tools"),
             "inhibitors": self._probe("inhibitors")}
+        if _busy_now(inputs["gpu_busy"], inputs["loadavg"]):
+            self.last_busy = now
+        inputs["last_busy"] = self.last_busy
         sleep, why = decide(inputs)
         try:
             # the server panel reads the setting (enabled, minutes) and this tick's DECISION from here

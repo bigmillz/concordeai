@@ -12,6 +12,7 @@ here as root:
   rmdevice ID      unpair a device
   lan on|off       LAN mode for the gateway (off by default)
   backup           nightly copy of settings and the model list to /var/backups/ollama1 (root fs)
+  before-sleep     from the sleep hook: unload every model (or stop Ollama), so none stays on the card (6b446)
 
 Arguments are hashes and ids, checked here against root-owned lists, so a
 unit instance name can never smuggle in a command or a model that isn't
@@ -242,6 +243,7 @@ def main():
         ("reboot", 0): lambda: run(["systemctl", "reboot"]),
         ("sleep", 0): lambda: sleep(),
         ("resume-check", 0): lambda: (0 if o1sleep.resume_check()["resume_check"]["ok"] else 1),
+        ("before-sleep", 0): lambda: (0 if o1sleep.before_sleep()["pre_sleep"]["ok"] else 1),
         ("stamp", 1): lambda: stamp(args[1]),
         ("backup", 0): lambda: backup(),
         ("pull", 1): lambda: held("a model is being downloaded", pull, args[1]),
@@ -250,7 +252,7 @@ def main():
         ("lan", 1): lambda: lan(args[1]),
     }
     if not args or (args[0], len(args) - 1) not in verbs:
-        sys.exit("usage: ollama1-helper update-now|restart|reboot|sleep|resume-check|backup|pull HASH|"
+        sys.exit("usage: ollama1-helper update-now|restart|reboot|sleep|resume-check|before-sleep|backup|pull HASH|"
                  "rmmodel HASH|rmdevice ID|lan on|off|stamp sleep|wake")
     if len(args) == 2 and not re.match(r"^[0-9a-z]{2,64}$", args[1]):
         sys.exit("bad argument")

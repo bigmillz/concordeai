@@ -15,6 +15,10 @@
 # Wi-Fi backup (6b439): before suspending, the Wi-Fi card is set to wake the machine on a magic packet (or a
 # disconnect); after waking that is switched off again and networkd re-associates. The tool does nothing when
 # Wi-Fi backup is off, no network is set or there is no card, and whatever it does or says, the hook still exits 0.
+# Nothing stays loaded across a sleep (6b446): a model left on the card came back answering junk after a wake.
+# Last before suspending (so the watchdog and Wi-Fi steps never wait on Ollama), every model is unloaded, and if
+# that can't be confirmed Ollama is stopped (at most about 70 s in all); the check after waking starts it again
+# and unloads anything still loaded. This hook runs for every suspend: the kit's, the power button's, anyone's.
 HELPER=${OLLAMA1_HELPER:-/usr/local/lib/ollama1/bin/ollama1-helper}
 WIFI=${OLLAMA1_WIFI_TOOL:-/usr/local/lib/ollama1/bin/ollama1-wifi}
 WATCHDOG=${OLLAMA1_WATCHDOG:-/usr/local/lib/ollama1/bin/ollama1-watchdog}
@@ -22,7 +26,8 @@ case "$1" in
   pre)
     [ ! -x "$WATCHDOG" ] || "$WATCHDOG" pause    # does nothing when the service is not running
     "$HELPER" stamp sleep
-    [ ! -x "$WIFI" ] || "$WIFI" wowlan enable >/dev/null 2>&1 || true ;;
+    [ ! -x "$WIFI" ] || "$WIFI" wowlan enable >/dev/null 2>&1 || true
+    "$HELPER" before-sleep || true ;;
   post)
     [ ! -x "$WATCHDOG" ] || "$WATCHDOG" resume
     "$HELPER" stamp wake

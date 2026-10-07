@@ -9,6 +9,63 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b446 — nothing stays loaded on the card across a sleep; the idle clock counts a busy card (kit, per Patrick)
+
+What happened on the server (Ubuntu 26.04, RX 6900 XT, Ollama v0.40.0, ROCm): `ollama1-idle` suspended it at
+17:02 ("sleeping: idle 36 minutes") with gemma4:12b still loaded (keep_alive 10m). It woke at 17:06:43; the
+kernel logged "amdgpu: Failed to set manual fan control mode" and "Fence fallback timer expired on ring
+kiq_0.2.1.0". From then on the same still-loaded model answered every prompt with `<unused49>` repeated.
+Unloading it (keep_alive 0) and loading it again fixed it at once. Pat has reported "input output not
+responding garbage" after wakes before; this is probably part of that. Kit only (`ollama1/`), no app change.
+Not tried on the server.
+
+- **Before every suspend, every model is unloaded.** The kit already had a pre-sleep hook,
+  `/usr/lib/systemd/system-sleep/ollama1` (`config/ollama1-sleep-hook`), and systemd-sleep runs it for every
+  suspend: Sleep now, auto sleep, the power button, a plain `systemctl suspend`. So no new unit and no change to
+  `ollama1-idle`'s sleep path. Its `pre` branch now ends with `ollama1-helper before-sleep` (`|| true`: it never
+  stops a suspend) -> `o1sleep.before_sleep`: if `ollama.service` is active, every model in `/api/ps` gets
+  `/api/generate` with `keep_alive: 0` (else `/api/embed`, as the gateway's `unload` does, for an embedding
+  model), then `/api/ps` must show none. If Ollama doesn't answer `/api/ps`, or a model is still listed after
+  15 s, `systemctl stop ollama.service`. It goes **last** in `pre`, after the watchdog pause, the sleep stamp and
+  Wi-Fi wake, so those never wait on Ollama, and it is bounded (about 71 s worst case: 8 s per unload call, 15 s
+  for the unloads and the check, a 30 s stop; systemd-sleep gives a hook 90 s and kills it after that, and the
+  suspend still goes ahead). The record is `pre_sleep` in `/var/lib/ollama1/sleep.json`: `ok`, `unloaded` (a
+  count), `stopped_ollama`, `detail`, `at`. No model names in the file; the journal line says the count.
+- **After the wake** (`o1sleep.resume_check`): if `pre_sleep` says Ollama was stopped (and that record hasn't been
+  handled yet: `resumed`), it is started first. If the record doesn't show this sleep's hook leaving the card
+  empty (`ok` or `stopped_ollama`, written at or after `last_sleep`), anything `/api/ps` shows once Ollama answers
+  may be from before the sleep: it is unloaded (`after_wake_clear`), and if that can't be confirmed, Ollama is
+  restarted once. When the hook did empty it, `/api/ps` is not touched: the check runs after gpu-tune, a minute
+  or more after the wake, and by then a model may be loaded for a request from the relay's wake; unloading it, or
+  restarting Ollama because a busy model won't unload at once, would cut that request off. The record says each
+  step. 13 new mutants in `tests/mutate.py` (`6b446`).
+- **No test generate after the wake.** Considered and left out: the evidence is that a fresh load answers
+  correctly (unload and reload fixed it at once), and the fix makes every post-wake request a fresh load. A
+  "junk?" check would need a per-model expected answer, would load a second model just as a request from the
+  relay's wake arrives (and could trip the gateway's fit check, which reads `/api/ps`), and a false alarm would
+  restart Ollama under a user. If junk is seen again after a wake with this build, that is the time for it.
+- **The idle clock counted only gateway requests.** Work sent straight to `127.0.0.1:11434` never passes the
+  gateway, so the clock said "idle 36 minutes" through half an hour of prompts; only the load average gate
+  (> 1.5) held it, and it slept 90 s after the load fell. Fixed small: `Idle.tick` remembers the last tick that
+  found the card at `GPU_IDLE_PCT` (10%) or more or the load over `LOAD_BUSY` (1.5), and `decide()` /
+  `idle_seconds()` count from the latest of that, the last request, the boot and the last resume (`_since`).
+  Ticks are 30 s apart, so a card busy only between two ticks is not seen; a half-hour of prompts is.
+- **Tests:** `TestBeforeSleep`, `TestHelperBeforeSleep` and new `TestResumeCheck` cases in `tests/test_sleep.py`
+  (fakes on a fake clock, plus the real hook and helper against `stub_ollama`); `test_a_busy_tick_counts_as_activity`,
+  `test_work_straight_to_ollama_keeps_the_clock_at_zero`, `test_load_alone_or_the_card_alone_counts` in
+  `tests/test_idle.py`; the watchdog's hook-order test now expects `helper before-sleep` last. In a test
+  (`OLLAMA1_PREFIX` set) `o1sleep.ollama_base()` is `OLLAMA1_OLLAMA_URL` or port 1, never 11434: a test run must
+  not unload the models of an Ollama on the machine it runs on (this Mac runs one on 11434). On main, the
+  mutants "idle: boot time ignored" and "idle: a resume ignored" were BROKEN (their line appeared twice, in
+  `decide` and `idle_seconds`); `_since` makes it one line and both are killed again. Six other mutants elsewhere
+  are BROKEN on main the same way (cpu 7-column history, two gpu-tune, leds on by default, two modelplan polkit);
+  not touched here.
+- **Unverified on the real server:** that the unload in the hook finishes before the card is suspended
+  (`journalctl -b -u systemd-suspend` should show "before sleep: unloaded 1 model"); that `systemctl stop` works
+  from inside systemd-sleep without a hang; that fresh loads after a wake are always sane (the kiq fence timeout
+  may mean the card itself is unwell after some wakes; if junk comes back with nothing carried over, the next
+  step is a GPU reset or a reboot on that kernel message, not this); and the idle change under real use.
+
 ## 6b444 — the server's HDMI panel and text dashboard update twice a second (per the owner)
 
 Owner: "Can we increase the screen update speed to update faster? Every half a second, if it's not going to be an

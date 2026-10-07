@@ -606,7 +606,8 @@ class TestSleep(Case):
                    OLLAMA1_WATCHDOG=os.path.join(d, "wd"))
         hook = os.path.join(U.CONFIG, "ollama1-sleep-hook")
         subprocess.run(["sh", hook, "pre", "suspend"], env=env, check=True)
-        self.assertEqual(open(log).read().splitlines(), ["watchdog pause", "helper stamp sleep"])
+        # 6b446: the models are unloaded last, so the watchdog is never left waiting on Ollama
+        self.assertEqual(open(log).read().splitlines(), ["watchdog pause", "helper stamp sleep", "helper before-sleep"])
         os.unlink(log)
         subprocess.run(["sh", hook, "post", "suspend"], env=env, check=True)
         lines = open(log).read().splitlines()
