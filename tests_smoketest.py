@@ -29333,7 +29333,7 @@ def _w46c_ui(src):
                                 'data-a="sleepmin" data-k="smin" value="45" aria-label="Minutes with no questions before it sleeps">'
                                 '<span>minutes</span></span></div><div class="srv-hint">Sleeps after this long with no questions, '
                                 'and wakes when you ask.</div><div class="srv-relay"><div class="srv-wakerow"><button class="about-btn slim" '
-                                'data-a="relayopen" aria-expanded="false">Advanced ▾</button></div></div></div>')
+                                'data-a="relayopen" aria-expanded="false">Advanced<span class="srv-disc" aria-hidden="true"></span></button></div></div></div>')
                    and "<input" not in h[2] and "Reading it from the server\u2026" in h[2] and "Sleep when idle" in h[2]
                    and "&lt;b&gt;x&lt;/b&gt; &amp; y" in h[3] and "<b>x</b>" not in h[3] and "<input" not in h[3]
                    and "<input" not in h[4] and 'value="30"' not in h[4] and "checked" not in h[4])
@@ -30455,6 +30455,117 @@ for _d36, _o36, _n36 in _L36_MUT:
 check("wake row: %d mutations, each caught by a check above" % len(_L36_MUT),
       all(isinstance(v, list) for _d, v in _l36m), "%r" % [x for x in _l36m if not isinstance(x[1], list)])
 # ==== 6b436 wake row: end ====
+
+
+# ==== 6b442 server card polish: begin ====
+print("== Your servers: lighter buttons, a turning arrow, the badge in the corner (6b442) ==")
+# Patrick (2026-10-07): "make the boxes around buttons like advanced ... a little bit lighter
+# colored and change that arrow so that it points forward and then down when the advanced button
+# is clicked. Also move the check mark in yours for everything to a different spot in that box so
+# it doesn't shove the rest of the text down." The CSS read from the source, the Advanced button
+# rendered in node closed and open, then each rule mutated and shown caught.
+
+
+def _l42_hex(h):
+    h = h.lstrip("#")
+    return sum(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _l42_run(src):
+    import re as _re42
+    out = {}
+    css = src[src.index("<style>"):src.index("</style>")]
+    tok = dict(_re42.findall(r"--(line|line-hi):(#[0-9a-fA-F]{6})", css[:css.index("}", css.index(":root{"))]))
+    # lighter than the old edge (--line), still well under the hover edge (--dim)
+    out["button edge one step lighter"] = (
+        "line" in tok and "line-hi" in tok
+        and 0 < _l42_hex(tok["line-hi"]) - _l42_hex(tok["line"]) <= 60
+        and "#p-servers .about-btn.slim:not(.danger){border-color:var(--line-hi)}" in css
+        and "#p-servers .about-btn.slim:not(.danger):hover{border-color:var(--dim)}" in css)
+    # the arrow: drawn pointing right, turned down when open, with a transition and a still fallback
+    out["arrow turns on open"] = (
+        "[aria-expanded=\"true\"]>.srv-disc{transform:rotate(90deg)}" in css
+        and _re42.search(r"\.srv-disc\{[^}]*border-width:\.3em 0 \.3em \.48em;[^}]*transition:transform \.15s\}", css) is not None
+        and "@media (prefers-reduced-motion:reduce){.srv-disc{transition:none}}" in css
+        and "u25be" not in src[src.index("function srvRelayHtml(s){"):src.index("function srvSleepHtml(s,z){")]
+        and "dc.classList.add(\"from\");void dc.offsetWidth;dc.classList.remove(\"from\");" in src)
+    # the badge: absolute in the corner, the chosen card no taller at the top, its title kept clear
+    cur = _re42.search(r"\.plan-card \.cur\{([^}]*)\}", css)
+    out["badge in the corner, titles level"] = (
+        cur is not None and "position:absolute" in cur.group(1) and "top:8px" in cur.group(1)
+        and "right:10px" in cur.group(1)
+        and _re42.search(r"\.set-card\.current\{[^}]*padding-top", css) is None
+        and ".set-card .cur{top:-6px;right:8px;padding:0 5px;line-height:10px;" in css
+        and _re42.search(r"\.plan-card\{[^}]*position:relative", css) is not None)
+    i0 = src.index("function esc(s){")
+    esc = src[i0:src.index(";}\n", i0) + 3]
+    a = src.index('const SRV_LAN_LINE="')
+    b = src.index("function srvSleepHtml(s,z){")
+    js = esc + "let srvRelayOpen={};let srvLan=false;\n" + src[a:b] + r"""
+const R={},s0={id:"a1",paired:true,name:"Desk"};
+R.closed=srvRelayHtml(s0);srvRelayOpen.a1=true;R.open=srvRelayHtml(s0);
+process.stdout.write(JSON.stringify(R));
+"""
+    pth = os.path.join(_si_dir, "srvcard442.js")
+    open(pth, "w").write(js)
+    p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
+    try:
+        R = json.loads(p.stdout)
+    except ValueError:
+        R = {"closed": "", "open": ""}
+    arrow = '>Advanced<span class="srv-disc" aria-hidden="true"></span></button>'
+    out["one arrow, the state on the button"] = (
+        arrow in R["closed"] and arrow in R["open"]
+        and 'data-a="relayopen" aria-expanded="false"' in R["closed"]
+        and 'data-a="relayopen" aria-expanded="true"' in R["open"]
+        and not any(ch in R["closed"] + R["open"] for ch in "\u25be\u25b4\u25b8"))
+    # the relay's fields on their own row, the address the wider, the buttons on the row below
+    # (Patrick: "move the buttons under these boxes so that ... the boxes can be wider")
+    o = R["open"]
+    fi = o.find('<div class="srv-tokf srv-relayf">')
+    bi = o.find('<div class="srv-relaybtns">')
+    fields = o[fi:o.find("</div>", fi)] if fi >= 0 else ""
+    out["relay fields wide, buttons below"] = (
+        fi >= 0 and bi > fi and 'data-k="rurl"' in fields and 'data-k="rtok"' in fields
+        and "<button" not in fields
+        and all(o.find('data-a="%s"' % k) > bi for k in ("relaysave", "relayclear", "relaytest"))
+        and '.srv-relayf input[data-k="rurl"]{flex:2 1 220px}' in css
+        and '.srv-relayf input[data-k="rtok"]{flex:1 1 120px}' in css
+        and ".srv-relaybtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}" in css)
+    return [(k, bool(v), "") for k, v in out.items()] + [("node", p.returncode == 0, p.stderr[:200])]
+
+
+for _n42, _o42, _d42 in _l42_run(_MILLENAI_SRC):
+    check("server card polish: " + _n42, _o42, _d42)
+
+_L42_MUT = [
+    ("old edge", "#p-servers .about-btn.slim:not(.danger){border-color:var(--line-hi)}",
+     "#p-servers .about-btn.slim:not(.danger){border-color:var(--line)}"),
+    ("token too bright", "  --line-hi:#33343a;", "  --line-hi:#b4b4b4;"),
+    ("no turn", "[aria-expanded=\"true\"]>.srv-disc{transform:rotate(90deg)}",
+     "[aria-expanded=\"true\"]>.srv-disc{transform:none}"),
+    ("no still fallback", "@media (prefers-reduced-motion:reduce){.srv-disc{transition:none}}", ""),
+    ("glyph back", "+'<span class=\"srv-disc\" aria-hidden=\"true\"></span></button></div>'",
+     "+(open?\" \\u25b4\":\" \\u25be\")+'</button></div>'"),
+    ("text shoved down", ".set-card .cur{top:-6px;right:8px;", ".set-card.current{padding-top:22px}\n.set-card .cur{top:8px;right:8px;"),
+    ("badge in the flow", ".plan-card .cur{position:absolute;", ".plan-card .cur{position:static;"),
+    ("buttons back beside the fields", "+'\" aria-label=\"Wake relay token\"></div>'\n      +'<div class=\"srv-relaybtns\"><button",
+     "+'\" aria-label=\"Wake relay token\">'\n      +'<div class=\"srv-relaybtns\"><button"),
+    ("address no wider", '.srv-relayf input[data-k="rurl"]{flex:2 1 220px}', '.srv-relayf input[data-k="rurl"]{flex:1}'),
+]
+_l42m = []
+for _d42, _o42, _n42 in _L42_MUT:
+    if _MILLENAI_SRC.count(_o42) != 1:
+        _l42m.append((_d42, "anchor missing %d" % _MILLENAI_SRC.count(_o42)))
+        continue
+    try:
+        _r42 = _l42_run(_MILLENAI_SRC.replace(_o42, _n42, 1))
+        _l42m.append((_d42, [n for n, o, _x in _r42 if not o][:1] or "MISSED"))
+    except Exception as _e42:
+        _l42m.append((_d42, ["raised"]))
+check("server card polish: %d mutations, each caught by a check above" % len(_L42_MUT),
+      all(isinstance(v, list) for _d, v in _l42m), "%r" % [x for x in _l42m if not isinstance(x[1], list)])
+# ==== 6b442 server card polish: end ====
 
 
 

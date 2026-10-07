@@ -34194,6 +34194,7 @@ select option{background:#16171b;color:#ececec}
   --panel:#0a0a0c;
   --panel2:#191a1e;
   --line:#26272c;
+  --line-hi:#33343a;         /* one step up from --line: Your servers' buttons (6b442) */
   --line-soft:#1e1f23;
   --text:#ececec;
   --dim:#b4b4b4;
@@ -36936,6 +36937,12 @@ body.gen #chip-model{color:var(--accent)}
 .srv-tokf .about-btn.slim{margin-top:0}
 .srv-relay{margin-top:8px}
 .srv-relay .srv-tokf{flex-wrap:wrap}
+/* the relay's address about twice the token's width, each a full row when narrow, and
+   Save / Clear / Test relay on the row below (6b442) */
+.srv-relayf input[data-k="rurl"]{flex:2 1 220px}
+.srv-relayf input[data-k="rtok"]{flex:1 1 120px}
+.srv-relaybtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.srv-relaybtns .about-btn.slim{margin-top:0}
 .srv-st{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.45}
 .srv.ok .srv-st{color:#9fd8b4}
 .srv.warn .srv-st{color:#d9c08a}
@@ -36977,6 +36984,20 @@ body.gen #chip-model{color:var(--accent)}
 .srv-amber{color:#d9c08a}
 .srv-wakerow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .srv-wakerow .about-btn.slim{margin-top:0}
+/* the pane's buttons one step lighter (6b442, per Patrick: "a little bit lighter colored");
+   Remove keeps its red edge */
+#p-servers .about-btn.slim:not(.danger){border-color:var(--line-hi)}
+#p-servers .about-btn.slim:not(.danger):hover{border-color:var(--dim)}
+/* Advanced's arrow points right, and turns down when open (6b442): the Settings list's
+   drawn triangle (.snav-chev), sized from the button's own text */
+.srv-disc{display:inline-block;width:0;height:0;margin-left:.45em;vertical-align:.02em;
+  border-style:solid;border-width:.3em 0 .3em .48em;
+  border-color:transparent transparent transparent currentColor;transition:transform .15s}
+[aria-expanded="true"]>.srv-disc{transform:rotate(90deg)}
+/* the repaint makes a new button, so it starts at the old angle and turns from there */
+[aria-expanded="true"]>.srv-disc.from{transform:none;transition:none}
+[aria-expanded="false"]>.srv-disc.from{transform:rotate(90deg);transition:none}
+@media (prefers-reduced-motion:reduce){.srv-disc{transition:none}}
 .srv-msg.ok{color:#9fd8b4;font-size:12px}
 .srv-msg.bad{color:#e8907e;font-size:12px}
 .srv-msg.warn{color:#d9c08a;font-size:12px}
@@ -37108,7 +37129,13 @@ body.gen #chip-model{color:var(--accent)}
   margin:4px 0 12px}
 .set-row{margin:14px 0 4px}
 .set-card{padding-right:12px}
-.set-card.current{padding-top:22px}
+/* the badge sits on the corner and the text stays put (6b442, per Patrick: "so it doesn't
+   shove the rest of the text down"): a small tag on the top edge, so the chosen card's title
+   lines up with the others' and no title is ever under it. At the pane's width a card's
+   title line has no room for it (Everything plus the tag is wider than the card), so it
+   sits on the border rather than beside the title */
+.set-card .cur{top:-6px;right:8px;padding:0 5px;line-height:10px;
+  background:var(--panel);border:1px solid var(--text);border-radius:999px}
 .set-card.on{border-color:var(--accent-hot);background:var(--accent-dim)}
 .set-card:focus-visible{outline:2px solid var(--accent-hot);outline-offset:2px}
 .set-card.none{opacity:.5;cursor:default}
@@ -44830,13 +44857,15 @@ function srvRelayHtml(s){
   const r=s.relay||{},open=!!srvRelayOpen[s.id];
   return '<div class="srv-relay"><div class="srv-wakerow">'+srvWakeBtn(s)
     +'<button class="about-btn slim" data-a="relayopen" aria-expanded="'+(open?"true":"false")+'">Advanced'
-    +(open?" \u25b4":" \u25be")+'</button></div>'+srvWakeNote(s)
+    +'<span class="srv-disc" aria-hidden="true"></span></button></div>'+srvWakeNote(s)
     +(open?'<div class="srv-relay-body"><div class="srv-hint">'+esc(SRV_RELAY_HINT)+'</div>'
-      +'<div class="srv-tokf"><input type="text" data-k="rurl" autocomplete="off" spellcheck="false" placeholder="http://10.0.0.5:8080" '
+      // the fields get the width and the buttons a row of their own (6b442, per Patrick: "the boxes
+      // can be wider and more visible, especially the address one")
+      +'<div class="srv-tokf srv-relayf"><input type="text" data-k="rurl" autocomplete="off" spellcheck="false" placeholder="http://10.0.0.5:8080" '
       +'aria-label="Wake relay address" value="'+esc(r.url||"")+'">'
       +'<input type="password" data-k="rtok" autocomplete="off" placeholder="'+(r.has_token?"Token saved":"Token")
-      +'" aria-label="Wake relay token">'
-      +'<button class="about-btn slim" data-a="relaysave">Save</button>'
+      +'" aria-label="Wake relay token"></div>'
+      +'<div class="srv-relaybtns"><button class="about-btn slim" data-a="relaysave">Save</button>'
       +'<button class="about-btn slim" data-a="relayclear"'+(r.url||r.has_token?"":" disabled")+'>Clear</button>'
       +'<button class="about-btn slim" data-a="relaytest"'+(r.url&&r.has_token?"":" disabled")+'>Test relay</button></div></div>':"")
     +'</div>';
@@ -45041,7 +45070,13 @@ $("#srv-list").addEventListener("click",async ev=>{
     return;
   }
   if(a==="relayopen"){
+    const had=document.activeElement===b;
     srvRelayOpen[id]=!srvRelayOpen[id];paintServers();
+    // the arrow turns (6b442): the new button's arrow starts at the old angle, then is let go
+    const nb=document.querySelector('#srv-list .srv[data-id="'+id+'"] [data-a="relayopen"]'),
+      dc=nb&&nb.querySelector(".srv-disc");
+    if(dc){dc.classList.add("from");void dc.offsetWidth;dc.classList.remove("from");}
+    if(nb&&had)nb.focus();
     return;
   }
   if(a==="relaysave"||a==="relayclear"||a==="relaytest"){

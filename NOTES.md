@@ -9,6 +9,41 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b442 — Your servers: lighter buttons, an arrow that turns, the badge off the text, wider relay fields (per Patrick)
+
+Patrick: "make the boxes around buttons like advanced in this screenshot a little bit lighter colored and change
+that arrow so that it points forward and then down when the advanced button is clicked. Also move the check mark in
+yours for everything to a different spot in that box so it doesn't shove the rest of the text down." Then, of the
+wake relay: "move the buttons under these boxes so that it's, the boxes can be wider and more visible, especially
+the address one."
+
+- **Buttons.** New token `--line-hi:#33343a`, one step up from `--line` (#26272c). `#p-servers
+  .about-btn.slim:not(.danger)` uses it (Advanced, Wake up server, Test, Pair again, Change Access token, Save,
+  Clear, Test relay, Pair, Add); hover stays `--dim`. Remove keeps its red edge. The app has one (dark) theme, so
+  there is no light value to set.
+- **Arrow.** The `▴`/`▾` glyphs are gone: `.srv-disc` is the drawn triangle Settings' own list uses
+  (`.snav-chev`), pointing right, turned 90° by `[aria-expanded="true"]>.srv-disc` with a .15 s transition and
+  none under reduced motion. The click repaints the card (a new button), so the handler adds `.from` (the old
+  angle, no transition), forces a layout, and removes it so the turn plays; it also puts focus back on the button
+  when it had it. The only other `▾` disclosure is the agent list's, in the tier pop-up (left alone; another
+  branch is reworking it).
+- **"✓ yours".** `.set-card.current{padding-top:22px}` is gone; the badge is a small tag on the card's top-right
+  edge (`.set-card .cur`: absolute, `top:-6px`, a pill on `--panel` with a `--text` rim). It cannot sit beside the
+  title: the cards are ~120 px in the 402 px pane and "Everything" plus the tag doesn't fit, and padding the title
+  widened that column. Measured: the three titles share one top y, the cards share one width, the tag ends above
+  the title's ink.
+- **Relay fields.** The address and token have their own row (`.srv-relayf`: address `flex:2 1 220px`, token
+  `flex:1 1 120px`, each a full row when narrow), Save / Clear / Test relay a row below (`.srv-relaybtns`). At the
+  pane's width the address is 239 px and `http://192.168.86.15:8097` shows whole.
+- **Gauntlet.** The 6b346 markup pin now expects the `srv-disc` span; new "server card polish" checks (edge lighter
+  than `--line` and under `--dim`, the arrow's turn and reduced-motion rule, the tag's position and no top padding,
+  the relay rows in node) with nine mutants, each caught.
+- **Unverified.** Only in the Browser pane (Blink), on a faked paired server; not in the WKWebView app. The full
+  gauntlet wasn't run (its ports were in use); the 6b346, 6b431, 6b436 and new blocks were run alone. The wizard's
+  set row has a 4 px top margin, so a "yours" tag there would reach ~2 px above it.
+
+---
+
 ## 6b439 — Wi-Fi backup for the server kit: a spare connection and a second way to wake it (per the owner; opt-in)
 
 Owner: "Let's take a look into having Wi-Fi as a backup connection. Can we do wake on LAN with that? If it's on the
