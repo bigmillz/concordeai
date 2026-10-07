@@ -6483,7 +6483,7 @@ print("== usage (6b325) ==")
 # the pane's four figures and bars. These run the real functions.
 import io as _io25, stat as _stat25, tempfile as _tf25, urllib.error as _ue25
 _UN = {"USAGE_FILE", "USAGE_RAW_DAYS", "USAGE_HOURLY_DAYS", "USAGE_COMPACT_BYTES",
-       "USAGE_SUM_KEYS", "USAGE_RANGES", "USAGE_UNITS", "_USAGE_T0", "_usage_q",
+       "USAGE_SUM_KEYS", "USAGE_ROLL_KEYS", "USAGE_RANGES", "USAGE_UNITS", "_USAGE_T0", "_usage_q",
        "_usage_qlock", "_usage_lock", "_usage_wake", "_usage_state", "_usage_num",
        "_usage_est", "_usage_est_in", "usage_counts", "usage_note", "usage_put",
        "_usage_writer", "_usage_write_all", "usage_flush", "_usage_load", "usage_read",
@@ -10267,7 +10267,7 @@ function advChip(){}
 function paintAutonomy(){}
 function paintModels(){}
 function setAgent(n){agent=n;}
-function isSrvMode(){return false;}
+function isCloudMode(){return false;}function cloudTierParse(){return {};}function isSrvMode(){return false;}
 function srvModeGone(){}
 function advPrune(){}function micWarmPaint(){}
 """ % (json.dumps(INST.base), json.dumps(INST.headers)) + _sbseg + r"""
@@ -10352,7 +10352,7 @@ let adv=null,advOn=false,autonomy="auto",tierOff={},agent="",uiMode="ai",council
     council=["Llama 3.2 3B"],tier="Fast";
 function paintAgents(){} function paintModels(){} function advChip(){} function paintAutonomy(){}
 function modeShow(w){uiMode=w;}
-function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}function micWarmPaint(){}
+function isCloudMode(){return false;}function cloudTierParse(){return {};}function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}function micWarmPaint(){}
 """ + _sbseg + _jsfn(page, "function setTier(name,quiet){") + _jsfn(page, "function switchLane(m){")
              + _jsfn(page, "function setAgent(name,guess){") + r"""
 const boot=storeBoot();
@@ -16834,7 +16834,7 @@ function advChip(){}
 function paintAutonomy(){}
 function paintModels(){}
 function setAgent(n){agent=n;}
-function isSrvMode(){return false;}
+function isCloudMode(){return false;}function cloudTierParse(){return {};}function isSrvMode(){return false;}
 function srvModeGone(){}
 function advPrune(){}function micWarmPaint(){}
 """ + _pg9 + r"""
@@ -19805,6 +19805,9 @@ def _sv_ns(src, hooks=("server-http-loopback",)):
     # the modes' roles and the seat cap (6b426: Fast, Thinking and Pro on one server alone read them)
     exec(re.search(r"^_TIER_ROLE = .*$", src, re.M).group(0), ns)
     exec(re.search(r"^SRV_SEATS_MAX = .*$", src, re.M).group(0), ns)
+    # the line under a mode's row (6b440): the servers section's rows call it
+    exec(re.search(r"^BLEND_NONE = .*$", src, re.M).group(0), ns)
+    exec(src[src.index("def blend_text("):src.index("\n\n\ndef max_tier_seats(")], ns)
 
     class Ctl(str):
         pass
@@ -22023,7 +22026,7 @@ _SO_MUT = [
     ("a flyout never on the left", "  let left=roomR>=w||roomR>=roomL?mr.right+GAP:mr.left-GAP-w;",
      "  let left=mr.right+GAP;"),
     ("a flyout off the window's edge", "  left=Math.max(EDGE,Math.min(left,iw-w-EDGE));", "  left=left;"),
-    ("a flyout taller than the window", "maxH:h>maxH?Math.floor(maxH):0};", "maxH:0};"),
+    ("a flyout taller than the window", "ih-EDGE-hh));\n  return {left:Math.round(left),top:Math.round(top),maxH:h>maxH?Math.floor(maxH):0};", "ih-EDGE-hh));\n  return {left:Math.round(left),top:Math.round(top),maxH:0};"),
     ("a flyout's top off the window", "  const top=Math.max(EDGE,Math.min(rr.top,ih-EDGE-hh));", "  const top=rr.top;"),
     ("an outside click leaving the flyout", '     &&!e.target.closest("#model-chip"))closeEngMenus();',
      '     &&!e.target.closest("#model-chip"))engMenu.hidden=true;'),
@@ -23763,8 +23766,9 @@ _P2_MUT = [
      '  paintEngMenuServers();\n  if(d.err)srvMsg(id,d.err);'),
     ("the chip naming a server for Fast with the cloud first", '||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return t;', ')return t;'),
     ("the cap not said in the bubble", "    (info.srvcap\n      ? '<span class=\"note\">seats '", "    (false\n      ? '<span class=\"note\">seats '"),
-    ("a model seated twice", '        if _srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) in taken:\n            continue\n', ''),
-    ("no local copy behind a server seat", '            st["fb"] = local_tag.get(st.pop("tag", ""), "") or first_local', '            st["fb"] = ""'),
+    ("a model seated twice", '            break\n        if _srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) in taken:\n            continue\n', '            break\n'),
+    ("no local copy behind a server seat", '                       ready[0] if ready else "")\n    for st in seats:\n        if server_label(st["label"]):\n            st["fb"] = local_tag.get(st.pop("tag", ""), "") or first_local',
+     '                       ready[0] if ready else "")\n    for st in seats:\n        if server_label(st["label"]):\n            st["fb"] = ""'),
     ("a server seat with no fallback", '    if not fallback:\n        emit(AppText("\\u26a0\\ufe0f " + why))\n        return "failed"',
      '    if True:\n        emit(AppText("\\u26a0\\ufe0f " + why))\n        return "failed"'),
     ("a second answer after a word", '    if shown[0]:\n        emit(AppText("\\n\\n\\u26a0\\ufe0f " + why))\n        return "failed"\n', ''),
@@ -24391,8 +24395,8 @@ _SM_MUT = [
     ("no rows for the modes in the flyout", "    +srvSubModes().map(([k,n,ic])=>", "    +[].map(([k,n,ic])=>"),
     ("the rows never greyed", "      +(tier===t+\":\"+k&&!advOn?\" on\":\"\")+(ok?\"\":\" off\")+",
      "      +(tier===t+\":\"+k&&!advOn?\" on\":\"\")+"),
-    ("the server's name not escaped in a row", "      +'<span class=\"edsc\">'+esc(s.name)+' only</span></div>').join(\"\");",
-     "      +'<span class=\"edsc\">'+s.name+' only</span></div>').join(\"\");"),
+    ("the server's name not escaped in a row", "      +'<span class=\"edsc\">'+esc(s.name)+' only</span></div>'+blendHtml(t+\":\"+k)).join(\"\");",
+     "      +'<span class=\"edsc\">'+s.name+' only</span></div>'+blendHtml(t+\":\"+k)).join(\"\");"),
     ("the modes not greyed", '    srvSubModes().forEach(x=>{tierOff["srv:"+s.id+":"+x[0]]=1;});});', "    });"),
     ("the chip not naming the mode", '  if(s&&mode)return mode+" \\u00b7 "+s.name+" only";', "  if(false)return \"\";"),
     ("the menu row not marked", "    const here=!advOn&&(srvTierParse(tier).id===s.id||",
@@ -27094,7 +27098,7 @@ check("mic warm pref: an account's choice sits in its own local.json and never r
       _mw_acct())
 _MW_PROF = _prof_sect("profile")
 _mw_mut = [
-    ("class", "local", '"lend", "lend_pick", "studio_opts.*.neg", "mic_warm"))', '"lend", "lend_pick", "studio_opts.*.neg"))'),
+    ("class", "local", '"lend", "lend_pick", "studio_opts.*.neg", "mic_warm",\n    "cloud_balance"))', '"lend", "lend_pick", "studio_opts.*.neg",\n    "cloud_balance"))'),
     ("bool", "bool", "                k in LOCAL_BOOL and not isinstance(v, bool)):", "                False):"),
 ]
 _mw_bad = []
@@ -28968,8 +28972,8 @@ _M53_MUT = [
     ("the card's two read again at every tick", "const poll=o.ids.filter(id=>(o.due[id]||0)<=o.now);", "const poll=o.ids.slice();"),
     ("a hidden window read with the dialog open", "if(!o.ids.length||!o.page)return {poll:[],next:null};", "if(!o.ids.length)return {poll:[],next:null};"),
     ("\"not read\" back", 'u.ok?"usage not reported":"reading\\u2026"', 'u.ok?"usage not reported":"not read"'),
-    ("shown without cloud power", '(!!cs.turbo||t==="Cloud Only")', "true"),
-    ("Cloud Only not showing it", '(!!cs.turbo||t==="Cloud Only")', "!!cs.turbo"),
+    ("shown without cloud power", '(!!cs.turbo||t==="Cloud Only"||', '(true||t==="Cloud Only"||'),
+    ("Cloud Only not showing it", '(!!cs.turbo||t==="Cloud Only"||', "(!!cs.turbo||"),
     ("a resting provider not counted", 'const has=!!cs.configured||Object.keys(pv).some(k=>(pv[k]||{}).status==="ok");',
      "const has=!!cs.configured;"),
     ("a failed key counted", '(pv[k]||{}).status==="ok");', '(pv[k]||{}).status!=="");'),
