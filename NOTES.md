@@ -75,6 +75,94 @@ connect from Terminal worked, and macOS never asked.
   rather than Python, so macOS will likely ask for it once more.
 
 ---
+## 6b442 — the model menu as Patrick laid it out: four modes, Cloud Only and each server in a sub-menu, a pop-out per mode with its compositor (per Patrick)
+
+Patrick (2026-10-07), of 6b440's menu: "No, this isn't how I wanted it at all. We want to have fast thinking, pro, and
+max. Under those, don't say the compositor, but have it so you can hold the cursor over each one. And then in the menu
+that pops out, listing what models it uses, allow the user to hover over that pop out. And at the bottom, highlight the
+compositor and change it. Also mark which one was the default in case they want to go back. Under max, we then have
+cloud only, which is another pop out to the right of that menu where they can select fast thinking pro. then list any
+servers they have. So in our case, Olama one, which you almost got it right, but have fast thinking pro and max, max
+being all models on that server. And same thing for each one, have the default compositor, but allow them to select a
+different one. Then finally, we can have advanced where they can pick and choose exactly what they want. I don't want
+the four cloud models sitting there in that menu on their own."
+
+- **The menu** (`engMainRows`): Fast, Thinking, Pro, Max (one line each: icon, name, a few words, an (i)); Cloud Only
+  (a chevron row, `data-sv="__cloud__"`); one row per paired server (unchanged wording, asleep included); a rule;
+  Advanced. No "blend: …" line anywhere (`blendHtml` and `.engblend` are gone; /api/tiers keeps `blend` for the
+  resolver tests). Every mode row, main or sub-menu, is wired once (`wireModeRow`): click picks and closes both menus,
+  a greyed row opens its pop-out instead, Enter/Space pick, the right arrow opens the pop-out (or a sub-menu), up/down
+  move between rows, Esc closes the pop-out first, then the sub-menu, then the menu.
+- **Sub-menus** (`#engsub`, `openEngSub`): Cloud Only's has Fast, Thinking and Pro (`cloudSubRows`; no Max, no
+  per-model rows); a server's has Fast, Thinking, Pro and Max (`srvSubRows`, `SRV_MODE_DESC`), greyed with the reason
+  when the server can't answer, "asleep · wakes when you ask" above them when it sleeps (a pick still wakes it, as
+  6b426). "<name> Only" (`srv:<id>`) and the per-model rows left the menu: a server's single models are picked in
+  Advanced (6b337 put them there too). Saved `srv:<id>` and single-model picks still run; the server row stays marked.
+  The sub-menu is placed by `popPlace` beside the whole menu (`flyPlace` is gone).
+- **A server's Max** (`srv:<id>:max`, `SRV_MODE_KEYS`, `_SRV_MODE_ROLE`): every suitable model of that server (role
+  "all"), with no `SRV_SEATS_MAX` cap (the loop already gives a server `SRV_DRAFT_S` per seat), run as
+  `run_council(..., srv_only=True, max_mode=True)` with no review pass, the merge on the server (6b426's rules).
+- **One cloud model alone left the menu.** A saved `cloud:m:<provider>` becomes Thinking · cloud only on load
+  (`cloudPickRetire`, saved, said once under the chip: "Gemini only isn’t in the menu any more, so this is on Thinking
+  · cloud only."); if that can't answer, 6b440's rule sends it on to plain Cloud Only. The server's parser still reads
+  the old ids. Advanced can't stand in for it: it needs at least one local model ("for pure cloud, use Cloud Only"), so
+  a single cloud model on its own is no longer a choice anywhere; no new Advanced UI was built.
+- **The pop-out** (`#tierpop.det`, `showTierPop`, `detHtml`): what the mode uses now (the 6b440 bubbles' words, from
+  /api/tiers as the menu last read it), its note, and **the Compositor section** (`compHtml`): every model that could
+  write the final answer, the one that will highlighted, the default tagged "default", the unusable ones greyed and
+  disabled with the reason. A click keeps the menus open and stores the pick for that mode; picking the default again
+  removes the pick, so the mode follows its default. Fast (and Cloud Fast, a server's Fast) has nothing to blend and no
+  section. Placed by `popPlace` beside the menu it belongs to, never over it (`detBox`: a sub-menu row's box is as wide
+  as both menus), right, else left, else below or above, 8 px inside the window, scrolling when taller.
+- **Hover intent** (`detIntent`, pure, node-tested with real timers): a row's pop-out opens after 200 ms; another row
+  takes it only after a 280 ms rest; leaving the row and the pop-out closes it after 300 ms. **The safe triangle**
+  (`detAim`): from where the pointer left the row to the pop-out's near edge; moving inside it, the rows it crosses
+  don't take the pop-out, a hover-opened sub-menu stays, and each move restarts the grace; stopping on a row hands it
+  over. Non-hover ways in: the row's (i) (click or tap), keyboard focus (`:focus-visible` only, so a mouse click doesn't
+  flash it), the right arrow.
+- **The candidates** (/api/tiers `comp`: `{def, cands: [{id, name, where, kind, ok, why}]}`; ids are a provider,
+  a server label or a model of this computer): Thinking and Pro, `mode_comp_choices` (the cloud in strength order,
+  greyed "cloud power is off" while it is; the server's merge-capable models; this computer's `MERGE_RANK` models, "needs
+  more memory" when they don't fit), the default from `mode_blend_pick` (the same rules as the merge; `mode_blend` wraps
+  it); Max, `max_comp_choices` (MAX_COMPOSITOR_ORDER, its cloud open whatever cloud power says, default
+  `max_compositor`); Cloud Thinking and Pro, `cloud_comp_choices` (the providers with a key, usable when the plan's merge
+  ladder holds them, so Thinking's are the cheap rungs; default its first); a server's Thinking, Pro and Max,
+  `server_comp_choices` (that server's models, then the cloud only while cloud power is on; default its own pen). A
+  provider with no key isn't listed; a resting or rejected one is greyed with its reason. Six of each kind at most
+  (`COMP_LIST_MAX`), the default always among them.
+- **Saved and sent.** Prefs `comps` (`{mode id: compositor id}`), PROFILE_LOCAL, checked by `comps_ok` (≤ 64 short string
+  pairs, else ignored). The page sends `mode_comp` (`modeComp()`: the pick for the mode in use, "" for its default; plain
+  Cloud Only uses cloud Pro's, `compKey`), never with Advanced.
+- **Honoured at answer time** (`run_council(..., pen=)`, `pen_resolve`): a cloud pick goes first on that mode's own
+  ladder (the plan's for Cloud Only, Max's for Max, the strength ladder otherwise; only with the cloud open to that
+  mode), the rest of the ladder behind it; a mode on one server tries the cloud pick, then its own server pen, never
+  this computer. A server pick writes the merge there with 6b339's deadline and fallbacks; a pick of this computer
+  writes it here (never for Cloud Only or a server's mode). A pick that can't write it now (a resting key, cloud power
+  off, a model the server no longer lists, too big for memory) is set aside and the status line says "<name> can’t
+  write the answer right now, so the usual compositor does". The handler passes it to the council, Max, plain Cloud
+  Only and the Cloud Only plans (`run_cloud_only`/`run_cloud_plan` take `pen`); a local pick also drafts last.
+- **Copy, old → new**: Cloud Only's row "your API keys only — nothing runs on this machine" → "your API keys only" ›;
+  its modes' "cloud only" → "one model, cheapest first" / "three models, free ones first" / "every cloud model"; a
+  server's "<name> Only · strongest that fits its card" and "<name> only" rows → "one model, quick" / "a few models,
+  double-checked" / "more models, blended" / "every model on it"; the four "<cost> · <model>" cloud rows and every
+  "blend: …" line → gone; the Cloud Only bubble's "then the strongest composites" → "then one writes the final answer";
+  the generic bubble's "answers blended by Gemma" and Max's "blend: …" note → gone (the Compositor section says it).
+  New: "Compositor  writes the final answer", "default", "cloud power is off", "not used in this mode", "needs more
+  memory", "<name> can’t write it right now, so the default does.", the status line and the note above.
+- **Tests**: a new block `== the model menu … (6b442) ==` (81 checks, 54 mutants, each anchor once): the choosers against
+  fake provider files, `pen_resolve`, run_council with the pen (cloud first, cloud failing to the ladder, unavailable said,
+  server, local, cloud power off, a server's mode with and without its own pen, Cloud Only's plan), a server's Max seats
+  and parse, the prefs key, the handler pins; the page in node (menu order, no blend lines, no cloud model rows, the two
+  sub-menus, the pop-out's models and compositor, the pick per mode and in the request, the old pick retired, the
+  triangle, the placement with fake boxes, the hover intent with real timers). Moved with the code: 6b440's page checks
+  (sub-menu rows, no blend lines, the placement pin), 6b337's menu and flyout checks (four modes, popPlace), 6b334's
+  flyout check, 6b426's parse/rows/greying/pins (Max added), 6b339's bubble node check and merge pins, the request-shape
+  check (`mode_comp`), the mic-warm mutant anchors (PROFILE_LOCAL's line). Run standalone: 6b334, 6b337, 6b339, 6b426,
+  6b436, 6b440, 6b442; the full gauntlet was not run.
+- **Seen in Blink** (the Browser pane, a dev copy, a paired server and cloud keys faked in the page): the menu, both
+  sub-menus, pop-outs beside the menus, a compositor changed and kept across a restart, the request carrying it, the
+  hover grace and the triangle driven with real events. **Not verified**: WKWebView (hover, `:focus-visible`, the
+  triangle's timing), a live chat honouring a pick against real providers or a real server, touch.
 
 ## 6b439 — Wi-Fi backup for the server kit: a spare connection and a second way to wake it (per the owner; opt-in)
 

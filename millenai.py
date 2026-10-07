@@ -3542,7 +3542,10 @@ def cloud_mode_state(mode: str, pid: str = "", plan=None) -> dict:
            "skipped": [], "why": plan["why"], "short": "", "note": "",
            # who writes the blend: the plan's first merge rung, with two or more seats
            "blend": (blend_text((plan["comp"] or [{}])[0].get("name", ""))
-                     if mode in ("Thinking", "Pro") and len(seats) > 1 else "")}
+                     if mode in ("Thinking", "Pro") and len(seats) > 1 else ""),
+           # who writes it, and who else could (6b442)
+           "comp": (cloud_comp_choices(plan)
+                    if mode in ("Thinking", "Pro") and len(seats) > 1 else None)}
     if not seats:
         w = plan["why"]
         out["short"] = ("no key yet" if "no key yet" in w or "Add a key" in w
@@ -3685,28 +3688,32 @@ def max_tier_row(ctx) -> dict:
                                  "Models, pair a server, or add a key under Settings › "
                                  "Cloud power."),
             "blend": blend_text(comp["label"]) if n > 1 else "",
+            # who writes it, and who else could (6b442)
+            "comp": max_comp_choices(ctx, labels) if n > 1 else None,
             "warn": "Uses every model, including paid cloud keys. Each question can spend money "
                     "on every key you have."}
 
 
-def mode_blend(ctx, chosen: list, bench_n: int) -> str:
-    """The blend line of Thinking or Pro: who writes the merge, by the same
-    rules run_council follows: the cloud ladder when cloud power is on, else
-    the strongest suitable model of the person's server, else the largest
-    Gemma this computer holds (or the strongest seat that fits), its server
-    copy standing in when there is one. "" when fewer than two models answer."""
+def mode_blend_pick(ctx, chosen: list, bench_n: int) -> tuple:
+    """(id, label) of who writes the merge of Thinking or Pro by default, by
+    the same rules run_council follows: the cloud ladder when cloud power is
+    on (id: the provider), else the strongest suitable model of the person's
+    server, else the largest Gemma this computer holds (or the strongest seat
+    that fits), its server copy standing in when there is one (id: the
+    label). ("", "") when fewer than two models answer; (None, "") when
+    nothing can write it."""
     if len(chosen) + (bench_n if cloud_allowed() else 0) < 2:
-        return ""
+        return "", ""
     if cloud_allowed():
         lad = compositor_ladder()
         if lad:
-            return blend_text(lad[0]["name"])
+            return _provider_of(lad[0]), lad[0]["name"]
     try:
         m = server_compositor(ctx)
     except Exception:
         m = None
     if m:
-        return blend_text(m["label"])
+        return m["label"], m["label"]
     merger = merge_pref_label() or next(
         (l for l in MERGE_RANK if l in chosen and model_fits_memory(l)), "")
     if merger in MODEL_ROUTES:
@@ -3717,7 +3724,169 @@ def mode_blend(ctx, chosen: list, bench_n: int) -> str:
             sc = None
         if sc is not None:
             merger = sc["label"]
-    return blend_text(merger)
+    return (merger or None), merger
+
+
+def mode_blend(ctx, chosen: list, bench_n: int) -> str:
+    """The blend words of Thinking or Pro (mode_blend_pick's label): "" when
+    fewer than two models answer."""
+    pid, label = mode_blend_pick(ctx, chosen, bench_n)
+    return "" if pid == "" else blend_text(label)
+
+
+# ---- WHO WRITES EACH MODE'S ANSWER, CHOSEN BY THE PERSON (6b442)
+# Patrick (2026-10-07): "have it so you can hold the cursor over each one. And
+# then in the menu that pops out, listing what models it uses, allow the user
+# to hover over that pop out. And at the bottom, highlight the compositor and
+# change it. Also mark which one was the default in case they want to go back."
+# Every mode that blends (Thinking, Pro, Max; Cloud Only's Thinking and Pro; a
+# server's Thinking, Pro and Max) has a row "comp" in /api/tiers: {def: the id
+# of who writes it by default, cands: [{id, name, where, kind, ok, why}]}. An id
+# is a cloud provider ("claude"), a server's label ("Desk · gpt-oss:20b") or a
+# model of this computer ("Gemma 4 26B"). The page keeps the person's pick per
+# mode (prefs "comps") and sends it as `mode_comp`; run_council takes it as
+# `pen` (pen_resolve), and a pick that can't write the answer at that moment is
+# set aside for the default, said in the status line. Fast has nothing to blend.
+COMP_LIST_MAX = 6          # rows of one kind (a server's or this computer's) in the list
+
+
+def _comp_cloud_cands(ladder, order, gate=""):
+    """The cloud rows: each provider with a key saved, in `order`; usable when it is
+    on `ladder` (the confs that mode's merge may use) and gate (the reason the
+    whole cloud is shut, "cloud power is off") is empty."""
+    on = {_provider_of(c): c for c in ladder or []}
+    sts = {s["id"]: s for s in cloud_provider_states()}
+    out = []
+    for pid in order:
+        s = sts.get(pid)
+        if not s or s["why"] == "no key yet":
+            continue
+        ok = pid in on and not gate
+        out.append({"id": pid, "name": s["name"], "where": "cloud", "kind": "cloud", "ok": ok,
+                    "why": "" if ok else (gate or (s["why"] if not s["ok"] else "not used in this mode"))})
+    return out
+
+
+def _comp_srv_cands(cands, speeds=None) -> list:
+    """A server's rows: its models that may write a merge (srv_rank "compose"),
+    strongest first, named by model with the server as where."""
+    try:
+        ranked = srv_rank(cands or [], "compose", "normal", speeds)
+    except Exception:
+        ranked = []
+    return [{"id": m["label"], "name": m["label"].split(SERVER_SEP, 1)[-1],
+             "where": m["label"].split(SERVER_SEP, 1)[0], "kind": "server", "ok": True, "why": ""}
+            for m in ranked[:COMP_LIST_MAX]]
+
+
+def _comp_local_cands() -> list:
+    """This computer's rows: the models MERGE_RANK says may write a merge that
+    are downloaded; one that doesn't fit memory now is listed, unusable."""
+    pulled = ollama_pulled_tags() or set()
+    out = []
+    for l in MERGE_RANK:
+        if (l in MODEL_ROUTES and model_cached(l, pulled) and l not in BLEND_EXCLUDE
+                and not slow_giant(l)):
+            fits = model_fits_memory(l)
+            out.append({"id": l, "name": l, "where": "this computer", "kind": "local", "ok": fits,
+                        "why": "" if fits else "needs more memory"})
+    return out[:COMP_LIST_MAX]
+
+
+def _comp_row(default_id, default_label, cands) -> dict:
+    """{def, cands}: the default always among the rows (first, when the lists
+    didn't hold it), each id once."""
+    seen, rows = set(), []
+    for c in cands:
+        if c["id"] not in seen:
+            seen.add(c["id"])
+            rows.append(c)
+    if default_id and default_id not in seen:
+        srv = server_label(default_id)
+        rows.insert(0, {"id": default_id, "name": (default_label or default_id).split(SERVER_SEP, 1)[-1],
+                        "where": (default_id.split(SERVER_SEP, 1)[0] if srv else
+                                  "cloud" if default_id in PROVIDER_BASES else "this computer"),
+                        "kind": "server" if srv else "cloud" if default_id in PROVIDER_BASES else "local",
+                        "ok": True, "why": ""})
+    return {"def": default_id or "", "cands": rows}
+
+
+def mode_comp_choices(ctx, chosen: list, bench_n: int):
+    """Thinking's or Pro's compositor rows: the cloud (strength order, shut while
+    cloud power is off), the person's server's suitable models, this computer's.
+    None when the mode doesn't blend."""
+    pid, label = mode_blend_pick(ctx, chosen, bench_n)
+    if pid == "":
+        return None
+    try:
+        srv = _comp_srv_cands(server_mode_candidates(ctx), server_speeds(ctx))
+    except Exception:
+        srv = []
+    return _comp_row(pid, label,
+                     _comp_cloud_cands(compositor_ladder(), CLOUD_STRENGTH,
+                                       "" if cloud_allowed() else "cloud power is off")
+                     + srv + _comp_local_cands())
+
+
+def max_comp_choices(ctx, seat_labels=None):
+    """Max's compositor rows, in MAX_COMPOSITOR_ORDER (its cloud opens whatever
+    cloud power says), the default max_compositor's pick."""
+    comp = max_compositor(ctx, seat_labels)
+    did = comp["kind"] if comp["kind"] in PROVIDER_BASES else comp["label"]
+    try:
+        srv = _comp_srv_cands(server_mode_candidates(ctx), server_speeds(ctx))
+    except Exception:
+        srv = []
+    return _comp_row(did, comp["label"],
+                     _comp_cloud_cands(max_cloud_ladder(),
+                                       [p for p in MAX_COMPOSITOR_ORDER if p in PROVIDER_BASES])
+                     + srv + _comp_local_cands())
+
+
+def server_comp_choices(ctx, e, default=None, speeds=None) -> dict:
+    """The compositor rows of a mode on server e alone (6b442): that server's
+    models that may write a merge, then (only while cloud power is on) the
+    cloud's; the default is the server's own pen (server_compositor)."""
+    try:
+        rows = _comp_srv_cands(server_only_cands(e), speeds)
+    except Exception:
+        rows = []
+    if cloud_allowed():
+        rows += _comp_cloud_cands(compositor_ladder(), CLOUD_STRENGTH)
+    return _comp_row(default["label"] if default else None,
+                     default["label"] if default else "", rows)
+
+
+def cloud_comp_choices(plan):
+    """A Cloud Only mode's rows: the providers with a key, usable when the plan's
+    merge ladder holds them (Thinking's is the cheap one), the first by default."""
+    lad = plan.get("comp") or []
+    did = _provider_of(lad[0]) if lad else None
+    return _comp_row(did, lad[0]["name"] if lad else "", _comp_cloud_cands(lad, CLOUD_STRENGTH))
+
+
+def pen_resolve(pen, ladder, srv_pool, cloud_ok=True, local_ok=True) -> tuple:
+    """(kind, what) of a mode's chosen compositor at answer time: ("cloud", the
+    conf from `ladder`), ("server", the row of `srv_pool`), ("local", label), or
+    ("", None) when it can't write the answer now (the key is resting, the
+    cloud is shut for this mode, the server no longer lists it, the model
+    doesn't fit or isn't here) and the default writes it."""
+    if not pen or not isinstance(pen, str):
+        return "", None
+    if pen in PROVIDER_BASES:
+        c = next((c for c in ladder or [] if _provider_of(c) == pen), None) if cloud_ok else None
+        return ("cloud", c) if c else ("", None)
+    if server_label(pen):
+        m = next((m for m in srv_pool or [] if m.get("label") == pen), None)
+        return ("server", m) if m else ("", None)
+    if local_ok and pen in MODEL_ROUTES and model_cached(pen) and model_fits_memory(pen):
+        return "local", pen
+    return "", None
+
+
+def pen_name(pen: str) -> str:
+    """How the status line names a chosen compositor."""
+    return CLOUD_NAMES.get(pen) or str(pen or "").split(SERVER_SEP, 1)[-1] or "That model"
 
 
 def claude_refusal_conf(c: dict):
@@ -10074,7 +10243,7 @@ PROFILE_LOCAL = frozenset((
     "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
     "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
     "lend", "lend_pick", "studio_opts.*.neg", "mic_warm",
-    "cloud_balance"))
+    "cloud_balance", "comps"))
 MACHINE = frozenset((
     "app_models", "model_offers", "no_limits", "include_giants",
     "auto_cleanup", "studio_image", "studio_video", "studio_opts",
@@ -10091,6 +10260,14 @@ STUDIO_NEG = "neg"
 # profile-local keys that hold a real boolean and nothing else (6b429): a
 # string "true" or a 1 from a stray client is ignored, not saved
 LOCAL_BOOL = ("mic_warm",)
+
+
+def comps_ok(v) -> bool:
+    """"comps" (6b442): each mode's chosen compositor, {mode id: compositor id},
+    both short strings, a few dozen at most. Anything else is ignored."""
+    return (isinstance(v, dict) and len(v) <= 64
+            and all(isinstance(k, str) and 0 < len(k) <= 80 and isinstance(x, str)
+                    and 0 < len(x) <= 160 for k, x in v.items()))
 
 # KEY-2: every value a synced key may hold. None of them turns on the
 # cloud, cloud-only, the bench or the Remote agent, and no key here is a
@@ -10354,7 +10531,8 @@ def split_prefs(ctx, incoming: dict, old=None) -> dict:
         c = pref_class(k)
         if c is None or k == "studio_opts.*.neg" or (
                 c == "synced" and not synced_value_ok(k, v)) or (
-                k in LOCAL_BOOL and not isinstance(v, bool)):
+                k in LOCAL_BOOL and not isinstance(v, bool)) or (
+                k == "comps" and not comps_ok(v)):
             ignored.append(k)
         else:
             by[c][k] = v
@@ -19432,9 +19610,10 @@ SRV_ONLY_PREFIX = "srv:"
 SRV_ONLY_DESC = "strongest that fits its card"
 SRV_ONLY_FRESH_S = 60           # a check older than this is repeated for a chat
 # "srv:<id>" is "<server> Only"; "srv:<id>:fast", ":think" and ":pro" are Fast,
-# Thinking and Pro on that server alone (6b426). Read in one place: srv_tier_parse
-_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})(?::(fast|think|pro))?")
-SRV_MODE_KEYS = {"fast": "Fast", "think": "Thinking", "pro": "Pro"}
+# Thinking and Pro on that server alone (6b426), and ":max" every model on it
+# (6b442). Read in one place: srv_tier_parse
+_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})(?::(fast|think|pro|max))?")
+SRV_MODE_KEYS = {"fast": "Fast", "think": "Thinking", "pro": "Pro", "max": "Max"}
 _SRV_PARAMS_RX = re.compile(r"(?<![\w.])e?(?:(\d+)x)?(\d+(?:\.\d+)?)([bm])(?![a-z0-9])", re.I)
 # (profile, chat id) -> (label or "", time): the chat's last answer was
 # "<server> Only", so its title goes to that server or nowhere
@@ -19450,8 +19629,8 @@ def srv_only_tier(tier) -> bool:
 
 def srv_tier_parse(tier) -> tuple:
     """(server id, mode) of a server tier: "srv:<id>" is ("<id>", ""), "<server>
-    Only" (6b337); "srv:<id>:fast", ":think" and ":pro" are ("<id>", "Fast" |
-    "Thinking" | "Pro"), that mode on the server alone (6b426). ("", "") for
+    Only" (6b337); "srv:<id>:fast", ":think", ":pro" and ":max" are ("<id>", "Fast" |
+    "Thinking" | "Pro" | "Max"), that mode on the server alone (6b426, Max 6b442). ("", "") for
     anything else, which a chat finds gone and never runs elsewhere."""
     m = _SRV_ONLY_RX.fullmatch(tier) if isinstance(tier, str) else None
     return (m.group(1), SRV_MODE_KEYS.get(m.group(2) or "", "")) if m else ("", "")
@@ -19462,7 +19641,7 @@ def srv_only_id(tier) -> str:
 
 
 def srv_only_mode(tier) -> str:
-    """"Fast", "Thinking" or "Pro" for a mode on one server alone, else ""."""
+    """"Fast", "Thinking", "Pro" or "Max" for a mode on one server alone, else ""."""
     return srv_tier_parse(tier)[1]
 
 
@@ -19600,13 +19779,17 @@ def server_only_tiers(ctx) -> dict:
                     ms, desc="%s only" % e["name"], skipped=[], available=ms["ok"] or ms["asleep"])
                 # who writes that mode's blend (6b440): the server's own pen, as run_council
                 # picks it for a mode on one server alone; none for Fast
-                if mode in ("Thinking", "Pro") and len(ms.get("models") or []) > 1:
+                if mode in ("Thinking", "Pro", "Max") and len(ms.get("models") or []) > 1:
                     try:
                         _bc = server_compositor(ctx, (), server_only_named(ctx, e["name"]))
                     except Exception:
                         _bc = None
                     out[SRV_ONLY_PREFIX + e["id"] + ":" + k]["blend"] = blend_text(
                         _bc["label"] if _bc else "")
+                    # who writes it, and who else could (6b442): that server's
+                    # models, and the cloud while cloud power is on
+                    out[SRV_ONLY_PREFIX + e["id"] + ":" + k]["comp"] = server_comp_choices(
+                        ctx, e, _bc, speeds)
     return out
 
 
@@ -19655,7 +19838,12 @@ def server_only_resolve(sid: str, ctx, defer=False):
 # how many each mode seats (Fast one, Thinking three, Pro every model), as the
 # modes themselves do; SRV_SEATS_MAX caps them. Kept equal to the modes' own
 # counts by a gauntlet check (this section names no mode table of its own)
-SRV_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}
+SRV_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99, "Max": 99}
+# MAX ON ONE SERVER (6b442, per Patrick: "have fast thinking pro and max, max
+# being all models on that server"): every suitable model of that server, with
+# no SRV_SEATS_MAX cap (run_council gives the server SRV_DRAFT_S per seat), the
+# role Max has everywhere ("all"), and no review pass, as the main Max
+_SRV_MODE_ROLE = {"Max": "all"}
 
 
 def server_only_cands(e) -> list:
@@ -19680,12 +19868,12 @@ def server_mode_seats(e, mode: str, speeds=None) -> tuple:
     With none of those, "<server> Only"'s own pick alone, so the mode isn't
     dead (how "smallest" when that one doesn't fit whole either). of: how
     many were suitable. ([], "", 0) when the server lists nothing to run."""
-    n, role = SRV_MODE_SEATS.get(mode), _TIER_ROLE.get(mode)
+    n, role = SRV_MODE_SEATS.get(mode), _TIER_ROLE.get(mode) or _SRV_MODE_ROLE.get(mode)
     if not n or not role:
         return [], "", 0
     ranked = srv_rank(server_only_cands(e), role, "normal", speeds)
     if ranked:
-        return ([m["label"] for m in ranked[:min(n, SRV_SEATS_MAX)]],
+        return ([m["label"] for m in ranked[:n if mode == "Max" else min(n, SRV_SEATS_MAX)]],
                 "fits", len(ranked))
     s = _srv_seen.get(e["id"]) or {}
     pick = server_only_pick(s.get("models") or [], (s.get("gpu") or {}).get("vram_bytes"))
@@ -19724,6 +19912,8 @@ def server_mode_state(e, mode: str, speeds=None) -> dict:
                 "second pass on it." % n)
     elif k == 1:
         note = "Only one model on %s suits %s, so it answers alone." % (n, mode)
+    elif mode == "Max":
+        note = "Every model on %s drafts (%d), then one writes the final answer there." % (n, k)
     else:
         note = ("%d models on %s draft, %s, then %s writes the merge there."
                 % (k, n, "one double-checks them" if mode == "Thinking"
@@ -24579,12 +24769,13 @@ PEER_INSTRUCTION = (
     "Never mention the drafts or this process.\n\n")
 
 
-def run_cloud_only(messages: list, emit, status, step, plan=None) -> None:
+def run_cloud_only(messages: list, emit, status, step, plan=None, pen: str = "") -> None:
     """CLOUD ONLY: answer entirely off the API keys. One key streams
     straight through; several draft in parallel and the compositor
-    ladder writes the final answer. Nothing here loads a local engine."""
+    ladder writes the final answer. Nothing here loads a local engine.
+    pen (6b442): the compositor the person chose, for run_council."""
     if plan is not None:
-        run_cloud_plan(messages, emit, status, step, plan)
+        run_cloud_plan(messages, emit, status, step, plan, pen)
         return
     bench = cloud_bench()
     if not bench:
@@ -24636,7 +24827,7 @@ def run_cloud_only(messages: list, emit, status, step, plan=None) -> None:
         emit(_cloud_all_down())
         return
     try:
-        run_council([], messages, emit, status, cloud_only=True)
+        run_council([], messages, emit, status, cloud_only=True, pen=pen)
     except Exception:
         # every cloud voice failed at once. Say what happened and when
         # they come back, rather than surfacing a raw engine error.
@@ -24661,7 +24852,7 @@ def _cloud_plan_down(plan: dict, tried: bool = False) -> str:
                    "every key. %s" % (cloud_plan_title(plan), why, CLOUD_PROMISE))
 
 
-def run_cloud_plan(messages: list, emit, status, step, plan: dict) -> None:
+def run_cloud_plan(messages: list, emit, status, step, plan: dict, pen: str = "") -> None:
     """A Cloud Only mode or pick (6b440). One seat streams straight through:
     Fast, a pick, or a mode with one usable provider. Fast has `spare`
     models behind its seat (the next cheapest, said in the status line); a
@@ -24695,7 +24886,7 @@ def run_cloud_plan(messages: list, emit, status, step, plan: dict) -> None:
         emit(_cloud_plan_down(plan, tried=True))
         return
     try:
-        run_council([], messages, emit, status, cloud_only=True, cloud_plan=plan)
+        run_council([], messages, emit, status, cloud_only=True, cloud_plan=plan, pen=pen)
     except Exception:
         emit(_cloud_plan_down(plan, tried=True))
 
@@ -24742,7 +24933,7 @@ def _cloud_all_down() -> str:
 def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
                 cloud_only: bool = False, srv_only: bool = False,
-                bench_allow=None, comp: str = "",
+                bench_allow=None, comp: str = "", pen: str = "",
                 cloud_plan=None, max_mode=False,
                 hurry=None, srv_first_s=None, srv_merge=False) -> None:
     """Ask each selected model in turn, then stream a merged answer.
@@ -24757,6 +24948,9 @@ def run_council(labels: list, messages: list, emit, status,
     strength ladder. max_mode (Max, 6b440): every model drafts, so the roster
     is not cut to 12 and the merge is the largest local model that fits, not
     the Gemma preference; the cloud plan opens the cloud as Cloud Only does.
+    pen (6b442): the compositor the person chose for this mode (a provider, a
+    server's label or a model of this computer); one that can't write the
+    answer now is set aside, said in the status line, and the default writes it.
     """
     # reflection and peer review both run LOCAL passes — off the table
     # when the whole point of the tier is that nothing runs here
@@ -25138,6 +25332,24 @@ def run_council(labels: list, messages: list, emit, status,
     _mp = merge_pref_label()
     if _mp and not max_mode:         # Max: the largest model that fits, as MERGE_RANK has it (6b440)
         merger = _mp
+    # THE PERSON'S PEN (6b442): the compositor chosen in the model menu for this
+    # mode, if it can write the answer right now: a cloud key on this mode's own
+    # merge ladder (and the cloud open to it), a model the server lists for this
+    # mode, a model of this computer that is here and fits. Else the default.
+    _pen_kind, _pen = "", None
+    if pen:
+        try:
+            _pool = ([] if cloud_only else
+                     server_only_named(bound_ctx(), labels[0].split(SERVER_SEP, 1)[0]) if srv_only
+                     else server_mode_candidates(bound_ctx()))
+        except Exception:
+            _pool = []
+        _pen_kind, _pen = pen_resolve(
+            pen, cloud_plan["comp"] if cloud_plan is not None else compositor_ladder(), _pool,
+            cloud_ok=cloud_only or cloud_plan is not None or cloud_allowed(),
+            local_ok=not (cloud_only or srv_only))
+    if _pen_kind == "local":
+        merger = _pen
     # ADVANCED (6b248): a hand-picked LOCAL compositor beats policy —
     # the user chose who holds the pen
     if comp in MODEL_ROUTES and model_cached(comp) \
@@ -25157,7 +25369,7 @@ def run_council(labels: list, messages: list, emit, status,
     # (server_compositor). This computer's compositor stays behind it. A
     # cloud compositor still comes first, below: only the local choice moves.
     _merge_srv = None
-    if srv_merge and comp not in MODEL_ROUTES and not cloud_only:
+    if srv_merge and comp not in MODEL_ROUTES and not cloud_only and _pen_kind != "local":
         try:
             _merge_srv = (server_compositor(
                 bound_ctx(), _srv_used,
@@ -25165,7 +25377,9 @@ def run_council(labels: list, messages: list, emit, status,
                 if srv_only else server_compositor(bound_ctx(), _srv_used))
         except Exception:
             _merge_srv = None
-    if srv_only and _merge_srv is None:
+    if _pen_kind == "server":
+        _merge_srv = _pen              # the person's pick on the server (6b442)
+    if srv_only and _merge_srv is None and _pen_kind != "cloud":
         # (6b426) that server has no model that may write a merge (or it can't
         # be read): its best draft stands, and no other model writes one
         emit(good[0][1])
@@ -25174,7 +25388,7 @@ def run_council(labels: list, messages: list, emit, status,
         _merge_fb = (merger if merger in MODEL_ROUTES and model_cached(merger)
                      and model_fits_memory(merger) and not srv_only else "")
         merger = _merge_srv["label"]
-    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES:
+    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES and _pen_kind != "local":
         try:
             _sc = server_copy((MODEL_INFO.get(merger) or {}).get("ollama"),
                               server_mode_candidates(bound_ctx()),
@@ -25196,7 +25410,8 @@ def run_council(labels: list, messages: list, emit, status,
               else rank.get(d[0], 99))
     good = good[:5]
 
-    status("compositing\u2026")
+    status("compositing\u2026" if _pen_kind or not pen else
+           "%s can\u2019t write the answer right now, so the usual compositor does" % pen_name(pen))
     question = messages[-1]["content"] if messages else ""
     # TWO CUTS OF THE SAME DRAFTS (6b245, per Patrick: "will Gemma
     # distilling ruin it?"). The 1500-char cap exists for SMALL LOCAL
@@ -25296,13 +25511,18 @@ def run_council(labels: list, messages: list, emit, status,
     _comp_cloud = bool(comp) and comp not in MODEL_ROUTES
     if _comp_cloud:
         _ladder = [c for c in _ladder if _provider_of(c) == comp]
+    if _pen_kind == "cloud":
+        # the person's cloud pen first, then this mode's own ladder behind it; a
+        # mode on one server has no cloud ladder: its server's pen is behind it
+        _ladder = [_pen] + ([] if srv_only else
+                            [c for c in _ladder if _provider_of(c) != pen])
     # a hurried merge goes to the FASTEST pen, not the strongest —
     # speed is what the button promised (6b257). An empty fast ladder
     # (no keys, everyone resting) keeps the strength ladder, and the
     # local-merger floor below still catches everything.
     # (a mode's merge ladder is already its cheapest, 6b440)
     _hurry_fast = _hurried() and len(good) >= 2 and cloud_plan is None
-    if _hurry_fast and not _comp_cloud:
+    if _hurry_fast and not _comp_cloud and _pen_kind != "cloud":
         _fast = fast_cloud_ladder()
         if _fast:
             _ladder = _fast
@@ -25329,7 +25549,15 @@ def run_council(labels: list, messages: list, emit, status,
     # the cloud writes the merge only when cloud power is on (6b326, 0a
     # 5.5): a named cloud compositor or the run's own cloud list used to
     # reach the cloud with the switch off; now they only pick WHICH cloud
-    if comp in MODEL_ROUTES or srv_only:
+    if _pen_kind == "cloud":
+        # the person's cloud pen (6b442); a mode on one server with no pen of its
+        # own there shows the best draft, as before
+        if _walk_ladder():
+            return
+        if srv_only and _merge_srv is None:
+            emit(good[0][1])
+            return
+    elif comp in MODEL_ROUTES or srv_only or _pen_kind in ("local", "server"):
         pass          # the user chose a LOCAL pen, or one server (6b426) — no cloud ladder
     elif max_mode and cloud_plan is not None:
         # Max opens the cloud whatever cloud power says: its own rungs first
@@ -29127,6 +29355,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         out[name]["blend"] = mode_blend(self.ctx, chosen, len(bench))
                     except Exception:
                         pass
+                    # who writes it, and who else could (6b442)
+                    try:
+                        out[name]["comp"] = mode_comp_choices(self.ctx, chosen, len(bench))
+                    except Exception:
+                        pass
             # "<server> Only" (6b337): one row per paired server, from its
             # last check; greyed on the page while it can't answer
             try:
@@ -30881,6 +31114,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         else:
             req_cloud = None
         req_comp = str(req_json.get("compositor") or "")[:40]
+        # A MODE'S OWN COMPOSITOR (6b442): the person's pick in the model menu's
+        # pop-out, for a tier only (Advanced names its own, above); run_council
+        # checks it at answer time and falls back to the default, saying so
+        mode_pen = req_json.get("mode_comp")
+        mode_pen = mode_pen[:160] if isinstance(mode_pen, str) and tier else ""
         if server_label(req_comp):
             # run_council has no server compositor (6b337): a server's model
             # drafts, and the merge is this computer's or the cloud's
@@ -30983,6 +31221,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # answers — one fewer multi-GB load per council.
         if len(council) > 1 and not model_name:
             _mp = (req_comp if req_comp in MODEL_ROUTES
+                   else mode_pen if mode_pen in MODEL_ROUTES   # the person's pen drafts last too (6b442)
                    else merge_pref_label())
             if _mp in council:
                 council = [l for l in council if l != _mp] + [_mp]
@@ -32520,7 +32759,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "power**, or switch to Fast, Thinking or Pro and "
                          "the local vision engine will look at it.")
             elif cloud_only:
-                run_cloud_only(full_messages, memit, status, step, _cplan)
+                run_cloud_only(full_messages, memit, status, step, _cplan, mode_pen)
             elif ag_remote:
                 # THE REMOTE AGENT (6b249): drive the user's VPS over
                 # SSH. await_approval blocks on the approval channel —
@@ -32571,7 +32810,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 run_council(council, full_messages, memit, status,
                             hurry=hurry_ev,
                             srv_first_s=(60.0 if _seat_fb else None),
-                            srv_merge=True, max_mode=True,
+                            srv_merge=True, max_mode=True, pen=mode_pen,
                             cloud_plan={"mode": "Max", "seats": _max_bench,
                                         "comp": max_cloud_ladder(), "spare": [],
                                         "why": "", "pid": ""})
@@ -32598,6 +32837,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             elif len(council) > 1:
                 # Thinking or Pro on one server alone (6b426): its seats, its
                 # merge, no cloud and nothing of this computer's
+                # Max on one server alone (6b442): every model of it, no review pass
                 run_council(council, full_messages, memit, status,
                             reflect=(tier == "Thinking" or (
                                 _srv_only and _so_mode == "Thinking")),
@@ -32605,6 +32845,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             bench_allow=[] if _srv_only else req_cloud,
                             comp="" if _srv_only else req_comp,
                             hurry=hurry_ev, srv_only=_srv_only,
+                            max_mode=bool(_srv_only and _so_mode == "Max"), pen=mode_pen,
                             srv_first_s=(60.0 if _seat_fb else None),
                             srv_merge=(tier in TIERS and not cloud_only))
             else:
@@ -34886,6 +35127,24 @@ mark.find-hit.cur{background:#ffd60a;color:#101013}
 #tierpop .mline{font-family:var(--mono);font-size:11px;color:var(--accent)}
 #tierpop .note{color:var(--faint);font-size:10.5px;margin-top:7px;display:block}
 #tierpop .note.warn{color:#e8a08f}
+/* the pop-out beside a mode (6b442): the pointer can move into it, and its
+   compositor rows are buttons; the one that writes is highlighted */
+#tierpop.det{min-width:240px;max-width:300px}
+#tierpop .pcomp{margin-top:9px;padding-top:8px;border-top:1px solid var(--line-soft)}
+#tierpop .pch{color:var(--text);font-size:11.5px;font-weight:600;margin-bottom:4px}
+#tierpop .pch i{font-style:normal;font-weight:400;color:var(--faint);margin-left:5px}
+#tierpop .pcand{display:flex;align-items:center;gap:7px;width:100%;margin:1px 0;
+  padding:5px 7px;border:1px solid transparent;border-radius:7px;background:none;
+  color:var(--dim);font:inherit;font-size:11.5px;text-align:left;cursor:pointer}
+#tierpop .pcand:hover,#tierpop .pcand:focus-visible{background:rgba(255,255,255,.07);color:var(--text);outline:none}
+#tierpop .pcand.on{background:var(--accent-dim);border-color:rgba(255,255,255,.22);color:var(--text)}
+#tierpop .pcand.off{opacity:.45;cursor:default}
+#tierpop .pcand.off:hover{background:none;color:var(--dim)}
+#tierpop .pcn{font-family:var(--mono);font-size:11px;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tierpop .pcw{margin-left:auto;flex:none;color:var(--faint);font-size:10.5px;white-space:nowrap}
+#tierpop .pdef{flex:none;font-size:9px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--accent);border:1px solid currentColor;border-radius:5px;padding:0 4px;line-height:14px}
 .model.active{
   color:var(--text);background:var(--accent-dim);
   border-color:rgba(255,255,255,.22);
@@ -36890,19 +37149,17 @@ body.gen #chip-model{color:var(--accent)}
 .engrow .edsc{font-size:11px;color:var(--faint);margin-left:auto;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   max-width:150px}
-/* your own servers' models in the engine menu (6b334) */
-.engrow.srvrow .enm{font-weight:500}
-.engrow.srvrow .edsc{max-width:190px}
-.engrow.srvrow.off{cursor:default}
 /* "<server> Only" rows (6b337): a mode's row, with a roomier description */
 .engrow.srvmode .edsc{max-width:190px}
-/* Fast, Thinking and Pro on that server alone (6b426): under "<server> Only" */
-.engrow.srvsub{padding-left:26px}
-/* Cloud Only's Fast, Thinking, Pro and model rows sit indented under it (6b440) */
-.engrow.cloudsub{padding-left:26px}
-/* who writes a mode's blend: one small grey line under its row (6b440) */
-.engblend{font-size:10.5px;color:var(--faint);padding:0 10px 3px 37px;margin-top:-4px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* a mode's (i): its pop-out without a hover, for touch and keyboard (6b442) */
+.engrow .einfo{flex:none;width:15px;height:15px;border-radius:50%;margin-left:4px;
+  border:1px solid rgba(255,255,255,.2);color:var(--faint);font:italic 600 9.5px/13px Georgia,serif;
+  text-align:center;cursor:pointer}
+.engrow:hover .einfo,.engrow:focus-visible .einfo{color:var(--text);border-color:rgba(255,255,255,.4)}
+.engrow:focus-visible{outline:1px solid rgba(255,255,255,.28);outline-offset:-1px}
+.engrow.detopen{background:rgba(255,255,255,.07);color:var(--text)}   /* its pop-out is open */
+/* a server's sub-menu says it is asleep above its modes (6b442) */
+.engnote{font-size:11px;color:var(--faint);padding:4px 10px 5px}
 .engrow.cloudmode .edsc{max-width:190px}
 .engrow.cloudmode.off{cursor:default}
 /* a server's row in the engine menu opens a flyout beside it (6b337) */
@@ -38612,8 +38869,11 @@ function applyPrefs(){
      &&P.council.every(x=>typeof x==="string"))council=P.council.slice(0,12);
   if(!prefMine.has("model")&&typeof P.model==="string"&&P.model
      &&council[0]!==P.model)council=[P.model];
+  if(!prefMine.has("comps"))
+    comps=P.comps&&typeof P.comps==="object"&&!Array.isArray(P.comps)?P.comps:{};
   if(!prefMine.has("tier")){
     let t=typeof P.tier==="string"?P.tier:"Fast";
+    t=cloudPickRetire(t);                  // one cloud model alone left the menu (6b442)
     if(t==="Smart"||t==="Best")t="Fast";   // merged (1.20) and retired (5.3)
     if(t==="Power")t="Pro";                // Pro absorbed Power (5.3)
     if(isCloudMode(t)&&!cloudTierParse(t).mode)t="Fast";   // an unknown cloud id (6b440)
@@ -38777,6 +39037,9 @@ let tierOff={};
 // what /api/tiers last said each mode resolves to: the chip shows a server
 // seat (6b339)
 let tierInfo={};
+// each mode's chosen compositor, {mode id: compositor id} (prefs "comps", 6b442);
+// a mode not in it uses its default. Declared early: sends and the menu read it
+let comps={};
 // the saved mode comes from prefs.json (applyPrefs, 6b324)
 let tier="Fast";
 // quiet: the boot's own call, which saves nothing
@@ -38795,58 +39058,74 @@ function setTier(name,quiet){
   paintModels();                 // paints both tier and model highlights
 }
 const tierPop=$("#tierpop");
-async function showTierPop(el,name){
-  let info={},cloudOn=false,ci={};
-  try{
-    const r2=await Promise.all([
-      (await api("/api/tiers")).json(),
-      (await api("/api/cloud")).json()]);
-    info=r2[0][name]||{};ci=r2[1]||{};
-    cloudOn=!!(ci.configured&&ci.turbo);
-  }catch(e){}
+// THE POP-OUT BESIDE A MODE (6b442, per Patrick: "hold the cursor over each one.
+// And then in the menu that pops out, listing what models it uses, allow the
+// user to hover over that pop out. And at the bottom, highlight the compositor
+// and change it. Also mark which one was the default in case they want to go
+// back."): what the mode uses right now (from /api/tiers, read when the menu
+// opens), what it promises, and its compositor. Drawn from what the page holds,
+// so it opens at once; the menu's own refresh draws it again.
+let detEl=null,detT="";          // the row the pop-out belongs to, and its mode
+function showTierPop(el,name){
+  detEl=el;detT=name;
+  tierPop.innerHTML=detHtml(name,tierInfo[name]||{},typeof cloudSt==="undefined"?null:cloudSt);
+  tierPop.classList.add("det");
+  document.querySelectorAll(".engrow.detopen").forEach(e=>e.classList.toggle("detopen",e===el));
+  el.classList.add("detopen");
+  placeTierPop(el,detBox(el));
+}
+// where it goes: beside the menus, never over them. The row's own height, and
+// the width of the menu it sits in (with the main menu, for a sub-menu's row),
+// so popPlace puts it right of them, else left of them, else below or above
+function detBox(el){
+  const r=el.getBoundingClientRect(),bs=[];
+  if(engMenu.contains(el)||engSub.contains(el))bs.push(engMenu.getBoundingClientRect());
+  if(engSub.contains(el))bs.push(engSub.getBoundingClientRect());
+  if(!bs.length)return r;
+  return {left:Math.min(...bs.map(b=>b.left)),right:Math.max(...bs.map(b=>b.right)),
+    top:r.top,bottom:r.bottom};
+}
+// the pop-out's words for one mode: the models, the note, then the compositor
+function detHtml(name,info,ci){
+  ci=ci||{};
+  const cloudOn=!!(ci.configured&&ci.turbo);
   const list=(info.models||[]);
   const bench=(cloudOn&&list.length>1)?(ci.bench||[]):[];
+  let h;
   // Max (6b440): every model, said plainly, with the cost warning
-  if(name==="Max"){
-    tierPop.innerHTML=maxTierPopHtml(info);
-  }else
-  // Cloud Only's modes and picks (6b440): the models it would ask, or why it can't
-  if(cloudTierParse(name).mode){
-    tierPop.innerHTML=cloudTierPopHtml(name,info);
-  }else
-  // "<server> Only" (6b337): the one model it runs, or why it can't
-  if(isSrvMode(name)){
-    tierPop.innerHTML=srvTierPopHtml(name,info);   // and its Fast, Thinking, Pro (6b426)
-  }else
+  if(name==="Max")h=maxTierPopHtml(info);
+  // Cloud Only's modes (6b440): the models it would ask, or why it can't
+  else if(cloudTierParse(name).mode)h=cloudTierPopHtml(name,info);
+  // a server's modes (6b337, 6b426): what it runs, or why it can't
+  else if(isSrvMode(name))h=srvTierPopHtml(name,info);
   // Cloud Only owns its bubble: its line-up IS the key bench, and with no
   // key the bubble has to say what to do rather than list nothing
-  if(info.available===false||(info.available!==undefined&&!list.length
+  else if(info.available===false||(info.available!==undefined&&!list.length
      &&name==="Cloud Only")){
-    tierPop.innerHTML="<b>"+esc(name)+"</b>"
+    h="<b>"+esc(name)+"</b>"
       +'<div class="mline">no API key yet</div>'
       +'<span class="note">add one under Settings › Cloud power — '
       +'Gemini and Groq both have free tiers</span>';
   }else if(name==="Cloud Only"){
-    tierPop.innerHTML="<b>"+esc(name)+"</b>"
+    h="<b>"+esc(name)+"</b>"
       +list.map(m=>'<div class="mline mcloud">'+esc(m)
         +' <i>· cloud</i></div>').join("")
       +'<span class="note">'+(list.length>1
-        ?"all of them answer, then the strongest composites"
+        ?"all of them answer, then one writes the final answer"
         :"streams straight from your key")
       +' — nothing runs on this machine</span>';
   }else
-  tierPop.innerHTML="<b>"+esc(name)+"</b>"+
+  h="<b>"+esc(name)+"</b>"+
     (list.length
       ? list.map(m=>'<div class="mline">'+esc(m)
-          +(m.indexOf(SRV_SEP)>=0?' <i>\u00b7 your server</i>':"")+'</div>').join("")+
+          +(m.indexOf(SRV_SEP)>=0?' <i>· your server</i>':"")+'</div>').join("")+
         bench.map(m=>'<div class="mline mcloud">'+esc(m)
           +' <i>· cloud</i></div>').join("")+
         (cloudOn
           ?'<span class="note"><i class="gcheck">✓</i> Cloud Enabled'
             +(info.fastcloud?' — '+esc(info.fastcloud)+' answers first, '
               +'this machine is the fallback':'')+'</span>'
-          :list.length>1?'<span class="note">answers blended by Gemma</span>'
-                        :'<span class="note">single model — fastest</span>')
+          :list.length>1?"":'<span class="note">single model — fastest</span>')
       : '<div class="mline">nothing downloaded yet</div>')+
     // a mode with more server models than seats (6b339, final review)
     (info.srvcap
@@ -38855,8 +39134,123 @@ async function showTierPop(el,name){
     ((info.skipped||[]).length
       ? '<span class="note">skipped, needs more memory: '+
         esc(info.skipped.join(", "))+'</span>' : "");
-  placeTierPop(el);
+  return h+compHtml(name,info);
 }
+// THE COMPOSITOR SECTION (6b442): who can write this mode's final answer
+// (/api/tiers' `comp`: {def, cands}), the one that will highlighted, the
+// default marked so the person can go back; one that can't right now is
+// greyed with the reason. A mode that doesn't blend (Fast) has none.
+function compKey(t){return t==="Cloud Only"?"cloud:pro":t;}   // plain Cloud Only is cloud Pro
+function compHtml(t,info){
+  const c=info&&info.comp;
+  if(!c||!Array.isArray(c.cands)||!c.cands.length)return "";
+  const k=compKey(t),pick=comps&&typeof comps==="object"?comps[k]:"";
+  const mine=pick?c.cands.find(x=>x.id===pick):null;
+  const cur=mine?mine.id:c.def;
+  return '<div class="pcomp"><div class="pch">Compositor <i>writes the final answer</i></div>'
+    +c.cands.map(x=>'<button type="button" class="pcand'+(x.id===cur?" on":"")+(x.ok?"":" off")
+      +'" data-k="'+esc(k)+'" data-c="'+esc(x.id)+'"'
+      +(x.ok?"":' disabled title="'+esc(x.why||"unavailable")+'"')+'>'
+      +'<span class="pcn">'+esc(x.name)+'</span>'
+      +'<span class="pcw">'+esc(x.ok?(x.where||""):(x.why||"unavailable"))+'</span>'
+      +(x.id===c.def?'<span class="pdef">default</span>':"")+'</button>').join("")
+    +(mine&&!mine.ok?'<span class="note">'+esc(mine.name)
+      +' can’t write it right now, so the default does.</span>':"")
+    +'</div>';
+}
+// a compositor picked in the pop-out: kept per mode (prefs "comps"); the
+// default picked again is no pick at all, so the mode follows its default
+function compPick(k,id){
+  const c=(tierInfo[k]||{}).comp,next=Object.assign({},comps);
+  if(!id||(c&&id===c.def))delete next[k];else next[k]=id;
+  comps=next;
+  prefSet({comps:next});
+}
+// what a send carries for the mode in use: its pick, or "" for the default
+function modeComp(){return tier&&!advOn&&comps?(comps[compKey(tier)]||""):"";}
+// HOVER INTENT (6b442): holding the cursor on a row opens its pop-out
+// (DET_OPEN_MS); with one already open, another row takes it only after a
+// longer rest (DET_SWITCH_MS); leaving the row or the pop-out closes it after
+// DET_GRACE_MS unless the pointer is back on one of them. THE SAFE TRIANGLE:
+// from the point where the pointer left the row to the pop-out's near edge
+// (detAim). While the pointer moves inside it, it is on its way: the rows it
+// crosses don't take the pop-out and the grace starts again at each move; it
+// stops on a row, and that row takes it after DET_SWITCH_MS; it leaves the
+// triangle, and the rows behave as above. now(): a click on the row's (i), or
+// keyboard focus, opens it at once. show, hide and box (the open pop-out's
+// rect) do the drawing, so node can run this with real timers.
+const DET_OPEN_MS=200,DET_SWITCH_MS=280,DET_GRACE_MS=300;
+// is (x,y) inside the triangle from p0 (where the pointer left its row, set 6 px
+// back from the pop-out) to the pop-out box's near edge? Pure, for the gauntlet
+function detAim(p0,b,x,y){
+  if(!p0||!b)return false;
+  let a,c,q={x:p0.x,y:p0.y};
+  if(b.left>=p0.x){a={x:b.left,y:b.top};c={x:b.left,y:b.bottom};q.x-=6;}
+  else if(b.right<=p0.x){a={x:b.right,y:b.top};c={x:b.right,y:b.bottom};q.x+=6;}
+  else if(b.top>=p0.y){a={x:b.left,y:b.top};c={x:b.right,y:b.top};q.y-=6;}
+  else{a={x:b.left,y:b.bottom};c={x:b.right,y:b.bottom};q.y+=6;}
+  const s=(p,r,t)=>(r.x-p.x)*(t.y-p.y)-(r.y-p.y)*(t.x-p.x);
+  const P={x:x,y:y},d1=s(q,a,P),d2=s(a,c,P),d3=s(c,q,P);
+  return !((d1<0||d2<0||d3<0)&&(d1>0||d2>0||d3>0));
+}
+function detIntent(show,hide,box){
+  let cur="",tOpen=0,tClose=0,aim=null,pend=null;
+  const clr=()=>{clearTimeout(tOpen);clearTimeout(tClose);tOpen=tClose=0;};
+  const close=()=>{clearTimeout(tClose);
+    tClose=setTimeout(()=>{cur="";aim=null;pend=null;hide();},DET_GRACE_MS);};
+  const open=(id,el,ms)=>{clearTimeout(tOpen);
+    tOpen=setTimeout(()=>{clearTimeout(tClose);tClose=0;aim=null;pend=null;show(id,el);cur=id;},ms);};
+  return {
+    rowEnter(id,el){
+      if(cur===id){clearTimeout(tClose);tClose=0;aim=null;pend=null;return;}
+      if(cur&&aim){pend=[id,el];return;}      // crossing it on the way to the pop-out
+      clearTimeout(tClose);tClose=0;
+      open(id,el,cur?DET_SWITCH_MS:DET_OPEN_MS);
+    },
+    rowLeave(x,y){
+      clearTimeout(tOpen);tOpen=0;pend=null;
+      if(!cur)return;
+      const b=box();
+      aim=b&&typeof x==="number"?{x:x,y:y}:null;
+      close();
+    },
+    move(x,y){
+      if(!cur||!aim)return;
+      if(detAim(aim,box(),x,y)){
+        close();                                 // still on its way: the grace starts again
+        if(pend)open(pend[0],pend[1],DET_SWITCH_MS);   // a stop on a row lets it take over
+        return;
+      }
+      aim=null;                                 // off the path: rows behave as usual
+      if(pend){const p=pend;pend=null;clearTimeout(tClose);tClose=0;open(p[0],p[1],DET_SWITCH_MS);}
+    },
+    popEnter(){clr();aim=null;pend=null;},
+    popLeave(){if(cur){aim=null;close();}},
+    now(id,el){clr();aim=null;pend=null;show(id,el);cur=id;},
+    reset(){clr();cur="";aim=null;pend=null;},
+    cur(){return cur;},
+    aiming(){return !!(cur&&aim);}
+  };
+}
+const det=detIntent((t,el)=>{
+  if(!el||!el.isConnected||engMenu.hidden)return;
+  // a main row's pop-out takes the place of an open sub-menu
+  if(engMenu.contains(el)&&!engSub.hidden)closeEngSub();
+  showTierPop(el,t);
+},()=>hideTierPop(),()=>tierPop.hidden?null:tierPop.getBoundingClientRect());
+document.addEventListener("mousemove",e=>det.move(e.clientX,e.clientY),{passive:true});
+tierPop.addEventListener("mouseenter",()=>{if(tierPop.classList.contains("det"))det.popEnter();});
+tierPop.addEventListener("mouseleave",()=>{if(tierPop.classList.contains("det"))det.popLeave();});
+// a compositor clicked: kept, and the pop-out drawn again where it is; the
+// menus stay open (the click doesn't reach the document's closer)
+tierPop.addEventListener("click",ev=>{
+  if(!tierPop.classList.contains("det"))return;
+  ev.stopPropagation();
+  const b=ev.target.closest(".pcand");
+  if(!b||b.disabled)return;
+  compPick(b.dataset.k,b.dataset.c);
+  if(detEl&&detEl.isConnected)showTierPop(detEl,detT);
+});
 // WHERE THE POP-OUT GOES (6b440, per Patrick: it must never be clipped by the
 // window; a page can't draw outside it). rr: the hovered row's box, w and h the
 // pop-out's size, iw and ih the window's. Right of the row when it fits, else
@@ -38876,14 +39270,17 @@ function popPlace(rr,w,h,iw,ih){
   }
   return {left:Math.round(left),top:Math.round(top),maxH:h>maxH?Math.floor(maxH):0};
 }
-function placeTierPop(el){
+function placeTierPop(el,box){
   tierPop.hidden=false;
   tierPop.style.maxHeight="";
-  const p=popPlace(el.getBoundingClientRect(),tierPop.offsetWidth,tierPop.offsetHeight,innerWidth,innerHeight);
+  const p=popPlace(box||el.getBoundingClientRect(),tierPop.offsetWidth,tierPop.offsetHeight,innerWidth,innerHeight);
   if(p.maxH)tierPop.style.maxHeight=p.maxH+"px";
   tierPop.style.left=p.left+"px";tierPop.style.top=p.top+"px";
 }
-function hideTierPop(){tierPop.hidden=true;}
+function hideTierPop(){
+  tierPop.hidden=true;tierPop.classList.remove("det");detEl=null;detT="";det.reset();
+  document.querySelectorAll(".engrow.detopen").forEach(e=>e.classList.remove("detopen"));
+}
 // a one-line note under the composer chip that goes by itself (6b440): a chosen
 // cloud model that stopped answering says where the pick went
 let tierNoteEl=null,tierNoteT=0;
@@ -39081,14 +39478,13 @@ const engMenu=document.createElement("div");
 engMenu.id="engmenu";engMenu.hidden=true;
 document.body.appendChild(engMenu);
 engMenu.addEventListener("scroll",()=>hideTierPop(),{passive:true});   // its bubble would float off its row
-// YOUR SERVERS IN ONE ROW (6b337, per Patrick: "let's at least put all the
-// your server models ... under one menu that they can break out into.
-// Instead of having them pile under all the other like fast thinking pro
-// cloud only, let's just have the server name ... and then that splits
-// into a new menu where you can select which one."): a row per paired
-// server under Cloud Only opens a flyout beside it, "<name> Only" first,
-// then that server's models. It opens on a click, which works in every
-// webview, and after a short hover; Esc or a click elsewhere closes it.
+// SUB-MENUS (6b337; 6b442, per Patrick: "Under max, we then have cloud only,
+// which is another pop out to the right of that menu where they can select fast
+// thinking pro. then list any servers they have ... have fast thinking pro and
+// max, max being all models on that server."): the Cloud Only row and a row per
+// paired server each open a menu beside them with that place's modes. It opens
+// on a click, which works in every webview, and after a short hover; Esc or a
+// click elsewhere closes it. "__cloud__" is Cloud Only's; a server's is its id.
 const engSub=document.createElement("div");
 engSub.id="engsub";engSub.hidden=true;
 document.body.appendChild(engSub);
@@ -39101,30 +39497,39 @@ function closeEngSub(){
   engMenu.querySelectorAll(".engrow.srvmenu.open").forEach(e=>e.classList.remove("open"));
 }
 function closeEngMenus(){engMenu.hidden=true;closeEngSub();}
-// Escape: the flyout first, then the menu; true when it closed something
+// Escape: the pop-out first, then the flyout, then the menu; true when it closed something
 function engMenuEsc(){
+  if(!tierPop.hidden&&tierPop.classList.contains("det")){
+    const r=detEl;hideTierPop();
+    if(r&&r.isConnected){detQuiet=true;r.focus();detQuiet=false;}   // back on its row, closed
+    return true;}
   if(!engSub.hidden){closeEngSub();return true;}
   if(!engMenu.hidden){closeEngMenus();hideTierPop();return true;}
   return false;
 }
+// beside the menu, at its row, by the pop-outs' own rules (popPlace): right if
+// it fits, else left, else below or above, inside the window, scrolling if taller
 function placeEngSub(){
   if(engSub.hidden)return;
   const row=engMenu.querySelector('.engrow.srvmenu[data-sv="'+engSubId+'"]');
   if(!row){closeEngSub();return;}
   engSub.style.maxHeight="";
-  const f=flyPlace(engMenu.getBoundingClientRect(),row.getBoundingClientRect(),
+  const mr=engMenu.getBoundingClientRect(),rr=row.getBoundingClientRect();
+  const f=popPlace({left:mr.left,right:mr.right,top:rr.top,bottom:rr.bottom},
     engSub.offsetWidth,engSub.offsetHeight,innerWidth,innerHeight);
   if(f.maxH)engSub.style.maxHeight=f.maxH+"px";
   engSub.style.left=f.left+"px";engSub.style.top=f.top+"px";
 }
 // keepScroll: a repaint keeps the list where it was (as the menu does, 6b336)
 function openEngSub(id,keepScroll,byHover){
-  const s=srvList.find(x=>x.paired&&x.id===id);
+  const s=id==="__cloud__"?null:srvList.find(x=>x.paired&&x.id===id);
   const row=engMenu.querySelector('.engrow.srvmenu[data-sv="'+id+'"]');
-  if(!s||!row||engMenu.hidden){closeEngSub();return;}
+  if((!s&&id!=="__cloud__")||!row||engMenu.hidden){closeEngSub();return;}
   const keep=keepScroll&&!engSub.hidden?engSub.scrollTop:-1;
+  // a main row's pop-out gives way to the sub-menu opening beside it
+  if(keep<0&&detEl&&engMenu.contains(detEl))hideTierPop();
   engSubId=id;engSubByHover=!!byHover;
-  engSub.innerHTML=srvSubRows(s);
+  engSub.innerHTML=s?srvSubRows(s):cloudSubRows();
   engMenu.querySelectorAll(".engrow.srvmenu").forEach(e=>e.classList.toggle("open",e===row));
   engSub.hidden=false;
   placeEngSub();
@@ -39133,20 +39538,9 @@ function openEngSub(id,keepScroll,byHover){
     if(on&&engSub.scrollHeight>engSub.clientHeight)on.scrollIntoView({block:"nearest"});}
   engSub.querySelectorAll(".engrow").forEach(el=>{
     if(el.dataset.none)return;
-    if(el.dataset.s){
-      el.addEventListener("click",ev=>{
-        ev.stopPropagation();pickServerModel(el.dataset.s);closeEngMenus();});
-      return;
-    }
-    // "<name> Only": its bubble says why it is off, and what it would run
-    el.addEventListener("mouseenter",()=>showTierPop(el,el.dataset.t));
-    el.addEventListener("mouseleave",hideTierPop);
-    el.addEventListener("click",ev=>{
-      ev.stopPropagation();
-      if(tierOff[el.dataset.t]){showTierPop(el,el.dataset.t);return;}
-      setTier(el.dataset.t);hideTierPop();closeEngMenus();
-    });
+    wireModeRow(el);
   });
+  detRefresh();
 }
 // a click on a server's row (6b339, final review): the hover timer a quick click
 // races is cleared FIRST, or it fires after the click and opens the flyout again
@@ -39158,30 +39552,84 @@ function srvRowClick(id){
   else if(a==="pin")engSubByHover=false;   // a hover opened it; the click keeps it
   else openEngSub(id,false,false);
 }
+// A MODE'S ROW (6b442): a click picks the mode and closes the menus; holding the
+// cursor on it opens its pop-out (det), and so do its (i), keyboard focus and the
+// right arrow; Enter or Space picks it. A mode that can't answer stays in the
+// menu and opens its pop-out, which says why.
+function wireModeRow(el){
+  const t=el.dataset.t;
+  el.addEventListener("mouseenter",()=>det.rowEnter(t,el));
+  el.addEventListener("mouseleave",ev=>det.rowLeave(ev.clientX,ev.clientY));
+  el.addEventListener("focus",()=>{
+    if(detQuiet)return;
+    let kb=true;try{kb=el.matches(":focus-visible");}catch(e){}
+    if(kb)det.now(t,el);});
+  el.addEventListener("click",ev=>{
+    ev.stopPropagation();
+    if(ev.target.closest(".einfo")){
+      if(detEl===el&&!tierPop.hidden)hideTierPop();else det.now(t,el);
+      return;
+    }
+    if(tierOff[t]){det.now(t,el);return;}
+    setTier(t);hideTierPop();closeEngMenus();
+  });
+  el.addEventListener("keydown",engRowKey);
+}
+// the keys on a row: Enter/Space as a click, the right arrow into its pop-out
+// or sub-menu, up and down to the next row of the same menu
+function engRowKey(ev){
+  const el=ev.currentTarget;
+  if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();el.click();return;}
+  if(ev.key==="ArrowRight"){
+    ev.preventDefault();
+    if(el.dataset.sv){openEngSub(el.dataset.sv,false,false);
+      const f=engSub.querySelector(".engrow:not(.off)");if(f)f.focus();}
+    else if(el.dataset.t&&el.dataset.t!=="__adv__"){det.now(el.dataset.t,el);
+      const b=tierPop.querySelector(".pcand:not([disabled])");if(b)b.focus();}
+    return;
+  }
+  if(ev.key==="ArrowLeft"&&engSub.contains(el)){
+    ev.preventDefault();const r=engMenu.querySelector(".engrow.srvmenu.open");
+    closeEngSub();if(r)r.focus();return;}
+  if(ev.key==="ArrowDown"||ev.key==="ArrowUp"){
+    ev.preventDefault();
+    const rows=[...el.parentNode.querySelectorAll(".engrow[tabindex]")];
+    const i=rows.indexOf(el)+(ev.key==="ArrowDown"?1:-1);
+    if(rows[i])rows[i].focus();
+  }
+}
+let detQuiet=false;              // a focus the page moved itself opens nothing
+// a repaint (the menu, or a sub-menu) draws an open pop-out again on its new row
+function detRefresh(){
+  if(!detT||tierPop.hidden||!tierPop.classList.contains("det"))return;
+  const r=[...document.querySelectorAll("#engmenu .engrow[data-t],#engsub .engrow[data-t]")]
+    .find(e=>e.dataset.t===detT);
+  if(r)showTierPop(r,detT);else hideTierPop();
+}
+// THE MENU (6b442, per Patrick: "We want to have fast thinking, pro, and max.
+// Under those, don't say the compositor ... Under max, we then have cloud only
+// ... then list any servers they have ... Then finally, we can have advanced ...
+// I don't want the four cloud models sitting there in that menu on their own."):
+// Fast, Thinking, Pro and Max; Cloud Only and each server open a sub-menu;
+// Advanced. No line under any row: who writes the answer is in the pop-out.
+function engMainRows(){
+  return ["Fast","Thinking","Pro","Max"].filter(n=>TIER_META[n]).map(n=>
+    modeRow(n,TIER_META[n].icon,n,TIER_META[n].desc,!!tierOff[n],"","",tier===n))
+    .join("")
+    +cloudMenuRow()
+    // one row per paired server: its modes open in a sub-menu beside it (6b337)
+    +srvMenuRows()
+    // ADVANCED (6b248, per Patrick): hand-pick the council + compositor,
+    // set apart from the modes by a thin rule
+    +'<div class="engdiv"></div>'
+    +'<div class="engrow'+(advOn?" on":"")+'" data-t="__adv__" tabindex="0">'
+    +'<span class="eico">⚙️</span><span class="enm">Advanced</span>'
+    +'<span class="edsc">hand-pick models &amp; compositor</span></div>';
+}
 function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
   srvSyncOff();
-  engMenu.innerHTML=Object.keys(TIER_META).map(n=>{
-    const m=TIER_META[n];
-    return '<div class="engrow'+(tier===n&&!advOn?" on":"")
-      +(tierOff[n]?" off":"")+'" data-t="'+n+'">'
-      +'<span class="eico">'+m.icon+'</span>'
-      +'<span class="enm">'+esc(n)+'</span>'
-      +'<span class="edsc">'+esc(m.desc)+'</span></div>'+blendHtml(n)
-      // Fast, Thinking, Pro and one row per cloud model, under Cloud Only (6b440)
-      +(n==="Cloud Only"?cloudMenuRows():"");
-  }).join("")
-  // one row per paired server, under Cloud Only: its "Only" mode and its
-  // models open in a flyout beside it (6b337)
-  +srvMenuRows()
-  // ADVANCED (6b248, per Patrick): hand-pick the council + compositor,
-  // set apart from the modes by a thin rule
-  +'<div class="engdiv"></div>'
-  +'<div class="engrow'+(advOn?" on":"")+'" data-t="__adv__">'
-  +'<span class="eico">⚙️</span><span class="enm">Advanced</span>'
-  +'<span class="edsc">hand-pick models &amp; compositor</span></div>'
-  // Advanced names its own compositor when it has one (6b440)
-  +(adv&&adv.comp?'<div class="engblend">'+esc("blend: "+adv.comp)+'</div>':"");
+  engMenu.innerHTML=engMainRows();
   engMenu.hidden=false;
   // fit the window (6b336): open on the side with room; when neither
   // side holds the whole list, take the roomier one and scroll
@@ -39214,27 +39662,23 @@ function openEngMenu(){
           if(!engMenu.hidden)openEngSub(el.dataset.sv,false,true);},300);
       });
       el.addEventListener("mouseleave",()=>clearTimeout(engSubTimer));
+      el.addEventListener("keydown",engRowKey);
       return;
     }
     // a flyout a hover opened goes when the pointer moves on to another
     // row; one a click opened stays until it is closed
+    // (not while the pointer is on its way to a sub-menu row's pop-out, 6b442)
     el.addEventListener("mouseenter",()=>{
-      clearTimeout(engSubTimer);if(engSubByHover)closeEngSub();});
-    if(el.dataset.t!=="__adv__"){
-      el.addEventListener("mouseenter",()=>showTierPop(el,el.dataset.t));
-      el.addEventListener("mouseleave",hideTierPop);
+      clearTimeout(engSubTimer);if(engSubByHover&&!det.aiming())closeEngSub();});
+    if(el.dataset.t==="__adv__"){
+      el.addEventListener("click",ev=>{
+        ev.stopPropagation();hideTierPop();closeEngMenus();openAdv();});
+      el.addEventListener("keydown",engRowKey);
+      return;
     }
-    el.addEventListener("click",ev=>{
-      ev.stopPropagation();
-      if(el.dataset.t==="__adv__"){
-        hideTierPop();closeEngMenus();openAdv();return;
-      }
-      // an unavailable mode keeps the menu open and leaves its bubble
-      // up — the bubble is where the fix is written
-      if(tierOff[el.dataset.t]){showTierPop(el,el.dataset.t);return;}
-      setTier(el.dataset.t);hideTierPop();closeEngMenus();
-    });
+    wireModeRow(el);
   });
+  detRefresh();
   // a repaint (a server's list refreshing) keeps its flyout open
   if(engSubId)openEngSub(engSubId,true,engSubByHover);
   else engSub.hidden=true;
@@ -39255,6 +39699,7 @@ document.addEventListener("click",e=>{
   hideTierPop();
   const em=document.getElementById("engmenu");
   if(em&&!e.target.closest("#engmenu")&&!e.target.closest("#engsub")
+     &&!e.target.closest("#tierpop")
      &&!e.target.closest("#model-chip"))closeEngMenus();
 });
 setTier(tier,true);
@@ -39312,6 +39757,7 @@ async function paintTierAvail(){
   // pick goes back to plain Cloud Only, said out loud; never to another model
   // (6b440). Plain Cloud Only off too: the line below sends it to Fast as before
   if(isCloudMode(tier)){
+    if(cloudTierParse(tier).mode==="Model")tier=cloudPickRetire(tier);   // (6b442)
     if(!cloudTierParse(tier).mode){setTier("Fast");}
     else if(tierOff[tier]&&!tierOff["Cloud Only"]){
       const was=tier,inf=tierInfo[was]||{};
@@ -41244,6 +41690,7 @@ async function send(){
         :{model:advGhostOnly?"":model,models:advGhostOnly?[]:council,
           tier:advGhostOnly?"Fast":tier,messages:askCtx(myMessages),
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
+          mode_comp:advGhostOnly?"":modeComp(),    // the mode's own compositor, "" for its default (6b442)
           // the Remote agent (6b249) carries the autonomy throttle
           autonomy:agent==="Remote"?autonomy:undefined},turn)),
     });
@@ -45332,29 +45779,19 @@ function flyClick(curId,hidden,byHover,id){
   if(curId!==id||hidden)return "open";
   return byHover?"pin":"close";
 }
-// where a flyout goes (6b337): beside the menu, to its right or, with no room
-// there, to its left; its top at its row; inside the window on every edge,
-// and capped to it so a long list scrolls (as the menu itself does, 6b336).
-// mr, rr: the menu's and the row's boxes; w, h: the flyout's size
-function flyPlace(mr,rr,w,h,iw,ih){
-  const EDGE=10,GAP=4,maxH=Math.max(120,ih-2*EDGE),hh=Math.min(h,maxH);
-  const roomR=iw-mr.right-GAP-EDGE,roomL=mr.left-GAP-EDGE;
-  let left=roomR>=w||roomR>=roomL?mr.right+GAP:mr.left-GAP-w;
-  left=Math.max(EDGE,Math.min(left,iw-w-EDGE));
-  const top=Math.max(EDGE,Math.min(rr.top,ih-EDGE-hh));
-  return {left:Math.round(left),top:Math.round(top),maxH:h>maxH?Math.floor(maxH):0};
+// ONE ROW OF A MODE (6b442): its icon, name and a few words, and an (i) that
+// opens its pop-out without a hover (touch, keyboard). Greyed (off) rows say
+// why in a few words, the sentence in the tooltip. No line under it.
+function modeRow(t,ic,nm,dsc,off,cls,tip,on){
+  return '<div class="engrow mode'+(cls?" "+cls:"")+(on&&!advOn?" on":"")+(off?" off":"")
+    +'" data-t="'+esc(t)+'" tabindex="0"'+(tip?' title="'+esc(tip)+'"':"")+'>'
+    +'<span class="eico">'+ic+'</span><span class="enm">'+esc(nm)+'</span>'
+    +'<span class="edsc">'+esc(dsc)+'</span>'
+    +'<span class="einfo" role="button" aria-label="What '+esc(nm)+' uses">i</span></div>';
 }
 // the engine menu's server rows (6b337): ONE per paired server, its own
-// name, how many models it lists and a chevron; the models and "<name>
-// Only" are in the flyout it opens (srvSubRows)
-// the small grey line under a mode's row naming who writes its blend (6b440, per
-// Patrick); the words come from /api/tiers ("blend: Gemma 4 26B", "blend: none
-// available"), computed by the same resolver the merge uses. A mode with one
-// model has none. typeof: the pieces are also run apart from the page
-function blendHtml(t){
-  const i=typeof tierInfo==="undefined"?null:tierInfo[t];
-  return i&&i.blend?'<div class="engblend">'+esc(i.blend)+'</div>':"";
-}
+// name, how many models it lists and a chevron; its modes are in the
+// sub-menu it opens (srvSubRows)
 function srvMenuRows(){
   return srvList.filter(s=>s.paired).map(s=>{
     const ms=s.models||[];
@@ -45369,31 +45806,17 @@ function srvMenuRows(){
       +'<span class="echev">\u203a</span></div>';
   }).join("");
 }
-// a server's flyout: "<name> Only" first, then Fast, Thinking and Pro on that
-// server alone (6b426), then each of its models with where it runs; a server
-// that doesn't answer or lists none says so
+// a server's sub-menu (6b442): Fast, Thinking, Pro and Max on that server alone
+// (6b426); greyed with the reason while it can't answer, and a line saying so
+// while it sleeps (it wakes when a mode of it is asked)
+const SRV_MODE_DESC={fast:"one model, quick",think:"a few models, double-checked",
+  pro:"more models, blended",max:"every model on it"};
 function srvSubRows(s){
-  const ms=s.models||[],t="srv:"+s.id,ok=srvPickable(s);
-  const only='<div class="engrow srvmode'+(tier===t&&!advOn?" on":"")
-    +(ok?"":" off")+'" data-t="'+esc(t)+'">'
-    +'<span class="eico">\ud83d\udda5\ufe0f</span>'
-    +'<span class="enm">'+esc(s.name)+' Only</span>'
-    +'<span class="edsc">strongest that fits its card</span></div>'
-    +srvSubModes().map(([k,n,ic])=>'<div class="engrow srvmode srvsub'
-      +(tier===t+":"+k&&!advOn?" on":"")+(ok?"":" off")+'" data-t="'+esc(t+":"+k)+'">'
-      +'<span class="eico">'+ic+'</span><span class="enm">'+n+'</span>'
-      +'<span class="edsc">'+esc(s.name)+' only</span></div>'+blendHtml(t+":"+k)).join("");
-  if(!ms.length)
-    return only+'<div class="engdiv"></div><div class="engrow srvrow off" data-none="1">'
-      +'<span class="edsc">'+(srvAsleep(s)?"asleep \u00b7 wakes when you ask"
-        :(s.status||{}).err?"not answering":"no models listed")
-      +'</span></div>';
-  return only+'<div class="engdiv"></div>'+ms.map(m=>'<div class="engrow srvrow'
-    +(!tier&&!advOn&&!agent&&council[0]===m.label?" on":"")
-    +'" data-s="'+esc(m.label)+'" title="Runs on your server '+esc(s.name)
-    +', not in the cloud"><span class="eico">\ud83d\udda5\ufe0f</span>'
-    +'<span class="enm">'+esc(m.name)+'</span><span class="edsc">'
-    +esc(srvWhere(m)?"yours \u00b7 "+srvWhere(m):"your server")+'</span></div>').join("");
+  const t="srv:"+s.id,ok=srvPickable(s),ms=s.models||[];
+  const why=(s.status||{}).err||!(s.only||{}).ok&&ms.length?"not answering":ms.length?"":"no models listed";
+  return (srvAsleep(s)?'<div class="engnote">asleep · wakes when you ask</div>':"")
+    +srvSubModes().map(([k,n,ic])=>modeRow(t+":"+k,ic,n,ok?SRV_MODE_DESC[k]:(why||"not answering"),
+      !ok,"srvmode","",tier===t+":"+k)).join("");
 }
 // the composer's server chips (6b334): "● AMD", "● NVIDIA", "● INTEL"
 // for each paired server whose card its gateway names; dimmed while it
@@ -45432,9 +45855,9 @@ function srvPickable(s){return !!(s&&s.paired&&s.only&&(s.only.ok||s.only.asleep
 // isn't one of these has no id, so its server is "gone". A function, not a
 // const: a boot path that reads it before this line would throw (the TDZ)
 function srvSubModes(){return [["fast","Fast","\u26a1\ufe0f"],["think","Thinking","\ud83e\udde0"],
-  ["pro","Pro","\u2728"]];}
+  ["pro","Pro","\u2728"],["max","Max","\ud83d\ude80"]];}   // Max: every model on it (6b442)
 function srvTierParse(t){
-  const m=isSrvMode(t)?/^srv:([^:]+)(?::(fast|think|pro))?$/.exec(t):null;
+  const m=isSrvMode(t)?/^srv:([^:]+)(?::(fast|think|pro|max))?$/.exec(t):null;
   const k=m&&m[2]?srvSubModes().find(x=>x[0]===m[2]):null;
   return {id:m?m[1]:"",mode:k?k[1]:""};
 }
@@ -45472,21 +45895,42 @@ function cloudTierParse(t){
   const p=m&&m[2]?cloudProvs().find(x=>x[0]===m[2]):null;
   return {mode:k?k[1]:p?"Model":"",pid:p?p[0]:""};
 }
-// the sub-rows under "Cloud Only" in the engine menu: Fast, Thinking and Pro, then
-// one row per cloud model with the model it runs. A row that can't answer is
-// greyed (tierOff, from /api/tiers) and says why in a few words, the whole
-// sentence in its tooltip
-function cloudMenuRows(){
-  const row=(t,ic,nm,dsc)=>{
-    const inf=tierInfo[t]||{},off=!!tierOff[t];
-    return '<div class="engrow cloudmode cloudsub'+(tier===t&&!advOn?" on":"")+(off?" off":"")
-      +'" data-t="'+esc(t)+'"'+(off&&inf.why?' title="'+esc(inf.why)+'"':"")+'>'
-      +'<span class="eico">'+ic+'</span><span class="enm">'+esc(nm)+'</span>'
-      +'<span class="edsc">'+esc(off?(inf.short||"unavailable"):dsc)+'</span></div>'+(off?"":blendHtml(t));};
-  return cloudSubModes().map(x=>row("cloud:"+x[0],x[2],x[1],"cloud only")).join("")
-    +'<div class="engdiv"></div>'
-    +cloudProvs().map(p=>{const inf=tierInfo["cloud:m:"+p[0]]||{};
-      return row("cloud:m:"+p[0],"☁️",p[1],(inf.desc?inf.desc+" · ":"")+(inf.model||""));}).join("");
+// ONE CLOUD MODEL ALONE LEFT THE MENU (6b442, per Patrick: "I don't want the four
+// cloud models sitting there in that menu on their own."): a saved
+// "cloud:m:<id>" pick becomes Thinking · cloud only, saved, and said once in
+// the note under the chip; paintTierAvail sends it on to plain Cloud Only when
+// that can't answer, as it does any cloud mode. The server still reads the old
+// ids (cloud_tier_parse), so a page from before keeps working.
+function cloudPickRetire(t){
+  if(cloudTierParse(t).mode!=="Model")return t;
+  const was=cloudTierShown(t);
+  prefSet({tier:"cloud:think"});
+  setTimeout(()=>tierNote(was+" isn’t in the menu any more, so this is on "
+    +"Thinking · cloud only."),0);
+  return "cloud:think";
+}
+// CLOUD ONLY'S ROW AND SUB-MENU (6b442, per Patrick: "cloud only, which is
+// another pop out to the right of that menu where they can select fast thinking
+// pro ... I don't want the four cloud models sitting there in that menu on their
+// own."): the row opens a sub-menu with Fast, Thinking and Pro, each greyed with
+// its reason when it can't answer. Plain "Cloud Only" (old prefs) is its Pro.
+const CLOUD_MODE_DESC={fast:"one model, cheapest first",think:"three models, free ones first",
+  pro:"every cloud model"};
+function cloudMenuRow(){
+  const on=!advOn&&(tier==="Cloud Only"||isCloudMode(tier));
+  const dead=cloudSubModes().every(x=>tierOff["cloud:"+x[0]]);
+  const inf=tierInfo["cloud:fast"]||{};
+  return '<div class="engrow srvmenu cloudmenu'+(on?" on":"")+'" data-sv="__cloud__" tabindex="0">'
+    +'<span class="eico">☁️</span><span class="enm">Cloud Only</span>'
+    +'<span class="edsc">'+esc(dead?(inf.short||"unavailable"):"your API keys only")+'</span>'
+    +'<span class="echev">›</span></div>';
+}
+function cloudSubRows(){
+  return cloudSubModes().map(([k,n,ic])=>{
+    const t="cloud:"+k,inf=tierInfo[t]||{},off=!!tierOff[t];
+    return modeRow(t,ic,n,off?(inf.short||"unavailable"):CLOUD_MODE_DESC[k],off,"cloudmode",
+      off&&inf.why?inf.why:"",tier===t||(k==="pro"&&tier==="Cloud Only"));
+  }).join("");
 }
 // the hover bubble: the models it would ask, or why it can't; always that only
 // cloud models answer
@@ -45506,7 +45950,6 @@ function maxTierPopHtml(info){
       ?'<div class="mline">'+esc(info.why||"nothing is available")+'</div>'
       :loc.map(m=>'<div class="mline">'+esc(m)+(m.indexOf(SRV_SEP)>=0?' <i>· your server</i>':"")+'</div>').join("")
         +cl.map(m=>'<div class="mline mcloud">'+esc(m)+' <i>· cloud</i></div>').join(""))
-    +(info.blend?'<span class="note">'+esc(info.blend)+'</span>':"")
     +'<span class="note warn">'+esc(info.warn||"Uses every model, including paid cloud keys.")+'</span>';
 }
 // the chip: "Fast · Claude", "Gemini only", "Thinking · cloud only"
