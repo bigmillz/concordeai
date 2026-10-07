@@ -10267,7 +10267,7 @@ function advChip(){}
 function paintAutonomy(){}
 function paintModels(){}
 function setAgent(n){agent=n;}
-function isCloudMode(){return false;}function cloudTierParse(){return {};}function isSrvMode(){return false;}
+function isCloudMode(){return false;}function cloudTierParse(){return {};}function cloudPickRetire(t){return t;}function isSrvMode(){return false;}
 function srvModeGone(){}
 function advPrune(){}function micWarmPaint(){}
 """ % (json.dumps(INST.base), json.dumps(INST.headers)) + _sbseg + r"""
@@ -10352,7 +10352,7 @@ let adv=null,advOn=false,autonomy="auto",tierOff={},agent="",uiMode="ai",council
     council=["Llama 3.2 3B"],tier="Fast";
 function paintAgents(){} function paintModels(){} function advChip(){} function paintAutonomy(){}
 function modeShow(w){uiMode=w;}
-function isCloudMode(){return false;}function cloudTierParse(){return {};}function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}function micWarmPaint(){}
+function isCloudMode(){return false;}function cloudTierParse(){return {};}function cloudPickRetire(t){return t;}function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}function micWarmPaint(){}
 """ + _sbseg + _jsfn(page, "function setTier(name,quiet){") + _jsfn(page, "function switchLane(m){")
              + _jsfn(page, "function setAgent(name,guess){") + r"""
 const boot=storeBoot();
@@ -14132,12 +14132,18 @@ def _bal8(s_, i_):
     return ""
 
 
+# (6b442) a value's own colon is not a key: prefSet({tier:"cloud:think"})
+# saves "tier", never "cloud", so string literals are blanked first
+def _keys8(s_):
+    return set(re.findall(r"([a-z_]+):", re.sub(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'', '""', s_)))
+
+
 _pk8 = set()
 for _m8 in re.finditer(r'api\("/api/prefs",\{method:"POST"', _S8):
     _k8 = _S8.index("JSON.stringify(", _m8.start()) + len("JSON.stringify")
-    _pk8 |= set(re.findall(r"([a-z_]+):", _bal8(_S8, _k8)))
+    _pk8 |= _keys8(_bal8(_S8, _k8))
 for _m8 in re.finditer(r"(?<![\w.])(?:prefSet|stamp)\(", _S8):
-    _pk8 |= set(re.findall(r"([a-z_]+):", _bal8(_S8, _m8.end() - 1)))
+    _pk8 |= _keys8(_bal8(_S8, _m8.end() - 1))
 _stt8 = _S8[_S8.index("function setTier(name,quiet){"):]
 _pk8 |= set(re.findall(r"\bo\.([a-z_]+)=", _stt8[:_stt8.index("\n}\n")]))
 _pc8 = {}
@@ -16834,7 +16840,7 @@ function advChip(){}
 function paintAutonomy(){}
 function paintModels(){}
 function setAgent(n){agent=n;}
-function isCloudMode(){return false;}function cloudTierParse(){return {};}function isSrvMode(){return false;}
+function isCloudMode(){return false;}function cloudTierParse(){return {};}function cloudPickRetire(t){return t;}function isSrvMode(){return false;}
 function srvModeGone(){}
 function advPrune(){}function micWarmPaint(){}
 """ + _pg9 + r"""
@@ -25079,7 +25085,7 @@ check("servers (live): Cloud Only never seats a server model; Pro seats the serv
       and _SVN not in json.dumps(_tiers34["Cloud Only"], ensure_ascii=False)
       and _tiers34["Cloud Only"]["models"] == []
       and [k_ for k_ in _tiers34 if k_.startswith("srv:")] == ["srv:" + _sid34] + [
-          "srv:%s:%s" % (_sid34, m_) for m_ in ("fast", "think", "pro")]   # (6b426) "<server> Only" and its three modes
+          "srv:%s:%s" % (_sid34, m_) for m_ in ("fast", "think", "pro", "max")]   # (6b426) "<server> Only" and its modes, Max since 6b442
       and any(_SVN in m_ for m_ in _tiOn["Pro"]["models"])
       and _pf0[1].get("ok") is True and _pf0[1]["server"]["prefer"] is False
       and not any(_SVN in m_ for k_ in ("Fast", "Thinking", "Pro") for m_ in _tiOff[k_]["models"])
