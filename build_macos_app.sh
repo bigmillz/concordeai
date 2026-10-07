@@ -82,6 +82,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>     <string>APPL</string>
   <key>NSHighResolutionCapable</key> <true/>
   <key>LSMinimumSystemVersion</key>  <string>11.0</string>
+  <key>LSUIElement</key>             <true/>
   <key>NSLocalNetworkUsageDescription</key> <string>ConcordeAI wakes your own server over your home network and talks to it there.</string>
   <key>NSMicrophoneUsageDescription</key> <string>ConcordeAI uses the microphone for voice input — audio never leaves this Mac.</string>
 </dict>
@@ -91,8 +92,11 @@ PLIST
 # --- launcher: self-bootstrapping, so the .app works on a fresh Mac.
 # On first run it builds a private venv in ~/Library/Application Support
 # and pip-installs the engine deps (needs internet, a few minutes).
+# It lives in Resources (6b443): the main executable is the native launcher
+# below, which runs this script as its child. DIR is Resources now, so
+# "$DIR/../.." is still the bundle and "$DIR/../Resources" still Resources.
 # NOTE: single-quoted heredoc — nothing here is expanded at build time.
-cat > "$APP/Contents/MacOS/MillenAI" <<'LAUNCH'
+cat > "$APP/Contents/Resources/launch.sh" <<'LAUNCH'
 #!/bin/zsh
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -136,7 +140,28 @@ fi
 
 exec "$PY" "$DIR/../Resources/millenai.py"
 LAUNCH
-chmod +x "$APP/Contents/MacOS/MillenAI"
+chmod +x "$APP/Contents/Resources/launch.sh"
+
+# --- the main executable: a native Mach-O launcher (6b443, per Patrick:
+# "Neither Concord AI nor Python is listed under local network and privacy
+# and security settings"). macOS asks for Local Network on behalf of the
+# bundle's main executable, by its signature and Mach-O UUID (TN3179). A
+# zsh script has no UUID, and exec'ing python turned the process into
+# Homebrew's Python.app, so LAN connections to the server failed with "No
+# route to host" and no alert. The launcher stays alive as python's parent,
+# which keeps this bundle the responsible code. Universal when the SDK
+# allows; one arch is enough to run. No compiler, no app: a script
+# launcher would bring the silent block back.
+LSRC="packaging/macos_launcher.m"
+LFLAGS=(-O2 -fobjc-arc -mmacosx-version-min=11.0 -framework Cocoa
+        -DLAUNCHER_TAG='"com.millen.millenai"')
+if ! xcrun clang "${LFLAGS[@]}" -arch arm64 -arch x86_64 \
+       -o "$APP/Contents/MacOS/MillenAI" "$LSRC" 2>/dev/null; then
+  echo "  universal launcher build failed; building for $(uname -m) only"
+  xcrun clang "${LFLAGS[@]}" -arch "$(uname -m)" \
+    -o "$APP/Contents/MacOS/MillenAI" "$LSRC"
+fi
+lipo -archs "$APP/Contents/MacOS/MillenAI" | sed 's/^/  launcher archs: /'
 
 touch "$APP"
 
@@ -144,9 +169,10 @@ touch "$APP"
 # This does NOT satisfy Gatekeeper — only a paid Developer ID + notarization
 # does — but it gives the bundle a stable identity, avoids the harsher
 # "app is damaged" rejection, and keeps Apple silicon happy.
-codesign --force --sign - "$APP" 2>/dev/null \
-  && echo "  ad-hoc signed" \
-  || echo "  ! ad-hoc signing failed (app still runs; see README)"
+# The launcher must carry it (6b443): Local Network tracks the app by it,
+# so a bundle that won't verify is a failed build, not a warning.
+codesign --force --sign - "$APP"
+codesign --verify --strict "$APP" && echo "  ad-hoc signed"
 
 echo ""
 echo "✓ built $APP"
