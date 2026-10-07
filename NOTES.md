@@ -255,6 +255,37 @@ it would most likely just make Ollama build it again on the next gpt-oss load. I
   server wasn't queried). Whether /api/ps ever names the copy instead of gpt-oss:20b while it runs: loaded lists
   (the panel, the dashboard, the admin memory bar, the app's "loaded" flag) were left as they are, since hiding a
   loaded model would hide memory in use. Not run against the server or in the desktop app.
+## 6b447 — the Claude balance field lines up with its button (per Patrick)
+
+Patrick, on Settings > Cloud power's estimated-balance row (6b441): "fix how this doesn't line up. That box is
+way too tiny and looks stupid."
+
+Cause, measured in the Browser pane: `.ckbal-in` was `width:84px`, `padding:3px 7px`, 11px type, radius 7px, so
+21px tall; the button beside it is an `.about-btn.slim`, which carries `margin-top:8px` (meant for stacked dialog
+buttons) and came out 30.5px tall, radius 10px. Centred in an inline-flex, the 8px margin pushed the button's
+text down, and the field was a third of its height short.
+
+Fix, CSS only (the markup and the estimate are untouched):
+- `.ckbal-set` is a wrapping flex item `flex:1 1 240px`, at most 340px wide, 6px/8px gaps.
+- `.ckbal-in` fills it (`flex:1 1 auto`, at least 96px), `height:30px`, `box-sizing:border-box`, 12px Helvetica,
+  radius 8px, padding 0 9px, the same background, border and focus colour as `#ck-key`.
+- `.ckbal .about-btn.slim.ckbal-go`: `height:30px`, border-box, `margin:0`, padding 0 14px, radius 8px,
+  `line-height:1`, nowrap. Four classes, so it outranks `.about-btn.slim` and the later `.about-btn` block.
+- Fixed heights rather than padding, so WKWebView's different input metrics can't reopen the gap. Nothing exotic.
+
+Measured (getBoundingClientRect, pane at 1024x768, Settings > Cloud, a faked "ok" Claude row):
+- before: field 84 x 21, top 462.6 / bottom 483.6, radius 7px; button 117.8 x 30.5, top 461.9 / bottom 492.4,
+  radius 10px.
+- after, with an estimate: field 214.2 x 30, button 117.8 x 30, both top 458.1 / bottom 488.1, both radius 8px.
+- after, no balance yet ("Set"): field 283.6 x 30, button 48.4 x 30, both top 495.9 / bottom 525.9.
+- `#ck-models` squeezed to 220px: the button wraps under a 202px field, no overflow.
+- `elementFromPoint` at both controls returns the field and the button.
+
+Tests: one served-HTML check, `6b447: the balance field and its button are one 30px line …`, after "dark list
+injected". No earlier check asserted the old CSS.
+
+- **Unverified in WKWebView.** Measured in the Blink pane only; the row was drawn by calling `ckBoard()` with a
+  faked "ok" status, since a dev copy has no real Claude key.
 
 ## 6b444 — the server's HDMI panel and text dashboard update twice a second (per the owner)
 

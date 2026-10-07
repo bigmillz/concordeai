@@ -35992,10 +35992,22 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   gap:3px 10px;margin:0 0 5px 18px}
 .ckbal .ckbal-fig{color:var(--dim)}
 .ckbal.low .ckbal-fig,.ckbal.used .ckbal-fig{color:#e3b341;font-weight:700}
-.ckbal .ckbal-set{display:inline-flex;gap:5px;align-items:center}
-.ckbal .ckbal-in{width:84px;background:rgba(18,20,26,.7);color:var(--text);
-  border:1px solid rgba(255,255,255,.12);border-radius:7px;font-size:11px;
-  padding:3px 7px;outline:none}
+/* the balance field and its button are one 30px line, same radius as
+   #ck-key (6b447, per Patrick: "that box is way too tiny and looks
+   stupid"): the 84px pill sat 21px tall beside a 30px button that
+   .about-btn.slim pushed 8px down. Fixed heights, not padding, so the
+   two match in WKWebView too; the pair takes its own line when narrow */
+.ckbal .ckbal-set{display:flex;flex-wrap:wrap;flex:1 1 240px;
+  max-width:340px;min-width:0;gap:6px 8px;align-items:center}
+.ckbal .ckbal-in{flex:1 1 auto;width:auto;min-width:96px;height:30px;
+  box-sizing:border-box;margin:0;background:rgba(18,20,26,.7);
+  color:var(--text);border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;font:12px var(--helv);letter-spacing:0;
+  padding:0 9px;outline:none}
+.ckbal .ckbal-in:focus{border-color:rgba(143,157,255,.6)}
+.ckbal .about-btn.slim.ckbal-go{flex:none;width:auto;height:30px;
+  box-sizing:border-box;margin:0;padding:0 14px;border-radius:8px;
+  letter-spacing:0;line-height:1;white-space:nowrap}
 .ckbal .ckbal-un,.ckbal .ckbal-note{flex-basis:100%;font-size:10px;
   line-height:1.45;color:var(--faint);letter-spacing:0}
 .ckbal.low .ckbal-un,.ckbal .ckbal-un{color:#a8935f}

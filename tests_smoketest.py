@@ -832,6 +832,18 @@ s, h, b = req("/", cookie=K, token=False)
 page = b.decode("utf-8", "replace")
 check("SKY_N injected", re.search(r'parseInt\("\d+",10\)', page))
 check("dark list injected", "darkSet=new Set(JSON.parse('[0, 3, 4" in page)
+# 6b447, per Patrick: the balance field was an 84px pill, 21px tall, beside
+# a 30px button pushed 8px down. Both are now one 30px line, radius 8px,
+# the field fills the row and the pair wraps when narrow.
+_bb447 = page[page.find(".ckbal .ckbal-set{"):page.find(".ckbal .ckbal-un,")]
+check("6b447: the balance field and its button are one 30px line (wide field, same height and radius, no 8px drop)",
+      "display:flex;flex-wrap:wrap;flex:1 1 240px;" in _bb447
+      and ".ckbal .ckbal-in{flex:1 1 auto;width:auto;min-width:96px;height:30px;" in _bb447
+      and ".ckbal .about-btn.slim.ckbal-go{flex:none;width:auto;height:30px;" in _bb447
+      and "box-sizing:border-box;margin:0;padding:0 14px;border-radius:8px;" in _bb447
+      and _bb447.count("border-radius:8px") == 2 and _bb447.count("box-sizing:border-box") == 2
+      and "width:84px" not in _bb447 and "padding:3px 7px" not in _bb447,
+      _bb447[:300])
 
 print("== the cookie alone (ISO-14, 6b321) ==")
 # COOKIE REPLAY: a listener on another port that got the launch cookie
