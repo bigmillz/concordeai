@@ -17405,6 +17405,23 @@ check("wake: every packet refused by this computer says so, naming Local Network
       and "Privacy & Security \\u203a Local Network" in _MILLENAI_SRC
       and "SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e[\"id\"]) else" in _MILLENAI_SRC
       and "NSLocalNetworkUsageDescription" in open("build_macos_app.sh").read())
+_bm443 = open("build_macos_app.sh", encoding="utf-8").read()
+_lm443 = open("packaging/macos_launcher.m", encoding="utf-8").read()
+check("6b443: the .app's main executable is a native launcher that keeps the bundle responsible for python (Local Network)",
+      'cat > "$APP/Contents/Resources/launch.sh" <<\'LAUNCH\'' in _bm443
+      and 'cat > "$APP/Contents/MacOS/MillenAI"' not in _bm443
+      and 'LSRC="packaging/macos_launcher.m"' in _bm443
+      and '-o "$APP/Contents/MacOS/MillenAI" "$LSRC"' in _bm443
+      and "-arch arm64 -arch x86_64" in _bm443
+      and "<key>LSUIElement</key>             <true/>" in _bm443
+      and "<key>CFBundleExecutable</key>      <string>MillenAI</string>" in _bm443
+      and 'codesign --verify --strict "$APP"' in _bm443
+      and "posix_spawn(&child, \"/bin/zsh\"" in _lm443
+      and '@"launch.sh"' in _lm443 and "execv" not in _lm443
+      and "kill(child, sig)" in _lm443 and "DISPATCH_PROC_EXIT" in _lm443
+      and "yieldActivationToApplication" in _lm443
+      and "packaging/macos_launcher.m" in open(".github/workflows/nightly.yml").read()
+      and '/Contents/MacOS/MillenAI" >/dev/null || break' in _MILLENAI_SRC)
 check("the composer grows with its text: typing, pasting and code that fills it refit it, to 45% of the window",
       "function fitInput(){" in _MILLENAI_SRC and 'input.addEventListener("input",fitInput);' in _MILLENAI_SRC
       and 'set(v){d.set.call(this,v);fitInput();}' in _MILLENAI_SRC

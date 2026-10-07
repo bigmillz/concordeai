@@ -9,6 +9,41 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b443 — the app gets its own Local Network permission: a native launcher instead of a script (per Patrick)
+
+Patrick: "Neither Concord AI nor Python is listed under local network and privacy and security settings." Test relay
+from the installed app failed with `No route to host` (EHOSTUNREACH) to the wake relay on the LAN while the same
+connect from Terminal worked, and macOS never asked.
+
+- **Cause (confirmed on Patrick's Mac).** macOS asks on behalf of the *responsible code*, the bundle LaunchServices
+  started, and tracks it by code signature and main-executable Mach-O UUID (TN3179). `Contents/MacOS/MillenAI` was a
+  zsh script (no UUID), and it `exec`'d the venv's python, which re-execs into Homebrew's `Python.app`, so the process
+  *became* `org.python.python` with a UUID every Homebrew python shares. nehelper logged
+  `bundle_id: (null)` / `found bundle id org.python.python by UUID` for it and never prompted; the kernel dropped the
+  SYN with `reason: NECP`. A throwaway bundle with the old script layout reproduced it; one with a native launcher
+  that still `exec`'d (pid kept, process became Python.app) failed the same way.
+- **Fix.** `packaging/macos_launcher.m` is compiled by `build_macos_app.sh` (clang, universal arm64+x86_64, falls back
+  to the build Mac's arch) into `Contents/MacOS/MillenAI`. It `posix_spawn`s the old launcher, now
+  `Resources/launch.sh` (unchanged text, so its paths still resolve), as a **child** and stays alive, so this signed
+  Mach-O stays the responsible code for python and everything python starts. With that layout nehelper logged
+  `found bundle id com.millen.lnptest.fix by PID` and `Local network preference not yet set, prompting`.
+- The python process is still its own app (`Python.app`, as before), so the WebKit store, the menu rename (6b264) and
+  the Dock icon don't move. The launcher is `LSUIElement` (no second Dock icon), brings python's window forward when
+  ConcordeAI is opened again, forwards TERM/INT/HUP/QUIT to python and exits with python's status.
+- **Updates.** The updater's swap script (`_SWAP_SCRIPT`) pgreps `…/Contents/MacOS/MillenAI`; that path is now a live
+  process until python quits, so the swap waits as intended. The swap replaces the whole bundle with `ditto`, so an
+  old install updating to this one gets the new layout whole. The bundle must verify (`codesign --verify --strict`)
+  or the build fails: no silent fallback to a script launcher.
+- **Signature.** Still ad hoc. The launcher's UUID is stable for one toolchain (same source, same output name gives
+  the same binary), but the bundle's ad-hoc signature changes every build (Info.plist, millenai.py). The alert's
+  title uses the executable name, so it reads "MillenAI", not ConcordeAI.
+- Gauntlet: a source check for the launcher, `launch.sh`, `LSUIElement`, the strict verify and the nightly path filter.
+- **Unverified.** Re-asking after an update (may or may not happen with ad-hoc signing); the "open again brings the
+  window forward" path (the screen was locked during the test); the microphone permission now belongs to ConcordeAI
+  rather than Python, so macOS will likely ask for it once more.
+
+---
+
 ## 6b439 — Wi-Fi backup for the server kit: a spare connection and a second way to wake it (per the owner; opt-in)
 
 Owner: "Let's take a look into having Wi-Fi as a backup connection. Can we do wake on LAN with that? If it's on the
