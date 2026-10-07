@@ -731,6 +731,78 @@ class TestMetrics(unittest.TestCase):
         self.assertEqual(st["series"]["ram_used"][-1], 600 * 1024)
         self.assertEqual(len(st["series"]["cpu_total"]), 2)
 
+    # -- 6b444: a reading every half second ----------------------------------------------------------------
+    def test_an_hour_of_history_is_an_hour_whatever_the_tick(self):
+        self.assertEqual(o1metrics.TICK_S, 0.5)                              # the owner's ask: new numbers twice a second
+        self.assertEqual(o1metrics.HISTORY * o1metrics.TICK_S, o1metrics.HISTORY_S)
+        self.assertEqual(o1metrics.HISTORY_S, 3600)
+        self.assertEqual({d.maxlen for d in o1metrics.Sampler(tunnel_port=1).series.values()}, {7200})
+        for tick in (1.0, 0.5, 0.25, 2.0):
+            s = o1metrics.Sampler(tunnel_port=1, tick_s=tick)
+            self.assertEqual({d.maxlen * tick for d in s.series.values()}, {3600}, tick)
+
+    def rates_at(self, tick, n=4):
+        """The sampler read every `tick` seconds of a machine that reads 1 MiB/s from disk, receives 10 kB/s and
+        keeps its one core 40% busy (100 jiffies a second): the last state."""
+        clock = [1000.0]
+        s = o1metrics.Sampler(clock=lambda: clock[0], tunnel_port=1, tick_s=tick)
+        s.slow["net"] = (1e12, {"name": "br0"})
+        s.slow["tunnel"] = (1e12, {"up": False})
+        s.slow["updates"] = (1e12, {})
+        self.write("proc/meminfo", "MemTotal: 1000 kB\nMemAvailable: 400 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n")
+        self.write("sys/class/net/br0/statistics/tx_bytes", "500\n")
+        for i in range(n):
+            t = i * tick
+            busy, idle = int(40 * t), int(60 * t)
+            self.write("proc/stat", "cpu  %d 0 0 %d 0 0 0 0\ncpu0 %d 0 0 %d 0 0 0 0\n" % (busy, idle, busy, idle))
+            self.write("proc/diskstats", "   8 0 sda 1 0 %d 0 1 0 0 0 0 0 0\n" % int(2048 * t))
+            self.write("sys/class/net/br0/statistics/rx_bytes", "%d\n" % int(10000 * t))
+            clock[0] = 1000.0 + t
+            st = s.tick()
+        return st
+
+    def test_rates_are_per_second_whatever_the_tick(self):
+        for tick in (1.0, 0.5, 0.25):
+            st = self.rates_at(tick)
+            self.assertEqual(st["tick_s"], tick)
+            self.assertEqual(st["io"]["read_bps"], 2048 * 512, tick)           # 1 MiB/s, not per reading
+            self.assertEqual(st["net"]["rx_bps"], 10000, tick)
+            self.assertEqual(st["cpu"]["total"], 40.0, tick)
+            self.assertEqual(st["series"]["io_read"][-1], 2048 * 512, tick)
+            self.assertEqual(len(st["series"]["cpu_total"]), 4)
+
+    def test_the_beat(self):
+        due = o1metrics.next_due
+        self.assertEqual(due(0.0, 1000.0, 0.5), 1000.75)                        # the first: half way between two half seconds
+        self.assertEqual(due(1000.75, 1000.75, 0.5), 1001.25)
+        self.assertEqual(due(1000.75, 1001.2, 0.5), 1001.25)                    # however long the picture took: on the beat
+        self.assertEqual(due(1000.75, 1003.1, 0.5), 1003.75)                    # more than a beat late: again from now
+        self.assertEqual(due(10.5, 11.0, 1.0), 11.5)
+        self.assertEqual(due(0.0, 100.2), 100.75)                               # TICK_S by default
+
+
+class TestTrendSpan(unittest.TestCase):
+    """6b444: the text dashboard's trends cover 5 minutes, or an hour after `t`, whatever the tick."""
+
+    def test_the_trends_cover_their_range_whatever_the_tick(self):
+        for tick in (1.0, 0.5, 0.25):
+            n = int(round(3600 / tick))
+            st = {"tick_s": tick, "series": {"gpu_busy": [(n - 1 - i) * tick for i in range(n)]}}
+            for rng in (300, 3600):
+                got = o1dashui._series(st, "gpu_busy", rng)
+                self.assertEqual(len(got) * tick, rng, (tick, rng))
+                self.assertEqual((got[0], got[-1]), (rng - tick, 0), (tick, rng))      # the oldest is as old as the range
+
+    def test_the_hour_view_draws_with_half_second_samples(self):
+        st = dash_sample.sample()
+        st["series"] = {k: v + v for k, v in st["series"].items()}            # an hour at two samples a second
+        st["tick_s"] = 0.5
+        del o1dashui.ERRORS[:]
+        for rng in (300, 3600):
+            text = o1dashui.render(st, 120, 40, "blocks", rng).text()
+            self.assertIn("5 min" if rng == 300 else "1 h", text)
+        self.assertEqual(o1dashui.ERRORS, [])
+
 
 def psf2(glyphs):
     """A PSF2 font whose unicode table maps one code point per glyph."""

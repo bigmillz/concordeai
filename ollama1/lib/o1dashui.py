@@ -325,9 +325,22 @@ def frac(a, b):
     return None if a is None or not b else a / b
 
 
+def tick_of(st):
+    """Seconds between two samples of the state's series: what the sampler says (o1metrics.TICK_S, 6b444),
+    else one a second (a state from before that, or a test's sample)."""
+    v = _f(st.get("tick_s")) if isinstance(st, dict) else None
+    return v if v is not None and v > 0 else 1.0
+
+
+def samples(st, seconds):
+    """How many samples of the state's series cover this many seconds."""
+    return max(1, int(round(seconds / tick_of(st))))
+
+
 def _series(st, name, range_s):
+    """The samples of the last range_s seconds."""
     s = (st.get("series") or {}).get(name) if isinstance(st.get("series"), dict) else None
-    return list(s)[-range_s:] if isinstance(s, (list, tuple)) else []
+    return list(s[-samples(st, range_s):]) if isinstance(s, (list, tuple)) else []
 
 
 # ---- widgets: they draw into a Cells of their own and nothing else -------------

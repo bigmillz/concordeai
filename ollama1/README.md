@@ -583,11 +583,13 @@ around a little from time to time.
     picture stretched). All text is a rounded stroke font (capitals, lower
     case, digits and every sign the panel prints, names kept as they are);
     rings, bars, graph lines (round joins) and box corners have anti-aliased
-    edges. It costs little: a picture every 2 seconds (every second while
-    pairing), only the boxes whose numbers changed are redrawn, dials and graph
-    plots come from kept pictures, only the rows that changed are written (about
-    3% of one core at 4K with every number moving), and nothing is drawn while
-    another console (Alt+F2) is on the screen. It puts the console in graphics mode
+    edges. It costs little: new numbers and a picture twice a second (`TICK_S` in
+    `lib/o1metrics.py`, one setting for this panel and the text dashboard; the
+    graphs still cover 5 minutes, still move every 6 seconds, and the history is
+    still an hour), only the boxes whose numbers changed are redrawn, dials and
+    graph plots come from kept pictures, only the rows that changed are written
+    (about 5% of one core at 4K with every number moving, 2% at 1080p), and nothing
+    is drawn while another console (Alt+F2) is on the screen. It puts the console in graphics mode
     while it runs, so the text console never paints over it, and always puts
     it back when it stops.
   - **When it is used.** `--dash auto` (the default): when `/dev/fb0` exists
@@ -641,7 +643,7 @@ around a little from time to time.
 - **Text dashboard:** it fills the server's monitor (tty1) when the panel is
   off, and `ollama1-top` shows it over SSH (`q` quits, `--ascii` for plain
   terminals, `--once` for one
-  text frame). It updates every second. It is made to be read from a few
+  text frame). It updates twice a second. It is made to be read from a few
   feet away: a few boxes, each a label, a value and one bar or trend line
   (the trend covers the last 5 minutes, or an hour after pressing `t`).
   - **GPU:** busy %, VRAM and power against their limits (bars), temperature

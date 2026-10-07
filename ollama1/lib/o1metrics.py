@@ -1,11 +1,19 @@
-"""The dashboard's sampler: one tick a second, straight from /proc and
-/sys (plus the gateway's counts-only snapshot file), with an hour of
-history for the charts. Slow sources (the tunnel, the network address,
-timers) are refreshed every 10-60 s. Nothing here sees a prompt or an
+"""The dashboard's sampler: one tick every TICK_S (half a second), straight
+from /proc and /sys (plus the gateway's counts-only snapshot file), with an
+hour of history for the charts. Slow sources (the tunnel, the network
+address, timers, the processor's temperature and clock) are refreshed every
+2 s to 5 minutes of wall time, whatever the tick. Nothing here sees a prompt or an
 answer: the gateway's snapshot has none, and nothing else is read.
+
+The series hold one sample per tick, so a sample is TICK_S seconds, not one:
+the state says so ("tick_s") and the drawings turn seconds into samples with
+it (o1dashui.samples), so a 5-minute graph stays 5 minutes and an hour of
+history an hour whatever TICK_S is. Rates are per second (divided by the time
+between two ticks), never per tick.
 """
 import glob
 import json
+import math
 import os
 import re
 import time
@@ -16,7 +24,9 @@ import o1stats
 from o1common import Paths, read_json
 from o1stats import PROC, SYS
 
-HISTORY = 3600
+TICK_S = 0.5          # the one knob (6b444): the panel and the text dashboard take a reading, and draw, this often
+HISTORY_S = 3600      # the charts keep an hour, whatever the tick
+HISTORY = int(round(HISTORY_S / TICK_S))      # samples in that hour
 SERIES = ("tps", "gpu_busy", "vram_used", "gpu_power", "ram_used", "io_read", "io_write",
           "net_rx", "net_tx", "cpu_total", "active",
           "gpu_temp", "cpu_temp", "cpu_mhz", "fan_rpm")      # the last four: the graphical panel (6b380)
@@ -131,9 +141,22 @@ def ollama_cgroup():
     return {"current": cur, "max": int(mx) if mx and mx.isdigit() else None}
 
 
+def next_due(due, now, every=TICK_S):
+    """When the next reading is due: one `every` after the last one was due, so the time a picture takes never
+    stretches the beat (the samples stay `every` apart and an hour of them stays an hour). After a stall of more
+    than a beat it starts again from now, without a burst of readings to catch up, half way between two multiples
+    of `every`, so a reading's time never sits on the line where the graphs step."""
+    due += every
+    if due > now:
+        return due
+    return (math.floor(now / every) + 1.5) * every
+
+
 class Sampler:
-    def __init__(self, history=HISTORY, clock=time.time, tunnel_port=8439):
+    def __init__(self, history=None, clock=time.time, tunnel_port=8439, tick_s=TICK_S):
         self.clock = clock
+        self.tick_s = float(tick_s)                  # the caller ticks this often; the state says so
+        history = history or int(round(HISTORY_S / self.tick_s))
         self.series = {k: deque(maxlen=history) for k in SERIES}
         self.prev = None
         self.slow = {}
@@ -189,6 +212,7 @@ class Sampler:
         gw = o1stats.gateway_snapshot()
         st = {
             "time": now,
+            "tick_s": self.tick_s,                  # seconds between two samples of "series" (6b444)
             "host": os.uname().nodename,
             "uptime": o1stats.uptime(),
             "gw": gw,

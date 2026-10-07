@@ -199,10 +199,16 @@ _FOLD = {"’": "'", "‘": "'", "“": '"', "”": '"', "–": "-", "—": "-",
          "…": "..."}
 
 
+_BBOX = {}
+
+
 def _bbox(ch):
-    pts = [p for s in STROKES[ch] for p in s]
-    return (min(x for x, _ in pts) - PEN, min(y for _, y in pts) - PEN,
-            max(x for x, _ in pts) + PEN, max(y for _, y in pts) + PEN)
+    got = _BBOX.get(ch)                  # kept: every text is measured, and the panel draws twice a second (6b444)
+    if got is None:
+        pts = [p for s in STROKES[ch] for p in s]
+        got = _BBOX[ch] = (min(x for x, _ in pts) - PEN, min(y for _, y in pts) - PEN,
+                           max(x for x, _ in pts) + PEN, max(y for _, y in pts) + PEN)
+    return got
 
 
 def advance_units(ch):

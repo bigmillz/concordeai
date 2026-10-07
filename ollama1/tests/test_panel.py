@@ -28,6 +28,7 @@ import o1gfx
 import o1panel
 import o1paneld
 import o1hipix
+import o1metrics
 import o1pixfont as F
 import o1vecfont
 import o1vtext
@@ -530,12 +531,43 @@ class TestLoop(unittest.TestCase):
         self.assertEqual((n, tty.entered, tty.left), (3, 1, 1))
         self.assertGreater(len(fb.writes), 3)
 
-    def test_a_picture_every_two_seconds_and_a_sample_every_second(self):
+    def test_a_reading_and_a_picture_every_half_second(self):
+        self.assertEqual(o1paneld.TICK_S, 0.5)                          # the owner's ask (6b444): new numbers twice a second
+        self.assertEqual(o1paneld.TICK_S, o1metrics.TICK_S)             # one knob, shared with the text dashboard
+        self.assertLessEqual(o1paneld.POLL_S, o1paneld.TICK_S)
         s = FakeSampler()
-        n, _fb, _tty, c = self.go(sampler=s, max_frames=5)
-        self.assertEqual(n, 5)
-        self.assertAlmostEqual(c.t - 1000.0, 4 * o1paneld.DRAW_S, delta=1.0)
-        self.assertGreaterEqual(s.n, 8)
+        n, _fb, _tty, c = self.go(sampler=s, max_frames=9)
+        self.assertEqual((n, s.n), (9, 9))                              # a picture with every reading, none between
+        self.assertAlmostEqual(c.t - 1000.0, 8 * o1paneld.TICK_S, delta=o1paneld.TICK_S)
+
+    def test_the_beat_is_steady_however_long_a_picture_takes(self):
+        """The readings stay TICK_S apart (so an hour of samples is an hour) when a reading and its picture take
+        a while; after a stall they go on without a burst to catch up."""
+        c = Clock()
+        times = []
+
+        class Slow(FakeSampler):
+            def tick(self_):
+                times.append(c.t)
+                c.t += 2.3 if len(times) == 12 else 0.17               # some work every time, and once a stall
+                return FakeSampler.tick(self_)
+        o1paneld.run(FakeFb(), FakeTty(), Slow(), clock=c.now, sleep=c.sleep, max_frames=30)
+        T = o1paneld.TICK_S
+        gaps = [round(b - a, 6) for a, b in zip(times, times[1:])]
+        self.assertEqual(len(gaps), 29)
+        self.assertEqual(set(gaps[1:11]), {T})                          # the work does not stretch the beat
+        self.assertGreaterEqual(gaps[11], 2.29)                         # the stall,
+        self.assertTrue(all(g >= T for g in gaps))                      # not made up with readings close together,
+        self.assertEqual(set(gaps[13:]), {T})                           # and the beat goes on
+
+    def test_the_text_dashboard_shares_the_knob(self):
+        dash = load_dash()
+        self.assertEqual(dash.TICK_S, o1metrics.TICK_S)
+        self.assertLessEqual(dash.POLL_S, dash.TICK_S)
+        with open(os.path.join(U.BIN, "ollama1-dash")) as f:
+            src = f.read()
+        self.assertIn("o1metrics.Sampler(tick_s=TICK_S)", src)
+        self.assertIn("o1metrics.next_due(next_tick, now, sampler.tick_s)", src)     # the same steady beat
 
     def test_the_pairing_countdown_redraws_every_second(self):
         st = dash_sample.sample(now=1790000000.0, pairing=True)
@@ -580,8 +612,9 @@ class TestLoop(unittest.TestCase):
         def written(frames):
             _n, fb, _t, _c = self.go(sampler=FakeSampler(st), max_frames=frames)
             return sum(n for _o, n in fb.writes) / float(screen)
-        self.assertAlmostEqual(written(10), 2.0, delta=0.01)        # the black at the start, then the first picture
-        self.assertAlmostEqual(written(20), 3.0, delta=0.01)        # and everything again after 30 s
+        per_refresh = int(o1paneld.FULL_REFRESH_S / o1paneld.TICK_S)     # pictures in 30 s
+        self.assertAlmostEqual(written(per_refresh - 4), 2.0, delta=0.01)   # the black at the start, then the first picture
+        self.assertAlmostEqual(written(per_refresh + 4), 3.0, delta=0.01)   # and everything again after 30 s
 
     def test_a_dead_screen_raises_and_still_restores_the_console(self):
         tty = FakeTty()
@@ -1585,6 +1618,54 @@ class TestSmoothSurface(unittest.TestCase):
         self.assertNotEqual(d.buf, a.buf)
         self.assertEqual(d.get(10, 10), 0x00FF00)
 
+    def test_a_picture_whose_box_reaches_past_the_clip_is_kept_too(self):
+        """6b444: the dials' boxes reach a unit above their panel's inside. The part inside the clip is kept, the
+        cut being part of the key, so a dial showing the same value is pasted, not painted again."""
+        calls = []
+
+        def picture(pm):
+            calls.append(1)
+            pm.disc(20, 20, 14, 0xFF0000)
+            pm.polyline([(6, 30), (34, 8)], 2, 0xFFFFFF)
+
+        def kept(clip):
+            pm = o1hipix.HiPixmap(60, 50, BG, 3)
+            with pm.clipped(*clip):
+                pm.cached(("past the clip", 6444), (5, 5, 31, 31), lambda: picture(pm))
+            return pm.buf
+
+        def fresh(clip):
+            pm = o1hipix.HiPixmap(60, 50, BG, 3)
+            with pm.clipped(*clip):
+                picture(pm)
+            return pm.buf
+        top = (0, 8, 60, 42)                                                   # cuts 3 units off the top
+        self.assertEqual(kept(top), fresh(top))
+        self.assertEqual(kept(top), fresh(top))
+        self.assertEqual(len(calls), 3)                                        # drawn once, then pasted
+        for clip in ((0, 0, 60, 50), (10, 0, 50, 50), (0, 0, 31, 50)):        # no cut; 5 off the left; 5 off the right (the same size)
+            del calls[:]
+            self.assertEqual(kept(clip), fresh(clip), clip)
+            self.assertEqual(len(calls), 2, clip)                              # a cut of its own is a picture of its own
+
+    def test_a_dial_showing_the_same_value_is_not_painted_again(self):
+        k, lw, lh = 3, 640, 360
+        r = o1panel.PanelRenderer(lw, lh, k)
+        r.draw(dash_sample.sample(now=1790000000.0), incremental=True)
+        st = dash_sample.sample(now=1790000000.0)
+        st["gpu"]["power_w"] = 250.0                                           # the GPU box is redrawn, its dial shows the same
+        arcs = []
+        orig = o1hipix.HiPixmap.arc
+        o1hipix.HiPixmap.arc = lambda self_, *a: arcs.append(a) or orig(self_, *a)
+        try:
+            pm = r.draw(st, incremental=True)
+        finally:
+            o1hipix.HiPixmap.arc = orig
+        self.assertEqual(arcs, [])
+        o1hipix.HiPixmap._SNAPS.clear()
+        o1hipix.HiPixmap._SNAP_PIXELS[0] = 0
+        self.assertEqual(pm.buf, o1panel.PanelRenderer(lw, lh, k).draw(st).buf)    # the same as painting everything
+
     def test_the_cache_is_bounded(self):
         pm = o1hipix.HiPixmap(40, 30, 0, 4)
         old = o1hipix.HiPixmap.SNAP_BUDGET
@@ -1764,6 +1845,72 @@ class TestSmoothPanel(unittest.TestCase):
         pm.fill_rect(10, 10, 3, 3, 0x00FF00)
         w2 = pres.frame(pm)
         self.assertEqual(sum(len(d) for _o, d in w2), 3 * k * 1280 * 4)       # only the rows that changed
+
+
+class TestHalfSecondReadings(unittest.TestCase):
+    """6b444: a reading every half second. A sample is a tick, not a second: the graphs still show the last
+    5 minutes and still move every 6 seconds, whatever the tick (the state says it: "tick_s")."""
+
+    NOW = 1790000000.25
+
+    def state(self, tick):
+        """The sample state with an hour of samples `tick` apart, each one's value its age in seconds."""
+        st = dash_sample.sample(now=self.NOW)
+        n = int(round(3600 / tick))
+        ages = [(n - 1 - i) * tick for i in range(n)]
+        st["series"] = {k: list(ages) for k in st["series"]}
+        st["tick_s"] = tick
+        return st
+
+    def plotted(self, st):
+        """{label: the samples its graph plots} for every graph on the panel."""
+        got = {}
+        orig = o1panel.graph
+
+        def spy(pm, box, curves, range_label=""):
+            for c in curves:
+                got[c["label"]] = o1panel.graph_samples(c["values"], c.get("shift") or 0, c.get("window"))
+            return orig(pm, box, curves, range_label)
+        o1panel.graph = spy
+        try:
+            o1panel.render(st, 640, 360)
+        finally:
+            o1panel.graph = orig
+        return got
+
+    def test_the_graphs_show_five_minutes_whatever_the_tick(self):
+        for tick in (1.0, 0.5, 0.25):
+            st = self.state(tick)
+            shift = o1panel.graph_clock(st, st["time"], 300)["shift"]
+            got = self.plotted(st)
+            self.assertEqual(sorted(got), ["Clock", "Power", "RAM", "Speed", "Temp", "Use", "VRAM"])
+            for label, vals in got.items():
+                self.assertEqual(len(vals) * tick, 300, (tick, label))
+                if label != "VRAM":                                            # (that one is a share of the card's VRAM)
+                    self.assertEqual(vals[-1], shift * tick, (tick, label))    # the newest shown: as old as the step is
+                    self.assertEqual(vals[0] - vals[-1], 300 - tick, (tick, label))
+
+    def test_the_picture_moves_every_six_seconds_whatever_the_tick(self):
+        for tick in (1.0, 0.5, 0.25):
+            n = int(round(400 / tick))
+            moves, prev = [], None
+            for i in range(int(round(24 / tick))):
+                now = 1790000000.0 + (i + 0.5) * tick                          # half way between two boundaries, as the beat puts them
+                st = {"time": now, "tick_s": tick, "series": {"x": [now - (n - 1 - j) * tick for j in range(n)]}}
+                c = o1panel.graph_clock(st, now, 300)
+                times = o1panel.graph_samples(o1panel.series(st, "x", 300), c["shift"], c["window"])
+                self.assertEqual(len(times), c["window"])
+                if prev is not None and times != prev:
+                    moves.append(times[-1] - prev[-1])
+                prev = times
+            self.assertEqual(moves, [o1panel.GRAPH_STEP_S] * 4, tick)         # 24 s: four steps of exactly 6 s, nothing between
+
+    def test_a_state_that_does_not_say_is_a_sample_a_second(self):
+        for st in ({}, {"tick_s": None}, {"tick_s": "x"}, {"tick_s": 0}, {"tick_s": -1}, {"tick_s": float("nan")}):
+            self.assertEqual(o1panel.D.tick_of(st), 1.0, st)
+            self.assertEqual(o1panel.D.samples(st, 300), 300)
+        self.assertEqual(o1panel.D.samples({"tick_s": 0.5}, 300), 600)
+        self.assertEqual(o1panel.D.samples({"tick_s": 0.5}, 0), 1)
 
 
 class TestMixedCaseFont(unittest.TestCase):

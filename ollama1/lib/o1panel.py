@@ -112,13 +112,24 @@ def _l(v):
     return v if isinstance(v, list) else []
 
 
-GRAPH_STEP_S = 6          # a graph's picture moves this often
+GRAPH_STEP_S = 6          # a graph's picture moves this often (seconds, whatever the tick)
 
 
 def series(st, name, range_s):
-    """The last range_s samples, plus a few more that a graph that moves in steps drops again."""
+    """The samples of the last range_s seconds, plus one step more that a graph that moves in steps drops again.
+    A sample is the sampler's tick (D.tick_of), not a second (6b444)."""
     s = _d(st.get("series")).get(name)
-    return list(s)[-(range_s + GRAPH_STEP_S):] if isinstance(s, (list, tuple)) else []
+    return list(s[-D.samples(st, range_s + GRAPH_STEP_S):]) if isinstance(s, (list, tuple)) else []
+
+
+def graph_clock(st, now, range_s):
+    """{"window": samples a graph shows, "shift": samples since its picture last moved, "graph": which step this is}.
+    The picture moves every GRAPH_STEP_S seconds: within a step each new sample only adds to "shift", so the
+    samples shown (and the kept picture of the plot) stay the same."""
+    tick = D.tick_of(st)
+    per_step = max(1, int(round(GRAPH_STEP_S / tick)))
+    n = int(now / tick)
+    return {"window": D.samples(st, range_s), "shift": n % per_step, "graph": n // per_step}
 
 
 def last_value(vals):
@@ -232,6 +243,14 @@ def ring(pm, cx, cy, r, th, f, color, label, sub=""):
         pm.text_center(cx, cy + 8, sub, T["dim"], 1, max_w=inner)
 
 
+def graph_samples(vals, shift=0, window=None):
+    """The samples a graph plots: once there are enough, the newest `shift` are left out (the picture moves
+    every GRAPH_STEP_S, not with every sample), then the last `window` (all of them without one)."""
+    if shift and len(vals) > shift + 10:
+        vals = vals[:len(vals) - shift]
+    return vals[-window:] if window else vals
+
+
 def graph(pm, box, curves, range_label=""):
     """A rolling line graph with a legend line above it. curves: [{values,
     color, vmax (None = scale to the data), floor, label, now (text), fill}]
@@ -257,13 +276,7 @@ def graph(pm, box, curves, range_label=""):
         return
     traces = []                                    # what the plot shows: one list of (x, y) runs per curve
     for k, c in enumerate(curves):
-        vals = c["values"]
-        shift = c.get("shift") or 0
-        if shift and len(vals) > shift + 10:        # the picture moves every few seconds, not every one
-            vals = vals[:len(vals) - shift]
-        if c.get("window"):
-            vals = vals[-c["window"]:]
-        pts = D.resample(vals, iw)
+        pts = D.resample(graph_samples(c["values"], c.get("shift") or 0, c.get("window")), iw)
         seen = [v for v in (D._f(p) for p in pts) if v is not None]
         if not seen:
             continue
@@ -349,7 +362,7 @@ def _graph_row(pm, inner, used_h, left, right, ctx):
     gw = (w - 6) // 2
     for c in left + right:
         c["shift"] = ctx.get("shift", 0)
-        c["window"] = ctx["range_s"]
+        c["window"] = ctx["window"]
     graph(pm, (x, gy, gw, gh), left, "")
     graph(pm, (x + gw + 6, gy, w - gw - 6, gh), right, "")
 
@@ -507,7 +520,7 @@ def draw_models(pm, r, st, ctx):
     if gh >= 32:
         sp = series(st, "tps", ctx["range_s"])
         graph(pm, (x, yy + 2, w, gh), [{"values": sp, "color": T["tps"], "vmax": None, "floor": 10, "label": "Speed",
-                                         "shift": ctx.get("shift", 0), "window": ctx["range_s"],
+                                         "shift": ctx.get("shift", 0), "window": ctx["window"],
                                          "now": "%s tok/s" % D.num(last_value(sp), "%.0f") if last_value(sp) is not None else ""}],
               "")
 
@@ -1213,8 +1226,8 @@ class PanelRenderer:
             pm.text(8, 8, "Screen too small for the panel", T["warn"], 1, max_w=w - 16)
             return pm
         warns = D.warnings(st, now)
-        ctx = {"now": now, "range_s": range_s, "rng": "5 min" if range_s <= 300 else "1 h", "warns": warns,
-               "shift": int(now) % GRAPH_STEP_S, "graph": int(now) // GRAPH_STEP_S}
+        ctx = dict({"now": now, "range_s": range_s, "rng": "5 min" if range_s <= 300 else "1 h", "warns": warns},
+                   **graph_clock(st, now, range_s))
         for name, fname in self.BOXES:
             fn = globals()[fname]
             r = boxes[name]

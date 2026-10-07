@@ -56,8 +56,8 @@ MODE_FILE = "/etc/ollama1/dash-mode"
 FB_PATH = "/dev/fb0"
 TTY_PATH = "/dev/tty1"
 SWITCH_CHECK_S = 10.0     # the text dashboard looks for a newly connected screen this often
-TICK_S = 1.0     # new numbers once a second
-POLL_S = 0.25    # the size and the keys are looked at four times a second
+TICK_S = o1metrics.TICK_S     # new numbers twice a second (6b444); the knob is o1metrics.TICK_S, shared with the panel
+POLL_S = min(0.25, TICK_S)    # the size and the keys are looked at at least four times a second
 
 winch = [False]
 
@@ -94,11 +94,11 @@ def raw_input_mode():
     return old
 
 
-def read_keys():
+def read_keys(timeout=POLL_S):
     if not sys.stdin.isatty():
         return b""
     try:
-        if select.select([0], [], [], POLL_S)[0]:
+        if select.select([0], [], [], timeout)[0]:
             return os.read(0, 64)
     except (OSError, ValueError, InterruptedError):
         pass
@@ -109,7 +109,7 @@ def run(console, force_ascii, switch=None):
     """The text dashboard. With `switch` (a function), it returns "graphic"
     as soon as that says the graphical panel can run (a monitor was plugged in)."""
     glyphs = pick_glyphs(console, force_ascii)
-    sampler = o1metrics.Sampler()
+    sampler = o1metrics.Sampler(tick_s=TICK_S)
     screen = o1dashterm.Screen()
     signal.signal(signal.SIGWINCH, lambda *_: winch.__setitem__(0, True))
     old = raw_input_mode()
@@ -129,7 +129,7 @@ def run(console, force_ascii, switch=None):
                 st = sampler.tick()
                 if not console and os.geteuid() != 0:
                     st["pairing"] = None
-                next_tick, dirty = now + TICK_S, True
+                next_tick, dirty = o1metrics.next_due(next_tick, now, sampler.tick_s), True   # a steady beat
             size = o1dashterm.term_size()          # asked every time: it is never cached
             if size != last_size or winch[0]:
                 winch[0] = False
@@ -137,10 +137,11 @@ def run(console, force_ascii, switch=None):
             if dirty:
                 dirty = False
                 write(screen.frame(o1dashui.render(st, size[0], size[1], glyphs, range_s, console=console), now))
-            keys = read_keys()
+            wait = max(0.0, min(POLL_S, next_tick - time.time()))         # until the next reading at the latest
+            keys = read_keys(wait)
             if not keys:
                 if not sys.stdin.isatty():
-                    time.sleep(POLL_S)
+                    time.sleep(wait)
                 continue
             if b"t" in keys or b"T" in keys:
                 range_s = 3600 if range_s == 300 else 300

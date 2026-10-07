@@ -9,6 +9,65 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b444 — the server's HDMI panel and text dashboard update twice a second (per the owner)
+
+Owner: "Can we increase the screen update speed to update faster? Every half a second, if it's not going to be an
+issue." Kit only (`ollama1/`). Not run on the server (a stress test was running on it).
+
+- **One knob.** `o1metrics.TICK_S = 0.5`: the graphical panel (`o1paneld`) and the text dashboard (`ollama1-dash`,
+  so `ollama1-top` too) take a reading and draw every half second. They were a reading a second, and on the panel a
+  picture every 2 s (every 1 s while pairing). `o1paneld.TICK_S` and `ollama1-dash`'s `TICK_S` are that value.
+  `DRAW_S` and `PAIRING_DRAW_S` are gone: a picture follows each reading, because a picture shows only the reading
+  (its clock is the reading's time), so drawing more often only drew the same picture again. The pairing countdown
+  now moves twice a second. `POLL_S` is at most the tick (0.5 panel, 0.25 text), and a key still ends the wait at once.
+- **A sample is a tick, not a second.** The sampler's state says how far apart its samples are (`"tick_s"`), and
+  `o1dashui.samples(st, seconds)` turns seconds into samples. A state that doesn't say is one sample a second, as
+  before (`dash_sample`, older fixtures). History is `HISTORY_S = 3600` s, so `HISTORY = 7200` samples. The panel's
+  graphs take 5 minutes of samples, and the step that moves the picture every 6 s (`GRAPH_STEP_S`, unchanged) counts
+  `6 / tick` samples (`o1panel.graph_clock`). The text dashboard's 5 min and 1 h trends follow the same rule.
+  Unchanged because they were never counted in readings: rates (disk and network are divided by the time between two
+  readings), CPU % (a ratio of jiffies), anything that compares times (fan staleness, the burn banner, the sleep
+  countdown, idle seconds), and the slow sources (tunnel, address, CPU temperature and clock, updates). Those are
+  cached by wall time for 2 to 300 s and keep their pace. No subprocess runs per reading: `ip`, `systemctl` and
+  `nvidia-smi` are cached for 15 to 300 s.
+- **A steady beat.** Both loops waited a full `POLL_S` after drawing, so a reading came every second plus the
+  drawing time. At half a second that would have stretched a "5 minute" graph by a few percent.
+  `o1metrics.next_due` keeps readings exactly `TICK_S` apart: the wait ends at the next one, and drawing time doesn't
+  push it back. After a stall the beat starts again from now, with no burst of catch-up readings. It sits half way
+  between two multiples of the tick, so a reading never lands on a graph-step boundary. (`o1leds` already samples
+  the card this way, every 0.25 s.)
+- **CPU.** Measured on a fake 4K framebuffer with every number moving (Mac M4 Pro core, Python 3.14): 2.8% of a core
+  before, 5.2% now; at 1080p 1.3% before, 2.0% now. The text dashboard takes about 2 ms a frame (6 ms on the hour
+  view). Four times the pictures cost less than twice the CPU because of two fixes:
+  - The dials' kept pictures never matched. Their box reaches one unit above the panel's inside, and
+    `HiPixmap.cached` gave up on any box that crossed the clip, so both rings were painted again on every redraw.
+    It now keeps the part inside the clip and adds the cut to the key.
+  - The stroke font measures each glyph's box once (`o1vecfont._bbox` cache). Every text is measured two or three
+    times per draw.
+
+  Graph plots are still redrawn once per 6 s step, whatever the tick. The sampler reads about 30 small /proc and
+  /sys files per reading, now twice as often; that cost was not measured on the server.
+- **Tests.** `test_panel`:
+  - a reading and a picture every half second;
+  - the beat holds when a picture takes 0.17 s, and a stall gets no burst;
+  - the text dashboard shares the knob;
+  - the full refresh is counted in pictures per 30 s;
+  - `TestHalfSecondReadings`: the graphs show exactly 5 minutes at ticks of 1, 0.5 and 0.25 s, the picture moves in
+    exact 6 s steps, and a state that doesn't say is one sample a second;
+  - a kept picture past the clip, cut on the top, left or right, equals a fresh drawing;
+  - a dial showing the same value is not painted again.
+
+  `test_dash`:
+  - an hour of history is an hour at any tick;
+  - disk, network and CPU rates are the same at 1, 0.5 and 0.25 s;
+  - `next_due`;
+  - the trends cover 5 min and 1 h at any tick.
+
+  `mutate.py` has 8 new `tick:` mutants, all killed. The `panel:`, `burn:` and `dash:` mutants were run again.
+- **Unverified.** On the server's own framebuffer and CPU: Zen 3 is slower per core than the Mac that measured this,
+  so expect a few points more. Also unverified: reading the card's sensors twice a second; the LED service already
+  reads busy % four times a second.
+
 ## 6b442 — Your servers: lighter buttons, an arrow that turns, the badge off the text, wider relay fields (per Patrick)
 
 Patrick: "make the boxes around buttons like advanced in this screenshot a little bit lighter colored and change

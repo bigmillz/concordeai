@@ -238,15 +238,21 @@ class HiPixmap(o1gfx.Pixmap):
         """Draw `fn` into the logical box, or, if the same `key` was drawn into a box of the same
         size before, paste the picture that came out then: its pixels, background included, so the
         box must hold nothing but what fn draws. A dial that shows the same value, a graph whose
-        data has not moved: no drawing at all, just copying rows."""
+        data has not moved: no drawing at all, just copying rows. A box that reaches past the clip
+        keeps only the part inside it (fn cannot paint the rest), the cut being part of the key; the
+        dials' boxes reach a unit above their panel's inside, and were drawn again every time (6b444)."""
         S = self.S
         xa, ya = int(round(box[0] * S)), int(round(box[1] * S))
         xb, yb = xa + int(round(box[2] * S)), ya + int(round(box[3] * S))
         c = self.pclip
-        if xa < c[0] or ya < c[1] or xb > c[2] or yb > c[3] or xb <= xa or yb <= ya:
+        cut = (max(0, c[0] - xa), max(0, c[1] - ya), max(0, xb - c[2]), max(0, yb - c[3]))
+        xa, ya, xb, yb = xa + cut[0], ya + cut[1], xb - cut[2], yb - cut[3]
+        if xb <= xa or yb <= ya:
             fn()
             return False
         k = (key, xb - xa, yb - ya, self.pw)
+        if any(cut):
+            k += cut
         snap = self._SNAPS.get(k)
         W = self.pw
         if snap is not None:
