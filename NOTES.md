@@ -326,6 +326,34 @@ not observed here; an MLX refresh against the real hub was not run (the API shap
 against this Mac's cache); WKWebView not opened; no metered-line detection exists in the app, so the consent is the
 click.
 
+### 6b445, part two — Gemma 4 E2B replaces Llama 3.2 3B; FLUX.2 klein 4B replaces FLUX.1 schnell (per Patrick)
+
+Approved by Patrick after the candidate test, and shipped through the mechanism above, which is its first real use:
+the retired model is cleared here and on servers (only where the app brought it), its successor is offered.
+
+- **Gemma 4 E2B** (`mlx-community/gemma-4-e2b-it-4bit`, `gemma4:e2b`, port 8946, mem 3.2, 3.6 GB; the repo and tag
+  checked 2026-10-07; OLLAMA_BYTES 4,587,156,505). On this Mac: 15/19 on hard quick prompts against 9/19, 122 against
+  126 tok/s, 2.7 GB peak, loads on mlx-lm 0.31.3. Llama 3.2 3B moved to RETIRED_MODELS with its vetted identity
+  (`RETIRED_SUCCESSORS` → Gemma 4 E2B) and every name swapped: QUICK_PAIR, Fast's picks, Hermes's picks, CODE_LADDER,
+  the funnel fallback, the page's default model and chip, ADV_USE, _BENCH_FAKE, the successors of four older retired
+  rows. Light's everyday Gemma now skips the quick pair (E2B is a Gemma 4 and would have taken that seat).
+  OLLAMA_REQUIRES: every gemma4 tag now says 0.30.9 in the registry (12b and 26b were pushed again since 0.30.5 and
+  0.30.0 were recorded), so all three are 0.30.9. Llama 3.2 1B stays; Qwen 3.5 2B was declined.
+- **FLUX.2 klein 4B on Quick** (`mflux-community/flux2-klein-4b-mflux-q4`, Apache 2.0 like upstream; the tester's
+  `ar9av` build is the same 4.62 GB but labels its licence "other"). 4.6 GB, mem 13.5, 4 steps, guidance 1.0, run by
+  `mflux-generate-flux2` (mflux 0.19's plain `mflux-generate` refuses klein; the rung's `cmd`, and any `flux2` base
+  picks it). `_img_distilled` gives klein schnell's step rule (effort buys pixels, not steps). `_snap_dir` follows
+  refs/main: a FLUX.2 repo has no top-level config.json, so the old glob found no snapshot. The engine probe is now
+  `mflux-generate-flux2` and the studio pip installs `--upgrade mflux`, so an older engine is brought up to one that
+  can draw it. `STUDIO_RETIRED` holds FLUX.1 schnell (9.6 GB; its real peak was ~20 GB, not the 12 the rung said):
+  auto-clean deletes it, Remove counts and deletes it with the studio, and the Update models card offers "Image
+  generation · Quick · replaces FLUX.1 schnell · 4.6 GB" (`studio_updates`), installed by the studio's own installer.
+  IMAGE_REPO/IMAGE_GB follow. Rendered through `generate_image` on this Mac (a dev home, the real venv-image): a
+  768x768 fox in 18 s.
+- Tests: `model updates (6b445): Gemma 4 E2B and FLUX.2 klein`, and the earlier checks moved to the new catalog.
+- Not verified: an E2B chat in the app (the candidate test ran it outside the app); the Accurate and Finest rungs
+  (FLUX.1 dev) are unchanged and their mem_gb not re-measured; a server running gemma4:e2b.
+
 ## 6b446 — nothing stays loaded on the card across a sleep; the idle clock counts a busy card (kit, per Patrick)
 
 What happened on the server (Ubuntu 26.04, RX 6900 XT, Ollama v0.40.0, ROCm): `ollama1-idle` suspended it at

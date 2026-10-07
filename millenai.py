@@ -12,8 +12,8 @@ Optional extras:
 
 Backends (any subset is fine — missing ones just report offline):
   MLX / llama.cpp OpenAI-compatible servers on:
-    127.0.0.1:8888  -> Llama 3.2 3B
-    127.0.0.1:8892  -> Mistral Nemo 12B
+    127.0.0.1:8946  -> Gemma 4 E2B
+    127.0.0.1:8884  -> Llama 3.2 1B
   Ollama on 127.0.0.1:11434 for the heavy models.
 
 If mlx-lm (and/or ollama) is installed, the app spawns any engine whose
@@ -1217,7 +1217,10 @@ def reveal(path: str):
 CATALOG = [
     # label,               icon, size, group, mlx repo, ollama tag, port, mem_gb, gb, star
     ("Llama 3.2 1B",       "🪶", "1B",  "core", "mlx-community/Llama-3.2-1B-Instruct-4bit",        "llama3.2:1b",       8884,  1.2,  0.8, True),
-    ("Llama 3.2 3B",       "⚡️", "3B",  "core", "mlx-community/Llama-3.2-3B-Instruct-4bit",        "llama3.2:3b",       8888,  2.5,  1.8, True),
+    # 6b445, per Patrick: Gemma 4 E2B replaces Llama 3.2 3B as the quick model
+    # (15/19 against 9/19 on hard quick prompts, 122 against 126 tok/s, 2.7 GB
+    # peak, loads on mlx-lm 0.31.3; the repo and tag checked 2026-10-07)
+    ("Gemma 4 E2B",        "⚡️", "2B",  "core", "mlx-community/gemma-4-e2b-it-4bit",              "gemma4:e2b",        8946,  3.2,  3.6, True),
     ("Ministral 3 14B",    "🌪️", "14B", "core", "mlx-community/Ministral-3-14B-Instruct-2512-4bit", "ministral-3:14b", 8932, 9.6, 8.5, True),
     # tuned for tool use and structured output — the Research agent's first pick
     ("Hermes 3 8B",        "🪽", "8B",  "core", "mlx-community/Hermes-3-Llama-3.1-8B-4bit",        "hermes3:8b",        8912,  5.5,  4.6, False),
@@ -1261,12 +1264,12 @@ OLLAMA_BYTES = {
     "deepseek-r1:8b": 5_225_376_047,
     "deepseek-v3.1:671b": 404_494_157_743,
     "gemma4:12b": 7_556_508_396,
+    "gemma4:e2b": 4_587_156_505,
     "gemma4:26b": 18_604_148_513,
     "gpt-oss:120b": 65_369_818_941,
     "gpt-oss:20b": 13_793_441_244,
     "hermes3:8b": 4_661_227_243,
     "llama3.2:1b": 1_321_098_329,
-    "llama3.2:3b": 2_019_393_189,
     "ministral-3:14b": 9_082_537_546,
     "qwen3-coder:480b": 290_058_836_445,
     "qwen3.5:9b": 6_594_474_711,
@@ -1280,8 +1283,11 @@ OLLAMA_BYTES = {
 # when it's too old; a user's own Ollama gets a note saying what to do.
 OLLAMA_REQUIRES = {
     "deepseek-v3.1:671b": (0, 13, 5),
-    "gemma4:12b": (0, 30, 5),
-    "gemma4:26b": (0, 30, 0),
+    # the gemma4 tags were pushed again since: all three require 0.30.9 now
+    # (the registry, 2026-10-07)
+    "gemma4:12b": (0, 30, 9),
+    "gemma4:26b": (0, 30, 9),
+    "gemma4:e2b": (0, 30, 9),
     "qwen3-coder:480b": (0, 13, 5),
     "qwen3.5:9b": (0, 17, 1),
     "qwen3.6:35b": (0, 30, 0),
@@ -1344,6 +1350,10 @@ RETIRED_MODELS = {
     "GLM-5.2":           ("mlx-community/GLM-5.2-4bit", None, 8928, 418.3),
     "DeepSeek R1 671B":  ("mlx-community/DeepSeek-R1-0528-4bit", None, 8930,
                           377.6),
+    # 6b445, per Patrick: Gemma 4 E2B answers more of the hard quick prompts
+    # at the same speed
+    "Llama 3.2 3B":      ("mlx-community/Llama-3.2-3B-Instruct-4bit",
+                          "llama3.2:3b", 8888, 1.8),
 }
 
 # WHAT REPLACES EACH (6b306, per Patrick: "keep users current on their
@@ -1356,10 +1366,10 @@ RETIRED_MODELS = {
 # Like for like on size where the lineage allows: a 2B was picked for
 # speed, so its replacement is small too.
 RETIRED_SUCCESSORS = {
-    "Gemma 2 2B":         ("Llama 3.2 3B", "Gemma 4 12B"),
-    "Gemma 2 9B IT":      ("Gemma 4 12B", "Qwen 3.5 9B", "Llama 3.2 3B"),
-    "Llama 3.1 8B":       ("Qwen 3.5 9B", "Hermes 3 8B", "Llama 3.2 3B"),
-    "Qwen 2.5 7B":        ("Qwen 3.5 9B", "Llama 3.2 3B"),
+    "Gemma 2 2B":         ("Gemma 4 E2B", "Gemma 4 12B"),
+    "Gemma 2 9B IT":      ("Gemma 4 12B", "Qwen 3.5 9B", "Gemma 4 E2B"),
+    "Llama 3.1 8B":       ("Qwen 3.5 9B", "Hermes 3 8B", "Gemma 4 E2B"),
+    "Qwen 2.5 7B":        ("Qwen 3.5 9B", "Gemma 4 E2B"),
     "DeepSeek R1":        ("DeepSeek R1 8B", "Qwen 3.5 9B"),
     "Mistral Small 24B":  ("Ministral 3 14B", "Gemma 4 26B", "Qwen 3.5 9B"),
     "Mistral Nemo 12B":   ("Ministral 3 14B", "Qwen 3.5 9B"),
@@ -1378,6 +1388,7 @@ RETIRED_SUCCESSORS = {
                            "Qwen 3.8 27B"),
     "DeepSeek R1 671B":   ("DeepSeek V3.2 671B", "GLM 5.3", "GPT-OSS 120B",
                            "Qwen 3.8 27B"),
+    "Llama 3.2 3B":       ("Gemma 4 E2B",),
 }
 
 GROUP_TITLES = {"core": "General Models", "code": "Coding & Vision",
@@ -4159,7 +4170,7 @@ TIERS = {
         # 15-19s on random turns. Same brains, steadier hand.
         "picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B",
           "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B",
-          "Qwen 3.5 9B", "Ministral 3 14B", "Llama 3.2 3B",
+          "Qwen 3.5 9B", "Ministral 3 14B", "Gemma 4 E2B",
           "Llama 3.2 1B"],
         "count": 1,
     },
@@ -4297,7 +4308,7 @@ AGENTS = {
         # what must be refused, it just skips the sermon.
         "icon": "\U0001fabd", "desc": "the infamous one — direct, no varnish",
         "picks": ["Hermes 4 14B", "Hermes 3 8B", "Ministral 3 14B",
-                  "Llama 3.2 3B"],
+                  "Gemma 4 E2B"],
         "system": (
             "You are Hermes — direct, sharp, personality-forward. "
             "Answer exactly what was asked. Take real positions when "
@@ -4644,7 +4655,7 @@ def resolve_agent_seat(name, ctx=None):
 # same with No limits ticked and whose "every model this machine can run"
 # was said while half of them were missing. Built by ROLE from the ladders
 # the modes already use, so no machine is ever written in here:
-#   Light        the quick pair (Llama 3.2 3B and 1B) and ONE everyday
+#   Light        the quick pair (Gemma 4 E2B and Llama 3.2 1B) and ONE everyday
 #                model that also writes merges: the largest Gemma 4 of
 #                catalog size EVERYDAY_MAX_GB or less, else the largest
 #                model of that size that isn't the vision model; pictures
@@ -4670,7 +4681,7 @@ MODEL_SET_ALIASES = {"basic": "light", "min": "light",
                      "pro": "recommended", "rec": "recommended",
                      "max": "everything", "full": "everything",
                      "all": "everything"}
-QUICK_PAIR = ("Llama 3.2 3B", "Llama 3.2 1B")
+QUICK_PAIR = ("Gemma 4 E2B", "Llama 3.2 1B")
 # what a first run installs until the person picks another (per Patrick)
 FIRST_RUN_SET = "light"
 EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
@@ -4678,7 +4689,7 @@ EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
 MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
 # the code lane's local planner, strongest first: remote_driver reads it too
 CODE_LADDER = ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
-               "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B")
+               "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Gemma 4 E2B")
 VISION_MODEL = "Qwen 3.5 Vision 9B"
 
 
@@ -4741,7 +4752,8 @@ def model_sets(target=None) -> dict:
     small = sorted((l for l in MODEL_INFO if fits(l)
                     and MODEL_INFO[l]["cat_gb"] <= EVERYDAY_MAX_GB),
                    key=lambda l: -MODEL_INFO[l]["cat_gb"])
-    everyday = (next((l for l in small if l.startswith("Gemma 4")), None)
+    # a Gemma 4 that isn't the quick pair's (6b445: Gemma 4 E2B is in it)
+    everyday = (next((l for l in small if l.startswith("Gemma 4") and l not in QUICK_PAIR), None)
                 or next((l for l in small if _family_of(l) != "vision"
                          and l not in QUICK_PAIR), None))
     for l in QUICK_PAIR + (everyday,):
@@ -6493,7 +6505,7 @@ def make_title(text: str, conf=None, server=None, local: bool = True, ask_server
 # PICTURES FROM A DESCRIPTION (6b294, per Patrick: "add image generation
 # capability… cleanly integrate that into the model settings… a smaller
 # box under the presets… also in the first start wizard"). Local first:
-# FLUX.1 schnell, pre-quantised to 4-bit for MLX, driven by mflux in its
+# FLUX (FLUX.2 klein 4B on Quick since 6b445), 4-bit for MLX, driven by mflux in its
 # OWN venv (its mlx pins must never touch the chat engine's). Not there
 # yet? A Gemini key can paint; and when nothing can, the reply says
 # exactly where to add it.
@@ -6517,13 +6529,22 @@ STUDIOS = {
         "noun": "pictures",
         "verb": "make pictures from a description",
         "venv": os.path.join(app_dir(), "venv-image"),
-        "pip": ["mflux"],
-        "probe": "mflux-generate",
+        # --upgrade (6b445): an engine from before FLUX.2 lacks
+        # mflux-generate-flux2, and a plain install keeps it
+        "pip": ["--upgrade", "mflux"],
+        "probe": "mflux-generate-flux2",
         "tiers": [
+            # FLUX.2 klein 4B (6b445, per Patrick): 34-40 s a picture
+            # against FLUX.1 schnell's 62-64 s, a 12.4 GB peak against 19.1,
+            # a 4.6 GB download. The mflux-community build: Apache 2.0 as
+            # upstream (the ar9av build of the same weights mislabels it).
+            # mflux 0.19 runs FLUX.2 only through mflux-generate-flux2
+            # ("cmd"); a distilled klein takes guidance 1.0 and four steps.
             {"id": "quick", "name": "Quick",
-             "repo": "dhairyashil/FLUX.1-schnell-mflux-4bit",
-             "gb": 9.6, "mem_gb": 12.0, "steps": 4, "base": "schnell",
-             "note": "four steps, about a minute a picture"},
+             "repo": "mflux-community/flux2-klein-4b-mflux-q4",
+             "gb": 4.6, "mem_gb": 13.5, "steps": 4, "base": "flux2-klein-4b",
+             "cmd": "mflux-generate-flux2", "guidance": 1.0,
+             "note": "four steps, about half a minute a picture"},
             {"id": "accurate", "name": "Accurate",
              "repo": "dhairyashil/FLUX.1-dev-mflux-4bit",
              "gb": 9.6, "mem_gb": 12.5, "steps": 20, "base": "dev",
@@ -6565,6 +6586,14 @@ STUDIOS = {
     },
 }
 _STUDIO_ROWS = {v["row"]: k for k, v in STUDIOS.items()}
+# RETIRED STUDIO MODELS (6b445): a rung's old weights, by repo: (its name,
+# disk GB, the rung that replaces it). Auto-clean deletes them (nothing
+# reads them any more: the rung names its new repo), the Update models card
+# offers the replacement, and Remove takes them with the studio.
+# FLUX.1 schnell's real peak was about 20 GB, not the 12 the rung said.
+STUDIO_RETIRED = {
+    "image": {"dhairyashil/FLUX.1-schnell-mflux-4bit": ("FLUX.1 schnell", 9.6, "quick")},
+}
 
 
 def studio_supported() -> bool:
@@ -6718,6 +6747,12 @@ def studio_prefs(key: str) -> dict:
     return out
 
 
+def _img_distilled(base) -> bool:
+    """A 4-step distilled image model (schnell; FLUX.2 klein, not its base)."""
+    b = str(base or "")
+    return b == "schnell" or (b.startswith("flux2-klein") and "base" not in b)
+
+
 def studio_opts(key: str, over: dict = None) -> dict:
     """The settings one render will actually use. Never raises: every
     value is coerced and clamped, because the override layer comes from
@@ -6725,7 +6760,7 @@ def studio_opts(key: str, over: dict = None) -> dict:
     t = studio_tier(key)
     cfg = engine_cfg(key)
     out = {"w": t.get("w", 1024), "h": t.get("h", 1024),
-           "steps": t.get("steps", 4), "guidance": 3.5,
+           "steps": t.get("steps", 4), "guidance": t.get("guidance", 3.5),
            "fmt": STUDIO_FORMATS[key][0], "seed": 0, "neg": ""}
     if key == "video":
         out.update(frames=t.get("frames", 33), fps=cfg.get("fps") or 24)
@@ -6958,9 +6993,9 @@ def resolve_overrides(key: str, ov: dict, prev: dict = None) -> tuple:
                 notes.append("smaller and shorter, to be quicker")
             else:
                 out["steps"] = min(40, base["steps"] + (8 * eff))
-        elif studio_tier("image").get("base") == "schnell" and eff > 0:
-            # schnell is a 4-step distillation: more steps buy nothing,
-            # so quality comes from pixels
+        elif _img_distilled(studio_tier("image").get("base")) and eff > 0:
+            # schnell and klein are 4-step distillations: more steps buy
+            # nothing, so quality comes from pixels
             out["w"] = int(base["w"] * (1.4 if eff == 1 else 1.75))
             out["h"] = int(base["h"] * (1.4 if eff == 1 else 1.75))
             notes.append("larger, which is where detail comes from here")
@@ -6997,8 +7032,17 @@ def _studio_engine_ok(key: str) -> bool:
 
 
 def _snap_dir(repo: str) -> str:
-    snaps = glob.glob(os.path.join(_hf_model_dir(repo), "snapshots", "*",
-                                   "config.json"))
+    """The snapshot main points at (a FLUX.2 repo has no config.json at its
+    top, 6b445), else the first one holding a config.json."""
+    d = _hf_model_dir(repo)
+    try:
+        with open(os.path.join(d, "refs", "main"), encoding="utf-8") as f:
+            cur = os.path.join(d, "snapshots", f.read(80).strip())
+        if os.path.isdir(cur) and os.path.basename(cur):
+            return cur
+    except OSError:
+        pass
+    snaps = glob.glob(os.path.join(d, "snapshots", "*", "config.json"))
     return os.path.dirname(snaps[0]) if snaps else ""
 
 
@@ -7046,7 +7090,8 @@ def _studio_bytes_uncached(key: str) -> int:
     # rungs may SHARE a repo (quick and accurate differ only in how many
     # frames they render), so count each repo once or Remove promises
     # twice the disk it can free
-    for repo in dict.fromkeys(t["repo"] for t in STUDIOS[key]["tiers"]):
+    for repo in dict.fromkeys([t["repo"] for t in STUDIOS[key]["tiers"]]
+                              + list(STUDIO_RETIRED.get(key) or {})):
         total += _dir_bytes_real(_hf_model_dir(repo))
     return total
 
@@ -7145,7 +7190,8 @@ def studio_remove(key: str) -> dict:
     _studio_bytes_forget(key)
     targets = [STUDIOS[key]["venv"]] + [
         _hf_model_dir(r) for r in
-        dict.fromkeys(t["repo"] for t in STUDIOS[key]["tiers"])]
+        dict.fromkeys([t["repo"] for t in STUDIOS[key]["tiers"]]
+                      + list(STUDIO_RETIRED.get(key) or {}))]
     for target in targets:
         try:
             if os.path.isdir(target):
@@ -7188,8 +7234,8 @@ def studio_status(key: str) -> dict:
 
 
 IMAGE_ROW = "Image generation"
-IMAGE_REPO = "dhairyashil/FLUX.1-schnell-mflux-4bit"
-IMAGE_GB = 9.6
+IMAGE_REPO = "mflux-community/flux2-klein-4b-mflux-q4"
+IMAGE_GB = 4.6
 IMAGE_VENV = os.path.join(app_dir(), "venv-image")
 IMAGE_SUB = "images"      # a profile's pictures (1a 5.5): image_dir(ctx)
 
@@ -7738,10 +7784,13 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
         out = stage_path("." + o["fmt"])
         # the prompt reaches mflux through a 0600 file (6b326), never
         # its command line
+        _base = _t.get("base", "schnell")
         args = ["--model", _snap_dir(_t["repo"]),
-                "--base-model", _t.get("base", "schnell"),
+                "--base-model", _base,
                 "--prompt", "@prompt:prompt", "--steps", str(o["steps"]),
-                "--guidance", str(o["guidance"]),
+                # a distilled FLUX.2 takes 1.0 and nothing else (6b445)
+                "--guidance", ("1.0" if _base.startswith("flux2") and _img_distilled(_base)
+                               else str(o["guidance"])),
                 "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
                 "--width", str(o["w"]), "--height", str(o["h"]),
                 "--output", out]
@@ -7751,7 +7800,9 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
         try:
             _vb = os.path.join(STUDIOS["image"]["venv"], "bin")
             cmd, pf = prompt_cmd(os.path.join(_vb, "python3"), "script",
-                                 os.path.join(_vb, "mflux-generate"), args,
+                                 os.path.join(_vb, _t.get("cmd") or (
+                                     "mflux-generate-flux2" if _base.startswith("flux2")
+                                     else "mflux-generate")), args,
                                  {"prompt": prompt})
             _t0 = time.time()
             rc, tail, cut = _run_render(cmd, 900, sock)
@@ -15487,17 +15538,71 @@ def _cleanup_stat(pulled=None) -> dict:
     refresh = fresh_refresh_list(pulled)
     added = [{"label": l, "gb": MODEL_INFO[l]["gb"]} for l in update_added(pulled)
              if l not in news]
+    studio = studio_updates()
+    studio_old = studio_retired_on_disk()
     return {"labels": [u["old"] for u in ups if not u.get("gone")],
-            "gb": round(sum(u["free_gb"] for u in ups), 1),
+            "gb": round(sum(u["free_gb"] for u in ups) + sum(x["gb"] for x in studio_old), 1),
+            "studio": studio,
+            "studio_old": [{"label": x["label"], "gb": x["gb"]} for x in studio_old],
             "updates": ups,
             "news": news,
             "refresh": refresh,
             "added": added,
             "dl_gb": round(sum(MODEL_INFO[n]["gb"] for n in news)
                            + sum(r["gb"] for r in refresh)
-                           + sum(a["gb"] for a in added), 1),
+                           + sum(a["gb"] for a in added)
+                           + sum(x["gb"] for x in studio), 1),
             "auto": auto_cleanup_on(),
             "running": _modup.get("state") == "running"}
+
+
+def studio_updates() -> list:
+    """A studio whose engine is here but whose chosen rung's model isn't
+    (6b445: the Quick image rung became FLUX.2 klein, so an install that had
+    FLUX.1 schnell has nothing to draw with until it downloads). Offered by
+    the Update models card, never downloaded unasked."""
+    out = []
+    if not studio_supported():
+        return out
+    for key, st in STUDIOS.items():
+        if not _studio_engine_ok(key):
+            continue
+        t = studio_tier(key)
+        with _setup_lock:
+            moving = (_setup_jobs.get(st["row"]) or {}).get("status") in ("downloading", "queued")
+        if moving or _studio_model_ok(key, t["id"]):
+            continue
+        olds = [v[0] for v in (STUDIO_RETIRED.get(key) or {}).values() if v[2] == t["id"]]
+        out.append({"label": st["row"] + " \u00b7 " + t["name"], "key": key, "tid": t["id"],
+                    "row": st["row"], "gb": t["gb"],
+                    "why": ("replaces " + ", ".join(olds)) if olds else "not downloaded"})
+    return out
+
+
+def studio_retired_on_disk() -> list:
+    """Retired studio weights still on the disk: [{"key", "repo", "label", "gb"}]."""
+    return [{"key": k, "repo": repo, "label": v[0], "gb": v[1]}
+            for k, old in STUDIO_RETIRED.items() for repo, v in old.items()
+            if os.path.isdir(_hf_model_dir(repo))]
+
+
+def _studio_retired_sweep() -> list:
+    """Delete retired studio weights (6b445): never while that studio
+    downloads or a picture is being made. Names removed."""
+    gone = []
+    for x in studio_retired_on_disk():
+        with _setup_lock:
+            if (_setup_jobs.get(STUDIOS[x["key"]]["row"]) or {}).get("status") in ("downloading", "queued"):
+                continue
+        if x["key"] == "image" and _render_lock.locked():
+            continue
+        d = _hf_model_dir(x["repo"])
+        for pth in (d, os.path.join(os.path.dirname(d), ".locks", os.path.basename(d))):
+            shutil.rmtree(pth, ignore_errors=True)
+        if not os.path.isdir(d):
+            gone.append(x["label"])
+            _studio_bytes_forget(x["key"])
+    return gone
 
 
 def update_added(pulled=None) -> list:
@@ -15673,6 +15778,9 @@ def _auto_cleanup_pass(manual=False) -> list:
         # every cleanup clears failed-download leftovers first (6b307),
         # whatever the switch says: none of it is a usable model
         _sweep_leftovers()
+        if manual or auto_cleanup_on():
+            # retired studio weights (6b445): nothing reads them any more
+            _studio_retired_sweep()
         # manual == the Clean-now button (6b268, per Patrick): the
         # user is asking RIGHT NOW, so the standing pref doesn't
         # gate it, and the list they were shown is the whole list.
@@ -15816,20 +15924,26 @@ def start_model_update() -> dict:
         # newer weights and the set's new models come along (6b445)
         fresh = [r["label"] for r in fresh_refresh_list() if r["label"] not in news]
         added = [l for l in update_added() if l not in news and l not in fresh]
+        studio = studio_updates()
         _modup.clear()
-        _modup.update(state="running" if (plan or fresh or added) else "done",
+        _modup.update(state="running" if (plan or fresh or added or studio) else "done",
                       olds=[u["old"] for u in plan], news=news,
-                      fresh=fresh, added=added,
+                      fresh=fresh, added=added, studios=[x["row"] for x in studio],
                       removed=[], failed=[], freed_gb=0.0,
                       dl_gb=round(sum(MODEL_INFO[n]["gb"]
                                       for n in news + added)
                                   + sum((_fresh["local"].get(l) or {}).get("gb", 0)
-                                        for l in fresh), 1))
+                                        for l in fresh)
+                                  + sum(x["gb"] for x in studio), 1))
         del _modup_hist[:]
         snap = dict(_modup)
-    if plan or fresh or added:
-        ctx_thread(target=_model_update_worker, args=(plan, news, fresh, added),
-                         daemon=True).start()
+    for x in studio:
+        # the studio's own installer; its row is in the bar below (6b445)
+        start_studio_install(x["key"], x["tid"])
+    if plan or fresh or added or studio:
+        ctx_thread(target=_model_update_worker,
+                   args=(plan, news, fresh, list(added) + [x["row"] for x in studio]),
+                   daemon=True).start()
     return snap
 
 
@@ -15901,7 +16015,8 @@ def _model_update_worker(plan: list, news: list, fresh=(), added=()):
 def model_update_status() -> dict:
     """The run's state plus bytes across ITS replacements only."""
     st = dict(_modup)
-    news = (st.get("news") or []) + (st.get("added") or []) + (st.get("fresh") or [])
+    news = ((st.get("news") or []) + (st.get("added") or []) + (st.get("fresh") or [])
+            + (st.get("studios") or []))
     if st.get("state") == "running" and news:
         pulled = ollama_pulled_tags() or set()
         have, want = _downloaded_bytes(pulled, news)
@@ -23779,7 +23894,7 @@ _BENCH_FAKE = {
         "t_send": 10.0, "t_first": 10.5, "t_last": 16.875, "chunks": 256,
         "usage": {"prompt_tokens": 1000, "completion_tokens": 256,
                   "prompt_tokens_details": {"cached_tokens": 0}}}},
-    "Llama 3.2 3B": {"ollama": True, "raw": {
+    "Gemma 4 E2B": {"ollama": True, "raw": {
         "t_send": 0.0, "t_first": 0.3, "t_last": 5.5, "chunks": 256,
         "load_duration": 1.5e9, "prompt_eval_count": 1000,
         "prompt_eval_duration": 2.5e8, "eval_count": 256,
@@ -28660,7 +28775,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         % (goal, reqs or "none stated", chosen, prior, stage, total,
            final, opts))
     label = next((l for l in ("Gemma 4 26B", "Gemma 4 12B", "Qwen 3.6 35B MoE",
-                              "Llama 3.2 3B")
+                              "Gemma 4 E2B")
                   if model_cached(l) and model_fits_memory(l)), "")
     msgs = [{"role": "system", "content": funnel_sys_for(goal)},
             {"role": "user", "content": ask}]
@@ -31924,7 +32039,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             council = [x["label"] for x in _seats]
             _seat_fb = {x["label"]: x["fb"] for x in _seats if server_label(x["label"])}
             # THE PAGE'S `model` IS NOT THE MODE'S (6b339, final review: the page
-            # always sends the model last picked by hand, "Llama 3.2 3B" on a
+            # always sends the model last picked by hand, "Gemma 4 E2B" on a
             # fresh install, beside a tier). Routing on it ran Fast on that model
             # whatever the seats said, never reached a server seat, and warmed
             # its engine on a Mac that should stay quiet. A mode answers from its
@@ -38750,7 +38865,7 @@ __CODE_ROWS__
         accept="image/*,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
       <textarea id="input" rows="1" placeholder="How can I help you today?"></textarea>
       <div id="crow">
-      <div id="model-chip" title="Change engine — opens the picker">engine <b id="chip-model">Llama 3.2 3B</b></div>
+      <div id="model-chip" title="Change engine — opens the picker">engine <b id="chip-model">Gemma 4 E2B</b></div>
       <div id="accel-chip" hidden><i></i><b></b></div>
       <!-- your servers' cards (6b334): one chip per paired server whose
            card the server names, in the MLX chip's style -->
@@ -39710,7 +39825,7 @@ let pendingEdit=null,genChat=null;  // genChat: the chat whose answer is being w
 // account's page neither reads nor writes it (prefs.json holds each
 // profile's own), so a later root boot can't adopt an account's pick
 const ROOT_LS=PROFILE.startsWith("local.");
-let model=(ROOT_LS&&localStorage.getItem("millen.model"))||"Llama 3.2 3B";
+let model=(ROOT_LS&&localStorage.getItem("millen.model"))||"Gemma 4 E2B";
 // VISUAL EFFECTS (6b292, per Patrick): the old "performance mode"
 // switched off spinners, halos, theatre and telemetry too. Now it is ONE
 // thing — the moving backdrop — and lives in Settings › About. The old
@@ -40105,7 +40220,7 @@ let adv=null;
 let advOn=false;
 const ADV_USE={
   "Llama 3.2 1B":"instant drafts, the simplest questions",
-  "Llama 3.2 3B":"quick everyday answers",
+  "Gemma 4 E2B":"quick everyday answers",
   "Hermes 3 8B":"creative writing and roleplay",
   "Hermes 4 14B":"creative writing, roleplay and tool use",
   "Ministral 3 14B":"long context, natural prose",
@@ -48730,6 +48845,7 @@ function muRows(p,srv){
   muOffers(p).forEach(u=>rows.push({t:u.old+" \u2192 "+u.new,gb:muGB(u.dl_gb)}));
   ((p&&p.refresh)||[]).forEach(r=>rows.push({t:r.label+" \u00b7 newer weights",gb:muGB(r.gb)}));
   ((p&&p.added)||[]).forEach(a=>rows.push({t:a.label+" \u00b7 new",gb:muGB(a.gb)}));
+  ((p&&p.studio)||[]).forEach(x=>rows.push({t:x.label+" \u00b7 "+x.why,gb:muGB(x.gb)}));
   (srv||[]).forEach(s=>{
     (s.add||[]).forEach(a=>rows.push({t:s.name+" \u00b7 "+a.name+" \u00b7 "+a.why,gb:muGB(a.gb)}));
     (s.refresh||[]).forEach(r=>rows.push({t:s.name+" \u00b7 "+r.name+" \u00b7 newer weights",
@@ -48786,6 +48902,8 @@ function muPaint(el,st){
         '<div><span>'+esc(r.t)+'</span><span>'+esc(r.gb)+'</span></div>').join("")
       +(p.updates||[]).filter(u=>!u.new).map(u=>
         '<div><span>'+esc(u.old)+'</span><span>remove</span></div>').join("")
+      +((p.studio_old)||[]).map(x=>
+        '<div><span>'+esc(x.label)+'</span><span>remove</span></div>').join("")
       +(kept.length?'<div class="mu-kept">Retired, added outside the app, so kept: '
         +esc(kept.join(", "))+'</div>':"")+'</div>'
       +'<div class="mu-foot"><button class="primary" data-mu="go">'
@@ -49794,6 +49912,7 @@ def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
     for k, st in STUDIOS.items():
         if st["row"] not in live:
             repos.update(t["repo"] for t in st["tiers"])
+            repos.update(STUDIO_RETIRED.get(k) or {})
     try:
         repos.add(WHISPER_REPO)
         repos.add(WHISPER_REPO_CPU)

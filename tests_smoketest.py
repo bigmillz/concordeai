@@ -2542,7 +2542,8 @@ def _fake_dl(labels):
 _mns.update(_remove_models=_fake_remove,
             start_model_downloads=lambda labels, refresh=(): _fake_dl(list(labels) + list(refresh)),
             _sweep_leftovers=lambda: 0, _fresh={"local": {}},
-            fresh_refresh_list=lambda pulled=None: [], update_added=lambda pulled=None: [])
+            fresh_refresh_list=lambda pulled=None: [], update_added=lambda pulled=None: [],
+            studio_updates=lambda: [], studio_retired_on_disk=lambda: [], _studio_retired_sweep=lambda: [])
 for _n in _ctree.body:
     if isinstance(_n, (_ast.FunctionDef, _ast.Assign)) and (
             getattr(_n, "name", "") in (
@@ -5433,7 +5434,8 @@ def _of_ns(src):
         st["dl"].append(list(labels) + list(refresh))
         return list(labels) + list(refresh)
     ns.update(_remove_models=_rm, start_model_downloads=_dl,
-              fresh_refresh_list=lambda pulled=None: list(st.get("fresh") or []))
+              fresh_refresh_list=lambda pulled=None: list(st.get("fresh") or []),
+              _studio_retired_sweep=lambda: [])
     for n in tree.body:
         if isinstance(n, _ast.FunctionDef) and n.name in (
                 "_retired_on_disk", "model_updates", "superseded_installed",
@@ -34397,7 +34399,7 @@ def _u45_ns(src):
               _ollama_models_dirs=lambda: st["dirs"], ollama_local_digests=lambda: dict(st["digests"]),
               SUPPORTED={l: True for l in ns["MODEL_INFO"]},
               MODEL_ROUTES={"Qwen 3.5 9B": ("mlx", 8934), "Qwen 3.5 Vision 9B": ("ollama", "qwen3.5:9b"),
-                            "Llama 3.2 3B": ("mlx", 8888)},
+                            "Llama 3.2 1B": ("mlx", 8884)},
               model_cached=lambda l, pulled=None: l in st["disk"], ollama_pulled_tags=lambda: set(),
               _setup_lock=threading.RLock(), _setup_jobs={},
               ctx_executor=_ctx_exec34, machine_prefs=lambda strict=False: st["prefs"],
@@ -34461,7 +34463,7 @@ def _u45_fresh(src):
     out["mlx: a README-only commit is no update"] = mb(repo, doc) == 0
     out["hf: a bad repo name is never asked"] = ns["hf_repo_files"]("../etc") is None
     # the check: both kinds, a day's cache, a download in flight skipped
-    st["disk"] = {"Qwen 3.5 9B", "Qwen 3.5 Vision 9B", "Llama 3.2 3B"}
+    st["disk"] = {"Qwen 3.5 9B", "Qwen 3.5 Vision 9B", "Llama 3.2 1B"}
     st["digests"] = {"qwen3.5:9b": "f" * 64}
     r = ns["model_fresh_check"](force=True, now=1000.0)
     out["the check finds both"] = (set(r) == {"Qwen 3.5 9B", "Qwen 3.5 Vision 9B"}
@@ -34524,14 +34526,14 @@ _U45_RET = [("phi4:14b", True, False), ("mistral-nemo:12b", False, False), ("qwe
 
 
 def _u45_state(plan=None, managed=True, digest=True):
-    ms = [{"name": "llama3.2:3b", "size": 2019393189, "loaded": False, "digest": "1" * 64 if digest else ""},
+    ms = [{"name": "llama3.2:1b", "size": 1321098329, "loaded": False, "digest": "1" * 64 if digest else ""},
           {"name": "gemma4:12b", "size": 7556508396, "loaded": False, "digest": "2" * 64},
           {"name": "custom:1b", "size": 1 << 30, "loaded": False, "digest": "3" * 64}]
     ms += [{"name": n, "size": 8 * _GB45, "loaded": ld, "digest": ""} for n, _m, ld in _U45_RET]
     js = {"models": ms, "busy": False, "jobs": [], "plan": plan, "disk_free_bytes": 400 * _GB45,
           "vram_bytes": 16 * _GI7, "allow": []}
     if managed:
-        js["managed"] = ["llama3.2:3b"] + [n for n, m, _l in _U45_RET if m]
+        js["managed"] = ["llama3.2:1b"] + [n for n, m, _l in _U45_RET if m]
     return js
 
 
@@ -34551,19 +34553,19 @@ def _u45_view(src):
         and st["models"][0]["digest"] == "1" * 64
         and ns["_srv_mstate_parse"](dict(_u45_state(), managed="x"))["managed_known"] is False
         and ns["_srv_mstate_parse"](_u45_state(managed=False))["managed"] == [])
-    remote = {"llama3.2:3b": ("9" * 64, {"sha256:" + "a" * 64: 2 * _GB45}),
+    remote = {"llama3.2:1b": ("9" * 64, {"sha256:" + "a" * 64: 2 * _GB45}),
               "gemma4:12b": ("2" * 64, {}), "custom:1b": ("0" * 64, {})}
     v = ns["server_update_view"](st, 16 * _GI7, lambda t: remote.get(t), None, set())
     out["retire: only what this app brought, never a loaded one"] = [r["name"] for r in v["retire"]] == ["phi4:14b"]
     out["kept: what the person put there"] = v["kept"] == ["mistral-nemo:12b"]
     out["refresh: a catalog model whose digest moved, nothing else"] = (
-        v["refresh"] == [{"name": "llama3.2:3b", "gb": 2.0}])
+        v["refresh"] == [{"name": "llama3.2:1b", "gb": 2.0}])
     adds = {a["name"]: a["why"] for a in v["add"]}
     out["a retired model's replacement"] = adds.get("ministral-3:14b") == "replaces Phi-4 14B"
     out["no set, nothing new seen: no other add"] = set(adds) <= {"ministral-3:14b", "qwen3.5:9b"}
     v2 = ns["server_update_view"](ns["_srv_mstate_parse"](_u45_state(plan={"name": "light", "at": 1, "by": "x"})),
                                   16 * _GI7, None, None, set())
-    out["a set applied there: its missing models"] = {"llama3.2:1b"} <= {a["name"] for a in v2["add"]}
+    out["a set applied there: its missing models"] = {"gemma4:e2b"} <= {a["name"] for a in v2["add"]}
     out["no registry asked when not wanted"] = v2["refresh"] == []
     v3 = ns["server_update_view"](st, 16 * _GI7, None, None, {"deepseek-r1:8b"})
     out["the offer names what it does"] = (v3["offer"] != v["offer"] and len(v["offer"]) == 16
@@ -34647,10 +34649,50 @@ def _u45_page(src):
     return all(out.values()), out
 
 
+def _u45_swap(src):
+    """Pat's two swaps (6b445) go out through the same paths: Llama 3.2 3B
+    retired for Gemma 4 E2B here and on a server; FLUX.1 schnell for
+    FLUX.2 klein in the image studio."""
+    ns, ctx, d = _u45_srvns(src)
+    I, R, S = ns["MODEL_INFO"], ns["RETIRED_MODELS"], ns["RETIRED_SUCCESSORS"]
+    out = {"the row": (I["Gemma 4 E2B"]["ollama"] == "gemma4:e2b" and "Llama 3.2 3B" not in I
+                       and R["Llama 3.2 3B"] == ("mlx-community/Llama-3.2-3B-Instruct-4bit", "llama3.2:3b", 8888, 1.8)
+                       and S["Llama 3.2 3B"] == ("Gemma 4 E2B",)
+                       and "Llama 3.2 3B" not in [c for v in S.values() for c in v]),
+           "no other row named it": not re.search(r'"Llama 3\.2 3B"', src[src.index("TIERS = {"):]
+                                                  .split("# ==== model freshness: begin")[0]
+                                                  .replace('"Llama 3.2 3B":      (', "")),
+           "the quick pair": ns["QUICK_PAIR"] == ("Gemma 4 E2B", "Llama 3.2 1B"),
+           "its size and floor": ('    "gemma4:e2b": 4_587_156_505,\n' in src
+                                  and '    "gemma4:e2b": (0, 30, 9),\n' in src)}
+    st = dict(_u45_state())
+    st["models"] = st["models"] + [{"name": "llama3.2:3b", "size": 2019393189, "loaded": False, "digest": ""}]
+    st["managed"] = st["managed"] + ["llama3.2:3b"]
+    v = ns["server_update_view"](ns["_srv_mstate_parse"](st), 16 * _GI7, None, None, set())
+    out["a server: the 3B goes, E2B is offered"] = (
+        "llama3.2:3b" in [r["name"] for r in v["retire"]]
+        and {a["name"]: a["why"] for a in v["add"]}.get("gemma4:e2b") == "replaces Llama 3.2 3B")
+    T = re.search(r'"tiers": \[\n            # FLUX\.2 klein.*?"note": [^}]*\}', src, re.S)
+    out["the Quick rung"] = bool(T) and all(x in T.group(0) for x in (
+        '"repo": "mflux-community/flux2-klein-4b-mflux-q4"', '"gb": 4.6', '"mem_gb": 13.5',
+        '"base": "flux2-klein-4b"', '"cmd": "mflux-generate-flux2"', '"guidance": 1.0'))
+    out["schnell retired"] = '"image": {"dhairyashil/FLUX.1-schnell-mflux-4bit": ("FLUX.1 schnell", 9.6, "quick")},' in src
+    z = dict(_LH)
+    _s5_exec(src, z, {"_img_distilled"})
+    out["four steps for klein, not its base"] = (z["_img_distilled"]("flux2-klein-4b") and z["_img_distilled"]("schnell")
+                                                 and not z["_img_distilled"]("flux2-klein-base-4b")
+                                                 and not z["_img_distilled"]("dev"))
+    g = src[src.index("def generate_image("):src.index("def generate_image(") + 4000]
+    out["the FLUX.2 command and guidance 1.0"] = (
+        '"mflux-generate-flux2" if _base.startswith("flux2")' in g
+        and '"--guidance", ("1.0" if _base.startswith("flux2") and _img_distilled(_base)' in g)
+    return all(out.values()), out
+
+
 _U45 = [("what a set gained", _u45_news), ("newer weights, found and sized", _u45_fresh),
         ("a refresh download", _u45_dl), ("a server's update", _u45_view),
         ("auto-clean and the click on a server", _u45_wire), ("the presets", _u45_tiers),
-        ("the page and routes", _u45_page)]
+        ("the page and routes", _u45_page), ("Gemma 4 E2B and FLUX.2 klein", _u45_swap)]
 for _n45, _f45 in _U45:
     try:
         _ok45, _d45 = _f45(_MILLENAI_SRC)
