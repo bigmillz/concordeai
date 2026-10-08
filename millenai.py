@@ -39729,7 +39729,7 @@ function detRefresh(){
 // Advanced. No line under any row: who writes the answer is in the pop-out.
 function engMainRows(){
   return ["Fast","Thinking","Pro","Max"].filter(n=>TIER_META[n]).map(n=>
-    modeRow(n,TIER_META[n].icon,n,TIER_META[n].desc,!!tierOff[n],"","",tier===n))
+    modeRow(n,TIER_META[n].icon,n,MODE_LABEL[n]||"",!!tierOff[n],"","",tier===n))
     .join("")
     +cloudMenuRow()
     // one row per paired server: its modes open in a sub-menu beside it (6b337)
@@ -39739,7 +39739,7 @@ function engMainRows(){
     +'<div class="engdiv"></div>'
     +'<div class="engrow'+(advOn?" on":"")+'" data-t="__adv__" tabindex="0">'
     +'<span class="eico">⚙️</span><span class="enm">Advanced</span>'
-    +'<span class="edsc">hand-pick models &amp; compositor</span></div>';
+    +'<span class="edsc"></span></div>';
 }
 function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
@@ -45944,8 +45944,7 @@ function srvMenuRows(){
       +'<span class="eico">\ud83d\udda5\ufe0f</span>'
       +'<span class="enm">'+esc(s.name)+'</span>'
       +'<span class="edsc">'+esc(srvAsleep(s)?"your server \u00b7 asleep \u00b7 wakes when you ask"
-        :ms.length?"your server \u00b7 "+ms.length+" model"
-        +(ms.length===1?"":"s"):(s.status||{}).err?"your server \u00b7 not answering"
+        :ms.length?"":(s.status||{}).err?"your server \u00b7 not answering"
         :"your server \u00b7 no models listed")+'</span>'
       +'<span class="echev">\u203a</span></div>';
   }).join("");
@@ -45953,13 +45952,16 @@ function srvMenuRows(){
 // a server's sub-menu (6b442): Fast, Thinking, Pro and Max on that server alone
 // (6b426); greyed with the reason while it can't answer, and a line saying so
 // while it sleeps (it wakes when a mode of it is asked)
-const SRV_MODE_DESC={fast:"one model, quick",think:"a few models, double-checked",
-  pro:"more models, blended",max:"every model on it"};
+// (6b458, per Patrick: "Remove the descriptions next to each of these. They
+// should be self-explanatory. Except for Max: next to that just have 'all
+// models'"): a row says nothing beside its name, except Max and a reason
+const MODE_LABEL={Max:"all models"};
+const SRV_MODE_DESC={max:"all models"};
 function srvSubRows(s){
   const t="srv:"+s.id,ok=srvPickable(s),ms=s.models||[];
   const why=(s.status||{}).err||!(s.only||{}).ok&&ms.length?"not answering":ms.length?"":"no models listed";
   return (srvAsleep(s)?'<div class="engnote">asleep · wakes when you ask</div>':"")
-    +srvSubModes().map(([k,n,ic])=>modeRow(t+":"+k,ic,n,ok?SRV_MODE_DESC[k]:(why||"not answering"),
+    +srvSubModes().map(([k,n,ic])=>modeRow(t+":"+k,ic,n,ok?(SRV_MODE_DESC[k]||""):(why||"not answering"),
       !ok,"srvmode","",tier===t+":"+k)).join("");
 }
 // the composer's server chips (6b334): "● AMD", "● NVIDIA", "● INTEL"
@@ -46058,21 +46060,19 @@ function cloudPickRetire(t){
 // pro ... I don't want the four cloud models sitting there in that menu on their
 // own."): the row opens a sub-menu with Fast, Thinking and Pro, each greyed with
 // its reason when it can't answer. Plain "Cloud Only" (old prefs) is its Pro.
-const CLOUD_MODE_DESC={fast:"one model, cheapest first",think:"three models, free ones first",
-  pro:"every cloud model"};
 function cloudMenuRow(){
   const on=!advOn&&(tier==="Cloud Only"||isCloudMode(tier));
   const dead=cloudSubModes().every(x=>tierOff["cloud:"+x[0]]);
   const inf=tierInfo["cloud:fast"]||{};
   return '<div class="engrow srvmenu cloudmenu'+(on?" on":"")+'" data-sv="__cloud__" tabindex="0">'
     +'<span class="eico">☁️</span><span class="enm">Cloud Only</span>'
-    +'<span class="edsc">'+esc(dead?(inf.short||"unavailable"):"your API keys only")+'</span>'
+    +'<span class="edsc">'+esc(dead?(inf.short||"unavailable"):"")+'</span>'
     +'<span class="echev">›</span></div>';
 }
 function cloudSubRows(){
   return cloudSubModes().map(([k,n,ic])=>{
     const t="cloud:"+k,inf=tierInfo[t]||{},off=!!tierOff[t];
-    return modeRow(t,ic,n,off?(inf.short||"unavailable"):CLOUD_MODE_DESC[k],off,"cloudmode",
+    return modeRow(t,ic,n,off?(inf.short||"unavailable"):"",off,"cloudmode",
       off&&inf.why?inf.why:"",tier===t||(k==="pro"&&tier==="Cloud Only"));
   }).join("");
 }

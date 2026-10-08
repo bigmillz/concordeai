@@ -18049,6 +18049,14 @@ _al_bad = [n for n, ok in [
 check("6b451: slim buttons are one 30px line and every button-beside-a-field row shares one control-row rule",
       not _al_bad, "%r" % _al_bad)
 
+check("6b458: the picker's rows carry no description; only Max says 'all models'",
+      'const MODE_LABEL={Max:"all models"};' in _MILLENAI_SRC
+      and 'modeRow(n,TIER_META[n].icon,n,MODE_LABEL[n]||"",' in _MILLENAI_SRC
+      and "hand-pick models &amp; compositor" not in _MILLENAI_SRC.split("function engMainRows")[1][:900]
+      and "CLOUD_MODE_DESC" not in _MILLENAI_SRC and '"your API keys only")' not in _MILLENAI_SRC
+      and "one model, quick" not in _MILLENAI_SRC and "more models, blended" not in _MILLENAI_SRC
+      and 'const SRV_MODE_DESC={max:"all models"};' in _MILLENAI_SRC)
+
 # ---- live: a copy of its own, the model replaced by a stand-in (suggest-fake)
 _SG_NOW = int(time.time() * 1000)
 _SG_CORE = [("Replacing front brake pads", "How do I replace the front brake pads on my Civic?"),
@@ -20539,13 +20547,13 @@ def _svc_page(src):
         "card lost": 'class="srv bad"' in o[2],
         # (6b337) ONE row per paired server in the menu; its models are in the flyout it opens
         "menu": o[3].count('data-sv="') == 2 and "data-s=" not in o[3] and "Studio" not in o[3]
-        and '<span class="enm">Desktop</span><span class="edsc">your server · 3 models</span>' in o[3]
+        and '<span class="enm">Desktop</span><span class="edsc"></span>' in o[3]
         and '<span class="enm">Lost</span><span class="edsc">your server · not answering</span>' in o[3]
         and 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o[3],
         # 6b442: the sub-menu holds the server's Fast, Thinking, Pro and Max; its models are picked in Advanced
         "flyout": o[5].startswith('<div class="engrow mode srvmode') and o[5].count('data-t="srv:a1b2c3d4:') == 4
         and all('data-t="srv:a1b2c3d4:%s"' % k in o[5] for k in ("fast", "think", "pro", "max"))
-        and 'data-s="' not in o[5] and " off" not in o[5] and "every model on it</span>" in o[5]
+        and 'data-s="' not in o[5] and " off" not in o[5] and "every model on it" not in o[5] and "all models</span>" in o[5]
         and o[6].count(' off"') == 4 and o[6].count("not answering</span>") == 4,
         # the badge: the server by name; a server's model or name never
         # reads as the cloud; a council names its servers beside "this Mac"
@@ -21822,7 +21830,7 @@ def _soc_menu(src):
         and "d1b2c3d4" not in plain and "data-s=" not in plain and "data-t=" not in plain
         and "<b>&" not in plain and "Desk &lt;b&gt;&amp;" in plain and plain.count("›</span>") == 3
         and plain.count("\U0001f5a5️") == 3,
-        "desc": 'class="edsc">your server · 3 models</span>' in plain
+        "desc": "your server · 3 models" not in plain and 'class="edsc"></span>' in plain
         and 'class="edsc">your server · not answering</span>' in plain
         and 'class="edsc">your server · no models listed</span>' in plain,
         # the row says where the selection is
@@ -24512,7 +24520,7 @@ _SM_MUT = [
      "  const m=isSrvMode(t)?/^srv:([^:]+)/.exec(t):null;"),
     ("no rows for the modes in the flyout", "    +srvSubModes().map(([k,n,ic])=>", "    +[].map(([k,n,ic])=>"),
     ("the rows never greyed", '!ok,"srvmode","",tier===t+":"+k)', 'false,"srvmode","",tier===t+":"+k)'),
-    ("a row's reason lost while greyed", 'ok?SRV_MODE_DESC[k]:(why||"not answering")', 'SRV_MODE_DESC[k]'),
+    ("a row's reason lost while greyed", 'ok?(SRV_MODE_DESC[k]||""):(why||"not answering")', 'SRV_MODE_DESC[k]'),
     ("the modes not greyed", '    srvSubModes().forEach(x=>{tierOff["srv:"+s.id+":"+x[0]]=1;});});', "    });"),
     ("the chip not naming the mode", '  if(s&&mode)return mode+" \\u00b7 "+s.name+" only";', "  if(false)return \"\";"),
     ("the menu row not marked", "    const here=!advOn&&(srvTierParse(tier).id===s.id||",
@@ -33723,14 +33731,14 @@ def _cm_page(src):
         "sub-menu rows before the state is known: Fast, Thinking, Pro, pickable, no reasons": (
             o["rows0"].count('class="engrow mode cloudmode"') == 3 and 'data-t="cloud:fast"' in o["rows0"]
             and 'data-t="cloud:pro"' in o["rows0"] and " off" not in o["rows0"]
-            and "one model, cheapest first</span>" in o["rows0"] and "every cloud model</span>" in o["rows0"]),
+            and "one model, cheapest first" not in o["rows0"] and "every cloud model" not in o["rows0"]),
         "no row per cloud model, no Max in Cloud Only (6b442)": all("cloud:m:" not in o[k] and "cloud:max" not in o[k] and "Max" not in o[k]
                                                                      for k in ("rows0", "rows1", "rows2")),
         "the mode in use is marked, plain Cloud Only as its Pro": (
             o["rows1"].count(" on\"") == 1 and 'cloudmode on" data-t="cloud:think"' in o["rows1"]
             and o["rowsPlain"].count(" on\"") == 1 and 'cloudmode on" data-t="cloud:pro"' in o["rowsPlain"]),
         "the Cloud Only row opens a sub-menu and is marked for any cloud mode": (
-            'data-sv="__cloud__"' in o["row0"] and "\u203a</span>" in o["row0"] and "your API keys only" in o["row0"]
+            'data-sv="__cloud__"' in o["row0"] and "\u203a</span>" in o["row0"] and "your API keys only" not in o["row0"]
             and 'srvmenu cloudmenu on"' in o["row1"] and 'srvmenu cloudmenu"' in o["row1off"]),
         "a mode with nothing behind it is greyed with its reason, and so is the row": (
             o["rows2"].count(' off"') == 3 and "no key yet</span>" in o["rows2"] and 'title="Add a key under Settings"' in o["rows2"]
@@ -33910,7 +33918,7 @@ _CM_MUT = [
     ("greyed rows not marked", "+(on&&!advOn?\" on\":\"\")+(off?\" off\":\"\")\n    +'\" data-t=\"'+esc(t)+'\" tabindex=\"0\"'",
      "+(on&&!advOn?\" on\":\"\")\n    +'\" data-t=\"'+esc(t)+'\" tabindex=\"0\"'"),
     ("greyed rows without the tooltip", "off&&inf.why?inf.why:\"\",tier===t", "\"\",tier===t"),
-    ("greyed rows without the reason", "modeRow(t,ic,n,off?(inf.short||\"unavailable\"):CLOUD_MODE_DESC[k]", "modeRow(t,ic,n,CLOUD_MODE_DESC[k]"),
+    ("greyed rows without the reason", "modeRow(t,ic,n,off?(inf.short||\"unavailable\"):\"\"", "modeRow(t,ic,n,\"\""),
     ("the chip names no model", '  return p.mode==="Fast"&&(inf.models||[])[0]?"Fast · "+inf.models[0]:p.mode+" · cloud only";',
      '  return p.mode+" · cloud only";'),
     ("a pick's chip", '  if(p.mode==="Model")return inf.name?inf.name+" only"', '  if(p.mode==="Model")return "Cloud Only"+""'),
