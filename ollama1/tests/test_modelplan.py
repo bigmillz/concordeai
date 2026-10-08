@@ -1094,13 +1094,15 @@ class TestManaged(Base):
 
     def test_a_broken_ledger_lists_only_good_tags(self):
         os.makedirs(Paths.modelplan_state, exist_ok=True)
-        for body, want in (({"names": ["a:1b", "BAD", "a:1b", 5, "b", "b:latest", "../x"]}, ["a:1b", "b"]),
+        cache = "llamacpp:" + "ab" * 32          # Ollama's own copy (6b448): never managed
+        for body, want in (({"names": ["a:1b", "BAD", "a:1b", 5, "b", "b:latest", "../x", cache]}, ["a:1b", "b"]),
                            ({"names": "a:1b"}, []), ({"v": 1}, [])):
             write_json_atomic(M.managed_file(), body, mode=0o640)
             self.assertEqual(M.read_managed(), want, body)
         with open(M.managed_file(), "w") as f:
             f.write("not json")
         self.assertEqual(M.read_managed(), [])
+        self.assertEqual(M.managed_change(add=[cache, "c:1b"]), ["c:1b"])
 
     def test_the_digest_ollama_gives(self):
         hx = "ab" * 32

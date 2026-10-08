@@ -22418,13 +22418,13 @@ def _srv_mstate_parse(js):
             continue
         sz = m.get("size")
         sz = sz if isinstance(sz, int) and not isinstance(sz, bool) and sz >= 0 else 0
+        # Ollama's digest of it (6b445), "" from an older kit
+        dg = m.get("digest")
+        dg = dg if isinstance(dg, str) and re.fullmatch(r"[0-9a-f]{64}", dg) else ""
         seen_names.append(n)
         if ollama_internal(m):
             continue
-        dg = m.get("digest")
-        models.append({"name": n, "loaded": m.get("loaded") is True, "size": sz,
-                       # Ollama's digest of it (6b445), "" from an older kit
-                       "digest": dg if isinstance(dg, str) and re.fullmatch(r"[0-9a-f]{64}", dg) else ""})
+        models.append({"name": n, "loaded": m.get("loaded") is True, "size": sz, "digest": dg})
     p = js.get("plan")
     plan = None
     if isinstance(p, dict) and model_set_key(p.get("name")):

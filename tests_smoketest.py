@@ -34570,6 +34570,21 @@ def _u45_view(src):
     v3 = ns["server_update_view"](st, 16 * _GI7, None, None, {"deepseek-r1:8b"})
     out["the offer names what it does"] = (v3["offer"] != v["offer"] and len(v["offer"]) == 16
                                            and v["seen"] == ns["srv_seen_hash"]([m["name"] for m in st["models"]]))
+    # Ollama's own cache copy (6b448) on the server, even listed as managed by
+    # a kit and named like a retired tag's digest: never retired, refreshed or
+    # managed, and `seen` still hashes every name the kit sent
+    cache = "llamacpp:" + "9ba9cc2b" * 8
+    js4 = _u45_state()
+    js4["models"].append({"name": cache, "size": 13_800_000_000, "loaded": False, "digest": "4" * 64})
+    js4["managed"].append(cache)
+    st4 = ns["_srv_mstate_parse"](js4)
+    v4 = ns["server_update_view"](st4, 16 * _GI7, lambda t: dict(remote, **{cache: ("5" * 64, {"sha256:" + "b" * 64: 9 * _GB45})}).get(t),
+                                  None, set())
+    out["Ollama's cache copy is never touched"] = (
+        cache not in st4["managed"] and cache not in [m["name"] for m in st4["models"]]
+        and cache not in [r["name"] for r in v4["retire"]] and cache not in [r["name"] for r in v4["refresh"]]
+        and [r["name"] for r in v4["retire"]] == ["phi4:14b"]
+        and v4["seen"] == ns["srv_seen_hash"]([m["name"] for m in js4["models"]]))
     return all(out.values()), out
 
 
@@ -34714,16 +34729,20 @@ def _u45_run(src):
 
 _U45_MUT = [
     ("a person's retired model removed",
-     "    retire = [n for n in on_retired if _srv_tag_key(n) in managed\n              and _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]",
+     "    retire = [n for n in on_retired if _srv_tag_key(n) in managed\n              and _srv_tag_key(n) not in loaded and not ollama_internal(n)][:SRV_SETS_MAX]",
      "    retire = [n for n in on_retired if _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]"),
     ("a loaded model removed",
-     "    retire = [n for n in on_retired if _srv_tag_key(n) in managed\n              and _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]",
+     "    retire = [n for n in on_retired if _srv_tag_key(n) in managed\n              and _srv_tag_key(n) not in loaded and not ollama_internal(n)][:SRV_SETS_MAX]",
      "    retire = [n for n in on_retired if _srv_tag_key(n) in managed][:SRV_SETS_MAX]"),
     ("an older kit cleaned", '        if not state["managed_known"] or state["busy"]:\n', '        if state["busy"]:\n'),
     ("the switch ignored", "    if not auto_cleanup_on():\n        return out\n    try:\n        entries = _srv_read(ctx)",
      "    try:\n        entries = _srv_read(ctx)"),
     ("a sleeping server asked", "    return now - float((_srv_seen.get(e[\"id\"]) or {}).get(\"at\") or 0) < SUGGEST_SERVER_FRESH_S",
      "    return True"),
+    ("the cache copy retired", "              and _srv_tag_key(n) not in loaded and not ollama_internal(n)][:SRV_SETS_MAX]",
+     "              and _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]"),
+    ("the cache copy managed", "            \"managed\": [n for n in mg[:400] if isinstance(n, str) and SRV_TAG_RX.fullmatch(n)\n                        and not ollama_internal(n)]",
+     "            \"managed\": [n for n in mg[:400] if isinstance(n, str) and SRV_TAG_RX.fullmatch(n)]"),
     ("the offer not checked", '    if v["offer"] != offer:\n        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}\n', ""),
     ("a README commit is an update", "               if blob not in blobs and not _FRESH_DOC_RX.search(path))",
      "               if blob not in blobs)"),

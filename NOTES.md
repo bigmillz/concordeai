@@ -293,13 +293,15 @@ NOW:
   named, never touched). `servers_autoclean` (POST /api/servers/autoclean, the page 90 s after load and every 6 h;
   the auto-clean switch governs it) removes `retire` unasked through POST /v1/models/apply (signed, `seen`, the
   allow-list line goes with it). add and refresh go only on the Update models click (`server_update_apply`, checked
-  against the offer the card showed). An older kit (no `managed`) gets nothing removed. The page shows a server's rows
-  in the same card and the daily More-models nudge opens it when only servers have updates.
+  against the offer the card showed). An older kit (no `managed`) gets nothing removed. Ollama's own llamacpp:<sha>
+  cache copy (6b448) is never retired, refreshed or counted as managed, whatever a kit lists, and `seen` hashes every
+  name the kit sent, as 6b448 set it. The page shows a server's rows in the same card and the daily More-models nudge
+  opens it when only servers have updates.
 - **Kit** (`ollama1/`): `/var/lib/ollama1-modelplan/managed.json` (root:o1view 0640): each set pull of a model that
   wasn't on the disk is added, each set removal taken off; a pull of a model already there (a refresh) leaves the
   owner; the first set after this kit seeds it from the last set's finished pulls. GET /v1/models/state gains
-  `managed` and each model's `digest` (PROTOCOL.md). Nothing else changes: the root program, the unit and polkit
-  are as they were.
+  `managed` and each model's `digest` (PROTOCOL.md); managed.json never holds a cache copy. Nothing else changes:
+  the root program, the unit and polkit are as they were.
 
 PRESETS (checked, not re-picked; the candidate test will change them): every TIERS pick is a current catalog row
 (a new gauntlet check keeps it so); Pro and Max take every model. Flags for Patrick: the Thinking tier's comments
@@ -351,6 +353,7 @@ the retired model is cleared here and on servers (only where the app brought it)
   IMAGE_REPO/IMAGE_GB follow. Rendered through `generate_image` on this Mac (a dev home, the real venv-image): a
   768x768 fox in 18 s.
 - Tests: `model updates (6b445): Gemma 4 E2B and FLUX.2 klein`, and the earlier checks moved to the new catalog.
+  Rebased onto 6b448 (0db294e) before landing: the full gauntlet and the whole kit suite were run after the rebase.
 - Not verified: an E2B chat in the app (the candidate test ran it outside the app); the Accurate and Finest rungs
   (FLUX.1 dev) are unchanged and their mem_gb not re-measured; a server running gemma4:e2b.
 

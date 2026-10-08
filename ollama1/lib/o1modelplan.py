@@ -106,7 +106,7 @@ def _managed_names(obj):
     names = obj.get("names") if isinstance(obj, dict) else None
     out = []
     for n in (names if isinstance(names, list) else [])[:MANAGED_MAX]:
-        if valid_tag(n) and not any(norm(n) == norm(o) for o in out):
+        if valid_tag(n) and not o1ollama.is_internal(n) and not any(norm(n) == norm(o) for o in out):
             out.append(n)
     return out
 
@@ -129,7 +129,8 @@ def managed_change(add=(), drop=()):
     read_managed() says, so the last set's pulls are kept."""
     cur = read_managed()
     nxt = [n for n in cur if not any(norm(n) == norm(d) for d in drop)]
-    nxt += [a for a in add if valid_tag(a) and not any(norm(a) == norm(n) for n in nxt)]
+    nxt += [a for a in add if valid_tag(a) and not o1ollama.is_internal(a)      # never Ollama's cache (6b448)
+            and not any(norm(a) == norm(n) for n in nxt)]
     if nxt == cur and os.path.exists(managed_file()):
         return nxt
     os.makedirs(Paths.modelplan_state, exist_ok=True)
