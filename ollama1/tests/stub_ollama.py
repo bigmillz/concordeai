@@ -46,6 +46,14 @@ CLOUD = {"name": "gpt-oss:120b-cloud", "model": "gpt-oss:120b-cloud", "size": 38
 CLOUD2 = {"name": "plain:latest", "model": "plain:latest", "size": 384,
           "remote_model": "plain", "remote_host": "https://ollama.com:443", "digest": "c2"}
 
+# Ollama 0.40's own converted copy of a model for its llama.cpp runner (6b448):
+# a manifest named llamacpp:<sha> that nobody pulled. /api/tags lists it like
+# a model; the kit must never show, serve, count or remove it.
+CACHE_SHA = "9ba9cc2b" * 8      # the shape of the real one (a 64-hex literal trips test_repo)
+CACHE = {"name": "llamacpp:" + CACHE_SHA, "model": "llamacpp:" + CACHE_SHA, "size": 13_800_000_000,
+         "digest": "d-cache", "modified_at": "2026-10-07T12:23:00Z",
+         "details": {"format": "gguf", "family": "gptoss", "parameter_size": "20.9B"}}
+
 
 class Stub:
     def __init__(self, port, models=None):
@@ -62,6 +70,7 @@ class Stub:
         self.pull_layers = {}
         self.pull_digest = {}
         self.pull_fail = 0
+        self.extra_tags = [CACHE]   # listed by /api/tags beside the models and the cloud stubs
         stub = self
 
         class H(BaseHTTPRequestHandler):
@@ -85,7 +94,7 @@ class Stub:
                     ms = [{"name": n, "model": n, "size": m["size"], "digest": m.get("digest", "d-" + n),
                            "details": {"family": "x"}, "modified_at": "2026-09-29T00:00:00Z"}
                           for n, m in stub.models.items()]
-                    return self.js(200, {"models": ms + [CLOUD, CLOUD2]})
+                    return self.js(200, {"models": ms + [CLOUD, CLOUD2] + list(stub.extra_tags)})
                 if self.path == "/api/ps":
                     return self.js(200, {"models": list(stub.loaded.values())})
                 if self.path == "/api/version":

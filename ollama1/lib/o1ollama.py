@@ -43,6 +43,66 @@ def is_remote(entry):
     return tag == "cloud" or tag.endswith("-cloud") or name.endswith("-cloud")
 
 
+# Ollama's own converted copies (6b448). Ollama 0.40 converts a model for its
+# llama.cpp runner and keeps the result as a manifest of its own, named
+# llamacpp:<64-hex sha> (manifest "runner":"llamacpp", layers "from" the
+# source model). Nobody pulled it, it can't be pulled, and deleting it only
+# makes Ollama build it again: it is Ollama's cache, not a model. It is
+# never listed, counted, served, synced or removed by the kit; its bytes are
+# still on the disk, so storage figures show them as "Ollama cache".
+INTERNAL_PREFIXES = ("llamacpp:", "llamacpp/")
+_DEFAULT_REPO = ("registry.ollama.ai/library/", "registry.ollama.ai/", "library/")
+
+
+def _hex64(s):
+    return len(s) == 64 and all(c in "0123456789abcdef" for c in s)
+
+
+def is_internal(entry):
+    """True for an Ollama-internal cache entry (a dict from /api/tags or
+    /api/ps, or a bare name). Matched on the name (llamacpp:... or
+    llamacpp/...), or on `runner` metadata saying llamacpp when the tag is a
+    bare sha256: a runner field alone never hides a model someone pulled."""
+    if isinstance(entry, dict):
+        names = [entry.get("name"), entry.get("model")]
+        meta = [entry.get("runner")]
+        if isinstance(entry.get("details"), dict):
+            meta.append(entry["details"].get("runner"))
+    else:
+        names, meta = [entry], []
+    llamacpp_runner = any(str(r or "").strip().lower() == "llamacpp" for r in meta)
+    for n in names:
+        n = str(n or "").strip().lower()
+        for p in _DEFAULT_REPO:
+            if n.startswith(p):
+                n = n[len(p):]
+                break
+        if n.startswith(INTERNAL_PREFIXES):
+            return True
+        if llamacpp_runner and ":" in n and _hex64(n.rsplit(":", 1)[1]):
+            return True
+    return False
+
+
+def user_models(entries):
+    """The models someone installed, from an /api/tags "models" list: named
+    entries that are neither Ollama cloud stubs nor Ollama's own cache."""
+    return [m for m in (entries if isinstance(entries, list) else [])
+            if isinstance(m, dict) and isinstance(m.get("name"), str) and m["name"]
+            and not is_remote(m) and not is_internal(m)]
+
+
+def cache_bytes(entries):
+    """Bytes the Ollama-internal entries report (for storage totals)."""
+    total = 0
+    for m in entries if isinstance(entries, list) else []:
+        if isinstance(m, dict) and is_internal(m):
+            s = m.get("size")
+            if isinstance(s, int) and not isinstance(s, bool) and s > 0:
+                total += s
+    return total
+
+
 def same_model(a, b):
     def norm(x):
         x = str(x or "")

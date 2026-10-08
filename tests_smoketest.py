@@ -3160,14 +3160,16 @@ class _FakeTagsResp:
     def __exit__(self, *a): return False
 _ptz = dict(_LH, urllib=__import__("urllib.request"),
             ollama_url=lambda p: "http://127.0.0.1:1" + p)
-_exec_names(_ptz, {"ollama_pulled_tags", "_retired_on_disk", "RETIRED_MODELS"})
+_exec_names(_ptz, {"ollama_pulled_tags", "_retired_on_disk", "RETIRED_MODELS",
+                   "ollama_internal", "_OLLAMA_INTERNAL_PREFIXES", "_OLLAMA_SHA_TAG"})
 _ptz["IS_ARM"] = False
 _ptz["mlx_model_cached"] = lambda repo: False
 _orig_uo = __import__("urllib.request").request.urlopen
 try:
     __import__("urllib.request").request.urlopen = lambda *a, **k: _FakeTagsResp(json.dumps(
         {"models": [{"name": "deepseek-r1:8b"}, {"name": "deepseek-r1:671b"},
-                    {"name": "llava:7b"}, {"name": "mistral:latest"}]}).encode())
+                    {"name": "llava:7b"}, {"name": "mistral:latest"},
+                    {"name": "llamacpp:" + "9ba9cc2b" * 8}]}).encode())     # Ollama's own copy (6b448)
     _pt = _ptz["ollama_pulled_tags"]()
 finally:
     __import__("urllib.request").request.urlopen = _orig_uo
@@ -3175,6 +3177,7 @@ _rm_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _remove_models("):
                         _MILLENAI_SRC.index("def _remove_models(") + 4000]
 check("a bare retired tag means its :latest pull and nothing else",
       _pt is not None and "mistral" in _pt and "deepseek-r1" not in _pt
+      and not any(n.startswith("llamacpp") for n in _pt)
       and "llava" not in _pt and "deepseek-r1:671b" in _pt
       and not _ptz["_retired_on_disk"]("DeepSeek R1", _pt)
       # every version pulled LLaVA as llava:7b, and cleanup still finds it
@@ -20901,7 +20904,8 @@ _SV_MUT = [
     ("no size cap", "                if chunk and sent[0] + len(chunk) > SRV_MAX_CHARS:", "                if False:"),
     ("the proof compared as text", '    if not (hmac.compare_digest(str(js.get(\"device_id\") or \"\").encode(\"utf-8\"),\n                                dev_id.encode(\"utf-8\"))', '    if not (hmac.compare_digest(str(js.get(\"device_id\") or \"\"), dev_id)'),
     ("any model name taken", "        if isinstance(known, list) and known and m not in known:\n            continue\n", ""),
-    ("an Ollama cloud tag taken", "                or _SRV_CLOUD_TAG.search(m):\n            continue", "                    :\n            continue"),
+    ("an Ollama cloud tag taken", "                or _SRV_CLOUD_TAG.search(m) or ollama_internal(m):\n            continue",
+     "                or ollama_internal(m):\n            continue"),
     ("ollama1 in the pane", "      <p class=\"tdesc\">For advanced users.", "      <p class=\"tdesc\">For ollama1 users."),
     ("a card guessed", '    if not isinstance(g, dict) or g.get("vendor") not in ("amd", "nvidia", "intel"):\n        return None',
      '    if not isinstance(g, dict):\n        return None'),
@@ -31556,6 +31560,43 @@ process.stdout.write(JSON.stringify({on:on,off:off,h:srvSheetHtml(on),hoff:srvSh
     return ok, o
 
 
+_S7_SHA = "9ba9cc2b" * 8      # a 64-hex sha, as Ollama names the copy
+
+
+def _s7_cache(src):
+    """Ollama's own converted copy, llamacpp:<sha> (6b448): never a model.
+    Not on the sheet, not offered for removal, not counted, not in the
+    picker, not pickable, not benchmarked; an old kit's `seen` still hashes
+    every name it sent; the local Ollama's list skips it too."""
+    ns, ctx, d = _s7_ns(src)
+    oi, cache = ns["ollama_internal"], "llamacpp:" + _S7_SHA
+    out = {"the rule": (oi(cache) and oi({"name": cache, "size": 1}) and oi("llamacpp/gpt-oss:20b")
+                        and oi("registry.ollama.ai/library/" + cache)
+                        and oi({"name": "x:" + _S7_SHA, "details": {"runner": "llamacpp"}})
+                        and not any(oi(n) for n in ("llama3.2:3b", "gpt-oss:20b", "llamacpp", "my-llamacpp:1b",
+                                                   {"name": "gpt-oss:20b", "runner": "llamacpp"}, None)))}
+    js = json.loads(json.dumps(_S7_STATE))
+    js["models"].insert(2, {"name": cache, "size": 13_800_000_000, "loaded": False})
+    st = ns["_srv_mstate_parse"](js)
+    v = ns["server_sets_view"](st, st["vram_bytes"])
+    allnames = [m["name"] for m in js["models"]]
+    out["not on the sheet"] = cache not in [m["name"] for m in st["models"]] and v["n"] == 4
+    out["never offered for removal"] = all(cache not in [x["name"] for x in x7["remove"]]
+                                           for x7 in v["sets"].values()) and v["sets"]["light"]["keep_n"] == 3
+    out["an old kit's seen hashes what it sent"] = (
+        v["seen"] == _h34.sha256("\n".join(sorted(allnames)).encode()).hexdigest())
+    e = {"name": "Desk", "id": "x"}
+    pick = ns["_srv_models"](e, {"models": [{"name": "small:8b"}, {"name": cache, "size": 1}]}, {})
+    out["not in the picker"] = [m["name"] for m in pick] == ["small:8b"]
+    out["not pickable or benchmarked"] = ("or _SRV_CLOUD_TAG.search(m) or ollama_internal(m):" in src
+                                          and "and not ollama_internal(n) and n not in names):" in src)
+    lo = src[src.index("def ollama_pulled_tags():"):src.index("def model_cached(")]
+    en = src[src.index("    def _send_engines(self):"):]
+    en = en[:en.index("for label, (kind, target) in MODEL_ROUTES.items():")]
+    out["the local Ollama's list skips it"] = ("not ollama_internal(m)" in lo and "not ollama_internal(m)" in en)
+    return all(out.values()), {"failed": [k for k, v7 in out.items() if not v7]}
+
+
 _S7_CHECKS = [
     ("server sets: sized for the card whole, by the same roles, nested, one per tag", _s7_sets),
     ("server sets: the cards' and sheet's lists, the state, the plan and the jobs from the gateway's state", _s7_view),
@@ -31563,6 +31604,8 @@ _S7_CHECKS = [
     ("server sets: the sheet as shown, signed; every refusal of the gateway and of this app in words; "
      "nothing sent that the sheet didn't list", _s7_apply),
     ("server sets: the sheet's lists, the switch, the totals and the jobs in words (node)", _s7_page),
+    ("Ollama's cache copy (llamacpp:<sha>) is never a model: not listed, counted, removed or picked (6b448)",
+     _s7_cache),
 ]
 
 
@@ -31605,6 +31648,10 @@ _S7_MUT = [
      "    if (False", [3]),
     ("the switch ignored", "const x=((d||{}).sets||{})[k]||{},dl=x.download||[],out=rm?(x.remove||[]):[];",
      "const x=((d||{}).sets||{})[k]||{},dl=x.download||[],out=x.remove||[];", [4]),
+    ("Ollama's cache copy listed", "        if ollama_internal(m):\n            continue\n        models.append(", "        models.append(", [5]),
+    ("the cache's name matched as a model", "        if n.startswith(_OLLAMA_INTERNAL_PREFIXES):\n            return True\n", "", [5]),
+    ("an old kit's seen without the cache", 'srv_seen_hash(state.get("seen_names", names))', "srv_seen_hash(names)", [5]),
+    ("the cache in the picker", '                or _SRV_CLOUD_TAG.search(n) or ollama_internal(m):', '                or _SRV_CLOUD_TAG.search(n):', [5]),
 ]
 _s7m = []
 for _d7, _o7, _n7, _w7 in _S7_MUT:

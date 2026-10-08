@@ -20,7 +20,7 @@ import o1test_util as U
 import o1library as L
 import o1sleep
 from o1common import Paths
-from stub_ollama import Stub, llama_info
+from stub_ollama import CACHE, Stub, llama_info
 
 GIB = 1 << 30
 
@@ -123,6 +123,7 @@ class Base(unittest.TestCase):
         self.stub.pull_layers.clear()
         self.stub.pull_digest.clear()
         self.stub.pull_fail = 0
+        self.stub.extra_tags = []       # no Ollama cache entry unless a test lists one (it needs its manifest)
         self.reg.manifests.clear()
         self.reg.calls.clear()
         self.reg.redirect = None
@@ -201,6 +202,30 @@ class TestPlan(Base):
             self.assertIn("huge:70b", names)
         finally:
             stub.close()
+
+    def test_ollama_cache_never_removed_and_its_layers_kept(self):
+        """llamacpp:<sha> (6b448) is in /api/tags (the stub lists it) and on no
+        allow-list: a sync leaves it alone, and a layer it shares with a
+        removed model frees nothing."""
+        self.write_allow("")
+        self.install("gone:1b")
+        self.stub.extra_tags = [CACHE]
+        # its manifest unreadable: any layer might be its, so nothing is counted (errs low)
+        p = L.plan(base=self.base, allow_path=self.allow, manifest_fn=lambda n: (None, None))
+        self.assertEqual(p["totals"]["freed_bytes"], 0)
+        host, repo, tag = L.split_name(CACHE["name"])
+        mdir = os.path.join(Paths.models, "manifests", host, repo)
+        os.makedirs(mdir, exist_ok=True)
+        with open(os.path.join(mdir, tag), "wb") as f:      # shares gone:1b's license layer, as the real one does
+            f.write(manifest_for("cache-source"))
+        p = L.plan(base=self.base, allow_path=self.allow, manifest_fn=lambda n: (None, None))
+        self.assertEqual([x["name"] for x in p["remove"]], ["gone:1b"])
+        self.assertEqual(p["installed"], ["gone:1b"])
+        self.assertEqual(p["totals"]["freed_bytes"], 1000 + 100)      # weights and config, not the shared license
+        self.run_plan(p)
+        self.assertEqual(self.deleted(), ["gone:1b"])
+        self.assertEqual(L.installed_models(self.base), [])
+        self.assertEqual(L.cache_names(self.base), [CACHE["name"]])
 
     def test_update_found_by_digest_without_downloading(self):
         self.write_allow("same:1b\n")
@@ -542,7 +567,7 @@ class TestAllowEdits(Base):
 
     def test_add_refuses_bad_names(self):
         self.write_allow("")
-        for bad in ("", "a b", "../x", "x:1b ram", "gpt-oss:120b-cloud", "-x", "x" * 200):
+        for bad in ("", "a b", "../x", "x:1b ram", "gpt-oss:120b-cloud", "-x", "x" * 200, CACHE["name"]):
             with self.assertRaises(ValueError, msg=bad):
                 L.allow_add(bad, allow_path=self.allow)
         self.assertEqual(open(self.allow).read(), "")

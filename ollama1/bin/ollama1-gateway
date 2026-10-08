@@ -619,9 +619,8 @@ class Gateway:
         if st != 200 or not isinstance(data, dict):
             raise GatewayError(502, "ollama", "Ollama is not answering")
         tags = {}
-        for m in data.get("models", []) or []:
-            if isinstance(m, dict) and not o1ollama.is_remote(m) and m.get("name"):
-                tags[m["name"]] = m
+        for m in o1ollama.user_models(data.get("models")):      # no cloud stubs, no Ollama cache (6b448)
+            tags[m["name"]] = m
         self.tags = tags
         self.tags_at = self.clock()
         return tags

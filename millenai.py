@@ -5965,7 +5965,8 @@ def ollama_pulled_tags():
             ollama_url("/api/tags"), timeout=1.5
         ) as r:
             tags = json.loads(r.read().decode("utf-8")).get("models", [])
-            names = {m.get("name", "") for m in tags}
+            names = {m.get("name", "") for m in tags
+                     if isinstance(m, dict) and not ollama_internal(m)}
             return names | {n[:-len(":latest")] for n in names
                             if n.endswith(":latest")}
     except Exception:
@@ -18847,6 +18848,44 @@ SRV_WAKE_BLOCKED = (" This computer wouldn\u2019t let the app send the wake-up c
                     "Allow ConcordeAI in System Settings \u203a Privacy & Security \u203a Local Network.")
 SRV_USAGE_S = 3                 # one read of a server's card usage: short, the meter polls
 SRV_MAX_CHARS = 2_000_000       # an answer longer than this is cut there
+# Ollama's own converted copies (6b448, per Patrick): Ollama 0.40 converts a
+# model for its llama.cpp runner and keeps the result as a manifest named
+# llamacpp:<64-hex sha> ("runner":"llamacpp", layers "from" the source
+# model). Nobody pulled it and deleting it only makes Ollama build it again:
+# it is Ollama's cache, never a model. One rule for the local Ollama and
+# every server (an old kit still lists it): never listed, picked, counted or
+# offered for removal. Mirrors o1ollama.is_internal in the server kit.
+# (It lives in the servers section so the gauntlet's copy of that section has
+# it; ollama_pulled_tags, earlier in the file, calls it at run time.)
+_OLLAMA_INTERNAL_PREFIXES = ("llamacpp:", "llamacpp/")
+_OLLAMA_SHA_TAG = re.compile(r"[0-9a-f]{64}")
+
+
+def ollama_internal(entry) -> bool:
+    """True for an Ollama-internal cache entry: a dict from /api/tags (or
+    /v1/models/state) or a bare name. Matched on the llamacpp: / llamacpp/
+    name, or on `runner` metadata saying llamacpp when the tag is a bare
+    sha256 (a runner field alone never hides a model someone pulled)."""
+    if isinstance(entry, dict):
+        names = [entry.get("name"), entry.get("model")]
+        det = entry.get("details")
+        meta = [entry.get("runner"), det.get("runner") if isinstance(det, dict) else None]
+    else:
+        names, meta = [entry], []
+    runner = any(str(r or "").strip().lower() == "llamacpp" for r in meta)
+    for n in names:
+        n = str(n or "").strip().lower()
+        for pre in ("registry.ollama.ai/library/", "registry.ollama.ai/", "library/"):
+            if n.startswith(pre):
+                n = n[len(pre):]
+                break
+        if n.startswith(_OLLAMA_INTERNAL_PREFIXES):
+            return True
+        if runner and ":" in n and _OLLAMA_SHA_TAG.fullmatch(n.rsplit(":", 1)[1]):
+            return True
+    return False
+
+
 # an Ollama cloud model's tag ("gpt-oss:120b-cloud", "kimi-k2:cloud"): the
 # gateway hides them; the app refuses one too (review of 6b334)
 _SRV_CLOUD_TAG = re.compile(r"(^|[-:])cloud$", re.I)
@@ -19056,7 +19095,7 @@ def server_pick(label, ctx):
         p = e["name"] + SERVER_SEP
         m = label[len(p):]
         if not label.startswith(p) or not _SRV_LABEL_RX.fullmatch(m) \
-                or _SRV_CLOUD_TAG.search(m):
+                or _SRV_CLOUD_TAG.search(m) or ollama_internal(m):
             continue
         # once the server has listed its models, only those (review)
         known = e.get("models")
@@ -20423,7 +20462,7 @@ def _srv_models(e, js: dict, ps=None) -> list:
             continue
         n = str(m.get("name") or m.get("model") or "")
         if not _SRV_LABEL_RX.fullmatch(n) or "embed" in n.lower() \
-                or _SRV_CLOUD_TAG.search(n):
+                or _SRV_CLOUD_TAG.search(n) or ollama_internal(m):
             continue
         lm = loaded.get(n) or {}
         pl = m.get("placement") or lm.get("placement")
@@ -21795,15 +21834,20 @@ def _srv_mstate_parse(js):
     (name, when, by which device), free disk and the card's size."""
     if not isinstance(js, dict) or not isinstance(js.get("models"), list):
         return None
-    models = []
+    # Ollama's cache copies (6b448) are never shown, counted or offered for
+    # removal; an old kit still lists them, so `seen` hashes every name it
+    # sent (its own check counts them)
+    models, seen_names = [], []
     for m in js["models"][:400]:
         n = m.get("name") if isinstance(m, dict) else None
         if not isinstance(n, str) or not n or len(n) > 200 or not n.isprintable():
             continue
         sz = m.get("size")
-        models.append({"name": n, "loaded": m.get("loaded") is True,
-                       "size": sz if isinstance(sz, int) and not isinstance(sz, bool)
-                       and sz >= 0 else 0})
+        sz = sz if isinstance(sz, int) and not isinstance(sz, bool) and sz >= 0 else 0
+        seen_names.append(n)
+        if ollama_internal(m):
+            continue
+        models.append({"name": n, "loaded": m.get("loaded") is True, "size": sz})
     p = js.get("plan")
     plan = None
     if isinstance(p, dict) and model_set_key(p.get("name")):
@@ -21814,7 +21858,8 @@ def _srv_mstate_parse(js):
     def num(k):
         v = js.get(k)
         return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 1 << 50 else 0
-    return {"models": models, "busy": js.get("busy") is True,
+    return {"models": models, "seen_names": seen_names,
+            "busy": js.get("busy") is True,
             "jobs": _srv_jobs_parse(js.get("jobs")), "plan": plan,
             "disk_free_bytes": num("disk_free_bytes"), "vram_bytes": num("vram_bytes")}
 
@@ -21830,8 +21875,8 @@ def server_sets_view(state: dict, vram) -> dict:
     names = [m["name"] for m in state["models"]]
     size = {m["name"]: m["size"] for m in state["models"]}
     have = {_srv_tag_key(n) for n in names}
-    out = {"sets": {}, "seen": srv_seen_hash(names), "n": len(names),
-           "vram": vram or 0}
+    out = {"sets": {}, "seen": srv_seen_hash(state.get("seen_names", names)),
+           "n": len(names), "vram": vram or 0}
     keys, full = {}, []
     for i, k in enumerate(MODEL_SETS):
         tags = [MODEL_INFO[l]["ollama"] for l in sets[k]]
@@ -23752,7 +23797,7 @@ def _bench_plan_remote(target: str, spec: dict, ctx) -> dict:
         for n in spec.get("models") or []:
             n = str(n)
             if (_SRV_LABEL_RX.fullmatch(n) and not _SRV_CLOUD_TAG.search(n)
-                    and n not in names):
+                    and not ollama_internal(n) and n not in names):
                 names.append(n)
         if not names:
             raise _BenchRefuse("Tick at least one model.")
@@ -29550,7 +29595,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 ollama_url("/api/tags"), timeout=1.5
             ) as r:
                 tags = json.loads(r.read().decode("utf-8")).get("models", [])
-                pulled = {m.get("name", "") for m in tags}
+                pulled = {m.get("name", "") for m in tags
+                          if isinstance(m, dict) and not ollama_internal(m)}
                 pulled |= {n[:-len(":latest")] for n in pulled
                            if n.endswith(":latest")}
         except Exception:

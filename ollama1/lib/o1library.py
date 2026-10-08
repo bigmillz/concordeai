@@ -170,14 +170,27 @@ def local_manifest(name):
     return read_json_safe(os.path.join(Paths.models, "manifests", host, repo, tag), max_bytes=MAX_MANIFEST)
 
 
-def installed_models(base=None):
-    """Local models (Ollama's 'cloud' stubs aren't models on this disk: they
-    are left alone, and the gateway never serves them)."""
+def _tags(base=None):
+    """/api/tags' "models", or RuntimeError."""
     st, data = o1ollama.call(ollama_url(base), "GET", "/api/tags", timeout=20)
     if st != 200 or not isinstance(data, dict):
         raise RuntimeError("Ollama isn't answering (systemctl status ollama)")
-    return [m for m in data.get("models") or [] if isinstance(m, dict) and m.get("name")
-            and not o1ollama.is_remote(m)]
+    return data.get("models") or []
+
+
+def installed_models(base=None, tags=None):
+    """Local models (Ollama's 'cloud' stubs aren't models on this disk: they
+    are left alone, and the gateway never serves them; nor are Ollama's own
+    cache copies, llamacpp:<sha> (6b448): never listed, never removed)."""
+    return o1ollama.user_models(_tags(base) if tags is None else tags)
+
+
+def cache_names(base=None, tags=None):
+    """Names of Ollama's own cache entries (llamacpp:<sha>): their layers
+    count as kept when removals are sized."""
+    tags = _tags(base) if tags is None else tags
+    return [m["name"] for m in tags if isinstance(m, dict) and isinstance(m.get("name"), str)
+            and o1ollama.is_internal(m)] if isinstance(tags, list) else []
 
 
 def listed(name, allowed):
@@ -226,7 +239,8 @@ def plan(base=None, allow_path=None, manifest_fn=None):
     entries, errors = parse_allow_list(allow_path)
     allowed = [e["name"] for e in entries]
     protected = protected_names(allow_path)
-    installed = installed_models(base)
+    tags = _tags(base)                  # one read: the models and Ollama's cache copies agree
+    installed = installed_models(tags=tags)
     download, update, remove, unknown, blocked = [], [], [], [], []
     for m in installed:
         if not kept(m["name"], allowed, protected):
@@ -252,7 +266,7 @@ def plan(base=None, allow_path=None, manifest_fn=None):
     free = disk_free()
     down_b = sum(x["bytes"] for x in download)
     up_b = sum(x["bytes"] for x in update)
-    freed = freed_bytes([x["name"] for x in remove], [m["name"] for m in installed])
+    freed = freed_bytes([x["name"] for x in remove], [m["name"] for m in installed] + cache_names(tags=tags))
     after = (free + freed - down_b - up_b) if free is not None else None
     p = {"download": download, "update": update, "remove": remove, "unknown": unknown,
          "removals_blocked": blocked, "allow_errors": errors, "installed": sorted(m["name"] for m in installed),
@@ -547,7 +561,7 @@ def _line_name(raw):
 
 def allow_add(name, ram=False, allow_path=None):
     """Put a model on the list (or change its ram flag). Returns what changed."""
-    if not valid_model_name(name) or o1ollama.is_remote({"name": name}):
+    if not valid_model_name(name) or o1ollama.is_remote({"name": name}) or o1ollama.is_internal(name):
         raise ValueError("%r isn't a model name this server can run" % name)
     lines = _read_lines(allow_path)
     want = name + ("   ram" if ram else "")

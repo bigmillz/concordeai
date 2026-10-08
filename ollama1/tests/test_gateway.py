@@ -14,7 +14,7 @@ import o1test_util as U  # sets OLLAMA1_PREFIX first
 
 import o1pair  # noqa: E402
 from o1common import DEFAULTS, Paths  # noqa: E402
-from stub_ollama import Stub  # noqa: E402
+from stub_ollama import CACHE, Stub  # noqa: E402
 
 GIB = 1 << 30
 
@@ -93,6 +93,16 @@ class TestAccess(unittest.TestCase):
             st, data, _ = call("POST", "/api/chat", {"model": cloud,
                                                      "messages": [{"role": "user", "content": "hi"}]})
             self.assertEqual(st, 404, cloud)
+
+    def test_ollama_cache_is_hidden_and_refused(self):
+        """llamacpp:<sha> (6b448) is in Ollama's /api/tags, never in ours, and can't be asked for."""
+        names = [m["name"] for m in json.loads(call("GET", "/api/tags")[1])["models"]]
+        self.assertIn("small:8b", names)
+        self.assertFalse([n for n in names if n.startswith("llamacpp")], names)
+        for n in (CACHE["name"], "llamacpp/gpt-oss:20b"):
+            st, data, _ = call("POST", "/api/chat", {"model": n, "messages": [{"role": "user", "content": "hi"}]})
+            self.assertEqual(st, 404, n)
+            self.assertEqual(call("POST", "/api/show", {"model": n})[0], 404, n)
 
     def test_missing_jwt(self):
         st, data, _ = call("GET", "/api/tags", jwt_token=None)

@@ -66,6 +66,66 @@ Not tried on the server.
   may mean the card itself is unwell after some wakes; if junk comes back with nothing carried over, the next
   step is a GPU reset or a reboot on that kernel message, not this); and the idle change under real use.
 
+## 6b448 — Ollama's own llamacpp:<sha> copy is never a model, in the kit or the app (per Patrick)
+
+Patrick saw a row named `llamacpp:9ba9cc2b…f3c5` in a model list, between llama3.2:3b and ministral-3:14b. On the
+server (read only): on 2026-10-07 Ollama 0.40.0 made the manifest
+`/srv/models/manifests/registry.ollama.ai/library/llamacpp/<sha>`, `"runner":"llamacpp","format":"gguf"`, a 13.8 GB
+model layer of its own, and template, license and params layers marked `"from":"gpt-oss:20b"`. It is Ollama's
+converted copy of gpt-oss:20b for its llama.cpp runner: a cache entry nobody pulled. It can't be pulled, and deleting
+it would most likely just make Ollama build it again on the next gpt-oss load. It was not deleted.
+
+- **The rule, one helper per codebase.** Kit: `o1ollama.is_internal(entry)`, plus `user_models(entries)` (named,
+  not a cloud stub, not internal) and `cache_bytes(entries)`. App: `ollama_internal(entry)`, in the servers section
+  so the gauntlet's copy of that section has it. An entry is internal when its name (or `model`) starts with
+  `llamacpp:` or `llamacpp/` (case-insensitive; a leading `registry.ollama.ai/library/` is dropped first), or when
+  `runner` metadata (top level or in `details`) says `llamacpp` **and** the tag is a bare 64-hex sha. The runner
+  field alone never hides a model: nothing in the kit says which fields 0.40's /api/tags carries, and if it marked
+  every model its llama.cpp runner loads, a runner-only rule would hide models people pulled.
+- **What it was in.** Every place that read /api/tags listed it as a model:
+  - the admin page's Library card, as "installed by hand, GPU only" with a Remove button (the likeliest screen: a
+    monospace name on a dark page);
+  - the gateway's /api/tags to the app, so the app's model picker, a server's model sheet, the benchmark and the
+    compositor rows;
+  - `GET /v1/models/state`, so the server-sets sheet listed it, counted it, and offered it under Remove for every
+    set (its name passes the tag pattern);
+  - the library sync (`ollama1-models`, admin "Update model library"): it is on no allow-list, so a sync would
+    have **deleted it**;
+  - `o1gputune`'s self-check could pick it as its load model.
+  The text dashboard and the HDMI panel show only loaded models (/api/ps), not the disk list; nothing changed there.
+- **Kit changes.** The gateway's tag cache (`refresh_tags`: /api/tags, /api/show, chat and generate all go through
+  it, so the copy is a 404 like a cloud stub) and `disk_models` (`o1modelplan.local_models`) skip it. A model-set
+  request that names it in add or remove is refused ("Ollama's own cache, not a model"). The library's
+  `installed_models` skips it, so a sync never removes it; `allow_add` refuses its name. `freed_bytes` counts its
+  layers as kept (`cache_names`, from the same /api/tags read as the plan), so removing gpt-oss:20b doesn't claim the license and template layers it shares;
+  if its manifest can't be read nothing is counted, as for any kept model (errs low). The helper's `rmmodel` and
+  backup `models.json` skip it. `o1gputune.Ollama.models` now uses `user_models`, which also drops Ollama cloud
+  stubs (they were pickable as the self-check's model too: smallest size wins).
+- **Size.** Its 13.8 GB is still on the disk. The disk and free-space figures come from the filesystem, so they
+  include it already. The admin Library card shows it as one extra row, **"Ollama cache"**, with its size and
+  "Ollama's own converted copies, not models" (`cache_bytes` in `/api/models`), no Remove button. It is in no model
+  count and no "frees N GB".
+- **App changes.** `_srv_models` (the picker), `server_pick`, benchmark targets, and the local Ollama's pulled list
+  (`ollama_pulled_tags`, the engines probe) skip it. `_srv_mstate_parse` leaves it out of the sheet's models, so it
+  is never counted or offered for removal, but keeps every name in `seen_names`: an **old kit** still lists it in
+  /v1/models/state and its own check hashes it, so `seen` is the hash of what the server sent, not of what is shown.
+- **`ollama list`** in a terminal is Ollama's own tool and still shows the row; we can't change that.
+- **Tests.** Kit: the stub Ollama now lists the copy by default (`CACHE`, `extra_tags`), so every gateway, admin
+  and model-plan test runs with it present (the library tests clear it: a listed entry needs its manifest).
+  New `test_ollama_cache` (the rule, user_models, cache_bytes, the self-check never picks it), and new checks in
+  `test_gateway` (hidden from /api/tags, 404 for chat and show), `test_admin` (not in the Library, not removable,
+  cache_bytes, the row on the page), `test_library` (never removed, its shared layers kept, nothing counted with
+  its manifest missing; allow_add refuses it) and `test_modelplan` (local_models skips it; add and remove refuse
+  it). App: gauntlet check "Ollama's cache copy (llamacpp:<sha>) is never a model", with 4 mutations in the server
+  sets block; the "an Ollama cloud tag taken" mutation's anchor follows the new `server_pick` line; the 6b314
+  `ollama_pulled_tags` check now loads the helper and lists a copy that must not come back. Kit suite 1910 tests
+  OK; gauntlet 1037/1037. (`test_gateway`'s "a request in flight is ... released on error" fails about 1 run in
+  6 on a40ef87 as well: a race, not this change.)
+- **Unverified.** Which fields Ollama 0.40's /api/tags really returns for the copy (no docs in the repo; the live
+  server wasn't queried). Whether /api/ps ever names the copy instead of gpt-oss:20b while it runs: loaded lists
+  (the panel, the dashboard, the admin memory bar, the app's "loaded" flag) were left as they are, since hiding a
+  loaded model would hide memory in use. Not run against the server or in the desktop app.
+
 ## 6b444 — the server's HDMI panel and text dashboard update twice a second (per the owner)
 
 Owner: "Can we increase the screen update speed to update faster? Every half a second, if it's not going to be an

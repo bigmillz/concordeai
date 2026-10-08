@@ -366,13 +366,14 @@ class Panel:
         write_json_atomic(Paths.history, {"rows": list(self.history)}, mode=0o600)
 
     def models(self):
-        installed = []
+        installed, cache = [], 0
         try:
             st, data = o1ollama.call(self.cfg["ollama_url"], "GET", "/api/tags", timeout=5)
-            for m in (data or {}).get("models", []) if st == 200 else []:
-                if not o1ollama.is_remote(m):
-                    installed.append({"name": m["name"], "size": m.get("size"), "hash": name_hash(m["name"]),
-                                      "modified_at": m.get("modified_at")})
+            tags = (data or {}).get("models", []) if st == 200 and isinstance(data, dict) else []
+            for m in o1ollama.user_models(tags):        # Ollama's cache copies aren't models (6b448)
+                installed.append({"name": m["name"], "size": m.get("size"), "hash": name_hash(m["name"]),
+                                  "modified_at": m.get("modified_at")})
+            cache = o1ollama.cache_bytes(tags)
         except OSError:
             pass
         names = {m["name"] for m in installed}
@@ -384,7 +385,7 @@ class Panel:
             last_plan = clean_modelplan(o1modelplan.read_status())
         except Exception:                # the line is extra: it never takes the models card down
             last_plan = None
-        return {"installed": installed, "allow": allow, "allow_errors": errors,
+        return {"installed": installed, "cache_bytes": cache, "allow": allow, "allow_errors": errors,
                 "pull": read_json(Paths.pull_status), "last_plan": last_plan}
 
     def power(self):
@@ -1565,6 +1566,7 @@ function renderModels(){const m=models;if(!m)return;const rows=[];
    if(c===x.name)act('remove-model',x.hash,c,b);});
   const a=m.allow.find(a=>a.name===x.name);rows.push([el('span',x.name,'mono'),gib(x.size),a?(a.ram?'allow-listed, may use system memory':'allow-listed, GPU only'):'installed by hand, GPU only',b]);});
  m.allow.filter(a=>!a.installed).forEach(a=>{const b=el('button','Pull','small');b.type='button';b.addEventListener('click',()=>act('pull',a.hash,undefined,b));rows.push([el('span',a.name,'mono'),'-','allow-listed'+(a.ram?', may use system memory':'')+', not installed',b]);});
+ if(m.cache_bytes>0)rows.push([el('span','Ollama cache','dim'),gib(m.cache_bytes),'Ollama\'s own converted copies, not models','']);
  (m.allow_errors||[]).forEach(e=>rows.push(['line '+e.line+': '+e.text,'-','ignored: '+e.reason,'']));
  table($('models'),['Model','Size','',''],rows);const p=m.pull,pe=$('pull');pe.replaceChildren();
  if(p&&p.model){pe.append(el('div','Pull '+p.model+': '+p.status+(p.total?' '+Math.round(100*p.completed/p.total)+'%':'')));if(p.total)pe.append(bar(p.completed/p.total));}

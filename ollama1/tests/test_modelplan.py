@@ -273,6 +273,13 @@ class TestRequestShape(unittest.TestCase):
             self.assertIn("cloud", M.parse_request(self.good(add=[t], remove=[]))[1])
             self.assertEqual(M.parse_request(self.good(add=[], remove=[t]))[1], "")      # off the list: fine
 
+    def test_the_ollama_cache_is_never_added_or_removed(self):
+        """llamacpp:<sha> (6b448) passes the tag pattern, so it is refused by name."""
+        t = "llamacpp:" + "ab" * 32
+        self.assertIn("cache", M.parse_request(self.good(add=[t], remove=[]))[1])
+        self.assertIn("cache", M.parse_request(self.good(add=[], remove=[t]))[1])
+        self.assertIn("cache", M.parse_request(self.good(add=["a:1b"], remove=["llamacpp:x"]))[1])
+
     def test_the_reason_never_repeats_what_was_sent(self):
         mark = "EVIL<script>"
         for b in (dict(self.good(), **{mark: 1}), self.good(plan=mark), self.good(add=[mark]),
@@ -290,6 +297,9 @@ class TestRequestShape(unittest.TestCase):
                            {"name": ""}, {"name": 5}, "junk", {"model": "no-name"}]}
         self.assertEqual([m["name"] for m in M.local_models(tags)], ["a:1b"])
         self.assertEqual(M.local_models(None), [])
+        # nor Ollama's own cache (6b448): not shown, not in `seen`, never removed
+        tags["models"] += [{"name": "llamacpp:" + "9b" * 32, "size": 13_800_000_000}, {"name": "llamacpp/x:1"}]
+        self.assertEqual([m["name"] for m in M.local_models(tags)], ["a:1b"])
         self.assertEqual(M.local_models({"models": "x"}), [])
 
 

@@ -127,6 +127,8 @@ def parse_request(obj):
                               "and '-', one ':' before the tag; no host, no namespace, no '/')" % (key, i))
             if key == "add" and o1ollama.is_remote({"name": t}):
                 return None, "add[%d] is an Ollama cloud model: those never run on this server" % i
+            if o1ollama.is_internal(t):
+                return None, "%s[%d] is Ollama's own cache, not a model" % (key, i)
         if len({norm(t) for t in v}) != len(v):
             return None, "%s names a model twice" % key
         lists[key] = list(v)
@@ -149,10 +151,10 @@ def seen_hash(names):
 def local_models(tags):
     """The models on this server's disk from an /api/tags answer. Ollama's
     cloud entries aren't (the gateway never serves them, a sync never touches
-    them)."""
+    them), nor are Ollama's own cache copies (llamacpp:<sha>, 6b448): never
+    shown, never in `seen`, never removed."""
     models = tags.get("models") if isinstance(tags, dict) else None
-    return [m for m in (models if isinstance(models, list) else [])
-            if isinstance(m, dict) and isinstance(m.get("name"), str) and m["name"] and not o1ollama.is_remote(m)]
+    return o1ollama.user_models(models)
 
 
 def loaded_names(ps):

@@ -369,7 +369,7 @@ class Ollama:
 
     def models(self):
         b = self._get("/api/tags")
-        return [m for m in (b or {}).get("models", []) if isinstance(m, dict)]
+        return o1ollama.user_models((b or {}).get("models"))     # not cloud stubs or Ollama's cache (6b448)
 
     def loaded(self):
         b = self._get("/api/ps")

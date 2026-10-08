@@ -119,7 +119,7 @@ def pull(h):
 
 def rmmodel(h):
     st, data = o1ollama.call(OLLAMA, "GET", "/api/tags")
-    names = [m["name"] for m in (data or {}).get("models", []) if name_hash(m.get("name", "")) == h]
+    names = [m["name"] for m in o1ollama.user_models((data or {}).get("models")) if name_hash(m["name"]) == h]
     if len(names) != 1:
         record("rmmodel", "refused", "no such installed model")
         return 2
@@ -190,7 +190,8 @@ def backup():
                 tf.add(path)
     st, data = o1ollama.call(OLLAMA, "GET", "/api/tags")
     models = [{"name": m.get("name"), "digest": m.get("digest"), "size": m.get("size")}
-              for m in (data or {}).get("models", [])] if st == 200 else []
+              for m in (data or {}).get("models", []) or []
+              if isinstance(m, dict) and not o1ollama.is_internal(m)] if st == 200 else []    # not Ollama's cache (6b448)
     with open(os.path.join(tmp, "models.json"), "w") as f:
         json.dump({"models": models, "allow_list": read_allow_list()}, f, indent=1)
     size = sum(os.path.getsize(os.path.join(tmp, n)) for n in os.listdir(tmp))

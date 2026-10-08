@@ -178,7 +178,7 @@ Ollama's own API shapes, minus anything that changes state on the server:
 | `POST /v1/sleep-config` | `{"enabled": bool, "minutes": int}` (either): saves it and answers as the GET does |
 | `GET /v1/models/state` | The models on the server, its allow-list, and the model set being applied or last applied: see "Model sets" below |
 | `POST /v1/models/apply` | `{"plan", "add", "remove", "seen"}`: apply a model set chosen in the app, see "Model sets" below |
-| `GET /api/tags` | Installed local models. Ollama cloud models are never listed. Each has `placement` and `gpu_pct` (below) |
+| `GET /api/tags` | Installed local models. Ollama cloud models and Ollama's own cache copies (`llamacpp:<sha>`) are never listed. Each has `placement` and `gpu_pct` (below) |
 | `GET /api/ps` | Loaded models, with `size`, `size_vram`, `placement` and `gpu_pct` |
 | `GET /api/version` | `{"version"}` |
 | `POST /api/show` | `{"model"}` → Ollama's model description |
@@ -346,7 +346,9 @@ the server kit".
 
 - `models`: what Ollama has on the server's disk, sorted by name; `size` in
   bytes; `loaded` is true while the model is in memory. Ollama cloud entries
-  are never listed.
+  and Ollama's own cache copies (`llamacpp:<sha>`, `llamacpp/...`) are never
+  listed (kits before 6b448 listed the copies; the app hashes `seen` over every
+  name it was sent, and never shows or removes one).
 - `allow`: the names on the server's allow-list, in its order (a line it
   can't read is left out).
 - `busy`: true while a set is being applied, while a model-library sync or
@@ -375,7 +377,8 @@ the server kit".
 - `add`, `remove`: at most 40 tags each, from Ollama's own library only:
   `^[a-z0-9][a-z0-9._-]{0,79}(:[a-z0-9][a-z0-9._-]{0,63})?$` and no `..` (no
   host, no namespace, no `/`). No model twice (`x` is `x:latest`), none in both
-  lists, not both empty, no Ollama cloud model to add.
+  lists, not both empty, no Ollama cloud model to add, no Ollama cache copy
+  (`llamacpp:...`) in either list.
 - `seen`: the hex sha256 of the model names the app saw: `"\n".join(sorted(names))`
   in UTF-8, where `names` are the `name`s in `models` above (the hash of no
   models is the hash of the empty string). It proves the lists were made from

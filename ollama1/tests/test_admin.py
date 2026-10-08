@@ -12,7 +12,7 @@ import unittest
 import o1test_util as U
 import o1pair
 from o1common import DEFAULTS, Paths, name_hash
-from stub_ollama import Stub
+from stub_ollama import CACHE, Stub
 
 A = {}
 ADMIN_HOST = "testsrv-admin.example.test"
@@ -197,6 +197,19 @@ class TestActions(unittest.TestCase):
             self.assertEqual(A["started"], ["ollama1-pull@%s.service" % name_hash("small:8b")])
         finally:
             os.unlink(Paths.allow)
+
+    def test_ollama_cache_is_not_a_model(self):
+        """llamacpp:<sha> (6b448): not in the Library list, not removable, its bytes shown as Ollama cache."""
+        m = json.loads(get("/api/models")[1])
+        names = [x["name"] for x in m["installed"]]
+        self.assertIn("small:8b", names)
+        self.assertNotIn(CACHE["name"], names)
+        self.assertEqual(m["cache_bytes"], CACHE["size"])
+        self.assertEqual(post({"action": "remove-model", "arg": name_hash(CACHE["name"]),
+                               "confirm": CACHE["name"]})[0], 400)
+        self.assertNotIn("ollama1-rmmodel@%s.service" % name_hash(CACHE["name"]), A["started"])
+        page = get("/")[1]
+        self.assertIn(b"Ollama cache", page)
 
     def test_allow_list_errors_and_ram_flag_shown(self):
         with open(Paths.allow, "w") as f:
