@@ -8,7 +8,8 @@ when it works and quiet, and easy on the bearings, when it does not:
                      in 2% steps (no hold at 100% first)
   idle20       20%   from 60 s after the work ended (and from the start)
   deepen   20->10%   after 300 s of idle (6b434, per the owner; the lights go white to
-                     blue at the same moment), a straight line over 30 s, in 1% steps
+                     blue at the same moment: they read this phase from the status file,
+                     6b449), a straight line over 30 s, in 1% steps
   deep         10%   while deeply idle. Only outputs that can run that low go to 10%: an
                      output's own floor wins (the lowest level it was found to spin at, the
                      fan the stall check kept at 20%, a pump or fixed header kept at 100%,

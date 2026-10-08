@@ -90,11 +90,13 @@ class Rig(unittest.TestCase):
         self.probes = Probes(self.clock)
         self.client = StubClient(self.clock)
         self.lines = []
+        self.fanst = None                   # the fan service's status as the lights read it: None, no fan service (6b449)
         self.make()
         self.addCleanup(lambda: os.path.exists(o1leds.status_path()) and os.unlink(o1leds.status_path()))
 
     def make(self, **kw):
         kw.setdefault("poll_s", 2)
+        kw.setdefault("fans", lambda: self.fanst)
         self.leds = o1leds.Leds(self.probes.dict(), client=self.client, clock=self.clock, wall=lambda: 1_700_000_000,
                                 log=self.lines.append, **kw)
 
@@ -681,7 +683,8 @@ class TestBehaviour(Phases):
 
 
 class TestDeepIdle(Phases):
-    """White for 300 s, then white to blue over 30 s (brightness never changes); the 300 s count from white."""
+    """With no fan service (the rig's default, `fanst` None): white for 300 s, then white to blue over 30 s
+    (brightness never changes); the 300 s count from white. With one, the blue follows it: TestBlueFollowsTheFans."""
 
     def test_the_blue_starts_at_300_s_idle_and_takes_30_s_in_a_straight_line(self):
         self.run_for(300, step=0.25)                                  # the last tick is at 299.75 s
@@ -846,6 +849,247 @@ class TestDeepIdle(Phases):
         self.until(lambda: self.leds.phase == "waking")
         self.leds.write_status(self.clock.t)
         self.assertEqual(st()["line"], "Lights: blue to white, back to white (card 90% busy)  -  1 device")
+
+
+class TestBlueFollowsTheFans(Phases):
+    """6b449, per the owner: "the lights shouldn't be blue when it's on idle 20%, only idle 10%". The blue follows the
+    fan service's own deep idle (its status file's phase, `deepen` then `deep`): white at `idle20` however long, blue
+    over the fans' 30 s fall, back to white when the fans leave it; the lights' own 300 s clock only without a fan
+    service."""
+
+    def one_device(self):
+        self.client.devices = [type("D", (), {"name": "MSI", "vendor": "MSI", "nleds": 6, "kind": "leds",
+                                              "modes": [type("M", (), {"name": "Direct"})()], "mode": 0,
+                                              "zones": []})()]
+
+    def status(self):
+        with open(o1leds.status_path()) as f:
+            return json.load(f)
+
+    def fan_lines(self):
+        return [l for l in self.lines if l.startswith("fans:")]
+
+    def test_white_at_the_fans_idle_20_however_long_the_idle(self):
+        self.fanst = {"phase": "idle20", "pct": 20}
+        self.run_for(1200, step=0.25)                                 # four times the old 300 s
+        self.assertEqual((self.leds.phase, self.last_shown(), self.leds.z), ("idle", WHITE, 0.0))
+        self.assertGreater(self.leds.idle_s(self.clock.t), 1000)      # the idle is counted all along, only the blue waits
+        self.assertEqual(self.leds.fan_phase, "idle20")
+
+    def test_no_other_fan_phase_is_blue_either(self):
+        for ph in ("ramp", "working", "hot", "calibrating", "idle20"):
+            self.setUp()
+            self.fanst = {"phase": ph}
+            self.run_for(400, step=0.25)
+            self.assertEqual((ph, self.leds.phase, self.last_shown()), (ph, "idle", WHITE))
+
+    def test_the_blue_begins_when_the_fans_begin_their_fall_and_lands_with_them(self):
+        self.fanst = {"phase": "idle20", "pct": 20}
+        self.run_for(400, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        self.fanst = {"phase": "deepen", "pct": 20}                   # the fans' 20% to 10% fall has begun
+        self.run_for(0.25, step=0.25)                                 # the next 0.25 s sample sees it
+        self.assertEqual(self.leds.phase, "bluing")
+        for secs in (7.5, 15, 22.5):
+            self.run_for(7.5, step=0.25)
+            self.assertAlmostEqual(self.leds.z, secs / 30.0, delta=0.01)
+            self.assertEqual(self.last_shown(), mix(self.leds.z))
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.run_for(7.5, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown(), self.leds.z), ("blue", BLUE, 1.0))
+        self.run_for(600, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))   # and stays blue while the fans are at 10%
+
+    def test_fans_already_at_10_when_the_lights_start_go_blue_at_once_over_30_s(self):
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.leds.tick()
+        self.assertEqual(self.leds.phase, "bluing")
+        self.run_for(31, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
+
+    def test_the_fans_leaving_deep_idle_take_the_lights_back_to_white_in_2_s_and_the_idle_goes_on(self):
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.run_for(100, step=0.25)
+        self.assertEqual(self.leds.phase, "blue")
+        since = self.leds.idle_since
+        self.fanst = {"phase": "idle20", "pct": 20}                   # the temperature guard: back to 20%
+        self.run_for(0.25, step=0.25)
+        self.assertEqual((self.leds.phase, self.leds.z0), ("waking", 1.0))
+        self.assertEqual(self.leds.tick(), o1leds.FRAME_S)            # drawn at 25 a second, like the other fades
+        t0 = self.leds.t0
+        self.at(t0 + 1.0)
+        self.assertAlmostEqual(self.leds.z, 0.5, delta=0.03)
+        self.assertEqual(self.last_shown(), mix(self.leds.z))
+        self.at(t0 + 2.05)
+        self.assertEqual((self.leds.phase, self.last_shown(), self.leds.z), ("idle", WHITE, 0.0))
+        self.assertEqual(self.leds.idle_since, since)                  # no work happened: the idle minutes go on
+        self.run_for(600, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))   # white while the fans stay at 20%
+        self.fanst = {"phase": "deepen", "pct": 19}                   # the guard cleared: the fans fall again
+        self.run_for(31, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
+
+    def test_part_way_to_blue_the_fans_turning_back_fade_in_proportion(self):
+        self.fanst = {"phase": "deepen", "pct": 20}
+        self.run_for(15.25, step=0.25)                                 # half way
+        self.assertEqual(self.leds.phase, "bluing")
+        self.assertAlmostEqual(self.leds.z, 0.5, delta=0.02)
+        self.fanst = {"phase": "idle20", "pct": 20}
+        t0 = self.until(lambda: self.leds.phase == "waking", step=0.05)
+        end = t0 + self.leds.z0 * 2.0                                  # about 1 s, not 2
+        self.assertLess(end - t0, 1.1)
+        self.at(end - 0.1)
+        self.assertEqual(self.leds.phase, "waking")
+        self.at(end + 0.1)
+        self.assertEqual((self.leds.phase, self.leds.z, self.last_shown()), ("idle", 0.0, WHITE))
+
+    def test_the_fans_working_for_the_processor_turn_blue_to_white_not_red(self):
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.run_for(100, step=0.25)
+        self.assertEqual(self.leds.phase, "blue")
+        self.fanst = {"phase": "working", "pct": 100, "why": "CPU 63 C"}    # the card is still at 0%
+        self.run_for(10, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown(), self.leds.x), ("idle", WHITE, 0.0))
+        self.assertFalse([l for l in self.lines if l.startswith(("rising", "working"))])
+
+    def test_the_cards_work_fades_and_rises_whatever_the_fans_say_and_no_blue_while_red_or_cooling(self):
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.run_for(100, step=0.25)
+        self.assertEqual(self.leds.phase, "blue")
+        self.probes.v["gpu_busy"] = 100
+        t0 = self.until(lambda: self.leds.phase == "waking", step=0.05)
+        self.at(t0 + 2.1)
+        self.assertEqual(self.leds.phase, "rising")
+        self.at(t0 + 7.3)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("working", RED))
+        self.run_for(60, step=0.25)                                    # the fans (2 s polls) may still say deep
+        self.assertEqual((self.leds.phase, self.leds.z), ("working", 0.0))
+        self.probes.v["gpu_busy"] = 0
+        t1 = self.until(lambda: self.leds.phase == "cooling", step=0.25)
+        while self.clock.t < t1 + o1leds.COOL_S - 1:
+            self.run_for(1, step=0.25)
+            self.assertEqual((self.leds.phase, self.leds.z), ("cooling", 0.0))
+        self.run_for(2, step=0.25)
+        self.assertEqual(self.leds.phase, "bluing")                    # white reached with the fans still at 10%: blue again
+
+    def test_without_a_fan_service_the_lights_keep_their_own_300_s_clock(self):
+        self.fanst = None                                              # --fans off: nothing writes /run/ollama1/fan.json
+        self.run_for(300, step=0.25)
+        self.assertEqual(self.leds.phase, "idle")
+        self.run_for(0.25, step=0.25)
+        self.assertEqual((self.leds.phase, self.leds.fan_phase), ("bluing", None))
+        self.assertEqual(self.fan_lines(), ["fans: no fan service; blue after 300 s of white on the lights' own clock"])
+
+    def test_a_fan_service_that_stops_does_not_turn_the_lights_blue_at_once(self):
+        self.fanst = {"phase": "idle20", "pct": 20}
+        self.run_for(400, step=0.25)                                   # white, long past 300 s
+        self.assertEqual(self.leds.phase, "idle")
+        self.fanst = None                                              # the service stopped (its status went stale)
+        self.run_for(100, step=0.25)
+        self.assertEqual(self.leds.phase, "idle")
+        self.fanst = {"phase": "idle20", "pct": 20}                   # back within its 300 s: white goes on
+        self.run_for(100, step=0.25)
+        self.assertEqual(self.leds.phase, "idle")
+        self.fanst = None
+        self.run_for(299.75, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        self.run_for(0.5, step=0.25)
+        self.assertEqual(self.leds.phase, "bluing")                    # its own clock, from the last word from the fans
+        self.run_for(60, step=0.25)
+        self.assertEqual(self.leds.phase, "blue")
+        self.fanst = {"phase": "idle20", "pct": 20}                   # it came back, at 20%
+        self.run_for(0.25, step=0.25)
+        self.assertEqual(self.leds.phase, "waking")
+        self.run_for(3, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+
+    def test_the_fans_phase_is_read_from_their_status_file_and_only_while_fresh(self):
+        path = o1fan.status_path()
+        self.addCleanup(lambda: os.path.exists(path) and os.unlink(path))
+        self.make(fans=None)                                           # the service's own reader: the fans' status file
+        wall = 1_700_000_000
+        o1fan.write_json_atomic(path, {"at": wall, "phase": "deep", "pct": 10}, mode=0o644)
+        self.leds.tick()
+        self.assertEqual((self.leds.fan_phase, self.leds.phase), ("deep", "bluing"))
+        o1fan.write_json_atomic(path, {"at": wall - o1fan.STATUS_STALE_S - 1, "phase": "deep", "pct": 10}, mode=0o644)
+        self.run_for(0.5, step=0.25)
+        self.assertIsNone(self.leds.fan_phase)                          # stale: the service isn't running
+        self.assertEqual(self.leds.phase, "bluing")                     # (a blue already under way goes on)
+        os.unlink(path)
+        self.run_for(0.5, step=0.25)
+        self.assertIsNone(self.leds.fan_phase)
+        with open(path, "w") as f:
+            f.write("{not json")
+        self.run_for(0.5, step=0.25)
+        self.assertIsNone(self.leds.fan_phase)
+        o1fan.write_json_atomic(path, {"at": wall, "phase": 7}, mode=0o644)     # a phase that is not a word
+        self.run_for(0.5, step=0.25)
+        self.assertIsNone(self.leds.fan_phase)
+        o1fan.write_json_atomic(path, {"at": wall, "phase": "idle20", "pct": 20}, mode=0o644)
+        self.run_for(0.5, step=0.25)
+        self.assertEqual(self.leds.fan_phase, "idle20")
+        with open(os.path.join(U.LIB, "o1leds.py")) as f:
+            src = f.read()
+        self.assertIn("o1fan.read_status(now=self.wall())", src)      # the fans' own reader and staleness rule, not a copy
+
+    def test_a_reader_that_fails_is_no_fan_service(self):
+        def boom():
+            raise OSError(5, "Input/output error")
+        self.make(fans=boom)
+        self.run_for(1, step=0.25)
+        self.assertEqual((self.leds.fan_phase, self.leds.phase), (None, "idle"))
+
+    def test_the_status_says_the_fans_phase_and_the_rule(self):
+        self.one_device()
+        self.fanst = {"phase": "idle20", "pct": 20}
+        self.run_for(400, step=0.25)
+        s = self.status()
+        self.assertEqual((s["phase"], s["fans"], s["line"]), ("idle", "idle20", "Lights: white, idle (card 0% busy)  -  1 device"))
+        self.assertIn("white goes to blue over 30 s when the fans go to 10% (fans now: idle20)", o1leds.render_status(s))
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.run_for(40, step=0.25)
+        s = self.status()
+        self.assertEqual((s["phase"], s["fans"], s["line"]), ("blue", "deep", "Lights: blue, blue (idle 7 min)  -  1 device"))
+        self.fanst = {"phase": "idle20", "pct": 20}
+        self.run_for(0.5, step=0.25)
+        self.leds.write_status(self.clock.t)
+        self.assertEqual(self.status()["line"], "Lights: blue to white, back to white (fans idle20)  -  1 device")
+        self.fanst = None
+        self.run_for(3, step=0.25)
+        s = self.status()
+        self.assertIsNone(s["fans"])
+        self.assertIn("on the lights' own clock (no fan service running)", o1leds.render_status(s))
+
+    def test_the_log_says_once_which_rule_the_blue_follows(self):
+        self.fanst = {"phase": "idle20", "pct": 20}
+        self.run_for(10, step=0.25)
+        self.assertEqual(self.fan_lines(), ["fans: following the fan service's deep idle for the blue (fans idle20)"])
+        self.fanst = None
+        self.run_for(10, step=0.25)
+        self.assertEqual(self.fan_lines()[1:], ["fans: no fan service; blue after 300 s of white on the lights' own clock"])
+        self.fanst = {"phase": "deepen", "pct": 15}
+        self.run_for(10, step=0.25)
+        self.assertEqual(len(self.fan_lines()), 3)
+        self.assertIn("bluing (card 0% busy, fans deepen)", self.lines)          # a phase line says the fans' phase too
+        self.fanst = {"phase": "idle20", "pct": 20}
+        self.run_for(3, step=0.25)
+        self.assertIn("waking (card 0% busy, fans idle20)", self.lines)
+        self.assertIn("idle (card 0% busy, fans idle20)", self.lines)
+        self.assertEqual(self.lines[0], "fans: following the fan service's deep idle for the blue (fans idle20)")
+
+    def test_a_wake_starts_white_and_follows_the_fans_again(self):
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.run_for(100, step=0.25)
+        self.assertEqual(self.leds.phase, "blue")
+        self.leds.resync = True                                        # the sleep hook's SIGUSR1
+        self.fanst = {"phase": "idle20", "pct": 20}                   # the fan service's idle clock starts over at a wake too
+        self.leds.tick()
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        self.run_for(400, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        self.fanst = {"phase": "deepen", "pct": 20}
+        self.run_for(31, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
 
 
 class TestTheCardReadingIsTheSharedOne(unittest.TestCase):
@@ -1013,7 +1257,10 @@ class TestStatus(Rig):
         out = o1leds.render_status(st)
         self.assertIn("lights: orange  now 255,128,0 (FF8000)  -  cooling down (white in 80 s)", out)
         self.assertIn("card: 3% busy  -  not working  -  position 0.67 of 1 (0 white, 1 red)", out)
-        self.assertIn("brightness: 100%  -  idle 0 s (white goes to blue over 30 s after 300 s)", out)
+        self.assertIn("brightness: 100%  -  idle 0 s  -  white goes to blue over 30 s after 300 s of white, on the lights' "
+                      "own clock (no fan service running)", out)
+        self.assertIn("white goes to blue over 30 s when the fans go to 10% (fans now: idle20)",
+                      o1leds.render_status(dict(st, fans="idle20")))
         self.assertIn("2 devices found", out)
         self.assertIn("MSI MYSTIC LIGHT", out)
         self.assertIn("mode Direct, 6 LEDs", out)
@@ -1557,7 +1804,8 @@ class TestZoneWiring(unittest.TestCase):
         self.assertIn("set to 60 LEDs", self.bash('leds_plan on ""')[1])
         self.assertIn("set to 90 LEDs", self.bash("leds_plan on 90")[1])
         self.assertIn("--leds-length", self.bash("leds_plan on")[1])
-        self.assertIn("white to blue over 30 s after 5 idle minutes", self.bash("leds_plan on")[1])
+        self.assertIn("white to blue over 30 s when the fans go to 10% after 5 idle minutes (white while they are at 20%)",
+                      self.bash("leds_plan on")[1])
         self.assertNotIn("dim", self.bash("leds_plan on")[1])
         self.assertNotIn("LEDs so", self.bash("leds_plan off")[1])
 

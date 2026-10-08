@@ -113,7 +113,7 @@ it asks for any it can't find, at the terminal):
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 1 minute, and 10% after 5 idle minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 1-minute ramp when it stops, and goes from white to blue over 30 s after 5 minutes of white, always at full brightness (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 1-minute ramp when it stops, and goes from white to blue over 30 s when the fans go to their deep-idle 10% (white while they are at the idle 20%), always at full brightness (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--wifi on\|off` | Wi-Fi as a backup connection and a second way to wake the server (see "Wi-Fi backup" below). **Off unless you say `--wifi on`** (or `OLLAMA1_WIFI=1`); `on` installs `iw` (and `wpasupplicant` if missing) and the `ollama1-wifi` tool, and sets up no network: `sudo ollama1-wifi set` does. Saved in `setup.env` (`WIFI=`), so a re-run without the flag keeps it |
 | `--leds-length N` | LEDs given to a board header that lists none, 1 to 1024 (default **60**): see "Lights" below. Saved in `setup.env` (`LEDS_LENGTH=`, only when you give it), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 300 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
@@ -989,9 +989,9 @@ at a level that follows what the server is doing:
 |---|---|---|
 | `working` | 100% | the graphics card is over 50% busy, or the CPU is at 60 C or more |
 | `ramp` | 100% down to 20% | from the moment that ends: a straight line over 60 s, written in whole 2% steps (no hold at 100% first) |
-| `idle20` | 20% | from 60 s after the work ended, and from the start |
-| `deepen` | 20% down to 10% | after **5 idle minutes** (counted from when the ramp ends, or from the start or a wake, after the first measuring): a straight line over 30 s, written in whole 1% steps; the lights go from white to blue over the same 30 s |
-| `deep` | 10% | while deeply idle |
+| `idle20` | 20% | from 60 s after the work ended, and from the start; the lights stay white (6b449) |
+| `deepen` | 20% down to 10% | after **5 idle minutes** (counted from when the ramp ends, or from the start or a wake, after the first measuring): a straight line over 30 s, written in whole 1% steps; the lights go from white to blue over the same 30 s (they read this phase from the status file) |
+| `deep` | 10% | while deeply idle; the lights are blue |
 
 Work at any time, the ramp included, goes back to 100% at once; when it ends
 again the ramp starts over from 100%. A level is `pwm = round(percent * 255 /
@@ -1188,20 +1188,20 @@ saved in `/etc/ollama1/setup.env`. `on` runs `apt-get -y -q install openrgb`
 MSI MEG X570 ACE with a Corsair H115i Platinum: the board's Mystic Light and
 the cooler's pump head) gets the same colour, on all its LEDs:
 
-The lights have these states (per the owner, 6b421; the blue idle of 6b434), driven by **the same trigger
+The lights have these states (per the owner, 6b421; the blue idle of 6b434, tied to the fans' 10% in 6b449), driven by **the same trigger
 that sends the fans to 100% for the graphics card**: busy over 50%
 (`gpu_busy_percent`, read every 0.25 s) for 1.5 s in a row, ending after 1.5 s
 in a row at or under 50% (`lib/o1work.py`; a 1 s blip does nothing). **The brightness is 100% always: nothing dims
 the lights any more.**
 
-| State | Colour |
-|---|---|
-| idle | white, 255,255,255 |
-| bluing | white fading to blue over 30 s |
-| blue (deep idle) | blue, 0,0,255 |
-| waking | blue fading back to white in 2 s |
-| working | red, 255,0,0 |
-| cooling | red, then orange, yellow, white |
+| State | Colour | Fans (`ollama1-fan`) |
+|---|---|---|
+| idle | white, 255,255,255 | `idle20` (20%), however long the idle lasts |
+| bluing | white fading to blue over 30 s | `deepen` (20% falling to 10% over the same 30 s) |
+| blue (deep idle) | blue, 0,0,255 | `deep` (10%) |
+| waking | blue fading back to white in 2 s | work started, or the fans left deep idle (back at 20%, or up for heat) |
+| working | red, 255,0,0 | `working` (100%) |
+| cooling | red, then orange, yellow, white | `ramp` (100% down to 20% over the same 60 s) |
 
 - **Work starts while the lights are white** (a request, a benchmark, a burn test: anything that keeps the
   card over 50%): over **5 s** the colour goes from white to red, along the gradient (so through yellow and orange).
@@ -1211,11 +1211,25 @@ the lights any more.**
 - **Work ends**: the colour goes back from red through orange and yellow to
   white over **60 s**, linear in time along the gradient: exactly the fans'
   ramp, so the lights and the fans finish together.
-- **After 5 minutes of white** (counted from the moment the cool-down reached
-  white, or from start/wake) the lights go from white to **blue** over **30 s**, a straight line in RGB and in time,
-  and stay blue at 100% while idle; the fans go from 20% to 10% over the same 30 s (see "Fans").
+- **Blue is the fans' deep idle, nothing else** (6b449, per the owner: "the lights shouldn't be blue when it's on
+  idle 20%, only idle 10%"). The lights read the fan service's status file (`/run/ollama1/fan.json`, its `phase`)
+  with every 0.25 s sample. While the fans are at their idle **20%** (`idle20`) the lights stay **white, however long
+  the idle lasts**: the fans' 5 idle minutes may be held up by their temperature guard (the CPU at 50 C or more, the
+  card's junction at 60 C or more, any sensor within 10 C of its limit) or by the CPU at 60 C keeping them at 100%,
+  and the lights wait with them. When the fans begin their fall to **10%** (`deepen`) the lights go from white to
+  **blue** over the same **30 s**, a straight line in RGB and in time, and stay blue at 100% while the fans are at
+  10% (`deep`). The fans leaving deep idle without the card working (the guard, the CPU trigger, a wake) take the
+  lights back to white the way work does: **in 2 s** (less from part way), then white idle again, with the idle
+  minutes still counting; when the fans fall again the lights go blue again.
+- **Without a fan service** (`--fans off`, or no status fresher than 15 s from it) the lights keep their own clock:
+  blue after **5 minutes of white** (counted from the moment the cool-down reached white, or from start/wake, or
+  from the fan service's last word, whichever is later, so a fan service that stops mid-idle does not turn the
+  lights blue at once). `journalctl -u ollama1-leds` says which rule is in force ("fans: following the fan
+  service's deep idle for the blue" / "fans: no fan service; ...").
 - **Work starts while blue (or part way to blue)**: the lights go back to white **quickly, in 2 s** (less from part way:
-  the same speed), and only then begin the 5 s rise to red. Work while white has no such step.
+  the same speed), and only then begin the 5 s rise to red. Work while white has no such step. The fans' phase
+  never turns the lights red (the fans at 100% for the CPU take them from blue to white, no further) and never
+  makes them blue while red or cooling.
 
 **The blue** is pure blue, `0,0,255` (`BLUE` in `lib/o1work.py`). This server's strips show white (255,255,255) with
 a yellow-green cast: the blue channel is the weak one, so the target gives that channel everything (255) and the
@@ -1235,7 +1249,8 @@ for the 0.25 s sample, and every 2 s the connection is looked at and the colour 
 device that was reset gets it back). The status
 line reads "Lights: red, working (card 87% busy)", "Lights: orange, cooling down
 (white in 62 s)", "Lights: white, idle (card 0% busy)", "Lights: white to blue, going blue (idle 5 min)",
-"Lights: blue, blue (idle 6 min)" or "Lights: blue to white, back to white (card 90% busy)".
+"Lights: blue, blue (idle 6 min)", "Lights: blue to white, back to white (card 90% busy)" or, when the fans came
+back up instead, "Lights: blue to white, back to white (fans idle20)".
 
 **How.** Two units. `ollama1-openrgb.service` runs `openrgb --server` with no
 window, bound to `127.0.0.1` (`--server-host` when this build has it, and
@@ -1253,7 +1268,7 @@ allows only `hidraw` and USB nodes: the I2C/SMBus scans OpenRGB can do for
 memory modules and graphics cards (which can write to the wrong chip) find no
 `/dev/i2c-*` to open, so DIMM sensors and the card are not touched. It has no
 network but the loopback. The lights service has no device access and no
-network but the loopback; it reads the card's busy percent and writes only
+network but the loopback; it reads the card's busy percent and the fan service's status file, and writes only
 `/run/ollama1/leds.json`. If you want OpenRGB to drive more than USB lights,
 that is your call, not the kit's.
 
@@ -1288,9 +1303,11 @@ and pokes the service (`SIGUSR1`), which connects afresh and starts white at 100
 (and goes red through the 5 s rise if the card is still working). The lights are not turned off for sleep: the board decides.
 
 **Status.** `ollama1-leds status` (no root): the colour name, the colour now and what the lights
-are doing, the card's load and whether it counts as working, the brightness, the devices found
+are doing, the card's load and whether it counts as working, the brightness and the rule for the blue ("white goes
+to blue over 30 s when the fans go to 10% (fans now: idle20)", or "... on the lights' own clock (no fan service
+running)"), the devices found
 and their mode (and, under each, its zones with the LEDs each has after the resize), and any error. `/run/ollama1/leds.json` has `state` (the colour), `phase` (idle,
-bluing, blue, waking, rising, working, cooling), `rgb`, `brightness` (always 1.0), `blue` (0 white to 1 blue), `working`, `cool_left`, `idle_s` and `gpu_pct`, and per device `zones` (`name`, `leds`). The admin page's lights card lists the same zones. The admin panel's CPU card shows one line, "Lights: ...". Logs:
+bluing, blue, waking, rising, working, cooling), `rgb`, `brightness` (always 1.0), `blue` (0 white to 1 blue), `working`, `cool_left`, `idle_s`, `gpu_pct` and `fans` (the fan service's phase as the lights last read it, or null: no fan service), and per device `zones` (`name`, `leds`). The admin page's lights card lists the same zones. The admin panel's CPU card shows one line, "Lights: ...". Logs:
 `journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
 
 ## Hardware watchdog

@@ -9,6 +9,63 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b449 — the server lights are blue only in the fans' deep idle, never at idle 20% (kit, per Patrick)
+
+Patrick (2026-10-08): "the lights shouldn't be blue when it's on idle 20%, only idle 10%." Kit only (`ollama1/`),
+branch `ledidle-1008`. Not run on the server.
+
+Why they were: since 6b434 the lights (`lib/o1leds.py`) and the fans (`lib/o1fan.py`) each counted their own
+five idle minutes. The fans' count starts at the end of the ramp and is held at `idle20` by their temperature
+guard (the CPU at 50 C or more, the card's junction at 60 C or more, any sensor within 10 C of its limit, nothing
+readable) and by the CPU-at-60-C trigger, which the lights never see (the lights follow the card alone, 6b421).
+The lights' count starts when the cool-down reaches white and nothing holds it: on an idle server whose CPU sits
+at 50 C the fans stay at 20% and the lights go blue anyway, the very thing Patrick saw.
+
+- **The rule.** The blue follows the fan service, not a clock of the lights' own. With every 0.25 s sample
+  `Leds.read_fans` reads the fan service's status file (`/run/ollama1/fan.json`, through `o1fan.read_status(now=
+  self.wall())`: the same reader and 15 s staleness the admin page uses; no new channel) and keeps its `phase`.
+  `blue_from`: with a phase, the white starts going blue the moment it is `deepen` or `deep` (`FAN_DEEP_PHASES`),
+  over `BLUE_S` 30 s, the fans' own fall, so the two land together (the lag is the fans' 2 s poll plus a sample).
+  At `idle20`, `ramp`, `working`, `hot` or `calibrating` the lights are white, however long the idle; `idle_s`
+  keeps counting (the status words still say "idle 7 min").
+- **Leaving it.** The fans leaving deep idle while the lights are blue or part way (the guard, the CPU trigger, a
+  wake) is the same 2 s fade work causes (`waking`, proportional from part way), then idle white again, with
+  `idle_since` kept (`fade_why` "fans"; a fade for work still restarts it, as 6b434 had it): when the guard
+  clears, the fans fall again (their `deep_again`) and the lights go blue again. The fans' phase never turns the
+  lights red (the fans at 100% for the CPU take them from blue to white, no further), never makes them blue while
+  red or cooling, and the card's work is handled first in `follow`, before the fans are looked at.
+- **No fan service** (`--fans off`, a stopped service, a status older than 15 s): the lights' own clock, as before,
+  `IDLE_DEEP_S` 300 s after the white, or after the fan service's last fresh status (`fans_seen`), whichever is
+  later: a service that stops mid-idle does not turn the lights blue at once, and one that comes back at `idle20`
+  takes them back to white. Chosen over "never blue without the fans" because the blue is a feature in its own
+  right (6b434) and a server run with `--fans off` would otherwise lose it for no reason. During `idle20` the
+  lights show the idle colour, white, which is also where the cool-down ends: no new colour for that phase.
+- **Status and log.** `leds.json` gains `fans` (the phase, or null); the `status` text says the rule ("white goes
+  to blue over 30 s when the fans go to 10% (fans now: idle20)" / "... after 300 s of white, on the lights' own
+  clock (no fan service running)"); the panel line for a fade the fans caused reads "Lights: blue to white, back
+  to white (fans idle20)". The journal says once per change which rule is in force ("fans: following the fan
+  service's deep idle for the blue (fans idle20)" / "fans: no fan service; blue after 300 s of white on the
+  lights' own clock"). The unit needs nothing new: `ReadWritePaths=/run/ollama1` already covers the read.
+- **Unchanged.** Working red, the 5 s rise, the 60 s cool-down and its colours, the 100%-to-white timing, the
+  wake fade, the brightness, the fans' own phases, levels and guard; the fan service does not read the lights.
+- **Tests.** `tests/test_leds.py`: the rig's `fanst` is what the lights read from the fans (None: no service,
+  so every older test runs the own-clock rule unchanged); new `TestBlueFollowsTheFans` (15 tests: white at
+  idle20 for 1200 s and at every other phase, the blue begins at `deepen` and lands with the fans, fans already
+  at 10% at the start, the fans leaving deep idle and the idle going on, part way back in proportion, the CPU's
+  100% is white not red, work fades and rises whatever the fans say and no blue while red or cooling, the own
+  clock without a service, a service that stops and one that comes back, the real file read only while fresh
+  with a broken file and a non-word phase, a reader that raises, the status and the rule text, the log once per
+  change, a wake). `mutate.py`: two `leds:` anchors moved to `blue_from`, eight new mutants (the fans' phase
+  ignored, leaving it ignored, only idle20 brings them back, the idle minutes restarted, never blue without
+  the fans, the own clock from the white not the fans' last word, a stale status taken, a non-word phase);
+  `python3 tests/mutate.py leds`: 101 mutants, 100 killed, and `leds: on by default` BROKEN as it already was on
+  main (6b446 lists it; its setuplib.sh anchor is gone; not touched here). Kit suite: 1948 tests OK (787 s), exit 0.
+- **Unverified on the server:** the lag between the fans' 10% and the blue under the real polls; that
+  `/run/ollama1/fan.json` is readable from inside the lights unit's sandbox (it is in `ReadWritePaths`, so it
+  should be; the file is 0644 and the service is root); what the lights do across a real wake, where the
+  fans' status is stale for up to one 2 s poll (the own clock then, 300 s from the wake, until the fans' first
+  write).
+
 ## 6b446 — nothing stays loaded on the card across a sleep; the idle clock counts a busy card (kit, per Patrick)
 
 What happened on the server (Ubuntu 26.04, RX 6900 XT, Ollama v0.40.0, ROCm): `ollama1-idle` suspended it at

@@ -25,11 +25,14 @@ or a model answering shows up as the card over 50%, which is what heats it).
 
 Deep idle (6b434, per the owner: no more dimming; the lights stay at 100% brightness always):
 
-  IDLE_DEEP_S  300 s   idle (counted from when the cool-down reaches white, from the start,
-                       or from a wake) this long, then, over BLUE_S (30 s) together:
-  BLUE_S       30 s      the lights go from white to BLUE, a straight line in RGB and in time,
-                         and stay blue at 100% while idle; the fans fall from the idle 20%
-                         to FAN_DEEP_PCT (10%), a straight line, and stay there
+  IDLE_DEEP_S  300 s   the fans: idle (counted from the end of the ramp, from the start, or
+                       from a wake) this long, then, over BLUE_S (30 s) together:
+  BLUE_S       30 s      the fans fall from the idle 20% to FAN_DEEP_PCT (10%), a straight
+                         line, and stay there; the lights go from white to BLUE, a straight
+                         line in RGB and in time, and stay blue at 100%. The lights take the
+                         moment from the fan service's status file (its phase deepen / deep,
+                         6b449: never blue while the fans are at the idle 20%); only without
+                         a fan service do they count IDLE_DEEP_S of white themselves
   FAN_DEEP_PCT 10%       only for outputs that can run that low; every output's own floor wins
   WAKE_FADE_S  2 s     work while the lights are blue (or part way): back to white in this
                        long (full blue; proportionally less from part way), only THEN the
@@ -40,6 +43,7 @@ Deep idle (6b434, per the owner: no more dimming; the lights stay at 100% bright
   DEEP_CPU_C (50 C) or more, or the card's junction at DEEP_GPU_C (60 C) or more; back in
   only when all are DEEP_REENTER_C (3 C) under those figures. Any safety override
   (the over-limit "hot" one, the 60 C CPU trigger, the card trigger) raises the fans at once.
+  The lights follow: the fans back at 20% take them from blue to white (WAKE_FADE_S).
 """
 import time
 
@@ -52,7 +56,7 @@ CPU_HOT_C, CPU_COOL_C = 60, 55    # the processor's temperature: work from 60 C,
 COOL_S = 60                       # the cool-down: fans 100 -> 20%, lights red -> white
 RISE_S = 5.0                      # the lights: white to red
 IDLE_PCT = 20                     # the fans' idle level
-IDLE_DEEP_S = 300.0               # idle this long, then the lights go blue and the fans go deeper
+IDLE_DEEP_S = 300.0               # the fans: idle this long, then they go deeper (and the lights blue, following them)
 BLUE_S = 30.0                     # ... over this long (both)
 FAN_DEEP_PCT = 10                 # the fans' deep-idle level (an output's own floor wins)
 BLUE = (0, 0, 255)                # the lights' deep-idle colour: pure blue (see README, Lights)

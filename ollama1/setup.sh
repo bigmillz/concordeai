@@ -39,7 +39,7 @@
 #                                    busy or the CPU is at 60 C or more, then down to 20% over 1 minute, 10% after 5 idle minutes (ollama1-fan).
 #                                    Default on; also OLLAMA1_FANS=1|0; saved in setup.env
 #   sudo ./setup.sh --leds on|off    the case, board and cooler lights: white when the graphics card is idle, through
-#                                    yellow and orange to red in 5 s when it works, white again over 1 minute, blue over 30 s after 5 idle minutes (ollama1-leds, through the openrgb package, which
+#                                    yellow and orange to red in 5 s when it works, white again over 1 minute, blue over 30 s when the fans go to 10% (ollama1-leds, through the openrgb package, which
 #                                    this installs). Default OFF; also OLLAMA1_LEDS=1|0; saved in setup.env
 #   sudo ./setup.sh --wifi on|off    Wi-Fi as a backup connection and a second way to wake the server: installs iw and the
 #                                    ollama1-wifi tool (it does not set up any network: sudo ollama1-wifi set does). Default OFF;

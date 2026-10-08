@@ -2,10 +2,20 @@
 every RGB device OpenRGB lists (on this server: the motherboard's Mystic Light and the AIO
 cooler's pump head) is held at the same colour.
 
-  idle       white; the brightness is 100% always (6b434: no more dimming). After
-             IDLE_DEEP_S (300 s) of idle:
-  bluing     white to BLUE over BLUE_S (30 s), a straight line in RGB and in time
-  blue       BLUE at 100% while idle (the fans go from 20% to 10% over the same 30 s)
+  idle       white; the brightness is 100% always (6b434: no more dimming). White for as
+             long as the fans are at their idle 20% (6b449, per the owner: "the lights
+             shouldn't be blue when it's on idle 20%, only idle 10%"); when the fan
+             service begins its own fall to 10% (its phase `deepen`: after 5 idle
+             minutes, and only while its temperature guard allows; read from its status
+             file, /run/ollama1/fan.json, with every 0.25 s sample):
+  bluing     white to BLUE over BLUE_S (30 s), a straight line in RGB and in time: the
+             fans' own 30 s fall, so the two land together
+  blue       BLUE at 100% while the fans are at 10% (`deep`). The fans leaving deep idle
+             without the card working (heat, the processor at 60 C, a wake) take the
+             lights back to white the way work does, the 2 s fade, then idle white again.
+             Without a fan service (`--fans off`, or no fresh status from it) the lights
+             keep their own clock: blue IDLE_DEEP_S (300 s) after the white, or after
+             the fan service was last heard from, whichever is later.
   waking     work while blue or part way: back to white over WAKE_FADE_S (2 s; less from
              part way, the same speed), THEN the rise. Work while white: no such step.
   rising     the card starts working: over RISE_S (5 s) from the colour it has now
@@ -69,7 +79,8 @@ STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
 RISE_S = o1work.RISE_S            # white to red takes this long (5 s)
 COOL_S = o1work.COOL_S            # red to white takes this long: the fans' ramp (60 s)
-IDLE_DEEP_S = o1work.IDLE_DEEP_S  # idle this long, then white goes to blue (300 s)
+IDLE_DEEP_S = o1work.IDLE_DEEP_S  # with no fan service: idle this long, then white goes to blue (300 s)
+FAN_DEEP_PHASES = ("deepen", "deep")   # the fan service's phases that mean its deep idle (lib/o1fan.py): blue then
 BLUE_S = o1work.BLUE_S            # white to blue takes this long (30 s)
 BLUE = o1work.BLUE                # the deep-idle colour
 WAKE_FADE_S = o1work.WAKE_FADE_S  # blue back to white takes this long (2 s)
@@ -501,24 +512,29 @@ def status_path():
 
 class Leds:
     """One tick() per wake-up; it returns how long to sleep. `probes` as in lib/o1work.py (gpu_busy);
-    `clock` is monotonic; `wall` stamps the status file.
+    `fans` returns the fan service's fresh status (a dict with its `phase`) or None, by default from its
+    status file (o1fan.read_status); `clock` is monotonic; `wall` stamps the status file.
 
-    phase  idle      white; `idle_since` counts towards the blue (IDLE_DEEP_S)
-           bluing    z (0 white .. 1 BLUE) rises 1/BLUE_S a second
-           blue      z = 1
-           waking    z falls 1/WAKE_FADE_S a second to 0 (work started while z > 0), then the rise
+    phase  idle      white; `idle_since` says how long (and, with no fan service, counts towards the blue)
+           bluing    z (0 white .. 1 BLUE) rises 1/BLUE_S a second: the fans' phase went deepen (or deep)
+           blue      z = 1, while the fans' phase stays deepen or deep
+           waking    z falls 1/WAKE_FADE_S a second to 0 (work started while z > 0, or the fans left their deep
+                     idle), then the rise, or idle white again
            rising    RISE_S from x0 to red at 1.0, eased; started by the card's work trigger
            working   red at 1.0 while the trigger holds
            cooling   x falls 1/COOL_S a second from where it was (red to white in COOL_S)
     The brightness is 100% always; there is no dimming."""
 
     def __init__(self, probes, client=None, clock=time.monotonic, wall=time.time, log=print, poll_s=POLL_S,
-                 status=True):
+                 status=True, fans=None):
         self.probes = probes
         self.client = client or Client()
         self.clock, self.wall, self.log = clock, wall, log
         self.poll_s, self.status = poll_s, status
+        self.fans = fans or (lambda: o1fan.read_status(now=self.wall()))   # the fan service's status, fresh, or None
         self.gpu = None                           # the last reading, or None: no reading
+        self.fan_phase = None                     # the fans' phase as last read, or None: no fresh status (no service)
+        self.fans_said = None                     # whether the log last said a fan service was there
         self.last, self.next_sample = None, 0.0
         self.next_poll, self.retry_at, self.backoff = 0.0, 0.0, RETRY_FIRST_S
         self.sent, self.err, self.seen_name, self.seen_phase = None, None, None, None
@@ -526,10 +542,13 @@ class Leds:
         self.reset(self.clock())
 
     def reset(self, now):
-        """Start (and a wake): white, idle, the 300 s from now; the trigger begins again."""
+        """Start (and a wake): white, idle, the fans read afresh (their own clock starts over at a wake too);
+        the trigger begins again."""
         self.trigger = o1work.GpuTrigger()
         self.phase, self.x, self.z = "idle", 0.0, 0.0
         self.idle_since = now
+        self.fans_seen = None                     # when a fresh fan status was last read (None: not since the start)
+        self.fade_why = None                      # what started the wake fade: "work" or "fans"
         self.t0, self.x0, self.z0 = now, 0.0, 0.0   # where the current rise, cool-down or wake fade started
 
     def idle_s(self, now):
@@ -542,19 +561,54 @@ class Leds:
             return None
         return o1work.number(g)
 
+    def read_fans(self, now):
+        """The fan service's phase from its status (written every 2 s; stale after 15 s): `fan_phase`, None when
+        there is no fresh one (`--fans off`, or the service stopped). A file that makes no sense is the same."""
+        try:
+            st = self.fans()
+        except Exception:
+            st = None
+        ph = st.get("phase") if isinstance(st, dict) else None
+        self.fan_phase = ph if isinstance(ph, str) and ph else None
+        if self.fan_phase is not None:
+            self.fans_seen = now
+        if self.fans_said != (self.fan_phase is not None):
+            self.fans_said = self.fan_phase is not None
+            self.log("fans: following the fan service's deep idle for the blue (fans %s)" % self.fan_phase
+                     if self.fans_said else
+                     "fans: no fan service; blue after %d s of white on the lights' own clock" % IDLE_DEEP_S)
+
+    def blue_from(self, now):
+        """When the white starts going blue, or None (not yet). With a fan service: the moment it is seen in its
+        deep idle (deepen: its own 20% to 10% fall, over the same 30 s; or deep). Without one: IDLE_DEEP_S after
+        the white, or after the fan service was last heard from, whichever is later (a service that stops
+        mid-idle does not turn the lights blue at once)."""
+        if self.fan_phase is not None:
+            return now if self.fan_phase in FAN_DEEP_PHASES else None
+        base = self.idle_since if self.fans_seen is None else max(self.idle_since, self.fans_seen)
+        return base + IDLE_DEEP_S if now - base >= IDLE_DEEP_S else None
+
+    def fans_left_deep(self):
+        """True while a fan service says it is not in its deep idle (idle20, working, hot, ramp, calibrating)."""
+        return self.fan_phase is not None and self.fan_phase not in FAN_DEEP_PHASES
+
     # -- the machine -----------------------------------------------------------------------
     def follow(self, now, working):
         """The phase from the trigger: work from white or mid-cool starts the rise from wherever it is; work while
-        blue (or part way) first fades back to white (WAKE_FADE_S); the end of the work starts the cool-down."""
+        blue (or part way) first fades back to white (WAKE_FADE_S); the end of the work starts the cool-down.
+        The fans leaving their deep idle while the lights are blue (or part way) is the same fade, to white."""
         if working and self.phase in ("bluing", "blue"):
             if self.z > 0.0:
                 self.phase, self.t0, self.z0 = "waking", now, self.z
+                self.fade_why = "work"
             else:
                 self.phase, self.t0, self.x0 = "rising", now, 0.0
         elif working and self.phase in ("idle", "cooling"):
             self.phase, self.t0, self.x0 = "rising", now, self.x
         elif not working and self.phase in ("rising", "working"):
             self.phase, self.t0, self.x0 = "cooling", now, self.x
+        elif not working and self.phase in ("bluing", "blue") and self.fans_left_deep():
+            self.phase, self.t0, self.z0, self.fade_why = "waking", now, self.z, "fans"
 
     def move(self, now):
         """x (the way to red) and z (the way to blue) for now."""
@@ -564,6 +618,8 @@ class Leds:
                 self.z = 0.0
                 if self.trigger.on:
                     self.phase, self.t0, self.x0 = "rising", end, 0.0
+                elif self.fade_why == "fans":
+                    self.phase = "idle"                                  # the fans left deep idle: white, the same idle
                 else:
                     self.phase, self.idle_since = "idle", end            # the work ended meanwhile: white, idle again
             else:
@@ -581,8 +637,9 @@ class Leds:
                 self.phase, self.idle_since = "idle", self.t0 + self.x0 * COOL_S       # white from that moment
         if self.phase == "idle":
             self.x, self.z = 0.0, 0.0
-            if self.idle_s(now) >= IDLE_DEEP_S:
-                self.phase, self.t0 = "bluing", self.idle_since + IDLE_DEEP_S
+            start = self.blue_from(now)
+            if start is not None:
+                self.phase, self.t0 = "bluing", start
         if self.phase == "bluing":
             self.z = min(1.0, max(0.0, (now - self.t0) / BLUE_S))
             if self.z >= 1.0:
@@ -648,6 +705,7 @@ class Leds:
             if self.next_sample <= now:
                 self.next_sample = now + SAMPLE_S
             self.gpu = self.read_gpu()
+            self.read_fans(now)                                 # the fans' phase, on the same beat: the blue follows it
             self.follow(now, self.trigger.update(now, self.gpu))
         polled = now >= self.next_poll or self.resync          # a wake does not wait for the poll
         if polled:
@@ -665,8 +723,8 @@ class Leds:
         name = self.state_name()
         if polled or name != self.seen_name or self.phase != self.seen_phase:
             if self.phase != self.seen_phase:
-                self.log("%s%s" % (self.phase, " (card %d%% busy)" % round(self.gpu) if self.gpu is not None else
-                                   " (no card reading)"))
+                self.log("%s (%s%s)" % (self.phase, "card %d%% busy" % round(self.gpu) if self.gpu is not None else
+                                        "no card reading", ", fans %s" % self.fan_phase if self.fan_phase else ""))
             self.seen_name, self.seen_phase = name, self.phase
             self.write_status(now)
         if self.moving():
@@ -705,6 +763,7 @@ class Leds:
               "idle": self.phase == "idle", "idle_s": int(self.idle_s(now)), "cool_left": self.cool_left(now),
               "working": self.trigger.on, "gpu_pct": None if self.gpu is None else round(self.gpu, 1),
               "gpu_reading": self.gpu is not None,
+              "fans": self.fan_phase,                     # the fan service's phase, or None: no fan service running
               "connected": c.connected, "error": self.err, "protocol": c.ver if c.connected else None,
               "devices": [{"name": d.name, "vendor": d.vendor, "leds": d.nleds,
                            "mode": d.modes[d.mode].name if d.kind else None, "usable": d.kind is not None,
@@ -737,12 +796,23 @@ def what_text(st):
     if ph == "cooling":
         return "cooling down (white in %d s)" % st.get("cool_left", 0)
     if ph == "waking":
+        if not st.get("working") and st.get("fans"):                     # the fans left deep idle, not the card's work
+            return "back to white (fans %s)" % st["fans"]
         return "back to white (%s)" % card_text(st)
     if ph == "bluing":
         return "going blue (idle %d min)" % idle_min
     if ph == "blue":
         return "blue (idle %d min)" % idle_min
     return "idle (%s)" % card_text(st)
+
+
+def blue_rule_text(st):
+    """When the white goes blue, in words: with the fan service, or on the lights' own clock without one."""
+    fans = st.get("fans")
+    if fans:
+        return "white goes to blue over %d s when the fans go to %d%% (fans now: %s)" % (BLUE_S, o1work.FAN_DEEP_PCT, fans)
+    return "white goes to blue over %d s after %d s of white, on the lights' own clock (no fan service running)" % (
+        BLUE_S, IDLE_DEEP_S)
 
 
 def status_line(st):
@@ -784,8 +854,8 @@ def render_status(st):
                "%d%% busy" % round(pct) if pct is not None else "no reading (taken as not working)",
                "working (over %d%%)" % o1work.GPU_BUSY_PCT if st.get("working") else "not working",
                st.get("intensity", "?")),
-           "brightness: %d%%  -  idle %d s (white goes to blue over %d s after %d s)" % (
-               round(st.get("brightness", 1.0) * 100), st.get("idle_s", 0), BLUE_S, IDLE_DEEP_S)]
+           "brightness: %d%%  -  idle %d s  -  %s" % (
+               round(st.get("brightness", 1.0) * 100), st.get("idle_s", 0), blue_rule_text(st))]
     devs = st.get("devices") or []
     if st.get("connected"):
         out.append("openrgb: connected to %s:%d (protocol %s), %d device%s found" % (
