@@ -95,6 +95,62 @@ on the server (it was not to be touched from here).
   `arp -n 192.168.86.10` should show `0:d8:61:c2:d2:c6` from then on, and `sudo ollama1-wifi status` on the server
   `Answers ARP only for its own address: yes`.
 
+## 6b455 — the window's process is ConcordeAI.app: the launcher runs the interpreter itself (per Patrick)
+
+Patrick, with a screenshot of his Dock: "opening the app with the icon to the far left in the screenshot doesn't show
+it as open. It just opens another Python instance on the right." The ConcordeAI icon had no running dot; the window
+sat under a Python rocket on the right.
+
+- **Cause (measured on Patrick's Mac).** 6b443's launcher (`Contents/MacOS/MillenAI`, `LSUIElement`) spawned
+  `launch.sh`, which exec'd the venv's python3; that stub execs Homebrew's `Python.app/Contents/MacOS/Python`, so the
+  process that owns the window was `org.python.python`, type Foreground (`lsappinfo`): the rocket. The launcher, an
+  LSUIElement, had no Dock presence, so the app's icon never got a dot and a click on it started the launcher again
+  (whose python exited on the single-copy guard; the rocket stayed).
+- **Fix.** `packaging/macos_launcher.m` loads the Python framework dylib behind the venv's python3
+  (`realpath(venv/bin/python3)` → `<framework>/Versions/3.x/Python`, `dlopen` with `RTLD_GLOBAL` so extension
+  modules resolve the interpreter's symbols) and calls `Py_BytesMain`, the way the venv's own stub
+  (`Mac/Tools/pythonw.c`) would, only in this process instead of exec'ing `Python.app`. The venv is found as that
+  stub finds it: `__PYVENV_LAUNCHER__` set to `venv/bin/python3` before the call; getpath takes it as the executable,
+  reads `pyvenv.cfg` beside it, and unsets it, so `sys.executable` is the venv's python3 and subprocesses don't
+  inherit it (checked: a child's env has none, its prefix is the venv). So `NSBundle.mainBundle` is ConcordeAI.app:
+  its icon, its name, one Dock entry with a dot, Cmd-Tab "ConcordeAI", a Dock click that reopens the running copy
+  (no process starts: LaunchServices sends the running app a reopen), and the Local Network identity of 6b443 kept,
+  since this signed Mach-O is still the responsible code for everything python starts. `LSUIElement` left the plist.
+- **Bootstrap and fallback.** `launch.sh` is still the first-run venv setup: the launcher runs it with `--bootstrap`
+  (venv check and setup, then `exit 0` before the `exec`) and only then loads the interpreter. A python whose dylib
+  can't be found (not a framework build, or the venv's symlink broken) falls back to 6b443's layout, `launch.sh` as a
+  child that execs python, this process waiting as the responsible parent with `NSApplicationActivationPolicyAccessory`
+  (out of the Dock, as `LSUIElement` did). Checked in a throwaway layout: the in-process path (venv prefix, `mlx.core`,
+  `nacl`, `webview` import, a child with no `__PYVENV_LAUNCHER__`), the fallback (no venv → the child's exit status).
+- **The WebKit store is the app's own now** (`~/Library/WebKit/com.millen.millenai`, not `org.python.python`'s), which
+  6b324's review had left for "a follow-up": `_webkit_own_store()` is true in the .app, so `_webstore_webkit` ran live
+  for the first time (clean and local recorded in the profile, no error). The page's localStorage (the backdrop
+  history, voice, speeds, sidebar width) would have started empty after the update, so `_webkit_store_adopt()` copies
+  Python's `WebsiteData` folder (salt included, so the origin hashes hold) to the app's once, before the window opens,
+  only in the desktop app and only while the app's own has none. The 6b264 menu rename is a no-op in the .app now and
+  stays for a python run any other way.
+- **Measured (a build in the scratchpad, `MILLENAI_DEV=1`, port 9899, `open --env`).** `lsappinfo`: the window's
+  process (the instance.json pid) is `bundleID="com.millen.millenai"`, `type="Foreground"`, executable
+  `…/ConcordeAI.app/Contents/MacOS/MillenAI`, no child python; the window server lists its window with owner
+  "ConcordeAI", title "ConcordeAI 7.0" (the installed app's says owner "Python"). `NSRunningApplication`: one entry for
+  the bundle, activation policy regular. `open` on the running bundle (what a Dock click does) started no process and
+  printed no "Another copy". Adding a LAN server from it: `UserEventAgent … LocalNetwork: found bundle id
+  com.millen.millenai by PID`, no re-prompt (the 6b443 permission held for the new layout on this Mac), and the probe
+  ended in "didn't answer", not "No route to host". The quit Apple event (Cmd-Q, the Dock's Quit) ended the process in
+  0.5 s with the port freed and `instance.json` gone.
+- **Updates.** `_SWAP_SCRIPT` still pgreps `…/Contents/MacOS/MillenAI`, which is the window's process now; `ditto`
+  replaces the bundle whole, so the in-app update brings the new layout and plist. No fresh install needed.
+- Gauntlet: the 6b443 check keeps the build-script, nightly-filter and swap-script pins; a 6b455 check pins the
+  launcher (`dlopen`, `Py_BytesMain`, `__PYVENV_LAUNCHER__`, `--bootstrap`, the accessory fallback), no `LSUIElement`,
+  `launch.sh`'s `--bootstrap` exit, the adopt call before `webview.start`, and drives `_webkit_store_adopt` on a
+  temp folder (nothing to copy, a copy, once only).
+- **Unverified.** The screen was locked for the whole test (`loginwindow` frontmost), so the window coming forward on
+  the Dock click, the menu bar's name and the Dock icon itself were not seen, only measured through LaunchServices and
+  the window server; a fresh Mac's first run (the `--bootstrap` path with no venv) only in the throwaway layout; the
+  Local Network prompt itself didn't show here because the permission was already granted.
+
+---
+
 ## 6b449 — the server lights are blue only in the fans' deep idle, never at idle 20% (kit, per Patrick)
 
 Patrick (2026-10-08): "the lights shouldn't be blue when it's on idle 20%, only idle 10%." Kit only (`ollama1/`),
