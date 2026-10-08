@@ -19565,6 +19565,9 @@ const old={models:[{label:"Llama 3.2 1B",engine:"Ollama",src:"engine",status:"do
   {label:"Llama 3.2 1B",engine:"MLX",src:"measured",status:"done",gen_tps:2}]};
 out.push(JSON.stringify(bmMatch(old,r)));
 out.push(bmVer({mlx_lm:"0.31.3",ollama:"0.12.9"})+"|"+bmVer({mlx_lm:"0.31.3"})+"|"+bmVer(null));
+// (6b454) a row waiting for its server says so, from its note, and counts as under way
+out.push(bmRow({label:"S · m",model:"m",network:true,engine:"Ollama",status:"back",note:"waiting for S to come back…"},true,null,256));
+out.push(String(bmFrac({cur:1,models:[{status:"done"},{status:"back"},{status:"waiting"}]},256)));
 console.log(JSON.stringify(out));
 """
     f = os.path.join(tempfile.mkdtemp(), "bm.js")
@@ -19573,7 +19576,9 @@ console.log(JSON.stringify(out));
     o = json.loads(subprocess.run(["node", f], capture_output=True, text=True,
                                   timeout=30).stdout or "null")
     D = "·"
-    ok = (isinstance(o, list) and len(o) == 10
+    ok = (isinstance(o, list) and len(o) == 12
+          and "waiting for S to come back…" in o[10] and "bm-v" not in o[10] and "pbar-track" in o[10]
+          and abs(float(o[11]) - (1 + 0.05) / 3) < 1e-9
           and '<span class="bm-v">212.4<small>tok/s</small></span>' in o[0]
           and '>+6.2%</span>' in o[0] and 'class="bm-d up"' in o[0]
           and ("reads 3,120 tok/s %s first token 0.31 s %s load 1.9 s" % (D, D)) in o[0]
@@ -19585,14 +19590,163 @@ console.log(JSON.stringify(out));
           and abs(float(o[3]) - (1 + 0.4 + 0.6 * 0.5) / 3) < 1e-9
           and o[4] == "3,120|9.9|0.31 s|1.9 s|123 s|—"
           and 'class="bm-d" title="Was 200.0 tok/s">+1.0%</span>' in o[5]
-          and ">estimated</span>" in o[6] and "%" not in o[6].split("tok/s")[1].split("</div>")[0]
-          and "%</span>" not in o[7] and ">estimated<" not in o[7]
+          and ">estimated*</span>" in o[6] and '<span class="bm-v">9.0*<small>' in o[6]
+          and "%" not in o[6].split("tok/s")[1].split("</div>")[0]
+          and "%</span>" not in o[7] and ">estimated" not in o[7] and '212.4<small>' in o[7]
           and json.loads(o[8]).get("gen_tps") == 2
           and o[9] == "mlx_lm 0.31.3 %s Ollama 0.12.9|mlx_lm 0.31.3|" % D)
     return ok, o
 
 
+def _bm_srv_ns(src):
+    """The benchmark's namespace with the servers section's errors and
+    words in it (6b454): ServerError, _srv_fail, ollama_internal."""
+    ns = _bm_ns(src)
+
+    def piece(start, end="\n\n\n"):
+        i = src.index(start)
+        return src[i:src.index(end, i)]
+    for part in ("class ServerError(RuntimeError):", "class ServerSlow(ServerError):", "def _srv_span(",
+                 "def _srv_js(", "def _srv_fail(", "def _srv_fail_why(", "def ollama_internal(",
+                 "_OLLAMA_INTERNAL_PREFIXES = ", "_OLLAMA_SHA_TAG = ", "SERVER_SEP = ", "SRV_CONNECT_S = "):
+        exec(piece(part, "\n\n\n" if part.startswith(("class", "def")) else "\n"), ns)
+    exec(piece("SRV_PAIR_LOST = ", "\n\n"), ns)       # two lines each, with SRV_NO_CRYPTO under it
+    ns["_SRV_LABEL_RX"] = re.compile(r"[\w.:/+-]{1,120}")
+    ns["_SRV_CLOUD_TAG"] = re.compile(r"(^|[-:])cloud$", re.I)
+    ns["_srv_paired"] = lambda e: True
+    ns["cai_crypto"] = type("C", (), {"available": staticmethod(lambda: True)})
+    return ns
+
+
+def _bm_hiccup(src):
+    """6b454: which failures are the server's own (waited for, asked
+    again) and which the model's (failed at once); the row's words for a
+    spill, a load that doesn't fit, a busy server, Ollama away; a stream
+    cut before Ollama's last line is no result; an estimate names what
+    the last line lacked."""
+    ns = _bm_srv_ns(src)
+    F, SE, SS = ns["_srv_fail"], ns["ServerError"], ns["ServerSlow"]
+    e = {"name": "Ollama1", "id": "ab12cd34", "url": "https://s.example", "access_id": "", "access_secret": ""}
+    out = {}
+    t = lambda st, js, m="": F(e, st, js, m).transient
+    out["transient"] = (t(0, {"code": "ollama", "error": "Ollama stopped while loading the model"}) is True
+                        and t(502, {"code": "ollama", "error": "Ollama is not answering"}) is True
+                        and t(503, {"code": "busy", "error": "the server could not unload another model first; try again"}) is True
+                        and t(0, {"code": "ollama", "status": 503, "error": "Ollama: stub away"}) is True
+                        and t(0, {"code": "busy", "status": 503, "error": "x"}) is True
+                        and t(502, {}) is True and t(504, {}) is True and t(409, {"code": "busy"}) is True)
+    out["own reason"] = (t(0, {"code": "gpu_spill", "error": "model did not fit entirely in VRAM (85% on GPU); it was unloaded"}) is False
+                         and t(507, {"code": "gpu_fit", "error": "model does not fit"}) is False
+                         and t(404, {}, "m:1b") is False and t(401, {"code": "unpaired"}) is False
+                         and t(0, {"code": "ollama", "status": 500, "error": "Ollama: refused by the test"}) is False
+                         and t(0, {"code": "ollama", "status": 400, "error": "Ollama refused to load the model: x"}) is False
+                         and SS("offline", "Ollama1 took longer than 12 seconds to start answering.").transient is False
+                         and SE("offline", "Ollama1 didn\u2019t answer.").transient is True
+                         and F(e, 503, {"code": "busy"}).status == 503 and F(e, 0, {"status": 507, "code": "gpu_spill"}).status == 507)
+    B = ns["_BenchServer"]
+    b = B(e, "qwen3.5:9b", {"models": [{"name": "qwen3.5:9b"}]})
+    b.still = ["ministral-3:14b"]
+    w = lambda st, js: b.why(F(e, st, js, "qwen3.5:9b"))
+    spill = "model did not fit entirely in VRAM (85% on GPU); it was unloaded"
+    out["spill, older kit"] = w(0, {"code": "gpu_spill", "error": spill}) == (
+        "Ollama1 loaded only 85% of qwen3.5:9b on the card because ministral-3:14b was still loaded "
+        "(an older kit: a newer one empties the card first); its GPU-only rule unloaded it")
+    out["spill, alone after unloading"] = w(0, {"code": "gpu_spill", "status": 507, "gpu_pct": 59, "loaded_with": ["small:8b"],
+                                              "error": "model did not fit entirely in VRAM (59% on GPU, alone on the card); it was unloaded"}) == (
+        "Ollama1 loaded only 59% of qwen3.5:9b on the card, even alone after it unloaded small:8b; its GPU-only rule unloaded it")
+    out["spill, unload didn't take"] = w(0, {"code": "gpu_spill", "gpu_pct": 85, "loaded_with": ["ministral-3:14b"],
+                                            "error": "model did not fit entirely in VRAM (85% on GPU; ministral-3:14b was still loaded and could not be unloaded); it was unloaded"}) == (
+        "Ollama1 loaded only 85% of qwen3.5:9b on the card because ministral-3:14b was still loaded and couldn\u2019t be unloaded; its GPU-only rule unloaded it")
+    b.still = []
+    out["spill, alone"] = w(0, {"code": "gpu_spill", "gpu_pct": 59, "loaded_with": [], "error": "model did not fit entirely in VRAM (59% on GPU); it was unloaded"}) == (
+        "Ollama1 loaded only 59% of qwen3.5:9b on the card, alone; its GPU-only rule unloaded it")
+    out["spill at 0%: the old words"] = "graphics card isn\u2019t in use" in w(0, {"code": "gpu_spill", "error": "model did not fit entirely in VRAM (0% on GPU); it was unloaded"})
+    out["no fit, the figures"] = (w(507, {"code": "gpu_fit", "need_bytes": 17_200_000_000, "budget_bytes": 12_000_000_000,
+                                           "error": "model does not fit in VRAM at num_ctx 4096: needs about 16.0 GiB, 11.2 GiB available"})
+                                  == "Ollama1 won\u2019t load it: it needs about 17.2 GB and the card has 12.0 GB free"
+                                  and w(507, {"code": "gpu_fit", "need_bytes": 60_000_000_000, "budget_bytes": 40_000_000_000,
+                                              "error": "model does not fit in free system memory (the whole model, since weight repacking is on) at num_ctx 4096: needs about 55.9 GiB, 37.3 GiB available"})
+                                  == "Ollama1 won\u2019t load it: it needs about 60.0 GB and the server\u2019s memory has 40.0 GB free"
+                                  and w(507, {"code": "gpu_fit", "error": "model does not fit"}) == "Ollama1 won\u2019t load it: model does not fit")
+    out["busy, the server's reason"] = (w(503, {"code": "busy", "error": "the server could not unload another model first; try again"})
+                                        == "Ollama1 won\u2019t run it right now: the server could not unload another model first; try again"
+                                        and w(503, {"code": "busy"}) == "Ollama1 won\u2019t run it right now: it is busy with other requests")
+    out["ollama away"] = (w(502, {"code": "ollama", "error": "Ollama stopped while loading the model"})
+                          == "On Ollama1, Ollama stopped while loading the model")
+    out["key scrubbed"] = "***" in ns["_bench_why"](F(e, 503, {"code": "busy", "error": "sk-ant-api03-" + "A" * 40}), b)
+    # a stream that ends before Ollama's last line: the server's hiccup, not a result
+    b2 = B(e, "m:1b", {"models": [{"name": "m:1b"}]})
+    lines = [json.dumps({"message": {"content": "t%d" % i}, "done": False}).encode() + b"\n" for i in range(3)]
+    b2._lines = lambda method, path, obj, read_s: iter(lines)
+    ns["_bench_live"]["capped"] = False
+    try:
+        b2.run(lambda: None, lambda n: None)
+        cut = "no error"
+    except SE as se:
+        cut = (se.kind, se.transient, str(se))
+    out["cut stream"] = cut == ("offline", True, "Ollama1\u2019s connection dropped before Ollama\u2019s last line, after 3 pieces had come.")
+    done = json.dumps({"done": True, "eval_count": 3, "eval_duration": 60_000_000, "prompt_eval_count": 7,
+                       "prompt_eval_duration": 7_000_000}).encode() + b"\n"
+    b2._lines = lambda method, path, obj, read_s: iter(lines + [done])
+    raw = b2.run(lambda: None, lambda n: None)
+    n1 = ns["bench_numbers"](raw)
+    out["whole stream"] = raw["final"] is True and n1["src"] == "engine" and n1["gen_tps"] == 50.0 and n1["missing"] == []
+    bare = json.dumps({"done": True, "prompt_eval_count": 7}).encode() + b"\n"
+    b2._lines = lambda method, path, obj, read_s: iter(lines + [bare])
+    raw2 = b2.run(lambda: None, lambda n: None)
+    n2 = ns["bench_numbers"](raw2)
+    b2.fix(n2)
+    out["what the last line lacked"] = (n2["est"] is True and n2["missing"] == ["eval_count", "eval_duration", "prompt_eval_duration"]
+                                        and n2["prompt_tps"] is None and n2["gen_tokens"] == 3
+                                        and n2["note"].startswith("Ollama\u2019s last line carried no eval_count or eval_duration or "
+                                                                  "prompt_eval_duration, so the writing speed is this computer\u2019s "
+                                                                  "count of the 3 pieces that arrived over the time they took, "
+                                                                  "network included; reads weren\u2019t measured."))
+    out["no final: no missing list"] = "missing" not in ns["bench_numbers"]({"t_send": 1.0, "t_first": 1.5, "t_last": 2.0, "chunks": 4})
+    # Ollama's own cache copy never runs; a model the fresh list lacks neither
+    try:
+        B(e, "llamacpp:" + "9ba9cc2b" * 8, {"models": [{"name": "llamacpp:" + "9ba9cc2b" * 8}]}).prepare()
+        out["cache copy"] = False
+    except SE as se:
+        out["cache copy"] = se.kind == "missing" and "cache copy" in str(se)
+    try:
+        B(e, "gone:1b", {"models": [{"name": "m:1b"}]}).prepare()
+        out["not installed"] = False
+    except SE as se:
+        out["not installed"] = str(se) == "gone:1b isn\u2019t installed on Ollama1."
+    # the wait: polls /api/version until it answers, gives up after its seconds, Stop cuts it
+    polls = []
+    answers = [(0, {}), (0, {}), (200, {"version": "0.40.1"})]
+
+    def sj(e_, method, path, obj=None, signed=True, timeout=12):
+        polls.append((path, timeout))
+        st, js = answers.pop(0) if answers else (0, {})
+        if not st:
+            raise SE("offline", "Ollama1 didn\u2019t answer.")
+        return st, js
+    ns["_srv_json"] = sj
+    ns["BENCH_BACK_STEP"] = 0.05
+    t0 = time.time()
+    back = b.wait_back(5)
+    out["waited, came back"] = back is True and polls == [("/api/version", 8.0)] * 3 and time.time() - t0 < 2
+    answers[:] = []
+    polls[:] = []
+    t0 = time.time()
+    out["gave up"] = b.wait_back(0.3) is False and 3 <= len(polls) <= 8 and 0.25 <= time.time() - t0 < 1.5
+    out["hook"] = ns["_hook_arg"]("bench-back") == "" and b.back_line() == "waiting for Ollama1 to come back\u2026"
+    ns["_bench_stop"].set()
+    try:
+        b.wait_back(5)
+        out["stop cuts"] = False
+    except ns["BenchStopped"]:
+        out["stop cuts"] = True
+    ns["_bench_stop"].clear()
+    return all(out.values()), out
+
+
 _BM_CHECKS = [
+    ("benchmark servers (6b454): the server's own hiccup is waited for and the model asked again, its refusal fails at once "
+     "with its reason in plain words; a cut stream is no result; an estimate names what Ollama's last line lacked", _bm_hiccup),
     ("benchmark: the figures from known timings (MLX measured, cached prompt, Ollama's own, a cut stream, junk)", _bm_numbers),
     ("benchmark: memory rise, pressure (kernel level or compressor; 90% elsewhere) and swap flags (not for a page or two)", _bm_mem),
     ("benchmark: skip notes from the app's fit rule; another copy's engine, an unreadable owner, a giant on Ollama", _bm_skip),
@@ -24926,6 +25080,16 @@ class Ctl(BaseHTTPRequestHandler):
             with STUB.lock:
                 STUB.loaded.clear()
             return self.reply({"ok": True})
+        if p == "/stub-set":
+            # (6b454) a lagging unload, Ollama away for the next chats, a model that spills beside another
+            for k_, v_ in d.items():
+                if k_ in ("unload_lag", "fail_status", "fail_count", "tokens"):
+                    setattr(STUB, k_, v_)
+            return self.reply({"ok": True})
+        if p == "/model-flag":
+            with STUB.lock:
+                STUB.models[d["name"]][d["key"]] = d.get("value", True)
+            return self.reply({"ok": True})
         if p in ("/comfy-on", "/comfy-off"):
             GWO.gen.comfy.port = COMFY.port if p == "/comfy-on" else DEAD_COMFY
             GWO.gen.caps_at = None
@@ -24951,7 +25115,8 @@ class Ctl(BaseHTTPRequestHandler):
         if self.path == "/stub":
             with STUB.lock:
                 calls = [[m, pth, b] for m, pth, b in STUB.calls]
-            return self.reply({"calls": calls})
+                loaded = sorted(STUB.loaded)
+            return self.reply({"calls": calls, "loaded": loaded})
         if self.path == "/comfy":
             with COMFY.lock:
                 calls = [[m, pth, b] for m, pth, b in COMFY.calls]
@@ -24999,7 +25164,8 @@ for _i34 in range(240):
             break
         time.sleep(0.5)
 _SV = Instance(9903, "SRV", env={"MILLENAI_TEST_HOOKS":
-                                 "server-http-loopback,profiles,bench-fake,bench-pace=0.05,local-record"}).start()
+                                 "server-http-loopback,profiles,bench-fake,bench-pace=0.05,local-record,"
+                                 "bench-back=6"}).start()
 _SVREPLIES = []
 
 
@@ -25890,15 +26056,17 @@ _bfile = os.path.join(_SV.home, "bench_targets.jsonl")
 _braw = open(_bfile, "rb").read() if os.path.exists(_bfile) else b""
 _brec = [json.loads(x_) for x_ in _braw.splitlines()]
 _seedb = json.load(open(_sfile34))["servers"][0].get("seed", "")
+_bunl1 = [c_ for c_ in _o1("/stub")["calls"][_nsb:] if c_[1] == "/api/generate" and (c_[2] or {}).get("keep_alive") == 0]
 check("benchmark servers (live): the real gateway: the figures are Ollama's own from its last line, the card is "
-      "/v1/info's, every call is signed and carries the fixed test, nothing is unloaded",
+      "/v1/info's, every call is signed and carries the fixed test; the card is emptied first (6b454) so the load is timed",
       _bts.get("name") == _SVN and _bts.get("card") == "Test Card · 16 GB" and "small:8b" in _btm
       and _btm["small:8b"].get("tick") is True and "version" in _bts
       and _bs1[0] == 200 and _br1.get("state") == "done" and _br1.get("target") == "server"
       and _br1.get("target_name") == _SVN and _br1.get("card") == "Test Card · 16 GB"
       and _brow1.get("status") == "done" and _brow1.get("src") == "engine" and _brow1.get("gen_tps") == 50.0
       and _brow1.get("network") is True and _brow1.get("prompt_tps") is None
-      and _brow1.get("load_src") == "not measured" and _brow1.get("label") == _SVN + " · small:8b"
+      and _brow1.get("load_src") == "timed" and _brow1.get("load_s") is not None
+      and _brow1.get("label") == _SVN + " · small:8b" and _brow1.get("missing") == []
       and len(_bchat) == 1 and "X-O1-Signature" in _bchat[0]["headers"]
       and json.loads(_bchat[0]["body"])["messages"] == [{"role": "user", "content": _b41p}]
       and json.loads(_bchat[0]["body"])["options"] == {"temperature": 0, "seed": 42, "num_predict": 256,
@@ -25906,7 +26074,7 @@ check("benchmark servers (live): the real gateway: the figures are Ollama's own 
       and "keep_alive" not in json.loads(_bchat[0]["body"])
       and _bstub and _bstub[0][2]["options"].get("num_predict") == 256 and _bstub[0][2]["options"].get("seed") == 42
       and _bstub[0][2].get("keep_alive") is None,
-      "%r" % [_bts.get("card"), _bs1, _br1.get("state"), _brow1, [r_["path"] for r_ in _blog]])
+      "%r" % [_bts.get("card"), _bs1, _br1.get("state"), _brow1, [r_["path"] for r_ in _blog], _bunl1])
 check("benchmark servers (live): kept in the profile's own file (0600, the server's name and card, no Access "
       "secret, device key or address), none in the machine's benchmarks.jsonl",
       os.path.exists(_bfile) and _st34.S_IMODE(os.stat(_bfile).st_mode) == 0o600
@@ -25955,11 +26123,74 @@ _bs4 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "
 _bd4 = _b41_wait_run(60)
 _br4 = _bd4.get("run") or {}
 _o1("/up", {})
-check("benchmark servers (live): a server that is off fails on its row and nothing runs on this computer or in the cloud",
+check("benchmark servers (live): a server that is off fails on its row (after the wait for it, 6b454) and nothing runs "
+      "on this computer or in the cloud",
       _bs4[0] == 200 and [r_.get("status") for r_ in _br4.get("models") or []] == ["failed"]
       and ((_br4.get("models") or [{}])[0].get("note") or "").startswith("Failed: %s didn’t answer" % _SVN)
+      and "didn’t come back within 6 seconds." in ((_br4.get("models") or [{}])[0].get("note") or "")
       and all(r_["path"] != "/api/chat" for r_ in _o1("/log")["log"][_nlb3:]),
       "%r" % [_bs4, _br4.get("models")])
+# ---- (6b454) the card emptied before each model; a spill on an empty card worded; the server's hiccup waited for
+_o1("/stub-set", {"fail_count": 0, "unload_lag": 0})
+_o1("/models-loaded", {"name": "small:8b"})          # left on the card by an earlier chat
+_nsb5 = len(_o1("/stub")["calls"])
+_bs5 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b", "sneaky:14b"]})
+_bd5 = _b41_wait_run(90)
+_br5 = _bd5.get("run") or {}
+_bm5 = _br5.get("models") or [{}, {}]
+_st5 = [c_ for c_ in _o1("/stub")["calls"][_nsb5:] if c_[1] in ("/api/chat", "/api/generate", "/api/ps")]
+_ev5 = [("unload", c_[2]["model"]) if c_[1] == "/api/generate" and c_[2].get("keep_alive") == 0
+        else ("load", c_[2]["model"]) if c_[1] == "/api/generate" and not c_[2].get("prompt")
+        else ("chat", c_[2]["model"]) if c_[1] == "/api/chat" else ("ps", "") for c_ in _st5]
+_ev5n = [x_ for x_ in _ev5 if x_[0] != "ps"]
+# the gateway loads a model itself before it relays the app's own load or chat: runs of one event are one
+_ev5c = [x_ for i_, x_ in enumerate(_ev5n) if i_ == 0 or x_ != _ev5n[i_ - 1]]
+check("benchmark servers (live): the card is emptied before each model (an unload through the gateway, /api/ps seen "
+      "empty), the second model's spill on the empty card fails at once, worded with the share on the card",
+      _bs5[0] == 200 and _br5.get("state") == "done"
+      and [r_.get("status") for r_ in _bm5] == ["done", "failed"]
+      and _bm5[0].get("load_src") == "timed" and _bm5[0].get("gen_tps") == 50.0
+      and _ev5c == [("unload", "small:8b"), ("load", "small:8b"), ("chat", "small:8b"),
+                    ("unload", "small:8b"), ("load", "sneaky:14b"), ("unload", "sneaky:14b")]
+      and _ev5.index(("load", "small:8b")) > _ev5.index(("ps", "")) + 1
+      and _bm5[1].get("note") == "Failed: %s loaded only 59%% of sneaky:14b on the card, alone; its GPU-only rule unloaded it." % _SVN
+      and not _o1("/stub")["loaded"],
+      "%r" % [_bs5, _br5.get("state"), _bm5, _ev5])
+# Ollama away for the first chat (a 503 through the gateway, after the stream's headers): the row waits for the
+# server, says so, and the model is asked again
+_o1("/stub-set", {"fail_count": 1, "fail_status": 503})
+_nsb6 = len(_o1("/stub")["calls"])
+_bs6 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b"]})
+_seen6, _end6 = [], time.time() + 60
+while time.time() < _end6:
+    _d6 = _svq("/api/bench")[1]
+    _r6 = ((_d6.get("run") or {}).get("models") or [{}])[0]
+    if _r6.get("status") == "back":
+        _seen6.append(_r6.get("note"))
+    if _d6.get("running") is False:
+        break
+    time.sleep(0.03)
+_br6 = (_d6.get("run") or {})
+_bm6 = (_br6.get("models") or [{}])[0]
+_ch6 = [c_ for c_ in _o1("/stub")["calls"][_nsb6:] if c_[1] == "/api/chat"]
+check("benchmark servers (live): Ollama away for a chat (503 through the gateway) is the server's hiccup: the row says "
+      "it is waiting for the server, the model is asked once more, and the figures are the second answer's",
+      _bs6[0] == 200 and _br6.get("state") == "done" and _bm6.get("status") == "done" and _bm6.get("gen_tps") == 50.0
+      and _bm6.get("src") == "engine" and len(_ch6) == 2 and _seen6
+      and all(n_ == "waiting for %s to come back…" % _SVN for n_ in _seen6) and not (_bm6.get("note") or "").strip(),
+      "%r" % [_bs6, _br6.get("state"), _bm6, len(_ch6), _seen6[:2]])
+# away for both: failed, with the server's words, and that it was asked twice
+_o1("/stub-set", {"fail_count": 2, "fail_status": 503})
+_nsb7 = len(_o1("/stub")["calls"])
+_bs7 = _svq("/api/bench/start", "POST", {"target": "server", "server": _sid34, "models": ["small:8b"]})
+_bd7 = _b41_wait_run(60)
+_bm7 = ((_bd7.get("run") or {}).get("models") or [{}])[0]
+_ch7 = [c_ for c_ in _o1("/stub")["calls"][_nsb7:] if c_[1] == "/api/chat"]
+_o1("/stub-set", {"fail_count": 0, "fail_status": 0})
+check("benchmark servers (live): away for both askings: the row fails with the server's own words and says it was asked twice",
+      _bs7[0] == 200 and _bm7.get("status") == "failed" and len(_ch7) == 2
+      and _bm7.get("note") == "Failed: %s won’t run it right now: Ollama: stub away. It was asked twice." % _SVN,
+      "%r" % [_bs7, _bm7, len(_ch7)])
 # a profile's own: B sees none of A's runs or server, and can't start A's
 _pB41 = _svq("/api/test/profile", "POST", {"op": "create"})[1].get("name", "")
 _svq("/api/test/profile", "POST", {"op": "switch", "to": _pB41})

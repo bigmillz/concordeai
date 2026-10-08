@@ -65,6 +65,16 @@ class Stub:
         self.delay = 0.0
         self.reply_text = ""        # when set, the whole answer (a test that wants JSON back)
         self.fail_marker = ""       # when set, a chat whose last message holds it gets a 500
+        # Ollama unloads after it has answered keep_alive 0 (6b454): with a
+        # lag, /api/ps keeps listing an unloaded model for that many more
+        # reads. A model flagged "crowds" loads 85% on the card when another
+        # model is loaded, and wholly when alone (Ollama 0.40's fit to free
+        # memory).
+        self.unload_lag = 0
+        self.pending_unload = {}
+        # the next fail_count chats are answered with fail_status and an
+        # error body: Ollama away for a moment, as the gateway sees it
+        self.fail_status, self.fail_count = 0, 0
         # pulls: name -> [(digest, size, already on disk)], the digest the
         # model gets once pulled, and how many pulls fail before one works
         self.pull_layers = {}
@@ -96,7 +106,13 @@ class Stub:
                           for n, m in stub.models.items()]
                     return self.js(200, {"models": ms + [CLOUD, CLOUD2] + list(stub.extra_tags)})
                 if self.path == "/api/ps":
-                    return self.js(200, {"models": list(stub.loaded.values())})
+                    with stub.lock:
+                        for n in list(stub.pending_unload):
+                            stub.pending_unload[n] -= 1
+                            if stub.pending_unload[n] <= 0:
+                                stub.pending_unload.pop(n, None)
+                                stub.loaded.pop(n, None)
+                        return self.js(200, {"models": list(stub.loaded.values())})
                 if self.path == "/api/version":
                     return self.js(200, {"version": "0.34.4"})
                 self.js(404, {"error": "not found"})
@@ -161,14 +177,25 @@ class Stub:
                             else ["completion", "vision"] if m.get("vision") else ["completion"])
                     return self.js(200, {"model_info": m["info"], "capabilities": caps,
                                          "details": {"family": "x"}})
+                if self.path == "/api/chat" and stub.fail_count > 0:
+                    with stub.lock:
+                        stub.fail_count -= 1
+                    return self.js(stub.fail_status or 503, {"error": "stub away"})
                 if (stub.fail_marker and self.path == "/api/chat" and stub.fail_marker in str(
                         ((body.get("messages") or [{}])[-1] or {}).get("content", ""))):
                     return self.js(500, {"error": "refused by the test"})
                 if body.get("keep_alive") == 0:
-                    stub.loaded.pop(name, None)
+                    with stub.lock:
+                        if stub.unload_lag and name in stub.loaded:
+                            stub.pending_unload[name] = stub.unload_lag
+                        else:
+                            stub.loaded.pop(name, None)
                     return self.js(200, {"model": name, "done": True, "done_reason": "unload"})
                 ctx = (body.get("options") or {}).get("num_ctx", 4096)
                 share = m.get("share", 0.6 if m.get("spill") else 1.0)
+                if m.get("crowds") and any(n != name for n in stub.loaded):
+                    share = 0.85
+                stub.pending_unload.pop(name, None)
                 stub.loaded[name] = {"name": name, "model": name, "size": m["size"],
                                      "size_vram": int(m["size"] * share), "context_length": ctx,
                                      "expires_at": "2026-09-29T23:00:00Z"}

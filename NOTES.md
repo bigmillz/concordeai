@@ -95,6 +95,105 @@ on the server (it was not to be touched from here).
   `arp -n 192.168.86.10` should show `0:d8:61:c2:d2:c6` from then on, and `sudo ollama1-wifi status` on the server
   `Answers ARP only for its own address: yes`.
 
+## 6b454 — the server benchmark: a hiccup is waited for, the card is emptied before each load, refusals in the server's own words (app and kit, per Patrick)
+
+Patrick (2026-10-08): "We're still having issues with the benchmark feature too." His run against Ollama1: gemma4:e2b
+238.3 tok/s; gpt-oss:20b "Ollama1 answered with an error: Ollama stopped while loading the model."; hermes3:8b,
+llama3.2:1b and llama3.2:3b "Ollama1 didn't answer. It may be off, asleep or offline."; two `llamacpp:<sha>` rows
+"isn't installed"; ministral-3:14b "48.2 tok/s estimated · reads not measured". A second run (list refreshed):
+qwen3.5:9b "couldn't keep qwen3.5:9b in its memory, so it stopped." and qwen3.6:35b "is busy with other requests".
+Branch `benchfix-1008`. Not run on the server; the server needs the kit reinstalled for the gateway part.
+
+What the server's logs said (read by the coordinator): the gateway restarted twice during the first run (a kit
+reinstall), so gpt-oss's load got a 502, three models "didn't answer" a server that was back ten seconds later, and
+ministral's stream was cut before Ollama's last line, which the app took for a finished answer and scored from the
+pieces that had arrived. gemma4:26b's warm-up was refused 503 in 137 ms. In the second run qwen3.5:9b went 85% on
+the card because ministral-3:14b (9 GB) was still resident (the server runs `OLLAMA_MAX_LOADED_MODELS=2`; Ollama
+0.40.1 fits a new model to the memory the card has free instead of evicting the old one) and the gateway's GPU-only
+rule refused it (507 `gpu_spill`); the next model got 503 in 49 ms.
+
+- **The 503 rule.** Both quick 503s are `make_room` in `bin/ollama1-gateway`: it unloads what is in the way
+  (keep_alive 0) and reads `/api/ps` once, at once; Ollama answers keep_alive 0 before the weights have gone, so
+  the model is still listed and the request is refused `503 busy "the server could not unload another model
+  first; try again"`. (The 137 ms one may instead be its sibling, `"Ollama is not answering; try again"`, if the
+  reinstall had Ollama down at that second; the app treats both the same.) The gateway's 503 body already carries
+  the reason in `error`; the app threw it away ("is busy with other requests"). Now `wait_unloaded` polls
+  `/api/ps` every 0.25 s for up to `UNLOAD_WAIT_S` 5 s before `make_room` refuses.
+- **Kit: a spill beside another model is loaded again alone** (`settle_on_gpu`, in place of `ensure_on_gpu` for
+  chat and generate; embeddings keep the old at-once refusal). A GPU-only model under 100% on the card with another
+  model loaded: both are unloaded, confirmed through `/api/ps`, the model is loaded once more, and only a spill on
+  an empty card is refused. The journal says `make-room model=<the others>` then `gpu-spill-retry model=… gpu_pct=…`. The retry runs with
+  the GPU slot held, so it trips no "busy". The 507 body gains `gpu_pct` and `loaded_with` (the models that were
+  beside it) and its text says "alone on the card" or "X was still loaded and could not be unloaded". This hits
+  real chats too, whenever two models that don't fit together are used back to back.
+- **Kit: an unload through the gateway.** `keep_alive` is still dropped, except Ollama's own unload: a chat or
+  generate with `keep_alive: 0` (`"0"`, `"0s"`) and nothing to answer unloads the model, waits for `/api/ps` to stop
+  listing it and answers Ollama's own `{"model", "done": true, "done_reason": "unload"}` (503 `busy` if it would not
+  go; 404 if not installed). It takes the GPU slot, so it queues behind an answer on the card. A stream's error
+  line gains `status` (`{"error", "code", "status", "done": true}`), so a reader can tell the server's hiccup
+  (502, 503) from the model's refusal (404, 507). PROTOCOL.md 5 says all three.
+- **App: the server's hiccup is waited for, once** (`_bench_one`, `_BenchServer.again/wait_back`). A failure
+  that is the server's and not the model's — `ServerError.transient`: kind offline (not a time limit) or busy, a
+  502/503/504, an older kit's stream line `ollama` that says "stopped" or "not answering" — puts the row at
+  status `back`, "waiting for Ollama1 to come back…", polls the server's `/api/version` (the gateway answers it
+  from Ollama, so a 200 means both are up) every 2 s for `BENCH_BACK_S` 90 s (dev hook `bench-back=<s>`), then
+  asks the model once more; the second failure is final, "… It was asked twice."; a server that never comes back
+  fails "…, and Ollama1 didn't come back within 90 seconds". A refusal of the model itself (404, 507, 400, auth)
+  fails at once with its reason. The same wait runs at the start of a run when the check finds the server away.
+  `ServerError` keeps `status`, `detail` (the gateway's words) and `js` (its body), set by `_srv_fail`, which also
+  takes the status from a stream line's `status`.
+- **App: the card is emptied before each model** (`clear_card`): every model `/api/ps` lists is unloaded through
+  the gateway (the new unload; an older kit answers it as a no-op load), then `/api/ps` is watched until it lists
+  nothing, `BENCH_CLEAR_S` 15 s at most; what stays is kept (`still`) and named on the row. So every load is
+  measured from an empty card (the stub's small:8b now reads "timed", not "not measured"), and `was_loaded` means
+  "was loaded and wouldn't go".
+- **App: refusals in the server's words** (`_BenchServer.why`): a spill "Ollama1 loaded only 85% of qwen3.5:9b
+  on the card because ministral-3:14b was still loaded; its GPU-only rule unloaded it" (with "(an older kit: a
+  newer one empties the card first)" when the gateway didn't say what was beside it; ", even alone after it
+  unloaded X" after the kit's own retry; "…and couldn't be unloaded"); no fit "Ollama1 won't load it: it needs
+  about 17.2 GB and the card has 12.0 GB free" (from `need_bytes`/`budget_bytes`; "the server's memory" for a
+  ram model); busy "Ollama1 won't run it right now: the server could not unload another model first; try again";
+  Ollama away "On Ollama1, Ollama stopped while loading the model". `_bench_why(exc, eng)` asks the engine first;
+  the words still go through `_bench_scrub`.
+- **App: a cut stream is no result; an estimate says what it rests on.** `run()` marks Ollama's last line
+  (`raw["final"]`); a stream that ends without it (and not at the time limit) raises offline, transient, "Ollama1's
+  connection dropped before Ollama's last line, after 12 pieces had come" — that is what made ministral "48.2
+  tok/s estimated". When the last line comes without its counts, `bench_numbers` lists exactly which
+  (`missing`: eval_count, eval_duration, prompt_eval_count, prompt_eval_duration) and the row's note says "Ollama's
+  last line carried no eval_count or eval_duration, so the writing speed is this computer's count of the N pieces
+  that arrived over the time they took, network included; reads weren't measured." The headline wears a star
+  (`48.2*`, badge "estimated*") per the house rule for estimates. The request shape was already the same for every
+  model (an empty `generate` to load, then the one `chat`); ministral differed only in the cut.
+- **Order and overlap.** Unchanged and checked: a run's models go one at a time (`_bench_worker_remote`'s loop,
+  `_bench_one` synchronous); the gateway's GPU slot serialises on the server too. A failed model unloads nothing
+  itself (`close` is a no-op); what gets unloaded is the gateway's own doing (a spill) or the next model's
+  `clear_card`. The model list: the worker's `server_check` at the start is the refresh path (the same one as the
+  pane's refresh); `_bench_plan_remote` already drops `ollama_internal` names (6b448) and `prepare()` now refuses
+  one too ("…is Ollama's own cache copy, not a model"), so a stale page list can't run one.
+- **Page.** Status `back` shows the row's note and counts as under way (`bmStep`, `bmFrac`); the look of the
+  card is otherwise as it was.
+- **Tests.** Kit: `tests/test_gateway.py` `TestUnloadAndSpill` (6: the unload honoured for 0/"0"/"0s" and
+  answered in Ollama's shape with nothing forwarded, a chat with keep_alive 0 still a chat, 404 for a stranger; an
+  unload Ollama lands late is waited for and one that never lands is 503 after the wait; make_room waits for a
+  late unload instead of 503; a spill beside another model is loaded again alone and is 100% on the card, with and
+  without a lagging unload; a spill alone is refused with `gpu_pct` and `loaded_with`, and so is one that stays a
+  spill alone, saying so; the stream's error line carries `status`). `tests/stub_ollama.py`: `unload_lag` (/api/ps
+  keeps listing an unloaded model for N reads), a model flag `crowds` (85% on the card beside another, whole
+  alone), `fail_count`/`fail_status` (the next chats answered with an error). `mutate.py`: four new gpu mutants
+  (the spill not loaded again alone, the late unload not waited for, the unload not honoured, the unload answered
+  before it landed); `python3 tests/mutate.py gpu:` 8 mutants, 8 killed. Kit suite: 1954 tests OK (700 s), exit 0 (one earlier run had `test_cpu`'s probe test flake while two gauntlets shared the machine; alone it passes 3/3 and nothing here touches it).
+  Gauntlet: `_bm_hiccup` (which failures are transient and which the model's own; every wording above; a cut
+  stream; the missing list and the note; the cache copy and a missing model refused; the wait polls
+  `/api/version`, gives up on time, Stop cuts it); `_bm_node` (the `back` row and its share, the star); live on the
+  real gateway: the card emptied before each model and the event order (unload, load, chat, unload, load, unload),
+  sneaky:14b's spill worded with its share; Ollama away for one chat (a 503 after the stream's headers) seen as
+  "waiting for … to come back…" and the figures from the second asking; away for both askings failed "It was asked
+  twice."; the server off fails after the wait ("didn't come back within 6 seconds", hook `bench-back=6` on the
+  live copy); the first server-benchmark check now expects a timed load. Gauntlet: GAUNTLET_COUNT.
+- **Unverified on the server:** the whole thing, since the server was not touched. What to look for after the
+  kit reinstall: `gpu-spill-retry` lines in the journal when qwen3.5:9b follows ministral-3:14b; the benchmark's
+  rows for a run of all models with no `Failed:` but a genuine no-fit; `/api/ps` empty between models.
+
 ## 6b449 — the server lights are blue only in the fans' deep idle, never at idle 20% (kit, per Patrick)
 
 Patrick (2026-10-08): "the lights shouldn't be blue when it's on idle 20%, only idle 10%." Kit only (`ollama1/`),

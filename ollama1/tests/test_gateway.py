@@ -1315,6 +1315,146 @@ class TestMakeRoomSpilled(unittest.TestCase):
         self.assertEqual([m["name"] for m in json.loads(data)["models"]], ["small:8b"])
 
 
+class TestUnloadAndSpill(unittest.TestCase):
+    """6b454. An asked-for unload (keep_alive 0 with nothing to answer, as
+    Ollama spells it) is honoured, confirmed through /api/ps and answered
+    in Ollama's shape; an unload Ollama lands a moment late is waited for
+    instead of refused "busy"; a GPU-only model that spills beside another
+    loaded model is loaded again alone and only refused if it spills on an
+    empty card; a stream's error line says the status it would have had."""
+
+    def setUp(self):
+        from stub_ollama import llama_info
+        self.reset()
+        G["stub"].models["crowd:9b"] = {"size": 6 * GIB, "info": llama_info(), "crowds": True}
+
+    def tearDown(self):
+        self.reset()
+        G["stub"].models.pop("crowd:9b", None)
+
+    def reset(self):
+        G["stub"].loaded.clear()
+        G["stub"].pending_unload.clear()
+        G["stub"].unload_lag = 0
+        G["gw"].stats.loaded = []
+        G["mod"].UNLOAD_WAIT_S = 5.0
+
+    def chat(self, m, stream=False, **extra):
+        obj = {"model": m, "messages": [{"role": "user", "content": "x"}], "stream": stream}
+        obj.update(extra)
+        return call("POST", "/api/chat", obj)
+
+    def ps_names(self):
+        st, data, _ = call("GET", "/api/ps")
+        self.assertEqual(st, 200)
+        return [m["name"] for m in json.loads(data)["models"]]
+
+    def test_unload_is_honoured_and_confirmed(self):
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        self.assertIn("small:8b", G["stub"].loaded)
+        n = len(G["stub"].calls)
+        for ka in (0, "0", "0s"):
+            st, data, _ = call("POST", "/api/generate", {"model": "small:8b", "keep_alive": ka})
+            self.assertEqual(st, 200, data)
+            self.assertEqual(json.loads(data), {"model": "small:8b", "done": True, "done_reason": "unload"})
+        self.assertNotIn("small:8b", G["stub"].loaded)
+        sent = [c for c in G["stub"].calls[n:] if c[1] in ("/api/chat", "/api/generate")]
+        self.assertTrue(sent and all(c[2].get("keep_alive") == 0 and not c[2].get("prompt") for c in sent), sent)
+        self.assertEqual(self.ps_names(), [])
+        # keep_alive 0 WITH something to answer is a chat, and keep_alive is dropped as before
+        n = len(G["stub"].calls)
+        st, data, _ = self.chat("small:8b", keep_alive=0)
+        self.assertEqual(st, 200)
+        self.assertIn("small:8b", G["stub"].loaded)
+        chats = [c for c in G["stub"].calls[n:] if c[1] == "/api/chat"]
+        self.assertEqual(len(chats), 1)
+        self.assertNotIn("keep_alive", chats[0][2])
+        # an unload of a model that isn't installed is Ollama's own 404
+        st, data, _ = call("POST", "/api/generate", {"model": "nothere:1b", "keep_alive": 0})
+        self.assertEqual(st, 404)
+
+    def test_unload_waits_for_ollama(self):
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        G["stub"].unload_lag = 3
+        n = len(G["stub"].calls)
+        st, data, _ = call("POST", "/api/generate", {"model": "small:8b", "keep_alive": 0, "prompt": ""})
+        self.assertEqual(st, 200, data)
+        self.assertEqual(json.loads(data)["done_reason"], "unload")
+        self.assertNotIn("small:8b", G["stub"].loaded)
+        ps = [c for c in G["stub"].calls[n:] if c[1] == "/api/ps"]
+        self.assertGreaterEqual(len(ps), 3)
+        # one that never lands is refused, as "busy", after the wait
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        G["stub"].unload_lag = 1000
+        G["mod"].UNLOAD_WAIT_S = 0.6
+        t0 = time.monotonic()
+        st, data, _ = call("POST", "/api/generate", {"model": "small:8b", "keep_alive": 0})
+        self.assertEqual((st, json.loads(data)["code"]), (503, "busy"))
+        self.assertIn("could not unload", json.loads(data)["error"])
+        self.assertLess(time.monotonic() - t0, 5)
+
+    def test_make_room_waits_for_a_late_unload(self):
+        # a model partly in system memory sits on the card; Ollama lists it
+        # for three more /api/ps after the unload: the GPU-only chat waits
+        # for it instead of answering 503 "could not unload another model first"
+        G["stub"].loaded["sneaky:14b"] = {"name": "sneaky:14b", "model": "sneaky:14b", "size": 9 * GIB,
+                                          "size_vram": int(9 * GIB * 0.6), "context_length": 4096,
+                                          "expires_at": "2026-09-29T23:00:00Z"}
+        G["stub"].unload_lag = 3
+        st, data, _ = self.chat("small:8b")
+        self.assertEqual(st, 200, data)
+        self.assertEqual(self.ps_names(), ["small:8b"])
+
+    def test_spill_beside_another_model_is_loaded_again_alone(self):
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        n = len(G["stub"].calls)
+        st, data, _ = self.chat("crowd:9b")
+        self.assertEqual(st, 200, data)
+        self.assertTrue(json.loads(data)["message"]["content"].startswith("ANSWER-"))
+        self.assertEqual(self.ps_names(), ["crowd:9b"])
+        self.assertEqual(G["stub"].loaded["crowd:9b"]["size_vram"], 6 * GIB)     # wholly on the card
+        after = [c for c in G["stub"].calls[n:] if c[1] in ("/api/chat", "/api/generate")]
+        unloads = [c[2]["model"] for c in after if c[2].get("keep_alive") == 0]
+        self.assertEqual(sorted(unloads), ["crowd:9b", "small:8b"])
+        loads = [c for c in after if c[1] == "/api/generate" and c[2].get("prompt") == ""
+                 and c[2].get("keep_alive") != 0]
+        self.assertEqual(len(loads), 2)                                          # beside small, then alone
+        chats = [c for c in after if c[1] == "/api/chat"]
+        self.assertEqual(len(chats), 1)                                          # answered once
+        self.assertEqual(after.index(chats[0]), len(after) - 1)                  # and last
+        # the same model with a lag on the unload: still 200, the second load waited for the card to clear
+        self.reset()
+        G["stub"].models["crowd:9b"] = {"size": 6 * GIB, "info": __import__("stub_ollama").llama_info(),
+                                        "crowds": True}
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        G["stub"].unload_lag = 2
+        self.assertEqual(self.chat("crowd:9b")[0], 200)
+        self.assertEqual(self.ps_names(), ["crowd:9b"])
+
+    def test_spill_alone_is_refused_with_the_figures(self):
+        # sneaky:14b spills on an empty card: refused as before, and the body
+        # says how much was on the card and what else was loaded (nothing)
+        st, data, _ = self.chat("sneaky:14b")
+        self.assertEqual(st, 507)
+        d = json.loads(data)
+        self.assertEqual((d["code"], d["gpu_pct"], d["loaded_with"]), ("gpu_spill", 59, []))      # int(0.6 * 9 GiB) / 9 GiB
+        self.assertNotIn("alone on the card", d["error"])
+        self.assertEqual(self.ps_names(), [])
+        # beside small:8b: both unloaded, loaded again alone, still 60%: refused, and the body says so
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        st, data, _ = self.chat("sneaky:14b")
+        d = json.loads(data)
+        self.assertEqual((st, d["code"], d["gpu_pct"], d["loaded_with"]), (507, "gpu_spill", 59, ["small:8b"]))
+        self.assertIn("alone on the card", d["error"])
+        self.assertEqual(self.ps_names(), [])
+
+    def test_stream_error_carries_status(self):
+        st, data, _ = self.chat("sneaky:14b", stream=True)
+        self.assertEqual(st, 200)
+        lines = U.ndjson(data)
+        self.assertEqual((lines[0]["code"], lines[0]["status"], lines[0]["done"]), ("gpu_spill", 507, True))
+
+
 class TestLanMode(unittest.TestCase):
     """The LAN listener skips the Access JWT only when LAN mode is on and
     the caller is on the home network."""

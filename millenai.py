@@ -19233,10 +19233,29 @@ class ServerError(RuntimeError):
     fit, missing, server, gone, unpaired, crypto."""
 
     slow = False         # a time limit, not a refusal (ServerSlow): the server is up, only too slow for this
+    status = 0           # the HTTP status it came with (0: none, a dropped line or a stream's error line)
+    detail = ""          # the gateway's own words, printable, at most 160 characters (6b454)
+    js = None            # the refusal's body (the gateway's extras: gpu_pct, loaded_with, need_bytes, budget_bytes)
 
     def __init__(self, kind: str, text: str, code: str = ""):
         RuntimeError.__init__(self, text)
         self.kind, self.code = kind, code
+
+    @property
+    def transient(self) -> bool:
+        """The server's own hiccup rather than this request's refusal: it
+        didn't answer or dropped the line (not a time limit), it was busy,
+        or the gateway said Ollama was away (502, 503, 504, or the
+        "ollama" code with no status, an older kit's stream line). A
+        caller may wait for it and ask again (6b454)."""
+        if self.slow:
+            return False
+        if self.kind in ("offline", "busy"):
+            return True
+        if self.status in (502, 503, 504):
+            return True
+        return self.code == "ollama" and not self.status and (
+            "not answering" in self.detail or "stopped" in self.detail)
 
 
 class ServerSlow(ServerError):
@@ -19388,7 +19407,18 @@ def _srv_js(raw: bytes) -> dict:
 
 
 def _srv_fail(e, status: int, js: dict, model: str = "") -> ServerError:
-    """What a refusal means, in one line (PROTOCOL.md 3-5)."""
+    """What a refusal means, in one line (PROTOCOL.md 3-5). The error
+    keeps the status, the gateway's words and its body (6b454)."""
+    if not status and isinstance(js.get("status"), int) and not isinstance(js.get("status"), bool):
+        status = js["status"]           # a stream's error line says the status it would have had
+    se = _srv_fail_why(e, status, js, model)
+    se.status, se.js = int(status or 0), dict(js)
+    se.detail = " ".join("".join(ch for ch in str(js.get("error") or "")
+                                 if ch.isprintable()).split())[:160]
+    return se
+
+
+def _srv_fail_why(e, status: int, js: dict, model: str = "") -> ServerError:
     name, code = e["name"], str(js.get("code") or "")
     detail = " ".join("".join(ch for ch in str(js.get("error") or "")
                               if ch.isprintable()).split())[:160]
@@ -22504,6 +22534,11 @@ BENCH_KEEP_ALIVE = "45s"    # the app's own Ollama keep-alive (stream_ollama)
 BENCH_SETTLE_S = 8.0        # the longest wait for memory to come back
 BENCH_SETTLE_STEP = 0.5
 BENCH_SHOW = 20             # runs the pane can pick from
+# a server's own hiccup mid-run (6b454): how long the row waits for it to
+# answer again before the model is asked once more, and the poll's step
+BENCH_BACK_S = 90.0
+BENCH_BACK_STEP = 2.0
+BENCH_CLEAR_S = 15.0        # the server's card watched empty before a load
 BENCH_PASSAGE = (
     "Along sheltered estuaries on both sides of the North Atlantic, people "
     "once ground grain with the sea. A tide mill is a watermill that takes "
@@ -22665,6 +22700,12 @@ def bench_numbers(raw: dict) -> dict:
         out.update(gen_tokens=comp, prompt_tokens=pt, cached_tokens=cached)
     out["gen_tps"] = round(gen, 1) if gen else None
     out["prompt_tps"] = round(rd, 1) if rd else None
+    if raw.get("final"):
+        # the engine's last line came (6b454): name exactly what it lacked,
+        # so an estimate says what it rests on instead of "estimated"
+        out["missing"] = [k for k in ("eval_count", "eval_duration", "prompt_eval_count",
+                                      "prompt_eval_duration")
+                          if not (_bench_int if k.endswith("count") else _bench_pos)(raw.get(k))]
     ld = _bench_pos(raw.get("load_duration"))
     if ld:
         out.update(load_s=round(ld / 1e9, 2), load_src="engine")
@@ -23241,17 +23282,41 @@ def _bench_one(row: dict, keep: bool, eng=None):
         smp.start()
     ok = False
     try:
-        _bench_set(row, status="loading")
-        load = eng.load()
-        _bench_set(row, status="reading")
-        _bench_live["capped"] = False
-        cap = ctx_timer(BENCH_RUN_CAP, _bench_capped)
-        cap.start()
-        try:
-            raw = eng.run(lambda: _bench_set(row, status="writing"),
-                          lambda n: _bench_set(row, tok=n))
-        finally:
-            cap.cancel()
+        for attempt in (0, 1):
+            try:
+                _bench_set(row, status="loading", tok=0)
+                load = eng.load()
+                _bench_set(row, status="reading")
+                _bench_live["capped"] = False
+                cap = ctx_timer(BENCH_RUN_CAP, _bench_capped)
+                cap.start()
+                try:
+                    raw = eng.run(lambda: _bench_set(row, status="writing"),
+                                  lambda n: _bench_set(row, tok=n))
+                finally:
+                    cap.cancel()
+                break
+            except BenchStopped:
+                raise
+            except Exception as exc:
+                # THE SERVER'S OWN HICCUP, ONCE (6b454, per Patrick: "We're
+                # still having issues with the benchmark feature"): a line
+                # that dropped, a 502/503/504, a "busy" is not the model's
+                # failure. The row waits for the server to answer again
+                # (BENCH_BACK_S at most), then the model is asked once
+                # more; a refusal of the model itself (not installed, a
+                # spill, no fit) fails at once with the reason.
+                again = getattr(eng, "again", None)
+                if attempt == 0 and again is not None and again(exc):
+                    _bench_set(row, status="back", note=eng.back_line(), tok=0)
+                    if eng.wait_back():
+                        _bench_set(row, note="")
+                        continue
+                    raise RuntimeError("%s, and %s didn\u2019t come back within %s" % (
+                        _bench_why(exc, eng), eng.back_name(), _srv_span(BENCH_BACK_S)))
+                if attempt == 1 and again is not None and again(exc):
+                    raise RuntimeError("%s. It was asked twice" % _bench_why(exc, eng))
+                raise
         raw.update(load)
         raw["capped"] = _bench_live["capped"]
         _bench_live["capped"] = False
@@ -23269,7 +23334,7 @@ def _bench_one(row: dict, keep: bool, eng=None):
     except BenchStopped:
         _bench_set(row, status="stopped", note="Stopped.")
     except Exception as exc:
-        _bench_set(row, status="failed", note="Failed: %s." % _bench_why(exc))
+        _bench_set(row, status="failed", note="Failed: %s." % _bench_why(exc, eng))
     finally:
         done.set()
         if not remote:
@@ -23397,8 +23462,14 @@ def _bench_scrub(v, keys=()):
     return v
 
 
-def _bench_why(exc) -> str:
-    """An error as a row's note: one line, no home folder, no final stop."""
+def _bench_why(exc, eng=None) -> str:
+    """An error as a row's note: one line, no home folder, no final stop.
+    eng: an engine with its own words for a refusal (why(), 6b454)."""
+    if eng is not None and hasattr(eng, "why"):
+        try:
+            return _bench_scrub(eng.why(exc).rstrip(".")) or type(exc).__name__
+        except Exception:
+            pass
     t = " ".join(str(exc).split()).rstrip(".")[:160]
     return _bench_scrub(t) or type(exc).__name__
 
@@ -23944,14 +24015,17 @@ class _BenchServer:
     """One model on one of the profile's servers, through the app's own
     signed calls. The figures are Ollama's, from the last line the
     gateway passes through; the first token is timed here, and so
-    includes the network. Nothing is unloaded (the gateway drops
-    keep_alive), so a model already loaded has no load time to measure."""
+    includes the network. Before the load the server's card is emptied
+    (clear_card, 6b454), so every load is measured from nothing; a model
+    an older kit wouldn't unload has no load time to measure."""
     kind, name, remote = "server", "Ollama", True
 
     def __init__(self, e, model, seen):
         self.e, self.model, self.seen = e, model, seen or {}
         self.label = e["name"] + SERVER_SEP + model
         self.ps, self.was_loaded, self.place = {}, False, ""
+        self.still = []          # on the card when this load began and wouldn't go (6b454)
+        self.cleared = False     # the card was seen empty before the load
         for m in self.seen.get("models") or []:
             if m.get("name") == model:
                 self.place = m.get("placement") or ""
@@ -24008,16 +24082,145 @@ class _BenchServer:
         if not _srv_paired(self.e):
             raise ServerError("unpaired", "%s isn\u2019t paired with this computer."
                               % self.e["name"])
+        if ollama_internal(self.model):
+            raise ServerError("missing", "%s is Ollama\u2019s own cache copy, not a "
+                              "model (6b448)." % self.model)
         if self.model not in [m.get("name") for m in self.seen.get("models") or []]:
             raise ServerError("missing", "%s isn\u2019t installed on %s."
                               % (self.model, self.e["name"]))
         return None
 
+    # ---- the server's own hiccup, waited for (6b454)
+    def again(self, exc) -> bool:
+        """True for a failure that is the server's and not the model's:
+        the row may wait for the server and ask once more."""
+        return isinstance(exc, ServerError) and exc.transient
+
+    def back_name(self) -> str:
+        return self.e["name"]
+
+    def back_line(self) -> str:
+        return "waiting for %s to come back\u2026" % self.e["name"]
+
+    def wait_back(self, secs=None) -> bool:
+        """Polls the server's /api/version (the gateway answers it from
+        Ollama, so a 200 says both are up again), every BENCH_BACK_STEP
+        seconds for secs (BENCH_BACK_S; the dev hook bench-back shortens
+        it), and says whether it answered. Stop cuts the wait."""
+        if secs is None:
+            secs = float(_hook_arg("bench-back") or BENCH_BACK_S)
+        end = time.monotonic() + secs
+        while True:
+            if _bench_stop.wait(max(0.0, min(BENCH_BACK_STEP, end - time.monotonic()))):
+                raise BenchStopped()
+            if time.monotonic() >= end:
+                return False
+            try:
+                st, _js = _bench_wait(lambda: _srv_json(
+                    self.e, "GET", "/api/version", timeout=min(8.0, SRV_CONNECT_S)))
+                if st == 200:
+                    return True
+            except BenchStopped:
+                raise
+            except (ServerError, OSError, RuntimeError):
+                pass
+
+    def why(self, exc) -> str:
+        """A refusal in plain words, the gateway's own reason in them
+        (6b454: a spill names what was loaded beside the model, a refused
+        load says the memory it needed and what was free, a "busy" says
+        what the server was doing)."""
+        if not isinstance(exc, ServerError):
+            return str(exc)
+        name, js, det = self.e["name"], exc.js or {}, exc.detail
+        if exc.code == "gpu_spill" and not re.search(r"\(0% on GPU", det):
+            pct = js.get("gpu_pct")
+            m = re.search(r"\((\d+)% on GPU", det)
+            if not isinstance(pct, int) or isinstance(pct, bool):
+                pct = int(m.group(1)) if m else None
+            beside = [str(x) for x in (js.get("loaded_with") or []) if str(x)]
+            part = "%d%%" % pct if pct is not None else "part"
+            m2 = re.search(r"; (.+?) was still loaded and could not be unloaded", det)
+            if m2:
+                mid = " because %s was still loaded and couldn\u2019t be unloaded" % m2.group(1)
+            elif "alone on the card" in det and beside:
+                mid = ", even alone after it unloaded %s" % ", ".join(beside)
+            elif beside or self.still:
+                was = beside or list(self.still)
+                mid = " because %s %s still loaded" % (
+                    ", ".join(was), "was" if len(was) == 1 else "were")
+                if not beside:
+                    mid += " (an older kit: a newer one empties the card first)"
+            else:
+                mid = ", alone"
+            return "%s loaded only %s of %s on the card%s; its GPU-only rule unloaded it" % (
+                name, part, self.model, mid)
+        if exc.code == "gpu_fit":
+            need, have = _bench_int(js.get("need_bytes")), _bench_int(js.get("budget_bytes"))
+            if need and have is not None:
+                where = ("the card" if "VRAM" in det and "system memory" not in det
+                         else "the server\u2019s memory")
+                return "%s won\u2019t load it: it needs about %.1f GB and %s has %.1f GB free" % (
+                    name, need / 1e9, where, have / 1e9)
+            return "%s won\u2019t load it%s" % (name, (": " + det) if det else "")
+        if exc.kind == "busy":
+            return "%s won\u2019t run it right now: %s" % (
+                name, det or "it is busy with other requests")
+        if exc.code == "ollama" and det:
+            return "On %s, %s" % (name, det[0].lower() + det[1:] if det[:2] != "Ol" else det)
+        return str(exc)
+
+    def _unload(self, model: str):
+        """Ollama's own unload, through the gateway: keep_alive 0 with
+        nothing to answer (PROTOCOL.md 5, a kit of 6b454 or later; an
+        older one drops keep_alive and answers it as a load of a model
+        that is loaded already, a no-op)."""
+        obj = _srv_js(b"".join(self._lines("POST", "/api/generate", {
+            "model": model, "keep_alive": 0, "stream": False}, 60)))
+        if obj.get("error"):
+            raise _srv_fail(self.e, 0, obj, model)
+
+    def _loaded(self) -> list:
+        return [str(m.get("name") or m.get("model") or "")
+                for m in self._ps().get("models") or [] if isinstance(m, dict)
+                and (m.get("name") or m.get("model"))]
+
+    def clear_card(self):
+        """Every model off the server's card before this one loads (6b454,
+        from Patrick's run: ministral-3:14b left resident made qwen3.5:9b
+        load 85% on the card, and the gateway's GPU-only rule refused
+        it). Each is unloaded through the gateway, then /api/ps is watched
+        until it lists nothing, BENCH_CLEAR_S at most; what stays is kept
+        in self.still and named on the row if a spill follows."""
+        names = self._loaded()
+        self.still, self.cleared = [], not names
+        if not names:
+            return
+        for n in names:
+            try:
+                self._unload(n)
+            except BenchStopped:
+                raise
+            except ServerError as exc:
+                if exc.transient:
+                    raise
+                # the unload itself refused (an older kit's fit check on
+                # the model it answered as a load): /api/ps says what stayed
+        end = time.monotonic() + BENCH_CLEAR_S
+        while True:
+            left = self._loaded()
+            if not left or time.monotonic() >= end:
+                break
+            if _bench_stop.wait(0.5):
+                raise BenchStopped()
+        self.still, self.cleared = left, not left
+
     def load(self):
         def mine(ps):
             return [m for m in ps.get("models") or [] if isinstance(m, dict)
                     and (m.get("name") or m.get("model")) == self.model]
-        self.was_loaded = bool(mine(self._ps()))
+        self.clear_card()
+        self.was_loaded = self.model in self.still
         final, t_done = {}, None
         # an empty prompt loads the model and answers nothing; streamed,
         # because Cloudflare ends a plain call that takes over 100 s
@@ -24057,6 +24260,7 @@ class _BenchServer:
                             "num_predict": BENCH_MAX_TOKENS,
                             "num_ctx": BENCH_CTX}}
         raw["t_send"] = time.monotonic()
+        raw["final"] = False
         for line in self._lines("POST", "/api/chat", body, BENCH_RUN_CAP + 30):
             obj = _srv_js(line)
             if obj.get("error"):
@@ -24074,7 +24278,16 @@ class _BenchServer:
                 for k in ("eval_count", "eval_duration", "prompt_eval_count",
                           "prompt_eval_duration"):
                     raw[k] = obj.get(k)
+                raw["final"] = True
                 break
+        if not raw["final"] and not _bench_live["capped"]:
+            # THE STREAM ENDED WITHOUT OLLAMA'S LAST LINE (6b454): the
+            # gateway went away mid-answer (Patrick's ministral-3:14b came
+            # out "48.2 tok/s estimated" from the pieces before the cut).
+            # Not a result: the server's hiccup, waited for and asked again
+            raise ServerError("offline", "%s\u2019s connection dropped before Ollama\u2019s "
+                              "last line%s." % (self.e["name"], (", after %d pieces had come"
+                                                                  % raw["chunks"]) if raw["chunks"] else ""))
         if raw["t_first"] is None:
             raise RuntimeError(
                 "nothing came back within %d minutes" % (BENCH_RUN_CAP // 60)
@@ -24091,17 +24304,30 @@ class _BenchServer:
 
     def fix(self, nums: dict):
         nums["network"] = True
+        notes = []
         if nums.get("src") != "engine":
             nums["prompt_tps"] = None        # reads: only from the server's own numbers
-        if nums.get("load_src") == "engine":
-            return
-        if not self.was_loaded and nums.get("load_s") is not None:
-            nums["load_src"] = "timed"       # by this computer, network in it (6b409)
-            return
-        nums["load_s"], nums["load_src"] = None, "not measured"
-        nums["note"] = ("Already in the server\u2019s memory, so its load time "
-                        "wasn\u2019t measured." if self.was_loaded else
-                        "The server didn\u2019t report a load time.")
+            miss = nums.get("missing") or []
+            if miss:
+                # an estimate says what it rests on (6b454): Ollama's last
+                # line came, without these; the figure is this computer's
+                notes.append("Ollama\u2019s last line carried no %s, so the writing speed is "
+                             "this computer\u2019s count of the %d pieces that arrived over "
+                             "the time they took, network included%s." % (
+                                 " or ".join(miss), nums.get("gen_tokens") or 0,
+                                 "; reads weren\u2019t measured" if nums.get("prompt_tps") is None else ""))
+        if self.still and not self.was_loaded:
+            notes.append("%s stayed loaded on the card through this run." % ", ".join(self.still))
+        if nums.get("load_src") != "engine":
+            if not self.was_loaded and nums.get("load_s") is not None:
+                nums["load_src"] = "timed"       # by this computer, network in it (6b409)
+            else:
+                nums["load_s"], nums["load_src"] = None, "not measured"
+                notes.append("Already in the server\u2019s memory and it wouldn\u2019t unload, so "
+                             "its load time wasn\u2019t measured." if self.was_loaded else
+                             "The server didn\u2019t report a load time.")
+        if notes:
+            nums["note"] = " ".join(notes)
 
     def close(self, keep):
         pass
@@ -24360,9 +24586,29 @@ def _bench_worker_remote(run: dict, plan: dict):
                                        gpu.get("vram_bytes")]] if gpu else []}
                 run["versions"] = {"mlx_lm": None,
                                    "ollama": seen.get("version") or None}
+            if not _bench_stop.is_set() and seen.get("kind") == "offline":
+                # away as the run starts (6b454): the rows wait for it, as a
+                # row does mid-run, and the check is made once more
+                waiter = _BenchServer(e, "", seen)
+                for row in rows:
+                    _bench_set(row, status="back", note=waiter.back_line())
+                try:
+                    back = waiter.wait_back()
+                except BenchStopped:
+                    back = False
+                for row in rows:
+                    _bench_set(row, status="waiting", note="")
+                if back:
+                    try:
+                        seen = _bench_wait(lambda: server_check(e)) or {}
+                    except BenchStopped:
+                        seen = {}
             if not _bench_stop.is_set() and not (
                     seen.get("reachable") and seen.get("auth")):
                 why = seen.get("err") or "%s didn't answer." % e["name"]
+                if seen.get("kind") == "offline":
+                    why = "%s, and it didn\u2019t come back within %s" % (
+                        why.rstrip("."), _srv_span(float(_hook_arg("bench-back") or BENCH_BACK_S)))
                 for row in rows:
                     _bench_set(row, status="failed",
                                note="Failed: %s." % _bench_why(why))
@@ -46891,7 +47137,9 @@ const BM_STEP_S={checking:"checking the server",loading:"loading on the server",
   reading:"reading the passage",writing:"writing"};
 const BM_STEP_C={checking:"checking the key",loading:"sending",
   reading:"waiting for the first token",writing:"writing"};
-function bmStep(r){return (r.provider?BM_STEP_C:r.network?BM_STEP_S:BM_STEP)[r.status]||r.status;}
+// (6b454) "back": the row waits for its server to answer again, its note says so
+function bmStep(r){if(r.status==="back")return r.note||"waiting for the server to come back\u2026";
+  return (r.provider?BM_STEP_C:r.network?BM_STEP_S:BM_STEP)[r.status]||r.status;}
 const BM_GIB=1073741824;
 let bmSeq=0,bmT=0,bmErr="",bmShow="",bmCmp="";
 // (6b341) what the pane tests: "local", "srv:<server id>" or "cloud"; what
@@ -46911,9 +47159,9 @@ function bmFrac(run,max){
   const M=run.models||[],n=M.length;if(!n)return 0;
   let k=0;
   M.forEach((r,i)=>{
-    if(i!==run.cur){if(!["waiting","checking","loading","reading","writing"].includes(r.status))k+=1;return;}
+    if(i!==run.cur){if(!["waiting","checking","loading","reading","writing","back"].includes(r.status))k+=1;return;}
     k+=r.status==="writing"?.4+.6*Math.min(1,(r.tok||0)/max)
-      :({checking:.02,loading:.1,reading:.35}[r.status]||0);});
+      :({checking:.02,loading:.1,reading:.35,back:.05}[r.status]||0);});
   return Math.min(1,k/n);
 }
 // run-to-run noise measured about 0.5%: a change inside 3% is not news
@@ -46940,11 +47188,12 @@ function bmRow(r,cur,old,max,ow){
   let top='<span class="bm-n">'+esc(r.network&&r.model?r.model:r.label)+'</span>'
     +((r.provider||r.engine)?'<span class="bm-e">'+esc(r.provider||r.engine)+'</span>':"");
   if(done){
-    top+='<span class="bm-v">'+bmGen(r.gen_tps)+'<small>tok/s</small></span>';
+    // an estimate wears a star, and the row's note says what it rests on (6b454)
+    top+='<span class="bm-v">'+bmGen(r.gen_tps)+(bmEst(r)?"*":"")+'<small>tok/s</small></span>';
     // a model cut at the time limit is estimated, and never compared
     // (review of 6b331); a change inside run-to-run noise stays grey
     if(bmEst(r))top+='<span class="bm-d" title="'+(r.capped?'Cut at the time limit: counted from what arrived'
-      :'Counted from what arrived: no token count came with it')+'">estimated</span>';
+      :'Counted from what arrived: no token count came with it')+'">estimated*</span>';
     else if(old&&!bmEst(old)&&old.gen_tps>0&&r.gen_tps>0){
       const p=(r.gen_tps-old.gen_tps)/old.gen_tps*100;
       top+='<span class="bm-d'+(p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":"")+'" title="'

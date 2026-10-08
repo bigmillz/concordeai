@@ -430,7 +430,26 @@ Request shaping (so every request stands alone and stays on the GPU):
   prompt suffix images format options system template stream raw context
   think logprobs top_logprobs`; embed: `model input truncate options
   dimensions`). `keep_alive` is dropped: the server decides how long
-  weights stay loaded.
+  weights stay loaded. The one exception is Ollama's own unload: a
+  `chat` or `generate` with `keep_alive: 0` (or `"0"`, `"0s"`) and nothing
+  to answer (no `prompt`, no `messages`) unloads the model, waits for
+  `/api/ps` to stop listing it (up to 5 s) and answers Ollama's own
+  `{"model", "done": true, "done_reason": "unload"}`; 503 `busy` if it
+  would not go, 404 if it isn't installed. It takes the GPU's turn like a
+  request, so it waits behind an answer on the card rather than pulling
+  the weights from under it (6b454: the benchmark empties the card
+  before each model so every load is measured clean).
+- A GPU-only model that loads partly into system memory beside another
+  loaded model (Ollama 0.40 fits a new model to the memory the card has
+  free instead of evicting the one before it) is not refused at once:
+  both are unloaded, the model is loaded again alone, and only a spill on
+  an empty card is refused (507 `gpu_spill`, with `gpu_pct` and
+  `loaded_with`, the models that were beside it). The journal says
+  `make-room model=<the others>` then `gpu-spill-retry model=… gpu_pct=…`.
+- An error after a stream's headers have gone out is its last line,
+  `{"error", "code", "status", "done": true}`; `status` is the HTTP status
+  it would have had, so a reader can tell the server's own hiccup (502,
+  503) from a refusal of the model (404, 507).
 - Only sampling options go through (`temperature top_k top_p min_p
   typical_p repeat_last_n repeat_penalty presence_penalty
   frequency_penalty seed stop num_predict num_keep penalize_newline
@@ -485,7 +504,7 @@ Streaming (`stream` true, the default for chat and generate): once the
 request passes auth, validation and the fit estimate, the gateway sends
 `200` with `Content-Type: application/x-ndjson` and then waits its turn and
 loads the model. A failure after that point arrives as one last NDJSON
-line: `{"error": "...", "code": "gpu_spill" | "ram_pressure" | "ram_oom" | "busy" | "ollama", "done": true}`.
+line: `{"error": "...", "code": "gpu_spill" | "ram_pressure" | "ram_oom" | "busy" | "ollama", "status": 507 | 503 | 502, "done": true}`.
 The app must treat a line with `error` as the end of the answer.
 Prefer streaming: Cloudflare ends a non-streamed request whose answer
 takes longer than 100 s.

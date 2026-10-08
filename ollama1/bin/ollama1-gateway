@@ -92,6 +92,17 @@ FIELDS = {
     "embed": {"model", "input", "truncate", "options", "dimensions"},
     "embeddings": {"model", "prompt", "options"},
 }
+UNLOAD_WAIT_S = 5.0        # how long an asked-for unload may take to show in /api/ps (6b454)
+
+
+def is_unload(obj):
+    """Ollama's own unload request: keep_alive 0 (0, "0" or "0s") with
+    nothing to answer, no prompt and no messages (6b454)."""
+    ka = obj.get("keep_alive")
+    zero = (ka == 0 and not isinstance(ka, bool)) or ka in ("0", "0s")
+    return zero and not obj.get("prompt") and not obj.get("messages")
+
+
 SAMPLING_OPTIONS = {
     "temperature", "top_k", "top_p", "min_p", "typical_p", "repeat_last_n",
     "repeat_penalty", "presence_penalty", "frequency_penalty", "seed", "stop",
@@ -744,13 +755,27 @@ class Gateway:
             return
         for v in victims:
             self.unload(v, "unload: make room")
-        try:
-            left = self.loaded_names()
-        except (OSError, ValueError):
-            left = victims
-        if any(o1ollama.same_model(v, n) for v in victims for n in left):
+        if self.wait_unloaded(victims):
             raise GatewayError(503, "busy", "the server could not unload another model first; try again")
         log("make-room", model=",".join(victims))
+
+    def wait_unloaded(self, names, secs=None):
+        """Ollama answers keep_alive 0 before the weights have gone, so the
+        /api/ps right after it can still list the model (6b454: the
+        benchmark's next model was refused 503 in 49 ms, "could not unload
+        another model first", for an unload that landed a moment later).
+        Polled until none of names is listed or secs are up; returns the
+        names still loaded."""
+        end = time.monotonic() + (UNLOAD_WAIT_S if secs is None else secs)
+        while True:
+            try:
+                left = [n for n in self.loaded_names()
+                        if any(o1ollama.same_model(v, n) for v in names)]
+            except (OSError, ValueError):
+                left = list(names)
+            if not left or time.monotonic() >= end:
+                return left
+            time.sleep(0.25)
 
     def check_oom(self, before):
         """If Ollama's memory limit stopped the load, say so plainly."""
@@ -762,11 +787,15 @@ class Gateway:
                                "the model did not fit in memory: Ollama's memory limit stopped the load "
                                "(the server itself is fine); try a smaller num_ctx or model")
 
-    def check_placement(self, name, ram, before):
+    def check_placement(self, name, ram, before, n_ctx=None):
         """After loading: a GPU-only model must be 100% in VRAM; a 'ram'
         model may share, but loading it must not have pushed anything into
-        swap or left the machine without memory."""
+        swap or left the machine without memory. n_ctx: the context it was
+        loaded with, so a spill beside another model can be loaded again
+        alone (settle_on_gpu); None (an embedding) refuses a spill at once."""
         if not ram:
+            if n_ctx:
+                return self.settle_on_gpu(name, n_ctx)
             return self.ensure_on_gpu(name)
         share = self.gpu_share(name)
         if share is None:
@@ -854,7 +883,52 @@ class Gateway:
             log("gpu-spill", model=name, gpu_pct=int(share * 100))
             raise GatewayError(
                 507, "gpu_spill",
-                "model did not fit entirely in VRAM (%d%% on GPU); it was unloaded" % int(share * 100))
+                "model did not fit entirely in VRAM (%d%% on GPU); it was unloaded" % int(share * 100),
+                gpu_pct=int(share * 100))
+
+    def settle_on_gpu(self, name, n_ctx):
+        """A GPU-only model must be 100% in VRAM. Ollama 0.40 fits a new
+        model to the memory the card has free instead of evicting the one
+        loaded before it (OLLAMA_MAX_LOADED_MODELS=2), so a model that fits
+        an empty card spills when another is resident (6b454: qwen3.5:9b
+        went 85% on the GPU with ministral-3:14b still loaded). A spill
+        with another model loaded: both are unloaded, the model is loaded
+        once more alone, and only a spill on an empty card is refused. The
+        caller holds the GPU slot, so the second load trips no "busy"."""
+        share = self.gpu_share(name)
+        if share is None:
+            raise GatewayError(502, "ollama", "model did not load")
+        if share >= 1.0:
+            return
+        try:
+            others = [n for n in self.loaded_names() if not o1ollama.same_model(n, name)]
+        except (OSError, ValueError):
+            others = []
+        where = ""
+        if others:
+            self.unload(name, "unload: spill")
+            for o in others:
+                self.unload(o, "unload: make room")
+            left = self.wait_unloaded(others + [name])
+            if left:
+                where = "; %s was still loaded and could not be unloaded" % ",".join(left)
+            else:
+                log("make-room", model=",".join(others))
+                self.warm_load(name, n_ctx)
+                again = self.gpu_share(name)
+                if again is not None and again >= 1.0:
+                    log("gpu-spill-retry", model=name, gpu_pct=100)
+                    return
+                share = again or 0.0
+                where = ", alone on the card"
+            log("gpu-spill-retry", model=name, gpu_pct=int(share * 100))
+        self.stats.event("refused: gpu_spill", name)
+        self.unload(name)
+        log("gpu-spill", model=name, gpu_pct=int(share * 100))
+        raise GatewayError(
+            507, "gpu_spill",
+            "model did not fit entirely in VRAM (%d%% on GPU%s); it was unloaded" % (int(share * 100), where),
+            gpu_pct=int(share * 100), loaded_with=others)
 
     def warm_load(self, name, n_ctx, ram=False):
         was_loaded = any(o1ollama.same_model(m.get("name"), name) for m in self.stats.loaded)
@@ -1152,6 +1226,8 @@ def make_handler(gw, lan=False):
                 # the card belongs to a picture or video job until it ends (6b356)
                 raise GatewayError(503, "busy", "the server is making a picture or video; try again when it is done")
             name, entry = gw.local_model(obj.get("model"))
+            if kind in ("chat", "generate") and is_unload(obj):
+                return self.unload_job(name, dev_id, dev, t0)
             ram = gw.is_ram_model(name)
             fwd, n_ctx, explicit = gw.shape(kind, obj, name, entry, ram)
             fitted = gw.fit_check(name, entry, n_ctx or 2048, ram, explicit)
@@ -1185,7 +1261,7 @@ def make_handler(gw, lan=False):
                     except GatewayError:
                         gw.check_oom(oom_before)
                         raise
-                    gw.check_placement(name, ram, before)
+                    gw.check_placement(name, ram, before, n_ctx)
                     if streaming:
                         self.relay_stream(kind, fwd, rec, t0)
                     else:
@@ -1236,9 +1312,42 @@ def make_handler(gw, lan=False):
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
 
+        def unload_job(self, name, dev_id, dev, t0):
+            """Ollama's own unload (keep_alive 0, nothing to answer), the one
+            keep_alive the gateway honours (6b454): the model is unloaded
+            and that confirmed through /api/ps before the answer, so the
+            caller's next load starts from an empty card. Takes the GPU
+            slot, so it waits behind a request on the card rather than
+            pulling the weights from under it. Ollama's own answer shape."""
+            rec = {"t": int(gw.clock()), "device": dev["name"], "model": name, "kind": "unload",
+                   "status": 200, "ms": 0, "tokens": 0, "prompt_tokens": 0}
+            gw.stats.begin(dev_id, dev["name"])
+            got = None
+            try:
+                got = gw.slot.acquire(float(cfg["queue_wait_s"]))
+                if got != "ok":
+                    raise GatewayError(503, "busy", "the server is busy; try again shortly")
+                gw.unload(name, "unload: asked")
+                if gw.wait_unloaded([name]):
+                    raise GatewayError(503, "busy", "the server could not unload the model; try again")
+                self.send_json(200, {"model": name, "done": True, "done_reason": "unload"})
+            except GatewayError as e:
+                rec["status"], rec["code"] = e.status, e.code
+                raise
+            finally:
+                if got == "ok":
+                    gw.slot.release()
+                rec["ms"] = int((time.monotonic() - t0) * 1000)
+                gw.stats.end(dev_id, rec)
+                log("req", device=dev["name"], model=name, kind="unload", status=rec["status"],
+                    ms=rec["ms"], tokens=0, prompt_tokens=0)
+
         def stream_error(self, e):
             try:
-                line = {"error": str(e), "code": e.code, "done": True}
+                # status: the HTTP status this would have been before the
+                # headers went out (6b454), so a reader can tell the
+                # server's hiccup (502, 503) from the model's own refusal
+                line = {"error": str(e), "code": e.code, "status": e.status, "done": True}
                 line.update(getattr(e, "extra", {}) or {})
                 self.chunk(json.dumps(line).encode("utf-8") + b"\n")
                 self.end_chunks()

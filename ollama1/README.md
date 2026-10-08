@@ -28,7 +28,12 @@ however you like. This page writes it as `<server-name>`, your user as
   device names.
 - It runs on the GPU only. A model that can't fit entirely in the 16 GB of
   VRAM is refused. If one lands partly on the CPU anyway, it is unloaded and
-  the request gets an error.
+  the request gets an error — unless another model was loaded beside it
+  (Ollama 0.40 fits a new model to the memory the card has free instead of
+  evicting the old one): then both are unloaded and the model is loaded
+  once more alone, and only a spill on an empty card is refused. A paired
+  device can also ask for an unload itself (Ollama's own `keep_alive: 0`
+  with nothing to answer), which the benchmark does before each model.
 - It is locked down:
   - The firewall only lets in SSH, and only from the home LAN.
   - SSH accepts keys only (your Mac's), for the one user you name, with no
@@ -1860,7 +1865,7 @@ not apply. The services, timers, tunnel and config keep working: they live in
 | Before the body | Access and the signature headers (a paired device, a fresh timestamp) are checked before any body is read; at most 16 requests are handled at once; bodies are capped at 32 MiB (8 KiB for pairing). Any error closes the connection, so a leftover body can't pass as the next request on a connection cloudflared reuses |
 | Replay, old requests | 60 s timestamp window, nonces remembered for 2 minutes, anything signed before the gateway last started is refused |
 | Nothing mixes, nothing kept | One request at a time on the GPU. When the next request comes from a different paired device, every loaded model is unloaded first, so not even Ollama's prompt cache is shared (the cost: one reload when the device changes). No history; bodies are never written or logged (`tests/test_stateless.py` checks the source and does a live check with markers); Ollama and the gateway run with no core dumps and no swap, and Ollama at its normal log level (its debug levels could print prompts) |
-| GPU only | Fit estimate before loading, `/api/ps` must show 100% VRAM after. Options that change placement (`num_gpu`, etc.) are stripped. Ollama cloud models are refused |
+| GPU only | Fit estimate before loading, `/api/ps` must show 100% VRAM after (a spill beside another loaded model is loaded again alone first). Options that change placement (`num_gpu`, etc.) are stripped. Ollama cloud models are refused |
 | No model management from outside | The gateway passes on chat, generate, embed, tags, ps, show, version. Pull/delete/create/copy/push are 404. The panel can pull only allow-listed models. A paired device can apply a model set: the gateway can only start `ollama1-modelplan.service` (polkit), whose root program checks the request again, edits the allow-list and has Ollama delete and pull exactly those library models |
 | Admin only | Panel: Access JWT with your email on every request. Actions need a CSRF token, same-origin and JSON. It can only *start* fixed systemd units (polkit rule), never run a command |
 | Local users | `ollama1-nft` lets only the kit's users (and root) connect to Ollama, the gateway and the panel, on any of the machine's own addresses; the services won't start without it. The terminal has no TCP port at all |
