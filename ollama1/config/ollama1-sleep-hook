@@ -12,8 +12,8 @@
 # suspending it closes the device cleanly ('V') and waits (at most 5 s) until that
 # is done; after waking it reopens as soon as the system disk answers (or 90 s at
 # the latest, so a drive that never comes back still ends in a reset).
-# Wi-Fi backup (6b439): before suspending, the Wi-Fi card is set to wake the machine on a magic packet (or a
-# disconnect); after waking that is switched off again and networkd re-associates. The tool does nothing when
+# Wi-Fi backup (6b439): before suspending, the Wi-Fi card is set to wake the machine on a magic packet (never on
+# a disconnect, 6b457); after waking that is switched off again and networkd re-associates. The tool does nothing when
 # Wi-Fi backup is off, no network is set or there is no card, and whatever it does or says, the hook still exits 0.
 # Nothing stays loaded across a sleep (6b446): a model left on the card came back answering junk after a wake.
 # Last before suspending (so the watchdog and Wi-Fi steps never wait on Ollama), every model is unloaded, and if

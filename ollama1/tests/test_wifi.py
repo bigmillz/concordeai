@@ -532,7 +532,8 @@ class TestHook(Fixture):
         self.card(phy="phy3")
         r = self.hook_run("pre")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("iw phy phy3 wowlan enable magic-packet disconnect", self.log())
+        self.assertIn("iw phy phy3 wowlan enable magic-packet", self.log())
+        self.assertNotIn("disconnect", self.log())   # 6b457: a dropped association must not wake it
         self.assertEqual(open(self.wakeup).read(), "enabled")           # PCI wake is on for the card
         r = self.hook_run("post")
         self.assertEqual(r.returncode, 0)

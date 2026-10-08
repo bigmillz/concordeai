@@ -9,6 +9,19 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
+
+Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no
+wake request anywhere: no relay line on the Pi, nothing from the app, no gateway request after it. The log at the
+wake: `wlo1: CTRL-EVENT-DISCONNECTED ... reason=1 locally_generated=1`, then S3 resume. The Wi-Fi backup (6b439)
+armed the card with `iw phy <phy> wowlan enable magic-packet disconnect`, so the access point dropping the sleeping
+card was itself a wake event. With the cable as the main link that is a wake for nothing, and it breaks auto sleep
+whenever the router rekeys, roams or restarts.
+
+- `o1wifi.wowlan("enable")` now arms `magic-packet` only. Waking over Wi-Fi by a magic packet is unchanged.
+- `test_wifi`: the enable line has no `disconnect`. README (Honest limits) and the sleep hook comment say so.
+- Takes effect after a kit run on the server (`sudo ./setup.sh`).
+
 ## 6b450 — the Wi-Fi card no longer answers ARP for the wired address: SSH to the server stops timing out (kit, per Patrick)
 
 Seen on the server on 2026-10-07 and 2026-10-08, at least four times. Its wired bridge br0 has 192.168.86.10 (MAC

@@ -2002,8 +2002,8 @@ every address in the server's wake list (`/v1/sleep-config`, "N network cards
 can wake it" in the panel). Once Wi-Fi backup is on and a network is set, and
 `iw phy <phy> info` lists "wake up on magic packet" for the card, its MAC joins
 that list after the wired cards'. Before a suspend, the sleep hook enables
-the card's PCI wake and runs `iw phy <phy> wowlan enable magic-packet
-disconnect` (the phy is found from the card, not assumed); after the wake it
+the card's PCI wake and runs `iw phy <phy> wowlan enable magic-packet`
+(magic packet only, never "disconnect": 6b457) (the phy is found from the card, not assumed); after the wake it
 runs `wowlan disable` and has networkd look at the card again. All of that does
 nothing when Wi-Fi backup is off, no network is set or there is no card, and
 never delays or stops a suspend. The BIOS must allow wake from a PCI-E device
@@ -2024,8 +2024,9 @@ never delays or stops a suspend. The BIOS must allow wake from a PCI-E device
   your router bridges them, which most home routers do.
 - With the cable in, the wired card is the one that should wake it; the Wi-Fi
   card is a second chance, and a way back when the cable is out.
-- `wake up on disconnect` is also switched on, so the machine may wake when the
-  access point drops it.
+- Only a magic packet wakes it over Wi-Fi. "Wake up on disconnect" stays off:
+  with it on, the access point dropping the sleeping card woke the server for
+  nothing (seen 2026-10-08).
 - The app talks to the server at the address or name it was paired with.
   Through the Cloudflare tunnel that is a name, and the server's end of the
   tunnel goes out over whichever link has the default route, so the cable-out

@@ -242,7 +242,7 @@ def wowlan(action, root=None, run_=run, log=print):
                 continue
             if action == "enable":
                 set_wakeup(dev)
-                r = run_(["iw", "phy", dev["phy"], "wowlan", "enable", "magic-packet", "disconnect"], 10)
+                r = run_(["iw", "phy", dev["phy"], "wowlan", "enable", "magic-packet"], 10)   # not "disconnect" (6b457): the access point dropping a sleeping card woke the server
                 log("wifi wake: %s" % ("on" if ok(r) else "not turned on"))
             else:
                 run_(["iw", "phy", dev["phy"], "wowlan", "disable"], 10)
