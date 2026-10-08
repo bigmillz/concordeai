@@ -30368,6 +30368,14 @@ def _l31c_test(src):
         r = ns["server_wake_test"](ctx, sid)
         out["both refused"] = (r["ok"] is False and r["blocked"] is True and r["relay"] == {"ok": False, "err": "Relay refused the token."}
                                and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is True)
+        # 6b456: the broadcast leaves without error but the relay says no: ok stays
+        # true for the broadcast, and the relay's own failure travels with it
+        st["mode"] = "401"
+        ns["_srv_udp"] = lambda pkt, addr: events.append("udp")
+        r = ns["server_wake_test"](ctx, sid)
+        out["sent, relay refused"] = (r["ok"] is True and r["blocked"] is False and r["failed"] == 0
+                                      and r["relay"] == {"ok": False, "err": "Relay refused the token."})
+        st["mode"] = "ok"
         # relay only: no broadcast, no Mac needed, the card's words
         events.clear()
         st["mode"] = "ok"
@@ -30409,6 +30417,11 @@ def _l31c_text(src):
                     and '"Relay not reachable: %s" % _srv_relay_reason(ex)' in src
                     and 'const SRV_RELAY_HINT="Wake relay (advanced): a small service on your network that sends the wake-up '
                         'for you when you\\u2019re away. Address and token.";' in src)
+    out["wake button tells the relay"] = (
+        'const rl=d&&d.relay,rbad=rl&&!rl.ok' in src
+        and 'else if(d&&d.ok&&rbad)srvMsg(id,"Wake-up sent on this network, but the relay didn\\u2019t answer: "+rwhy+". Away from home, the relay is how the server gets woken.","warn");' in src
+        and 'else if(d&&d.ok&&rl)srvMsg(id,"Wake-up sent to "+s.name+", and the relay answered.","ok");' in src
+        and src.index("else if(d&&d.ok&&rbad)") < src.index("else if(d&&d.ok&&rl)") < src.index('else if(d&&d.ok)srvMsg(id,"Wake-up sent to "+s.name+".","ok")'))
     out["page"] = ('srvPost("wake-test",{id:id,relay_only:true})' in src and 'srvPost("relay",' in src
                    and src.count("srvRelayHtml(s)+'</div>'") == 2
                    and 'type="password" data-k="rtok"' in src
