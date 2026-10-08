@@ -181,7 +181,7 @@ rule refused it (507 `gpu_spill`); the next model got 503 in 49 ms.
   keeps listing an unloaded model for N reads), a model flag `crowds` (85% on the card beside another, whole
   alone), `fail_count`/`fail_status` (the next chats answered with an error). `mutate.py`: four new gpu mutants
   (the spill not loaded again alone, the late unload not waited for, the unload not honoured, the unload answered
-  before it landed); `python3 tests/mutate.py gpu:` 8 mutants, 8 killed. Kit suite: 1954 tests OK (700 s), exit 0 (one earlier run had `test_cpu`'s probe test flake while two gauntlets shared the machine; alone it passes 3/3 and nothing here touches it).
+  before it landed); `python3 tests/mutate.py gpu:` 8 mutants, 8 killed. Kit: `test_gateway` 111 tests OK; the full kit suite not re-run after the last edits.
   Gauntlet: `_bm_hiccup` (which failures are transient and which the model's own; every wording above; a cut
   stream; the missing list and the note; the cache copy and a missing model refused; the wait polls
   `/api/version`, gives up on time, Stop cuts it); `_bm_node` (the `back` row and its share, the star); live on the
@@ -189,7 +189,7 @@ rule refused it (507 `gpu_spill`); the next model got 503 in 49 ms.
   sneaky:14b's spill worded with its share; Ollama away for one chat (a 503 after the stream's headers) seen as
   "waiting for … to come back…" and the figures from the second asking; away for both askings failed "It was asked
   twice."; the server off fails after the wait ("didn't come back within 6 seconds", hook `bench-back=6` on the
-  live copy); the first server-benchmark check now expects a timed load. Gauntlet: GAUNTLET_COUNT.
+  live copy); the first server-benchmark check now expects a timed load. Full gauntlet not run by the helper; Patrick runs it.
 - **Unverified on the server:** the whole thing, since the server was not touched. What to look for after the
   kit reinstall: `gpu-spill-retry` lines in the journal when qwen3.5:9b follows ministral-3:14b; the benchmark's
   rows for a run of all models with no `Failed:` but a genuine no-fit; `/api/ps` empty between models.
