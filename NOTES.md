@@ -139,6 +139,74 @@ at 50 C the fans stay at 20% and the lights go blue anyway, the very thing Patri
   fans' status is stale for up to one 2 s poll (the own clock then, 300 s from the wake, until the fans' first
   write).
 
+## 6b451 — buttons line up with what sits beside them: one control-row rule (per Patrick)
+
+Patrick, with a screenshot of Settings › Personality's Refresh pill beside its "Updated …" line, the text
+sitting visibly higher than the button: "fix this misalignment and any others still in there. this has been an
+ongoing issue."
+
+A sweep, not one fix. Every row in the page where a button sits beside a field, another button or a line of
+text was measured in the Browser pane (getBoundingClientRect, 1100x800, a dev copy with a faked paired server
+so the card's rows drew). The rows that were off, before → after (height / vertical-centre difference):
+
+- Personality › Refresh + "Updated …": button 24.5px, text 16.5px, centres 4.1px apart → both centred on one
+  30px row, 0.0px apart. The button was `display:inline-block;vertical-align:middle` after a `<br>` beside a
+  baseline-aligned inline-block span: a line box can't centre those two on each other.
+- Cloud › key field + Save: field 28px, button 30.5px, same centre → both 30px.
+- Code lane › workspace folder + Use: field 32px, button 30.5px, 0.8px apart (the button `align-self:
+  flex-start` in a centred row) → both 30px, 0.0.
+- Code lane › SSH Save + Test connection: Save 30.5px, Test 45px when its text wrapped, 7.3px apart —
+  `#remote-foot` had no `align-items`, the button had `align-self:flex-start` → both 30px on one line, 0.0; the
+  row wraps whole buttons now, never their text.
+- Server tasks › search field + Close: field 32.5px, button 30.5px, 1.0px apart (top-aligned) → both 30px, 0.0.
+- Your servers › Test … + the red ✕: 30.5px and 28px (`line-height:1`), 1.3px apart → both 30px, 0.0.
+- Your servers › Access token fields + Save/Cancel: fields 28.5px, buttons 30.5px, same centre → all 30px.
+  Same for the wake relay's address/token fields (28.5 → 30) and the setup wizard's key field + Save.
+
+Already level, left alone: the composer's buttons, the brand row's icons beside the version, dialog footers
+(`.sh-foot`, `#about-foot`, `#wiz-foot`), the Update channel select in its label, the Usage head's selects, the
+pairing-code row (30 / 30.5), the sleep-minutes box beside "minutes", `#autoclean-bar`, the model studio
+cards' action row, and the Claude balance row 6b447 fixed on its own branch.
+
+Why it kept coming back: `.about-btn` is a block with `width:100%` and `margin-top:8px`, and `.about-btn.slim`
+adds `align-self:flex-start`, all meant for stacked dialog buttons. Every row then undid the margin on its own
+(`#ws-row .about-btn.slim{margin-top:0}` and eight more like it), none undid the flex-start, and the slim
+button's height was `line-height:normal`, which Blink and WKWebView size differently, beside fields of 28, 28.5,
+30, 32 and 32.5px. Each new row was a new chance to miss one of those.
+
+Fix, in `millenai.py`:
+- `.about-btn.slim` is one 30px line everywhere: `line-height:14px;box-sizing:border-box;min-height:30px` with
+  its 7px/14px padding (7+14+7+2 = 30 in both engines). `min-height`, not `height`, so an armed Remove still
+  wraps to two lines. The 24.5px Refresh pill is now the same 30px as every other slim button.
+- One shared control-row rule, right after it: `.ctlrow,.wkey,.srv-tokf,.srv-pair,.srv-acts,.srv-relaybtns,
+  .srv-wakerow{display:flex;align-items:center;min-width:0}`; its direct `.about-btn.slim` children
+  `width:auto;margin-top:0;flex:none;align-self:center;white-space:nowrap` (margin-top only: the selector is
+  three classes deep, and a first cut's `margin:0` beat `.srv-acts .srv-rm{margin-left:auto}` and pulled the
+  red ✕ off the right edge — caught by measuring the armed Remove); its direct inputs and selects
+  `height:30px;box-sizing:border-box;margin:0`. `.ctlrow[hidden]{display:none}` since an author `display`
+  outranks the UA's `hidden`. Each row keeps its own gap, wrap and margins. The server card's rows are named
+  in the selector because the gauntlet pins their markup strings; static markup carries `class="ctlrow"`:
+  the new `#sugg-row` (Refresh + status, in place of the `<br>`), `#cloudkey-row`, `#ws-row`, `#remote-foot`,
+  `#task-head`.
+- `#cloudkey-row` is a wrapping flex row instead of `grid 1fr auto` (`#ck-provider{flex:0 0 100%}`): the same
+  layout, one layout mode. `#remote-foot` gets `flex-wrap:wrap`.
+- Removed as redundant: the nine per-row `.about-btn.slim{margin-top:0}` patches, `#task-head .about-btn.slim
+  {margin-top:0;width:auto}`, `.wkey button{flex:none}`, `#sugg-note .about-btn.slim{…}`, and the
+  `display:flex;align-items:center` the shared rule now supplies for `#ws-row`, `#remote-foot`, `#task-head`,
+  `.wkey`. The asserted `.srv-wakerow`, `.srv-relaybtns`, `.srv-acts` rules are untouched.
+- Specificity order relied on, deliberately: `.srv-acts .srv-rm{margin-left:auto}` and `.srv-acts .srv-rm.armed
+  {white-space:normal}` come later in the sheet at equal specificity, so Remove still sits at the right edge and
+  still wraps when armed; `#task-q`'s 8px padding keeps its id and simply sits inside the 30px box (the text
+  isn't clipped; looked at in the pane).
+
+Tests: one served-HTML check, `6b451: slim buttons are one 30px line and every button-beside-a-field row shares
+one control-row rule`, in the starter-chips section after "starter chips: … are in place". No earlier check
+asserted the removed CSS.
+
+- **Unverified in WKWebView.** Measured in the Blink pane only; the explicit line-height and fixed heights are
+  there precisely so the two engines agree, but nobody has opened the shipped app on this build yet.
+- `elementFromPoint` at the centres of Refresh and its text returns the button and the span.
+
 ## 6b446 — nothing stays loaded on the card across a sleep; the idle clock counts a busy card (kit, per Patrick)
 
 What happened on the server (Ubuntu 26.04, RX 6900 XT, Ollama v0.40.0, ROCm): `ollama1-idle` suspended it at

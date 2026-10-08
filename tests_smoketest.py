@@ -17965,6 +17965,43 @@ _sg_bad = [n for n, f in _SG_STATIC if not f(_SG_PAGE, _MILLENAI_SRC)]
 check("starter chips: the page, the switch, the routes, the profile's file and the guards are in place (%d)" % len(_SG_STATIC),
       not _sg_bad, "%r" % _sg_bad)
 
+# 6b451, per Patrick: "fix this misalignment and any others still in there. this has been an
+# ongoing issue." Refresh sat as an inline-block button beside a baseline span, 4px off its
+# text; elsewhere a 30.5px button top-aligned against 28px and 32px fields through a
+# per-row margin-top:0 each. Now every slim button is one 30px line (explicit line-height,
+# min-height) and a button beside a field or text sits in one shared control row: centred,
+# no margin, the fields the same 30px. The per-row patches are gone.
+_AL_SLIM = _SG_PAGE[_SG_PAGE.find(".about-btn.slim{"):][:220]
+_AL_ROW = _SG_PAGE[_SG_PAGE.find(".ctlrow,.wkey,.srv-tokf,"):][:700]
+_AL_CK = _SG_PAGE[_SG_PAGE.find("#cloudkey-row{"):][:120]
+_al_bad = [n for n, ok in [
+    ("slim 30px line", ".about-btn.slim{padding:7px 14px;font-size:12px;line-height:14px;\n"
+     "  box-sizing:border-box;min-height:30px;margin-top:8px;" in _AL_SLIM),
+    ("one row rule", ".ctlrow,.wkey,.srv-tokf,.srv-pair,.srv-acts,.srv-relaybtns,.srv-wakerow{\n"
+     "  display:flex;align-items:center;min-width:0}" in _AL_ROW),
+    ("hidden still hides", ".ctlrow[hidden]{display:none}" in _AL_ROW),
+    # margin-top only: the selector is three classes deep and a bare margin:0 beat
+    # .srv-acts .srv-rm's margin-left:auto, pulling Remove off the right edge
+    ("the button centred, no top margin", "width:auto;margin-top:0;flex:none;align-self:center;white-space:nowrap}" in _AL_ROW
+     and "width:auto;margin:0;flex:none" not in _AL_ROW),
+    ("fields the button's height", ".ctlrow>input,.ctlrow>select,.wkey>input,.srv-tokf>input,.srv-pair>input{\n"
+     "  height:30px;box-sizing:border-box;margin:0}" in _AL_ROW),
+    ("Refresh in a row, not after a <br>", '<div id="sugg-row" class="ctlrow"><button class="about-btn slim" '
+     'id="sugg-refresh" type="button">Refresh</button><span id="sugg-status"></span></div>' in _SG_PAGE
+     and "#sugg-note .about-btn.slim{display:inline-block" not in _SG_PAGE
+     and "#sugg-status{display:inline-block;margin-top:6px}" not in _SG_PAGE),
+    ("the static rows carry the class", all(s in _SG_PAGE for s in (
+        '<div id="cloudkey-row" class="ctlrow">', '<div id="ws-row" class="ctlrow">',
+        '<div id="remote-foot" class="ctlrow">', '<div id="task-head" class="ctlrow">'))),
+    ("the cloud key row wraps instead of a grid", "flex-wrap:wrap" in _AL_CK and "grid-template-columns" not in _AL_CK
+     and "#ck-provider{flex:0 0 100%;width:100%}" in _SG_PAGE),
+    ("no per-row margin patches left", ".about-btn.slim{margin-top:0}" not in _SG_PAGE
+     and "#task-head .about-btn.slim{margin-top:0;width:auto}" not in _SG_PAGE
+     and ".wkey button{flex:none}" not in _SG_PAGE),
+] if not ok]
+check("6b451: slim buttons are one 30px line and every button-beside-a-field row shares one control-row rule",
+      not _al_bad, "%r" % _al_bad)
+
 # ---- live: a copy of its own, the model replaced by a stand-in (suggest-fake)
 _SG_NOW = int(time.time() * 1000)
 _SG_CORE = [("Replacing front brake pads", "How do I replace the front brake pads on my Civic?"),

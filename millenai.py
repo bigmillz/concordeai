@@ -35041,9 +35041,8 @@ mark.find-hit.cur{background:#ffd60a;color:#101013}
 .tcat.on{color:#fff;background:rgba(255,255,255,.055);
   border-left-color:#ececec}
 #task-main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
-#task-head{display:flex;gap:8px;padding:14px 16px;
+#task-head{gap:8px;padding:14px 16px;
   border-bottom:1px solid var(--line-soft)}
-#task-head .about-btn.slim{margin-top:0;width:auto}
 #task-q{flex:1;min-width:0;background:rgba(0,0,0,.3);color:var(--text);
   border:1px solid var(--line);border-radius:9px;padding:8px 11px;
   font-size:12.5px;outline:none}
@@ -35545,8 +35544,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   background:rgba(255,255,255,.045);
   border:1px solid rgba(255,255,255,.08)}
 #ws-bar[hidden]{display:none}
-#ws-row{display:flex;gap:7px;align-items:center}
-#ws-row .about-btn.slim{margin-top:0}
+#ws-row{gap:7px}
 #ws-path{flex:1;background:rgba(18,20,26,.7);color:var(--text);
   border:1px solid rgba(255,255,255,.12);border-radius:8px;
   font:12px var(--mono);padding:7px 9px;outline:none;min-width:0}
@@ -35592,8 +35590,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 #rm-host{flex:1}#rm-user{width:78px}#rm-port{width:52px}
 #rm-key,#rm-jump{width:100%;box-sizing:border-box;font-size:11px}
 #rm-jump{margin-top:6px}
-#remote-foot{display:flex;gap:7px;margin-top:7px}
-#remote-foot .about-btn.slim{margin-top:0}
+#remote-foot{flex-wrap:wrap;gap:7px;margin-top:7px}
 #rm-note{font-size:11px;color:var(--faint);margin-top:7px;min-height:13px;
   line-height:1.4;white-space:pre-wrap}
 /* the live approval card in the answer stream */
@@ -35945,8 +35942,36 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .set-h{font-family:var(--mono);font-size:9px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--faint);opacity:.8;
   margin-bottom:10px}
-.about-btn.slim{padding:7px 14px;font-size:12px;margin-top:8px;
+/* a slim button is one 30px line in both engines (6b451): an explicit
+   line-height instead of "normal", which Blink and WKWebView size
+   differently, so a 30.5px button never sits beside a 28px field again.
+   min-height, not height: an armed Remove still wraps to two lines */
+.about-btn.slim{padding:7px 14px;font-size:12px;line-height:14px;
+  box-sizing:border-box;min-height:30px;margin-top:8px;
   align-self:flex-start}
+/* THE CONTROL ROW (6b451, per Patrick: "fix this misalignment and any
+   others still in there. this has been an ongoing issue."): wherever a
+   button sits beside a field or a line of text, the row is one shared
+   rule. .about-btn is a block with an 8px top margin and align-self:
+   flex-start, meant for stacked dialog buttons; every row used to undo
+   that on its own and still top-aligned a 30.5px button against a 28px
+   or 32px field. Here the row centres, the button drops its top margin,
+   width and flex-start, and the row's fields take the button's 30px, so
+   the pair share one centre and one height. Each row keeps its own gap,
+   wrap and margins. Static rows carry .ctlrow; the server card's rows
+   are named, since the gauntlet pins their markup. Only margin-top is
+   reset: this selector is three classes deep and would otherwise beat
+   .srv-acts .srv-rm's margin-left:auto, which keeps Remove at the
+   right edge. */
+.ctlrow,.wkey,.srv-tokf,.srv-pair,.srv-acts,.srv-relaybtns,.srv-wakerow{
+  display:flex;align-items:center;min-width:0}
+.ctlrow[hidden]{display:none}
+.ctlrow>.about-btn.slim,.wkey>.about-btn.slim,.srv-tokf>.about-btn.slim,
+.srv-pair>.about-btn.slim,.srv-acts>.about-btn.slim,
+.srv-relaybtns>.about-btn.slim,.srv-wakerow>.about-btn.slim{
+  width:auto;margin-top:0;flex:none;align-self:center;white-space:nowrap}
+.ctlrow>input,.ctlrow>select,.wkey>input,.srv-tokf>input,.srv-pair>input{
+  height:30px;box-sizing:border-box;margin:0}
 .about-btn.danger:hover{border-color:rgba(226,109,90,.5);
   color:#e8907e}
 #cloudkey-head em{font-style:normal;opacity:.65;font-size:9px;
@@ -35958,10 +35983,10 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 #cloudkey-head{font-family:var(--mono);font-size:10px;
   letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
   margin-bottom:8px}
-#cloudkey-row{display:grid;gap:8px;
-  grid-template-columns:1fr auto;align-items:center}
-#ck-provider{grid-column:1 / -1;width:100%}
-#cloudkey-row .about-btn.slim{margin-top:0}
+/* a wrapping .ctlrow (6b451): the provider takes the first line, the
+   key and Save share the second, at the same 30px as the button */
+#cloudkey-row{flex-wrap:wrap;gap:8px}
+#ck-provider{flex:0 0 100%;width:100%}
 #ck-provider{background:rgba(18,20,26,.7);color:var(--text);
   border:1px solid rgba(255,255,255,.12);border-radius:8px;
   font-size:12px;padding:6px 6px;outline:none}
@@ -37122,9 +37147,11 @@ body.gen #chip-model{color:var(--accent)}
 #p-persona .toggle-row span{color:var(--dim)}
 #sugg-note{font-size:11px;line-height:1.5;color:var(--faint);
   margin:2px 2px 2px 36px}
-#sugg-note .about-btn.slim{display:inline-block;width:auto;margin:6px 8px 0 0;
-  padding:4px 12px;vertical-align:middle}
-#sugg-status{display:inline-block;margin-top:6px}
+/* Refresh and its "Updated …" line are one .ctlrow (6b451): as an
+   inline-block button with vertical-align:middle beside a baseline
+   span, the text sat 4px above the button's centre */
+#sugg-row{margin-top:6px;gap:8px}
+#sugg-status{min-width:0}
 #len-head{font-family:var(--mono);font-size:9px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--faint);margin-bottom:9px;
   display:flex;justify-content:space-between;align-items:baseline;gap:10px}
@@ -37249,7 +37276,6 @@ body.gen #chip-model{color:var(--accent)}
   border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:12px;
   padding:6px 9px;outline:none;font-family:var(--helv)}
 .srv-tokf input:focus{border-color:rgba(143,157,255,.6)}
-.srv-tokf .about-btn.slim{margin-top:0}
 .srv-relay{margin-top:8px}
 .srv-relay .srv-tokf{flex-wrap:wrap}
 /* the relay's address about twice the token's width, each a full row when narrow, and
@@ -37257,7 +37283,6 @@ body.gen #chip-model{color:var(--accent)}
 .srv-relayf input[data-k="rurl"]{flex:2 1 220px}
 .srv-relayf input[data-k="rtok"]{flex:1 1 120px}
 .srv-relaybtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.srv-relaybtns .about-btn.slim{margin-top:0}
 .srv-st{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.45}
 .srv.ok .srv-st{color:#9fd8b4}
 .srv.warn .srv-st{color:#d9c08a}
@@ -37269,7 +37294,6 @@ body.gen #chip-model{color:var(--accent)}
 .srv-m{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
 .srv-m i{font-style:normal;color:var(--faint)}
 .srv-pair{display:flex;gap:8px;align-items:center;margin-top:9px}
-.srv-pair .about-btn.slim,.srv-acts .about-btn.slim{margin-top:0}
 .srv .about-btn.slim,#srv-add .about-btn.slim{width:auto;flex:none}
 .srv-hint{font-size:11px;color:var(--faint);margin-top:5px;line-height:1.45}
 .srv-acts{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;align-items:center}
@@ -37298,7 +37322,6 @@ body.gen #chip-model{color:var(--accent)}
 .srv-msg:empty,#srv-note:empty{display:none}
 .srv-amber{color:#d9c08a}
 .srv-wakerow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.srv-wakerow .about-btn.slim{margin-top:0}
 /* the pane's buttons one step lighter (6b442, per Patrick: "a little bit lighter colored");
    Remove keeps its red edge */
 #p-servers .about-btn.slim:not(.danger){border-color:var(--line-hi)}
@@ -37469,12 +37492,11 @@ body.gen #chip-model{color:var(--accent)}
   text-decoration:none;white-space:nowrap}
 .wprov-row .wlink:hover{text-decoration:underline}
 .wprov-row .wok{color:#a8cf9f;font-size:12px}
-.wkey{display:flex;gap:8px;margin-top:9px}
+.wkey{gap:8px;margin-top:9px}
 .wkey[hidden]{display:none}
 .wkey input{flex:1;min-width:0;box-sizing:border-box;
   background:rgba(0,0,0,.3);border:1px solid var(--line);
   border-radius:8px;color:var(--text);padding:7px 10px;font-size:12px}
-.wkey button{flex:none}
 .wnote{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.45}
 #wiz-foot{display:flex;align-items:center;gap:12px;margin-top:16px;
   padding-top:14px;border-top:1px solid var(--line-soft)}
@@ -37886,7 +37908,7 @@ body.gen #chip-model{color:var(--accent)}
 __CODE_ROWS__
     <div id="ws-bar" hidden>
       <div class="set-h">Workspace folder</div>
-      <div id="ws-row">
+      <div id="ws-row" class="ctlrow">
         <input id="ws-path" placeholder="~/code/my-project"
                autocomplete="off" spellcheck="false">
         <button class="about-btn slim" id="ws-set">Use</button>
@@ -37920,7 +37942,7 @@ __CODE_ROWS__
              autocomplete="off" spellcheck="false">
       <input id="rm-jump" placeholder="jump host, if the server needs one  —  user@bastion:22"
              autocomplete="off" spellcheck="false">
-      <div id="remote-foot">
+      <div id="remote-foot" class="ctlrow">
         <button class="about-btn slim" id="rm-save">Save</button>
         <button class="about-btn slim" id="rm-test">Test connection</button>
         <button class="about-btn slim" id="rm-forget" hidden>Forget its old key</button>
@@ -38054,7 +38076,7 @@ __CODE_ROWS__
       <div id="task-cats"></div>
     </nav>
     <div id="task-main">
-      <div id="task-head">
+      <div id="task-head" class="ctlrow">
         <input id="task-q" placeholder="Search tasks…" autocomplete="off"
                spellcheck="false">
         <button class="about-btn slim" id="task-close">Close</button>
@@ -38241,8 +38263,8 @@ __CODE_ROWS__
       <div class="toggle-row on" id="sugg-toggle"
            title="The three chips above the message box follow what you ask about most.">
         <div class="switch"></div><span>Personalise suggestions</span></div>
-      <div id="sugg-note">Reads the titles of your recent chats, nothing else. Your server writes the chips, else this computer; the cloud only in Cloud Only.<br>
-        <button class="about-btn slim" id="sugg-refresh" type="button">Refresh</button><span id="sugg-status"></span></div>
+      <div id="sugg-note">Reads the titles of your recent chats, nothing else. Your server writes the chips, else this computer; the cloud only in Cloud Only.
+        <div id="sugg-row" class="ctlrow"><button class="about-btn slim" id="sugg-refresh" type="button">Refresh</button><span id="sugg-status"></span></div></div>
     </section>
     <section class="spane" id="p-cloud">
       <div class="set-h">Cloud power</div>
@@ -38258,7 +38280,7 @@ __CODE_ROWS__
         title="Answers come from a cloud service instead of this computer. Your prompts leave this computer while this is on, and whenever you pick the Cloud Only tier. Pictures and videos use a saved Gemini key either way; keys stay saved when it is off.">i</i></label>
       <div id="turbo-note" hidden></div>
       <div id="cloudkey-box">
-        <div id="cloudkey-row">
+        <div id="cloudkey-row" class="ctlrow">
           <select id="ck-provider">
             <option value="gemini">Gemini (free tier)</option>
             <option value="groq">Groq (free tier)</option>
