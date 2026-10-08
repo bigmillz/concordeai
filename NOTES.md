@@ -253,6 +253,48 @@ empty while the card was full. App only; the kit is untouched.
   shown as the fallback. Verified in a windowless dev copy on 9896 with a stubbed `srvUse`: the label reads
   "OLLAMA1 VRAM" and the bar's width is the card's share.
 
+## 6b453 — the starter chips are worded to fit their chips: 30 characters, whole, no ellipsis (per Patrick)
+
+Patrick (2026-10-08), with a screenshot of the three chips above the composer, each cut off ("🎹 How do I choose a
+piano for home…", "🌍 What is the official language spok…", "🏠 How did households manage with…"): "Make sure the
+suggestions are worded such that they fit into the chips."
+
+- **Where the chips come from.** The three personal chips are written by a model in the background pass of 6b390/6b438
+  (`SUGGEST_PROMPT`, the person's server first, else a loaded local model, the cloud in Cloud Only), filtered by
+  `_suggest_chip`, kept in the profile's `suggest.json` and drawn three at a time. The fixed pool (`SUGG_SETS`, the
+  page's own list) fills in when there are none. 6b438 asked for 5 to 12 words and let a chip run to 90 characters,
+  and the CSS (`.sugg[data-own]{max-width:calc((100% - 14px)/3)}`) made three share the 780 px row, so almost every
+  personal chip ended in an ellipsis. The fixed chips are never cut: they take their natural width and the one-row
+  trim drops whole chips that wrap, so they are left as they were.
+- **The limit, measured.** In a dev copy at the app's default 1320 x 860 window: the row is 780 px, a personal chip
+  254 px, less 26 px padding and 18 px for the emoji and its space, 208 px of text at 12 px Space Grotesk. Ordinary
+  question text measures 6.1 px a character (6.9 all in capitals), so 32 to 34 characters fit; **30** is the limit
+  (`SUGGEST_CHIP_MAX`, the emoji not counted), 5 to 8 words (`SUGGEST_WORDS_MAX` was 16). The prompt now says so ("at
+  most 30 characters, counting spaces ... because it must fit a small button whole"), says a long question is
+  shortened by choosing fewer, plainer words and never cut off, and shows Patrick's piano chip as the too-long
+  example and two 29-character ones as good. A chip over the limit is **dropped** by `_suggest_chip`, never cut
+  mid-word (the pass asks for six a topic, so a dropped one leaves five). The collapsed-text test is gone from the
+  chip filter: it needs twelve words in a row, which eight words can't hold.
+- **A file from before.** `suggest.json` written under the old rules holds 90-character chips. `suggest_read` now
+  reads a v2 file whose chips don't all pass the present rules the way it reads a v1 file (`_suggest_chips_current`):
+  the long ones go, the short stay, the pool is rebuilt, `upgraded:true` and `sig:""` so a new pass is due at once.
+  Proved over the wire: a seeded old file gave no long chip on the first look and a pass started (asks 1 to 2).
+- **Narrow windows.** At the 940 px minimum window the row is 592 px and a chip holds 145 px of text, about 23
+  characters, so a 30-character chip still can't fit there. The page clips it at a **word boundary** with an ellipsis
+  (`suggFitWords`, run after the one-row trim and at every resize, the text put back whole first so a wider window
+  shows it whole again); the full question stays in the title and is what a click sends. The CSS ellipsis stays as
+  the last resort. Verified in the pane: at 1320 all three chips `scrollWidth == clientWidth`, whole; at 940 each
+  ends at a word ("🛠️ How often should I…"), and a click typed the whole question. Screenshots (the pane, 1320 wide):
+  `scratchpad/chips-before-1320.png` (the old wording, three ellipses) and `scratchpad/chips-after-1320.png`.
+- **Gauntlet** ("starter chips"): the fixtures rewritten under 30 characters; 86 unit checks (30 kept, 31 refused,
+  the prompt's own examples pass and its bad ones are refused, a v2 file with long chips re-read), 30 page and source
+  checks (the limit, the word clip, the clip after the trim and at a resize, the click sending the title, the old
+  file re-read), a new check "a chip fits its chip whole (6b453)", 107 mutants (31 and 90 allowed, the old file
+  shown, the page cutting mid-word, the clipped text sent, the prompt without its length or its example).
+- Not verified: WKWebView's text widths (measured in the pane's Blink only; the 10 percent margin is for that), and
+  how a real 3B to 12B model keeps to 30 characters (the fakes prove the filter; a model that runs long simply
+  leaves fewer chips a topic, and the pass is not asked again for it).
+
 ## 6b446 — nothing stays loaded on the card across a sleep; the idle clock counts a busy card (kit, per Patrick)
 
 What happened on the server (Ubuntu 26.04, RX 6900 XT, Ollama v0.40.0, ROCm): `ollama1-idle` suspended it at

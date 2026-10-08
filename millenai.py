@@ -13583,8 +13583,15 @@ SUGGEST_LABELS = 30              # the newest this many topic labels
 SUGGEST_LABEL_MAX = 60           # a label is cut here
 SUGGEST_AGE_S = 6 * 3600         # a kept summary is looked at again after this
 SUGGEST_RETRY_S = 15 * 60        # a pass that gave nothing is not repeated sooner
-SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 90   # characters, the emoji not counted
-SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 16  # a chip is a sentence, not a label
+# A CHIP FITS ITS CHIP (6b453, per Patrick: "Make sure the suggestions are
+# worded such that they fit into the chips."): three personal chips share
+# the composer's 780 px row, so each is 254 px; less its padding and the
+# emoji, 208 px of text at 12 px Space Grotesk, which is 32 to 34
+# characters of ordinary question text (measured in the page; 6.1 px a
+# character, 6.9 for capitals). 30 leaves the margin. A longer one is
+# dropped, never cut mid-word.
+SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 30   # characters, the emoji not counted
+SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 8   # a chip is a sentence, not a label
 SUGGEST_TOPICS = 4               # topics kept
 SUGGEST_PER_TOPIC = 6            # chips kept per topic
 SUGGEST_TOPIC_MIN = 2            # a topic with fewer good chips is dropped
@@ -13603,9 +13610,12 @@ SUGGEST_PROMPT = (
     "newest first. Group them into at most 4 topics and count how many lines "
     "each topic covers. For every topic write 6 different follow-up "
     "questions this person might type to a chatbot next. Each one must be a "
-    "complete, natural question: a full sentence of 5 to 12 words that starts "
+    "complete, natural question: a full sentence of 5 to 8 words that starts "
     "with a question word (what, why, how, which, can, should, is, does...) "
     "and ends with a question mark, with one fitting emoji at the start. "
+    "Each question is SHORT: at most 30 characters, counting spaces, not "
+    "counting the emoji, because it must fit a small button whole. A long "
+    "question is shortened by choosing fewer, plainer words, never cut off. "
     "Each must clearly be about that topic and specific: it may name the "
     "thing the chats were about (a kind of product, a city, a subject), but "
     "never a person's name, an email address, a link or a number. Each must "
@@ -13613,9 +13623,11 @@ SUGGEST_PROMPT = (
     "ask, and must never be a topic label or a repeat of a line below.\n"
     "Bad (labels and fragments): \"\U0001F697 Vehicle performance?\", "
     "\"\U0001F30D New culture facts?\"\n"
-    "Good (whole questions, one step further): "
-    "\"\U0001F527 How do I tell when brake rotors need replacing too?\", "
-    "\"\U0001F35D What can I cook ahead for a week of busy dinners?\"\n"
+    "Bad (too long for the button): "
+    "\"\U0001F3B9 How do I choose a piano for home practice?\"\n"
+    "Good (whole, short questions, one step further): "
+    "\"\U0001F527 Are my brake rotors worn too?\", "
+    "\"\U0001F35D Which meals keep all week?\"\n"
     "Answer in exactly this form and nothing else:\n"
     "TOPIC: <the topic in one to three words> | COUNT: <number of lines>\n"
     "- <emoji> <question>\n- <emoji> <question>\n- <emoji> <question>\n"
@@ -13682,11 +13694,12 @@ _SUGGEST_Q_RX = re.compile(
 
 def _suggest_chip(raw: str, labels: list, hide: set):
     """One starter question as the page shows it ("🔧 How do I ..."), or
-    None when it isn't safe or good to show: not 20 to 90 characters or 5 to
-    16 words, not a question (no question word first, no "?" last: a label
+    None when it isn't safe or good to show: not 20 to 30 characters or 5 to
+    8 words (6b453: a longer one would not fit its chip whole, and it is
+    dropped rather than cut), not a question (no question word first, no "?" last: a label
     like "Vehicle performance?" is out), with an address, a link, a long
     number or a tender topic in it, a word of the person's own name or
-    place, collapsed text, or the same as a chat they already have."""
+    place, or the same as a chat they already have."""
     s = " ".join(str(raw or "").split())
     s = re.sub(r"^(?:[-*•]|\d+[.)])\s*", "", s).strip("\"'*` ")
     m = re.match(r"^([^\w\"'(]{1,8})\s*(.+)$", s)
@@ -13699,8 +13712,10 @@ def _suggest_chip(raw: str, labels: list, hide: set):
     if not body.endswith("?") or not _SUGGEST_Q_RX.match(body):
         return None
     if re.search(r"https?:|www\.|@|\.com\b|\d{4,}|[<>{}|\\]", body) \
-            or _TENDER_RX.search(body) or _looks_degenerate(body):
+            or _TENDER_RX.search(body):
         return None
+    # (the collapsed-text test of 6b390 is gone with 6b453: it needs twelve
+    # words in a row, and a chip of eight words cannot hold them)
     w = _suggest_words(body)
     if w & hide:
         return None
@@ -13790,19 +13805,34 @@ def suggest_pick(cache: dict, rng=random, k: int = SUGGEST_SHOW) -> list:
     return out
 
 
+def _suggest_chips_current(d: dict) -> bool:
+    """Whether every chip kept in d passes the present rules as it is: a
+    file from before 6b453 may hold chips too long for their chip."""
+    for t in d.get("topics") or []:
+        if not isinstance(t, dict):
+            continue
+        for c in t.get("chips") or []:
+            if not isinstance(c, str) or _suggest_chip(c, [], set()) != c:
+                return False
+    return True
+
+
 def suggest_read(ctx) -> dict:
     """The kept summary. A v1 file (three chips a topic, no pool) is upgraded
     in the reading: the chips the present rules still accept stay (a topic
-    with fewer than two goes), and it is marked so a new pass is due at once."""
+    with fewer than two goes), and it is marked so a new pass is due at once.
+    A v2 file written under older rules (6b453: chips up to 90 characters,
+    which overran their chips) is read the same way, so a long chip is never
+    shown again and shorter ones are asked for at once."""
     try:
         d = _read_json(SUGGEST_FILE, ctx, dict)
     except (StoreReadError, NoProfile, StaleProfile):
         return {}
     if not isinstance(d, dict):
         return {}
-    if d.get("v") == 2:
+    if d.get("v") == 2 and _suggest_chips_current(d):
         return d
-    if d.get("v") == 1:
+    if d.get("v") in (1, 2):
         tps = []
         for t in d.get("topics") or []:
             if not isinstance(t, dict):
@@ -13904,26 +13934,27 @@ def _suggest_local_label():
 _SUGGEST_FAKE = (
     "TOPIC: car repairs | COUNT: 6\n"
     "- \U0001F527 How do I change my brake pads?\n"
-    "- \U0001F697 Why is my car shaking at speed?\n"
+    "- \U0001F697 Why does my car shake so much?\n"
     "- \U0001F6E0\uFE0F How often should I change oil?\n"
-    "- \U0001F6DE When should I rotate my tires again?\n"
-    "- \U0001F50B How can I tell a weak battery from a bad alternator?\n"
-    "- \U0001F4A1 Why does my check engine light keep coming back?\n"
+    "- \U0001F6DE When should I rotate my tires?\n"
+    "- \U0001F50B Why does my battery die fast?\n"
+    "- \U0001F4A1 Why is the engine light on?\n"
     "TOPIC: healthy eating | COUNT: 2\n"
-    "- \U0001F957 What are easy healthy dinners for busy weeknights?\n"
-    "- \U0001F34E How do I cut down on sugar without cravings?\n"
-    "- \U0001F966 Which vegetables keep best for a week of meal prep?\n"
+    "- \U0001F957 What are easy healthy dinners?\n"
+    "- \U0001F34E How do I cut sugar cravings?\n"
+    "- \U0001F966 Which vegetables keep a week?\n"
     "- Meal prep ideas\n"
     "TOPIC: sourdough | COUNT: 1\n"
-    "- \U0001F35E Why is my sourdough starter not rising?\n")
+    "- \U0001F35E Why won't my sourdough rise?\n")
 _SUGGEST_UNSAFE = (
     "TOPIC: car repairs | COUNT: 5\n"
     "- \U0001F527 Email me at pat@example.com about brakes\n"
     "- \U0001F697 See https://example.com/brakes for pads\n"
-    "- \U0001F6E0 How do I deal with my anxiety about cars?\n"
+    "- \U0001F6E0 How do I calm my car anxiety?\n"
     "- \U0001F527 Vehicle performance?\n"
     "- \U0001F30D New culture facts?\n"
-    "- \U0001F527 Brakes?\n")
+    "- \U0001F527 Brakes?\n"
+    "- \U0001F3B9 How do I choose a piano for home practice?\n")
 
 
 def _suggest_hooked() -> bool:
@@ -36242,10 +36273,13 @@ body.gen #chip-model{color:var(--accent)}
   transition:background .15s,border-color .15s,color .15s;
   animation:suggIn .3s ease both;
 }
-/* the chips from the person's chats are whole questions, longer than the
-   fixed ones (6b438): three share the row and a long one is cut with an
-   ellipsis, the full text kept for the click and the tooltip; on a narrow
-   window each may take the whole row and the one-row trim keeps the first */
+/* the chips from the person's chats are whole questions (6b438): three
+   share the row. Each is worded to fit its third whole (6b453: the server
+   keeps a chip under 30 characters, measured against this width); on a
+   window too narrow for that the page clips at a word boundary
+   (suggFitWords), the ellipsis here only a last resort, the full text kept
+   for the click and the tooltip; on a narrow window each may take the
+   whole row and the one-row trim keeps the first */
 .sugg{max-width:100%}
 .sugg[data-own]{max-width:calc((100% - 14px)/3)}
 @media (max-width:640px){.sugg[data-own]{max-width:100%}}
@@ -42700,6 +42734,30 @@ function suggOk(c){
   return typeof c==="string"&&c.length>=20&&/\?\s*$/.test(c)
     &&c.split(/\s+/).length>=6;               // the emoji counts as a word
 }
+// A CHIP SHOWS ITS WHOLE QUESTION (6b453, per Patrick: "Make sure the
+// suggestions are worded such that they fit into the chips."): the server
+// keeps each under 30 characters, which fits the 254 px chip of the 780 px
+// row whole. A narrower window (the 940 px minimum holds 23) still has to
+// clip, and then at a WORD boundary with an ellipsis, never mid-word; the
+// whole question stays in the title and is what a click sends. Run after
+// the row trim and again at a resize; the text is put back whole first so
+// a wider window shows it whole again.
+function suggFitWords(box){
+  box.querySelectorAll(".sugg[data-own]").forEach(el=>{
+    const full=el.getAttribute("title")||el.textContent;
+    if(el.textContent!==full)el.textContent=full;
+    const words=full.trim().split(/\s+/);
+    let guard=0;
+    while(el.scrollWidth>el.clientWidth&&words.length>3&&guard++<12){
+      words.pop();
+      el.textContent=words.join(" ")+"\u2026";
+    }
+  });
+}
+addEventListener("resize",()=>{
+  const b=$("#suggest");
+  if(b&&!b.hidden)suggFitWords(b);
+});
 function suggLoad(){
   if(suggFlight)return;
   suggAsked=Date.now();suggFlight=true;
@@ -42820,7 +42878,7 @@ function paintSuggest(){
   // anything that wrapped past the FIRST row (6b248, per Patrick: one
   // row only, even if that means 3-4 chips). Chip widths vary with
   // the text, so a fixed count would either overflow or leave a gap.
-  requestAnimationFrame(()=>{
+  const trimRow=()=>{
     const kids=[...box.children];
     if(!kids.length)return;
     const rows=[...new Set(kids.map(k=>
@@ -42829,11 +42887,16 @@ function paintSuggest(){
     kids.forEach(k=>{
       if(keep.indexOf(Math.round(k.getBoundingClientRect().top))<0)k.remove();
     });
-  });
+    suggFitWords(box);
+  };
+  requestAnimationFrame(trimRow);
+  setTimeout(trimRow,60);         // hidden documents never run rAF
   box.querySelectorAll(".sugg").forEach(el=>{
     el.addEventListener("click",()=>{
-      // the emoji is decoration for the chip, not part of the question
-      input.value=el.textContent.replace(/^[^\w"'(]+\s*/,"").trim();
+      // the emoji is decoration for the chip, not part of the question;
+      // a clipped chip sends its whole question (the title)
+      input.value=(el.getAttribute("title")||el.textContent)
+        .replace(/^[^\w"'(]+\s*/,"").trim();
       input.dispatchEvent(new Event("input"));
       syncSuggest();
       send();

@@ -17512,25 +17512,26 @@ def _sgc(cid, title, q, lane="ai", ts=0):
     return c
 
 
-_SG_CAR = ["\U0001F527 How do I change my brake pads?", "\U0001F697 Why is my car shaking at speed?",
-           "\U0001F6E0\uFE0F How often should I change oil?", "\U0001F6DE When should I rotate my tires again?",
-           "\U0001F50B How can I tell a weak battery from a bad alternator?",
-           "\U0001F4A1 Why does my check engine light keep coming back?"]
-_SG_EAT = ["\U0001F957 What are easy healthy dinners for busy weeknights?",
-           "\U0001F34E How do I cut down on sugar without cravings?",
-           "\U0001F966 Which vegetables keep best for a week of meal prep?"]
+# every chip at most 30 characters beside its emoji (6b453): the width of a third of the 780 px row
+_SG_CAR = ["\U0001F527 How do I change my brake pads?", "\U0001F697 Why does my car shake so much?",
+           "\U0001F6E0\uFE0F How often should I change oil?", "\U0001F6DE When should I rotate my tires?",
+           "\U0001F50B Why does my battery die fast?",
+           "\U0001F4A1 Why is the engine light on?"]
+_SG_EAT = ["\U0001F957 What are easy healthy dinners?",
+           "\U0001F34E How do I cut sugar cravings?",
+           "\U0001F966 Which vegetables keep a week?"]
 # the reply as a model writes it: a fragment among the good ones, and a topic with one good chip
 _SG_REPLY = ("TOPIC: car repairs | COUNT: 6\n- " + "\n- ".join(_SG_CAR)
              + "\nTOPIC: healthy eating | COUNT: 2\n- " + "\n- ".join(_SG_EAT) + "\n- Meal prep ideas\n"
-             + "TOPIC: sourdough | COUNT: 1\n- \U0001F35E Why is my sourdough starter not rising?\n")
-_SG_B90 = "How do I change my brake pads " + "a" * 59 + "?"      # 90 characters exactly
-_SG_CAR2 = ["\U0001F697 Why is my car so loud at low speed?", "\U0001F527 Why is my car slow to accelerate lately?"]
+             + "TOPIC: sourdough | COUNT: 1\n- \U0001F35E Why won't my sourdough rise?\n")
+_SG_B30 = "How do I change my brake pads?"      # 30 characters exactly
+_SG_CAR2 = ["\U0001F697 Why is my car so loud lately?", "\U0001F527 Why is my car slow to start?"]
 
 
 def _sg_unit(src):
     """Every behaviour of the pass that needs no running copy, by name."""
     o = {}
-    labels = ["Replacing front brake pads", "Easy weeknight pasta"]
+    labels = ["Front brake pads wear", "Easy weeknight pasta"]
     ns = _sg_ns(src)
     chip = lambda raw, lb=labels, hide=frozenset(): ns["_suggest_chip"](raw, lb, set(hide))
     o["a good chip kept as written"] = chip("\U0001F527 How do I change my brake pads?") == "\U0001F527 How do I change my brake pads?"
@@ -17540,9 +17541,13 @@ def _sg_unit(src):
         chip("\U0001F527 Brakes?") is None and chip("\U0001F527 Why?!") is None and chip("\U0001F527 Why brake pads wear?") is None
         and chip("\U0001F527 How do brakes work?") is None and chip("\U0001F527 How is it?") is None
         and chip("\U0001F527 " + "How do I change my brake pads " * 4 + "?") is None and chip("\U0001F527 Brakesbrakesbrakes") is None
-        and chip("\U0001F527 How is it that I can do so much on my own if it is not a big deal at all?") is None)
-    o["90 characters kept, 91 refused"] = (len(_SG_B90) == 90 and chip("\U0001F527 " + _SG_B90) is not None
-                                           and chip("\U0001F527 " + _SG_B90[:-1] + "a?") is None)
+        and chip("\U0001F527 How is it that I can do so much on my own if it is not a big deal at all?") is None
+        and chip("\U0001F527 Why do I go to bed at 2 am?") is None)       # nine words in 27 characters
+    o["30 characters kept, 31 refused (6b453): a longer one is dropped, never cut"] = (
+        len(_SG_B30) == 30 and chip("\U0001F527 " + _SG_B30) == "\U0001F527 " + _SG_B30
+        and chip("\U0001F527 " + _SG_B30[:-1] + "s?") is None
+        and chip("\U0001F3B9 How do I choose a piano for home practice?") is None
+        and chip("\U0001F30D What is the official language spoken in Brazil?") is None)
     o["20 characters kept, 19 refused"] = (chip("\U0001F527 How do I fry an egg?") is not None
                                            and chip("\U0001F527 How do I fry an eg?") is None)
     o["fragments and labels with a question mark refused"] = all(chip(x) is None for x in (
@@ -17555,62 +17560,69 @@ def _sg_unit(src):
         and chip("\U0001F527 My brake pads wear fast, why?") is None
         and chip("\U0001F527 Brake pad prices in my own town?") is None)
     o["real questions kept"] = all(chip(x) == x for x in (
-        "\U0001F30D Which cities in Portugal are best for a first trip?",
-        "\U0001F373 Can learning to cook at home really save money?",
-        "\U0001F6D2 Should I buy a heat pump or a gas furnace this year?",
-        "\U0001F4D6 Explain how compound interest works in simple terms?",
-        "\U0001F4BB Tell me which laptop suits video editing best?",
-        "\U0001F4C8 Isn't a slow start to the day worth fixing first?"))
+        "\U0001F30D Which Portuguese city is best?",
+        "\U0001F373 Can home cooking save money?",
+        "\U0001F6D2 Should I buy a heat pump?",
+        "\U0001F4D6 Explain how interest adds up?",
+        "\U0001F4BB Tell me which laptop is best?",
+        "\U0001F4C8 Isn't a slow start fixable?"))
     o["an address, a link or a long number refused"] = all(chip(x) is None for x in (
-        "\U0001F527 Can I email me at pat@example.com about brakes?", "\U0001F527 Should I see www.example.org for brake pads?",
-        "\U0001F527 Can I call 5551234567 about brake pads?", "\U0001F527 Should I read https://example.com for brake pads?",
-        "\U0001F527 Is it example.com for brake pads, then?"))
+        "\U0001F527 Can I email pat@example.com?", "\U0001F527 Should I see www.example.org?",
+        "\U0001F527 Can I call 5551234 for help?", "\U0001F527 Should I read https://x.io?",
+        "\U0001F527 Is it example.com for brakes?"))
     o["a tender topic refused"] = all(chip(x) is None for x in (
-        "\U0001F9E0 How do I deal with my anxiety at work?", "\U0001F494 Should I leave my marriage this year?",
-        "\U0001F48A Which medications mix badly with coffee?", "\U0001FAC2 What do I say when grieving a friend?"))
+        "\U0001F9E0 How do I handle work anxiety?", "\U0001F494 Should I leave my marriage?",
+        "\U0001F48A Do medications mix with tea?", "\U0001FAC2 What helps a grieving friend?"))
     o["a word of the person's own name or place refused"] = (
-        chip("\U0001F697 How do I fix a car in Denver today?", hide={"denver"}) is None
-        and chip("\U0001F697 How do I fix a car in Denver today?") is not None)
+        chip("\U0001F697 How do I fix a car in Denver?", hide={"denver"}) is None
+        and chip("\U0001F697 How do I fix a car in Denver?") is not None)
     o["a copy of a chat they already have refused"] = (
-        chip("\U0001F527 How do I do replacing front brake pads?") is None
-        and chip("\U0001F527 Is replacing front brake pads hard?") is None
-        and chip("\U0001F527 How do I change spark plugs myself?") is not None)
-    o["collapsed text refused"] = chip("\U0001F527 Why " + "go " * 12 + "go?") is None
+        chip("\U0001F527 Why do front brake pads wear?") is None
+        and chip("\U0001F527 How do front brake pads wear?") is None
+        and chip("\U0001F527 How do I change spark plugs?") is not None)
     parse = lambda t, lb=labels, hide=frozenset(): ns["suggest_parse"](t, lb, set(hide))
     tp = parse(_SG_REPLY, labels * 4)
     o["a reply read into topics, the biggest first, six and three chips, a fragment and a one-chip topic dropped"] = (
         [t["topic"] for t in tp] == ["car repairs", "healthy eating"] and [t["n"] for t in tp] == [6, 2]
         and [t["chips"] for t in tp] == [_SG_CAR, _SG_EAT])
-    tp2 = parse("TOPIC: cooking | COUNT: 1\n- \U0001F373 How do I fry an egg without sticking?\n- \U0001F373 Why does my omelette turn out rubbery?\n"
-                "TOPIC: cars | COUNT: 9\n- \U0001F697 Why is my car so loud at low speed?\n- \U0001F697 Why is my car so loud at low speed?\n"
-                "- \U0001F527 Why is my car slow to accelerate lately?\n")
+    tp2 = parse("TOPIC: cooking | COUNT: 1\n- \U0001F373 How do I fry an egg neatly?\n- \U0001F373 Why is my omelette rubbery?\n"
+                "TOPIC: cars | COUNT: 9\n- \U0001F697 Why is my car so loud lately?\n- \U0001F697 Why is my car so loud lately?\n"
+                "- \U0001F527 Why is my car slow to start?\n")
     o["biggest first whatever the order written, a repeat once, counts held to the lines sent"] = (
         [t["topic"] for t in tp2] == ["cars", "cooking"] and tp2[0]["chips"] == _SG_CAR2 and tp2[0]["n"] == 2)
     o["a near copy of another chip is dropped"] = (
-        len(parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Why is my car so loud at low speed?\n- \U0001F697 Why is my car so loud at low speed now?\n"
-                  "- \U0001F527 Why is my car slow to accelerate lately?\n")[0]["chips"]) == 2)
+        len(parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Why is my car so loud lately?\n- \U0001F697 Why is my car loud lately?\n"
+                  "- \U0001F527 Why is my car slow to start?\n")[0]["chips"]) == 2)
     o["no more than six chips a topic"] = len(parse("TOPIC: cars | COUNT: 3\n" + "".join(
-        "- \U0001F697 Why does the %s keep failing so often?\n" % w for w in
+        "- \U0001F697 Why does my %s fail?\n" % w for w in
         ("brakes", "engine", "gearbox", "clutch", "exhaust", "radiator", "starter", "alternator")))[0]["chips"]) == 6
     o["fewer than two good chips in a topic: the topic dropped; none left is nothing"] = (
-        parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Brakes?\n- \U0001F527 Why is my car loud at low speed?\n") == []
+        parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Brakes?\n- \U0001F527 Why is my car loud at speed?\n") == []
         and parse("") == [] and parse("no topics here, sorry") == []
         and parse("TOPIC: cars | COUNT: 3\n- \U0001F697 Vehicle performance?\n- \U0001F30D New culture facts?\n") == [])
     o["a topic with no safe chip is left out, the rest kept"] = (
-        [t["topic"] for t in parse("TOPIC: mail | COUNT: 4\n- \U0001F4E7 Can I mail pat@example.com now?\nTOPIC: cars | COUNT: 3\n"
-                                   "- \U0001F697 Why is my car so loud at low speed?\n- \U0001F527 Why is my car slow to accelerate lately?\n")] == ["cars"])
+        [t["topic"] for t in parse("TOPIC: mail | COUNT: 4\n- \U0001F4E7 Can I mail pat@example.com?\nTOPIC: cars | COUNT: 3\n"
+                                   "- \U0001F697 Why is my car so loud lately?\n- \U0001F527 Why is my car slow to start?\n")] == ["cars"])
     _ws = ("brakes", "engine", "gearbox", "clutch", "exhaust", "radiator")
     o["at most four topics"] = len(parse("".join(
-        "TOPIC: t%d | COUNT: %d\n- \U0001F697 Why do the %s wear out so quickly?\n- \U0001F527 How should I check the %s before a trip?\n"
+        "TOPIC: t%d | COUNT: %d\n- \U0001F697 Why do my %s wear out?\n- \U0001F527 How do I check my %s?\n"
         % (i, 9 - i, _ws[i], _ws[i]) for i in range(6)), labels * 6)) == 4
-    # the prompt: whole questions, 6 a topic, bad and good examples
+    # the prompt: whole, short questions, 6 a topic, bad and good examples
     pr = ns["SUGGEST_PROMPT"]
-    o["the prompt asks for 6 whole questions of 5 to 12 words a topic, shows bad and good, and ends at the labels"] = (
-        "6 different follow-up questions" in pr and "5 to 12 words" in pr and "ends with a question mark" in pr
+    o["the prompt asks for 6 whole questions of 5 to 8 words and 30 characters a topic, shows bad and good, and ends at the labels"] = (
+        "6 different follow-up questions" in pr and "5 to 8 words" in pr and "ends with a question mark" in pr
+        and "at most 30 characters, counting spaces" in pr and "never cut off" in pr
         and "at most 4 topics" in pr and "Bad (labels and fragments)" in pr and "Vehicle performance?" in pr
-        and "New culture facts?" in pr and "Good (whole questions" in pr and "one step further" in pr
+        and "New culture facts?" in pr and "Bad (too long for the button)" in pr and "piano for home practice?" in pr
+        and "Good (whole, short questions" in pr and "one step further" in pr
         and "never a person's name" in pr and pr.endswith("\nCHATS:\n") and pr.count("- <emoji> <question>") == 6
-        and ns["SUGGEST_MAX_TOKENS"] == 1600 and ns["SUGGEST_CHIP_MIN"] == 20 and ns["SUGGEST_CHIP_MAX"] == 90)
+        and ns["SUGGEST_MAX_TOKENS"] == 1600 and ns["SUGGEST_CHIP_MIN"] == 20 and ns["SUGGEST_CHIP_MAX"] == 30
+        and ns["SUGGEST_WORDS_MIN"] == 5 and ns["SUGGEST_WORDS_MAX"] == 8)
+    # the prompt's own examples obey its rules
+    o["the prompt's good examples pass the filter whole, its bad ones are refused"] = (
+        all(chip(x) == x for x in ("\U0001F527 Are my brake rotors worn too?", "\U0001F35D Which meals keep all week?"))
+        and all(chip(x) is None for x in ("\U0001F697 Vehicle performance?", "\U0001F30D New culture facts?",
+                                          "\U0001F3B9 How do I choose a piano for home practice?")))
     # the picking
     pick = ns["suggest_pick"]
     cache = {"topics": tp}
@@ -17663,7 +17675,7 @@ def _sg_unit(src):
     nsr = _sg_ns(src, _read_json=lambda f, ctx, t: store["d"], StoreReadError=OSError, NoProfile=KeyError)
     v1 = {"v": 1, "sig": "abc", "n": 9, "tried": 5, "at": 6, "checked": 7, "made": "test",
           "topics": [{"topic": "car repairs", "n": 6, "chips": ["\U0001F527 How do I change my brake pads?",
-                                                                  "\U0001F697 Why is my car shaking at speed?",
+                                                                  "\U0001F697 Why does my car shake so much?",
                                                                   "\U0001F6E0 Vehicle performance?"]},
                      {"topic": "healthy eating", "n": 2, "chips": ["\U0001F957 What are easy healthy dinners?",
                                                                     "\U0001F34E How do I cut down on sugar?",
@@ -17685,6 +17697,21 @@ def _sg_unit(src):
     o["a v2 file is read as it is, anything else as nothing"] = (
         nsr["suggest_read"](None) == store["d"] and not (store.update(d=[1]) or nsr["suggest_read"](None))
         and not (store.update(d={"v": 3}) or nsr["suggest_read"](None)))
+    # a v2 file from before 6b453: chips up to 90 characters, which overran their chips
+    v2old = {"v": 2, "sig": "abc", "n": 9, "at": 6, "checked": 7, "tried": 5, "made": "test", "shown": [["x ?"]],
+             "topics": [{"topic": "pianos", "n": 6, "chips": ["\U0001F3B9 How do I choose a piano for home practice?",
+                                                             "\U0001F3B9 Which piano suits a flat?", "\U0001F3B9 Is a digital piano enough?"]},
+                        {"topic": "history", "n": 2, "chips": ["\U0001F3E0 How did households manage without electricity?",
+                                                              "\U0001F30D What is the official language spoken in Brazil?"]}]}
+    v2old["pool"] = ns["suggest_pool"](v2old["topics"])
+    store["d"] = v2old
+    up2 = nsr["suggest_read"](None)
+    o["a v2 file with long chips is read like a v1: the long ones gone, the short kept, a pool rebuilt, a new pass due at once"] = (
+        up2["v"] == 2 and up2["upgraded"] is True and up2["sig"] == "" and up2["shown"] == []
+        and [t["topic"] for t in up2["topics"]] == ["pianos"] and up2["topics"][0]["chips"] == v2old["topics"][0]["chips"][1:]
+        and [e["c"] for e in up2["pool"]] == v2old["topics"][0]["chips"][1:] and "home practice" not in str(up2)
+        and all(len(e["c"].split(" ", 1)[1]) <= 30 for e in up2["pool"])
+        and nsr["suggest_due"](dict(up2, tried=time.time() - 3600, at=time.time(), checked=time.time())) is True)
     # the labels
     chats = [_sgc("a%d" % i, "Brakes %d topic" % i, "q", ts=1000 - i) for i in range(40)]
     lb, n = ns["suggest_labels"](chats)
@@ -17852,9 +17879,9 @@ def _sg_unit(src):
     w, a, nsx = run_pass(five, answer=("I cannot help with that.", "test"))
     o["an answer that is no list: the try is noted, no topics"] = w[0]["topics"] == [] and w[0]["tried"] > time.time() - 30
     w, a, nsx = run_pass(five, user={"user_name": "Dana Whitfield"},
-                         answer=("TOPIC: cars | COUNT: 3\n- \U0001F697 Why is Dana's car so loud at low speed?\n"
-                                 "- \U0001F527 Why is my car slow to accelerate lately?\n"
-                                 "- \U0001F527 Why is my car so loud at low speed?\n", "test"))
+                         answer=("TOPIC: cars | COUNT: 3\n- \U0001F697 Why is Dana's car so loud?\n"
+                                 "- \U0001F527 Why is my car slow to start?\n"
+                                 "- \U0001F527 Why is my car so loud lately?\n", "test"))
     o["a word of the person's own name keeps a chip out"] = (
         len(w) == 1 and w[0]["topics"] and not any("Dana" in c for c in w[0]["topics"][0]["chips"])
         and len(w[0]["topics"][0]["chips"]) == 2)
@@ -17921,6 +17948,15 @@ def _sg_unit(src):
 _sg_good = _sg_unit(_MILLENAI_SRC)
 check("starter chips: the topic labels, the chip filter, the picking, the model's route, busy, due and a whole pass (%d checks)" % len(_sg_good),
       all(_sg_good.values()), "%r" % [k for k, v in _sg_good.items() if not v])
+# A CHIP FITS ITS CHIP (6b453, per Patrick: "Make sure the suggestions are worded such that they fit into the chips."):
+# a third of the 780 px row holds 208 px of 12 px text beside the emoji, 32 to 34 characters measured; 30 is the limit
+check("starter chips: a chip fits its chip whole (6b453): at most 30 characters beside the emoji and 5 to 8 words, the prompt says so "
+      "and its own examples obey it, a longer one is dropped rather than cut, and an old file's long chips are never shown",
+      _sg_good["30 characters kept, 31 refused (6b453): a longer one is dropped, never cut"]
+      and _sg_good["the prompt's good examples pass the filter whole, its bad ones are refused"]
+      and _sg_good["a v2 file with long chips is read like a v1: the long ones gone, the short kept, a pool rebuilt, a new pass due at once"]
+      and all(len(c.split(" ", 1)[1]) <= 30 and 5 <= len(c.split(" ", 1)[1].split()) <= 8 for c in _SG_CAR + _SG_EAT),
+      "%r" % [k for k, v in _sg_good.items() if not v])
 
 # the page and the server's source
 _SG_PAGE = _ireq(INST, "/", token=False)[1].decode("utf-8", "replace")
@@ -17936,6 +17972,17 @@ _SG_STATIC = [
     ("long chips cut with an ellipsis, three to a row", lambda p, s: ".sugg[data-own]{max-width:calc((100% - 14px)/3)}" in p
      and "@media (max-width:640px){.sugg[data-own]{max-width:100%}}" in p and ".sugg{max-width:100%}" in p
      and "min-width:0;overflow:hidden;text-overflow:ellipsis;" in p),
+    # A CHIP FITS ITS CHIP (6b453): the server's limit is the chip's width, a narrow window clips at a word
+    ("the limit the chip's third of the row allows", lambda p, s: "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 30   # characters" in s
+     and "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 8   # a chip is a sentence" in s),
+    ("a narrow window clipping at a word boundary, never mid-word", lambda p, s: "function suggFitWords(box){" in p
+     and '    while(el.scrollWidth>el.clientWidth&&words.length>3&&guard++<12){\n      words.pop();\n'
+         '      el.textContent=words.join(" ")+"\\u2026";' in p
+     and "    if(el.textContent!==full)el.textContent=full;" in p),
+    ("the clip run after the row trim and at a resize", lambda p, s: "    suggFitWords(box);\n  };\n  requestAnimationFrame(trimRow);\n  setTimeout(trimRow,60);" in p
+     and 'addEventListener("resize",()=>{\n  const b=$("#suggest");\n  if(b&&!b.hidden)suggFitWords(b);\n});' in p),
+    ("a clipped chip sending its whole question", lambda p, s: '      input.value=(el.getAttribute("title")||el.textContent)\n        .replace(/^[^\\w"\'(]+\\s*/,"").trim();' in p),
+    ("an old file's long chips never shown", lambda p, s: '    if d.get("v") == 2 and _suggest_chips_current(d):\n        return d\n    if d.get("v") in (1, 2):' in s),
     ("a fetch that never holds a painting", lambda p, s: 'api("/api/suggest").then(r=>r.json()).then(d=>{' in p),
     ("the page's state declared with var", lambda p, s: "var suggOwn=[],suggGot=false,suggAsked=0,suggWaits=0,suggFlight=false,suggFresh=false;" in p),
     ("a few looks while a pass runs", lambda p, s: "const wait=!suggOwn.length&&d&&d.refreshing&&suggWaits++<8;" in p
@@ -18213,8 +18260,8 @@ _sg3_c = _sg_cache(_SG3)
 for _i in range(3):
     _sg_q(_SG3, "/api/suggest")
 time.sleep(0.5)
-check("starter chips (live): a model that writes an address, a link, a tender topic or a too long chip gets none of it shown, "
-      "and is not asked again at once",
+check("starter chips (live): a model that writes an address, a link, a tender topic, a fragment or a chip too long for its "
+      "chip gets none of it shown, and is not asked again at once",
       _sg3_d.get("chips") == [] and _sg3_c and _sg3_c.get("topics") == [] and _sg_asks(_SG3).get("asks") == 1,
       "%r" % [_sg3_d, _sg3_c, _sg_asks(_SG3)])
 _SG3.stop()
@@ -18235,10 +18282,16 @@ _SG4.stop()
 _SG_MUT = [
     ("a chip of any length or word count", '    if not (SUGGEST_CHIP_MIN <= len(body) <= SUGGEST_CHIP_MAX) \\\n            or not (SUGGEST_WORDS_MIN <= len(body.split()) <= SUGGEST_WORDS_MAX) \\\n            or not emoji:',
      '    if not body:'),
-    ("a chip longer than 90 characters", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 90", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 140"),
-    ("a chip shorter than 20 characters", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 90", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 90"),
-    ("a chip of two words", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 16", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 2, 16"),
-    ("a chip of any number of words", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 16", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 40"),
+    ("a chip longer than 30 characters", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 30", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 31"),
+    ("a chip of 90 characters, as before 6b453", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 30", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 90"),
+    ("a chip shorter than 20 characters", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 20, 30", "SUGGEST_CHIP_MIN, SUGGEST_CHIP_MAX = 8, 30"),
+    ("a chip of two words", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 8", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 2, 8"),
+    ("a chip of any number of words", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 8", "SUGGEST_WORDS_MIN, SUGGEST_WORDS_MAX = 5, 40"),
+    ("an old file's long chips shown", '    if d.get("v") == 2 and _suggest_chips_current(d):\n        return d', '    if d.get("v") == 2:\n        return d'),
+    ("the page cutting a narrow chip mid-word", "    suggFitWords(box);\n  };\n  requestAnimationFrame(trimRow);", "  };\n  requestAnimationFrame(trimRow);"),
+    ("a clipped chip sending its clipped text", '      input.value=(el.getAttribute("title")||el.textContent)', '      input.value=(el.textContent)'),
+    ("the prompt without its length", "at most 30 characters, counting spaces", "as long as it needs to be, counting spaces"),
+    ("the prompt without its too-long example", '"Bad (too long for the button): "', '"Bad (also): "'),
     ("a chip with no question mark", '    if not body.endswith("?") or not _SUGGEST_Q_RX.match(body):', '    if not _SUGGEST_Q_RX.match(body):'),
     ("a chip with no question word", '    if not body.endswith("?") or not _SUGGEST_Q_RX.match(body):', '    if not body.endswith("?"):'),
     ("a question word list without how", "    r\"^(?:what|why|how|which", "    r\"^(?:what|why|which"),
@@ -18247,7 +18300,7 @@ _SG_MUT = [
     ("more than six chips a topic", 'if not c or len(cur["chips"]) >= SUGGEST_PER_TOPIC:', 'if not c:'),
     ("a repeated question kept", "            if any(len(cw & o) / len(cw | o) >= 0.8 for o in seen if cw | o):\n                continue                    # the same question again\n", ""),
     ("the prompt asking for three", "write 6 different follow-up", "write 3 different follow-up"),
-    ("the prompt allowing any length", "a full sentence of 5 to 12 words", "a short phrase of 2 to 12 words"),
+    ("the prompt allowing any length", "a full sentence of 5 to 8 words", "a short phrase of 2 to 8 words"),
     ("the prompt without its examples", '"Bad (labels and fragments): ', '"Note: '),
     ("the pass allowed to write more", "SUGGEST_MAX_TOKENS = 1600", "SUGGEST_MAX_TOKENS = 6000"),
     ("the cloud's call uncapped", "max_tokens=SUGGEST_MAX_TOKENS, quiet=True", "max_tokens=9000, quiet=True"),
@@ -18267,7 +18320,7 @@ _SG_MUT = [
     ("the old pool kept after a pass", "            base.update(topics=topics, pool=suggest_pool(topics), sig=sig,", "            base.update(topics=topics, sig=sig,"),
     ("a pass undoing what was shown", "        base[\"shown\"] = (suggest_read(ctx).get(\"shown\")\n                         or base.get(\"shown\") or [])", "        base[\"shown\"] = []"),
     ("a v1 file trusted as it is", "            ch = [c for c in (_suggest_chip(x, [], set()) for x in\n                              (t.get(\"chips\") or []) if isinstance(x, str)) if c]", "            ch = [x for x in (t.get(\"chips\") or []) if isinstance(x, str)]"),
-    ("a v1 file not upgraded", '    if d.get("v") == 1:\n        tps = []', '    if False:\n        tps = []'),
+    ("a v1 file not upgraded", '    if d.get("v") in (1, 2):\n        tps = []', '    if False:\n        tps = []'),
     ("a v1 file not marked for a new pass", "shown=[], upgraded=True)", "shown=[], upgraded=False)"),
     ("an upgraded file not due at once", '    if cache.get("upgraded") or not cache.get("topics"):', '    if not cache.get("topics"):'),
     ("an upgraded file left alone by its sig", 'and old.get("sig") == sig \\\n                and not old.get("upgraded"):', 'and old.get("sig") == sig:'),
@@ -18276,10 +18329,10 @@ _SG_MUT = [
     ("a failed pass leaving no try", "                        upgraded=False)\n        suggest_save(base, ctx)", "                        upgraded=False)\n            suggest_save(base, ctx)"),
     ("a failed pass erasing the old topics", '                "topics": old.get("topics") or [],\n                "pool": old.get("pool") or [],', '                "topics": [],\n                "pool": old.get("pool") or [],'),
     ("a failed pass erasing the old pool", '                "pool": old.get("pool") or [], "made"', '                "pool": [], "made"'),
-    ("the filter letting an address through", '    if re.search(r"https?:|www\\.|@|\\.com\\b|\\d{4,}|[<>{}|\\\\]", body) \\\n            or _TENDER_RX.search(body)',
-     '    if _TENDER_RX.search(body)'),
-    ("the filter letting a tender topic through", '            or _TENDER_RX.search(body) or _looks_degenerate(body):', '            or _looks_degenerate(body):'),
-    ("collapsed text let through", '            or _TENDER_RX.search(body) or _looks_degenerate(body):', '            or _TENDER_RX.search(body):'),
+    ("the filter letting an address through", '    if re.search(r"https?:|www\\.|@|\\.com\\b|\\d{4,}|[<>{}|\\\\]", body) \\\n            or _TENDER_RX.search(body):',
+     '    if _TENDER_RX.search(body):'),
+    ("the filter letting a tender topic through", '    if re.search(r"https?:|www\\.|@|\\.com\\b|\\d{4,}|[<>{}|\\\\]", body) \\\n            or _TENDER_RX.search(body):',
+     '    if re.search(r"https?:|www\\.|@|\\.com\\b|\\d{4,}|[<>{}|\\\\]", body):'),
     ("the person's own words not refused", "    if w & hide:\n        return None\n", ""),
     ("a copy of a chat shown", "        if lw and w and len(w & lw) / len(w | lw) >= 0.7:\n            return None\n", "        pass\n"),
     ("a missing emoji left bare", '("\\U0001F4A1", s)', '("", s)'),
