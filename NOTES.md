@@ -207,6 +207,39 @@ asserted the removed CSS.
   there precisely so the two engines agree, but nobody has opened the shipped app on this build yet.
 - `elementFromPoint` at the centres of Refresh and its text returns the button and the span.
 
+## 6b452 — the sidebar's last server bar is the card's memory: "OLLAMA1 VRAM" (per Patrick)
+
+Pat, from a screenshot of the sidebar card's "OLLAMA1 MEMORY" row and its nearly empty bar: "change this to the
+server name followed by VRAM and obviously change the bar to reflect VRAM usage." The row was the server's
+system memory (6b342's fourth bar, "put server memory usage"); with every model on the card, that bar sat near
+empty while the card was full. App only; the kit is untouched.
+
+- **What the server sends was already enough.** `GET /v1/usage` has carried `gpu.vram_used_bytes` and
+  `gpu.vram_total_bytes` beside `busy_pct` since 6b342 (amdgpu's `mem_info_vram_used` / `mem_info_vram_total`;
+  nvidia-smi on NVIDIA; `null` on Intel and when the files can't be read), and the app's `/api/servers/usage`
+  already passed them through (`_srv_usage_gpu`) for the every-server dialog's "GPU memory" line. The sidebar
+  row just never read them. So no gateway change, no `PROTOCOL.md` change, and the server needs no kit reinstall
+  for this: any kit from 6b342 on shows it as soon as the app updates.
+- **The row** (`srvMeterRows`, the `:m` row): when the reading has both VRAM numbers it is `<NAME> VRAM`, the bar
+  used/total of the card, the tooltip "Desk · VRAM · 8.5 of 16 GB in use" (the numbers stay in the tooltip, as
+  they were; the card shows no figures beside its labels since 6b268). `srvMemName(name, what)` takes the word,
+  "VRAM" by default.
+- **Older kits, and cards the kit can't read.** A reading with the server's memory but no card memory (a kit
+  before 6b342's usage route can't happen here, since that same route brought both, but a card whose files
+  aren't there: Intel, an NVIDIA box without nvidia-smi, a driver without `mem_info_vram_used`) keeps the row it
+  had: `<NAME> MEMORY`, the server's memory, "Desk · memory · 22 of 62 GB in use". So nothing is hidden and the
+  bar is never drawn from the wrong figure. A reading with neither, a server not answering, or no reading yet
+  shows `<NAME> VRAM` with the empty bar and the same tooltips as before ("not answering", "usage not reported
+  (update the server kit)"). The row is the same element either way (`a1:m`), so the bar eases between readings
+  and a kit that gains the card reading relabels in place.
+- **Tests:** the 6b342 node checks in `tests_smoketest.py` have the VRAM cases (`R.vram`: both numbers, VRAM
+  alone, 0 used, a null or zero total falling back to memory, not answering), the fallback cases kept as they
+  were, `srvMemName` with and without the word, the card's row drawn from VRAM (25% then 75% while the server's
+  memory changes nothing) and relabelled when the card reading goes and comes back. Three new mutants: the row
+  named MEMORY while it shows the card's, the bar drawn from the server's memory, the server's memory never
+  shown as the fallback. Verified in a windowless dev copy on 9896 with a stubbed `srvUse`: the label reads
+  "OLLAMA1 VRAM" and the bar's width is the card's share.
+
 ## 6b446 — nothing stays loaded on the card across a sleep; the idle clock counts a busy card (kit, per Patrick)
 
 What happened on the server (Ubuntu 26.04, RX 6900 XT, Ollama v0.40.0, ROCm): `ollama1-idle` suspended it at

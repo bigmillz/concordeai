@@ -28252,23 +28252,38 @@ const rows5=srvMeterRows(five,{});
 R.many=[rows5.map(r=>r.id),rows5.map(r=>r.title),srvMeterServers(five).map(s=>s.id),
   srvMeterRows(five.slice(0,2),{})[3].title];
 const memR=u=>srvMeterRows([S1],{a1:u})[1];
-R.mem=[memR({ok:true,gpu:{busy_pct:1},ram:{used_bytes:23622320128,total_bytes:66571993088}}),
+const RAM={used_bytes:23622320128,total_bytes:66571993088};
+R.mem=[memR({ok:true,gpu:{busy_pct:1},ram:RAM}),
   memR({ok:true,gpu:null,ram:null}),memR({ok:true,gpu:{busy_pct:1}}),memR({ok:false}),memR({}),
   memR({ok:true,ram:{used_bytes:5,total_bytes:null}}),memR({ok:true,ram:{used_bytes:0,total_bytes:100}})];
-R.memname=[srvMemName('Desk'),srvMemName("  Pat's   very long server name here "),srvMemName('')];
+// the card's memory (6b452): the bar is VRAM when the kit reads it, the server's memory only when it can't
+R.vram=[memR({ok:true,gpu:{busy_pct:1,vram_used_bytes:9126805504,vram_total_bytes:17163091968},ram:RAM}),
+  memR({ok:true,gpu:{busy_pct:1,vram_used_bytes:9126805504,vram_total_bytes:17163091968}}),
+  memR({ok:true,gpu:{busy_pct:1,vram_used_bytes:0,vram_total_bytes:17163091968},ram:RAM}),
+  memR({ok:true,gpu:{busy_pct:1,vram_used_bytes:9126805504,vram_total_bytes:null},ram:RAM}),
+  memR({ok:true,gpu:{busy_pct:1,vram_used_bytes:null,vram_total_bytes:17163091968},ram:RAM}),
+  memR({ok:true,gpu:{busy_pct:1,vram_used_bytes:5,vram_total_bytes:0},ram:RAM}),
+  memR({ok:false,gpu:{busy_pct:1,vram_used_bytes:9126805504,vram_total_bytes:17163091968},ram:RAM})];
+R.memname=[srvMemName('Desk'),srvMemName("  Pat's   very long server name here "),srvMemName(''),
+  srvMemName('Desk','MEMORY'),srvMemName('Desk','VRAM')];
 // ---- the card
 R.dom0=kids();
-srvList=[S1];srvUse.a1={ok:true,gpu:{busy_pct:37,vram_total_bytes:17163091968},ram:{used_bytes:1073741824,total_bytes:4294967296},fails:0,due:1e12};
+srvList=[S1];srvUse.a1={ok:true,gpu:{busy_pct:37,vram_used_bytes:4290772992,vram_total_bytes:17163091968},ram:{used_bytes:1073741824,total_bytes:4294967296},fails:0,due:1e12};
 srvMetersSync();
 const box=document.getElementById("srv-meters"),row1=box.children[0],mem1=box.children[1];
 R.dom1=kids();
 R.row1={n:box.children.length,text:row1.textContent,title:row1.title,cls:row1.className,
   w:row1.lastChild.firstChild.style.width,head:row1.firstChild.className,bar:row1.lastChild.className};
 R.memrow=[mem1.textContent,mem1.title,mem1.className,mem1.lastChild.firstChild.style.width,mem1.dataset.sid];
-srvUse.a1.gpu={busy_pct:85};srvMetersSync();
-srvUse.a1.ram={used_bytes:3221225472,total_bytes:4294967296};srvMetersSync();
+srvUse.a1.gpu={busy_pct:85,vram_used_bytes:12884901888,vram_total_bytes:17163091968};srvMetersSync();
+srvUse.a1.ram={used_bytes:3221225472,total_bytes:4294967296};srvMetersSync();   // the server's memory moves nothing while the card reads
 R.keep=[box.children[0]===row1,row1.lastChild.firstChild.style.width,row1.lastChild.firstChild.classList.contains("hot"),
-  document.getElementById("srv-meters")===box,box.children[1]===mem1,mem1.lastChild.firstChild.style.width];
+  document.getElementById("srv-meters")===box,box.children[1]===mem1,mem1.lastChild.firstChild.style.width,mem1.textContent];
+// a kit with no card reading (6b342's row): the same element, now the server's memory, and back
+srvUse.a1.gpu={busy_pct:85};srvMetersSync();
+R.fall=[box.children[1]===mem1,mem1.textContent,mem1.title,mem1.lastChild.firstChild.style.width];
+srvUse.a1.gpu={busy_pct:85,vram_used_bytes:12884901888,vram_total_bytes:17163091968};srvMetersSync();
+R.fall.push(box.children[1]===mem1,mem1.textContent,mem1.lastChild.firstChild.style.width);
 srvUse.a1.ok=false;srvMetersSync();
 R.dim=[row1.className,row1.lastChild.firstChild.style.width,row1.title,mem1.className,mem1.lastChild.firstChild.style.width,mem1.title];
 srvUse.a1.ok=true;srvUse.a1.gpu={busy_pct:20};srvMetersSync();
@@ -28453,17 +28468,29 @@ def _m42c_rows(src):
                                   "INSTINCT MI300X"]
     out["many"] = (R["many"][0] == ["s1", "s1:m", "s2", "s2:m"] and R["many"][2] == ["s1", "s2"]
                    and not any(t_.endswith("more") for t_ in R["many"][1]) and not R["many"][3].endswith("more")
-                   and R["many"][1][1] == "Srv1 \u00b7 memory" and R["many"][3] == "Srv2 \u00b7 memory")
-    nk = "Desk \u00b7 memory \u00b7 usage not reported (update the server kit)"
+                   and R["many"][1][1] == "Srv1 \u00b7 VRAM" and R["many"][3] == "Srv2 \u00b7 VRAM")
+    # the server's memory only while the kit reads no card memory (6b342's row, kept for an older kit)
+    nk = "Desk \u00b7 VRAM \u00b7 usage not reported (update the server kit)"
     mem = R["mem"]
     out["mem"] = (mem[0] == {"id": "a1:m", "name": "DESK MEMORY", "title": "Desk \u00b7 memory \u00b7 22 of 62 GB in use",
                              "pct": 35, "off": False}
-                  and all(m_["title"] == nk and m_["pct"] is None and m_["off"] is False for m_ in (mem[1], mem[2], mem[5]))
-                  and mem[3] == {"id": "a1:m", "name": "DESK MEMORY", "title": "Desk \u00b7 memory \u00b7 not answering",
+                  and all(m_["title"] == nk and m_["pct"] is None and m_["off"] is False and m_["name"] == "DESK VRAM"
+                          for m_ in (mem[1], mem[2], mem[5]))
+                  and mem[3] == {"id": "a1:m", "name": "DESK VRAM", "title": "Desk \u00b7 VRAM \u00b7 not answering",
                                  "pct": None, "off": True}
-                  and mem[4]["title"] == "Desk \u00b7 memory" and mem[4]["pct"] is None and mem[4]["off"] is False
-                  and mem[6]["pct"] == 0 and mem[6]["title"].endswith("0 of 0 GB in use")
-                  and R["memname"] == ["DESK MEMORY", "PAT'S VERY LONG S\u2026 MEMORY", " MEMORY"])
+                  and mem[4] == {"id": "a1:m", "name": "DESK VRAM", "title": "Desk \u00b7 VRAM", "pct": None, "off": False}
+                  and mem[6]["pct"] == 0 and mem[6]["title"].endswith("0 of 0 GB in use") and mem[6]["name"] == "DESK MEMORY"
+                  and R["memname"] == ["DESK VRAM", "PAT'S VERY LONG S\u2026 VRAM", " VRAM", "DESK MEMORY", "DESK VRAM"])
+    # the card's memory (6b452): the bar is the card's share, the server's memory beside it changes nothing
+    v = R["vram"]
+    vr = {"id": "a1:m", "name": "DESK VRAM", "title": "Desk \u00b7 VRAM \u00b7 8.5 of 16 GB in use", "pct": 53, "off": False}
+    mr = {"id": "a1:m", "name": "DESK MEMORY", "title": "Desk \u00b7 memory \u00b7 22 of 62 GB in use", "pct": 35, "off": False}
+    out["vram"] = (v[0] == vr and v[1] == vr
+                   and v[2] == {"id": "a1:m", "name": "DESK VRAM", "title": "Desk \u00b7 VRAM \u00b7 0 of 16 GB in use",
+                                "pct": 0, "off": False}
+                   and v[3] == mr and v[4] == mr and v[5] == mr
+                   and v[6] == {"id": "a1:m", "name": "DESK VRAM", "title": "Desk \u00b7 VRAM \u00b7 not answering",
+                                "pct": None, "off": True})
     return all(out.values()), [out, err]
 
 
@@ -28472,12 +28499,15 @@ def _m42c_card(src):
     out = {}
     out["before"] = R["dom0"] == ["t-head", "meter-row", "meter-row"]
     out["row"] = (R["dom1"] == ["t-head", "meter-row", "meter-row", "srv-meters"]
-                  and R["memrow"] == ["DESK MEMORY", "Desk \u00b7 memory \u00b7 1 of 4 GB in use",
+                  and R["memrow"] == ["DESK VRAM", "Desk \u00b7 VRAM \u00b7 4 of 16 GB in use",
                                       "meter-row srv-mrow", "25%", "a1:m"]
                   and R["row1"] == {"n": 2, "text": "RADEON RX 6900 XT", "cls": "meter-row srv-mrow",
                                     "title": "Desk · Radeon RX 6900 XT · 16 GB · 37% busy",
                                     "w": "37%", "head": "t-head", "bar": "meter"})
-    out["easing"] = R["keep"] == [True, "85%", True, True, True, "75%"]
+    out["easing"] = R["keep"] == [True, "85%", True, True, True, "75%", "DESK VRAM"]
+    # an older kit's reading (6b342): the same row, relabelled, and back (6b452)
+    out["fallback"] = R["fall"] == [True, "DESK MEMORY", "Desk · memory · 3 of 4 GB in use", "75%",
+                                    True, "DESK VRAM", "75%"]
     out["dim"] = (R["dim"][0] == "meter-row srv-mrow off" and R["dim"][1] == "0%"
                   and R["dim"][2].endswith("not answering") and R["undim"] == ["meter-row srv-mrow"] * 2
                   and R["dim"][3] == "meter-row srv-mrow off" and R["dim"][4] == "0%"
@@ -28590,7 +28620,11 @@ _M42_MUT = [
     ("the memory row not dimmed", "pct:off||!have?null:Math.round(ru/rt*100),off:off}];", "pct:off||!have?null:Math.round(ru/rt*100),off:false}];"),
     ("the memory bar not a share", "Math.round(ru/rt*100)", "Math.round(ru/rt)"),
     ("memory in the wrong unit", "const srvGB=b=>String(Math.round(b/1073741824*10)/10);", "const srvGB=b=>String(Math.round(b/1000000000*10)/10);"),
-    ("the memory row named for the card", "name:srvMemName(s.name),", "name:srvMeterName(g),"),
+    ("the memory row named for the card", "name:srvMemName(s.name,what),", "name:srvMeterName(g),"),
+    ("the row named MEMORY while it shows the card's", 'what=ram?"MEMORY":"VRAM";', 'what="MEMORY";'),
+    ("the bar drawn from the server's memory, not the card's (6b452)", "ru=vram?vu:rU,rt=vram?vt:rT,", "ru=rU,rt=rT,"),
+    ("the server's memory never shown when the card's is unread", "vram=vu!=null&&vt!=null,ram=!vram&&rU!=null&&rT!=null,",
+     "vram=vu!=null&&vt!=null,ram=false,"),
     ("an older kit's memory shown as a reading", ':u.ok?"usage not reported (update the server kit)":""];', ':""];'),
     ("the memory reading not kept", "u.ram=d.ram||null;u.fails=0;", "u.ram=null;u.fails=0;"),
     ("memory kept through a miss", "u.gpu=null;u.ram=null;u.fails++;", "u.gpu=null;u.fails++;"),

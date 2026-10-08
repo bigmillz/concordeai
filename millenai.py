@@ -35254,8 +35254,9 @@ mark.find-hit.cur{background:#ffd60a;color:#101013}
    put memory pressure. Then under that, put the name of the server's GPU and
    how much load it's under. And then for the last bar, put server memory
    usage."): the name set like the chip's, the bar the same bar; dimmed while
-   the server doesn't answer. The rows are made by script, so a card with no
-   server is the markup it always was */
+   the server doesn't answer. The last bar is the card's memory since 6b452
+   (per Patrick: "the server name followed by VRAM"). The rows are made by
+   script, so a card with no server is the markup it always was */
 #telemetry .srv-mrow{transition:opacity .3s}
 #telemetry .srv-mrow.off{opacity:.45}
 #telemetry .srv-mrow .t-head span{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -46086,7 +46087,7 @@ function paintEngMenuServers(){
 // THE SIDEBAR CARD'S SERVER ROWS (6b342, per Patrick: "When a server is connected
 // for the user, can we have this box get bigger and put the GPU name in a middle
 // row? ... Hopefully this can adjust based on if the server is connected or not."):
-// two rows per paired server whose gateway names a card (its card, then its memory),
+// two rows per paired server whose gateway names a card (its card, then the card's memory, 6b452),
 // up to two servers, under this computer's chip and memory pressure. The row is the card's name set like
 // the chip's ("M4 PRO") and a bar for how busy the card is. A server that doesn't
 // answer is dimmed with an empty bar; a gateway with no usage reading (an older
@@ -46101,10 +46102,12 @@ function srvMeterName(g){
   n=(n||SRV_GPU[g&&g.vendor]||"").toUpperCase();
   return n.length>26?n.slice(0,25)+"\u2026":n;
 }
-// "DESK MEMORY": the server's name, shortened, and what the row is
-function srvMemName(n){
+// "DESK VRAM" (6b452, per Patrick: "change this to the server name followed by VRAM"): the
+// server's name, shortened, and what the row is; "DESK MEMORY" only while the row has fallen
+// back to the server's memory (srvMeterRows)
+function srvMemName(n,what){
   n=String(n||"").replace(/\s+/g," ").trim().toUpperCase();
-  return (n.length>18?n.slice(0,17)+"\u2026":n)+" MEMORY";
+  return (n.length>18?n.slice(0,17)+"\u2026":n)+" "+(what||"VRAM");
 }
 const srvGB=b=>String(Math.round(b/1073741824*10)/10);
 function srvMeterRows(list,use){
@@ -46118,14 +46121,22 @@ function srvMeterRows(list,use){
     const t=[s.name,g.name||"",vb?Math.round(vb/1073741824)+" GB":""];
     t.push(off?"not answering":busy!=null?busy+"% busy"
       :u.ok?"usage not reported (update the server kit)":"");
-    // the server's memory, under its card: the same bar, from the same reading
-    const rg=u.ram||null,ru=rg&&typeof rg.used_bytes==="number"?rg.used_bytes:null,
-      rt=rg&&typeof rg.total_bytes==="number"&&rg.total_bytes>0?rg.total_bytes:null,have=ru!=null&&rt!=null;
-    const m=[s.name,"memory",off?"not answering":have?srvGB(ru)+" of "+srvGB(rt)+" GB in use"
+    // the card's memory, under its card (6b452, per Patrick: "change the bar to reflect VRAM
+    // usage"): the same bar, from the same reading. A kit that reports the server's memory
+    // but can't read the card's (Intel, no nvidia-smi) keeps the memory row it had (6b342);
+    // one that reports neither shows the VRAM name and an empty bar
+    const vu=ug&&typeof ug.vram_used_bytes==="number"?ug.vram_used_bytes:null,
+      vt=ug&&typeof ug.vram_total_bytes==="number"&&ug.vram_total_bytes>0?ug.vram_total_bytes:null,
+      rg=u.ram||null,
+      rU=rg&&typeof rg.used_bytes==="number"?rg.used_bytes:null,
+      rT=rg&&typeof rg.total_bytes==="number"&&rg.total_bytes>0?rg.total_bytes:null,
+      vram=vu!=null&&vt!=null,ram=!vram&&rU!=null&&rT!=null,have=vram||ram,
+      ru=vram?vu:rU,rt=vram?vt:rT,what=ram?"MEMORY":"VRAM";
+    const m=[s.name,ram?"memory":"VRAM",off?"not answering":have?srvGB(ru)+" of "+srvGB(rt)+" GB in use"
       :u.ok?"usage not reported (update the server kit)":""];
     return [{id:s.id,name:srvMeterName(g),title:t.filter(Boolean).join(" \u00b7 "),
       pct:off?null:busy,off:off},
-      {id:s.id+":m",name:srvMemName(s.name),title:m.filter(Boolean).join(" \u00b7 "),
+      {id:s.id+":m",name:srvMemName(s.name,what),title:m.filter(Boolean).join(" \u00b7 "),
       pct:off||!have?null:Math.round(ru/rt*100),off:off}];
   });
   return [].concat.apply([],rows);
