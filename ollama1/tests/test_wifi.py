@@ -1,6 +1,8 @@
 """Wi-Fi backup (6b439): the ollama1-wifi tool, the suspend hook's wake-over-Wi-Fi step, the wake list, and
-setup.sh's --wifi option. Everything runs against fake sysfs and fake iw / netplan / ip / apt-get
-(tests/fakewifi.py); nothing touches a real network."""
+setup.sh's --wifi option; and (6b450) the sysctl file that makes each card answer ARP only for its own addresses,
+with status reading the kernel's effective value from a fake /proc. Everything runs against fake sysfs and fake
+iw / netplan / ip / apt-get (tests/fakewifi.py); nothing touches a real network, and nothing reads the machine's
+own /proc."""
 import json
 import os
 import pty
@@ -39,9 +41,10 @@ class Fixture(unittest.TestCase):
         self.state_path = os.path.join(self.dir, "state.json")
         self.fs = {"log": [], "envs": [], "cut_root": self.net}
         self.save()
+        self.proc = os.path.join(self.dir, "proc")              # the kernel's settings; absent until proc_sys()
         self.env0 = dict(os.environ)
         os.environ.update(PATH=self.bin + ":" + os.environ["PATH"], FAKE_STATE=self.state_path,
-                          OLLAMA1_SYS=self.sys, OLLAMA1_WIFI_SETTLE="0")
+                          OLLAMA1_SYS=self.sys, OLLAMA1_PROC=self.proc, OLLAMA1_WIFI_SETTLE="0")
         os.environ.pop("OLLAMA1_WIFI_PASSWORD", None)
         for sub in ("etc/netplan", "etc/ollama1", "etc/systemd/network", "etc/udev/rules.d", "usr/local/sbin"):
             shutil.rmtree(os.path.join(U.PREFIX, sub), ignore_errors=True)
@@ -91,6 +94,16 @@ class Fixture(unittest.TestCase):
         elif os.path.exists(os.path.join(self.net, name, "addr_assign_type")):
             os.unlink(os.path.join(self.net, name, "addr_assign_type"))
         self.wakeup = os.path.join(self.net, name, "device", "power", "wakeup")
+
+    def proc_sys(self, **scopes):
+        """The kernel's ARP settings as a fake /proc/sys tree: all=(arp_ignore, arp_announce), wlo1=(...)."""
+        shutil.rmtree(self.proc, ignore_errors=True)
+        for scope, (ignore, announce) in scopes.items():
+            d = os.path.join(self.proc, "sys", "net", "ipv4", "conf", scope)
+            os.makedirs(d)
+            for key, val in (("arp_ignore", ignore), ("arp_announce", announce)):
+                with open(os.path.join(d, key), "w") as f:
+                    f.write("%s\n" % val)
 
     def turn_on(self, ssid=None):
         o1wifi.write_state({"enabled": True, **({"ssid": ssid} if ssid else {})})
@@ -339,10 +352,12 @@ class TestStatus(Fixture):
                        routes="default via 192.0.2.1 dev br0 proto dhcp metric 100\n"
                               "default via 192.0.2.1 dev wlo1 proto dhcp metric 600\n")
         self.save()
+        self.proc_sys(all=(1, 2))
         t = "\n".join(o1wifi.status_lines())
         for want in ("Wi-Fi backup: on", "wlo1, MAC 02:00:5e:10:00:77", 'Network: set ("Home Net 5G")',
                      'connected to "Home Net 5G", signal -52 dBm', "Address: 192.0.2.9/24",
-                     "enp5s0 up, enp6s0 up", "Default route: br0 (metric 100)", "(WoWLAN): yes",
+                     "enp5s0 up, enp6s0 up", "Default route: br0 (metric 100)",
+                     "Answers ARP only for its own address: yes", "(WoWLAN): yes",
                      "Published to the app as a wake card: 02:00:5e:10:00:77"):
             self.assertIn(want, t)
 
@@ -351,7 +366,85 @@ class TestStatus(Fixture):
         self.assertIn("Wi-Fi backup: off", t)
         self.assertIn("Network: not set (sudo ollama1-wifi set)", t)
         self.assertIn("Link: not connected", t)
+        self.assertIn("Answers ARP only for its own address: no (sudo ./setup.sh", t)      # no /proc tree: not set
         self.assertIn("wake card: no", t)
+
+
+class TestEachCardAnswersForItself(Fixture):
+    """6b450: with Linux's default the Wi-Fi card answered ARP for the wired bridge's address too, and a client whose
+    cache took that reply sent the server's traffic to a card in power save (SSH to the server timed out). The kit's
+    sysctl file makes every card answer only for its own addresses, and status says whether the kernel is set so."""
+
+    LINE = "Answers ARP only for its own address: "
+
+    def arp_lines(self):
+        return [l for l in o1wifi.status_lines() if l.startswith(self.LINE)]
+
+    def test_the_sysctl_file_sets_exactly_the_two_keys_for_every_card(self):
+        with open(os.path.join(U.CONFIG, o1wifi.ARP_CONF)) as f:
+            text = f.read()
+        keys = {}
+        for line in text.splitlines():
+            s = line.strip()
+            if s and not s.startswith("#"):
+                k, _, v = s.partition("=")
+                keys[k.strip()] = v.strip()
+        self.assertEqual(keys, {"net.ipv4.conf.all.arp_ignore": "1", "net.ipv4.conf.all.arp_announce": "2"})
+        # "all" (the kernel takes the larger of it and a card's own): no card name, nothing to time with the card's
+        # creation; and the keys always exist, so there is no leading "-" to hide a typo behind
+        self.assertNotIn("conf.wl", text)
+        self.assertNotIn("conf.default", text)
+        self.assertIn("6b450", text)
+
+    def test_setup_installs_it_on_every_server_and_applies_it_now(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        inst = 'install -m 0644 "$KIT/config/%s" /etc/sysctl.d/%s' % (o1wifi.ARP_CONF, o1wifi.ARP_CONF)
+        self.assertEqual(setup.count(inst), 1)
+        i = setup.index(inst)
+        self.assertLess(setup.index('install -m 0644 "$KIT/config/60-ollama1-bridge.conf"'), i)   # beside the bridge file
+        self.assertLess(i, setup.index('step "Firewall"'))                     # in the kit-files step, every server
+        self.assertNotIn('step "Wi-Fi backup"', setup[:i])                    # not only with --wifi on
+        applied = [l for l in setup.splitlines() if l.startswith("sysctl -q -p /etc/sysctl.d/" + o1wifi.ARP_CONF)]
+        self.assertEqual(len(applied), 1)
+        self.assertNotIn("|| true", applied[0])                                # a failure is said, not swallowed
+        self.assertNotIn("2>/dev/null", applied[0])
+        self.assertIn("|| note", applied[0])
+
+    def test_status_reads_the_kernels_effective_value(self):
+        self.turn_on(SSID)
+        self.put_netplan()
+        self.assertEqual(self.arp_lines(), [self.LINE + "no (sudo ./setup.sh installs /etc/sysctl.d/%s)" % o1wifi.ARP_CONF])
+        for scopes, want in (
+                (dict(all=(1, 2)), "yes"),
+                (dict(all=(2, 2)), "yes"),                          # stricter still counts
+                (dict(all=(0, 0), wlo1=(1, 2)), "yes"),             # the card's own value: the kernel takes the larger
+                (dict(all=(1, 2), wlo1=(0, 0)), "yes"),
+                (dict(all=(0, 0)), "no"),                           # Linux's default: the symptom
+                (dict(all=(1, 0)), "no"),                           # answers right, but asks with any address
+                (dict(all=(0, 2)), "no"),
+                (dict(all=(1, 1)), "no"),                           # arp_announce 1 does not help on one subnet
+                (dict(all=(8, 2)), "no"),                           # 8: never answers at all
+                (dict(all=("x", 2)), "no"),                         # unreadable: no, and no error
+        ):
+            self.proc_sys(**scopes)
+            lines = self.arp_lines()
+            self.assertEqual(len(lines), 1, scopes)
+            self.assertTrue(lines[0].startswith(self.LINE + want), (scopes, lines))
+
+    def test_the_effective_value_is_the_larger_of_all_and_the_cards_own(self):
+        self.proc_sys(all=(1, 0), wlo1=(0, 2))
+        self.assertEqual(o1wifi.arp_setting("arp_ignore", "wlo1"), 1)
+        self.assertEqual(o1wifi.arp_setting("arp_announce", "wlo1"), 2)
+        self.assertEqual(o1wifi.arp_setting("arp_announce"), 0)                # "all" alone
+        self.assertEqual(o1wifi.arp_setting("arp_ignore", "enp5s0"), 1)        # a card with no file of its own
+        self.assertTrue(o1wifi.arp_own_only("wlo1"))
+        self.assertFalse(o1wifi.arp_own_only())
+        self.assertFalse(o1wifi.arp_own_only("wlo1", proc=os.path.join(self.dir, "none")))
+
+    def test_no_card_no_line(self):
+        self.proc_sys(all=(1, 2))
+        shutil.rmtree(os.path.join(self.net, "wlo1"))
+        self.assertEqual(self.arp_lines(), [])
 
 
 class TestWakeList(Fixture):
@@ -618,8 +711,10 @@ class TestSetupSh(unittest.TestCase):
         self.assertIn("## Wi-Fi backup", r)
         self.assertIn("| `--wifi on\\|off` |", r)
         sec = r.split("## Wi-Fi backup")[1].split("\n## ")[0]
-        for word in ("sudo ollama1-wifi set", "never", "metric", "S3", "access point", "70-ollama1-wifi.yaml"):
+        for word in ("sudo ollama1-wifi set", "never", "metric", "S3", "access point", "70-ollama1-wifi.yaml",
+                     "61-ollama1-arp.conf", "arp_ignore", "Answers ARP only for its own address"):
             self.assertIn(word, sec)
+        self.assertIn("61-ollama1-arp.conf", r.split("## The network")[1].split("## Wi-Fi backup")[0])
 
 
 if __name__ == "__main__":

@@ -2523,6 +2523,16 @@ MUTANTS = [
      '        had = configured()\n        remove_file(netplan_path())', '        had = False', ['test_wifi']),
     ('wifi: the .link randomises the MAC', 'lib/o1wifi.py', 'MACAddressPolicy=persistent\\n")', 'MACAddressPolicy=random\\n")', ['test_wifi']),
     ('wifi: the interface is hard-coded', 'lib/o1wifi.py', '    iface = cards[0]["name"]', '    iface = "wlan0"', ['test_wifi']),
+    # ---- each card answers ARP only for its own addresses (6b450)
+    ('wifi: the Wi-Fi card answers ARP for the wired address (6b450)', 'config/61-ollama1-arp.conf',
+     'net.ipv4.conf.all.arp_ignore = 1', 'net.ipv4.conf.all.arp_ignore = 0', ['test_wifi']),
+    ('wifi: the Wi-Fi card asks ARP with the wired address (6b450)', 'config/61-ollama1-arp.conf',
+     'net.ipv4.conf.all.arp_announce = 2', 'net.ipv4.conf.all.arp_announce = 0', ['test_wifi']),
+    ('wifi: status says the ARP setting is in effect when it is not (6b450)', 'lib/o1wifi.py',
+     '    return arp_setting("arp_ignore", iface, proc) in (1, 2) and arp_setting("arp_announce", iface, proc) == 2',
+     '    return True', ['test_wifi']),
+    ('wifi: status reads only "all", not the card\'s own ARP setting (6b450)', 'lib/o1wifi.py',
+     '    for scope in ("all",) + ((iface,) if iface else ()):', '    for scope in ("all",):', ['test_wifi']),
 ]
 
 

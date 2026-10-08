@@ -701,6 +701,11 @@ install -m 0644 "$KIT/config/ollama1.tmpfiles" /etc/tmpfiles.d/ollama1.conf
 systemd-tmpfiles --create /etc/tmpfiles.d/ollama1.conf
 install -m 0644 "$KIT/config/60-ollama1-bridge.conf" /etc/sysctl.d/60-ollama1-bridge.conf
 sysctl -q -p /etc/sysctl.d/60-ollama1-bridge.conf 2>/dev/null || true
+# each network card answers ARP only for its own addresses (6b450): with the Wi-Fi backup on, the Wi-Fi card also
+# answered for the wired bridge's address, and a client whose ARP cache took that reply sent its traffic to a card in
+# power save (SSH timed out). Every server, bridge or not. The keys always exist: a failure is said, not swallowed.
+install -m 0644 "$KIT/config/61-ollama1-arp.conf" /etc/sysctl.d/61-ollama1-arp.conf
+sysctl -q -p /etc/sysctl.d/61-ollama1-arp.conf || note "the ARP settings in /etc/sysctl.d/61-ollama1-arp.conf did not apply now; the next boot applies them"
 # boot must not wait for links that are unplugged (the second wired port, a Wi-Fi spare): one link is enough
 install -d -m 0755 /etc/systemd/system/systemd-networkd-wait-online.service.d
 install -m 0644 "$KIT/config/10-ollama1-wait-online.conf" /etc/systemd/system/systemd-networkd-wait-online.service.d/10-ollama1.conf

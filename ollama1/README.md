@@ -1893,7 +1893,10 @@ not apply. The services, timers, tunnel and config keep working: they live in
 ## The network
 
 The kit never touches your network settings (the one exception is the optional
-"Wi-Fi backup" below, which writes a netplan file of its own and nothing else). It works with a plain wired
+"Wi-Fi backup" below, which writes a netplan file of its own and nothing else); it sets two kernel
+knobs, bridge netfilter off (below) and, since 6b450, each network card answering ARP only for its
+own addresses (`/etc/sysctl.d/61-ollama1-arp.conf`, every server; see "Wi-Fi backup" for the
+symptom it ends). It works with a plain wired
 port, and also with a bridge. If your server has a bridge `br0` over its
 two wired ports (one to the router, one to another device, like a
 Raspberry Pi), at `<server-ip>`, that comes from your own bridge script
@@ -1944,6 +1947,21 @@ exactly one country. Then:
 - **The cable always wins.** A wired bridge's DHCP route has metric 100; this
   one has 600, so Wi-Fi carries traffic only while the wired link is down, and
   `ollama1-wifi status` shows which link has the default route.
+- **Each card answers only for its own address** (6b450). Linux's default lets
+  any card answer an ARP request ("who has `<server-ip>`?") for any address
+  the machine has, so the Wi-Fi card also answered for the wired bridge's.
+  Whenever its reply landed last in a client's ARP cache, that client sent the
+  server's traffic to a Wi-Fi card in power save: SSH to `<server-ip>` timed
+  out and ping took hundreds of milliseconds instead of under one, until the
+  cache flipped back minutes later. `/etc/sysctl.d/61-ollama1-arp.conf`
+  (`net.ipv4.conf.all.arp_ignore=1`, `net.ipv4.conf.all.arp_announce=2`;
+  setup.sh installs and applies it on every server, and every boot applies it)
+  ends that: `<server-ip>` is answered on the wired link only, `<wifi-ip>` on
+  the Wi-Fi card only. Nothing is lost: the app's wake needs no address (a
+  magic packet carries the card's MAC), and with the cable out the server is
+  reached at `<wifi-ip>`, as meant; the wired address was never a way in over
+  Wi-Fi that worked. `ollama1-wifi status` says whether the setting is in
+  effect.
 - **Boot never waits for it** (`optional: true`; the kit's wait-online drop-in
   already waits for one link, 30 s at most).
 - **It cannot cut the wired link.** The new file is checked with
@@ -1973,6 +1991,7 @@ Link: connected to "<your-network>", signal -52 dBm
 Address: <wifi-ip>/24
 Wired: eth0 up, eth1 down
 Default route: br0 (metric 100)
+Answers ARP only for its own address: yes
 Card can wake on a magic packet (WoWLAN): yes
 PCI wake enabled: yes
 Published to the app as a wake card: 02:00:5e:10:00:77
@@ -2007,11 +2026,25 @@ never delays or stops a suspend. The BIOS must allow wake from a PCI-E device
   card is a second chance, and a way back when the cable is out.
 - `wake up on disconnect` is also switched on, so the machine may wake when the
   access point drops it.
+- The app talks to the server at the address or name it was paired with.
+  Through the Cloudflare tunnel that is a name, and the server's end of the
+  tunnel goes out over whichever link has the default route, so the cable-out
+  case needs nothing from the app. In LAN mode the paired address is the wired
+  one, which Wi-Fi does not answer for: LAN mode has no Wi-Fi fallback.
+- Whether Wi-Fi takes the default route when the cable is out depends on your
+  bridge, not on the kit: netplan writes `ConfigureWithoutCarrier=yes` for a
+  bridge, and networkd then keeps the bridge's address and routes through a
+  carrier loss, so `status` may still say `Default route: br0` with the cable
+  out, and the server's own traffic goes into the dead bridge. Check it once
+  (unplug, then `ip route show default`: `linkdown` on the bridge's line is
+  that case); the fix is a networkd drop-in for the bridge with
+  `IgnoreCarrierLoss=` of a few seconds, in your own bridge configuration.
 
 **To try it with the cable unplugged**: `sudo ollama1-wifi set`, check
 `sudo ollama1-wifi status` shows it connected, unplug the cable, and see that
-the server still answers (its address on Wi-Fi is in `status`). Then put it to
-sleep from the panel and wake it from the app.
+the server answers at its Wi-Fi address (`Address:` in `status`; the wired
+address is not answered over Wi-Fi, so an SSH session to it ends with the
+cable). Then put it to sleep from the panel and wake it from the app.
 
 ## Troubleshooting
 
@@ -2025,6 +2058,7 @@ sleep from the panel and wake it from the app.
 | Watchdog | `ollama1-watchdog status`; `journalctl -u ollama1-watchdog`; off: `sudo ./setup.sh --watchdog off`; see "Hardware watchdog" |
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
 | Wi-Fi backup | `sudo ollama1-wifi status`; `iw dev`; off: `sudo ./setup.sh --wifi off`; see "Wi-Fi backup" |
+| SSH to the server slow or timing out while Wi-Fi backup is on | On the client, `arp -n <server-ip>` must show the wired card's MAC, not the Wi-Fi card's; on the server, `sudo ollama1-wifi status` must say `Answers ARP only for its own address: yes` (a `no` means a kit from before 6b450: run `sudo ./setup.sh`). Then clear the client's entry once: `sudo arp -d <server-ip>` |
 | Lights | `ollama1-leds status`; `journalctl -u ollama1-leds -u ollama1-openrgb`; off: `sudo ./setup.sh --leds off` |
 | System move to the other NVMe | `cat /var/lib/ollama1/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
@@ -2096,7 +2130,10 @@ Ed25519 (the server uses PyNaCl). They cover:
   cable, the bridge file untouched, the hook's wake-on-magic-packet and
   disable with the right phy and a hook that never fails a suspend, and the
   Wi-Fi card's address in the wake list only when it is on, set up, permanent
-  and able;
+  and able; each card answering ARP only for its own addresses (the sysctl
+  file's exact keys, setup.sh installing and applying it on every server and
+  not swallowing a failure, and `status` reading the kernel's effective value,
+  the larger of `all` and the card's own, from a fake `/proc`);
 - the auto sleep setting across a gateway restart, the idle service's, a
   reboot and a setup.sh run (`test_sleepcfg.py`), and the check after a wake
   waiting, bounded, for the card and the models drive (`test_sleep.py`,

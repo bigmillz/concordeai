@@ -9,6 +9,79 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b450 — the Wi-Fi card no longer answers ARP for the wired address: SSH to the server stops timing out (kit, per Patrick)
+
+Seen on the server on 2026-10-07 and 2026-10-08, at least four times. Its wired bridge br0 has 192.168.86.10 (MAC
+00:d8:61:c2:d2:c6, the Realtek enp39s0; the Intel enp38s0 is the bridge's other member, cable out) and the Wi-Fi backup
+(6b439, `ollama1-wifi`) is on: wlo1 (50:eb:71:0f:68:e2) is on the same LAN with its own DHCP address 192.168.86.21/24
+and a default route at metric 600 (the wired one is 100). With the server awake and the cable in, the Mac's ARP cache
+for 192.168.86.10 sometimes held the Wi-Fi MAC (`arp -n 192.168.86.10` → `50:eb:71:f:68:e2`); while it did, ssh to .10
+timed out ("Operation timed out", "No route to host") and ping took ~220 ms instead of under 1 ms; minutes later the
+entry flipped back to the wired MAC and all was fast again. Kit only (`ollama1/`); `millenai.py` is untouched. Not run
+on the server (it was not to be touched from here).
+
+- **Cause.** Linux's defaults, `arp_ignore=0` and `arp_announce=0`: every interface answers an ARP request for any
+  address the machine has. "Who has .10?" is a broadcast the Wi-Fi card hears too (the access point is on the same
+  LAN), so it got two replies, the bridge's and wlo1's, and whichever landed last won the Mac's cache. With the Wi-Fi
+  entry in place the Mac's packets went to a card in power save (slow to receive, some frames dropped: the ~220 ms)
+  and the server's replies came back over the wire; "No route to host" is the Mac's own ARP giving up. The kit's one
+  sysctl file so far, `60-ollama1-bridge.conf`, turns bridge netfilter off and says nothing about ARP.
+- **The design, checked before fixing** (the 6b439 entry, README "Wi-Fi backup", `lib/o1wifi.py`, the app's server
+  code): the app reaches a server at the address or name it was paired with (`e["url"]`), and the kit publishes no
+  Wi-Fi address to it: `/v1/sleep-config` carries the wake MACs only, and a wake is a magic packet carrying the
+  card's MAC, sent to the LAN's broadcast addresses (or through the wake relay), so it needs no server address at
+  all. With the cable out, the design reaches the server at the Wi-Fi card's own address (README: "its address on
+  Wi-Fi is in `status`"), the server's end of the tunnel going out over whichever link has the default route. Nothing
+  relied on .10 being answered over Wi-Fi on purpose, and it never was a working way in: with the cable out, either
+  the bridge has dropped .10 (then nothing answers for it) or it has kept .10 with its metric-100 routes (then the
+  replies go into the dead bridge). The fix takes nothing away.
+- **The fix: `config/61-ollama1-arp.conf`** → `/etc/sysctl.d/`, `net.ipv4.conf.all.arp_ignore = 1` (answer only for
+  an address on the interface the request came in on) and `net.ipv4.conf.all.arp_announce = 2` (ask with an address
+  of the sending interface). `all`, because the kernel takes the larger of `all` and the interface's own value for
+  both keys: every card, present or future, is covered, the reverse case too (the bridge answering for .21), with no
+  interface name and nothing to time with the card's creation; with one card it changes nothing. setup.sh installs
+  it beside the bridge file, on every server, and applies it with `sysctl -p` (a failure is a `note`, not swallowed:
+  the keys always exist, so there is no leading `-`); systemd-sysctl applies it at every boot. The smallest fix that
+  is right: no daemon, no carrier hook, no change to `ollama1-wifi set`, and the Wi-Fi card goes on answering for its
+  own address, which is the takeover the design wants.
+- **`ollama1-wifi status`** gets a line, `Answers ARP only for its own address: yes` or `no (sudo ./setup.sh installs
+  /etc/sysctl.d/61-ollama1-arp.conf)`, from the kernel's effective values for the card (`o1wifi.arp_own_only`: the
+  larger of `all` and the card's own, `arp_ignore` 1 or 2 and `arp_announce` 2, read under `/proc/sys`, or
+  `OLLAMA1_PROC` in a test), so a server says whether it has the fix. README: "The network", a Wi-Fi backup bullet,
+  the status example, a troubleshooting row (`arp -n <server-ip>` on the client, `sudo arp -d` once after the fix),
+  and two honest limits (below).
+- **Not done, and why.** `net.ipv4.conf.all.ignore_routes_with_linkdown=1` would make the kernel skip the bridge's
+  routes while it has no carrier (an explicit "on carrier loss" takeover of the default route), but after every
+  resume the wired link renegotiates for a second or two while the Wi-Fi card, kept associated for WoWLAN, already
+  has its routes, so anything the server opened in that window (the tunnel, say) would be bound to the Wi-Fi
+  address and stay on the slow card until it reconnected: a sticky version of this very bug, on the main path.
+  Left out; the cable-out question belongs to the bridge's own configuration (next point).
+- **Unverified on the server.** The fix itself (the sysctl is standard; the mechanism is inferred from the ARP cache,
+  not captured on the wire). And a question the symptom raised, outside this fix: netplan writes
+  `ConfigureWithoutCarrier=yes` for a bridge definition (checked in netplan's own generator test,
+  `tests/generator/test_bridges.py::test_bridge_empty`: a bridge with only `dhcp4: true` gets it), and networkd then
+  keeps the bridge's address and routes
+  through a carrier loss (`IgnoreCarrierLoss=` follows it), so with the cable out `status` may still say `Default
+  route: br0` and the server's own traffic goes into the dead bridge, Wi-Fi backup or not. One check tells: unplug,
+  `ip route show default`; `linkdown` on br0's line is that case, and then the fix is a networkd drop-in for br0
+  with `IgnoreCarrierLoss=` of a few seconds, in Patrick's own bridge config (the kit does not edit it; README
+  "Honest limits" says so).
+- **Tests.** `tests/test_wifi.py` 39 → 44: `TestEachCardAnswersForItself` (the file's exact keys and values, `all`
+  and no `default`; setup.sh installing it beside the bridge file before the firewall step, once, not under the
+  Wi-Fi step, and not swallowing a failed apply; the status line in every combination of `all` and the card's own,
+  8 as "never answers", an unreadable value as "no" with no error, no line without a card; `arp_setting` as the
+  larger of the two) and the status tests; the fixture points `OLLAMA1_PROC` at a folder of its own, so no test
+  reads the machine's /proc. Four mutants in `mutate.py` (`6b450`), all killed. Kit suite: 1953 tests in 12 minutes on a
+  Mac busy with other sessions, exit 1 with three timing failures in files this build does not touch
+  (`test_gateway.TestSleepRoutes`, the in-flight counter read 1 instead of 0, twice; `test_tools.TestWaitGpu`, a
+  1.5 s wait measured at 1.0 s); `test_gateway` (105) and `test_tools` (59) alone again: exit 0, and the whole
+  suite run a second time: 1953 tests, OK, exit 0.
+- **What the server needs.** A kit re-run, `sudo ./setup.sh` with its saved settings (it installs and applies the
+  file; no reinstall, no reboot), or until then by hand, `sudo sysctl -w net.ipv4.conf.all.arp_ignore=1
+  net.ipv4.conf.all.arp_announce=2` (lasts until the next boot). Then on the Mac, once, `sudo arp -d 192.168.86.10`;
+  `arp -n 192.168.86.10` should show `0:d8:61:c2:d2:c6` from then on, and `sudo ollama1-wifi status` on the server
+  `Answers ARP only for its own address: yes`.
+
 ## 6b449 — the server lights are blue only in the fans' deep idle, never at idle 20% (kit, per Patrick)
 
 Patrick (2026-10-08): "the lights shouldn't be blue when it's on idle 20%, only idle 10%." Kit only (`ollama1/`),

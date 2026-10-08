@@ -12,6 +12,12 @@ The wired link is never touched: the Wi-Fi netplan file is its own (70-ollama1-w
 higher metric than the wired one (so Wi-Fi only carries traffic while the cable's link is down), it is `optional`
 (boot never waits for it), the new file is checked with `netplan generate` before `netplan apply`, and a failed apply
 or a lost wired link puts the previous file back.
+
+Each network card answers ARP only for its own addresses (6b450): Linux's default let the Wi-Fi card answer for the
+wired bridge's address too, and a client whose ARP cache took that reply sent the server's traffic to a card in power
+save (SSH timed out until the cache flipped back). setup.sh installs /etc/sysctl.d/61-ollama1-arp.conf
+(net.ipv4.conf.all.arp_ignore=1, arp_announce=2) on every server; `status` says whether the kernel is set that way.
+With the cable out the server is reached at this card's own address, never at the wired one.
 """
 import getpass
 import json
@@ -29,6 +35,7 @@ WIFI_METRIC = 600                  # the wired bridge's DHCP route is 100: a lar
 NETPLAN_NAME = "70-ollama1-wifi.yaml"
 LINK_NAME = "50-ollama1-wifi.link"
 UDEV_NAME = "70-ollama1-wifi.rules"
+ARP_CONF = "61-ollama1-arp.conf"   # /etc/sysctl.d: each card answers ARP only for its own addresses (6b450)
 PHY_RX = re.compile(r"^phy[0-9]{1,3}$")
 IFACE_RX = re.compile(r"^[A-Za-z0-9_.:-]{1,15}$")
 PACKAGES = (("iw", "iw"), ("wpa_supplicant", "wpasupplicant"))
@@ -132,6 +139,29 @@ def redact(text, secrets=()):
 
 def sysnet():
     return o1idle._sysnet()
+
+
+def proc_sys():
+    return os.path.join(os.environ.get("OLLAMA1_PROC", "/proc"), "sys")
+
+
+def arp_setting(key, iface=None, proc=None):
+    """The kernel's effective net.ipv4.conf.<iface>.<key>: the larger of `all` and the card's own, as the kernel
+    takes it for arp_ignore and arp_announce; 0 for what cannot be read."""
+    root = os.path.join(proc or proc_sys(), "net", "ipv4", "conf")
+    best = 0
+    for scope in ("all",) + ((iface,) if iface else ()):
+        try:
+            best = max(best, int(o1idle._first_line(os.path.join(root, scope, key)) or 0))
+        except ValueError:
+            pass
+    return best
+
+
+def arp_own_only(iface=None, proc=None):
+    """Whether the card answers ARP only for its own addresses and asks with its own (6b450): arp_ignore 1 (or 2,
+    stricter) and arp_announce 2, as /etc/sysctl.d/61-ollama1-arp.conf sets for every card. 8 never answers at all."""
+    return arp_setting("arp_ignore", iface, proc) in (1, 2) and arp_setting("arp_announce", iface, proc) == 2
 
 
 # ---- the card ---------------------------------------------------------------------------
@@ -520,6 +550,10 @@ def status_lines(root=None, run_=run):
     r = run_(["ip", "-o", "route", "show", "default"], 10)
     route = default_route(r.stdout) if ok(r) else None
     out.append("Default route: " + ("%s (metric %d)" % route if route else "none"))
+    for dev in cards[:1]:
+        # 6b450: with Linux's default the Wi-Fi card answered for the wired address too (SSH to it timed out)
+        out.append("Answers ARP only for its own address: " + (
+            "yes" if arp_own_only(dev["name"]) else "no (sudo ./setup.sh installs /etc/sysctl.d/%s)" % ARP_CONF))
     if cards:
         dev = cards[0]
         r = run_(["iw", "phy", dev["phy"], "info"], 10) if PHY_RX.match(dev["phy"]) else None
