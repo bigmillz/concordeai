@@ -15574,6 +15574,88 @@ def _resident(label: str) -> bool:
                               or bool(tgt and _port_in_use(tgt)))
 
 
+# ==== eta: begin ====
+# THE TIME-LEFT PLAN (6b459, per Patrick: "make the estimated time
+# remaining a little more accurate. It just keeps going up and up and up
+# basically the entire time."). Worked out ONCE, before the first byte,
+# from what this install has measured: usage.jsonl for each model's real
+# tokens/s and typical answer length, the benchmarks for its load time and
+# prompt reading speed. The page turns it into stages and counts each one
+# down from real progress (etaCalc in the page).
+ETA_DEFAULT = {"local": (20.0, 250.0, 25.0), "server": (30.0, 600.0, 0.0),
+               "cloud": (60.0, 3000.0, 0.0)}   # tok/s, read tok/s, load s
+ETA_OUT_DEFAULT = 450          # answer tokens when a model has no history
+
+
+def _eta_secs(load_s, ptoks, read_tps, otoks, gen_tps) -> float:
+    """One model's turn: load it, read the prompt, write the answer."""
+    return (max(0.0, load_s) + max(0.0, ptoks) / max(1.0, read_tps)
+            + max(0.0, otoks) / max(1.0, gen_tps))
+
+
+def eta_plan(ctx, council: list, messages: list, searched: bool) -> dict:
+    """{"search": s, "models": [s, ...], "final": s, "ftok": tokens,
+    "est": True when any figure is a default}. Never raises: {} means the
+    page falls back on its own remembered pace."""
+    try:
+        recs = [r for r in usage_read(ctx)[-4000:] if r.get("m")]
+        bench = {}
+        for run in bench_history(6):
+            for r in run.get("models") or []:
+                if r.get("label") and r["label"] not in bench:
+                    bench[r["label"]] = r
+        for run in bench_targets_history(ctx, 2):
+            for r in run.get("models") or []:
+                if r.get("label") and r["label"] not in bench:
+                    bench[r["label"]] = r
+        est = [False]
+        ptok = _usage_est_in(messages) + (2500 if searched else 0)
+
+        def figs(lbl):
+            mine = [r for r in recs if r.get("m") == lbl and r.get("d")][-60:]
+            where = (mine[-1].get("w") if mine else "") \
+                or ("local" if lbl in MODEL_ROUTES else "cloud")
+            kind = "local" if where == "local" else (
+                "server" if where == "server" else "cloud")
+            d_tps, d_read, d_load = ETA_DEFAULT[kind]
+            o = sum(_usage_num(r.get("o")) for r in mine)
+            n = sum(_usage_num(r.get("n")) or 1 for r in mine)
+            ms = sum(_usage_num(r.get("d")) for r in mine)
+            b = bench.get(lbl) or {}
+            tps = (o / ms * 1000.0) if (o >= 60 and ms > 0) \
+                else (_usage_num(b.get("gen_tps")) or d_tps)
+            out = (o / n) if (n and o >= 60) else ETA_OUT_DEFAULT
+            read = _usage_num(b.get("prompt_tps")) or d_read
+            load = 0.0
+            if kind == "local" and not _resident(lbl):
+                load = _usage_num(b.get("load_s")) or d_load
+            if not (o >= 60 and ms > 0):
+                est[0] = True
+            return load, read, out, tps
+        rows = [figs(l) for l in council]
+        if not rows:
+            return {}
+        out = {"search": 14.0 if searched else 0.0}
+        if len(rows) == 1:
+            ld, rd, ot, tp = rows[0]
+            out.update(models=[], final=round(_eta_secs(ld, ptok, rd, ot, tp), 1),
+                       ftok=int(ot))
+        else:
+            mods = [round(_eta_secs(ld, ptok, rd, ot, tp), 1)
+                    for ld, rd, ot, tp in rows]
+            # the merge: the last seat reads every draft, then writes
+            ld, rd, ot, tp = rows[-1]
+            drafts_tok = sum(r[2] for r in rows)
+            out.update(models=mods,
+                       final=round(_eta_secs(0, ptok + drafts_tok, rd, ot, tp), 1),
+                       ftok=int(ot))
+        out["est"] = est[0]
+        return out
+    except Exception:
+        return {}
+# ==== eta: end ====
+
+
 def _auto_clean_targets(manual=False) -> list:
     """The models an auto-clean pass would delete right now, and the
     More-models card's Remove list (6b335): one rule for both, so the
@@ -32575,6 +32657,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # everything outside printable ASCII, and %, is percent-encoded;
         # the page decodes it (hdrText)
         self.send_header("X-Models", header_text(xm))
+        # the time-left plan (6b459): measured figures, worked out up front
+        _ep = eta_plan(self.ctx, council, messages, bool(query or _links))
+        if _ep:
+            self.send_header("X-Eta", json.dumps(_ep, separators=(",", ":")))
         # ANSWER NOW (6b257): an unguessable per-request id the client
         # may POST back to /api/chat/hurry. A header beats a frame here
         # — it arrives before the first body byte and costs the frame
@@ -41346,14 +41432,70 @@ let stepPlan=[],answerChars=0,streamDone=false;
 // honest math, a time-left line rides under it (millen.speeds keeps a
 // per-tier EMA of past runs), and Answer now can cut a council short.
 let dispPct=0,lastTween=0,etaTxt="";
+// the time-left plan from the server (X-Eta), the drafts landed so far,
+// when the last milestone landed, and the number last shown (6b459)
+let etaPlan=null,draftsGot=0,etaMark=0,etaShown=-1,etaShownT=0,etaSearchDone=false;
 let curHid="",liveDrafts=0,hurriedNow=false;
 let runT0=0,runTier="";
 const STEP_ORDER=["search","read","geo","council","draft","polish","places"];
 function resetSteps(host){steps=[];stepHost=host;
   stepPlan=[];answerChars=0;streamDone=false;
   dispPct=0;lastTween=0;etaTxt="";
+  etaPlan=null;draftsGot=0;etaShown=-1;etaShownT=0;etaSearchDone=false;
   curHid="";liveDrafts=0;hurriedNow=false;
-  runT0=performance.now();runTier=tier||"?";}
+  runT0=performance.now();etaMark=runT0;runTier=tier||"?";}
+// ==== eta-js: begin ====
+// TIME LEFT, HONESTLY (6b459, per Patrick: "It just keeps going up and
+// up and up"). The old line divided elapsed time by a creeping bar
+// percentage, so every slow stretch pushed the total out. Now: a list of
+// stages {exp: expected s, el: s spent in it, f: real progress 0..1 or
+// null, done}. A finished stage is 0; the running one counts down from
+// its progress; the rest are their plan. An overrun extends THAT stage
+// by a small fixed tail and nothing else.
+function etaStageLeft(st){
+  if(!st||st.done)return 0;
+  const exp=Math.max(1,st.exp||1),el=Math.max(0,st.el||0);
+  const tail=Math.max(2,0.12*exp);
+  const planned=Math.max(exp-el,0);
+  if(st.f==null||st.f<=0)return Math.max(planned,tail);    // by the clock
+  const f=Math.min(st.f,1);
+  if(f>=1)return tail;                                     // token overrun
+  // real progress: blend from the plan toward this stage's own pace
+  const w=Math.min(1,f/0.4);
+  const byPace=el*(1-f)/Math.max(f,0.02);
+  return Math.max(tail,(1-w)*Math.max(exp*(1-f),0)+w*byPace);
+}
+function etaCalc(stages){
+  let t=0;
+  (stages||[]).forEach(s=>{t+=etaStageLeft(s);});
+  return t;
+}
+// what is SHOWN: it counts down by the clock; a new estimate lower than
+// that pulls it down (over ~3s); one higher may lift it by 0.2s per
+// second only, so an overrun never jumps the number
+function etaSmooth(prev,est,dt){
+  if(prev<0)return est;
+  dt=Math.max(0,Math.min(dt,2));
+  const base=Math.max(0,prev-dt);
+  if(est<=base)return base-(base-est)*Math.min(1,dt/3);
+  return Math.min(est,base+0.2*dt);
+}
+// the stage list for this moment of the run
+function etaStages(plan,o){
+  const st=[];
+  if(plan.search>0)st.push({exp:plan.search,done:o.searchDone||o.draftsGot>0||o.textStarted});
+  (plan.models||[]).forEach((m,i)=>{
+    st.push({exp:m,done:i<o.draftsGot||o.textStarted});
+  });
+  st.push({exp:plan.final||20,done:false,
+    f:o.textStarted?Math.min(1,(o.answerChars/4)/Math.max(20,plan.ftok||450)):null});
+  let first=true;                      // the stage running now gets the time
+  st.forEach(s=>{
+    if(!s.done&&first){first=false;s.el=o.sinceMark;}else if(!s.done)s.el=0;
+  });
+  return st;
+}
+// ==== eta-js: end ====
 function addStep(s){
   if(!s||!s.id)return;
   const at=steps.findIndex(x=>x.id===s.id);
@@ -41425,17 +41567,27 @@ function paintSteps(){
   else dispPct=Math.max(dispPct,
     dispPct+(pct-dispPct)*(1-Math.exp(-dt/0.55)));
   const shown=streamDone?100:Math.min(dispPct,96);
-  // TIME LEFT (6b257): this run's own pace blended with the
-  // remembered per-tier total (millen.speeds EMA). Quiet until there
-  // is signal, gone the moment the stream settles.
+  // TIME LEFT (6b459): the plan the server measured, counted down by
+  // each stage's real progress (etaCalc), shown through etaSmooth. Without
+  // a plan, this tier's remembered total as one stage on the clock.
   const el2=(nowT-runT0)/1000;
   let eta=0;
   try{
-    const sp=JSON.parse(localStorage.getItem("millen.speeds")||"{}");
-    const hist=sp[runTier]||0;
-    const pace=shown>8?el2/(shown/100):0;
-    const est=hist&&pace?hist*.45+pace*.55:(pace||hist);
-    if(est)eta=Math.max(0,est-el2);
+    let plan=etaPlan;
+    if(!plan){
+      const sp=JSON.parse(localStorage.getItem("millen.speeds")||"{}");
+      plan={search:0,models:[],final:sp[runTier]||30,ftok:450};
+    }
+    if(!etaSearchDone&&steps.length&&steps.every(x=>x.s==="done"
+       ||STEP_ORDER.indexOf(x.id)>2)&&steps.some(x=>STEP_ORDER.indexOf(x.id)<=2)){
+      etaSearchDone=true;etaMark=nowT;}
+    const stages=etaStages(plan,{searchDone:etaSearchDone,draftsGot:draftsGot,
+      textStarted:answerChars>0,answerChars:answerChars,
+      sinceMark:(nowT-etaMark)/1000});
+    const est=etaCalc(stages);
+    eta=etaShown=etaSmooth(etaShown,Math.max(0,est),
+      etaShownT?(nowT-etaShownT)/1000:0);
+    etaShownT=nowT;
   }catch(e){}
   etaTxt=(!streamDone&&el2>5&&eta>=3)
     ?(eta>=90?"~"+Math.round(eta/60)+" min left"
@@ -42085,6 +42237,9 @@ async function send(){
     searched=resp.headers.get("X-Web-Search")==="1";
     lastModels=hdrText(resp.headers.get("X-Models"));
     curHid=resp.headers.get("X-Hurry")||"";   // Answer now (6b257)
+    try{etaPlan=JSON.parse(resp.headers.get("X-Eta")||"null");}
+    catch(e){etaPlan=null;}                   // time-left plan (6b459)
+    etaMark=performance.now();
     // the phase plan for THIS run — what the bar measures against
     stepPlan=[];
     if(searched)stepPlan.push("search","read","geo");
@@ -42155,6 +42310,8 @@ async function send(){
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
                        x=>!/^\(no answer/.test(x.t||"")).length;
+                     if(drafts.length!==draftsGot){
+                       draftsGot=drafts.length;etaMark=performance.now();}
                  }catch(e){}},
         SOURCES:j=>{try{sources=JSON.parse(j);}catch(e){}},
         PHOTOS:j=>{try{photos=JSON.parse(j);}catch(e){}},
@@ -42184,6 +42341,7 @@ async function send(){
       lastRate=secs>0.3?tokEst/secs:0;
       setToks(lastRate,"streaming");
       if(cut>=0)dripShown=0;    // a RESET replays the replacement
+      if(!answerChars&&full.length)etaMark=performance.now();  // text began (6b459)
       answerChars=full.length;  // drafting progress is real text
       if(steps.length)paintSteps();
       kickDrip();

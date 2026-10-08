@@ -34639,6 +34639,81 @@ check("model menu (6b442): %d mutations of its code, each caught by a check abov
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
+# ---- time left (6b459): the estimator is pure, tested from the source -----
+def _eta_js_run():
+    j = _MILLENAI_SRC[_MILLENAI_SRC.index("// ==== eta-js: begin ===="):
+                      _MILLENAI_SRC.index("// ==== eta-js: end ====")]
+    body = j + """
+const out={};
+// a stage counting down on real progress: tokens 10%..95% at a steady pace
+let prev=1e9,mono=true;
+for(let k=1;k<=19;k++){
+  const f=k*0.05,el=f*20;   // 20 s stage, steady pace
+  const l=etaCalc([{exp:20,el:el,f:f},{exp:10,el:0,f:null}]);
+  if(l>prev+1e-9)mono=false; prev=l;
+}
+out.mono=mono;
+// by the clock: never rises, floors at a small tail
+let p2=1e9,m2=true;
+for(let el=0;el<=60;el+=1){
+  const l=etaCalc([{exp:20,el:el,f:null}]);
+  if(l>p2+1e-9)m2=false;p2=l;
+}
+out.clock=m2;out.tail=etaCalc([{exp:20,el:60,f:null}]);
+// an overrun extends only that stage: later stages keep their plan
+const a=etaCalc([{exp:20,el:10,f:null},{exp:8,el:0,f:null}]);
+const b=etaCalc([{exp:20,el:90,f:null},{exp:8,el:0,f:null}]);
+out.overrun=[a,b];
+out.done=etaCalc([{exp:20,done:true},{exp:5,el:0,f:null}]);
+// smoothing: a jump up is capped, a drop is followed, the clock counts down
+out.up=etaSmooth(30,90,1);out.down=etaSmooth(30,5,1);out.tick=etaSmooth(30,29,1);
+out.first=etaSmooth(-1,42,0.2);
+// the stage list from a plan
+const pl={search:10,models:[12,12],final:15,ftok:400};
+const s0=etaStages(pl,{searchDone:false,draftsGot:0,textStarted:false,answerChars:0,sinceMark:4});
+const s1=etaStages(pl,{searchDone:true,draftsGot:1,textStarted:false,answerChars:0,sinceMark:3});
+const s2=etaStages(pl,{searchDone:true,draftsGot:2,textStarted:true,answerChars:800,sinceMark:2});
+out.n=[s0.length,s0.filter(x=>x.done).length,s1.filter(x=>x.done).length,s2.filter(x=>x.done).length,s2[3].f];
+// the whole run's displayed number never climbs more than the cap
+let shown=-1,rose=0,t=0;const plan2={search:6,models:[10,10],final:12,ftok:400};
+for(let i=0;i<400;i++){
+  t+=0.5;
+  // a slow run: stage 1 takes 3x its plan
+  const o={searchDone:t>6,draftsGot:t>36?1:0,textStarted:t>70,answerChars:t>70?(t-70)*60:0,sinceMark:t<6?t:(t<36?t-6:(t<70?t-36:t-70))};
+  const e=etaCalc(etaStages(plan2,o));
+  const n=etaSmooth(shown,e,0.5);
+  if(shown>=0&&n>shown+0.1+1e-9)rose=Math.max(rose,n-shown);
+  shown=n;
+}
+out.rose=rose;
+process.stdout.write(JSON.stringify(out));
+"""
+    f = os.path.join(tempfile.mkdtemp(), "eta.js")
+    open(f, "w").write(body)
+    return json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=30).stdout)
+
+
+_ETA = _eta_js_run()
+check("time left: counts down monotonically on real progress and on the clock",
+      _ETA["mono"] and _ETA["clock"] and 2 <= _ETA["tail"] <= 3, repr(_ETA))
+check("time left: an overrun extends only that stage; a done stage is zero",
+      _ETA["overrun"][0] > _ETA["overrun"][1] and _ETA["overrun"][1] < 8 + 3
+      and _ETA["done"] <= 5.0 + 1e-9, repr(_ETA["overrun"]))
+check("time left: the shown number rises at most 0.2 s/s, falls with the estimate, ticks down",
+      abs(_ETA["up"] - 29.2) < 1e-6 and _ETA["down"] < 29 and abs(_ETA["tick"] - 29) < 1e-6
+      and _ETA["first"] == 42 and _ETA["rose"] < 0.11, repr(_ETA))
+check("time left: stage list follows the plan (search, drafts, final tokens)",
+      _ETA["n"] == [4, 0, 2, 3, 0.5] , repr(_ETA["n"]))
+_ns = {}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("def _eta_secs("):
+                   _MILLENAI_SRC.index("def eta_plan(")], _ns)
+check("time left: server stage seconds = load + read + write",
+      abs(_ns["_eta_secs"](20, 500, 250, 400, 20) - 42.0) < 1e-9)
+check("time left: X-Eta header sent, page reads it, no unreplaced old pace maths",
+      'send_header("X-Eta"' in _MILLENAI_SRC
+      and 'resp.headers.get("X-Eta")' in _MILLENAI_SRC
+      and "hist*.45+pace*.55" not in _MILLENAI_SRC)
+
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
     if not o:

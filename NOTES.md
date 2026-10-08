@@ -9,6 +9,40 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b459 — the time-left line counts down instead of climbing (per Patrick)
+
+Patrick: "when running a query … make the estimated time remaining a little
+more accurate. It just keeps going up and up and up basically the entire
+time."
+
+**Why it climbed.** `paintSteps` (6b257) took `pace = elapsed / (bar % / 100)`
+and blended it 55/45 with the tier's remembered total. The bar % is a
+time-creep curve (`1-exp(-age/14)` per phase) over phase weights, so it
+flattens while elapsed keeps growing: elapsed/% only grows. A phase that
+appeared late (a surprise step) also added weight to the total and pulled the
+% back. Load time, prompt reading and the merge stage were nowhere in it.
+
+**Now.** `eta_plan()` (server, `# ==== eta`) works out the stages once, before
+the first byte, and sends them as the `X-Eta` header: per model
+load (if an MLX engine is not resident, `load_s` from the benchmarks) + prompt
+tokens / `prompt_tps` + expected output tokens / measured tok/s, the merge
+(reads every draft, writes one answer), and a search allowance. Measured
+figures come from `usage.jsonl` (tok/s = o/d, typical o per call), the
+benchmarks and bench_targets; a model with no history gets a conservative
+default and the plan says `"est":true`. The page (`etaCalc`, `etaStages`,
+`etaSmooth`, `# ==== eta-js`) counts each stage from real progress: a finished
+stage is 0, drafts landed count off the model stages, the answer stage uses
+streamed tokens against expected. An overrun extends only that stage by a small
+fixed tail; the number shown falls with the estimate, counts down by the clock,
+and may rise by at most 0.2 s per second. No `X-Eta` (older server): the tier's
+remembered total as one stage on the clock. Display unchanged ("~N s left",
+"~N min left"; the "~" is the estimate mark).
+
+Gauntlet: five estimator checks (monotone, overrun, smoothing, stage list,
+server seconds). Not run in full; dev copy checked to send `X-Eta`.
+
+---
+
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
 
 Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no
