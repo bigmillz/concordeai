@@ -26066,7 +26066,7 @@ check("benchmark servers (live): the real gateway: the figures are Ollama's own 
       and _brow1.get("status") == "done" and _brow1.get("src") == "engine" and _brow1.get("gen_tps") == 50.0
       and _brow1.get("network") is True and _brow1.get("prompt_tps") is None
       and _brow1.get("load_src") == "timed" and _brow1.get("load_s") is not None
-      and _brow1.get("label") == _SVN + " · small:8b" and _brow1.get("missing") == []
+      and _brow1.get("label") == _SVN + " · small:8b" and _brow1.get("missing") == ["prompt_eval_duration"]
       and len(_bchat) == 1 and "X-O1-Signature" in _bchat[0]["headers"]
       and json.loads(_bchat[0]["body"])["messages"] == [{"role": "user", "content": _b41p}]
       and json.loads(_bchat[0]["body"])["options"] == {"temperature": 0, "seed": 42, "num_predict": 256,
@@ -26205,7 +26205,7 @@ check("benchmark servers (live): profile B sees none of A's runs or servers and 
       and _bB1.get("run") is None and _bB2.get("servers") == []
       and _bB2.get("cloud") == [] and _bB3[0] == 400 and "isn’t in Settings" in _bB3[1].get("err", "")
       and _bB4[0] == 400 and "err" in _bB4[1]
-      and [r_.get("target") for r_ in _bA1.get("history") or []].count("server") == 3
+      and [r_.get("target") for r_ in _bA1.get("history") or []].count("server") == 6
       and [r_.get("target") for r_ in _bB1.get("history") or []].count("local") == [
           r_.get("target") for r_ in _bA1.get("history") or []].count("local")
       and not os.path.exists(os.path.join(_SV.home, "accounts", _pB41, "bench_targets.jsonl")),
@@ -32132,6 +32132,7 @@ class _B41Ollama:
                       "prompt_eval_duration": 250_000_000}
         self.fail = {}                  # (path, model) -> (status, body)
         self.err_line = None            # an error line after two chunks
+        self.stuck = []                 # models a keep_alive-0 call can't unload (an older kit, or a busy card)
         self.s = _B41Server(self._h)
         self.log = self.s.log
 
@@ -32153,6 +32154,12 @@ class _B41Ollama:
         if (path, model) in self.fail or (path, None) in self.fail:
             st, ob = self.fail.get((path, model)) or self.fail[(path, None)]
             return _b41_send_json(h, st, ob)
+        if path == "/api/generate" and body.get("keep_alive") == 0:
+            # Ollama's own unload (6b454): nothing to answer, the model leaves /api/ps
+            if model not in self.stuck and model in self.loaded:
+                self.loaded.remove(model)
+            return _b41_send_json(h, 200, {"model": model, "done": True, "done_reason": "unload",
+                                           "response": ""})
         if path == "/api/generate":
             if self.hang_load:
                 srv.gate.wait(30)
@@ -32332,6 +32339,8 @@ class _B41World:
                   _bench_engine=lambda l: self.local_calls.append(l) or 1 / 0,
                   run_model=lambda *a, **k: self.local_calls.append(a))
         ns["BENCH_PRICES"].update(prices or {})
+        ns["BENCH_CLEAR_S"] = 0.1       # a card that won't empty is looked at four times here (the fake clock ticks 25 ms a call), not for fifteen seconds
+        ns["BENCH_BACK_S"], ns["BENCH_BACK_STEP"] = 1.5, 0.1    # a server that stays away is waited for 1.5 s here, not 90
         self.entry = None
         self.pair(name)
         ns["time"] = self.clock
@@ -32405,6 +32414,7 @@ def _b41_server_run(src):
     try:
         ns, ctx, o = W.ns, W.ctx, W.ollama
         o.loaded = ["mid:14b"]                  # one is already in the server's memory
+        o.stuck = ["mid:14b"]                   # and won't leave it when asked (an older kit, 6b454)
         ok0, run, fin = W.run(W.spec(("small:8b", "mid:14b")))
         rows = {r["model"]: r for r in W.rows()}
         s, m = rows.get("small:8b", {}), rows.get("mid:14b", {})
@@ -32412,7 +32422,8 @@ def _b41_server_run(src):
         rec = recs[0] if recs else {}
         p = os.path.join(W.d, "bench_targets.jsonl")
         chat = [x for x in o.log if x[1] == "/api/chat"]
-        gen = [x for x in o.log if x[1] == "/api/generate"]
+        gen = [x for x in o.log if x[1] == "/api/generate" and x[3].get("keep_alive") != 0]
+        unl = [x for x in o.log if x[1] == "/api/generate" and x[3].get("keep_alive") == 0]
         P = {
             "started and finished": ok0 and fin and run["state"] == "done",
             "target and its names": run["target"] == "server" and run["target_name"] == "Desk"
@@ -32426,15 +32437,16 @@ def _b41_server_run(src):
             "first token: measured here": s["ttft_s"] == 0.025,
             "placement and the card's share": s.get("placement") == "gpu"
             and s.get("gpu_size") == 5 << 30 and s.get("gpu_vram") == 5 << 30,
-            "no load time for a model already loaded": m.get("status") == "done" and m["load_s"] is None
-            and m["load_src"] == "not measured" and "Already in the server" in m["note"]
+            "no load time for a model that wouldn't unload": m.get("status") == "done" and m["load_s"] is None
+            and m["load_src"] == "not measured" and "wouldn\u2019t unload" in m["note"]
             and m["gen_tps"] == 50.0 and m["prompt_tps"] == 4000.0,
             "no memory figures of this computer": "mem_rise" not in s and "mem_peak" not in s,
             "every call signed": len(chat) == 2 and len(gen) == 2 and all(
                 "X-O1-Signature" in x[2] and "X-O1-Device" in x[2]
                 and x[2].get("User-Agent", "").startswith("ConcordeAI/")
                 for x in o.log if x[1] in ("/api/chat", "/api/generate", "/api/ps")),
-            "the fixed test, nothing unloaded": chat[0][3]["messages"] == [
+            "the card is emptied before the model loads (6b454)": [x[3]["model"] for x in unl] == ["mid:14b", "mid:14b", "small:8b"],   # each model's card is emptied first
+            "the fixed test, no keep_alive on the chat": chat[0][3]["messages"] == [
                 {"role": "user", "content": _B41_PROMPT}] and chat[0][3]["stream"] is True
             and "keep_alive" not in chat[0][3] and chat[0][3]["options"] == {
                 "temperature": 0, "seed": 42, "num_predict": 256, "num_ctx": 4096},
@@ -32450,14 +32462,17 @@ def _b41_server_run(src):
             "nothing on this computer": not W.local_calls}
         # no engine duration: the count is exact, the time is measured here (and marked so)
         o.final = {"load_duration": None, "prompt_eval_count": 1000, "eval_duration": None}
-        o.loaded = []
+        o.stuck, o.loaded = [], ["mid:14b"]      # now it leaves when asked: the load is timed from nothing
+        n_unl = len(unl)
         ok1, run1, fin1 = W.run(W.spec(("small:8b",)))
         r1 = W.rows()[0]
         P["no engine duration: measured here; the load timed here (6b409)"] = (
             ok1 and fin1 and r1["src"] == "measured" and r1["gen_tps"] == 40.0 and r1["gen_tokens"] == 40
             and not r1.get("est") and r1["prompt_tps"] is None
             and isinstance(r1["load_s"], float) and 0 < r1["load_s"] < 1
-            and r1["load_src"] == "timed" and not r1.get("note"))
+            and r1["load_src"] == "timed" and "eval_duration" in (r1.get("note") or "")
+            and "stayed loaded" not in (r1.get("note") or "")
+            and len([x for x in o.log if x[1] == "/api/generate" and x[3].get("keep_alive") == 0]) == n_unl + 1)
         return _b41_done(P, [s, m, r1])
     finally:
         W.stop()
@@ -32471,7 +32486,8 @@ def _b41_server_fail(src):
     try:
         ns, ctx, o = W.ns, W.ctx, W.ollama
         out, started = {}, []
-        o.fail[("/api/chat", "small:8b")] = (507, {"error": "no fit", "code": "gpu_fit"})
+        o.fail[("/api/chat", "small:8b")] = (507, {"error": "needs more VRAM than the card has", "code": "gpu_fit",
+                                                   "need_bytes": 9_000_000_000, "budget_bytes": 8_000_000_000})
         ok, run, fin = W.run(W.spec(("small:8b", "mid:14b", "ghost:1b")))
         started.append(ok and fin)
         r = {x["model"]: x for x in W.rows()}
@@ -32498,11 +32514,12 @@ def _b41_server_fail(src):
         out["off"] = [[x["status"], x["note"]] for x in W.rows()]
         P = {
             "every run started and ended": all(started),
-            "full": out["fit"][:3] == ["failed", "Failed: small:8b doesn’t fit in Desk’s "
-                                               "graphics memory.", "done"],
+            "full": out["fit"][:3] == ["failed", "Failed: Desk won’t load it: it needs about 9.0 GB and "
+                                               "the card has 8.0 GB free.", "done"],
             "missing": out["fit"][3:] == ["failed", "Failed: ghost:1b isn’t installed on Desk."],
-            "spilled": out["spill"][0] == "failed" and "couldn’t keep" in out["spill"][1],
-            "busy": out["busy"] == ["failed", "Failed: Desk is busy with other requests. Try again in a moment."],
+            "spilled": out["spill"][0] == "failed" and "its GPU-only rule unloaded it" in out["spill"][1]
+            and "small:8b" in out["spill"][1],
+            "busy": out["busy"] == ["failed", "Failed: Desk won’t run it right now: queue. It was asked twice."],
             "pairing lost": "no longer accepts this computer" in out["unpaired"],
             "off": [x[0] for x in out["off"]] == ["failed", "failed"] and all(
                 x[1].startswith("Failed: Desk didn’t answer") for x in out["off"]),
@@ -33225,7 +33242,7 @@ try{const sc=bmCompare(sparse);out.sparse={ok:true,rows:sc.rows.map(r=>[r.name,r
         and "memory" not in o["rowCl"] and ">400.0<small>" in o["rowCl"],
         "a failed cloud row says why": "Failed: rate limited." in o["rowClF"] and "bm-v" not in o["rowClF"],
         "a cloud row on the go": "waiting for the first token" in o["rowClNow"],
-        "an estimated cloud row": ">estimated</span>" in o["rowEst"] and "no token count" in o["rowEst"],
+        "an estimated cloud row": ">estimated*</span>" in o["rowEst"] and "no token count" in o["rowEst"],
         "this computer's row unchanged": "reads 900 tok/s \u00b7 first token 1.10 s \u00b7 load 3.0 s" in o["rowMac"],
         "the cloud: Run for 1 to 6 models only": o["cloudReady"] == [False] + [True] * 6 + [False],
         "the cloud's picks are provider and model": o["cloudPick"]["target"] == "cloud" and len(o["cloudPick"]["models"]) == 7
@@ -33435,8 +33452,8 @@ _B41_MUT = [
     ("another profile's results shown", "bench_targets_history(ctx, BENCH_SHOW)", "bench_targets_history(owner or ctx, BENCH_SHOW)", [10]),
     ("a run that outlives its profile", "        if ctx.cancel.is_set():\n            with _bench_lock:", "        if False:\n            with _bench_lock:", [10]),
     # the figures and the request (0, 5)
-    ("the server's own test cut short", "                \"messages\": [{\"role\": \"user\", \"content\": BENCH_PROMPT}],\n                \"options\": {\"temperature\": 0, \"seed\": BENCH_SEED,\n                            \"num_predict\": BENCH_MAX_TOKENS,\n                            \"num_ctx\": BENCH_CTX}}\n        raw[\"t_send\"] = time.monotonic()\n        for line in self._lines(",
-     "                \"messages\": [{\"role\": \"user\", \"content\": BENCH_PROMPT[:100]}],\n                \"options\": {\"temperature\": 0, \"seed\": BENCH_SEED,\n                            \"num_predict\": BENCH_MAX_TOKENS,\n                            \"num_ctx\": BENCH_CTX}}\n        raw[\"t_send\"] = time.monotonic()\n        for line in self._lines(", [0]),
+    ("the server's own test cut short", "                \"messages\": [{\"role\": \"user\", \"content\": BENCH_PROMPT}],\n                \"options\": {\"temperature\": 0, \"seed\": BENCH_SEED,\n                            \"num_predict\": BENCH_MAX_TOKENS,\n                            \"num_ctx\": BENCH_CTX}}\n        raw[\"t_send\"] = time.monotonic()\n        raw[\"final\"] = False\n        for line in self._lines(",
+     "                \"messages\": [{\"role\": \"user\", \"content\": BENCH_PROMPT[:100]}],\n                \"options\": {\"temperature\": 0, \"seed\": BENCH_SEED,\n                            \"num_predict\": BENCH_MAX_TOKENS,\n                            \"num_ctx\": BENCH_CTX}}\n        raw[\"t_send\"] = time.monotonic()\n        raw[\"final\"] = False\n        for line in self._lines(", [0]),
     ("a load time for a model already loaded", "        if not self.was_loaded and _bench_pos(final.get(\"load_duration\")):",
      "        if _bench_pos(final.get(\"load_duration\")):", [0]),
     ("a reading speed from the first token", "        if nums.get(\"src\") != \"engine\":\n            nums[\"prompt_tps\"] = None        # reads: only from the server's own numbers",
@@ -33488,7 +33505,7 @@ _B41_MUT = [
     # (6b409) a load the server doesn't time is timed here, and says so
     ("the load not timed here", '            out["load_s"] = t_done - t0\n', '            pass\n', [0]),
     ("the time not taken at the last line", "                final, t_done = obj, time.monotonic()", "                final = obj", [0]),
-    ("a timed load called not measured", '            nums["load_src"] = "timed"       # by this computer, network in it (6b409)\n            return\n', '', [0]),
+    ("a timed load called not measured", '            nums["load_src"] = "timed"       # by this computer, network in it (6b409)\n', 'nums["load_s"], nums["load_src"] = None, "not measured"\n', [0]),
     ("a timed load shown without its label", '+(r.load_src==="timed"&&r.load_s!=null?", timed by this computer":"")', '', [13]),
     ("a provider's dropped line read as no answer", "            except (ConnectionError, http.client.HTTPException):\n                conn.close()\n                raise RuntimeError(\"the connection dropped\") from None",
      "            except (ConnectionError, http.client.HTTPException):\n                conn.close()\n                raise RuntimeError(\"the provider didn\u2019t answer\") from None", [15]),
