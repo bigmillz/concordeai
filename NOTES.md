@@ -9,6 +9,39 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b468 — a wake is a fresh idle: the lights come out of sleep white, the fans at 20% (kit, per Patrick)
+
+Patrick (2026-10-09): "the lights stay blue when coming out of sleep. they go back to white after running a request.
+can you make sure they go back to white when coming out of sleep?" Kit only (`ollama1/`), branch `wakewhite-1009`, on
+`lightsfollow-1008` (6b466, itself on `fancurve-1008`, 6b460). Not run on the server.
+
+**Cause (from the code; not reproduced on the server).** After hours of deep idle the fans stood at `deep` (10%) and the
+lights at blue (6b466: they follow the fans). The wake was only half a reset: the lights started white at the sleep
+hook's SIGUSR1, but read the fans' status file as it was, and the fan service's wake did not clear its hold/ramp
+clock (`cool_from`, `was_working`). Two ways for the old `deep` to come back: `/run/ollama1/fan.json` is tmpfs and
+survives a suspend, and the fan loop's own 2 s timer can fire right after the thaw, before the hook's USR1 is handled,
+writing a fresh-looking `deep` (the monotonic clock does not count the sleep, so its state still says "long idle").
+The lights believed either one: blue at once, and only work (new fan phases) took them back to white.
+
+**Now, at a wake.**
+- The hook (unchanged; test added) writes `last_wake` in `/var/lib/ollama1/sleep.json` (`ollama1-helper stamp wake`)
+  first, then signals the fans and the lights.
+- `lib/o1fan.py` `Fan.wake()`: the end of any work and a fresh idle: no 100% hold, no ramp (`was_working`, `cool_from`,
+  `calib_at` cleared), `idle20` at 20%, the idle clock from now, so 20% for 5 minutes, then the 90 s fall to 10%. Work or
+  heat found at the next tick still wins. It stores the hook's stamp (`last_wake`; its own wall clock when there is
+  none) and every status carries it as `woke` (0 before any wake).
+- `lib/o1leds.py`: on the resync (SIGUSR1) it takes the same `last_wake` as its `wake_stamp` (none: 30 s ago) and
+  ignores any fan status whose `woke` is missing or older, as if there were no fan service: white at full brightness,
+  its own 300 s clock, no blue flash. Once the fan service writes its first status after the wake (`idle20`, `woke` =
+  the stamp) the lights follow the fans again by the 6b466 rules: white at 20%, blue as they fall to 10%.
+- The lights' reset and the rest are unchanged (temperature guard, hot, the 5 s rise, the no-fan-service fallback).
+- Tests: `test_leds` `TestAWakeIsAFreshIdle` (a `deep` status from before the sleep, one with no stamp, the first word
+  after, no fan word, no hook stamp, work right after); `test_fan` (a wake in the hold, from deep, work after, the stamp
+  in the status); `test_sleep` (stamp before both signals). `tests/mutate.py`: eight new mutants.
+- **Unverified on the server:** a real suspend/wake; the cause above is read from the code.
+
+---
+
 ## 6b466 — the lights cool down with the fans, red to white as they fall from 100% to 20% (kit, per Patrick)
 
 Patrick (2026-10-08): "Have the lights cool down, follow the fans as they go down to 10% from 20%." Kit only

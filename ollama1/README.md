@@ -1101,7 +1101,10 @@ To forget what was learned (a fan was changed), stop the service, delete
   it controls once, like "controlling GPU fan + 7 case/CPU fan outputs".
 - After a wake, amdgpu resets its fan to automatic: the sleep hook pokes the
   service (`SIGUSR1`), and every tick writes again any output it holds that
-  has changed, at the current level.
+  has changed, at the current level. A wake also counts as a fresh idle (6b468):
+  20% at once (no 100% hold), the idle clock from the wake, so the 5 minutes at
+  20% and the fall to 10% start again; work or heat still wins. The status
+  carries `woke`, the hook's wake stamp, so the lights can tell it from an older one.
 
 **A Corsair liquid cooler (optional).** A Hydro Platinum, Pro XT or Elite
 cooler (an H115i Platinum is USB `1b1c:0c17`) has its fans and its pump on
@@ -1308,7 +1311,11 @@ nowhere but `/run/ollama1`).
 never left red; after that they are as the board leaves them. After a wake the
 sleep hook restarts the OpenRGB server (the USB devices may have come back new)
 and pokes the service (`SIGUSR1`), which connects afresh and starts white at 100%
-(and goes red through the 5 s rise if the card is still working). The lights are not turned off for sleep: the board decides.
+(and goes red through the 5 s rise if the card is still working). A wake is a fresh idle for the fans too (6b468, per the
+owner: "make sure they go back to white when coming out of sleep"): the fan service goes to 20% with its idle clock
+started again (no 100% hold), and the lights ignore any fan status written before the wake (each status carries a
+`woke` stamp, the hook's `last_wake` in `sleep.json`), so they stay white, then follow the fans down to blue on the
+normal curve (20% for 5 minutes, then the 90 s fall to 10%). The lights are not turned off for sleep: the board decides.
 
 **Status.** `ollama1-leds status` (no root): the colour name, the colour now and what the lights
 are doing, the card's load and whether it counts as working, the brightness and the rule for the blue ("white goes

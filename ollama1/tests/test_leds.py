@@ -20,9 +20,11 @@ import o1test_util as U  # noqa: F401  (sets OLLAMA1_PREFIX first)
 import fakeopenrgb as F
 import o1fan
 import o1leds
+import o1sleep
 import o1work
 
 WHITE, RED, BLUE = (255, 255, 255), (255, 0, 0), (0, 0, 255)
+WAKE = 1_700_000_000 - 10                # the sleep hook's last_wake in the wake tests (the rig's wall clock is 1_700_000_000)
 
 
 def mix(z):
@@ -872,7 +874,7 @@ class FanRig(Phases):
         n = int(round(secs / step))
         for i in range(1, n + 1):
             lv = a + (b - a) * i / float(n)
-            self.fanst = {"phase": phase, "pct": int(round(lv)), "level": lv}
+            self.fanst = {"phase": phase, "pct": int(round(lv)), "level": lv, "woke": WAKE}
             self.run_for(step, step=step)
             if check:
                 check(lv)
@@ -1116,13 +1118,90 @@ class TestBlueFollowsTheFans(FanRig):
         self.run_for(100, step=0.25)
         self.assertEqual(self.leds.phase, "blue")
         self.leds.resync = True                                        # the sleep hook's SIGUSR1
-        self.fanst = {"phase": "idle20", "pct": 20}                   # the fan service's idle clock starts over at a wake too
+        self.fanst = {"phase": "idle20", "pct": 20, "woke": WAKE}     # the fan service's idle clock starts over at a wake too
         self.leds.tick()
         self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
         self.run_for(400, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
         self.fall(90, 20, 10, "deepen")
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
+
+
+class TestAWakeIsAFreshIdle(FanRig):
+    """6b468, per the owner: "the lights stay blue when coming out of sleep. they go back to white after running a
+    request. can you make sure they go back to white when coming out of sleep?" The fan status left from before the
+    sleep (`deep`, on /run, or written by a tick that ran before the wake was handled) must not turn the lights blue
+    again: a status whose `woke` stamp is older than the wake's is ignored until the fan service has written one
+    after it."""
+
+    def wake(self, stamp=WAKE):
+        o1sleep.record(last_wake=stamp)
+        self.leds.resync = True                                        # the sleep hook's SIGUSR1
+        self.leds.tick()
+
+    def test_the_deep_status_from_before_the_sleep_does_not_turn_the_lights_blue(self):
+        self.fanst = {"phase": "deep", "pct": 10, "woke": WAKE - 5000}
+        self.run_for(100, step=0.25)
+        self.assertEqual(self.leds.phase, "blue")
+        self.wake()
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        for _ in range(60):                                            # the old, still fresh looking status stays on /run
+            self.run_for(1, step=0.25)
+            self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+
+    def test_a_status_with_no_wake_stamp_is_old_too(self):
+        self.fanst = {"phase": "deep", "pct": 10}
+        self.run_for(100, step=0.25)
+        self.wake()
+        self.run_for(30, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+
+    def test_the_fans_first_word_after_the_wake_is_followed_down_to_the_blue(self):
+        self.fanst = {"phase": "deep", "pct": 10, "woke": WAKE - 5000}
+        self.run_for(100, step=0.25)
+        self.wake()
+        self.fanst = {"phase": "deep", "pct": 10, "woke": WAKE - 5000}
+        self.run_for(10, step=0.25)
+        self.fanst = {"phase": "idle20", "pct": 20, "woke": WAKE}
+        self.run_for(300, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        self.fall(90, 20, 10, "deepen")                                # the normal curve: 5 idle minutes, then the fall
+        self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
+
+    def test_with_no_fan_word_the_lights_keep_their_own_clock_from_the_wake(self):
+        self.fanst = {"phase": "deep", "pct": 10, "woke": WAKE - 5000}
+        self.run_for(100, step=0.25)
+        self.wake()
+        self.run_for(290, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        self.run_for(120, step=0.25)
+        self.assertEqual(self.leds.phase, "blue")
+
+    def test_without_the_hooks_stamp_the_wake_is_taken_as_just_now(self):
+        self.fanst = {"phase": "deep", "pct": 10, "woke": WAKE - 5000}
+        self.run_for(100, step=0.25)
+        try:
+            os.remove(o1sleep.sleep_file())
+        except OSError:
+            pass
+        self.leds.resync = True
+        self.leds.tick()
+        self.assertEqual(self.leds.phase, "idle")
+        self.fanst = {"phase": "deep", "pct": 10, "woke": 1_700_000_000 - 100}     # an older wake's: not believed
+        self.run_for(5, step=0.25)
+        self.assertEqual((self.leds.phase, self.leds.fan_phase), ("idle", None))
+        self.fanst = {"phase": "idle20", "pct": 20, "woke": 1_700_000_000 - 3}     # the fan service woke a moment before
+        self.run_for(60, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
+        self.assertEqual(self.leds.fan_phase, "idle20")
+
+    def test_work_right_after_the_wake_still_goes_red(self):
+        self.fanst = {"phase": "deep", "pct": 10, "woke": WAKE - 5000}
+        self.run_for(100, step=0.25)
+        self.wake()
+        self.probes.v["gpu_busy"] = 90
+        self.run_for(10, step=0.25)
+        self.assertEqual((self.leds.phase, self.last_shown()), ("working", RED))
 
 
 class TestCoolDownFollowsTheFans(FanRig):
@@ -1970,7 +2049,7 @@ class TestZoneWiring(unittest.TestCase):
         self.assertIn("set to 60 LEDs", self.bash('leds_plan on ""')[1])
         self.assertIn("set to 90 LEDs", self.bash("leds_plan on 90")[1])
         self.assertIn("--leds-length", self.bash("leds_plan on")[1])
-        self.assertIn("white to blue over 90 s when the fans go to 10% after 5 idle minutes (white while they are at 20%)",
+        self.assertIn("then from white to blue as they fall to 10% after 5 idle minutes (white while they are at 20%)",
                       self.bash("leds_plan on")[1])
         self.assertNotIn("dim", self.bash("leds_plan on")[1])
         self.assertNotIn("LEDs so", self.bash("leds_plan off")[1])

@@ -539,6 +539,13 @@ class TestBeforeSleep(unittest.TestCase):
         self.assertLess(pre.index('"$WATCHDOG" pause'), pre.index("before-sleep"))
         self.assertNotIn("before-sleep", h[h.index("  post)"):])
 
+    def test_the_wake_is_stamped_before_the_fans_and_lights_are_told(self):
+        """6b468: both services compare their status with the stamp (sleep.json last_wake), so it is written first."""
+        h = open(os.path.join(U.CONFIG, "ollama1-sleep-hook")).read()
+        post = h[h.index("  post)"):]
+        self.assertLess(post.index('"$HELPER" stamp wake'), post.index("--signal=USR1 ollama1-fan.service"))
+        self.assertLess(post.index('"$HELPER" stamp wake'), post.index("--signal=USR1 ollama1-leds.service"))
+
 
 class TestHelperBeforeSleep(HelperFixture):
     def test_the_helper_unloads_through_ollama(self):
