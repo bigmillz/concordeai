@@ -15360,3 +15360,35 @@ Patrick (2026-10-08): "copying over a block of code doesn't work."
   by the gauntlet, and the page renders model output; a clipboard method there widens that surface. Say if wanted.
 - **Checks.** One gauntlet source check. The fallback chain was exercised in the Browser pane (Blink) with the
   Clipboard API stubbed to reject; WKWebView itself was not tried.
+
+## 6b463 — a RESET replays the answer once, not on every chunk after it (per Patrick)
+
+Patrick: "when streaming, I clicked on Funnel mode and now the output started streaming all over
+again while flickering rapidly." His screenshot: the Code question "write a macos app that shows
+whats using my disk space in a pie chart" at "Drafted the answer 8394 chars / Sharpening it",
+FUNNELS selected, the answer replaying and flickering.
+
+- **The lane click is not the cause.** `switchLane` -> `modeShow` only toggles `#code-wrap` /
+  `#funnel-wrap`, the tab classes and (a tick later) the sidebar list and starter chips; it never
+  redraws `#inner`, and `loadChat` is not called. Proved in a dev copy (MILLENAI_DEV, port 9894,
+  fake /api/chat stream): five switches (ai/funnel/code/ai/funnel/ai) mid-stream left the same
+  `.msg.ai` and the same `.body` node, and its text only grew.
+- **The cause is the "Sharpening it" stage.** The merge sends `\0RESET\0` (throw away the draft on
+  screen, show the replacement). `raw` keeps that marker for the rest of the stream, and the read
+  loop did `if(cut>=0)dripShown=0` on EVERY chunk after it, so the paced reveal restarted from
+  zero every few hundred ms: the replacement replayed from its first word and sawtoothed. A
+  fake stream with one RESET reproduced it (38 drops in 70 samples). It looked like the click only
+  because the merge began about then.
+- **Fix** (`send()`, the stream read loop): `dripCut` remembers the RESET position already
+  replayed; `dripShown` is zeroed only when `cut` moves to a new marker. After the fix the same
+  stream drops once (at the RESET) and grows after it.
+- **What shows after a lane switch (unchanged, chosen):** the chat stays on screen and keeps
+  streaming into its own message node; only the sidebar form/list and chips change. Switching to
+  ANOTHER chat mid-stream (`loadChat`) still detaches the live bubble, the answer streams on in
+  its own chat and is painted in when it finishes (6b-earlier design, see the comment in
+  `loadChat` and the `inner.contains(aiDiv)` repaint in `send()`).
+- Touched: `send()` (two lines in the stream loop, one in the `dripShown` declaration). Not
+  touched: `paintSteps`, the spinner, the Code lane.
+- Test: one served-HTML check, "6b463: a RESET replays the answer once and a lane switch leaves the
+  streaming message alone" (the guard, the old reset gone, `modeShow`/`switchLane` free of
+  `inner.innerHTML` and `loadChat(`).

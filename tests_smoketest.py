@@ -18096,6 +18096,20 @@ check("6b458: the picker's rows carry no description; only Max says 'all models'
       and "CLOUD_MODE_DESC" not in _MILLENAI_SRC and '"your API keys only")' not in _MILLENAI_SRC
       and "one model, quick" not in _MILLENAI_SRC and "more models, blended" not in _MILLENAI_SRC
       and 'const SRV_MODE_DESC={max:"all models"};' in _MILLENAI_SRC)
+# a RESET replays the replacement once, not on every later chunk (6b463, per Patrick:
+# "started streaming all over again while flickering rapidly"); a lane switch never
+# touches the chat pane (switchLane/modeShow redraw the tabs, forms and sidebar only)
+_ls_bad = [n for n, ok in [
+    ("the reveal is zeroed only for a RESET it has not seen",
+     "if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;}" in page
+     and "streamEnded=false,dripCut=-1;" in page),
+    ("the old every-chunk reset is gone", "if(cut>=0)dripShown=0;" not in page),
+    ("modeShow leaves the message pane alone",
+     "inner.innerHTML" not in page.split("function modeShow(which){")[1].split("function switchLane(m){")[0]
+     and "loadChat(" not in page.split("function switchLane(m){")[1].split("$$(\"#mode-tabs .ltab\")")[0]),
+] if not ok]
+check("6b463: a RESET replays the answer once and a lane switch leaves the streaming message alone",
+      not _ls_bad, "%r" % _ls_bad)
 
 # ---- live: a copy of its own, the model replaced by a stand-in (suggest-fake)
 _SG_NOW = int(time.time() * 1000)

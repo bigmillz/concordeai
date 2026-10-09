@@ -42336,7 +42336,7 @@ async function send(){
     // animator reveals it at a rate that eases toward the backlog, so
     // text flows like typing instead of teleporting. The caret is
     // gone — the pinwheel rides the text's tail instead.
-    let dripShown=0,dripOn=false,streamEnded=false;
+    let dripShown=0,dripOn=false,streamEnded=false,dripCut=-1;
     const paintStream=txt=>{
       // the tree owns the narration; the bare status line is only for
       // the moment before any step exists
@@ -42425,7 +42425,11 @@ async function send(){
       const secs=(performance.now()-t0)/1000;
       lastRate=secs>0.3?tokEst/secs:0;
       setToks(lastRate,"streaming");
-      if(cut>=0)dripShown=0;    // a RESET replays the replacement
+      // a RESET replays the replacement ONCE, when it arrives (6b463, per
+      // Patrick: "started streaming all over again while flickering").
+      // raw keeps the marker for the rest of the stream, so testing
+      // cut>=0 on every chunk zeroed the reveal every few hundred ms
+      if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;}
       if(!answerChars&&full.length)etaMark=performance.now();  // text began (6b459)
       answerChars=full.length;  // drafting progress is real text
       if(steps.length)paintSteps();
