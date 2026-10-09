@@ -35348,7 +35348,6 @@ check("model updates (6b445): %d mutations of its code, each caught by a check a
       all(isinstance(v, list) for _d, v in _m45), "%r" % [x for x in _m45 if not isinstance(x[1], list)])
 
 print()
-passed = sum(1 for _n, o, _d in RESULTS if o)
 # ---- time left (6b459): the estimator is pure, tested from the source -----
 def _eta_js_run():
     j = _MILLENAI_SRC[_MILLENAI_SRC.index("// ==== eta-js: begin ===="):
@@ -35458,6 +35457,9 @@ check("a pin and its pinned-at stamp survive the chat store's save and load; a b
       _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
       and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))
 
+# counted HERE, after every check: a count taken mid-file left the checks
+# written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
+passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
     if not o:
