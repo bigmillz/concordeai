@@ -18049,6 +18049,21 @@ _al_bad = [n for n, ok in [
 check("6b451: slim buttons are one 30px line and every button-beside-a-field row shares one control-row rule",
       not _al_bad, "%r" % _al_bad)
 
+# a RESET replays the replacement once, not on every later chunk (6b463, per Patrick:
+# "started streaming all over again while flickering rapidly"); a lane switch never
+# touches the chat pane (switchLane/modeShow redraw the tabs, forms and sidebar only)
+_ls_bad = [n for n, ok in [
+    ("the reveal is zeroed only for a RESET it has not seen",
+     "if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;}" in page
+     and "streamEnded=false,dripCut=-1;" in page),
+    ("the old every-chunk reset is gone", "if(cut>=0)dripShown=0;" not in page),
+    ("modeShow leaves the message pane alone",
+     "inner.innerHTML" not in page.split("function modeShow(which){")[1].split("function switchLane(m){")[0]
+     and "loadChat(" not in page.split("function switchLane(m){")[1].split("$$(\"#mode-tabs .ltab\")")[0]),
+] if not ok]
+check("6b463: a RESET replays the answer once and a lane switch leaves the streaming message alone",
+      not _ls_bad, "%r" % _ls_bad)
+
 # ---- live: a copy of its own, the model replaced by a stand-in (suggest-fake)
 _SG_NOW = int(time.time() * 1000)
 _SG_CORE = [("Replacing front brake pads", "How do I replace the front brake pads on my Civic?"),
