@@ -1970,7 +1970,7 @@ class TestZoneWiring(unittest.TestCase):
         self.assertIn("set to 60 LEDs", self.bash('leds_plan on ""')[1])
         self.assertIn("set to 90 LEDs", self.bash("leds_plan on 90")[1])
         self.assertIn("--leds-length", self.bash("leds_plan on")[1])
-        self.assertIn("white to blue over 90 s when the fans go to 10% after 5 idle minutes (white while they are at 20%)",
+        self.assertIn("then from white to blue as they fall to 10% after 5 idle minutes (white while they are at 20%)",
                       self.bash("leds_plan on")[1])
         self.assertNotIn("dim", self.bash("leds_plan on")[1])
         self.assertNotIn("LEDs so", self.bash("leds_plan off")[1])
