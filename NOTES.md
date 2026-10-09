@@ -9,6 +9,48 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b466 — the lights cool down with the fans, red to white as they fall from 100% to 20% (kit, per Patrick)
+
+Patrick (2026-10-08): "Have the lights cool down, follow the fans as they go down to 10% from 20%." Kit only
+(`ollama1/`), branch `lightsfollow-1008`, from `fancurve-1008` (6b460). Not run on the server.
+
+Before, the red-to-white was a clock of the lights' own, `COOL_S` = 60 s, so since 6b460 it finished a minute before the
+fans reached 20%. Now the whole cool-down follows the fan service's published phase and percentage (the seam 6b449
+uses: `o1fan.read_status` on `/run/ollama1/fan.json`, read with every 0.25 s sample).
+
+| fans' phase | lights before | lights now |
+|---|---|---|
+| `hold100` (100%, 30 s) | red to white, already part way (60 s clock) | **red**, held |
+| `ramp` (100% to 20%, 90 s) | white by 60 s, then white | red to white **in proportion to the fans' percentage** (100% red, 20% white): white exactly as the fans reach 20% |
+| `idle20` | white | white |
+| `deepen` (20% to 10%, 90 s) | white to blue over 90 s (6b449, phase-triggered, own clock) | white to blue **in proportion to the percentage** (20% white, 10% blue) |
+| `deep` | blue | blue |
+
+- `lib/o1leds.py`: `fan_x()` (x = (pct - 20) / 80, clamped; without a percentage, the phase: `hold100`, `working`,
+  `hot`, `calibrating` are red, the rest white) and `fan_z()` (z = (20 - pct) / 10 in `deepen`, 1 in `deep`). In
+  `cooling`, `x = min(x, fan_x())`: it only ever falls, so a guard that lifts the fans (the CPU at 60 C, `hot`) leaves a
+  half-cooled light where it is, and a guard that holds them at a level holds the lights at that level's colour; at
+  0 it is `idle` (idle clock from that moment). In `bluing`, z follows `fan_z()`.
+- `lib/o1fan.py`: the status gains `level`, the unrounded percentage (the ramp's is otherwise in 2% steps, the
+  deepen's in 1%: steps of 25 RGB in the blue). `pct`, `phase`, `hold_left` unchanged; the lights read `level`, else `pct`.
+- **`COOL_S` is kept, for the fallback only** (`--fans off`, or a status older than 15 s): the old 60 s clock, and the
+  old `BLUE_S` blue fade. A service lost mid-fall hands over to the own clock from the colour the lights had (t0/x0 and
+  t0 are re-based on every fan-driven move). The status text and the README say so; `cool_left` is the fans'
+  `hold_left` (+ 90 s in `hold100`).
+- Unchanged: new work goes red at once (5 s eased rise from wherever it is), the 2 s wake fade, brightness 100%, the
+  fans never turn the lights red, the blue leaving rule (6b449).
+- Edge: the lights ask nothing of the fans' clock at the *start*: if the fan service's status still says `idle20` at
+  the moment the lights' work ends (work shorter than the fans' 2 s poll, which the fans never saw), the lights go white
+  at once instead of cooling for a minute.
+- Tests: `test_leds` has `TestCoolDownFollowsTheFans` (hold stays red, proportional ramp landing with the 20%, a guard
+  holding or lifting the fans, work again mid-cool, a service lost mid-cool, `cool_left`, a status with no percentage)
+  and the blue tests drive a falling `level`; the old own-clock cool-down tests are now the fallback tests. `test_fan`
+  checks `level`. `tests/mutate.py`: eleven new mutants (cool-down ignoring the fans, not proportional, climbing back,
+  rounded instead of exact, countdown ignoring the hold, blue on the own clock, blue not 20% to 10%, `deep` not blue,
+  the fans' exact level).
+- **Unverified on the server:** the look of the 90 s fall on the real strips and the 2 s steps of the fans' poll
+  (about 2% of the way each).
+
 ## 6b460 — the fans hold 100% for 30 s after the work, fall to 20% over 90 s, and to 10% over 90 s (kit, per Patrick)
 
 Patrick (2026-10-08): "run 100% after a query is done for thirty seconds, then scale down to twenty percent over the

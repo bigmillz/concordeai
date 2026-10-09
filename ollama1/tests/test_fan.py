@@ -457,13 +457,14 @@ class TestSequence(FanCase):
     def test_the_countdown_is_in_the_status(self):
         f, t, _ = self.after_work(0)
         st = o1fan.read_status(now=1_800_000_000)
-        self.assertEqual((st["phase"], st["hold_left"], st["pct"]), ("hold100", 30, 100))
+        self.assertEqual((st["phase"], st["hold_left"], st["pct"], st["level"]), ("hold100", 30, 100, 100))
         self.go(f, t + 10)
         st = o1fan.read_status(now=1_800_000_000)
         self.assertEqual((st["phase"], st["hold_left"], st["pct"]), ("hold100", 20, 100))
         self.go(f, t + 40)                                          # 10 s into the ramp: 91.1 -> 92
         st = o1fan.read_status(now=1_800_000_000)
         self.assertEqual((st["phase"], st["hold_left"], st["pct"]), ("ramp", 80, 92))
+        self.assertAlmostEqual(st["level"], 91.11, places=2)         # the unrounded level the lights follow (6b466)
 
     def test_only_the_levels_are_ever_written(self):
         f = self.fan()
@@ -839,12 +840,13 @@ class TestDeepIdle(DeepCase):
         self.idle_to(f, 330)
         st = o1fan.read_status(now=1_800_000_000)
         self.assertEqual((st["phase"], st["pct"], st["hold_left"]), ("deepen", 17, 60))
+        self.assertAlmostEqual(st["level"], 16.67, places=2)
         self.assertEqual(o1fan.phase_text(st), "deepen 17%")
         self.assertIn("Fans: going quieter, 17% (10% in 60 s)", st["line"])
         self.assertEqual(st["why"], "idle, going quieter")
         self.idle_to(f, 400)
         st = o1fan.read_status(now=1_800_000_000)
-        self.assertEqual((st["phase"], st["pct"]), ("deep", 10))
+        self.assertEqual((st["phase"], st["pct"], st["level"]), ("deep", 10, 10))
         self.assertEqual(o1fan.phase_text(st), "deep")
         self.assertIn("Fans: 10% (deep idle)", st["line"])
         self.assertIn("phase: deep", o1fan.render_status(st, self.snap()))

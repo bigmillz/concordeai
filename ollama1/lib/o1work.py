@@ -19,8 +19,9 @@ Nothing else is work any more: not the processors' utilisation, not a request in
 flight, not a running tool or setup.sh / apt-get / unattended-upgrade (a burn test
 or a model answering shows up as the card over 50%, which is what heats it).
 
-  COOL_S       60 s    when the work ends the lights go red -> orange -> yellow -> white over this,
-                       linear in time
+  COOL_S       60 s    the lights' red -> orange -> yellow -> white, linear in time, ONLY with no fan
+                       service (6b466: with one, the lights follow the fans' percentage, 100% red
+                       to 20% white, so they land with the fans' FAN_RAMP_S)
   FAN_HOLD_S   30 s    when the work ends the fans stay at 100% this long (6b460), then
   FAN_RAMP_S   90 s    fall in a straight line 100% -> 20% over this
   RISE_S       5 s     the lights' way from white to red when work starts
@@ -55,7 +56,7 @@ GPU_BUSY_PCT = 50                 # the card over this (strictly) is work
 GPU_CONFIRM_S = 1.5               # ... for this long in a row; and at/under it this long in a row to end it
 CLOCK_SLACK_S = 1e-6              # a sample due at exactly 1.5 s that a float clock puts a hair early still counts
 CPU_HOT_C, CPU_COOL_C = 60, 55    # the processor's temperature: work from 60 C, until it is under 55 C (fans only)
-COOL_S = 60                       # the lights' cool-down, red -> white
+COOL_S = 60                       # the lights' cool-down, red -> white, only with no fan service (6b466)
 FAN_HOLD_S = 30                   # the fans: 100% for this long after the work ends (6b460) ...
 FAN_RAMP_S = 90                   # ... then a straight fall 100 -> 20% over this long
 RISE_S = 5.0                      # the lights: white to red

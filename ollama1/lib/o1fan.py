@@ -375,6 +375,7 @@ class Fan:
         self.since = {}                # key -> when that level was set
         self.checked = {}              # key -> the level whose rpm was judged
         self.phase, self.pct, self.why, self.left = "idle20", LOW_PCT, "idle", 0
+        self.exact, self.status_level = None, LOW_PCT   # the unrounded level (6b466) and the one the status shows
         self.seen = None               # what it last said it controls
         self.kinds = self.said_kinds = ()   # which triggers hold it working (the log says when that changes)
         self.gpu = o1work.GpuTrigger()
@@ -644,7 +645,8 @@ class Fan:
         d = min(1.0, max(0.0, (now - self.deep_start) / o1work.BLUE_S))
         if d >= 1.0:
             return "deep", DEEP_PCT, "deep idle", 0
-        pct = int(round(LOW_PCT - (LOW_PCT - DEEP_PCT) * d))
+        self.exact = LOW_PCT - (LOW_PCT - DEEP_PCT) * d              # the lights follow this exact figure (6b466)
+        pct = int(round(self.exact))
         return "deepen", pct, "idle, going quieter", int(o1work.BLUE_S * (1.0 - d) + 0.999)
 
     # -- one tick --------------------------------------------------------------------
@@ -666,6 +668,7 @@ class Fan:
             self.was_working, self.cool_from = False, now          # the work just ended: the ramp starts now
         age = None if self.cool_from is None else now - self.cool_from
         left = 0
+        self.exact = None                                        # set where the level is not a whole step
         if hot:
             phase, pct, why = "hot", FULL_PCT, "too warm: " + "; ".join(hwhy)
         elif working:
@@ -677,6 +680,7 @@ class Fan:
             phase, pct, why, left = "hold100", FULL_PCT, "the work ended", int(HOLD_S - age + 0.999)
         elif age is not None and age < HOLD_S + RAMP_S:
             pct = ramp_pct(age - HOLD_S)
+            self.exact = ramp_exact(age - HOLD_S)
             phase, why, left = "ramp", "the work ended", int(HOLD_S + RAMP_S - age + 0.999)
         else:
             phase, pct, why, left = self.deep_level(now)
@@ -698,6 +702,7 @@ class Fan:
             self.log("%s: %s" % (phase, why))
             self.said_kinds = self.kinds
         self.phase, self.pct, self.why, self.left = phase, pct, why, left
+        self.status_level = round(self.exact, 2) if self.exact is not None else pct   # (6b466) the lights' exact figure
         self.write_status(usable)
         return phase, why
 
@@ -754,7 +759,8 @@ class Fan:
                 row["tach_raw"], row["rpm"], row["label"] = row["rpm"], pump_rpm, "Pump"
                 row["note"] = "the cooler's pump (its own rpm reading); the header's tach is in tach_raw"
         shown = [o for _row, o in rows]
-        st = {"at": int(self.wall()), "phase": self.phase, "pct": self.pct, "why": self.why, "hold_left": self.left,
+        st = {"at": int(self.wall()), "phase": self.phase, "pct": self.pct, "level": self.status_level, "why": self.why,
+              "hold_left": self.left,
               "controlling": controlling_text(shown), "outputs": [row for row, _o in rows], "temps": live["temps"],
               "unconnected": gone, "pump": pump,
               "aio": aio,
@@ -791,6 +797,11 @@ def _rpm_summary(rows):
     if case:
         parts.append("case fans up to %d rpm" % max(case))
     return parts
+
+
+def ramp_exact(t):
+    """The level `t` seconds into the ramp before it is rounded to steps (what the lights follow, 6b466)."""
+    return FULL_PCT - (FULL_PCT - LOW_PCT) * min(max(t, 0), RAMP_S) / float(RAMP_S)
 
 
 def ramp_pct(t):

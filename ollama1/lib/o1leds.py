@@ -8,8 +8,9 @@ cooler's pump head) is held at the same colour.
              service begins its own fall to 10% (its phase `deepen`: after 5 idle
              minutes, and only while its temperature guard allows; read from its status
              file, /run/ollama1/fan.json, with every 0.25 s sample):
-  bluing     white to BLUE over BLUE_S (90 s), a straight line in RGB and in time: the
-             fans' own 90 s fall, so the two land together
+  bluing     white to BLUE in proportion to the fans' fall from 20% (white) to 10% (BLUE),
+             a straight line in RGB (their `deepen`, 90 s), so the two land together; over
+             BLUE_S on the lights' own clock when there is no fan service
   blue       BLUE at 100% while the fans are at 10% (`deep`). The fans leaving deep idle
              without the card working (heat, the processor at 60 C, a wake) take the
              lights back to white the way work does, the 2 s fade, then idle white again.
@@ -22,9 +23,13 @@ cooler's pump head) is held at the same colour.
              (white after a waking) to red, along the gradient (so through yellow and
              orange) and eased in and out (smoothstep)
   working    red at 100% while the card works
-  cooling    the work ended: from red back through orange and yellow to white over
-             COOL_S (60 s), linear in time along the gradient (the lights' own
-             time since 6b460: the fans hold 100% for 30 s, then fall over 90 s). Work again mid-cool: the 5 s
+  cooling    the work ended: red back through orange and yellow to white, following the FANS
+             (6b466, per the owner: "have the lights cool down, follow the fans"): red while
+             the fans hold 100% (`hold100`), then white at their 20% and red at their 100%, in
+             proportion to the fans' own falling percentage (`ramp`: 90 s, so the white lands
+             with the 20%). It never goes back up, even if a temperature guard lifts the fans.
+             Without a fan service (`--fans off`, or no fresh status) the lights' own clock:
+             COOL_S (60 s), linear in time along the gradient. Work again mid-cool: the 5 s
              rise again, from wherever it is (no white step).
 
 "The card works" is lib/o1work.py's GpuTrigger, the very rule that sends the fans to
@@ -78,7 +83,9 @@ RED = (255, 0, 0)
 STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
 RISE_S = o1work.RISE_S            # white to red takes this long (5 s)
-COOL_S = o1work.COOL_S            # red to white takes this long (60 s; the fans' own curve is longer, 6b460)
+COOL_S = o1work.COOL_S            # red to white on the lights' OWN clock, only with no fan service (60 s); else the fans' (6b466)
+FULL_PCT, LOW_PCT, DEEP_PCT = 100, o1work.IDLE_PCT, o1work.FAN_DEEP_PCT   # the fans' levels: red, white, blue
+FAN_RED_PHASES = ("hold100", "working", "hot", "calibrating")   # the fan phases that are 100% when no percentage is given
 IDLE_DEEP_S = o1work.IDLE_DEEP_S  # with no fan service: idle this long, then white goes to blue (300 s)
 FAN_DEEP_PHASES = ("deepen", "deep")   # the fan service's phases that mean its deep idle (lib/o1fan.py): blue then
 BLUE_S = o1work.BLUE_S            # white to blue takes this long (90 s)
@@ -534,6 +541,8 @@ class Leds:
         self.fans = fans or (lambda: o1fan.read_status(now=self.wall()))   # the fan service's status, fresh, or None
         self.gpu = None                           # the last reading, or None: no reading
         self.fan_phase = None                     # the fans' phase as last read, or None: no fresh status (no service)
+        self.fan_pct = None                       # the fans' level then (their `level`, else `pct`), or None
+        self.fan_left = 0                         # the fans' `hold_left`: seconds to their next step
         self.fans_said = None                     # whether the log last said a fan service was there
         self.last, self.next_sample = None, 0.0
         self.next_poll, self.retry_at, self.backoff = 0.0, 0.0, RETRY_FIRST_S
@@ -570,6 +579,15 @@ class Leds:
             st = None
         ph = st.get("phase") if isinstance(st, dict) else None
         self.fan_phase = ph if isinstance(ph, str) and ph else None
+        self.fan_pct, self.fan_left = None, 0
+        if self.fan_phase is not None:
+            for k in ("level", "pct"):
+                v = o1work.number(st.get(k))
+                if v is not None:
+                    self.fan_pct = v
+                    break
+            left = o1work.number(st.get("hold_left"))
+            self.fan_left = int(left) if left is not None and left > 0 else 0
         if self.fan_phase is not None:
             self.fans_seen = now
         if self.fans_said != (self.fan_phase is not None):
@@ -587,6 +605,26 @@ class Leds:
             return now if self.fan_phase in FAN_DEEP_PHASES else None
         base = self.idle_since if self.fans_seen is None else max(self.idle_since, self.fans_seen)
         return base + IDLE_DEEP_S if now - base >= IDLE_DEEP_S else None
+
+    def fan_x(self):
+        """How red the fans' percentage says the lights are (1 = their 100%, 0 = their 20% or less), or None
+        with no fan service. From the percentage; the phase alone when none is given."""
+        if self.fan_phase is None:
+            return None
+        if self.fan_pct is None:
+            return 1.0 if self.fan_phase in FAN_RED_PHASES else 0.0
+        return min(1.0, max(0.0, (self.fan_pct - LOW_PCT) / float(FULL_PCT - LOW_PCT)))
+
+    def fan_z(self):
+        """How blue the fans' percentage says the lights are (0 = their 20%, 1 = their 10%), or None when
+        the fans are not in `deepen` or `deep` (or there is no fan service)."""
+        if self.fan_phase == "deep":
+            return 1.0
+        if self.fan_phase != "deepen":
+            return None
+        if self.fan_pct is None:
+            return 0.0
+        return min(1.0, max(0.0, (LOW_PCT - self.fan_pct) / float(LOW_PCT - DEEP_PCT)))
 
     def fans_left_deep(self):
         """True while a fan service says it is not in its deep idle (idle20, working, hot, ramp, calibrating)."""
@@ -632,16 +670,28 @@ class Leds:
         elif self.phase == "working":
             self.x = 1.0
         elif self.phase == "cooling":
-            self.x = max(0.0, self.x0 - (now - self.t0) / COOL_S)
-            if self.x <= 0.0:
-                self.phase, self.idle_since = "idle", self.t0 + self.x0 * COOL_S       # white from that moment
+            tx = self.fan_x()
+            if tx is not None:                  # the fans' own percentage; never back up (a guard may lift the fans)
+                self.x = min(self.x, tx)
+                self.t0, self.x0 = now, self.x            # (so the lights' own clock could carry on from here)
+                if self.x <= 0.0:
+                    self.phase, self.idle_since = "idle", now
+            else:
+                self.x = max(0.0, self.x0 - (now - self.t0) / COOL_S)
+                if self.x <= 0.0:
+                    self.phase, self.idle_since = "idle", self.t0 + self.x0 * COOL_S   # white from that moment
         if self.phase == "idle":
             self.x, self.z = 0.0, 0.0
             start = self.blue_from(now)
             if start is not None:
                 self.phase, self.t0 = "bluing", start
         if self.phase == "bluing":
-            self.z = min(1.0, max(0.0, (now - self.t0) / BLUE_S))
+            tz = self.fan_z()
+            if tz is not None:                  # the fans' percentage: 20% white, 10% blue
+                self.z = tz
+                self.t0 = now - self.z * BLUE_S           # (so the lights' own clock could carry on from here)
+            else:
+                self.z = min(1.0, max(0.0, (now - self.t0) / BLUE_S))
             if self.z >= 1.0:
                 self.phase = "blue"
         elif self.phase == "blue":
@@ -752,7 +802,15 @@ class Leds:
         return color_name(self.x)
 
     def cool_left(self, now):
-        return int(max(0.0, self.x0 * COOL_S - (now - self.t0)) + 0.999) if self.phase == "cooling" else 0
+        if self.phase != "cooling":
+            return 0
+        if self.fan_phase is None:
+            return int(max(0.0, self.x0 * COOL_S - (now - self.t0)) + 0.999)
+        if self.fan_phase == "hold100":
+            return self.fan_left + o1work.FAN_RAMP_S
+        if self.fan_phase == "ramp":
+            return self.fan_left
+        return int(self.x * o1work.FAN_RAMP_S + 0.999)
 
     def write_status(self, now):
         if not self.status:
@@ -810,9 +868,10 @@ def blue_rule_text(st):
     """When the white goes blue, in words: with the fan service, or on the lights' own clock without one."""
     fans = st.get("fans")
     if fans:
-        return "white goes to blue over %d s when the fans go to %d%% (fans now: %s)" % (BLUE_S, o1work.FAN_DEEP_PCT, fans)
-    return "white goes to blue over %d s after %d s of white, on the lights' own clock (no fan service running)" % (
-        BLUE_S, IDLE_DEEP_S)
+        return ("red cools to white as the fans fall from 100%% to %d%%, and white goes to blue as they fall to %d%% "
+                "(fans now: %s)" % (LOW_PCT, o1work.FAN_DEEP_PCT, fans))
+    return ("red cools to white over %d s, and white goes to blue over %d s after %d s of white, on the lights' own "
+            "clock (no fan service running)" % (COOL_S, BLUE_S, IDLE_DEEP_S))
 
 
 def status_line(st):

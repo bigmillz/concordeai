@@ -113,7 +113,7 @@ it asks for any it can't find, at the terminal):
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
 | `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then 100% for 30 s after the work ends, a ramp down to 20% over the next 90 s, and a second ramp to 10% over 90 s after 5 idle minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over 60 s when it stops, and goes from white to blue over 90 s when the fans go to their deep-idle 10% (white while they are at the idle 20%), always at full brightness (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white as the fans fall from 100% to 20% (the fans' own percentage, not a clock of the lights'), and goes from white to blue as they fall from 20% to their deep-idle 10% (white while they are at the idle 20%), always at full brightness (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--wifi on\|off` | Wi-Fi as a backup connection and a second way to wake the server (see "Wi-Fi backup" below). **Off unless you say `--wifi on`** (or `OLLAMA1_WIFI=1`); `on` installs `iw` (and `wpasupplicant` if missing) and the `ollama1-wifi` tool, and sets up no network: `sudo ollama1-wifi set` does. Saved in `setup.env` (`WIFI=`), so a re-run without the flag keeps it |
 | `--leds-length N` | LEDs given to a board header that lists none, 1 to 1024 (default **60**): see "Lights" below. Saved in `setup.env` (`LEDS_LENGTH=`, only when you give it), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 300 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
@@ -1198,32 +1198,39 @@ the lights any more.**
 | State | Colour | Fans (`ollama1-fan`) |
 |---|---|---|
 | idle | white, 255,255,255 | `idle20` (20%), however long the idle lasts |
-| bluing | white fading to blue over 90 s | `deepen` (20% falling to 10% over the same 90 s) |
+| bluing | white fading to blue in step with the fans: white at 20%, blue at 10% | `deepen` (20% falling to 10% over 90 s) |
 | blue (deep idle) | blue, 0,0,255 | `deep` (10%) |
 | waking | blue fading back to white in 2 s | work started, or the fans left deep idle (back at 20%, or up for heat) |
 | working | red, 255,0,0 | `working` (100%) |
-| cooling | red, then orange, yellow, white, over 60 s | `hold100` then `ramp` (30 s at 100%, then 100% down to 20% over 90 s; the two no longer finish together, 6b460) |
+| cooling, held | red, 255,0,0 | `hold100` (100% for 30 s) |
+| cooling, falling | red through orange and yellow to white in step with the fans: red at 100%, white at 20% | `ramp` (100% down to 20% over 90 s; the two land together, 6b466) |
 
 - **Work starts while the lights are white** (a request, a benchmark, a burn test: anything that keeps the
   card over 50%): over **5 s** the colour goes from white to red, along the gradient (so through yellow and orange).
   The curve is eased in and out (smoothstep), so it starts and lands softly. **Work starting mid-cool-down** rises
   from the colour it has, with no white step.
 - **While working**: red at 100%.
-- **Work ends**: the colour goes back from red through orange and yellow to
-  white over **60 s**, linear in time along the gradient (the lights' own time: since 6b460 the fans
-  hold 100% for 30 s and then fall over 90 s, so they finish later than the lights).
+- **Work ends** (6b466, per the owner: "have the lights cool down, follow the fans as they go down to 10% from
+  20%"): the lights follow **the fans' own phase and percentage** from the fan service's status file, not a
+  clock of their own. While the fans hold 100% (`hold100`, 30 s) the lights **stay red**; while the fans fall from
+  100% to 20% (`ramp`, 90 s) the colour goes from red through orange and yellow to white in proportion to the
+  falling percentage (100% is red, 20% is white, linear in time along the gradient as the fall is), so the lights
+  reach white exactly as the fans reach 20%; at `idle20` they are white. If a temperature guard holds the fans
+  higher, the lights stay at the colour of that percentage; they never go back up on their own (the fans at 100% for
+  the CPU leave a half-cooled light where it is). Work again mid-cool rises from the colour it has.
 - **Blue is the fans' deep idle, nothing else** (6b449, per the owner: "the lights shouldn't be blue when it's on
   idle 20%, only idle 10%"). The lights read the fan service's status file (`/run/ollama1/fan.json`, its `phase`)
   with every 0.25 s sample. While the fans are at their idle **20%** (`idle20`) the lights stay **white, however long
   the idle lasts**: the fans' 5 idle minutes may be held up by their temperature guard (the CPU at 50 C or more, the
   card's junction at 60 C or more, any sensor within 10 C of its limit) or by the CPU at 60 C keeping them at 100%,
   and the lights wait with them. When the fans begin their fall to **10%** (`deepen`) the lights go from white to
-  **blue** over the same **90 s**, a straight line in RGB and in time, and stay blue at 100% while the fans are at
-  10% (`deep`). The fans leaving deep idle without the card working (the guard, the CPU trigger, a wake) take the
+  **blue** in proportion to the fans' percentage (20% is white, 10% is blue; a straight line in RGB, and in time
+  over the fans' **90 s**), and stay blue at 100% while the fans are at 10% (`deep`). The fans leaving deep idle without the card working (the guard, the CPU trigger, a wake) take the
   lights back to white the way work does: **in 2 s** (less from part way), then white idle again, with the idle
   minutes still counting; when the fans fall again the lights go blue again.
-- **Without a fan service** (`--fans off`, or no status fresher than 15 s from it) the lights keep their own clock:
-  blue after **5 minutes of white** (counted from the moment the cool-down reached white, or from start/wake, or
+- **Without a fan service** (`--fans off`, or no status fresher than 15 s from it) the lights keep their own clocks:
+  red to white over **60 s** (`COOL_S`, now only this fallback; a service lost mid-cool carries on from the colour
+  it had) and blue after **5 minutes of white** (counted from the moment the cool-down reached white, or from start/wake, or
   from the fan service's last word, whichever is later, so a fan service that stops mid-idle does not turn the
   lights blue at once). `journalctl -u ollama1-leds` says which rule is in force ("fans: following the fan
   service's deep idle for the blue" / "fans: no fan service; ...").
