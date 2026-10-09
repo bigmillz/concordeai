@@ -21811,12 +21811,56 @@ def server_wake_if_down(e, ctx=None, defer=False):
             pass
 
 
-def server_only_wake(sid: str, ctx, status, alive=None):
+def council_merger_last(council: list, req_comp: str = "", mode_pen: str = "") -> list:
+    """THE MERGER DRAFTS LAST (6b243): the council's local loop leaves the last
+    engine resident, and the merge stage wants the biggest Gemma, so it goes to
+    the end of the roster and the merge finds it loaded. Shared by the first
+    resolve and the one after a server woke (6b465)."""
+    if len(council) > 1:
+        _mp = (req_comp if req_comp in MODEL_ROUTES
+               else mode_pen if mode_pen in MODEL_ROUTES   # the person's pen drafts last too (6b442)
+               else merge_pref_label())
+        if _mp in council:
+            council = [l for l in council if l != _mp] + [_mp]
+    return council
+
+
+def server_wake_step(e, status, step, skip, alive, wait_s: int) -> str:
+    """The wake of server e the page can see (6b465, one implementation for the
+    Code lane, the Chat modes and "<name> Only"): a "wake" step reading
+    "Waking <name>" with the seconds left, "Waking <name>... 7 s" as the status
+    line, and a Skip (skip is the Event the page's POST sets) that ends the wait
+    within a quarter second. Returns server_wake's word: "woke", "tried",
+    "skipped", "stopped" or ""."""
+    name = _srv_plain(e["name"])
+    lbl = "Waking %s" % name
+    step("wake", lbl, "run", "%d s" % wait_s)
+    status("Waking %s..." % name)
+
+    def _prog(w):
+        left = max(0, int(wait_s - w + 0.5))
+        step("wake", lbl, "run", "%d s" % left)
+        status("Waking %s... %d s" % (name, left))
+    r = server_wake(e, _prog, alive, wait_s, skip.is_set if skip is not None else None)
+    if r == "woke":
+        step("wake", "Woke %s" % name, "done", "")
+    elif r == "skipped":
+        step("wake", "Skipped waking %s" % name, "done", "")
+    elif r == "tried":
+        step("wake", "%s didn\u2019t wake in %d s" % (name, wait_s), "done", "")
+    else:                          # stopped, or nothing was asked
+        step("wake", lbl, "done", "")
+    return r
+
+
+def server_only_wake(sid: str, ctx, status, alive=None, step=None, skip=None):
     """The wake of "<name> Only", run once the page has its headers (6b369):
-    (label to run on, why not). The page sees "Waking <name>... 12 s" every
-    two seconds, a stop of the reader ends it, and a server that did not come
-    up in SRV_WAKE_WAIT_S ends in one line that says so. ("", "") when the
-    reader left."""
+    (label to run on, why not). The page sees the "Waking <name>" step and
+    "Waking <name>... 12 s" counting down every two seconds from
+    SRV_WAKE_WAIT_S, with a Skip (6b465: stop waiting and say it is asleep);
+    a stop of the reader ends it, and a server that did not come up in
+    SRV_WAKE_WAIT_S ends in one line that says so. ("", "") when the reader
+    left. It cannot go elsewhere, so it keeps the whole minute."""
     try:
         e = _srv_find(_srv_read(ctx), sid)
     except (StoreReadError, NoProfile):
@@ -21824,10 +21868,12 @@ def server_only_wake(sid: str, ctx, status, alive=None):
     if e is None:
         return "", SRV_GONE
     name = _srv_plain(e["name"])
-    status("Waking %s..." % name)
-    r = server_wake(e, lambda w: status("Waking %s... %d s" % (name, int(w))), alive)
+    r = server_wake_step(e, status, step or (lambda *a: None), skip, alive, SRV_WAKE_WAIT_S)
     if r == "stopped":
         return "", ""
+    if r == "skipped":
+        return "", ("%s is asleep, and you chose not to wait for it. Nothing was sent anywhere "
+                    "else." % name)
     if r == "tried":
         server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
         return "", ("%s didn\u2019t wake up in %d seconds. It may be off or offline. "
@@ -21875,33 +21921,20 @@ def server_wake_ask(sids, ctx, status, step, skip, alive=None):
         if e is None:
             continue
         name = _srv_plain(e["name"])
-        lbl = "Waking %s" % name
-        step("wake", lbl, "run", "%d s" % SRV_WAKE_ASK_S)
-        status("Waking %s..." % name)
-
-        def _prog(w, lbl=lbl, name=name):
-            left = max(0, int(SRV_WAKE_ASK_S - w + 0.5))
-            step("wake", lbl, "run", "%d s" % left)
-            status("Waking %s... %d s" % (name, left))
-        r = server_wake(e, _prog, alive, SRV_WAKE_ASK_S, skip.is_set)
+        r = server_wake_step(e, status, step, skip, alive, SRV_WAKE_ASK_S)
         if r == "stopped":
             return None
         if r == "woke":
-            step("wake", "Woke %s" % name, "done", "")
             status("%s is awake." % name)
             woke.append(name)
         elif r == "skipped":
-            step("wake", "Skipped waking %s" % name, "done", "")
             status("Skipped waking %s, going on without it" % name)
         elif r == "tried":
-            step("wake", "%s didn\u2019t wake in %d s" % (name, SRV_WAKE_ASK_S), "done", "")
             status("%s didn\u2019t wake in %d s, going on without it" % (name, SRV_WAKE_ASK_S))
             try:
                 server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
             except (StoreReadError, NoProfile):
                 pass
-        else:                      # a call went out within the last five minutes: nothing asked
-            step("wake", lbl, "done", "")
     return woke
 
 
@@ -31628,6 +31661,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # model ever answers in its place.
         _so_c0, _so_fail, _so_wake = "", "", ""
         _ag_wake = []     # servers asleep that the agent lane wakes after the headers (6b461)
+        _ch_wake = []     # the same for Fast, Thinking, Pro and Max (6b465)
+        _ch_council0 = None
         # Fast, Thinking or Pro on that server alone (6b426): the mode, and
         # the seats it found there (every one that server's)
         _so_mode, _so_seats = srv_only_mode(tier), []
@@ -31642,7 +31677,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             try:
                 # Cloud Only never contacts the server (6b339, rules review)
                 if not cloud_only:
-                    server_refresh_modes(self.ctx)
+                    # a sleeping server is woken after the headers, with the step the
+                    # page shows, ten seconds and a Skip (6b465); the pictures and the
+                    # agents that run their own flow keep the old wake
+                    _ag0 = str(req_json.get("agent") or "")
+                    if req_json.get("images") or (_ag0 and _ag0 not in _AGENT_ROLE):
+                        server_refresh_modes(self.ctx)
+                    else:
+                        server_refresh_modes(self.ctx, wake=False)
+                        if not _ag0:
+                            _ch_wake = server_sleepers(self.ctx)
             except (StaleProfile, BrokenPipeError, ConnectionResetError):
                 raise
             except Exception:
@@ -31717,11 +31761,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # swap spent purely on ordering. Same models, same merger, same
         # answers — one fewer multi-GB load per council.
         if len(council) > 1 and not model_name:
-            _mp = (req_comp if req_comp in MODEL_ROUTES
-                   else mode_pen if mode_pen in MODEL_ROUTES   # the person's pen drafts last too (6b442)
-                   else merge_pref_label())
-            if _mp in council:
-                council = [l for l in council if l != _mp] + [_mp]
+            council = council_merger_last(council, req_comp, mode_pen)
+        _ch_council0 = list(council)    # the roster as the mode resolved it, to tell a hijack (6b465)
         # a tier request has model_name "" here (the page's own is set aside
         # above, 6b339) — the router matches on model_name, and an empty one
         # fell through to the smallest-cached fallback: the header said Gemma
@@ -31979,27 +32020,31 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _srv_seat = bool(_srv_lbl) and _srv_lbl in _seat_fb
         if _srv_seat:
             _srv_lbl = ""
-        if _srv_lbl:
-            route, route_label = (None, None), _srv_lbl
-        elif server_label(model_name):
-            # a council led by a server model warms its first local one,
-            # never a catalog label found inside the server's name
-            route_label = next((l for l in council if l in MODEL_ROUTES), None)
-            route = MODEL_ROUTES.get(route_label) if route_label else None
-        for label, target in ({} if server_label(model_name)
-                              else MODEL_ROUTES).items():
-            if label in model_name:
-                route, route_label = target, label
-                break
-        if (route is None and not cloud_only
-                and not all(server_label(l) for l in council)):
-            # smallest cached model, never a 40 GB bomb (see run_model)
-            pulled = ollama_pulled_tags() or set()
-            route_label = next((l for l in reversed(MERGE_RANK)
-                                if model_cached(l, pulled)), None)
-            route = MODEL_ROUTES.get(route_label, (None, None))
-        if route is None:
-            route = (None, None)     # Cloud Only: there is no local route
+        def _resolve_route():
+            nonlocal route, route_label
+            route, route_label = None, None
+            if _srv_lbl:
+                route, route_label = (None, None), _srv_lbl
+            elif server_label(model_name):
+                # a council led by a server model warms its first local one,
+                # never a catalog label found inside the server's name
+                route_label = next((l for l in council if l in MODEL_ROUTES), None)
+                route = MODEL_ROUTES.get(route_label) if route_label else None
+            for label, target in ({} if server_label(model_name)
+                                  else MODEL_ROUTES).items():
+                if label in model_name:
+                    route, route_label = target, label
+                    break
+            if (route is None and not cloud_only
+                    and not all(server_label(l) for l in council)):
+                # smallest cached model, never a 40 GB bomb (see run_model)
+                pulled = ollama_pulled_tags() or set()
+                route_label = next((l for l in reversed(MERGE_RANK)
+                                    if model_cached(l, pulled)), None)
+                route = MODEL_ROUTES.get(route_label, (None, None))
+            if route is None:
+                route = (None, None)     # Cloud Only: there is no local route
+        _resolve_route()      # (again after a server woke, 6b465)
 
         # PRE-WARM IN PARALLEL WITH THE SEARCH (6b243). This used to run
         # serially AFTER the search and BEFORE the headers: search 5-20s
@@ -32033,7 +32078,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 ctx_thread(target=_prewarm, daemon=True).start()
         # a server being woken for this question may answer it: this computer's
         # engine is warmed only when that fails (6b461)
-        if not _ag_wake:
+        # (the same for a mode: only a roster the mode resolved itself is
+        # re-seated after a wake, so a picture, a pick or an agent that took
+        # the council leaves the sleeper alone, 6b465)
+        if _ch_wake and (tier not in TIERS or cloud_only or _srv_only or _ag_wake
+                         or _ch_council0 is None or council != _ch_council0):
+            _ch_wake = []
+        if not (_ag_wake or _ch_wake):
             _start_prewarm()
 
         # LINKS PASTED INTO THE MESSAGE ARE READ, NOT SEARCHED (6b423, per
@@ -32873,7 +32924,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             try:
                 _w_lbl, _w_why = server_only_wake(
                     _so_wake, self.ctx, status,
-                    lambda: not _client_gone(self.connection))
+                    lambda: not _client_gone(self.connection), step, skip_ev)
             except (StaleProfile, BrokenPipeError, ConnectionResetError):
                 raise
             except Exception:
@@ -32922,6 +32973,37 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     council, model_name = [_ag2_label], _ag2_label
                     _seat_fb = {_ag2_label: _ag2_fb}
                     route, route_label = (None, None), None
+            _start_prewarm()
+
+        # FAST, THINKING, PRO AND MAX WAKE A SLEEPING SERVER WITH THE SAME STEP
+        # (6b465, per Patrick: "Chat's Fast, Thinking and Pro modes still wake a
+        # sleeping server silently, for up to a minute and with no Skip"). The
+        # same server_wake_ask as the Code lane; a server that answers is
+        # seated now (the roster, the merger last, the route), one that doesn't
+        # leaves the roster as it was: the cloud, then this computer.
+        if _ch_wake:
+            try:
+                _cw = server_wake_ask(_ch_wake, self.ctx, status, step, skip_ev,
+                                      lambda: not _client_gone(self.connection))
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                _cw = []
+            if _cw is None:                  # the reader left
+                hb_stop.set()
+                return
+            if _cw:
+                try:
+                    _seats = (max_tier_seats(self.ctx) if _max
+                              else resolve_tier_seats(tier, self.ctx))
+                except Exception:
+                    _seats = []
+                if _seats:
+                    council = council_merger_last([x["label"] for x in _seats], req_comp, mode_pen)
+                    _seat_fb = {x["label"]: x["fb"] for x in _seats if server_label(x["label"])}
+                    model_name = council[0]
+                    _srv_lbl = ""            # a mode's seat is never an explicit pick (6b339)
+                    _resolve_route()
             _start_prewarm()
 
         # MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER (review of
