@@ -82,7 +82,6 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>     <string>APPL</string>
   <key>NSHighResolutionCapable</key> <true/>
   <key>LSMinimumSystemVersion</key>  <string>11.0</string>
-  <key>LSUIElement</key>             <true/>
   <key>NSLocalNetworkUsageDescription</key> <string>ConcordeAI wakes your own server over your home network and talks to it there.</string>
   <key>NSMicrophoneUsageDescription</key> <string>ConcordeAI uses the microphone for voice input — audio never leaves this Mac.</string>
 </dict>
@@ -93,8 +92,12 @@ PLIST
 # On first run it builds a private venv in ~/Library/Application Support
 # and pip-installs the engine deps (needs internet, a few minutes).
 # It lives in Resources (6b443): the main executable is the native launcher
-# below, which runs this script as its child. DIR is Resources now, so
-# "$DIR/../.." is still the bundle and "$DIR/../Resources" still Resources.
+# below. DIR is Resources now, so "$DIR/../.." is still the bundle and
+# "$DIR/../Resources" still Resources. The launcher runs it with
+# --bootstrap (6b455): the venv check and setup, then exit 0 instead of
+# running python, which the launcher then does in its own process. Without
+# the flag it still execs python: the launcher's fallback for a python
+# with no framework dylib to load.
 # NOTE: single-quoted heredoc — nothing here is expanded at build time.
 cat > "$APP/Contents/Resources/launch.sh" <<'LAUNCH'
 #!/bin/zsh
@@ -138,6 +141,8 @@ if [[ ! -x "$PY" ]] || ! "$PY" -c "import webview" 2>/dev/null; then
   fi
 fi
 
+# --bootstrap (6b455): the venv is ready; the launcher runs python itself
+[[ "$1" == "--bootstrap" ]] && exit 0
 exec "$PY" "$DIR/../Resources/millenai.py"
 LAUNCH
 chmod +x "$APP/Contents/Resources/launch.sh"
@@ -148,10 +153,13 @@ chmod +x "$APP/Contents/Resources/launch.sh"
 # bundle's main executable, by its signature and Mach-O UUID (TN3179). A
 # zsh script has no UUID, and exec'ing python turned the process into
 # Homebrew's Python.app, so LAN connections to the server failed with "No
-# route to host" and no alert. The launcher stays alive as python's parent,
-# which keeps this bundle the responsible code. Universal when the SDK
-# allows; one arch is enough to run. No compiler, no app: a script
-# launcher would bring the silent block back.
+# route to host" and no alert. The launcher IS python (6b455, per Patrick:
+# the Dock showed the window as a Python rocket and a click on the app's
+# icon started a second copy): it loads the venv's Python framework dylib
+# into its own process, so the window's process is this bundle, with its
+# icon, its name and one Dock entry, and this bundle stays the responsible
+# code. Universal when the SDK allows; one arch is enough to run. No
+# compiler, no app: a script launcher would bring the silent block back.
 LSRC="packaging/macos_launcher.m"
 LFLAGS=(-O2 -fobjc-arc -mmacosx-version-min=11.0 -framework Cocoa
         -DLAUNCHER_TAG='"com.millen.millenai"')

@@ -17445,15 +17445,44 @@ check("6b443: the .app's main executable is a native launcher that keeps the bun
       and 'LSRC="packaging/macos_launcher.m"' in _bm443
       and '-o "$APP/Contents/MacOS/MillenAI" "$LSRC"' in _bm443
       and "-arch arm64 -arch x86_64" in _bm443
-      and "<key>LSUIElement</key>             <true/>" in _bm443
       and "<key>CFBundleExecutable</key>      <string>MillenAI</string>" in _bm443
       and 'codesign --verify --strict "$APP"' in _bm443
-      and "posix_spawn(&child, \"/bin/zsh\"" in _lm443
       and '@"launch.sh"' in _lm443 and "execv" not in _lm443
-      and "kill(child, sig)" in _lm443 and "DISPATCH_PROC_EXIT" in _lm443
-      and "yieldActivationToApplication" in _lm443
       and "packaging/macos_launcher.m" in open(".github/workflows/nightly.yml").read()
       and '/Contents/MacOS/MillenAI" >/dev/null || break' in _MILLENAI_SRC)
+# THE WINDOW'S PROCESS IS THE APP (6b455, per Patrick: the Dock showed a
+# Python rocket, no dot under the app's icon, and a click started a second
+# copy): the launcher loads the venv's Python framework and runs the
+# interpreter in its own process, the venv found the way python's own stub
+# finds it; no LSUIElement, so that one process owns the Dock entry; the
+# child layout of 6b443 only as the fallback, out of the Dock. The WebKit
+# store is the app's own then, so Python's is carried over once.
+_ad = tempfile.mkdtemp()
+_ws3 = dict(_cs)
+_exec_names(_ws3, {"APP_BUNDLE_ID", "_webkit_store_adopt", "_webkit_own_store"})
+_a0 = _ws3["_webkit_store_adopt"](_ad)          # nothing to carry over
+os.makedirs(os.path.join(_ad, "org.python.python", "WebsiteData", "Default"))
+open(os.path.join(_ad, "org.python.python", "WebsiteData", "salt"), "w").write("s")
+_a1 = _ws3["_webkit_store_adopt"](_ad)
+_a2 = _ws3["_webkit_store_adopt"](_ad)          # once only
+_a_dst = os.path.join(_ad, _ws3["APP_BUNDLE_ID"], "WebsiteData")
+_a_ok = (_a0 is False and _a1 is True and _a2 is False
+         and os.path.isfile(os.path.join(_a_dst, "salt"))
+         and os.path.isdir(os.path.join(_a_dst, "Default")))
+shutil.rmtree(_ad, ignore_errors=True)
+check("6b455: the launcher runs the interpreter itself, so the window's process is ConcordeAI.app (Dock, Cmd-Tab, reopen); Python's WebKit store carried over once",
+      "dlopen(" in _lm443 and 'dlsym(lib, "Py_BytesMain")' in _lm443
+      and 'setenv("__PYVENV_LAUNCHER__"' in _lm443 and "RTLD_NOW | RTLD_GLOBAL" in _lm443
+      and '"--bootstrap"' in _lm443 and "return runAsParent(script);" in _lm443
+      and "posix_spawn(pid, \"/bin/zsh\"" in _lm443 and "kill(child, sig)" in _lm443
+      and "setActivationPolicy:NSApplicationActivationPolicyAccessory" in _lm443
+      and "LSUIElement" not in _bm443
+      and '[[ "$1" == "--bootstrap" ]] && exit 0\nexec "$PY" "$DIR/../Resources/millenai.py"' in _bm443
+      and "if _webkit_store_adopt():" in _MILLENAI_SRC
+      and (_MILLENAI_SRC.index("if _webkit_store_adopt():")
+           < _MILLENAI_SRC.index("webview.start(private_mode=False,"))
+      and "if not (IS_MAC and DEFAULT_APP and _webkit_own_store()):" in _MILLENAI_SRC
+      and _a_ok, "%r" % [_a0, _a1, _a2])
 check("the composer grows with its text: typing, pasting and code that fills it refit it, to 45% of the window",
       "function fitInput(){" in _MILLENAI_SRC and 'input.addEventListener("input",fitInput);' in _MILLENAI_SRC
       and 'set(v){d.set.call(this,v);fitInput();}' in _MILLENAI_SRC

@@ -34130,14 +34130,41 @@ APP_BUNDLE_ID = "com.millen.millenai"      # build_macos_app.sh's
 def _webkit_own_store() -> bool:
     """True only when this process is the app's own bundle, so that
     WKWebsiteDataStore.defaultDataStore() is ConcordeAI's store and no
-    one else's. Never true today: the .app starts the venv's python3,
-    whose bundle is org.python.python. A follow-up gives the window a
-    data store of its own; until then the macOS branch never runs."""
+    one else's. True in the .app since 6b455: its launcher runs the
+    interpreter in its own process, so the bundle is ConcordeAI.app (it
+    was org.python.python when the venv's python3 ran). False for a
+    python started any other way, the launcher's child fallback
+    included, so the macOS branch leaves Python's shared store alone."""
     try:
         from Foundation import NSBundle
         return str(NSBundle.mainBundle().bundleIdentifier() or "") \
             == APP_BUNDLE_ID
     except Exception:
+        return False
+
+
+def _webkit_store_adopt(base=None) -> bool:
+    """One-time (6b455): the window's WebKit store is the app's own now
+    (~/Library/WebKit/<APP_BUNDLE_ID>), not Python's shared one, so the
+    page's localStorage (the backdrop history, the voice, the sidebar
+    width) would start empty after the update. Before the window opens,
+    Python's store is copied there once, when the app's own has none
+    yet; after that they go their own ways. base: the ~/Library/WebKit
+    folder (a test's seam; without it, the desktop app's own only)."""
+    if base is None:
+        if not (IS_MAC and DEFAULT_APP and _webkit_own_store()):
+            return False
+        base = os.path.expanduser("~/Library/WebKit")
+    src = os.path.join(base, "org.python.python", "WebsiteData")
+    dst = os.path.join(base, APP_BUNDLE_ID, "WebsiteData")
+    if os.path.exists(dst) or not os.path.isdir(src):
+        return False
+    try:
+        shutil.copytree(src, dst)
+        return True
+    except Exception as exc:
+        print("  (web view store not carried over: %s)" % exc)
+        shutil.rmtree(dst, ignore_errors=True)
         return False
 
 
@@ -50454,10 +50481,13 @@ if __name__ == "__main__":
         # a first run (5.3.6, per Patrick: "STILL defaults to that earth
         # one each time"). Persist the profile in app_dir.
         # THE MENU SAYS THE APP'S NAME (6b264, per Patrick: it said
-        # "Python"). The process is the venv's python3, so macOS
+        # "Python"). When the process is the venv's python3, macOS
         # attributes the app menu to Python's bundle — overriding the
         # in-memory CFBundleName before the app activates renames the
-        # menu without touching the interpreter on disk.
+        # menu without touching the interpreter on disk. In the .app the
+        # bundle is ConcordeAI's own since 6b455 (the launcher runs the
+        # interpreter itself), so this is a no-op there and the window's
+        # WebKit store is the app's: Python's is carried over once.
         try:
             from Foundation import NSBundle
             _bi = NSBundle.mainBundle().infoDictionary()
@@ -50466,6 +50496,8 @@ if __name__ == "__main__":
                 _bi["CFBundleDisplayName"] = APP_NAME
         except Exception:
             pass
+        if _webkit_store_adopt():
+            print("  (web view store carried over from Python's)")
         try:                       # 6b295: without this the WKDownload
             webview.settings["ALLOW_DOWNLOADS"] = True   # chain never runs
         except Exception:
