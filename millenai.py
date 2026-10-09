@@ -36012,7 +36012,10 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   cursor:default}
 /* the living pinwheel (5.2): Claude has its flower — ours spins the
    identity gradient beside whatever is in motion */
-.wthead{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.wthead{display:flex;align-items:center;gap:9px;margin-bottom:10px;
+  contain:layout paint}
+/* 6b462: its own layer, so the answer reflowing below never repaints it */
+.wthead .cspin{will-change:transform;transform:translateZ(0)}
 .cspin{display:inline-block;flex:none;width:15px;height:15px;
   border-radius:50%;border:2px solid rgba(255,255,255,.16);
   border-top-color:rgba(255,255,255,.9);vertical-align:-3px;
@@ -41615,16 +41618,28 @@ function paintSteps(){
     return;
   }
   box._sig=sig;
-  box.innerHTML=
-    '<div class="wthead"><i class="cspin"></i>'
-    +'<div class="wtbar"><i style="width:'+shown+'%"></i></div></div>'
-    +headTail
+  // the head (pinwheel + bar) is built ONCE and kept (6b462): a new step
+  // or status line rewrites only what is below it, so the pinwheel is the
+  // same element with the same running animation for the whole run
+  let kept=box.firstChild&&box.firstChild.classList
+    &&box.firstChild.classList.contains("wthead")?box.firstChild:null;
+  if(kept){
+    while(kept.nextSibling)box.removeChild(kept.nextSibling);
+    const bi2=kept.querySelector(".wtbar i");
+    if(bi2)bi2.style.width=shown+"%";
+  }
+  const headHTML=kept?"":'<div class="wthead"><i class="cspin"></i>'
+    +'<div class="wtbar"><i style="width:'+shown+'%"></i></div></div>';
+  const restHTML=
+    headTail
     +'<div class="wtlist">'+ordered.map(s=>
       '<div class="wtrow '+(s.s==="done"?"ok":"run")+'">'
       +'<span class="wtdot"></span>'
       +'<span class="wtl">'+esc(s.l||"")+'</span>'
       +(s.d?'<span class="wtd">'+esc(s.d)+'</span>':"")
       +'</div>').join("")+'</div>';
+  if(kept)box.insertAdjacentHTML("beforeend",restHTML);
+  else box.innerHTML=headHTML+restHTML;
   if(!box.classList.contains("warm"))follow();
 }
 // repaint on a 200ms clock — the tween needs frames even when the
@@ -42260,15 +42275,20 @@ async function send(){
     const paintStream=txt=>{
       // the tree owns the narration; the bare status line is only for
       // the moment before any step exists
-      const hasBar=!!body.querySelector(".worktree");
-      const treeHTML=(body.querySelector(".worktree")||{}).outerHTML||"";
-      body.innerHTML=treeHTML
-        +(status&&!txt&&!hasBar
+      // the step card is KEPT, not re-parsed from its outerHTML (6b462):
+      // a fresh node every drip frame restarted the pinwheel at 0deg each
+      // time, which read as a jitter. Lifted out, put back: same node,
+      // same running animation, and its _sig survives for the cheap path.
+      const keepTree=body.querySelector(".worktree");
+      const hasBar=!!keepTree;
+      if(keepTree)keepTree.remove();
+      body.innerHTML=(status&&!txt&&!hasBar
           ?'<span class="statusline"><i class="cspin"></i> '
            +esc(status)+'…</span>':"")
         +(searched&&sources&&sources.length?srcRow(sources):"")
         +annIn(myChat,()=>renderMD(txt.replace(/\n?\[\[PLACES\]\][\s\S]*$/,"")))
         ;
+      if(keepTree)body.insertBefore(keepTree,body.firstChild);
       requestAnimationFrame(()=>wireFlow(body));
       if(curChat===myChat)autoScroll();
     };

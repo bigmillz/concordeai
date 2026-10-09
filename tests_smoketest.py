@@ -5156,6 +5156,17 @@ check("spinner-first stream, caret retired",
       '<span class="caret">' not in page and ".caret{" not in page
       and ".worktree.warm{" in page
       and 'box.classList.add("warm")' in page)
+# 6b462: the pinwheel never restarts while text streams -- paintStream
+# lifts the SAME step-card node out and back (no outerHTML re-parse),
+# and the pinwheel sits on its own layer inside a contained header
+check("pinwheel survives streaming (6b462)",
+      "const keepTree=body.querySelector(\".worktree\")" in page
+      and "body.insertBefore(keepTree,body.firstChild)" in page
+      and "const treeHTML=(body.querySelector(\".worktree\")" not in page
+      and ".wthead .cspin{will-change:transform;transform:translateZ(0)}" in page
+      and "margin-bottom:10px;\n  contain:layout paint}" in page
+      and "const headHTML=kept?\"\":'<div class=\"wthead\"><i class=\"cspin\">" in page
+      and 'box.insertAdjacentHTML("beforeend",restHTML)' in page)
 # 6b257: the bar the user SEES is a tween chasing the honest math —
 # the in-place fast path moves .wtbar i without an innerHTML rewrite
 # (a rewrite recreates the <i> and kills the width transition), and
