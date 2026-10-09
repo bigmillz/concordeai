@@ -34669,6 +34669,18 @@ for _d442, _o442, _nw442 in _MC_MUT:
 check("model menu (6b442): %d mutations of its code, each caught by a check above" % len(_MC_MUT),
       all(isinstance(v, list) for _d, v in _mcm), "%r" % [x for x in _mcm if not isinstance(x[1], list)])
 
+# COPY BUTTONS (6b464): one delegated listener, the execCommand fallback inside the click, the Clipboard API
+# after it, a word on the button either way, and the raw code (not the label) copied
+_cp = _MILLENAI_SRC
+check("copy buttons (6b464): delegated .ccopy handler, textarea+execCommand fallback, Clipboard API second, Copied / Couldn't copy feedback, code only",
+      'inner.addEventListener("click",e=>{\n  const b=e.target.closest&&e.target.closest(".ccopy");' in _cp
+      and "function copyText(t){" in _cp and 'document.execCommand("copy")' in _cp
+      and "navigator.clipboard.writeText(t).then(()=>true,()=>false)" in _cp
+      and _cp.index('document.execCommand("copy")') < _cp.index("navigator.clipboard.writeText(t).then(()=>true,()=>false)")
+      and 'set(ok?"Copied":"Couldn\'t copy")' in _cp
+      and 'code.querySelector("pre code")' in _cp and "pre.textContent" in _cp
+      and "copyText(t).then(ok=>{" in _cp and "navigator.clipboard.writeText(pre" not in _cp)
+
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
 # ---- time left (6b459): the estimator is pure, tested from the source -----
