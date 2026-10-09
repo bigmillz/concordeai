@@ -12919,10 +12919,10 @@ def _chat_op(chats, op, bk=None):
         return {"ok": True}, True
     if kind == "set":
         f, old, new = op.get("field"), op.get("old"), op.get("new")
-        if f not in ("title", "pin", "named", "lane"):
+        if f not in ("title", "pin", "named", "lane", "pin_at"):
             return {"err": "bad field"}, False
         cur = c.get(f)
-        same = (cur == old or (f in ("pin", "named")
+        same = (cur == old or (f in ("pin", "named", "pin_at")
                                and not cur and not old))
         if not same:
             return {"conflict": cur}, False
@@ -12934,6 +12934,12 @@ def _chat_op(chats, op, bk=None):
             if new not in _CHAT_LANES:
                 return {"err": "bad lane"}, False
             c[f] = new
+        elif f == "pin_at":
+            # when it was pinned (6b467): Pinned lists the latest first
+            if (isinstance(new, bool) or not isinstance(new, (int, float))
+                    or new < 0):
+                return {"err": "bad pin_at"}, False
+            c[f] = int(new)
         else:
             c[f] = bool(new)
         return {"ok": True}, True
@@ -35557,6 +35563,24 @@ body.resizing{cursor:col-resize;user-select:none}
   text-transform:uppercase;color:var(--faint);opacity:.75;
   padding:12px 10px 5px;user-select:none}
 .cgroup:first-child{padding-top:2px}
+.cgroup.recents{display:flex;align-items:center;justify-content:space-between}
+.cgroup .rbtn{width:15px;height:15px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;color:var(--faint);opacity:.9;
+  text-transform:none;letter-spacing:0}
+.cgroup .rbtn:hover,.cgroup .rbtn.on{color:var(--text)}
+.cgroup .rbtn svg{width:13px;height:13px}
+.chidden{font-size:11.5px;color:var(--faint);padding:8px 10px;user-select:none}
+.chidden .rall{cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.chidden .rall:hover{color:var(--text)}
+#recents-menu{position:fixed;z-index:60;min-width:168px;padding:6px;
+  background:var(--panel2);border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.45);font-size:12.5px}
+#recents-menu .rm-h{font-family:var(--mono);font-size:9px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--faint);padding:6px 8px 4px;user-select:none}
+#recents-menu .rm-i{display:flex;align-items:center;gap:8px;padding:5px 8px;
+  border-radius:6px;cursor:pointer;color:var(--text)}
+#recents-menu .rm-i:hover{background:rgba(255,255,255,.07)}
+#recents-menu .rm-i .rm-t{width:12px;flex:none;opacity:.9}
 /* a lane with nothing in it says so quietly instead of sitting blank */
 .cempty{font-size:12.5px;color:var(--faint);padding:10px;
   font-style:italic;user-select:none}
@@ -43702,19 +43726,58 @@ async function nameChat(c,text){
     await chatOps([{op:"set",id:c.id,field:"named",old:false,new:true}]);
   }catch(e){c.named=false;}
 }
-// WHEN was this chat? Real products group by day; a flat wall sorted by
-// recency is the tell of a prototype.
-function chatBucket(ts){
-  if(!ts)return "Older";
-  const d=new Date(ts), now=new Date();
-  const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
-  const diff=(day(now)-day(d))/86400000;
-  if(diff<=0)return "Today";
-  if(diff===1)return "Yesterday";
-  if(diff<=6)return "This week";
-  if(diff<=30)return "This month";
-  return "Older";
+// PINNED and RECENTS (6b467, per Patrick): the sidebar has two sections,
+// not date groups. Recents can be cut to a recent stretch of days; pinned
+// chats are never cut, and a search looks at everything.
+const RECENT_RANGES=[[1,"1 day"],[3,"3 days"],[7,"7 days"],[14,"14 days"],
+  [30,"1 month"],[0,"All"]];
+var recentsDays=0;
+try{const v=parseInt(localStorage.getItem("millen.recentsDays")||"0",10);
+  if(RECENT_RANGES.some(r=>r[0]===v))recentsDays=v;}catch(e){}
+// pure: {pins (latest pinned first), shown (newest first), hidden (count)}
+function recentsSplit(list,days,now,all){
+  const pins=list.filter(c=>c.pin).sort((a,b)=>
+    ((b.pin_at||b.ts||0)-(a.pin_at||a.ts||0))||((b.ts||0)-(a.ts||0)));
+  const rest=list.filter(c=>!c.pin).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(!days||all)return {pins:pins,shown:rest,hidden:0};
+  const from=now-days*86400000;
+  const shown=rest.filter(c=>(c.ts||0)>=from);
+  return {pins:pins,shown:shown,hidden:rest.length-shown.length};
 }
+function setRecentsDays(d){
+  recentsDays=d;
+  try{localStorage.setItem("millen.recentsDays",String(d));}catch(e){}
+  renderChats();
+}
+// the options menu: sections of radio items, so more can be added
+function recentsMenuOpen(btn){
+  const old=document.getElementById("recents-menu");
+  if(old){old.remove();btn.classList.remove("on");return;}
+  const m=document.createElement("div");m.id="recents-menu";
+  const sections=[{h:"Show",items:RECENT_RANGES.map(r=>({
+    t:r[1],on:recentsDays===r[0],go:()=>setRecentsDays(r[0])}))}];
+  m.innerHTML=sections.map((sec,si)=>'<div class="rm-h">'+sec.h+'</div>'
+    +sec.items.map((it,ii)=>'<div class="rm-i" data-s="'+si+'" data-i="'+ii+'">'
+      +'<span class="rm-t">'+(it.on?"\u2713":"")+'</span>'+esc(it.t)+'</div>').join("")).join("");
+  const r=btn.getBoundingClientRect();
+  m.style.left=Math.max(8,Math.min(r.left,innerWidth-190))+"px";
+  m.style.top=(r.bottom+4)+"px";
+  document.body.appendChild(m);btn.classList.add("on");
+  m.addEventListener("click",ev=>{
+    const it=ev.target.closest(".rm-i");if(!it)return;
+    const sec=sections[+it.dataset.s];
+    m.remove();sec.items[+it.dataset.i].go();
+  });
+  setTimeout(()=>document.addEventListener("click",function off(ev){
+    if(m.contains(ev.target)&&ev.target.closest(".rm-i"))return;
+    if(ev.target.closest&&ev.target.closest(".rbtn"))return;
+    m.remove();document.removeEventListener("click",off);
+    const b=document.querySelector("#chat-list .rbtn");if(b)b.classList.remove("on");
+  }),0);
+}
+const OPTS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  +'stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/>'
+  +'<circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
 const PIN_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
   +'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
   +'<path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l2 3.2H7z"/></svg>';
@@ -43731,8 +43794,8 @@ function renderChats(){
   const qOK=c=>!q||(c.title||"").toLowerCase().includes(q)
     ||(window.chatQHits&&window.chatQHits.has(c.id));
   const mine=chats.filter(c=>laneOK(c)&&qOK(c));
-  const pins=mine.filter(c=>c.pin);
-  const rest=mine.filter(c=>!c.pin);
+  const sp=recentsSplit(mine,recentsDays,Date.now(),!!q);
+  const pins=sp.pins,rest=sp.shown;
   const row=c=>
     '<div class="chat-item'+(c.id===curChat?" active":"")
     +(c.pin?" pinned":"")+'" data-id="'+esc(c.id)+'">'
@@ -43744,18 +43807,23 @@ function renderChats(){
   let html="";
   if(pins.length)
     html+='<div class="cgroup">Pinned</div>'+pins.map(row).join("");
-  let last="";
-  rest.forEach(c=>{
-    const b=chatBucket(c.ts);
-    if(b!==last){html+='<div class="cgroup">'+b+'</div>';last=b;}
-    html+=row(c);
-  });
+  if(rest.length||sp.hidden){
+    html+='<div class="cgroup recents"><span>Recents</span>'
+      +'<span class="rbtn" title="Recents options">'+OPTS_SVG+'</span></div>';
+    html+=rest.map(row).join("");
+    if(sp.hidden)html+='<div class="chidden">'+sp.hidden+' older chat'
+      +(sp.hidden===1?"":"s")+' hidden \u00b7 <span class="rall">Show all</span></div>';
+  }
   if(chatsErr)html='<div class="cempty">'+esc(chatsErr)+'</div>';
   else if(!html)html='<div class="cempty">'
     +(q?"Nothing matches \u201c"+esc(window.chatQ)+"\u201d"
       :uiMode==="code"?"No code chats yet"
       :uiMode==="funnel"?"No funnels yet":"No chats yet")+'</div>';
   el.innerHTML=html;
+  const rb=el.querySelector(".rbtn");
+  if(rb)rb.addEventListener("click",ev=>{ev.stopPropagation();recentsMenuOpen(rb);});
+  const ra=el.querySelector(".rall");
+  if(ra)ra.addEventListener("click",()=>setRecentsDays(0));
   el.querySelectorAll(".chat-item").forEach(it=>{
     const id=it.dataset.id;
     it.querySelector(".cx").addEventListener("click",ev=>{
@@ -43764,10 +43832,13 @@ function renderChats(){
     it.querySelector(".cpin").addEventListener("click",ev=>{
       ev.stopPropagation();
       const c=chats.find(x=>x.id===id);if(!c)return;
-      const was=!!c.pin;c.pin=!was;renderChats();
-      chatOps([{op:"set",id,field:"pin",old:was,new:!was}])
-        .then(r=>{if(!(r[0]&&r[0].ok)){c.pin=was;renderChats();}})
-        .catch(()=>{c.pin=was;renderChats();});
+      const was=!!c.pin,wasAt=c.pin_at||0,at=was?wasAt:Date.now();
+      c.pin=!was;c.pin_at=at;renderChats();
+      const undo=()=>{c.pin=was;c.pin_at=wasAt;renderChats();};
+      chatOps([{op:"set",id,field:"pin",old:was,new:!was},
+               {op:"set",id,field:"pin_at",old:wasAt,new:at}])
+        .then(r=>{if(!(r[0]&&r[0].ok))undo();})
+        .catch(undo);
     });
     it.addEventListener("dblclick",ev=>{
       ev.stopPropagation();startRename(it,id);

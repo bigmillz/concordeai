@@ -15476,3 +15476,23 @@ FUNNELS selected, the answer replaying and flickering.
 - Test: one served-HTML check, "6b463: a RESET replays the answer once and a lane switch leaves the
   streaming message alone" (the guard, the old reset gone, `modeShow`/`switchLane` free of
   `inner.innerHTML` and `loadChat(`).
+
+## 6b467 — the sidebar says Pinned and Recents, and Recents can be cut to a recent stretch (per Patrick)
+
+Patrick (2026-10-09): "similar to Claude, have the section Pinned instead of Today, and then Recents for everything
+else, with an options icon next to it that allows you to pick, amongst other things, how recent to go back: 1 day,
+3 days, 7 days, 14 days, 1 month, all."
+
+- **Two sections, no date groups.** Pinned (hidden when empty; latest pinned first) and Recents (every other chat,
+  newest first). `chatBucket` is gone. Pinning already existed (the pin button on a row, field `pin` in
+  chats.v2.json); this adds `pin_at`, the pin time, as a second `set` field the server accepts (a number >= 0;
+  anything else is refused), so the order can be "latest first". A chat pinned before has no stamp and sorts by `ts`.
+- **The options icon** (sliders) sits on the Recents heading and opens a small menu: Show: 1 day, 3 days, 7 days,
+  14 days, 1 month (30 days), All, the current one ticked. The menu is built from a `sections` list, so more
+  (a sort, say) is one more entry. Default All. Stored per machine in `localStorage` `millen.recentsDays`.
+- **What the range never hides:** pinned chats, and anything a search finds (search ignores the range). When it
+  hides chats, the end of Recents says "N older chats hidden · Show all" (Show all sets All).
+- `recentsSplit(list,days,now,all)` is pure; the gauntlet runs it under node. A check also saves a pin and its
+  stamp through the chat store and loads them back, and a bad stamp is refused.
+- Not checked in the Browser pane or WKWebView: the page's script parses and the dev copy serves it; the menu's
+  look is unseen.

@@ -34989,6 +34989,40 @@ check("time left: X-Eta header sent, page reads it, no unreplaced old pace maths
       and 'resp.headers.get("X-Eta")' in _MILLENAI_SRC
       and "hist*.45+pace*.55" not in _MILLENAI_SRC)
 
+# --- 6b467: Pinned and Recents instead of date groups ---------------------
+_pj = os.path.join(_SMOKE_TMP, "recents467.js")
+with open(_pj, "w", encoding="utf-8") as fh:
+    fh.write(_jsfn(page, "function recentsSplit(list,days,now,all){") + r"""
+const D=86400000,now=1e13;
+const L=[{id:"a",ts:now-D*0.5},{id:"b",ts:now-D*2},{id:"c",ts:now-D*10},{id:"d",ts:now-D*40},
+  {id:"p1",pin:true,ts:now-D*90,pin_at:now-D*5},{id:"p2",pin:true,ts:now-D*1,pin_at:now-D*2},{id:"e"}];
+const o=x=>JSON.stringify([x.pins.map(c=>c.id),x.shown.map(c=>c.id),x.hidden]);
+console.log(JSON.stringify([o(recentsSplit(L,0,now,false)),o(recentsSplit(L,1,now,false)),
+  o(recentsSplit(L,7,now,false)),o(recentsSplit(L,30,now,false)),o(recentsSplit(L,1,now,true))]));
+""")
+_pr = json.loads(subprocess.run(["node", _pj], capture_output=True, text=True, timeout=30).stdout or "[]")
+check("Recents range: pinned always shown (latest pinned first), the rest newest first, hidden count right, search ignores the range",
+      _pr == ['[["p2","p1"],["a","b","c","d","e"],0]', '[["p2","p1"],["a"],4]', '[["p2","p1"],["a","b"],3]',
+              '[["p2","p1"],["a","b","c"],2]', '[["p2","p1"],["a","b","c","d","e"],0]'], str(_pr))
+check("sidebar: Pinned and Recents sections, a range menu (1 day to All), no date groups (6b467)",
+      "chatBucket" not in page
+      and '<div class="cgroup recents"><span>Recents</span>' in page
+      and '<div class="cgroup">Pinned</div>' in page
+      and '[1,"1 day"],[3,"3 days"],[7,"7 days"],[14,"14 days"],' in page
+      and '[30,"1 month"],[0,"All"]' in page and "millen.recentsDays" in page
+      and 'class="rall">Show all' in page and "#recents-menu" in page)
+with tempfile.TemporaryDirectory() as _cd:
+    _o = lambda ops: _cs["chat_ops"](ops, _cd)["results"]
+    _pa, _pb = "c" + "p" * 26, "c" + "q" * 26
+    _o([{"op": "create", "id": _pa, "lane": "ai", "title": "P"}, {"op": "create", "id": _pb, "lane": "ai", "title": "Q"}])
+    _pr1 = _o([{"op": "set", "id": _pa, "field": "pin", "old": False, "new": True},
+               {"op": "set", "id": _pa, "field": "pin_at", "old": 0, "new": 1760000000000},
+               {"op": "set", "id": _pb, "field": "pin_at", "old": 0, "new": "x"}])
+    _ld = {c["id"]: c for c in _cs["load_chats"](_cd)}
+check("a pin and its pinned-at stamp survive the chat store's save and load; a bad stamp is refused (6b467)",
+      _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
+      and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))
+
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
     if not o:
