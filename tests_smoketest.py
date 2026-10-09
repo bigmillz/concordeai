@@ -19744,7 +19744,128 @@ def _bm_hiccup(src):
     return all(out.values()), out
 
 
+class _BmClock:
+    """A fake clock for the load wait: every look at it moves it on a
+    tenth of a second, and a sleep moves it by the sleep."""
+    def __init__(self, on_sleep=None):
+        self.t, self.on_sleep = 0.0, on_sleep
+
+    def monotonic(self):
+        self.t += 0.1
+        return self.t
+
+    def sleep(self, n):
+        self.t += n
+        if self.on_sleep:
+            self.on_sleep(self.t)
+
+    def __getattr__(self, k):
+        return getattr(time, k)
+
+
+class _BmLoadEng(_BmEng):
+    """Stand-in whose load goes the way its mode says (6b469)."""
+    def load(self):
+        if self.mode == "dead":
+            raise RuntimeError("%s didn\u2019t load: its engine stopped" % self.label)
+        if self.mode == "skipme":
+            while not _BmLoadEng.ns["_bench_skip"].wait(0.02):
+                pass
+            raise _BmLoadEng.ns["BenchSkipped"]()
+        return {"load_s": 1.25}
+
+
+def _bm_load(src):
+    """6b469 (per Patrick: Gemma 4 12B sat at "loading" for minutes): a
+    local model's load sees a dead or replaced engine at once, a port
+    another program holds, and its time allowance (90 s, +10 s per GB over
+    20); Skip ends it; the row says why and the run goes on."""
+    out = {}
+
+    def probe(over=None, mem=0, on_sleep=None, **kw):
+        procs = {"M": _BmProc()}
+        kw.setdefault("_port_in_use", lambda p: False)
+        ns = _bm_ns(src, MODEL_ROUTES={"M": ("mlx", 7)}, MLX_REPOS={"M": "org/m"},
+                    MODEL_MEM_BYTES={"M": mem}, _mlx_procs=procs, **kw)
+        clk = _BmClock(lambda t: on_sleep(t, ns, procs) if on_sleep else None)
+        ns["time"] = clk
+        try:
+            ns["_BenchMLX"]("M").load()
+            return "loaded", clk.t, ns
+        except ns["BenchSkipped"]:
+            return "skipped", clk.t, ns
+        except RuntimeError as e:
+            return str(e), clk.t, ns
+
+    a = probe()[0:2]
+    out["timeout: 90 s, plain words"] = (a[0] == "M didn\u2019t load in 90 s: it never answered"
+                                         and 90 <= a[1] < 92)
+    def die(t, ns, procs):
+        if t > 2:
+            procs["M"].alive = False
+    a = probe(on_sleep=die)[0:2]
+    out["dead engine: stops at once"] = a[0] == "M didn\u2019t load: its engine stopped" and a[1] < 4
+    def swap(t, ns, procs):
+        if t > 2:
+            procs["M"] = _BmProc()
+            ns["_mlx_procs"]["M"] = procs["M"]
+    a = probe(on_sleep=swap)[0:2]
+    out["replaced engine"] = a[0] == "M didn\u2019t load: its engine stopped" and a[1] < 4
+    a = probe(_port_in_use=lambda p: True, _listener_is_mine=lambda p: False)[0:2]
+    out["port held by another program"] = ("another program is using its port" in a[0]
+                                           and 5 <= a[1] < 8)
+    def skip(t, ns, procs):
+        if t > 3:
+            ns["_bench_skip"].set()
+    a = probe(on_sleep=skip)[0:2]
+    out["skip ends the wait"] = a[0] == "skipped" and a[1] < 5
+    ns = probe()[2]
+    al = ns["bench_load_allow"]
+    ns["MODEL_MEM_BYTES"].update({"S": 10e9, "G": 30e9, "H": 120e9})
+    out["allowance"] = (al("M") == 90 and al("S") == 90 and al("G") == 190 and al("H") == 1090
+                        and ns["_bench_span"](190) == "3 minutes" and ns["_bench_span"](90) == "90 s")
+    # ready: the port is ours, the one-token answer comes back
+    ns2 = _bm_ns(src, MODEL_ROUTES={"M": ("mlx", 7)}, MLX_REPOS={"M": "org/m"},
+                 _mlx_procs={"M": _BmProc()}, _port_in_use=lambda p: True)
+    ns2["_bench_json"] = lambda *a, **k: {}
+    out["ready"] = ns2["_BenchMLX"]("M").load()["load_s"] >= 0
+    # a whole run: the dead one fails with its words, the skipped one says Skipped,
+    # the next still runs; memory already tight: no figures, a word
+    d = tempfile.mkdtemp()
+    log = []
+    _BmEng.log = log
+    modes = {"A": "dead", "B": "skipme", "C": "ok"}
+    ns3 = _bm_ns(src, app_dir=lambda: d, MODEL_ROUTES={k: ("mlx", i + 10) for i, k in enumerate(modes)},
+                 SUPPORTED=dict.fromkeys(modes, True), MODEL_MEM_BYTES={"A": 1, "B": 2, "C": 3})
+    _BmLoadEng.ns = ns3
+    ns3["_bench_engine"] = lambda l: _BmLoadEng(l, modes[l])
+    ns3["_bench_vm"] = lambda: {"used": 40 << 30, "total": 48 << 30, "pct": 90.0,
+                                "level": 2, "comp": 1 << 30, "swapout": 0, "swap": 0}
+    ok0, _run = ns3["bench_start"]()
+    out["idle skip is nothing"] = ns3["bench_skip"]() in (True, False)
+    t_end = time.time() + 15
+    while time.time() < t_end and not any(r["status"] == "loading" for r in (ns3["_bench"]["run"] or {}).get("models") or []
+                                          if r["label"] == "B"):
+        time.sleep(0.02)
+    out["skip while loading"] = ns3["bench_skip"]() is True
+    fin = _bm_wait(ns3)
+    rows = {r["label"]: r for r in ns3["_bench"]["run"]["models"]}
+    out["run goes on"] = (ok0 and fin and rows["A"]["status"] == "failed"
+                          and rows["A"]["note"].startswith("Failed: A didn\u2019t load: its engine stopped.")
+                          and rows["B"]["status"] == "skipped" and rows["B"]["note"].startswith("Skipped.")
+                          and rows["C"]["status"] == "done"
+                          and ("close", "A", False) in log and ("close", "B", False) in log)
+    out["crowded: a word, no figures"] = (rows["C"].get("crowded") is True and rows["C"]["mem_rise"] is None
+                                          and "Other programs were using memory." in rows["C"]["note"])
+    out["nothing loading: skip does nothing"] = ns3["bench_skip"]() is False
+    out["pinned"] = ('"/api/bench/skip"' in src and "Skip this model" in src
+                     and "BENCH_LOAD_S = 90.0" in src)
+    return all(out.values()), out
+
+
 _BM_CHECKS = [
+    ("benchmark local load (6b469): a dead or replaced engine, a taken port and a 90 s limit (+10 s per GB over 20) fail the model in plain words; "
+     "Skip this model ends the wait; the run goes on; memory already tight gives no figures", _bm_load),
     ("benchmark servers (6b454): the server's own hiccup is waited for and the model asked again, its refusal fails at once "
      "with its reason in plain words; a cut stream is no result; an estimate names what Ollama's last line lacked", _bm_hiccup),
     ("benchmark: the figures from known timings (MLX measured, cached prompt, Ollama's own, a cut stream, junk)", _bm_numbers),

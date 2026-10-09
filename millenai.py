@@ -22527,7 +22527,16 @@ BENCH_TEST = "b1"           # the fixed test; a new passage is a new name
 BENCH_MAX_TOKENS = 256
 BENCH_SEED = 42
 BENCH_CTX = 4096            # Ollama's context, the same on every machine
-BENCH_LOAD_CAP = 300.0      # a load that takes longer fails the model
+BENCH_LOAD_CAP = 300.0      # a load that takes longer fails the model (a server's)
+# (6b469, per Patrick: "Do we want that model? And why would it die?") THIS
+# COMPUTER's loads: a model that is not ready in BENCH_LOAD_S fails with its
+# reason and the run goes on; a model over BENCH_LOAD_OVER_GB gets
+# BENCH_LOAD_PER_GB more seconds for each GB above it.
+BENCH_LOAD_S = 90.0
+BENCH_LOAD_OVER_GB = 20
+BENCH_LOAD_PER_GB = 10.0
+BENCH_PORT_LOST_S = 5.0     # the port held by another program this long
+BENCH_CROWD_PCT = 85        # memory pressure at a model's start: others are using it
 BENCH_RUN_CAP = 120.0       # a slow model stops here; figures from what came
 BENCH_KEEP = 100            # runs kept in the file
 BENCH_KEEP_ALIVE = "45s"    # the app's own Ollama keep-alive (stream_ollama)
@@ -22619,7 +22628,7 @@ BENCH_FIELDS = ("label", "engine", "status", "note", "gen_tps", "prompt_tps",
                 "cached_tokens", "src", "load_src", "est", "capped",
                 "mem_base", "mem_peak", "mem_total", "mem_rise",
                 "pressure_pct", "pressure_level", "pressured", "swapped",
-                "swap_mb", "gpu_size", "gpu_vram",
+                "swap_mb", "crowded", "gpu_size", "gpu_vram",
                 # (6b341) a server's or a provider's row: the model as that
                 # target names it, the provider, where a server runs it, the
                 # first token (or all of it) includes the network, a cloud
@@ -22633,6 +22642,25 @@ _bench_hw = {}
 
 class BenchStopped(Exception):
     """Stop was pressed while a model loaded or wrote."""
+
+
+class BenchSkipped(Exception):
+    """Skip this model was pressed while it loaded (6b469)."""
+
+
+_bench_skip = threading.Event()
+
+
+def bench_load_allow(label: str) -> float:
+    """Seconds a local model may take to load (6b469): BENCH_LOAD_S, and
+    BENCH_LOAD_PER_GB more for each GB over BENCH_LOAD_OVER_GB."""
+    gb = (MODEL_MEM_BYTES.get(label, 0) or 0) / 1e9
+    return BENCH_LOAD_S + max(0.0, gb - BENCH_LOAD_OVER_GB) * BENCH_LOAD_PER_GB
+
+
+def _bench_span(sec) -> str:
+    n = int(round(float(sec)))
+    return "%d s" % n if n < 120 else "%d minutes" % round(n / 60)
 
 
 # ------------------------------------------------ the numbers (6b331)
@@ -22871,12 +22899,15 @@ def _bench_http(url: str, body=None, timeout: float = 60.0, method="POST",
     try:
         if _bench_stop.is_set() and not force:
             raise BenchStopped()
+        if _bench_skip.is_set() and not force:
+            raise BenchSkipped()
         conn.request(method, u.path or "/",
                      body=None if body is None else json.dumps(body).encode(),
                      headers={"Content-Type": "application/json"})
         if not force:
             _bench_live["sock"] = conn.sock
-            if _bench_stop.is_set() or _bench_live["capped"]:
+            if (_bench_stop.is_set() or _bench_skip.is_set()
+                    or _bench_live["capped"]):
                 _bench_cut()             # pressed while the request went out
         resp = conn.getresponse()
         if resp.status != 200:
@@ -22897,6 +22928,8 @@ def _bench_http(url: str, body=None, timeout: float = 60.0, method="POST",
             raise
         if _bench_stop.is_set():
             raise BenchStopped() from exc
+        if _bench_skip.is_set():
+            raise BenchSkipped() from exc
         if not _bench_live["capped"]:
             raise
     finally:
@@ -22905,6 +22938,8 @@ def _bench_http(url: str, body=None, timeout: float = 60.0, method="POST",
         conn.close()
     if _bench_stop.is_set() and not force:
         raise BenchStopped()
+    if _bench_skip.is_set() and not force:
+        raise BenchSkipped()
 
 
 def _bench_json(url, body=None, timeout=60.0, method="POST", force=False):
@@ -22983,29 +23018,65 @@ class _BenchMLX:
         return _bench_fit(self.label)
 
     def load(self):
+        # (6b469, per Patrick) THE WAIT HAS EYES AND A LIMIT: each pass sees
+        # Stop and Skip, whether the engine process is still there (and is
+        # still the one this copy started), whether the port is still ours,
+        # and the allowance for this model's size. A wedged engine is
+        # retired by close().
         t0 = time.monotonic()
+        allow = bench_load_allow(self.label)
+        nm = self.label
         with _engine_lock:
             if not _spawn_mlx_engine(self.label, offline=True):
-                raise RuntimeError("its engine didn't start")
+                raise RuntimeError("%s didn\u2019t load: its engine didn\u2019t start" % nm)
             self.proc = _mlx_procs.get(self.label)
         port = MODEL_ROUTES[self.label][1]
-        end = t0 + BENCH_LOAD_CAP
-        while not (_port_in_use(port) and _listener_is_mine(port) is True):
+        end = t0 + allow
+        lost = None
+        while True:
             if _bench_stop.is_set():
                 raise BenchStopped()
-            if self.proc is not None and self.proc.poll() is not None:
-                raise RuntimeError("its engine stopped while loading")
-            if time.monotonic() > end:
-                raise RuntimeError("it didn't load within %d minutes"
-                                   % (BENCH_LOAD_CAP // 60))
+            if _bench_skip.is_set():
+                raise BenchSkipped()
+            if self.proc is not None and (
+                    self.proc.poll() is not None
+                    or _mlx_procs.get(self.label) is not self.proc):
+                raise RuntimeError("%s didn\u2019t load: its engine stopped" % nm)
+            now = time.monotonic()
+            if now > end:
+                raise RuntimeError("%s didn\u2019t load in %s: it never answered"
+                                   % (nm, _bench_span(allow)))
+            if _port_in_use(port):
+                mine = _listener_is_mine(port)
+                if mine is True:
+                    break
+                if mine is False:
+                    lost = lost or now
+                    if now - lost >= BENCH_PORT_LOST_S:
+                        raise RuntimeError(
+                            "%s didn\u2019t load: another program is using its port" % nm)
+                else:
+                    lost = None
+            else:
+                lost = None
             time.sleep(0.25)
         # mlx_lm loads the weights after its port opens: the load is over
         # when a one-token answer comes back (it also warms the kernels)
-        _bench_json("http://127.0.0.1:%d/v1/chat/completions" % port, {
-            "model": MLX_REPOS[self.label], "max_tokens": 1,
-            "temperature": 0.0, "stream": False,
-            "messages": [{"role": "user", "content": "Hello"}]},
-            timeout=max(5.0, end - time.monotonic()))
+        try:
+            _bench_json("http://127.0.0.1:%d/v1/chat/completions" % port, {
+                "model": MLX_REPOS[self.label], "max_tokens": 1,
+                "temperature": 0.0, "stream": False,
+                "messages": [{"role": "user", "content": "Hello"}]},
+                timeout=max(5.0, end - time.monotonic()))
+        except (BenchStopped, BenchSkipped):
+            raise
+        except Exception as exc:
+            if self.proc is not None and self.proc.poll() is not None:
+                raise RuntimeError("%s didn\u2019t load: its engine stopped" % nm) from exc
+            if time.monotonic() >= end - 0.5 or isinstance(exc, (socket.timeout, TimeoutError)):
+                raise RuntimeError("%s didn\u2019t load in %s: it didn\u2019t answer"
+                                   % (nm, _bench_span(allow))) from exc
+            raise
         return {"load_s": time.monotonic() - t0}
 
     def run(self, on_first, on_tok):
@@ -23077,11 +23148,19 @@ class _BenchOllama:
 
     def load(self):
         t0 = time.monotonic()
-        # an empty prompt loads the model and answers nothing
-        r = _bench_json(ollama_url("/api/generate"), {
-            "model": self.tag, "prompt": "", "stream": False,
-            "keep_alive": BENCH_KEEP_ALIVE, "options": {"num_ctx": BENCH_CTX}},
-            BENCH_LOAD_CAP)
+        # an empty prompt loads the model and answers nothing (6b469: for
+        # the model's allowance at most, and Skip cuts it)
+        allow = bench_load_allow(self.label)
+        try:
+            r = _bench_json(ollama_url("/api/generate"), {
+                "model": self.tag, "prompt": "", "stream": False,
+                "keep_alive": BENCH_KEEP_ALIVE,
+                "options": {"num_ctx": BENCH_CTX}}, allow)
+        except (BenchStopped, BenchSkipped):
+            raise
+        except (socket.timeout, TimeoutError) as exc:
+            raise RuntimeError("%s didn\u2019t load in %s: it didn\u2019t answer"
+                               % (self.label, _bench_span(allow))) from exc
         out = {"load_s": time.monotonic() - t0}
         if _bench_pos(r.get("load_duration")):
             out["load_duration"] = r["load_duration"]
@@ -23091,7 +23170,7 @@ class _BenchOllama:
                 if m.get("name") == self.tag or m.get("model") == self.tag:
                     self.ps = {"gpu_size": _bench_int(m.get("size")),
                                "gpu_vram": _bench_int(m.get("size_vram"))}
-        except BenchStopped:
+        except (BenchStopped, BenchSkipped):
             raise
         except Exception:
             pass
@@ -23274,6 +23353,11 @@ def _bench_one(row: dict, keep: bool, eng=None):
                                 else "failed"), note=why)
         return
     base = {} if remote else _bench_vm()
+    # (6b469, per Patrick: Llama 3.2 3B "+12.2 GB, 35.1 of 48 GB in use at
+    # peak, memory pressure" while other engines loaded beside it) memory
+    # already tight when the model starts: its figures are not its own
+    crowd = (not remote) and ((base.get("level") or 0) >= 2
+                              or (base.get("pct") or 0) >= BENCH_CROWD_PCT)
     acc = dict(base)
     done = threading.Event()
     smp = ctx_thread(target=_bench_sampler, args=(done, acc), bind=False,
@@ -23284,8 +23368,10 @@ def _bench_one(row: dict, keep: bool, eng=None):
     try:
         for attempt in (0, 1):
             try:
+                _bench_skip.clear()
                 _bench_set(row, status="loading", tok=0)
                 load = eng.load()
+                _bench_skip.clear()      # a Skip that landed as it finished
                 _bench_set(row, status="reading")
                 _bench_live["capped"] = False
                 cap = ctx_timer(BENCH_RUN_CAP, _bench_capped)
@@ -23296,7 +23382,7 @@ def _bench_one(row: dict, keep: bool, eng=None):
                 finally:
                     cap.cancel()
                 break
-            except BenchStopped:
+            except (BenchStopped, BenchSkipped):
                 raise
             except Exception as exc:
                 # THE SERVER'S OWN HICCUP, ONCE (6b454, per Patrick: "We're
@@ -23333,15 +23419,27 @@ def _bench_one(row: dict, keep: bool, eng=None):
         ok = True
     except BenchStopped:
         _bench_set(row, status="stopped", note="Stopped.")
+    except BenchSkipped:
+        _bench_set(row, status="skipped", note="Skipped.", tok=0)
     except Exception as exc:
         _bench_set(row, status="failed", note="Failed: %s." % _bench_why(exc, eng))
     finally:
         done.set()
+        _bench_skip.clear()
         if not remote:
             smp.join(3)
             end = _bench_vm()
             _bench_fold(acc, end)
-            _bench_set(row, **bench_mem(base, acc, end))
+            mem = bench_mem(base, acc, end)
+            need = MODEL_MEM_BYTES.get(row["label"], 0) or 0
+            if crowd or (need >= 1 << 30
+                         and (mem.get("mem_rise") or 0) > 2 * need + (2 << 30)):
+                # the rise is everyone's, not this model's: no figures, a word
+                mem.update(mem_rise=None, mem_peak=None, pressured=False,
+                           crowded=True)
+                _bench_set(row, note=((row.get("note") or "") + " Other "
+                           "programs were using memory.").strip())
+            _bench_set(row, **mem)
         kept = keep and ok and not _bench_stop.is_set()
         try:
             eng.close(kept)
@@ -23599,6 +23697,23 @@ def bench_stop() -> bool:
         _bench_stop.set()
         _bench_cut()
     return running
+
+
+def bench_skip() -> bool:
+    """Skip this model (6b469): the model being loaded stops loading, its
+    row says Skipped and the run goes on with the next. True when a model
+    was loading; any other moment does nothing."""
+    with _bench_lock:
+        run = _bench["run"] if _bench["running"] else None
+        rows = (run or {}).get("models") or []
+        i = (run or {}).get("cur", -1)
+        loading = (isinstance(i, int) and 0 <= i < len(rows)
+                   and rows[i].get("status") == "loading")
+        if loading:
+            _bench_skip.set()
+    if loading:
+        _bench_cut()
+    return loading
 
 
 def _bench_path() -> str:
@@ -31267,7 +31382,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "errors": errors})
             return
         if self.path in ("/api/bench/start", "/api/bench/stop",
-                         "/api/bench/cloud-plan"):
+                         "/api/bench/skip", "/api/bench/cloud-plan"):
             # the hardware benchmark (6b331). A start is refused (409)
             # while an answer is being written or a run is going
             n = int(self.headers.get("Content-Length", 0) or 0)
@@ -31278,6 +31393,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _bd = _bd if isinstance(_bd, dict) else {}
             if self.path == "/api/bench/stop":
                 self._send_json({"ok": True, "stopped": bench_stop()})
+                return
+            if self.path == "/api/bench/skip":
+                self._send_json({"ok": True, "skipped": bench_skip()})
                 return
             if self.path == "/api/bench/cloud-plan":
                 # (6b341) what a cloud run would call, and the one-use
@@ -47231,6 +47349,9 @@ function bmRow(r,cur,old,max,ow){
   }
   let h='<div class="bm-row"><div class="bm-l">'+top+'</div><div class="bm-s">'+sub+"</div>";
   if(mem)h+='<div class="bm-s">'+mem+"</div>";
+  // (6b469) a model loading on this computer can be skipped
+  if(cur&&r.status==="loading"&&!r.provider&&!r.network)
+    h+='<div class="bm-s"><button class="bm-btn" data-bm-skip="1">Skip this model</button></div>';
   if(cur)h+='<div class="pbar-track"><div class="pbar-fill" style="width:'
     +(r.status==="writing"?Math.round(100*Math.min(1,(r.tok||0)/max)):r.status==="reading"?4:1)
     +'%"></div></div>';
@@ -47579,6 +47700,10 @@ function bmCvPaint(){
   $("#bm-stop").addEventListener("click",async()=>{
     const b=$("#bm-stop");b.disabled=true;await benchPost("/api/bench/stop");
     b.disabled=false;loadBench();});
+  // (6b469) Skip this model: delegated, the rows are repainted each second
+  $("#bm").addEventListener("click",async e=>{
+    const k=e.target.closest&&e.target.closest("[data-bm-skip]");if(!k)return;
+    k.disabled=true;await benchPost("/api/bench/skip");loadBench();});
   $("#bm-show").addEventListener("change",e=>{bmShow=e.target.value;bmCmp="";loadBench();});
   $("#bm-cmp").addEventListener("change",e=>{bmCmp=e.target.value;loadBench();});
   // the target: a server is checked when picked, and never run until Run is pressed
