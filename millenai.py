@@ -46098,7 +46098,11 @@ $("#srv-list").addEventListener("click",async ev=>{
     b.disabled=false;
     s.lan_blocked=!!(d&&d.blocked);
     paintServers();
-    if(d&&d.blocked)srvMsg(id,SRV_LAN_BLOCKED,"warn");
+    // 6b456: a relay that failed is never hidden behind "sent" (away from home it is the only way in)
+    const rl=d&&d.relay,rbad=rl&&!rl.ok,rwhy=rbad?(rl.err||"no reason given").replace(/[.\s]+$/,""):"";
+    if(d&&d.blocked)srvMsg(id,SRV_LAN_BLOCKED+(rbad?" The relay didn\u2019t answer either: "+rwhy+".":""),"warn");
+    else if(d&&d.ok&&rbad)srvMsg(id,"Wake-up sent on this network, but the relay didn\u2019t answer: "+rwhy+". Away from home, the relay is how the server gets woken.","warn");
+    else if(d&&d.ok&&rl)srvMsg(id,"Wake-up sent to "+s.name+", and the relay answered.","ok");
     else if(d&&d.ok)srvMsg(id,"Wake-up sent to "+s.name+".","ok");
     else srvMsg(id,(d&&d.err)||"Couldn\u2019t send the wake-up.","bad");
     return;

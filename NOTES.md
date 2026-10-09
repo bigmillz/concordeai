@@ -56,6 +56,24 @@ whenever the router rekeys, roams or restarts.
 - `test_wifi`: the enable line has no `disconnect`. README (Honest limits) and the sleep hook comment say so.
 - Takes effect after a kit run on the server (`sudo ./setup.sh`).
 
+## 6b456 — Wake up server no longer says "sent" when the relay said no (per Patrick)
+
+Patrick, away from home: "tethered to my phone ... Wake-up sent to Ollama1 but it won't wake the server". The button's
+message came from `d.ok`, and `server_wake_test()` sets ok when ANY broadcast send didn't raise or the relay answered.
+Tethered (and on a VPN) the broadcast leaves the laptop without error, since it just can't reach home, so ok was true
+while the relay request failed. The relay's own result was already returned as `out["relay"] = {ok, err}` but the page
+never read it. Away from home the relay is the only way in, so the button hid the one failure that mattered.
+
+- The page (`a==="waketest"`) now reads `d.relay`. Relay set and failed: a warning, "Wake-up sent on this network, but
+  the relay didn't answer: <reason>. Away from home, the relay is how the server gets woken." Relay set and answered:
+  "Wake-up sent to <name>, and the relay answered." No relay: unchanged ("Wake-up sent to <name>."). Every send refused
+  and the relay failed too: the macOS Local Network text, plus "The relay didn't answer either: <reason>." Still set
+  with srvMsg (textContent).
+- Other paths checked: `server_wake` (a chat) records `_srv_wake_blocked` from the relay's answer, nothing says "sent";
+  the Test relay button already shows the relay's own words. No other place says "sent" over a relay failure.
+- Gauntlet: backend check `sent, relay refused` (broadcast fine, relay 401: ok true, relay carries the refusal) and a
+  served-HTML check `wake button tells the relay` (the three wordings and the `d.relay` branch order).
+
 ## 6b450 — the Wi-Fi card no longer answers ARP for the wired address: SSH to the server stops timing out (kit, per Patrick)
 
 Seen on the server on 2026-10-07 and 2026-10-08, at least four times. Its wired bridge br0 has 192.168.86.10 (MAC
