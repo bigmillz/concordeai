@@ -15059,3 +15059,22 @@ polling the Mac on the VMware network; no admin rights, no settings).
   chat's venue clock, "... in Tokyo"). A plain local date now; the
   gauntlet writes a real deck. The on-demand pip install of the export
   libraries no longer flashes a console window on Windows.
+
+## 6b464 — the copy buttons copy (per Patrick)
+
+Patrick (2026-10-08): "copying over a block of code doesn't work."
+
+- **Cause.** The handlers were already delegated (one listener on the messages container, so streaming's
+  innerHTML swaps were not the problem) and read the right text (`pre code`.textContent, label excluded). They
+  called `navigator.clipboard.writeText` alone and swallowed its rejection (`.catch(()=>{})`): in the shipped
+  WKWebView that call is rejected for a page on http://127.0.0.1, so nothing was copied and the button said
+  nothing. The Blink pane accepts it, which is why it looked fine in testing. The Code lane's blocks use the same
+  renderer and the same `.ccopy` button; there is no separate path.
+- **Fix.** New `copyText(t)`: a hidden readonly textarea, selected, `document.execCommand("copy")` synchronously
+  inside the click (still within the user gesture), the textarea removed and focus given back; if that returns
+  false, `navigator.clipboard.writeText`; resolves true/false, never throws. `copyFlash()` shows "Copied" or
+  "Couldn't copy" for 1.5 s. Used by the code card's `.ccopy` listener and the answer's copy button in `msgActions`.
+- **Not done: a native pbcopy path.** `_WindowBridge` is deliberately one public method (`api_token`), asserted
+  by the gauntlet, and the page renders model output; a clipboard method there widens that surface. Say if wanted.
+- **Checks.** One gauntlet source check. The fallback chain was exercised in the Browser pane (Blink) with the
+  Clipboard API stubbed to reject; WKWebView itself was not tried.

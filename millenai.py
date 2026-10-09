@@ -35813,6 +35813,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .ccopy:hover{color:#fff}
 .ccopy.wait{opacity:.32;cursor:default;pointer-events:none}
 .ccopy.did{color:#fff}
+.ccopy.fail{color:#ff8a80}
 .codecard pre{margin:0;border:none;border-radius:0}
 .body code{color:#e8a08f}
 .body pre code{color:#dfe2e8}
@@ -41291,6 +41292,44 @@ inner.addEventListener("click",e=>{
   list.hidden=!list.hidden;
   box.classList.toggle("open",!list.hidden);
 });
+// COPY (6b464, per Patrick: "copying over a block of code doesn't work").
+// One helper, used by the code cards and the answer's copy button. The
+// old path was navigator.clipboard.writeText alone with its failure
+// swallowed: WKWebView rejects it (no gesture left, or no permission
+// for a page on http://127.0.0.1) and nothing happened, not even a word
+// on the button. execCommand("copy") goes first because it is
+// synchronous and so still inside the click's gesture; the async
+// Clipboard API is the second chance. Resolves true/false, never throws.
+function copyText(t){
+  t=String(t==null?"":t);
+  let ok=false;
+  const ae=document.activeElement;
+  try{
+    const ta=document.createElement("textarea");
+    ta.value=t;ta.setAttribute("readonly","");
+    ta.style.cssText="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none";
+    document.body.appendChild(ta);
+    try{ta.focus({preventScroll:true});}catch(_){ta.focus();}
+    ta.select();ta.setSelectionRange(0,t.length);
+    try{ok=!!document.execCommand("copy");}catch(_){ok=false;}
+    ta.remove();
+    if(ae&&ae.focus&&ae!==document.body){try{ae.focus({preventScroll:true});}catch(_){}}
+  }catch(_){}
+  if(ok)return Promise.resolve(true);
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      return navigator.clipboard.writeText(t).then(()=>true,()=>false);
+  }catch(_){}
+  return Promise.resolve(false);
+}
+// a button says what happened for 1.5 s: Copied, or Couldn't copy
+function copyFlash(b,ok,idle,html){
+  if(b._cft)clearTimeout(b._cft);
+  const set=v=>{if(html)b.innerHTML=v;else b.textContent=v;};
+  set(ok?"Copied":"Couldn't copy");
+  b.classList.toggle("did",ok);b.classList.toggle("fail",!ok);
+  b._cft=setTimeout(()=>{set(idle);b.classList.remove("did","fail");b._cft=0;},1500);
+}
 // code-card copy, delegated for the same reason as the chevron above:
 // streaming re-renders the answer via innerHTML on every chunk, so a
 // listener attached to any one button is dead within the second
@@ -41300,10 +41339,8 @@ inner.addEventListener("click",e=>{
   const code=b.closest(".codecard");
   const pre=code&&code.querySelector("pre code");
   if(!pre)return;
-  navigator.clipboard.writeText(pre.textContent).then(()=>{
-    b.textContent="copied";b.classList.add("did");
-    setTimeout(()=>{b.textContent="copy";b.classList.remove("did");},1200);
-  }).catch(()=>{});
+  const raw=pre.textContent;      // the code only: the language label is in .codebar
+  copyText(raw).then(ok=>copyFlash(b,ok,"copy",false));
 });
 const ICO={
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
@@ -41323,9 +41360,10 @@ function msgActions(div,role,text){
   };
   mk("copy","Copy",ICO.copy,b=>{
     const t=(typeof text==="string"?text:"");
-    navigator.clipboard.writeText(t).then(()=>{
-      b.classList.add("done");setTimeout(()=>b.classList.remove("done"),1200);
-    }).catch(()=>{});
+    copyText(t).then(ok=>{
+      if(ok){b.classList.add("done");setTimeout(()=>b.classList.remove("done"),1200);}
+      else copyFlash(b,false,ICO.copy,true);
+    });
   });
   if(role==="assistant")
     mk("redo","Try again",ICO.redo,()=>regenerate());
