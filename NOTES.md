@@ -41,6 +41,23 @@ remembered total as one stage on the clock. Display unchanged ("~N s left",
 Gauntlet: five estimator checks (monotone, overrun, smoothing, stage list,
 server seconds). Not run in full; dev copy checked to send `X-Eta`.
 
+## 6b458 — the picker's rows lose their descriptions; Max says "all models" (per Patrick)
+
+Patrick, on a screenshot of the picker: "Remove the descriptions next to each of these. They should be
+self-explanatory. Except for Max: next to that just have 'all models', aligned all the way to the right against
+the ⓘ symbol."
+
+- Fast, Thinking, Pro, Cloud Only, each server row, Advanced and every row of the Cloud Only and server
+  sub-menus now draw an empty `.edsc` (it still carries `margin-left:auto`, which keeps the ⓘ and the › on the
+  right edge). Max, in the menu and in a server's sub-menu, draws "all models" there, just left of its ⓘ.
+- Kept on purpose: a status that is not a description. A server that is asleep, not answering or lists no models,
+  a greyed sub-menu row's reason ("no key yet"), a dead Cloud Only row's reason. The pop-outs are untouched
+  (`TIER_META[...].desc` still feeds them and Settings).
+- Menu width: unchanged (`min-width:250px`); the rows are narrower than that now, so the menu sits at 250px.
+- `MODE_LABEL` replaces the per-row text; `CLOUD_MODE_DESC` is gone, `SRV_MODE_DESC` is just Max.
+- Tests: the server-row, flyout and cloud-row checks now assert the old text is absent; one new check
+  (`6b458: the picker's rows carry no description`).
+
 ---
 
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
