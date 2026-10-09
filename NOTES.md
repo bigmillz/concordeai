@@ -9,6 +9,45 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b465 — Fast, Thinking, Pro and Max wake a sleeping server on the same "Waking" step, with 10 s and a Skip (per Patrick)
+
+Patrick: "Chat's Fast, Thinking and Pro modes still wake a sleeping server silently, for up to a minute and with no
+Skip ... do this." (6b461 did it for the Code lane and left the modes for a build of its own: this is that build.)
+
+**Before.** `/api/chat` called `server_refresh_modes(ctx)` before the headers; a server whose check found it offline was
+woken there by `server_wake_if_down` (magic packet, up to `SRV_WAKE_WAIT_S` = 60 s), so the page saw nothing until it
+answered or gave up, and the roster was resolved after that. "<name> Only" (`srv:<id>`, and the mode rows
+`srv:<id>:fast|think|pro|max`) already deferred its wake until after the headers (6b369: `server_only_resolve(...,
+defer=True)` -> `server_take_wake_pending()` -> `server_only_wake`) but with a status line only and no Skip.
+
+**Now.**
+- **Modes (Fast / Thinking / Pro / Max).** The first resolve checks the servers with `server_refresh_modes(ctx,
+  wake=False)` and takes `_ch_wake = server_sleepers(ctx)` (paired, not opted out, last found offline, a card, no call in
+  five minutes). The headers go out as before. Then, with `status`/`step` and the request's `skip_ev`, the same
+  `server_wake_ask` the Code lane uses runs: step "Waking <name>" with "10 s" counting down, a Skip, and the three
+  endings ("Woke", "<name> didn't wake in 10 s" -> marked down, "Skipped waking"). On "woke" the roster is resolved
+  again (`max_tier_seats` for Max, else `resolve_tier_seats`), the compositor goes last again (`council_merger_last`,
+  now shared with the first resolve), `_seat_fb` is rebuilt and the route is recomputed (`_resolve_route`, the old inline
+  block made a closure so both resolves run the same code). On a timeout or a Skip the roster stays as it was (cloud,
+  then this computer) and one status line says "... going on without it".
+- **Local pre-warm.** Not started while a wake is pending (`if not (_ag_wake or _ch_wake)`); `_start_prewarm()` runs after
+  the wake, for the route as it stands then, so a model the server took is never loaded here, and a failed wake warms it.
+- **When it does not apply.** `_ch_wake` is dropped if the roster is no longer the mode's own (`council != _ch_council0`:
+  a picture, an agent or a pick took it), for Cloud Only and for "<name> Only". Pictures and the agents that run their own
+  flow (Research, Remote) keep the old pre-header wake (`server_refresh_modes(ctx)`): their seat is not this roster.
+- **"<name> Only" and the server-only mode rows (`srv:<id>`, `srv:<id>:fast|think|pro|max`).** Chosen reading: these cannot go
+  anywhere else (6b337, 6b426: "never an answer from elsewhere"), so they keep the whole minute, 60 s. They now show the same
+  "Waking <name>" step counting down from 60 s, "Waking <name>... 42 s" as the status line (it counted up before) and
+  the Skip, which here means "stop waiting": one line "<name> is asleep, and you chose not to wait for it. Nothing was
+  sent anywhere else." The server is not marked down by a Skip (the five-minute gap holds); a timeout still marks it down.
+  If Pat meant the server-only mode rows to move on to the cloud after 10 s, that contradicts 6b426 and is one condition.
+- **One implementation.** `server_wake_step(e, status, step, skip, alive, wait_s)` draws the step, the countdown and the
+  ending and calls `server_wake`; `server_wake_ask` (Code lane and modes, 10 s) and `server_only_wake` (60 s) both use it.
+- Not changed: the X-Models header still names the roster as first resolved (the RUN frame names the real one).
+- Tests: `6b465` section (who `server_sleepers` returns, the mode's 10 s wake on a fake clock, Only's 60 s countdown and its
+  Skip, the handler order: check before the headers, wake after, before anything is made; the re-seating; the prewarm gate;
+  `council_merger_last`); the 6b369 wake checks, the route pins and two mutations follow the moved code.
+
 ## 6b461 — the Code lane goes to the server first; a sleeping server is woken with 10 s and a Skip; the server bars follow (per Patrick)
 
 Patrick: "coding doesn't use the server or cloud models — let's fix that. Same thing, prefer server over local models."

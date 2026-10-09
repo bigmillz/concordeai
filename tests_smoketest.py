@@ -20458,13 +20458,13 @@ def _svc_pins(src):
         "picks": "                       or server_pick(m, self.ctx)[0] is not None]" in ch,
         "one server model": "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n"
                             "                    and server_label(council[0]) else \"\")" in ch
-        and "        for label, target in ({} if server_label(model_name)\n"
-            "                              else MODEL_ROUTES).items():" in ch
-        and "        if (route is None and not cloud_only\n"
-            "                and not all(server_label(l) for l in council)):" in ch
+        and "            for label, target in ({} if server_label(model_name)\n"
+            "                                  else MODEL_ROUTES).items():" in ch
+        and "            if (route is None and not cloud_only\n"
+            "                    and not all(server_label(l) for l in council)):" in ch
         # (review) a council led by a server model warms its first local one
-        and "        elif server_label(model_name):\n" in ch
-        and "            route_label = next((l for l in council if l in MODEL_ROUTES), None)" in ch,
+        and "            elif server_label(model_name):\n" in ch
+        and "                route_label = next((l for l in council if l in MODEL_ROUTES), None)" in ch,
         # (review) a picture for a server pick stays on that server: no
         # vision takeover, no cloud or local reader, no download
         "picture stays": "            if not (len(council) == 1 and not cloud_only\n"
@@ -21015,9 +21015,9 @@ _SV_MUT = [
     ("a chip for an unpaired server", "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor])", "filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor])"),
     ("a silent server's chip not dimmed", '(st.reachable===false||st.err?" off":"")', '""'),
     ("the chips never painted", "  paintEngMenuServers();\n  paintSrvChips();\n}", "  paintEngMenuServers();\n}"),
-    ("a server-led council warms a catalog name inside it", "        for label, target in ({} if server_label(model_name)\n"
-     "                              else MODEL_ROUTES).items():",
-     "        for label, target in MODEL_ROUTES.items():"),
+    ("a server-led council warms a catalog name inside it", "            for label, target in ({} if server_label(model_name)\n"
+     "                                  else MODEL_ROUTES).items():",
+     "            for label, target in MODEL_ROUTES.items():"),
 ]
 _svm = []
 for _d34, _o34, _nw34 in _SV_MUT:
@@ -22978,7 +22978,9 @@ def _p2c_pins(src):
         "not an explicit pick": "        _srv_seat = bool(_srv_lbl) and _srv_lbl in _seat_fb\n        if _srv_seat:\n            _srv_lbl = \"\"" in ch
         and "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n                    and server_label(council[0]) else \"\")" in ch,
         "refresh": "                # Cloud Only never contacts the server (6b339, rules review)\n                if not cloud_only:\n"
-        "                    server_refresh_modes(self.ctx)" in ch,
+        "                    # a sleeping server is woken after the headers, with the step" in ch
+        and "                        server_refresh_modes(self.ctx, wake=False)\n                        if not _ag0:\n"
+            "                            _ch_wake = server_sleepers(self.ctx)" in ch,
         "agent": "            ag_label, ag, _ag_fb = resolve_agent_seat(agent_name, self.ctx)" in ch
         and "                    _seat_fb = ({ag_label: _ag_fb} if server_label(ag_label)\n                                else {})" in ch
         and "                if agent_name in _AGENT_ROLE and not cloud_only:\n"
@@ -23916,8 +23918,8 @@ _P2_MUT = [
     ("the flag not sent", '        cloud:fnCloudLoaded?fnCloudOn:undefined,\n        after_len:fn', '        after_len:fn'),
     ("a late answer flipping the box back", '    if(!fnCloudTouched)fnCloudOn=pr.funnel_cloud!==false;', '    fnCloudOn=pr.funnel_cloud!==false;'),
     ("the box's two reasons as one", '    :!(cs&&cs.configured)?"no cloud keys saved"\n    :"cloud power is off (Settings \\u203a Cloud power)";', '    :"no cloud keys saved";'),
-    ("Cloud Only contacting the server", '                if not cloud_only:\n                    server_refresh_modes(self.ctx)', '                if True:\n                    server_refresh_modes(self.ctx)'),
-    ("servers not refreshed before a mode", '                if not cloud_only:\n                    server_refresh_modes(self.ctx)', '                if not cloud_only:\n                    pass'),
+    ("Cloud Only contacting the server", '                if not cloud_only:\n                    # a sleeping server is woken after the headers, with the step', '                if True:\n                    # a sleeping server is woken after the headers, with the step'),
+    ("servers not refreshed before a mode", '                        server_refresh_modes(self.ctx, wake=False)\n                        if not _ag0:', '                        pass\n                        if not _ag0:'),
     ("an agent that may not asking the server", '                if agent_name in _AGENT_ROLE and not cloud_only:', '                if True:'),
     ("a memory pass asking a server that just failed", '                    and not (server_label(_ml)\n                             and server_label_down(user_base, _ml))):', '                    ):'),
     ("place pins asking a server that just failed", '                            and not (server_label(route_label or model_name)\n                                     and server_label_down(\n                                         user_base, route_label or model_name))):', '                            ):'),
@@ -29586,7 +29588,7 @@ def _w46c_only_wake(src):
     routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
     lbl, why = ns["server_only_wake"](sid, ctx, said.append, lambda: True)
     out["woke"] = (lbl == "Desktop \u00b7 small:8b" and why == ""
-                   and said[:3] == ["Waking Desktop...", "Waking Desktop... 0 s", "Waking Desktop... 2 s"]
+                   and said[:3] == ["Waking Desktop...", "Waking Desktop... 60 s", "Waking Desktop... 58 s"]
                    and said[-1] == "Desktop is awake." and len(packets) == 4
                    and sorted(a for _p, a in packets) == sorted((x, pt) for x in ("255.255.255.255", "192.168.1.255") for pt in (9, 7)))
     # it does not come up: one line, the server marked down, a minute's worth of status on the way
@@ -29599,7 +29601,7 @@ def _w46c_only_wake(src):
     out["failed"] = (lbl == "" and why == "Desktop didn\u2019t wake up in 60 seconds. It may be off or offline. "
                                           "Nothing was sent anywhere else."
                      and 60 <= t[0] - ta <= 62 and said[0] == "Waking Desktop..."
-                     and len(said) >= 28 and said[-1].startswith("Waking Desktop... 5")
+                     and len(said) >= 28 and said[-1] == "Waking Desktop... 2 s"
                      and ns["server_label_down"](ctx, "Desktop \u00b7 small:8b"))
     # Stop: it ends within one poll, quietly
     ns["_srv_wake_at"].clear()
@@ -29720,8 +29722,8 @@ _W46_MUT = [
     ("the wake's notes kept from an earlier request", "server_take_wake_notes()           # none left from an earlier request on this thread (6b346)\n", ""),
     ("the chat not told", 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)', "pass"),
     ("the wake after the headers made before them", "        if _so_wake and _srv_only:\n", "        if False:\n"),
-    ("no status while it waits", 'r = server_wake(e, lambda w: status("Waking %s... %d s" % (name, int(w))), alive)',
-     'r = server_wake(e, None, alive)'),
+    ("no status while it waits", 'r = server_wake(e, _prog, alive, wait_s, skip.is_set if skip is not None else None)',
+     'r = server_wake(e, None, alive, wait_s, skip.is_set if skip is not None else None)'),
     ("Stop not heard", '        if alive is not None and not alive():\n            return "stopped"\n', ""),
     ("a wake waited for before the headers", "        if _srv_wake_due(e):\n            _srv_wake_tl.pending = e[\"id\"]\n        return\n",
      "        pass\n"),
@@ -34463,7 +34465,7 @@ check("the Code lane asks the server's coder before the cloud ladder, quietly, a
 check("the agent lanes wake after the headers and warm this computer's engine only if the server fails (6b461)",
       "server_refresh_modes(self.ctx, wake=False)" in _s461 and "_ag_wake = server_sleepers(self.ctx)" in _s461
       and "_aw = server_wake_ask(_ag_wake, self.ctx, status, step, skip_ev," in _s461
-      and "if not _ag_wake:\n            _start_prewarm()" in _s461 and "resolve_agent_seat(agent_name, self.ctx)" in _s461[_s461.index("_aw = server_wake_ask"):])
+      and "if not (_ag_wake or _ch_wake):\n            _start_prewarm()" in _s461 and "resolve_agent_seat(agent_name, self.ctx)" in _s461[_s461.index("_aw = server_wake_ask"):])
 check("Skip reaches the wake without cancelling the question: the hurry id, a second Event (6b461)",
       "_skip_jobs[hurry_id] = skip_ev" in _s461 and "_hb.get(\"skip\")" in _s461 and "_skip_jobs.pop(hurry_id, None)" in _s461
       and "skip:true" in _s461 and 'class="wtskip"' in _s461)
@@ -34472,6 +34474,109 @@ check("the sidebar bars are read at once when the server wakes or starts answeri
       and "if(srvBoost&&u.fails<=0)u.due=Date.now()+1500;" in _s461 and "srvBoost=false;     // the bars go back" in _s461
       and "u.due=Date.now()+srvUseWait(u.fails);" in _s461)
 # ==== 6b461: end ====
+
+# ==== 6b465 Chat's modes wake a sleeping server with the same step: begin ====
+print("== Fast, Thinking, Pro and Max wake a sleeping server after the headers, with 10 s and a Skip (6b465) ==")
+def _w465(src):
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    t = [1000.0]
+    ns["_srv_wake_clock"] = lambda: t[0]
+    def _spin(s_):
+        if t[0] > 9000:
+            raise RuntimeError("the wake never gave up")
+        t[0] += s_
+    ns["_srv_wake_sleep"] = _spin
+    ns["_srv_udp"] = lambda pkt, addr: None
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255"]
+    good = {"enabled": True, "minutes": 30, "supported": True, "wake": [_W46_MAC]}
+    routes, off = _w46_ok_routes(ns)
+    routes["/v1/sleep-config"] = [_SvResp(200, good)]
+    log = []
+    _w46_router(ns, routes, log)
+    ns["server_sleep_get"](ctx, sid)
+    name = ns["_srv_read"](ctx)[0]["name"]
+    steps, stats = [], []
+    st = lambda x: stats.append(x)
+    sp = lambda i, l, s_="run", dd="": steps.append((i, l, s_, dd))
+    # who a mode may wake: paired, found offline, a card, no call in five minutes, not opted out
+    ns["_srv_seen"][sid] = {"at": 1, "reachable": False, "kind": "offline"}
+    ns["_srv_wake_at"].clear()
+    a1 = ns["server_sleepers"](ctx)
+    ns["_srv_seen"][sid] = {"at": 1, "reachable": True, "kind": ""}
+    a2 = ns["server_sleepers"](ctx)
+    ns["_srv_seen"][sid] = {"at": 1, "reachable": False, "kind": "offline"}
+    ns["_srv_wake_at"][sid] = t[0] - 10
+    a3 = ns["server_sleepers"](ctx)
+    ns["_srv_wake_at"].clear()
+    out["who"] = (a1 == [sid] and a2 == [] and a3 == [])
+    # the Chat modes: Waking, a countdown, then Woke (ten seconds), through the same function as the Code lane
+    ev = _th329.Event()
+    routes["/v1/info"] = [off, off, _SvResp(200, {"gpu": {}})]
+    routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
+    w = ns["server_wake_ask"]([sid], ctx, st, sp, ev)
+    out["modes woke"] = (w == [name] and steps[0] == ("wake", "Waking " + name, "run", "10 s")
+                         and steps[-1] == ("wake", "Woke " + name, "done", ""))
+    # "<name> Only": the same step with the whole minute counting down, no 10 s limit
+    steps.clear(); stats.clear(); ns["_srv_wake_at"].clear()
+    routes["/v1/info"] = [off] * 80
+    routes["/v1/whoami"] = [off]
+    ta = t[0]
+    lbl, why = ns["server_only_wake"](sid, ctx, st, lambda: True, sp, ev.__class__())
+    left = [int(x[3].split()[0]) for x in steps if x[2] == "run"]
+    out["only waits a minute"] = (lbl == "" and 60 <= t[0] - ta <= 62 and steps[0] == ("wake", "Waking " + name, "run", "60 s")
+                                  and left[:3] == [60, 60, 58] and left[-1] == 2 and left == sorted(left, reverse=True)
+                                  and steps[-1] == ("wake", name + " didn\u2019t wake in 60 s", "done", "")
+                                  and "didn\u2019t wake up in 60 seconds" in why and stats[-1] == "Waking %s... 2 s" % name)
+    # a Skip on it: stop waiting, say it is asleep, nothing is sent elsewhere, the server is not marked down
+    steps.clear(); stats.clear(); ns["_srv_wake_at"].clear()
+    ev2 = _th329.Event(); ev2.set()
+    ta = t[0]
+    lbl, why = ns["server_only_wake"](sid, ctx, st, lambda: True, sp, ev2)
+    out["only skipped"] = (lbl == "" and t[0] - ta < 1.5 and steps[-1] == ("wake", "Skipped waking " + name, "done", "")
+                           and "is asleep" in why and "Nothing was sent anywhere else" in why
+                           and not ns["server_label_down"](ctx, name + "\u00b7 x"))
+    return all(out.values()), out
+
+_r465 = _w465(_MILLENAI_SRC)
+check("wake for the Chat modes and \"<name> Only\" (6b465): who may be woken, 10 s for a mode, a minute counting down for Only, a Skip that stops the wait",
+      _r465[0], "%r" % (_r465[1],))
+_s465 = _MILLENAI_SRC
+_h465 = _s465[_s465.index("_ch_wake = []     # the same for Fast"):]
+_hb465 = _s465.index("        # FAST, THINKING, PRO AND MAX WAKE A SLEEPING SERVER WITH THE SAME STEP")
+check("Chat: the mode checks the servers before the headers without waking them, and the wake runs after the headers, before anything is made or asked (6b465)",
+      "server_refresh_modes(self.ctx, wake=False)\n                        if not _ag0:\n                            _ch_wake = server_sleepers(self.ctx)" in _s465
+      and _s465.index("_ch_wake = server_sleepers(self.ctx)") < _s465.index("self.send_header(\"X-Hurry\", hurry_id)")
+      < _s465.index("self.end_headers()", _s465.index("self.send_header(\"X-Hurry\", hurry_id)"))
+      < _s465.index("def status(text: str):", _hb465 - 6000) < _hb465
+      < _s465.index("_cw = server_wake_ask(_ch_wake, self.ctx, status, step, skip_ev,")
+      < _s465.index("if (img_subject or vid_subject or export_req) and not self._bench_held:"),
+      "order")
+_wk465 = _s465[_hb465:_s465.index("# MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER", _hb465)]
+check("Chat: a server that woke is seated now (the mode's roster again, the merger last, the route), a failure leaves the roster, the local engine warms only then (6b465)",
+      "resolve_tier_seats(tier, self.ctx)" in _wk465 and "max_tier_seats(self.ctx) if _max" in _wk465
+      and "council_merger_last([x[\"label\"] for x in _seats], req_comp, mode_pen)" in _wk465
+      and "_seat_fb = {x[\"label\"]: x[\"fb\"] for x in _seats if server_label(x[\"label\"])}" in _wk465
+      and "_resolve_route()" in _wk465 and "if _cw:" in _wk465 and "_cw is None" in _wk465 and "_start_prewarm()" in _wk465
+      and "if not (_ag_wake or _ch_wake):\n            _start_prewarm()" in _s465
+      and "council != _ch_council0" in _s465 and "tier not in TIERS or cloud_only or _srv_only" in _s465
+      and "council = council_merger_last(council, req_comp, mode_pen)" in _s465)
+check("Chat: pictures and the agents that run their own flow keep the old wake; the Code lane's agents keep theirs (6b465)",
+      'if req_json.get("images") or (_ag0 and _ag0 not in _AGENT_ROLE):\n                        server_refresh_modes(self.ctx)' in _s465
+      and "server_refresh_modes(self.ctx, wake=False)\n                    _ag_wake = server_sleepers(self.ctx)" in _s465)
+check("\"<name> Only\" waits its minute on the same step, with the page's Skip (6b465)",
+      "_so_wake, self.ctx, status,\n                    lambda: not _client_gone(self.connection), step, skip_ev)" in _s465
+      and "def server_wake_step(e, status, step, skip, alive, wait_s: int) -> str:" in _s465
+      and _s465.count("server_wake_step(e, status,") == 3 and "SRV_WAKE_WAIT_S)" in _s465[_s465.index("def server_only_wake"):_s465.index("def server_sleepers")])
+_cm465 = {"MODEL_ROUTES": {"A": 1, "B": 2, "C": 3}, "merge_pref_label": lambda: "B"}
+exec(_s465[_s465.index("def council_merger_last"):_s465.index("def server_wake_step")], _cm465)
+_f465 = _cm465["council_merger_last"]
+check("the merger drafts last, before and after a server joins the roster (6b465)",
+      _f465(["B", "A", "C"]) == ["A", "C", "B"] and _f465(["Srv \u00b7 x", "B", "A"]) == ["Srv \u00b7 x", "A", "B"]
+      and _f465(["A", "C"], "C") == ["A", "C"] and _f465(["B"]) == ["B"] and _f465(["B", "A"], "", "A") == ["B", "A"])
+# ==== 6b465: end ====
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
