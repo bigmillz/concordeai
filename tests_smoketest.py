@@ -3601,7 +3601,7 @@ _pz2 = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
             giant_fits_here=lambda l: _pcf.get("fit", True),
             # no Gemma 4 here: the everyday line falls to the largest model
             # of catalog size 8.5 GB or less (6b405)
-            fits_by_memory=lambda l: not l.startswith("Gemma 4"))
+            fits_by_memory=lambda l: l == "Gemma 4 E2B" or not l.startswith("Gemma 4"))
 _exec_names(_pz2, {"GIANT_GB", "model_is_giant", "_family_of", "TIERS", "MODEL_SETS",
                    "QUICK_PAIR", "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER",
                    "VISION_MODEL", "model_sets"})
@@ -3615,7 +3615,7 @@ _all_big = _pz2["model_sets"]()
 _pcf.update(gi=False, fit=True)
 check("sets pick by catalog size (Ministral 3 14B is 8.5 GB in the catalog, 9.1 on Ollama); "
       "Everything lists giants only where they fit, Light and Recommended never",
-      _pro == ["Llama 3.2 3B", "Llama 3.2 1B", "Ministral 3 14B"]
+      _pro == ["Gemma 4 E2B", "Llama 3.2 1B", "Ministral 3 14B"]
       and not set(_WG) & set(_all_small) and set(_WG) <= set(_all_big["everything"])
       and not set(_WG) & set(_all_big["recommended"] + _all_big["light"]),
       "%r" % [_pro, sorted(set(_WG) & set(_all_small))])
@@ -3631,11 +3631,11 @@ _ep = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
            _ollama_install_worker=lambda b: _ep_started.append(list(b)))
 _ep_started = []
 _exec_names(_ep, {"start_model_downloads"})
-_ep_r = _ep["start_model_downloads"](["DeepSeek V3.1 671B", "Llama 3.2 3B"])
+_ep_r = _ep["start_model_downloads"](["DeepSeek V3.1 671B", "Gemma 4 E2B"])
 import time as _tm1
 _tm1.sleep(0.2)
 check("the download endpoint won't start a giant a PC can't hold",
-      _ep_r == ["Llama 3.2 3B"] and _ep_started == [["Llama 3.2 3B"]]
+      _ep_r == ["Gemma 4 E2B"] and _ep_started == [["Gemma 4 E2B"]]
       and "DeepSeek V3.1 671B" not in _ep["_setup_jobs"],
       "%r" % [_ep_r, _ep_started, _ep["_setup_jobs"]])
 # the version floor: a user's own old Ollama gets a note saying what to
@@ -3653,7 +3653,7 @@ def _worker_run(ours, stage="staging"):
              _pull_ollama_model=lambda l, t: _wr_pulled.append(t),
              _stage_engine_update=lambda: _wr_staged.append(1) or stage)
     _exec_names(z, {"_STAGE_SAY", "_ollama_too_old", "_ollama_install_worker", "_refresh_keep"})
-    z["_ollama_install_worker"](["Qwen 3.8 27B", "Llama 3.2 3B"])
+    z["_ollama_install_worker"](["Qwen 3.8 27B", "Llama 3.2 1B"])
     return {l: (j["status"], j.get("note", "")) for l, j in z["_setup_jobs"].items()}
 _wr_pulled, _wr_staged = [], []
 _w_theirs = _worker_run(False)
@@ -3666,10 +3666,10 @@ _w_say = {st: _worker_run(True, st)["Qwen 3.8 27B"][1]
 check("an old Ollama: the user's gets a note, the app's fetches a newer one",
       _w_theirs["Qwen 3.8 27B"][0] == "error"
       and "needs Ollama 0.32.12 or newer; this computer has 0.28.1" in _w_theirs["Qwen 3.8 27B"][1]
-      and _w_theirs["Llama 3.2 3B"][0] == "done" and _w_theirs_pull == ["llama3.2:3b"]
+      and _w_theirs["Llama 3.2 1B"][0] == "done" and _w_theirs_pull == ["llama3.2:1b"]
       and not _w_theirs_staged
       and "is downloading: in a few minutes quit and reopen" in _w_ours["Qwen 3.8 27B"][1]
-      and _w_ours_staged == [1] and _w_ours_pull == ["llama3.2:3b"]
+      and _w_ours_staged == [1] and _w_ours_pull == ["llama3.2:1b"]
       # (review of the port) each outcome says what it is
       and "is ready: quit and reopen" in _w_say["staged"]
       and "close every ConcordeAI window" in _w_say["sibling"]
@@ -4066,7 +4066,7 @@ check("the engine download is checked against the release, and sized to this com
       _dl_ok and _dl_bad == ("the engine download doesn't match the release's checksum", [])
       and _need["apple"] == (0, 17, 1)          # only its MLX-less Vision row
       and _need["windows"] == (0, 32, 12) and _need["intel"] == (0, 32, 12)
-      and _need["intel, no 3.8"] == (0, 30, 5),
+      and _need["intel, no 3.8"] == (0, 30, 9),
       "%r" % [_dl_ok, _dl_bad, _need])
 _stream_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def stream_ollama("):
                             _MILLENAI_SRC.index("def stream_openai_compat(")]
@@ -4801,7 +4801,7 @@ check("leftover sweep: failed downloads go; fresh, complete and foreign files st
       and not _ex(_p_old) and _ex(_p_new) and _ex(_p_new0) and _ex(_blob)
       and _ex(_p_big) and not _ex(_p_big_old)
       and not _ex(_tmpf) and not _ex(_dev) and _ex(_mine_dev)
-      and "_sweep_leftovers()\n        # manual == the Clean-now button" in _MILLENAI_SRC
+      and "_sweep_leftovers()\n        if manual or auto_cleanup_on():" in _MILLENAI_SRC
       and "_sweep_leftovers()      # a failed replacement leaves pieces" in _MILLENAI_SRC
       and "open(os.path.join(st[\"venv\"], STUDIO_FAIL_MARK), \"w\")" in _MILLENAI_SRC,
       "%r" % [_ex(x) for x in (_r_ret, _r_part, _r_fresh, _r_done, _r_stu, _r_mine, _venv,
@@ -5455,11 +5455,11 @@ def _of_scene(ns):
     two current models are installed."""
     st, R = ns["_OF"], ns["RETIRED_MODELS"]
     st.update(disk={R["Mistral Nemo 12B"][0], "LLaVA Vision 7B",
-                    R["Qwen 3.6 27B"][0], "Llama 3.2 3B", "Hermes 3 8B"},
+                    R["Qwen 3.6 27B"][0], "Llama 3.2 1B", "Hermes 3 8B"},
               ports={R["Qwen 3.6 27B"][2]}, removed=[], dl=[],
-              max=["Gemma 4 12B", "Llama 3.2 3B", "Qwen 3.5 Vision 9B"],
+              max=["Gemma 4 12B", "Llama 3.2 1B", "Qwen 3.5 Vision 9B"],
               prefs={"app_models": ["Mistral Nemo 12B", "Qwen 3.6 27B"],
-                     "seen_models": ["Llama 3.2 3B", "Hermes 3 8B",
+                     "seen_models": ["Llama 3.2 1B", "Hermes 3 8B",
                                      "Qwen 3.5 Vision 9B"]})
     ns["_setup_jobs"].clear()
     ns["_update"]["state"] = "idle"
@@ -6106,7 +6106,7 @@ def _s5_pc(src, key):
     return z
 
 
-_S5_REC48 = ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B", "Qwen 3.8 27B",
+_S5_REC48 = ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B", "Qwen 3.8 27B",
              "Qwen 3.6 35B MoE", "Qwen 3.5 Vision 9B"]
 
 
@@ -6120,17 +6120,17 @@ def _s5_rules(src):
     nl48 = _s5_mac(src, 48, nl=True)["model_sets"]()
     gi512 = _s5_mac(src, 512, nl=True, gi=True)["model_sets"]()
     pc = _s5_pc(src, "xtx+64")["model_sets"]()
-    out["48 GB Mac"] = (m[48]["light"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"]
+    out["48 GB Mac"] = (m[48]["light"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"]
                         and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 13
                         and "GPT-OSS 120B" not in m[48]["everything"] and m[48]["over"] == [])
     out["No limits: Everything only"] = (nl48["light"] == m[48]["light"]
                                          and nl48["recommended"] == m[48]["recommended"]
                                          and nl48["everything"] == m[48]["everything"] + ["GPT-OSS 120B"]
                                          and nl48["over"] == ["GPT-OSS 120B"])
-    out["8 GB Mac"] = (m[8]["light"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Hermes 3 8B"]
+    out["8 GB Mac"] = (m[8]["light"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Hermes 3 8B"]
                        and m[8]["recommended"] == m[8]["light"] + ["DeepSeek R1 8B"]
                        and m[8]["everything"] == m[8]["recommended"])
-    out["16 GB Mac"] = (m[16]["recommended"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B", "Qwen 3.5 9B",
+    out["16 GB Mac"] = (m[16]["recommended"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Qwen 3.5 9B",
                                                  "DeepSeek R1 8B", "Qwen 3.5 Vision 9B"]
                         and len(m[16]["everything"]) == 9)
     out["128 GB Mac"] = (m[128]["recommended"][3] == "GPT-OSS 120B" and "Gemma 4 26B" in m[128]["recommended"]
@@ -6146,7 +6146,7 @@ def _s5_rules(src):
     # 24 GB on the card and 64 GB beside it: GPT-OSS 120B's experts sit in
     # RAM (6b315), so it answers Fast; Qwen 3.5 9B and its Vision row are one
     # Ollama download, listed once
-    out["a PC with a 24 GB card"] = (pc["light"] == ["Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"]
+    out["a PC with a 24 GB card"] = (pc["light"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"]
                                      and pc["recommended"][3] == "GPT-OSS 120B"
                                      and len({"Qwen 3.5 9B", "Qwen 3.5 Vision 9B"}
                                              & set(pc["everything"])) == 1
@@ -6176,7 +6176,7 @@ def _s5_rules(src):
         f0["first_set_labels"]() == f0["model_sets"]()["light"]
         and f1["first_set_labels"]() == f1["model_sets"]()["recommended"]
         and f0["model_sets_status"](set())["mine"] == ""
-        and round(f0["model_sets_status"](set())["light"]["dl_gb"]) == 9)
+        and round(f0["model_sets_status"](set())["light"]["dl_gb"]) == 11)
     return all(out.values()), {"failed": [k for k, v in out.items() if not v],
                                "48": m[48], "16": m[16], "8": m[8], "pc": pc}
 
@@ -6186,12 +6186,12 @@ def _s5_status(src):
     here), installed, to download (only what is missing), the same-as, and
     "every" only while Everything is all here; old names read as new."""
     out = {}
-    a = _s5_mac(src, 8, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Hermes 3 8B", "DeepSeek R1 8B"})
+    a = _s5_mac(src, 8, disk={"Gemma 4 E2B", "Llama 3.2 1B", "Hermes 3 8B", "DeepSeek R1 8B"})
     s = a["model_sets_status"](set())
     out["small Mac, all here"] = (s["recommended"]["state"] == "yours" and s["light"]["state"] == "installed"
                                   and s["everything"]["same"] == "recommended"
                                   and s["everything"]["state"] == "installed" and s["every"] is True)
-    b = _s5_mac(src, 48, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B"})
+    b = _s5_mac(src, 48, disk={"Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B"})
     s = b["model_sets_status"](set())
     out["48 GB, Light here"] = (s["light"]["state"] == "yours" and s["recommended"]["state"] == "download"
                                 and s["recommended"]["missing"] == ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
@@ -6219,11 +6219,11 @@ def _s5_offer(src):
     never a bigger set's: nothing when none was picked and the largest
     complete set has nothing missing."""
     out = {}
-    b = _s5_mac(src, 48, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"})
+    b = _s5_mac(src, 48, disk={"Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"})
     out["no pick, Light here: nothing"] = b["offer_set_labels"](set()) == b["model_sets"]()["light"]
-    b2 = _s5_mac(src, 48, disk={"Llama 3.2 3B"})
+    b2 = _s5_mac(src, 48, disk={"Gemma 4 E2B"})
     out["no pick, no set complete: nothing"] = b2["offer_set_labels"](set()) == []
-    c = _s5_mac(src, 48, disk={"Llama 3.2 3B", "Llama 3.2 1B", "Gemma 4 12B"},
+    c = _s5_mac(src, 48, disk={"Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"},
                 prefs={"model_set": "recommended"})
     out["Recommended picked: its own"] = c["offer_set_labels"](set()) == _S5_REC48
     d = _s5_mac(src, 48, disk=set(_S5_REC48), prefs={"model_set": "light"})
@@ -6313,7 +6313,7 @@ _S5_MUT = [
      "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n                    and model_fits_machine(l))", [0]),
     ("a giant in Recommended", "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n",
      "            return (bool(SUPPORTED.get(l))\n", [0]),
-    ("the everyday not a Gemma first", 'next((l for l in small if l.startswith("Gemma 4")), None)', 'None', [0]),
+    ("the everyday not a Gemma first", 'next((l for l in small if l.startswith("Gemma 4") and l not in QUICK_PAIR), None)', 'None', [0]),
     ("no quick pair", "    for l in QUICK_PAIR + (everyday,):\n", "    for l in (everyday,):\n", [0]),
     ("Thinking not filled", "        if seats >= TIERS[\"Thinking\"][\"count\"]:", "        if seats >= 1:", [0]),
     ("no code model", "    add(first(CODE_LADDER))\n", "", [0]),
@@ -17151,7 +17151,7 @@ check("an account's page neither reads nor writes This computer's model pick in 
       "(review of 6b330: a later root boot could adopt it)",
       _pmr9["local"].get("model") == "Hermes 3 8B" and _pmr9["local"].get("sets")
       == ["millen.model", "millen.council"]
-      and _pmr9["aaaaa"].get("model") == "Llama 3.2 3B" and _pmr9["aaaaa"].get("sets") == [],
+      and _pmr9["aaaaa"].get("model") == "Gemma 4 E2B" and _pmr9["aaaaa"].get("sets") == [],
       "%r" % _pmr9)
 
 # ---- two profiles, A -> B -> A, with canaries: B never sees A, and A comes back as it was
@@ -19739,7 +19739,7 @@ _bt = [_ireq(_BM, "/api/bench", token=False)[0],
 _bi = _bmq("/api/bench")
 check("benchmark (live): the routes answer only with the launch key and the API token",
       _bt == [403] * 6 and _bi[0] == 200 and _bi[1].get("running") is False
-      and _bi[1].get("installed") == ["Llama 3.2 1B", "Llama 3.2 3B", "GPT-OSS 120B"]
+      and _bi[1].get("installed") == ["Llama 3.2 1B", "Gemma 4 E2B", "GPT-OSS 120B"]
       and _bi[1].get("hw") and not os.path.exists(os.path.join(_BM.home, "benchmarks.jsonl")),
       "%r" % [_bt, _bi])
 # a run to the end, with a second start and a chat while it goes
@@ -19758,8 +19758,8 @@ check("benchmark (live): a run on the stand-in engine gives the known figures an
       and _brows.get("Llama 3.2 1B", {}).get("gen_tps") == 40.0
       and _brows["Llama 3.2 1B"].get("prompt_tps") == 2000.0
       and _brows["Llama 3.2 1B"].get("ttft_s") == 0.5 and _brows["Llama 3.2 1B"].get("load_s") == 2.0
-      and _brows.get("Llama 3.2 3B", {}).get("gen_tps") == 50.0
-      and _brows["Llama 3.2 3B"].get("src") == "engine" and _brows["Llama 3.2 3B"].get("load_s") == 1.5
+      and _brows.get("Gemma 4 E2B", {}).get("gen_tps") == 50.0
+      and _brows["Gemma 4 E2B"].get("src") == "engine" and _brows["Gemma 4 E2B"].get("load_s") == 1.5
       and _brows.get("GPT-OSS 120B", {}).get("status") == "skipped"
       and "(80% of 48 GB)" in _brows["GPT-OSS 120B"].get("note", "")
       and all(isinstance(r.get("mem_rise"), int) for l_, r in _brows.items() if l_ != "GPT-OSS 120B"),
@@ -25770,7 +25770,8 @@ for _i42 in range(200):
     if not _svq("/api/bench")[1].get("running"):
         break
     time.sleep(0.1)
-_u6 = [_svq("/api/servers/usage?id=" + x_) for x_ in ("", "zz", "00000000", "../..", _sid34.upper())]
+_u6 = [_svq("/api/servers/usage?id=" + x_) for x_ in ("", "zz", "00000000", "../..",
+                                                                     _sid34.upper() if _sid34.upper() != _sid34 else "G" + _sid34[1:])]
 _u7 = [_ireq(_SV, "/api/servers/usage?id=" + _sid34, cookie=False)[0],
        _ireq(_SV, "/api/servers/usage?id=" + _sid34, token=False)[0],
        _ireq(_SV, "/api/servers/usage?id=" + _sid34, token="A" * 43)[0]]
@@ -26247,8 +26248,8 @@ _l7lg = [r_ for r_ in _o1("/log")["log"][_l7_n:] if r_["path"].startswith("/v1/m
 _l7t = {k_: [m_["name"] for m_ in v_["download"]] for k_, v_ in (_l7a.get("sets") or {}).items()}
 check("server sets (live): one signed read through Access; the 16 GB card's sets, every model outside them listed",
       _l7a.get("ok") is True and _l7a.get("vram") == 16 << 30
-      and _l7t.get("light") == ["llama3.2:3b", "llama3.2:1b", "gemma4:12b"]
-      and _l7t.get("recommended") == ["llama3.2:3b", "llama3.2:1b", "gemma4:12b", "gpt-oss:20b",
+      and _l7t.get("light") == ["gemma4:e2b", "llama3.2:1b", "gemma4:12b"]
+      and _l7t.get("recommended") == ["gemma4:e2b", "llama3.2:1b", "gemma4:12b", "gpt-oss:20b",
                                       "qwen3.5:9b", "deepseek-r1:8b"]
       and sorted(m_["name"] for m_ in _l7a["sets"]["light"]["remove"]) == sorted(
           n_ for n_ in ("small:8b", "huge:70b", "sneaky:14b", "moe:120b", "embed:small", "embed:spill"))
@@ -26275,7 +26276,7 @@ check("server sets (live): unsigned is refused; Light with the switch off pulls 
       and (_l7b.get("plan") or {}).get("name") == "light"
       and _l7b["sets"]["light"]["state"] == "yours" and _l7b["sets"]["light"]["download"] == []
       and {"small:8b", "huge:70b"} <= {m_["name"] for m_ in (_l7b["sets"]["light"]["remove"])}
-      and {"llama3.2:3b", "gemma4:12b"} <= _l7have,
+      and {"gemma4:e2b", "gemma4:12b"} <= _l7have,
       "%r" % [_l7u, _l7p, _l7b.get("mine"), _l7b.get("jobs"), sorted(_l7have)])
 # the same sheet again: this app reads the list again first; the list
 # changed at the server since the sheet: the gateway refuses, nothing moves
@@ -31445,10 +31446,10 @@ def _s7_sets(src):
     ns, ctx, d = _s7_ns(src)
     t16, t8, t24 = _s7_tags(ns, 16 * _GI7), _s7_tags(ns, 8 * _GI7), _s7_tags(ns, 24 * _GI7)
     t320 = _s7_tags(ns, 320 * _GI7)
-    out = {"16 GB": (t16["light"] == ["llama3.2:3b", "llama3.2:1b", "gemma4:12b"]
+    out = {"16 GB": (t16["light"] == ["gemma4:e2b", "llama3.2:1b", "gemma4:12b"]
                      and t16["recommended"] == t16["light"] + ["gpt-oss:20b", "qwen3.5:9b", "deepseek-r1:8b"]
                      and t16["everything"] == t16["recommended"] + ["ministral-3:14b", "hermes3:8b"]),
-           "8 GB: no Gemma fits whole": t8["light"] == ["llama3.2:3b", "llama3.2:1b", "qwen3.5:9b"],
+           "8 GB: no Gemma fits whole": t8["light"] == ["gemma4:e2b", "llama3.2:1b", "qwen3.5:9b"],
            "24 GB": t24["recommended"][3:6] == ["gemma4:26b", "qwen3.8:27b", "qwen3.6:35b"],
            "a giant only in Everything": ("qwen3-coder:480b" in t320["everything"]
                                           and "qwen3-coder:480b" not in t320["recommended"]),
@@ -31462,7 +31463,7 @@ def _s7_sets(src):
 _S7_STATE = {"models": [{"name": "gemma4:12b", "size": 7556508396, "loaded": True},
                         {"name": "custom:1b", "size": 1 << 30, "loaded": False},
                         {"name": "hf.co/User/x:Q4", "size": 2 << 30, "loaded": False},
-                        {"name": "llama3.2:3b", "size": 2019393189, "loaded": False}],
+                        {"name": "gemma4:e2b", "size": 2019393189, "loaded": False}],
              "allow": ["gemma4:12b"], "busy": False, "plan": {"name": "pro", "at": 1791100000, "by": "Pat’s MacBook"},
              "jobs": [{"name": "gpt-oss:20b", "action": "pull", "state": "running", "pct": 40, "error": ""},
                       {"name": "BAD NAME", "action": "pull", "state": "running", "pct": 1, "error": ""},
@@ -31494,7 +31495,7 @@ def _s7_view(src):
         "nothing complete, nothing yours": v["mine"] == "" and all(
             x["state"] == "download" for x in v["sets"].values())}
     full = {"models": [{"name": t, "size": 1, "loaded": False}
-                       for t in ["llama3.2:3b", "llama3.2:1b", "gemma4:12b", "gpt-oss:20b", "qwen3.5:9b",
+                       for t in ["gemma4:e2b", "llama3.2:1b", "gemma4:12b", "gpt-oss:20b", "qwen3.5:9b",
                                  "deepseek-r1:8b"]], "busy": False, "jobs": [], "plan": None,
             "disk_free_bytes": 0, "vram_bytes": 0}
     v2 = ns["server_sets_view"](full, 16 * _GI7)
@@ -31577,7 +31578,7 @@ def _s7_apply(src):
     rs = [ns["server_models_apply"](ctx, sid, b) for b in bad]
     out["bad input refused here"] = all(x["kind"] == "input" for x in rs) and not sent
     stale = [dict(g, seen="1" * 64), dict(g, add=["qwen3.8:27b"]), dict(g, remove=["gemma4:12b"]),
-             dict(g, remove=["llama3.2:3b"]), dict(g, plan="recommended", remove=["hf.co"])]
+             dict(g, remove=["gemma4:e2b"]), dict(g, plan="recommended", remove=["hf.co"])]
     rs = [ns["server_models_apply"](ctx, sid, b) for b in stale]
     out["not on the sheet: the list is read again"] = (
         all(x == {"ok": False, "kind": "changed", "err": "The server’s list changed. Check it again."}
@@ -31662,7 +31663,7 @@ def _s7_cache(src):
     out = {"the rule": (oi(cache) and oi({"name": cache, "size": 1}) and oi("llamacpp/gpt-oss:20b")
                         and oi("registry.ollama.ai/library/" + cache)
                         and oi({"name": "x:" + _S7_SHA, "details": {"runner": "llamacpp"}})
-                        and not any(oi(n) for n in ("llama3.2:3b", "gpt-oss:20b", "llamacpp", "my-llamacpp:1b",
+                        and not any(oi(n) for n in ("gemma4:e2b", "gpt-oss:20b", "llamacpp", "my-llamacpp:1b",
                                                    {"name": "gpt-oss:20b", "runner": "llamacpp"}, None)))}
     js = json.loads(json.dumps(_S7_STATE))
     js["models"].insert(2, {"name": cache, "size": 13_800_000_000, "loaded": False})
@@ -31722,8 +31723,8 @@ _S7_MUT = [
     ("a name the gateway can't take listed", "              if _srv_tag_key(n) not in keys[k] and SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]",
      "              if _srv_tag_key(n) not in keys[k]][:SRV_SETS_MAX]", [1]),
     ("an unknown job kept", '                or act not in ("pull", "remove")', '                or False', [1]),
-    ("the read unsigned", '        st, js = _srv_json(e, "GET", "/v1/models/state", timeout=SRV_CONNECT_S)',
-     '        st, js = _srv_json(e, "GET", "/v1/models/state", signed=False, timeout=SRV_CONNECT_S)', [2]),
+    ("the read unsigned", '        st, js = _srv_json(e, "GET", "/v1/models/state", timeout=SRV_CONNECT_S)\n    except ServerError as se:\n        return {"ok": False, "kind": se.kind, "err": str(se)}\n    if st == 404 and js.get("code") == "not_found":',
+     '        st, js = _srv_json(e, "GET", "/v1/models/state", signed=False, timeout=SRV_CONNECT_S)\n    except ServerError as se:\n        return {"ok": False, "kind": se.kind, "err": str(se)}\n    if st == 404 and js.get("code") == "not_found":', [2]),
     ("an old kit not said", '        return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}\n    if st != 200:', '    if st != 200:', [2]),
     ("the sheet's lists not kept", '    _srv_mstate[e["id"]] = {', '    _srv_mstate["x"] = {', [2, 3]),
     ("an add outside the set sent", '            or not set(add) <= set(ms["dl"].get(plan) or [])\n', '', [3]),
@@ -31739,7 +31740,7 @@ _S7_MUT = [
      "const x=((d||{}).sets||{})[k]||{},dl=x.download||[],out=x.remove||[];", [4]),
     ("Ollama's cache copy listed", "        if ollama_internal(m):\n            continue\n        models.append(", "        models.append(", [5]),
     ("the cache's name matched as a model", "        if n.startswith(_OLLAMA_INTERNAL_PREFIXES):\n            return True\n", "", [5]),
-    ("an old kit's seen without the cache", 'srv_seen_hash(state.get("seen_names", names))', "srv_seen_hash(names)", [5]),
+    ("an old kit's seen without the cache", '    out = {"sets": {}, "seen": srv_seen_hash(state.get("seen_names", names)),', '    out = {"sets": {}, "seen": srv_seen_hash(names),', [5]),
     ("the cache in the picker", '                or _SRV_CLOUD_TAG.search(n) or ollama_internal(m):', '                or _SRV_CLOUD_TAG.search(n):', [5]),
 ]
 _s7m = []
@@ -34470,7 +34471,9 @@ def _u45_fresh(src):
                                    and r["Qwen 3.5 9B"]["b"] == 5 * _GB45 and r["Qwen 3.5 9B"]["gb"] == 5.0
                                    and r["Qwen 3.5 Vision 9B"]["kind"] == "ollama")
     n = len(st["asked"])
-    ns["model_fresh_check"](now=2000.0)
+    disk0, st["disk"] = st["disk"], set()
+    out["a day's answer is kept, not asked again"] = ns["model_fresh_check"](now=2000.0) == r
+    st["disk"] = disk0
     ns["model_fresh_check"](force=True, now=3000.0)
     out["asked at most once a day"] = len(st["asked"]) == n
     ns["_setup_jobs"]["Qwen 3.5 9B"] = {"status": "downloading"}
@@ -34734,13 +34737,14 @@ _U45_MUT = [
     ("a loaded model removed",
      "    retire = [n for n in on_retired if _srv_tag_key(n) in managed\n              and _srv_tag_key(n) not in loaded and not ollama_internal(n)][:SRV_SETS_MAX]",
      "    retire = [n for n in on_retired if _srv_tag_key(n) in managed][:SRV_SETS_MAX]"),
-    ("an older kit cleaned", '        if not state["managed_known"] or state["busy"]:\n', '        if state["busy"]:\n'),
+    # ("an older kit cleaned") is not a mutant: an older kit sends no managed list,
+    # so server_update_view retires nothing whatever the guard says
     ("the switch ignored", "    if not auto_cleanup_on():\n        return out\n    try:\n        entries = _srv_read(ctx)",
      "    try:\n        entries = _srv_read(ctx)"),
     ("a sleeping server asked", "    return now - float((_srv_seen.get(e[\"id\"]) or {}).get(\"at\") or 0) < SUGGEST_SERVER_FRESH_S",
      "    return True"),
-    ("the cache copy retired", "              and _srv_tag_key(n) not in loaded and not ollama_internal(n)][:SRV_SETS_MAX]",
-     "              and _srv_tag_key(n) not in loaded][:SRV_SETS_MAX]"),
+    # ("the cache copy retired") is not a mutant: a cache copy's name is never a retired
+    # tag, so on_retired never holds one; "the cache copy managed" below guards the list
     ("the cache copy managed", "            \"managed\": [n for n in mg[:400] if isinstance(n, str) and SRV_TAG_RX.fullmatch(n)\n                        and not ollama_internal(n)]",
      "            \"managed\": [n for n in mg[:400] if isinstance(n, str) and SRV_TAG_RX.fullmatch(n)]"),
     ("the offer not checked", '    if v["offer"] != offer:\n        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}\n', ""),

@@ -12625,7 +12625,7 @@ MACHINE_IO = frozenset((
     "_fetch_engine_update", "_apply_staged_engine", "_rollback_engine",
     "_update_note_set", "_trial_proven", "_drop_trial",
     "_download_model", "studio_remove", "_remove_models",
-    "_sweep_hf_carcasses", "_rm_hf_repo", "reap_orphan_engines",
+    "_sweep_hf_carcasses", "_rm_hf_repo", "_studio_retired_sweep", "reap_orphan_engines",
     "_sweep_leftovers", "_crypto_record_write", "_crypto_pip",
     # the render's own log, a temporary file the render writes into
     "_run_render",
