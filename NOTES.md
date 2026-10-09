@@ -9,6 +9,28 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b462 — the pinwheel no longer jitters while the answer streams (per Patrick)
+
+Patrick: "this spinner jitters too while it's streaming the output below."
+
+- Cause: `paintStream` (every drip frame) rebuilt the answer with
+  `body.innerHTML = <step card's outerHTML> + prose`. That parses a NEW
+  `.worktree` and a new `.cspin` each frame, so the CSS spin restarted at
+  0 degrees dozens of times a second; the card also lost its `_sig`, so
+  `paintSteps` took the full innerHTML path instead of the cheap one.
+- Fix: the card node is lifted out and put back (`keepTree`), so the
+  pinwheel is one element with one continuous animation. The pinwheel got
+  its own layer (`will-change:transform;translateZ(0)`) and `.wthead` is
+  `contain:layout paint` so the answer reflowing below does not repaint it.
+  Look unchanged. The final settle at the end of `send()` still re-serialises
+  the card (collapseSteps rebuilds it anyway).
+- The head (pinwheel + bar) of the card is also built once: a new step or status
+  rewrites only the rows below it (`kept` in `paintSteps`), so STEP/STATUS frames
+  do not recreate the pinwheel either.
+- Touches `eta-1008` (6b459) nowhere in code: it edits the time-left math in
+  `paintSteps`; this edits `paintStream` and two CSS rules.
+- Test: "pinwheel survives streaming (6b462)" (served-HTML substrings).
+
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
 
 Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no
