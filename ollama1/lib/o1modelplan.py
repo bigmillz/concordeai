@@ -25,6 +25,15 @@ Files:
   /run/ollama1/modelplan/status.json               root:o1view 0640  the plan running or last run
   /run/ollama1/modelplan/plan.lock                 root:o1view 0640  held while a plan runs
   /var/lib/ollama1-modelplan/last.json             root:o1view 0640  the same record, across reboots
+  /var/lib/ollama1-modelplan/managed.json          root:o1view 0640  the models a set brought here (6b445)
+
+THE MODELS THE APP BROUGHT (6b445, per the owner: retired models are cleared
+on the server too, but never one the person pulled themselves). Every model
+a set downloads that wasn't on the disk before is written to managed.json; a
+set that removes it takes it off. GET /v1/models/state lists them as
+"managed", and the app only ever removes a retired model unasked when it is
+on that list. A model that was already here when a set pulled it again (the
+app refreshing its weights) keeps its owner: it is not added.
 
 Only model names, a set's name, a device's id and name, and times are
 written: nothing anyone asked a model.
@@ -83,6 +92,62 @@ def lock_file():
 
 def record_file():
     return os.path.join(Paths.modelplan_state, "last.json")
+
+
+def managed_file():
+    return os.path.join(Paths.modelplan_state, "managed.json")
+
+
+MANAGED_MAX = 400
+
+
+def _managed_names(obj):
+    """The valid tags of a managed.json body, in order, each once."""
+    names = obj.get("names") if isinstance(obj, dict) else None
+    out = []
+    for n in (names if isinstance(names, list) else [])[:MANAGED_MAX]:
+        if valid_tag(n) and not o1ollama.is_internal(n) and not any(norm(n) == norm(o) for o in out):
+            out.append(n)
+    return out
+
+
+def read_managed():
+    """The models a set from the app brought to this server (6b445):
+    managed.json, else (a server whose last set ran before that file
+    existed) the pulls the last set finished. Sorted; only library tags."""
+    raw = read_json_safe(managed_file(), None, max_bytes=FILE_MAX_BYTES)
+    if isinstance(raw, dict):
+        return sorted(_managed_names(raw))
+    rec = clean_status(read_json_safe(record_file(), None, max_bytes=FILE_MAX_BYTES))
+    return sorted({j["name"] for j in (rec or {}).get("jobs") or []
+                   if j["action"] == "pull" and j["state"] == "done"})
+
+
+def managed_change(add=(), drop=()):
+    """root only: managed.json gains `add` and loses `drop` (compared as
+    one model, "x" is "x:latest"). The first write starts from what
+    read_managed() says, so the last set's pulls are kept."""
+    cur = read_managed()
+    nxt = [n for n in cur if not any(norm(n) == norm(d) for d in drop)]
+    nxt += [a for a in add if valid_tag(a) and not o1ollama.is_internal(a)      # never Ollama's cache (6b448)
+            and not any(norm(a) == norm(n) for n in nxt)]
+    if nxt == cur and os.path.exists(managed_file()):
+        return nxt
+    os.makedirs(Paths.modelplan_state, exist_ok=True)
+    write_json_atomic(managed_file(), {"v": 1, "names": sorted(nxt)[:MANAGED_MAX]}, mode=0o640, group="o1view",
+                      sync_dir=True)
+    return nxt
+
+
+DIGEST_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def model_digest(m):
+    """The digest Ollama lists for a model (the sha256 of its manifest), as
+    64 lowercase hex characters, or "" when it isn't that shape."""
+    d = m.get("digest") if isinstance(m, dict) else None
+    d = d[7:] if isinstance(d, str) and d.startswith("sha256:") else d
+    return d if isinstance(d, str) and DIGEST_HEX_RE.fullmatch(d) else ""
 
 
 # ---- the request: one check for both sides ----------------------------------------

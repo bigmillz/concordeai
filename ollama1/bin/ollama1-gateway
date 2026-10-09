@@ -487,8 +487,9 @@ class Gateway:
         return sorted(o1modelplan.local_models(data), key=lambda m: m["name"])
 
     def models_state(self):
-        """GET /v1/models/state: exactly models, allow, busy, jobs, plan,
-        disk_free_bytes and vram_bytes."""
+        """GET /v1/models/state: exactly models (each with its digest,
+        6b445), allow, managed (the models a set from the app brought,
+        6b445), busy, jobs, plan, disk_free_bytes and vram_bytes."""
         disk = self.disk_models()
         try:
             loaded = self.loaded_names()
@@ -498,7 +499,7 @@ class Gateway:
         def size(m):
             s = m.get("size")
             return s if isinstance(s, int) and not isinstance(s, bool) and s >= 0 else 0
-        models = [{"name": m["name"], "size": size(m),
+        models = [{"name": m["name"], "size": size(m), "digest": o1modelplan.model_digest(m),
                    "loaded": any(o1ollama.same_model(m["name"], n) for n in loaded)} for m in disk]
         st = o1modelplan.read_status()
         vram = (self.gpu() or {}).get("vram_bytes")
@@ -507,7 +508,8 @@ class Gateway:
                 vram = max(0, int(self.cfg.get("vram_total_bytes") or 0))
             except (TypeError, ValueError):
                 vram = 0
-        return {"models": models, "allow": read_allow_list(), "busy": bool(self.models_busy()),
+        return {"models": models, "allow": read_allow_list(), "managed": o1modelplan.read_managed(),
+                "busy": bool(self.models_busy()),
                 "jobs": st["jobs"] if st else [], "plan": st["plan"] if st else None,
                 "disk_free_bytes": o1modelplan.disk_free() or 0, "vram_bytes": vram}
 

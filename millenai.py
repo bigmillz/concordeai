@@ -12,8 +12,8 @@ Optional extras:
 
 Backends (any subset is fine — missing ones just report offline):
   MLX / llama.cpp OpenAI-compatible servers on:
-    127.0.0.1:8888  -> Llama 3.2 3B
-    127.0.0.1:8892  -> Mistral Nemo 12B
+    127.0.0.1:8946  -> Gemma 4 E2B
+    127.0.0.1:8884  -> Llama 3.2 1B
   Ollama on 127.0.0.1:11434 for the heavy models.
 
 If mlx-lm (and/or ollama) is installed, the app spawns any engine whose
@@ -94,7 +94,7 @@ MACHINE_STATE = frozenset((
     "_QT_CLEAR_CACHE", "_RELOCATED", "_BOOT_HEALS",
     # models, engines, hardware and installs
     "MODEL_ROUTES", "OLLAMA_PORT", "_MINE_CACHE",
-    "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache",
+    "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_fresh",
     # 6b315: the graphics cards, and when the engine update last failed
     "_gpus", "_stage_last", "_proof",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
@@ -1217,7 +1217,10 @@ def reveal(path: str):
 CATALOG = [
     # label,               icon, size, group, mlx repo, ollama tag, port, mem_gb, gb, star
     ("Llama 3.2 1B",       "🪶", "1B",  "core", "mlx-community/Llama-3.2-1B-Instruct-4bit",        "llama3.2:1b",       8884,  1.2,  0.8, True),
-    ("Llama 3.2 3B",       "⚡️", "3B",  "core", "mlx-community/Llama-3.2-3B-Instruct-4bit",        "llama3.2:3b",       8888,  2.5,  1.8, True),
+    # 6b445, per Patrick: Gemma 4 E2B replaces Llama 3.2 3B as the quick model
+    # (15/19 against 9/19 on hard quick prompts, 122 against 126 tok/s, 2.7 GB
+    # peak, loads on mlx-lm 0.31.3; the repo and tag checked 2026-10-07)
+    ("Gemma 4 E2B",        "⚡️", "2B",  "core", "mlx-community/gemma-4-e2b-it-4bit",              "gemma4:e2b",        8946,  3.2,  3.6, True),
     ("Ministral 3 14B",    "🌪️", "14B", "core", "mlx-community/Ministral-3-14B-Instruct-2512-4bit", "ministral-3:14b", 8932, 9.6, 8.5, True),
     # tuned for tool use and structured output — the Research agent's first pick
     ("Hermes 3 8B",        "🪽", "8B",  "core", "mlx-community/Hermes-3-Llama-3.1-8B-4bit",        "hermes3:8b",        8912,  5.5,  4.6, False),
@@ -1261,12 +1264,12 @@ OLLAMA_BYTES = {
     "deepseek-r1:8b": 5_225_376_047,
     "deepseek-v3.1:671b": 404_494_157_743,
     "gemma4:12b": 7_556_508_396,
+    "gemma4:e2b": 4_587_156_505,
     "gemma4:26b": 18_604_148_513,
     "gpt-oss:120b": 65_369_818_941,
     "gpt-oss:20b": 13_793_441_244,
     "hermes3:8b": 4_661_227_243,
     "llama3.2:1b": 1_321_098_329,
-    "llama3.2:3b": 2_019_393_189,
     "ministral-3:14b": 9_082_537_546,
     "qwen3-coder:480b": 290_058_836_445,
     "qwen3.5:9b": 6_594_474_711,
@@ -1280,8 +1283,11 @@ OLLAMA_BYTES = {
 # when it's too old; a user's own Ollama gets a note saying what to do.
 OLLAMA_REQUIRES = {
     "deepseek-v3.1:671b": (0, 13, 5),
-    "gemma4:12b": (0, 30, 5),
-    "gemma4:26b": (0, 30, 0),
+    # the gemma4 tags were pushed again since: all three require 0.30.9 now
+    # (the registry, 2026-10-07)
+    "gemma4:12b": (0, 30, 9),
+    "gemma4:26b": (0, 30, 9),
+    "gemma4:e2b": (0, 30, 9),
     "qwen3-coder:480b": (0, 13, 5),
     "qwen3.5:9b": (0, 17, 1),
     "qwen3.6:35b": (0, 30, 0),
@@ -1344,6 +1350,10 @@ RETIRED_MODELS = {
     "GLM-5.2":           ("mlx-community/GLM-5.2-4bit", None, 8928, 418.3),
     "DeepSeek R1 671B":  ("mlx-community/DeepSeek-R1-0528-4bit", None, 8930,
                           377.6),
+    # 6b445, per Patrick: Gemma 4 E2B answers more of the hard quick prompts
+    # at the same speed
+    "Llama 3.2 3B":      ("mlx-community/Llama-3.2-3B-Instruct-4bit",
+                          "llama3.2:3b", 8888, 1.8),
 }
 
 # WHAT REPLACES EACH (6b306, per Patrick: "keep users current on their
@@ -1356,10 +1366,10 @@ RETIRED_MODELS = {
 # Like for like on size where the lineage allows: a 2B was picked for
 # speed, so its replacement is small too.
 RETIRED_SUCCESSORS = {
-    "Gemma 2 2B":         ("Llama 3.2 3B", "Gemma 4 12B"),
-    "Gemma 2 9B IT":      ("Gemma 4 12B", "Qwen 3.5 9B", "Llama 3.2 3B"),
-    "Llama 3.1 8B":       ("Qwen 3.5 9B", "Hermes 3 8B", "Llama 3.2 3B"),
-    "Qwen 2.5 7B":        ("Qwen 3.5 9B", "Llama 3.2 3B"),
+    "Gemma 2 2B":         ("Gemma 4 E2B", "Gemma 4 12B"),
+    "Gemma 2 9B IT":      ("Gemma 4 12B", "Qwen 3.5 9B", "Gemma 4 E2B"),
+    "Llama 3.1 8B":       ("Qwen 3.5 9B", "Hermes 3 8B", "Gemma 4 E2B"),
+    "Qwen 2.5 7B":        ("Qwen 3.5 9B", "Gemma 4 E2B"),
     "DeepSeek R1":        ("DeepSeek R1 8B", "Qwen 3.5 9B"),
     "Mistral Small 24B":  ("Ministral 3 14B", "Gemma 4 26B", "Qwen 3.5 9B"),
     "Mistral Nemo 12B":   ("Ministral 3 14B", "Qwen 3.5 9B"),
@@ -1378,6 +1388,7 @@ RETIRED_SUCCESSORS = {
                            "Qwen 3.8 27B"),
     "DeepSeek R1 671B":   ("DeepSeek V3.2 671B", "GLM 5.3", "GPT-OSS 120B",
                            "Qwen 3.8 27B"),
+    "Llama 3.2 3B":       ("Gemma 4 E2B",),
 }
 
 GROUP_TITLES = {"core": "General Models", "code": "Coding & Vision",
@@ -4159,7 +4170,7 @@ TIERS = {
         # 15-19s on random turns. Same brains, steadier hand.
         "picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B",
           "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B",
-          "Qwen 3.5 9B", "Ministral 3 14B", "Llama 3.2 3B",
+          "Qwen 3.5 9B", "Ministral 3 14B", "Gemma 4 E2B",
           "Llama 3.2 1B"],
         "count": 1,
     },
@@ -4297,7 +4308,7 @@ AGENTS = {
         # what must be refused, it just skips the sermon.
         "icon": "\U0001fabd", "desc": "the infamous one — direct, no varnish",
         "picks": ["Hermes 4 14B", "Hermes 3 8B", "Ministral 3 14B",
-                  "Llama 3.2 3B"],
+                  "Gemma 4 E2B"],
         "system": (
             "You are Hermes — direct, sharp, personality-forward. "
             "Answer exactly what was asked. Take real positions when "
@@ -4644,7 +4655,7 @@ def resolve_agent_seat(name, ctx=None):
 # same with No limits ticked and whose "every model this machine can run"
 # was said while half of them were missing. Built by ROLE from the ladders
 # the modes already use, so no machine is ever written in here:
-#   Light        the quick pair (Llama 3.2 3B and 1B) and ONE everyday
+#   Light        the quick pair (Gemma 4 E2B and Llama 3.2 1B) and ONE everyday
 #                model that also writes merges: the largest Gemma 4 of
 #                catalog size EVERYDAY_MAX_GB or less, else the largest
 #                model of that size that isn't the vision model; pictures
@@ -4670,7 +4681,7 @@ MODEL_SET_ALIASES = {"basic": "light", "min": "light",
                      "pro": "recommended", "rec": "recommended",
                      "max": "everything", "full": "everything",
                      "all": "everything"}
-QUICK_PAIR = ("Llama 3.2 3B", "Llama 3.2 1B")
+QUICK_PAIR = ("Gemma 4 E2B", "Llama 3.2 1B")
 # what a first run installs until the person picks another (per Patrick)
 FIRST_RUN_SET = "light"
 EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
@@ -4678,7 +4689,7 @@ EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
 MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
 # the code lane's local planner, strongest first: remote_driver reads it too
 CODE_LADDER = ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
-               "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B")
+               "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Gemma 4 E2B")
 VISION_MODEL = "Qwen 3.5 Vision 9B"
 
 
@@ -4741,7 +4752,8 @@ def model_sets(target=None) -> dict:
     small = sorted((l for l in MODEL_INFO if fits(l)
                     and MODEL_INFO[l]["cat_gb"] <= EVERYDAY_MAX_GB),
                    key=lambda l: -MODEL_INFO[l]["cat_gb"])
-    everyday = (next((l for l in small if l.startswith("Gemma 4")), None)
+    # a Gemma 4 that isn't the quick pair's (6b445: Gemma 4 E2B is in it)
+    everyday = (next((l for l in small if l.startswith("Gemma 4") and l not in QUICK_PAIR), None)
                 or next((l for l in small if _family_of(l) != "vision"
                          and l not in QUICK_PAIR), None))
     for l in QUICK_PAIR + (everyday,):
@@ -4845,7 +4857,25 @@ def offer_set_labels(pulled=None) -> list:
     else the largest set that is all here (so nothing). Never a bigger set."""
     st = model_sets_status(pulled)
     k = st["chosen"] or st["mine"]
-    return list(st[k]["labels"]) if k else []
+    out = list(st[k]["labels"]) if k else []
+    # what a new catalog or a tier change added to the set this computer had
+    # (6b445): offered too, by the same card, never a bigger set otherwise
+    return out + [l for l in local_set_news(st) if l not in out]
+
+
+def local_set_news(st: dict) -> list:
+    """set_news for this computer, from a model_sets_status answer: the
+    labels it gained since this computer last had it all (or, the first
+    time, catalog rows no card has shown yet). The record is kept."""
+    sets = {k: list(st[k]["labels"]) for k in MODEL_SETS}
+    have = {l for k in MODEL_SETS for l in st[k]["labels"] if l not in st[k]["missing"]}
+    seen = machine_prefs().get("seen_models")
+    seen = set(seen) if isinstance(seen, list) else set()
+    # a first run has shown nothing yet: nothing is new to it
+    unseen = {l for k in MODEL_SETS for l in sets[k] if l not in seen} if seen else set()
+    news, nxt = set_news(sets, have, unseen, _set_had_get("local"), st.get("chosen") or "")
+    _set_had_put("local", nxt)
+    return news
 
 
 def _family_of(label: str) -> str:
@@ -6344,8 +6374,14 @@ def _download_model(label: str):
         from huggingface_hub import snapshot_download  # ships with mlx-lm
         with _MLX_GATE:
             with _setup_lock:
-                _setup_jobs[label] = {"status": "downloading", "note": ""}
+                _setup_jobs[label] = dict(_refresh_keep(label),
+                                          status="downloading", note="")
             snapshot_download(repo)
+        if _refresh_keep(label):
+            # newer weights landed beside the old ones (6b445): the old
+            # revision goes, and the check forgets this model
+            _hf_prune_old(repo)
+            _fresh_forget(label)
         # sweep carcasses: a KILLED earlier attempt leaves *.incomplete
         # blobs that poison the completeness check forever — a finished
         # 35B sat uncrowned behind eight of them (seen live)
@@ -6356,8 +6392,12 @@ def _download_model(label: str):
             except Exception:
                 pass
         with _setup_lock:
-            _setup_jobs[label] = {"status": "done", "note": ""}
-        _app_models_add(label)
+            _setup_jobs[label] = dict(_refresh_keep(label),
+                                      status="done", note="")
+        if not _refresh_keep(label):
+            # newer weights keep their owner (6b445): a model the person
+            # downloaded outside the app doesn't become the app's
+            _app_models_add(label)
         # not beside a benchmark's model (review of 6b331): the next
         # question starts it instead
         if not _bench["running"]:
@@ -6465,7 +6505,7 @@ def make_title(text: str, conf=None, server=None, local: bool = True, ask_server
 # PICTURES FROM A DESCRIPTION (6b294, per Patrick: "add image generation
 # capability… cleanly integrate that into the model settings… a smaller
 # box under the presets… also in the first start wizard"). Local first:
-# FLUX.1 schnell, pre-quantised to 4-bit for MLX, driven by mflux in its
+# FLUX (FLUX.2 klein 4B on Quick since 6b445), 4-bit for MLX, driven by mflux in its
 # OWN venv (its mlx pins must never touch the chat engine's). Not there
 # yet? A Gemini key can paint; and when nothing can, the reply says
 # exactly where to add it.
@@ -6489,13 +6529,22 @@ STUDIOS = {
         "noun": "pictures",
         "verb": "make pictures from a description",
         "venv": os.path.join(app_dir(), "venv-image"),
-        "pip": ["mflux"],
-        "probe": "mflux-generate",
+        # --upgrade (6b445): an engine from before FLUX.2 lacks
+        # mflux-generate-flux2, and a plain install keeps it
+        "pip": ["--upgrade", "mflux"],
+        "probe": "mflux-generate-flux2",
         "tiers": [
+            # FLUX.2 klein 4B (6b445, per Patrick): 34-40 s a picture
+            # against FLUX.1 schnell's 62-64 s, a 12.4 GB peak against 19.1,
+            # a 4.6 GB download. The mflux-community build: Apache 2.0 as
+            # upstream (the ar9av build of the same weights mislabels it).
+            # mflux 0.19 runs FLUX.2 only through mflux-generate-flux2
+            # ("cmd"); a distilled klein takes guidance 1.0 and four steps.
             {"id": "quick", "name": "Quick",
-             "repo": "dhairyashil/FLUX.1-schnell-mflux-4bit",
-             "gb": 9.6, "mem_gb": 12.0, "steps": 4, "base": "schnell",
-             "note": "four steps, about a minute a picture"},
+             "repo": "mflux-community/flux2-klein-4b-mflux-q4",
+             "gb": 4.6, "mem_gb": 13.5, "steps": 4, "base": "flux2-klein-4b",
+             "cmd": "mflux-generate-flux2", "guidance": 1.0,
+             "note": "four steps, about half a minute a picture"},
             {"id": "accurate", "name": "Accurate",
              "repo": "dhairyashil/FLUX.1-dev-mflux-4bit",
              "gb": 9.6, "mem_gb": 12.5, "steps": 20, "base": "dev",
@@ -6537,6 +6586,14 @@ STUDIOS = {
     },
 }
 _STUDIO_ROWS = {v["row"]: k for k, v in STUDIOS.items()}
+# RETIRED STUDIO MODELS (6b445): a rung's old weights, by repo: (its name,
+# disk GB, the rung that replaces it). Auto-clean deletes them (nothing
+# reads them any more: the rung names its new repo), the Update models card
+# offers the replacement, and Remove takes them with the studio.
+# FLUX.1 schnell's real peak was about 20 GB, not the 12 the rung said.
+STUDIO_RETIRED = {
+    "image": {"dhairyashil/FLUX.1-schnell-mflux-4bit": ("FLUX.1 schnell", 9.6, "quick")},
+}
 
 
 def studio_supported() -> bool:
@@ -6690,6 +6747,12 @@ def studio_prefs(key: str) -> dict:
     return out
 
 
+def _img_distilled(base) -> bool:
+    """A 4-step distilled image model (schnell; FLUX.2 klein, not its base)."""
+    b = str(base or "")
+    return b == "schnell" or (b.startswith("flux2-klein") and "base" not in b)
+
+
 def studio_opts(key: str, over: dict = None) -> dict:
     """The settings one render will actually use. Never raises: every
     value is coerced and clamped, because the override layer comes from
@@ -6697,7 +6760,7 @@ def studio_opts(key: str, over: dict = None) -> dict:
     t = studio_tier(key)
     cfg = engine_cfg(key)
     out = {"w": t.get("w", 1024), "h": t.get("h", 1024),
-           "steps": t.get("steps", 4), "guidance": 3.5,
+           "steps": t.get("steps", 4), "guidance": t.get("guidance", 3.5),
            "fmt": STUDIO_FORMATS[key][0], "seed": 0, "neg": ""}
     if key == "video":
         out.update(frames=t.get("frames", 33), fps=cfg.get("fps") or 24)
@@ -6930,9 +6993,9 @@ def resolve_overrides(key: str, ov: dict, prev: dict = None) -> tuple:
                 notes.append("smaller and shorter, to be quicker")
             else:
                 out["steps"] = min(40, base["steps"] + (8 * eff))
-        elif studio_tier("image").get("base") == "schnell" and eff > 0:
-            # schnell is a 4-step distillation: more steps buy nothing,
-            # so quality comes from pixels
+        elif _img_distilled(studio_tier("image").get("base")) and eff > 0:
+            # schnell and klein are 4-step distillations: more steps buy
+            # nothing, so quality comes from pixels
             out["w"] = int(base["w"] * (1.4 if eff == 1 else 1.75))
             out["h"] = int(base["h"] * (1.4 if eff == 1 else 1.75))
             notes.append("larger, which is where detail comes from here")
@@ -6969,8 +7032,17 @@ def _studio_engine_ok(key: str) -> bool:
 
 
 def _snap_dir(repo: str) -> str:
-    snaps = glob.glob(os.path.join(_hf_model_dir(repo), "snapshots", "*",
-                                   "config.json"))
+    """The snapshot main points at (a FLUX.2 repo has no config.json at its
+    top, 6b445), else the first one holding a config.json."""
+    d = _hf_model_dir(repo)
+    try:
+        with open(os.path.join(d, "refs", "main"), encoding="utf-8") as f:
+            cur = os.path.join(d, "snapshots", f.read(80).strip())
+        if os.path.isdir(cur) and os.path.basename(cur):
+            return cur
+    except OSError:
+        pass
+    snaps = glob.glob(os.path.join(d, "snapshots", "*", "config.json"))
     return os.path.dirname(snaps[0]) if snaps else ""
 
 
@@ -7018,7 +7090,8 @@ def _studio_bytes_uncached(key: str) -> int:
     # rungs may SHARE a repo (quick and accurate differ only in how many
     # frames they render), so count each repo once or Remove promises
     # twice the disk it can free
-    for repo in dict.fromkeys(t["repo"] for t in STUDIOS[key]["tiers"]):
+    for repo in dict.fromkeys([t["repo"] for t in STUDIOS[key]["tiers"]]
+                              + list(STUDIO_RETIRED.get(key) or {})):
         total += _dir_bytes_real(_hf_model_dir(repo))
     return total
 
@@ -7117,7 +7190,8 @@ def studio_remove(key: str) -> dict:
     _studio_bytes_forget(key)
     targets = [STUDIOS[key]["venv"]] + [
         _hf_model_dir(r) for r in
-        dict.fromkeys(t["repo"] for t in STUDIOS[key]["tiers"])]
+        dict.fromkeys([t["repo"] for t in STUDIOS[key]["tiers"]]
+                      + list(STUDIO_RETIRED.get(key) or {}))]
     for target in targets:
         try:
             if os.path.isdir(target):
@@ -7160,8 +7234,8 @@ def studio_status(key: str) -> dict:
 
 
 IMAGE_ROW = "Image generation"
-IMAGE_REPO = "dhairyashil/FLUX.1-schnell-mflux-4bit"
-IMAGE_GB = 9.6
+IMAGE_REPO = "mflux-community/flux2-klein-4b-mflux-q4"
+IMAGE_GB = 4.6
 IMAGE_VENV = os.path.join(app_dir(), "venv-image")
 IMAGE_SUB = "images"      # a profile's pictures (1a 5.5): image_dir(ctx)
 
@@ -7710,10 +7784,13 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
         out = stage_path("." + o["fmt"])
         # the prompt reaches mflux through a 0600 file (6b326), never
         # its command line
+        _base = _t.get("base", "schnell")
         args = ["--model", _snap_dir(_t["repo"]),
-                "--base-model", _t.get("base", "schnell"),
+                "--base-model", _base,
                 "--prompt", "@prompt:prompt", "--steps", str(o["steps"]),
-                "--guidance", str(o["guidance"]),
+                # a distilled FLUX.2 takes 1.0 and nothing else (6b445)
+                "--guidance", ("1.0" if _base.startswith("flux2") and _img_distilled(_base)
+                               else str(o["guidance"])),
                 "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
                 "--width", str(o["w"]), "--height", str(o["h"]),
                 "--output", out]
@@ -7723,7 +7800,9 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
         try:
             _vb = os.path.join(STUDIOS["image"]["venv"], "bin")
             cmd, pf = prompt_cmd(os.path.join(_vb, "python3"), "script",
-                                 os.path.join(_vb, "mflux-generate"), args,
+                                 os.path.join(_vb, _t.get("cmd") or (
+                                     "mflux-generate-flux2" if _base.startswith("flux2")
+                                     else "mflux-generate")), args,
                                  {"prompt": prompt})
             _t0 = time.time()
             rc, tail, cut = _run_render(cmd, 900, sock)
@@ -10250,7 +10329,7 @@ MACHINE = frozenset((
     "auto_cleanup", "studio_image", "studio_video", "studio_opts",
     "update_channel", "beta_updates", "auto_update_check", "last_ident",
     "last_version", "wizard_done", "seen_models", "remind_models_ts",
-    "remind_models_off", "model_set"))
+    "remind_models_off", "model_set", "model_set_had"))
 # whole families of machine keys: studio_* (the negative prompt, which
 # PROFILE_LOCAL names by path, apart), last_*, seen_*, remind_*, and the
 # retired Contribute keys the boot sweep removes
@@ -12546,7 +12625,7 @@ MACHINE_IO = frozenset((
     "_fetch_engine_update", "_apply_staged_engine", "_rollback_engine",
     "_update_note_set", "_trial_proven", "_drop_trial",
     "_download_model", "studio_remove", "_remove_models",
-    "_sweep_hf_carcasses", "_rm_hf_repo", "reap_orphan_engines",
+    "_sweep_hf_carcasses", "_rm_hf_repo", "_studio_retired_sweep", "reap_orphan_engines",
     "_sweep_leftovers", "_crypto_record_write", "_crypto_pip",
     # the render's own log, a temporary file the render writes into
     "_run_render",
@@ -15206,8 +15285,8 @@ def _ollama_install_worker(labels: list):
     try:
         for label in labels:
             with _setup_lock:
-                _setup_jobs[label] = {"status": "downloading", "note": "",
-                                      "pct": 0}
+                _setup_jobs[label] = dict(_refresh_keep(label),
+                                          status="downloading", note="", pct=0)
             try:
                 why = _ollama_too_old(MODEL_ROUTES[label][1], have, stage)
                 if why:
@@ -15217,10 +15296,15 @@ def _ollama_install_worker(labels: list):
                     # the size stays with the finished job: dropping it
                     # stepped the overall bar (and its speed) backwards
                     # the moment a pull finished (6b317, review)
-                    _setup_jobs[label] = {
-                        "status": "done", "note": "", "pct": 100,
-                        "total_b": _setup_jobs.get(label, {}).get("total_b")}
-                _app_models_add(label)
+                    _setup_jobs[label] = dict(
+                        _refresh_keep(label), status="done", note="", pct=100,
+                        total_b=_setup_jobs.get(label, {}).get("total_b"))
+                if _refresh_keep(label):
+                    # newer weights (6b445): Ollama dropped the old layers
+                    # itself; the owner stays who it was
+                    _fresh_forget(label)
+                else:
+                    _app_models_add(label)
             except Exception as exc:
                 with _setup_lock:
                     _setup_jobs[label] = {"status": "error",
@@ -15229,13 +15313,20 @@ def _ollama_install_worker(labels: list):
         _keep_awake(False)
 
 
-def start_model_downloads(labels=None) -> list:
-    """Kick off background downloads (first-run starters, or a chosen few)."""
+def start_model_downloads(labels=None, refresh=()) -> list:
+    """Kick off background downloads (first-run starters, or a chosen few).
+    refresh (6b445): models already here whose newer weights download
+    again (only those model_fresh_check found); their jobs carry
+    refresh=True and the bytes that change (want_b), so the bars count
+    only what moves."""
     if "no-downloads" in TEST_HOOKS:        # a dev copy's test hook (6b326)
         return []
     started, ollama_batch = [], []
     pulled = ollama_pulled_tags() or set()
-    for label in (labels if labels is not None else first_set_labels()):
+    fresh = dict(_fresh.get("local") or {})
+    again = [l for l in refresh if l in fresh]
+    for label in (list(labels) if labels is not None else first_set_labels()) + [
+            l for l in again if labels is None or l not in labels]:
         if not SUPPORTED.get(label):
             continue
         if not giant_fits_here(label):
@@ -15244,21 +15335,27 @@ def start_model_downloads(labels=None) -> list:
             # or the progress bar would wait for it forever)
             continue
         kind, _target = MODEL_ROUTES[label]
-        if model_cached(label, pulled):
+        re_get = label in again and model_cached(label, pulled)
+        if model_cached(label, pulled) and not re_get:
             continue
         with _setup_lock:
             if _setup_jobs.get(label, {}).get("status") in ("downloading",
                                                             "queued"):
                 continue
+        extra = {}
+        if re_get:
+            extra = {"refresh": True, "want_b": int(fresh[label].get("b") or 0),
+                     "base_b": (_dir_bytes_real(_hf_model_dir(MLX_REPOS[label]))
+                                if kind == "mlx" else 0)}
         if kind == "mlx":
             with _setup_lock:
-                _setup_jobs[label] = {"status": "queued", "note": ""}
+                _setup_jobs[label] = dict(extra, status="queued", note="")
             ctx_thread(target=_download_model, args=(label,),
                              daemon=True).start()
         else:
             with _setup_lock:
-                _setup_jobs[label] = {"status": "queued", "note": "",
-                                      "pct": 0}
+                _setup_jobs[label] = dict(extra, status="queued", note="",
+                                          pct=0)
             ollama_batch.append(label)
         started.append(label)
     if ollama_batch:
@@ -15309,6 +15406,21 @@ def _downloaded_bytes(pulled, labels=None) -> tuple:
         # the catalog's size is the Mac's MLX build; an Ollama pull knows
         # its own, larger or smaller (6b317: on Windows the overall bar
         # read 100% with the 3B at 90%, its file being 2.0 GB, not 1.8)
+        if job.get("refresh"):
+            # newer weights of a model already here (6b445): only the bytes
+            # that change count, so the bar doesn't start at 100%
+            w = int(job.get("want_b") or 0)
+            want += w
+            if job.get("status") == "done":
+                have += w
+            elif job.get("status") == "downloading" and kind == "mlx":
+                have += min(w, max(0, _dir_bytes_real(_hf_model_dir(MLX_REPOS[label]))
+                                   - int(job.get("base_b") or 0)))
+            elif job.get("status") == "downloading" and "done_b" in job:
+                # Ollama reports layers it already holds as complete at once
+                have += min(w, max(0, int(job["done_b"])
+                                   - max(0, int(job.get("total_b") or 0) - w)))
+            continue
         if kind == "ollama" and job.get("total_b"):
             est = int(job["total_b"])
         want += est
@@ -15458,13 +15570,101 @@ def _cleanup_stat(pulled=None) -> dict:
     counted once."""
     ups = model_updates(pulled)
     news = list(dict.fromkeys(u["new"] for u in ups if u["new"]))
+    # newer weights of what is here, and what a new catalog or tier change
+    # added to this computer's set (6b445): the same card brings them in
+    refresh = fresh_refresh_list(pulled)
+    added = [{"label": l, "gb": MODEL_INFO[l]["gb"]} for l in update_added(pulled)
+             if l not in news]
+    studio = studio_updates()
+    studio_old = studio_retired_on_disk()
     return {"labels": [u["old"] for u in ups if not u.get("gone")],
-            "gb": round(sum(u["free_gb"] for u in ups), 1),
+            "gb": round(sum(u["free_gb"] for u in ups) + sum(x["gb"] for x in studio_old), 1),
+            "studio": studio,
+            "studio_old": [{"label": x["label"], "gb": x["gb"]} for x in studio_old],
             "updates": ups,
             "news": news,
-            "dl_gb": round(sum(MODEL_INFO[n]["gb"] for n in news), 1),
+            "refresh": refresh,
+            "added": added,
+            "dl_gb": round(sum(MODEL_INFO[n]["gb"] for n in news)
+                           + sum(r["gb"] for r in refresh)
+                           + sum(a["gb"] for a in added)
+                           + sum(x["gb"] for x in studio), 1),
             "auto": auto_cleanup_on(),
             "running": _modup.get("state") == "running"}
+
+
+def studio_updates() -> list:
+    """A studio whose engine is here but whose chosen rung's model isn't
+    (6b445: the Quick image rung became FLUX.2 klein, so an install that had
+    FLUX.1 schnell has nothing to draw with until it downloads). Offered by
+    the Update models card, never downloaded unasked."""
+    out = []
+    if not studio_supported():
+        return out
+    for key, st in STUDIOS.items():
+        if not _studio_engine_ok(key):
+            continue
+        t = studio_tier(key)
+        with _setup_lock:
+            moving = (_setup_jobs.get(st["row"]) or {}).get("status") in ("downloading", "queued")
+        if moving or _studio_model_ok(key, t["id"]):
+            continue
+        olds = [v[0] for v in (STUDIO_RETIRED.get(key) or {}).values() if v[2] == t["id"]]
+        out.append({"label": st["row"] + " \u00b7 " + t["name"], "key": key, "tid": t["id"],
+                    "row": st["row"], "gb": t["gb"],
+                    "why": ("replaces " + ", ".join(olds)) if olds else "not downloaded"})
+    return out
+
+
+def studio_retired_on_disk() -> list:
+    """Retired studio weights still on the disk: [{"key", "repo", "label", "gb"}]."""
+    return [{"key": k, "repo": repo, "label": v[0], "gb": v[1]}
+            for k, old in STUDIO_RETIRED.items() for repo, v in old.items()
+            if os.path.isdir(_hf_model_dir(repo))]
+
+
+def _studio_retired_sweep() -> list:
+    """Delete retired studio weights (6b445): never while that studio
+    downloads or a picture is being made. Names removed."""
+    gone = []
+    for x in studio_retired_on_disk():
+        with _setup_lock:
+            if (_setup_jobs.get(STUDIOS[x["key"]]["row"]) or {}).get("status") in ("downloading", "queued"):
+                continue
+        if x["key"] == "image" and _render_lock.locked():
+            continue
+        d = _hf_model_dir(x["repo"])
+        for pth in (d, os.path.join(os.path.dirname(d), ".locks", os.path.basename(d))):
+            shutil.rmtree(pth, ignore_errors=True)
+        if not os.path.isdir(d):
+            gone.append(x["label"])
+            _studio_bytes_forget(x["key"])
+    return gone
+
+
+def update_added(pulled=None) -> list:
+    """The models a new build added to this computer's set (6b445), not here
+    yet: the set's new members (set_news), and, in a set the person picked,
+    its catalog rows no card has shown yet. Never a bigger set's."""
+    if pulled is None:
+        pulled = ollama_pulled_tags() or set()
+    st = model_sets_status(pulled)
+    seen = machine_prefs().get("seen_models")
+    seen = set(seen) if isinstance(seen, list) else set()
+    with _setup_lock:
+        moving = {l for l, j in _setup_jobs.items()
+                  if (j or {}).get("status") in ("downloading", "queued")}
+    cand = list(local_set_news(st))
+    if st["chosen"] and seen:
+        cand += [l for l in st[st["chosen"]]["missing"] if l not in seen]
+    out, keys = [], set()
+    for l in cand:
+        key = MODEL_ROUTES.get(l, (None, l))
+        if (l in MODEL_INFO and SUPPORTED.get(l) and l not in moving and key not in keys
+                and not model_cached(l, pulled)):
+            keys.add(key)
+            out.append(l)
+    return out
 
 
 def auto_cleanup_on() -> bool:
@@ -15697,6 +15897,9 @@ def _auto_cleanup_pass(manual=False) -> list:
         # every cleanup clears failed-download leftovers first (6b307),
         # whatever the switch says: none of it is a usable model
         _sweep_leftovers()
+        if manual or auto_cleanup_on():
+            # retired studio weights (6b445): nothing reads them any more
+            _studio_retired_sweep()
         # manual == the Clean-now button (6b268, per Patrick): the
         # user is asking RIGHT NOW, so the standing pref doesn't
         # gate it, and the list they were shown is the whole list.
@@ -15764,6 +15967,11 @@ def model_offer_plan(pulled=None) -> dict:
         download.append({"label": l, "gb": MODEL_INFO[l]["gb"],
                          "why": _offer_reason(l, olds_of.get(l, []), seen),
                          "fresh": l not in seen})
+    # newer weights of a model already here (6b445): what changes, sized
+    for r in fresh_refresh_list(pulled):
+        if r["label"] not in moving and not any(d["label"] == r["label"] for d in download):
+            download.append({"label": r["label"], "gb": r["gb"], "why": "newer weights",
+                             "fresh": False, "refresh": True})
     new_of = {u["old"]: u["new"] for u in ups}
     remove = [{"label": l, "gb": _gb_of(l), "new": new_of.get(l)}
               for l in _auto_clean_targets()]
@@ -15806,11 +16014,14 @@ def apply_model_offer(plan: dict) -> dict:
     _offers_set(add=[r["label"] for r in plan.get("remove") or []
                      if r["label"] in removed and r.get("new")])
     started = start_model_downloads(
-        [d["label"] for d in plan.get("download") or []])
+        [d["label"] for d in plan.get("download") or [] if not d.get("refresh")],
+        refresh=[d["label"] for d in plan.get("download") or [] if d.get("refresh")])
     return {"ok": True, "removed": removed, "errors": errors,
             "started": started,
             "freed_gb": round(sum(_gb_of(l) for l in removed), 1),
-            "gb": round(sum(MODEL_INFO[l]["gb"] for l in started), 1)}
+            "gb": round(sum(next((d["gb"] for d in plan.get("download") or []
+                                  if d["label"] == l), MODEL_INFO[l]["gb"])
+                             for l in started), 1)}
 
 
 # UPDATE MODELS (6b306, per Patrick: the post-update card recommends it
@@ -15829,24 +16040,38 @@ def start_model_update() -> dict:
             return dict(_modup)
         plan = model_updates()
         news = list(dict.fromkeys(u["new"] for u in plan if u["new"]))
+        # newer weights and the set's new models come along (6b445)
+        fresh = [r["label"] for r in fresh_refresh_list() if r["label"] not in news]
+        added = [l for l in update_added() if l not in news and l not in fresh]
+        studio = studio_updates()
         _modup.clear()
-        _modup.update(state="running" if plan else "done",
+        _modup.update(state="running" if (plan or fresh or added or studio) else "done",
                       olds=[u["old"] for u in plan], news=news,
+                      fresh=fresh, added=added, studios=[x["row"] for x in studio],
                       removed=[], failed=[], freed_gb=0.0,
                       dl_gb=round(sum(MODEL_INFO[n]["gb"]
-                                      for n in news), 1))
+                                      for n in news + added)
+                                  + sum((_fresh["local"].get(l) or {}).get("gb", 0)
+                                        for l in fresh)
+                                  + sum(x["gb"] for x in studio), 1))
         del _modup_hist[:]
         snap = dict(_modup)
-    if plan:
-        ctx_thread(target=_model_update_worker, args=(plan, news),
-                         daemon=True).start()
+    for x in studio:
+        # the studio's own installer; its row is in the bar below (6b445)
+        start_studio_install(x["key"], x["tid"])
+    if plan or fresh or added or studio:
+        ctx_thread(target=_model_update_worker,
+                   args=(plan, news, fresh, list(added) + [x["row"] for x in studio]),
+                   daemon=True).start()
     return snap
 
 
-def _model_update_worker(plan: list, news: list):
+def _model_update_worker(plan: list, news: list, fresh=(), added=()):
     try:
-        if news:
-            start_model_downloads(news)
+        if news or added:
+            start_model_downloads(list(news) + list(added))
+        if fresh:
+            start_model_downloads([], refresh=list(fresh))
         pending, strikes = list(plan), {}
         deadline = time.time() + 12 * 3600
         while pending and time.time() < deadline:
@@ -15886,6 +16111,17 @@ def _model_update_worker(plan: list, news: list):
             if pending:
                 time.sleep(3)
         _modup["failed"] += [u["old"] for u in pending]
+        # newer weights and new models (6b445): each done, or failed by name
+        extra = list(fresh) + list(added)
+        while extra and time.time() < deadline:
+            with _setup_lock:
+                st = {l: (_setup_jobs.get(l) or {}).get("status") for l in extra}
+            if not any(v in ("downloading", "queued") for v in st.values()):
+                break
+            time.sleep(3)
+        with _setup_lock:
+            _modup["failed"] += [l for l in extra
+                                 if (_setup_jobs.get(l) or {}).get("status") != "done"]
         try:
             _sweep_leftovers()      # a failed replacement leaves pieces
         except Exception:
@@ -15898,7 +16134,8 @@ def _model_update_worker(plan: list, news: list):
 def model_update_status() -> dict:
     """The run's state plus bytes across ITS replacements only."""
     st = dict(_modup)
-    news = st.get("news") or []
+    news = ((st.get("news") or []) + (st.get("added") or []) + (st.get("fresh") or [])
+            + (st.get("studios") or []))
     if st.get("state") == "running" and news:
         pulled = ollama_pulled_tags() or set()
         have, want = _downloaded_bytes(pulled, news)
@@ -15930,8 +16167,345 @@ def _post_update_cleanup():
     this, so it never offers to free space that's already free."""
     try:
         _auto_cleanup_pass()
+        # newer weights for what is here (6b445), before the card asks:
+        # small descriptions only, a few seconds at most, never a download
+        model_fresh_check(force=True)
+    except Exception:
+        pass
     finally:
         _SWEEP_DONE.set()
+
+
+# ==== model freshness: begin ====
+# NEWER WEIGHTS UNDER THE SAME NAME (6b445, per Patrick: "these models should
+# be included when the app itself updates ... it should bring in updates to
+# models, the newest models that we add, and clear out the ones that are
+# deprecated"). A model's name can stay while its files change: an Ollama tag
+# is pointed at a new manifest, a Hugging Face repo gets a new commit (the
+# 2026-10-07 audit found qwen3.5:9b stale on the server and on this Mac). The
+# check reads only small public descriptions (an Ollama manifest, a repo's
+# file list), never a model: Ollama's own digest of a model is the sha256 of
+# its manifest, so it compares with the registry's directly; an MLX model's
+# cached revision (refs/main) compares with the repo's, and only files whose
+# blobs aren't here count (a README-only commit is no update). What it finds
+# is OFFERED with its size, in the Update models card and the More-models
+# card, and downloads only on a click, as every other model download here
+# does (there is no metered-line detection in this app; the click is the
+# consent). Asked by the real app at the first launch after an update and on
+# the janitor's tick, at most once a day; a dev or test copy never asks on
+# its own.
+FRESH_CHECK_S = 24 * 3600
+FRESH_RETRY_S = 3600            # a registry that didn't answer: asked again after this
+FRESH_TIMEOUT_S = 8
+FRESH_MAX_BYTES = 2 << 20
+OLLAMA_REGISTRY = "https://registry.ollama.ai"
+HF_MODELS_API = "https://huggingface.co/api/models/"
+_FRESH_TAG_RX = re.compile(r"[a-z0-9][a-z0-9._-]{0,79}(?::[a-z0-9][a-z0-9._-]{0,63})?")
+_FRESH_REPO_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}/[A-Za-z0-9][A-Za-z0-9._-]{0,95}")
+_FRESH_HEX_RX = re.compile(r"[0-9a-f]{64}")
+_FRESH_COMMIT_RX = re.compile(r"[0-9a-f]{40}")
+# files that change no weights: a commit touching only these is no update
+_FRESH_DOC_RX = re.compile(r"(^|/)(README|LICEN[CS]E|NOTICE)(\.\w+)?$|(^|/)\.gitattributes$|\.md$", re.I)
+# local: {label: {"b": bytes that change, "gb", "kind"}}; remote: key -> (when, answer)
+_fresh = {"at": 0.0, "local": {}, "remote": {}}
+_fresh_lock = threading.Lock()
+
+
+def _fresh_fetch(url: str, accept: str = "") -> bytes:
+    """A small public description (a manifest, a file list), or b""."""
+    h = {"User-Agent": "MillenAI/%s" % APP_VERSION}
+    if accept:
+        h["Accept"] = accept
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=h),
+                                    timeout=FRESH_TIMEOUT_S) as r:
+            raw = r.read(FRESH_MAX_BYTES + 1)
+        return b"" if len(raw) > FRESH_MAX_BYTES else raw
+    except Exception:
+        return b""
+
+
+def ollama_registry_manifest(tag: str):
+    """(sha256 hex of the manifest's bytes, {layer digest: bytes}) for a tag
+    of Ollama's own library, or None. The hex is what Ollama lists as the
+    digest of a model it pulled from that manifest."""
+    if not isinstance(tag, str) or not _FRESH_TAG_RX.fullmatch(tag) or ".." in tag:
+        return None
+    name, _, t = tag.partition(":")
+    raw = _fresh_fetch("%s/v2/library/%s/manifests/%s" % (OLLAMA_REGISTRY, name, t or "latest"),
+                       "application/vnd.docker.distribution.manifest.v2+json")
+    try:
+        m = json.loads(raw) if raw else None
+    except ValueError:
+        return None
+    items = m.get("layers") if isinstance(m, dict) else None
+    if not isinstance(items, list) or not items:
+        return None
+    layers = {}
+    for x in items + ([m["config"]] if m.get("config") is not None else []):
+        d = x.get("digest") if isinstance(x, dict) else None
+        sz = x.get("size") if isinstance(x, dict) else None
+        if (not isinstance(d, str) or not d.startswith("sha256:")
+                or not _FRESH_HEX_RX.fullmatch(d[7:])
+                or not isinstance(sz, int) or isinstance(sz, bool) or not 0 <= sz < 1 << 45):
+            return None
+        layers[d] = sz
+    return hashlib.sha256(raw).hexdigest(), layers
+
+
+def hf_repo_files(repo: str):
+    """{"sha": the commit of main, "files": {path: (blob id, bytes)}} of a
+    public repo, or None. The blob id is the name the hub cache stores the
+    file under: the sha256 of a large (LFS) file, else its git blob id."""
+    if not isinstance(repo, str) or not _FRESH_REPO_RX.fullmatch(repo) or ".." in repo:
+        return None
+    raw = _fresh_fetch(HF_MODELS_API + repo + "/revision/main?blobs=true")
+    try:
+        js = json.loads(raw) if raw else None
+    except ValueError:
+        return None
+    sha = js.get("sha") if isinstance(js, dict) else None
+    sib = js.get("siblings") if isinstance(js, dict) else None
+    if not isinstance(sha, str) or not _FRESH_COMMIT_RX.fullmatch(sha) or not isinstance(sib, list):
+        return None
+    files = {}
+    for s in sib[:2000]:
+        if not isinstance(s, dict) or not isinstance(s.get("rfilename"), str):
+            continue
+        lfs = s.get("lfs") if isinstance(s.get("lfs"), dict) else {}
+        blob = lfs.get("sha256") or s.get("blobId")
+        size = lfs.get("size") if lfs else s.get("size")
+        if not isinstance(blob, str) or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", blob):
+            continue
+        files[s["rfilename"]] = (blob, size if isinstance(size, int)
+                                 and not isinstance(size, bool) and size >= 0 else 0)
+    return {"sha": sha, "files": files}
+
+
+def _fresh_remote(key: str, fn, now: float):
+    """A registry's answer, kept a day (a failure an hour)."""
+    with _fresh_lock:
+        hit = _fresh["remote"].get(key)
+    if hit and now - hit[0] < (FRESH_CHECK_S if hit[1] is not None else FRESH_RETRY_S):
+        return hit[1]
+    ans = fn()
+    with _fresh_lock:
+        _fresh["remote"][key] = (now, ans)
+    return ans
+
+
+def mlx_refresh_bytes(repo: str, remote) -> int:
+    """What newer weights of an MLX model would download (0: none): main has
+    moved past the cached revision, and a file that isn't documentation has
+    a blob this cache doesn't hold."""
+    if not remote:
+        return 0
+    d = _hf_model_dir(repo)
+    try:
+        with open(os.path.join(d, "refs", "main"), encoding="utf-8") as f:
+            have = f.read(80).strip()
+    except OSError:
+        return 0
+    if not have or have == remote["sha"]:
+        return 0
+    try:
+        blobs = set(os.listdir(os.path.join(d, "blobs")))
+    except OSError:
+        blobs = set()
+    return sum(sz for path, (blob, sz) in remote["files"].items()
+               if blob not in blobs and not _FRESH_DOC_RX.search(path))
+
+
+def _ollama_blob_here(digest: str) -> bool:
+    name = digest.replace(":", "-")
+    return any(os.path.exists(os.path.join(d, "blobs", name)) for d in _ollama_models_dirs())
+
+
+def ollama_refresh_bytes(local_digest: str, remote) -> int:
+    """What newer weights of an Ollama model would download (0: none): the
+    registry's manifest isn't the one Ollama holds; only its layers not on
+    this disk count."""
+    if not remote or not local_digest:
+        return 0
+    if local_digest.replace("sha256:", "").lower() == remote[0]:
+        return 0
+    return sum(sz for dg, sz in remote[1].items() if not _ollama_blob_here(dg))
+
+
+def ollama_local_digests() -> dict:
+    """{tag: digest} of the models this computer's Ollama holds, or {}."""
+    try:
+        with urllib.request.urlopen(ollama_url("/api/tags"), timeout=3) as r:
+            tags = json.loads(r.read().decode("utf-8")).get("models") or []
+    except Exception:
+        return {}
+    out = {}
+    for m in tags:
+        if (isinstance(m, dict) and isinstance(m.get("name"), str) and isinstance(m.get("digest"), str)
+                and not ollama_internal(m)):        # never Ollama's own copy (6b448)
+            out[m["name"]] = m["digest"]
+            if m["name"].endswith(":latest"):
+                out[m["name"][:-len(":latest")]] = m["digest"]
+    return out
+
+
+def model_fresh_check(force: bool = False, now=None) -> dict:
+    """{label: {"b", "gb", "kind"}}: the catalog models on this computer
+    whose newer weights are out, and what each would download. Read from
+    the registries at most once a day (force: now, still through the
+    per-registry cache); else the last answer. A model being downloaded
+    is skipped."""
+    now = time.time() if now is None else now
+    with _fresh_lock:
+        if not force and now - _fresh["at"] < FRESH_CHECK_S:
+            return dict(_fresh["local"])
+    digests = ollama_local_digests()
+    pulled = set(digests)
+    with _setup_lock:
+        moving = {l for l, j in _setup_jobs.items()
+                  if (j or {}).get("status") in ("downloading", "queued")}
+    todo = []
+    for label in MODEL_INFO:
+        route = MODEL_ROUTES.get(label)
+        if not route or not SUPPORTED.get(label) or label in moving:
+            continue
+        if not model_cached(label, pulled):
+            continue
+        todo.append((label,) + tuple(route))
+
+    def one(item):
+        label, kind, target = item
+        if kind == "mlx":
+            repo = MLX_REPOS[label]
+            return label, kind, mlx_refresh_bytes(
+                repo, _fresh_remote("hf:" + repo, lambda: hf_repo_files(repo), now))
+        return label, kind, ollama_refresh_bytes(
+            digests.get(target, ""),
+            _fresh_remote("ol:" + target, lambda: ollama_registry_manifest(target), now))
+    out = {}
+    if todo:
+        with ctx_executor(6) as pool:
+            for label, kind, b in pool.map(one, todo):
+                if b > 0:
+                    out[label] = {"b": int(b), "gb": round(b / 1e9, 1), "kind": kind}
+    with _fresh_lock:
+        _fresh["at"], _fresh["local"] = now, out
+    return dict(out)
+
+
+def _fresh_forget(label: str):
+    """A model whose newer weights just landed is current."""
+    with _fresh_lock:
+        _fresh["local"].pop(label, None)
+
+
+def fresh_refresh_list(pulled=None) -> list:
+    """The models the cards offer to bring up to date: the last check's,
+    still here, not downloading now. [{"label", "gb", "b"}]."""
+    with _fresh_lock:
+        found = dict(_fresh["local"])
+    with _setup_lock:
+        moving = {l for l, j in _setup_jobs.items()
+                  if (j or {}).get("status") in ("downloading", "queued")}
+    if pulled is None and any(MODEL_ROUTES.get(l, ("",))[0] == "ollama" for l in found):
+        pulled = ollama_pulled_tags() or set()
+    return [{"label": l, "gb": v["gb"], "b": v["b"]} for l, v in found.items()
+            if l in MODEL_INFO and l not in moving and model_cached(l, pulled)]
+
+
+def _refresh_keep(label: str) -> dict:
+    """The refresh fields of a model's job (refresh, want_b, base_b), so a
+    job dict rewritten by a worker keeps them."""
+    with _setup_lock:
+        j = _setup_jobs.get(label) or {}
+        return {k: j[k] for k in ("refresh", "want_b", "base_b") if k in j}
+
+
+def _hf_prune_old(repo: str):
+    """After newer weights of `repo` landed: every cached revision but main's
+    goes, with the blobs only they used (the hub's own deleter)."""
+    try:
+        from huggingface_hub import scan_cache_dir
+        with open(os.path.join(_hf_model_dir(repo), "refs", "main"), encoding="utf-8") as f:
+            cur = f.read(80).strip()
+        info = scan_cache_dir(os.path.join(os.path.dirname(_hf_model_dir(repo))))
+        for r in info.repos:
+            if r.repo_id == repo and r.repo_type == "model":
+                old = [v.commit_hash for v in r.revisions if v.commit_hash != cur]
+                if cur and old:
+                    info.delete_revisions(*old).execute()
+    except Exception:
+        pass        # an old revision left behind costs space, not a model
+
+
+def set_news(sets: dict, have, unseen, had, chosen: str = ""):
+    """THE MODELS A SET GAINED (6b445): what a new catalog or a tier change
+    added to the set this machine (or server) uses, so they are offered by the
+    same rules as the rest. sets: {set key: [ids]} in MODEL_SETS order; have:
+    the ids here; unseen: ids no card has ever shown (a new catalog row);
+    had: {"k", "ids"}, the set last seen complete here, or None; chosen: the
+    set the person picked (then all its missing ids are offered elsewhere,
+    and nothing is added here). Returns (ids to offer, the new `had` or None
+    when it stays). Two rules:
+      * the set last complete here (`had`): every id it holds now that it
+        didn't then (a tier change or a new row);
+      * with no record yet (the first look after this build), the largest
+        set whose only missing ids are unseen ones: it was this machine's
+        set before the new rows joined it.
+    A model the person removed stays in `had`, so it is never offered again
+    by this rule."""
+    if chosen:
+        return [], None
+    keys = [k for k in MODEL_SETS if k in sets]
+    have, unseen = set(have), set(unseen)
+    full = [k for k in keys if sets[k] and all(i in have for i in sets[k])]
+    mine = full[-1] if full else ""
+    rank = {k: i for i, k in enumerate(keys)}
+    news, nxt = [], None
+    hk = (had or {}).get("k") if isinstance(had, dict) else None
+    hids = list((had or {}).get("ids") or []) if hk in rank else []
+    if hk in rank:
+        news = [i for i in sets[hk] if i not in hids and i not in have]
+    else:
+        for k in reversed(keys):
+            miss = [i for i in sets[k] if i not in have]
+            if sets[k] and miss and all(i in unseen for i in miss):
+                if not full or rank[k] > rank[mine]:
+                    news = miss
+                    hk, hids = k, [i for i in sets[k] if i not in miss]
+                break
+    if mine and (hk not in rank or rank[mine] >= rank[hk]):
+        if hk != mine or list(sets[mine]) != hids:
+            nxt = {"k": mine, "ids": list(sets[mine])}
+    elif hk in rank and (had or {}).get("k") != hk:
+        nxt = {"k": hk, "ids": hids}
+    return [i for i in dict.fromkeys(news)], nxt
+
+
+def _set_had_get(key: str):
+    v = machine_prefs().get("model_set_had")
+    v = v.get(key) if isinstance(v, dict) else None
+    return v if isinstance(v, dict) and isinstance(v.get("ids"), list) else None
+
+
+def _set_had_put(key: str, val):
+    if val is None:
+        return
+
+    def _set(p):
+        cur = p.get("model_set_had")
+        cur = dict(cur) if isinstance(cur, dict) else {}
+        cur[key] = val
+        # this computer's record stays; servers' at most 16, newest kept
+        srv = [(k, v) for k, v in cur.items() if k != "local"][-16:]
+        p["model_set_had"] = dict(([("local", cur["local"])] if "local" in cur else []) + srv)
+    try:
+        machine_prefs_update(_set)
+    except StaleProfile:
+        raise
+    except Exception:
+        pass            # a record not kept: the same models are offered next time
+# ==== model freshness: end ====
 
 
 def _engine_loading(label: str, job: dict) -> bool:
@@ -22109,10 +22683,13 @@ def _srv_mstate_parse(js):
             continue
         sz = m.get("size")
         sz = sz if isinstance(sz, int) and not isinstance(sz, bool) and sz >= 0 else 0
+        # Ollama's digest of it (6b445), "" from an older kit
+        dg = m.get("digest")
+        dg = dg if isinstance(dg, str) and re.fullmatch(r"[0-9a-f]{64}", dg) else ""
         seen_names.append(n)
         if ollama_internal(m):
             continue
-        models.append({"name": n, "loaded": m.get("loaded") is True, "size": sz})
+        models.append({"name": n, "loaded": m.get("loaded") is True, "size": sz, "digest": dg})
     p = js.get("plan")
     plan = None
     if isinstance(p, dict) and model_set_key(p.get("name")):
@@ -22123,8 +22700,16 @@ def _srv_mstate_parse(js):
     def num(k):
         v = js.get(k)
         return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 1 << 50 else 0
+    mg = js.get("managed")
     return {"models": models, "seen_names": seen_names,
             "busy": js.get("busy") is True,
+            # what a set from this app brought there (6b445); an older kit
+            # says nothing, and then nothing is removed unasked. Never
+            # Ollama's own cache copy (6b448), whatever a kit lists
+            "managed": [n for n in mg[:400] if isinstance(n, str) and SRV_TAG_RX.fullmatch(n)
+                        and not ollama_internal(n)]
+            if isinstance(mg, list) else [],
+            "managed_known": isinstance(mg, list),
             "jobs": _srv_jobs_parse(js.get("jobs")), "plan": plan,
             "disk_free_bytes": num("disk_free_bytes"), "vram_bytes": num("vram_bytes")}
 
@@ -22272,6 +22857,238 @@ def server_models_apply(ctx, sid: str, d: dict) -> dict:
     if st == 404 and code == "not_found":
         return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
     return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
+
+
+# ---- an app update reaches your servers too (6b445)
+# Patrick: "these models should be included when the app itself updates ...
+# it should bring in updates to models, the newest models that we add, and
+# clear out the ones that are deprecated." For each paired server that is
+# awake (it answered a check in the last SUGGEST_SERVER_FRESH_S; none is ever
+# woken for this), from one signed read of its models:
+#   add      what its set gained: in the set last applied there, every
+#            missing model; else what set_news finds (a new catalog row, a
+#            tier change); and the replacement of a retired model it holds
+#   refresh  a catalog model whose Ollama digest isn't the registry's now
+#            (sized as its whole manifest: which layers changed can't be
+#            seen from here, so the card says "up to")
+#   retire   a retired model that a set from this app brought there (the
+#            kit's "managed" list): removed WITHOUT asking, like auto-clean
+#            here, by the same guarded route (signed, `seen`, never a loaded
+#            model, its allow-list line taken out with it)
+#   kept     a retired model the person put there themselves: never touched,
+#            only named
+# add and refresh download only on the person's click (Update models), as
+# here. Everything goes through POST /v1/models/apply, nothing else.
+_srv_upd = profile_cache("_srv_upd", {})
+
+
+def _srv_fresh_up(e, now=None) -> bool:
+    now = time.time() if now is None else now
+    return now - float((_srv_seen.get(e["id"]) or {}).get("at") or 0) < SUGGEST_SERVER_FRESH_S
+
+
+def _retired_tag_keys() -> dict:
+    return {_srv_tag_key(r[1]): old for old, r in RETIRED_MODELS.items() if r[1]}
+
+
+def server_update_view(state: dict, vram, remote=None, had=None, unseen=()) -> dict:
+    """What an app update means for one server, from its state (see above).
+    remote(tag) -> (digest hex, {layer: bytes}) or None (None: no refresh
+    check); had: set_news's record for this server; unseen: tags of catalog
+    rows no card has shown yet."""
+    sets = model_sets({"vram": vram}) if vram else {k: [] for k in MODEL_SETS}
+    tags = {k: [MODEL_INFO[l]["ollama"] for l in sets[k]] for k in MODEL_SETS}
+    names = [m["name"] for m in state["models"]]
+    have = {_srv_tag_key(n) for n in names}
+    size = {m["name"]: m["size"] for m in state["models"]}
+    loaded = {_srv_tag_key(m["name"]) for m in state["models"] if m["loaded"]}
+    managed = {_srv_tag_key(n) for n in state.get("managed") or []}
+    retired = _retired_tag_keys()
+    on_retired = [n for n in names if _srv_tag_key(n) in retired]
+    retire = [n for n in on_retired if _srv_tag_key(n) in managed
+              and _srv_tag_key(n) not in loaded and not ollama_internal(n)][:SRV_SETS_MAX]
+    kept = [n for n in on_retired if _srv_tag_key(n) not in managed]
+    plan = model_set_key((state.get("plan") or {}).get("name"))
+    keyed = {k: [_srv_tag_key(t) for t in tags[k]] for k in MODEL_SETS}
+    news, nxt = set_news(keyed, have, {_srv_tag_key(t) for t in unseen}, had, plan)
+    add, why = [], {}
+    for t in (tags[plan] if plan else []):
+        if _srv_tag_key(t) not in have:
+            add.append(t)
+            why.setdefault(t, "in its set")
+    for t in tags["everything"]:
+        if _srv_tag_key(t) in news and t not in add:
+            add.append(t)
+            why.setdefault(t, "new")
+    everything = {_srv_tag_key(t): t for t in tags["everything"]}
+    for n in on_retired:
+        old = retired[_srv_tag_key(n)]
+        for c in RETIRED_SUCCESSORS.get(old, ()):
+            t = (MODEL_INFO.get(c) or {}).get("ollama")
+            if t and _srv_tag_key(t) in everything:
+                if _srv_tag_key(t) not in have and t not in add:
+                    add.append(t)
+                    why[t] = "replaces " + old
+                break
+    cat = {_srv_tag_key(i["ollama"]) for i in MODEL_INFO.values() if i.get("ollama")}
+    refresh = []
+    if remote is not None:
+        for m in state["models"]:
+            k = _srv_tag_key(m["name"])
+            if k not in cat or not m.get("digest") or m["name"] in retire:
+                continue
+            r = remote(m["name"])
+            if r and r[0] != m["digest"]:
+                refresh.append({"name": m["name"], "gb": round(sum(r[1].values()) / 1e9, 1)})
+    add = add[:SRV_SETS_MAX]
+    refresh = refresh[:max(0, SRV_SETS_MAX - len(add))]
+    full = [k for k in MODEL_SETS if keyed[k] and all(i in have for i in keyed[k])]
+    out = {"add": [{"name": t, "gb": round(_set_tag_bytes(t) / 1e9, 1), "why": why.get(t, "new")}
+                   for t in add],
+           "refresh": refresh,
+           "retire": [{"name": n, "gb": round(size.get(n, 0) / 1e9, 1)} for n in retire],
+           "kept": kept,
+           # every name the kit sent, cache copies included (6b448's rule)
+           "seen": srv_seen_hash(state.get("seen_names", names)),
+           "plan_name": plan or (full[-1] if full else "recommended"),
+           "had": nxt}
+    out["dl_gb"] = round(sum(a["gb"] for a in out["add"]) + sum(r["gb"] for r in refresh), 1)
+    out["free_gb"] = round(sum(r["gb"] for r in out["retire"]), 1)
+    out["offer"] = hashlib.sha1(json.dumps(
+        [[a["name"] for a in out["add"]], [r["name"] for r in refresh],
+         [r["name"] for r in out["retire"]], out["seen"]]).encode()).hexdigest()[:16]
+    return out
+
+
+def _srv_unseen_tags() -> set:
+    seen = machine_prefs().get("seen_models")
+    if not isinstance(seen, list) or not seen:
+        return set()        # nothing shown yet: nothing is new
+    return {i["ollama"] for l, i in MODEL_INFO.items() if i.get("ollama") and l not in seen}
+
+
+def _srv_state_now(e):
+    """(state, vram) from one signed read of e's models, or (None, why)."""
+    try:
+        st, js = _srv_json(e, "GET", "/v1/models/state", timeout=SRV_CONNECT_S)
+    except ServerError as se:
+        return None, str(se)
+    if st != 200:
+        return None, (SRV_SETS_OLD if st == 404 else str(_srv_fail(e, st, js)))
+    state = _srv_mstate_parse(js)
+    if state is None:
+        return None, "%s answered in a way this app doesn’t understand." % e["name"]
+    vram = state["vram_bytes"] or ((_srv_seen.get(e["id"]) or {}).get("gpu") or {}).get("vram_bytes")
+    return (state, vram), ""
+
+
+def _srv_remote_fn(now=None):
+    now = time.time() if now is None else now
+    return lambda tag: _fresh_remote("ol:" + tag, lambda: ollama_registry_manifest(tag), now)
+
+
+def servers_updates(ctx, remote=True) -> list:
+    """The update card's part for ctx's awake paired servers (6b445): per
+    server {id, name, add, refresh, retire, kept, dl_gb, free_gb, offer,
+    busy}; a server with nothing to say is left out. Never wakes one."""
+    out = []
+    try:
+        entries = _srv_read(ctx)
+    except (StoreReadError, NoProfile):
+        return out
+    if not cai_crypto.available():
+        return out
+    rfn = _srv_remote_fn() if remote else None
+    unseen = _srv_unseen_tags()
+    for e in entries:
+        if not _srv_paired(e) or not _srv_fresh_up(e):
+            continue
+        got, _why = _srv_state_now(e)
+        if got is None:
+            continue
+        state, vram = got
+        v = server_update_view(state, vram, rfn, _set_had_get("srv:" + e["id"]), unseen)
+        _set_had_put("srv:" + e["id"], v.pop("had"))
+        _srv_upd[e["id"]] = {"offer": v["offer"], "at": time.time()}
+        if v["add"] or v["refresh"] or v["retire"] or v["kept"]:
+            out.append(dict(v, id=e["id"], name=e["name"], busy=state["busy"]))
+    return out
+
+
+def _srv_apply_now(e, v: dict, add: list, remove: list) -> dict:
+    """One POST /v1/models/apply of add and remove, made from view v."""
+    body = {"plan": v["plan_name"], "add": list(add), "remove": list(remove), "seen": v["seen"]}
+    try:
+        st, js = _srv_json(e, "POST", "/v1/models/apply", body, timeout=SRV_CONNECT_S)
+    except ServerError as se:
+        return {"ok": False, "kind": se.kind, "err": str(se)}
+    if st == 202 and js.get("ok") is True:
+        _srv_mstate.pop(e["id"], None)
+        return {"ok": True, "jobs": _srv_jobs_parse(js.get("jobs"))}
+    code = str(js.get("code") or "")
+    if st == 409 and code in ("changed", "busy", "in_use"):
+        return {"ok": False, "kind": code, "err": "%s is busy or its models changed. Nothing was "
+                "changed; try again in a moment." % e["name"]}
+    if st == 404 and code == "not_found":
+        return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
+    return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
+
+
+def server_update_apply(ctx, sid: str, offer) -> dict:
+    """Update models' click for one server: read it again, and only while
+    what it would do is still what the card listed (offer), send its
+    downloads (add and refresh) and its retired models to go."""
+    if not isinstance(offer, str) or not re.fullmatch(r"[0-9a-f]{16}", offer):
+        return {"ok": False, "kind": "input", "err": "That isn’t a list this app made."}
+    e, bad = _srv_sets_entry(ctx, sid)
+    if bad:
+        return bad
+    got, why = _srv_state_now(e)
+    if got is None:
+        return {"ok": False, "kind": "server", "err": why}
+    state, vram = got
+    v = server_update_view(state, vram, _srv_remote_fn(), _set_had_get("srv:" + e["id"]),
+                           _srv_unseen_tags())
+    if v["offer"] != offer:
+        return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}
+    add = [a["name"] for a in v["add"]] + [r["name"] for r in v["refresh"]]
+    rm = [r["name"] for r in v["retire"]]
+    if not add and not rm:
+        return {"ok": True, "jobs": []}
+    return _srv_apply_now(e, v, add, rm)
+
+
+def servers_autoclean(ctx) -> list:
+    """Auto-clean on your servers (6b445): on each awake paired server whose
+    kit lists what this app brought there, the retired models among those
+    go, unasked, by the guarded route (never one loaded, never one the
+    person put there). With the switch off, nothing. [{id, name, removed |
+    err}]."""
+    out = []
+    if not auto_cleanup_on():
+        return out
+    try:
+        entries = _srv_read(ctx)
+    except (StoreReadError, NoProfile):
+        return out
+    if not cai_crypto.available():
+        return out
+    for e in entries:
+        if not _srv_paired(e) or not _srv_fresh_up(e):
+            continue
+        got, _why = _srv_state_now(e)
+        if got is None:
+            continue
+        state, vram = got
+        if not state["managed_known"] or state["busy"]:
+            continue
+        v = server_update_view(state, vram)
+        rm = [r["name"] for r in v["retire"]]
+        if rm:
+            r = _srv_apply_now(e, v, [], rm)
+            out.append({"id": e["id"], "name": e["name"],
+                        **({"removed": rm} if r.get("ok") else {"err": r.get("err", "")})})
+    return out
 # ==== server model sets: end ====
 
 
@@ -23353,7 +24170,7 @@ _BENCH_FAKE = {
         "t_send": 10.0, "t_first": 10.5, "t_last": 16.875, "chunks": 256,
         "usage": {"prompt_tokens": 1000, "completion_tokens": 256,
                   "prompt_tokens_details": {"cached_tokens": 0}}}},
-    "Llama 3.2 3B": {"ollama": True, "raw": {
+    "Gemma 4 E2B": {"ollama": True, "raw": {
         "t_send": 0.0, "t_first": 0.3, "t_last": 5.5, "chunks": 256,
         "load_duration": 1.5e9, "prompt_eval_count": 1000,
         "prompt_eval_duration": 2.5e8, "eval_count": 256,
@@ -28445,7 +29262,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         % (goal, reqs or "none stated", chosen, prior, stage, total,
            final, opts))
     label = next((l for l in ("Gemma 4 26B", "Gemma 4 12B", "Qwen 3.6 35B MoE",
-                              "Llama 3.2 3B")
+                              "Gemma 4 E2B")
                   if model_cached(l) and model_fits_memory(l)), "")
     msgs = [{"role": "system", "content": funnel_sys_for(goal)},
             {"role": "user", "content": ask}]
@@ -29750,6 +30567,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # the post-update card: after the startup sweep
                 _SWEEP_DONE.wait(15)
                 st["plan"] = _cleanup_stat()
+                # and the person's awake servers (6b445); none is woken
+                st["servers"] = servers_updates(self.ctx)
             self._send_json(st)
         elif self.path.startswith("/api/update/check"):
             force = urllib.parse.parse_qs(
@@ -30301,6 +31120,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # Wake up server (6b430): the packets, none waited for
                 out = (server_wake_test(self.ctx, sid, d.get("relay_only") is True)
                        if _SRV_ID_RX.fullmatch(sid) else {"ok": False, "kind": "gone", "err": SRV_GONE})
+            elif op == "autoclean":
+                # auto-clean on your servers (6b445): the page asks once a
+                # launch and every six hours; only what this app brought there
+                out = {"ok": True, "servers": servers_autoclean(self.ctx)}
             elif op == "lan-settings":
                 # the Local Network pane, a fixed argument list (6b430)
                 if IS_MAC:
@@ -31435,8 +32258,21 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if self.path == "/api/model/update":
             # Update models (6b306): replacements download, each old
-            # model goes once its replacement is complete
-            self._send_json(start_model_update())
+            # model goes once its replacement is complete; with servers
+            # (6b445), each server the card listed gets what it listed
+            _n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                _b = json.loads(self.rfile.read(_n)) if _n else {}
+            except (ValueError, json.JSONDecodeError):
+                _b = {}
+            _out = start_model_update()
+            _sv = _b.get("servers") if isinstance(_b, dict) else None
+            if isinstance(_sv, list):
+                _out["servers"] = [
+                    dict(server_update_apply(self.ctx, str(x.get("id") or ""), x.get("offer")),
+                         id=str(x.get("id") or ""))
+                    for x in _sv[:SERVER_MAX] if isinstance(x, dict)]
+            self._send_json(_out)
             return
         if self.path == "/api/model/cleanup":
             # run the auto-clean sweep NOW — the checkbox's first act
@@ -31704,7 +32540,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             council = [x["label"] for x in _seats]
             _seat_fb = {x["label"]: x["fb"] for x in _seats if server_label(x["label"])}
             # THE PAGE'S `model` IS NOT THE MODE'S (6b339, final review: the page
-            # always sends the model last picked by hand, "Llama 3.2 3B" on a
+            # always sends the model last picked by hand, "Gemma 4 E2B" on a
             # fresh install, beside a tier). Routing on it ran Fast on that model
             # whatever the seats said, never reached a server seat, and warmed
             # its engine on a Mac that should stay quiet. A mode answers from its
@@ -37032,6 +37868,7 @@ body.gen #chip-model{color:var(--accent)}
 .mu-list div span:first-child{min-width:0;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .mu-list div span:last-child{color:var(--faint);flex:none}
+.mu-list div.mu-kept{display:block;white-space:normal;color:var(--faint)}
 .mu-bar{height:3px;border-radius:99px;background:rgba(255,255,255,.08);
   overflow:hidden;margin:12px 0 8px}
 .mu-bar i{display:block;height:100%;width:0;background:#ecedf2;
@@ -38694,7 +39531,7 @@ __CODE_ROWS__
         accept="image/*,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
       <textarea id="input" rows="1" placeholder="How can I help you today?"></textarea>
       <div id="crow">
-      <div id="model-chip" title="Change engine — opens the picker">engine <b id="chip-model">Llama 3.2 3B</b></div>
+      <div id="model-chip" title="Change engine — opens the picker">engine <b id="chip-model">Gemma 4 E2B</b></div>
       <div id="accel-chip" hidden><i></i><b></b></div>
       <!-- your servers' cards (6b334): one chip per paired server whose
            card the server names, in the MLX chip's style -->
@@ -39654,7 +40491,7 @@ let pendingEdit=null,genChat=null;  // genChat: the chat whose answer is being w
 // account's page neither reads nor writes it (prefs.json holds each
 // profile's own), so a later root boot can't adopt an account's pick
 const ROOT_LS=PROFILE.startsWith("local.");
-let model=(ROOT_LS&&localStorage.getItem("millen.model"))||"Llama 3.2 3B";
+let model=(ROOT_LS&&localStorage.getItem("millen.model"))||"Gemma 4 E2B";
 // VISUAL EFFECTS (6b292, per Patrick): the old "performance mode"
 // switched off spinners, halos, theatre and telemetry too. Now it is ONE
 // thing — the moving backdrop — and lives in Settings › About. The old
@@ -40049,7 +40886,7 @@ let adv=null;
 let advOn=false;
 const ADV_USE={
   "Llama 3.2 1B":"instant drafts, the simplest questions",
-  "Llama 3.2 3B":"quick everyday answers",
+  "Gemma 4 E2B":"quick everyday answers",
   "Hermes 3 8B":"creative writing and roleplay",
   "Hermes 4 14B":"creative writing, roleplay and tool use",
   "Ministral 3 14B":"long context, natural prose",
@@ -43067,7 +43904,7 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
     (async()=>{try{mu=await muFetch(true);}catch(e){}})()]);
   $("#updated-notes").innerHTML=notes?notesHTML(notes)
     :"<p>The full notes are in Settings \u2192 About.</p>";
-  if(mu&&(mu.state==="running"||muOffers(muPlan).length||(muPlan&&muPlan.gb))){
+  if(mu&&(mu.state==="running"||muRows(muPlan,muSrv).length||(muPlan&&muPlan.gb))){
     // the section brings its own buttons: Update models / Later
     $("#updated-card .sh-foot").hidden=true;
     muShow($("#updated-models"),mu);
@@ -48369,7 +49206,17 @@ async function announceModels(){
 
     // ONE SENTENCE, per Patrick — the Basic/Pro/Max panel does the rest
     if(prefs.remind_models_off&&!fresh.length)return;
-    if(!(plan.download||[]).length)return;
+    if(!(plan.download||[]).length){
+      // nothing for this computer: a server's updates get the Update models
+      // card, on the same daily rhythm (6b445)
+      if(Date.now()-(prefs.remind_models_ts||0)<REMIND_GAP)return;
+      try{
+        await muFetch(true);
+        if(muSrvGo(muSrv).some(s=>(s.add||[]).length||(s.refresh||[]).length)){
+          await stamp();openModelUpdates();}
+      }catch(e){}
+      return;
+    }
     if(!fresh.length&&
        Date.now()-(prefs.remind_models_ts||0)<REMIND_GAP)return;
     title.textContent="More models available";
@@ -48899,18 +49746,42 @@ $("#roster-manage").addEventListener("click",async()=>{
    on their models while also not forcing them to sit there and wait
    for a 20 gigabyte download". One section, two hosts: the post-update
    card and the card the Manage pane opens. Names only on request. */
-let muPlan=null,muHost=null,muTimer=null;
+let muPlan=null,muHost=null,muTimer=null,muSrv=[];
 function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";}
 function muOffers(p){return ((p&&p.updates)||[]).filter(u=>u.new);}
 function muHas(p){return !!(p&&((p.updates||[]).length));}
+/* WHAT ELSE AN UPDATE BRINGS (6b445): newer weights of models already here
+   (refresh), the models a new build added to this computer's set (added),
+   and each awake server's own (servers: add, refresh, retire). One list,
+   one button; every row says where and how big. */
+function muRows(p,srv){
+  const rows=[];
+  muOffers(p).forEach(u=>rows.push({t:u.old+" \u2192 "+u.new,gb:muGB(u.dl_gb)}));
+  ((p&&p.refresh)||[]).forEach(r=>rows.push({t:r.label+" \u00b7 newer weights",gb:muGB(r.gb)}));
+  ((p&&p.added)||[]).forEach(a=>rows.push({t:a.label+" \u00b7 new",gb:muGB(a.gb)}));
+  ((p&&p.studio)||[]).forEach(x=>rows.push({t:x.label+" \u00b7 "+x.why,gb:muGB(x.gb)}));
+  (srv||[]).forEach(s=>{
+    (s.add||[]).forEach(a=>rows.push({t:s.name+" \u00b7 "+a.name+" \u00b7 "+a.why,gb:muGB(a.gb)}));
+    (s.refresh||[]).forEach(r=>rows.push({t:s.name+" \u00b7 "+r.name+" \u00b7 newer weights",
+      gb:"up to "+muGB(r.gb)}));
+  });
+  return rows;
+}
+function muSrvGo(srv){return (srv||[]).filter(s=>!s.busy&&((s.add||[]).length
+  ||(s.refresh||[]).length||(s.retire||[]).length));}
+function muSrvGB(srv){return (srv||[]).reduce((a,s)=>a+(+s.dl_gb||0),0);}
 async function muFetch(withPlan){
   const r=await(await api("/api/model/update"+(withPlan?"?plan=1":""))).json();
   if(r.plan)muPlan=r.plan;
+  if(withPlan)muSrv=r.servers||[];
   return r;
 }
 function muPaint(el,st){
   const p=muPlan||{updates:[],dl_gb:0,gb:0};
-  const offers=muOffers(p),n=offers.length;
+  const offers=muOffers(p),rows=muRows(p,muSrv),n=rows.length;
+  // the retired models only: the words as they were (6b306)
+  const onlyNew=n===offers.length;
+  const kept=[].concat(...(muSrv||[]).map(s=>(s.kept||[]).map(k=>s.name+" \u00b7 "+k)));
   let h;
   if(st&&st.state==="running"){
     const eta=dlLeft("modup",st.have_b,st.want_b);
@@ -48932,15 +49803,23 @@ function muPaint(el,st){
       +'</div><div class="mu-foot"><button class="primary" data-mu="close">'
       +'Done</button></div>';
   }else if(n){
-    const meta=[p.dl_gb?muGB(p.dl_gb)+" to download":"",
+    const dl=(+p.dl_gb||0)+muSrvGB(muSrv);
+    const meta=[dl?muGB(dl)+" to download":"",
                 p.gb?"frees "+muGB(p.gb):""].filter(Boolean).join(" · ");
-    h='<div class="mu-h">'+(n===1?"A newer version of one of your models is"
-        :"Newer versions of "+n+" of your models are")+' ready</div>'
+    h='<div class="mu-h">'+(onlyNew?(n===1?"A newer version of one of your models is"
+        :"Newer versions of "+n+" of your models are")
+        :(n===1?"An update for one of your models is":"Updates for "+n+" of your models are"))
+      +' ready</div>'
       +'<div class="mu-m">'+meta+'</div>'
       +'<button class="mu-which" data-mu="which">Show which</button>'
-      +'<div class="mu-list" hidden>'+(p.updates||[]).map(u=>
-        '<div><span>'+esc(u.new?u.old+" → "+u.new:u.old)+'</span><span>'
-        +(u.new?muGB(u.dl_gb):"remove")+'</span></div>').join("")+'</div>'
+      +'<div class="mu-list" hidden>'+rows.map(r=>
+        '<div><span>'+esc(r.t)+'</span><span>'+esc(r.gb)+'</span></div>').join("")
+      +(p.updates||[]).filter(u=>!u.new).map(u=>
+        '<div><span>'+esc(u.old)+'</span><span>remove</span></div>').join("")
+      +((p.studio_old)||[]).map(x=>
+        '<div><span>'+esc(x.label)+'</span><span>remove</span></div>').join("")
+      +(kept.length?'<div class="mu-kept">Retired, added outside the app, so kept: '
+        +esc(kept.join(", "))+'</div>':"")+'</div>'
       +'<div class="mu-foot"><button class="primary" data-mu="go">'
       +'Update models</button><button class="ghost" data-mu="later">'
       +'Later</button></div>';
@@ -48979,6 +49858,19 @@ function muShow(host,st){
   muPaint(host,st);
   if(st&&st.state==="running"&&!muTimer)muTimer=setTimeout(muTick,1500);
 }
+// what each server did with its part: the servers card shows the jobs
+function muSrvSaid(st){
+  const r=(st&&st.servers)||[];
+  if(!r.length)return;
+  muSrv=[];
+  const bad=r.filter(x=>!x.ok);
+  if(muHost){
+    const n=document.createElement("div");n.className="mu-m mu-srv";
+    n.textContent=bad.length?bad.map(x=>x.err).join(" "):
+      "Your server"+(r.length>1?"s are":" is")+" updating too \u00b7 Settings \u203a Servers shows it";
+    setTimeout(()=>{if(muHost&&!muHost.querySelector(".mu-srv"))muHost.appendChild(n);},0);
+  }
+}
 function muDismiss(){
   if(!muHost)return;
   const v=muHost.closest("#updated-veil,#clean-veil");
@@ -49015,8 +49907,12 @@ document.addEventListener("click",async e=>{
   }else if(act==="go"){
     b.disabled=true;
     try{
+      // each server gets exactly what the card listed for it (6b445)
+      const srv=muSrvGo(muSrv).map(s=>({id:s.id,offer:s.offer}));
       const st=await(await api("/api/model/update",{method:"POST",
-        headers:{"Content-Type":"application/json"},body:"{}"})).json();
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(srv.length?{servers:srv}:{})})).json();
+      muSrvSaid(st);
       muHost.dataset.ran="1";muPaint(muHost,st);
       if(st.state==="running"){if(!muTimer)muTimer=setTimeout(muTick,800);}
       else muSettled();
@@ -49033,15 +49929,16 @@ function paintCleanNote(){
   const c=(lastSetup&&lastSetup.cleanup)||{updates:[],gb:0};
   muPlan=c;
   const note=$("#autoclean-note"),btn=$("#clean-now");
-  const n=muOffers(c).length;
+  const n=muRows(c,muSrv).length;
   // the switch reads the same answer the server acts on (on unless off)
   if(typeof c.auto==="boolean")
     $("#autoclean-toggle").classList.toggle("on",c.auto);
   if(c.running){
     note.textContent="Updating your models…";btn.textContent="View";btn.hidden=false;
   }else if(n){
-    note.textContent=n===1?"A newer version of one model is ready"
-      :"Newer versions of "+n+" models are ready";
+    note.textContent=n===muOffers(c).length
+      ?(n===1?"A newer version of one model is ready":"Newer versions of "+n+" models are ready")
+      :(n===1?"An update for one model is ready":"Updates for "+n+" models are ready");
     btn.textContent="Update";btn.hidden=false;
   }else if(c.gb){
     note.textContent="Outdated models are taking "+muGB(c.gb);
@@ -49051,6 +49948,10 @@ function paintCleanNote(){
   }
 }
 $("#clean-now").addEventListener("click",openModelUpdates);
+// auto-clean on your servers (6b445): only what this app brought there
+function srvAutoclean(){api("/api/servers/autoclean",{method:"POST",
+  headers:{"Content-Type":"application/json"},body:"{}"}).catch(()=>{});}
+setTimeout(srvAutoclean,90*1000);setInterval(srvAutoclean,6*3600*1000);
 $("#autoclean-toggle").addEventListener("click",async()=>{
   const t=$("#autoclean-toggle"),on=!t.classList.contains("on");
   t.classList.toggle("on",on);
@@ -49925,6 +50826,7 @@ def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
     for k, st in STUDIOS.items():
         if st["row"] not in live:
             repos.update(t["repo"] for t in st["tiers"])
+            repos.update(STUDIO_RETIRED.get(k) or {})
     try:
         repos.add(WHISPER_REPO)
         repos.add(WHISPER_REPO_CPU)
@@ -50124,6 +51026,13 @@ def _mlx_janitor():
             sweep_all_exports()
             _sweep_leftovers()
             _auto_cleanup_pass()   # no-op unless the pref is on
+            # newer weights of what is here (6b445): the real app only,
+            # small descriptions, at most once a day; offered, never pulled
+            if DEFAULT_APP and not os.environ.get("MILLENAI_TESTBUILD"):
+                try:
+                    model_fresh_check()
+                except Exception:
+                    pass
         try:
             # never under a running benchmark (6b331): it owns the engines
             if _mlx_procs and _mlx_last_use and not _bench["running"] and \

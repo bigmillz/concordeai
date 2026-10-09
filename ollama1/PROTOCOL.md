@@ -335,8 +335,9 @@ the server kit".
 `GET /v1/models/state` answers exactly these keys:
 
 ```json
-{"models": [{"name": "gemma4:12b", "size": 7600000000, "loaded": false}],
+{"models": [{"name": "gemma4:12b", "size": 7600000000, "digest": "<64 hex>", "loaded": false}],
  "allow": ["gemma4:12b"],
+ "managed": ["gemma4:12b"],
  "busy": false,
  "jobs": [{"name": "gpt-oss:20b", "action": "pull", "state": "running", "pct": 41, "error": ""}],
  "plan": {"name": "recommended", "at": 1791100000, "by": "Alice's Mac"},
@@ -349,8 +350,18 @@ the server kit".
   and Ollama's own cache copies (`llamacpp:<sha>`, `llamacpp/...`) are never
   listed (kits before 6b448 listed the copies; the app hashes `seen` over every
   name it was sent, and never shows or removes one).
+  `digest` is Ollama's own digest of the model (the sha256 of its
+  manifest, 64 lowercase hex characters), or `""` when Ollama didn't give
+  one in that shape. The app compares it with the registry's manifest for
+  the same tag to see that newer weights exist (6b445): a model set that
+  adds a model already on the disk downloads only what changed.
 - `allow`: the names on the server's allow-list, in its order (a line it
   can't read is left out).
+- `managed`: the models a model set from the app downloaded to this server
+  that weren't on it before, sorted (6b445). A set that removes one takes it
+  off; a model that was here already when a set pulled it again keeps its
+  owner. A kit without the key: treat it as `[]`. The app only removes a
+  retired model without asking when it is on this list. Never a cache copy.
 - `busy`: true while a set is being applied, while a model-library sync or
   `ollama1-models` runs at the server, or while the admin panel pulls or
   removes a model. Applying then answers 409 `busy`.
@@ -413,6 +424,10 @@ What the server does with an accepted set:
   allow-list; a download is not done if it was taken off the list meanwhile
   or the models disk has less than 2 GiB free. The server doesn't check that
   everything fits before it starts: use `disk_free_bytes`.
+- A tag to add may already be on the disk: Ollama then downloads only the
+  layers that changed in the registry since (the app sends this to bring in
+  newer weights, 6b445). Each download that worked of a model that wasn't
+  on the disk before goes on `managed`; each removal that worked comes off.
 - The POST returns as soon as the server has accepted the set (normally
   within a few seconds); the work goes on after it. Poll `GET
   /v1/models/state` every few seconds until `busy` is false; `pct` moves at
