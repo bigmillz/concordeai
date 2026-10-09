@@ -2,8 +2,8 @@
 """ollama1-leds: lights that follow the server's work (6b395, 6b421). Every RGB device
 OpenRGB lists: white when idle; when the graphics card works (over 50% busy) through
 yellow and orange to red at full brightness in 5 s; back to white over 60 s when it
-stops (with the fans' ramp); when the fan service goes from its idle 20% to 10% (after 5 idle
-minutes) it goes to blue over the same 30 s (brightness is 100% always; white for as long as
+stops (over 60 s); when the fan service goes from its idle 20% to 10% (after 5 idle
+minutes) it goes to blue over the same 90 s (brightness is 100% always; white for as long as
 the fans are at 20%, 6b449) and, when work starts or the fans come back up, white again in 2 s first.
 See lib/o1leds.py.
 

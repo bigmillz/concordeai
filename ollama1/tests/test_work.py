@@ -24,7 +24,8 @@ class TestNumbers(unittest.TestCase):
         self.assertEqual(o1work.COOL_S, 60)
         self.assertEqual(o1work.RISE_S, 5.0)
         self.assertEqual((o1work.IDLE_DEEP_S, o1work.BLUE_S, o1work.FAN_DEEP_PCT, o1work.WAKE_FADE_S),
-                         (300.0, 30.0, 10, 2.0))
+                         (300.0, 90.0, 10, 2.0))
+        self.assertEqual((o1work.FAN_HOLD_S, o1work.FAN_RAMP_S), (30, 90))
         self.assertEqual((o1work.IDLE_PCT, o1work.BLUE), (20, (0, 0, 255)))
         self.assertEqual((o1work.DEEP_LIMIT_MARGIN_C, o1work.DEEP_CPU_C, o1work.DEEP_GPU_C, o1work.DEEP_REENTER_C),
                          (10, 50, 60, 3))

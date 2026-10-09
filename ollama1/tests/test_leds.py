@@ -413,11 +413,12 @@ class TestRamp(unittest.TestCase):
 class TestTheNumbers(unittest.TestCase):
     def test_the_lights_use_the_shared_numbers_so_they_agree_with_the_fans(self):
         self.assertEqual((o1leds.RISE_S, o1leds.COOL_S, o1leds.IDLE_DEEP_S, o1leds.BLUE_S, o1leds.WAKE_FADE_S),
-                         (5.0, 60, 300.0, 30.0, 2.0))
+                         (5.0, 60, 300.0, 90.0, 2.0))
         self.assertEqual(o1leds.BLUE, BLUE)
         for gone in ("IDLE_DIM_S", "DIM_S", "DIM_MIN"):
             self.assertFalse(hasattr(o1leds, gone))
-        self.assertEqual(o1leds.COOL_S, o1fan.RAMP_S)            # lights and fans finish together
+        self.assertEqual(o1leds.BLUE_S, o1fan.o1work.BLUE_S)      # the lights' blue fade is the fans' deepen (6b460: 90 s)
+        self.assertEqual((o1fan.HOLD_S, o1fan.RAMP_S), (30, 90))  # the lights' red-to-white (COOL_S) is their own 60 s
         self.assertEqual((o1leds.SAMPLE_S, o1leds.FRAME_S), (0.25, 0.04))
 
 
@@ -495,7 +496,7 @@ class TestBehaviour(Phases):
         self.assertEqual(self.last_shown(), RED)
 
     def test_from_blue_the_lights_go_white_in_2_s_then_rise_over_5_s(self):
-        self.run_for(340, step=0.25)
+        self.run_for(400, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
         self.probes.v["gpu_busy"] = 100
         t0 = self.until(lambda: self.leds.phase == "waking", step=0.05)
@@ -648,7 +649,7 @@ class TestBehaviour(Phases):
         self.assertFalse(self.client.connected)
 
     def test_a_wake_connects_afresh_and_starts_white(self):
-        self.run_for(340, step=0.25)
+        self.run_for(400, step=0.25)
         self.assertEqual(self.leds.z, 1.0)
         self.assertEqual(self.client.opens, 1)
         self.leds.resync = True
@@ -683,19 +684,19 @@ class TestBehaviour(Phases):
 
 
 class TestDeepIdle(Phases):
-    """With no fan service (the rig's default, `fanst` None): white for 300 s, then white to blue over 30 s
+    """With no fan service (the rig's default, `fanst` None): white for 300 s, then white to blue over 90 s
     (brightness never changes); the 300 s count from white. With one, the blue follows it: TestBlueFollowsTheFans."""
 
-    def test_the_blue_starts_at_300_s_idle_and_takes_30_s_in_a_straight_line(self):
+    def test_the_blue_starts_at_300_s_idle_and_takes_90_s_in_a_straight_line(self):
         self.run_for(300, step=0.25)                                  # the last tick is at 299.75 s
         self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
         self.run_for(0.25, step=0.25)                                 # the tick at exactly 300 s
         self.assertEqual(self.leds.phase, "bluing")
-        for secs in (7.5, 15, 22.5):
-            self.run_for(7.5, step=0.25)
-            self.assertAlmostEqual(self.leds.z, secs / 30.0, delta=0.01)
+        for secs in (22.5, 45, 67.5):
+            self.run_for(22.5, step=0.25)
+            self.assertAlmostEqual(self.leds.z, secs / 90.0, delta=0.01)
             self.assertEqual(self.last_shown(), mix(self.leds.z))
-        self.run_for(7.5, step=0.25)
+        self.run_for(22.5, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown(), self.leds.z), ("blue", BLUE, 1.0))
         self.run_for(120, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))   # and stays blue
@@ -705,7 +706,7 @@ class TestDeepIdle(Phases):
         t0 = self.leds.idle_since
         self.clock.t = t0 + 310
         self.leds.tick()                                              # one tick, 10 s after the 300 s
-        self.assertAlmostEqual(self.leds.z, 10.0 / 30.0, delta=0.01)
+        self.assertAlmostEqual(self.leds.z, 10.0 / 90.0, delta=0.01)
 
     def test_the_brightness_never_changes_it_is_always_100(self):
         seen = set()
@@ -757,7 +758,7 @@ class TestDeepIdle(Phases):
         self.assertEqual(self.leds.z, 0.0)
 
     def test_work_part_way_to_blue_fades_back_in_proportion_then_rises(self):
-        self.run_for(300 + 15, step=0.25)                              # half way to blue
+        self.run_for(300 + 45, step=0.25)                              # half way to blue
         self.assertAlmostEqual(self.leds.z, 0.5, delta=0.02)
         self.probes.v["gpu_busy"] = 100
         t0 = self.until(lambda: self.leds.phase == "waking", step=0.05)
@@ -771,19 +772,19 @@ class TestDeepIdle(Phases):
         self.assertEqual((self.leds.phase, self.last_shown()), ("working", RED))
 
     def test_the_card_over_50_only_briefly_does_not_wake_it(self):
-        self.run_for(340, step=0.25)
+        self.run_for(400, step=0.25)
         self.run_for(1, step=0.25, gpu=100)
         self.run_for(5, step=0.25, gpu=0)
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
 
     def test_nothing_but_the_card_wakes_it(self):
-        self.run_for(340, step=0.25)
+        self.run_for(400, step=0.25)
         self.probes.v.update(inflight=2, tools=["stability-test.sh"], cpu=(990, 1000), cpu_c=80)
         self.run_for(20, step=0.25, gpu=40)
         self.assertEqual(self.leds.phase, "blue")
 
     def test_work_that_ends_during_the_wake_fade_goes_on_to_white(self):
-        self.run_for(340, step=0.25)
+        self.run_for(400, step=0.25)
         self.probes.v["gpu_busy"] = 100
         self.until(lambda: self.leds.phase == "waking", step=0.05)
         self.probes.v["gpu_busy"] = 0
@@ -796,7 +797,7 @@ class TestDeepIdle(Phases):
         self.run_for(310, step=0.25)
         self.assertEqual(self.leds.phase, "bluing")
         self.assertEqual(self.leds.tick(), o1leds.FRAME_S)
-        self.run_for(40, step=0.25)
+        self.run_for(90, step=0.25)
         self.assertEqual(self.leds.phase, "blue")
         self.assertGreater(self.leds.tick(), o1leds.FRAME_S)            # nothing moves: the 0.25 s sample
         self.probes.v["gpu_busy"] = 100
@@ -804,7 +805,7 @@ class TestDeepIdle(Phases):
         self.assertEqual(self.leds.tick(), o1leds.FRAME_S)
 
     def test_the_resent_colour_is_blue_and_a_reconnect_sends_blue(self):
-        self.run_for(340, step=0.25)
+        self.run_for(400, step=0.25)
         self.client.shown.clear()
         self.run_for(6, step=0.25)
         self.assertGreaterEqual(len(self.client.shown), 2)            # the keepalive
@@ -841,10 +842,10 @@ class TestDeepIdle(Phases):
         s = st()
         self.assertEqual((s["phase"], s["brightness"]), ("bluing", 1.0))
         self.assertEqual(s["line"], "Lights: white to blue, going blue (idle 5 min)  -  1 device")
-        self.run_for(60, step=0.25)
+        self.run_for(95, step=0.25)
         s = st()
         self.assertEqual((s["brightness"], s["rgb"], s["phase"], s["blue"]), (1.0, [0, 0, 255], "blue", 1.0))
-        self.assertEqual(s["line"], "Lights: blue, blue (idle 6 min)  -  1 device")
+        self.assertEqual(s["line"], "Lights: blue, blue (idle 7 min)  -  1 device")
         self.probes.v["gpu_busy"] = 90
         self.until(lambda: self.leds.phase == "waking")
         self.leds.write_status(self.clock.t)
@@ -854,7 +855,7 @@ class TestDeepIdle(Phases):
 class TestBlueFollowsTheFans(Phases):
     """6b449, per the owner: "the lights shouldn't be blue when it's on idle 20%, only idle 10%". The blue follows the
     fan service's own deep idle (its status file's phase, `deepen` then `deep`): white at `idle20` however long, blue
-    over the fans' 30 s fall, back to white when the fans leave it; the lights' own 300 s clock only without a fan
+    over the fans' 90 s fall, back to white when the fans leave it; the lights' own 300 s clock only without a fan
     service."""
 
     def one_device(self):
@@ -890,21 +891,21 @@ class TestBlueFollowsTheFans(Phases):
         self.fanst = {"phase": "deepen", "pct": 20}                   # the fans' 20% to 10% fall has begun
         self.run_for(0.25, step=0.25)                                 # the next 0.25 s sample sees it
         self.assertEqual(self.leds.phase, "bluing")
-        for secs in (7.5, 15, 22.5):
-            self.run_for(7.5, step=0.25)
-            self.assertAlmostEqual(self.leds.z, secs / 30.0, delta=0.01)
+        for secs in (22.5, 45, 67.5):
+            self.run_for(22.5, step=0.25)
+            self.assertAlmostEqual(self.leds.z, secs / 90.0, delta=0.01)
             self.assertEqual(self.last_shown(), mix(self.leds.z))
         self.fanst = {"phase": "deep", "pct": 10}
-        self.run_for(7.5, step=0.25)
+        self.run_for(22.5, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown(), self.leds.z), ("blue", BLUE, 1.0))
         self.run_for(600, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))   # and stays blue while the fans are at 10%
 
-    def test_fans_already_at_10_when_the_lights_start_go_blue_at_once_over_30_s(self):
+    def test_fans_already_at_10_when_the_lights_start_go_blue_at_once_over_90_s(self):
         self.fanst = {"phase": "deep", "pct": 10}
         self.leds.tick()
         self.assertEqual(self.leds.phase, "bluing")
-        self.run_for(31, step=0.25)
+        self.run_for(91, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
 
     def test_the_fans_leaving_deep_idle_take_the_lights_back_to_white_in_2_s_and_the_idle_goes_on(self):
@@ -926,12 +927,12 @@ class TestBlueFollowsTheFans(Phases):
         self.run_for(600, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))   # white while the fans stay at 20%
         self.fanst = {"phase": "deepen", "pct": 19}                   # the guard cleared: the fans fall again
-        self.run_for(31, step=0.25)
+        self.run_for(91, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
 
     def test_part_way_to_blue_the_fans_turning_back_fade_in_proportion(self):
         self.fanst = {"phase": "deepen", "pct": 20}
-        self.run_for(15.25, step=0.25)                                 # half way
+        self.run_for(45.25, step=0.25)                                 # half way
         self.assertEqual(self.leds.phase, "bluing")
         self.assertAlmostEqual(self.leds.z, 0.5, delta=0.02)
         self.fanst = {"phase": "idle20", "pct": 20}
@@ -995,7 +996,7 @@ class TestBlueFollowsTheFans(Phases):
         self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
         self.run_for(0.5, step=0.25)
         self.assertEqual(self.leds.phase, "bluing")                    # its own clock, from the last word from the fans
-        self.run_for(60, step=0.25)
+        self.run_for(95, step=0.25)
         self.assertEqual(self.leds.phase, "blue")
         self.fanst = {"phase": "idle20", "pct": 20}                   # it came back, at 20%
         self.run_for(0.25, step=0.25)
@@ -1045,11 +1046,11 @@ class TestBlueFollowsTheFans(Phases):
         self.run_for(400, step=0.25)
         s = self.status()
         self.assertEqual((s["phase"], s["fans"], s["line"]), ("idle", "idle20", "Lights: white, idle (card 0% busy)  -  1 device"))
-        self.assertIn("white goes to blue over 30 s when the fans go to 10% (fans now: idle20)", o1leds.render_status(s))
+        self.assertIn("white goes to blue over 90 s when the fans go to 10% (fans now: idle20)", o1leds.render_status(s))
         self.fanst = {"phase": "deep", "pct": 10}
-        self.run_for(40, step=0.25)
+        self.run_for(95, step=0.25)
         s = self.status()
-        self.assertEqual((s["phase"], s["fans"], s["line"]), ("blue", "deep", "Lights: blue, blue (idle 7 min)  -  1 device"))
+        self.assertEqual((s["phase"], s["fans"], s["line"]), ("blue", "deep", "Lights: blue, blue (idle 8 min)  -  1 device"))
         self.fanst = {"phase": "idle20", "pct": 20}
         self.run_for(0.5, step=0.25)
         self.leds.write_status(self.clock.t)
@@ -1088,7 +1089,7 @@ class TestBlueFollowsTheFans(Phases):
         self.run_for(400, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("idle", WHITE))
         self.fanst = {"phase": "deepen", "pct": 20}
-        self.run_for(31, step=0.25)
+        self.run_for(91, step=0.25)
         self.assertEqual((self.leds.phase, self.last_shown()), ("blue", BLUE))
 
 
@@ -1257,9 +1258,9 @@ class TestStatus(Rig):
         out = o1leds.render_status(st)
         self.assertIn("lights: orange  now 255,128,0 (FF8000)  -  cooling down (white in 80 s)", out)
         self.assertIn("card: 3% busy  -  not working  -  position 0.67 of 1 (0 white, 1 red)", out)
-        self.assertIn("brightness: 100%  -  idle 0 s  -  white goes to blue over 30 s after 300 s of white, on the lights' "
+        self.assertIn("brightness: 100%  -  idle 0 s  -  white goes to blue over 90 s after 300 s of white, on the lights' "
                       "own clock (no fan service running)", out)
-        self.assertIn("white goes to blue over 30 s when the fans go to 10% (fans now: idle20)",
+        self.assertIn("white goes to blue over 90 s when the fans go to 10% (fans now: idle20)",
                       o1leds.render_status(dict(st, fans="idle20")))
         self.assertIn("2 devices found", out)
         self.assertIn("MSI MYSTIC LIGHT", out)
@@ -1804,7 +1805,7 @@ class TestZoneWiring(unittest.TestCase):
         self.assertIn("set to 60 LEDs", self.bash('leds_plan on ""')[1])
         self.assertIn("set to 90 LEDs", self.bash("leds_plan on 90")[1])
         self.assertIn("--leds-length", self.bash("leds_plan on")[1])
-        self.assertIn("white to blue over 30 s when the fans go to 10% after 5 idle minutes (white while they are at 20%)",
+        self.assertIn("white to blue over 90 s when the fans go to 10% after 5 idle minutes (white while they are at 20%)",
                       self.bash("leds_plan on")[1])
         self.assertNotIn("dim", self.bash("leds_plan on")[1])
         self.assertNotIn("LEDs so", self.bash("leds_plan off")[1])

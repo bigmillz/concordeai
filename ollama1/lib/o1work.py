@@ -19,15 +19,17 @@ Nothing else is work any more: not the processors' utilisation, not a request in
 flight, not a running tool or setup.sh / apt-get / unattended-upgrade (a burn test
 or a model answering shows up as the card over 50%, which is what heats it).
 
-  COOL_S       60 s    when the work ends the fans fall 100% -> 20% and the lights
-                       red -> orange -> yellow -> white over this, both linear in time
+  COOL_S       60 s    when the work ends the lights go red -> orange -> yellow -> white over this,
+                       linear in time
+  FAN_HOLD_S   30 s    when the work ends the fans stay at 100% this long (6b460), then
+  FAN_RAMP_S   90 s    fall in a straight line 100% -> 20% over this
   RISE_S       5 s     the lights' way from white to red when work starts
 
 Deep idle (6b434, per the owner: no more dimming; the lights stay at 100% brightness always):
 
   IDLE_DEEP_S  300 s   the fans: idle (counted from the end of the ramp, from the start, or
-                       from a wake) this long, then, over BLUE_S (30 s) together:
-  BLUE_S       30 s      the fans fall from the idle 20% to FAN_DEEP_PCT (10%), a straight
+                       from a wake) this long, then, over BLUE_S (90 s) together:
+  BLUE_S       90 s      the fans fall from the idle 20% to FAN_DEEP_PCT (10%), a straight
                          line, and stay there; the lights go from white to BLUE, a straight
                          line in RGB and in time, and stay blue at 100%. The lights take the
                          moment from the fan service's status file (its phase deepen / deep,
@@ -53,11 +55,13 @@ GPU_BUSY_PCT = 50                 # the card over this (strictly) is work
 GPU_CONFIRM_S = 1.5               # ... for this long in a row; and at/under it this long in a row to end it
 CLOCK_SLACK_S = 1e-6              # a sample due at exactly 1.5 s that a float clock puts a hair early still counts
 CPU_HOT_C, CPU_COOL_C = 60, 55    # the processor's temperature: work from 60 C, until it is under 55 C (fans only)
-COOL_S = 60                       # the cool-down: fans 100 -> 20%, lights red -> white
+COOL_S = 60                       # the lights' cool-down, red -> white
+FAN_HOLD_S = 30                   # the fans: 100% for this long after the work ends (6b460) ...
+FAN_RAMP_S = 90                   # ... then a straight fall 100 -> 20% over this long
 RISE_S = 5.0                      # the lights: white to red
 IDLE_PCT = 20                     # the fans' idle level
 IDLE_DEEP_S = 300.0               # the fans: idle this long, then they go deeper (and the lights blue, following them)
-BLUE_S = 30.0                     # ... over this long (both)
+BLUE_S = 90.0                     # ... over this long (both; 6b460)
 FAN_DEEP_PCT = 10                 # the fans' deep-idle level (an output's own floor wins)
 BLUE = (0, 0, 255)                # the lights' deep-idle colour: pure blue (see README, Lights)
 WAKE_FADE_S = 2.0                 # blue back to white in this long when work starts (proportional from part way)

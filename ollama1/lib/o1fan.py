@@ -4,12 +4,12 @@ case fans, the CPU/radiator fans) follow what the server is doing, so it is cool
 when it works and quiet, and easy on the bearings, when it does not:
 
   working     100%   the card over 50% busy, or the processor at 60 C or more
-  ramp     100->20%  from the moment that ends, a straight line down over 60 s,
-                     in 2% steps (no hold at 100% first)
-  idle20       20%   from 60 s after the work ended (and from the start)
+  hold100      100%  from the moment that ends, for 30 s (6b460, per the owner)
+  ramp     100->20%  then a straight line down over 90 s, in 2% steps
+  idle20       20%   from 120 s after the work ended (and from the start)
   deepen   20->10%   after 300 s of idle (6b434, per the owner; the lights go white to
                      blue at the same moment: they read this phase from the status file,
-                     6b449), a straight line over 30 s, in 1% steps
+                     6b449), a straight line over 90 s, in 1% steps
   deep         10%   while deeply idle. Only outputs that can run that low go to 10%: an
                      output's own floor wins (the lowest level it was found to spin at, the
                      fan the stall check kept at 20%, a pump or fixed header kept at 100%,
@@ -101,7 +101,8 @@ import o1work
 from o1common import read_json_safe, write_json_atomic
 
 POLL_S = 2
-RAMP_S = o1work.COOL_S           # when the work ends, a straight ramp down to the idle level over this long
+HOLD_S = o1work.FAN_HOLD_S       # when the work ends, the fans stay at 100% this long (6b460) ...
+RAMP_S = o1work.FAN_RAMP_S       # ... then a straight ramp down to the idle level over this long
 QUANT_PCT = 2                    # the ramp is written in whole steps of this many percent
 FULL_PCT, LOW_PCT = 100, o1work.IDLE_PCT
 DEEP_PCT = o1work.FAN_DEEP_PCT   # the deep-idle level (an output's own floor wins)
@@ -622,10 +623,10 @@ class Fan:
         return block
 
     def idle_base(self):
-        """When the idle began: 60 s after the work ended, or the start or wake, or the end of the measuring."""
+        """When the idle began: HOLD_S + RAMP_S (120 s) after the work ended, or the start or wake, or the end of the measuring."""
         base = self.born
         if self.cool_from is not None:
-            base = max(base, self.cool_from + RAMP_S)
+            base = max(base, self.cool_from + HOLD_S + RAMP_S)
         if self.calib_at is not None:
             base = max(base, self.calib_at)
         return base
@@ -672,12 +673,14 @@ class Fan:
         elif any(o.lkey not in self.learned for o in usable) or (self.aio and self.aio.needs_calibration()):
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
             self.calib_at = now
-        elif age is not None and age < RAMP_S:
-            pct = ramp_pct(age)
-            phase, why, left = "ramp", "the work ended", int(RAMP_S - age + 0.999)
+        elif age is not None and age < HOLD_S:
+            phase, pct, why, left = "hold100", FULL_PCT, "the work ended", int(HOLD_S - age + 0.999)
+        elif age is not None and age < HOLD_S + RAMP_S:
+            pct = ramp_pct(age - HOLD_S)
+            phase, why, left = "ramp", "the work ended", int(HOLD_S + RAMP_S - age + 0.999)
         else:
             phase, pct, why, left = self.deep_level(now)
-        if phase in ("hot", "working", "calibrating", "ramp"):
+        if phase in ("hot", "working", "calibrating", "hold100", "ramp"):
             if phase == "hot":                                   # anything that raises the fans drops deep idle
                 if self.deep_start is not None:
                     self.deep_again = True                       # (heat: the next fall starts over from 20%)
@@ -815,7 +818,7 @@ def present(rows, st):
 
 
 def phase_text(st):
-    """The phase in words: working / ramp NN% / idle20 / deepen NN% / deep (and the two that force 100%)."""
+    """The phase in words: working / hold100 / ramp NN% / idle20 / deepen NN% / deep (and the two that force 100%)."""
     ph = st.get("phase")
     if ph in ("ramp", "deepen"):
         return "%s %d%%" % (ph, st.get("pct", 0))
@@ -837,6 +840,8 @@ def status_line(st):
     pct = st.get("pct", 0)
     if ph in ("working", "hot", "calibrating"):
         head = "Fans: %d%% (%s)" % (pct, st.get("why") or ph)
+    elif ph == "hold100":
+        head = "Fans: 100%% for %d s more, then down to 20%%" % st.get("hold_left", 0)
     elif ph == "ramp":
         head = "Fans: ramping down, %d%% (20%% in %d s)" % (pct, st.get("hold_left", 0))
     elif ph == "deepen":
