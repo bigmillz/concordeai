@@ -118,6 +118,51 @@ next minute and a half. Then same thing after five minutes, drop down to ten per
 - **Unverified on the server:** the fan curve on the real hardware (rpm at each step), and that the lights' 90 s blue
   fade lands with the fans' 90 s under the real 2 s polls.
 
+## 6b461 — the Code lane goes to the server first; a sleeping server is woken with 10 s and a Skip; the server bars follow (per Patrick)
+
+Patrick: "coding doesn't use the server or cloud models — let's fix that. Same thing, prefer server over local models."
+"When the server is asleep and a query is entered, have the gradient box showing progress start by saying it's waking
+the server. Give it a timeout of 10 seconds in case the server isn't available, as well as a skip button." "If it
+connects to the server, make sure the bars in the bottom left update to reflect the server's stats." His screenshot:
+the Coding agent drafting on a local MLX model while the AMD chip was red (Ollama1 asleep).
+
+**Why the Coding agent went local.** `resolve_agent_seat` already seated a server's coder, but only from servers
+that were *answering*; a sleeping one was no candidate, so the seat was this computer's. The wake that should have
+fixed it ran before the headers (`server_refresh_modes` -> `server_wake_if_down`, up to 60 s of silence) and only for
+servers whose check was over a minute old. And when a server was seated, the single-answer path asked the cloud
+ladder first, the server second.
+
+- **Order, Code lane (Coding/Workspace): server, cloud, this computer.** The single-answer path asks the seated
+  server coder first (`server_first_answer(..., defer_fail=True)`: no fallback inside, a failure before the first
+  word says one status line and returns `"down"`), then the Code cloud ladder (`work_ladder("code")`, gated as
+  before), then this computer's copy of the model. No local copy and no cloud: one line says so. Chat's single seat
+  (Fast) keeps cloud, server, local; this is the Code lane only. An explicit pick in the picker still never reaches this
+  path (it is not an agent seat).
+- **Remote agent** (`remote_driver`): server's coder, then the strongest cloud brain, then local (it was cloud, server,
+  local). Its planner is a JSON line per turn, not native tool calls, so any server chat model can drive it. Coding
+  and Workspace use no tool calls either (Workspace reads the folder into the prompt).
+- **The wake, after the headers.** The agent lanes call `server_refresh_modes(ctx, wake=False)` (checks only) and
+  `server_sleepers(ctx)` (paired, not opted out, last found offline, a card that wakes it, no call in the last 5 min;
+  it no longer depends on the check being over a minute old). After the headers `server_wake_ask` runs a "wake"
+  STEP: "Waking Ollama1" with "10 s" counting down, STATUS "Waking Ollama1... 7 s", then "Woke Ollama1" (the agent seat
+  is resolved again and the server takes it), "Ollama1 didn't wake in 10 s" (marked down, as before) or "Skipped
+  waking Ollama1". Either failure goes on to the cloud, then this computer, with a STATUS line. This computer's
+  engine is no longer pre-warmed while a wake is pending (`_start_prewarm`, called after the wake if it was needed).
+- **Skip.** The page's "Skip" button (on the running wake row) POSTs `{hid, skip: true}` to `/api/chat/hurry`; the
+  request's X-Hurry id now also keys `_skip_jobs` (a second Event). `server_wake(..., wait_s, skip)` polls it every
+  0.25 s and returns `"skipped"`. The question is not cancelled.
+- **Where 60 s stays.** `SRV_WAKE_WAIT_S` (60) still serves "<name> Only" (`server_only_wake`, 6b369: nothing else may
+  answer, so it must wait for the box) and the Chat modes' wake (`server_refresh_modes` default, `wake=True`), which still runs
+  before the headers and silently; moving the modes onto this step means resolving their seats again after the wake
+  (the council, its merge order, the header's model list) and is left for a build of its own. The 5-minute
+  gap between wake calls (`SRV_WAKE_GAP_S`) still holds: a Skip or a timeout is not retried by the next question.
+- **Bars.** The sidebar's server bars (`srvUseTick`) back off to 30 s while a server does not answer, so a freshly woken
+  one stayed empty for up to 30 s. New `srvUseKick()` forgets the back-off, reloads the server list (the chip's red dot)
+  and reads at once; it runs when the wake step says "Woke ..." and when a RUN frame names a server. `srvBoost` makes
+  the poll 1.5 s while a server-routed answer streams and is cleared where the answer ends.
+- Tests: `6b461` section (wake 10 s / skip / the three step endings on a fake clock, the driver order, the Code lane's
+  order, the post-header wake, the skip route, the bar kick); the 6b346 mutations follow the moved wake code.
+
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
 
 Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no

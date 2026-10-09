@@ -18950,6 +18950,7 @@ SRV_SLEEP_MIN, SRV_SLEEP_MAX, SRV_SLEEP_DEFAULT = 5, 1440, 30   # minutes idle b
 SRV_WAKE_GAP_S = 300            # one wake-up call in five minutes per server (6b346): longer than the wait,
                                 # so a server that is simply off costs one wait, not one a question
 SRV_WAKE_WAIT_S = 60            # then up to this long for it to answer
+SRV_WAKE_ASK_S = 10             # (6b461, per Patrick) a question that may go elsewhere waits only this long, with a Skip
 SRV_WAKE_POLL_S = 2
 _SRV_MAC_RX = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}")
 _srv_wake_at = profile_cache("_srv_wake_at", {})
@@ -20435,7 +20436,7 @@ def server_take_wake_notes() -> list:
     return n
 
 
-def server_refresh_modes(ctx, limit: float = 5.0):
+def server_refresh_modes(ctx, limit: float = 5.0, wake: bool = True):
     """Before a mode resolves: servers that opted in and were last checked
     over a minute ago (or never) are asked again, side by side, each
     within `limit` seconds. A server that was found down less than a
@@ -20452,9 +20453,12 @@ def server_refresh_modes(ctx, limit: float = 5.0):
         with ctx_executor(min(4, len(due))) as pool:
             list(pool.map(lambda e: server_check(e, limit), due))
         # a server that sleeps is woken for this question (6b346), and only
-        # here: the sidebar's poll, Settings and background passes never do
-        for e in due:
-            server_wake_if_down(e, ctx)
+        # here: the sidebar's poll, Settings and background passes never do.
+        # wake=False (6b461): the caller wakes it itself once the page has its
+        # headers (server_sleepers, server_wake_ask)
+        if wake:
+            for e in due:
+                server_wake_if_down(e, ctx)
 
 
 def server_mark_down(ctx, name: str, why: str):
@@ -20507,7 +20511,8 @@ def server_seat_title(council: list, seat_fb: dict, res: str, said: bool,
 
 
 def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
-                        status, step, first_s: float = 60.0, polish=None) -> str:
+                        status, step, first_s: float = 60.0, polish=None,
+                        defer_fail: bool = False) -> str:
     """A mode's server seat (6b339): streamed from the server, with `fallback`
     (this computer's copy, or "") behind it. UNLIKE an explicit pick
     (server_answer), which never falls back: a mode means the best
@@ -20521,7 +20526,10 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
     stops. polish(draft) -> messages: Fast's second pass, run on the SAME
     server with the same deadline; a server that fails during it leaves the
     first draft, without alarm. Never another server, never a cloud model
-    here. Returns "server", "fallback" or "failed"."""
+    here. defer_fail (6b461): a server that fails before its first word says
+    one status line and returns "down" with nothing else shown, for a caller
+    that goes on to the cloud and then this computer itself. Returns "server",
+    "fallback", "failed" or "down"."""
     name = label.split(SERVER_SEP, 1)[0]
     shown = [False]
 
@@ -20577,6 +20585,9 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
     if shown[0]:
         emit(AppText("\n\n\u26a0\ufe0f " + why))
         return "failed"
+    if defer_fail:
+        status("%s didn\u2019t answer, going on without it" % name)
+        return "down"
     if not fallback:
         emit(AppText("\u26a0\ufe0f " + why))
         return "failed"
@@ -21705,9 +21716,10 @@ def server_wake_test(ctx, sid: str, relay_only: bool = False) -> dict:
     return out
 
 
-def server_wake(e, progress=None, alive=None) -> str:
+def server_wake(e, progress=None, alive=None, wait_s=None, skip=None) -> str:
     """Wake server e with a magic packet and wait for it to answer. "woke",
-    "tried" (no answer in SRV_WAKE_WAIT_S), "stopped" (alive() said the reader
+    "tried" (no answer in wait_s, SRV_WAKE_WAIT_S unless given), "skipped"
+    (skip() said the person went on without it, 6b461), "stopped" (alive() said the reader
     left), or "" (nothing asked: it has no card to wake it, it wasn't known to
     sleep, or a call went out within the last SRV_WAKE_GAP_S, five minutes).
     The packet carries nothing but the card's address, to UDP ports 9 and 7 (the two a
@@ -21743,7 +21755,13 @@ def server_wake(e, progress=None, alive=None) -> str:
     if progress is not None:
         progress(0)
     while True:
-        _srv_wake_sleep(SRV_WAKE_POLL_S)
+        if skip is None:
+            _srv_wake_sleep(SRV_WAKE_POLL_S)
+        else:                      # a Skip is answered within a quarter second
+            for _q in range(int(SRV_WAKE_POLL_S * 4)):
+                _srv_wake_sleep(0.25)
+                if skip():
+                    return "skipped"
         if alive is not None and not alive():
             return "stopped"
         try:
@@ -21754,7 +21772,7 @@ def server_wake(e, progress=None, alive=None) -> str:
         except ServerError:
             pass
         waited = _srv_wake_clock() - t0
-        if waited >= SRV_WAKE_WAIT_S:
+        if waited >= (wait_s or SRV_WAKE_WAIT_S):
             return "tried"
         if progress is not None:
             progress(waited)
@@ -21820,6 +21838,71 @@ def server_only_wake(sid: str, ctx, status, alive=None):
     if r == "woke":
         status("%s is awake." % name)
     return st["label"], st["why"]
+
+
+def server_sleepers(ctx) -> list:
+    """ids of ctx's servers a question may wake now (6b461): paired, not
+    turned off for the modes, last found not answering, with a card that wakes
+    them, and no wake-up call within SRV_WAKE_GAP_S."""
+    out = []
+    try:
+        for e in _srv_read(ctx):
+            s = _srv_seen.get(e["id"]) or {}
+            if (_srv_paired(e) and e.get("prefer") is not False and not s.get("reachable")
+                    and s.get("kind") == "offline" and _srv_wake_due(e)):
+                out.append(e["id"])
+    except (StoreReadError, NoProfile):
+        pass
+    return out
+
+
+def server_wake_ask(sids, ctx, status, step, skip, alive=None):
+    """The wake of a sleeping server for a question that can go on without it
+    (6b461, per Patrick: "start by saying it's waking the server. Give it a
+    timeout of 10 seconds ... as well as a skip button"). Run once the page has
+    its headers: a "wake" step reading "Waking <name>" with the seconds left,
+    a Skip (skip is the Event the page's POST sets) and SRV_WAKE_ASK_S at the
+    most. Returns the names that woke, or None when the reader left. A server
+    that did not answer is marked down; one skipped is only left alone (the
+    five-minute gap still holds, so it is not called again by the next question)."""
+    woke = []
+    try:
+        ents = _srv_read(ctx)
+    except (StoreReadError, NoProfile):
+        return woke
+    for sid in sids:
+        e = _srv_find(ents, sid)
+        if e is None:
+            continue
+        name = _srv_plain(e["name"])
+        lbl = "Waking %s" % name
+        step("wake", lbl, "run", "%d s" % SRV_WAKE_ASK_S)
+        status("Waking %s..." % name)
+
+        def _prog(w, lbl=lbl, name=name):
+            left = max(0, int(SRV_WAKE_ASK_S - w + 0.5))
+            step("wake", lbl, "run", "%d s" % left)
+            status("Waking %s... %d s" % (name, left))
+        r = server_wake(e, _prog, alive, SRV_WAKE_ASK_S, skip.is_set)
+        if r == "stopped":
+            return None
+        if r == "woke":
+            step("wake", "Woke %s" % name, "done", "")
+            status("%s is awake." % name)
+            woke.append(name)
+        elif r == "skipped":
+            step("wake", "Skipped waking %s" % name, "done", "")
+            status("Skipped waking %s, going on without it" % name)
+        elif r == "tried":
+            step("wake", "%s didn\u2019t wake in %d s" % (name, SRV_WAKE_ASK_S), "done", "")
+            status("%s didn\u2019t wake in %d s, going on without it" % (name, SRV_WAKE_ASK_S))
+            try:
+                server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
+            except (StoreReadError, NoProfile):
+                pass
+        else:                      # a call went out within the last five minutes: nothing asked
+            step("wake", lbl, "done", "")
+    return woke
 
 
 # ==== servers: end ====
@@ -26254,6 +26337,9 @@ _remote_lock = threading.Lock()
 # the APPROVE jid above: the id IS the authorization.
 _hurry_jobs = profile_cache("_hurry_jobs", {})                # hid -> threading.Event
 _hurry_lock = threading.Lock()
+# SKIP WAKING (6b461): the same id, a second Event; the page's Skip button on the
+# "Waking <server>" step POSTs {hid, skip: true} to /api/chat/hurry
+_skip_jobs = profile_cache("_skip_jobs", {})                 # hid -> threading.Event
 
 
 def remote_conf() -> dict:
@@ -27176,9 +27262,20 @@ def _classify_seg(seg: str) -> str:
 
 
 def remote_driver():
-    """Who plans the commands: the strongest CLOUD brain when a key is
-    active (agentic multi-step work needs it), else the strongest local
-    coding model. Returns ('cloud', conf) or ('local', label) or None."""
+    """Who plans the commands, in the order the Code lane keeps (6b461, per
+    Patrick: "prefer server over local models"): the person's server's coder
+    first, then the strongest CLOUD brain when a key is active, then the
+    strongest local coding model. Returns ('server', label), ('cloud', conf),
+    ('local', label) or None. The planner is a text protocol (a JSON line per
+    turn), not native tool calls, so any chat model of the server can drive it."""
+    # the person's server before anything (6b357, 6b461): its coder first. A
+    # turn it fails marks it down, and the next resolve lands below
+    try:
+        _sd = server_side_pick(bound_ctx(), "code", "normal")
+    except NoProfile:
+        _sd = None
+    if _sd is not None:
+        return ("server", _sd["label"])
     # follows the cloud-power switch like every other path (6b308, per
     # Patrick); a step is an intermediate turn, so it drives at the work
     # effort (Opus 5.5 medium), not the final answer's
@@ -27186,14 +27283,6 @@ def remote_driver():
         ladder = work_ladder("work")
         if ladder:
             return ("cloud", ladder[0])
-    # the person's server before this computer (6b357): its coder first. A
-    # turn it fails marks it down, and the next resolve lands here below
-    try:
-        _sd = server_side_pick(bound_ctx(), "code", "normal")
-    except NoProfile:
-        _sd = None
-    if _sd is not None:
-        return ("server", _sd["label"])
     pulled = ollama_pulled_tags() or set()
     for l in CODE_LADDER:
         if l in MODEL_ROUTES and model_cached(l, pulled) \
@@ -31068,13 +31157,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # /api/chat. The unguessable id is the whole authorization,
             # exactly like the Remote agent's APPROVE jid.
             n = int(self.headers.get("Content-Length", 0) or 0)
+            _hb = {}
             try:
                 _hb = json.loads(self.rfile.read(n)) if n else {}
                 hid = str(_hb.get("hid", "")) if isinstance(_hb, dict) else ""
             except (ValueError, json.JSONDecodeError):
                 hid = ""
             with _hurry_lock:
-                ev = _hurry_jobs.get(hid)
+                ev = (_skip_jobs if isinstance(_hb, dict) and _hb.get("skip")
+                      else _hurry_jobs).get(hid)
             if ev:
                 ev.set()
             self._send_json({"ok": bool(ev)})
@@ -31536,6 +31627,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # council is a placeholder label and `_so_fail` says why: no other
         # model ever answers in its place.
         _so_c0, _so_fail, _so_wake = "", "", ""
+        _ag_wake = []     # servers asleep that the agent lane wakes after the headers (6b461)
         # Fast, Thinking or Pro on that server alone (6b426): the mode, and
         # the seats it found there (every one that server's)
         _so_mode, _so_seats = srv_only_mode(tier), []
@@ -31759,7 +31851,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # only the agents that may use a server ask it (Research and
                 # Remote run their own flows, Cloud Only never asks, 6b339)
                 if agent_name in _AGENT_ROLE and not cloud_only:
-                    server_refresh_modes(self.ctx)
+                    # a sleeping server is woken after the headers, with a step
+                    # the page shows, ten seconds and a Skip (6b461)
+                    server_refresh_modes(self.ctx, wake=False)
+                    _ag_wake = server_sleepers(self.ctx)
             except (StaleProfile, BrokenPipeError, ConnectionResetError):
                 raise
             except Exception:
@@ -31928,13 +32023,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _no_text_model = (cloud_only or img_subject or vid_subject
                           or (export_req and export_req.get("lane")
                               == "retro"))
-        if route[0] == "mlx" and route_label and not _no_text_model:
-            def _prewarm(_lbl=route_label):
-                global _mlx_last_use
-                with _engine_lock:
-                    ensure_mlx_engine(_lbl)
-                    _mlx_last_use = time.time()
-            ctx_thread(target=_prewarm, daemon=True).start()
+        def _start_prewarm():
+            if route[0] == "mlx" and route_label and not _no_text_model:
+                def _prewarm(_lbl=route_label):
+                    global _mlx_last_use
+                    with _engine_lock:
+                        ensure_mlx_engine(_lbl)
+                        _mlx_last_use = time.time()
+                ctx_thread(target=_prewarm, daemon=True).start()
+        # a server being woken for this question may answer it: this computer's
+        # engine is warmed only when that fails (6b461)
+        if not _ag_wake:
+            _start_prewarm()
 
         # LINKS PASTED INTO THE MESSAGE ARE READ, NOT SEARCHED (6b423, per
         # Patrick: "I just sent a request to review some Airbnbs that I
@@ -32667,8 +32767,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # parser nothing.
         hurry_id = secrets.token_hex(8)
         hurry_ev = threading.Event()
+        skip_ev = threading.Event()
         with _hurry_lock:
             _hurry_jobs[hurry_id] = hurry_ev
+            _skip_jobs[hurry_id] = skip_ev
         self.send_header("X-Hurry", hurry_id)
         self.end_headers()
 
@@ -32792,6 +32894,35 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 return
             else:
                 _so_fail = _w_why
+
+        # THE CODE LANE WAKES A SLEEPING SERVER FIRST (6b461, per Patrick: "when
+        # the server is asleep and a query is entered, have the gradient box
+        # ... start by saying it's waking the server. Give it a timeout of 10
+        # seconds ... as well as a skip button"). The page has its headers, so
+        # the step shows; the Skip button POSTs to /api/chat/hurry. A server that
+        # answers takes the agent's seat; one that doesn't (10 s, Skip) leaves
+        # the cloud, then this computer, exactly as before.
+        if _ag_wake and not _srv_only:
+            try:
+                _aw = server_wake_ask(_ag_wake, self.ctx, status, step, skip_ev,
+                                      lambda: not _client_gone(self.connection))
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                _aw = []
+            if _aw is None:                  # the reader left
+                hb_stop.set()
+                return
+            if _aw:
+                try:
+                    _ag2_label, _ag2, _ag2_fb = resolve_agent_seat(agent_name, self.ctx)
+                except Exception:
+                    _ag2_label, _ag2, _ag2_fb = "", None, ""
+                if _ag2 and _ag2_label and server_label(_ag2_label):
+                    council, model_name = [_ag2_label], _ag2_label
+                    _seat_fb = {_ag2_label: _ag2_fb}
+                    route, route_label = (None, None), None
+            _start_prewarm()
 
         # MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER (review of
         # 6b334): a chat on your own server that took no hold takes it
@@ -33291,6 +33422,23 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                  + json.dumps({"r": names}) + NUL))
                     except Exception:
                         pass
+                # THE CODE LANE: SERVER, THEN CLOUD, THEN THIS COMPUTER (6b461, per
+                # Patrick: "coding doesn't use the server or cloud models ... prefer
+                # server over local models"). A server coder seated for the agent
+                # is asked before the cloud ladder; if it fails before its first
+                # word the cloud walks next, then this computer's copy.
+                _cl_fb = None
+                if (_lane == "code" and lbl in _seat_fb and not images
+                        and server_label(lbl)):
+                    _cl_fb = _seat_fb[lbl]
+                    _cs = server_first_answer(
+                        lbl, "", full_messages, memit, emit, status, step,
+                        first_s=60.0, polish=None, defer_fail=True)
+                    if _cs != "down":
+                        _seat_res[0] = _cs
+                        hb_stop.set()
+                        return
+                    lbl = _cl_fb or ""
                 if turbo:
                     # FAST WALKS THE SPEED LADDER (6b246, per Patrick:
                     # "prefer one fast cloud model over any LLM").
@@ -33314,6 +33462,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             hb_stop.set()
                             return
                     status("cloud power unavailable — running locally")
+                if _cl_fb is not None and not lbl:
+                    # the server didn't answer, the cloud had nothing, and this
+                    # computer holds no copy of the coder (6b461)
+                    emit(AppText("\u26a0\ufe0f Your server didn\u2019t answer, and no cloud "
+                                 "model or model on this computer could take the question."))
+                    hb_stop.set()
+                    return
                 if lbl in _seat_fb:
                     # a mode's server seat (6b339): asked first, this
                     # computer's copy behind it until the first word; Fast
@@ -33464,6 +33619,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # arriving after this harmlessly answers ok:false (6b257)
             with _hurry_lock:
                 _hurry_jobs.pop(hurry_id, None)
+                _skip_jobs.pop(hurry_id, None)
             # which provider wrote this answer, if any (6b308): titles,
             # memory and map pins go back to it and nowhere else
             _ans_conf = _answered.pop(threading.get_ident(), None)
@@ -36037,6 +36193,13 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .wtnow:hover{border-color:rgba(255,255,255,.5)}
 .wtnow[disabled]{color:var(--faint);border-color:rgba(255,255,255,.12);
   cursor:default}
+/* Skip on the "Waking <server>" step (6b461) */
+.wtskip{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text);background:none;
+  border:1px solid rgba(255,255,255,.25);border-radius:999px;
+  padding:2px 9px;cursor:pointer;margin-left:auto;flex:none}
+.wtskip:hover{border-color:rgba(255,255,255,.5)}
+.wtskip[disabled]{color:var(--faint);border-color:rgba(255,255,255,.12);cursor:default}
 /* the living pinwheel (5.2): Claude has its flower — ours spins the
    identity gradient beside whatever is in motion */
 .wthead{display:flex;align-items:center;gap:9px;margin-bottom:10px;
@@ -41466,14 +41629,16 @@ let dispPct=0,lastTween=0,etaTxt="";
 // the time-left plan from the server (X-Eta), the drafts landed so far,
 // when the last milestone landed, and the number last shown (6b459)
 let etaPlan=null,draftsGot=0,etaMark=0,etaShown=-1,etaShownT=0,etaSearchDone=false;
-let curHid="",liveDrafts=0,hurriedNow=false;
+let curHid="",liveDrafts=0,hurriedNow=false,wakeSkipNow=false;
+// the server bars poll fast while a server is writing the answer (6b461)
+let srvBoost=false;
 let runT0=0,runTier="";
-const STEP_ORDER=["search","read","geo","council","draft","polish","places"];
+const STEP_ORDER=["wake","search","read","geo","council","draft","polish","places"];
 function resetSteps(host){steps=[];stepHost=host;
   stepPlan=[];answerChars=0;streamDone=false;
   dispPct=0;lastTween=0;etaTxt="";
   etaPlan=null;draftsGot=0;etaShown=-1;etaShownT=0;etaSearchDone=false;
-  curHid="";liveDrafts=0;hurriedNow=false;
+  curHid="";liveDrafts=0;hurriedNow=false;wakeSkipNow=false;
   runT0=performance.now();etaMark=runT0;runTier=tier||"?";}
 // ==== eta-js: begin ====
 // TIME LEFT, HONESTLY (6b459, per Patrick: "It just keeps going up and
@@ -41637,7 +41802,7 @@ function paintSteps(){
   // rewrite recreates the <i> and kills the transition every 600ms,
   // which is why the old bar always jumped)
   const sig=ordered.map(s=>s.id+s.s+(s.d||"")).join("|")
-    +(etaTxt?"|e":"")+(nowBtn?(hurriedNow?"|h":"|n"):"");
+    +(etaTxt?"|e":"")+(nowBtn?(hurriedNow?"|h":"|n"):"")+(wakeSkipNow?"|w":"");
   if(box._sig===sig&&box.firstChild){
     const bi=box.querySelector(".wtbar i");
     if(bi)bi.style.width=shown+"%";
@@ -41665,6 +41830,10 @@ function paintSteps(){
       +'<span class="wtdot"></span>'
       +'<span class="wtl">'+esc(s.l||"")+'</span>'
       +(s.d?'<span class="wtd">'+esc(s.d)+'</span>':"")
+      // SKIP WAKING (6b461): the server's wake gives up by itself after 10 s
+      +(s.id==="wake"&&s.s==="run"&&curHid
+        ?(wakeSkipNow?'<button class="wtskip" disabled>Skipping…</button>'
+                     :'<button class="wtskip">Skip</button>'):"")
       +'</div>').join("")+'</div>';
   if(kept)box.insertAdjacentHTML("beforeend",restHTML);
   else box.innerHTML=headHTML+restHTML;
@@ -41687,6 +41856,18 @@ inner.addEventListener("click",e=>{
   api("/api/chat/hurry",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({hid:curHid})}).catch(()=>{});
+  paintSteps();
+});
+// SKIP WAKING (6b461, per Patrick): the same delegation; the server stops
+// waiting for the sleeping server and the question goes on to the cloud, then
+// this computer. The question itself is not cancelled.
+inner.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest(".wtskip");
+  if(!b||!curHid||wakeSkipNow)return;
+  wakeSkipNow=true;
+  api("/api/chat/hurry",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({hid:curHid,skip:true})}).catch(()=>{});
   paintSteps();
 });
 // srcs, when given, are TUCKED INSIDE the disclosure (6b242, per
@@ -42382,7 +42563,8 @@ async function send(){
                 try{const d=JSON.parse(j);
                   if(d.w==="cloud"&&!/cloud/.test(lastModels))
                     lastModels=(lastModels+" cloud").trim();
-                  if(d.w==="server")srvWho=String(d.s||"");
+                  if(d.w==="server"){srvWho=String(d.s||"");
+                    if(!srvBoost){srvBoost=true;srvUseKick();}}
                   else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
@@ -42404,7 +42586,10 @@ async function send(){
         CTX:j=>{try{locCtx=(JSON.parse(j).loc)||"";}catch(e){}},
         PLACEHINT:j=>{try{placeHint=JSON.parse(j);}catch(e){}},
         PLACES2:j=>{try{places=JSON.parse(j);}catch(e){}},
-        STEP:j=>{try{addStep(JSON.parse(j));}catch(e){}},
+        STEP:j=>{try{const sd=JSON.parse(j);addStep(sd);
+                 // the server answered the wake: its bars are read now (6b461)
+                 if(sd&&sd.id==="wake"&&sd.s==="done"&&/^Woke /.test(sd.l||""))
+                   srvUseKick();}catch(e){}},
         // the Remote agent live approval card (6b249)
         APPROVE:j=>{
                  // the whole stream is re-read on every chunk: draw
@@ -42557,6 +42742,7 @@ async function send(){
   }
   setToks(0,"idle");
   generating=false;abortCtl=null;genChat=null;document.body.classList.remove("gen");
+  srvBoost=false;     // the bars go back to their normal rate (6b461)
   sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
   if(curChat===myChat)autoScroll();
   chatJumpPaint();                 // the ↓ is a streaming control only
@@ -46866,6 +47052,18 @@ async function srvUsagePoll(s){
   if(d&&d.ok){u.ok=true;u.gpu=d.gpu||null;u.ram=d.ram||null;u.fails=0;}
   else{u.ok=false;u.gpu=null;u.ram=null;u.fails++;}
   u.due=Date.now()+srvUseWait(u.fails);
+  // while a server writes the answer its bars are read every 1.5 s (6b461)
+  if(srvBoost&&u.fails<=0)u.due=Date.now()+1500;
+}
+// the server answered (it woke, or an answer is coming from it): forget the
+// back-off of the failed reads, refresh its row in the list and read the bars now (6b461)
+function srvUseKick(){
+  try{
+    Object.keys(srvUse).forEach(k=>{const u=srvUse[k];u.fails=0;u.due=0;});
+    if(srvUseT){clearTimeout(srvUseT);srvUseT=0;}
+    if(!document.hidden&&!srvUseDead)srvUseT=setTimeout(srvUseTick,0);
+    loadServers(true);
+  }catch(e){}
 }
 async function srvUseTick(){
   srvUseT=0;

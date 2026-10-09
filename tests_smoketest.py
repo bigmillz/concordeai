@@ -23197,7 +23197,9 @@ def _p2c_pins(src):
         "                    server_refresh_modes(self.ctx)" in ch,
         "agent": "            ag_label, ag, _ag_fb = resolve_agent_seat(agent_name, self.ctx)" in ch
         and "                    _seat_fb = ({ag_label: _ag_fb} if server_label(ag_label)\n                                else {})" in ch
-        and "                if agent_name in _AGENT_ROLE and not cloud_only:\n                    server_refresh_modes(self.ctx)" in ch,
+        and "                if agent_name in _AGENT_ROLE and not cloud_only:\n"
+        "                    # a sleeping server is woken after the headers, with a step\n" in ch
+        and "                    server_refresh_modes(self.ctx, wake=False)" in ch,
         # Fast asks the cloud first (when it is on), then the server, then this Mac
         "after the cloud ladder": ch.index('status("cloud power unavailable — running locally")')
         < ch.index("                if lbl in _seat_fb:\n                    # a mode's server seat")
@@ -29988,12 +29990,12 @@ _W46_MUT = [
     ("woken without the setting known", '(e.get("sleep") or {}).get("enabled") is True', "True"),
     ("woken with no card", 'return bool(_srv_paired(e) and e.get("wake") and (e.get("sleep")', "return bool(_srv_paired(e) and (e.get(\"sleep\")"),
     ("woken for any failure", 'if s.get("reachable") or s.get("kind") != "offline":\n        return', 'if s.get("reachable"):\n        return'),
-    ("waiting for ever", "if waited >= SRV_WAKE_WAIT_S:\n            return \"tried\"",
+    ("waiting for ever", "if waited >= (wait_s or SRV_WAKE_WAIT_S):\n            return \"tried\"",
      "if False:\n            return \"tried\""),
     ("the answer not checked", "            if st == 200:\n                server_check(e)\n                return \"woke\"",
      "            if True:\n                server_check(e)\n                return \"woke\""),
     ("a wake that isn't said", "    if r:\n        _srv_wake_tl.notes", "    if False:\n        _srv_wake_tl.notes"),
-    ("woken by the refresh of a server not due", "        for e in due:\n            server_wake_if_down(e, ctx)\n",
+    ("woken by the refresh of a server not due", "        if wake:\n            for e in due:\n                server_wake_if_down(e, ctx)\n",
      "    for e in _srv_read(ctx):\n        server_wake_if_down(e, ctx)\n"),
     ("a wake that fails marks nothing down", 'if r == "tried" and ctx is not None:', "if False:"),
     ("a wake call every minute", "SRV_WAKE_GAP_S = 300 ", "SRV_WAKE_GAP_S = 60 "),
@@ -34723,6 +34725,87 @@ check("copy buttons (6b464): delegated .ccopy handler, textarea+execCommand fall
       and 'set(ok?"Copied":"Couldn\'t copy")' in _cp
       and 'code.querySelector("pre code")' in _cp and "pre.textContent" in _cp
       and "copyText(t).then(ok=>{" in _cp and "navigator.clipboard.writeText(pre" not in _cp)
+# ==== 6b461 the Code lane: server first, a wake with ten seconds and a Skip, bars that follow: begin ====
+print("== the Code lane follows the server first; the wake has 10 s and a Skip; the bars follow (6b461) ==")
+def _w461(src):
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    t = [1000.0]
+    ns["_srv_wake_clock"] = lambda: t[0]
+    def _spin(s_):
+        if t[0] > 5000:
+            raise RuntimeError("the wake never gave up")
+        t[0] += s_
+    ns["_srv_wake_sleep"] = _spin
+    ns["_srv_udp"] = lambda pkt, addr: None
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255"]
+    good = {"enabled": True, "minutes": 30, "supported": True, "wake": [_W46_MAC]}
+    routes, off = _w46_ok_routes(ns)
+    routes["/v1/sleep-config"] = [_SvResp(200, good)]
+    log = []
+    _w46_router(ns, routes, log)
+    ns["server_sleep_get"](ctx, sid)
+    e = ns["_srv_read"](ctx)[0]
+    name = e["name"]
+    steps, stats = [], []
+    st = lambda x: stats.append(x)
+    sp = lambda i, l, s_="run", dd="": steps.append((i, l, s_, dd))
+    # silence: gives up at the ten seconds, not the sixty
+    routes["/v1/info"] = [off] * 40
+    ns["_srv_wake_at"].clear(); t0 = t[0]
+    r1 = ns["server_wake"](e, None, None, ns["SRV_WAKE_ASK_S"])
+    used1 = t[0] - t0
+    # a Skip ends it inside a second
+    ns["_srv_wake_at"].clear(); t0 = t[0]; n = [0]
+    def sk():
+        n[0] += 1
+        return n[0] > 3
+    r2 = ns["server_wake"](e, None, None, ns["SRV_WAKE_ASK_S"], sk)
+    used2 = t[0] - t0
+    out["the wait"] = (ns["SRV_WAKE_ASK_S"] == 10 and r1 == "tried" and 10 <= used1 <= 13 and r2 == "skipped" and used2 < 1.5)
+    # the page's step: Waking, a countdown, then Woke / Skipped / didn't wake
+    ev = _th329.Event()
+    ns["_srv_wake_at"].clear()
+    routes["/v1/info"] = [off, off, _SvResp(200, {"gpu": {}})]
+    routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
+    w = ns["server_wake_ask"]([sid], ctx, st, sp, ev)
+    out["woke"] = (w == [name] and steps[0] == ("wake", "Waking " + name, "run", "10 s")
+                   and steps[-1] == ("wake", "Woke " + name, "done", "") and any(x.startswith("Waking ") and x.endswith(" s") for x in stats))
+    steps.clear(); stats.clear(); ns["_srv_wake_at"].clear()
+    routes["/v1/info"] = [off] * 40
+    w = ns["server_wake_ask"]([sid], ctx, st, sp, ev)
+    out["didn't wake"] = (w == [] and "didn" in steps[-1][1] and steps[-1][2] == "done" and "going on without it" in stats[-1])
+    steps.clear(); stats.clear(); ns["_srv_wake_at"].clear(); ev.set()
+    w = ns["server_wake_ask"]([sid], ctx, st, sp, ev)
+    out["skipped"] = (w == [] and steps[-1] == ("wake", "Skipped waking " + name, "done", "") and "going on without it" in stats[-1])
+    return all(out.values()), out
+
+_r461 = _w461(_MILLENAI_SRC)
+check("wake for a question (6b461): 10 s, a Skip, a step that says Waking, Woke, Skipped or didn't wake", _r461[0], "%r" % (_r461[1],))
+_s461 = _MILLENAI_SRC
+_ra = _s461[_s461.index("def remote_driver():"):_s461.index("def _agent_turn(")]
+check("the Remote agent plans on the server first, then the cloud, then this computer (6b461)",
+      _ra.index("server_side_pick(bound_ctx()") < _ra.index("if cloud_allowed():") < _ra.index("for l in CODE_LADDER:"))
+_ans = _s461[_s461.index("# THE CODE LANE: SERVER, THEN CLOUD, THEN THIS COMPUTER (6b461"):]
+_ans = _ans[:_ans.index("FAST WALKS THE SPEED LADDER")] if "FAST WALKS THE SPEED LADDER" in _ans else _ans
+check("the Code lane asks the server's coder before the cloud ladder, quietly, and goes on when it is down (6b461)",
+      "_lane == \"code\" and lbl in _seat_fb" in _ans and "defer_fail=True" in _ans and "lbl = _cl_fb or \"\"" in _ans
+      and _s461.index("# THE CODE LANE: SERVER, THEN CLOUD") < _s461.index("for _fc in _fl:")
+      and "if _cl_fb is not None and not lbl:" in _s461 and 'return "down"' in _s461)
+check("the agent lanes wake after the headers and warm this computer's engine only if the server fails (6b461)",
+      "server_refresh_modes(self.ctx, wake=False)" in _s461 and "_ag_wake = server_sleepers(self.ctx)" in _s461
+      and "_aw = server_wake_ask(_ag_wake, self.ctx, status, step, skip_ev," in _s461
+      and "if not _ag_wake:\n            _start_prewarm()" in _s461 and "resolve_agent_seat(agent_name, self.ctx)" in _s461[_s461.index("_aw = server_wake_ask"):])
+check("Skip reaches the wake without cancelling the question: the hurry id, a second Event (6b461)",
+      "_skip_jobs[hurry_id] = skip_ev" in _s461 and "_hb.get(\"skip\")" in _s461 and "_skip_jobs.pop(hurry_id, None)" in _s461
+      and "skip:true" in _s461 and 'class="wtskip"' in _s461)
+check("the sidebar bars are read at once when the server wakes or starts answering, then every 1.5 s until the answer ends (6b461)",
+      "function srvUseKick()" in _s461 and 'srvUseKick();}catch(e){}},' in _s461 and "if(!srvBoost){srvBoost=true;srvUseKick();}" in _s461
+      and "if(srvBoost&&u.fails<=0)u.due=Date.now()+1500;" in _s461 and "srvBoost=false;     // the bars go back" in _s461
+      and "u.due=Date.now()+srvUseWait(u.fails);" in _s461)
+# ==== 6b461: end ====
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
