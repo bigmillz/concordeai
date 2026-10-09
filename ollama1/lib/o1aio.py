@@ -268,12 +268,12 @@ class Aio:
             phase, fans = self.phase, sorted(self.status["fans"]) or [1, 2]
         if self.coolant_hot or phase in ("working", "hot"):
             pump = "extreme"
-        elif phase in ("ramp", "calibrating"):
+        elif phase in ("hold100", "ramp", "calibrating"):
             pump = "balanced"
         else:
             pump = "quiet"
         base = 100 if (self.coolant_hot or phase in ("working", "hot", "calibrating")) else \
-            self.pct if phase in ("ramp", "deepen", "deep") else 20
+            self.pct if phase in ("hold100", "ramp", "deepen", "deep") else 20
         out = {}
         for n in fans:
             L = self.learned.get("aio/fan%d" % n)

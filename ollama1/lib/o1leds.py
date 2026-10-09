@@ -8,8 +8,8 @@ cooler's pump head) is held at the same colour.
              service begins its own fall to 10% (its phase `deepen`: after 5 idle
              minutes, and only while its temperature guard allows; read from its status
              file, /run/ollama1/fan.json, with every 0.25 s sample):
-  bluing     white to BLUE over BLUE_S (30 s), a straight line in RGB and in time: the
-             fans' own 30 s fall, so the two land together
+  bluing     white to BLUE over BLUE_S (90 s), a straight line in RGB and in time: the
+             fans' own 90 s fall, so the two land together
   blue       BLUE at 100% while the fans are at 10% (`deep`). The fans leaving deep idle
              without the card working (heat, the processor at 60 C, a wake) take the
              lights back to white the way work does, the 2 s fade, then idle white again.
@@ -23,8 +23,8 @@ cooler's pump head) is held at the same colour.
              orange) and eased in and out (smoothstep)
   working    red at 100% while the card works
   cooling    the work ended: from red back through orange and yellow to white over
-             COOL_S (60 s), linear in time along the gradient: the fans' 60 s ramp
-             (lib/o1fan.py), so the two finish together. Work again mid-cool: the 5 s
+             COOL_S (60 s), linear in time along the gradient (the lights' own
+             time since 6b460: the fans hold 100% for 30 s, then fall over 90 s). Work again mid-cool: the 5 s
              rise again, from wherever it is (no white step).
 
 "The card works" is lib/o1work.py's GpuTrigger, the very rule that sends the fans to
@@ -78,10 +78,10 @@ RED = (255, 0, 0)
 STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
 RISE_S = o1work.RISE_S            # white to red takes this long (5 s)
-COOL_S = o1work.COOL_S            # red to white takes this long: the fans' ramp (60 s)
+COOL_S = o1work.COOL_S            # red to white takes this long (60 s; the fans' own curve is longer, 6b460)
 IDLE_DEEP_S = o1work.IDLE_DEEP_S  # with no fan service: idle this long, then white goes to blue (300 s)
 FAN_DEEP_PHASES = ("deepen", "deep")   # the fan service's phases that mean its deep idle (lib/o1fan.py): blue then
-BLUE_S = o1work.BLUE_S            # white to blue takes this long (30 s)
+BLUE_S = o1work.BLUE_S            # white to blue takes this long (90 s)
 BLUE = o1work.BLUE                # the deep-idle colour
 WAKE_FADE_S = o1work.WAKE_FADE_S  # blue back to white takes this long (2 s)
 FRAME_S = 0.04                    # at most 25 frames a second while anything moves
@@ -580,7 +580,7 @@ class Leds:
 
     def blue_from(self, now):
         """When the white starts going blue, or None (not yet). With a fan service: the moment it is seen in its
-        deep idle (deepen: its own 20% to 10% fall, over the same 30 s; or deep). Without one: IDLE_DEEP_S after
+        deep idle (deepen: its own 20% to 10% fall, over the same 90 s; or deep). Without one: IDLE_DEEP_S after
         the white, or after the fan service was last heard from, whichever is later (a service that stops
         mid-idle does not turn the lights blue at once)."""
         if self.fan_phase is not None:

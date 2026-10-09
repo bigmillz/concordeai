@@ -82,6 +82,42 @@ Patrick: "this spinner jitters too while it's streaming the output below."
   `paintSteps`; this edits `paintStream` and two CSS rules.
 - Test: "pinwheel survives streaming (6b462)" (served-HTML substrings).
 
+## 6b460 — the fans hold 100% for 30 s after the work, fall to 20% over 90 s, and to 10% over 90 s (kit, per Patrick)
+
+Patrick (2026-10-08): "run 100% after a query is done for thirty seconds, then scale down to twenty percent over the
+next minute and a half. Then same thing after five minutes, drop down to ten percent." Kit only (`ollama1/`), branch
+`fancurve-1008`. Not run on the server.
+
+| | before | now |
+|---|---|---|
+| work ends -> 100% | not held (the ramp began at once) | `hold100`, **30 s** |
+| 100% -> 20% | `ramp`, 60 s | `ramp`, **90 s** (after the hold) |
+| 20% | `idle20` from 60 s after the work | from **120 s** after the work, for 5 minutes |
+| 20% -> 10% | `deepen`, 30 s | `deepen`, **90 s** |
+| lights white -> blue | 30 s | **90 s** (they follow the fans' `deepen` and use the same `BLUE_S`) |
+
+- `lib/o1work.py`: new `FAN_HOLD_S = 30` and `FAN_RAMP_S = 90`; `BLUE_S` 30 -> 90 (the fans' deepen and the lights'
+  blue fade share it). `COOL_S` stays 60 and is now the lights' red-to-white only: the fans no longer use it.
+- `lib/o1fan.py`: `HOLD_S`, `RAMP_S`; a new phase `hold100` (100%, `hold_left` counts down the 30 s) before `ramp`
+  (`hold_left` = seconds to 20%); `idle_base` counts the 5 idle minutes from `HOLD_S + RAMP_S` after the work. The
+  phase drops deep idle and resets `deep_again` like `ramp`. Status words: "Fans: 100% for N s more, then down to
+  20%", "Fans: ramping down, NN% (20% in N s)", "Fans: going quieter, NN% (10% in N s)". `lib/o1aio.py`: the cooler
+  treats `hold100` like `ramp` (fans at 100%, pump balanced).
+- Unchanged and still overriding the curve: the temperature guard (holds `idle20`, or `hot` forces 100%),
+  calibrating, the stalled-fan minimums, the CPU-at-60-C trigger, the card's work; new work at any point goes
+  straight back to `working`.
+- Words: `bin/ollama1-admin` already knew `hold100` (its hold bar and "100% for N s more"); the line now says "then
+  down to 20% over 90 s". `bin/ollama1-fan`, `bin/ollama1-leds`, `setup.sh`, `lib/setuplib.sh` (the `leds_plan`
+  line) and the README tables say 30 s / 90 s / 90 s.
+- **Not changed, a choice for Patrick:** the lights' red-to-white cool-down is still 60 s, so it now finishes 60 s
+  before the fans (it used to finish with them). Say if the lights should follow the new 120 s.
+- Tests: `test_fan`, `test_aio`, `test_leds` moved to the new timings (hold boundaries at 29/30 s, ramp to 119/120 s,
+  deepen 300-390 s, the idle clock from 120 s, the status words, the cooler in `hold100`); `test_admin`, `test_panel`
+  untouched and green. `tests/mutate.py`: the ramp/hold/BLUE_S anchors moved, new mutants for the hold length and
+  level, the ramp counted from the end of the hold, the cooler in `hold100`, the idle clock without the hold.
+- **Unverified on the server:** the fan curve on the real hardware (rpm at each step), and that the lights' 90 s blue
+  fade lands with the fans' 90 s under the real 2 s polls.
+
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
 
 Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no

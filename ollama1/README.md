@@ -117,8 +117,8 @@ it asks for any it can't find, at the terminal):
 | `--timezone <Area/City>` | Default: the time zone the machine already has |
 | `--os-serial`, `--models-serial` | The two disks, by serial. `lsblk -d -o NAME,SIZE,MODEL,SERIAL` lists them. Setup checks each serial exactly before it wipes anything (only the models disk is ever wiped) |
 | `--hdd1-serial`, `--hdd2-serial` | Accepted and **ignored**, with a one-line note, so an old command line or `setup.env` keeps working. They are kept in `setup.env` only so `tools/remove-raid.sh` can find the old mirror's disks |
-| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then at once a ramp down to 20% over 1 minute, and 10% after 5 idle minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
-| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over the fans' 1-minute ramp when it stops, and goes from white to blue over 30 s when the fans go to their deep-idle 10% (white while they are at the idle 20%), always at full brightness (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
+| `--fans on\|off` | The graphics card's fan and the motherboard's fans at 100% while the graphics card is over 50% busy or the CPU is at 60 C or more, then 100% for 30 s after the work ends, a ramp down to 20% over the next 90 s, and a second ramp to 10% over 90 s after 5 idle minutes: see "Fans" below. **On unless you say `--fans off`** (or `OLLAMA1_FANS=0`). Saved in `setup.env` (`FANS=`), so a re-run without the flag keeps it |
+| `--leds on\|off` | The lights: every RGB device OpenRGB lists is white when idle, goes through yellow and orange to red in 5 s when the graphics card works (over 50% busy), back to white over 60 s when it stops, and goes from white to blue over 90 s when the fans go to their deep-idle 10% (white while they are at the idle 20%), always at full brightness (see "Lights" below). **Off unless you say `--leds on`** (or `OLLAMA1_LEDS=1`); `on` installs the `openrgb` package. Saved in `setup.env` (`LEDS=`), so a re-run without the flag keeps it |
 | `--wifi on\|off` | Wi-Fi as a backup connection and a second way to wake the server (see "Wi-Fi backup" below). **Off unless you say `--wifi on`** (or `OLLAMA1_WIFI=1`); `on` installs `iw` (and `wpasupplicant` if missing) and the `ollama1-wifi` tool, and sets up no network: `sudo ollama1-wifi set` does. Saved in `setup.env` (`WIFI=`), so a re-run without the flag keeps it |
 | `--leds-length N` | LEDs given to a board header that lists none, 1 to 1024 (default **60**): see "Lights" below. Saved in `setup.env` (`LEDS_LENGTH=`, only when you give it), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 300 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
@@ -717,7 +717,7 @@ around a little from time to time.
   - 1 h / 24 h area graphs of tokens per second, GPU busy, VRAM, GPU
     temperature and power, CPU busy, temperature and speed, and memory,
     with a crosshair that reads out any moment;
-  - **Hardware**: the CPU card below, the fans (the phase: working, ramp,
+  - **Hardware**: the CPU card below, the fans (the phase: working, hold100, ramp,
     idle20 or deep idle, the level, each fan's rpm and the pump), the lights
     (their colour now and why), storage (each disk's use, the RAID mirror
     and its check's progress), the services, the network, and GPU tuning
@@ -993,13 +993,14 @@ at a level that follows what the server is doing:
 | Phase | Level | When |
 |---|---|---|
 | `working` | 100% | the graphics card is over 50% busy, or the CPU is at 60 C or more |
-| `ramp` | 100% down to 20% | from the moment that ends: a straight line over 60 s, written in whole 2% steps (no hold at 100% first) |
-| `idle20` | 20% | from 60 s after the work ended, and from the start; the lights stay white (6b449) |
-| `deepen` | 20% down to 10% | after **5 idle minutes** (counted from when the ramp ends, or from the start or a wake, after the first measuring): a straight line over 30 s, written in whole 1% steps; the lights go from white to blue over the same 30 s (they read this phase from the status file) |
+| `hold100` | 100% | from the moment that ends, for **30 s** (6b460, per the owner) |
+| `ramp` | 100% down to 20% | then a straight line over **90 s**, written in whole 2% steps |
+| `idle20` | 20% | from 120 s after the work ended, and from the start; the lights stay white (6b449) |
+| `deepen` | 20% down to 10% | after **5 idle minutes** (counted from when the ramp ends, or from the start or a wake, after the first measuring): a straight line over **90 s** (6b460; it was 30 s), written in whole 1% steps; the lights go from white to blue over the same 90 s (they read this phase from the status file) |
 | `deep` | 10% | while deeply idle; the lights are blue |
 
-Work at any time, the ramp included, goes back to 100% at once; when it ends
-again the ramp starts over from 100%. A level is `pwm = round(percent * 255 /
+Work at any time, the 100% hold and the ramps included, goes back to 100% at once; when it ends
+again the 30 s at 100% and the ramp start over. A level is `pwm = round(percent * 255 /
 100)`: 20% is 51, 60% is 153, 100% is 255. While the service runs it always
 holds the outputs; whenever it stops, for any reason, they go back to their own
 control (the BIOS's automatic), and that is also what is in force at boot
@@ -1038,7 +1039,7 @@ of two triggers:
 
 - **The graphics card** (sysfs `gpu_busy_percent`) **over 50%** for 1.5 s in a
   row. The fans look every 2 s, so that is two looks in a row: a single 1 s
-  blip over 50% never starts a 1-minute ramp. It ends when the card has been at
+  blip over 50% never starts the 100% hold and the ramp. It ends when the card has been at
   or under 50% for 1.5 s in a row (a short dip between two answers keeps it
   working). No card reading counts as not busy.
 - **The CPU's temperature** (k10temp `Tctl`/`Tdie`, the "CPU" sensor below)
@@ -1119,13 +1120,13 @@ with the case fans. The cooler follows the same phases:
 |---|---|---|
 | `working`, temperature override | 100% | extreme |
 | first start (measuring) | 100% | balanced |
-| `ramp` | the same percent as the fans (100% falling to 20%) | balanced |
+| `hold100`, `ramp` | the same percent as the fans (100%, then falling to 20%) | balanced |
 | `idle20` | 20% (or higher for a fan that stalls) | quiet |
-| `deepen`, `deep` | 20% falling to 10% over 30 s, then 10% (6b434; a fan that stalls under 20% stays at 20%, one with a higher floor keeps it) | quiet |
+| `deepen`, `deep` | 20% falling to 10% over 90 s, then 10% (6b434, 90 s since 6b460; a fan that stalls under 20% stays at 20%, one with a higher floor keeps it) | quiet |
 
 The pump is at extreme only while working (the card over 50% or the CPU at
 60 C), during the temperature override, and when the coolant is hot; it is
-balanced from the first second of the ramp: a coolant at 40 C or more forces the pump to extreme and the
+balanced from the first second of the 100% hold and the ramp: a coolant at 40 C or more forces the pump to extreme and the
 fans to 100% until it is under 35 C. A cooler fan is measured at 100% on the
 first start and raised in steps if it stalls at a low level, like the case
 fans; one that reads no rpm stays at 100%. The cooler's status is read at
@@ -1171,7 +1172,7 @@ command line; that is your call). Do not run `fancontrol` or another fan
 daemon beside this one.
 
 **Status.** `ollama1-fan status` (no root) shows the level and the phase
-(`working`, `ramp 60%`, `idle20`, `deepen 15%`, `deep`), which outputs it
+(`working`, `hold100`, `ramp 60%`, `idle20`, `deepen 15%`, `deep`), which outputs it
 controls, each fan's setting, rpm and lowest level, the highest temperature
 and the sensor closest to its limit (and every sensor with its limit). The
 admin panel's CPU card shows the same in one line. Logs:
@@ -1202,11 +1203,11 @@ the lights any more.**
 | State | Colour | Fans (`ollama1-fan`) |
 |---|---|---|
 | idle | white, 255,255,255 | `idle20` (20%), however long the idle lasts |
-| bluing | white fading to blue over 30 s | `deepen` (20% falling to 10% over the same 30 s) |
+| bluing | white fading to blue over 90 s | `deepen` (20% falling to 10% over the same 90 s) |
 | blue (deep idle) | blue, 0,0,255 | `deep` (10%) |
 | waking | blue fading back to white in 2 s | work started, or the fans left deep idle (back at 20%, or up for heat) |
 | working | red, 255,0,0 | `working` (100%) |
-| cooling | red, then orange, yellow, white | `ramp` (100% down to 20% over the same 60 s) |
+| cooling | red, then orange, yellow, white, over 60 s | `hold100` then `ramp` (30 s at 100%, then 100% down to 20% over 90 s; the two no longer finish together, 6b460) |
 
 - **Work starts while the lights are white** (a request, a benchmark, a burn test: anything that keeps the
   card over 50%): over **5 s** the colour goes from white to red, along the gradient (so through yellow and orange).
@@ -1214,15 +1215,15 @@ the lights any more.**
   from the colour it has, with no white step.
 - **While working**: red at 100%.
 - **Work ends**: the colour goes back from red through orange and yellow to
-  white over **60 s**, linear in time along the gradient: exactly the fans'
-  ramp, so the lights and the fans finish together.
+  white over **60 s**, linear in time along the gradient (the lights' own time: since 6b460 the fans
+  hold 100% for 30 s and then fall over 90 s, so they finish later than the lights).
 - **Blue is the fans' deep idle, nothing else** (6b449, per the owner: "the lights shouldn't be blue when it's on
   idle 20%, only idle 10%"). The lights read the fan service's status file (`/run/ollama1/fan.json`, its `phase`)
   with every 0.25 s sample. While the fans are at their idle **20%** (`idle20`) the lights stay **white, however long
   the idle lasts**: the fans' 5 idle minutes may be held up by their temperature guard (the CPU at 50 C or more, the
   card's junction at 60 C or more, any sensor within 10 C of its limit) or by the CPU at 60 C keeping them at 100%,
   and the lights wait with them. When the fans begin their fall to **10%** (`deepen`) the lights go from white to
-  **blue** over the same **30 s**, a straight line in RGB and in time, and stay blue at 100% while the fans are at
+  **blue** over the same **90 s**, a straight line in RGB and in time, and stay blue at 100% while the fans are at
   10% (`deep`). The fans leaving deep idle without the card working (the guard, the CPU trigger, a wake) take the
   lights back to white the way work does: **in 2 s** (less from part way), then white idle again, with the idle
   minutes still counting; when the fans fall again the lights go blue again.
@@ -1309,7 +1310,7 @@ and pokes the service (`SIGUSR1`), which connects afresh and starts white at 100
 
 **Status.** `ollama1-leds status` (no root): the colour name, the colour now and what the lights
 are doing, the card's load and whether it counts as working, the brightness and the rule for the blue ("white goes
-to blue over 30 s when the fans go to 10% (fans now: idle20)", or "... on the lights' own clock (no fan service
+to blue over 90 s when the fans go to 10% (fans now: idle20)", or "... on the lights' own clock (no fan service
 running)"), the devices found
 and their mode (and, under each, its zones with the LEDs each has after the resize), and any error. `/run/ollama1/leds.json` has `state` (the colour), `phase` (idle,
 bluing, blue, waking, rising, working, cooling), `rgb`, `brightness` (always 1.0), `blue` (0 white to 1 blue), `working`, `cool_left`, `idle_s`, `gpu_pct` and `fans` (the fan service's phase as the lights last read it, or null: no fan service), and per device `zones` (`name`, `leds`). The admin page's lights card lists the same zones. The admin panel's CPU card shows one line, "Lights: ...". Logs:
