@@ -36400,6 +36400,15 @@ body.resizing{cursor:col-resize;user-select:none}
   padding:12px 10px 5px;user-select:none}
 .cgroup:first-child{padding-top:2px}
 .cgroup.recents{display:flex;align-items:center;justify-content:space-between}
+.cgroup .fold{display:flex;align-items:center;gap:6px;background:none;border:0;
+  padding:0;margin:0;font:inherit;letter-spacing:inherit;text-transform:inherit;
+  color:inherit;cursor:pointer;text-align:left}
+.cgroup .fold:hover,.cgroup .fold:focus-visible{color:var(--text)}
+.cgroup .fold:focus-visible{outline:1px solid var(--faint);outline-offset:2px;border-radius:3px}
+.fchev{display:block;flex:none;width:0;height:0;border-style:solid;
+  border-width:.32em 0 .32em .52em;border-color:transparent transparent transparent currentColor;
+  transition:transform .15s}
+.fold[aria-expanded="true"] .fchev{transform:rotate(90deg)}
 .cgroup .rbtn{width:15px;height:15px;display:flex;align-items:center;
   justify-content:center;cursor:pointer;color:var(--faint);opacity:.9;
   text-transform:none;letter-spacing:0}
@@ -44581,6 +44590,26 @@ function recentsSplit(list,days,now,all){
   const shown=rest.filter(c=>(c.ts||0)>=from);
   return {pins:pins,shown:shown,hidden:rest.length-shown.length};
 }
+// FOLDING (6b470, per Patrick): Pinned and Recents fold from their headings.
+// Per machine, like the range (the lists are not per lane, so neither is this).
+var foldPinned=false,foldRecents=false;
+try{foldPinned=localStorage.getItem("millen.foldPinned")==="1";
+  foldRecents=localStorage.getItem("millen.foldRecents")==="1";}catch(e){}
+// pure: which rows a section shows. A search opens it (the saved state is not
+// touched); a folded one keeps only the chat the person is in.
+function foldView(rows,folded,searching,activeId){
+  if(!folded||searching)return {rows:rows,open:true,count:rows.length};
+  return {rows:rows.filter(c=>c.id===activeId),open:false,count:rows.length};
+}
+function toggleFold(which){
+  if(which==="pinned"){foldPinned=!foldPinned;
+    try{localStorage.setItem("millen.foldPinned",foldPinned?"1":"0");}catch(e){}}
+  else{foldRecents=!foldRecents;
+    try{localStorage.setItem("millen.foldRecents",foldRecents?"1":"0");}catch(e){}}
+  renderChats();
+  const b=document.querySelector('#chat-list [data-fold="'+which+'"]');
+  if(b)b.focus();
+}
 function setRecentsDays(d){
   recentsDays=d;
   try{localStorage.setItem("millen.recentsDays",String(d));}catch(e){}
@@ -44632,7 +44661,12 @@ function renderChats(){
     ||(window.chatQHits&&window.chatQHits.has(c.id));
   const mine=chats.filter(c=>laneOK(c)&&qOK(c));
   const sp=recentsSplit(mine,recentsDays,Date.now(),!!q);
-  const pins=sp.pins,rest=sp.shown;
+  const pv=foldView(sp.pins,foldPinned,!!q,curChat);
+  const rv=foldView(sp.shown,foldRecents,!!q,curChat);
+  const pins=pv.rows,rest=rv.rows;
+  const head=(which,name,v)=>'<button type="button" class="fold" data-fold="'+which
+    +'" aria-expanded="'+(v.open?"true":"false")+'"><span class="fchev"></span>'
+    +name+(v.open?'':'<span class="fldn"> \u00b7 '+v.count+'</span>')+'</button>';
   const row=c=>
     '<div class="chat-item'+(c.id===curChat?" active":"")
     +(c.pin?" pinned":"")+'" data-id="'+esc(c.id)+'">'
@@ -44642,13 +44676,13 @@ function renderChats(){
     +PIN_SVG+'</span>'
     +'<span class="cx" title="Delete chat">\u00d7</span></div>';
   let html="";
-  if(pins.length)
-    html+='<div class="cgroup">Pinned</div>'+pins.map(row).join("");
-  if(rest.length||sp.hidden){
-    html+='<div class="cgroup recents"><span>Recents</span>'
+  if(sp.pins.length)
+    html+='<div class="cgroup">'+head("pinned","Pinned",pv)+'</div>'+pins.map(row).join("");
+  if(sp.shown.length||sp.hidden){
+    html+='<div class="cgroup recents">'+head("recents","Recents",rv)
       +'<span class="rbtn" title="Recents options">'+OPTS_SVG+'</span></div>';
     html+=rest.map(row).join("");
-    if(sp.hidden)html+='<div class="chidden">'+sp.hidden+' older chat'
+    if(sp.hidden&&rv.open)html+='<div class="chidden">'+sp.hidden+' older chat'
       +(sp.hidden===1?"":"s")+' hidden \u00b7 <span class="rall">Show all</span></div>';
   }
   if(chatsErr)html='<div class="cempty">'+esc(chatsErr)+'</div>';
@@ -44657,6 +44691,10 @@ function renderChats(){
       :uiMode==="code"?"No code chats yet"
       :uiMode==="funnel"?"No funnels yet":"No chats yet")+'</div>';
   el.innerHTML=html;
+  if(!el._foldWired){el._foldWired=true;
+    el.addEventListener("click",ev=>{
+      const f=ev.target.closest&&ev.target.closest(".fold");
+      if(f&&el.contains(f))toggleFold(f.dataset.fold);});}
   const rb=el.querySelector(".rbtn");
   if(rb)rb.addEventListener("click",ev=>{ev.stopPropagation();recentsMenuOpen(rb);});
   const ra=el.querySelector(".rall");

@@ -35440,8 +35440,8 @@ check("Recents range: pinned always shown (latest pinned first), the rest newest
               '[["p2","p1"],["a","b","c"],2]', '[["p2","p1"],["a","b","c","d","e"],0]'], str(_pr))
 check("sidebar: Pinned and Recents sections, a range menu (1 day to All), no date groups (6b467)",
       "chatBucket" not in page
-      and '<div class="cgroup recents"><span>Recents</span>' in page
-      and '<div class="cgroup">Pinned</div>' in page
+      and 'html+=\'<div class="cgroup recents">\'+head("recents","Recents",rv)' in page
+      and '<div class="cgroup">\'+head("pinned","Pinned",pv)' in page
       and '[1,"1 day"],[3,"3 days"],[7,"7 days"],[14,"14 days"],' in page
       and '[30,"1 month"],[0,"All"]' in page and "millen.recentsDays" in page
       and 'class="rall">Show all' in page and "#recents-menu" in page)
@@ -35453,6 +35453,24 @@ with tempfile.TemporaryDirectory() as _cd:
                {"op": "set", "id": _pa, "field": "pin_at", "old": 0, "new": 1760000000000},
                {"op": "set", "id": _pb, "field": "pin_at", "old": 0, "new": "x"}])
     _ld = {c["id"]: c for c in _cs["load_chats"](_cd)}
+_fj = os.path.join(_SMOKE_TMP, "fold470.js")
+with open(_fj, "w", encoding="utf-8") as fh:
+    fh.write(_jsfn(page, "function foldView(rows,folded,searching,activeId){") + r"""
+const R=[{id:"a"},{id:"b"},{id:"c"}];
+const o=x=>JSON.stringify([x.rows.map(c=>c.id),x.open,x.count]);
+console.log(JSON.stringify([o(foldView(R,false,false,"b")),o(foldView(R,true,false,"x")),
+  o(foldView(R,true,false,"b")),o(foldView(R,true,true,"x")),o(foldView([],true,false,"b"))]));
+""")
+_fr = json.loads(subprocess.run(["node", _fj], capture_output=True, text=True, timeout=30).stdout or "[]")
+check("fold state: open shows all, folded shows none (or only the active chat) with the full count, a search opens it (6b470)",
+      _fr == ['[["a","b","c"],true,3]', '[[],false,3]', '[["b"],false,3]', '[["a","b","c"],true,3]', '[[],false,0]'], str(_fr))
+check("sidebar folds: heading buttons with aria-expanded, one delegated click, storage keys, chevron CSS, options icon outside the button (6b470)",
+      'class="fold" data-fold="' in page and 'aria-expanded="\'+(v.open?"true":"false")' in page
+      and "millen.foldPinned" in page and "millen.foldRecents" in page
+      and "el._foldWired" in page and 'ev.target.closest(".fold")' in page
+      and '.fold[aria-expanded="true"] .fchev{transform:rotate(90deg)}' in page
+      and '.fchev{display:block' in page
+      and page.index('head("recents","Recents",rv)') < page.index('<span class="rbtn"'))
 check("a pin and its pinned-at stamp survive the chat store's save and load; a bad stamp is refused (6b467)",
       _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
       and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))

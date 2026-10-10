@@ -15676,3 +15676,23 @@ else, with an options icon next to it that allows you to pick, amongst other thi
   stamp through the chat store and loads them back, and a bad stamp is refused.
 - Not checked in the Browser pane or WKWebView: the page's script parses and the dev copy serves it; the menu's
   look is unseen.
+
+## 6b470 — Pinned and Recents fold up from their headings (per Patrick)
+
+Patrick (2026-10-10, on the installed app's old date groups): "what happened to having these sections so they can
+fold up?"
+
+- **The headings are buttons.** A small triangle (the `.snav-chev` style) points down when open, right when
+  folded; Enter/Space toggle, `aria-expanded` is set. A folded heading keeps a one-line summary: "RECENTS · 24".
+- **Stored per machine:** `localStorage` `millen.foldPinned` / `millen.foldRecents` ("1" = folded), in try/catch.
+  Not per lane, because the range (`millen.recentsDays`) is not either.
+- **One delegated click on `#chat-list`** (wired once, `el._foldWired`), so the redraws from streaming and new
+  chats cannot drop it. After a toggle the redraw puts focus back on the heading button.
+- **`foldView(rows,folded,searching,activeId)` is pure.** A search opens a folded section without touching the
+  saved state. A folded section still shows the row of the chat the person is in, so the open chat never
+  disappears; new chats made while Recents is folded stay hidden under the heading.
+- The sliders icon sits beside the Recents button, not inside it, so it stays clickable when folded. The "N older
+  chats hidden" line shows only while Recents is open.
+- Gauntlet: `foldView` under node, plus served-HTML checks (buttons, aria-expanded, keys, chevron CSS). The 6b467
+  heading assertion was reworded for the button markup. The script parses (node --check on the served page); the
+  look and the click are unseen in the Browser pane and WKWebView.
