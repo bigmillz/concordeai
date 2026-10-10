@@ -34137,7 +34137,7 @@ def _cm_wiring(src):
         # Max
         "Max sits right under Pro, above Cloud Only": src.index("    \"Max\": {") > src.index("    \"Pro\": {") and src.index("    \"Max\": {") < src.index("    \"Cloud Only\": {"),
         "Max is not a server role (the modes' roles are unchanged)": '_TIER_ROLE = {"Fast": "fast", "Thinking": "think", "Pro": "all"}' in src,
-        "Max seats and cloud in the handler": "_seats = (max_tier_seats(self.ctx) if _max\n" in src
+        "Max seats and cloud in the handler": "\n            _seats = (max_tier_seats(self.ctx) if _max\n" in src
         and "            elif _max and (_max_bench or len(council) > 1) and not images:" in src
         and "srv_merge=True, max_mode=True," in src and '"comp": max_cloud_ladder()' in src,
         "Max's header names its cloud models": "        if _max:                                  # Max names every cloud model it asks" in src,
