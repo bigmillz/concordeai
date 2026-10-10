@@ -20,6 +20,7 @@ import unittest
 
 import o1test_util as U  # noqa: F401  (sets OLLAMA1_PREFIX first)
 import o1fan
+import o1sleep
 
 NCT_ENABLE = {1: 5, 2: 5, 3: 1, 4: 0, 5: 5, 6: 5, 7: 5}      # as the chip had them
 NCT_PWM = {1: 90, 2: 90, 3: 120, 4: 255, 5: 90, 6: 90, 7: 90}
@@ -904,6 +905,47 @@ class TestDeepIdle(DeepCase):
         self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
         self.assertEqual(self.go(f, self.clock.t + 290)[0], "idle20")
         self.assertEqual(self.go(f, self.clock.t + 20)[0], "deepen")
+
+
+    def test_a_wake_in_the_hold_is_the_end_of_the_work_not_a_new_hold(self):
+        """6b468, per the owner: "make sure they go back to white when coming out of sleep": 20% at once, no 100%."""
+        f = self.fan()
+        self.busy(f)
+        self.p["gpu_busy"] = 0
+        self.assertIn("hold100", self.run_for(f, 4))
+        self.assertEqual(f.phase, "hold100")
+        f.wake()
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.assertEqual(self.go(f, self.clock.t + 290)[0], "idle20")
+        self.assertEqual(self.go(f, self.clock.t + 20)[0], "deepen")
+
+    def test_a_wake_from_deep_idle_is_20_percent_and_the_idle_clock_again(self):
+        f = self.fan()
+        self.idle_to(f, 400)
+        self.assertEqual(f.phase, "deep")
+        f.wake()
+        self.assertEqual(self.go(f, self.clock.t + 1)[0], "idle20")
+        self.assertEqual(f.pct, 20)
+
+    def test_work_right_after_a_wake_still_takes_the_fans_to_100(self):
+        f = self.fan()
+        self.idle_to(f, 400)
+        f.wake()
+        self.busy(f)
+        self.assertEqual(f.phase, "working")
+
+    def test_the_status_carries_the_wake_stamp_from_the_sleep_hook(self):
+        f = self.fan()
+        self.go(f, self.clock.t + 1)
+        self.assertEqual(o1fan.read_status(now=1_800_000_000)["woke"], 0)
+        o1sleep.record(last_wake=1_799_999_990)
+        f.wake()
+        self.go(f, self.clock.t + 1)
+        self.assertEqual(o1fan.read_status(now=1_800_000_000)["woke"], 1_799_999_990)
+        os.remove(o1sleep.sleep_file())
+        f.wake()                                                    # no stamp from the hook: the wall clock's now
+        self.go(f, self.clock.t + 1)
+        self.assertEqual(o1fan.read_status(now=1_800_000_000)["woke"], 1_800_000_000)
 
 
 class TestDeepIdleFloors(DeepCase):

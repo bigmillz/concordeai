@@ -2602,6 +2602,25 @@ MUTANTS = [
      '    return True', ['test_wifi']),
     ('wifi: status reads only "all", not the card\'s own ARP setting (6b450)', 'lib/o1wifi.py',
      '    for scope in ("all",) + ((iface,) if iface else ()):', '    for scope in ("all",):', ['test_wifi']),
+    # 6b468: a wake is a fresh idle for the fans and the lights
+    ('fan: a wake keeps the hold and the ramp going', 'lib/o1fan.py',
+     '        self.was_working, self.cool_from, self.calib_at = False, None, None',
+     '        self.calib_at = None', ['test_fan']),
+    ('fan: a wake does not write its stamp in the status', 'lib/o1fan.py',
+     '"at": int(self.wall()), "woke": self.woke_at, "phase"', '"at": int(self.wall()), "phase"', ['test_fan', 'test_leds']),
+    ('fan: a wake takes the wall clock, not the hook\'s stamp', 'lib/o1fan.py',
+     '        self.woke_at = st if isinstance(st, int) and not isinstance(st, bool) else int(self.wall())',
+     '        self.woke_at = int(self.wall())', ['test_fan']),
+    ('leds: a status from before the wake is believed', 'lib/o1leds.py',
+     '            if w is None or w < self.wake_stamp:', '            if False:', ['test_leds']),
+    ('leds: a status with no wake stamp is believed after a wake', 'lib/o1leds.py',
+     '            if w is None or w < self.wake_stamp:', '            if w is not None and w < self.wake_stamp:', ['test_leds']),
+    ('leds: the wake stamp is never taken', 'lib/o1leds.py',
+     '            self.wake_stamp = self.wake_time()', '            pass', ['test_leds']),
+    ('leds: with no hook stamp the wake is taken as 1000 s ago', 'lib/o1leds.py',
+     'else int(self.wall()) - 30', 'else int(self.wall()) - 1000', ['test_leds']),
+    ('sleep: the hook does not stamp the wake (6b468)', 'config/ollama1-sleep-hook',
+     '    "$HELPER" stamp wake\n', '', ['test_sleep']),
 ]
 
 

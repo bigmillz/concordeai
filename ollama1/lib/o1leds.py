@@ -47,7 +47,11 @@ Frames go out only when the rounded RGB changes, at most FRAME_S apart (25 a sec
 while anything moves; when nothing moves the loop wakes only for the 0.25 s sample and
 every POLL_S (2 s) the connection is looked at and the colour sent again (a keepalive:
 a device that was reset by a wake or a hot-plug gets it back). At start, and after a
-wake (the sleep hook's SIGUSR1), it is white and the 300 s start then.
+wake (the sleep hook's SIGUSR1), it is white and the 300 s start then (6b468, per the owner: "the lights stay
+blue when coming out of sleep ... make sure they go back to white"): a fan status written before the wake (its
+`woke` stamp older than the hook's `last_wake` in sleep.json, or none) is ignored, so the deep idle the fans were
+in cannot turn the lights blue again; the fan service takes a wake as the end of any work and a fresh idle (20%
+and its idle clock again, no 100% hold), and its first status after it is followed again.
 
 Zones with no real length yet (6b428, per the owner: "just send the same lighting signals to all of those
 headers"): an MSI Mystic Light board lists its addressable headers (JRAINBOW1, JRAINBOW2,
@@ -72,6 +76,7 @@ import time
 
 import o1common
 import o1fan
+import o1sleep
 import o1work
 from o1common import read_json_safe, write_json_atomic
 
@@ -548,6 +553,7 @@ class Leds:
         self.next_poll, self.retry_at, self.backoff = 0.0, 0.0, RETRY_FIRST_S
         self.sent, self.err, self.seen_name, self.seen_phase = None, None, None, None
         self.resync = False
+        self.wake_stamp = None                    # the sleep hook's stamp of the last wake this service was told of (6b468)
         self.reset(self.clock())
 
     def reset(self, now):
@@ -570,6 +576,12 @@ class Leds:
             return None
         return o1work.number(g)
 
+    def wake_time(self):
+        """The sleep hook's stamp of this wake (sleep.json last_wake, written before it signals either service); with
+        none, 30 s ago (the fan service wakes a moment before this one, never 30 s)."""
+        st = o1sleep.last().get("last_wake")
+        return st if isinstance(st, int) and not isinstance(st, bool) else int(self.wall()) - 30
+
     def read_fans(self, now):
         """The fan service's phase from its status (written every 2 s; stale after 15 s): `fan_phase`, None when
         there is no fresh one (`--fans off`, or the service stopped). A file that makes no sense is the same."""
@@ -577,6 +589,10 @@ class Leds:
             st = self.fans()
         except Exception:
             st = None
+        if self.wake_stamp is not None and isinstance(st, dict):
+            w = o1work.number(st.get("woke"))
+            if w is None or w < self.wake_stamp:
+                st = None                         # (6b468) written before this wake (/run survives a suspend): old news
         ph = st.get("phase") if isinstance(st, dict) else None
         self.fan_phase = ph if isinstance(ph, str) and ph else None
         self.fan_pct, self.fan_left = None, 0
@@ -750,6 +766,7 @@ class Leds:
         now = self.clock()
         if self.resync:
             self.reset(now)                       # a wake: white, the 5 minutes start again
+            self.wake_stamp = self.wake_time()
         if now >= self.next_sample:
             self.next_sample += SAMPLE_S                        # on the 0.25 s beat, not drifting with the frames
             if self.next_sample <= now:

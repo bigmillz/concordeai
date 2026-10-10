@@ -97,6 +97,7 @@ import time
 import o1aio
 import o1common
 import o1cpu
+import o1sleep
 import o1work
 from o1common import read_json_safe, write_json_atomic
 
@@ -366,6 +367,7 @@ class Fan:
         self.cool_from = None          # when the work last ended: the ramp is counted from here
         self.hot = {}                  # temperature key -> label, while over its limit
         self.born = self.clock()       # the start, or the last wake: the idle clock counts from here at the earliest
+        self.woke_at = 0               # the last wake's stamp (6b468): in the status, so the lights can tell old words from new
         self.calib_at = None           # the last time it was measuring at full speed
         self.deep_block = False        # a temperature keeps deep idle off (see deep_guard)
         self.deep_start = None         # when the fall to the deep level began (None: not in deep idle)
@@ -714,8 +716,16 @@ class Fan:
             self.aio.safe_exit()
 
     def wake(self):
-        """After a suspend: the cooler may have lost what it was told; send it all again."""
+        """After a suspend: the cooler may have lost what it was told; send it all again. And (6b468, per the owner:
+        "make sure they go back to white when coming out of sleep") a wake is the end of any work and the start of a
+        fresh idle: no 100% hold, 20% (idle20), the idle clock again from now, so the lights follow the fans back to
+        white and then to blue on the normal curve. Work or heat found at the next tick still takes precedence.
+        `woke` in the status is the sleep hook's stamp (sleep.json last_wake), so a status written before the wake
+        (a tick that ran first, or one left on /run across the sleep) is known as old."""
         self.born, self.deep_start, self.deep_again = self.clock(), None, False      # the idle clock starts again
+        self.was_working, self.cool_from, self.calib_at = False, None, None          # no hold, no ramp, no measuring clock
+        st = o1sleep.last().get("last_wake")
+        self.woke_at = st if isinstance(st, int) and not isinstance(st, bool) else int(self.wall())
         if self.aio:
             self.aio.reset()
 
@@ -759,7 +769,7 @@ class Fan:
                 row["tach_raw"], row["rpm"], row["label"] = row["rpm"], pump_rpm, "Pump"
                 row["note"] = "the cooler's pump (its own rpm reading); the header's tach is in tach_raw"
         shown = [o for _row, o in rows]
-        st = {"at": int(self.wall()), "phase": self.phase, "pct": self.pct, "level": self.status_level, "why": self.why,
+        st = {"at": int(self.wall()), "woke": self.woke_at, "phase": self.phase, "pct": self.pct, "level": self.status_level, "why": self.why,
               "hold_left": self.left,
               "controlling": controlling_text(shown), "outputs": [row for row, _o in rows], "temps": live["temps"],
               "unconnected": gone, "pump": pump,
