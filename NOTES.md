@@ -278,6 +278,39 @@ ladder first, the server second.
 - Tests: `6b461` section (wake 10 s / skip / the three step endings on a fake clock, the driver order, the Code lane's
   order, the post-header wake, the skip route, the bar kick); the 6b346 mutations follow the moved wake code.
 
+## 6b469 — the benchmark on this computer: a load that stalls is cut, Skip this model, a crowded machine says so (per Patrick)
+
+Patrick (2026-10-09): the benchmark on "This computer" sat at "Model 4 of 9 · Gemma 4 12B", "loading", the bar at the
+very start, for several minutes with only Stop; his screenshot also showed Llama 3.2 3B with "+12.2 GB, 35.1 of 48 GB
+in use at peak, memory pressure". "Do we want that model? And why would it die?" Branch `benchload-1009`.
+
+The model is fine (files complete, a core model). The fault was the benchmark's local load: it waited up to
+`BENCH_LOAD_CAP` 300 s, saw a dead process only until the port opened, and the one-token warm-up after the port had
+no look at the process at all. Other copies' engines load on the same 88xx ports and the same memory (a test run on
+the Mac), so a port taken by another program, an engine that died or was replaced, or a wedged load all looked like
+"loading". The 12.2 GB was every engine on the machine, not the model's.
+
+- **The wait has eyes** (`_BenchMLX.load`): every 0.25 s it looks for Stop, Skip, the engine process still running and
+  still the one `_mlx_procs` holds, the port still ours (another program holding it `BENCH_PORT_LOST_S` 5 s fails),
+  and the model's allowance. The warm-up answer keeps the same check if it fails. Ollama's load request gets the same
+  allowance as its timeout (`_BenchOllama.load`).
+- **The limit** `BENCH_LOAD_S` 90 s; a model over `BENCH_LOAD_OVER_GB` 20 GB (its `MODEL_MEM_BYTES`) gets
+  `BENCH_LOAD_PER_GB` 10 s more per GB (`bench_load_allow`). The server benchmark keeps `BENCH_LOAD_CAP`.
+- **Plain reasons.** "Failed: Gemma 4 12B didn't load: its engine stopped.", "...didn't load in 90 s: it never
+  answered." (the process is there, the port is not ours/open), "...it didn't answer." (the warm-up or Ollama timed
+  out), "...another program is using its port." The engine is then closed by the existing path (`eng.close` ->
+  `_retire_engine`: terminate, kill), memory settles, and the run goes on with the next model.
+- **Skip this model.** A button on the loading row of this computer's run; `POST /api/bench/skip` (`bench_skip`) sets
+  `_bench_skip` and cuts the call in flight like Stop; the row says "Skipped." and the run goes on. It does nothing
+  unless a model is loading, and the flag is cleared when each load starts and ends.
+- **A crowded machine.** If memory pressure was already high when a model started (kernel level 2+, or
+  `BENCH_CROWD_PCT` 85%), or the rise is over twice the model's size plus 2 GB, the row keeps no memory figures,
+  gets `crowded` and the note "Other programs were using memory."
+- **Touched:** `_BenchMLX.load`, `_BenchOllama.load`, `_bench_http`, `_bench_one`, new `bench_load_allow`,
+  `_bench_span`, `bench_skip`, `BenchSkipped`; the `/api/bench/skip` route; page JS `bmRow` and one delegated click
+  handler on `#bm`; `BENCH_FIELDS` gains `crowded`. Gauntlet: `_bm_load` (fake clock; dead, replaced, taken port,
+  90 s, allowance, Skip, a whole run, crowded). Not run: the full gauntlet.
+
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
 
 Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no
