@@ -12919,10 +12919,10 @@ def _chat_op(chats, op, bk=None):
         return {"ok": True}, True
     if kind == "set":
         f, old, new = op.get("field"), op.get("old"), op.get("new")
-        if f not in ("title", "pin", "named", "lane", "pin_at"):
+        if f not in ("title", "pin", "named", "lane", "pin_at", "unread"):
             return {"err": "bad field"}, False
         cur = c.get(f)
-        same = (cur == old or (f in ("pin", "named", "pin_at")
+        same = (cur == old or (f in ("pin", "named", "pin_at", "unread")
                                and not cur and not old))
         if not same:
             return {"conflict": cur}, False
@@ -12940,6 +12940,11 @@ def _chat_op(chats, op, bk=None):
                     or new < 0):
                 return {"err": "bad pin_at"}, False
             c[f] = int(new)
+        elif f == "unread":
+            # an answer came in that the person hasn't seen (6b471)
+            if not isinstance(new, bool):
+                return {"err": "bad unread"}, False
+            c[f] = new
         else:
             c[f] = bool(new)
         return {"ok": True}, True
@@ -34774,6 +34779,7 @@ select option{background:#16171b;color:#ececec}
   --accent-dim:rgba(255,255,255,.10);
   --teal:#c8c8c8;            /* was the secondary hue; now a light grey */
   --red:#e26d5a;             /* kept: errors and the update flag */
+  --unread:#4a8cf7;          /* the blue dot on a chat with an unseen answer (6b471) */
   --radius:10px;
   --mono:'IBM Plex Mono',ui-monospace,monospace;
   --sans:'Space Grotesk',system-ui,sans-serif;
@@ -35194,6 +35200,12 @@ body.resizing{cursor:col-resize;user-select:none}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
 }
 .chat-item .ct{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* unread (6b471): a solid blue dot in the row's left padding, out of flow like the
+   pin, so the title text never shifts */
+.chat-item{position:relative}
+.chat-item .cdot{position:absolute;left:2px;top:50%;width:7px;height:7px;
+  margin-top:-3.5px;border-radius:50%;background:var(--unread)}
+.chat-item.unread .ct{color:var(--text)}
 .chat-item .cx{color:var(--faint);visibility:hidden;font-size:13px;padding:0 3px}
 .chat-item:hover .cx{visibility:visible}
 .chat-item .cx:hover{color:var(--red)}
@@ -42300,6 +42312,9 @@ async function send(){
   }
   curHid="";liveDrafts=0;
   const isErr=full.trim().startsWith("⚠️")||full.includes("\n⚠️");
+  // seen or not is decided now, as the answer ends (6b471)
+  const goesUnread=unreadDecision(!!full,isErr,wasAborted,myChat,curChat,
+    document.visibilityState!=="hidden");
   if(full&&!isErr&&!aiDiv.querySelector(".mact"))
     msgActions(aiDiv,"assistant",stripTokens(full));
   if(!full&&!wasAborted){
@@ -42349,6 +42364,8 @@ async function send(){
   input.focus();
   // the chat as saved (the stream has closed, so the answer is on disk)
   const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);
+  if(goesUnread&&saved&&unreadDecision(true,false,false,saved.id,curChat,
+      document.visibilityState!=="hidden"))setUnread(saved.id,true);
   if(saved&&!saved.named&&full&&!isErr){
     const first=(saved.messages||[]).find(m=>m.role==="user");
     if(first)nameChat(saved,first.content);
@@ -42715,6 +42732,7 @@ async function loadChatsFromDisk(){
       messages=(c.messages||[]).slice();redrawOpen();
     }
     renderChats();
+    markSeen();
   }catch(e){setTimeout(loadChatsFromDisk,3000);}
 }
 // one chat, as the server saved it: adopted after every answer, so the
@@ -43220,11 +43238,31 @@ async function nameChat(c,text){
     await chatOps([{op:"set",id:c.id,field:"named",old:false,new:true}]);
   }catch(e){c.named=false;}
 }
+// UNREAD (6b471, per Patrick): an answer that finished in a chat the person
+// isn't looking at marks it. Pure: finished = a real answer that ran to its end
+// (not an error notice, not stopped); seen = that chat is open in a visible window.
+function unreadDecision(finished,isErr,stopped,chatId,openId,visible){
+  if(!finished||isErr||stopped)return false;
+  return !(chatId===openId&&visible);
+}
+function setUnread(id,on){
+  const c=chats.find(x=>x.id===id);
+  if(!c||!!c.unread===on)return;
+  c.unread=on;renderChats();
+  // refused or failed: the flag stays on this page for now
+  try{chatOps([{op:"set",id,field:"unread",old:!on,new:on}]).catch(()=>{});}catch(e){}
+}
+function markSeen(){
+  const c=curChat&&chats.find(x=>x.id===curChat);
+  if(c&&c.unread&&document.visibilityState!=="hidden")setUnread(c.id,false);
+}
+document.addEventListener("visibilitychange",markSeen);
+window.addEventListener("focus",markSeen);
 // PINNED and RECENTS (6b467, per Patrick): the sidebar has two sections,
 // not date groups. Recents can be cut to a recent stretch of days; pinned
 // chats are never cut, and a search looks at everything.
 const RECENT_RANGES=[[1,"1 day"],[3,"3 days"],[7,"7 days"],[14,"14 days"],
-  [30,"1 month"],[0,"All"]];
+  [30,"30 days"],[0,"All time"]];
 var recentsDays=0;
 try{const v=parseInt(localStorage.getItem("millen.recentsDays")||"0",10);
   if(RECENT_RANGES.some(r=>r[0]===v))recentsDays=v;}catch(e){}
@@ -43317,7 +43355,9 @@ function renderChats(){
     +name+(v.open?'':'<span class="fldn"> \u00b7 '+v.count+'</span>')+'</button>';
   const row=c=>
     '<div class="chat-item'+(c.id===curChat?" active":"")
-    +(c.pin?" pinned":"")+'" data-id="'+esc(c.id)+'">'
+    +(c.pin?" pinned":"")+(c.unread&&c.id!==curChat?" unread":"")
+    +'" data-id="'+esc(c.id)+'">'
+    +(c.unread&&c.id!==curChat?'<span class="cdot" role="img" aria-label="unread"></span>':'')
     +'<span class="ct" title="'+esc(c.title||"chat")+'">'
     +esc(c.title||"chat")+'</span>'
     +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin to top")+'">'
@@ -43452,6 +43492,7 @@ function loadChat(id){
   inner.innerHTML="";
   messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
   renderChats();
+  markSeen();
 }
 renderChats();
 loadChatsFromDisk();

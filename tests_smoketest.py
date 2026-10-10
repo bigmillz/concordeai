@@ -34660,7 +34660,7 @@ check("sidebar: Pinned and Recents sections, a range menu (1 day to All), no dat
       and 'html+=\'<div class="cgroup recents">\'+head("recents","Recents",rv)' in page
       and '<div class="cgroup">\'+head("pinned","Pinned",pv)' in page
       and '[1,"1 day"],[3,"3 days"],[7,"7 days"],[14,"14 days"],' in page
-      and '[30,"1 month"],[0,"All"]' in page and "millen.recentsDays" in page
+      and '[30,"30 days"],[0,"All time"]' in page and "millen.recentsDays" in page
       and 'class="rall">Show all' in page and "#recents-menu" in page)
 with tempfile.TemporaryDirectory() as _cd:
     _o = lambda ops: _cs["chat_ops"](ops, _cd)["results"]
@@ -34691,6 +34691,37 @@ check("sidebar folds: heading buttons with aria-expanded, one delegated click, s
 check("a pin and its pinned-at stamp survive the chat store's save and load; a bad stamp is refused (6b467)",
       _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
       and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))
+
+# --- 6b471: unread dot ---------------------------------------------------
+_uj = os.path.join(_SMOKE_TMP, "unread471.js")
+with open(_uj, "w", encoding="utf-8") as fh:
+    fh.write(_jsfn(page, "function unreadDecision(finished,isErr,stopped,chatId,openId,visible){") + r"""
+console.log(JSON.stringify([unreadDecision(true,false,false,"a","b",true),unreadDecision(true,false,false,"a","a",true),
+  unreadDecision(true,false,false,"a","a",false),unreadDecision(true,true,false,"a","b",true),
+  unreadDecision(true,false,true,"a","b",true),unreadDecision(false,false,false,"a","b",true)]));
+""")
+_ur = json.loads(subprocess.run(["node", _uj], capture_output=True, text=True, timeout=30).stdout or "[]")
+check("unread decision: finished in another chat marks; in the open, visible chat it does not; hidden window marks; errors, stops and empty answers never (6b471)",
+      _ur == [True, False, True, False, False, False], str(_ur))
+check("unread dot: 7px solid blue, out of flow, aria-label, menu reads 30 days / All time, opening a chat clears it (6b471)",
+      "--unread:#4a8cf7" in page and ".chat-item .cdot{position:absolute;" in page
+      and "width:7px;height:7px" in page and "background:var(--unread)" in page
+      and 'class="cdot" role="img" aria-label="unread"' in page
+      and '[14,"14 days"],' in page and '"1 month"' not in page.split("RECENT_RANGES=")[1][:200]
+      and 'field:"unread"' in page and "markSeen();\n}" in page)
+with tempfile.TemporaryDirectory() as _cd:
+    _o = lambda ops: _cs["chat_ops"](ops, _cd)["results"]
+    _ua = "c" + "u" * 26
+    _o([{"op": "create", "id": _ua, "lane": "ai", "title": "U"}])
+    _ur1 = _o([{"op": "set", "id": _ua, "field": "unread", "old": False, "new": "yes"},
+               {"op": "set", "id": _ua, "field": "unread", "old": False, "new": 1},
+               {"op": "set", "id": _ua, "field": "unread", "old": False, "new": True}])
+    _ul = {c["id"]: c for c in _cs["load_chats"](_cd)}
+    _ur2 = _o([{"op": "set", "id": _ua, "field": "unread", "old": True, "new": False}])
+    _ul2 = {c["id"]: c for c in _cs["load_chats"](_cd)}
+check("unread survives the chat store's save and load, clears, and a non-boolean is refused (6b471)",
+      _ur1 == [{"err": "bad unread"}, {"err": "bad unread"}, {"ok": True}] and _ul[_ua].get("unread") is True
+      and _ur2 == [{"ok": True}] and not _ul2[_ua].get("unread"), str(_ur1) + str(_ur2))
 
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
