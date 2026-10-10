@@ -24544,7 +24544,7 @@ def _smc_pins(src):
         "header": "        if (len(council) > 1 and cloud_allowed() and not _srv_only\n" in ch,
         "no rescue": "            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:" in ch,
         # a council of server labels warms nothing here (the route stays empty)
-        "no warm-up": "        if (route is None and not cloud_only\n                and not all(server_label(l) for l in council)):" in ch,
+        "no warm-up": "            if (route is None and not cloud_only\n                    and not all(server_label(l) for l in council)):" in ch,
         "title": "            if (_srv_only and not _srv_lbl and council\n"
                  "                    and not server_label_down(user_base, council[0])):\n"
                  "                _srv_lbl = council[0]\n"
@@ -25724,8 +25724,8 @@ _MUT39 = [
     ("the page's stale model used for a mode",
      '            model_name = ""\n        elif srv_only_tier(tier):', '        elif srv_only_tier(tier):', "modes"),
     ("an engine warmed for a mode's server seat",
-     '        if route[0] == "mlx" and route_label and not _no_text_model:\n            def _prewarm(_lbl=route_label):',
-     '        if _seat_fb and not _no_text_model:\n            def _prewarm(_lbl="Llama 3.2 3B"):', "modes"),
+     '            if route[0] == "mlx" and route_label and not _no_text_model:\n                def _prewarm(_lbl=route_label):',
+     '            if _seat_fb and not _no_text_model:\n                def _prewarm(_lbl="Llama 3.2 3B"):', "modes"),
 ]
 INST_B.stop()
 _bad39 = []
@@ -28728,7 +28728,7 @@ def _m42_node(src):
     mt = src.index("function buildMeter(el){")
     pm = src.index("function paintMeter(el,pct){")
     meter = src[mt:src.index("buildMeter($(", mt)] + src[pm:src.index("let simGpu=", pm)]
-    js = _M42_ENV + gpu + state + meter + src[a:b] + _M42_TESTS
+    js = _M42_ENV + "let srvBoost=false;\n" + gpu + state + meter + src[a:b] + _M42_TESTS   # (6b461: the poll reads it)
     pth = os.path.join(_si_dir, "meters42.js")
     open(pth, "w").write(js)
     p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
@@ -29203,7 +29203,7 @@ def _m53_node(src):
     mt = src.index("function buildMeter(el){")
     pm = src.index("function paintMeter(el,pct){")
     meter = src[mt:src.index("buildMeter($(", mt)] + src[pm:src.index("let simGpu=", pm)]
-    js = _M42_ENV + gpu + sep + state.replace("let srvAllFrom=null,cloudSt=null;", "let srvAllFrom=null;") + meter + src[a:b] + _M53_TESTS
+    js = _M42_ENV + "let srvBoost=false;\n" + gpu + sep + state.replace("let srvAllFrom=null,cloudSt=null;", "let srvAllFrom=null;") + meter + src[a:b] + _M53_TESTS
     pth = os.path.join(_si_dir, "servers53.js")
     open(pth, "w").write(js)
     p = subprocess.run(["node", pth], capture_output=True, text=True, timeout=60)
@@ -34227,7 +34227,7 @@ _CM_MUT = [
     ("the council ignoring the plan's merge", "    _ladder = (cloud_plan[\"comp\"] if cloud_plan is not None\n               else compositor_ladder())",
      "    _ladder = compositor_ladder()"),
     ("titles asked of another provider", "            if _only_pid and _provider_of(conf) != _only_pid:\n                continue\n", ""),
-    ("Max without a roster of its own", "        _seats = (max_tier_seats(self.ctx) if _max\n", "        _seats = (resolve_tier_seats(tier, self.ctx) if _max\n"),
+    ("Max without a roster of its own", "\n            _seats = (max_tier_seats(self.ctx) if _max\n", "\n            _seats = (resolve_tier_seats(tier, self.ctx) if _max\n"),
     ("Max not run as a council", "            elif _max and (_max_bench or len(council) > 1) and not images:", "            elif False:"),
     ("Max cut at twelve", "[:(40 if max_mode else 12)]", "[:12]"),
     ("Max's merge by Gemma", "    if _mp and not max_mode:", "    if _mp:"),
