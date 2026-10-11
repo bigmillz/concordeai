@@ -7856,6 +7856,258 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
     raise RuntimeError("; ".join(errs) or "no image engine")
 
 
+# ==== photoedit: begin ====
+# EDIT THIS PICTURE (6b472, per Patrick: "Build photo editing" after a photo
+# of himself and "different hairstyles" got a refusal in words). A message
+# with a photo attached that asks to CHANGE it runs FLUX.2 klein's edit
+# command (mflux-generate-flux2-edit, mflux 0.19) on this Mac with the photo
+# as the reference. LOCAL ONLY: the photo never goes to a cloud painter or a
+# server, and a failed edit is never retried anywhere else. The segment holds
+# no cloud or server call on purpose; the gauntlet checks that.
+PE_NOTE = "Edited on this computer; your photo wasn’t sent anywhere"
+PE_TIER = "quick"                     # the klein rung: the only edit weights
+PE_BASE = "flux2-klein-4b"
+PE_TOOL = "mflux-generate-flux2-edit"
+PE_ETA_DEFAULT = 45.0                 # measured 32 s warm at 768 px, plus a cold load
+_PE_QUESTION = re.compile(
+    r"^\s*(?:what|which|who|whom|whose|why|how|where|when|is|are|was|were|"
+    r"does|do|did|tell\s+me|describe|explain|identify|read|translate|"
+    r"summari[sz]e|list|count|recommend|suggest)\b", re.I)
+_PE_WOULD = re.compile(
+    r"\b(?:what|how)\s+(?:would|will|might|could)\s+(?:i|he|she|they|we|it|this|"
+    r"my\s+\w+)\s+look\s*(?:like\s+)?(?:with|in|as|if|wearing|having)\b", re.I)
+_PE_PARTS = (r"hair(?:style|cut|line)?s?|background|backdrop|shirt|t-?shirt|outfit|"
+             r"clothes|clothing|jacket|suit|dress|hat|glasses|eyes?|eye\s+colou?r|"
+             r"skin|beard|mustache|moustache|sky|lighting|expression|face|"
+             r"colou?rs?|picture|photo|image|pic")
+_PE_RX = (
+    # change / swap / retouch a named part
+    re.compile(r"\b(?:change|swap|replace|recolou?r|restyle|retouch|edit|alter|"
+               r"modify|touch\s+up)\b\s+(?:out\s+)?(?:the|this|that|my|his|her|"
+               r"their|its|a|an)?\s*(?:\w+\s+)?(?:" + _PE_PARTS + r")\b", re.I),
+    # remove / erase a thing or a person
+    re.compile(r"\b(?:remove|erase|delete|get\s+rid\s+of|take\s+(?:out|away)|"
+               r"cut\s+out)\b\s+(?:the\s+|this\s+|that\s+|my\s+|his\s+|her\s+|"
+               r"their\s+|all\s+(?:the\s+)?|any\s+|everyone\s+|everything\s+)?"
+               r"(?:\w+\s+){0,2}(?:person|people|man|men|woman|women|guy|girl|"
+               r"kid|child|children|background|backdrop|object|car|sign|logo|"
+               r"watermark|text|tree|building|dog|cat|glasses|sunglasses|hat|"
+               r"beard|mustache|moustache|wrinkles|blemish\w*|pimples?|acne|"
+               r"tattoos?|stains?|shadows?|reflection|crowd|strangers?|"
+               r"photobomber|him|her|them|everyone|background\s+people)\b", re.I),
+    # add / give / put a thing on the subject
+    re.compile(r"\b(?:add|put|give|paste|place)\b\s+(?:me|him|her|them|us|"
+               r"my\s+\w+|the\s+\w+)?\s*(?:an?\s+|some\s+|the\s+)?(?:\w+\s+){0,2}"
+               r"(?:hair(?:style|cut)?|buzz\s*cut|crew\s*cut|undercut|pixie|"
+               r"beard|mustache|moustache|sunglasses|glasses|hat|cap|tattoos?|earrings?|necklace|scarf|tie|mask|"
+               r"crown|wings|horns|bangs|fringe|mohawk|afro|ponytail|braids?|"
+               r"dreadlocks|wig|makeup|lipstick|snow|rain|rainbow|sunset|"
+               r"bokeh|filter|border|halo)\b", re.I),
+    re.compile(r"\bput\s+(?:me|him|her|us|them)\s+(?:in|on|at|into|onto|"
+               r"next\s+to|inside)\b", re.I),
+    # show me with / in / as ...
+    re.compile(r"\b(?:show|let\s+me\s+see|i\s+(?:want|d\s+like|would\s+like)"
+               r"\s+to\s+see)\s+(?:me|him|her|us|them)\s+(?:again\s+|also\s+|"
+               r"now\s+)?(?:with|in|as|wearing|having|if)\b", re.I),
+    # try / give a few styles
+    re.compile(r"\btry\b\s+(?:on\s+|out\s+)?(?:an?\s+|some\s+|the\s+|different\s+|"
+               r"other\s+|a\s+few\s+|several\s+|various\s+)?(?:\w+\s+){0,2}"
+               r"(?:hair\w*|bang\w*|beard|mustache|moustache|glasses|sunglasses|"
+               r"hat|buzz\s*cut|mohawk|afro|bald|wig|colou?rs?)\b", re.I),
+    re.compile(r"\b(?:show|give|try|see|make|do|generate|create|gimme)\b.{0,40}?"
+               r"\b(?:different|other|new|various|several|a\s+few|some)\s+"
+               r"(?:hair\s*(?:style|cut|colou?r)s?|haircuts?|hairstyles?|looks|"
+               r"outfits|beards|glasses|hats)\b", re.I),
+    # whole-picture verbs
+    re.compile(r"\b(?:redraw|repaint|reimagine|re-?imagine|cartoonif\w+|"
+               r"colori[sz]e|photoshop|airbrush|de-?age)\b", re.I),
+)
+# make / turn / transform it into something LOOKING different: the rest of
+# the sentence must name a look, so "turn this into a table" stays a read
+_PE_MAKE = re.compile(
+    r"\b(?P<v>make|turn|transform|convert|render|redo)\b\s+(?:me|him|her|them|us|it|"
+    r"this|that|these|the\s+\w+(?:\s+\w+)?|my\s+\w+(?:\s+\w+)?)\b"
+    r"(?!\s+(?:an?|some)\b)(?P<rest>.*)$", re.I | re.S)
+_PE_LOOK = re.compile(
+    r"\b(?:look|looks|appear|older|younger|bald|blond|blonde|brunette|redhead|"
+    r"ginger|grey|gray|black|white|blue|green|red|pink|purple|orange|yellow|"
+    r"brown|silver|gold|smil\w*|taller|thinner|slimmer|muscular|cartoon|anime|"
+    r"pixar|disney|lego|clay|painting|painted|watercolou?r|oil|sketch|drawing|"
+    r"pencil|comic|manga|pop\s*art|cyberpunk|vintage|retro|noir|sepia|"
+    r"polaroid|sunny|sunset|night|dark|darker|bright|brighter|colou?rful|snow|"
+    r"winter|summer|stylis\w+|hair\w*|curly|straight|wavy|short|long|buzz|"
+    r"mohawk|beard|shaved?|clean-shaven|3d|sticker|statue|marble|sharper|"
+    r"clearer|background|sky)\b", re.I)
+
+
+def photo_edit_intent(text: str):
+    """The request to run on the attached photo when the message asks to
+    CHANGE it ("show me with different hairstyles", "make my hair blonde",
+    "remove the person on the left"), else None. Conservative: questions
+    about a photo ("what hairstyle suits me") and plain reads of it never
+    match. Only called when a photo is attached to this message."""
+    t = (text or "").strip()
+    if not t or len(t) > 400:
+        return None
+    t = _img_strip_pre(t) or t
+    if _PE_QUESTION.match(t) and not _PE_WOULD.search(t):
+        return None
+    if _PE_WOULD.search(t) or any(r.search(t) for r in _PE_RX):
+        return t.strip()
+    m = _PE_MAKE.search(t)
+    if m and _PE_LOOK.search(m.group(0)[len(m.group("v")):]):
+        return t.strip()
+    return None
+
+
+# shrink the photo to what the engine holds (long side 1024, sides a
+# multiple of 16, EXIF turn applied) with the engine's own Pillow
+_PE_PREP = (
+    "import sys\n"
+    "from PIL import Image, ImageOps\n"
+    "im = ImageOps.exif_transpose(Image.open(sys.argv[1])).convert('RGB')\n"
+    "w, h = im.size\n"
+    "s = min(1.0, 1024.0 / max(w, h))\n"
+    "w, h = max(256, int(w * s) // 16 * 16), max(256, int(h * s) // 16 * 16)\n"
+    "im.resize((w, h), Image.LANCZOS).save(sys.argv[2])\n"
+    "print('SIZE %d %d' % (w, h))\n")
+# the dev-only stand-in for the engine (hook photoedit-stub, gauntlet): copies
+# the reference to the output, or fails on photoedit-stub=fail
+_PE_STUB = (
+    "import shutil, sys\n"
+    "if sys.argv[3] == 'fail':\n"
+    "    sys.stderr.write('stub engine failed'); sys.exit(1)\n"
+    "shutil.copyfile(sys.argv[1], sys.argv[2])\n")
+
+
+class PhotoEditUnavailable(RuntimeError):
+    """The edit can't run here; the message says why, in a sentence."""
+
+
+def photo_edit_unavailable():
+    """'' when this Mac can edit a photo now, else the sentence that says
+    why not (nothing was sent anywhere)."""
+    if not studio_supported():
+        return ("Editing a photo only works on an Apple silicon Mac for now, "
+                "so it wasn’t edited, and your photo wasn’t sent "
+                "anywhere.")
+    t = studio_tier("image", PE_TIER)
+    tool = os.path.join(STUDIOS["image"]["venv"], "bin", PE_TOOL)
+    if not _studio_engine_ok("image") or not os.path.exists(tool):
+        return ("Editing a photo needs image generation on this Mac: add or "
+                "update it under **Settings › Models › Manage "
+                "models**. Your photo wasn’t sent anywhere.")
+    if not _studio_model_ok("image", PE_TIER) or not _snap_dir(t["repo"]):
+        return ("Editing a photo needs the Quick picture model (%s GB): add "
+                "it under **Settings › Models › Manage models**. "
+                "Your photo wasn’t sent anywhere." % t.get("gb", 4.6))
+    return ""
+
+
+def photo_edit_eta(ctx) -> dict:
+    """The time-left plan for an edit (X-Eta): the median of the edits this
+    profile has timed (their .render.json), else the measured default,
+    flagged as an estimate."""
+    secs = []
+    try:
+        fs = sorted(glob.glob(os.path.join(ctx.path(IMAGE_SUB), "*.render.json")),
+                    key=os.path.getmtime)[-30:]
+        for f in fs:
+            with open(f) as h:
+                d = json.load(h)
+            if d.get("edit") and float(d.get("secs") or 0) > 0:
+                secs.append(float(d["secs"]))
+    except Exception:
+        secs = []
+    if secs:
+        secs.sort()
+        return {"search": 0.0, "models": [], "final": round(secs[len(secs) // 2], 1),
+                "ftok": 0, "est": False}
+    return {"search": 0.0, "models": [], "final": PE_ETA_DEFAULT, "ftok": 0,
+            "est": True}
+
+
+def edit_photo(ctx, b64: str, request: str, sock=None, step=None) -> str:
+    """The edited picture's path, in ctx's pictures. Local FLUX.2 klein
+    only; raises PhotoEditUnavailable (say why), RenderBusy, or a plain
+    error from the engine. Never asks a cloud painter or a server."""
+    stub = _hook_arg("photoedit-stub") or (
+        "ok" if "photoedit-stub" in TEST_HOOKS else "")
+    if not stub:
+        why = photo_edit_unavailable()
+        if why:
+            raise PhotoEditUnavailable(why)
+    try:
+        raw = base64.b64decode(b64, validate=False)
+        if len(raw) < 16:
+            raise ValueError("empty")
+    except Exception:
+        raise PhotoEditUnavailable("I couldn’t read that photo, so nothing "
+                                   "was edited.")
+    if stub and raw.startswith(b"FAIL-STUB"):
+        stub = "fail"                  # the gauntlet's failing engine
+    if not _render_lock.acquire(timeout=5):
+        raise RenderBusy("already making one — ask again when it lands")
+    src = prepped = pf = None
+    out = stage_path(".png")
+    landed = False
+    try:
+        src = stage_path(".src")
+        fd = os.open(src, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+        _vb = os.path.join(STUDIOS["image"]["venv"], "bin")
+        t0 = time.time()
+        w = h = 0
+        if stub:
+            cmd = [sys.executable, "-c", _PE_STUB, src, out, stub]
+        else:
+            prepped = stage_path(".png")
+            rc, tail, cut = _run_render(
+                [os.path.join(_vb, "python3"), "-I", "-c", _PE_PREP, src, prepped],
+                120, sock)
+            if cut:
+                raise RenderBusy("stopped")
+            m = re.search(r"SIZE (\d+) (\d+)", tail)
+            if rc != 0 or not m or not os.path.exists(prepped):
+                raise PhotoEditUnavailable(
+                    "I couldn’t open that photo, so nothing was edited.")
+            w, h = int(m.group(1)), int(m.group(2))
+            t = studio_tier("image", PE_TIER)
+            # the request, then what must not move: a hairstyle ask leaves
+            # the face, the clothes and the background alone
+            ask = (request.strip().rstrip(".") + ". Keep everything else the "
+                   "same: the same person, face, pose, clothes and background.")
+            args = ["--model", _snap_dir(t["repo"]), "--base-model", PE_BASE,
+                    "--image-paths", prepped, "--prompt", "@prompt:prompt",
+                    "--steps", "4", "--guidance", "1.0",
+                    "--seed", str(secrets.randbelow(10 ** 6)),
+                    "--width", str(w), "--height", str(h),
+                    "--no-metadata", "--output", out]
+            cmd, pf = prompt_cmd(os.path.join(_vb, "python3"), "script",
+                                 os.path.join(_vb, PE_TOOL), args,
+                                 {"prompt": ask})
+        rc, tail, cut = _run_render(cmd, 900, sock)
+        if cut:
+            raise RenderBusy("stopped")
+        if rc != 0 or not os.path.exists(out):
+            raise RuntimeError(tail[-200:].strip() or "the engine stopped")
+        _render_note(out, {"w": w, "h": h, "steps": 4, "guidance": 1.0,
+                           "fmt": "png", "seed": 0, "neg": "", "edit": True},
+                     time.time() - t0)
+        final = _media_land(ctx, IMAGE_SUB, out)
+        landed = True
+        return final
+    finally:
+        for p in (src, prepped, pf):
+            drop_run_file(p)
+        if not landed:
+            drop_run_file(out)
+            drop_run_file(os.path.splitext(out)[0] + ".render.json")
+        _render_lock.release()
+# ==== photoedit: end ====
+
+
 # ---------------------------------------------------------------- export
 # FILES OUT (6b295, per Patrick: "add export for all the following formats
 # … performed intelligently, so that if the user asks 'can I export a
@@ -32828,6 +33080,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             auto_web = False
         if img_subject:
             auto_web = False
+        # EDIT THIS PICTURE (6b472): a photo attached to THIS message and a
+        # request to change it. Never a marked-up copy (6b355's own lane)
+        edit_req = (photo_edit_intent(_ann_q) if images and not _ann
+                    and not export_req else None)
+        if edit_req:
+            auto_web = False
 
         # a selected AGENT owns the request: its best installed model, its
         # specialist system prompt; Research routes to the research flow
@@ -33027,7 +33285,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the only thing that stamps _mlx_last_use, the janitor (which
         # skips a zero stamp) never released it. The warm-up now stamps
         # the clock itself, so anything it loads is reclaimable.
-        _no_text_model = (cloud_only or img_subject or vid_subject
+        _no_text_model = (cloud_only or img_subject or vid_subject or edit_req
                           or (export_req and export_req.get("lane")
                               == "retro"))
         def _start_prewarm():
@@ -33771,7 +34029,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the page decodes it (hdrText)
         self.send_header("X-Models", header_text(xm))
         # the time-left plan (6b459): measured figures, worked out up front
-        _ep = eta_plan(self.ctx, council, messages, bool(query or _links))
+        _ep = (photo_edit_eta(self.ctx) if edit_req else
+               eta_plan(self.ctx, council, messages, bool(query or _links)))
         if _ep:
             self.send_header("X-Eta", json.dumps(_ep, separators=(",", ":")))
         # ANSWER NOW (6b257): an unguessable per-request id the client
@@ -33980,7 +34239,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (_so_c0.split(SERVER_SEP, 1)[0] or "Your server")))
             hb_stop.set()
             return
-        if (img_subject or vid_subject or export_req) and not self._bench_held:
+        if (img_subject or vid_subject or export_req or edit_req) \
+                and not self._bench_held:
             if not bench_hold():
                 emit(AppText(BENCH_BUSY))
                 hb_stop.set()
@@ -34099,6 +34359,59 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (", or add video generation under **Settings "
                             "\u203a Models \u203a Manage models**"
                             if studio_supported() else "", str(exc)[:160]))
+            hb_stop.set()
+            return
+
+        if edit_req:
+            # LOCAL ONLY (6b472): the photo is edited on this Mac with the
+            # klein edit engine and goes nowhere else: no server, no cloud
+            # painter, and a failure is said, never retried elsewhere.
+            # "<name> Only" and Cloud Only are text routes; the edit runs
+            # here anyway and one line says so (nothing leaves this Mac)
+            _pe_note = ""
+            if _srv_only or cloud_only:
+                _pe_note = (" \u00b7 %s runs text, so this edit ran on this "
+                            "Mac" % ("Cloud Only" if cloud_only else
+                                     (_so_c0.split(SERVER_SEP, 1)[0]
+                                      or "Your server") + " Only"))
+                status("editing on this Mac \u2014 your photo stays here")
+            _pe_why = ("" if "photoedit-stub" in "".join(TEST_HOOKS)
+                       else photo_edit_unavailable())
+            if _pe_why:
+                step("image", "Couldn\u2019t edit the photo", "done",
+                     "nothing was sent")
+                emit(_pe_why)
+                hb_stop.set()
+                return
+            step("image", "Editing your photo", "run", "on this Mac")
+            status("editing your photo \u00b7 on this Mac")
+            try:
+                _b64 = images[0].split(",", 1)[1] \
+                    if images[0].startswith("data:") else images[0]
+                path = edit_photo(self.ctx, _b64, edit_req,
+                                  sock=self.connection)
+                step("image", "Edited the photo", "done", "on this Mac")
+                emit("![%s](/api/image/%s)\n\n*%s%s*"
+                     % ("Edited photo: " + edit_req[:80].replace("]", ""),
+                        os.path.basename(path), PE_NOTE, _pe_note))
+            except RenderBusy as rb:
+                if str(rb) != "stopped":
+                    step("image", "Another render is running", "done", "")
+                    emit("I\u2019m already making a picture \u2014 ask again "
+                         "when it lands, and I\u2019ll edit this one straight "
+                         "after.")
+            except PhotoEditUnavailable as pu:
+                step("image", "Couldn\u2019t edit the photo", "done",
+                     "nothing was sent")
+                emit(str(pu))
+            except StaleProfile:
+                raise
+            except Exception as exc:
+                step("image", "Couldn\u2019t edit the photo", "done",
+                     str(exc)[:70])
+                emit("The picture editor on this Mac hit a snag \u2014 try once "
+                     "more in a moment, and your photo wasn\u2019t sent "
+                     "anywhere. (%s)" % str(exc)[:160])
             hb_stop.set()
             return
 
