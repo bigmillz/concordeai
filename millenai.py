@@ -23984,7 +23984,9 @@ def _bench_settle():
     if floor is None:
         return
     end = time.monotonic() + BENCH_SETTLE_S
-    while time.monotonic() < end:
+    # a Stop is not waited on: nothing is measured after it, and a machine whose
+    # memory was still coming back made Stop take 5+ s (6b470)
+    while time.monotonic() < end and not _bench_stop.is_set():
         time.sleep(BENCH_SETTLE_STEP)
         now = _bench_avail()
         if now is None or now <= floor:

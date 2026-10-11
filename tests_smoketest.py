@@ -9641,7 +9641,7 @@ _mg_mut = [page.replace('<div id="snav-models-kids" hidden>', '<div id="snav-mod
            page.replace('data-pane="p-cloud">Cloud<', 'data-pane="p-cloud">Cloud power<', 1),
            page.replace('.snav-grp[aria-expanded="true"] .snav-chev{transform:rotate(90deg)}',
                         '.snav-grp[aria-expanded="true"] .snav-chev{transform:none}', 1),
-           page.replace("border-width:.32em 0 .32em .52em;", "border-width:.2em 0 .2em .3em;", 1)]
+           page.replace("border-width:.32em 0 .32em .52em;", "border-width:.2em 0 .2em .3em;")]   # every copy (the fold chevrons share it, 6b470)
 check("settings rail: Models opens Local, Cloud and Servers; a pane under it opens the group",
       _mg_ok(page) and not any(_mg_ok(m_) for m_ in _mg_mut) and all(m_ != page for m_ in _mg_mut),
       "%r" % ([_mg_ok(page), [_mg_ok(m_) for m_ in _mg_mut]],))
