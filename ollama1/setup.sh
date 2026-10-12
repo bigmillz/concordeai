@@ -790,6 +790,8 @@ ufw default allow outgoing >/dev/null
 ufw default deny routed >/dev/null
 for r in OpenSSH ssh 22 22/tcp; do ufw delete allow "$r" >/dev/null 2>&1 || true; done
 run ufw allow in on "$LANIF" from "$HOME_LAN" to any port 22 proto tcp comment 'ollama1: SSH from the home LAN'
+# the Wi-Fi card's own SSH rule (6b474) is added by the "Wi-Fi backup" step below (ollama1-wifi setup), only while the
+# backup is on and a network is set, and found again by its comment; this step never removes it
 if [ "$LANIF" = br0 ]; then
   # Bridged frames (a device on the bridge's other port) don't go through iptables while
   # bridge netfilter is off (60-ollama1-bridge.conf). If something loads

@@ -25,7 +25,7 @@ BRIDGE = "network:\n  version: 2\n  bridges:\n    br0:\n      interfaces: [enp5s
 UNIVERSAL = ":".join(["a8", "bb", "cc", "dd", "ee", "01"])          # built, so the personal-values scan sees no real-looking MAC
 LOCAL = ":".join(["a2", "bb", "cc", "dd", "ee", "01"])
 FAKE = os.path.join(U.HERE, "fakewifi.py")
-TOOLS = ["iw", "netplan", "ip", "apt-get", "udevadm", "networkctl", "systemctl"]
+TOOLS = ["iw", "netplan", "ip", "apt-get", "udevadm", "networkctl", "systemctl", "ufw"]
 
 
 class Fixture(unittest.TestCase):
@@ -510,6 +510,104 @@ class TestWiredDownGoesOverWifi(Fixture):
         self.linkdown(all=1)
         shutil.rmtree(os.path.join(self.net, "wlo1"))
         self.assertEqual(self.lines(), [])
+
+
+class TestSshOverWifi(Fixture):
+    """6b474: the firewall let SSH in on the wired bridge only, so with the cable out the Wi-Fi address answered pings
+    and refused SSH. While the backup is on and a network is set, one ufw rule opens SSH on the Wi-Fi card for the home
+    LAN; `set` and setup add it, `remove` and `--wifi off` take out only that rule, found by its comment."""
+
+    LAN = "192.0.2.0/24"
+    WIRED = "22/tcp on br0 ALLOW IN    192.0.2.0/24 # ollama1: SSH from the home LAN"
+    RULE = "22/tcp on wlo1 ALLOW IN    192.0.2.0/24 # " + o1wifi.SSH_COMMENT
+
+    def setUp(self):
+        super().setUp()
+        with open(os.path.join(U.PREFIX, "etc", "ollama1", "config.json"), "w") as f:
+            json.dump({"lan_cidr": self.LAN}, f)
+        self.fs["ufw_rules"] = [self.WIRED]
+        self.save()
+
+    def tearDown(self):
+        shutil.rmtree(os.path.join(U.PREFIX, "etc", "ollama1"), ignore_errors=True)   # other test files read the same prefix
+        super().tearDown()
+
+    def rules(self):
+        return self.st()["ufw_rules"]
+
+    def test_set_opens_it_once_and_names_the_card_it_found(self):
+        self.turn_on()
+        rc, out = self.run_set()
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE])
+        self.assertEqual(o1wifi.sync_ssh_rule(), True)                         # idempotent
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE])
+        self.assertTrue(o1wifi.ssh_open())
+
+    def test_a_card_with_another_name_gets_its_own_name(self):
+        self.turn_on()
+        shutil.rmtree(os.path.join(self.net, "wlo1"))
+        self.card("wlp3s0")
+        self.assertEqual(self.run_set()[0], 0)
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE.replace("wlo1", "wlp3s0")])
+
+    def test_remove_takes_out_only_its_own_rule(self):
+        self.turn_on()
+        self.run_set()
+        self.fs = self.st()
+        self.fs["ufw_rules"].append("8431/tcp ALLOW IN    192.0.2.0/24")
+        self.save()
+        self.assertEqual(o1wifi.cmd_remove(out=lambda *_: None), 0)
+        self.assertEqual(self.rules(), [self.WIRED, "8431/tcp ALLOW IN    192.0.2.0/24"])
+        o1wifi.sync_ssh_rule()                                                  # nothing left to remove: no error
+        self.assertEqual(len(self.rules()), 2)
+
+    def test_not_open_without_a_network_or_when_off_or_without_a_lan(self):
+        self.turn_on()
+        self.assertTrue(o1wifi.sync_ssh_rule())                                 # on, no network set
+        self.assertEqual(self.rules(), [self.WIRED])
+        self.run_set()
+        o1wifi.write_state({})                                                  # off
+        o1wifi.sync_ssh_rule()
+        self.assertEqual(self.rules(), [self.WIRED])
+        self.turn_on()
+        os.unlink(os.path.join(U.PREFIX, "etc", "ollama1", "config.json"))
+        o1wifi.sync_ssh_rule()
+        self.assertEqual(self.rules(), [self.WIRED])                            # no LAN saved: nothing opened
+
+    def test_setup_on_adds_and_setup_off_removes(self):
+        self.turn_on()
+        self.put_netplan()
+        logs = []
+        self.assertEqual(o1wifi.setup("on", which=lambda n: "/x", apt=lambda n: True, tool="/t", log=logs.append), 0)
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE])
+        self.assertEqual(o1wifi.setup("off", log=logs.append), 0)
+        self.assertEqual(self.rules(), [self.WIRED])
+
+    def test_a_ufw_failure_is_said(self):
+        self.turn_on()
+        self.fs["ufw_fail"] = True
+        self.save()
+        out = []
+        self.assertFalse(o1wifi.sync_ssh_rule(log=out.append) is True and not out)
+        self.assertTrue(out)
+
+    def test_status_says_open_or_closed(self):
+        self.turn_on(SSID)
+        self.put_netplan()
+        self.assertIn("SSH over Wi-Fi: closed (sudo ./setup.sh opens it)", o1wifi.status_lines())
+        o1wifi.sync_ssh_rule()
+        self.assertIn("SSH over Wi-Fi: open to the home network", o1wifi.status_lines())
+
+    def test_setup_sh_leaves_it_to_the_wifi_step_and_the_readme_says_so(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        self.assertIn('"$LIBDIR/bin/ollama1-wifi" setup "$WIFI"', setup)
+        self.assertLess(setup.index('step "Firewall"'), setup.index('step "Wi-Fi backup"'))
+        r = open(os.path.join(U.KIT, "README.md")).read()
+        sec = r.split("## Wi-Fi backup")[1].split("\n## ")[0]
+        for word in ("SSH over Wi-Fi", "over Wi-Fi", "8431", "ollama1: SSH from the home LAN over Wi-Fi"):
+            self.assertIn(word, sec)
+        self.assertIn("Wi-Fi card", r.split("Interface rules use `br0`")[1].split("## Wi-Fi backup")[0])
 
 
 class TestWakeList(Fixture):

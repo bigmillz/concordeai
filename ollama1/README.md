@@ -221,7 +221,9 @@ Every step skips what is already done, so it is safe to run again.
 15. It sets up Cloudflare with the API token you paste: the tunnel, the DNS
     records and Access (see below).
 16. It checks what listens on the network: nothing but sshd may listen
-    beyond loopback (plus the gateway on br0, in LAN mode).
+    beyond loopback (plus the gateway on br0, in LAN mode). SSH is open from
+    your LAN on the wired port, and on the Wi-Fi card too while Wi-Fi backup
+    is on and set.
 17. It asks whether to remove the setup key `claude-setup@concordeai`. It only
     asks if a key of your own is present, and it removes nothing unless you
     type `yes`. You can also pass `--remove-setup-key`. Your own key(s) always
@@ -1918,7 +1920,8 @@ With a bridge, the firewall is set so it can't cut the other device off:
 - **`ufw route allow in on br0 out on br0`** is added as a second line of
   defence, in case something loads `br_netfilter` later.
 - **Interface rules use `br0`.** SSH is allowed in on `br0`, from
-  `<lan-cidr>`.
+  `<lan-cidr>`. With the Wi-Fi backup on and a network set, the same rule
+  also exists for the Wi-Fi card (see "Wi-Fi backup").
 
 ## Wi-Fi backup
 
@@ -1989,6 +1992,17 @@ exactly one country. Then:
   your own configuration, as the next limit below says (the kit never edits
   your bridge file, so it does not add that).
   The wired address is not reachable over Wi-Fi either way; use `<wifi-ip>`.
+- **SSH over Wi-Fi** (6b474). The firewall lets SSH in on the wired bridge
+  only, so with the cable out the Wi-Fi address answered pings and refused
+  SSH. While Wi-Fi backup is on and a network is set, one more rule is added
+  for the Wi-Fi card (found by its type, not by a name): SSH in on that card,
+  from `<lan-cidr>` only, with the comment
+  `ollama1: SSH from the home LAN over Wi-Fi`. `sudo ollama1-wifi set` and `sudo ./setup.sh` add it (adding twice
+  changes nothing); `sudo ollama1-wifi remove` and `--wifi off` delete exactly
+  the rule with that comment and nothing else. `status` says `SSH over Wi-Fi:
+  open to the home network` or `closed`. Not opened: the gateway port 8431
+  (LAN mode); the app reaches the server through the tunnel, which needs no
+  inbound port, and LAN mode has no Wi-Fi fallback (see the limits below).
 - **Boot never waits for it** (`optional: true`; the kit's wait-online drop-in
   already waits for one link, 30 s at most).
 - **It cannot cut the wired link.** The new file is checked with
@@ -2020,6 +2034,7 @@ Wired: eth0 up, eth1 down
 Default route: br0 (metric 100)
 Answers ARP only for its own address: yes
 Wired link down: traffic goes over Wi-Fi: yes
+SSH over Wi-Fi: open to the home network
 Card can wake on a magic packet (WoWLAN): yes
 PCI wake enabled: yes
 Published to the app as a wake card: 02:00:5e:10:00:77

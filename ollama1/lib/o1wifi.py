@@ -19,6 +19,9 @@ save (SSH timed out until the cache flipped back). setup.sh installs /etc/sysctl
 (net.ipv4.conf.all.arp_ignore=1, arp_announce=2) on every server; `status` says whether the kernel is set that way.
 With the cable out the server is reached at this card's own address, never at the wired one.
 
+With the cable out the firewall must let SSH in on the Wi-Fi card too (6b474): `set` and `setup` add, and `remove`
+and `--wifi off` take out, one ufw rule for the saved home LAN, found again by its comment. The gateway port is not opened.
+
 With the cable out the bridge keeps its address and its metric-100 routes (netplan's bridge has no carrier
 requirement), which beat this card's metric 600, so replies went into the dead bridge (6b473). setup.sh installs
 /etc/sysctl.d/62-ollama1-linkdown.conf (ignore_routes_with_linkdown=1); `status` says whether the kernel is set so.
@@ -40,6 +43,7 @@ NETPLAN_NAME = "70-ollama1-wifi.yaml"
 LINK_NAME = "50-ollama1-wifi.link"
 UDEV_NAME = "70-ollama1-wifi.rules"
 LINKDOWN_CONF = "62-ollama1-linkdown.conf"   # /etc/sysctl.d: routes through a link with no carrier are skipped (6b473)
+SSH_COMMENT = "ollama1: SSH from the home LAN over Wi-Fi"   # the firewall rule's comment: how the kit finds its own rule (6b474)
 ARP_CONF = "61-ollama1-arp.conf"   # /etc/sysctl.d: each card answers ARP only for its own addresses (6b450)
 PHY_RX = re.compile(r"^phy[0-9]{1,3}$")
 IFACE_RX = re.compile(r"^[A-Za-z0-9_.:-]{1,15}$")
@@ -169,6 +173,70 @@ def linkdown_ignored(iface=None, proc=None):
     kernel ORs with `all` (arp_setting takes the larger, the same thing for a 0/1 key). Without it the dead
     bridge's metric-100 routes beat the Wi-Fi card's metric 600 and the server is unreachable."""
     return arp_setting("ignore_routes_with_linkdown", iface, proc) >= 1
+
+
+def home_lan():
+    """The home LAN setup.sh saved (`lan_cidr`), the network SSH is allowed from; "" when unset or unreadable."""
+    try:
+        with open(p("/etc/ollama1/config.json")) as f:
+            v = json.load(f).get("lan_cidr")
+        return v if isinstance(v, str) else ""
+    except (OSError, ValueError, AttributeError):
+        return ""
+
+
+def ssh_rule_numbers(run_=run):
+    """The numbers (highest first) of the kit's own Wi-Fi SSH rules in `ufw status numbered`, found by the rule's
+    comment; None when ufw cannot be read."""
+    r = run_(["ufw", "status", "numbered"], 30)
+    if not ok(r):
+        return None
+    nums = []
+    for line in r.stdout.splitlines():
+        m = re.match(r"\s*\[\s*(\d+)\]\s", line)
+        if m and SSH_COMMENT in line:
+            nums.append(int(m.group(1)))
+    return sorted(nums, reverse=True)
+
+
+def ssh_open(run_=run):
+    nums = ssh_rule_numbers(run_)
+    return bool(nums)
+
+
+def drop_ssh_rule(run_=run):
+    """Deletes every rule carrying the kit's Wi-Fi SSH comment (by number, highest first, so the numbers hold), and
+    nothing else. Nothing there is no error. True when none is left."""
+    for _ in range(8):
+        nums = ssh_rule_numbers(run_)
+        if nums is None:
+            return False
+        if not nums:
+            return True
+        if not ok(run_(["ufw", "--force", "delete", str(nums[0])], 30)):
+            return False
+    return False
+
+
+def sync_ssh_rule(root=None, run_=run, log=print):
+    """SSH is open on the Wi-Fi card for the home LAN exactly while the Wi-Fi backup is on and a network is set (6b474):
+    the firewall only let SSH in on the wired bridge, so with the cable out the card answered pings and refused SSH.
+    Idempotent: the rule is added only when it is missing, and removed only by its comment. The gateway port is
+    not opened here."""
+    cards = wlan_devices(root)
+    lan = home_lan()
+    if enabled() and configured() and cards and lan:
+        if ssh_open(run_):
+            return True
+        if ok(run_(["ufw", "allow", "in", "on", cards[0]["name"], "from", lan, "to", "any", "port", "22",
+                    "proto", "tcp", "comment", SSH_COMMENT], 30)):
+            return True
+        log("Wi-Fi backup: could not open SSH on %s for %s in the firewall" % (cards[0]["name"], lan))
+        return False
+    if not drop_ssh_rule(run_):
+        log("Wi-Fi backup: could not take the Wi-Fi SSH rule out of the firewall (sudo ufw status numbered)")
+        return False
+    return True
 
 
 def arp_own_only(iface=None, proc=None):
@@ -319,6 +387,7 @@ def setup(choice, root=None, which=shutil.which, apt=run_apt_install, run_=run, 
         for dev in wlan_devices(root):
             set_wakeup(dev)
         cards = wlan_devices(root)
+        sync_ssh_rule(root, run_, log)
         if not cards:
             log("Wi-Fi backup: on, but no Wi-Fi card was found")
         elif configured():
@@ -336,6 +405,7 @@ def setup(choice, root=None, which=shutil.which, apt=run_apt_install, run_=run, 
         if remove_file(udev_path()):
             run_(["udevadm", "control", "--reload"], 20)
         remove_file(state_path())
+        sync_ssh_rule(root, run_, log)
         if os.path.islink(tool_link()):
             remove_file(tool_link())
     log("Wi-Fi backup: off")
@@ -490,6 +560,9 @@ def cmd_set(args, root=None, run_=run, ask=input, ask_secret=getpass.getpass, sl
     st["ssid"] = ssid
     st["iface"] = iface
     write_state(st)
+    sync_ssh_rule(root, run_, out)
+    if not ssh_open(run_):
+        out("SSH over Wi-Fi is not open yet: sudo ./setup.sh opens it")
     out("Saved. %s will connect to the network now; it carries traffic only when the cable's link is down. "
         "Check it with: sudo ollama1-wifi status" % iface)
     return 0
@@ -508,6 +581,7 @@ def cmd_remove(root=None, run_=run, sleep=time.sleep, out=print):
     st.pop("iface", None)
     if st:
         write_state(st)
+    sync_ssh_rule(root, run_, out)
     out("The Wi-Fi network is removed.")
     return 0
 
@@ -570,6 +644,9 @@ def status_lines(root=None, run_=run):
         # 6b473: with the cable out the bridge kept its metric-100 routes and the server was unreachable on Wi-Fi
         out.append("Wired link down: traffic goes over Wi-Fi: " + (
             "yes" if linkdown_ignored(dev["name"]) else "no (sudo ./setup.sh installs /etc/sysctl.d/%s)" % LINKDOWN_CONF))
+        # 6b474: the firewall let SSH in on the wired bridge only, so on Wi-Fi the card answered pings and refused SSH
+        out.append("SSH over Wi-Fi: " + ("open to the home network" if ssh_open(run_) else "closed" + (
+            " (sudo ./setup.sh opens it)" if enabled(st) and configured() else "")))
     if cards:
         dev = cards[0]
         r = run_(["iw", "phy", dev["phy"], "info"], 10) if PHY_RX.match(dev["phy"]) else None

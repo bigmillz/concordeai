@@ -44,6 +44,23 @@ only (`ollama1/`); not run on the server (not to be touched from here).
   over Wi-Fi (6b450); with the cable out use .21. If the server stays unreachable after this, check
   `cat /sys/class/net/br0/carrier`: 1 means another port holds the bridge up.
 
+## 6b474 — SSH is open on the Wi-Fi card while the backup is on and set (kit, per Patrick)
+
+Found on the live server after 6b473, 2026-10-12: ufw opened SSH only on the wired bridge
+(`22/tcp on br0 ALLOW IN 192.168.86.0/24`), so with the cable out `.21` (wlo1) answered pings and refused SSH. Patrick
+approved, and the rule was applied by hand: `ufw allow in on wlo1 from 192.168.86.0/24 to any port 22 proto tcp
+comment "ollama1: SSH from the home LAN over Wi-Fi"`. The kit now does the same.
+
+- `lib/o1wifi.py` `sync_ssh_rule()`: the rule exists exactly while the feature is on (`wifi.json`), a network is set
+  (the netplan file) and a Wi-Fi card is found (the first of `wlan_devices`, no fixed name), from `lan_cidr` in
+  `/etc/ollama1/config.json` (the same HOME_LAN, written before the firewall step). Called by `setup` (so setup.sh's
+  "Wi-Fi backup" step, after the firewall, adds it on each run; `--wifi off` removes it), `set` and `remove`. Adding is
+  done only when `ufw status numbered` lacks the rule; removing deletes by number every rule whose comment is the
+  kit's, highest first, and nothing else (no comment, no deletion). Failures are said.
+- `status`: `SSH over Wi-Fi: open to the home network | closed (sudo ./setup.sh opens it)`.
+- Not opened: gateway port 8431 (not asked; the app goes through the tunnel; LAN mode has no Wi-Fi fallback). README says so.
+- Tests: `TestSshOverWifi` (fake ufw in `fakewifi.py`); three mutants in `mutate.py`.
+
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
 
 Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no

@@ -43,6 +43,20 @@ def main():
             out = s.get("routes", "")
         else:
             out = s.get("addr", "")
+    elif cmd == "ufw":
+        rules = s.setdefault("ufw_rules", [])
+        if s.get("ufw_fail"):
+            rc = 1
+        elif args[:2] == ["status", "numbered"]:
+            out = "Status: active\n\n     To                         Action      From\n     --                         ------      ----\n" + "".join(
+                "[%2d] %s\n" % (i + 1, r) for i, r in enumerate(rules))
+        elif args[:1] == ["allow"]:
+            c = args.index("comment")
+            line = "22/tcp on %s ALLOW IN    %s # %s" % (args[args.index("on") + 1], args[args.index("from") + 1], args[c + 1])
+            if line not in rules:
+                rules.append(line)
+        elif args[:2] == ["--force", "delete"]:
+            del rules[int(args[2]) - 1]
     elif cmd == "systemctl":
         rc = 0 if args[:1] == ["start"] else 1          # nothing is active or enabled
     elif cmd == "apt-get":
