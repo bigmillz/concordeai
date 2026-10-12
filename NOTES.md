@@ -15729,3 +15729,26 @@ fold up?"
 - Gauntlet: `foldView` under node, plus served-HTML checks (buttons, aria-expanded, keys, chevron CSS). The 6b467
   heading assertion was reworded for the button markup. The script parses (node --check on the served page); the
   look and the click are unseen in the Browser pane and WKWebView.
+
+## 6b475 — the server's panel and text dashboard go back to a reading a second and a picture every 2 s (per Patrick)
+
+Patrick: "let's put the dashboard refresh rate back to what it was. I think that was about two seconds." Kit only
+(`ollama1/`). It undoes the rate of 6b444 and keeps the rest of it. Not run on the server.
+
+- **The knobs, now two and explicit.** `o1metrics.TICK_S = 1.0`: a reading, for the panel and the text dashboard
+  (`ollama1-top` too). `o1paneld.DRAW_S = 2.0`: the panel's picture, and `o1paneld.PAIRING_DRAW_S = 1.0` while the
+  pairing window is open. These are the values from before 6b444 (panel: reading 1 s, picture 2 s, pairing picture
+  1 s; text dashboard: 1 s, with its keys and size looked at every 0.25 s). The text dashboard's `TICK_S` still
+  follows `o1metrics.TICK_S`, so it is 1 s again. Pat remembered "about two seconds": that is the panel's picture;
+  the readings were a second.
+- **What stayed from 6b444.** `"tick_s"` in the state and `o1dashui.samples()` (a sample is a tick, so the graphs
+  still show exactly 5 minutes, step every 6 s and keep an hour at any tick); `o1metrics.next_due` (a steady beat),
+  now used for the pictures too (`next_draw`), so drawing time does not stretch the 2 s either; the dial-cache and
+  the stroke-font box fixes. The loop waits until the next reading or picture, whichever is first.
+- **Tests.** `test_panel`: a reading every second and a picture every 2 s (and 1 s while pairing); the full refresh
+  is counted in pictures per 30 s (`FULL_REFRESH_S / DRAW_S`); the beat test counts readings, and after a stall
+  the restart is placed between 0.5 and 1.5 ticks (at 0.5 s it happened to be at least a tick). `test_dash`: the
+  hour of history is 3600 samples at the default tick; `next_due` by default is 1 s. `mutate.py` has three new
+  `tick:` mutants (a picture with every reading, the pairing pace, a flip waiting for the next picture).
+- **CPU, not re-measured.** The cost is back to about what it was before 6b444 (about 3% of a Mac core at 4K with
+  every number moving, 1.3% at 1080p); I have not measured it again. Changing `TICK_S` or `DRAW_S` changes it.

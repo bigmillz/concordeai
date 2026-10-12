@@ -56,7 +56,7 @@ MODE_FILE = "/etc/ollama1/dash-mode"
 FB_PATH = "/dev/fb0"
 TTY_PATH = "/dev/tty1"
 SWITCH_CHECK_S = 10.0     # the text dashboard looks for a newly connected screen this often
-TICK_S = o1metrics.TICK_S     # new numbers twice a second (6b444); the knob is o1metrics.TICK_S, shared with the panel
+TICK_S = o1metrics.TICK_S     # new numbers once a second (6b475; twice a second in 6b444); the knob is o1metrics.TICK_S, shared with the panel
 POLL_S = min(0.25, TICK_S)    # the size and the keys are looked at at least four times a second
 
 winch = [False]

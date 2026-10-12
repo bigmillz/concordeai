@@ -733,10 +733,10 @@ class TestMetrics(unittest.TestCase):
 
     # -- 6b444: a reading every half second ----------------------------------------------------------------
     def test_an_hour_of_history_is_an_hour_whatever_the_tick(self):
-        self.assertEqual(o1metrics.TICK_S, 0.5)                              # the owner's ask: new numbers twice a second
+        self.assertEqual(o1metrics.TICK_S, 1.0)                              # Pat (6b475): a reading a second, as before 6b444
         self.assertEqual(o1metrics.HISTORY * o1metrics.TICK_S, o1metrics.HISTORY_S)
         self.assertEqual(o1metrics.HISTORY_S, 3600)
-        self.assertEqual({d.maxlen for d in o1metrics.Sampler(tunnel_port=1).series.values()}, {7200})
+        self.assertEqual({d.maxlen for d in o1metrics.Sampler(tunnel_port=1).series.values()}, {3600})
         for tick in (1.0, 0.5, 0.25, 2.0):
             s = o1metrics.Sampler(tunnel_port=1, tick_s=tick)
             self.assertEqual({d.maxlen * tick for d in s.series.values()}, {3600}, tick)
@@ -778,7 +778,7 @@ class TestMetrics(unittest.TestCase):
         self.assertEqual(due(1000.75, 1001.2, 0.5), 1001.25)                    # however long the picture took: on the beat
         self.assertEqual(due(1000.75, 1003.1, 0.5), 1003.75)                    # more than a beat late: again from now
         self.assertEqual(due(10.5, 11.0, 1.0), 11.5)
-        self.assertEqual(due(0.0, 100.2), 100.75)                               # TICK_S by default
+        self.assertEqual(due(0.0, 100.2), 101.5)                                # TICK_S by default
 
 
 class TestTrendSpan(unittest.TestCase):

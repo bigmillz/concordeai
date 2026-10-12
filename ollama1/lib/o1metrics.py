@@ -1,4 +1,4 @@
-"""The dashboard's sampler: one tick every TICK_S (half a second), straight
+"""The dashboard's sampler: one tick every TICK_S (one second), straight
 from /proc and /sys (plus the gateway's counts-only snapshot file), with an
 hour of history for the charts. Slow sources (the tunnel, the network
 address, timers, the processor's temperature and clock) are refreshed every
@@ -24,7 +24,7 @@ import o1stats
 from o1common import Paths, read_json
 from o1stats import PROC, SYS
 
-TICK_S = 0.5          # the one knob (6b444): the panel and the text dashboard take a reading, and draw, this often
+TICK_S = 1.0          # the knob for readings (6b444, back to a second in 6b475): the panel and the text dashboard take a reading this often; the panel's picture is o1paneld.DRAW_S
 HISTORY_S = 3600      # the charts keep an hour, whatever the tick
 HISTORY = int(round(HISTORY_S / TICK_S))      # samples in that hour
 SERIES = ("tps", "gpu_busy", "vram_used", "gpu_power", "ram_used", "io_read", "io_write",

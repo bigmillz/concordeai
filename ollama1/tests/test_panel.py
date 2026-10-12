@@ -531,14 +531,24 @@ class TestLoop(unittest.TestCase):
         self.assertEqual((n, tty.entered, tty.left), (3, 1, 1))
         self.assertGreater(len(fb.writes), 3)
 
-    def test_a_reading_and_a_picture_every_half_second(self):
-        self.assertEqual(o1paneld.TICK_S, 0.5)                          # the owner's ask (6b444): new numbers twice a second
-        self.assertEqual(o1paneld.TICK_S, o1metrics.TICK_S)             # one knob, shared with the text dashboard
+    def test_a_reading_every_second_and_a_picture_every_two(self):
+        self.assertEqual(o1paneld.TICK_S, 1.0)                          # Pat (6b475): back to what it was before 6b444
+        self.assertEqual(o1paneld.TICK_S, o1metrics.TICK_S)             # readings: one knob, shared with the text dashboard
+        self.assertEqual((o1paneld.DRAW_S, o1paneld.PAIRING_DRAW_S), (2.0, 1.0))      # pictures: the panel's own
         self.assertLessEqual(o1paneld.POLL_S, o1paneld.TICK_S)
         s = FakeSampler()
         n, _fb, _tty, c = self.go(sampler=s, max_frames=9)
-        self.assertEqual((n, s.n), (9, 9))                              # a picture with every reading, none between
-        self.assertAlmostEqual(c.t - 1000.0, 8 * o1paneld.TICK_S, delta=o1paneld.TICK_S)
+        self.assertEqual(n, 9)
+        self.assertAlmostEqual(c.t - 1000.0, 8 * o1paneld.DRAW_S, delta=o1paneld.DRAW_S)      # a picture every 2 s,
+        self.assertAlmostEqual(s.n, 16, delta=2)                                              # a reading every second
+
+    def test_readings_follow_the_samplers_own_tick_and_pictures_stay_two_seconds_apart(self):
+        class Quick(FakeSampler):
+            tick_s = 0.5
+        s = Quick()
+        n, _fb, _tty, c = self.go(sampler=s, max_frames=5)
+        self.assertAlmostEqual(c.t - 1000.0, 4 * o1paneld.DRAW_S, delta=o1paneld.DRAW_S)
+        self.assertAlmostEqual(s.n, 4 * 4 + 1, delta=2)             # four readings between two pictures
 
     def test_the_beat_is_steady_however_long_a_picture_takes(self):
         """The readings stay TICK_S apart (so an hour of samples is an hour) when a reading and its picture take
@@ -551,13 +561,13 @@ class TestLoop(unittest.TestCase):
                 times.append(c.t)
                 c.t += 2.3 if len(times) == 12 else 0.17               # some work every time, and once a stall
                 return FakeSampler.tick(self_)
-        o1paneld.run(FakeFb(), FakeTty(), Slow(), clock=c.now, sleep=c.sleep, max_frames=30)
+        o1paneld.run(FakeFb(), FakeTty(), Slow(), clock=c.now, sleep=c.sleep, max_frames=16)
         T = o1paneld.TICK_S
         gaps = [round(b - a, 6) for a, b in zip(times, times[1:])]
-        self.assertEqual(len(gaps), 29)
+        self.assertGreaterEqual(len(gaps), 29)      # readings (a picture takes two of them)
         self.assertEqual(set(gaps[1:11]), {T})                          # the work does not stretch the beat
         self.assertGreaterEqual(gaps[11], 2.29)                         # the stall,
-        self.assertTrue(all(g >= T for g in gaps))                      # not made up with readings close together,
+        self.assertTrue(all(g > T / 2 for g in gaps))                  # not made up with readings close together (the restart is placed half way between two beats: 0.5 to 1.5 ticks),
         self.assertEqual(set(gaps[13:]), {T})                           # and the beat goes on
 
     def test_the_text_dashboard_shares_the_knob(self):
@@ -612,7 +622,7 @@ class TestLoop(unittest.TestCase):
         def written(frames):
             _n, fb, _t, _c = self.go(sampler=FakeSampler(st), max_frames=frames)
             return sum(n for _o, n in fb.writes) / float(screen)
-        per_refresh = int(o1paneld.FULL_REFRESH_S / o1paneld.TICK_S)     # pictures in 30 s
+        per_refresh = int(o1paneld.FULL_REFRESH_S / o1paneld.DRAW_S)     # pictures in 30 s
         self.assertAlmostEqual(written(per_refresh - 4), 2.0, delta=0.01)   # the black at the start, then the first picture
         self.assertAlmostEqual(written(per_refresh + 4), 3.0, delta=0.01)   # and everything again after 30 s
 
@@ -1092,6 +1102,33 @@ class TestCostScreen(unittest.TestCase):
         self.assertEqual(seen[-1], "panel")
         self.assertEqual(sorted(set(seen)), ["cost", "panel"])
         self.assertEqual(seen.count("cost") >= 1, True)
+
+    def test_a_flip_is_drawn_at_once_not_at_the_next_picture(self):
+        at = []
+        c = Clock()
+        polls = iter([b"", b" "])
+        real_cost = o1panel.render_cost
+
+        def spy_cost(st_, w, h):
+            at.append(c.t)
+            return real_cost(st_, w, h)
+
+        class K:
+            def wait(self, timeout):
+                c.sleep(timeout)
+                return next(polls, b"")
+        n = [0]
+
+        def stop():
+            n[0] += 1
+            return n[0] > 8
+        o1panel.render_cost = spy_cost
+        try:
+            o1paneld.run(FakeFb(), FakeTty(), FakeSampler(), clock=c.now, sleep=c.sleep, keys=K(), stop=stop)
+        finally:
+            o1panel.render_cost = real_cost
+        self.assertTrue(at)
+        self.assertLess(at[0] - 1000.0, 1.5)                         # the key came at about 1 s: the flip is drawn then, not at the picture 2 s in
 
     def test_other_keys_change_nothing(self):
         seen = self.run_loop([b"a", b"\r", b"\x1b[B", b"t", b"q", b"", b""])

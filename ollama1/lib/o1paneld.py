@@ -1,12 +1,12 @@
 """The loop behind the graphical panel (6b380): sample, draw, write the changed
-rows to the framebuffer, twice a second (6b444). Everything it touches is
+rows to the framebuffer: a reading every second, a picture every 2 s (6b475). Everything it touches is
 handed in (the framebuffer, the tty, the sampler, the clock, the sleep), so
 the tests run it on a fake screen and a fake clock.
 
 It is meant to be cheap, because the machine is also an AI server: one
-reading every TICK_S (o1metrics.TICK_S, half a second) on a steady beat, one
-picture per reading (a reading is all a picture shows, so drawing more often
-would draw the same picture), only the boxes whose numbers changed are
+reading every TICK_S (o1metrics.TICK_S, one second) on a steady beat, one
+picture every DRAW_S seconds (every PAIRING_DRAW_S while the pairing window
+is open, for its countdown), only the boxes whose numbers changed are
 redrawn and only the rows that changed are written, and nothing is drawn
 while another virtual terminal is on the screen.
 
@@ -27,7 +27,9 @@ try:
 except ImportError:                      # not a Unix (the tests import this on a Mac: fine)
     termios = None
 
-TICK_S = o1metrics.TICK_S     # a reading and a picture this often; the knob is o1metrics.TICK_S (one value for both dashboards)
+TICK_S = o1metrics.TICK_S     # a reading this often; the knob is o1metrics.TICK_S (one value for both dashboards)
+DRAW_S = 2.0              # a picture this often (seconds): the panel's own knob
+PAIRING_DRAW_S = 1.0      # ... and this often while the pairing window is open
 POLL_S = min(0.5, TICK_S)     # the longest wait between two looks at the keys and the terminal (a key ends it at once)
 FULL_REFRESH_S = 30.0     # every row again this often: a screen that lost its picture (suspend, a mode change) heals
 
@@ -138,7 +140,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
     tests). `keys` has wait(timeout) -> bytes (see Keys); Space flips to the
     electricity cost screen and back. `tty` is an o1fb.TtyGraphics; `vt` the number of the terminal
     this runs on, so the picture is only drawn while that one is showing. The sampler is read every
-    sampler.tick_s (TICK_S for one that does not say), and a picture is drawn after each reading.
+    sampler.tick_s (TICK_S for one that does not say), and a picture is drawn every DRAW_S (PAIRING_DRAW_S while pairing), on a steady beat too.
     Returns the number of frames drawn."""
     every = getattr(sampler, "tick_s", None) or TICK_S
     info = fb.info
@@ -157,8 +159,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
         for off, data in pres.clear():
             fb.write(off, data)
         st = None
-        next_tick = 0.0
-        redraw = True             # a picture at the next look: a new reading, a flip, a key for the burn test
+        next_tick = next_draw = 0.0
         last_full = clock()
         shown = True
         on_screen = "panel"
@@ -171,11 +172,9 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
             if st is None or now >= next_tick:
                 st = sampler.tick()
                 next_tick = o1metrics.next_due(next_tick, now, every)      # a steady beat: drawing never stretches it
-                redraw = True
             active = tty.vt_active() if vt is not None else None
             mine = vt is None or active is None or active == vt
-            if mine and (redraw or not shown):
-                redraw = False
+            if mine and (now >= next_draw or not shown):
                 eff = "panel" if (st.get("pairing") or o1panel.burn_view(st, now)) else screen   # a pairing window or the burn test takes the screen
                 if not shown or eff != on_screen:    # another terminal was showing, or the picture's size changes: start from black
                     for off, data in pres_by[eff].clear():
@@ -191,11 +190,12 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
                     pic = renderer.draw(st, range_s, incremental=True)
                 for off, data in pres_by[eff].frame(pic, force=full):
                     fb.write(off, data)
+                next_draw = o1metrics.next_due(next_draw, now, PAIRING_DRAW_S if st.get("pairing") else DRAW_S)     # steady, like the readings
                 frames += 1
                 if max_frames is not None and frames >= max_frames:
                     break
             shown = mine
-            typed = keys.wait(max(0.0, min(POLL_S, next_tick - clock())))     # until the next reading at the latest
+            typed = keys.wait(max(0.0, min(POLL_S, next_tick - clock(), next_draw - clock())))     # until the next reading or picture at the latest
             if typed:
                 t_ = clock()
                 action, last_burn = handle_burn_keys(typed, o1panel.burn_running(st, t_) or t_ < starting_until, t_, last_burn)
@@ -203,7 +203,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
                     try:
                         if action == "start":
                             burn.start()
-                            starting_until, next_tick = t_ + BURN_START_GRACE_S, 0.0     # a reading (and its picture) at once
+                            starting_until, next_tick, next_draw = t_ + BURN_START_GRACE_S, 0.0, 0.0     # a reading (and its picture) at once
                         else:
                             burn.abort()
                     except (OSError, subprocess.SubprocessError) as e:
@@ -211,7 +211,7 @@ def run(fb, tty, sampler, vt=None, range_s=300, clock=time.time, sleep=time.slee
                             log("burn test key: %s" % e)
                 new, last_flip = handle_keys(typed, screen, t_, last_flip)
                 if new != screen:
-                    screen, redraw = new, True        # flip at once, not at the next reading
+                    screen, next_draw = new, 0.0      # flip at once, not at the next picture
     finally:
         tty.leave()
     return frames
