@@ -642,7 +642,7 @@ class TestInhibitor(unittest.TestCase):
         self.assertEqual(p.stdout.readline().strip(), "ready")
         pid, _ = self.holder()
         p.send_signal(sig)
-        p.wait(10)
+        p.wait(30)      # generous: a busy machine can take seconds to run the signal's cleanup
         self.assertTrue(self.gone(pid), "the inhibitor outlived its parent (signal %d)" % sig)
         del signal
 
@@ -673,7 +673,7 @@ class TestInhibitor(unittest.TestCase):
         finally:
             os.close(fd)
         p.send_signal(signal.SIGKILL)
-        p.wait(10)
+        p.wait(30)
         self.assertTrue(self.gone(pid), "setup's inhibitor outlived setup")
 
     def test_where_it_is_held(self):

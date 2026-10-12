@@ -361,6 +361,16 @@ class TestSignatures(unittest.TestCase):
         self.assertEqual(json.loads(data)["device_id"], G["dev"].id)
 
 
+def _inflight_zero(gw, wait=5.0):
+    """The gateway releases the in-flight count on its handler thread after the reply is on the wire, so a client
+    that checks the instant its call returns can still see 1 on a busy machine: wait for it to settle."""
+    import time as _t
+    end = _t.time() + wait
+    while gw.activity.inflight != 0 and _t.time() < end:
+        _t.sleep(0.02)
+    return gw.activity.inflight
+
+
 class TestSleepRoutes(unittest.TestCase):
     """GET/POST /v1/sleep-config and what counts as activity (6b346): chats do,
     the app's polls never do."""
@@ -427,13 +437,13 @@ class TestSleepRoutes(unittest.TestCase):
                              ("GET", "/api/version")):
             call(method, path)
         call("POST", "/v1/sleep-config", {"minutes": 30})
-        self.assertEqual((gw.activity.last, gw.activity.inflight), (0.0, 0))
+        self.assertEqual((gw.activity.last, _inflight_zero(gw)), (0.0, 0))
         self.assertFalse(os.path.exists(self.o1idle.activity_file()) and
                          json.load(open(self.o1idle.activity_file()))["last"] > 0)
         call("POST", "/api/chat", {"model": "small:8b", "stream": False,
                                    "messages": [{"role": "user", "content": "hi"}]})
         self.assertGreater(gw.activity.last, 0)
-        self.assertEqual(gw.activity.inflight, 0)
+        self.assertEqual(_inflight_zero(gw), 0)
         gw.activity.write()                              # (the stats loop does this every second)
         self.assertGreater(json.load(open(self.o1idle.activity_file()))["last"], 0)
 
@@ -451,7 +461,7 @@ class TestSleepRoutes(unittest.TestCase):
         finally:
             gw.local_model = orig
         self.assertEqual(seen, [1])
-        self.assertEqual(gw.activity.inflight, 0)
+        self.assertEqual(_inflight_zero(gw), 0)
 
 
 class TestRoutes(unittest.TestCase):
