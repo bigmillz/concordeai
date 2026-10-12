@@ -1901,7 +1901,8 @@ The kit never touches your network settings (the one exception is the optional
 "Wi-Fi backup" below, which writes a netplan file of its own and nothing else); it sets two kernel
 knobs, bridge netfilter off (below) and, since 6b450, each network card answering ARP only for its
 own addresses (`/etc/sysctl.d/61-ollama1-arp.conf`, every server; see "Wi-Fi backup" for the
-symptom it ends). It works with a plain wired
+symptom it ends) and, since 6b473, routes through a link with no carrier skipped
+(`/etc/sysctl.d/62-ollama1-linkdown.conf`, the same section). It works with a plain wired
 port, and also with a bridge. If your server has a bridge `br0` over its
 two wired ports (one to the router, one to another device, like a
 Raspberry Pi), at `<server-ip>`, that comes from your own bridge script
@@ -1967,6 +1968,27 @@ exactly one country. Then:
   reached at `<wifi-ip>`, as meant; the wired address was never a way in over
   Wi-Fi that worked. `ollama1-wifi status` says whether the setting is in
   effect.
+- **Cable out, server on Wi-Fi** (6b473). A netplan bridge keeps its address
+  and its DHCP routes (metric 100) when its cable is pulled, and the Wi-Fi
+  card's routes are metric 600, so the kernel went on choosing the dead
+  bridge: replies, and the server's own outbound traffic (the Cloudflare
+  tunnel too), vanished, and the server, on and lit, answered at neither
+  address. `/etc/sysctl.d/62-ollama1-linkdown.conf`
+  (`net.ipv4.conf.all.ignore_routes_with_linkdown=1`, and the IPv6 twin; the
+  kernel ORs `all` with each link's own value, so every link, a later bridge
+  too, is covered) makes the kernel skip routes through a link with no
+  carrier. With the cable in nothing changes: the wired route is alive and
+  wins by metric. setup.sh installs and applies it on every server; `status`
+  says `Wired link down: traffic goes over Wi-Fi: yes`. Honest limits: it
+  only helps when the bridge itself loses its carrier, and a bridge has
+  carrier while any port has it (check `cat /sys/class/net/br0/carrier`
+  with the cable out: it must be `0`). A bridge that also holds a virtual
+  port (a VM's tap, a container's veth, a Pi on the second port) keeps its
+  carrier and its routes, and nothing here changes that: take such a port off
+  the bridge, or add `IgnoreCarrierLoss=` (a few seconds) to the bridge in
+  your own configuration, as the next limit below says (the kit never edits
+  your bridge file, so it does not add that).
+  The wired address is not reachable over Wi-Fi either way; use `<wifi-ip>`.
 - **Boot never waits for it** (`optional: true`; the kit's wait-online drop-in
   already waits for one link, 30 s at most).
 - **It cannot cut the wired link.** The new file is checked with
@@ -1997,6 +2019,7 @@ Address: <wifi-ip>/24
 Wired: eth0 up, eth1 down
 Default route: br0 (metric 100)
 Answers ARP only for its own address: yes
+Wired link down: traffic goes over Wi-Fi: yes
 Card can wake on a magic packet (WoWLAN): yes
 PCI wake enabled: yes
 Published to the app as a wake card: 02:00:5e:10:00:77
@@ -2043,7 +2066,8 @@ never delays or stops a suspend. The BIOS must allow wake from a PCI-E device
   carrier loss, so `status` may still say `Default route: br0` with the cable
   out, and the server's own traffic goes into the dead bridge. Check it once
   (unplug, then `ip route show default`: `linkdown` on the bridge's line is
-  that case); the fix is a networkd drop-in for the bridge with
+  that case; since 6b473 the kit's `62-ollama1-linkdown.conf` covers the
+  usual case, a bridge whose ports all lost carrier); otherwise the fix is a networkd drop-in for the bridge with
   `IgnoreCarrierLoss=` of a few seconds, in your own bridge configuration.
 
 **To try it with the cable unplugged**: `sudo ollama1-wifi set`, check
@@ -2065,6 +2089,7 @@ cable). Then put it to sleep from the panel and wake it from the app.
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
 | Wi-Fi backup | `sudo ollama1-wifi status`; `iw dev`; off: `sudo ./setup.sh --wifi off`; see "Wi-Fi backup" |
 | SSH to the server slow or timing out while Wi-Fi backup is on | On the client, `arp -n <server-ip>` must show the wired card's MAC, not the Wi-Fi card's; on the server, `sudo ollama1-wifi status` must say `Answers ARP only for its own address: yes` (a `no` means a kit from before 6b450: run `sudo ./setup.sh`). Then clear the client's entry once: `sudo arp -d <server-ip>` |
+| Cable out: server unreachable (on, fans and lights running, "didn't answer" in the app) | With the cable out use the Wi-Fi address (`sudo ollama1-wifi status` on the server's console shows it, or the router's client list). If that times out too, `sudo ollama1-wifi status` must say `Wired link down: traffic goes over Wi-Fi: yes` (a `no`: run `sudo ./setup.sh`; right away: `sudo sysctl -w net.ipv4.conf.all.ignore_routes_with_linkdown=1`), and `cat /sys/class/net/br0/carrier` must be `0` (a `1` means another port, like a VM's, holds the bridge up: see "Wi-Fi backup") |
 | Lights | `ollama1-leds status`; `journalctl -u ollama1-leds -u ollama1-openrgb`; off: `sudo ./setup.sh --leds off` |
 | System move to the other NVMe | `cat /var/lib/ollama1/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
@@ -2139,6 +2164,7 @@ Ed25519 (the server uses PyNaCl). They cover:
   and able; each card answering ARP only for its own addresses (the sysctl
   file's exact keys, setup.sh installing and applying it on every server and
   not swallowing a failure, and `status` reading the kernel's effective value,
+  and the same for the link-down routes file (6b473),
   the larger of `all` and the card's own, from a fake `/proc`);
 - the auto sleep setting across a gateway restart, the idle service's, a
   reboot and a setup.sh run (`test_sleepcfg.py`), and the check after a wake

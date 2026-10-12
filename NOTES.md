@@ -9,6 +9,41 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b473 — with the cable out the server answers on Wi-Fi: routes through a link with no carrier are skipped (kit, per Patrick)
+
+Seen 2026-10-12. Pat unplugged the server's network cable to run it on Wi-Fi only. "The server is ON (fans and
+lights running) but unreachable at both its wired address (br0, 192.168.86.10) and its Wi-Fi address (.21, wlo1);
+Angry IP Scanner lists .21 as ollama1.lan but pings and SSH to it time out", and the app says "didn't answer". Kit
+only (`ollama1/`); not run on the server (not to be touched from here).
+
+- **Cause** (hypothesis from the 6b450 entry's note, matching every symptom; the code agrees): netplan's bridge keeps
+  its address and its DHCP routes (metric 100) when the cable is out, and the Wi-Fi card's routes are metric 600
+  (`ollama1-wifi set`, "the cable always wins"). The kernel keeps using the lower-metric br0 routes although the link
+  has no carrier, so replies to the LAN, and the server's own outbound traffic (the Cloudflare tunnel), went into the
+  dead bridge. Both subnet routes cover 192.168.86.0/24, so the lower metric won there too.
+- **Fix: `config/62-ollama1-linkdown.conf`** → `/etc/sysctl.d/`: `net.ipv4.conf.all.ignore_routes_with_linkdown = 1`
+  and the IPv6 twin (with a leading `-`: the key is missing only when IPv6 is off in the kernel; the IPv4 key always
+  exists, so a typo there fails loudly). The kernel ORs `all` with each link's own value (IPv4 `IN_DEV_ORCONF`, IPv6
+  `ip6_ignore_linkdown`), so `all` covers every link, present or future, with no name to time; no per-interface
+  `br0`/`wlo1` value, no `default`. A route through a link that lost its carrier carries the LINKDOWN flag and is then
+  skipped, so the next route (Wi-Fi) is used. Cable in: the wired route is alive and still wins by metric. setup.sh
+  installs it right after the ARP file on every server and applies it with `sysctl -p` (a failure is a `note`).
+- **Is it enough for a bridge?** Only when the bridge itself reports NO-CARRIER, which a bridge does while none of its
+  ports has carrier (`/sys/class/net/br0/carrier` is 0). If the bridge holds another port that is up (a VM's tap, a
+  container's veth, a Pi on the second wired port), it keeps carrier and its routes, and this file does nothing.
+  A networkd `IgnoreCarrierLoss=`/`ConfigureWithoutCarrier=no` drop-in for br0 was considered and NOT added: the
+  netplan-generated `br0` config is the owner's file (the kit never edits the owner's bridge file, only writes its
+  own `70-ollama1-wifi.yaml`), and a drop-in that overrides what the owner's netplan renders would be an edit by
+  another name and could drop the bridge's address while the cable flaps. Documented as a manual step in the README.
+- **`ollama1-wifi status`** gets `Wired link down: traffic goes over Wi-Fi: yes | no (sudo ./setup.sh installs ...)`,
+  reading the kernel's effective value like the ARP line (`linkdown_ignored`, `all` or the card's own).
+- Tests: `TestWiredDownGoesOverWifi` in `test_wifi.py` (the file's exact keys, setup.sh placement and a failure not
+  swallowed, status yes/no combinations, README words); two mutants in `mutate.py` (setup.sh is not in the mutation copy).
+- **Worth knowing.** Until `sudo ./setup.sh` runs on the server, the one-line live fix is
+  `sudo sysctl -w net.ipv4.conf.all.ignore_routes_with_linkdown=1`. The wired address (.10) is still not reachable
+  over Wi-Fi (6b450); with the cable out use .21. If the server stays unreachable after this, check
+  `cat /sys/class/net/br0/carrier`: 1 means another port holds the bridge up.
+
 ## 6b457 — the server no longer wakes itself when Wi-Fi drops it (kit, per Patrick)
 
 Patrick: "Why did the server just turn itself on?" It had gone to sleep at 17:51 and woke at 18:04:00 with no

@@ -447,6 +447,71 @@ class TestEachCardAnswersForItself(Fixture):
         self.assertEqual(self.arp_lines(), [])
 
 
+class TestWiredDownGoesOverWifi(Fixture):
+    """6b473: with the cable out, br0 kept its address and metric-100 routes (no carrier needed), the Wi-Fi card's were
+    metric 600, and the server was unreachable on both addresses. The kit's sysctl file makes the kernel skip routes
+    through a link with no carrier; status says whether it is so."""
+
+    LINE = "Wired link down: traffic goes over Wi-Fi: "
+
+    def lines(self):
+        return [l for l in o1wifi.status_lines() if l.startswith(self.LINE)]
+
+    def linkdown(self, **scopes):
+        shutil.rmtree(self.proc, ignore_errors=True)
+        for scope, val in scopes.items():
+            d = os.path.join(self.proc, "sys", "net", "ipv4", "conf", scope)
+            os.makedirs(d)
+            with open(os.path.join(d, "ignore_routes_with_linkdown"), "w") as f:
+                f.write("%s\n" % val)
+
+    def test_the_sysctl_file_sets_the_ipv4_and_ipv6_keys_for_all_links(self):
+        with open(os.path.join(U.CONFIG, o1wifi.LINKDOWN_CONF)) as f:
+            text = f.read()
+        keys = [l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
+        self.assertEqual(keys, ["net.ipv4.conf.all.ignore_routes_with_linkdown = 1",
+                                "-net.ipv6.conf.all.ignore_routes_with_linkdown = 1"])   # v6 may be off: only that is optional
+        self.assertNotIn("conf.br0", text)
+        self.assertIn("6b473", text)
+
+    def test_setup_installs_it_beside_the_arp_file_and_says_a_failure(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        inst = 'install -m 0644 "$KIT/config/%s" /etc/sysctl.d/%s' % (o1wifi.LINKDOWN_CONF, o1wifi.LINKDOWN_CONF)
+        self.assertEqual(setup.count(inst), 1)
+        i = setup.index(inst)
+        self.assertLess(setup.index('install -m 0644 "$KIT/config/%s"' % o1wifi.ARP_CONF), i)
+        self.assertLess(i, setup.index("10-ollama1-wait-online.conf"))
+        self.assertLess(i, setup.index('step "Firewall"'))
+        self.assertNotIn('step "Wi-Fi backup"', setup[:i])                     # every server, not only with --wifi
+        applied = [l for l in setup.splitlines() if l.startswith("sysctl -q -p /etc/sysctl.d/" + o1wifi.LINKDOWN_CONF)]
+        self.assertEqual(len(applied), 1)
+        self.assertIn("|| note", applied[0])
+        self.assertNotIn("|| true", applied[0])
+        self.assertNotIn("2>/dev/null", applied[0])
+
+    def test_the_kit_edits_no_netplan_bridge_for_it(self):
+        text = open(os.path.join(U.CONFIG, o1wifi.LINKDOWN_CONF)).read()
+        self.assertNotIn("netplan", "\n".join(l for l in text.splitlines() if not l.startswith("#")))
+
+    def test_status_says_yes_or_no(self):
+        self.turn_on(SSID)
+        self.put_netplan()
+        no = self.LINE + "no (sudo ./setup.sh installs /etc/sysctl.d/%s)" % o1wifi.LINKDOWN_CONF
+        self.assertEqual(self.lines(), [no])                                    # no /proc tree
+        for scopes, want in ((dict(all=1), "yes"), (dict(all=0, wlo1=1), "yes"), (dict(all=1, wlo1=0), "yes"),
+                             (dict(all=0), "no"), (dict(all="x"), "no")):
+            self.linkdown(**scopes)
+            lines = self.lines()
+            self.assertEqual(len(lines), 1, scopes)
+            self.assertTrue(lines[0].startswith(self.LINE + want), (scopes, lines))
+        self.assertFalse(o1wifi.linkdown_ignored("wlo1", proc=os.path.join(self.dir, "none")))
+
+    def test_no_card_no_line(self):
+        self.linkdown(all=1)
+        shutil.rmtree(os.path.join(self.net, "wlo1"))
+        self.assertEqual(self.lines(), [])
+
+
 class TestWakeList(Fixture):
     def test_published_only_when_on_set_up_real_and_supported(self):
         self.assertEqual(o1wifi.wake_macs(), [])                          # off
@@ -713,8 +778,11 @@ class TestSetupSh(unittest.TestCase):
         self.assertIn("| `--wifi on\\|off` |", r)
         sec = r.split("## Wi-Fi backup")[1].split("\n## ")[0]
         for word in ("sudo ollama1-wifi set", "never", "metric", "S3", "access point", "70-ollama1-wifi.yaml",
-                     "61-ollama1-arp.conf", "arp_ignore", "Answers ARP only for its own address"):
+                     "61-ollama1-arp.conf", "arp_ignore", "Answers ARP only for its own address",
+                     "62-ollama1-linkdown.conf", "ignore_routes_with_linkdown", "Wired link down: traffic goes over Wi-Fi"):
             self.assertIn(word, sec)
+        self.assertIn("Cable out: server unreachable", r)                      # the troubleshooting row
+        self.assertIn("62-ollama1-linkdown.conf", r.split("## The network")[1].split("## Wi-Fi backup")[0])
         self.assertIn("61-ollama1-arp.conf", r.split("## The network")[1].split("## Wi-Fi backup")[0])
 
 

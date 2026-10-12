@@ -2543,6 +2543,12 @@ MUTANTS = [
      '    return True', ['test_wifi']),
     ('wifi: status reads only "all", not the card\'s own ARP setting (6b450)', 'lib/o1wifi.py',
      '    for scope in ("all",) + ((iface,) if iface else ()):', '    for scope in ("all",):', ['test_wifi']),
+    # ---- with the cable out, routes through the dead bridge are skipped (6b473)
+    ('wifi: routes through a link with no carrier are kept (6b473)', 'config/62-ollama1-linkdown.conf',
+     'net.ipv4.conf.all.ignore_routes_with_linkdown = 1', 'net.ipv4.conf.all.ignore_routes_with_linkdown = 0',
+     ['test_wifi']),
+    ('wifi: status says the link-down setting is in effect when it is not (6b473)', 'lib/o1wifi.py',
+     '    return arp_setting("ignore_routes_with_linkdown", iface, proc) >= 1', '    return True', ['test_wifi']),
 ]
 
 

@@ -18,6 +18,10 @@ wired bridge's address too, and a client whose ARP cache took that reply sent th
 save (SSH timed out until the cache flipped back). setup.sh installs /etc/sysctl.d/61-ollama1-arp.conf
 (net.ipv4.conf.all.arp_ignore=1, arp_announce=2) on every server; `status` says whether the kernel is set that way.
 With the cable out the server is reached at this card's own address, never at the wired one.
+
+With the cable out the bridge keeps its address and its metric-100 routes (netplan's bridge has no carrier
+requirement), which beat this card's metric 600, so replies went into the dead bridge (6b473). setup.sh installs
+/etc/sysctl.d/62-ollama1-linkdown.conf (ignore_routes_with_linkdown=1); `status` says whether the kernel is set so.
 """
 import getpass
 import json
@@ -35,6 +39,7 @@ WIFI_METRIC = 600                  # the wired bridge's DHCP route is 100: a lar
 NETPLAN_NAME = "70-ollama1-wifi.yaml"
 LINK_NAME = "50-ollama1-wifi.link"
 UDEV_NAME = "70-ollama1-wifi.rules"
+LINKDOWN_CONF = "62-ollama1-linkdown.conf"   # /etc/sysctl.d: routes through a link with no carrier are skipped (6b473)
 ARP_CONF = "61-ollama1-arp.conf"   # /etc/sysctl.d: each card answers ARP only for its own addresses (6b450)
 PHY_RX = re.compile(r"^phy[0-9]{1,3}$")
 IFACE_RX = re.compile(r"^[A-Za-z0-9_.:-]{1,15}$")
@@ -156,6 +161,14 @@ def arp_setting(key, iface=None, proc=None):
         except ValueError:
             pass
     return best
+
+
+def linkdown_ignored(iface=None, proc=None):
+    """Whether the kernel skips routes through a link that has lost its carrier (6b473), as
+    /etc/sysctl.d/62-ollama1-linkdown.conf sets: net.ipv4.conf.<iface>.ignore_routes_with_linkdown, which the
+    kernel ORs with `all` (arp_setting takes the larger, the same thing for a 0/1 key). Without it the dead
+    bridge's metric-100 routes beat the Wi-Fi card's metric 600 and the server is unreachable."""
+    return arp_setting("ignore_routes_with_linkdown", iface, proc) >= 1
 
 
 def arp_own_only(iface=None, proc=None):
@@ -554,6 +567,9 @@ def status_lines(root=None, run_=run):
         # 6b450: with Linux's default the Wi-Fi card answered for the wired address too (SSH to it timed out)
         out.append("Answers ARP only for its own address: " + (
             "yes" if arp_own_only(dev["name"]) else "no (sudo ./setup.sh installs /etc/sysctl.d/%s)" % ARP_CONF))
+        # 6b473: with the cable out the bridge kept its metric-100 routes and the server was unreachable on Wi-Fi
+        out.append("Wired link down: traffic goes over Wi-Fi: " + (
+            "yes" if linkdown_ignored(dev["name"]) else "no (sudo ./setup.sh installs /etc/sysctl.d/%s)" % LINKDOWN_CONF))
     if cards:
         dev = cards[0]
         r = run_(["iw", "phy", dev["phy"], "info"], 10) if PHY_RX.match(dev["phy"]) else None
