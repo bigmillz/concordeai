@@ -17,7 +17,8 @@
 #
 # Progress: /run/ollama1/quickburn.json every second (phase cpu|gpu|done, seconds_left, the
 # temperatures, the card's and the processor's busy percent, result, reason). The last result,
-# in one line: /var/lib/ollama1/quickburn-last.json.
+# in one line: /var/lib/ollama1/quickburn-last.json. When the processor part fails, stress-ng's last 20
+# output lines are kept in /var/lib/ollama1/quickburn-last-output.txt.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SECS=${O1_QB_SECONDS:-30}
@@ -128,11 +129,31 @@ run_phase() { # run_phase NAME COMMAND...  -> VERDICT (OK|FAIL|ABORTED), WHY
 }
 
 OUT=$(mktemp 2>/dev/null || echo /dev/null)
-trap 'stop_load; rm -f "$OUT"; finish aborted "stopped by the system"; exit 1' TERM INT
+# (6b476) newer stress-ng aborts unless it has a writable temp path, and the unit's sandbox leaves
+# only /tmp (private) writable: give it a folder of its own there, removed again on every way out.
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/o1qb.XXXXXX" 2>/dev/null || echo "")
+[ -n "$WORK" ] || { WORK="$RUN/quickburn/work.$$"; mkdir -p "$WORK" 2>/dev/null; }
+trap 'stop_load; rm -rf "$WORK"; rm -f "$OUT"; finish aborted "stopped by the system"; exit 1' TERM INT
 
 # 1. the processor
-run_phase cpu stress-ng --cpu 0 --cpu-method matrixprod --verify -t "${SECS}s" --metrics-brief
-if [ "$V" = OK ] && [ "$RC" -ne 0 ] && [ "$RC" -ne 143 ]; then V=FAIL; W="stress-ng exited with status $RC (a check failed)"; fi
+T_START=$(date +%s)
+run_phase cpu stress-ng --temp-path "$WORK" --cpu 0 --cpu-method matrixprod --verify -t "${SECS}s" --metrics-brief
+T_TOOK=$(( $(date +%s) - T_START ))
+rm -rf "$WORK"
+if [ "$V" = OK ] && [ "$RC" -ne 0 ] && [ "$RC" -ne 143 ]; then
+  V=FAIL
+  NFAIL=$(grep -oE 'failed: [0-9]+' "$OUT" 2>/dev/null | tail -1 | grep -oE '[0-9]+')
+  ERRLINE=$(grep -iE 'abort|error|must be|failed to init|cannot|unable' "$OUT" 2>/dev/null | grep -v 'failed: 0' | head -1 | cut -c1-150)
+  [ -n "$ERRLINE" ] || ERRLINE=$(grep -v '^[[:space:]]*$' "$OUT" 2>/dev/null | head -1 | cut -c1-150)
+  if grep -qiE 'aborting|must be readable|failed to initiali' "$OUT" 2>/dev/null || { [ "$RC" -eq 1 ] && [ "$T_TOOK" -le 2 ] && [ "${NFAIL:-0}" -eq 0 ]; }; then
+    W="stress-ng couldn't start: ${ERRLINE:-it exited with status $RC and said nothing}"
+  elif [ "${NFAIL:-0}" -gt 0 ]; then
+    W="a check failed: ${NFAIL} stressor(s) failed verification (stress-ng exit status $RC)"
+  else
+    W="stress-ng exited with status $RC (a check failed)"
+  fi
+fi
+if [ "$V" = FAIL ]; then tail -n 20 "$OUT" > "$STATE_DIR/quickburn-last-output.txt" 2>/dev/null; chmod 0644 "$STATE_DIR/quickburn-last-output.txt" 2>/dev/null; fi
 CPU_RES="$V${W:+: $W}"
 if [ "$V" != OK ]; then
   rm -f "$OUT"

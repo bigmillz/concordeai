@@ -632,7 +632,9 @@ around a little from time to time.
     aborted" or "Not started: <why>" (amber). Esc stops a running test at once; Enter is ignored while one runs.
     The test refuses to start while a request is running, a model download or update is going or another
     stability or burn test runs; it stops on a new hardware-error record, 95 C processor or 105 C graphics
-    junction. If llama-bench or the model is missing the card part says "not run: ..." and the processor result
+    junction. stress-ng runs with a private temp folder and the unit's working directory is `/run/ollama1`
+    (6b476: newer stress-ng aborts without a writable temp path); a failure says "stress-ng couldn't start: <its line>"
+    or "a check failed: N stressor(s)", and its last lines are in `/var/lib/ollama1/quickburn-last-output.txt`. If llama-bench or the model is missing the card part says "not run: ..." and the processor result
     stands. It needs `stress-ng` installed (the unit has no network): `sudo apt install stress-ng`. The last result
     is in `/var/lib/ollama1/quickburn-last.json`, progress in `/run/ollama1/quickburn.json`. Privilege: polkit lets
     only the screen's own user (`o1dash`) start that one unit (no other unit, no stop verb), and Esc makes an empty
