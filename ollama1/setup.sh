@@ -706,6 +706,10 @@ sysctl -q -p /etc/sysctl.d/60-ollama1-bridge.conf 2>/dev/null || true
 # power save (SSH timed out). Every server, bridge or not. The keys always exist: a failure is said, not swallowed.
 install -m 0644 "$KIT/config/61-ollama1-arp.conf" /etc/sysctl.d/61-ollama1-arp.conf
 sysctl -q -p /etc/sysctl.d/61-ollama1-arp.conf || note "the ARP settings in /etc/sysctl.d/61-ollama1-arp.conf did not apply now; the next boot applies them"
+# with the cable out the kernel must use the Wi-Fi card's routes, not the bridge's dead ones (6b473): the bridge keeps
+# its address and its metric-100 routes without a carrier, so replies went into it. Every server; a failure is said.
+install -m 0644 "$KIT/config/62-ollama1-linkdown.conf" /etc/sysctl.d/62-ollama1-linkdown.conf
+sysctl -q -p /etc/sysctl.d/62-ollama1-linkdown.conf || note "the link-down route setting in /etc/sysctl.d/62-ollama1-linkdown.conf did not apply now; the next boot applies it"
 # boot must not wait for links that are unplugged (the second wired port, a Wi-Fi spare): one link is enough
 install -d -m 0755 /etc/systemd/system/systemd-networkd-wait-online.service.d
 install -m 0644 "$KIT/config/10-ollama1-wait-online.conf" /etc/systemd/system/systemd-networkd-wait-online.service.d/10-ollama1.conf
@@ -786,6 +790,8 @@ ufw default allow outgoing >/dev/null
 ufw default deny routed >/dev/null
 for r in OpenSSH ssh 22 22/tcp; do ufw delete allow "$r" >/dev/null 2>&1 || true; done
 run ufw allow in on "$LANIF" from "$HOME_LAN" to any port 22 proto tcp comment 'ollama1: SSH from the home LAN'
+# the Wi-Fi card's own SSH rule (6b474) is added by the "Wi-Fi backup" step below (ollama1-wifi setup), only while the
+# backup is on and a network is set, and found again by its comment; this step never removes it
 if [ "$LANIF" = br0 ]; then
   # Bridged frames (a device on the bridge's other port) don't go through iptables while
   # bridge netfilter is off (60-ollama1-bridge.conf). If something loads

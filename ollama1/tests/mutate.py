@@ -2628,6 +2628,18 @@ MUTANTS = [
      'else int(self.wall()) - 30', 'else int(self.wall()) - 1000', ['test_leds']),
     ('sleep: the hook does not stamp the wake (6b468)', 'config/ollama1-sleep-hook',
      '    "$HELPER" stamp wake\n', '', ['test_sleep']),
+    # ---- with the cable out, routes through the dead bridge are skipped (6b473)
+    ('wifi: routes through a link with no carrier are kept (6b473)', 'config/62-ollama1-linkdown.conf',
+     'net.ipv4.conf.all.ignore_routes_with_linkdown = 1', 'net.ipv4.conf.all.ignore_routes_with_linkdown = 0',
+     ['test_wifi']),
+    ('wifi: remove leaves the Wi-Fi SSH rule in the firewall (6b474)', 'lib/o1wifi.py',
+     '    sync_ssh_rule(root, run_, out)\n    out("The Wi-Fi network is removed.")', '    out("The Wi-Fi network is removed.")', ['test_wifi']),
+    ('wifi: the Wi-Fi SSH rule is opened without a network set (6b474)', 'lib/o1wifi.py',
+     '    if enabled() and configured() and cards and lan:', '    if enabled() and cards and lan:', ['test_wifi']),
+    ('wifi: the Wi-Fi SSH rule removal ignores its comment (6b474)', 'lib/o1wifi.py',
+     '        if m and SSH_COMMENT in line:', '        if m:', ['test_wifi']),
+    ('wifi: status says the link-down setting is in effect when it is not (6b473)', 'lib/o1wifi.py',
+     '    return arp_setting("ignore_routes_with_linkdown", iface, proc) >= 1', '    return True', ['test_wifi']),
 ]
 
 

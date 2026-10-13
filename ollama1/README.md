@@ -221,7 +221,9 @@ Every step skips what is already done, so it is safe to run again.
 15. It sets up Cloudflare with the API token you paste: the tunnel, the DNS
     records and Access (see below).
 16. It checks what listens on the network: nothing but sshd may listen
-    beyond loopback (plus the gateway on br0, in LAN mode).
+    beyond loopback (plus the gateway on br0, in LAN mode). SSH is open from
+    your LAN on the wired port, and on the Wi-Fi card too while Wi-Fi backup
+    is on and set.
 17. It asks whether to remove the setup key `claude-setup@concordeai`. It only
     asks if a key of your own is present, and it removes nothing unless you
     type `yes`. You can also pass `--remove-setup-key`. Your own key(s) always
@@ -1919,7 +1921,8 @@ The kit never touches your network settings (the one exception is the optional
 "Wi-Fi backup" below, which writes a netplan file of its own and nothing else); it sets two kernel
 knobs, bridge netfilter off (below) and, since 6b450, each network card answering ARP only for its
 own addresses (`/etc/sysctl.d/61-ollama1-arp.conf`, every server; see "Wi-Fi backup" for the
-symptom it ends). It works with a plain wired
+symptom it ends) and, since 6b473, routes through a link with no carrier skipped
+(`/etc/sysctl.d/62-ollama1-linkdown.conf`, the same section). It works with a plain wired
 port, and also with a bridge. If your server has a bridge `br0` over its
 two wired ports (one to the router, one to another device, like a
 Raspberry Pi), at `<server-ip>`, that comes from your own bridge script
@@ -1935,7 +1938,8 @@ With a bridge, the firewall is set so it can't cut the other device off:
 - **`ufw route allow in on br0 out on br0`** is added as a second line of
   defence, in case something loads `br_netfilter` later.
 - **Interface rules use `br0`.** SSH is allowed in on `br0`, from
-  `<lan-cidr>`.
+  `<lan-cidr>`. With the Wi-Fi backup on and a network set, the same rule
+  also exists for the Wi-Fi card (see "Wi-Fi backup").
 
 ## Wi-Fi backup
 
@@ -1985,6 +1989,38 @@ exactly one country. Then:
   reached at `<wifi-ip>`, as meant; the wired address was never a way in over
   Wi-Fi that worked. `ollama1-wifi status` says whether the setting is in
   effect.
+- **Cable out, server on Wi-Fi** (6b473). A netplan bridge keeps its address
+  and its DHCP routes (metric 100) when its cable is pulled, and the Wi-Fi
+  card's routes are metric 600, so the kernel went on choosing the dead
+  bridge: replies, and the server's own outbound traffic (the Cloudflare
+  tunnel too), vanished, and the server, on and lit, answered at neither
+  address. `/etc/sysctl.d/62-ollama1-linkdown.conf`
+  (`net.ipv4.conf.all.ignore_routes_with_linkdown=1`, and the IPv6 twin; the
+  kernel ORs `all` with each link's own value, so every link, a later bridge
+  too, is covered) makes the kernel skip routes through a link with no
+  carrier. With the cable in nothing changes: the wired route is alive and
+  wins by metric. setup.sh installs and applies it on every server; `status`
+  says `Wired link down: traffic goes over Wi-Fi: yes`. Honest limits: it
+  only helps when the bridge itself loses its carrier, and a bridge has
+  carrier while any port has it (check `cat /sys/class/net/br0/carrier`
+  with the cable out: it must be `0`). A bridge that also holds a virtual
+  port (a VM's tap, a container's veth, a Pi on the second port) keeps its
+  carrier and its routes, and nothing here changes that: take such a port off
+  the bridge, or add `IgnoreCarrierLoss=` (a few seconds) to the bridge in
+  your own configuration, as the next limit below says (the kit never edits
+  your bridge file, so it does not add that).
+  The wired address is not reachable over Wi-Fi either way; use `<wifi-ip>`.
+- **SSH over Wi-Fi** (6b474). The firewall lets SSH in on the wired bridge
+  only, so with the cable out the Wi-Fi address answered pings and refused
+  SSH. While Wi-Fi backup is on and a network is set, one more rule is added
+  for the Wi-Fi card (found by its type, not by a name): SSH in on that card,
+  from `<lan-cidr>` only, with the comment
+  `ollama1: SSH from the home LAN over Wi-Fi`. `sudo ollama1-wifi set` and `sudo ./setup.sh` add it (adding twice
+  changes nothing); `sudo ollama1-wifi remove` and `--wifi off` delete exactly
+  the rule with that comment and nothing else. `status` says `SSH over Wi-Fi:
+  open to the home network` or `closed`. Not opened: the gateway port 8431
+  (LAN mode); the app reaches the server through the tunnel, which needs no
+  inbound port, and LAN mode has no Wi-Fi fallback (see the limits below).
 - **Boot never waits for it** (`optional: true`; the kit's wait-online drop-in
   already waits for one link, 30 s at most).
 - **It cannot cut the wired link.** The new file is checked with
@@ -2015,6 +2051,8 @@ Address: <wifi-ip>/24
 Wired: eth0 up, eth1 down
 Default route: br0 (metric 100)
 Answers ARP only for its own address: yes
+Wired link down: traffic goes over Wi-Fi: yes
+SSH over Wi-Fi: open to the home network
 Card can wake on a magic packet (WoWLAN): yes
 PCI wake enabled: yes
 Published to the app as a wake card: 02:00:5e:10:00:77
@@ -2061,7 +2099,8 @@ never delays or stops a suspend. The BIOS must allow wake from a PCI-E device
   carrier loss, so `status` may still say `Default route: br0` with the cable
   out, and the server's own traffic goes into the dead bridge. Check it once
   (unplug, then `ip route show default`: `linkdown` on the bridge's line is
-  that case); the fix is a networkd drop-in for the bridge with
+  that case; since 6b473 the kit's `62-ollama1-linkdown.conf` covers the
+  usual case, a bridge whose ports all lost carrier); otherwise the fix is a networkd drop-in for the bridge with
   `IgnoreCarrierLoss=` of a few seconds, in your own bridge configuration.
 
 **To try it with the cable unplugged**: `sudo ollama1-wifi set`, check
@@ -2083,6 +2122,7 @@ cable). Then put it to sleep from the panel and wake it from the app.
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
 | Wi-Fi backup | `sudo ollama1-wifi status`; `iw dev`; off: `sudo ./setup.sh --wifi off`; see "Wi-Fi backup" |
 | SSH to the server slow or timing out while Wi-Fi backup is on | On the client, `arp -n <server-ip>` must show the wired card's MAC, not the Wi-Fi card's; on the server, `sudo ollama1-wifi status` must say `Answers ARP only for its own address: yes` (a `no` means a kit from before 6b450: run `sudo ./setup.sh`). Then clear the client's entry once: `sudo arp -d <server-ip>` |
+| Cable out: server unreachable (on, fans and lights running, "didn't answer" in the app) | With the cable out use the Wi-Fi address (`sudo ollama1-wifi status` on the server's console shows it, or the router's client list). If that times out too, `sudo ollama1-wifi status` must say `Wired link down: traffic goes over Wi-Fi: yes` (a `no`: run `sudo ./setup.sh`; right away: `sudo sysctl -w net.ipv4.conf.all.ignore_routes_with_linkdown=1`), and `cat /sys/class/net/br0/carrier` must be `0` (a `1` means another port, like a VM's, holds the bridge up: see "Wi-Fi backup") |
 | Lights | `ollama1-leds status`; `journalctl -u ollama1-leds -u ollama1-openrgb`; off: `sudo ./setup.sh --leds off` |
 | System move to the other NVMe | `cat /var/lib/ollama1/migrate-os.status`, `bash /usr/local/lib/ollama1-migrate/migrate-os.sh --status`; see "Moving the system to the other drive" |
 | Graphics card tuning | `sudo ollama1-gpu-tune status`; `journalctl -u ollama1-gpu-tune -u ollama1-gpu-tune-check`; back to stock: `sudo ollama1-gpu-tune off` |
@@ -2157,6 +2197,7 @@ Ed25519 (the server uses PyNaCl). They cover:
   and able; each card answering ARP only for its own addresses (the sysctl
   file's exact keys, setup.sh installing and applying it on every server and
   not swallowing a failure, and `status` reading the kernel's effective value,
+  and the same for the link-down routes file (6b473),
   the larger of `all` and the card's own, from a fake `/proc`);
 - the auto sleep setting across a gateway restart, the idle service's, a
   reboot and a setup.sh run (`test_sleepcfg.py`), and the check after a wake

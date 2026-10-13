@@ -25,7 +25,7 @@ BRIDGE = "network:\n  version: 2\n  bridges:\n    br0:\n      interfaces: [enp5s
 UNIVERSAL = ":".join(["a8", "bb", "cc", "dd", "ee", "01"])          # built, so the personal-values scan sees no real-looking MAC
 LOCAL = ":".join(["a2", "bb", "cc", "dd", "ee", "01"])
 FAKE = os.path.join(U.HERE, "fakewifi.py")
-TOOLS = ["iw", "netplan", "ip", "apt-get", "udevadm", "networkctl", "systemctl"]
+TOOLS = ["iw", "netplan", "ip", "apt-get", "udevadm", "networkctl", "systemctl", "ufw"]
 
 
 class Fixture(unittest.TestCase):
@@ -447,6 +447,169 @@ class TestEachCardAnswersForItself(Fixture):
         self.assertEqual(self.arp_lines(), [])
 
 
+class TestWiredDownGoesOverWifi(Fixture):
+    """6b473: with the cable out, br0 kept its address and metric-100 routes (no carrier needed), the Wi-Fi card's were
+    metric 600, and the server was unreachable on both addresses. The kit's sysctl file makes the kernel skip routes
+    through a link with no carrier; status says whether it is so."""
+
+    LINE = "Wired link down: traffic goes over Wi-Fi: "
+
+    def lines(self):
+        return [l for l in o1wifi.status_lines() if l.startswith(self.LINE)]
+
+    def linkdown(self, **scopes):
+        shutil.rmtree(self.proc, ignore_errors=True)
+        for scope, val in scopes.items():
+            d = os.path.join(self.proc, "sys", "net", "ipv4", "conf", scope)
+            os.makedirs(d)
+            with open(os.path.join(d, "ignore_routes_with_linkdown"), "w") as f:
+                f.write("%s\n" % val)
+
+    def test_the_sysctl_file_sets_the_ipv4_and_ipv6_keys_for_all_links(self):
+        with open(os.path.join(U.CONFIG, o1wifi.LINKDOWN_CONF)) as f:
+            text = f.read()
+        keys = [l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
+        self.assertEqual(keys, ["net.ipv4.conf.all.ignore_routes_with_linkdown = 1",
+                                "-net.ipv6.conf.all.ignore_routes_with_linkdown = 1"])   # v6 may be off: only that is optional
+        self.assertNotIn("conf.br0", text)
+        self.assertIn("6b473", text)
+
+    def test_setup_installs_it_beside_the_arp_file_and_says_a_failure(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        inst = 'install -m 0644 "$KIT/config/%s" /etc/sysctl.d/%s' % (o1wifi.LINKDOWN_CONF, o1wifi.LINKDOWN_CONF)
+        self.assertEqual(setup.count(inst), 1)
+        i = setup.index(inst)
+        self.assertLess(setup.index('install -m 0644 "$KIT/config/%s"' % o1wifi.ARP_CONF), i)
+        self.assertLess(i, setup.index("10-ollama1-wait-online.conf"))
+        self.assertLess(i, setup.index('step "Firewall"'))
+        self.assertNotIn('step "Wi-Fi backup"', setup[:i])                     # every server, not only with --wifi
+        applied = [l for l in setup.splitlines() if l.startswith("sysctl -q -p /etc/sysctl.d/" + o1wifi.LINKDOWN_CONF)]
+        self.assertEqual(len(applied), 1)
+        self.assertIn("|| note", applied[0])
+        self.assertNotIn("|| true", applied[0])
+        self.assertNotIn("2>/dev/null", applied[0])
+
+    def test_the_kit_edits_no_netplan_bridge_for_it(self):
+        text = open(os.path.join(U.CONFIG, o1wifi.LINKDOWN_CONF)).read()
+        self.assertNotIn("netplan", "\n".join(l for l in text.splitlines() if not l.startswith("#")))
+
+    def test_status_says_yes_or_no(self):
+        self.turn_on(SSID)
+        self.put_netplan()
+        no = self.LINE + "no (sudo ./setup.sh installs /etc/sysctl.d/%s)" % o1wifi.LINKDOWN_CONF
+        self.assertEqual(self.lines(), [no])                                    # no /proc tree
+        for scopes, want in ((dict(all=1), "yes"), (dict(all=0, wlo1=1), "yes"), (dict(all=1, wlo1=0), "yes"),
+                             (dict(all=0), "no"), (dict(all="x"), "no")):
+            self.linkdown(**scopes)
+            lines = self.lines()
+            self.assertEqual(len(lines), 1, scopes)
+            self.assertTrue(lines[0].startswith(self.LINE + want), (scopes, lines))
+        self.assertFalse(o1wifi.linkdown_ignored("wlo1", proc=os.path.join(self.dir, "none")))
+
+    def test_no_card_no_line(self):
+        self.linkdown(all=1)
+        shutil.rmtree(os.path.join(self.net, "wlo1"))
+        self.assertEqual(self.lines(), [])
+
+
+class TestSshOverWifi(Fixture):
+    """6b474: the firewall let SSH in on the wired bridge only, so with the cable out the Wi-Fi address answered pings
+    and refused SSH. While the backup is on and a network is set, one ufw rule opens SSH on the Wi-Fi card for the home
+    LAN; `set` and setup add it, `remove` and `--wifi off` take out only that rule, found by its comment."""
+
+    LAN = "192.0.2.0/24"
+    WIRED = "22/tcp on br0 ALLOW IN    192.0.2.0/24 # ollama1: SSH from the home LAN"
+    RULE = "22/tcp on wlo1 ALLOW IN    192.0.2.0/24 # " + o1wifi.SSH_COMMENT
+
+    def setUp(self):
+        super().setUp()
+        with open(os.path.join(U.PREFIX, "etc", "ollama1", "config.json"), "w") as f:
+            json.dump({"lan_cidr": self.LAN}, f)
+        self.fs["ufw_rules"] = [self.WIRED]
+        self.save()
+
+    def tearDown(self):
+        shutil.rmtree(os.path.join(U.PREFIX, "etc", "ollama1"), ignore_errors=True)   # other test files read the same prefix
+        super().tearDown()
+
+    def rules(self):
+        return self.st()["ufw_rules"]
+
+    def test_set_opens_it_once_and_names_the_card_it_found(self):
+        self.turn_on()
+        rc, out = self.run_set()
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE])
+        self.assertEqual(o1wifi.sync_ssh_rule(), True)                         # idempotent
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE])
+        self.assertTrue(o1wifi.ssh_open())
+
+    def test_a_card_with_another_name_gets_its_own_name(self):
+        self.turn_on()
+        shutil.rmtree(os.path.join(self.net, "wlo1"))
+        self.card("wlp3s0")
+        self.assertEqual(self.run_set()[0], 0)
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE.replace("wlo1", "wlp3s0")])
+
+    def test_remove_takes_out_only_its_own_rule(self):
+        self.turn_on()
+        self.run_set()
+        self.fs = self.st()
+        self.fs["ufw_rules"].append("8431/tcp ALLOW IN    192.0.2.0/24")
+        self.save()
+        self.assertEqual(o1wifi.cmd_remove(out=lambda *_: None), 0)
+        self.assertEqual(self.rules(), [self.WIRED, "8431/tcp ALLOW IN    192.0.2.0/24"])
+        o1wifi.sync_ssh_rule()                                                  # nothing left to remove: no error
+        self.assertEqual(len(self.rules()), 2)
+
+    def test_not_open_without_a_network_or_when_off_or_without_a_lan(self):
+        self.turn_on()
+        self.assertTrue(o1wifi.sync_ssh_rule())                                 # on, no network set
+        self.assertEqual(self.rules(), [self.WIRED])
+        self.run_set()
+        o1wifi.write_state({})                                                  # off
+        o1wifi.sync_ssh_rule()
+        self.assertEqual(self.rules(), [self.WIRED])
+        self.turn_on()
+        os.unlink(os.path.join(U.PREFIX, "etc", "ollama1", "config.json"))
+        o1wifi.sync_ssh_rule()
+        self.assertEqual(self.rules(), [self.WIRED])                            # no LAN saved: nothing opened
+
+    def test_setup_on_adds_and_setup_off_removes(self):
+        self.turn_on()
+        self.put_netplan()
+        logs = []
+        self.assertEqual(o1wifi.setup("on", which=lambda n: "/x", apt=lambda n: True, tool="/t", log=logs.append), 0)
+        self.assertEqual(self.rules(), [self.WIRED, self.RULE])
+        self.assertEqual(o1wifi.setup("off", log=logs.append), 0)
+        self.assertEqual(self.rules(), [self.WIRED])
+
+    def test_a_ufw_failure_is_said(self):
+        self.turn_on()
+        self.fs["ufw_fail"] = True
+        self.save()
+        out = []
+        self.assertFalse(o1wifi.sync_ssh_rule(log=out.append) is True and not out)
+        self.assertTrue(out)
+
+    def test_status_says_open_or_closed(self):
+        self.turn_on(SSID)
+        self.put_netplan()
+        self.assertIn("SSH over Wi-Fi: closed (sudo ./setup.sh opens it)", o1wifi.status_lines())
+        o1wifi.sync_ssh_rule()
+        self.assertIn("SSH over Wi-Fi: open to the home network", o1wifi.status_lines())
+
+    def test_setup_sh_leaves_it_to_the_wifi_step_and_the_readme_says_so(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        self.assertIn('"$LIBDIR/bin/ollama1-wifi" setup "$WIFI"', setup)
+        self.assertLess(setup.index('step "Firewall"'), setup.index('step "Wi-Fi backup"'))
+        r = open(os.path.join(U.KIT, "README.md")).read()
+        sec = r.split("## Wi-Fi backup")[1].split("\n## ")[0]
+        for word in ("SSH over Wi-Fi", "over Wi-Fi", "8431", "ollama1: SSH from the home LAN over Wi-Fi"):
+            self.assertIn(word, sec)
+        self.assertIn("Wi-Fi card", r.split("Interface rules use `br0`")[1].split("## Wi-Fi backup")[0])
+
+
 class TestWakeList(Fixture):
     def test_published_only_when_on_set_up_real_and_supported(self):
         self.assertEqual(o1wifi.wake_macs(), [])                          # off
@@ -713,8 +876,11 @@ class TestSetupSh(unittest.TestCase):
         self.assertIn("| `--wifi on\\|off` |", r)
         sec = r.split("## Wi-Fi backup")[1].split("\n## ")[0]
         for word in ("sudo ollama1-wifi set", "never", "metric", "S3", "access point", "70-ollama1-wifi.yaml",
-                     "61-ollama1-arp.conf", "arp_ignore", "Answers ARP only for its own address"):
+                     "61-ollama1-arp.conf", "arp_ignore", "Answers ARP only for its own address",
+                     "62-ollama1-linkdown.conf", "ignore_routes_with_linkdown", "Wired link down: traffic goes over Wi-Fi"):
             self.assertIn(word, sec)
+        self.assertIn("Cable out: server unreachable", r)                      # the troubleshooting row
+        self.assertIn("62-ollama1-linkdown.conf", r.split("## The network")[1].split("## Wi-Fi backup")[0])
         self.assertIn("61-ollama1-arp.conf", r.split("## The network")[1].split("## Wi-Fi backup")[0])
 
 
