@@ -733,7 +733,7 @@ class TestMetrics(unittest.TestCase):
 
     # -- 6b444: a reading every half second ----------------------------------------------------------------
     def test_an_hour_of_history_is_an_hour_whatever_the_tick(self):
-        self.assertEqual(o1metrics.TICK_S, 1.0)                              # Pat (6b475): a reading a second, as before 6b444
+        self.assertEqual(o1metrics.TICK_S, 1.0)                              # owner (6b475): a reading a second, as before 6b444
         self.assertEqual(o1metrics.HISTORY * o1metrics.TICK_S, o1metrics.HISTORY_S)
         self.assertEqual(o1metrics.HISTORY_S, 3600)
         self.assertEqual({d.maxlen for d in o1metrics.Sampler(tunnel_port=1).series.values()}, {3600})
