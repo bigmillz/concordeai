@@ -532,7 +532,7 @@ class TestLoop(unittest.TestCase):
         self.assertGreater(len(fb.writes), 3)
 
     def test_a_reading_every_second_and_a_picture_every_two(self):
-        self.assertEqual(o1paneld.TICK_S, 1.0)                          # Pat (6b475): back to what it was before 6b444
+        self.assertEqual(o1paneld.TICK_S, 1.0)                          # owner (6b475): back to what it was before 6b444
         self.assertEqual(o1paneld.TICK_S, o1metrics.TICK_S)             # readings: one knob, shared with the text dashboard
         self.assertEqual((o1paneld.DRAW_S, o1paneld.PAIRING_DRAW_S), (2.0, 1.0))      # pictures: the panel's own
         self.assertLessEqual(o1paneld.POLL_S, o1paneld.TICK_S)
