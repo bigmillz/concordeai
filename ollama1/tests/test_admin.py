@@ -158,6 +158,13 @@ class TestActions(unittest.TestCase):
         self.assertEqual(post({"action": "reboot", "confirm": "reboot"})[0], 202)
         self.assertEqual(A["started"], ["ollama1-reboot.service"])
 
+    def test_shutdown_needs_confirm(self):
+        A["started"].clear()
+        self.assertEqual(post({"action": "shutdown"})[0], 400)
+        self.assertEqual(A["started"], [])
+        self.assertEqual(post({"action": "shutdown", "confirm": "shutdown"})[0], 202)
+        self.assertEqual(A["started"], ["ollama1-shutdown.service"])
+
     def test_sleep(self):
         panel = A["panel"]
         panel.busy = lambda: []
@@ -478,7 +485,7 @@ class TestGraphicalPage(unittest.TestCase):
         page, _ = self.page()
         js = self.script(page)
         acts = set(re.findall(r'data-act="([a-z-]+)"', page))
-        self.assertEqual(acts, {"sleep", "reboot", "restart", "update", "lan", "backup", "pair"})
+        self.assertEqual(acts, {"sleep", "reboot", "shutdown", "restart", "update", "lan", "backup", "pair"})
         mod = A["mod"]
         reach = {"lan-on": "'lan-on'", "lan-off": "'lan-off'", "library-preview": "act('library-preview'",
                  "library-sync": "act('library-sync',p.id,p.id", "power-apply": "post('/api/power/schedule'"}
@@ -496,7 +503,8 @@ class TestGraphicalPage(unittest.TestCase):
         # every destructive action asks first, in the styled dialog
         self.assertIn("act('reboot',null,'reboot',b)", js)
         self.assertIn("act('sleep',null,'sleep',b)", js)
-        for title in ("Reboot the server now?", "Put the server to sleep?", "Apply updates now?",
+        self.assertIn("act('shutdown',null,'shutdown',b)", js)
+        for title in ("Reboot the server now?", "Shut the server down?", "Put the server to sleep?", "Apply updates now?",
                       "Restart the services?", "'Unpair '+x.name+'?'", "'Remove '+x.name+'?'",
                       "Apply the library changes?", "Turn LAN mode on?", "Replace the prices?"):
             self.assertIn(title, js)

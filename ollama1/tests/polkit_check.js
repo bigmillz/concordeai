@@ -38,6 +38,7 @@ const cases=[['o1admin','org.freedesktop.systemd1.manage-units','ollama1-restart
 ['o1dash','org.freedesktop.systemd1.manage-units','ollama1-quickburn.service','restart','no'],
 ['o1dash','org.freedesktop.systemd1.manage-units','ollama1-restart.service','start','no'],
 ['o1dash','org.freedesktop.systemd1.manage-units','ollama1-reboot.service','start','no'],
+['o1dash','org.freedesktop.systemd1.manage-units','ollama1-shutdown.service','start','no'],
 ['o1gw','org.freedesktop.systemd1.manage-units','ollama1-quickburn.service','start','no'],
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-quickburn.service','start','no'],
 ['o1gw','org.freedesktop.systemd1.manage-units','ollama1-models-sync.service','start','no'],

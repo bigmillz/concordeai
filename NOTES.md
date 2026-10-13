@@ -15825,3 +15825,13 @@ processor: stress-ng exited with status 1 (a check failed)".
   `/var/lib/ollama1/quickburn-last-output.txt`.
 - Tests: fake stress-ng cases for both messages, the temp folder removed, the unit's WorkingDirectory inside a
   ReadWritePath; two mutate.py entries. Not run on the real server.
+
+## 6b477 — Shut down button in the server panel's Power card (per Patrick)
+
+- New **Shut down** button beside Reboot, same danger style, same ask-first dialog ("Shut the server down?"). Action
+  `shutdown` needs `confirm: "shutdown"` (400 otherwise), starts `ollama1-shutdown.service`, whose helper verb runs
+  `systemctl poweroff`. The polkit rule lists the unit for the panel's user only.
+- Waking after a shutdown is the power button, or the Pi's wake relay if the board's BIOS wakes from off (BIOS: Wake Up
+  Event By = BIOS, PCI-E wake on, ErP Ready off, as for sleep). Unverified on the real server: a poweroff, then a wake.
+- Tests: admin action needs its confirm and starts only its unit; the page carries the button and the dialog; polkit
+  check; one mutation (shutdown without confirmation).

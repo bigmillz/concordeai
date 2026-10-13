@@ -54,6 +54,7 @@ FIXED_UNITS = {
     "update": "ollama1-update-now.service",
     "restart": "ollama1-restart.service",
     "reboot": "ollama1-reboot.service",
+    "shutdown": "ollama1-shutdown.service",
     "sleep": "ollama1-sleep.service",
     "pair": "ollama1-pair-window.service",
     "lan-on": "ollama1-lan-on.service",
@@ -502,6 +503,8 @@ class Panel:
         if act in FIXED_UNITS:
             if act == "reboot" and obj.get("confirm") != "reboot":
                 return 400, "confirm the reboot"
+            if act == "shutdown" and obj.get("confirm") != "shutdown":
+                return 400, "confirm the shutdown"
             if act == "library-sync":
                 bad = self.library_sync_refusal(arg, obj.get("confirm"))
                 if bad:
@@ -1199,6 +1202,7 @@ footer{max-width:1680px;margin:0 auto;padding:0 28px 40px;color:var(--muted);fon
    <button type="button" class="big-act" data-act="sleep">Sleep now<span>Wake it with the power button</span></button>
    <button type="button" class="big-act danger" data-act="reboot">Reboot<span>Asks first</span></button>
    <button type="button" class="big-act" data-act="restart">Restart services<span>Ollama, gateway, terminal, tunnel</span></button>
+   <button type="button" class="big-act danger" data-act="shutdown">Shut down<span>Asks first</span></button>
   </div>
   <div class="sleepbox"><div class="row between"><span class="note">Auto sleep</span><span class="chip" id="autochip">-</span></div>
    <button type="button" class="switch mt" role="switch" aria-checked="false" id="autoswitch"><span class="lab"><b>Sleep when idle</b><span id="autoswsub">Reading the setting</span></span><span class="knob" aria-hidden="true"></span></button>
@@ -1282,7 +1286,7 @@ async function post(path,obj){
  catch(e){return {ok:false,status:0,msg:'no answer from the server ('+e.message+')',j:{}};}}
 function toast(title,text,kind){const t=el('div',undefined,'toast'+(kind?' '+kind:''));t.append(el('b',title));if(text)t.append(document.createTextNode(text));
  $('toasts').append(t);setTimeout(()=>t.remove(),kind==='bad'?10000:6000);}
-const LABEL={update:'Apply updates',restart:'Restart services',reboot:'Reboot',sleep:'Sleep',pair:'Pairing window',backup:'Back up','lan-on':'LAN mode on','lan-off':'LAN mode off',
+const LABEL={update:'Apply updates',restart:'Restart services',reboot:'Reboot',shutdown:'Shut down',sleep:'Sleep',pair:'Pairing window',backup:'Back up','lan-on':'LAN mode on','lan-off':'LAN mode off',
  'library-preview':'Model library check','library-sync':'Model library sync','remove-device':'Remove device',pull:'Download model','remove-model':'Remove model'};
 async function act(action,arg,confirm,btn){if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true');}
  const r=await post('/api/action',{action,arg,confirm});
@@ -1307,6 +1311,7 @@ function ask(o){return new Promise(res=>{const d=$('dlg'),ok=$('dlgok'),no=$('dl
 let lan=false,lastState={},sleepBusy=false,minDirty=false;
 document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
  if(a==='reboot'){if(await ask({title:'Reboot the server now?',body:['It can\'t be reached until it has started again, and running requests end.'],ok:'Reboot',danger:true}))act('reboot',null,'reboot',b);return;}
+ if(a==='shutdown'){if(await ask({title:'Shut the server down?',body:['It powers off completely and can\'t be reached until it is switched on again, and running requests end. Wake it with the power button, or from the app through the Pi if it is set up.'],ok:'Shut down',danger:true}))act('shutdown',null,'shutdown',b);return;}
  if(a==='sleep'){let t='The server will sleep. Press its power button to wake it. While it sleeps it can\'t be reached, and anything plugged into its second network port loses its connection.';
   const body=[t];if((lastState.raid||[]).some(r=>r.action))body.push('The mirror\'s sync pauses while it sleeps and carries on after it wakes.');
   if(await ask({title:'Put the server to sleep?',body,ok:'Sleep now'}))act('sleep',null,'sleep',b);return;}

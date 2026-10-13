@@ -733,7 +733,7 @@ around a little from time to time.
   - **Power and cost**: watts now and over the last hour, cost and energy
     for the last hour, 24 h, 7 and 30 days with the hours measured, the
     projection, and the prices editor;
-  - **Controls**: Sleep now, Reboot, Restart services, the auto sleep
+  - **Controls**: Sleep now, Reboot, Restart services, Shut down, the auto sleep
     switch and its idle minutes (chips 15 / 30 / 60 / 120 or any number
     from 5 to 1440; the app sets the same setting and the last change wins)
     with the server's own decision ("Sleeps in 12:34", or why not; the page

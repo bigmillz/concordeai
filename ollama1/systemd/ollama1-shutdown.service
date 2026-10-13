@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: shut down
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper shutdown
+TimeoutStartSec=5min
