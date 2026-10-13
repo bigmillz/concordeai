@@ -15752,3 +15752,24 @@ Patrick: "let's put the dashboard refresh rate back to what it was. I think that
   `tick:` mutants (a picture with every reading, the pairing pace, a flip waiting for the next picture).
 - **CPU, not re-measured.** The cost is back to about what it was before 6b444 (about 3% of a Mac core at 4K with
   every number moving, 1.3% at 1080p); I have not measured it again. Changing `TICK_S` or `DRAW_S` changes it.
+
+## 6b476 — the burn test starts under its sandbox, and says honestly when it cannot (per Patrick)
+
+Patrick (2026-10-12, a photo of the server's screen after Enter on the dashboard): a red banner, "Burn test failed:
+processor: stress-ng exited with status 1 (a check failed)".
+
+- **Cause:** `ollama1-quickburn.service` runs under `ProtectSystem=strict` with working directory `/`, read-only.
+  stress-ng 0.20 (Ubuntu 26.04) insists on a writable temp path, defaulting to `.`, and aborts at once with
+  `aborting: temp-path '.' must be readable and writeable`, exit 1. Reproduced on the server under the same systemd
+  properties; the same command outside the sandbox passes (32 workers, 0 failed). The script reported every nonzero
+  exit as "a check failed".
+- **Fix:** `quick-burn.sh` makes a `mktemp -d` (private `/tmp` under PrivateTmp; falls back to
+  `/run/ollama1/quickburn/work.<pid>`), passes it as `--temp-path`, removes it after the processor phase and in the trap.
+  The unit gets `WorkingDirectory=/run/ollama1` (inside ReadWritePaths). The kit's only other stress-ng user,
+  `stability-test.sh`, runs from a shell, unsandboxed, and no other unit calls stress-ng: unaffected.
+- **Honest message:** output containing aborting / must be readable / failed to initialise, or exit 1 within 2 s with
+  no failures counted, reads "stress-ng couldn't start: <its first error line>". Exit nonzero after running with
+  `failed: N` reads "a check failed: N stressor(s) failed verification". The last 20 lines of its output are kept in
+  `/var/lib/ollama1/quickburn-last-output.txt`.
+- Tests: fake stress-ng cases for both messages, the temp folder removed, the unit's WorkingDirectory inside a
+  ReadWritePath; two mutate.py entries. Not run on the real server.

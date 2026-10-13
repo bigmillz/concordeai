@@ -33,8 +33,9 @@ class Box:
         self.log = d + "/calls.log"
         os.makedirs(self.run + "/quickburn")
         os.makedirs(self.state)
+        os.makedirs(d + "/tmp")
         write(self.bin + "/stress-ng", '#!/bin/sh\necho "stress-ng $*" >>"$FAKE_LOG"\nt=1\nwhile [ $# -gt 0 ]; do [ "$1" = -t ] && t=${2%s}; shift; done\n'
-              'sleep "${FAKE_STRESS_SLEEP:-$t}"\nexit "${FAKE_STRESS_RC:-0}"\n', 0o755)
+              '[ -n "${FAKE_STRESS_OUT:-}" ] && printf "%s\\n" "$FAKE_STRESS_OUT"\nsleep "${FAKE_STRESS_SLEEP:-$t}"\nexit "${FAKE_STRESS_RC:-0}"\n', 0o755)
         write(self.bin + "/journalctl", '#!/bin/sh\ncat "$FAKE_JOURNAL" 2>/dev/null\nexit 0\n', 0o755)
         write(self.bin + "/systemctl", '#!/bin/sh\ncat "$FAKE_UNITS" 2>/dev/null\nexit 0\n', 0o755)
         write(d + "/gpu-burn.sh", '#!/bin/sh\necho "gpu-burn $* secs=$O1_BURN_SECONDS" >>"$FAKE_LOG"\n'
@@ -57,7 +58,7 @@ class Box:
                         O1_RUN_DIR=self.run, O1_STATE_DIR=self.state, O1_LIB_DIR=U.LIB, O1_HWMON=d + "/hw", O1_DRM=d + "/drm",
                         O1_PROC_STAT=d + "/stat", O1_GPU_BURN=d + "/gpu-burn.sh", O1_PROC=d + "/proc", FAKE_LOG=self.log,
                         FAKE_JOURNAL=d + "/journal", FAKE_UNITS=d + "/units", OLLAMA1_PREFIX=d + "/prefix",
-                        O1_GPU_BURN_LOG=d + "/gb.log")
+                        O1_GPU_BURN_LOG=d + "/gb.log", TMPDIR=d + "/tmp")
 
     def go(self, timeout=60, **env):
         e = dict(self.env, **env)
@@ -85,7 +86,8 @@ class TestQuickBurn(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         calls = b.calls()
         self.assertEqual(len(calls), 2)
-        self.assertTrue(calls[0].startswith("stress-ng --cpu 0 --cpu-method matrixprod --verify -t 2s"), calls[0])
+        self.assertTrue(calls[0].startswith("stress-ng --temp-path " + b.d + "/tmp/o1qb.") and " --cpu 0 --cpu-method matrixprod --verify -t 2s" in calls[0], calls[0])
+        self.assertEqual(os.listdir(b.d + "/tmp"), [])                           # its temp folder is gone
         self.assertEqual(calls[1], "gpu-burn 1 gemma4:12b secs=2")
         self.assertGreaterEqual(b.took, 3.8)
         self.assertEqual(b.last()["result"], "passed")
@@ -153,6 +155,34 @@ class TestQuickBurn(unittest.TestCase):
         self.assertIn("stress-ng exited with status 2", b.last()["reason"])
         self.assertEqual(len(b.calls()), 1)                                     # the card was not started
         self.assertEqual(b.last()["gpu"], "not run")
+
+    def test_stress_ng_that_cannot_start_is_not_called_a_failed_check(self):
+        b = Box(self)
+        line = "aborting: temp-path '.' must be readable and writeable"
+        r = b.go(FAKE_STRESS_RC="1", FAKE_STRESS_SLEEP="0", FAKE_STRESS_OUT=line)
+        self.assertEqual(r.returncode, 1)
+        reason = b.last()["reason"]
+        self.assertIn("stress-ng couldn't start: " + line, reason)
+        self.assertNotIn("a check failed", reason)
+        self.assertIn(line, open(b.state + "/quickburn-last-output.txt").read())
+        self.assertEqual(os.listdir(b.d + "/tmp"), [])
+        self.assertEqual(len(b.calls()), 1)
+
+    def test_a_verified_failure_after_the_full_time_says_a_check_failed_and_how_many(self):
+        b = Box(self)
+        r = b.go(FAKE_STRESS_RC="1", FAKE_STRESS_OUT="stress-ng: info: [1] failed: 2: cpu (2)")
+        self.assertEqual(r.returncode, 1)
+        reason = b.last()["reason"]
+        self.assertIn("a check failed: 2 stressor(s)", reason)
+        self.assertNotIn("couldn't start", reason)
+        self.assertEqual(os.listdir(b.d + "/tmp"), [])
+
+    def test_the_unit_has_a_working_directory_it_may_write(self):
+        unit = open(os.path.join(U.SYSTEMD, "ollama1-quickburn.service")).read() if hasattr(U, "SYSTEMD") else \
+            open(os.path.join(os.path.dirname(U.TOOLS), "systemd", "ollama1-quickburn.service")).read()
+        wd = re.search(r"^WorkingDirectory=(\S+)$", unit, re.M).group(1)
+        rw = re.search(r"^ReadWritePaths=(.*)$", unit, re.M).group(1).split()
+        self.assertTrue(any(wd == p or wd.startswith(p + "/") for p in rw), (wd, rw))
 
     def test_a_new_hardware_error_stops_the_run(self):
         b = Box(self)

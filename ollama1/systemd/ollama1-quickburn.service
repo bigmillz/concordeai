@@ -18,6 +18,8 @@ After=ollama.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/lib/ollama1/tools/quick-burn.sh
+# (6b476) a writable working directory: stress-ng wants one, and "/" is read-only under ProtectSystem=strict.
+WorkingDirectory=/run/ollama1
 Environment=PYTHONDONTWRITEBYTECODE=1
 TimeoutStartSec=300
 KillMode=control-group
