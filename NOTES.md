@@ -15729,3 +15729,13 @@ fold up?"
 - Gauntlet: `foldView` under node, plus served-HTML checks (buttons, aria-expanded, keys, chevron CSS). The 6b467
   heading assertion was reworded for the button markup. The script parses (node --check on the served page); the
   look and the click are unseen in the Browser pane and WKWebView.
+
+## 6b477 — Shut down button in the server panel's Power card (per Patrick)
+
+- New **Shut down** button beside Reboot, same danger style, same ask-first dialog ("Shut the server down?"). Action
+  `shutdown` needs `confirm: "shutdown"` (400 otherwise), starts `ollama1-shutdown.service`, whose helper verb runs
+  `systemctl poweroff`. The polkit rule lists the unit for the panel's user only.
+- Waking after a shutdown is the power button, or the Pi's wake relay if the board's BIOS wakes from off (BIOS: Wake Up
+  Event By = BIOS, PCI-E wake on, ErP Ready off, as for sleep). Unverified on the real server: a poweroff, then a wake.
+- Tests: admin action needs its confirm and starts only its unit; the page carries the button and the dialog; polkit
+  check; one mutation (shutdown without confirmation).

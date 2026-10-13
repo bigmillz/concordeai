@@ -380,6 +380,8 @@ MUTANTS = [
      'if (headers.get("Origin") or "").lower() != self.origin:', "if False:", ["test_admin"]),
     ("admin: pull beyond the allow-list", "bin/ollama1-admin", "if arg not in allowed:", "if False:",
      ["test_admin"]),
+    ("admin: shutdown without confirmation", "bin/ollama1-admin",
+     'if act == "shutdown" and obj.get("confirm") != "shutdown":', "if False:", ["test_admin"]),
     ("admin: reboot without confirmation", "bin/ollama1-admin",
      'if act == "reboot" and obj.get("confirm") != "reboot":', "if False:", ["test_admin"]),
     ("sleepcfg: polkit allows any instance name", "config/50-ollama1.rules",
