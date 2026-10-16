@@ -12833,6 +12833,69 @@ def chat_prefix_hash(msgs, n: int) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
+def _chat_snip(t, s, e, before=28, after=90):
+    """One line of a message around a match at t[s:e] (6b480): the words
+    either side with markdown's * # ` dropped and the spacing collapsed, an
+    ellipsis where it was cut. The match itself is kept as written, so the
+    page can find it again in the line and mark it."""
+    def _clean(x):
+        return " ".join(x.split())
+    pre = re.sub(r"[*#`]+", "", t[:s])
+    post = re.sub(r"[*#`]+", "", t[e:])
+    a = _clean(pre[-before * 4:])
+    if a and pre[-1:].isspace():
+        a += " "
+    if len(a) > before:
+        a = a[-before:]
+        sp = a.find(" ")
+        a = "…" + (a[sp + 1:] if 0 <= sp < 12 else a)
+    elif len(_clean(pre)) > len(a.strip()):
+        a = "…" + a
+    b = _clean(post[:after * 4])
+    if b and post[:1].isspace():
+        b = " " + b
+    if len(b) > after:
+        b = b[:after]
+        sp = b.rfind(" ")
+        b = (b[:sp] if sp > after - 16 else b) + "…"
+    elif len(_clean(post)) > len(b.strip()):
+        b += "…"
+    return a + " ".join(t[s:e].split()) + b
+
+
+def chat_search(chats, q, scan=400):
+    """Full-text search over the user's chats (6b269). Returns (ids, hits):
+    the ids of the chats whose title or messages hold q (any case), and per
+    chat {"id", "mi", "snip"} (6b480, per Patrick: the sidebar shows where
+    it matched and opens the chat at it). mi is the first matching
+    message's index in the saved chat, -1 when only the title matched;
+    snip is a line around that match, "" then."""
+    q = (q or "").strip()[:80]
+    ids, hits = [], []
+    if not q:
+        return ids, hits
+    rx = re.compile(re.escape(q), re.I)
+    for c in chats:
+        try:
+            if not isinstance(c, dict):
+                continue
+            mi, snip = -1, ""
+            for i, m in enumerate((c.get("messages") or [])[:scan]):
+                t = m.get("content", "") if isinstance(m, dict) else ""
+                t = t if isinstance(t, str) else str(t)
+                mt = rx.search(t)
+                if mt:
+                    mi, snip = i, _chat_snip(t, mt.start(), mt.end())
+                    break
+            if mi < 0 and not rx.search(str(c.get("title", ""))):
+                continue
+            ids.append(c.get("id"))
+            hits.append({"id": c.get("id"), "mi": mi, "snip": snip})
+        except Exception:
+            continue
+    return ids, hits
+
+
 def _chat_find(chats, cid):
     for i, c in enumerate(chats):
         if isinstance(c, dict) and c.get("id") == cid:
@@ -30865,23 +30928,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/api/chats/search"):
             # full-text over the user's own chats (6b269, per Patrick:
             # "search through existing conversations") — titles match
-            # instantly client-side; this covers message CONTENT
+            # instantly client-side; this covers message CONTENT. Since
+            # 6b480 each hit also carries where it matched and a line of
+            # the text around it (chat_search)
             _q = (urllib.parse.parse_qs(urllib.parse.urlparse(
                 self.path).query).get("q", [""])[0] or "")
-            _q = _q.strip().lower()[:80]
-            hits = []
-            if _q:
+            _ids, _hits = [], []
+            if _q.strip():
                 with _chats_lock:
                     _cs = load_chats(self.ctx)
-                for c in _cs:
-                    try:
-                        if _q in str(c.get("title", "")).lower() or any(
-                                _q in str(m.get("content", "")).lower()
-                                for m in (c.get("messages") or [])[:400]):
-                            hits.append(c.get("id"))
-                    except Exception:
-                        continue
-            self._send_json({"ids": hits})
+                _ids, _hits = chat_search(_cs, _q)
+            self._send_json({"ids": _ids, "hits": _hits})
         elif self.path == "/api/memory":
             self._send_json({"facts": _load_memory(self.ctx)})
         elif self.path == "/api/me":
@@ -36515,6 +36572,19 @@ body.resizing{cursor:col-resize;user-select:none}
   outline:none;-webkit-appearance:none}
 #chat-search input::placeholder{color:rgba(255,255,255,.32)}
 #chat-search input:focus{border-color:rgba(255,255,255,.22)}
+/* a search hit's excerpt under its title (6b480, per Patrick): two lines at
+   most, the match marked like find's, the lane named when it is another.
+   Its own [hidden] rule, because it declares display */
+.chat-item.has-snip{flex-wrap:wrap;row-gap:2px}
+.chat-item .csnip{flex:0 0 100%;order:3;min-width:0;display:-webkit-box;
+  -webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  white-space:normal;overflow-wrap:anywhere;font-size:11.5px;line-height:1.35;
+  color:var(--faint)}
+.chat-item .csnip[hidden]{display:none}
+.chat-item .csnip mark{background:rgba(255,214,10,.32);color:var(--text);
+  border-radius:2px;padding:0}
+.chat-item .csnip .clane{font-family:var(--mono);font-size:9px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-right:6px}
 .cgroup{font-family:var(--mono);font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--faint);opacity:.75;
   padding:12px 10px 5px;user-select:none}
@@ -44042,7 +44112,9 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
   $("#updated-ok").addEventListener("click",()=>{$("#updated-veil").hidden=true;});
 })();
 /* chat search: type-to-filter; three characters on, the server also
-   greps message CONTENT so an answer you remember finds its chat */
+   greps message CONTENT so an answer you remember finds its chat. Since
+   6b480 (per Patrick) it searches every lane, each hit shows a line of
+   the text it matched, and a click opens the chat at that match */
 (function(){
   const inp=$("#chat-q");if(!inp)return;
   let t=null,seq=0;
@@ -44055,7 +44127,7 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
         try{
           const r=await(await api("/api/chats/search?q="
             +encodeURIComponent(q))).json();
-          if(my===seq)window.chatQHits=new Set(r.ids||[]);
+          if(my===seq)window.chatQHits=chatHitMap(r,q);
         }catch(e){window.chatQHits=null;}
       }else window.chatQHits=null;
       if(my===seq)renderChats();
@@ -44767,6 +44839,46 @@ const OPTS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
 const PIN_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
   +'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
   +'<path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l2 3.2H7z"/></svg>';
+// SEARCH HITS (6b480, per Patrick): the server's answer as a Map id -> hit,
+// stamped with the query it answers, so a reply for an older query never
+// paints its excerpt (or picks the match) for the new one
+function chatHitMap(r,q){
+  const m=new Map();
+  ((r&&r.hits)||[]).forEach(h=>{if(h&&typeof h.id==="string")m.set(h.id,
+    {mi:Number.isInteger(h.mi)?h.mi:-1,snip:typeof h.snip==="string"?h.snip:""});});
+  ((r&&r.ids)||[]).forEach(id=>{if(typeof id==="string"&&!m.has(id))m.set(id,{mi:-1,snip:""});});
+  m.q=q;return m;
+}
+const LANE_NAME={ai:"Chat",code:"Code",funnel:"Funnels"};
+// pure: what a row under a search shows. snip: the line around the match;
+// lane: the lane's name when the chat is in another one (a search reaches
+// every lane); mi: the message to open at, -1 for none
+function chatHitView(hits,id,q,lane,mode){
+  const h=q&&hits&&hits.q===q?hits.get(id):null;
+  const ln=lane||"ai",here=(mode==="code"||mode==="funnel")?mode:"ai";
+  const other=ln!==here&&!(here==="ai"&&ln!=="code"&&ln!=="funnel");
+  return {snip:h&&h.mi>=0?h.snip:"",mi:h&&h.snip?h.mi:-1,
+          lane:q&&other?(LANE_NAME[ln]||"Chat"):""};
+}
+/*@hit-pure-end*/
+// the excerpt is built from nodes, never from HTML: it is the person's text
+function chatSnipPaint(el,v,q){
+  el.textContent="";
+  if(v.lane){const l=document.createElement("span");l.className="clane";
+    l.textContent=v.lane;el.appendChild(l);}
+  findSplit(v.snip,findHits(v.snip,q)).forEach(seg=>{
+    if(!seg.hit){el.appendChild(document.createTextNode(seg.t));return;}
+    const m=document.createElement("mark");m.textContent=seg.t;el.appendChild(m);
+  });
+}
+// a row clicked: the chat opens, and from a search hit in its text the find
+// bar opens on the query at that message (findOpenAt)
+function chatOpenHit(id){
+  const q=window.chatQ||"",c=chats.find(x=>x.id===id);
+  const v=chatHitView(window.chatQHits,id,q,c&&c.lane,uiMode);
+  loadChat(id);
+  if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);
+}
 function renderChats(){
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
@@ -44779,7 +44891,8 @@ function renderChats(){
   const q=(window.chatQ||"").toLowerCase();
   const qOK=c=>!q||(c.title||"").toLowerCase().includes(q)
     ||(window.chatQHits&&window.chatQHits.has(c.id));
-  const mine=chats.filter(c=>laneOK(c)&&qOK(c));
+  // a search reaches every lane (6b480): a hit in a Code chat shows from Chat
+  const mine=chats.filter(c=>(q||laneOK(c))&&qOK(c));
   const sp=recentsSplit(mine,recentsDays,Date.now(),!!q);
   const pv=foldView(sp.pins,foldPinned,!!q,curChat);
   const rv=foldView(sp.shown,foldRecents,!!q,curChat);
@@ -44787,14 +44900,18 @@ function renderChats(){
   const head=(which,name,v)=>'<button type="button" class="fold" data-fold="'+which
     +'" aria-expanded="'+(v.open?"true":"false")+'"><span class="fchev"></span>'
     +name+(v.open?'':'<span class="fldn"> \u00b7 '+v.count+'</span>')+'</button>';
-  const row=c=>
-    '<div class="chat-item'+(c.id===curChat?" active":"")
-    +(c.pin?" pinned":"")+'" data-id="'+esc(c.id)+'">'
+  const views=new Map();
+  const row=c=>{
+    const v=q?chatHitView(window.chatQHits,c.id,window.chatQ,c.lane,uiMode):null;
+    const sn=!!(v&&(v.snip||v.lane));if(sn)views.set(c.id,v);
+    return '<div class="chat-item'+(c.id===curChat?" active":"")
+    +(c.pin?" pinned":"")+(sn?" has-snip":"")+'" data-id="'+esc(c.id)+'">'
     +'<span class="ct" title="'+esc(c.title||"chat")+'">'
     +esc(c.title||"chat")+'</span>'
     +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin to top")+'">'
     +PIN_SVG+'</span>'
-    +'<span class="cx" title="Delete chat">\u00d7</span></div>';
+    +'<span class="cx" title="Delete chat">\u00d7</span>'
+    +(sn?'<span class="csnip"></span>':'')+'</div>';};
   let html="";
   if(sp.pins.length)
     html+='<div class="cgroup">'+head("pinned","Pinned",pv)+'</div>'+pins.map(row).join("");
@@ -44821,6 +44938,8 @@ function renderChats(){
   if(ra)ra.addEventListener("click",()=>setRecentsDays(0));
   el.querySelectorAll(".chat-item").forEach(it=>{
     const id=it.dataset.id;
+    const sp=it.querySelector(".csnip");
+    if(sp&&views.has(id))chatSnipPaint(sp,views.get(id),window.chatQ);
     it.querySelector(".cx").addEventListener("click",ev=>{
       ev.stopPropagation();deleteChat(id);
     });
@@ -44838,7 +44957,7 @@ function renderChats(){
     it.addEventListener("dblclick",ev=>{
       ev.stopPropagation();startRename(it,id);
     });
-    it.addEventListener("click",()=>loadChat(id));
+    it.addEventListener("click",()=>chatOpenHit(id));
   });
 }
 // RENAME in place — dblclick the title, type, Enter (Esc cancels)
@@ -46517,6 +46636,15 @@ function findCapHits(lists,cap){
 // while an answer streams, a one-letter search is not re-applied on every
 // paint (it waits for the answer to land)
 function findLive(q,streaming){return !streaming||(q||"").length>=2;}
+// opened from a sidebar search hit (6b480): the first mark inside that
+// message, else the first one after it (a turn whose matched words render
+// differently, a link's address say), else -1 (the caller keeps the first)
+function findAtMsg(marks,el){
+  if(!el||!marks.length)return -1;
+  let i=marks.findIndex(m=>el.contains(m));
+  if(i<0)i=marks.findIndex(m=>(el.compareDocumentPosition(m)&4)!==0);
+  return i;
+}
 /*@find-pure-end*/
 const FIND_SKIP="button,script,style,textarea,input,select,svg,canvas,video,"
   +"audio,.who,.mact,.codebar,.worktree,[hidden]";
@@ -46604,18 +46732,42 @@ function findLater(){
   if(findHitEls.some(m=>!m.isConnected)||inner.textContent!==findText
      ||findChat!==curChat)findRun(false);
 }
-function findOpen(){
-  const again=!fb.hidden;
-  fb.hidden=false;
-  fq.focus();fq.select();
-  if(again)return;
+function findWatch(){
   if(!findObs)findObs=new MutationObserver(()=>{
     // a streamed answer (or a chat switch) rewrote the DOM: look again, at
     // most four times a second, and only when it really changed
     if(findWait)return;
     findWait=setTimeout(findLater,250);
   });
+}
+function findOpen(){
+  const again=!fb.hidden;
+  fb.hidden=false;
+  fq.focus();fq.select();
+  if(again)return;
+  findWatch();
   findRun(true);
+}
+// from a sidebar search hit (6b480, per Patrick): the chat is open, the bar
+// takes the query, and the current match is the one in message mi (the
+// saved turn the server matched). The jump is instant and unpins the view,
+// so the open's own glide to the end does not carry it away
+function findOpenAt(q,mi){
+  fb.hidden=false;fq.value=q;
+  findWatch();
+  findRun(false);
+  const el=[...inner.children].filter(x=>x.classList.contains("msg"))[mi];
+  const i=findAtMsg(findHitEls,el);
+  if(i>=0){findCur=i;findPaint();}
+  const t=findCur>=0?findHitEls[findCur]:el;
+  if(t){
+    chatPinned=false;chatGlideTo=0;
+    scroller.style.scrollBehavior="auto";
+    t.scrollIntoView({block:"center"});
+    scroller.style.scrollBehavior="";
+    chatJumpPaint();
+  }
+  fq.focus();
 }
 function findClose(){
   if(findObs)findObs.disconnect();

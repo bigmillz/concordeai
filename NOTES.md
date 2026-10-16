@@ -15729,3 +15729,42 @@ fold up?"
 - Gauntlet: `foldView` under node, plus served-HTML checks (buttons, aria-expanded, keys, chevron CSS). The 6b467
   heading assertion was reworded for the button markup. The script parses (node --check on the served page); the
   look and the click are unseen in the Browser pane and WKWebView.
+
+## 6b480 — Find in chat (per Patrick)
+
+Asked for: Cmd/Ctrl+F in the open chat, and a sidebar search that reaches message text in every chat.
+
+- **The find bar was already there** (6b352: Cmd+F / Ctrl+F, live marks, "3 of 12", Enter / Shift+Enter,
+  Esc, case-insensitive, re-applied after streaming by a MutationObserver, code blocks and copy untouched).
+  Nothing in it was rebuilt. Its observer setup moved into `findWatch()` so a second opener can share it.
+- **The sidebar search was already full-text** (6b269: titles at once, the server greps message content from
+  three characters on), but it only said WHICH chats matched, only in the lane on screen, and a click opened
+  the chat at its end. Now:
+  - The server's `/api/chats/search` answers `{"ids", "hits"}`; each hit is `{id, mi, snip}`: the first
+    matching message's index in the saved chat (-1 when only the title matched) and one line of text around
+    the match (`chat_search` / `_chat_snip`, pure: whitespace collapsed, markdown's `* # `` dropped, the match
+    as written, an ellipsis where it was cut, about 120 characters). `ids` is unchanged for old pages.
+  - The row shows that line under its title, two lines at most, the match marked like find's marks. The line
+    is built from text nodes and `<mark>` elements (`chatSnipPaint`), never from HTML. Its `.csnip` has its
+    own `[hidden]` rule.
+  - **A search reaches every lane.** A hit in a Code or Funnels chat shows from Chat (and the reverse), its
+    lane named in small caps before the line. Without a query the list is per lane as before. Easy to undo
+    if Patrick prefers per-lane results: `(q||laneOK(c))` in `renderChats`.
+  - **A click opens the chat at the match.** `chatOpenHit` → `loadChat` (which hops lanes) → `findOpenAt(q,mi)`:
+    the find bar opens with the query, every match is marked, and the current one is the first inside message
+    `mi` (or the first after it when that turn's words render differently, a link's address say; else the
+    first). The jump is instant and unpins the view (`chatPinned=false`), so the open's own smooth glide to
+    the end doesn't carry it away. Esc closes as before. A title-only hit just opens the chat.
+  - A reply for an older query never paints its line or picks the match: the hit map carries its query.
+- Single theme: the page has one (dark) palette; the new rules use its tokens and find's mark colour.
+- Checked: ast parse; node --check on the served scripts; jsscan's undeclared names unchanged; style comment
+  opens = closes. A dev copy (9894, temp MILLENAI_HOME) served the page with no unreplaced tokens; the
+  endpoint returned the hits. In the Blink pane on that copy (token stubbed in): "pineapple" gave two rows
+  with lines, the `<b>&` in an answer shown as text; clicking opened the chat with "1 of 1" in the right
+  message and the find box focused; a Code hit from Chat switched lanes and the labels flipped; a 40-turn
+  chat opened at turn 17 with the mark centred and hittable (elementFromPoint), still there 1.5 s later; the
+  match inside a code block left its `code` text intact; Esc left no marks; no overflow at 560 px.
+- Gauntlet: five checks (`chat_search` on its own; the live endpoint on the LOC chat; the hit map, lane
+  names and `findAtMsg` under node; the page's wiring). Five mutations each failed a check.
+- **Not seen:** WKWebView (the shipped renderer) and Windows WebView2 — the look of the two-line clamp, the
+  instant jump and focus there; Cmd+F itself was not re-tried (unchanged since 6b352).
