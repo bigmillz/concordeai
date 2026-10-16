@@ -143,9 +143,38 @@ class TestCapabilities(Base):
         for bad in (b"/", b"safetensors", b"comfy", b"8188", b"models"):
             self.assertNotIn(bad, data.lower())
 
-    def test_image_needs_the_flux_checkpoint(self):
-        G["comfy"].files["CheckpointLoaderSimple/ckpt_name"] = ["something-else.safetensors"]
-        self.assertEqual(self.caps(), {"image": False, "video": True})
+    def test_a_picture_needs_flux2_klein_or_the_flux1_schnell_checkpoint(self):
+        c = G["comfy"]
+        self.assertEqual(self.caps(), {"image": True, "video": True})
+        self.assertEqual(G["gw"].gen.image_model, "klein")                 # klein first (6b482)
+        c.files["CheckpointLoaderSimple/ckpt_name"] = ["something-else.safetensors"]
+        self.assertEqual(self.caps(), {"image": True, "video": True})       # klein alone is enough
+        self.assertEqual(G["gw"].gen.image_model, "klein")
+        c.files["UNETLoader/unet_name"] = ["wan2.1_t2v_1.3B_fp16.safetensors"]
+        self.assertEqual(self.caps(), {"image": False, "video": True})      # neither
+        self.assertIsNone(G["gw"].gen.image_model)
+
+    def test_klein_needs_its_three_files_its_nodes_and_its_encoder_type_else_schnell(self):
+        """A server set up by 6b356 has only FLUX.1 schnell, and an older ComfyUI lists
+        klein's files without being able to load them: either way, schnell makes it."""
+        import stub_comfyui as S
+        c = G["comfy"]
+        cases = [("UNETLoader/unet_name", ["wan2.1_t2v_1.3B_fp16.safetensors"]),
+                 ("CLIPLoader/clip_name", ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"]),
+                 ("VAELoader/vae_name", ["wan_2.1_vae.safetensors"]),
+                 ("CLIPLoader/type", ["stable_diffusion", "wan"])]
+        for key, only in cases:
+            keep = c.files[key]
+            c.files[key] = list(only)
+            self.assertEqual(self.caps()["image"], True, key)
+            self.assertEqual(G["gw"].gen.image_model, "schnell", key)
+            c.files[key] = keep
+        for node in S.KLEIN_NODES:
+            c.nodes.remove(node)
+            self.assertEqual(self.caps(), {"image": True, "video": True}, node)
+            self.assertEqual(G["gw"].gen.image_model, "schnell", node)
+            c.nodes.append(node)
+        self.assertEqual((self.caps()["image"], G["gw"].gen.image_model), (True, "klein"))
 
     def test_video_needs_all_three_wan_files(self):
         for key in ("UNETLoader/unet_name", "CLIPLoader/clip_name", "VAELoader/vae_name"):
@@ -158,6 +187,10 @@ class TestCapabilities(Base):
     def test_the_newer_combo_spelling_is_read_too(self):
         G["comfy"].combo = "COMBO"
         self.assertEqual(self.caps(), {"image": True, "video": True})
+        self.assertEqual(G["gw"].gen.image_model, "klein")                 # the encoder type read that way too
+        G["comfy"].files["UNETLoader/unet_name"] = ["wan2.1_t2v_1.3B_fp16.safetensors"]
+        self.assertEqual(self.caps(), {"image": True, "video": True})
+        self.assertEqual(G["gw"].gen.image_model, "schnell")
         G["comfy"].files["CheckpointLoaderSimple/ckpt_name"] = []
         self.assertEqual(self.caps(), {"image": False, "video": True})
 
@@ -312,7 +345,49 @@ class TestRequests(Base):
         for raw in (b"nope", b"[1]", b'"x"'):
             self.assertEqual(call("POST", "/v1/generate/jobs", raw=raw)[0], 400)
 
-    def test_the_template_gets_only_the_whitelisted_numbers_and_the_prompt(self):
+    def test_the_klein_template_gets_only_the_whitelisted_numbers_and_the_prompt(self):
+        """FLUX.2 klein 4B distilled, as ComfyUI's own template wires it (6b482)."""
+        seen = []
+        G["comfy"].on_prompt = seen.append
+        hostile = 'a cat"}, "9": {"class_type": "LoadImage", "inputs": {"image": "../../etc/passwd"}} <script>'
+        st, ans = start(prompt=hostile, width=768, height=512, steps=6, seed=1234)
+        self.assertEqual(st, 202)
+        wait_state(ans["id"], ("done",))
+        g = seen[0]
+        self.assertEqual(sorted(v["class_type"] for v in g.values()),
+                         sorted(["UNETLoader", "VAELoader", "CLIPLoader", "CLIPTextEncode", "ConditioningZeroOut",
+                                 "CFGGuider", "RandomNoise", "KSamplerSelect", "Flux2Scheduler",
+                                 "EmptyFlux2LatentImage", "SamplerCustomAdvanced", "VAEDecode", "SaveImage"]))
+        by = {v["class_type"]: v["inputs"] for v in g.values()}
+        self.assertEqual(by["UNETLoader"], {"unet_name": "flux-2-klein-4b.safetensors", "weight_dtype": "default"})
+        self.assertEqual(by["CLIPLoader"], {"clip_name": "qwen_3_4b.safetensors", "type": "flux2", "device": "default"})
+        self.assertEqual(by["VAELoader"], {"vae_name": "flux2-vae.safetensors"})
+        self.assertEqual(by["CLIPTextEncode"]["text"], hostile.strip())
+        self.assertEqual(by["EmptyFlux2LatentImage"], {"width": 768, "height": 512, "batch_size": 1})
+        self.assertEqual(by["Flux2Scheduler"], {"steps": 6, "width": 768, "height": 512})
+        self.assertEqual(by["RandomNoise"], {"noise_seed": 1234})
+        self.assertEqual(by["KSamplerSelect"], {"sampler_name": "euler"})
+        self.assertEqual(by["CFGGuider"]["cfg"], 1.0)
+        # the wiring: every link names a node of the graph, and the sampler is fed by the five
+        ids = set(g)
+        for node in g.values():
+            for v in node["inputs"].values():
+                if isinstance(v, list):
+                    self.assertIn(v[0], ids)
+        idx = {v["class_type"]: k for k, v in g.items()}
+        sca = by["SamplerCustomAdvanced"]
+        self.assertEqual({k: v[0] for k, v in sca.items()},
+                         {"noise": idx["RandomNoise"], "guider": idx["CFGGuider"], "sampler": idx["KSamplerSelect"],
+                          "sigmas": idx["Flux2Scheduler"], "latent_image": idx["EmptyFlux2LatentImage"]})
+        self.assertEqual(by["CFGGuider"]["negative"][0], idx["ConditioningZeroOut"])
+        self.assertEqual(by["ConditioningZeroOut"]["conditioning"][0], idx["CLIPTextEncode"])
+        self.assertEqual(by["SaveImage"]["images"][0], idx["VAEDecode"])
+        self.assertEqual(o1gen.SAVE_NODE["image-klein"], idx["SaveImage"])
+        # the prompt is in no other place of the graph
+        self.assertEqual(json.dumps(g).count("etc/passwd"), 1)
+
+    def test_the_schnell_template_when_the_server_has_only_that(self):
+        G["comfy"].files["UNETLoader/unet_name"] = ["wan2.1_t2v_1.3B_fp16.safetensors"]
         seen = []
         G["comfy"].on_prompt = seen.append
         hostile = 'a cat"}, "9": {"class_type": "LoadImage", "inputs": {"image": "../../etc/passwd"}} <script>'
@@ -372,6 +447,7 @@ class TestRequests(Base):
 
     def test_a_server_without_the_models_says_so(self):
         G["comfy"].files["CheckpointLoaderSimple/ckpt_name"] = []
+        G["comfy"].files["UNETLoader/unet_name"] = ["wan2.1_t2v_1.3B_fp16.safetensors"]
         G["gw"].gen.caps_at = None
         st, ans = start()
         self.assertEqual((st, ans["code"]), (503, "unavailable"))
@@ -871,13 +947,17 @@ class TestInstallScript(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0, repr(bad))
         self.assertNotEqual(self.run_script("--bogus").returncode, 0)
 
-    def test_it_names_the_same_four_files_the_gateway_uses(self):
+    def test_it_names_the_same_six_files_the_gateway_uses(self):
         src = open(self.SCRIPT).read()
-        for name in (o1gen.IMAGE_CKPT, o1gen.WAN_UNET, o1gen.WAN_CLIP, o1gen.WAN_VAE):
-            self.assertEqual(src.count("|" + name + "|"), 1, name)
-        for folder, name in (("checkpoints", o1gen.IMAGE_CKPT), ("diffusion_models", o1gen.WAN_UNET),
-                             ("text_encoders", o1gen.WAN_CLIP), ("vae", o1gen.WAN_VAE)):
-            self.assertIn('"%s|%s|' % (folder, name), src)
+        rows = re.findall(r'^  "([a-z_]+)\|([^|]+)\|([^|]+)\|(\d+)"$', src, re.M)
+        want = [("diffusion_models", o1gen.KLEIN_UNET), ("text_encoders", o1gen.KLEIN_CLIP), ("vae", o1gen.KLEIN_VAE),
+                ("diffusion_models", o1gen.WAN_UNET), ("text_encoders", o1gen.WAN_CLIP), ("vae", o1gen.WAN_VAE)]
+        self.assertEqual([(f, n) for f, n, _u, _m in rows], want)
+        for _f, name, url, least in rows:
+            self.assertTrue(url.endswith("/" + name), name)
+            self.assertGreater(int(least), 10 ** 8, name)
+        # FLUX.1 schnell (6b356) is no longer fetched: 17 GB* for the weaker model
+        self.assertNotIn("|" + o1gen.IMAGE_CKPT + "|", src)
         for url in re.findall(r"\|(https://[^|]+)\|", src):
             self.assertTrue(url.startswith("https://huggingface.co/") or "$HF/" in url, url)
         self.assertIn("curl -fL -C -", src)
@@ -896,11 +976,36 @@ class TestInstallScript(unittest.TestCase):
         self.assertNotIn("chmod 777", src)
         self.assertNotIn("--listen 0.0.0.0", src)
 
-    def test_setup_only_mentions_it_and_never_runs_it(self):
+    def test_setup_runs_it_only_with_the_flag(self):
+        """6b482: setup.sh runs the installer only with --with-imagegen, as the admin user, last;
+        the flag is off by default, not saved and not read from the environment, so no image model
+        is ever downloaded without it."""
+        import subprocess
         setup = open(os.path.join(U.KIT, "setup.sh")).read()
-        uses = [l for l in setup.splitlines() if "install-comfyui" in l]
-        self.assertEqual(len(uses), 1)
-        self.assertIn("note ", uses[0])
+        runs = [l.strip() for l in setup.splitlines() if "install-comfyui" in l and not l.lstrip().startswith("#")]
+        self.assertEqual(runs, ['if bash "$KIT/tools/install-comfyui.sh" --user "$ADMIN_USER"; then'])
+        guard = setup.rindex('if [ "$IMAGEGEN" = 1 ]; then', 0, setup.index(runs[0]))
+        self.assertNotIn("\nfi\n", setup[guard:setup.index(runs[0])])           # inside that if, nothing between
+        self.assertLess(setup.index(runs[0]), setup.index("# ---- done ---"))
+        self.assertGreater(setup.index(runs[0]), setup.index("remove_setup_key\n  else"))
+        sets = re.findall(r"IMAGEGEN=(\S+)", setup)
+        self.assertEqual(sets, ["0", "1"])                                       # the default, and the flag
+        self.assertIn("    --with-imagegen) IMAGEGEN=1 ;;", setup)
+        self.assertNotIn("IMAGEGEN=%s", setup)                                   # not written to setup.env
+        self.assertNotIn("saved IMAGEGEN", setup)
+        self.assertNotIn("OLLAMA1_IMAGEGEN", setup)
+        # the flag parses (and a near miss is refused), before anything runs
+        env = dict(os.environ)
+        r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh"), "--with-imagegen", "--help"],
+                           capture_output=True, text=True, timeout=30, env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("--with-imagegen", r.stdout)
+        r = subprocess.run(["bash", os.path.join(U.KIT, "setup.sh"), "--with-image-gen", "--help"],
+                           capture_output=True, text=True, timeout=30, env=env)
+        self.assertEqual(r.returncode, 2)
+        # without it: one line saying how to add it
+        notes = [l for l in setup.splitlines() if "--with-imagegen" in l and l.lstrip().startswith("note ")]
+        self.assertEqual(len(notes), 1)
 
     def test_the_port_guard_lets_only_root_and_the_gateway_reach_comfyui(self):
         nft = open(os.path.join(U.CONFIG, "ollama1.nft.in")).read()
