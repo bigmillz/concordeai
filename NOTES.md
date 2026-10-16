@@ -16072,3 +16072,25 @@ LEFT ON PURPOSE
   values (a plug must be on a private range, so RFC 5737 addresses can't stand
   in there).
 - NOTES.md and the repo-root files are not part of the kit and not scanned.
+
+## 6b471 — a blue dot on a chat whose answer you haven't seen (per Patrick)
+
+Patrick (2026-10-10): "Similar to Claude, when a response comes in for a chat that's not selected, put a dot next to
+it. Let's go with blue, until it's read. Basically an unread indicator." Same message: the Recents range menu reads
+"1 day, 3 days, 7 days, 14 days, 30 days, All time" (was "1 month" and "All"; the stored values did not change).
+
+- **Stored:** `unread` (bool) on the chat in chats.v2.json, a fourth `set` field next to `pin`/`pin_at`/`named`
+  (`_chat_op`); a non-boolean is refused ("bad unread"). An absent flag and False count as the same. If the server
+  refuses or the call fails, the flag stays on the page until the next reload of the list.
+- **Set:** at the end of `send()`, after `syncChat`. The decision is `unreadDecision(finished,isErr,stopped,chatId,
+  openId,visible)`, pure: true only for a real answer that ran to its end (not an error notice, not stopped, not
+  empty) in a chat that is not open or in a window that is hidden (`document.visibilityState`). It is made as the
+  answer ends and re-checked after the save, so opening the chat during the save wins. This covers the detached
+  bubble path too: it is the same end of `send()`.
+- **Cleared:** `markSeen()` clears the open chat's flag when it is visible: from `loadChat` (click or Cmd+K), on
+  `visibilitychange`/`focus`, and after every `loadChatsFromDisk`.
+- **The dot:** `.cdot`, 7px, `--unread:#4a8cf7` (the app's accent is white, so this is a new token), absolutely
+  positioned in the row's left padding like the pin, so the title does not move; `role="img" aria-label="unread"`;
+  the title goes to full text colour. Pinned, Recents and search rows share `row()`. The open chat never shows one.
+- Gauntlet: `unreadDecision` under node, served-HTML assertions, a chat-store save/load/refuse check. The 6b467
+  menu assertion was reworded for the new labels. Not run in a browser or WKWebView; the look is unseen.
