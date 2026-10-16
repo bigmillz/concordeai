@@ -22482,6 +22482,23 @@ def server_sleepers(ctx) -> list:
     return out
 
 
+def server_gen_sleepers(ctx, kind: str) -> list:
+    """The sleepers a picture or a video may wake (6b482): server_sleepers whose
+    kit last said it can make `kind` ("image" or "video"). A server that never
+    said so, or said it can't, is left asleep: waking it would only delay this
+    computer's own painter."""
+    if kind not in ("image", "video"):
+        return []
+    ids = set(server_sleepers(ctx))
+    if not ids:
+        return []
+    try:
+        return [e["id"] for e in _srv_read(ctx)
+                if e["id"] in ids and (e.get("gen") or {}).get(kind) is True]
+    except (StoreReadError, NoProfile):
+        return []
+
+
 def server_wake_ask(sids, ctx, status, step, skip, alive=None):
     """The wake of a sleeping server for a question that can go on without it
     (6b461, per Patrick: "start by saying it's waking the server. Give it a
@@ -22533,18 +22550,36 @@ _SRV_GEN_WHY = {"offline": "didn’t answer", "tls": "its certificate didn’t c
                 "gone": "isn’t in Settings any more", "unpaired": "isn’t paired"}
 
 
-def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status) -> bool:
+def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status, skip=None) -> bool:
     what = "picture" if kind == "image" else "video"
     try:
-        # a sleeping server is woken for a question a person asked, here and
-        # nowhere else (6b346); the sidebar's poll never does
-        server_refresh_modes(ctx)
+        # the servers are checked without waking any (6b482): a sleeping one
+        # is woken below, with the step the page shows
+        server_refresh_modes(ctx, wake=False)
     except (StaleProfile, BrokenPipeError, ConnectionResetError):
         raise
     except Exception:
         pass
     for _wn, _wok in server_take_wake_notes():
         status(("Woke %s." if _wok else "%s didn’t wake.") % _srv_plain(_wn))
+    # A SLEEPING SERVER THAT CAN MAKE IT IS WOKEN WITH THE CHAT MODES' STEP
+    # (6b482): "Waking <name>" with ten seconds counting down and the page's
+    # Skip (6b465's server_wake_ask), and only one whose kit said it can make
+    # this. Before, a mode's wake woke any sleeper, one that can't make
+    # pictures too, and a question with no mode woke it silently for up to a
+    # minute (6b346). One that doesn't wake, or is skipped, leaves this
+    # computer's painter (or the cloud's), exactly as before. A format only
+    # this computer writes (a gif, a jpg) wakes nobody.
+    try:
+        _gs = server_gen_sleepers(ctx, kind) if srv_gen_opts(kind, use) is not None else []
+        _gw = (server_wake_ask(_gs, ctx, status, step, skip, lambda: not _client_gone(sock))
+               if _gs else [])
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception:
+        _gw = []
+    if _gw is None:                 # the reader left while it waited
+        return True
     e = server_gen_pick(ctx, kind)
     opts = srv_gen_opts(kind, use) if e is not None else None
     if e is None or opts is None:
@@ -33043,8 +33078,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # (the same for a mode: only a roster the mode resolved itself is
         # re-seated after a wake, so a picture, a pick or an agent that took
         # the council leaves the sleeper alone, 6b465)
+        # (and a picture or a video wakes only a server that can make it, in
+        # server_make, 6b482)
         if _ch_wake and (tier not in TIERS or cloud_only or _srv_only or _ag_wake
-                         or _ch_council0 is None or council != _ch_council0):
+                         or _ch_council0 is None or council != _ch_council0
+                         or img_subject or vid_subject):
             _ch_wake = []
         if not (_ag_wake or _ch_wake):
             _start_prewarm()
@@ -34031,7 +34069,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     _sg_use, _sg_n = resolve_overrides("video", _ovr, _pnote)
                     if server_make(user_base, "video", vid_subject, _sg_use,
-                                   _onotes, self.connection, emit, step, status):
+                                   _onotes, self.connection, emit, step, status,
+                                   skip=skip_ev):
                         hb_stop.set()
                         return
                 except (StaleProfile, BrokenPipeError, ConnectionResetError):
@@ -34108,7 +34147,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     _sg_use, _sg_n = resolve_overrides("image", _ovr, _pnote)
                     if server_make(user_base, "image", img_subject, _sg_use,
-                                   _onotes, self.connection, emit, step, status):
+                                   _onotes, self.connection, emit, step, status,
+                                   skip=skip_ev):
                         hb_stop.set()
                         return
                 except (StaleProfile, BrokenPipeError, ConnectionResetError):

@@ -35,6 +35,12 @@ import urllib.parse
 
 # ---- the models the templates use (as ComfyUI lists them) -------------------------
 
+# Pictures (6b482): FLUX.2 [klein] 4B, the distilled one (4 steps, Apache 2.0), in three
+# files, when the server has them and its ComfyUI knows FLUX.2; else FLUX.1 schnell, the
+# single fp8 checkpoint 6b356 used, so a server set up then keeps making pictures.
+KLEIN_UNET = "flux-2-klein-4b.safetensors"              # models/diffusion_models
+KLEIN_CLIP = "qwen_3_4b.safetensors"                    # models/text_encoders
+KLEIN_VAE = "flux2-vae.safetensors"                     # models/vae
 IMAGE_CKPT = "flux1-schnell-fp8.safetensors"            # models/checkpoints
 WAN_UNET = "wan2.1_t2v_1.3B_fp16.safetensors"           # models/diffusion_models
 WAN_CLIP = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"     # models/text_encoders
@@ -48,7 +54,7 @@ IMAGE_ALIGN = 64
 IMAGE_MAX_PIXELS = 1_700_000      # 1536x1024 fits, 1536x1536 doesn't
 IMAGE_DEFAULT = (1024, 1024)
 IMAGE_STEPS = (1, 12)
-IMAGE_STEPS_DEFAULT = 4           # FLUX.1 schnell is a 4-step model
+IMAGE_STEPS_DEFAULT = 4           # FLUX.2 klein (distilled) and FLUX.1 schnell are both 4-step models
 VIDEO_SIDE = (256, 832)           # multiples of 16
 VIDEO_ALIGN = 16
 VIDEO_MAX_PIXELS = 400_000        # 832x480 (399,360) fits
@@ -164,12 +170,39 @@ def parse_request(obj):
 # node and nothing else). The node that saves the result is named in SAVE_NODE so
 # the answer is read from that node only.
 
-SAVE_NODE = {"image": "7", "video-mp4": "11", "video-webp": "10"}
+SAVE_NODE = {"image-klein": "13", "image-schnell": "7", "video-mp4": "11", "video-webp": "10"}
+
+
+def klein_workflow(p):
+    """FLUX.2 [klein] 4B distilled: ComfyUI's own template ("Text to Image (Flux.2
+    Klein 4B Distilled)", Comfy-Org's workflow_templates, 6b482): the Qwen3 4B text
+    encoder (CLIPLoader type "flux2"), cfg 1 through CFGGuider with a zeroed negative,
+    euler, Flux2Scheduler, EmptyFlux2LatentImage."""
+    return {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": KLEIN_UNET, "weight_dtype": "default"}},
+        "2": {"class_type": "VAELoader", "inputs": {"vae_name": KLEIN_VAE}},
+        "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": KLEIN_CLIP, "type": "flux2", "device": "default"}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": p["prompt"], "clip": ["3", 0]}},
+        "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
+        "6": {"class_type": "CFGGuider", "inputs": {"model": ["1", 0], "positive": ["4", 0], "negative": ["5", 0],
+                                                     "cfg": 1.0}},
+        "7": {"class_type": "RandomNoise", "inputs": {"noise_seed": p["seed"]}},
+        "8": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "9": {"class_type": "Flux2Scheduler", "inputs": {"steps": p["steps"], "width": p["width"], "height": p["height"]}},
+        "10": {"class_type": "EmptyFlux2LatentImage",
+               "inputs": {"width": p["width"], "height": p["height"], "batch_size": 1}},
+        "11": {"class_type": "SamplerCustomAdvanced",
+               "inputs": {"noise": ["7", 0], "guider": ["6", 0], "sampler": ["8", 0], "sigmas": ["9", 0],
+                          "latent_image": ["10", 0]}},
+        "12": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["2", 0]}},
+        "13": {"class_type": "SaveImage", "inputs": {"images": ["12", 0], "filename_prefix": "o1gen"}},
+    }
 
 
 def image_workflow(p):
     """FLUX.1 schnell, the single-file fp8 checkpoint: ComfyUI's own example
-    (4 steps, cfg 1, euler/simple, an empty negative that cfg 1 ignores)."""
+    (4 steps, cfg 1, euler/simple, an empty negative that cfg 1 ignores). Used when
+    the server has it and not FLUX.2 klein (6b482)."""
     return {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": IMAGE_CKPT}},
         "2": {"class_type": "CLIPTextEncode", "inputs": {"text": p["prompt"], "clip": ["1", 1]}},
@@ -221,7 +254,10 @@ def video_workflow(p, fmt):
 
 
 def build_workflow(kind, params, fmt=None):
-    return image_workflow(params) if kind == "image" else video_workflow(params, fmt or "mp4")
+    """fmt: for a picture, the model ("klein" or "schnell"); for a video, "mp4" or "webp"."""
+    if kind == "image":
+        return klein_workflow(params) if fmt == "klein" else image_workflow(params)
+    return video_workflow(params, fmt or "mp4")
 
 
 # ---- what the result may be -------------------------------------------------------
@@ -433,6 +469,7 @@ class Generator:
         self.caps_at = None
         self.caps = {"image": False, "video": False}
         self.video_fmt = None
+        self.image_model = None         # "klein" or "schnell" (6b482), as the last probe found
 
     # -- capabilities ---------------------------------------------------------
     @staticmethod
@@ -451,12 +488,14 @@ class Generator:
         return None
 
     def probe(self):
-        """What this ComfyUI can do right now: {"image": bool, "video": bool}, and the
-        video format that will be used. True only when ComfyUI answers AND the
-        model files the template needs are listed AND the nodes it uses exist."""
-        caps, fmt = {"image": False, "video": False}, None
+        """What this ComfyUI can do right now: {"image": bool, "video": bool}, the
+        video format and the picture model that will be used. True only when ComfyUI
+        answers AND the model files the template needs are listed AND the nodes it
+        uses exist (and, for FLUX.2 klein, its text encoder type: an older ComfyUI
+        lists the files but can't load them)."""
+        caps, fmt, model = {"image": False, "video": False}, None, None
         if not self.comfy.local:
-            return caps, fmt
+            return caps, fmt, model
         try:
             st, info = self.comfy.call("GET", "/object_info", timeout=10, cap=64 << 20)
         except OSError:
@@ -467,9 +506,18 @@ class Generator:
 
             def lists(node, field, name):
                 return name in (self._options(info, node, field) or [])
-            caps["image"] = (has("CheckpointLoaderSimple", "CLIPTextEncode", "EmptySD3LatentImage",
-                                 "KSampler", "VAEDecode", "SaveImage")
-                             and lists("CheckpointLoaderSimple", "ckpt_name", IMAGE_CKPT))
+            klein = (has("UNETLoader", "VAELoader", "CLIPLoader", "CLIPTextEncode", "ConditioningZeroOut",
+                         "CFGGuider", "RandomNoise", "KSamplerSelect", "Flux2Scheduler", "EmptyFlux2LatentImage",
+                         "SamplerCustomAdvanced", "VAEDecode", "SaveImage")
+                     and lists("UNETLoader", "unet_name", KLEIN_UNET)
+                     and lists("CLIPLoader", "clip_name", KLEIN_CLIP)
+                     and lists("CLIPLoader", "type", "flux2")
+                     and lists("VAELoader", "vae_name", KLEIN_VAE))
+            schnell = (has("CheckpointLoaderSimple", "CLIPTextEncode", "EmptySD3LatentImage",
+                           "KSampler", "VAEDecode", "SaveImage")
+                       and lists("CheckpointLoaderSimple", "ckpt_name", IMAGE_CKPT))
+            model = "klein" if klein else "schnell" if schnell else None
+            caps["image"] = model is not None
             base = (has("UNETLoader", "CLIPLoader", "VAELoader", "CLIPTextEncode",
                         "EmptyHunyuanLatentVideo", "ModelSamplingSD3", "KSampler", "VAEDecode")
                     and lists("UNETLoader", "unet_name", WAN_UNET)
@@ -479,13 +527,13 @@ class Generator:
                 caps["video"], fmt = True, "mp4"
             elif base and has("SaveAnimatedWEBP"):
                 caps["video"], fmt = True, "webp"
-        return caps, fmt
+        return caps, fmt, model
 
     def capabilities(self, fresh=False):
         with self.caps_lock:
             now = time.monotonic()
             if fresh or self.caps_at is None or now - self.caps_at >= CAPS_CACHE_S:
-                self.caps, self.video_fmt = self.probe()
+                self.caps, self.video_fmt, self.image_model = self.probe()
                 self.caps_at = now
             return {"image": bool(self.caps["image"]), "video": bool(self.caps["video"])}
 
@@ -510,7 +558,7 @@ class Generator:
                 if self.active is not None:
                     raise GenError(409, "busy", "the server is already making one")
                 job = Job(secrets.token_urlsafe(24), kind, dev_id, params, self.clock())
-                job.fmt = self.video_fmt if kind == "video" else None
+                job.fmt = self.video_fmt if kind == "video" else self.image_model
                 self.active = job
                 self._drop_old_locked()
                 self.jobs[job.id] = job
@@ -627,7 +675,7 @@ class Generator:
 
     def _find_output(self, j, entry):
         """The one file the save node wrote: (filename, subfolder, type) or None."""
-        node = SAVE_NODE["image"] if j.kind == "image" else SAVE_NODE["video-" + (j.fmt or "mp4")]
+        node = SAVE_NODE["%s-%s" % (j.kind, j.fmt or ("schnell" if j.kind == "image" else "mp4"))]
         out = ((entry.get("outputs") or {}).get(node)) if isinstance(entry, dict) else None
         if not isinstance(out, dict):
             return None

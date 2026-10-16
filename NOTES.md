@@ -15729,3 +15729,121 @@ fold up?"
 - Gauntlet: `foldView` under node, plus served-HTML checks (buttons, aria-expanded, keys, chevron CSS). The 6b467
   heading assertion was reworded for the button markup. The script parses (node --check on the served page); the
   look and the click are unseen in the Browser pane and WKWebView.
+
+## 6b482 — pictures on the server: FLUX.2 klein, an opt-in setup flag, and the Waking step
+
+The ask: pictures (and a short clip if a 16 GB card can) made on the paired server first (Ryzen 9 5950X, RX 6900
+XT 16 GB, ROCm), this Mac as the fallback, the owner's rule that a task goes to a server with a capable model
+first. **Most of it already existed: 6b356 put ComfyUI behind the gateway** (`lib/o1gen.py`, the
+`/v1/generate/*` job routes, server-first routing in the app, Images and Video chips). This entry is the research
+that was asked for, what it changed, and the gaps it closed. Built on a Mac against stubs; the server was off and
+packed, and nothing touched it.
+
+**Research: which engine fits a 16 GB AMD card today** (checked 2026-10-16; sources below)
+- **ComfyUI (kept).** PyTorch for ROCm, already installed by `tools/install-comfyui.sh`. It runs FLUX.2 klein
+  (Comfy-Org ships the template), Wan 2.1 and 2.2, and has what the gateway needs: `/object_info` to see the
+  files and nodes, `/prompt` + `/history`, step progress on `/ws`, and `/free` to give the card back to Ollama.
+  ComfyUI's own source lists gfx1030 (the 6900 XT) as RDNA2 "don't support bf16", so it computes in fp16; FLUX.2
+  declares fp16 supported (`comfy/supported_models.py`), so that is a supported path. Not yet run on this card*.
+- **stable-diffusion.cpp (not chosen, the fallback idea).** One C++ binary, Vulkan backend, FLUX.2 klein and
+  Wan 2.1/2.2 in its model list, and `sd-server` has an OpenAI-style `POST /v1/images/generations` (and
+  edits). Its README names CUDA, Vulkan, Metal, OpenCL and SYCL, not ROCm (Vulkan would be the AMD path).
+  Unverified: progress on that route, and whether video is served over HTTP at all (the OpenAI layer is
+  images only). It would be a second engine and a rewrite of o1gen; worth it only if ROCm ComfyUI fails on
+  gfx1030.
+- **Ollama's image generation (not usable here).** Experimental since 2026-01-20 (FLUX.2 klein, Z-Image Turbo),
+  **macOS only**, "Windows and Linux support coming soon", CLI only, no documented HTTP route; its release notes
+  from v0.34.3 to v0.40.5 mention no Linux or AMD image generation. One third-party guide claims it on Ubuntu with
+  v0.22: unverified, and contradicted by Ollama's own pages. Revisit: on Linux it would be the simplest (one
+  engine, one unload).
+- **Models.** Pictures: **FLUX.2 [klein] 4B, distilled** (Apache 2.0, 4 steps, text-to-image and editing in one
+  model; BFL says "as little as 13GB VRAM"); ComfyUI's files are the 7.75 GB diffusion model, the 8.04 GB Qwen3
+  4B text encoder and the 0.34 GB VAE (sizes from Hugging Face's API). ComfyUI loads the encoder, encodes, and
+  swaps it out for the diffusion model, so the two are not resident together on 16 GB*. FLUX.1 schnell (6b356's)
+  is one 17.2 GB fp8 checkpoint around a 12B model: three times the parameters per step for a weaker
+  picture. SDXL/Turbo: fits easily, but older quality than either; not added. Video: **Wan 2.1 1.3B stays**
+  (Wan's README: 8.19 GB VRAM, about 4 minutes for 5 s at 480p on an RTX 4090). Wan 2.2 TI2V 5B is 10 GB fp16 +
+  1.4 GB VAE + the 6.7 GB encoder: it would fit only with offloading, and slowly; LTX-2 class models are bigger.
+- **Times on this card** (all estimates*): a 1024x1024 klein picture about 10 to 30 s* warm, plus about 15 to
+  40 s* to load from disk after a chat; schnell about 30 to 60 s* warm; a 2-second Wan clip (33 frames, 832x480)
+  about 3 to 8 minutes*, a 5-second one 10 to 20 minutes* (the app gives a clip 20 minutes). So: **video is
+  feasible only as short clips**, which is what 6b356 built.
+- **Sharing the card with chat** is unchanged from 6b356: the gateway's GPU slot is taken for the job, every
+  Ollama model is unloaded and confirmed first (else the job fails before ComfyUI is asked), it waits up to 30 s
+  for the card to read free, and `/free` after; a chat during a job gets 503 `busy`.
+- **No OpenAI-style `POST /v1/images/generations` on the gateway**, on purpose. The gateway answers only signed
+  requests from paired devices (PROTOCOL.md), so no OpenAI client could call it, and the app already uses the job
+  routes: 202 then polls every 2 s, which survives the tunnel's ~100 s cut-off on a silent response, carries
+  progress and Stop, and counts as use for auto sleep. A synchronous route would sit silent for the whole job. If
+  one is wanted later, it is a thin shim over `Generator.create/status/result`.
+
+**Kit (`ollama1/`)**
+- `lib/o1gen.py`: a FLUX.2 klein template, wired exactly as ComfyUI's own "Text to Image (Flux.2 Klein 4B
+  Distilled)" (UNETLoader, CLIPLoader type `flux2`, CLIPTextEncode, ConditioningZeroOut as the negative,
+  CFGGuider cfg 1, RandomNoise, KSamplerSelect euler, Flux2Scheduler, EmptyFlux2LatentImage,
+  SamplerCustomAdvanced, VAEDecode, SaveImage); the input names were checked against ComfyUI's current source.
+  The probe picks **klein when its three files, its nodes and the `flux2` encoder type are all there**, else
+  **FLUX.1 schnell** (so a server set up by 6b356 keeps working, and so does an older ComfyUI that lists klein's
+  files but can't load them), else no pictures. The job remembers which; the result is read from that template's
+  save node. Caps, routes, whitelist and the app's request are unchanged.
+- `tools/install-comfyui.sh` downloads klein's three files (about 16 GB*) instead of schnell's 17 GB*; the
+  header says an existing schnell file still works and can be deleted once klein's are there, and that FLUX.2
+  needs a ComfyUI from January 2026 or later (`--update`).
+- `setup.sh --with-imagegen` (opt in): after everything else, runs `install-comfyui.sh --user <admin user>`
+  (never root; a failure is a note and a "Still to do" line, not a stop). **Off by default, not saved in
+  setup.env, not read from the environment**, so no image model is downloaded without it. The plan shows it as
+  step 17; without the flag, setup's one line says how to add it. The firewall, polkit and the service's
+  hardening are unchanged (ComfyUI on 127.0.0.1:8188, only root and the gateway's user through the port guard).
+- Tests: `test_generate` gains klein's capability rules (each of its files, nodes and the encoder type falls back
+  to schnell), the klein graph's every input and link, the schnell fallback graph, the six downloads, and setup's
+  flag (it parses, a near miss is refused, the installer runs only inside `if [ "$IMAGEGEN" = 1 ]`, last). The
+  stub ComfyUI lists klein's nodes, files and encoder types. Nine mutants in `mutate.py`, all killed (one by the
+  tests hanging, as some older ones are); every `gen:` mutant was re-run. setup.sh can't be mutated by
+  `mutate.py` (it copies lib, bin, config, systemd and tools only), so its flag is held by static checks.
+
+**App (`millenai.py`)**
+- **A sleeping server that can make it is woken with the chat modes' step** (6b465's `server_wake_ask`):
+  "Waking <name>", ten seconds counting down, and the page's Skip. Only one whose kit last said it can make
+  this kind (`server_gen_sleepers`); one that said it can't, or never said, is left asleep. Before, a picture in
+  a mode went through the modes' wake (any sleeper, even one with no ComfyUI, then re-seated the council for
+  nothing), and a picture with no mode used 6b346's silent wake of up to a minute. Skip, no answer in 10 s
+  (marked down), and Stop (the reader left: nothing is made) each end the wait; this Mac's painter goes on as
+  before. A gif or a jpg (a format only this computer writes) wakes nobody. Both `server_make` calls get the
+  request's Skip event; the modes' wake now leaves pictures and videos to it.
+- Gauntlet: `== a picture or a video wakes a sleeping server that can make it ... (6b482) ==` (the whole
+  server_make on a sleeping server: woke and made it, a video too, can't make it, never said, a gif, Skip, no
+  answer, reader left), a source pin, and eight mutations. 6b356's "wakes only here" pin and 6b357's slow-job stub were
+  updated for the new wake.
+
+**What ran here:** `ast` parse of millenai.py; `test_generate` (64 tests), `test_setuplib`, `test_repo`,
+`test_rootfiles`, `test_stateless`, `test_gputune` one at a time; `mutate.py gen:`; and, in process with no app
+copy, the 6b356, 6b357, 6b465 and 6b482 gauntlet blocks and 6b356's 50 mutations. Not the full gauntlet or the
+full kit suite.
+
+**Needs the real server** (when it is back and not serving; send the output):
+1. `sudo ./setup.sh --with-imagegen` (or, for the ComfyUI installed by hand, `sudo bash
+   ollama1/tools/install-comfyui.sh --update` then `sudo ./setup.sh`).
+2. In the app: Settings > Your servers > Test (the Images chip), one picture, one 2-second clip; time both, and
+   a picture right after a chat (the reload).
+3. If either fails: `journalctl -u comfyui -e`. The things no stub can show: that ComfyUI accepts the klein graph
+   (node and input names were read from its source, not run), that fp16 on gfx1030 makes a real picture (not
+   black or noise), the speeds above, and that the klein download address (`Comfy-Org/flux2-klein`, which
+   Hugging Face now redirects to `Comfy-Org/vae-text-encorder-for-flux-klein-4b`; `curl -L` follows it) still
+   answers.
+
+\* Estimates: sizes from Hugging Face's listings; times scaled from published figures for other cards, not
+measured on this one.
+
+Sources:
+- Ollama, image generation (experimental, macOS): https://ollama.com/blog/image-generation
+- Ollama releases: https://github.com/ollama/ollama/releases
+- ComfyUI's FLUX.2 klein template: https://comfy.org/workflows/image_flux2_klein_text_to_image-814fd547d86e/
+- ComfyUI source (Flux2Scheduler, EmptyFlux2LatentImage, sampler nodes, RDNA2 and bf16, Flux2 dtypes):
+  https://github.com/comfyanonymous/ComfyUI (comfy_extras/nodes_flux.py, comfy_extras/nodes_custom_sampler.py,
+  comfy/model_management.py, comfy/supported_models.py)
+- FLUX.2 klein 4B model card: https://huggingface.co/black-forest-labs/FLUX.2-klein-4B
+- Comfy-Org's files: https://huggingface.co/Comfy-Org/flux2-klein, https://huggingface.co/Comfy-Org/flux1-schnell,
+  https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+- Wan 2.1 (1.3B VRAM and time): https://github.com/Wan-Video/Wan2.1
+- stable-diffusion.cpp: https://github.com/leejet/stable-diffusion.cpp and its server API summary,
+  https://deepwiki.com/leejet/stable-diffusion.cpp/5.2-server-api

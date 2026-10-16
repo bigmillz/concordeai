@@ -289,30 +289,40 @@ must be what suspend uses: `cat /sys/power/mem_sleep` shows `[deep]`.
 
 ## Images and video (optional)
 
-The server can also make pictures and short clips, with ComfyUI. It is not part
-of `setup.sh`: it is about 27 GB* of downloads and its own Python environment, so
-you ask for it. On the server, from the kit:
+The server can also make pictures and short clips, with ComfyUI. `setup.sh` adds
+it only when you ask: it is about 25 GB* of models and its own Python environment.
+On the server, from the kit:
 
 ```bash
-sudo ./setup.sh                                      # first, if it hasn't run since this version of the kit: the gateway and the port guard
-sudo bash ollama1/tools/install-comfyui.sh          # then this, as the user who ran sudo; --help lists the options
+sudo ./setup.sh --with-imagegen                      # everything setup does, then ComfyUI and its models, as the user who ran sudo
 ```
+
+Without `--with-imagegen` nothing for pictures is installed or downloaded. The
+installer can also be run on its own (`sudo bash ollama1/tools/install-comfyui.sh`,
+after `setup.sh`; `--help` lists its options).
 
 The script does the steps you would do by hand, each skipped when it is done, so
 it can be run again: `uv`, ComfyUI cloned into `~/comfyui`, a Python 3.12
 environment with PyTorch for ROCm 6.4 (an AMD card), ComfyUI's requirements, the
-four model files below (downloaded with `curl -C -`, so a cut-off download carries
+six model files below (downloaded with `curl -C -`, so a cut-off download carries
 on), and a service. For an NVIDIA card, run it with `TORCH_INDEX` set to the CUDA
 wheel address from pytorch.org (for example `TORCH_INDEX=https://download.pytorch.org/whl/cu128`).
 
 | File | Folder under `~/comfyui/models` | Used for | Size* |
 |---|---|---|---|
-| `flux1-schnell-fp8.safetensors` | `checkpoints` | pictures (FLUX.1 schnell, fp8) | about 17 GB |
+| `flux-2-klein-4b.safetensors` | `diffusion_models` | pictures (FLUX.2 klein 4B) | about 7.8 GB |
+| `qwen_3_4b.safetensors` | `text_encoders` | pictures' text encoder | about 8.0 GB |
+| `flux2-vae.safetensors` | `vae` | pictures' decoder | about 0.34 GB |
 | `wan2.1_t2v_1.3B_fp16.safetensors` | `diffusion_models` | video (Wan 2.1, 1.3B) | about 2.8 GB |
 | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | `text_encoders` | video's text encoder | about 6.7 GB |
 | `wan_2.1_vae.safetensors` | `vae` | video's decoder | about 0.25 GB |
 
 \* Estimates: check them against what the download shows.
+
+A server set up before this kit has `checkpoints/flux1-schnell-fp8.safetensors`
+(FLUX.1 schnell, about 17 GB*) instead. The gateway still uses it while FLUX.2
+klein's three files aren't there (or the ComfyUI is too old to load them: update
+it with `install-comfyui.sh --update`); once they are, it can be deleted.
 
 - **Only the gateway talks to it.** ComfyUI listens on `127.0.0.1:8188` and
   nowhere else, and the local port guard (`config/ollama1.nft.in`, installed by
@@ -330,8 +340,9 @@ wheel address from pytorch.org (for example `TORCH_INDEX=https://download.pytorc
   works through the Cloudflare tunnel, which drops a silent response after 100 s.
   If the server can't make it (off, busy, a model missing), the app says so in one
   line and does what it did before.
-- **Waking.** Asking for a picture wakes a sleeping server, as a question does
-  (see Sleep when idle). A running job, and for two minutes after the app last asked
+- **Waking.** Asking for a picture or a clip wakes a sleeping server that can make
+  it, with the same "Waking <name>" step, ten seconds and Skip as a question (see
+  Sleep when idle); one that can't is left asleep. A running job, and for two minutes after the app last asked
   about one, counts as use: the server won't sleep in the middle of one.
 - **Nothing kept.** The gateway holds a job and its result in memory only: a
   finished result for 10 minutes, then it is gone. Results are written by ComfyUI to

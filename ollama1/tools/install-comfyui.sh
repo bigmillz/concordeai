@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
 # install-comfyui.sh: optional image and video generation for an ollama1 server (6b356).
 #
-# setup.sh does NOT run this: ComfyUI is 20 GB or more of downloads and a Python
-# environment, so it is something you ask for. It is the same steps as doing it by
-# hand, in order, each one skipped when it is already done, so it is safe to run again:
+# setup.sh runs this only when asked (sudo ./setup.sh --with-imagegen, 6b482): ComfyUI
+# is 25 GB* or more of downloads and a Python environment, so it is something you ask
+# for. It is the same steps as doing it by hand, in order, each one skipped when it is
+# already done, so it is safe to run again:
 #
 #   1. uv (the Python tool) for the admin user, and Python 3.12 through it
-#   2. ComfyUI itself, cloned into ~/comfyui
+#   2. ComfyUI itself, cloned into ~/comfyui (FLUX.2 needs a ComfyUI from January 2026
+#      or later: --update pulls the newest into an older clone)
 #   3. a virtual environment with PyTorch built for ROCm 6.4 (AMD graphics cards),
 #      then ComfyUI's own requirements
-#   4. the four model files the gateway's templates use, downloaded with curl -C -
+#   4. the six model files the gateway's templates use, downloaded with curl -C -
 #      so a cut-off download carries on where it stopped:
-#        checkpoints/flux1-schnell-fp8.safetensors             images (FLUX.1 schnell, fp8)    about 17 GB*
+#        diffusion_models/flux-2-klein-4b.safetensors          pictures (FLUX.2 klein 4B)       about 7.8 GB*
+#        text_encoders/qwen_3_4b.safetensors                   pictures' text encoder           about 8.0 GB*
+#        vae/flux2-vae.safetensors                             pictures' decoder                about 0.34 GB*
 #        diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors     video (Wan 2.1, 1.3B)           about 2.8 GB*
 #        text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors  video's text encoder             about 6.7 GB*
 #        vae/wan_2.1_vae.safetensors                           video's decoder                 about 0.25 GB*
+#      (A server set up before 6b482 has checkpoints/flux1-schnell-fp8.safetensors, about
+#      17 GB*: the gateway still uses it when klein's files aren't there. Once they are,
+#      it can be deleted.)
 #   5. comfyui.service, which runs ComfyUI as the admin user on 127.0.0.1:8188 only,
 #      and comfyui-clean.timer, which removes finished pictures and clips from memory
 #      (they are written to /run, which is RAM) a few minutes after they were made
@@ -46,7 +53,9 @@ PORT=8188
 HF=https://huggingface.co/Comfy-Org
 # folder|file|url|smallest size (bytes) the finished file can have
 MODELS=(
-  "checkpoints|flux1-schnell-fp8.safetensors|$HF/flux1-schnell/resolve/main/flux1-schnell-fp8.safetensors|16000000000"
+  "diffusion_models|flux-2-klein-4b.safetensors|$HF/flux2-klein/resolve/main/split_files/diffusion_models/flux-2-klein-4b.safetensors|7500000000"
+  "text_encoders|qwen_3_4b.safetensors|$HF/flux2-klein/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors|7800000000"
+  "vae|flux2-vae.safetensors|$HF/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors|300000000"
   "diffusion_models|wan2.1_t2v_1.3B_fp16.safetensors|$HF/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors|2500000000"
   "text_encoders|umt5_xxl_fp8_e4m3fn_scaled.safetensors|$HF/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|6000000000"
   "vae|wan_2.1_vae.safetensors|$HF/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors|200000000"
@@ -255,8 +264,9 @@ fi
 cat <<EOF
 
 Done. What to do next:
-  1. On the server, run  sudo ./setup.sh  from the kit once (it installs the gateway that
-     builds generation jobs, and adds ComfyUI's port to the local port guard).
+  1. If setup.sh didn't run this for you (--with-imagegen), run  sudo ./setup.sh  from the
+     kit once (it installs the gateway that builds generation jobs, and adds ComfyUI's port
+     to the local port guard).
   2. Check what the gateway sees:  sudo -u o1gw curl -s http://127.0.0.1:$PORT/system_stats | head -c 80
   3. In the app: Settings > Your servers > Test. The card shows Images and Video when the
      server can make them.

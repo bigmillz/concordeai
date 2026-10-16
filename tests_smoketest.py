@@ -23983,7 +23983,8 @@ def _p8c_slow(src):
     (ServerSlow), like a first word that took too long, says it took too long and falls back WITHOUT marking the server
     down; a refusal or a connection failure still does."""
     downs, said, steps = [], [], []
-    ns = {"server_refresh_modes": lambda ctx: None, "server_take_wake_notes": lambda: [], "_srv_plain": lambda n: n,
+    ns = {"server_refresh_modes": lambda ctx, **k: None, "server_take_wake_notes": lambda: [], "_srv_plain": lambda n: n,
+          "server_gen_sleepers": lambda ctx, kind: [],              # (6b482) nobody asleep
           "server_gen_pick": lambda ctx, kind: {"name": "Desk", "id": "x"}, "srv_gen_opts": lambda kind, use: {"width": 8, "height": 8},
           "ServerGenStopped": type("ServerGenStopped", (Exception,), {}),
           "StaleProfile": type("StaleProfile", (OSError,), {}), "_client_gone": lambda sock: False,
@@ -31735,7 +31736,9 @@ def _g56c_pins(src):
     out["refuse_first"] = ch.index("makes no picture or video (6b339)") < v < i
     sect = _sv_sect(src, "server pictures")
     out["no_cloud"] = not re.search(r"cloud_allowed|gate_ladder|_cloud_all|gemini|GEMINI|_render_lock|bench_hold", sect)
-    out["wakes_only_here"] = "server_refresh_modes(ctx)" in sect and "server_wake_if_down(" not in sect
+    # (6b482) checked without a wake; a sleeper that can make it is woken with the chat modes' step
+    out["wakes_only_here"] = ("server_refresh_modes(ctx, wake=False)" in sect and "server_wake_if_down(" not in sect
+                              and "server_wake_ask(_gs, ctx, status, step, skip," in sect)
     gen = src[src.index("# ---- images and video on your server (6b356)"):src.index("def server_add(ctx, d: dict)")]
     out["nolog"] = not re.search(r"\bprint\(|logging|usage_note", gen + sect)
     out["profile_writer"] = ("ctx.write_bytes(" in sect and not re.search(r"\bopen\(|os\.open\(|fdopen|stage_path|_media_land|write_text|write_bytes\(b", sect))
@@ -35039,6 +35042,148 @@ check("the merger drafts last, before and after a server joins the roster (6b465
       _f465(["B", "A", "C"]) == ["A", "C", "B"] and _f465(["Srv \u00b7 x", "B", "A"]) == ["Srv \u00b7 x", "A", "B"]
       and _f465(["A", "C"], "C") == ["A", "C"] and _f465(["B"]) == ["B"] and _f465(["B", "A"], "", "A") == ["B", "A"])
 # ==== 6b465: end ====
+
+
+# ==== 6b482 a picture wakes only a server that can make it: begin ====
+print("== a picture or a video wakes a sleeping server that can make it, with the Waking step, 10 s and a Skip (6b482) ==")
+# server_make on the servers section and the server pictures section (as 6b356's checks run it), with a
+# server that sleeps and has a card that wakes it (as 6b465's). The server's answers follow one switch:
+# asleep, every request is refused as offline; awake, it answers.
+def _w482_case(src, gen, wake_after=2, skip=False, gone=False, kind="image", use=None):
+    ns, ctx, d, _nt = _g56_make_ns(src)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    t = [1000.0]
+    ns["_srv_wake_clock"] = lambda: t[0]
+
+    def _spin(s_):
+        if t[0] > 9000:
+            raise RuntimeError("the wake never gave up")
+        t[0] += s_
+    ns["_srv_wake_sleep"] = _spin
+    udp = []
+    ns["_srv_udp"] = lambda pkt, addr: udp.append(addr)
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255"]
+    routes, off = _w46_ok_routes(ns)
+    routes["/v1/sleep-config"] = [_SvResp(200, {"enabled": True, "minutes": 30, "supported": True, "wake": [_W46_MAC]})]
+    _w46_router(ns, routes, [])
+    ns["server_sleep_get"](ctx, sid)
+    ns["_srv_update"](ctx, lambda es: (ns["_srv_find"](es, sid).update(gen=gen), {"ok": True})[1])
+    awake, polls, log = [False], [0], []
+
+    def gate(r):
+        def f():
+            if not awake[0]:
+                raise ns["ServerError"]("offline", "Desktop didn’t answer.")
+            return r
+        return f
+
+    def info():
+        polls[0] += 1
+        if wake_after is not None and polls[0] >= wake_after:
+            awake[0] = True
+        return gate(_SvResp(200, {"gpu": {}}))()
+    jid = "/v1/generate/jobs/" + _G56_ID
+    routes.update({"/v1/whoami": [gate(_SvResp(200, {"device_id": "x"}))], "/v1/info": [info],
+                   "/api/tags": [gate(_SvResp(200, {"models": []}))], "/api/ps": [gate(_SvResp(200, {"models": []}))],
+                   "/api/version": [gate(_SvResp(200, {"version": "0.1"}))],
+                   "/v1/generate/capabilities": [gate(_SvResp(200, gen if isinstance(gen, dict) else {}))],
+                   "/v1/generate/jobs": [gate(_SvResp(202, {"id": _G56_ID}))],
+                   jid: [gate(_SvResp(200, {"state": "done", "progress": 1.0,
+                                            "type": "image/png" if kind == "image" else "video/mp4"}))],
+                   jid + "/result": [gate(_g56_file(_G56_PNG if kind == "image" else _G56_MP4))]})
+    _w46_router(ns, routes, log)
+    # last checked over a minute ago: the request checks it again (and finds it asleep)
+    ns["_srv_seen"][sid] = {"at": 1, "reachable": False, "kind": "offline", "err": "off", "gen_at": _real_time()}
+    ns["_srv_wake_at"].clear()
+    ns["_client_gone"] = (lambda sock: True) if gone else (lambda sock: False)
+    ev = _th329.Event()
+    if skip:
+        ev.set()
+    emitted, steps, stats = [], [], []
+    ns["time"] = _G56Time()
+    try:
+        r = ns["server_make"](ctx, kind, "a red balloon", use or {}, [], None, emitted.append,
+                              lambda *a: steps.append(a), stats.append, skip=ev)
+        err = None
+    except Exception as exc:
+        r, err = None, exc
+    ns["time"] = time
+    jobs = [p for _m, p, _b, _s, _t in log if p.startswith("/v1/generate/jobs")]
+    return {"r": r, "err": err, "udp": udp, "steps": steps, "stats": stats, "emitted": emitted, "jobs": jobs,
+            "down": ns["server_label_down"](ctx, "Desktop · x"), "t": t[0] - 1000.0}
+
+
+def _w482(src):
+    out = {}
+    w = _w482_case(src, {"image": True, "video": False})
+    out["woke and made it"] = (w["r"] is True and w["err"] is None and w["udp"]
+                               and w["steps"][0] == ("wake", "Waking Desktop", "run", "10 s")
+                               and ("wake", "Woke Desktop", "done", "") in w["steps"]
+                               and w["steps"][-1][:2] == ("srvgen", "Made the picture on Desktop")
+                               and "Desktop is awake." in w["stats"] and w["stats"][0] == "Waking Desktop..."
+                               and len(w["emitted"]) == 1 and "made on Desktop" in w["emitted"][0])
+    v = _w482_case(src, {"image": False, "video": True}, kind="video")
+    out["a video too"] = v["r"] is True and v["udp"] and v["steps"][0] == ("wake", "Waking Desktop", "run", "10 s")
+    for nm, g, u in (("can't make it", {"image": False, "video": True}, None), ("never said", None, None),
+                     ("a gif is this computer's", {"image": True, "video": True}, {"fmt": "gif"})):
+        n = _w482_case(src, g, use=u, kind="video" if u else "image")
+        out["%s: left asleep" % nm] = (n["r"] is False and not n["udp"] and n["steps"] == [] and n["jobs"] == []
+                                       and n["emitted"] == [] and n["t"] == 0)
+    s = _w482_case(src, {"image": True, "video": True}, wake_after=None, skip=True)
+    out["Skip"] = (s["r"] is False and s["steps"][-1] == ("wake", "Skipped waking Desktop", "done", "")
+                   and "Skipped waking Desktop, going on without it" in s["stats"] and s["jobs"] == []
+                   and s["t"] < 1.5 and s["emitted"] == [])
+    n = _w482_case(src, {"image": True, "video": True}, wake_after=None)
+    out["no answer in 10 s"] = (n["r"] is False and n["steps"][-1] == ("wake", "Desktop didn’t wake in 10 s", "done", "")
+                                and n["jobs"] == [] and n["down"] is True and 10 <= n["t"] <= 13)
+    g = _w482_case(src, {"image": True, "video": True}, wake_after=None, gone=True)
+    out["reader left"] = g["r"] is True and g["jobs"] == [] and g["emitted"] == [] and g["t"] < 4
+    return all(out.values()), out
+
+
+_r482 = _w482(_MILLENAI_SRC)
+check("server pictures (6b482): a sleeping server that can make it is woken with the step, ten seconds and the Skip; "
+      "one that can't, or never said, is left asleep; Skip, no answer and Stop each end the wait",
+      _r482[0], "%r" % (_r482[1],))
+_s482 = _MILLENAI_SRC
+check("server pictures (6b482): the chat modes' wake leaves a picture or a video to server_make, and both "
+      "server_make calls hand it the page's Skip",
+      "or _ch_council0 is None or council != _ch_council0\n                         or img_subject or vid_subject):\n"
+      "            _ch_wake = []" in _s482
+      and _s482.count("_onotes, self.connection, emit, step, status,\n                                   skip=skip_ev):") == 2
+      and "def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status, skip=None) -> bool:" in _s482)
+_M482 = [
+    ("a picture wakes a server that can't make it",
+     '                if e["id"] in ids and (e.get("gen") or {}).get(kind) is True]', '                if e["id"] in ids]'),
+    ("a picture's wake silent again", "        server_refresh_modes(ctx, wake=False)\n    except (StaleProfile,",
+     "        server_refresh_modes(ctx)\n    except (StaleProfile,"),
+    ("no wake for a picture", "        _gs = server_gen_sleepers(ctx, kind) if srv_gen_opts(kind, use) is not None else []\n",
+     "        _gs = []\n"),
+    ("a gif wakes the server", "server_gen_sleepers(ctx, kind) if srv_gen_opts(kind, use) is not None else []",
+     "server_gen_sleepers(ctx, kind)"),
+    ("the Skip not handed on", "server_wake_ask(_gs, ctx, status, step, skip,", "server_wake_ask(_gs, ctx, status, step, None,"),
+    ("the reader leaving goes on to make it", "    if _gw is None:                 # the reader left while it waited\n        return True",
+     "    if _gw is None:                 # the reader left while it waited\n        pass"),
+    ("a mode's wake for a picture", "\n                         or img_subject or vid_subject):\n", "):\n"),
+    ("the page's Skip not handed to server_make", "status,\n                                   skip=skip_ev):", "status):"),
+]
+_m482 = []
+for _d482, _o482, _n482 in _M482:
+    if _MILLENAI_SRC.count(_o482) != 1 and _d482 != "the page's Skip not handed to server_make":
+        _m482.append((_d482, "anchor missing %d" % _MILLENAI_SRC.count(_o482)))
+        continue
+    _x482 = _MILLENAI_SRC.replace(_o482, _n482, 1)
+    try:
+        _ok482 = _w482(_x482)[0] and (
+            "or img_subject or vid_subject):\n            _ch_wake = []" in _x482
+            and _x482.count("skip=skip_ev):") == 2
+            and "def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status, skip=None) -> bool:" in _x482)
+    except Exception:
+        _ok482 = False
+    _m482.append((_d482, "caught" if not _ok482 else "MISSED"))
+check("server pictures (6b482): %d mutations, each caught" % len(_M482),
+      all(v == "caught" for _d, v in _m482), "%r" % [x for x in _m482 if x[1] != "caught"])
+# ==== 6b482: end ====
 print("== an app update brings model updates: newer weights, new set models, retired ones cleared on servers too (6b445) ==")
 # Per Patrick: "these models should be included when the app itself updates
 # ... it should bring in updates to models, the newest models that we add,
