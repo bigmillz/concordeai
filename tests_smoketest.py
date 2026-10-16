@@ -9283,6 +9283,12 @@ check("LOC-3: viewing, switching and New chat write nothing",
       and "chatOps(" not in _lc.split("\n}")[0] and "api(" not in _lc.split("\n}")[0]
       and "chatOps(" not in _nc.split("});")[0],
       "%r" % [_rv0])
+# 6b480: the search's hits say where the chat matched
+_sh480 = json.loads(req("/api/chats/search?q=pine")[2] or b"{}")
+_sh480c = next((h for h in _sh480.get("hits") or [] if h.get("id") == _c1), {})
+check("chat search endpoint: a content hit carries its message index and a line around the match (6b480)",
+      _c1 in (_sh480.get("ids") or []) and _sh480c.get("mi") == 0
+      and "pineapple" in (_sh480c.get("snip") or ""), "%r" % _sh480)
 
 # LOC-5: an unreadable chats, memory or settings file answers 503 with its
 # line on every route that reads it, and is left byte for byte; a
@@ -35639,6 +35645,78 @@ check("sidebar folds: heading buttons with aria-expanded, one delegated click, s
 check("a pin and its pinned-at stamp survive the chat store's save and load; a bad stamp is refused (6b467)",
       _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
       and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))
+
+# --- 6b480: the sidebar search shows where a chat matched, and opens it there
+# (per Patrick: "Find in chat"; the find bar itself is 6b352's)
+_ns480 = {"re": re}
+for _n in _ctree.body:
+    if getattr(_n, "name", None) in ("_chat_snip", "chat_search"):
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _ns480)
+_long480 = "word " * 40
+_cs480 = [{"id": "a", "title": "Pineapple talk", "messages": [{"role": "user", "content": "hi"}]},
+          {"id": "b", "title": "x", "messages": [{"content": "q"},
+                                                 {"content": _long480 + "the **PINEAPPLE** is\n\n a fruit " + _long480}]},
+          {"id": "c", "title": "y", "messages": [{"content": "Pineapple first"}]},
+          {"id": "d", "title": "z", "messages": [{"content": "nothing here"}]}, "junk",
+          {"id": "e", "title": "t", "messages": [{"content": ["a", "list"]}, {"content": "a.b and axb"}]}]
+_ids480, _h480 = _ns480["chat_search"](_cs480, "pineapple")
+_hb480 = next((h for h in _h480 if h["id"] == "b"), {})
+check("chat search: ids and hits per chat, the first matching message's index, a one-line excerpt "
+      "with the match as written, -1 and no excerpt for a title-only match (6b480)",
+      _ids480 == ["a", "b", "c"] and [h["mi"] for h in _h480] == [-1, 1, 0]
+      and _h480[0]["snip"] == "" and _h480[2]["snip"] == "Pineapple first"
+      and "the PINEAPPLE is a fruit" in _hb480.get("snip", "")
+      and _hb480["snip"].startswith("\u2026") and _hb480["snip"].endswith("\u2026")
+      and "\n" not in _hb480["snip"] and "*" not in _hb480["snip"] and len(_hb480["snip"]) <= 130
+      and _ns480["chat_search"](_cs480, "  ") == ([], [])
+      and _ns480["chat_search"](_cs480, "a.b")[0] == ["e"]
+      and _ns480["chat_search"](_cs480, "a.b")[1][0]["mi"] == 1, "%r" % (_h480,))
+check("chat search endpoint: hits carry the message index and an excerpt; the page reads them (6b480)",
+      '_ids, _hits = chat_search(_cs, _q)' in _MILLENAI_SRC
+      and 'self._send_json({"ids": _ids, "hits": _hits})' in _MILLENAI_SRC
+      and "window.chatQHits=chatHitMap(r,q);" in page)
+_hj = os.path.join(_SMOKE_TMP, "hits480.js")
+with open(_hj, "w", encoding="utf-8") as fh:
+    fh.write(page[page.index("function chatHitMap(r,q){"):page.index("/*@hit-pure-end*/")]
+             + _jsfn(page, "function findAtMsg(marks,el){") + r"""
+const o={};
+const M=chatHitMap({ids:["a","b","t"],hits:[{id:"a",mi:2,snip:"x pine y"},{id:"b",mi:-1,snip:""},
+  {id:7,mi:1,snip:"bad"},{id:"c",mi:"3",snip:5}]},"pine");
+o.map=M.q==="pine"&&M.size===4&&M.get("a").mi===2&&M.get("t").mi===-1&&M.get("c").mi===-1
+  &&M.get("c").snip===""&&!M.has(7)&&chatHitMap(null,"x").size===0;
+o.here=JSON.stringify(chatHitView(M,"a","pine","ai","ai"))===JSON.stringify({snip:"x pine y",mi:2,lane:""});
+o.other=chatHitView(M,"a","pine","code","ai").lane==="Code"&&chatHitView(M,"a","pine","ai","code").lane==="Chat"
+  &&chatHitView(M,"a","pine","funnel","code").lane==="Funnels"&&chatHitView(M,"a","pine","agents","ai").lane===""
+  &&chatHitView(M,"a","pine",undefined,"funnel").lane==="Chat";
+o.stale=chatHitView(M,"a","pin","ai","ai").snip===""&&chatHitView(M,"a","pin","ai","ai").mi===-1;
+o.title=chatHitView(M,"b","pine","ai","ai").mi===-1&&chatHitView(M,"zz","pine","ai","ai").mi===-1
+  &&chatHitView(M,"a","","code","ai").lane==="";
+const mk=p=>({p}),A=mk(1),B=mk(5),C=mk(9);
+const el=(lo,hi)=>({contains:m=>m.p>=lo&&m.p<=hi,compareDocumentPosition:m=>m.p>hi?4:2});
+o.at=findAtMsg([A,B,C],el(4,6))===1&&findAtMsg([A,B,C],el(2,3))===1&&findAtMsg([A,B,C],el(10,12))===-1
+  &&findAtMsg([],el(0,9))===-1&&findAtMsg([A],undefined)===-1;
+console.log(JSON.stringify(o));
+""")
+_hr = json.loads(subprocess.run(["node", _hj], capture_output=True, text=True, timeout=30).stdout or "{}")
+check("sidebar search hits: the map keeps only well-formed hits for its own query, names another lane, "
+      "and the match to open is the first in that message or after it (node, 6b480)",
+      _hr == {"map": True, "here": True, "other": True, "stale": True, "title": True, "at": True}, str(_hr))
+check("sidebar search UI: every lane while searching, the excerpt built from nodes (no HTML), its own "
+      "[hidden] rule, a click opens the chat and the find bar at the match (6b480)",
+      "const mine=chats.filter(c=>(q||laneOK(c))&&qOK(c));" in page
+      and '(sn?\'<span class="csnip"></span>\':\'\')' in page
+      and "if(sp&&views.has(id))chatSnipPaint(sp,views.get(id),window.chatQ);" in page
+      and 'const m=document.createElement("mark");m.textContent=seg.t;el.appendChild(m);' in page
+      and "innerHTML" not in _jsfn(page, "function chatSnipPaint(el,v,q){")
+      and ".chat-item .csnip[hidden]{display:none}" in page
+      and ".chat-item.has-snip{flex-wrap:wrap;row-gap:2px}" in page
+      and 'it.addEventListener("click",()=>chatOpenHit(id));' in page
+      and "if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);" in page
+      and "const i=findAtMsg(findHitEls,el);" in page
+      and 'scroller.style.scrollBehavior="auto";\n    t.scrollIntoView({block:"center"});' in page
+      and "chatPinned=false;chatGlideTo=0;" in page
+      and "function findOpen(){\n  const again=!fb.hidden;\n  fb.hidden=false;\n  fq.focus();fq.select();\n"
+          "  if(again)return;\n  findWatch();\n  findRun(true);\n}" in page)
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
