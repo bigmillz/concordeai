@@ -63,7 +63,7 @@ API = "https://api.cloudflare.com/client/v4"
 # what derives from it; see o1common.access_names).
 TUNNEL = TOKEN_NAME = POL_ADMIN = POL_APP = APP_ADMIN = APP_GATEWAY = ""
 NO_ORG = """This Cloudflare account has no Zero Trust organization yet. That needs one visit:
-  dash.cloudflare.com > Zero Trust (left sidebar) > choose a team name (e.g. concorde)
+  dash.cloudflare.com > Zero Trust (left sidebar) > choose a team name (e.g. myteam)
   > select the Free plan > Proceed. Then run this again."""
 
 

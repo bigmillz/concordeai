@@ -16031,3 +16031,44 @@ Sources:
 - Wan 2.1 (1.3B VRAM and time): https://github.com/Wan-Video/Wan2.1
 - stable-diffusion.cpp: https://github.com/leejet/stable-diffusion.cpp and its server API summary,
   https://deepwiki.com/leejet/stable-diffusion.cpp/5.2-server-api
+
+## 6b481 — De-personalise the server kit (per Patrick)
+
+Goal: the server kit (`ollama1/`) can be handed to strangers. 6b347 had done the
+heavy part (user, domain, LAN, NIC names, serials as configuration with no
+personal default; made-up fixtures); this pass sweeps what was left and widens
+the guard.
+
+- **Cloudflare team name.** The README and `ollama1-cf-access`'s "no Zero Trust
+  yet" hint gave the maintainer's real team as the example; now `myteam`
+  (`myteam.cloudflareaccess.com` in the README and `test_cloudflare`). Text
+  only, no behaviour change.
+- **Test fixtures.** A user named `pat` in `test_idle` (loginctl/inhibitor
+  samples) and `/home/pat/...` in `test_quickburn` became `alice`.
+- **No code change needed for the owner's install.** Nothing in `bin/`, `lib/`,
+  `config/`, `setup.sh` or `tools/` still carries a personal default: the
+  admin user, domain, LAN range and serials already come from
+  `/etc/ollama1/config.json` (6b347), so the existing server keeps working as is.
+- **`test_repo.TestNoPersonalValues`** now also looks for the Pi's hostname,
+  the private domain, the real Cloudflare team domain and the two real MAC
+  prefixes (colon and dash forms); MACs written with dashes are checked
+  against the made-up ranges too (`02:00:00:00:00:xx` added to them). "Pat"
+  is caught capitalised anywhere and lowercase as data (`/home/pat`, `pat@`,
+  `1000 pat`), not as a variable (`pat = `, `pat.search`). lib/, bin/, tools/,
+  config/ and systemd/ are read from the `OLLAMA1_TEST_*` directories, so a
+  mutant planted there is seen. The "catches" test now also proves clean
+  samples (fake IPs, variables, dates, `PATH=`) pass.
+- **Mutants:** a Pi hostname and real MAC in the cf-access hint, and a
+  dash-written MAC in `o1power.py`; both killed by `test_repo`. (An earlier
+  draft mutated README.md, which `mutate.py` does not copy into its work tree.)
+
+LEFT ON PURPOSE
+- `github.com/bigmillz/concordeai`: the real clone URL, it must work.
+- The needles themselves live in `tests/test_repo.py`, which the scan skips;
+  literals there and in `mutate.py` are split so the email and needle scans
+  don't trip on them.
+- `America/New_York` in fixtures and the `--timezone` hint, `192.168.1.x` /
+  `192.168.0.0/16` in validation tests and the private-range tables: generic
+  values (a plug must be on a private range, so RFC 5737 addresses can't stand
+  in there).
+- NOTES.md and the repo-root files are not part of the kit and not scanned.
