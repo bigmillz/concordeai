@@ -15835,3 +15835,42 @@ processor: stress-ng exited with status 1 (a check failed)".
   Event By = BIOS, PCI-E wake on, ErP Ready off, as for sleep). Unverified on the real server: a poweroff, then a wake.
 - Tests: admin action needs its confirm and starts only its unit; the page carries the button and the dialog; polkit
   check; one mutation (shutdown without confirmation).
+
+## 6b472 — Edit this picture: an attached photo plus "change it" runs a local edit (per Patrick)
+
+Patrick (2026-10-11): attached a photo of himself and asked for different hairstyles; the app answered in words
+("I cannot generate images of you with different hairstyles"). Asked what to build, he chose: "Build photo editing."
+
+Why it failed: `image_intent()` only matches commissions of NEW pictures from text and is skipped when an image is
+attached; with an image the request went to the vision model; `generate_image` paints text to image only; and he was
+on "Thinking · Ollama1 only", a text model on the server.
+
+- **Feasibility (measured, mflux 0.19.1 in venv-image):** `mflux-generate-flux2-edit --image-paths` exists and takes the
+  klein 4B weights (`mflux-community/flux2-klein-4b-mflux-q4`, the Quick rung) with `--base-model flux2-klein-4b`.
+  Test on a generated sample (768x768 man on a hill, "buzz cut"): edit 31.9 s wall, 16.6 GB peak footprint (the text
+  to image run of the same size: 18.0 s, 15.3 GB). Subject, face, shirt and background held; only the hair changed.
+  Steps 4, guidance 1.0 as for generation.
+- **Intent:** `photo_edit_intent(text)` (segment `photoedit`), only consulted when a photo is attached to THIS message
+  and the message is not the 6b355 draw-on-the-picture lane. Conservative regexes: change/swap/retouch a named part,
+  remove/erase a thing or person, add/give/put a thing on the subject, "show me with/in/as", "try different
+  hairstyles", redraw/repaint/cartoonify, and make/turn/transform only when the rest names a look ("turn this into a
+  table" stays a read). Questions (what/how/is/describe/who...) never match, except "what would I look like with...".
+  No model fallback: the existing code classifies intent by regex only.
+- **Path:** the chat branch `if edit_req:` runs before the new-picture branch. `edit_photo()` writes the photo to run/
+  (0600), shrinks it with the engine's own Pillow (long side 1024, sides a multiple of 16, EXIF turn applied), runs the
+  edit with the request plus "keep everything else the same", lands the PNG in the profile's images (the usual
+  `/api/image/<id>.png`, `.render.json` marked `edit`), and drops every temp file. STEP/STATUS frames as for a painted
+  picture; the time-left plan (`X-Eta`) is the median of this profile's timed edits, else 45 s flagged as an estimate.
+  The reply carries "Edited on this computer; your photo wasn't sent anywhere".
+- **Local only, no fallback:** the segment has no cloud painter, server or fallback call, and a failed edit says why in a
+  sentence ("hit a snag", "I couldn't open that photo", "needs image generation on this Mac: add or update it under
+  Settings > Models > Manage models", "only works on an Apple silicon Mac for now"); never "I cannot generate images of
+  you". Ordinary self-edits are not refused.
+- **"<name> Only" and Cloud Only:** these are text routes, so the edit runs on this Mac anyway (nothing leaves it), with
+  one status line and a tail on the note saying so. Chosen over refusing because the photo stays put either way and
+  refusing is what failed Patrick.
+- **Not covered:** a follow-up with no new photo ("make it shorter") still takes the old text-picture path; only a
+  photo attached to the message is edited. The quality/look on a real face is unseen.
+- Gauntlet: the intent (positives, negatives, "draw me a cat" unchanged), a stand-in engine through `/api/chat`
+  (dev-only hook `photoedit-stub` on copy A; a photo starting `FAIL-STUB` makes it fail), and the no-cloud rule on the
+  segment's source. Not run in full.

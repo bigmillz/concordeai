@@ -273,7 +273,7 @@ if not _py_has_nacl(_SMOKE_PY):
 # (6b324) and webstore-fake: the web view's clean-up records what it was
 # asked in run/webstore.json instead of needing a window
 INST = Instance(9901, "A", seed=_seed_a,
-                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake"}).start()
+                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake,photoedit-stub"}).start()
 BASE = INST.base
 KEY = INST.key
 PORT_ = INST.port
@@ -6464,6 +6464,50 @@ def healthy(text):
     return len(text) > 300 and rep <= 8 and "⚠️" not in text, \
         f"{len(text)} chars, 3gram x{rep}"
 
+
+# 6b472, per Patrick: "Build photo editing". A photo attached to the message
+# plus a request to CHANGE it runs the local klein edit; everything else is
+# unchanged. The intent is pure; the path runs through a stand-in engine
+# (the dev-only photoedit-stub hook on copy A), never a real model.
+import base64 as _b64m
+_pseg = _MILLENAI_SRC[_MILLENAI_SRC.index("# ==== photoedit: begin ===="):_MILLENAI_SRC.index("# ==== photoedit: end ====")]
+exec(_pseg[_pseg.index("_PE_QUESTION = "):_pseg.index("# shrink the photo")], _ins)
+_pe = _ins["photo_edit_intent"]
+_pe_pos = ["show me with different hairstyles", "make my hair blonde",
+           "give me a buzz cut", "change the background to a beach",
+           "remove the person on the left", "add sunglasses",
+           "make it look like a watercolor painting", "put me on a beach",
+           "what would I look like with a beard", "try different hairstyles on me"]
+_pe_neg = ["what hairstyle suits me", "describe this image", "who is this",
+           "turn this into a table", "make me a list from this",
+           "extract the text", "is the background blurry", "translate this",
+           "show me the text in this image", "draw me a cat"]
+check("photo edit intent: change requests match, questions and reads do not",
+      all(_pe(x) for x in _pe_pos) and not any(_pe(x) for x in _pe_neg),
+      str([x for x in _pe_pos if not _pe(x)] + [x for x in _pe_neg if _pe(x)]))
+check("photo edit: draw-me-a-cat is still a new picture, not an edit",
+      _ii("draw me a cat") == "a cat" and not _pe("draw me a cat"))
+_pe_body = {"model": "", "models": [], "tier": "Fast", "auto_web": False,
+            "images": [_b64m.b64encode(b"\x89PNG\r\n\x1a\nstub-photo-bytes").decode()],
+            "messages": [{"role": "user", "content": "show me with different hairstyles"}]}
+_pe_t = req("/api/chat", "POST", _pe_body, cookie=K, timeout=120)[2].decode("utf-8", "replace")
+_pe_m = re.search(r"\(/api/image/([\w-]+\.png)\)", _pe_t)
+_pe_img = req("/api/image/" + _pe_m.group(1), cookie=K)[2] if _pe_m else b""
+check("photo edit path: an attached photo plus an edit request returns a saved picture and the plain note",
+      bool(_pe_m) and "wasn\u2019t sent anywhere" in _pe_t
+      and _pe_img.endswith(b"stub-photo-bytes"), _pe_t[-200:])
+_pe_body["images"] = [_b64m.b64encode(b"FAIL-STUB" + b"x" * 20).decode()]
+_pe_t2 = req("/api/chat", "POST", _pe_body, cookie=K, timeout=120)[2].decode("utf-8", "replace")
+check("photo edit failure: the reply says why in a sentence, no picture, never 'I cannot generate images of you'",
+      "hit a snag" in _pe_t2 and "![" not in _pe_t2 and "cannot generate" not in _pe_t2
+      and "wasn\u2019t sent anywhere" in _pe_t2, _pe_t2[-200:])
+check("photo edit is local only: no cloud painter, no server, no fallback in its code",
+      not any(w in _pseg for w in ("generate_image(", "GEMINI_API", "urlopen",
+                                    "server_make", "_cloud_all", "server_answer",
+                                    "requests."))
+      and "if edit_req:\n            # LOCAL ONLY" in _MILLENAI_SRC
+      and _MILLENAI_SRC.index("if edit_req:\n            # LOCAL ONLY")
+          < _MILLENAI_SRC.index("if img_subject:\n            # YOUR SERVER FIRST"))
 
 # Fast and Smart merged in 1.20: Fast now runs the strongest fitting
 # model, so it earns the strict health bar
