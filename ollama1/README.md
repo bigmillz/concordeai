@@ -87,7 +87,7 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 3. **Zero Trust must exist once.** If this Cloudflare account has never
    opened Zero Trust, setup stops and says so. The fix is one visit:
    dash.cloudflare.com > **Zero Trust** (left sidebar) > pick a team name
-   (for example `concorde`) > choose the **Free** plan > **Proceed**.
+   (for example `myteam`) > choose the **Free** plan > **Proceed**.
    Cloudflare may ask for a card for the $0 plan.
 
 ## Run it
@@ -367,7 +367,7 @@ around a little from time to time.
    - Save.
 5. **Copy four values:**
    - each application's **Application Audience (AUD) Tag**;
-   - the **team domain** (like `concorde.cloudflareaccess.com`, under
+   - the **team domain** (like `myteam.cloudflareaccess.com`, under
      **Settings**);
    - the service token's **Client ID**.
 

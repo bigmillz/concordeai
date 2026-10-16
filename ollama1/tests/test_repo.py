@@ -173,53 +173,73 @@ class TestGuide(unittest.TestCase):
 
 
 class TestNoPersonalValues(unittest.TestCase):
-    """The kit and its docs are public (6b347): nothing of the maintainer's
-    machine, user, LAN, domain or disks may be in them. Every example uses a
+    """The kit and its docs are public (6b347, 6b481): nothing of the
+    maintainer's machine, user, LAN, domain, Cloudflare team, Pi, disks or
+    MACs may be in them -- docs, code or tests. Every example uses a
     placeholder (<your-user>, <server-ip>, <your-domain>, <server-name>) or a
-    made-up value (testsrv, alice, example.test, 10.0.0.0/24). NOTES.md is a
-    dated log and is not scanned; this file holds the needles, so it is not
-    either."""
+    made-up value (testsrv, alice, example.test, 10.0.0.0/24, 192.0.2.x,
+    02:00:00:00:00:01). NOTES.md is a dated log and is not scanned; this file
+    holds the needles, so it is not either. lib/, bin/, tools/, config/ and
+    systemd/ are read where the tests are pointed (OLLAMA1_TEST_*), so a
+    mutant that plants a value there is caught."""
 
     NEEDLES = ("pmiller", "flyconcordefly", "192.168.86.", "enp38s0", "enp39s0", "patrick", "bigmillz",
-               "s6b0n", "zr127", "zr11z")
+               "s6b0n", "zr127", "zr11z", "millertechnology", "concorde-pi", "concorde.cloudflareaccess",
+               "00:d8:61:", "50:eb:71:", "00-d8-61-", "50-eb-71-")
     PUBLIC_URL = "github.com/bigmillz/concordeai"          # the real clone address: it must work
-    MAC = re.compile(r"\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b")
-    MADE_UP_MACS = ("02:00:5e:10:00:", "aa:bb:cc:dd:ee:", "00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff")
+    MAC = re.compile(r"\b(?:[0-9A-Fa-f]{2}([:-]))(?:[0-9A-Fa-f]{2}\1){4}[0-9A-Fa-f]{2}\b")
+    MADE_UP_MACS = ("02:00:00:00:00:", "02:00:5e:10:00:", "aa:bb:cc:dd:ee:", "00:00:00:00:00:00",
+                    "ff:ff:ff:ff:ff:ff")
+    # "Pat" anywhere; "pat" as data (/home/pat, pat@, "1000 pat"), not a variable (pat = , pat.search, (pat))
+    NAME = re.compile(r"\bPat\b|\bpat\b(?!\s*[=.)(,\]])")
 
     def files(self):
-        for top in (U.KIT, os.path.join(REPO, "docs")):
+        moved = {"lib": U.LIB, "bin": U.BIN, "tools": U.TOOLS, "config": U.CONFIG, "systemd": U.SYSTEMD}
+        tops = [(U.KIT, None), (os.path.join(REPO, "docs"), None)] + [(p, "ollama1/" + d) for d, p in moved.items()]
+        for top, label in tops:
             for root, dirs, names in os.walk(top):
-                dirs[:] = [d for d in dirs if d != "__pycache__"]
+                dirs[:] = [d for d in dirs if d != "__pycache__" and not (root == U.KIT and d in moved)]
                 for n in names:
                     path = os.path.join(root, n)
                     if os.path.abspath(path) == os.path.abspath(__file__) or n.endswith(".pyc"):
                         continue
+                    rel = os.path.join(label, os.path.relpath(path, top)) if label else os.path.relpath(path, REPO)
                     try:
                         with open(path, encoding="utf-8") as f:
-                            yield os.path.relpath(path, REPO), f.read()
+                            yield rel, f.read()
                     except (UnicodeDecodeError, OSError):
                         continue
 
+    def problems(self, text):
+        low = text.replace(self.PUBLIC_URL, "").lower()
+        out = ["has %r: use a placeholder" % n for n in self.NEEDLES if n in low]
+        out += ["names Pat: %r" % m.group(0) for m in self.NAME.finditer(text)]
+        out += ["has the MAC %s" % m.group(0) for m in self.MAC.finditer(text)
+                if not m.group(0).lower().replace("-", ":").startswith(self.MADE_UP_MACS)]
+        return out
+
     def test_kit_and_docs_carry_no_personal_values(self):
-        seen = 0
+        seen, hits = 0, []
         for rel, text in self.files():
             seen += 1
-            low = text.replace(self.PUBLIC_URL, "").lower()
-            for needle in self.NEEDLES:
-                self.assertNotIn(needle, low, "%s has %r: use a placeholder" % (rel, needle))
-            self.assertIsNone(re.search(r"\bPat\b", text), "%s names Pat" % rel)
-            for mac in self.MAC.findall(text):
-                self.assertTrue(mac.lower().startswith(self.MADE_UP_MACS), "%s has the MAC %s" % (rel, mac))
+            hits += ["%s %s" % (rel, p) for p in self.problems(text)]
+        self.assertEqual(hits, [])
         self.assertGreater(seen, 60)          # it really walked the kit
+        self.assertTrue(any(rel.startswith("ollama1/tests/") for rel, _ in self.files()))
+        self.assertTrue(any(rel.startswith("ollama1/lib/") for rel, _ in self.files()))
 
     def test_the_scan_catches_what_it_is_for(self):
         # the check itself must not be vacuous
         for bad in ("ssh pmiller@host", "https://ollama1.flyconcordefly.com", "ip 192.168.86.10", "port enp39s0",
-                    "Patrick's MacBook Pro", "mac 3c:7c:3f:12:34:56", "serial ZR127RMQ"):
-            hit = any(n in bad.lower() for n in self.NEEDLES) or bool(
-                [m for m in self.MAC.findall(bad) if not m.lower().startswith(self.MADE_UP_MACS)])
-            self.assertTrue(hit, bad)
-        self.assertNotIn("bigmillz", ("see " + self.PUBLIC_URL + "/tree/main").replace(self.PUBLIC_URL, "").lower())
+                    "Patrick's MacBook Pro", "mac 3c:7c:3f:12:34:56", "serial ZR127RMQ",
+                    "pat@miller" "technology.net", "ssh concorde-pi", "00:d8:61:aa:bb:cc", "00-D8-61-AA-BB-CC",
+                    "mac 3C-7C-3F-12-34-56", "thanks, Pat.", "/home/pat/ollama1", "1000 pat seat0",
+                    "team concorde.cloudflareaccess.com"):
+            self.assertTrue(self.problems(bad), bad)
+        for good in ("see " + self.PUBLIC_URL + "/tree/main", "pat = re.compile(x)", "pat.search(s)", "glob(pat)",
+                     "mac 02:00:00:00:00:01", "ip 192.0.2.10 or 203.0.113.7", "date 2026-10-16", "PATH=/usr/bin",
+                     "ssh alice@testsrv", "the pattern", "spatial"):
+            self.assertEqual(self.problems(good), [], good)
 
 
 class TestUnits(unittest.TestCase):

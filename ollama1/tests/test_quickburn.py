@@ -227,7 +227,7 @@ class TestQuickBurn(unittest.TestCase):
         b = Box(self)
         os.makedirs(b.d + "/proc/4242")
         with open(b.d + "/proc/4242/cmdline", "wb") as f:
-            f.write(b"bash\0/home/pat/ollama1/tools/stability-test.sh\0--minutes\x0010\0")
+            f.write(b"bash\0/home/alice/ollama1/tools/stability-test.sh\0--minutes\x0010\0")
         r = b.go()
         self.assertEqual((r.returncode, b.last()["result"], b.last()["reason"]), (1, "refused", "stability-test.sh is running"))
         self.assertEqual(b.calls(), [])

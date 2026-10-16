@@ -111,7 +111,7 @@ class FakeCF:
             return 200, [{"id": ZONE_ID, "name": "example.test", "account": {"id": ACCT, "name": "Alice"}}] \
                 if qs.get("name") == "example.test" else []
         if m == "GET" and p == A + "/access/organizations":
-            return (200, {"auth_domain": "concorde.cloudflareaccess.com"}) if self.org else (404, "no org")
+            return (200, {"auth_domain": "myteam.cloudflareaccess.com"}) if self.org else (404, "no org")
         if p == A + "/cfd_tunnel":
             if m == "GET":
                 return 200, [t for t in self.tunnels.values() if t["name"] == qs.get("name")]
@@ -233,7 +233,7 @@ class TestCloudflareHelper(unittest.TestCase):
         self.assertEqual(os.stat(CREDS).st_mode & 0o777, 0o600)
         cfg = json.load(open(CONFIG))
         self.assertEqual(cfg["tunnel_id"], tid)
-        self.assertEqual(cfg["access_team_domain"], "concorde.cloudflareaccess.com")
+        self.assertEqual(cfg["access_team_domain"], "myteam.cloudflareaccess.com")
         tok = next(iter(CF.stokens.values()))
         self.assertEqual(cfg["service_token_client_id"], tok["client_id"])
         self.assertEqual({a["domain"]: a["aud"] for a in CF.apps.values()},
