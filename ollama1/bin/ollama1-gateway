@@ -1461,6 +1461,31 @@ def stats_loop(gw, stop):
         stop.wait(1.0)
 
 
+LAN_RETRY_S = 15
+
+
+def lan_listener(cfg, gw, servers, stop, retry_s=None, server_cls=None):
+    """Bind the LAN listener, retrying every LAN_RETRY_S while its address is missing; then serve it."""
+    retry_s = LAN_RETRY_S if retry_s is None else retry_s
+    server_cls = server_cls or ThreadingHTTPServer
+    said = False
+    while not stop.is_set():
+        try:
+            srv = server_cls((cfg["lan_bind"], int(cfg["gateway_port"])), make_handler(gw, lan=True))
+        except OSError as e:
+            if not said:
+                log("lan_listener_waiting", address=cfg["lan_bind"], reason=getattr(e, "strerror", str(e)))
+                said = True
+            stop.wait(retry_s)
+            continue
+        srv.daemon_threads = True
+        servers.append(srv)
+        log("lan_listener_up", address=cfg["lan_bind"])
+        srv.serve_forever()
+        return srv
+    return None
+
+
 def serve(cfg, stop=None):
     if not o1crypto.available():
         log("fatal", reason="no_ed25519_backend_install_python3-nacl")
@@ -1474,14 +1499,16 @@ def serve(cfg, stop=None):
     if not gw.access.configured and cfg.get("access") != "none":
         log("warning", reason="access_not_configured_all_tunnel_requests_refused")
     servers = [ThreadingHTTPServer(("127.0.0.1", int(cfg["gateway_port"])), make_handler(gw))]
-    if cfg.get("lan_mode") and cfg.get("lan_bind") and cfg.get("lan_cidr"):
-        servers.append(ThreadingHTTPServer((cfg["lan_bind"], int(cfg["gateway_port"])),
-                                           make_handler(gw, lan=True)))
     stop = stop or threading.Event()
     threading.Thread(target=stats_loop, args=(gw, stop), daemon=True).start()
     for s in servers:
         s.daemon_threads = True
         threading.Thread(target=s.serve_forever, daemon=True).start()
+    if cfg.get("lan_mode") and cfg.get("lan_bind") and cfg.get("lan_cidr"):
+        # The LAN address belongs to the wired port: with its cable out (the server on Wi-Fi) it doesn't exist and
+        # the bind fails. That must not take the tunnel's loopback listener down with it, so the LAN listener
+        # binds on its own thread and retries until the address is back (6b485, per Patrick).
+        threading.Thread(target=lan_listener, args=(cfg, gw, servers, stop), daemon=True).start()
     log("started", port=cfg["gateway_port"], lan=bool(cfg.get("lan_mode")),
         crypto=o1crypto.BACKEND, access=gw.access.configured)
     return gw, servers, stop

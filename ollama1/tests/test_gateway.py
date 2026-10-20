@@ -1515,3 +1515,48 @@ class TestStatsFile(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLanListenerWaits(unittest.TestCase):
+    """6b485: the wired address missing (cable out, server on Wi-Fi) must not stop the gateway."""
+    def test_it_retries_until_the_address_binds(self):
+        gwmod = load_gateway()
+        tries = []
+
+        class Fake:
+            def __init__(self, addr, handler):
+                tries.append(addr)
+                if len(tries) < 3:
+                    raise OSError(99, "Cannot assign requested address")
+                self.served = False
+
+            def serve_forever(self):
+                self.served = True
+
+        stop = threading.Event()
+        servers = []
+        gwmod.make_handler = lambda gw, lan=False: None          # the handler isn't what's tested here
+        srv = gwmod.lan_listener({"lan_bind": "192.0.2.10", "gateway_port": 8431}, object(), servers, stop,
+                                 retry_s=0, server_cls=Fake)
+        self.assertEqual(len(tries), 3)
+        self.assertTrue(srv.served)
+        self.assertEqual(servers, [srv])
+
+    def test_a_stop_while_waiting_ends_it(self):
+        gwmod = load_gateway()
+
+        class Never:
+            def __init__(self, *a):
+                raise OSError(99, "Cannot assign requested address")
+
+        gwmod.make_handler = lambda gw, lan=False: None
+        stop = threading.Event()
+        stop.set()
+        self.assertIsNone(gwmod.lan_listener({"lan_bind": "192.0.2.10", "gateway_port": 8431}, object(), [], stop,
+                                             retry_s=0, server_cls=Never))
+
+    def test_serve_does_not_bind_the_lan_address_itself(self):
+        src = open(os.path.join(os.path.dirname(__file__), "..", "bin", "ollama1-gateway")).read()
+        body = src[src.index("def serve(cfg, stop=None):"):src.index("def main():")]
+        self.assertNotIn('ThreadingHTTPServer((cfg["lan_bind"]', body)
+        self.assertIn("target=lan_listener", body)

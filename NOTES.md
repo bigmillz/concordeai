@@ -15866,3 +15866,11 @@ processor: stress-ng exited with status 1 (a check failed)".
   recompiles its shaders for ~20 s each run), and fails the phase itself when the card's busy average, counted
   from the first busy reading, is under 30 % or the card never got busy. Verified on the server: a run with the
   cache warm passed with the card at 40 C at the end (it had sat at 31 C through every earlier "pass").
+
+## 6b485 — The gateway starts without its wired address (per Patrick)
+
+- With the ethernet cable out (the server on Wi-Fi only), ollama1-gateway crashed at start: LAN mode binds the
+  wired address (`lan_bind`, br0), which doesn't exist without a link, and the OSError took the loopback listener,
+  and so the Cloudflare tunnel, down with it. The LAN listener now binds on its own thread, logs
+  `lan_listener_waiting` once, retries every 15 s and serves as soon as the address comes back; the loopback
+  listener starts first and never depends on it. Verified on the server on Wi-Fi: gateway active, tunnel answers.
