@@ -1,5 +1,5 @@
 """System figures for the console dashboard, ollama1-top and the admin
-panel: the GPU (amdgpu sysfs/hwmon), CPU, memory, disks, a RAID if there is one,
+panel: the GPU (amdgpu sysfs/hwmon, or nvidia-smi), CPU, memory, disks, a RAID if there is one,
 the tunnel, updates. Read-only, stdlib only. Plus the gateway's counts-only
 snapshot. Nothing here ever sees a prompt or an answer.
 """
@@ -62,10 +62,50 @@ def gpu_vram_total():
     return v
 
 
+NV_QUERY = ("utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,"
+            "fan.speed,clocks.sm,clocks.mem")
+
+
+def _nv_num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None                       # "[N/A]", "[Not Supported]"
+
+
+def gpu_nvidia(run=subprocess.run):
+    """The same figures as gpu() for an NVIDIA card, from one nvidia-smi call (6b483, per Patrick: the
+    dashboard showed "No graphics card found" with an RTX 5070 Ti fitted). None when there is no
+    nvidia-smi or no card. NVIDIA reports one temperature (the chip's), kept as "edge"; its fan
+    speed is a percent, not rpm (a stopped fan at idle is 0 %, normal on current cards)."""
+    try:
+        r = run(["nvidia-smi", "--query-gpu=" + NV_QUERY, "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0 or not (r.stdout or "").strip():
+        return None
+    parts = [x.strip() for x in r.stdout.strip().splitlines()[0].split(",")]
+    if len(parts) != 9:
+        return None
+    busy, used, total, temp, pw, cap, fan, sclk, mclk = [_nv_num(x) for x in parts]
+    mib = lambda v: int(v) << 20 if v is not None else None
+    return {
+        "busy_pct": int(busy) if busy is not None else None,
+        "vram_used": mib(used), "vram_total": mib(total),
+        "temps": {"edge": temp} if temp is not None else {},
+        "power_w": round(pw, 1) if pw is not None else None,
+        "power_cap_w": round(cap) if cap else None,
+        "fan_rpm": None, "fan_pct": int(fan) if fan is not None else None,
+        "sclk_mhz": int(sclk) if sclk else None, "mclk_mhz": int(mclk) if mclk else None,
+        "vendor": "nvidia",
+    }
+
+
 def gpu():
     dev = gpu_card()
     if not dev:
-        return None
+        return gpu_nvidia()
     out = {
         "busy_pct": _int(dev + "/gpu_busy_percent"),
         "vram_used": _int(dev + "/mem_info_vram_used"),

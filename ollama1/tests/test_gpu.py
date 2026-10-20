@@ -153,6 +153,42 @@ class TestGpuUsage(GpuFixture):
                                                  "vram_total_bytes": 24564 << 20})
 
 
+class TestStatsNvidia(GpuFixture):
+    """o1stats.gpu() with no amdgpu card falls back to nvidia-smi (6b483)."""
+    def test_dashboard_figures_from_nvidia_smi(self):
+        import o1stats
+        self.nvidia_smi("37, 12686, 16303, 61, 212.40, 300.00, 45, 2610, 14001")
+        g = o1stats.gpu()
+        self.assertEqual(g["busy_pct"], 37)
+        self.assertEqual(g["vram_used"], 12686 << 20)
+        self.assertEqual(g["vram_total"], 16303 << 20)
+        self.assertEqual(g["temps"], {"edge": 61.0})
+        self.assertEqual((g["power_w"], g["power_cap_w"], g["fan_pct"], g["fan_rpm"]), (212.4, 300, 45, None))
+        self.assertEqual((g["sclk_mhz"], g["mclk_mhz"], g["vendor"]), (2610, 14001, "nvidia"))
+
+    def test_not_supported_fields_are_none_not_an_error(self):
+        import o1stats
+        self.nvidia_smi("0, 512, 16303, 30, [N/A], [N/A], [N/A], 210, 405")
+        g = o1stats.gpu()
+        self.assertEqual((g["power_w"], g["power_cap_w"], g["fan_pct"]), (None, None, None))
+        self.assertEqual(g["busy_pct"], 0)
+
+    def test_no_card_and_no_nvidia_smi_is_none(self):
+        import o1stats
+        self.assertIsNone(o1stats.gpu())
+
+    def test_an_amd_card_still_wins(self):
+        import o1stats
+        self.card(0, {"vendor": "0x1002", "mem_info_vram_total": "17163091968", "mem_info_vram_used": "1",
+                      "gpu_busy_percent": "5"})
+        self.nvidia_smi("99, 1, 16303, 61, 1, 1, 1, 1, 1")
+        old, o1stats.SYS = o1stats.SYS, self.sys            # SYS is read once, at import
+        try:
+            self.assertEqual(o1stats.gpu()["busy_pct"], 5)
+        finally:
+            o1stats.SYS = old
+
+
 class TestRamUsage(unittest.TestCase):
     """o1stats.ram_usage(): the server's memory in use, for GET /v1/usage."""
     def test_in_use_is_total_minus_available_not_free(self):

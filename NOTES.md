@@ -15835,3 +15835,17 @@ processor: stress-ng exited with status 1 (a check failed)".
   Event By = BIOS, PCI-E wake on, ErP Ready off, as for sleep). Unverified on the real server: a poweroff, then a wake.
 - Tests: admin action needs its confirm and starts only its unit; the page carries the button and the dialog; polkit
   check; one mutation (shutdown without confirmation).
+
+## 6b483 — The dashboard reads an NVIDIA card (per Patrick)
+
+- After the move the RX 6900 XT was found damaged and replaced with an RTX 5070 Ti. The console dashboard and
+  panel said "No graphics card found" because `o1stats.gpu()` only read amdgpu sysfs. It now falls back to one
+  `nvidia-smi` call per reading: busy, memory used/total, the chip temperature (kept as "edge"; NVIDIA has no
+  junction or memory sensor on consumer cards), power and power limit, fan percent (no rpm; 0 % at idle is the
+  card's own fan stop) and core/memory clocks. An amdgpu card still wins when both are present.
+- Server side (by hand, 2026-10-19): Ubuntu's Canonical-signed `linux-modules-nvidia-615-open-generic` (Secure Boot is
+  on, so the DKMS build would not load), `nvidia-driver-615-open`, and `nvidia-uvm` loaded at boot
+  (/etc/modules-load.d/ollama1-nvidia-uvm.conf) because ollama.service has ProtectKernelModules. Ollama found the card
+  (CUDA, compute 12.0); gpt-oss:20b ran fully on it at 171 tokens/s.
+- Still AMD-only: the fan curve's GPU fan control, the lights' load colour, gpu-tune. Unverified: the panel's look with
+  these figures on the real screen.
