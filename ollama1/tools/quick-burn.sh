@@ -104,7 +104,7 @@ trap 'stop_load; finish aborted "stopped by the system"; exit 1' TERM INT
 
 run_phase() { # run_phase NAME COMMAND...  -> VERDICT (OK|FAIL|ABORTED), WHY
   local name=$1; shift
-  PHASE=$name; V=OK; W=""
+  PHASE=$name; V=OK; W=""; GB_SUM=0; GB_N=0; GB_SEEN=0
   local errs0 errs1 c g busy cb t0 t1 b0 b1 end now
   errs0=$(hw_errors)
   read -r b0 t0 < <(cpu_stat)
@@ -114,7 +114,13 @@ run_phase() { # run_phase NAME COMMAND...  -> VERDICT (OK|FAIL|ABORTED), WHY
   while :; do
     now=$(date +%s); LEFT=$(( end - now )); [ "$LEFT" -ge 0 ] || LEFT=0
     read -r b1 t1 < <(cpu_stat); cb=0; [ "$t1" -gt "$t0" ] && cb=$(( 100 * (b1 - b0) / (t1 - t0) )); b0=$b1; t0=$t1
-    write_progress "$cb" "$(gpu_busy)"
+    gb=$(gpu_busy); write_progress "$cb" "$gb"
+    # the card's busy percent counts from the first busy reading: loading the model and (NVIDIA) compiling
+    # shaders take seconds before the load starts (6b484)
+    if [ "$name" = gpu ] && [ -n "$gb" ]; then
+      [ "$GB_N" -gt 0 ] || [ "$gb" -ge 50 ] && { GB_SUM=$((GB_SUM + gb)); GB_N=$((GB_N + 1)); }
+      GB_SEEN=$((GB_SEEN + 1))
+    fi
     if [ -e "$ABORT" ]; then V=ABORTED; W="stopped from the keyboard"; break; fi
     c=$(cpu_temp); g=$(gpu_temp)
     if [ -n "$c" ] && [ "$c" -ge "$CPU_ABORT_C" ]; then V=ABORTED; W="the processor reached $c C"; break; fi
@@ -167,12 +173,18 @@ fi
 
 # 2. the graphics card (its own script: it knows where llama-bench and the model are)
 : > "$OUT"
-run_phase gpu env O1_BURN_SECONDS="$SECS" O1_BURN_TICK="${O1_BURN_TICK:-2}" O1_BURN_NOROOT=1 bash "$GPU_BURN" 1 "${O1_QB_MODEL:-gemma4:12b}"
+mkdir -p "$STATE_DIR/gpu-cache" 2>/dev/null
+run_phase gpu env XDG_CACHE_HOME="$STATE_DIR/gpu-cache" __GL_SHADER_DISK_CACHE_PATH="$STATE_DIR/gpu-cache" O1_GPU_BURN_LOG="${O1_QB_GPU_LOG:-/run/ollama1/quickburn/gpu-burn.log}" O1_BURN_SECONDS="$SECS" O1_BURN_TICK="${O1_BURN_TICK:-2}" O1_BURN_NOROOT=1 bash "$GPU_BURN" 1 "${O1_QB_MODEL:-gemma4:12b}"
 if ! grep -q 'ollama1 gpu burn' "$OUT" 2>/dev/null && [ "$V" = OK ]; then          # it stopped before the load began
   why=$(grep -v '^[[:space:]]*$' "$OUT" 2>/dev/null | head -1 | cut -c1-150)
   rm -f "$OUT"
   finish passed "processor passed; graphics card not run: ${why:-it did not start}" "$CPU_RES" "not run: ${why:-it did not start}"
   exit 0
+fi
+if [ "$V" = OK ] && [ "$GB_SEEN" -ge 3 ] && { [ "$GB_N" -eq 0 ] || [ $((GB_SUM / GB_N)) -lt 30 ]; }; then   # the load never reached the card (6b484)
+  if [ "$GB_N" -eq 0 ]; then W="the card never got busy: the load did not run"; else W="the card was only $((GB_SUM / GB_N))% busy once loaded"; fi
+  V=FAIL
+  grep -v '^[[:space:]]*$' "${O1_QB_GPU_LOG:-/run/ollama1/quickburn/gpu-burn.log}.err" 2>/dev/null | grep -vE 'load_backend|ggml_vulkan' | tail -3 >> "$OUT"
 fi
 if [ "$V" = OK ] && [ "$RC" -ne 0 ] && [ "$RC" -ne 143 ]; then
   V=FAIL; W=$(grep -E '^(FAIL|ABORTED)' "$OUT" | tail -1 | cut -c1-150); W=${W:-the card test failed}

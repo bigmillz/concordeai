@@ -15858,3 +15858,11 @@ processor: stress-ng exited with status 1 (a check failed)".
   (busy, chip temperature, watts), stop at 90 C on an NVIDIA card (105 C junction stays for AMD), and count
   "NVRM: Xid" kernel records as hardware errors. llama-bench's Vulkan build already ran on the NVIDIA card.
 - Tests: busy/temperature/watts read from a fake nvidia-smi, the 90 C stop, an idle NVIDIA card still fails.
+- Found on the way, older than the new card: under ollama1-quickburn.service the card phase NEVER loaded the card.
+  gpu-burn.sh logs to /var/log, read-only under the unit's ProtectSystem=strict; a failed `2>>` redirection means
+  bash skips the command, so llama-bench never ran, and the 30 s phase is shorter than gpu-burn's 90 s warm-up
+  before its "card isn't busy" check, so it said passed. quick-burn.sh now gives it a log under
+  /run/ollama1/quickburn, a writable shader cache (/var/lib/ollama1/gpu-cache: the NVIDIA driver otherwise
+  recompiles its shaders for ~20 s each run), and fails the phase itself when the card's busy average, counted
+  from the first busy reading, is under 30 % or the card never got busy. Verified on the server: a run with the
+  cache warm passed with the card at 40 C at the end (it had sat at 31 C through every earlier "pass").
