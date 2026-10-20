@@ -427,6 +427,13 @@ class Gateway:
         if not (self.gpu_info or {}).get("vendor") and time.monotonic() - self.gpu_at >= GPU_RECHECK_S:
             self.gpu_at = time.monotonic()
             self.gpu_info = o1gpu.detect()
+            if self.gpu_info and not self.gpu_info.get("vram_bytes"):
+                try:                                     # an NVIDIA card seen from the sandbox (6b486)
+                    v = int(self.cfg.get("vram_total_bytes") or 0)
+                except (TypeError, ValueError):
+                    v = 0
+                if v > 0:
+                    self.gpu_info = dict(self.gpu_info, vram_bytes=v)
         return self.gpu_info
     def sleep_view(self):
         """The auto-sleep settings and what the server can do about them:

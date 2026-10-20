@@ -149,6 +149,13 @@ def detect():
     nv = _nvidia()
     if nv:
         return nv
+    if "nvidia" in seen:
+        # nvidia-smi needs /dev/nvidia*, which a PrivateDevices=yes unit (the gateway) doesn't have; sysfs still
+        # names the card. Its memory comes from config.json's vram_total_bytes, which setup.sh records (6b486)
+        d = seen["nvidia"]
+        name = pci_name("0x10de", _read(d + "/device") or "", _read(d + "/subsystem_vendor"),
+                        _read(d + "/subsystem_device"))
+        return {"vendor": "nvidia", "name": tidy(name) if name else None, "vram_bytes": None}
     if "intel" in seen:
         return _intel(seen["intel"])
     if "amd" in seen:

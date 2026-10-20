@@ -15874,3 +15874,12 @@ processor: stress-ng exited with status 1 (a check failed)".
   and so the Cloudflare tunnel, down with it. The LAN listener now binds on its own thread, logs
   `lan_listener_waiting` once, retries every 15 s and serves as soon as the address comes back; the loopback
   listener starts first and never depends on it. Verified on the server on Wi-Fi: gateway active, tunnel answers.
+
+## 6b486 — The gateway knows an NVIDIA card's memory (per Patrick)
+
+- The app's model sets said "Ollama1 didn't say how much graphics memory it has". The gateway runs with
+  PrivateDevices=yes, so nvidia-smi (which needs /dev/nvidia*) fails inside it, and o1gpu.detect() found no card
+  (AMD worked because amdgpu reports through sysfs). Rather than open the sandbox: setup.sh records the card's
+  memory as `vram_total_bytes` in config.json when nvidia-smi answers (and clears it when the NVIDIA driver is gone),
+  o1gpu.detect() names an NVIDIA card from sysfs/pci.ids when nvidia-smi can't run, and the gateway fills the
+  card's memory from config.json. Done by hand on the server too (17094934528 bytes recorded).

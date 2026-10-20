@@ -758,6 +758,19 @@ if zone:
     cfg.setdefault("hostname_admin", admin)
 if owner:
     cfg["owner_label"] = owner
+# an NVIDIA card: the gateway can't run nvidia-smi from its sandbox, so its memory is recorded here (6b486);
+# an AMD card is read from sysfs, so 0 ("read it yourself") stays
+import subprocess
+try:
+    r = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                       capture_output=True, text=True, timeout=15)
+    mib = int(float(r.stdout.split()[0])) if r.returncode == 0 and r.stdout.strip() else 0
+except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+    mib = 0
+if mib > 0:
+    cfg["vram_total_bytes"] = mib << 20
+elif cfg.get("vram_total_bytes") and not os.path.exists("/proc/driver/nvidia"):
+    cfg["vram_total_bytes"] = 0                        # the NVIDIA card is gone: back to sysfs
 tmp = path + ".tmp"
 fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, "w") as f:

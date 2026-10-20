@@ -223,3 +223,12 @@ class TestRamUsage(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNvidiaFromSandbox(GpuFixture):
+    """6b486: no nvidia-smi (the gateway's PrivateDevices sandbox), an NVIDIA card in sysfs."""
+    def test_vendor_and_name_without_memory(self):
+        self.card(0, {"vendor": "0x10de", "device": "0x2c05", "subsystem_vendor": "0x1458", "subsystem_device": "0x4181"})
+        g = o1gpu.detect()
+        self.assertEqual(g["vendor"], "nvidia")
+        self.assertIsNone(g["vram_bytes"])
