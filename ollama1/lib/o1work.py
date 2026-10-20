@@ -48,6 +48,7 @@ Deep idle (6b434, per the owner: no more dimming; the lights stay at 100% bright
   (the over-limit "hot" one, the 60 C CPU trigger, the card trigger) raises the fans at once.
   The lights follow: the fans back at 20% take them from blue to white (WAKE_FADE_S).
 """
+import os
 import time
 
 import o1gpu
@@ -94,7 +95,12 @@ class Gpu:
         if not self.vendor and time.monotonic() - self.at > 60:
             self.at = time.monotonic()
             self.vendor = o1gpu.detect().get("vendor")
-        return o1gpu.usage(self.vendor)["busy_pct"] if self.vendor else None
+        if not self.vendor:
+            return None
+        u = o1gpu.usage(self.vendor)
+        if self.vendor == "nvidia" and u.get("busy_pct") is not None and os.geteuid() == 0:
+            o1gpu.publish(u)                 # for the gateway's sandbox (6b488)
+        return u["busy_pct"]
 
 
 def probes():

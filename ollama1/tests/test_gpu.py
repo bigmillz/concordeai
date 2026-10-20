@@ -1,6 +1,7 @@
 """GET /v1/info's GPU detection, from fixture sysfs trees, a fake
 nvidia-smi and a small pci.ids."""
 import os
+import time
 import shutil
 import stat
 import tempfile
@@ -232,3 +233,22 @@ class TestNvidiaFromSandbox(GpuFixture):
         g = o1gpu.detect()
         self.assertEqual(g["vendor"], "nvidia")
         self.assertIsNone(g["vram_bytes"])
+
+
+class TestSharedReading(GpuFixture):
+    """6b488: the fan service leaves its NVIDIA reading for the gateway, which can't run nvidia-smi."""
+    def test_usage_falls_back_to_a_fresh_shared_reading(self):
+        path = os.path.join(self.dir, "gpu-usage.json")
+        old = o1gpu.SHARED
+        o1gpu.SHARED = path
+        try:
+            o1gpu.publish({"busy_pct": 88, "vram_used_bytes": 5 << 30, "vram_total_bytes": 16 << 30})
+            self.assertEqual(o1gpu.usage("nvidia"), {"busy_pct": 88, "vram_used_bytes": 5 << 30,
+                                                     "vram_total_bytes": 16 << 30})
+            self.assertIsNone(o1gpu.shared(path, now=time.time() + 60))         # stale: not believed
+        finally:
+            o1gpu.SHARED = old
+
+    def test_nvidia_smi_still_wins(self):
+        self.nvidia_smi("61, 8123, 24564")
+        self.assertEqual(o1gpu.usage("nvidia")["busy_pct"], 61)

@@ -15896,3 +15896,12 @@ processor: stress-ng exited with status 1 (a check failed)".
   Wi-Fi card behind the Xfinity gateway never sees them; a magic packet unicast to its address does, given a
   permanent neighbour entry (a sleeping card answers no ARP). relay.json gained "unicast" {MAC: IP}; neigh.py sets
   the entries as root before the relay starts (drop-in ExecStartPre=+). Relay also moved to 10.0.0.15 / 10.0.0.255.
+
+## 6b488 — The app's GPU meter reads an NVIDIA card (per Patrick)
+
+- The app's meter came from the gateway's /v1/usage, which calls o1gpu.usage(); for NVIDIA that is nvidia-smi, and the
+  gateway's PrivateDevices=yes sandbox has no /dev/nvidia*. The fan and lights services (root, unsandboxed) already
+  read the NVIDIA card through the same o1gpu.usage() every second, so the shared probe (o1work.Gpu.busy) now also
+  leaves that reading in /run/ollama1/gpu-usage.json (0644, atomic, root only), and o1gpu.usage("nvidia") falls back to
+  it when nvidia-smi can't run and the reading is under 15 s old. Verified on the server: the gateway's user reads
+  busy, VRAM used and total.

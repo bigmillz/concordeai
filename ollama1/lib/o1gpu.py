@@ -7,8 +7,10 @@ Sources, in order: amdgpu sysfs (VRAM) with the PCI ids for the name,
 nvidia-smi, Intel i915/xe sysfs. Detected once, when the gateway starts.
 """
 import glob
+import json
 import os
 import re
+import time
 import subprocess
 
 VENDORS = {"0x1002": "amd", "0x10de": "nvidia", "0x8086": "intel"}
@@ -180,6 +182,36 @@ def _bytes(v):
     return v if 0 <= v < 1 << 50 else None
 
 
+SHARED = os.environ.get("OLLAMA1_GPU_SHARED", "/run/ollama1/gpu-usage.json")
+SHARED_FRESH_S = 15
+
+
+def publish(u, path=None):
+    """Leave an NVIDIA reading where a sandboxed reader can find it (6b488): the gateway runs with PrivateDevices=yes,
+    so it can't run nvidia-smi; the fan service (root, every second) reads the card anyway. Never raises."""
+    path = path or SHARED
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(dict(u, at=time.time()), f)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, path)
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def shared(path=None, now=None):
+    """The fan service's last NVIDIA reading if it is under SHARED_FRESH_S old, else None."""
+    try:
+        with open(path or SHARED) as f:
+            d = json.load(f)
+        if not isinstance(d, dict) or (now or time.time()) - float(d.get("at") or 0) > SHARED_FRESH_S:
+            return None
+        return {k: d.get(k) for k in ("busy_pct", "vram_used_bytes", "vram_total_bytes")}
+    except (OSError, ValueError, TypeError):
+        return None
+
+
 def usage(vendor):
     """How busy the card is right now, for the app's meter. Exactly three
     numbers, each None when it can't be read (a card with no such file, an
@@ -215,4 +247,6 @@ def usage(vendor):
                             pass
     except (OSError, subprocess.SubprocessError):
         pass
+    if vendor == "nvidia" and out["busy_pct"] is None:      # no nvidia-smi here (a sandbox): the fan service's reading
+        out = shared() or out
     return out
