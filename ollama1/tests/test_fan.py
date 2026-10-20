@@ -1684,3 +1684,21 @@ class TestWiring(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDroppedDrive(unittest.TestCase):
+    """6b487: an NVMe drive whose controller isn't "live" is never asked for its temperature."""
+    def test_a_dead_drive_is_skipped_and_a_live_one_read(self):
+        import tempfile, shutil
+        import o1fan
+        root = tempfile.mkdtemp(); self.addCleanup(shutil.rmtree, root, True)
+        for n, state, c in (("hwmon1", "dead", 99000), ("hwmon2", "live", 41000)):
+            d = os.path.join(root, "class/hwmon", n)
+            os.makedirs(os.path.join(d, "device"))
+            open(os.path.join(d, "name"), "w").write("nvme\n")
+            open(os.path.join(d, "device", "state"), "w").write(state + "\n")
+            open(os.path.join(d, "temp1_input"), "w").write("%d\n" % c)
+            open(os.path.join(d, "temp1_label"), "w").write("Composite\n")
+        keys = {k: c for k, _l, c, _lim in o1fan.read_temps(root)}
+        self.assertNotIn("nvme:hwmon1", keys)
+        self.assertEqual(keys.get("nvme:hwmon2"), 41.0)

@@ -280,6 +280,14 @@ def _chip_temps(hw):
     return out
 
 
+def _nvme_live(hw):
+    """An NVMe drive's controller state is "live". A drive that dropped off (seen after a wake: "controller is down",
+    then "dead") hangs every temperature read in an admin command the kernel only gives up on after a minute,
+    and a read stuck in the kernel blocked the next suspend: "1 tasks refusing to freeze" (6b487)."""
+    st = (o1cpu.read_text(hw + "/device/state") or "").strip()
+    return st in ("", "live")          # "": no state file (an older kernel or a test tree) - read as before
+
+
 def read_temps(sysroot=None):
     """[(key, label, celsius or None, limit)]: every sensor that can force the fans to 100%:
     the CPU, the graphics card's junction, memory and edge, each NVMe drive, the DIMMs (jc42) and every
@@ -296,6 +304,8 @@ def read_temps(sysroot=None):
         name = (o1cpu.read_text(hw + "/name") or "").strip()
         if not (name in CPU_CHIPS or name in ("amdgpu", "nvme", "jc42") or SUPER_IO_RX.match(name)):
             continue
+        if name == "nvme" and not _nvme_live(hw):
+            continue                   # a drive that dropped off is not a hot drive, and must not be asked (6b487)
         sensors = _chip_temps(hw)
         by_label = {}
         for _n, label, c in sensors:

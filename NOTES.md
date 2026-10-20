@@ -15883,3 +15883,16 @@ processor: stress-ng exited with status 1 (a check failed)".
   memory as `vram_total_bytes` in config.json when nvidia-smi answers (and clears it when the NVIDIA driver is gone),
   o1gpu.detect() names an NVIDIA card from sysfs/pci.ids when nvidia-smi can't run, and the gateway fills the
   card's memory from config.json. Done by hand on the server too (17094934528 bytes recorded).
+
+## 6b487 — A dropped NVMe drive can't block sleep (per Patrick)
+
+- After a wake, the spare 980 PRO in the CPU-attached M.2 slot (0000:01:00.0; unused: an old Ubuntu copy from the
+  migration) sometimes drops off: "controller is down; will reset", then "Disabling device after reset failure",
+  state dead. ollama1-fan was mid-read of its hwmon temperature (an NVMe admin command), sat in D state, and the
+  next suspend failed: "Freezing user space processes failed: 1 tasks refusing to freeze ... ollama1-fan".
+  read_temps() now skips an nvme hwmon whose controller state isn't "live". (A 30 s cache on drive temperatures
+  was tried and dropped: it delayed the hot-drive override the fan tests pin.)
+- Found on the way, outside the repo, on the Pi (2026-10-20): the wake relay sent broadcasts only, and a sleeping
+  Wi-Fi card behind the Xfinity gateway never sees them; a magic packet unicast to its address does, given a
+  permanent neighbour entry (a sleeping card answers no ARP). relay.json gained "unicast" {MAC: IP}; neigh.py sets
+  the entries as root before the relay starts (drop-in ExecStartPre=+). Relay also moved to 10.0.0.15 / 10.0.0.255.
