@@ -10,7 +10,7 @@
 #      "not run: <reason>" and the processor's result stands.
 #
 # Safety, as in the stability scripts: it stops on a new hardware-error record in the kernel log,
-# at CPU 95 C or graphics junction 105 C, and at once when /run/ollama1/quickburn/abort exists
+# at CPU 95 C, graphics junction 105 C (AMD) or chip 90 C (NVIDIA), and at once when /run/ollama1/quickburn/abort exists
 # (the panel makes it on Esc; only its existence is looked at). It refuses to start while a
 # request is in flight, a model download or update runs, or another stability or burn test runs,
 # and says why. stress-ng must be installed (the unit has no network): sudo apt install stress-ng.
@@ -34,6 +34,8 @@ LAST=$STATE_DIR/quickburn-last.json
 GPU_BURN=${O1_GPU_BURN:-$HERE/gpu-burn.sh}
 CPU_ABORT_C=95
 GPU_ABORT_C=105
+NV_ABORT_C=90           # an NVIDIA card: its one chip temperature (6b484)
+NVSMI=${O1_NVIDIA_SMI:-nvidia-smi}
 
 [ "$(id -u)" -eq 0 ] || [ "${O1_QB_NOROOT:-}" = 1 ] || { echo "Run it with sudo."; exit 1; }
 mkdir -p "$RUN" "$STATE_DIR" 2>/dev/null
@@ -43,10 +45,12 @@ num() { [ -n "${1:-}" ] && printf '%s' "$1" || printf 'null'; }
 hwtemp() { local d f; for d in "$HWMON"/hwmon*; do [ "$(cat "$d/name" 2>/dev/null)" = "$1" ] || continue
   f=$d/$2; [ -r "$f" ] && { echo $(( $(cat "$f") / 1000 )); return; }; done; }
 cpu_temp() { hwtemp k10temp temp1_input; }
-gpu_temp() { local t; t=$(hwtemp amdgpu temp2_input); [ -n "$t" ] || t=$(hwtemp amdgpu temp1_input); printf '%s' "$t"; }
-gpu_busy() { local f; for f in "$DRM"/card*/device/gpu_busy_percent; do [ -r "$f" ] && { cat "$f"; return; }; done; }
+nv() { "$NVSMI" --query-gpu="$1" --format=csv,noheader,nounits 2>/dev/null | head -1 | awk -F. '/^ *[0-9]/{gsub(/ /,"",$1); print $1}'; }
+gpu_temp() { local t; t=$(hwtemp amdgpu temp2_input); [ -n "$t" ] || t=$(hwtemp amdgpu temp1_input); [ -n "$t" ] || t=$(nv temperature.gpu); printf '%s' "$t"; }
+gpu_limit() { if [ -n "$(hwtemp amdgpu temp1_input)" ]; then echo "$GPU_ABORT_C"; else echo "$NV_ABORT_C"; fi; }
+gpu_busy() { local f; for f in "$DRM"/card*/device/gpu_busy_percent; do [ -r "$f" ] && { cat "$f"; return; }; done; nv utilization.gpu; }
 cpu_stat() { awk '/^cpu /{print $2+$3+$4+$7+$8, $2+$3+$4+$5+$6+$7+$8}' "${O1_PROC_STAT:-/proc/stat}"; }
-hw_errors() { journalctl -k -b 0 --no-pager -q 2>/dev/null | grep -ciE 'mce: \[Hardware Error\]|amdgpu.*(ring.*timeout|gpu reset)|AER:' || true; }
+hw_errors() { journalctl -k -b 0 --no-pager -q 2>/dev/null | grep -ciE 'mce: \[Hardware Error\]|amdgpu.*(ring.*timeout|gpu reset)|NVRM: Xid|AER:' || true; }
 
 PHASE=""; LEFT=0; RESULT=running; REASON=""
 write_progress() { # the progress file, replaced whole
@@ -114,7 +118,7 @@ run_phase() { # run_phase NAME COMMAND...  -> VERDICT (OK|FAIL|ABORTED), WHY
     if [ -e "$ABORT" ]; then V=ABORTED; W="stopped from the keyboard"; break; fi
     c=$(cpu_temp); g=$(gpu_temp)
     if [ -n "$c" ] && [ "$c" -ge "$CPU_ABORT_C" ]; then V=ABORTED; W="the processor reached $c C"; break; fi
-    if [ -n "$g" ] && [ "$g" -ge "$GPU_ABORT_C" ]; then V=ABORTED; W="the graphics card reached $g C"; break; fi
+    if [ -n "$g" ] && [ "$g" -ge "$(gpu_limit)" ]; then V=ABORTED; W="the graphics card reached $g C"; break; fi
     errs1=$(hw_errors)
     if [ "${errs1:-0}" -gt "${errs0:-0}" ]; then V=FAIL; W="$((errs1 - errs0)) new hardware-error record(s) in the kernel log"; break; fi
     kill -0 "$LOAD_PID" 2>/dev/null || break

@@ -15849,3 +15849,12 @@ processor: stress-ng exited with status 1 (a check failed)".
   (CUDA, compute 12.0); gpt-oss:20b ran fully on it at 171 tokens/s.
 - Still AMD-only: the fan curve's GPU fan control, the lights' load colour, gpu-tune. Unverified: the panel's look with
   these figures on the real screen.
+
+## 6b484 — The burn tests read and protect an NVIDIA card (per Patrick)
+
+- With the RTX 5070 Ti fitted, the quick burn's card phase loaded the card (95–99 % busy, ~260 W, measured with
+  nvidia-smi every 2 s) but its own lines said "card busy 0%", the burn screen showed nothing, and its heat stop
+  could not see the card: gpu-burn.sh and quick-burn.sh read only amdgpu files. Both now fall back to nvidia-smi
+  (busy, chip temperature, watts), stop at 90 C on an NVIDIA card (105 C junction stays for AMD), and count
+  "NVRM: Xid" kernel records as hardware errors. llama-bench's Vulkan build already ran on the NVIDIA card.
+- Tests: busy/temperature/watts read from a fake nvidia-smi, the 90 C stop, an idle NVIDIA card still fails.

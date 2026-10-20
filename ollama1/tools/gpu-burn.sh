@@ -21,6 +21,8 @@ HWMON=${O1_HWMON:-/sys/class/hwmon}
 MODELS=${O1_MODELS:-/srv/models}
 TICK=${O1_BURN_TICK:-5}
 ABORT_JUNCTION_C=105
+ABORT_NV_C=90           # NVIDIA reports one chip temperature; current cards slow themselves near 90 C (6b484)
+NVSMI=${O1_NVIDIA_SMI:-nvidia-smi}
 [[ "$MIN" =~ ^[0-9]{1,3}$ ]] && [ "$MIN" -ge 1 ] || { echo "minutes: a whole number, like 15"; exit 2; }
 [[ "$MODEL" =~ ^[A-Za-z0-9._:/-]{1,80}$ ]] || { echo "model: a name like gemma4:12b"; exit 2; }
 [ "$(id -u)" -eq 0 ] || [ "${O1_BURN_NOROOT:-}" = 1 ] || { echo "Run it with sudo."; exit 1; }
@@ -43,11 +45,13 @@ BLOB="$MODELS/blobs/$digest"
 
 hwtemp() { local d f; for d in "$HWMON"/hwmon*; do [ "$(cat "$d/name" 2>/dev/null)" = "$1" ] || continue
   f=$d/$2; [ -r "$f" ] && { echo $(( $(cat "$f") / 1000 )); return; }; done; }
-gpu_busy() { local f; for f in "$DRM"/card*/device/gpu_busy_percent; do [ -r "$f" ] && { cat "$f"; return; }; done; }
+# an NVIDIA card has no amdgpu files: one nvidia-smi field, a whole number, or nothing (6b484)
+nv() { "$NVSMI" --query-gpu="$1" --format=csv,noheader,nounits 2>/dev/null | head -1 | awk -F. '/^ *[0-9]/{gsub(/ /,"",$1); print $1}'; }
+gpu_busy() { local f; for f in "$DRM"/card*/device/gpu_busy_percent; do [ -r "$f" ] && { cat "$f"; return; }; done; nv utilization.gpu; }
 gpu_watts() { local d f; for d in "$HWMON"/hwmon*; do [ "$(cat "$d/name" 2>/dev/null)" = amdgpu ] || continue
-  for f in power1_average power1_input; do [ -r "$d/$f" ] && { echo $(( $(cat "$d/$f") / 1000000 )); return; }; done; done; }
+  for f in power1_average power1_input; do [ -r "$d/$f" ] && { echo $(( $(cat "$d/$f") / 1000000 )); return; }; done; done; nv power.draw; }
 cpu_stat() { awk '/^cpu /{print $2+$3+$4+$7+$8, $2+$3+$4+$5+$6+$7+$8}' "${O1_PROC_STAT:-/proc/stat}"; }
-hw_errors() { journalctl -k -b --no-pager 2>/dev/null | grep -c -i -E 'amdgpu.*(ring.*timeout|gpu reset|hang)|nvme.*(timeout|reset|fail)|Machine check|Hardware Error|AER:' || true; }
+hw_errors() { journalctl -k -b --no-pager 2>/dev/null | grep -c -i -E 'amdgpu.*(ring.*timeout|gpu reset|hang)|NVRM: Xid|nvme.*(timeout|reset|fail)|Machine check|Hardware Error|AER:' || true; }
 
 say ""
 say "ollama1 gpu burn $(date '+%F %T'): $MODEL, $MIN min, one processor thread, $BENCH"
@@ -60,13 +64,16 @@ read -r b0 t0 < <(cpu_stat)
 start=$(date +%s); last=$start; sum=0; cnt=0; verdict=OK; why=""
 while kill -0 "$LOAD" 2>/dev/null; do
   sleep "$TICK"
-  now=$(date +%s); b=$(gpu_busy); b=${b:-0}; j=$(hwtemp amdgpu temp2_input)
+  now=$(date +%s); b=$(gpu_busy); b=${b:-0}; j=$(hwtemp amdgpu temp2_input); n=""
+  [ -n "${j:-}" ] || n=$(nv temperature.gpu)
   sum=$((sum + b)); cnt=$((cnt + 1))
   if [ -n "${j:-}" ] && [ "$j" -ge "$ABORT_JUNCTION_C" ]; then verdict=ABORTED; why="the card reached $j C"; fi
+  if [ -n "${n:-}" ] && [ "$n" -ge "$ABORT_NV_C" ]; then verdict=ABORTED; why="the card reached $n C"; fi
   if [ $((now - last)) -ge "$REPORT" ]; then
     read -r b1 t1 < <(cpu_stat); cpu=0; [ "$t1" -gt "$t0" ] && cpu=$(( 100 * (b1 - b0) / (t1 - t0) )); b0=$b1; t0=$t1
     avg=$((sum / cnt)); sum=0; cnt=0; last=$now
-    say "   $(date +%T)  card busy ${avg}%, edge $(hwtemp amdgpu temp1_input)C junction ${j:-?}C, $(gpu_watts) W, processor busy ${cpu}%"
+    if [ -n "${n:-}" ]; then t="chip ${n}C"; else t="edge $(hwtemp amdgpu temp1_input)C junction ${j:-?}C"; fi
+    say "   $(date +%T)  card busy ${avg}%, $t, $(gpu_watts) W, processor busy ${cpu}%"
     if [ $((now - start)) -ge "$WARM" ] && [ "$avg" -lt 40 ]; then verdict=FAIL; why="the card was only ${avg}% busy (see $LOG.err)"; fi
   fi
   [ "$verdict" = OK ] || { pkill -P "$LOAD" 2>/dev/null; kill "$LOAD" 2>/dev/null; pkill -f "$BENCH" 2>/dev/null; break; }
