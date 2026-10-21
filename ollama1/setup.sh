@@ -812,8 +812,14 @@ if [ "$LANIF" = br0 ]; then
   run ufw route allow in on br0 out on br0 comment 'ollama1: bridged LAN traffic'
 fi
 if python3 -c 'import json,sys; sys.exit(0 if json.load(open("/etc/ollama1/config.json")).get("lan_mode") else 1)'; then
-  # the same rule ollama1-lan adds and removes
-  run ufw allow from "$HOME_LAN" to "$LANIP" port 8431 proto tcp
+  # the same rule ollama1-lan adds and removes. With the cable out (the server on Wi-Fi) the wired port has no
+  # address: use the one config.json keeps for it, so the rule is right when the cable is back (6b491)
+  LAN_RULE_IP=${LANIP:-$(python3 -c 'import json; print(json.load(open("/etc/ollama1/config.json")).get("lan_bind") or "")' 2>/dev/null)}
+  if [ -n "$LAN_RULE_IP" ]; then
+    run ufw allow from "$HOME_LAN" to "$LAN_RULE_IP" port 8431 proto tcp
+  else
+    note "the wired port has no address and none is saved; the app's LAN port rule waits for the next setup with the cable in"
+  fi
 fi
 run ufw --force enable
 for k in net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables; do

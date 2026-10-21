@@ -15920,3 +15920,12 @@ processor: stress-ng exited with status 1 (a check failed)".
   /etc/ollama1/api-keys.json (root:o1gw 0640), compared in constant time, re-read when the file changes.
 - Not done: the RAM-model and spill handling of /api/chat (a model that doesn't fit runs as Ollama decides);
   embeddings and completions routes; the app's own pairing is unchanged.
+
+## 6b491 — Setup finishes with the ethernet cable out (per Patrick)
+
+- Run from the panel's web terminal while the server was on Wi-Fi only, setup died at step 8:
+  `ufw allow from 10.0.0.0/24 to  port 8431` -> "ERROR: Bad destination address", EXIT=1. LAN mode's rule used
+  `$LANIP`, the wired port's live address, which is empty without a link. It now falls back to config.json's
+  `lan_bind` (the address the wired port has when it's up), and only notes and skips when neither exists.
+- Pushed after the setup, root-file and repo tests rather than the full kit suite, so Patrick could finish the
+  install from an airport; the full suite runs after.
