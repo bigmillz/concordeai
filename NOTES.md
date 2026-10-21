@@ -15929,3 +15929,11 @@ processor: stress-ng exited with status 1 (a check failed)".
   `lan_bind` (the address the wired port has when it's up), and only notes and skips when neither exists.
 - Pushed after the setup, root-file and repo tests rather than the full kit suite, so Patrick could finish the
   install from an airport; the full suite runs after.
+
+## 6b492 — Ollama's default context is 32K (per Patrick)
+
+- OMP talks to Ollama1 through the OpenAI-style door (6b490), and that API can't ask for a context size per
+  request, so every OMP turn got the server default, 8K: too small for a coding agent's own instructions plus code.
+  `OLLAMA_CONTEXT_LENGTH` in ollama.service is now 32768. Cost: the KV cache of a loaded model grows (gpt-oss:20b
+  about +0.8 GB to ~15 GB of the 16 GB card; ministral-3:14b about +4 GB); the app's requests that don't set num_ctx
+  get 32K too, and the gateway's existing make-room/unload handles two models that no longer fit together.
