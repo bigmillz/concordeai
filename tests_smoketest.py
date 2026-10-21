@@ -35610,6 +35610,23 @@ check("a pin and its pinned-at stamp survive the chat store's save and load; a b
       _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
       and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))
 
+# --- 6b493: the setup lock is re-entrant: a download froze the whole model setup ---
+_ns493 = {"threading": __import__("threading")}
+exec("_setup_jobs = {}\n_setup_lock = threading.RLock()", _ns493)
+for _n in _ctree.body:
+    if getattr(_n, "name", None) == "_refresh_keep":
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _ns493)
+_out493 = []
+def _t493():
+    with _ns493["_setup_lock"]:
+        _ns493["_setup_jobs"]["m"] = {"refresh": 1, "want_b": 2}
+        _out493.append(_ns493["_refresh_keep"]("m"))
+_th493 = __import__("threading").Thread(target=_t493, daemon=True)
+_th493.start()
+_th493.join(3)
+check("setup lock: re-entrant, so _refresh_keep under it (a download's own call) doesn't freeze model setup (6b493)",
+      "_setup_lock = threading.RLock()" in _MILLENAI_SRC and "_setup_lock = threading.Lock()" not in _MILLENAI_SRC
+      and not _th493.is_alive() and _out493 == [{"refresh": 1, "want_b": 2}], str(_out493))
 # ==== 6b494 coders and Gemma 4 12B: begin ====
 print("== coding models for the presets; Gemma 4 12B on an older mlx-lm (6b494) ==")
 # Per Patrick: Devstral Small 2 24B and Qwen 3 Coder 30B join the catalog, the

@@ -15952,6 +15952,20 @@ Patrick: "spinner is stuck again with vfx off."
 - Gauntlet: the 6b462 check now pins the new rule and the explicit from. Unverified in WKWebView until Patrick's
   next update.
 
+## 6b493 — a model download no longer freezes the app's model setup (per Patrick)
+
+Patrick: "Clicking on everything or any of the model presets doesn't work/respond."
+
+- Cause (seen live, `sample` of the running app: every Python thread in `__psynch_cvwait`, `_download_model`
+  among them): 6b445's `_refresh_keep()` takes `_setup_lock`, and it was called *inside* `with _setup_lock:` by
+  `_download_model` (twice) and by the Ollama pull (twice). `_setup_lock` was a plain `threading.Lock`, so the first
+  download deadlocked its own thread, and every later /api/setup, /api/setup/busy and set-card click waited on it
+  forever. The card click itself was fine (checked in the Blink pane: it reaches the handler and posts the plan).
+- Fix: `_setup_lock = threading.RLock()`: the same thread may take it again; no code uses it with a Condition or a
+  non-blocking acquire. Gauntlet: the lock is an RLock, and `_refresh_keep` called under it finishes (with the old
+  Lock the same check hangs; shown before the change).
+- Until the build with this lands: quit and reopen the app after a frozen download, and don't start downloads.
+
 ## 6b494 — Coding models for local and server presets; Gemma 4 12B on MLX (per Patrick)
 
 Patrick: add two coding models so they appear in the Mac (MLX) and server (Ollama) presets, sort the presets so they
