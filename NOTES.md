@@ -15976,3 +15976,12 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
   finally drops, and a logged-in shell never ends; with both places held, a new tab got a blank page.
 - Now `--max-clients 8`, and the login runs as `env TMOUT=3600 /bin/login -p`: an idle shell ends after an hour
   (login -p keeps TMOUT for the shell), freeing its place. Unverified on the server until the next setup run.
+
+## 6b499 — Hold locks keep the server awake while other software works (per Patrick)
+
+- Patrick runs Claude Code on the server (bigmillz/devbox: user `dev`, Remote Control from the phone) and wants the
+  server not to sleep mid-task. o1sleep.busy_reasons() now also reads /etc/ollama1/hold-locks: one lock-file path
+  per line (absolute; a tab and the reason to show may follow). A listed lock that another process holds (flock, the
+  same test as setup.sh's lock) is a reason not to sleep, for auto sleep and the panel's Sleep button alike. A
+  missing list, a missing file or a free lock is nothing. devbox's Claude Code hooks take the lock when a prompt
+  arrives and let go when the turn stops, with a 6 h ceiling so a crashed turn can't keep the server up forever.

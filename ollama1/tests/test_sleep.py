@@ -690,3 +690,28 @@ class TestInhibitor(unittest.TestCase):
         with open(os.path.join(U.LIB, "setuplib.sh")) as f:
             lib = f.read()
         self.assertIn("sh -c 'while kill -0 \"$1\" 2>/dev/null; do sleep 2; done' sh \"$$\" </dev/null >/dev/null 2>&1 9>&- &", lib)
+
+
+class TestHoldLocks(unittest.TestCase):
+    """6b499: a lock named in /etc/ollama1/hold-locks and held by another process keeps the server awake."""
+    def test_a_held_lock_is_a_reason_and_a_free_one_is_not(self):
+        import fcntl, tempfile, shutil
+        import o1sleep
+        d = tempfile.mkdtemp(); self.addCleanup(shutil.rmtree, d, True)
+        lock, lst = os.path.join(d, "busy.lock"), os.path.join(d, "hold-locks")
+        open(lock, "w").close()
+        open(lst, "w").write("# comment\n%s\tClaude Code is working\n/nonexistent/x.lock\n\nrelative.lock\n" % lock)
+        self.assertEqual(o1sleep.held_locks(lst), [])
+        p = subprocess.Popen(["python3", "-c", "import fcntl,time,sys; f=open(sys.argv[1]); "
+                              "fcntl.flock(f, fcntl.LOCK_EX); print('held', flush=True); time.sleep(30)", lock],
+                             stdout=subprocess.PIPE, text=True)
+        self.addCleanup(p.kill)
+        self.assertEqual(p.stdout.readline().strip(), "held")
+        self.assertEqual(o1sleep.held_locks(lst), [(lock, "Claude Code is working")])
+        self.assertIn("Claude Code is working", o1sleep.busy_reasons(active_units=lambda pats: [], hold_locks=lst))
+        p.kill(); p.wait()
+        self.assertEqual(o1sleep.held_locks(lst), [])
+
+    def test_no_list_file_is_nothing(self):
+        import o1sleep
+        self.assertEqual(o1sleep.held_locks("/nonexistent/hold-locks"), [])
