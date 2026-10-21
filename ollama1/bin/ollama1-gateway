@@ -1481,13 +1481,13 @@ def lan_listener(cfg, gw, servers, stop, retry_s=None, server_cls=None):
             srv = server_cls((cfg["lan_bind"], int(cfg["gateway_port"])), make_handler(gw, lan=True))
         except OSError as e:
             if not said:
-                log("lan_listener_waiting", address=cfg["lan_bind"], reason=getattr(e, "strerror", str(e)))
+                log("lan_listener_waiting", reason=getattr(e, "strerror", None) or "bind_failed")
                 said = True
             stop.wait(retry_s)
             continue
         srv.daemon_threads = True
         servers.append(srv)
-        log("lan_listener_up", address=cfg["lan_bind"])
+        log("lan_listener_up", port=cfg["gateway_port"])
         srv.serve_forever()
         return srv
     return None
@@ -1514,7 +1514,7 @@ def serve(cfg, stop=None):
     if cfg.get("lan_mode") and cfg.get("lan_bind") and cfg.get("lan_cidr"):
         # The LAN address belongs to the wired port: with its cable out (the server on Wi-Fi) it doesn't exist and
         # the bind fails. That must not take the tunnel's loopback listener down with it, so the LAN listener
-        # binds on its own thread and retries until the address is back (6b485, per Patrick).
+        # binds on its own thread and retries until the address is back (6b485, per the owner).
         threading.Thread(target=lan_listener, args=(cfg, gw, servers, stop), daemon=True).start()
     log("started", port=cfg["gateway_port"], lan=bool(cfg.get("lan_mode")),
         crypto=o1crypto.BACKEND, access=gw.access.configured)

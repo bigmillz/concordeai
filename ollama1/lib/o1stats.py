@@ -74,7 +74,7 @@ def _nv_num(v):
 
 
 def gpu_nvidia(run=subprocess.run):
-    """The same figures as gpu() for an NVIDIA card, from one nvidia-smi call (6b483, per Patrick: the
+    """The same figures as gpu() for an NVIDIA card, from one nvidia-smi call (6b483, per the owner: the
     dashboard showed "No graphics card found" with an RTX 5070 Ti fitted). None when there is no
     nvidia-smi or no card. NVIDIA reports one temperature (the chip's), kept as "edge"; its fan
     speed is a percent, not rpm (a stopped fan at idle is 0 %, normal on current cards)."""
