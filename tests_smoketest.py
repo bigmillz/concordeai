@@ -5166,7 +5166,9 @@ check("pinwheel survives streaming (6b462)",
       "const keepTree=body.querySelector(\".worktree\")" in page
       and "body.insertBefore(keepTree,body.firstChild)" in page
       and "const treeHTML=(body.querySelector(\".worktree\")" not in page
-      and ".wthead .cspin{will-change:transform;transform:translateZ(0)}" in page
+      and ".wthead .cspin{will-change:transform}" in page
+      and "@keyframes cspin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}" in page
+      and ".wthead .cspin{will-change:transform;transform:" not in page
       and "margin-bottom:10px;\n  contain:layout paint}" in page
       and "const headHTML=kept?\"\":'<div class=\"wthead\"><i class=\"cspin\">" in page
       and 'box.insertAdjacentHTML("beforeend",restHTML)' in page)

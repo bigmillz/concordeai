@@ -37276,12 +37276,14 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .wthead{display:flex;align-items:center;gap:9px;margin-bottom:10px;
   contain:layout paint}
 /* 6b462: its own layer, so the answer reflowing below never repaints it */
-.wthead .cspin{will-change:transform;transform:translateZ(0)}
+.wthead .cspin{will-change:transform}
 .cspin{display:inline-block;flex:none;width:15px;height:15px;
   border-radius:50%;border:2px solid rgba(255,255,255,.16);
   border-top-color:rgba(255,255,255,.9);vertical-align:-3px;
   animation:cspin .7s linear infinite}
-@keyframes cspin{to{transform:rotate(360deg)}}
+/* 6b489: an explicit from; with only a to, a transform set elsewhere (6b462 had translateZ(0)) becomes the start,
+   the lists don't match, the browser interpolates matrices, and rotate(360deg) is the identity: it never turned */
+@keyframes cspin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .statusline .cspin{width:12px;height:12px;margin-right:6px}
 .wthead .wtbar{flex:1;margin-bottom:0}
 .wtspin{display:inline-block;flex:none;font-style:normal;font-size:14px;
@@ -37290,7 +37292,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   -webkit-background-clip:text;background-clip:text;color:transparent;
   filter:drop-shadow(0 0 8px rgba(220,225,235,.35))}
 .wtspin{animation:wtspin 1.5s linear infinite}
-@keyframes wtspin{to{transform:rotate(360deg)}}
+@keyframes wtspin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .wtrow{display:flex;align-items:center;gap:9px;padding:3px 0;
   font-size:12.5px;color:var(--faint)}
 .wtrow.ok{color:var(--dim)}

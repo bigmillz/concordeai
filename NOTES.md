@@ -15937,3 +15937,17 @@ processor: stress-ng exited with status 1 (a check failed)".
   `OLLAMA_CONTEXT_LENGTH` in ollama.service is now 32768. Cost: the KV cache of a loaded model grows (gpt-oss:20b
   about +0.8 GB to ~15 GB of the 16 GB card; ministral-3:14b about +4 GB); the app's requests that don't set num_ctx
   get 32K too, and the gateway's existing make-room/unload handles two models that no longer fit together.
+
+## 6b489 — the answer card's spinner turns again (per Patrick)
+
+Patrick: "spinner is stuck again with vfx off."
+
+- Cause: 6b462 gave `.wthead .cspin` its own layer with `will-change:transform;transform:translateZ(0)`, and
+  `@keyframes cspin` had only a `to{transform:rotate(360deg)}`. The missing start keyframe takes the element's own
+  transform, translateZ(0); the two function lists don't match, so the browser interpolates matrices, and
+  rotate(360deg) is the identity matrix: the ring sat still in every frame. It showed with Visual effects off
+  because nothing else on screen moved. Not about the effects setting at all.
+- Fix: `cspin` and `wtspin` get an explicit `from{transform:rotate(0deg)}`, and the static translateZ(0) is gone
+  (`will-change:transform` still gives the ring its own layer, which was the point of 6b462).
+- Gauntlet: the 6b462 check now pins the new rule and the explicit from. Unverified in WKWebView until Patrick's
+  next update.
