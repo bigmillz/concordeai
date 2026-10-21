@@ -1702,3 +1702,23 @@ class TestDroppedDrive(unittest.TestCase):
         keys = {k: c for k, _l, c, _lim in o1fan.read_temps(root)}
         self.assertNotIn("nvme:hwmon1", keys)
         self.assertEqual(keys.get("nvme:hwmon2"), 41.0)
+
+
+class TestWorkLevel(unittest.TestCase):
+    """6b495: config.json's fan_work_pct sets the level while working and in the hold; heat still goes to 100%."""
+    def test_the_setting_is_read_and_clamped(self):
+        import tempfile, json as _j
+        import o1work
+        d = tempfile.mkdtemp(); self.addCleanup(__import__("shutil").rmtree, d, True)
+        p = os.path.join(d, "config.json")
+        for val, want in ((50, 50), (10, 30), (150, 100), ("50", 100), (True, 100), (None, 100)):
+            _j.dump({"fan_work_pct": val} if val is not None else {}, open(p, "w"))
+            self.assertEqual(o1work.work_level(p), want, val)
+        self.assertEqual(o1work.work_level(os.path.join(d, "missing.json")), 100)
+
+    def test_the_ramp_starts_from_the_work_level(self):
+        import o1fan
+        self.assertEqual(o1fan.ramp_pct(0, 50), 50)
+        self.assertEqual(o1fan.ramp_pct(o1fan.RAMP_S, 50), o1fan.LOW_PCT)
+        self.assertEqual(o1fan.ramp_pct(0), 100)
+        self.assertAlmostEqual(o1fan.ramp_exact(o1fan.RAMP_S / 2.0, 50), (50 + o1fan.LOW_PCT) / 2.0)

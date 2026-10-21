@@ -106,6 +106,7 @@ HOLD_S = o1work.FAN_HOLD_S       # when the work ends, the fans stay at 100% thi
 RAMP_S = o1work.FAN_RAMP_S       # ... then a straight ramp down to the idle level over this long
 QUANT_PCT = 2                    # the ramp is written in whole steps of this many percent
 FULL_PCT, LOW_PCT = 100, o1work.IDLE_PCT
+work_level = o1work.work_level      # the setting, shared with the lights (6b495)
 DEEP_PCT = o1work.FAN_DEEP_PCT   # the deep-idle level (an output's own floor wins)
 STEP_PCT = 10                    # a stalled output is raised by this much
 SETTLE_S = 6                     # a level is judged by rpm only after this long
@@ -363,8 +364,9 @@ class Fan:
     jump); `wall` stamps the status file."""
 
     def __init__(self, probes, clock=time.monotonic, wall=time.time, log=print, io=None, sysroot=None,
-                 boot_id=read_boot_id, aio=None, aio_inline=False):
+                 boot_id=read_boot_id, aio=None, aio_inline=False, work_pct=None):
         self.p, self.clock, self.wall, self.log = probes, clock, wall, log
+        self.work_pct = FULL_PCT if work_pct is None else work_pct    # main() passes work_level() (6b495)
         self.aio, self.aio_inline = aio, aio_inline      # the liquid cooler, if any (lib/o1aio.py)
         self.plock = threading.Lock()
         self.io = io or SysfsIO()
@@ -684,15 +686,15 @@ class Fan:
         if hot:
             phase, pct, why = "hot", FULL_PCT, "too warm: " + "; ".join(hwhy)
         elif working:
-            phase, pct, why = "working", FULL_PCT, "; ".join(wwhy)
+            phase, pct, why = "working", self.work_pct, "; ".join(wwhy)
         elif any(o.lkey not in self.learned for o in usable) or (self.aio and self.aio.needs_calibration()):
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
             self.calib_at = now
         elif age is not None and age < HOLD_S:
-            phase, pct, why, left = "hold100", FULL_PCT, "the work ended", int(HOLD_S - age + 0.999)
+            phase, pct, why, left = "hold100", self.work_pct, "the work ended", int(HOLD_S - age + 0.999)
         elif age is not None and age < HOLD_S + RAMP_S:
-            pct = ramp_pct(age - HOLD_S)
-            self.exact = ramp_exact(age - HOLD_S)
+            pct = ramp_pct(age - HOLD_S, self.work_pct)
+            self.exact = ramp_exact(age - HOLD_S, self.work_pct)
             phase, why, left = "ramp", "the work ended", int(HOLD_S + RAMP_S - age + 0.999)
         else:
             phase, pct, why, left = self.deep_level(now)
@@ -819,16 +821,16 @@ def _rpm_summary(rows):
     return parts
 
 
-def ramp_exact(t):
+def ramp_exact(t, top=FULL_PCT):
     """The level `t` seconds into the ramp before it is rounded to steps (what the lights follow, 6b466)."""
-    return FULL_PCT - (FULL_PCT - LOW_PCT) * min(max(t, 0), RAMP_S) / float(RAMP_S)
+    return top - (top - LOW_PCT) * min(max(t, 0), RAMP_S) / float(RAMP_S)
 
 
-def ramp_pct(t):
-    """The level `t` seconds into the ramp: a straight line from 100% to LOW_PCT over RAMP_S, in whole steps of
-    QUANT_PCT, never under LOW_PCT."""
-    p = FULL_PCT - (FULL_PCT - LOW_PCT) * min(max(t, 0), RAMP_S) / RAMP_S
-    return max(LOW_PCT, min(FULL_PCT, int(round(p / QUANT_PCT)) * QUANT_PCT))
+def ramp_pct(t, top=FULL_PCT):
+    """The level `t` seconds into the ramp: a straight line from the work level (`top`) to LOW_PCT over RAMP_S, in
+    whole steps of QUANT_PCT, never under LOW_PCT."""
+    p = top - (top - LOW_PCT) * min(max(t, 0), RAMP_S) / RAMP_S
+    return max(LOW_PCT, min(top, int(round(p / QUANT_PCT)) * QUANT_PCT))
 
 
 def present(rows, st):
@@ -1120,7 +1122,7 @@ def aio_loop(aio, stop, log=print):
 
 def run_service(log=print):
     aio = o1aio.Aio(log=log)
-    fan = Fan(probes(), log=log, aio=aio)
+    fan = Fan(probes(), log=log, aio=aio, work_pct=work_level())
     stop, poke, woke = threading.Event(), threading.Event(), threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: (stop.set(), poke.set()))
     signal.signal(signal.SIGINT, lambda *_: (stop.set(), poke.set()))

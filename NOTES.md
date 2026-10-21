@@ -15951,3 +15951,18 @@ Patrick: "spinner is stuck again with vfx off."
   (`will-change:transform` still gives the ring its own layer, which was the point of 6b462).
 - Gauntlet: the 6b462 check now pins the new rule and the explicit from. Unverified in WKWebView until Patrick's
   next update.
+
+## 6b495 — The fans' working level is a setting (per Patrick)
+
+Patrick: "tweak the fan curve so its quieter for my mom — case/cpu fans to maybe 50% instead of 100%, unless temps
+warrant higher."
+
+- `fan_work_pct` in /etc/ollama1/config.json (30-100, default 100: nothing changes until it's set) is the level for
+  `working` and the `hold100` hold after it; the ramp falls from it to 20%. Heat (any sensor at its limit, the
+  existing override with its 10 C hysteresis) and the one-time calibration still go to 100%. Read once when the
+  fan and lights services start (o1work.work_level()); the lights are fully red at that level, not at 100%.
+  The panel's chip says the hold's real percent.
+- A tuning test that picks the level from measured temperatures (Patrick's idea: a 2-3 min query, 10 min, then a
+  20-30 min burn, without the fans hunting up and down) would write this same setting: not built yet.
+- Tests: the setting read and clamped; the ramp from the work level. The existing fan tests still pin 100% (the
+  default).
