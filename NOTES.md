@@ -15966,3 +15966,13 @@ warrant higher."
   20-30 min burn, without the fans hunting up and down) would write this same setting: not built yet.
 - Tests: the setting read and clamped; the ramp from the work level. The existing fan tests still pin 100% (the
   default).
+
+## 6b498 — The panel's web terminal opens reliably (per Patrick)
+
+Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
+
+- ttyd ran with `--max-clients 2`. A session whose browser went away without closing (a phone tab, a laptop that
+  slept, a network change, the panel restarted under it during setup) keeps its place until the connection
+  finally drops, and a logged-in shell never ends; with both places held, a new tab got a blank page.
+- Now `--max-clients 8`, and the login runs as `env TMOUT=3600 /bin/login -p`: an idle shell ends after an hour
+  (login -p keeps TMOUT for the shell), freeing its place. Unverified on the server until the next setup run.
