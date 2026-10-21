@@ -15951,3 +15951,70 @@ Patrick: "spinner is stuck again with vfx off."
   (`will-change:transform` still gives the ring its own layer, which was the point of 6b462).
 - Gauntlet: the 6b462 check now pins the new rule and the explicit from. Unverified in WKWebView until Patrick's
   next update.
+
+## 6b494 — Coding models for local and server presets; Gemma 4 12B on MLX (per Patrick)
+
+Patrick: add two coding models so they appear in the Mac (MLX) and server (Ollama) presets, sort the presets so they
+make sense, and fix the broken local Gemma 4 12B. Everything below was checked on 2026-10-21.
+
+- **Two catalog rows** (group "code", after Qwen 3.6 35B MoE; ports 8948 and 8950, the next even ones: every catalog
+  and retired port is still its own). **Devstral Small 2 24B** (`mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit`,
+  15,136,819,784 bytes, mistral3/ministral3; `devstral-small-2:24b`, 15,177,374,099 bytes with its config; mem 16.7):
+  Mistral's agentic coder, 68.0% SWE-bench Verified by Mistral's own card. **Qwen 3 Coder 30B MoE**
+  (`mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit`, 17,197,118,924 bytes, qwen3_moe; `qwen3-coder:30b`,
+  18,556,700,761 bytes; mem 18.7): 3B active, in MOE_ROWS, and "MoE" in its label so the Mac's admission uses 1.3x as
+  for Qwen 3.6 35B MoE. Both MLX builds load on mlx-lm 0.31.3: a model built from each config.json (no weights) has
+  exactly the checkpoint's weight keys after sanitize (925 and 1351 keys). OLLAMA_REQUIRES: devstral 0.13.3
+  (ollama.com/library/devstral-small-2: "requires Ollama 0.13.3 or later"; its manifest has no "requires");
+  qwen3-coder:30b has none anywhere; it uses the 480B's renderer and parser ("qwen3-coder", in Ollama since v0.12.0:
+  commit 4799194 is in v0.12.0, not v0.11.11), so it takes the 480B's 0.13.5. ADV_USE lines for both.
+- **The Code lane prefers them.** CODE_LADDER (the Remote planner and Recommended's code seat) and the Coding,
+  Workspace and Remote agents' picks start with Devstral Small 2, then Qwen 3 Coder; the old order follows for
+  machines that hold neither. A server's coder still comes first where the code already did that
+  (resolve_agent_seat, remote_driver); the server rules are unchanged.
+- **Presets, by the existing fit rules (no fixed lists).** Light is unchanged everywhere. Recommended gains the code
+  ladder's first, so Devstral on a Mac of 24 GB or more and on a 24 GB card (48 GB Mac: 8 models, 82.9 GB; it was 7,
+  66.0 GB); a 16 GB Mac holds neither coder, so its sets are unchanged. Everything holds both wherever they fit (48 GB
+  Mac: 15 models, Qwen 3 Coder last before the No-limits extras; a 24 or 32 GB card: both). Order: the roles first
+  (quick pair, everyday, Fast, merger, Thinking, code, vision), then the rest in catalog order (general models, then
+  the coders), then what is over memory. The coders' place in the catalog gives that, so no sort code was added.
+- **The server's RTX 5070 Ti (16303 MiB) gets neither coder.** A set's model must run whole on the card (_srv_fits:
+  file x1.05 + 1.25 GiB): Devstral needs 17,278,420,083 bytes against 17,094,934,528, Qwen 3 Coder 20,826,713,079.
+  The gateway agrees: its fit_check (weights +5% + 256 MiB + the KV cache) wants about 17.5 GB for Devstral at 8K
+  context against 16.3 GB (VRAM less its 768 MiB reserve), and still 16.5 GB at 2K. A set pulls with no `ram` flag
+  (allow_apply), so a set holding them would install models the gateway then refuses (gpu_fit). Running Qwen 3 Coder
+  there with its experts in RAM would need the kit's set apply to write the `ram` flag for MoE rows (a PROTOCOL
+  change), and with weight repacking on the whole model counts against system RAM: a decision for Patrick, not made
+  here.
+- **Gemma 4 12B: the cause.** Every Gemma 4 12B on the hub is Google's `gemma4_unified` build (google/gemma-4-12B-it,
+  mlx-community's 4bit at all three revisions, the base 4bit, OsaurusAI's MXFP4, unsloth): there is no other build
+  or older revision to switch to. mlx-lm reads it from **0.32.0** (`"gemma4_unified": "gemma4"` in MODEL_REMAPPING and
+  `vision_embedder` skipped in sanitize, ml-explore/mlx-lm#1349; in v0.32.0 and v0.32.2, not in 0.31.3). With 0.32.2
+  (unpacked into a scratch folder, not the app's venv) a model built from the current revision's config (73bcf09,
+  6.77 GB) has exactly the checkpoint's 1324 weight keys after sanitize; 0.31.3 raises "Model type gemma4_unified not
+  supported", as the engine log showed. The venv holds 0.31.3 because the installers run `pip install mlx-lm` with no
+  upgrade, so every Mac set up before 0.32.0 (2026-10-15) has it.
+- **Gemma 4 12B: the fix.** `MLX_REQUIRES` (the oldest mlx-lm an MLX build loads on, beside OLLAMA_REQUIRES) and
+  `MLX_LM_VERSION` (read once from the package record with `importlib.metadata`; nothing imported). A row whose MLX
+  build needs a newer mlx-lm than this Mac's routes to its Ollama tag (Gemma 4 12B: gemma4:12b, 8.0 GB), or isn't
+  offered when it has none; with no mlx-lm found nothing changes. On this Mac, today, Gemma 4 12B becomes an Ollama
+  model: the sets still hold it, the More-models card offers the Ollama download, and the 6.8 GB MLX copy stays on
+  disk (MLX_REPOS still names it, nothing sweeps it). An mlx-lm of 0.32.0 or newer puts it back on MLX at the next
+  start, on the weights already there. OLLAMA_BYTES gemma4:12b and gemma4:26b follow the registry (both pushed again
+  with a draft layer: 7.56 -> 8.02 GB, 18.60 -> 18.73 GB).
+- **For Patrick to decide:** upgrading mlx-lm in the venv (and having the installers ask for `mlx-lm>=0.32.0`). 0.32.2
+  also wants mlx >= 0.32.2 and transformers >= 5.7, so every MLX engine moves with it and should be re-run first.
+  The coders are not kept out of Pro and Max blends or the local merge writer (MERGE_RANK is by size), unlike a
+  server's coder (srv_role_ok); "Max is every model" was his word, so it is left as is.
+- Noticed, not changed: gpt-oss:20b and :120b now say "requires 0.30.0" in the registry and have no OLLAMA_REQUIRES
+  entry; on a 24 GB Mac Gemma 4 26B, Qwen 3.8 27B and now Qwen 3 Coder are offered (75% of memory) but the run-time
+  admission (x1.5, or x1.3 for MoE) rarely lets them load; CLAUDE.md still says the engine ports reach 8944.
+- Gauntlet: `== coding models for the presets; Gemma 4 12B on an older mlx-lm (6b494) ==` (3 checks, 5 mutants), and
+  the 6b405 expectations moved (Recommended on 48 GB holds Devstral; Everything 15 and 16 models). The simulated Macs
+  now fix MLX_LM_VERSION, so the sets don't depend on the venv running the gauntlet. Run here: ast parse of both
+  files; the new block and the 6b405 rules, status and offer checks in isolation (the 24 GB PC case needs the
+  gauntlet's PC sims and wasn't run). The full gauntlet was not run.
+- NOT VERIFIED: neither coder was downloaded or run (no answers, speed or peak memory; mem is an estimate from the
+  rows of their size); Gemma 4 12B on mlx-lm 0.32 is a weight-key match, not a generation; the gemma4:12b Ollama
+  route on a Mac was not exercised; the live gauntlet on this Mac (mlx-lm 0.31.3) will see Gemma 4 12B as an Ollama
+  model.

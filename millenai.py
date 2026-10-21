@@ -1225,6 +1225,9 @@ CATALOG = [
     # tuned for tool use and structured output — the Research agent's first pick
     ("Hermes 3 8B",        "🪽", "8B",  "core", "mlx-community/Hermes-3-Llama-3.1-8B-4bit",        "hermes3:8b",        8912,  5.5,  4.6, False),
     ("Hermes 4 14B",       "🪽", "14B", "core", "mlx-community/Hermes-4-14B-4bit",                 None,                8936,  9.3,  8.3, False),
+    # 6b494: this repo is Google's gemma4_unified build (every Gemma 4 12B
+    # is; reconverted 2026-06-03/06-08), which mlx-lm loads from 0.32.0 on.
+    # On an older mlx-lm the row runs on Ollama instead (MLX_REQUIRES)
     ("Gemma 4 12B",        "💠", "12B", "core", "mlx-community/gemma-4-12B-it-4bit",               "gemma4:12b",        8908,  8.2,  6.8, True),
     ("Gemma 4 26B",        "🔷", "26B", "core", "mlx-community/gemma-4-26b-a4b-it-4bit",           "gemma4:26b",        8910, 17.0, 15.4, False),
     ("Qwen 3.5 9B",        "🔬", "9B",  "core", "mlx-community/Qwen3.5-9B-4bit",                   "qwen3.5:9b",        8934,  6.9,  6.0, False),
@@ -1236,6 +1239,18 @@ CATALOG = [
     ("GPT-OSS 20B",        "🌀", "20B",  "core", "mlx-community/gpt-oss-20b-MXFP4-Q4",             "gpt-oss:20b",       8914, 13.0, 12.0, False),
     ("Qwen 3.8 27B",       "🐉", "27B",  "big",  "mlx-community/Qwen3.8-27B-4bit",                 "qwen3.8:27b",       8938, 17.6, 16.1, False),
     ("Qwen 3.6 35B MoE",   "🚀", "35B",  "big",  "mlx-community/Qwen3.6-35B-A3B-4bit",             "qwen3.6:35b",       8918, 20.0, 18.5, True),
+    # ---- THE CODERS (6b494, per Patrick: coding models for the Code lane, on
+    # the Mac and on servers). Both checked 2026-10-21 against the HF API and
+    # the Ollama registry; both MLX builds load on mlx-lm 0.31.3 (every weight
+    # key of the checkpoint matched a model built from its config.json, no
+    # weights downloaded). Devstral Small 2: Mistral's agentic coder, dense,
+    # 68.0% on SWE-bench Verified by Mistral's own card (model_type mistral3,
+    # 15,136,819,784 bytes, Apache 2.0). Qwen 3 Coder 30B: 3B active of 30B
+    # (qwen3_moe, 17,197,118,924 bytes, Apache 2.0); "qwen3-coder:30b", never
+    # the bare tag (see the giants below). mem is the file plus the allowance
+    # the rows of their size carry.
+    ("Devstral Small 2 24B", "🛠️", "24B", "code", "mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit", "devstral-small-2:24b", 8948, 16.7, 15.1, False),
+    ("Qwen 3 Coder 30B MoE", "⌨️", "30B", "code", "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",       "qwen3-coder:30b",      8950, 18.7, 17.2, False),
     ("GPT-OSS 120B",       "🌌", "120B", "big",  "mlx-community/gpt-oss-120b-MXFP4-Q4",            "gpt-oss:120b",      8924, 64.0, 61.0, False),
     ("GLM 5.3",            "👑", "744B", "big",  "mlx-community/GLM-5.3-4bit",                     None,                8944, 430.0, 418.3, False),
     ("DeepSeek V3.2 671B", "🌊", "671B", "big",  "mlx-community/DeepSeek-V3.2-4bit",               None,                8942, 390.0, 378.1, False),
@@ -1260,17 +1275,22 @@ WINDOWS_ONLY = {"DeepSeek V3.1 671B", "Qwen 3 Coder 480B"}
 # is sized from here, and its mem keeps the same allowance above it.
 # Which model a preset picks still goes by the catalog size (cat_gb):
 # the "everyday" line and the ties were tuned to it.
+# 6b494, the registry on 2026-10-21: the two coders are new; gemma4:12b and
+# gemma4:26b were pushed again with a draft layer (7.56 -> 8.02 GB and
+# 18.60 -> 18.73 GB), so their figures follow.
 OLLAMA_BYTES = {
     "deepseek-r1:8b": 5_225_376_047,
     "deepseek-v3.1:671b": 404_494_157_743,
-    "gemma4:12b": 7_556_508_396,
+    "devstral-small-2:24b": 15_177_374_099,
+    "gemma4:12b": 8_021_618_941,
     "gemma4:e2b": 4_587_156_505,
-    "gemma4:26b": 18_604_148_513,
+    "gemma4:26b": 18_731_025_629,
     "gpt-oss:120b": 65_369_818_941,
     "gpt-oss:20b": 13_793_441_244,
     "hermes3:8b": 4_661_227_243,
     "llama3.2:1b": 1_321_098_329,
     "ministral-3:14b": 9_082_537_546,
+    "qwen3-coder:30b": 18_556_700_761,
     "qwen3-coder:480b": 290_058_836_445,
     "qwen3.5:9b": 6_594_474_711,
     "qwen3.6:35b": 22_621_314_381,
@@ -1283,11 +1303,18 @@ OLLAMA_BYTES = {
 # when it's too old; a user's own Ollama gets a note saying what to do.
 OLLAMA_REQUIRES = {
     "deepseek-v3.1:671b": (0, 13, 5),
+    # 6b494 (2026-10-21): ollama.com/library/devstral-small-2 says "requires
+    # Ollama 0.13.3 or later" (its manifest carries no "requires")
+    "devstral-small-2:24b": (0, 13, 3),
     # the gemma4 tags were pushed again since: all three require 0.30.9 now
     # (the registry, 2026-10-07)
     "gemma4:12b": (0, 30, 9),
     "gemma4:26b": (0, 30, 9),
     "gemma4:e2b": (0, 30, 9),
+    # 6b494: neither the registry nor the library page gives one for the 30B;
+    # it uses the 480B's renderer and parser ("qwen3-coder", in Ollama from
+    # v0.12.0), so it takes the 480B's figure
+    "qwen3-coder:30b": (0, 13, 5),
     "qwen3-coder:480b": (0, 13, 5),
     "qwen3.5:9b": (0, 17, 1),
     "qwen3.6:35b": (0, 30, 0),
@@ -1299,7 +1326,38 @@ OLLAMA_REQUIRES = {
 # the graphics card, at a usable speed (6b315)
 MOE_ROWS = {"Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.6 35B MoE", "GPT-OSS 120B",
             "GLM 5.3", "DeepSeek V3.2 671B", "DeepSeek V3.1 671B",
-            "Qwen 3 Coder 480B"}
+            "Qwen 3 Coder 480B", "Qwen 3 Coder 30B MoE"}
+
+# THE OLDEST MLX-LM EACH MLX BUILD LOADS ON (6b494, per Patrick: Gemma 4 12B
+# was broken on this Mac). Gemma 4 12B exists only as Google's
+# "gemma4_unified" build (google/gemma-4-12B-it and every conversion of it on
+# the hub, checked 2026-10-21); mlx-lm reads it as a gemma4 from 0.32.0
+# (ml-explore/mlx-lm#1349: the type mapping, and the vision_embedder weights
+# skipped). Before that the engine dies with "Model type gemma4_unified not
+# supported": 0.31.3, which every venv made before 2026-10-15 holds, since
+# the installers never upgrade it. With 0.32.2 every weight key of the
+# current revision (73bcf09) matched a model built from its config.json.
+# A row whose MLX build needs a newer mlx-lm than the one here runs on
+# Ollama instead (its tag), or isn't offered when it has none; with no
+# mlx-lm found, nothing changes. Upgrading mlx-lm brings the row back to MLX
+# at the next start, onto the weights already downloaded.
+MLX_REQUIRES = {
+    "Gemma 4 12B": (0, 32, 0),
+}
+
+
+def _mlx_lm_version():
+    """The installed mlx-lm's version, (0, 31, 3), from its package record
+    (nothing is imported), or None when there is none or it can't be read."""
+    try:
+        import importlib.metadata as _im
+        v = tuple(int(x) for x in re.findall(r"\d+", _im.version("mlx-lm"))[:3])
+        return v or None
+    except Exception:
+        return None
+
+
+MLX_LM_VERSION = _mlx_lm_version()
 
 # PRUNED, NOT FORGOTTEN (6b269, per Patrick: "what models can we prune
 # that are basically redundant or outdated"). Six rows left the
@@ -1878,7 +1936,14 @@ MODEL_INFO = {c[0]: dict(icon=c[1], size=c[2], group=c[3], mlx=c[4],
 # run. The Windows giants are Windows only (6b314): on a Mac, Apple
 # silicon or Intel, they are neither offered nor routed, so a copy
 # pulled by hand in Ollama can't be seated by a tier or a fallback.
-SUPPORTED = {l: bool(((i["mlx"] and IS_ARM) or i["ollama"])
+def _mlx_runs(label: str) -> bool:
+    """Whether the mlx-lm here loads the row's MLX build (MLX_REQUIRES,
+    6b494); True when that isn't known."""
+    need = MLX_REQUIRES.get(label)
+    return not need or MLX_LM_VERSION is None or tuple(MLX_LM_VERSION) >= need
+
+
+SUPPORTED = {l: bool(((i["mlx"] and IS_ARM and _mlx_runs(l)) or i["ollama"])
                      and (IS_WIN or l not in WINDOWS_ONLY))
              for l, i in MODEL_INFO.items()}
 
@@ -1887,7 +1952,7 @@ MODEL_ROUTES = {}
 for _l, _i in MODEL_INFO.items():
     if _l in WINDOWS_ONLY and not IS_WIN:
         continue
-    if _i["mlx"] and IS_ARM and _i["port"]:
+    if _i["mlx"] and IS_ARM and _i["port"] and _mlx_runs(_l):
         MODEL_ROUTES[_l] = ("mlx", _i["port"])
     elif _i["ollama"]:
         MODEL_ROUTES[_l] = ("ollama", _i["ollama"])
@@ -4261,7 +4326,9 @@ AGENTS = {
         # Claude-Code-shaped, honestly scoped: it READS the folder you
         # point it at and answers about YOUR code. No writes, no shell.
         "icon": "\U0001f5c2\ufe0f", "desc": "answers about your own code",
-        "picks": ["Qwen 3.8 27B", "Gemma 4 26B",
+        # the coders first (6b494): both read 256K tokens of a workspace
+        "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+          "Qwen 3.8 27B", "Gemma 4 26B",
           "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Qwen 3.5 9B",
           "Gemma 4 12B"],
         "workspace": True,
@@ -4284,14 +4351,16 @@ AGENTS = {
         # run_remote_agent picks the strongest available driver (cloud
         # when keyed). Lives in the Code tab beside Coding/Workspace.
         "icon": "🛰️", "desc": "runs commands on your server over SSH",
-        "picks": ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+        "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+          "Qwen 3.8 27B", "Qwen 3.6 35B MoE",
           "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B"],
         "remote": True,
         "system": "",       # the loop supplies REMOTE_SYSTEM itself
     },
     "Coding": {
         "icon": "💻", "desc": "working code, tight explanations",
-        "picks": ["Qwen 3.8 27B", "Qwen 3.5 9B",
+        "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+          "Qwen 3.8 27B", "Qwen 3.5 9B",
           "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B"],
         "system": (
             "You are a senior software engineer. Give WORKING code first, "
@@ -4687,8 +4756,13 @@ FIRST_RUN_SET = "light"
 EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
 # who writes the merge, best first: merge_pref_label reads it too
 MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
-# the code lane's local planner, strongest first: remote_driver reads it too
-CODE_LADDER = ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
+# the code lane's local planner, strongest first: remote_driver reads it too.
+# The coders lead (6b494, per Patrick): Devstral Small 2, the agentic
+# specialist, then Qwen 3 Coder 30B (MoE, quicker); the general models stay
+# below them for machines that hold neither. Recommended takes the first
+# that fits, so it carries a coder wherever one fits.
+CODE_LADDER = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+               "Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
                "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Gemma 4 E2B")
 VISION_MODEL = "Qwen 3.5 Vision 9B"
 
@@ -34884,7 +34958,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
 
 # Where the app goes when 8889 is taken: far from the engines, whose
-# catalog ports climb by two from 8884 (8944 today, and the next row
+# catalog ports climb by two from 8884 (8950 today, and the next row
 # takes the next even port), from ConcordeGo's 9897, from the dev and
 # gauntlet ports (9894, 9895, 9901-9903) and from 9889, the retired web
 # copy's. The gauntlet fails if a catalog or retired port ever lands in
@@ -41028,6 +41102,8 @@ const ADV_USE={
   "GPT-OSS 20B":"strong open reasoning",
   "Qwen 3.8 27B":"heavyweight generalist and coder",
   "Qwen 3.6 35B MoE":"heavyweight generalist, fast for its size",
+  "Devstral Small 2 24B":"agentic coder — the Code lane's first pick",
+  "Qwen 3 Coder 30B MoE":"coder, fast for its size",
   "GPT-OSS 120B":"frontier-class open reasoning",
   "GLM 5.3":"the largest open model \u2014 512 GB Macs",
   "DeepSeek V3.2 671B":"frontier open model \u2014 512 GB Macs",

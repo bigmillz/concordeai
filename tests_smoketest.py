@@ -2966,7 +2966,8 @@ _pn = {}
 for _x in _ast0.parse(_MILLENAI_SRC).body:
     if isinstance(_x, _ast0.Assign) and any(getattr(_tg, "id", "") in (
             "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "FALLBACK_PORTS",
-            "WINDOWS_ONLY", "OLLAMA_BYTES", "OLLAMA_REQUIRES", "MOE_ROWS")
+            "WINDOWS_ONLY", "OLLAMA_BYTES", "OLLAMA_REQUIRES", "MOE_ROWS",
+            "MLX_REQUIRES")
             for _tg in _x.targets):
         exec(_ast0.get_source_segment(_MILLENAI_SRC, _x), _pn)
 _eng = ({i["port"] for i in _pn["MODEL_INFO"].values() if i["port"]}
@@ -3011,6 +3012,7 @@ for _k, (_arm, _win) in _PLAT.items():
     _pz = dict(MODEL_INFO=_copy.deepcopy(_pn["MODEL_INFO"]),
                WINDOWS_ONLY=_pn["WINDOWS_ONLY"],
                OLLAMA_BYTES=_pn["OLLAMA_BYTES"], IS_ARM=_arm, IS_WIN=_win,
+               MLX_REQUIRES=_pn["MLX_REQUIRES"], MLX_LM_VERSION=None,
                gpu_room_bytes=lambda: 0, giant_fits_here=lambda l: True)
     exec(_MILLENAI_SRC[_MILLENAI_SRC.index("# a model is usable here"):
                        _MILLENAI_SRC.index("MLX_REPOS = {l: i")], _pz)
@@ -6088,12 +6090,14 @@ def _s5_exec(src, ns, names):
             exec(_ast.get_source_segment(src, n), ns)
 
 
-def _s5_mac(src, gib, nl=False, gi=False, disk=(), prefs=None):
+def _s5_mac(src, gib, nl=False, gi=False, disk=(), prefs=None, mlxv=None):
     """A simulated Apple-silicon Mac of gib GB on src's own code: the
     catalog, its routes and sizes, the budget, the tiers and the sets."""
     ns = dict(_LH)
     exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
-    ns.update(IS_ARM=True, IS_WIN=False, IS_MAC=True)
+    # MLX_LM_VERSION as an mlx-lm that loads every row (6b494), whatever
+    # this Mac's venv holds: the sets mustn't depend on it
+    ns.update(IS_ARM=True, IS_WIN=False, IS_MAC=True, MLX_LM_VERSION=mlxv)
     exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
     ns["MODEL_MEM_BYTES"] = {l: i["mem"] for l, i in ns["MODEL_INFO"].items()}
     total = gib * (1 << 30)
@@ -6119,8 +6123,9 @@ def _s5_pc(src, key):
     return z
 
 
+# the code ladder's first is a coder since 6b494: Devstral Small 2
 _S5_REC48 = ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B", "Qwen 3.8 27B",
-             "Qwen 3.6 35B MoE", "Qwen 3.5 Vision 9B"]
+             "Qwen 3.6 35B MoE", "Devstral Small 2 24B", "Qwen 3.5 Vision 9B"]
 
 
 def _s5_rules(src):
@@ -6134,7 +6139,9 @@ def _s5_rules(src):
     gi512 = _s5_mac(src, 512, nl=True, gi=True)["model_sets"]()
     pc = _s5_pc(src, "xtx+64")["model_sets"]()
     out["48 GB Mac"] = (m[48]["light"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"]
-                        and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 13
+                        and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 15
+                        # both coders fit 48 GB; Qwen 3 Coder joins in Everything
+                        and m[48]["everything"][-1] == "Qwen 3 Coder 30B MoE"
                         and "GPT-OSS 120B" not in m[48]["everything"] and m[48]["over"] == [])
     out["No limits: Everything only"] = (nl48["light"] == m[48]["light"]
                                          and nl48["recommended"] == m[48]["recommended"]
@@ -6147,7 +6154,7 @@ def _s5_rules(src):
                                                  "DeepSeek R1 8B", "Qwen 3.5 Vision 9B"]
                         and len(m[16]["everything"]) == 9)
     out["128 GB Mac"] = (m[128]["recommended"][3] == "GPT-OSS 120B" and "Gemma 4 26B" in m[128]["recommended"]
-                         and len(m[128]["everything"]) == 14)
+                         and len(m[128]["everything"]) == 16)
     out["giants: only Everything, only with both boxes"] = (
         {"GLM 5.3", "DeepSeek V3.2 671B"} <= set(gi512["everything"])
         and not {"GLM 5.3", "DeepSeek V3.2 671B"} & set(gi512["recommended"])
@@ -6172,7 +6179,11 @@ def _s5_rules(src):
     out["a giant a ladder names stays out"] = "DeepSeek V3.2 671B" not in g["model_sets"]()["recommended"]
     c1 = _s5_mac(src, 48)
     c1["TIERS"] = dict(c1["TIERS"], Thinking=dict(c1["TIERS"]["Thinking"], count=1))
-    out["the code ladder's model"] = "Qwen 3.8 27B" in c1["model_sets"]()["recommended"]
+    out["the code ladder's model"] = "Devstral Small 2 24B" in c1["model_sets"]()["recommended"]
+    # a 16 GB Mac holds neither coder: the ladder falls to a general model
+    # already in, so Recommended doesn't grow there (6b494)
+    out["no coder that doesn't fit"] = not {"Devstral Small 2 24B", "Qwen 3 Coder 30B MoE"} & set(
+        m[16]["everything"])
     d1 = _s5_mac(src, 16)
     d1["MODEL_ROUTES"] = dict(d1["MODEL_ROUTES"], **{"Qwen 3.5 9B": d1["MODEL_ROUTES"]["Qwen 3.5 Vision 9B"]})
     r1 = d1["model_sets"]()["recommended"]
@@ -6208,8 +6219,9 @@ def _s5_status(src):
     s = b["model_sets_status"](set())
     out["48 GB, Light here"] = (s["light"]["state"] == "yours" and s["recommended"]["state"] == "download"
                                 and s["recommended"]["missing"] == ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+                                                                    "Devstral Small 2 24B",
                                                                     "Qwen 3.5 Vision 9B"]
-                                and s["recommended"]["dl_gb"] == round(16.1 + 18.5 + 6.6, 1)
+                                and s["recommended"]["dl_gb"] == round(16.1 + 18.5 + 15.1 + 6.6, 1)
                                 and s["every"] is False and s["mine"] == "light")
     c = _s5_mac(src, 48, disk=set(_S5_REC48), prefs={"model_set": "pro"})
     s = c["model_sets_status"](set())
@@ -35084,7 +35096,7 @@ def _u45_ns(src):
     ns = dict(_LH, APP_VERSION="9.9", hashlib=_h34, urllib=urllib, threading=_t34)
     exec(re.search(r"^MODEL_SETS = .*$", src, re.M).group(0), ns)
     exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
-    ns.update(IS_ARM=True, IS_WIN=False)
+    ns.update(IS_ARM=True, IS_WIN=False, MLX_LM_VERSION=None)
     exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
     ns["MLX_REPOS"] = {l: i["mlx"] for l, i in ns["MODEL_INFO"].items() if i.get("mlx")}
     exec(_sv_sect(src, "model freshness"), ns)
@@ -35597,6 +35609,144 @@ check("sidebar folds: heading buttons with aria-expanded, one delegated click, s
 check("a pin and its pinned-at stamp survive the chat store's save and load; a bad stamp is refused (6b467)",
       _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
       and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))
+
+# ==== 6b494 coders and Gemma 4 12B: begin ====
+print("== coding models for the presets; Gemma 4 12B on an older mlx-lm (6b494) ==")
+# Per Patrick: Devstral Small 2 24B and Qwen 3 Coder 30B join the catalog, the
+# Code lane prefers them where they fit, Everything holds them where they fit,
+# and Gemma 4 12B (a gemma4_unified build mlx-lm reads from 0.32.0) runs on
+# Ollama on a Mac whose mlx-lm is older. Run on simulated Macs and cards with
+# the real catalog and set code; each rule then broken and shown caught.
+_C94 = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE")
+
+
+def _c94_rows(src):
+    """The two rows as verified on 2026-10-21, their ports free, their
+    Ollama sizes and minimums, the MoE row, the ladders and the page's line."""
+    ns = {}
+    for x in _ast0.parse(src).body:
+        if isinstance(x, _ast0.Assign) and any(getattr(t, "id", "") in (
+                "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "OLLAMA_BYTES", "OLLAMA_REQUIRES",
+                "MOE_ROWS", "MLX_REQUIRES", "CODE_LADDER", "FALLBACK_PORTS") for t in x.targets):
+            exec(_ast0.get_source_segment(src, x), ns)
+    mi = ns["MODEL_INFO"]
+    d, q = mi.get(_C94[0]) or {}, mi.get(_C94[1]) or {}
+    ports = [i["port"] for i in mi.values() if i["port"]] + [r[2] for r in ns["RETIRED_MODELS"].values() if r[2]]
+    ag = {}
+    _s5_exec(src, ag, {"TASK_GUIDE", "AGENTS"})
+    out = {
+        "Devstral's row": (d.get("mlx"), d.get("ollama"), d.get("port"), d.get("gb"), d.get("group"))
+        == ("mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit", "devstral-small-2:24b", 8948, 15.1, "code"),
+        "Qwen 3 Coder's row": (q.get("mlx"), q.get("ollama"), q.get("port"), q.get("gb"), q.get("group"))
+        == ("mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit", "qwen3-coder:30b", 8950, 17.2, "code"),
+        "every engine port its own, even, none in the fallback band": (
+            len(ports) == len(set(ports)) and all(p % 2 == 0 for p in ports)
+            and not set(ports) & set(ns["FALLBACK_PORTS"])),
+        "Ollama's sizes and minimums": (ns["OLLAMA_BYTES"].get("devstral-small-2:24b") == 15_177_374_099
+                                        and ns["OLLAMA_BYTES"].get("qwen3-coder:30b") == 18_556_700_761
+                                        and ns["OLLAMA_REQUIRES"].get("devstral-small-2:24b") == (0, 13, 3)
+                                        and ns["OLLAMA_REQUIRES"].get("qwen3-coder:30b") == (0, 13, 5)),
+        "the 30B is a mixture of experts": _C94[1] in ns["MOE_ROWS"] and _C94[0] not in ns["MOE_ROWS"],
+        "the coders lead the code ladder and the Code lane's agents": (
+            ns["CODE_LADDER"][:2] == _C94
+            and all(ag["AGENTS"][a]["picks"][:2] == list(_C94) for a in ("Coding", "Workspace", "Remote"))),
+        "the page describes both": all('  "%s":"' % l in src for l in _C94),
+        "Gemma 4 12B needs mlx-lm 0.32.0 for MLX": ns["MLX_REQUIRES"] == {"Gemma 4 12B": (0, 32, 0)}}
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c94_gemma(src):
+    """mlx-lm 0.31.3: Gemma 4 12B on Ollama (still offered, Ollama's size), the
+    others on MLX; 0.32.0 and newer, or no mlx-lm found: MLX as before; an
+    MLX-only row an older mlx-lm can't load isn't offered; the version is read
+    from the package record, never by importing mlx_lm."""
+    out = {}
+    old, new, unk = (_s5_mac(src, 48, mlxv=v) for v in ((0, 31, 3), (0, 32, 0), None))
+    out["0.31.3: Ollama"] = (old["MODEL_ROUTES"]["Gemma 4 12B"] == ("ollama", "gemma4:12b")
+                             and old["SUPPORTED"]["Gemma 4 12B"] is True
+                             and old["MODEL_INFO"]["Gemma 4 12B"]["gb"] == 8.0
+                             and old["MODEL_ROUTES"]["Gemma 4 26B"] == ("mlx", 8910)
+                             and old["MODEL_ROUTES"][_C94[0]] == ("mlx", 8948)
+                             and old["model_sets"]()["light"][2] == "Gemma 4 12B")
+    out["0.32.0, unknown: MLX"] = all(m["MODEL_ROUTES"]["Gemma 4 12B"] == ("mlx", 8908) for m in (new, unk))
+    ns = dict(_LH)
+    exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
+    ns.update(IS_ARM=True, IS_WIN=False, MLX_LM_VERSION=(0, 31, 3),
+              MLX_REQUIRES={"Hermes 4 14B": (0, 99, 0)})
+    exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
+    out["an MLX-only row it can't load: not offered"] = (ns["SUPPORTED"]["Hermes 4 14B"] is False
+                                                         and "Hermes 4 14B" not in ns["MODEL_ROUTES"])
+    body = src[src.index("def _mlx_lm_version():"):src.index("MLX_LM_VERSION = _mlx_lm_version()")]
+    out["read, not imported"] = ('_im.version("mlx-lm")' in body and "import mlx_lm" not in body
+                                 and "\nMLX_LM_VERSION = _mlx_lm_version()\n" in src)
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c94_sets(src):
+    """Where the coders fit: a 48 GB Mac's Recommended gains Devstral (the code
+    ladder's first) and Everything both; a 16 GB Mac neither. A card holds a
+    coder only whole: a 16 GB card (the RTX 5070 Ti's 16303 MiB too) neither,
+    a 24 GB card both, Devstral in Recommended."""
+    out = {}
+    m48, m16 = _s5_mac(src, 48)["model_sets"](), _s5_mac(src, 16)["model_sets"]()
+    out["48 GB Mac"] = (_C94[0] in m48["recommended"] and _C94[1] not in m48["recommended"]
+                        and set(_C94) <= set(m48["everything"]))
+    out["16 GB Mac"] = not set(_C94) & set(m16["everything"])
+    # a card's sets need only the catalog and _srv_fits (as _s7_tags reads them)
+    ns = _s5_mac(src, 64)
+    t = {v: _s7_tags(ns, v) for v in (16 * _GI7, 16303 << 20, 24 * _GI7)}
+    co = {"devstral-small-2:24b", "qwen3-coder:30b"}
+    out["16 GB cards: neither"] = all(not co & set(t[v]["everything"]) for v in (16 * _GI7, 16303 << 20))
+    out["24 GB card: both, Devstral in Recommended"] = (co <= set(t[24 * _GI7]["everything"])
+                                                        and "devstral-small-2:24b" in t[24 * _GI7]["recommended"]
+                                                        and "qwen3-coder:30b" not in t[24 * _GI7]["recommended"])
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+_C94_CHECKS = [("the coders' rows: verified repos and tags, their own ports, Ollama's sizes and minimums, "
+                "first in the code ladder and the Code lane's agents", _c94_rows),
+               ("Gemma 4 12B runs on Ollama under an mlx-lm older than 0.32.0, on MLX otherwise; "
+                "an MLX-only row it can't load isn't offered", _c94_gemma),
+               ("the coders in the sets only where they fit: Macs by memory, cards whole", _c94_sets)]
+
+
+def _c94_run(src, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_C94_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _i94, _n94, _o94, _d94 in _c94_run(_MILLENAI_SRC):
+    check(_n94, _o94, "%r" % (_d94,))
+_C94_MUT = [
+    ("the route ignores the mlx-lm", '    if _i["mlx"] and IS_ARM and _i["port"] and _mlx_runs(_l):',
+     '    if _i["mlx"] and IS_ARM and _i["port"]:', [1]),
+    ("offered whatever the mlx-lm", '(i["mlx"] and IS_ARM and _mlx_runs(l))', '(i["mlx"] and IS_ARM)', [1]),
+    ("an unknown mlx-lm counts as old", "    return not need or MLX_LM_VERSION is None or",
+     "    return not need or", [1]),
+    ("the coders not first", 'CODE_LADDER = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",\n               ',
+     'CODE_LADDER = (', [0, 2]),
+    ("a coder seated on a card it spills from", "        return size * 1.05 + (5 << 28) <= vram",
+     "        return size <= vram * 1.2", [2]),
+]
+_c94_caught = []
+for _mn, _ma, _mb, _mw in _C94_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c94_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _c94_run(_ms, _mw)):
+        _c94_caught.append((_mn, "not caught"))
+check("6b494's rules each break a check when broken (%d mutants)" % len(_C94_MUT), not _c94_caught,
+      "%r" % _c94_caught)
+# ==== 6b494 coders and Gemma 4 12B: end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
