@@ -629,7 +629,8 @@ class Leds:
             return None
         if self.fan_pct is None:
             return 1.0 if self.fan_phase in FAN_RED_PHASES else 0.0
-        return min(1.0, max(0.0, (self.fan_pct - LOW_PCT) / float(FULL_PCT - LOW_PCT)))
+        top = getattr(self, "red_at", FULL_PCT)          # red at the fans' work level (6b495)
+        return min(1.0, max(0.0, (self.fan_pct - LOW_PCT) / float(max(top - LOW_PCT, 1))))
 
     def fan_z(self):
         """How blue the fans' percentage says the lights are (0 = their 20%, 1 = their 10%), or None when
@@ -1047,6 +1048,7 @@ def service_step(leds, notify=o1fan.sd_notify, log=print, first=False):
 
 def run_service(log=print):
     leds = Leds(o1work.probes(), log=log)
+    leds.red_at = o1work.work_level()      # red at the fans' work level (6b495)
     stop, poke = threading.Event(), threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: (stop.set(), poke.set()))
     signal.signal(signal.SIGINT, lambda *_: (stop.set(), poke.set()))

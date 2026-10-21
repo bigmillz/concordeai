@@ -9,7 +9,10 @@ After=network.target ollama1-nft.service
 
 [Service]
 ExecStartPre=-/usr/bin/rm -f /run/ollama1/ttyd/ttyd.sock
-ExecStart=/usr/bin/ttyd --interface /run/ollama1/ttyd/ttyd.sock --base-path /term --writable --check-origin --max-clients 2 -t titleFixed=ollama1 /bin/login
+# 6b498, per the owner (the terminal opened 1 time in 10): 8 sessions, not 2, since a tab closed on a phone or a
+# laptop that slept can hold one for a long time; and a shell idle for an hour ends (TMOUT, kept by login -p),
+# so dead sessions free their place
+ExecStart=/usr/bin/ttyd --interface /run/ollama1/ttyd/ttyd.sock --base-path /term --writable --check-origin --max-clients 8 -t titleFixed=ollama1 /usr/bin/env TMOUT=3600 /bin/login -p
 ExecStartPost=/bin/sh -c 'for i in $$(seq 1 50); do [ -S /run/ollama1/ttyd/ttyd.sock ] && break; sleep 0.1; done; chgrp o1admin /run/ollama1/ttyd/ttyd.sock && chmod 0660 /run/ollama1/ttyd/ttyd.sock'
 Restart=always
 RestartSec=2

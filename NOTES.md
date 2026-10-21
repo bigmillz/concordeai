@@ -16103,3 +16103,37 @@ to MLX.
 - NOT VERIFIED: the install itself (no download was allowed: the hashes come from PyPI's JSON, not from wheels
   downloaded and hashed here, and pip's choice of the macOS 26 wheel on this macOS was not seen); every MLX model on
   0.32.2/mlx 0.32.2 (the gauntlet's live engines should be re-run on an upgraded venv); the live venv was not touched.
+
+## 6b495 — The fans' working level is a setting (per Patrick)
+
+Patrick: "tweak the fan curve so its quieter for my mom — case/cpu fans to maybe 50% instead of 100%, unless temps
+warrant higher."
+
+- `fan_work_pct` in /etc/ollama1/config.json (30-100, default 100: nothing changes until it's set) is the level for
+  `working` and the `hold100` hold after it; the ramp falls from it to 20%. Heat (any sensor at its limit, the
+  existing override with its 10 C hysteresis) and the one-time calibration still go to 100%. Read once when the
+  fan and lights services start (o1work.work_level()); the lights are fully red at that level, not at 100%.
+  The panel's chip says the hold's real percent.
+- A tuning test that picks the level from measured temperatures (Patrick's idea: a 2-3 min query, 10 min, then a
+  20-30 min burn, without the fans hunting up and down) would write this same setting: not built yet.
+- Tests: the setting read and clamped; the ramp from the work level. The existing fan tests still pin 100% (the
+  default).
+
+## 6b498 — The panel's web terminal opens reliably (per Patrick)
+
+Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
+
+- ttyd ran with `--max-clients 2`. A session whose browser went away without closing (a phone tab, a laptop that
+  slept, a network change, the panel restarted under it during setup) keeps its place until the connection
+  finally drops, and a logged-in shell never ends; with both places held, a new tab got a blank page.
+- Now `--max-clients 8`, and the login runs as `env TMOUT=3600 /bin/login -p`: an idle shell ends after an hour
+  (login -p keeps TMOUT for the shell), freeing its place. Unverified on the server until the next setup run.
+
+## 6b499 — Hold locks keep the server awake while other software works (per Patrick)
+
+- Patrick runs Claude Code on the server (bigmillz/devbox: user `dev`, Remote Control from the phone) and wants the
+  server not to sleep mid-task. o1sleep.busy_reasons() now also reads /etc/ollama1/hold-locks: one lock-file path
+  per line (absolute; a tab and the reason to show may follow). A listed lock that another process holds (flock, the
+  same test as setup.sh's lock) is a reason not to sleep, for auto sleep and the panel's Sleep button alike. A
+  missing list, a missing file or a free lock is nothing. devbox's Claude Code hooks take the lock when a prompt
+  arrives and let go when the turn stops, with a 6 h ceiling so a crashed turn can't keep the server up forever.

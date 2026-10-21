@@ -49,6 +49,7 @@ Deep idle (6b434, per the owner: no more dimming; the lights stay at 100% bright
   The lights follow: the fans back at 20% take them from blue to white (WAKE_FADE_S).
 """
 import os
+import json
 import time
 
 import o1gpu
@@ -58,6 +59,19 @@ GPU_CONFIRM_S = 1.5               # ... for this long in a row; and at/under it 
 CLOCK_SLACK_S = 1e-6              # a sample due at exactly 1.5 s that a float clock puts a hair early still counts
 CPU_HOT_C, CPU_COOL_C = 60, 55    # the processor's temperature: work from 60 C, until it is under 55 C (fans only)
 COOL_S = 60                       # the lights' cool-down, red -> white, only with no fan service (6b466)
+def work_level(path=None):
+    """The fans' level while working and in the hold after it: config.json's fan_work_pct (6b495, per the owner:
+    quieter; 30-100), else 100. Heat and the one-time calibration always go to 100%. The lights are red at it."""
+    try:
+        with open(path or "/etc/ollama1/config.json", encoding="utf-8") as f:
+            v = json.load(f).get("fan_work_pct")
+    except (OSError, ValueError, AttributeError):
+        return 100
+    if isinstance(v, bool) or not isinstance(v, int):
+        return 100
+    return max(30, min(100, v))
+
+
 FAN_HOLD_S = 30                   # the fans: 100% for this long after the work ends (6b460) ...
 FAN_RAMP_S = 90                   # ... then a straight fall 100 -> 20% over this long
 RISE_S = 5.0                      # the lights: white to red

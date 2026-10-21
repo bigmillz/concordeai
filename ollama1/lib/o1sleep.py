@@ -103,9 +103,33 @@ def setup_running(lock=None):
         os.close(fd)
 
 
-def busy_reasons(active_units=_active_units, setup_lock=None):
+HOLD_LOCKS = "/etc/ollama1/hold-locks"     # one lock-file path per line; a held one keeps the server awake (6b499)
+
+
+def held_locks(path=None):
+    """Hold locks other software keeps while it works (6b499, per the owner: Claude Code on the server, through its
+    prompt and stop hooks): [(path, why)] of the ones held now. The list file is plain text, one path per line,
+    optionally followed by a tab and the reason to show; a missing file, path or unreadable lock is not held."""
+    out = []
+    try:
+        with open(path or HOLD_LOCKS, encoding="utf-8") as f:
+            lines = f.read(65536).splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        lock, _, why = line.partition("\t")
+        lock = lock.strip()
+        if lock.startswith("/") and os.path.exists(lock) and setup_running(lock):
+            out.append((lock, why.strip() or "a hold lock is held"))
+    return out
+
+
+def busy_reasons(active_units=_active_units, setup_lock=None, hold_locks=None):
     """Why the server must not sleep now ([] = it may)."""
-    reasons = []
+    reasons = [why for _p, why in held_locks(hold_locks)]
     active = active_units([p for p, _ in BUSY_UNITS])
     if active is None:
         return ["systemd could not be asked what is running"]
