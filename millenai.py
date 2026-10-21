@@ -6358,7 +6358,10 @@ def start_managed_engines():
 
 
 # ------------------------------------------------------- first-run setup
-_setup_lock = threading.Lock()
+# re-entrant (6b493): _refresh_keep() takes this lock and was called while it was held, by _download_model and
+# the Ollama pull, so the first download froze the app's whole model setup (every set card, /api/setup and the
+# download itself waited on a lock their own thread held)
+_setup_lock = threading.RLock()
 _setup_jobs = {}  # label -> {"status": "downloading"|"done"|"error", "note": str}
 
 
