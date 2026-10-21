@@ -15905,3 +15905,18 @@ processor: stress-ng exited with status 1 (a check failed)".
   leaves that reading in /run/ollama1/gpu-usage.json (0644, atomic, root only), and o1gpu.usage("nvidia") falls back to
   it when nvidia-smi can't run and the reading is under 15 s old. Verified on the server: the gateway's user reads
   busy, VRAM used and total.
+
+## 6b490 — An OpenAI-style door on the gateway, with API keys (per Patrick)
+
+- Patrick wants OMP (oh-my-pi) to use Ollama1. OMP speaks the OpenAI API and can't sign requests like the app;
+  Ollama is closed to every user but ollama, o1gw, o1admin and root (nft skuid), by design.
+- The gateway gains `/openai/v1/models` and `/openai/v1/chat/completions`. check_access runs first as for every
+  route (Cloudflare Access with the paired service token, or the home network on the LAN listener); then an API key
+  (`Authorization: Bearer o1k_...`) instead of a signature. Chat is handed to Ollama's /v1/chat/completions and
+  streamed back as it arrives (Connection: close ends it), counts as activity for auto sleep, refuses while a
+  picture or video job holds the card, and only names an installed model (404 otherwise, never a pull). The log line
+  has status, model and ms, never content.
+- Keys: lib/o1apikey.py and `sudo ollama1-apikey new|list|revoke NAME`; only sha256 hashes in
+  /etc/ollama1/api-keys.json (root:o1gw 0640), compared in constant time, re-read when the file changes.
+- Not done: the RAM-model and spill handling of /api/chat (a model that doesn't fit runs as Ollama decides);
+  embeddings and completions routes; the app's own pairing is unchanged.

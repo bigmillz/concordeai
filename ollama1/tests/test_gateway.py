@@ -1560,3 +1560,70 @@ class TestLanListenerWaits(unittest.TestCase):
         body = src[src.index("def serve(cfg, stop=None):"):src.index("def main():")]
         self.assertNotIn('ThreadingHTTPServer((cfg["lan_bind"]', body)
         self.assertIn("target=lan_listener", body)
+
+
+class TestOpenAIDoor(unittest.TestCase):
+    """6b490: /openai/v1/... for tools that can't sign: Cloudflare Access, then an API key."""
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        import o1apikey
+        cls.ak = o1apikey
+        cls.dir = tempfile.mkdtemp()
+        cls.old = o1apikey.PATH
+        o1apikey.PATH = os.path.join(cls.dir, "api-keys.json")
+        cls.key = o1apikey.new("omp-test")
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+        cls.ak.PATH = cls.old
+        shutil.rmtree(cls.dir, True)
+
+    def go(self, method, path, obj=None, key="default", jwt_token="default"):
+        h = {"Content-Type": "application/json"}
+        if key == "default":
+            key = self.key
+        if key:
+            h["Authorization"] = "Bearer " + key
+        return call(method, path, obj, dev=False, jwt_token=jwt_token, headers=h)
+
+    def test_no_key_or_a_wrong_key_is_refused_before_ollama(self):
+        before = len(G["stub"].calls)
+        for key in (None, "o1k_wrong", "not-a-key"):
+            st, data, _ = self.go("POST", "/openai/v1/chat/completions", {"model": "small:8b", "messages": []}, key=key)
+            self.assertEqual(st, 401, key)
+            self.assertEqual(json.loads(data)["code"], "api_key")
+        self.assertEqual(len(G["stub"].calls), before)
+
+    def test_access_still_comes_first(self):
+        st, _, _ = self.go("GET", "/openai/v1/models", jwt_token=None)
+        self.assertEqual(st, 403)
+
+    def test_models_lists_the_installed_ones(self):
+        st, data, _ = self.go("GET", "/openai/v1/models")
+        self.assertEqual(st, 200)
+        d = json.loads(data)
+        self.assertEqual(d["object"], "list")
+        self.assertIn("small:8b", [m["id"] for m in d["data"]])
+
+    def test_chat_is_passed_through_and_streams(self):
+        st, data, r = self.go("POST", "/openai/v1/chat/completions",
+                              {"model": "small:8b", "stream": True, "messages": [{"role": "user", "content": "hello"}]})
+        self.assertEqual(st, 200, data)
+        self.assertIn("text/event-stream", r.getheader("Content-Type"))
+        self.assertIn(b"ANSWER-hello", data)
+        self.assertIn(b"data: [DONE]", data)
+        st, data, _ = self.go("POST", "/openai/v1/chat/completions",
+                              {"model": "small:8b", "messages": [{"role": "user", "content": "hi"}]})
+        self.assertEqual(json.loads(data)["choices"][0]["message"]["content"], "ANSWER-hi")
+
+    def test_an_unknown_model_is_404_not_a_pull(self):
+        st, data, _ = self.go("POST", "/openai/v1/chat/completions", {"model": "nope:1b", "messages": []})
+        self.assertEqual(st, 404)
+
+    def test_a_revoked_key_stops_at_once(self):
+        k = self.ak.new("short-lived")
+        self.assertEqual(self.go("GET", "/openai/v1/models", key=k)[0], 200)
+        self.assertTrue(self.ak.revoke("short-lived"))
+        self.assertEqual(self.go("GET", "/openai/v1/models", key=k)[0], 401)

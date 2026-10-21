@@ -1,0 +1,57 @@
+#!/usr/bin/python3
+"""ollama1-apikey: keys for the gateway's OpenAI-style door (6b490).
+
+  sudo ollama1-apikey new NAME      make a key (printed once; only its hash is kept)
+  sudo ollama1-apikey list          names and dates, never the keys
+  sudo ollama1-apikey revoke NAME   the key stops working at once
+
+Use it with the base URL https://<gateway host>/openai/v1 and the paired service token's two
+Cloudflare Access headers (CF-Access-Client-Id and CF-Access-Client-Secret), as README "Other tools" shows.
+"""
+import grp
+import os
+import sys
+import time
+
+sys.path.insert(0, os.environ.get("OLLAMA1_PREFIX", "") + "/usr/local/lib/ollama1/lib")
+import o1apikey  # noqa: E402
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1] not in ("new", "list", "revoke") or (argv[1] != "list" and len(argv) != 3):
+        print(__doc__.strip())
+        return 2
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("Run it with sudo.")
+        return 1
+    try:
+        gid = grp.getgrnam("o1gw").gr_gid
+    except KeyError:
+        gid = None
+    cmd = argv[1]
+    if cmd == "new":
+        try:
+            key = o1apikey.new(argv[2], gid=gid)
+        except ValueError as e:
+            print(e)
+            return 2
+        print(key)
+        print("Keep it somewhere safe: it is not shown again. Revoke with: sudo ollama1-apikey revoke %s" % argv[2],
+              file=sys.stderr)
+        return 0
+    if cmd == "list":
+        keys = o1apikey.load()
+        if not keys:
+            print("no keys")
+        for k in keys:
+            print("%-32s made %s" % (k["name"], time.strftime("%Y-%m-%d", time.localtime(k.get("created") or 0))))
+        return 0
+    if o1apikey.revoke(argv[2], gid=gid):
+        print("revoked %s" % argv[2])
+        return 0
+    print("no key named %s" % argv[2])
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

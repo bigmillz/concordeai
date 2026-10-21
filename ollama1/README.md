@@ -889,6 +889,36 @@ reading other users' files (the request) and setting a file's group.
   or the unit is missing: run `setup.sh` again. To undo a set, apply another
   one, or edit the list and run `sudo ollama1-models sync`.
 
+## Other tools (an OpenAI-style API)
+
+Tools that can't sign requests the way the paired app does (OMP, editors, scripts) use an API key on
+`https://<server-name>.<your-domain>/openai/v1`. Two locks: Cloudflare Access (send the paired service token's
+`CF-Access-Client-Id` and `CF-Access-Client-Secret` headers, the same token the app uses) and the key
+(`Authorization: Bearer <key>`). Ollama itself stays closed to everything but the gateway.
+
+- Make a key on the server: `sudo ollama1-apikey new omp-mac` (printed once; only its hash is kept in
+  `/etc/ollama1/api-keys.json`). `sudo ollama1-apikey list`, `sudo ollama1-apikey revoke omp-mac`.
+- Routes: `GET /openai/v1/models` (the installed models) and `POST /openai/v1/chat/completions`
+  (passed to Ollama's own OpenAI endpoint, streamed as it arrives). A chat counts as work for auto sleep.
+- The server must be awake: wake it from the app (or the relay) first; the API doesn't wake it.
+
+Example for OMP (`~/.omp/agent/models.yml`), with the secrets in the Mac's Keychain:
+
+```yaml
+providers:
+  ollama1:
+    baseUrl: https://<server-name>.<your-domain>/openai/v1
+    api: openai-completions
+    apiKey: "!security find-generic-password -s ollama1-api-key -w"
+    authHeader: true
+    headers:
+      CF-Access-Client-Id: "!security find-generic-password -s ollama1-cf-id -w"
+      CF-Access-Client-Secret: "!security find-generic-password -s ollama1-cf-secret -w"
+    models:
+      - id: gpt-oss:20b
+        name: gpt-oss 20B (Ollama1)
+```
+
 ## Graphics card tuning
 
 **Off unless you ask**: `sudo ./setup.sh --gpu-tune` (or `OLLAMA1_GPU_TUNE=1`)

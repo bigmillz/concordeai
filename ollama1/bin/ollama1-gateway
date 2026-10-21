@@ -44,6 +44,7 @@ start, whose root program checks everything again and does the work. That
 is the only thing the gateway ever starts.
 """
 import datetime
+import http.client
 import ipaddress
 import json
 import os
@@ -53,11 +54,13 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
+import o1apikey  # noqa: E402
 import o1crypto  # noqa: E402
 from o1auth import AuthError, PAIR_MIN_INTERVAL, RequestVerifier, SKEW, parse_pair_request  # noqa: E402
 from o1common import (Paths, load_config, ram_models, read_allow_list, read_json, safe_label,  # noqa: E402
@@ -1066,6 +1069,8 @@ def make_handler(gw, lan=False):
                     raise GatewayError(414, "bad_request", "path too long")
                 gw.check_access(self.headers, lan, self.client_address[0], method)
                 route = self.path.split("?", 1)[0]
+                if route.startswith("/openai/"):
+                    return self.handle_openai(method, route, t0)     # an API key instead of a signature (6b490)
                 if route == "/v1/pair" and method == "POST":
                     return self.handle_pair()
                 try:
@@ -1092,6 +1097,62 @@ def make_handler(gw, lan=False):
                     self.close_connection = True
             finally:
                 gw.inflight.release()
+
+        # -- the OpenAI-style door (6b490) ---------------------------------
+        def handle_openai(self, method, route, t0):
+            """/openai/v1/models and /openai/v1/chat/completions for tools that can't sign (OMP, editors).
+            Cloudflare Access has already passed (check_access); the key is the second lock. Chat goes to
+            Ollama's own OpenAI endpoint, streamed through as it arrives, and counts as work for auto-sleep."""
+            auth = self.headers.get("Authorization") or ""
+            name = o1apikey.verify(auth[7:].strip() if auth[:7].lower() == "bearer " else "")
+            if not name:
+                gw.stats.auth_failure("api_key")
+                log("auth-fail", reason="api_key")
+                raise GatewayError(401, "api_key", "a valid API key is required: Authorization: Bearer <key>")
+            if method == "GET" and route == "/openai/v1/models":
+                data = [{"id": n, "object": "model", "created": 0, "owned_by": "ollama1"}
+                        for n in sorted(gw.refresh_tags(force=True))]
+                return self.send_json(200, {"object": "list", "data": data})
+            if method == "POST" and route == "/openai/v1/chat/completions":
+                obj = self.json_body(self.read_body(max_body))
+                if gw.gen.running():
+                    raise GatewayError(503, "busy", "the server is making a picture or video; try again when it is done")
+                model, _entry = gw.local_model(obj.get("model"))
+                obj["model"] = model
+                gw.activity.begin()
+                try:
+                    return self.proxy_openai("/v1/chat/completions", obj, model, t0)
+                finally:
+                    gw.activity.end()
+            raise GatewayError(404, "not_found", "not available through the gateway")
+
+        def proxy_openai(self, path, obj, model, t0):
+            u = urllib.parse.urlsplit(gw.base)
+            conn = http.client.HTTPConnection(u.hostname, u.port or 80, timeout=float(cfg.get("openai_timeout_s") or 900))
+            try:
+                conn.request("POST", path, body=json.dumps(obj).encode("utf-8"),
+                             headers={"Content-Type": "application/json"})
+                r = conn.getresponse()
+            except (OSError, http.client.HTTPException):
+                conn.close()
+                raise GatewayError(502, "ollama", "Ollama is not answering")
+            try:
+                self.send_response(r.status)
+                self.send_header("Content-Type", r.getheader("Content-Type") or "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Connection", "close")       # the body ends when the stream does
+                self.end_headers()
+                self.close_connection = True
+                while True:
+                    chunk = r.read1(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+            finally:
+                conn.close()
+                log("openai", status=r.status, model=model, ms=int((time.monotonic() - t0) * 1000))
 
         # -- pairing (POST /v1/pair) -------------------------------------
         def handle_pair(self):

@@ -207,6 +207,24 @@ class Stub:
                     return self.js(200, {"embedding": [0.1, 0.2, 0.3]})
                 if m.get("embedding"):
                     return self.js(400, {"error": "\"%s\" does not support generate" % name})
+                if self.path == "/v1/chat/completions":          # Ollama's OpenAI endpoint (6b490)
+                    msgs = body.get("messages") or []
+                    text = "ANSWER-" + (msgs[-1].get("content", "")[-12:] if msgs else "")
+                    if not body.get("stream"):
+                        return self.js(200, {"object": "chat.completion", "model": name, "choices": [
+                            {"index": 0, "message": {"role": "assistant", "content": text},
+                             "finish_reason": "stop"}]})
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Transfer-Encoding", "chunked")
+                    self.end_headers()
+                    for piece in (text, " more"):
+                        ev = ("data: " + json.dumps({"object": "chat.completion.chunk", "model": name, "choices": [
+                            {"index": 0, "delta": {"content": piece}}]}) + "\n\n").encode()
+                        self.wfile.write(b"%x\r\n%s\r\n" % (len(ev), ev))
+                    end = b"data: [DONE]\n\n"
+                    self.wfile.write(b"%x\r\n%s\r\n0\r\n\r\n" % (len(end), end))
+                    return
                 if self.path == "/api/generate":
                     prompt = body.get("prompt", "")
                     if not prompt:
