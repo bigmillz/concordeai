@@ -594,12 +594,14 @@ def allow_remove(name, allow_path=None):
 ALLOW_MAX_BYTES = 1 << 20
 
 
-def allow_apply(add, remove, allow_path=None):
+def allow_apply(add, remove, allow_path=None, ram=()):
     """The one edit a model set from the app makes (6b410, root only): every
     line whose model is a `remove` tag goes, in any letter case (a model the
     list names in any case is never deleted, so its line must go too); every
     `add` tag the list doesn't have yet gets a line of its own at the end, no
-    flag. Nothing else changes: the other lines, comments, flags, blank lines
+    flag, or the `ram` flag for a tag in `ram` (6b496: a coder the app sized
+    for system memory). A line already there keeps its flags: the owner's
+    word stands. Nothing else changes: the other lines, comments, flags, blank lines
     and line endings stay byte for byte. One write, one rename. A list that
     is missing (OSError: a new one holding only these tags would let the next
     sync delete every other model), isn't UTF-8 (UnicodeDecodeError) or is
@@ -624,7 +626,9 @@ def allow_apply(add, remove, allow_path=None):
     added = [t for t in add if not any(o1ollama.same_model(h, t) for h in have)]
     if added and keep and not keep[-1].endswith(("\n", "\r")):
         keep[-1] += "\n"
-    out = "".join(keep) + "".join(t + "\n" for t in added)
+    flagged = [r.lower() for r in ram]
+    out = "".join(keep) + "".join(
+        t + (" ram" if any(o1ollama.same_model(t.lower(), r) for r in flagged) else "") + "\n" for t in added)
     if out != text:
         _write_allow_text(out, path)
     return added, removed

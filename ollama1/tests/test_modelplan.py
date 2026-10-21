@@ -325,7 +325,8 @@ class TestStateRoute(Base):
         st, d = call("GET", "/v1/models/state")
         self.assertEqual(st, 200, d)
         self.assertEqual(sorted(d), ["allow", "busy", "disk_free_bytes", "jobs", "managed", "models", "plan",
-                                     "vram_bytes"])
+                                     "ram_bytes", "vram_bytes"])
+        self.assertIsInstance(d["ram_bytes"], int)           # 6b496
         # the stub's digests aren't sha256 hex: "" (6b445)
         self.assertEqual(d["models"], [{"name": "byhand:2b", "size": 2 * GIB, "digest": "", "loaded": False},
                                        {"name": "keep:1b", "size": 1 * GIB, "digest": "", "loaded": False},
@@ -1222,6 +1223,104 @@ class TestLocksAndSleep(unittest.TestCase):
         self.assertEqual(r, ["a model set from the app is being applied"])
         self.assertIn("ollama1-modelplan.service", [p for p, _ in o1sleep.BUSY_UNITS])
         self.assertEqual(G["root"].WHY, "a model set from the app is being applied")
+
+
+# ---- 6b496: a set's coders partly in system memory (the `ram` flag) ------------------
+
+class TestRamFlag(Base):
+    """The app may name some of `add` as `ram` (the coders it sized for a card
+    too small for them); their new allow-list lines get the flag, nothing else
+    changes, and the state says how much memory such a model may use."""
+
+    def good(self, **over):
+        b = {"plan": "everything", "add": ["devstral-small-2:24b", "qwen3-coder:30b", "gemma4:12b"],
+             "remove": [], "seen": "ab" * 32, "ram": ["devstral-small-2:24b", "qwen3-coder:30b"]}
+        b.update(over)
+        return b
+
+    def test_the_shape(self):
+        clean, err = M.parse_request(self.good())
+        self.assertEqual(err, "")
+        self.assertEqual(clean["ram"], ["devstral-small-2:24b", "qwen3-coder:30b"])
+        plain = {k: v for k, v in self.good().items() if k != "ram"}
+        self.assertNotIn("ram", M.parse_request(plain)[0])                 # absent: the old shape exactly
+        for ram in ([], None, "qwen3-coder:30b", ["llama3.2:1b"], ["qwen3-coder:30b", "qwen3-coder:30b"],
+                    ["Qwen3-coder:30b"], [5], ["qwen3-coder:30b\n"]):
+            clean, err = M.parse_request(self.good(ram=ram))
+            self.assertIsNone(clean, repr(ram))
+            self.assertTrue(err, repr(ram))
+            self.assertNotIn("llama3.2", err)                              # never repeats what was sent
+        self.assertEqual(M.parse_request(self.good(ram=["qwen3-coder:30b"]))[1], "")
+        self.assertIn("unknown key", M.parse_request(dict(self.good(), extra=1))[1])
+
+    def test_the_lines_it_writes(self):
+        with open(Paths.allow, "w") as f:
+            f.write("# mine\ngemma4:12b\nqwen3-coder:30b\n")              # already there, no flag: the owner's word
+        added, dropped = L.allow_apply(["devstral-small-2:24b", "qwen3-coder:30b", "new:1b"], [], Paths.allow,
+                                       ram=["devstral-small-2:24b", "qwen3-coder:30b"])
+        self.assertEqual((added, dropped), (["devstral-small-2:24b", "new:1b"], []))
+        self.assertEqual(self.allow(), "# mine\ngemma4:12b\nqwen3-coder:30b\ndevstral-small-2:24b ram\nnew:1b\n")
+        entries, errors = parse_allow_list(Paths.allow)
+        self.assertEqual(errors, [])
+        self.assertEqual({e["name"]: e["ram"] for e in entries},
+                         {"gemma4:12b": False, "qwen3-coder:30b": False, "devstral-small-2:24b": True,
+                          "new:1b": False})
+
+    def test_root_carries_it_out(self):
+        req = {"v": 1, "id": secrets.token_hex(8), "t": int(time.time()), "device": G["dev"].id, "plan": "everything",
+               "add": ["new:4b", "big:30b"], "remove": [], "seen": self.seen(), "ram": ["big:30b"]}
+        write_json_atomic(M.request_file(), req, mode=0o600)
+        rc = G["root"].run(owner_uid=os.getuid(), base=G["base"], active_units=lambda p: [], sleep=lambda s: None,
+                           tries=1, log=self.logs.append)
+        self.assertEqual(rc, 0)
+        self.assertTrue(self.allow().endswith("\nnew:4b\nbig:30b ram\n"), self.allow())
+        self.assertIn("with ram: big:30b", " ".join(self.logs))
+        # a ram name outside add is refused before anything changes
+        before = self.allow()
+        req = dict(req, id=secrets.token_hex(8), add=["other:1b"], ram=["big:30b"])
+        write_json_atomic(M.request_file(), req, mode=0o600)
+        rc = G["root"].run(owner_uid=os.getuid(), base=G["base"], active_units=lambda p: [], sleep=lambda s: None,
+                           tries=1, log=self.logs.append)
+        self.assertEqual(rc, 1)
+        self.assertEqual(json.load(open(M.answer_file()))["code"], "bad_request")
+        self.assertEqual(self.allow(), before)
+
+    def test_the_gateway_hands_it_on(self):
+        self.root.mode = "nothing"
+        G["gw"].plan_wait_s = 0.2
+        call("POST", "/v1/models/apply", self.body(add=["new:4b", "big:30b"], remove=[], ram=["big:30b"]))
+        req = json.load(open(M.request_file()))
+        self.assertEqual(sorted(req), sorted(M.REQUEST_KEYS + ("ram",)))
+        self.assertEqual(req["ram"], ["big:30b"])
+        os.unlink(M.request_file())
+        call("POST", "/v1/models/apply", self.body(add=["new:4b"], remove=[]))
+        self.assertEqual(sorted(json.load(open(M.request_file()))), sorted(M.REQUEST_KEYS))   # no ram: no key
+
+    def test_how_much_memory_a_ram_model_may_use(self):
+        gw = G["gw"]
+        saved = (gw.meminfo, dict(gw.cfg))
+        try:
+            gw.meminfo = lambda: {"MemTotal": 64 << 30, "MemAvailable": 10 << 30}
+            gw.cfg.update(ollama_memory_max_bytes=0, ollama_memory_high_bytes=0, ollama_no_repack=False,
+                          ram_margin_gib=8)
+            self.assertEqual(gw.ram_model_room(), 56 << 30)       # less 8 GiB (12% is 7.7); not what is free now
+            gw.meminfo = lambda: {"MemTotal": 128 << 30}
+            self.assertEqual(gw.ram_model_room(), (128 << 30) - int((128 << 30) * 0.12))    # 12% beats 8 GiB
+            gw.meminfo = lambda: {"MemTotal": 64 << 30, "MemAvailable": 10 << 30}
+            gw.cfg.update(ollama_memory_max_bytes=56 << 30)                              # MemoryHigh 2 GiB under it
+            self.assertEqual(gw.ram_model_room(), 54 << 30)
+            gw.cfg.update(ollama_no_repack=True)                                         # the card counts too
+            self.assertEqual(gw.ram_model_room(), (54 << 30) + 16 * GIB - (int(gw.cfg["vram_reserve_mib"]) << 20))
+            gw.meminfo = lambda: {}
+            self.assertEqual(gw.ram_model_room(), 0)
+            gw.meminfo = lambda: {"MemTotal": 64 << 30}
+            gw.cfg.update(ollama_no_repack=False)
+            st, d = call("GET", "/v1/models/state")
+            self.assertEqual(d["ram_bytes"], 54 << 30)
+        finally:
+            gw.meminfo = saved[0]
+            gw.cfg.clear()
+            gw.cfg.update(saved[1])
 
 
 if __name__ == "__main__":

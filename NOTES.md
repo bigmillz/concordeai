@@ -16032,3 +16032,74 @@ make sense, and fix the broken local Gemma 4 12B. Everything below was checked o
   rows of their size); Gemma 4 12B on mlx-lm 0.32 is a weight-key match, not a generation; the gemma4:12b Ollama
   route on a Mac was not exercised; the live gauntlet on this Mac (mlx-lm 0.31.3) will see Gemma 4 12B as an Ollama
   model.
+
+## 6b496 — The coders on a 16 GB card, partly in the server's memory (per Patrick)
+
+Patrick decided 6b494's open point: Devstral Small 2 24B and Qwen 3 Coder 30B on the server's RTX 5070 Ti (16 GB of
+VRAM, 64 GB of RAM) as models that spill into system memory, slower, without loosening the card-only rule for anything
+else.
+
+- **The kit already had the mechanism**: an allow-list line flagged `ram` lets the gateway load that model partly
+  into system memory (placement `gpu+ram`), alone, after its fit check (weights +5%, 2.5 GiB of compute buffers, the
+  KV cache; with weight repacking on, the default, against system memory alone). What was missing: a set from the
+  app could only write unflagged lines, and the app didn't know how much memory such a model may use.
+- **Kit, minimal.** `GET /v1/models/state` gains `ram_bytes` (`ram_model_room`): the gateway's own budget() rule on an
+  idle machine, from MemTotal: memory less the larger of 8 GiB and 12%, under Ollama's MemoryHigh, plus the card less
+  its reserve only with repacking off. `POST /v1/models/apply` takes one optional key, `ram`: a non-empty list from
+  `add`, each once (400 otherwise); the gateway hands it to root only when present (the request file keeps its old
+  shape otherwise), root checks it again and `allow_apply` writes those new lines as `<tag> ram`. A line already
+  there keeps its flags (the owner's word stands). The root log says "with ram: ...". PROTOCOL.md says all of it.
+  Tests: `TestRamFlag` in tests/test_modelplan.py (5), the state's key list, 4 mutants in tests/mutate.py (all
+  killed). Run one module at a time: test_modelplan (77 OK), test_library, test_gateway, test_repo (OK).
+- **App.** `SRV_RAM_ROWS` names the two coders; `model_sets({"vram", "ram"})` gives one of them a place in a server's
+  **Everything only** when it doesn't fit the card whole and fits `ram_bytes` with the file +5%, 2.5 GiB of buffers and
+  6 GiB for the KV cache at the server's 32K default context (6b492: Devstral's is 5.4 GB at fp16, 40 layers x 8 KV
+  heads x 128; Qwen 3 Coder's 3.2 GB). Light and Recommended stay whole-on-the-card. The sets carry `ram`; the sheet
+  marks those downloads "card + memory, slower" (the pane's own words for gpu+ram); the apply (and the update card's,
+  6b445) sends `ram` for exactly those of its downloads, taken from this app's own read, never from the page, and
+  only to a kit that said `ram_bytes` (an older kit gets no coder and no key). On a 64 GB server (about 52 GiB of room)
+  each fits with 25 GiB or more to spare (they need about 23 and 27 GiB by this rule).
+- **The Code lane seats them.** `server_mode_candidates(ctx, coders_in_ram=True)` (the Code lane's agents and the
+  Remote planner only) adds a model whose placement is `gpu+ram` and whose tag is one of SRV_RAM_ROWS', marked
+  `spill`; the modes, funnels, compositor and side passes never ask for it, so the "never gpu+ram unasked" rule
+  stands for everything else. srv_rank puts a coder first for the code role, the larger first (Qwen 3 Coder 30B).
+- Gauntlet: `== a server's coders partly in its memory (6b496) ==` (4 checks, 6 mutants), run in isolation with the
+  real servers section on the stand-in transport; 6b407 and 6b445 blocks re-run in isolation, passing.
+- NOT VERIFIED: nothing ran on the real server (no pull, no load): the speed of a dense 24B partly in RAM (Devstral)
+  is likely a few tokens a second with repacking on, since the gateway then counts the whole model against RAM and
+  llama.cpp may keep most of it on the CPU (as gpt-oss:120b did); Qwen 3 Coder's 3B active should do better. The
+  OpenAI-style door (6b490) still doesn't apply the RAM handling, as 6b490 noted.
+
+## 6b497 — The MLX engine follows the app: mlx-lm 0.31.3 -> 0.32.2 (per Patrick)
+
+Patrick decided the other open point: upgrade the app's MLX engine in the next app update, so Gemma 4 12B goes back
+to MLX.
+
+- **How the venv got stuck.** build_macos_app.sh and the launcher's first-run bootstrap run `pip install mlx-lm`
+  (unpinned, no --upgrade) once; nothing ever upgrades it, so every venv made before 2026-10-15 holds 0.31.3. An app
+  update replaces the bundle only.
+- **The update.** `_ensure_mlx_engine`, started at boot beside PyNaCl's install (6b327's pattern, after its pip):
+  only the copy holding the instance lock, only on Apple silicon, only into the app's own venv (never a dev or test
+  copy, a frozen build or a system Python: `_crypto_install_blocker`). If the venv's mlx-lm is older than
+  `MLX_LM_PIN` (0.32.2), Python is 3.11+ and transformers 5.7+ (0.32.2's requirements; this venv has 5.14.1), it
+  downloads `MLX_ENGINE_REQS` (mlx-lm 0.32.2, mlx 0.32.2 and mlx-metal 0.32.2, each by the sha256 PyPI lists: 1, 12
+  (CPython 3.11-3.14 on macOS 14/15/26 arm64) and 3 hashes; wheels only, no dependency) into a temporary folder, then
+  installs from that folder while holding `_engine_lock`, so no engine starts on a half-installed mlx. One try per
+  build + Python + pin (`mlx-engine.json`), again 3 days after a failure; each reason it doesn't try is in words
+  (`_mlx_engine`). The routes are read at start, so Gemma 4 12B moves to MLX at the start after the upgrade
+  (MLX_REQUIRES, 6b494), on the 6.8 GB already downloaded. mlx 0.32.2 rather than the newest 0.32.4 (one week old):
+  the oldest that 0.32.2 accepts. The CLI the app runs (`python -m mlx_lm server --model --port`) and its routes are
+  unchanged in 0.32.2.
+- **Every catalog MLX row must load on the pin.** `MLX_MODEL_TYPES`: each MLX build's config.json model_type from
+  the hub (2026-10-21). The gauntlet holds 0.32.2's own module list and MODEL_REMAPPING (read from its wheel) and
+  checks every row's type resolves there, the pin equals that snapshot's version (bump them together), no MLX_REQUIRES
+  exceeds the pin, and the pins are exactly the three wheels by hash.
+- The installers stay unpinned: pinning mlx-lm 0.32.2 there would break a first run on the Command Line Tools'
+  Python 3.9 (mlx-lm 0.32 needs 3.11), where today pip picks an older engine; on 3.9/3.10 the update says why and
+  Gemma 4 12B stays on Ollama.
+- ollama1/tests/test_repo.py: its secret scan now lets a `--hash=sha256:` pin line through (a wheel's published
+  hash is no secret); 16 such lines are new in millenai.py.
+- Gauntlet: `== the MLX engine follows the app: mlx-lm 0.32.2 (6b497) ==` (3 checks, 7 mutants), in isolation.
+- NOT VERIFIED: the install itself (no download was allowed: the hashes come from PyPI's JSON, not from wheels
+  downloaded and hashed here, and pip's choice of the macOS 26 wheel on this macOS was not seen); every MLX model on
+  0.32.2/mlx 0.32.2 (the gauntlet's live engines should be re-run on an upgraded venv); the live venv was not touched.

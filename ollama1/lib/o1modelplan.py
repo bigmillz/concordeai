@@ -50,6 +50,11 @@ from o1common import Paths, read_json_safe, write_json_atomic
 UNIT = "ollama1-modelplan.service"
 PLANS = ("light", "recommended", "everything")
 KEYS = ("plan", "add", "remove", "seen")
+# 6b496: optional. The models of `add` whose new allow-list line gets the
+# `ram` flag (they may load partly into system memory): the app sends it for
+# the coders it sized for a card too small for them, and only to a kit whose
+# GET /v1/models/state says ram_bytes. Absent, nothing changes.
+RAM_KEY = "ram"
 # A model from Ollama's own library: no host, no namespace, no "/".
 TAG_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,79}(:[a-z0-9][a-z0-9._-]{0,63})?$")
 MAX_PER_LIST = 40
@@ -172,7 +177,7 @@ def parse_request(obj):
     never repeats what was sent."""
     if not isinstance(obj, dict) or not obj:
         return None, "send plan, add, remove and seen"
-    if any(k not in KEYS for k in obj):
+    if any(k not in KEYS and k != RAM_KEY for k in obj):
         return None, "unknown key: send exactly plan, add, remove and seen"
     for k in KEYS:
         if k not in obj:
@@ -204,7 +209,20 @@ def parse_request(obj):
     seen = obj["seen"]
     if not isinstance(seen, str) or not HEX64_RE.fullmatch(seen):
         return None, "seen must be the hex sha256 of the model names on the server"
-    return {"plan": obj["plan"], "add": lists["add"], "remove": lists["remove"], "seen": seen.lower()}, ""
+    clean = {"plan": obj["plan"], "add": lists["add"], "remove": lists["remove"], "seen": seen.lower()}
+    if RAM_KEY in obj:
+        # 6b496: some of add, each once, to be allowed system memory
+        ram = obj[RAM_KEY]
+        if not isinstance(ram, list) or not ram:
+            return None, "ram must be a list of models from add"
+        added = {norm(t) for t in lists["add"]}
+        for i, t in enumerate(ram):
+            if not valid_tag(t) or norm(t) not in added:
+                return None, "ram[%d] is not one of the models in add" % i
+        if len({norm(t) for t in ram}) != len(ram):
+            return None, "ram names a model twice"
+        clean[RAM_KEY] = list(ram)
+    return clean, ""
 
 
 def seen_hash(names):
@@ -249,6 +267,8 @@ def write_request(rid, device, clean, now):
     root answers to, when, which device, and the checked request."""
     obj = {"v": 1, "id": rid, "t": int(now), "device": device}
     obj.update((k, clean[k]) for k in KEYS)
+    if clean.get(RAM_KEY):
+        obj[RAM_KEY] = list(clean[RAM_KEY])        # 6b496
     write_json_atomic(request_file(), obj, mode=0o600)
 
 

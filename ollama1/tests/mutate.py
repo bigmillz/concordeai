@@ -2642,6 +2642,17 @@ MUTANTS = [
      '        if m and SSH_COMMENT in line:', '        if m:', ['test_wifi']),
     ('wifi: status says the link-down setting is in effect when it is not (6b473)', 'lib/o1wifi.py',
      '    return arp_setting("ignore_routes_with_linkdown", iface, proc) >= 1', '    return True', ['test_wifi']),
+    # ---- a set's coders partly in system memory: the `ram` flag (6b496)
+    ('modelplan: a ram name outside add accepted (6b496)', 'lib/o1modelplan.py',
+     '            if not valid_tag(t) or norm(t) not in added:', '            if not valid_tag(t):', ['test_modelplan']),
+    ('modelplan: the ram flag never written (6b496)', 'lib/o1library.py',
+     't + (" ram" if any(o1ollama.same_model(t.lower(), r) for r in flagged) else "") + "\\n"',
+     't + "\\n"', ['test_modelplan']),
+    ('modelplan: the gateway drops ram before root (6b496)', 'lib/o1modelplan.py',
+     '        obj[RAM_KEY] = list(clean[RAM_KEY])        # 6b496', '        pass', ['test_modelplan']),
+    ('modelplan: ram_bytes counts what is free now, not the machine (6b496)', 'bin/ollama1-gateway',
+     '            total = int(self.meminfo().get("MemTotal", 0))',
+     '            total = int(self.meminfo().get("MemAvailable", 0))', ['test_modelplan']),
 ]
 
 

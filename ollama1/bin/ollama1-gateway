@@ -499,7 +499,8 @@ class Gateway:
     def models_state(self):
         """GET /v1/models/state: exactly models (each with its digest,
         6b445), allow, managed (the models a set from the app brought,
-        6b445), busy, jobs, plan, disk_free_bytes and vram_bytes."""
+        6b445), busy, jobs, plan, disk_free_bytes, vram_bytes and ram_bytes
+        (the most a 'ram' model may use, 6b496)."""
         disk = self.disk_models()
         try:
             loaded = self.loaded_names()
@@ -521,7 +522,8 @@ class Gateway:
         return {"models": models, "allow": read_allow_list(), "managed": o1modelplan.read_managed(),
                 "busy": bool(self.models_busy()),
                 "jobs": st["jobs"] if st else [], "plan": st["plan"] if st else None,
-                "disk_free_bytes": o1modelplan.disk_free() or 0, "vram_bytes": vram}
+                "disk_free_bytes": o1modelplan.disk_free() or 0, "vram_bytes": vram,
+                "ram_bytes": self.ram_model_room()}
 
     def wait_plan_answer(self, rid):
         """Root's answer to request `rid`, or None after plan_wait_s."""
@@ -709,6 +711,31 @@ class Gateway:
             # system memory must fit under it, not just under the hard cap.
             ram_part = min(ram_part, high)
         return max(0, vram + max(0, ram_part))
+
+    def ram_model_room(self):
+        """The most a 'ram' model may ever use here (6b496), for the app to
+        size its sets: budget()'s rule on an idle machine, from MemTotal (not
+        what is free now): system memory less the OS margin, under Ollama's
+        MemoryHigh, plus the card less its reserve only with repacking off
+        (fit_check's host_only). 0 when the memory can't be read."""
+        try:
+            total = int(self.meminfo().get("MemTotal", 0))
+        except (OSError, ValueError, TypeError):
+            total = 0
+        if total <= 0:
+            return 0
+        margin = max(8 << 30, int(total * 0.12), int(self.cfg.get("ram_margin_gib") or 8) << 30)
+        part = total - margin
+        cap = int(self.cfg.get("ollama_memory_max_bytes") or 0)
+        high = int(self.cfg.get("ollama_memory_high_bytes") or 0) or (cap - (2 << 30) if cap else 0)
+        if high:
+            part = min(part, high)
+        room = max(0, part)
+        if self.cfg.get("ollama_no_repack"):
+            vt = self.vram_total()
+            if vt:
+                room += max(0, vt - int(self.cfg["vram_reserve_mib"]) * (1 << 20))
+        return room
 
     def fit_check(self, name, entry, n_ctx, ram=False, explicit=True):
         """Refuses a model that can't fit; returns the num_ctx to use. A
