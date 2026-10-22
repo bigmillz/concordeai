@@ -16002,3 +16002,14 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
   (in + out against the link speed, else 1 Gbit/s) and two history charts, Network in / out in Mbit/s; history
   rows grow to 13 columns (older 7/9/11-column files are still read).
 - Needs the kit install on the server (setup.sh restarts the fan service and the panel).
+
+## 6b501 — No ROCm download on an NVIDIA server; setup's GPU check accepts CUDA (per Patrick, from the devbox session)
+
+- The devbox Claude session on the server saw a kit install spend over an hour fetching the 1 GB ROCm component
+  (ollama-linux-amd64-rocm) at ~55 KB/s for a machine with only the RTX 5070 Ti. ollama1-update-ollama now asks
+  want_rocm(): config.json's ollama_rocm when it is set (true or false), else yes unless o1gpu.detect() says
+  NVIDIA. An unknown card or a failing detect keeps the old answer, yes, so an AMD box can't lose ROCm by accident.
+  The base archive carries the CUDA libraries.
+- setup.sh step 11 treated the GPU as found only when Ollama's "inference compute" line said ROCm, so an NVIDIA
+  server got a false "Ollama did not report a ROCm GPU" note and a `later` item. It now accepts ROCm or CUDA. The
+  gateway's 100%-on-GPU rule was already vendor-neutral (size_vram against size from /api/ps).

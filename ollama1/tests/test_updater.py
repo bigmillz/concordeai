@@ -416,5 +416,22 @@ class TestNetworkWaitEndToEnd(unittest.TestCase):
         self.assertEqual(a.count("ou.result==='failed'?'Last update failed'"), 1)       # only a real failure is "failed"
 
 
+class TestWantRocm(unittest.TestCase):
+    """6b501: the ROCm component only where it can be used."""
+    def test_config_wins_then_the_card(self):
+        mod = load_updater()
+        nv, amd, none = (lambda: {"vendor": "nvidia"}), (lambda: {"vendor": "amd"}), (lambda: {"vendor": None})
+        self.assertFalse(mod.want_rocm({}, nv))
+        self.assertTrue(mod.want_rocm({}, amd))
+        self.assertTrue(mod.want_rocm({}, none))                  # unknown: the old answer
+        self.assertTrue(mod.want_rocm({"ollama_rocm": True}, nv))
+        self.assertFalse(mod.want_rocm({"ollama_rocm": False}, amd))
+
+    def test_a_failing_detect_keeps_rocm(self):
+        def boom():
+            raise OSError("no sysfs")
+        self.assertTrue(load_updater().want_rocm({}, boom))
+
+
 if __name__ == "__main__":
     unittest.main()
