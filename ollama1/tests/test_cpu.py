@@ -481,14 +481,14 @@ class TestAdminPanel(unittest.TestCase):
         self.panel.state_cache = (0, None)
         self.panel.sample()
         row = self.panel.history[-1]
-        self.assertEqual(len(row), 11)                         # 6b398 added CPU busy and memory used
+        self.assertEqual(len(row), 13)                         # 6b398 CPU busy and memory used; 6b500 network
         self.assertEqual((row[7], row[8]), (66.0, 4.0))
         st, raw, _ = self.TA.get("/api/history")
         d = json.loads(raw)
         self.assertEqual(d["fields"][:7], ["t", "tps", "gpu_busy", "vram_gib", "gpu_temp", "power_w", "active"])
         self.assertEqual(d["fields"][7:9], ["cpu_temp", "cpu_ghz"])
-        self.assertEqual(d["fields"][9:], ["cpu_pct", "ram_gib"])
-        self.assertTrue(all(len(r) == 11 for r in d["rows"]))
+        self.assertEqual(d["fields"][9:], ["cpu_pct", "ram_gib", "net_in_mbps", "net_out_mbps"])
+        self.assertTrue(all(len(r) == 13 for r in d["rows"]))
 
     def test_sampler_row_without_cpu_data_has_blanks(self):
         self.panel.cpuprobe = self.t.probe()
@@ -500,15 +500,17 @@ class TestAdminPanel(unittest.TestCase):
         from o1common import Paths, write_json_atomic
         now = int(time.time())
         write_json_atomic(Paths.history, {"rows": [[now - 5, 1, 2, 3, 4, 5, 6], [now - 4, 1, 2, 3, 4, 5, 6, 7, 8.5],
-                                                   [now - 3, 1, 2], "junk", [now - 2] + [0] * 12,
-                                                   [now - 1, 1, 2, 3, 4, 5, 6, 7, 8.5, 9.5, 10.5]]}, mode=0o600)
+                                                   [now - 3, 1, 2], "junk", [now - 2] + [0] * 13,
+                                                   [now - 1, 1, 2, 3, 4, 5, 6, 7, 8.5, 9.5, 10.5],
+                                                   [now, 1, 2, 3, 4, 5, 6, 7, 8.5, 9.5, 10.5, 0.4, 0.1]]}, mode=0o600)
         try:
             p = self.TA.A["mod"].Panel(self.TA.A["cfg"])
             rows = list(p.history)
-            self.assertEqual(len(rows), 3)                     # 7, 9 and 11 columns; the others are dropped
-            self.assertEqual(rows[0][7:], [None, None, None, None])
-            self.assertEqual(rows[1][7:], [7, 8.5, None, None])
-            self.assertEqual(rows[2][7:], [7, 8.5, 9.5, 10.5])
+            self.assertEqual(len(rows), 4)                     # 7, 9, 11 and 13 columns; the others are dropped
+            self.assertEqual(rows[0][7:], [None] * 6)
+            self.assertEqual(rows[1][7:], [7, 8.5] + [None] * 4)
+            self.assertEqual(rows[2][7:], [7, 8.5, 9.5, 10.5, None, None])
+            self.assertEqual(rows[3][11:], [0.4, 0.1])
         finally:
             os.unlink(Paths.history)
 

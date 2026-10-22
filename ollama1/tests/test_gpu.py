@@ -252,3 +252,86 @@ class TestSharedReading(GpuFixture):
     def test_nvidia_smi_still_wins(self):
         self.nvidia_smi("61, 8123, 24564")
         self.assertEqual(o1gpu.usage("nvidia")["busy_pct"], 61)
+
+
+class TestPanelSharedReading(GpuFixture):
+    """6b500: the panel can't run nvidia-smi either (PrivateDevices=yes); the fan service leaves the whole reading."""
+    def setUp(self):
+        super().setUp()
+        self.old, o1gpu.SHARED = o1gpu.SHARED, os.path.join(self.dir, "gpu-usage.json")
+
+    def tearDown(self):
+        o1gpu.SHARED = self.old
+        super().tearDown()
+
+    def test_the_fan_service_publishes_the_full_reading_and_the_panel_reads_it(self):
+        import o1stats
+        import o1work
+        self.nvidia_smi("37, 12686, 16303, 61, 212.40, 300.00, 45, 2610, 14001")
+        g = o1work.Gpu()
+        g.vendor = "nvidia"
+        real = os.geteuid
+        os.geteuid = lambda: 0
+        try:
+            self.assertEqual(g.busy(), 37)
+        finally:
+            os.geteuid = real
+        self.assertEqual(o1gpu.usage("nvidia")["vram_total_bytes"], 16303 << 20)
+        os.remove(os.path.join(self.bin, "nvidia-smi"))     # now the panel's sandbox: no nvidia-smi
+        s = o1stats.gpu()
+        self.assertEqual((s["busy_pct"], s["power_w"], s["power_cap_w"], s["temps"]), (37, 212.4, 300, {"edge": 61.0}))
+        self.assertEqual((s["vram_used"], s["sclk_mhz"], s["vendor"]), (12686 << 20, 2610, "nvidia"))
+        self.assertEqual(o1gpu.usage("nvidia")["busy_pct"], 37)             # the gateway's reader still works
+
+    def test_a_stale_or_three_number_reading_is_not_shown(self):
+        import o1stats
+        o1gpu.publish({"busy_pct": 5, "vram_used_bytes": 1, "vram_total_bytes": 2})   # an older fan service
+        self.assertIsNone(o1stats.gpu())
+        o1gpu.publish({"busy_pct": 5, "vendor": "nvidia", "temps": {"edge": 50}})
+        self.assertEqual(o1stats.gpu()["busy_pct"], 5)
+        self.assertIsNone(o1stats.gpu_nvidia_shared(now=time.time() + 60))
+
+
+class TestNet(unittest.TestCase):
+    """6b500: network traffic for the panel, physical ports only."""
+    DEV = ("Inter-|   Receive                                                |  Transmit\n"
+           " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n"
+           "    lo: %d 0 0 0 0 0 0 0 %d 0 0 0 0 0 0 0\n"
+           "eth0: %d 0 0 0 0 0 0 0 %d 0 0 0 0 0 0 0\n"
+           "   br0: %d 0 0 0 0 0 0 0 %d 0 0 0 0 0 0 0\n")
+
+    def setUp(self):
+        import o1stats
+        self.o1stats = o1stats
+        self.dir = tempfile.mkdtemp(prefix="o1net-")
+        os.makedirs(os.path.join(self.dir, "sys/class/net/eth0/device"))
+        os.makedirs(os.path.join(self.dir, "sys/class/net/br0"))
+        os.makedirs(os.path.join(self.dir, "proc/net"))
+        self.old = (o1stats.SYS, o1stats.PROC)
+        o1stats.SYS, o1stats.PROC = os.path.join(self.dir, "sys"), os.path.join(self.dir, "proc")
+
+    def tearDown(self):
+        self.o1stats.SYS, self.o1stats.PROC = self.old
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def counters(self, port_rx, port_tx):
+        with open(os.path.join(self.dir, "proc/net/dev"), "w") as f:
+            f.write(self.DEV % (10 ** 9, 10 ** 9, port_rx, port_tx, port_rx, port_tx))
+
+    def test_rate_between_two_calls_counts_each_byte_once(self):
+        t = [100.0]
+        n = self.o1stats.Net(clock=lambda: t[0])
+        self.counters(1000, 500)
+        self.assertIsNone(n.sample())
+        self.counters(1000 + 2_000_000, 500 + 250_000)
+        t[0] += 2
+        self.assertEqual(n.sample(), {"rx_bps": 1_000_000, "tx_bps": 125_000})
+
+    def test_a_counter_reset_is_no_reading(self):
+        t = [100.0]
+        n = self.o1stats.Net(clock=lambda: t[0])
+        self.counters(5000, 5000)
+        n.sample()
+        self.counters(10, 10)
+        t[0] += 1
+        self.assertIsNone(n.sample())

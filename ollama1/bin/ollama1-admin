@@ -71,9 +71,10 @@ TEMPLATE_UNITS = {
     "sleep-config": "ollama1-sleepcfg@%s.service",       # %s: on-30 / off-60 (6b402)
 }
 SLEEP_WAIT_S = 8.0     # how long the answer to a sleep-setting change waits for the unit to say what it saved
-HISTORY_COLS = 11     # t, tps, gpu busy, vram, gpu temp, gpu power, active, cpu temp, cpu GHz, cpu %, RAM GiB
+HISTORY_COLS = 13     # t, tps, gpu busy, vram, gpu temp, gpu power, active, cpu temp, cpu GHz, cpu %, RAM GiB,
+                      # network in and out in Mbit/s (6b500)
 HISTORY_FIELDS = ["t", "tps", "gpu_busy", "vram_gib", "gpu_temp", "power_w", "active", "cpu_temp", "cpu_ghz",
-                  "cpu_pct", "ram_gib"]
+                  "cpu_pct", "ram_gib", "net_in_mbps", "net_out_mbps"]
 TERM_OVERRIDE = {"x-frame-options", "content-security-policy", "cache-control", "referrer-policy",
                  "x-content-type-options"}
 
@@ -261,12 +262,14 @@ class Panel:
         self.origin = "https://" + cfg["hostname_admin"].lower()
         self.cpu = o1stats.CPU()
         self.cpu.sample()
+        self.net = o1stats.Net()
+        self.net.sample()
         self.cpuprobe = o1cpu.CpuProbe()
         self.history = collections.deque(maxlen=24 * 360)
         h = read_json(Paths.history, {}) or {}
         for row in h.get("rows", []) if isinstance(h, dict) else []:
-            if isinstance(row, list) and len(row) in (7, 9, HISTORY_COLS) and self.clock() - row[0] < 86400:
-                self.history.append(row + [None] * (HISTORY_COLS - len(row)))   # older files have 7 or 9 columns
+            if isinstance(row, list) and len(row) in (7, 9, 11, HISTORY_COLS) and self.clock() - row[0] < 86400:
+                self.history.append(row + [None] * (HISTORY_COLS - len(row)))   # older files have 7, 9 or 11 columns
         self.state_cache = (0, None)
         self.power_cache = (0, None, None)
         self.busy = o1sleep.busy_reasons
@@ -311,7 +314,7 @@ class Panel:
         with self.lock:
             if self.state_cache[1] is not None and now - self.state_cache[0] < 1.5:
                 return self.state_cache[1]
-            st = o1stats.collect(self.cpu, int(self.cfg["tunnel_metrics_port"]))
+            st = o1stats.collect(self.cpu, int(self.cfg["tunnel_metrics_port"]), self.net)
             st["pairing_open"] = bool((st.get("gateway") or {}).get("pairing_open")) or \
                 bool(o1pair.read_public())
             st["lan_mode"] = bool(self.cfg.get("lan_mode"))
@@ -361,6 +364,9 @@ class Panel:
                (cpu.get("temp") or {}).get("c"), round(ghz / 1000.0, 2) if ghz else None,
                round(util, 1) if isinstance(util, (int, float)) else None,
                round(mem["used"] / 2**30, 2) if mem.get("total") else None]
+        net = st.get("net") or {}
+        row += [round(net[k] * 8 / 1e6, 3) if isinstance(net.get(k), (int, float)) else None
+                for k in ("rx_bps", "tx_bps")]
         self.history.append(row)
 
     def save_history(self):
@@ -1378,6 +1384,10 @@ const GA=[
  {id:'clk',label:'CPU clock',grad:'blue',glow:'rgba(111,143,255,.15)',f:s=>{const f=((s.cpu||{}).freq)||{},top=f.rated_mhz||f.max_mhz;return {v:f.avg_mhz,max:top||5000,t:isNum(f.avg_mhz)?(f.avg_mhz/1000).toFixed(2):null,u:'GHz',sub:top?'of '+(top/1000).toFixed(2)+' GHz':''};}},
  {id:'ctemp',label:'CPU temp',grad:'amber',glow:'rgba(251,146,60,.13)',f:s=>{const c=s.cpu||{},t=c.temp,th=c.thresholds||{},v=t&&isNum(t.c)?t.c:null;
   return {v,max:Math.max(100,(th.hot_c||90)+10),t:v!=null?String(Math.round(v)):null,u:'°C',sub:t?(t.label||'')+(isNum(t.peak_c)?'  ·  peak '+Math.round(t.peak_c)+'°':''):'',lvl:v>=(th.hot_c||90)?'bad':v>=(th.warn_c||80)?'warn':''};}},
+ {id:'net',label:'Network',grad:'cyan',glow:'rgba(45,212,239,.13)',f:s=>{const n=s.net||{},w=s.network||{},inn=mbps(n.rx_bps),out=mbps(n.tx_bps);
+  const link=w.speed_mbps||((w.ports||[]).map(p=>p.speed_mbps).filter(isNum).sort((a,b)=>b-a)[0])||1000;
+  if(inn==null||out==null)return {t:null};const tot=inn+out;
+  return {v:tot,max:link,t:tot>=100?String(Math.round(tot)):tot>=1?tot.toFixed(1):(tot*1000).toFixed(0),u:tot>=1?'Mbit/s':'kbit/s',sub:'in '+fmtMbps(inn)+'  ·  out '+fmtMbps(out)};}},
  {id:'ram',label:'Memory',grad:'violet',glow:'rgba(167,139,250,.13)',f:s=>{const m=s.memory||{};return {v:m.used,max:m.total,t:m.total?(m.used/1073741824).toFixed(1):null,u:'GiB',sub:m.total?'of '+gib(m.total)+'  ·  '+Math.round(100*m.used/m.total)+'%':''};}}];
 (function buildGauges(){const box=$('gauges');for(const g of GA){const c=el('div',undefined,'gauge none');c.id='g-'+g.id;c.style.setProperty('--glow',g.glow);c.setAttribute('role','img');
  const w=el('div',undefined,'gw'),svg=sv('svg',{viewBox:'0 0 120 120','aria-hidden':'true'});
@@ -1694,13 +1704,16 @@ let range=3600,hist={rows:[]};const liveRows=[];
 function pushLive(s){const g=s.gpu||{},gw=s.gateway||{},t=(g.temps)||{},c=s.cpu||{},f=c.freq||{},m=s.memory||{};if(!isNum(s.time))return;
  const u=isNum(c.util_pct)?c.util_pct:s.cpu_pct;
  liveRows.push([s.time,(gw.tps||{}).current??0,g.busy_pct??null,g.vram_used!=null?g.vram_used/1073741824:null,t.junction??t.edge??null,g.power_w??null,gw.active||0,
-  (c.temp||{}).c??null,isNum(f.avg_mhz)?f.avg_mhz/1000:null,isNum(u)?u:null,m.total?m.used/1073741824:null]);
+  (c.temp||{}).c??null,isNum(f.avg_mhz)?f.avg_mhz/1000:null,isNum(u)?u:null,m.total?m.used/1073741824:null,mbps((s.net||{}).rx_bps),mbps((s.net||{}).tx_bps)]);
  while(liveRows.length&&liveRows[0][0]<s.time-3700)liveRows.shift();}
+function mbps(b){return isNum(b)?b*8/1e6:null;}
 function rows(){const r=hist.rows||[],last=r.length?r[r.length-1][0]:0;return r.concat(liveRows.filter(x=>x[0]>last));}
 const CH=[['Tokens per second',1,'cyan',v=>v.toFixed(1),null],['GPU busy (%)',2,'blue',v=>Math.round(v)+'%',100],['VRAM used (GiB)',3,'violet',v=>v.toFixed(1)+' GiB','vram'],
  ['GPU temperature (°C)',4,'amber',v=>Math.round(v)+'°C',null],['GPU power (W)',5,'pink',v=>Math.round(v)+' W',null],
  ['CPU busy (%)',9,'green',v=>Math.round(v)+'%',100],['CPU temperature (°C)',7,'orange',v=>Math.round(v)+'°C',null],['CPU speed (GHz)',8,'blue',v=>v.toFixed(2)+' GHz',null],
- ['Memory used (GiB)',10,'violet',v=>v.toFixed(1)+' GiB','ram']];
+ ['Memory used (GiB)',10,'violet',v=>v.toFixed(1)+' GiB','ram'],
+ ['Network in (Mbit/s)',11,'cyan',fmtMbps,null],['Network out (Mbit/s)',12,'pink',fmtMbps,null]];
+function fmtMbps(v){return v>=100?Math.round(v)+' Mbit/s':v>=1?v.toFixed(1)+' Mbit/s':Math.round(v*1000)+' kbit/s';}
 const STROKE={cyan:'#2dd4ef',blue:'#6f8fff',violet:'#a78bfa',amber:'#fbbf24',pink:'#f472b6',green:'#34d399',orange:'#fb923c'};
 (function buildCharts(){const box=$('charts');CH.forEach(([title],i)=>{const c=el('div',undefined,'card chart');const hd=el('div',undefined,'hd'),l=el('div');
  l.append(el('div',title,'ti'),el('div','','mm'));hd.append(l,el('div','-','cv'));const p=el('div',undefined,'plot');p.id='ch'+i;c.append(hd,p);box.append(c);});})();

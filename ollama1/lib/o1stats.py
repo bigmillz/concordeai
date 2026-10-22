@@ -102,10 +102,35 @@ def gpu_nvidia(run=subprocess.run):
     }
 
 
+NV_KEYS = ("busy_pct", "vram_used", "vram_total", "temps", "power_w", "power_cap_w", "fan_rpm", "fan_pct",
+           "sclk_mhz", "mclk_mhz")
+
+
+def gpu_nvidia_shared(now=None):
+    """The fan service's last full NVIDIA reading (6b500, per the owner: the panel's GPU gauges said "no reading"):
+    the panel runs with PrivateDevices=yes, so its own nvidia-smi can't open the card; the fan service (root) reads
+    it every second and leaves it in o1gpu.SHARED. None when there is none under o1gpu.SHARED_FRESH_S old."""
+    import o1gpu
+    try:
+        with open(o1gpu.SHARED) as f:
+            d = json.load(f)
+        if not isinstance(d, dict) or (now or time.time()) - float(d.get("at") or 0) > o1gpu.SHARED_FRESH_S:
+            return None
+    except (OSError, ValueError, TypeError):
+        return None
+    if d.get("vendor") != "nvidia":
+        return None                       # an older fan service's three numbers only: not a full reading
+    out = {k: d.get(k) for k in NV_KEYS}
+    out["temps"] = {k: v for k, v in (out["temps"] or {}).items() if isinstance(v, (int, float))} \
+        if isinstance(out["temps"], dict) else {}
+    out["vendor"] = "nvidia"
+    return out
+
+
 def gpu():
     dev = gpu_card()
     if not dev:
-        return gpu_nvidia()
+        return gpu_nvidia() or gpu_nvidia_shared()
     out = {
         "busy_pct": _int(dev + "/gpu_busy_percent"),
         "vram_used": _int(dev + "/mem_info_vram_used"),
@@ -304,6 +329,41 @@ def tunnel(port=8439):
         return {"up": False, "connections": 0}
 
 
+class Net:
+    """Network traffic between two calls, in bytes per second (6b500, per the owner: "add something for network
+    activity"): the physical ports' counters from /proc/net/dev (a port with a device behind it, so a bridge and
+    its member, or a tunnel over a port, aren't counted twice). None on the first call."""
+
+    def __init__(self, clock=time.monotonic):
+        self.prev, self.clock = None, clock
+
+    @staticmethod
+    def physical(name):
+        return name != "lo" and os.path.exists(SYS + "/class/net/" + name + "/device")
+
+    def counters(self):
+        rx = tx = 0
+        for line in (_read(PROC + "/net/dev", "") or "").splitlines()[2:]:
+            name, _, rest = line.partition(":")
+            f = rest.split()
+            if len(f) < 9 or not self.physical(name.strip()):
+                continue
+            try:
+                rx, tx = rx + int(f[0]), tx + int(f[8])
+            except ValueError:
+                pass
+        return rx, tx
+
+    def sample(self):
+        now = self.clock()
+        rx, tx = self.counters()
+        prev, self.prev = self.prev, (now, rx, tx)
+        if not prev or now - prev[0] <= 0 or rx < prev[1] or tx < prev[2]:
+            return None
+        dt = now - prev[0]
+        return {"rx_bps": round((rx - prev[1]) / dt), "tx_bps": round((tx - prev[2]) / dt)}
+
+
 _net_cache = {"t": 0, "v": None}
 
 
@@ -422,7 +482,7 @@ def pairing_window():
     return None
 
 
-def collect(cpu_sampler=None, tunnel_port=8439):
+def collect(cpu_sampler=None, tunnel_port=8439, net_sampler=None):
     return {
         "time": int(time.time()),
         "gpu": gpu(),
@@ -434,6 +494,7 @@ def collect(cpu_sampler=None, tunnel_port=8439):
         "uptime": uptime(),
         "tunnel": tunnel(tunnel_port),
         "network": network(),
+        "net": net_sampler.sample() if net_sampler else None,
         "updates": updates(),
         "gateway": gateway_snapshot(),
         "hostname": os.uname().nodename,

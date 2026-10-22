@@ -15985,3 +15985,20 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
   same test as setup.sh's lock) is a reason not to sleep, for auto sleep and the panel's Sleep button alike. A
   missing list, a missing file or a free lock is nothing. devbox's Claude Code hooks take the lock when a prompt
   arrives and let go when the turn stops, with a 6 h ceiling so a crashed turn can't keep the server up forever.
+
+## 6b500 — The panel's GPU gauges read the NVIDIA card again; a network gauge (per Patrick)
+
+- Patrick's screenshot: GPU, VRAM, GPU power and GPU temp all "no reading" on the admin panel. The card was fine
+  (gpt-oss:20b answered 400 tokens in 7 s through the gateway). Cause: the panel runs with PrivateDevices=yes, so
+  6b483's nvidia-smi call fails inside it (/dev/nvidia* isn't there); the AMD card's sysfs files never needed a
+  device node, which is why this only showed with the 5070 Ti. 6b483 was checked over SSH as root, not inside the
+  panel's sandbox.
+- Fix without loosening the sandbox: the fan service (root, every second) now makes the one full nvidia-smi query
+  (o1stats.gpu_nvidia) and publishes the whole reading to /run/ollama1/gpu-usage.json alongside 6b488's three
+  numbers; o1stats.gpu() falls back to it (o1stats.gpu_nvidia_shared, 15 s freshness, vendor must be "nvidia" so
+  an older fan service's three-number file isn't shown as a full reading). The gateway's reader is unchanged.
+- Patrick also asked for network activity: o1stats.Net samples /proc/net/dev between calls, physical ports only
+  (an interface with a device link), so br0 and its member aren't counted twice. The panel shows a Network gauge
+  (in + out against the link speed, else 1 Gbit/s) and two history charts, Network in / out in Mbit/s; history
+  rows grow to 13 columns (older 7/9/11-column files are still read).
+- Needs the kit install on the server (setup.sh restarts the fan service and the panel).
