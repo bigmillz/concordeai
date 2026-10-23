@@ -230,6 +230,16 @@ class FakeCFNoSSHType(TC.FakeCF):
         return super().route(m, p, qs, b)
 
 
+class FakeCFNoTypeChange(TC.FakeCF):
+    """An API that won't change an application's type in place."""
+
+    def route(self, m, p, qs, b):
+        mm = re.match(r"/accounts/[^/]+/access/apps/([^/]+)$", p)
+        if m == "PUT" and mm and b and self.apps.get(mm.group(1), {}).get("type") != b.get("type"):
+            return 400, "the application type can't be changed"
+        return super().route(m, p, qs, b)
+
+
 class TestCfAccessDoor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -294,7 +304,7 @@ class TestCfAccessDoor(unittest.TestCase):
         self.write_cfg(ssh_door=True)
         self.assertEqual(self.run_helper(), 0, self.out)
         app = self.check_door()
-        self.assertEqual(app["type"], "ssh")          # browser-rendered SSH
+        self.assertEqual(app["type"], "self_hosted")  # 6b510: not browser-rendered (its login page 404d)
         self.assertEqual(len(self.cf.apps), 3)
         self.assertEqual(len(self.cf.policies), 2)    # no new policy: the admin's is reused
         self.assertIn("Run setup.sh again", self.out)
@@ -302,7 +312,7 @@ class TestCfAccessDoor(unittest.TestCase):
     def test_door_flag_turns_it_on(self):
         self.write_cfg()
         self.assertEqual(self.run_helper(extra=["--ssh-door"]), 0, self.out)
-        self.assertEqual(self.check_door()["type"], "ssh")
+        self.assertEqual(self.check_door()["type"], "self_hosted")
 
     def test_door_off_changes_nothing(self):
         self.write_cfg()
@@ -340,7 +350,6 @@ class TestCfAccessDoor(unittest.TestCase):
             self.assertEqual(self.run_helper(cf), 0, self.out)
             app = self.check_door(cf)
             self.assertEqual(app["type"], "self_hosted")
-            self.assertIn("Browser rendering: SSH", self.out)
         finally:
             cf.srv.shutdown()
 
@@ -349,6 +358,81 @@ class TestCfAccessDoor(unittest.TestCase):
         self.assertEqual(self.run_helper(), 1)
         self.assertIn("ssh.elsewhere.test is not in the zone", self.out)
         self.assertEqual(self.cf.calls, [])
+
+
+    # ---- --ssh-door-only (6b509): an install whose Cloudflare side was made by hand under other names
+    def writes(self, cf=None):
+        return [(c[0], c[1]) for c in (cf or self.cf).calls if c[0] in ("POST", "PUT", "PATCH", "DELETE")]
+
+    def test_full_run_never_makes_a_second_tunnel(self):
+        self.write_cfg(ssh_door=True, tunnel_id="hand-made-tunnel")
+        self.assertEqual(self.run_helper(), 1)
+        self.assertIn("--ssh-door-only", self.out)
+        self.assertEqual(self.writes(), [])
+        self.assertEqual(self.cf.tunnels, {})
+
+    def test_door_only_touches_only_the_door(self):
+        self.write_cfg(tunnel_id="hand-made-tunnel", service_token_client_id="kept.access", admin_aud="kept-aud")
+        self.assertEqual(self.run_helper(extra=["--ssh-door-only"]), 0, self.out)
+        self.assertEqual((self.cf.tunnels, self.cf.stokens), ({}, {}))
+        app = self.ssh_app()
+        self.assertEqual((app["name"], app["type"]), ("testsrv ssh", "self_hosted"))
+        self.assertEqual(len(self.cf.apps), 1)
+        self.assertEqual([p["name"] for p in self.cf.policies.values()], ["testsrv ssh - admin only"])
+        pol = next(iter(self.cf.policies.values()))
+        self.assertEqual((pol["decision"], pol["include"]), ("allow", [{"email": {"email": U.ADMIN_EMAIL}}]))
+        recs = [r for r in self.cf.dns.values() if r["name"] == SSH_HOST]
+        self.assertEqual([(r["content"], r["proxied"]) for r in recs], [("hand-made-tunnel.cfargotunnel.com", True)])
+        self.assertEqual(len(self.cf.dns), 1)
+        cfg = json.load(open(TC.CONFIG))
+        self.assertEqual((cfg["ssh_door"], cfg["hostname_ssh"], cfg["ssh_aud"]), (True, SSH_HOST, app["aud"]))
+        self.assertEqual((cfg["tunnel_id"], cfg["service_token_client_id"], cfg["admin_aud"]),
+                         ("hand-made-tunnel", "kept.access", "kept-aud"))
+        self.assertNotIn(TC.TOKEN, self.out)
+        n = len(self.writes())
+        self.assertEqual(self.run_helper(extra=["--ssh-door-only"]), 0, self.out)   # again: brought in line only
+        self.assertEqual((len(self.cf.apps), len(self.cf.policies), len(self.cf.dns)), (1, 1, 1))
+        self.assertFalse([w for w in self.writes()[n:] if w[0] == "POST"])
+
+    def test_door_only_leaves_a_foreign_app_alone(self):
+        self.write_cfg(tunnel_id="hand-made-tunnel")
+        self.cf.apps["x"] = {"id": "x", "name": "someone's app", "domain": SSH_HOST, "aud": "foreign"}
+        self.assertEqual(self.run_helper(extra=["--ssh-door-only"]), 1)
+        self.assertIn("that this didn't make", self.out)
+        self.assertEqual(self.cf.apps["x"]["name"], "someone's app")
+        self.assertFalse([w for w in self.writes() if "/apps" in w[1]])
+
+    def test_door_only_needs_the_tunnel_id(self):
+        self.write_cfg()
+        self.assertEqual(self.run_helper(extra=["--ssh-door-only"]), 1)
+        self.assertIn("no tunnel_id", self.out)
+        self.assertEqual(self.writes(), [])
+
+    def test_door_only_turns_a_browser_ssh_app_into_a_plain_one(self):
+        # 6b510: the owner's first door app was type "ssh" and 404'd its login page
+        self.write_cfg(tunnel_id="hand-made-tunnel")
+        self.cf.apps["old"] = {"id": "old", "name": "testsrv ssh", "domain": SSH_HOST, "type": "ssh", "aud": "old-aud"}
+        cf = FakeCFNoTypeChange()
+        try:
+            cf.apps["old"] = dict(self.cf.apps["old"])
+            self.write_cfg(tunnel_id="hand-made-tunnel")
+            self.assertEqual(self.run_helper(cf, extra=["--ssh-door-only"]), 0, self.out)
+            app = self.ssh_app(cf)
+            self.assertEqual(app["type"], "self_hosted")
+            self.assertNotEqual(app["aud"], "old-aud")
+            self.assertEqual(json.load(open(TC.CONFIG))["ssh_aud"], app["aud"])
+            self.assertIn("making it again", self.out)
+        finally:
+            cf.srv.shutdown()
+
+    def test_door_only_falls_back_to_self_hosted(self):
+        cf = FakeCFNoSSHType()
+        try:
+            self.write_cfg(tunnel_id="hand-made-tunnel")
+            self.assertEqual(self.run_helper(cf, extra=["--ssh-door-only"]), 0, self.out)
+            self.assertEqual(self.ssh_app(cf)["type"], "self_hosted")
+        finally:
+            cf.srv.shutdown()
 
 
 if __name__ == "__main__":

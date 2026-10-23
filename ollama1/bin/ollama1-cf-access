@@ -40,7 +40,7 @@ nothing that is already right):
      --name and --owner); ollama1 in this command's name is the kit's, not yours.
      With the SSH door on (ssh_door in config.json, or --ssh-door), also a
      third application, "<server-name> ssh", for hostname_ssh, with the
-     admin policy and browser-rendered SSH (type "ssh"), and its DNS name
+     admin policy (a plain self-hosted app), and its DNS name
   6. writes the team domain, the AUD tags, the admin email, the service
      token's Client ID and the tunnel id to /etc/ollama1/config.json (0600)
 The service token's Client Secret is shown once on the terminal (never
@@ -120,6 +120,10 @@ class CF:
         return out.get("result")
 
 
+class _DoorDone(Exception):
+    """--ssh-door-only finished its three steps (it skips the rest of the full run)."""
+
+
 def q(**kw):
     return "?" + urllib.parse.urlencode(kw)
 
@@ -137,12 +141,18 @@ def ask_tty(prompt, default="", interactive=True):
         return tty.readline().strip() or default
 
 
-def tunnel_step(cf, acct, creds_path):
+def tunnel_step(cf, acct, creds_path, known=""):
     found = [t for t in cf.call("GET", "/accounts/%s/cfd_tunnel%s" % (acct, q(name=TUNNEL, is_deleted="false"))) or []
              if t.get("name") == TUNNEL and not t.get("deleted_at")]
     if found:
         tid = found[0]["id"]
         say("tunnel %s exists (%s)" % (TUNNEL, tid))
+    elif known:
+        # a tunnel this server already runs, under a name this didn't give it (made by hand, or by an older
+        # setup): a second one would take the hostnames from it (6b509)
+        raise Stop("config.json names the tunnel %s, but Cloudflare has no tunnel called %r. Its Cloudflare side "
+                   "was set up another way; for the SSH door alone run: sudo ollama1-cf-access --ssh-door-only"
+                   % (known, TUNNEL))
     else:
         secret = base64.b64encode(secrets.token_bytes(32)).decode()
         t = cf.call("POST", "/accounts/%s/cfd_tunnel" % acct,
@@ -291,18 +301,54 @@ def access_step(cf, acct, cfg, admin, interactive, rotate, test_mode=False, ssh_
     gw_aud = app(APP_GATEWAY, cfg["hostname_gateway"], pid_app, {"service_auth_401_redirect": True})
     ssh_aud = None
     if ssh_host:
-        # The SSH door (6b507): the admin's policy (Allow, the admin email), and type "ssh",
-        # which is a self-hosted app with Cloudflare's browser-rendered SSH on. If Cloudflare
-        # refuses that type, the app is made plain self-hosted (cloudflared access ssh works
-        # the same) and the browser terminal is left to one switch in the dashboard.
-        try:
-            ssh_aud = app(APP_SSH, ssh_host, pid_admin, {"type": "ssh"})
-        except Stop as e:
-            say("browser-rendered SSH refused (%s); making %s a plain self-hosted app" % (e, ssh_host))
-            ssh_aud = app(APP_SSH, ssh_host, pid_admin, {})
-            say("for the browser terminal: Zero Trust > Access > Applications > %s > Configure >" % APP_SSH)
-            say("  Browser rendering: SSH > Save")
+        # The SSH door (6b507): the admin's policy (Allow, the admin email), a plain self-hosted app
+        # (6b510: type "ssh", browser-rendered SSH, 404'd its own login page; see door_only_step)
+        ssh_aud = app(APP_SSH, ssh_host, pid_admin, {})
     return tok["client_id"], admin_aud, gw_aud, ssh_aud
+
+
+def door_only_step(cf, acct, ssh_host, admin):
+    """The SSH door alone (6b509, per the owner: the full run, on an install whose tunnel, service token and apps
+    were made by hand in the dashboard under other names, went to create a second tunnel). Only the door's own
+    policy and app, by their own names; the tunnel, the service token and the other apps aren't looked at."""
+    a = "/accounts/%s/access" % acct
+    name = APP_SSH + " - admin only"
+    include = [{"email": {"email": admin}}]
+    body = {"name": name, "decision": "allow", "include": include, "exclude": [], "require": []}
+    pols = cf.call("GET", a + "/policies" + q(per_page=100)) or []
+    cur = next((p for p in pols if p.get("name") == name), None)
+    if cur:
+        if cur.get("decision") != "allow" or cur.get("include") != include:
+            cf.call("PUT", a + "/policies/%s" % cur["id"], body)
+        pid = cur["id"]
+        say("policy %r ready" % name)
+    else:
+        pid = cf.call("POST", a + "/policies", body)["id"]
+        say("policy %r created" % name)
+    apps = cf.call("GET", a + "/apps" + q(per_page=100)) or []
+    cur = next((x for x in apps if (x.get("domain") or "").lower() == ssh_host), None)
+    if cur and cur.get("name") != APP_SSH:
+        raise Stop("%s already has an Access application (%r) that this didn't make; it won't change it"
+                   % (ssh_host, cur.get("name")))
+    # plain self-hosted (6b510): an app of type "ssh" (browser-rendered SSH) answered its own login page with a 404
+    # on the owner's account, and `cloudflared access ssh` stopped at "Empty app domain"
+    app = {"name": APP_SSH, "domain": ssh_host, "type": "self_hosted", "session_duration": "24h",
+           "app_launcher_visible": False, "http_only_cookie_attribute": True, "same_site_cookie_attribute": "lax",
+           "policies": [{"id": pid, "precedence": 1}]}
+    if cur:
+        try:
+            res = cf.call("PUT", a + "/apps/%s" % cur["id"], app)
+            say("Access application %s: brought in line (self-hosted)" % ssh_host)
+            return res["aud"]
+        except Stop as e:
+            if cur.get("type") == "self_hosted":
+                raise
+            # an app's type may not change in place: it is ours (by name), so it is made again (a new AUD tag)
+            say("Access application %s: its type can't change (%s); making it again" % (ssh_host, e))
+            cf.call("DELETE", a + "/apps/%s" % cur["id"])
+    res = cf.call("POST", a + "/apps", app)
+    say("Access application %s: created" % ssh_host)
+    return res["aud"]
 
 
 def show_secret(client_id, secret, test_mode):
@@ -331,7 +377,12 @@ def main():
     ap.add_argument("--rotate-service-token", action="store_true")
     ap.add_argument("--ssh-door", action="store_true",
                     help="turn the SSH door on (ssh_door in config.json) and make its DNS name and Access app")
+    ap.add_argument("--ssh-door-only", action="store_true",
+                    help="only the SSH door: its DNS name, policy and Access app, on the tunnel config.json names; "
+                         "for an install whose Cloudflare side was set up by hand")
     a = ap.parse_args()
+    if a.ssh_door_only:
+        a.ssh_door = True
     test_mode = bool(os.environ.get("OLLAMA1_PREFIX"))
     if os.geteuid() != 0 and not test_mode:
         sys.exit("run it with sudo: it writes root-only files")
@@ -371,6 +422,20 @@ def main():
     rotate = True if a.rotate_service_token else (False if a.no_prompt else None)
     try:
         zone = (cfg.get("cf_zone") or "").strip().lower()
+        if a.ssh_door_only:
+            tid = (cfg.get("tunnel_id") or "").strip()
+            if not tid:
+                raise Stop("config.json names no tunnel_id: run setup.sh's Cloudflare step first")
+            if not ssh_host.endswith("." + zone):
+                raise Stop("%s is not in the zone %s (hostname_ssh and cf_zone in config.json)" % (ssh_host, zone))
+            zones = cf.call("GET", "/zones" + q(name=zone)) or []
+            if not zones:
+                raise Stop("the token can't see the zone %s (Zone > Zone: Read on that zone)" % zone)
+            zone_id, acct = zones[0]["id"], zones[0]["account"]["id"]
+            say("zone %s; the tunnel from config.json (%s); nothing else in Cloudflare is touched" % (zone, tid))
+            dns_step(cf, zone_id, [ssh_host], tid)
+            ssh_aud = door_only_step(cf, acct, ssh_host, admin)
+            raise _DoorDone()
         hosts = [cfg["hostname_gateway"], cfg["hostname_admin"]] + ([ssh_host] if door else [])
         for h in hosts:
             if not h.lower().endswith("." + zone):
@@ -385,10 +450,19 @@ def main():
         if not team:
             raise Stop(NO_ORG)
         say("Zero Trust team domain %s" % team)
-        tid = tunnel_step(cf, acct, Paths.tunnel_creds)
+        tid = tunnel_step(cf, acct, Paths.tunnel_creds, (cfg.get("tunnel_id") or "").strip())
         dns_step(cf, zone_id, hosts, tid)
         client_id, admin_aud, gw_aud, ssh_aud = access_step(cf, acct, cfg, admin, interactive, rotate, test_mode,
                                                             ssh_host if door else None)
+    except _DoorDone:
+        cf.forget()
+        raw.update({"ssh_door": True, "hostname_ssh": ssh_host, "ssh_aud": ssh_aud})
+        write_json_atomic(Paths.config, raw, mode=0o600)
+        say("\nSaved to %s: the SSH door (on), its hostname and its AUD tag; nothing else changed." % Paths.config)
+        say("Run setup.sh again with --ssh-door to open it.")
+        say("\nThe API token is gone from memory. Delete it in the dashboard now:")
+        say("  dash.cloudflare.com > My Profile > API Tokens > ... > Delete")
+        return 0
     except Stop as e:
         say("\nSTOPPED: %s" % e)
         return 1

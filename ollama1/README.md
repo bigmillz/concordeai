@@ -400,10 +400,17 @@ unless you turn it on.
    terminal), in the kit's folder:
    `sudo ./bin/ollama1-cf-access --ssh-door --no-prompt`
    - It asks for the token (not shown), makes the DNS name and an Access
-     application `<server-name> ssh` with your admin policy and
-     Cloudflare's browser SSH, and saves its AUD tag. Your existing
+     application `<server-name> ssh` with your admin policy (a plain
+     self-hosted app), and saves its AUD tag. Your existing
      service token is kept.
    - Then delete the token in the dashboard.
+   - **If the Cloudflare side was set up by hand** (the tunnel, service
+     token and apps made in the dashboard), use
+     `sudo ./bin/ollama1-cf-access --ssh-door-only` instead. It makes only
+     the door's DNS name (on the tunnel config.json names), its own policy
+     and its app, and touches nothing else. The full run stops rather than
+     make a second tunnel when config.json already names one. The token
+     needs Zone: Read, DNS: Edit and Access: Apps and Policies: Edit.
 2. Run setup with `--ssh-door`: `sudo ./setup.sh --ssh-door`. It adds the
    route, the sshd line and the port guard, and restarts the tunnel. The
    setting is saved, so later runs keep it.
@@ -420,8 +427,9 @@ when the door has no Access app yet).
    Self-hosted.** Name `<server-name> ssh`, hostname
    `<server-name>-ssh.<your-domain>`, session 24 hours.
 3. **Policy:** the one the admin panel uses (Allow, your email). Save.
-4. Open the app again: **Configure > Browser rendering: SSH**. Save.
-5. Copy its **Application Audience (AUD) Tag**, and run
+   Leave **Browser rendering** off: with it on, the app's login page
+   answered 404 and `cloudflared access ssh` stopped at "Empty app domain".
+4. Copy its **Application Audience (AUD) Tag**, and run
    `sudo ./setup.sh --ssh-door --ssh-aud <AUD tag>`. (At a terminal,
    setup also asks for it.)
 
@@ -442,11 +450,10 @@ one-time code to your email) the first time, and every 24 hours; after
 that it is a normal SSH session with your key. On an Intel Mac,
 cloudflared is in `/usr/local/bin`.
 
-**Browser SSH.** Open `https://<server-name>-ssh.<your-domain>` and log in
-to Access; Cloudflare shows a terminal. It still logs in to sshd, which
-takes keys only. The kit does not set up Cloudflare's short-lived SSH
-certificates, so if the browser terminal can't use your key, use the Mac
-way.
+**No browser terminal.** Cloudflare's browser-rendered SSH is left off:
+on the owner's account it broke the login page that `cloudflared` needs,
+and without Cloudflare's short-lived SSH certificates it couldn't use
+your key anyway. The panel's web terminal stays the browser way in.
 
 **Turn it off:** `sudo ./setup.sh --no-ssh-door`. The route, the sshd line
 and the port guard go; the DNS name and the Access app stay in Cloudflare

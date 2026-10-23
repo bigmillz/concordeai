@@ -174,6 +174,9 @@ class FakeCF:
         if m2 and m == "PUT":
             self.apps[m2.group(1)].update(b)
             return 200, self.apps[m2.group(1)]
+        if m2 and m == "DELETE":
+            self.apps.pop(m2.group(1), None)
+            return 200, {"id": m2.group(1)}
         return 404, "no route %s %s" % (m, p)
 
 

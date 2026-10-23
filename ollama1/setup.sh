@@ -1362,7 +1362,7 @@ EOF
       esac
     else
       note "the SSH door needs its Access app, and there is no terminal here to ask for a token"
-      later "SSH door: run sudo ollama1-cf-access in a terminal (an API token), then setup again; or make the app in the dashboard and run setup with --ssh-aud <AUD>"
+      later "SSH door: run sudo ollama1-cf-access --ssh-door (or --ssh-door-only on a hand-made Cloudflare setup) in a terminal (an API token), then setup again; or make the app in the dashboard and run setup with --ssh-aud <AUD>"
     fi
   fi
   if cf_ready; then
