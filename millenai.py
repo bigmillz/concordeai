@@ -8102,7 +8102,7 @@ _PE_STUB = (
 def _pe_stage_photo(raw: bytes) -> str:
     """The attached photo's bytes in a new 0600 stage file under run/ (the
     engine's reference); its path. A machine path, never a profile's: the
-    caller drops it when the edit ends (6b510, the gauntlet's write lint)."""
+    caller drops it when the edit ends (6b511, the gauntlet's write lint)."""
     src = stage_path(".src")
     try:
         fd = os.open(src, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -13002,7 +13002,7 @@ MACHINE_IO = frozenset((
     # profile only through ctx.adopt
     "_render_note", "_ffmpeg_convert", "ex_table", "ex_calendar", "ex_cards",
     "ex_text",
-    # 6b510: a photo to edit, staged for the klein edit engine (6b472)
+    # 6b511: a photo to edit, staged for the klein edit engine (6b472)
     "_pe_stage_photo",
     # engines, models and their installs
     "_settle_engine_dir", "_studio_install_worker", "_download_ollama_binary",
