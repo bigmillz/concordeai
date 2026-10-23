@@ -375,10 +375,86 @@ around a little from time to time.
 
    Type them when setup asks.
 
+### The SSH door (optional)
+
+SSH normally works only from your home LAN. The SSH door lets you in from
+anywhere, through the same Cloudflare Tunnel as the panel. It is **off**
+unless you turn it on.
+
+- Two locks: Cloudflare Access first (your admin email, like the panel),
+  then sshd with your key. Passwords stay off; the door won't open while
+  password login is on.
+- No port opens at home. cloudflared already connects out; the door is one
+  more route inside the tunnel, to `ssh://127.0.0.1:22`, with cloudflared's
+  own Access check (`audTag`), like the other two routes.
+- sshd lets `<your-user>` in from `127.0.0.1` as well as the LAN. Only
+  cloudflared (and root) may connect to port 22 from the machine itself
+  (`ollama1-nft`), so `127.0.0.1` means the tunnel.
+- Its name is `<server-name>-ssh.<your-domain>` (`hostname_ssh` in
+  config.json, if you want another one).
+
+**Turn it on, with an API token** (the same token as in "The API token"):
+
+1. In a terminal on the server (SSH from the LAN, or the panel's web
+   terminal), in the kit's folder:
+   `sudo ./bin/ollama1-cf-access --ssh-door --no-prompt`
+   - It asks for the token (not shown), makes the DNS name and an Access
+     application `<server-name> ssh` with your admin policy and
+     Cloudflare's browser SSH, and saves its AUD tag. Your existing
+     service token is kept.
+   - Then delete the token in the dashboard.
+2. Run setup with `--ssh-door`: `sudo ./setup.sh --ssh-door`. It adds the
+   route, the sshd line and the port guard, and restarts the tunnel. The
+   setting is saved, so later runs keep it.
+
+Run with a terminal, setup can also ask for the token itself (it offers it
+when the door has no Access app yet).
+
+**Turn it on, without an API token.** In dash.cloudflare.com:
+
+1. **DNS > Records > Add record**: CNAME, name `<server-name>-ssh`,
+   target `<tunnel id>.cfargotunnel.com` (the `tunnel_id` in config.json),
+   Proxied.
+2. **Zero Trust > Access > Applications > Add an application >
+   Self-hosted.** Name `<server-name> ssh`, hostname
+   `<server-name>-ssh.<your-domain>`, session 24 hours.
+3. **Policy:** the one the admin panel uses (Allow, your email). Save.
+4. Open the app again: **Configure > Browser rendering: SSH**. Save.
+5. Copy its **Application Audience (AUD) Tag**, and run
+   `sudo ./setup.sh --ssh-door --ssh-aud <AUD tag>`. (At a terminal,
+   setup also asks for it.)
+
+**Connect from a Mac.** Install cloudflared once (`brew install
+cloudflared`), then add this to `~/.ssh/config`:
+
+```
+Host <server-name>-door
+  HostName <server-name>-ssh.<your-domain>
+  User <your-user>
+  ProxyCommand /opt/homebrew/bin/cloudflared access ssh --hostname %h
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+`ssh <server-name>-door` then opens a browser for the Access login (a
+one-time code to your email) the first time, and every 24 hours; after
+that it is a normal SSH session with your key. On an Intel Mac,
+cloudflared is in `/usr/local/bin`.
+
+**Browser SSH.** Open `https://<server-name>-ssh.<your-domain>` and log in
+to Access; Cloudflare shows a terminal. It still logs in to sshd, which
+takes keys only. The kit does not set up Cloudflare's short-lived SSH
+certificates, so if the browser terminal can't use your key, use the Mac
+way.
+
+**Turn it off:** `sudo ./setup.sh --no-ssh-door`. The route, the sshd line
+and the port guard go; the DNS name and the Access app stay in Cloudflare
+(they lead nowhere). Delete them in the dashboard if you like.
+
 ## After setup
 
-- **SSH:** only your Mac's key can log in, as `<your-user>`, from the home LAN.
-  Passwords and root login are off.
+- **SSH:** only your Mac's key can log in, as `<your-user>`, from the home LAN
+  (and through the SSH door, if you turned it on). Passwords and root login are off.
   - If you removed the setup key, it is only your key.
   - To add another Mac later, log in with the first one and append its key
     to `~/.ssh/authorized_keys`.

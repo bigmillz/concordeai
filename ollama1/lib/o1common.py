@@ -88,6 +88,11 @@ DEFAULTS = {
     "access_team_domain": "",        # e.g. yourteam.cloudflareaccess.com
     "gateway_aud": "",               # Access application AUD tag (app host)
     "admin_aud": "",                 # Access application AUD tag (admin host)
+    # The SSH door (6b507), off unless asked for (setup.sh --ssh-door): SSH through the
+    # tunnel, behind Access, at hostname_ssh (empty = <server_name>-ssh.<cf_zone>).
+    "ssh_door": False,
+    "hostname_ssh": "",
+    "ssh_aud": "",                   # its Access application's AUD tag
     "admin_email": "",
     "service_token_client_id": "",   # optional: pin the one service token
     "tunnel_id": "",                 # the ollama1 tunnel (not secret; its credential is separate)
@@ -141,8 +146,9 @@ def server_name(cfg):
 
 
 def resolve(cfg):
-    """Fill what derives from the server name and zone: the two hostnames.
-    Anything set explicitly in config.json wins."""
+    """Fill what derives from the server name and zone: the two hostnames,
+    and the SSH door's when it is on. Anything set explicitly in config.json
+    wins."""
     n = server_name(cfg)
     cfg["server_name"] = n
     zone = (cfg.get("cf_zone") or "").strip().lower()
@@ -150,6 +156,8 @@ def resolve(cfg):
         cfg["hostname_gateway"] = "%s.%s" % (n, zone)
     if not cfg.get("hostname_admin") and zone:
         cfg["hostname_admin"] = "%s-admin.%s" % (n, zone)
+    if cfg.get("ssh_door") is True and not cfg.get("hostname_ssh") and zone:
+        cfg["hostname_ssh"] = "%s-ssh.%s" % (n, zone)
     return cfg
 
 
@@ -165,6 +173,7 @@ def access_names(cfg):
         "policy_app": cfg.get("policy_app_name") or n + " app - service token",
         "app_admin": n + " admin",
         "app_gateway": n + " app",
+        "app_ssh": n + " ssh",
     }
 
 

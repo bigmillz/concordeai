@@ -7,3 +7,4 @@ PubkeyAuthentication yes
 LoginGraceTime 30
 X11Forwarding no
 @PASSWORD_LINES@
+@SSH_DOOR_LINES@
