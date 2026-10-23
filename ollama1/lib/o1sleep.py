@@ -24,6 +24,7 @@ BUSY_UNITS = [
     ("ollama1-modelplan.service", "a model set from the app is being applied"),     # 6b410
     ("ollama1-update-now.service", "updates are being applied"),
     ("ollama1-update-ollama.service", "Ollama is being updated"),
+    ("ollama1-fancal.service", "the fans are being calibrated"),                     # 6b505
     ("apt-daily.service", "the daily update check is running"),
     ("apt-daily-upgrade.service", "security updates are being installed"),
 ]

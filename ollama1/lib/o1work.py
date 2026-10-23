@@ -52,6 +52,7 @@ import os
 import json
 import time
 
+import o1common
 import o1gpu
 import o1stats
 
@@ -71,6 +72,76 @@ def work_level(path=None):
     if isinstance(v, bool) or not isinstance(v, int):
         return 100
     return max(30, min(100, v))
+
+
+# ---- the fan calibration's levels (6b505, per the owner: quiet, steady, from measured temperatures) -------------
+# The calibration (lib/o1fancal.py, the panel's Calibrate fans) finds two working levels and saves them in
+# CAL_FILE. While working the fans sit at the QUIET one; when any temperature comes within STEP_UP_MARGIN_C of its
+# limit they go to the HEAVY one at once, and back to quiet only when every temperature is STEP_DOWN_MARGIN_C under
+# its limit (8 C lower) and the heavy level has held STEP_MIN_S. Two steady levels with a wide band between them:
+# the fans never follow the temperature up and down. The over-limit override (100%) is unchanged and always wins.
+CAL_FILE = "/var/lib/ollama1/fan-calibration.json"
+WORK_MIN_PCT = 30                 # the lowest working level, set by hand or calibrated
+STEP_UP_MARGIN_C = 12             # a temperature this close to its limit: quiet -> heavy, at once
+STEP_DOWN_MARGIN_C = 20           # every temperature this far under its limit (and STEP_MIN_S at heavy): heavy -> quiet
+STEP_MIN_S = 180
+
+
+def _pct(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) and WORK_MIN_PCT <= v <= 100 else None
+
+
+def read_calibration(path=None):
+    """The calibration's result, checked: {"quiet_pct", "heavy_pct", "at", ...} or None (none, or not usable)."""
+    d = o1common.read_json_safe(path or o1common.p(CAL_FILE), None, max_bytes=262144)
+    if not isinstance(d, dict) or d.get("v") != 1:
+        return None
+    q, h, at = _pct(d.get("quiet_pct")), _pct(d.get("heavy_pct")), d.get("at")
+    if q is None or h is None or h < q or not isinstance(at, int) or isinstance(at, bool):
+        return None
+    return d
+
+
+def levels(cfg_path=None, cal_path=None):
+    """The working levels: {"quiet", "heavy", "source"}. The calibration's (source "calibration") unless
+    config.json's fan_calibration is "off" or there is none; then fan_work_pct for both ("setting"), else 100
+    ("default"). fan_work_pct stays the manual override: with fan_calibration "off" it is what applies."""
+    cfg_path = cfg_path or o1common.p("/etc/ollama1/config.json")
+    try:
+        with open(cfg_path, encoding="utf-8") as f:
+            cfg = json.load(f)
+        cfg = cfg if isinstance(cfg, dict) else {}
+    except (OSError, ValueError):
+        cfg = {}
+    if cfg.get("fan_calibration") != "off":
+        cal = read_calibration(cal_path)
+        if cal:
+            return {"quiet": cal["quiet_pct"], "heavy": cal["heavy_pct"], "source": "calibration"}
+    w = work_level(cfg_path)
+    return {"quiet": w, "heavy": w, "source": "setting" if "fan_work_pct" in cfg else "default"}
+
+
+class Levels:
+    """levels(), read again only when config.json or the calibration file changed (a stat of each per call), so a
+    new calibration or a changed setting applies without a restart."""
+
+    def __init__(self, cfg_path=None, cal_path=None):
+        self.cfg_path = cfg_path or o1common.p("/etc/ollama1/config.json")
+        self.cal_path = cal_path or o1common.p(CAL_FILE)
+        self.key, self.val = None, None
+
+    def _sig(self, path):
+        try:
+            st = os.stat(path)
+            return (st.st_mtime_ns, st.st_size, st.st_ino)
+        except OSError:
+            return None
+
+    def __call__(self):
+        key = (self._sig(self.cfg_path), self._sig(self.cal_path))
+        if key != self.key or self.val is None:
+            self.key, self.val = key, levels(self.cfg_path, self.cal_path)
+        return self.val
 
 
 FAN_HOLD_S = 30                   # the fans: 100% for this long after the work ends (6b460) ...
@@ -105,6 +176,7 @@ class Gpu:
 
     def __init__(self):
         self.vendor, self.at = None, -1e9
+        self.full, self.full_at = None, -1e9      # the last full NVIDIA reading (its chip temperature, 6b505)
 
     def busy(self):
         if not self.vendor and time.monotonic() - self.at > 60:
@@ -116,16 +188,27 @@ class Gpu:
             # one nvidia-smi call gives the whole reading; the gateway's and the panel's sandboxes read it
             # from here (6b488, 6b500: the panel's gauges too)
             full = o1stats.gpu_nvidia()
+            if full:
+                self.full, self.full_at = full, time.monotonic()
             if full and full.get("busy_pct") is not None:
                 o1gpu.publish(dict(full, vram_used_bytes=full["vram_used"], vram_total_bytes=full["vram_total"]))
                 return full["busy_pct"]
         u = o1gpu.usage(self.vendor)
         return u["busy_pct"]
 
+    def temp(self):
+        """An NVIDIA card's one (chip) temperature from the last busy() reading, or None (none under 10 s old, or
+        another card: an AMD card's sensors are hwmon files, which lib/o1fan.py reads itself). 6b505: the fans
+        watch the NVIDIA card's heat too."""
+        if not self.full or time.monotonic() - self.full_at > 10:
+            return None
+        return number((self.full.get("temps") or {}).get("edge"))
+
 
 def probes():
-    """The one probe both services read: the card's busy percent."""
-    return {"gpu_busy": Gpu().busy}
+    """The probes both services read: the card's busy percent (and, for the fans, an NVIDIA card's temperature)."""
+    g = Gpu()
+    return {"gpu_busy": g.busy, "gpu_temp": g.temp}
 
 
 def number(v):

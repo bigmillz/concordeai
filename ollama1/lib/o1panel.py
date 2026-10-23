@@ -647,7 +647,7 @@ def fan_view(st, now):
     if not fan or not fan_fresh(st, now):
         return ("none", None)
     phase, pct = fan.get("phase"), int(D._f(fan.get("pct")) or 0)
-    word = {"working": "working", "hot": "working", "calibrating": "measuring", "idle20": "idle",
+    word = {"working": "working", "hot": "working", "calibrating": "measuring", "tuning": "calibrating", "idle20": "idle",
             "hold100": "cooling down", "hold50": "cooling down", "ramp": "cooling down",
             "deepen": "idle", "deep": "deep idle"}.get(phase, "")
     head = ("%s %d%%" % (word, pct)) if word else ("%d%%" % pct)

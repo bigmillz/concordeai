@@ -3,7 +3,12 @@ card's fan and every fan header the motherboard's chip lets the kit control (the
 case fans, the CPU/radiator fans) follow what the server is doing, so it is cool
 when it works and quiet, and easy on the bearings, when it does not:
 
-  working     100%   the card over 50% busy, or the processor at 60 C or more
+  working     100%   the card over 50% busy, or the processor at 60 C or more (the level is a
+                     setting, 6b495, or the fan calibration's quiet level, which steps up to its
+                     heavy level when a temperature nears its limit, 6b505: see lib/o1work.py)
+  tuning       N%    while the fan calibration (lib/o1fancal.py) holds a test level: the level
+                     it asks for, refreshed every 2 s in /run/ollama1/fancal-hold.json; a file
+                     older than 10 s is ignored, so a dead calibration can't keep the fans low
   hold100      100%  from the moment that ends, for 30 s (6b460, per the owner)
   ramp     100->20%  then a straight line down over 90 s, in 2% steps
   idle20       20%   from 120 s after the work ended (and from the start)
@@ -120,6 +125,8 @@ LIMIT_CPUTIN_C = 85              # CPUTIN, PECI and TSI: the chip's own view of 
 LIMIT_VRM_C = 90                 # a label with VRM or MOS in it
 LIMIT_CHIPSET_C = 80             # a label with CHIPSET or PCH in it
 LIMIT_DIMM_C = 70                # jc42: the memory modules
+LIMIT_GPU_NV_C = 85               # an NVIDIA card's one (chip) temperature, from nvidia-smi (6b505; the burn stops at 90)
+TUNING_FRESH_S = 10               # the calibration's hold file is followed only while it is this fresh
 TEMP_LOW_C, TEMP_HIGH_C = 0, 120  # at or under, or at or over, these a sensor is disconnected or stuck: ignored
 CALL_JOIN_S = 6                  # the cooler's thread is given this long to finish a call at a stop
 OLD_UNIT = "ollama1-gpu-fan.service"          # the hand-made full-speed-always experiment
@@ -139,6 +146,26 @@ def state_path():
 
 def status_path():
     return o1common.p("/run/ollama1/fan.json")
+
+
+def tuning_path():
+    return o1common.p("/run/ollama1/fancal-hold.json")
+
+
+def read_tuning(path=None, now=None):
+    """The level the fan calibration holds the fans at (6b505), or None: none, not fresh (TUNING_FRESH_S), or not a
+    whole percent from 20 to 100. Only root can write /run/ollama1 (0755 root)."""
+    d = read_json_safe(path or tuning_path(), None, max_bytes=4096)
+    if not isinstance(d, dict):
+        return None
+    pct, at = d.get("pct"), d.get("at")
+    if isinstance(pct, bool) or not isinstance(pct, int) or not LOW_PCT <= pct <= FULL_PCT:
+        return None
+    if isinstance(at, bool) or not isinstance(at, (int, float)):
+        return None
+    if abs((time.time() if now is None else now) - at) > TUNING_FRESH_S:
+        return None
+    return pct
 
 
 def read_boot_id():
@@ -364,9 +391,14 @@ class Fan:
     jump); `wall` stamps the status file."""
 
     def __init__(self, probes, clock=time.monotonic, wall=time.time, log=print, io=None, sysroot=None,
-                 boot_id=read_boot_id, aio=None, aio_inline=False, work_pct=None):
+                 boot_id=read_boot_id, aio=None, aio_inline=False, work_pct=None, levels=None):
         self.p, self.clock, self.wall, self.log = probes, clock, wall, log
-        self.work_pct = FULL_PCT if work_pct is None else work_pct    # main() passes work_level() (6b495)
+        self.work_pct = FULL_PCT if work_pct is None else work_pct    # a fixed level (6b495; the tests) ...
+        self.heavy_pct, self.level_source = self.work_pct, "default" if work_pct is None else "setting"
+        self.levels = levels           # ... or o1work.Levels(): the calibration's quiet and heavy levels (6b505)
+        self.stepped, self.step_at, self.step_why = False, None, ""   # at the heavy level, since when, why
+        self.cool_top = None           # the level when the work ended: the hold and the ramp start from it
+        self.tuning = None             # the calibration's test level, while it holds one
         self.aio, self.aio_inline = aio, aio_inline      # the liquid cooler, if any (lib/o1aio.py)
         self.plock = threading.Lock()
         self.io = io or SysfsIO()
@@ -627,7 +659,7 @@ class Fan:
         m = o1work.DEEP_REENTER_C if self.deep_block else 0
         block = not temps
         for key, _label, c, limit in temps:
-            cpu, junction = key.startswith("cpu:"), key.startswith("gpu-junction:")
+            cpu, junction = key.startswith("cpu:"), key.startswith(("gpu-junction:", "gpu-nvidia:"))
             if c is None:
                 block = block or cpu or junction
                 continue
@@ -664,12 +696,53 @@ class Fan:
         return "deepen", pct, "idle, going quieter", int(o1work.BLUE_S * (1.0 - d) + 0.999)
 
     # -- one tick --------------------------------------------------------------------
+    def _nv_temps(self):
+        """An NVIDIA card's chip temperature as a sensor row (6b505), from the probe the busy reading fills: [] when
+        there is none (another card, no probe, no fresh reading). It counts for the override and deep idle as an AMD
+        card's junction does."""
+        try:
+            c = o1work.number(self.p["gpu_temp"]()) if "gpu_temp" in self.p else None
+        except Exception:
+            c = None
+        return [("gpu-nvidia:0", "GPU", c, LIMIT_GPU_NV_C)] if c is not None and plausible(c) else []
+
+    def heavy_guard(self, temps, now):
+        """True while the fans work at the heavy level (6b505): from the moment any temperature is within
+        STEP_UP_MARGIN_C of its limit, until every one is STEP_DOWN_MARGIN_C under its limit and STEP_MIN_S have
+        passed. Only when the heavy level is above the quiet one (a calibration found two)."""
+        if self.heavy_pct <= self.work_pct:
+            self.stepped, self.step_at = False, None
+            return False
+        near = [(label, c, limit) for _k, label, c, limit in temps
+                if c is not None and c >= limit - o1work.STEP_UP_MARGIN_C]
+        if near and not self.stepped:
+            label, c, limit = max(near, key=lambda r: r[1] - r[2])
+            self.stepped, self.step_at = True, now
+            self.step_why = "%s %.0f C (limit %d)" % (label, c, limit)
+            self.log("heavy level %d%%: %s" % (self.heavy_pct, self.step_why))
+        elif self.stepped and not near and now - self.step_at >= o1work.STEP_MIN_S and all(
+                c is None or c < limit - o1work.STEP_DOWN_MARGIN_C for _k, _l, c, limit in temps):
+            self.stepped, self.step_at = False, now
+            self.log("quiet level %d%%: every temperature %d C under its limit" % (self.work_pct,
+                                                                                   o1work.STEP_DOWN_MARGIN_C))
+        return self.stepped
+
     def tick(self):
         now = self.clock()
+        if self.levels is not None:
+            try:
+                L = self.levels()
+                self.work_pct, self.heavy_pct, self.level_source = L["quiet"], L["heavy"], L["source"]
+            except Exception:
+                pass                                             # keep the last levels
         temps = read_temps(self.sysroot)
         working, wwhy = self.working(now, temps)
+        temps = temps + self._nv_temps()
         hot, hwhy = self.overheated(temps)
         self.deep_guard(temps)
+        self.tuning = read_tuning(now=self.wall())
+        heavy = self.heavy_guard(temps, now)
+        level = self.heavy_pct if heavy else self.work_pct
         outs = find_outputs(self.sysroot)
         usable = [o for o in outs if o.key not in self.failed]
         text = controlling_text(usable)
@@ -677,28 +750,32 @@ class Fan:
             self.log("controlling " + text)
             self.seen = text
         if working:
-            self.was_working, self.cool_from = True, None
+            self.was_working, self.cool_from, self.cool_top = True, None, None
         elif self.was_working:
             self.was_working, self.cool_from = False, now          # the work just ended: the ramp starts now
+            self.cool_top = max(level, self.tuning or 0)           # ... from the level it worked at
+        top = self.cool_top if self.cool_top is not None else self.work_pct
         age = None if self.cool_from is None else now - self.cool_from
         left = 0
         self.exact = None                                        # set where the level is not a whole step
         if hot:
             phase, pct, why = "hot", FULL_PCT, "too warm: " + "; ".join(hwhy)
+        elif self.tuning is not None:
+            phase, pct, why = "tuning", self.tuning, "fan calibration: testing %d%%" % self.tuning
         elif working:
-            phase, pct, why = "working", self.work_pct, "; ".join(wwhy)
+            phase, pct, why = "working", level, "; ".join(wwhy) + ("; heavy level: " + self.step_why if heavy else "")
         elif any(o.lkey not in self.learned for o in usable) or (self.aio and self.aio.needs_calibration()):
             phase, pct, why = "calibrating", FULL_PCT, "measuring each fan at full speed (once)"
             self.calib_at = now
         elif age is not None and age < HOLD_S:
-            phase, pct, why, left = "hold100", self.work_pct, "the work ended", int(HOLD_S - age + 0.999)
+            phase, pct, why, left = "hold100", top, "the work ended", int(HOLD_S - age + 0.999)
         elif age is not None and age < HOLD_S + RAMP_S:
-            pct = ramp_pct(age - HOLD_S, self.work_pct)
-            self.exact = ramp_exact(age - HOLD_S, self.work_pct)
+            pct = ramp_pct(age - HOLD_S, top)
+            self.exact = ramp_exact(age - HOLD_S, top)
             phase, why, left = "ramp", "the work ended", int(HOLD_S + RAMP_S - age + 0.999)
         else:
             phase, pct, why, left = self.deep_level(now)
-        if phase in ("hot", "working", "calibrating", "hold100", "ramp"):
+        if phase in ("hot", "tuning", "working", "calibrating", "hold100", "ramp"):
             if phase == "hot":                                   # anything that raises the fans drops deep idle
                 if self.deep_start is not None:
                     self.deep_again = True                       # (heat: the next fall starts over from 20%)
@@ -711,13 +788,13 @@ class Fan:
             self.aio.set_phase(phase, pct)
             if self.aio_inline:
                 self.aio.step(now)
-        if phase != self.phase or (phase == "hot" and why != self.why) or (phase == "working" and
-                                                                             self.kinds != self.said_kinds):
+        if phase != self.phase or (phase in ("hot", "tuning") and why != self.why) or (
+                phase == "working" and self.kinds != self.said_kinds):
             self.log("%s: %s" % (phase, why))
             self.said_kinds = self.kinds
         self.phase, self.pct, self.why, self.left = phase, pct, why, left
         self.status_level = round(self.exact, 2) if self.exact is not None else pct   # (6b466) the lights' exact figure
-        self.write_status(usable)
+        self.write_status(usable, temps)
         return phase, why
 
     def shutdown(self):
@@ -760,8 +837,8 @@ class Fan:
         L = self.learned.get(o.lkey)
         return o.kind == "case" and L is not None and not L["rpm100"] and not rpm
 
-    def write_status(self, outs):
-        live = snapshot(outs, self.io, self.sysroot)
+    def write_status(self, outs, temps=None):
+        live = snapshot(outs, self.io, self.sysroot, temps)
         aio = self.aio.snapshot() if self.aio else None
         pump_rpm = aio["pump_rpm"] if aio and aio.get("found") and aio.get("state") == "controlling" else None
         rows, gone, pump = [], [], None
@@ -786,7 +863,9 @@ class Fan:
               "controlling": controlling_text(shown), "outputs": [row for row, _o in rows], "temps": live["temps"],
               "unconnected": gone, "pump": pump,
               "aio": aio,
-              "hottest": live["hottest"], "closest": live["closest"], "hot": sorted(self.hot.values())}
+              "hottest": live["hottest"], "closest": live["closest"], "hot": sorted(self.hot.values()),
+              # the working levels (6b505): the lights are red at "work"; "levels" says where they came from
+              "work": self.work_pct, "heavy": self.heavy_pct, "levels": self.level_source, "stepped": self.stepped}
         st["line"] = status_line(st)
         try:
             os.makedirs(os.path.dirname(status_path()), exist_ok=True)
@@ -797,15 +876,16 @@ class Fan:
 
 # ---- status text --------------------------------------------------------------------
 
-def snapshot(outs, io=None, sysroot=None):
-    """Live readings: each output's setting and rpm, and the temperatures."""
+def snapshot(outs, io=None, sysroot=None, temps=None):
+    """Live readings: each output's setting and rpm, and the temperatures (`temps`: read_temps() rows already read,
+    with an NVIDIA card's; else read now)."""
     io = io or SysfsIO()
     rows = []
     for o in outs:
         rows.append({"label": o.label, "chip": o.chip, "enable": _int(io.read(o.enable)),
                      "pwm": _int(io.read(o.pwm)), "rpm": rpm_of(o, io)})
     temps = [{"label": label, "c": round(c, 1), "limit": limit}
-             for _k, label, c, limit in read_temps(sysroot) if c is not None]
+             for _k, label, c, limit in (read_temps(sysroot) if temps is None else temps) if c is not None]
     hottest, closest = summarize_temps(temps)
     return {"outputs": rows, "temps": temps, "hottest": hottest, "closest": closest}
 
@@ -871,7 +951,7 @@ def status_line(st):
     """One line for the admin panel's CPU card and the top of `status`."""
     ph = st.get("phase")
     pct = st.get("pct", 0)
-    if ph in ("working", "hot", "calibrating"):
+    if ph in ("working", "hot", "calibrating", "tuning"):
         head = "Fans: %d%% (%s)" % (pct, st.get("why") or ph)
     elif ph == "hold100":
         head = "Fans: 100%% for %d s more, then down to 20%%" % st.get("hold_left", 0)
@@ -1122,7 +1202,7 @@ def aio_loop(aio, stop, log=print):
 
 def run_service(log=print):
     aio = o1aio.Aio(log=log)
-    fan = Fan(probes(), log=log, aio=aio, work_pct=work_level())
+    fan = Fan(probes(), log=log, aio=aio, levels=o1work.Levels())
     stop, poke, woke = threading.Event(), threading.Event(), threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: (stop.set(), poke.set()))
     signal.signal(signal.SIGINT, lambda *_: (stop.set(), poke.set()))

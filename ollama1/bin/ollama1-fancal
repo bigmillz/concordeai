@@ -1,0 +1,32 @@
+#!/usr/bin/python3
+"""ollama1-fancal: calibrate the fans from measured temperatures (6b505). See lib/o1fancal.py.
+
+  ollama1-fancal status       the calibrated levels, the ones in force, the last run (no root needed)
+
+Used by the system (root):
+  run          ollama1-fancal.service: a short model query, a longer one, then a graphics-card burn, about
+               40 minutes; started from the admin panel's Fans card
+  abort        ollama1-fancal-abort.service: the panel's Abort; stops the run at once
+  stop-post    the run's ExecStopPost: the fans' hold file goes, whatever ended it
+
+To forget a calibration: sudo rm /var/lib/ollama1/fan-calibration.json (the fan service notices within 2 s), or
+keep it and set "fan_calibration": "off" in /etc/ollama1/config.json to use fan_work_pct instead.
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1fancal  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal: stages, levels and temperatures, never what a model was asked
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        sys.exit(0)
+    sys.exit(o1fancal.main(sys.argv, log))

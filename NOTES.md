@@ -16014,6 +16014,82 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
   server got a false "Ollama did not report a ROCm GPU" note and a `later` item. It now accepts ROCm or CUDA. The
   gateway's 100%-on-GPU rule was already vendor-neutral (size_vram against size from /api/ps).
 
+## 6b505 — Fan calibration: the panel finds a quiet, steady working level from measured temperatures (per Patrick)
+
+Patrick's idea from 6b495: a button that runs a 2-3 minute model query, a 10-minute one, then a 20-30 minute burn,
+records temperatures against fan levels and sets a steady curve, quiet for the household, no hunting.
+
+- **The run** (`lib/o1fancal.py`, `bin/ollama1-fancal`, `ollama1-fancal.service`, root, sandboxed like the quick
+  burn plus `IPAddressAllow=localhost` for Ollama). Step 1, 150 s: a real `/api/generate` stream to 127.0.0.1:11434
+  (root is allowed by the nft rule), answer after answer, fans at 100%: the baseline. Step 2, 600 s: the same query;
+  the fans step down a fixed ladder 80/65/50/40/30%, 120 s a step; the first failing step goes back up one and the
+  descent stops for good. Step 3, 25-30 min: `tools/gpu-burn.sh` (llama-bench on the same model's blob; Ollama's copy
+  is unloaded first so both don't sit in the 16 GB), starting at step 2's level, 300 s blocks, only ever up a step;
+  it ends at the first passing block after 25 min. Model: `fan_cal_model` in config.json, else `gemma4:12b` (the
+  burn tools' default, installed on the server since 6b484).
+- **Judging.** Every sensor the fan service watches gets a ceiling `limit - 10 C`; one already within 13 C of its
+  limit at 100% gets its 100% reading + 3 C; within 3 C at 100% ends the run with nothing changed. A block fails
+  when the second half's peak (6 s moving average: Tctl's boost spikes aren't heat) or the projection reaches the
+  ceiling, or at once when a reading is over it after the block's first 60 s and not falling (so a step back up
+  isn't failed by the heat it inherited). The projection: three equal windows; slowing rise -> m3 + d2²/(d1-d2) (a
+  first-order system's remaining rise); flat/noisy (within 0.5 C) -> m3; just started -> m3 + 2·d2; not slowing ->
+  +8 C (assume the worst). Temperatures come from the fan service's own status file, so the run judges exactly
+  what the override watches.
+- **The target, and why.** Two levels, not one: QUIET = step 2's level + 10 points (what the household's real load,
+  model answers, needs) and HEAVY = step 3's level + 10 (sustained flat-out load), at least the quiet one, both
+  30-100. A single level from the burn alone would run the fans at burn speed for every short answer, which is
+  most of the work; a single level from the queries would leave a long job relying on the 100% override. The
+  fan service works at QUIET and moves to HEAVY at once when any temperature is within 12 C of its limit, back
+  only when all are 20 C under and HEAVY has held 180 s (lib/o1work.py: STEP_UP_MARGIN_C, STEP_DOWN_MARGIN_C,
+  STEP_MIN_S). An 8 C band plus a 3-minute dwell against thermal time constants of minutes means at most a step
+  every few minutes, never a hunt; the hold and the ramp after work start from whichever level it worked at.
+  The 10 C ceiling protects the hardware (it is also the override's hysteresis and the deep-idle margin); the +10
+  points cover what the test room didn't have: a warmer summer room, dust, ageing paste. The override at the limit
+  (100%) is unchanged and always wins.
+- **Applying it.** `/var/lib/ollama1/fan-calibration.json` (v1, quiet_pct, heavy_pct, found, ceilings, the judged
+  blocks). `o1work.levels()`: the calibration unless config.json says `"fan_calibration": "off"`; then
+  `fan_work_pct` (the manual override/fallback); else 100. The fan service re-reads both files when they change
+  (`o1work.Levels`, a stat per tick), so no restart; its status carries work/heavy/levels/stepped, and the lights
+  are red at the reported work level.
+- **The panel.** The Fans card gains a Calibration box: the saved levels, Calibrate fans (asks first; 409 with the
+  reason when serving, busy, already running, the fan service missing/measuring, or the model not installed), and
+  while running the step, the level, the card's busy %, the time left, the 4 sensors nearest their ceilings and the
+  blocks so far, with **Abort**. Abort starts `ollama1-fancal-abort.service` (root), which marks the abort and
+  `systemctl stop`s the run: SIGTERM ends the wait at once, the loads are killed (the burn's whole process tree:
+  GNU timeout makes its own process group, so it walks /proc; KillMode=control-group on a stop), the hold file goes,
+  nothing is saved. Both units are on the panel's polkit list (start only).
+- **During the run** the fan service shows phase `tuning` at the level asked for, via `/run/ollama1/fancal-hold.json`
+  written every 2 s and ignored at 10 s old, so a dead run can't keep the fans low; heat still wins.
+  `ollama1-fancal.service` is in o1sleep.BUSY_UNITS (auto sleep and the Sleep button say no) and the run holds a
+  logind inhibitor. Refusals before start: a request in flight or in the last 2 minutes, busy reasons (pulls,
+  updates, setup, hold locks), running burn/stability tools, the fan service not running/measuring/hot, no CPU
+  temperature, the model or its manifest missing, no llama-bench, no card reading. Safety stops: Abort/stop, the
+  fan service's hot phase or any reading at its limit, a new kernel record (NVRM Xid, MCE, AER, amdgpu ring
+  timeout) checked every 30 s with `journalctl -k --since @start`, the fan service going quiet, a request reaching
+  the gateway (the owner's work comes first), a load failing, the card not busy (no reading over 50% within 90 s,
+  or under 30% average). gpu-burn.sh's own 90 C NVIDIA stop stays. Files hold numbers and sensor names only.
+- **Found on the way, fixed:** (1) the NVIDIA card's temperature was in no fan decision (6b483 noted the fan curve
+  as AMD-only): the shared busy probe already calls nvidia-smi as root, so it now keeps the chip temperature and
+  the fan service adds it as a "GPU" sensor, limit 85 C (as an AMD edge sensor; the burns stop at 90), in the
+  override, deep-idle guard (like a junction, 60 C) and the status. (2) The Corsair cooler's fans ignored
+  `fan_work_pct` while working (its plan hard-coded 100% for `working`): they now follow the fans' level; the pump
+  is still extreme while working. Default behaviour is unchanged (100%).
+- **Tests** (no hardware): `test_fancal.py` (projection, ceilings, ladder; the search on a simulated first-order
+  machine finding 30%/80% and never hunting; a warm card stopping the descent; a near-limit sensor and an idle card
+  ending it; the whole run on a fake clock with the hold file read back through the fan service's reader, the
+  result read back through o1work.levels(); abort, heat, a reading at its limit, the fan service going quiet, a
+  request, an Xid, a failing load, a refusal; stop-post; every refusal; the query load against the Ollama stub; the
+  burn load's tree stop; the units), `test_fan.TestCalibratedLevels` (tuning, stale/odd holds, heat over tuning,
+  quiet->heavy->quiet with its band and dwell, the hold at the level it worked at, the NVIDIA sensor, Levels
+  reloading), test_aio (working/tuning follow the level), test_leds (red at the work level), test_admin (actions,
+  refusals, abort only while running, the card's data cut to known fields, the page), the polkit cases. The admin
+  demo runs a calibration 30x faster; checked in the browser (start, progress, Abort).
+- **Unverified on the server:** the whole run on the real machine (the sandbox's access to nvidia-smi, journalctl
+  and Ollama on localhost; llama-bench's start time with the shader cache; whether gemma4:12b queries keep the
+  5070 Ti over 30% busy); which sensor actually binds (on this board likely the card, NVMe or chipset); the
+  cooler's fans at a level under 100% while the pump is extreme; the lights' red at the quiet level. Needs the kit
+  install (setup.sh) first.
+
 ## 6b506 — Abandoned remote desktop sessions are ended (per Patrick)
 
 - The server runs GNOME with gnome-remote-desktop (RDP on :3389, GDM remote login). Clients that went away left

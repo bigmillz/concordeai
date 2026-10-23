@@ -723,7 +723,9 @@ around a little from time to time.
     temperature and power, CPU busy, temperature and speed, and memory,
     with a crosshair that reads out any moment;
   - **Hardware**: the CPU card below, the fans (the phase: working, hold100, ramp,
-    idle20 or deep idle, the level, each fan's rpm and the pump), the lights
+    idle20 or deep idle, the level, each fan's rpm and the pump; the calibration's
+    levels, **Calibrate fans** with its progress, and **Abort** while it runs: see
+    Fans, Fan calibration), the lights
     (their colour now and why), storage (each disk's use, the RAID mirror
     and its check's progress), the services, the network, and GPU tuning
     (what is applied and the last check; it is changed at the server only);
@@ -1027,7 +1029,8 @@ at a level that follows what the server is doing:
 
 | Phase | Level | When |
 |---|---|---|
-| `working` | 100% | the graphics card is over 50% busy, or the CPU is at 60 C or more |
+| `working` | 100%, or the working level | the graphics card is over 50% busy, or the CPU is at 60 C or more (the level: below) |
+| `tuning` | the level it tests | while the fan calibration runs (6b505, below) |
 | `hold100` | 100% | from the moment that ends, for **30 s** (6b460, per the owner) |
 | `ramp` | 100% down to 20% | then a straight line over **90 s**, written in whole 2% steps |
 | `idle20` | 20% | from 120 s after the work ended, and from the start; the lights stay white (6b449) |
@@ -1089,6 +1092,64 @@ benchmark or a burn test shows up as the card over 50%, which is what makes the
 heat). Status and the admin line say which trigger holds it ("the card is 87%
 busy", "CPU 63 C", or both). Auto sleep keeps its own idle rules.
 
+**The working level** (6b495, 6b505). While working, and in the hold after it, the fans run at the working level,
+and the ramp falls from it. It comes from, in order:
+
+1. **the fan calibration's levels** (below), when `/var/lib/ollama1/fan-calibration.json` holds a good result and
+   `/etc/ollama1/config.json` does not say `"fan_calibration": "off"`. There are two: the **quiet** level, which the
+   fans work at, and the **heavy** level, which they move to at once when any watched temperature comes within
+   **12 C** of its limit, and leave only when every temperature is **20 C** under its limit and the heavy level has
+   held **180 s**. Two steady levels with an 8 C band between them: the fans never follow the temperature up and
+   down. The status line says "heavy level: CPU 68 C (limit 80)" while it applies;
+2. **`fan_work_pct`** in `config.json` (a whole number, 30 to 100), for both: the manual setting, and the override
+   when `"fan_calibration": "off"` is set;
+3. **100%**, the default.
+
+The fan service reads these again when either file changes (no restart); the lights are fully red at the working
+level the fan service reports. The temperature override (100%, below) wins over all of them, always. The Corsair
+cooler's fans follow the working level too (6b505; before, they stayed at 100% while working whatever
+`fan_work_pct` said); its pump is extreme while working, as before.
+
+**Fan calibration** (6b505, per the owner: quiet for the household, steady, from measured temperatures). The admin
+panel's Fans card has **Calibrate fans**; it asks first, then starts `ollama1-fancal.service` (root;
+`bin/ollama1-fancal`, `lib/o1fancal.py`). About 40 minutes:
+
+| Step | Load | Fans |
+|---|---|---|
+| 1, 150 s | a real model query (`fan_cal_model` in `config.json`, else `gemma4:12b`) to the server's own Ollama, answer after answer | 100%: the baseline |
+| 2, 600 s | the same query, going on | down the ladder 80, 65, 50, 40, 30%, 120 s a step, while every temperature stays under its ceiling; the first step that doesn't goes back up one and never down again |
+| 3, 25 to 30 min | `tools/gpu-burn.sh` (llama-bench on the same model's file: the card flat out, the processor near idle) | from step 2's level, 300 s a block, only ever up a step when a block fails; it ends at the first block that passes after 25 minutes |
+
+Every temperature the fan service watches (the table below, the NVIDIA card included) gets a **ceiling 10 C under
+its limit**; a sensor already within 13 C of its limit with the fans at 100% gets its own 100% reading plus 3 C, and
+one within 3 C of its limit even at 100% ends the run (nothing to gain; nothing is changed). A block fails when the
+second half's peak (a 6 s average, so a processor's boost spikes don't count) or where the readings are heading (a
+projection of how a first-order rise settles) reaches the ceiling, or at once when a reading is over it, past the
+block's first minute and not falling. The result: **quiet = step 2's level + 10**, **heavy = step 3's level + 10**
+(at least the quiet one; both 30 to 100). The ten points are for a warmer room, dust and age; the 10 C ceiling is
+for the hardware. It is saved in `/var/lib/ollama1/fan-calibration.json` (with every block it judged and the
+ceilings), the samples every 10 s in `/var/lib/ollama1/fan-calibration-log.json`, the last run's end in
+`/var/lib/ollama1/fan-calibration-last.json`; progress is in `/run/ollama1/fancal.json` and on the card.
+
+While it runs the fan service is in phase `tuning` at the level the run asks for, through
+`/run/ollama1/fancal-hold.json`, refreshed every 2 s and ignored once 10 s old, so a dead run can't keep the fans
+low; the temperature override still wins. Auto sleep and the Sleep button say no ("the fans are being calibrated")
+and a logind inhibitor is held.
+
+It **refuses to start** while the server is serving (a request in flight, or one in the last 2 minutes), while a
+download, an update, setup.sh, another burn test or a hold lock is running, when the fan service isn't running or is
+still measuring its fans, when the model isn't installed, when llama-bench isn't there (the Vulkan build
+`tools/gpu-burn.sh` looks for in `~/llama-bench/<release>/llama-bench`: see that script's header), or with no reading from the card. It **stops at once**, saving nothing and
+giving the fans back, on **Abort** (the button starts `ollama1-fancal-abort.service`, which stops the run), a request
+reaching the gateway, any temperature at its limit, a new hardware-error record in the kernel log (an NVIDIA Xid, a
+machine check, a PCIe AER error, an amdgpu ring timeout), the fan service no longer reporting, the load failing or
+the card not getting busy; gpu-burn.sh's own 90 C stop for an NVIDIA card stays. Its files hold numbers and sensor
+names only, never what the model was asked or answered.
+
+`ollama1-fancal status` (no root) shows the saved levels, the ones in force and the last run. To forget a
+calibration: `sudo rm /var/lib/ollama1/fan-calibration.json`, or keep it and set `"fan_calibration": "off"` to use
+`fan_work_pct`. Run it again after changing a fan, the cooler or the case.
+
 **Temperature override.** Any of these at its limit forces 100% whatever the
 load says, until it is 10 C under it; then the normal rule follows:
 
@@ -1096,6 +1157,7 @@ load says, until it is 10 C under it; then the normal rule follows:
 |---|---|
 | CPU (k10temp, Tctl) | 80 C |
 | Graphics card: junction / memory / edge | 90 / 95 / 85 C |
+| An NVIDIA card's one (chip) temperature, from nvidia-smi through the busy reading (6b505) | 85 C |
 | NVMe drives (composite) | 70 C |
 | DIMMs (jc42) | 70 C |
 | Motherboard chip (nct6797) inputs, by `temp*_label`: board, system, AUXTIN and any label it does not know | 70 C |
@@ -1156,7 +1218,8 @@ with the case fans. The cooler follows the same phases:
 
 | Phase | Cooler fans | Pump |
 |---|---|---|
-| `working`, temperature override | 100% | extreme |
+| temperature override | 100% | extreme |
+| `working`, `tuning` | the fans' percent: the working level, 100% unless set or calibrated (6b505); the calibration's test level | extreme |
 | first start (measuring) | 100% | balanced |
 | `hold100`, `ramp` | the same percent as the fans (100%, then falling to 20%) | balanced |
 | `idle20` | 20% (or higher for a fan that stalls) | quiet |
@@ -1210,7 +1273,7 @@ command line; that is your call). Do not run `fancontrol` or another fan
 daemon beside this one.
 
 **Status.** `ollama1-fan status` (no root) shows the level and the phase
-(`working`, `hold100`, `ramp 60%`, `idle20`, `deepen 15%`, `deep`), which outputs it
+(`working`, `tuning`, `hold100`, `ramp 60%`, `idle20`, `deepen 15%`, `deep`), which outputs it
 controls, each fan's setting, rpm and lowest level, the highest temperature
 and the sensor closest to its limit (and every sensor with its limit). The
 admin panel's CPU card shows the same in one line. Logs:

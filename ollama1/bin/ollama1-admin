@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 
 import o1cpu  # noqa: E402
 import o1fan  # noqa: E402
+import o1fancal  # noqa: E402
 import o1gputune  # noqa: E402
 import o1idle  # noqa: E402
 import o1leds  # noqa: E402
@@ -63,6 +64,8 @@ FIXED_UNITS = {
     "library-preview": "ollama1-models-preview.service",
     "library-sync": "ollama1-models-sync.service",
     "power-apply": "ollama1-power-apply.service",
+    "fancal": "ollama1-fancal.service",                  # the fan calibration (6b505), about 40 minutes
+    "fancal-abort": "ollama1-fancal-abort.service",      # ... and its Abort: stops it at once
 }
 TEMPLATE_UNITS = {
     "remove-device": "ollama1-rmdevice@%s.service",
@@ -138,8 +141,46 @@ def clean_fan(st):
             "temps": [r for r in (_temp_row(t) for t in (st.get("temps") if isinstance(st.get("temps"), list)
                                                           else [])[:16]) if r],
             "hottest": _temp_row(st.get("hottest")), "closest": _temp_row(st.get("closest")),
+            # the working levels as the fan service has them now (6b505): quiet, heavy, where they came from
+            "work": _num(st.get("work")), "heavy": _num(st.get("heavy")), "levels": _txt(st.get("levels"), 16),
+            "stepped": st.get("stepped") is True,
             "aio": {"name": _txt(aio.get("name"), 60), "pump_rpm": _num(aio.get("pump_rpm")),
                     "coolant_c": _num(aio.get("coolant_c"))} if aio and aio.get("found") else None}
+
+
+def clean_fancal(prog, last, cal):
+    """The fan calibration (6b505): the run in progress (/run/ollama1/fancal.json, "stalled" when its writer went
+    quiet), else the last run's end (/var/lib/ollama1/fan-calibration-last.json), and the saved result
+    (/var/lib/ollama1/fan-calibration.json). Known fields only, as for every status file."""
+    def run_of(st):
+        if not isinstance(st, dict):
+            return None
+        res = st.get("result") if isinstance(st.get("result"), dict) else {}
+        found = st.get("found") if isinstance(st.get("found"), dict) else {}
+        return {"state": _txt(st.get("state"), 12), "stage": _txt(st.get("stage"), 8),
+                "stage_text": _txt(st.get("stage_text"), 40), "pct": _num(st.get("pct")),
+                "stage_left": _num(st.get("stage_left")), "left": _num(st.get("left")), "at": _num(st.get("at")),
+                "started": _num(st.get("started")), "model": _txt(st.get("model"), 80),
+                "gpu_busy": _num(st.get("gpu_busy")), "reason": _txt(st.get("reason"), 200),
+                "temps": [{"label": _txt(t.get("label"), 40), "c": _num(t.get("c")), "limit": _num(t.get("limit")),
+                           "ceiling": _num(t.get("ceiling"))}
+                          for t in (st.get("temps") if isinstance(st.get("temps"), list) else [])[:4]
+                          if isinstance(t, dict)],
+                "blocks": [{"stage": _txt(b.get("stage"), 8), "pct": _num(b.get("pct")), "s": _num(b.get("s")),
+                            "ok": b.get("ok") is True, "worst": _txt(b.get("worst"), 40)}
+                           for b in (st.get("blocks") if isinstance(st.get("blocks"), list) else [])[-16:]
+                           if isinstance(b, dict)],
+                "found": {"query": _num(found.get("query")), "burn": _num(found.get("burn"))},
+                "result": {"quiet_pct": _num(res.get("quiet_pct")), "heavy_pct": _num(res.get("heavy_pct"))}
+                if res else None}
+    run = prog if isinstance(prog, dict) and prog.get("state") in ("running", "stalled") else (prog or last)
+    cal_out = None
+    if isinstance(cal, dict):
+        found = cal.get("found") if isinstance(cal.get("found"), dict) else {}
+        cal_out = {"at": _num(cal.get("at")), "quiet_pct": _num(cal.get("quiet_pct")),
+                   "heavy_pct": _num(cal.get("heavy_pct")), "model": _txt(cal.get("model"), 80),
+                   "found": {"query": _num(found.get("query")), "burn": _num(found.get("burn"))}}
+    return {"run": run_of(run), "cal": cal_out, "total_s": o1fancal.SHORT_S + o1fancal.LONG_S + o1fancal.BURN_S}
 
 
 def clean_leds(st):
@@ -336,7 +377,9 @@ class Panel:
                               ("leds_status", lambda: clean_leds(o1leds.read_status())),
                               ("idle", lambda: clean_idle(read_json_safe(os.path.join(Paths.run, "idle.json"), None,
                                                                          max_bytes=8192), now)),
-                              ("gpu_tune", lambda: clean_gpu_tune(o1gputune.read_state()))):
+                              ("gpu_tune", lambda: clean_gpu_tune(o1gputune.read_state())),
+                              ("fancal", lambda: clean_fancal(o1fancal.read_progress(now), o1fancal.read_last(),
+                                                              o1fancal.o1work.read_calibration()))):
                 try:
                     st[key] = read()
                 except Exception:
@@ -485,6 +528,36 @@ class Panel:
     def library(self):
         return {"preview": o1library.read_preview(), "sync": read_json(o1library.status_file())}
 
+    def fancal_refusal(self):
+        """Why the fan calibration can't start now (6b505), or None: the panel's quick answer. The unit asks all of
+        it again as root (and more: llama-bench, the card's reading) and says why in its progress file."""
+        now = self.clock()
+        if o1fancal.running(now):
+            return "a calibration is already running"
+        st = o1fan.read_status()
+        if not st:
+            return "the fan service isn't running"
+        if st.get("phase") == "calibrating":
+            return "the fan service is still measuring its fans; try again in a minute"
+        if st.get("phase") == "hot":
+            return "a temperature is at its limit now"
+        act = o1idle.read_activity(now)
+        if act.get("inflight") is None:
+            return "couldn't tell whether the server is serving (the gateway isn't reporting)"
+        if act["inflight"] > 0:
+            return "the server is answering a request"
+        if now - (act.get("last") or 0) < o1fancal.QUIET_BEFORE_S:
+            return "the server answered a request %d s ago; try again after %d quiet minutes" % (
+                max(0, now - act["last"]), o1fancal.QUIET_BEFORE_S // 60)
+        reasons = self.busy()
+        if reasons:
+            return "; ".join(reasons)
+        model = o1fancal.model_name(self.cfg)
+        names = {m["name"] for m in self.models()["installed"]}
+        if model not in names and (":" in model or model + ":latest" not in names):
+            return "%s isn't installed (the calibration runs on it; set fan_cal_model for another)" % model
+        return None
+
     def library_sync_refusal(self, arg, confirm):
         """The sync unit carries out the preview the panel showed; start it
         only for that preview, confirmed, fresh, and with something to do."""
@@ -515,6 +588,14 @@ class Panel:
                 bad = self.library_sync_refusal(arg, obj.get("confirm"))
                 if bad:
                     return bad
+            if act == "fancal":
+                if obj.get("confirm") != "fancal":
+                    return 400, "confirm the calibration"
+                why = self.fancal_refusal()
+                if why:
+                    return 409, "not now: " + why
+            if act == "fancal-abort" and not o1fancal.running(self.clock()):
+                return 409, "no fan calibration is running"
             if act == "sleep":
                 if obj.get("confirm") != "sleep":
                     return 400, "confirm the sleep"
@@ -1136,6 +1217,12 @@ footer{max-width:1680px;margin:0 auto;padding:0 28px 40px;color:var(--muted);fon
   <div class="holdbar" id="fanhold" hidden><i></i></div>
   <div class="fans" id="fans"></div>
   <div class="note mt" id="fantemps"></div>
+  <div class="sleepbox" id="calbox"><div class="row between"><span class="note">Calibration</span><span class="chip" id="calchip">-</span></div>
+   <div class="st mt" id="calhead">-</div><div class="sub" id="calsub"></div>
+   <div class="holdbar" id="calbar" hidden><i></i></div>
+   <div class="note mt" id="caltemps"></div><div class="note" id="calsteps"></div>
+   <div class="acts mt"><button type="button" class="small" data-act="fancal" id="calstart">Calibrate fans</button><button type="button" class="small danger" data-act="fancal-abort" id="calabort" hidden>Abort</button></div>
+   <div class="note mt">About 40 minutes: a short model query, a longer one, then a graphics-card burn, while the fans step down to the quietest steady level that keeps every temperature 10 °C under its limit; 10 points are added for margin. It won't start while the server is serving, and stops at once for a request, Abort, heat or a hardware error.</div></div>
  </div>
  <div class="card s4"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Storage</span></h3>
   <div class="list" id="disks"></div><div class="list mt" id="raid"></div>
@@ -1293,7 +1380,8 @@ async function post(path,obj){
 function toast(title,text,kind){const t=el('div',undefined,'toast'+(kind?' '+kind:''));t.append(el('b',title));if(text)t.append(document.createTextNode(text));
  $('toasts').append(t);setTimeout(()=>t.remove(),kind==='bad'?10000:6000);}
 const LABEL={update:'Apply updates',restart:'Restart services',reboot:'Reboot',shutdown:'Shut down',sleep:'Sleep',pair:'Pairing window',backup:'Back up','lan-on':'LAN mode on','lan-off':'LAN mode off',
- 'library-preview':'Model library check','library-sync':'Model library sync','remove-device':'Remove device',pull:'Download model','remove-model':'Remove model'};
+ 'library-preview':'Model library check','library-sync':'Model library sync','remove-device':'Remove device',pull:'Download model','remove-model':'Remove model',
+ fancal:'Fan calibration','fancal-abort':'Fan calibration abort'};
 async function act(action,arg,confirm,btn){if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true');}
  const r=await post('/api/action',{action,arg,confirm});
  if(btn){btn.disabled=false;btn.removeAttribute('aria-busy');}
@@ -1323,6 +1411,7 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-ac
   if(await ask({title:'Put the server to sleep?',body,ok:'Sleep now'}))act('sleep',null,'sleep',b);return;}
  if(a==='lan'){if(await ask(lan?{title:'Turn LAN mode off?',body:['The gateway will answer only through Cloudflare again.'],ok:'Turn off'}:
    {title:'Turn LAN mode on?',body:['Turn LAN mode on? The gateway will also answer on the home network without Cloudflare Access (signatures still required, traffic unencrypted).'],ok:'Turn on',danger:true}))act(lan?'lan-off':'lan-on',null,undefined,b);return;}
+ if(a==='fancal'){if(await ask({title:'Calibrate the fans?',body:['It takes about 40 minutes: a 2½-minute model query with the fans at 100%, a 10-minute one while they step down, then a 25-minute graphics-card burn. The fans will be loud at the start and the card will be hot for a while.','It won\'t start while the server is serving, and it stops at once if a request comes in, if you press Abort, or on heat or a hardware error. The levels it finds replace the working level (fan_work_pct stays as the fallback).'],ok:'Calibrate'}))act('fancal',null,'fancal',b);return;}
  if(a==='update'&&!await ask({title:'Apply updates now?',body:['Apply all pending updates and update Ollama now?'],ok:'Apply updates'}))return;
  if(a==='restart'&&!await ask({title:'Restart the services?',body:['Restart Ollama, the gateway, the terminal and the tunnel? Running requests end.'],ok:'Restart',danger:true}))return;
  act(a,undefined,undefined,b);});
@@ -1438,7 +1527,7 @@ function renderCpu(c,s){c=c||{};const f=c.freq||{},t=c.temp,th=c.thresholds||{},
  spark('cspeedspark','cspark2',8,typeof f.avg_mhz==='number'?f.avg_mhz/1000:null,1,0.5);}
 
 // ---- fans, lights, storage, network, GPU tuning, services ----------------------------------
-const PHASE={deepen:['Idle',''],deep:['Deep idle',''],working:['Working','info'],hold100:['Cooling down','info'],ramp:['Cooling down','info'],idle20:['Idle',''],idle:['Idle',''],hot:['Hot','bad'],calibrating:['Calibrating','warn']};
+const PHASE={deepen:['Idle',''],deep:['Deep idle',''],working:['Working','info'],hold100:['Cooling down','info'],ramp:['Cooling down','info'],idle20:['Idle',''],idle:['Idle',''],hot:['Hot','bad'],calibrating:['Calibrating','warn'],tuning:['Fan calibration','warn']};
 function fanIcon(){const s=sv('svg',{viewBox:'0 0 32 32','aria-hidden':'true'});const g=sv('g',{class:'blades',fill:'currentColor'});
  for(let i=0;i<4;i++)g.append(sv('path',{d:'M16 16 C14 10 15 5 19 4 C22 4 21 10 16 16Z',transform:'rotate('+i*90+' 16 16)',opacity:.85}));
  s.append(sv('circle',{cx:16,cy:16,r:14.5,fill:'none',stroke:'currentColor','stroke-opacity':.25,'stroke-width':1.5}),g,sv('circle',{cx:16,cy:16,r:2.6,fill:'#0b1220',stroke:'currentColor','stroke-width':1.2}));return s;}
@@ -1455,6 +1544,27 @@ function renderFans(f){const box=$('fans');box.replaceChildren();
  if(f.aio){const t=el('div',undefined,'fan'+(f.aio.pump_rpm>0?' on':''));const ic=fanIcon();if(f.aio.pump_rpm>0)ic.querySelector('.blades').style.animationDuration=clamp(1200/f.aio.pump_rpm,0.18,3).toFixed(2)+'s';
   const d=el('div');d.append(el('div','Pump'+(f.aio.name?' · '+f.aio.name:''),'fl'),el('div',isNum(f.aio.pump_rpm)?Math.round(f.aio.pump_rpm)+' rpm':'no rpm','fr'),el('div',isNum(f.aio.coolant_c)?'coolant '+f.aio.coolant_c.toFixed(1)+' °C':'','fp'));t.append(ic,d);box.append(t);}
  const h=f.hottest,n=f.closest;$('fantemps').textContent=h&&n?'Hottest: '+h.label+' '+Math.round(h.c)+' °C  ·  closest to its limit: '+n.label+' '+Math.round(n.c)+' of '+n.limit+' °C':'';}
+// the fan calibration (6b505): a run in progress, else the saved levels and how the last run ended
+const CALSTATE={running:['Running','info'],stalled:['Stopped','bad'],done:['Calibrated','ok'],failed:['Failed','bad'],aborted:['Aborted','warn'],refused:['Not started','warn']};
+const CALSTAGE={short:'1 of 3',long:'2 of 3',burn:'3 of 3'};
+function renderCal(c,f){if(!c)return;const r=c.run,cal=c.cal,run=!!r&&r.state==='running';f=f||{};
+ $('calstart').hidden=run;$('calabort').hidden=!run;const bar=$('calbar');bar.hidden=!run;
+ if(run){chip('calchip','Running','info');
+  $('calhead').textContent='Step '+(CALSTAGE[r.stage]||'?')+': fans '+(isNum(r.pct)?r.pct:'?')+'%';
+  $('calsub').textContent=(r.stage_text||'')+(isNum(r.gpu_busy)?'  ·  card '+Math.round(r.gpu_busy)+'% busy':'')+'  ·  about '+Math.max(1,Math.round((r.left||0)/60))+' min left';
+  bar.firstChild.style.width=(c.total_s?clamp(1-(r.left||0)/c.total_s,0,1)*100:0)+'%';
+  $('caltemps').textContent=(r.temps||[]).filter(t=>isNum(t.c)).map(t=>t.label+' '+Math.round(t.c)+' of '+Math.round(t.ceiling)+' °C').join('  ·  ');
+  $('calsteps').textContent=(r.blocks||[]).filter(b=>b.stage!=='short').map(b=>b.pct+'% '+(b.ok?'ok':'too warm'+(b.worst?' ('+b.worst+')':''))).join(', ');return;}
+ const st=r?CALSTATE[r.state]||[r.state||'?','']:null;
+ if(cal&&isNum(cal.quiet_pct)){chip('calchip',st&&r.state!=='done'?'Calibrated · last run '+st[0].toLowerCase():'Calibrated',st&&r.state!=='done'?'warn':'ok');
+  $('calhead').textContent='Quiet '+cal.quiet_pct+'%  ·  heavy '+cal.heavy_pct+'%';
+  $('calsub').textContent=(cal.at?stamp(cal.at):'')+(cal.model?' with '+cal.model:'')+(isNum(cal.found.query)?'  ·  found '+cal.found.query+'% under queries, '+cal.found.burn+'% under the burn, +10 margin':'');}
+ else{chip('calchip',st?st[0]:'Not calibrated',st?st[1]:'');
+  $('calhead').textContent=isNum(f.work)?'Working level '+Math.round(f.work)+'%':'Not calibrated';
+  $('calsub').textContent=f.levels==='setting'?'From fan_work_pct in config.json':'The default: 100% while working';}
+ const why=r&&r.state!=='done'&&r.reason?'Last run '+(st?st[0].toLowerCase():r.state)+(r.at?' '+ago(r.at):'')+': '+r.reason:'';
+ $('caltemps').textContent=why;
+ $('calsteps').textContent=f.levels==='calibration'&&f.stepped?'Working at the heavy level now: a temperature came near its limit.':'';}
 function renderLeds(l){const orb=$('orb');
  if(!l){chip('ledchip','Not reporting','');$('ledstate').textContent='-';$('ledwhy').textContent='The lights service isn\'t reporting (it is off unless setup.sh --leds on).';$('leddevs').textContent='';orb.style.background='#1a2030';orb.style.boxShadow='none';return;}
  const rgb=l.rgb||[40,48,64],c='rgb('+rgb.join(',')+')';orb.style.background='radial-gradient(circle at 35% 30%,#fff8,'+c+' 45%,'+c+')';orb.style.boxShadow='0 0 34px 6px rgba('+rgb.join(',')+',.45)';
@@ -1555,7 +1665,7 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){setLi
  fetchedAt=Date.now()/1000;if(isNum(s.time))skew=s.time-fetchedAt;lastState=s;if(JOBS[0].t)setLive('','Live');
  $('asof').textContent='Updated '+new Date().toLocaleTimeString();
  pushLive(s);
- const parts=[['hero',()=>renderHero(s)],['gauges',()=>renderGauges(s)],['cpu',()=>renderCpu(s.cpu,s)],['fans',()=>renderFans(s.fan_status)],['leds',()=>renderLeds(s.leds_status)],
+ const parts=[['hero',()=>renderHero(s)],['gauges',()=>renderGauges(s)],['cpu',()=>renderCpu(s.cpu,s)],['fans',()=>renderFans(s.fan_status)],['cal',()=>renderCal(s.fancal,s.fan_status)],['leds',()=>renderLeds(s.leds_status)],
   ['storage',()=>renderStorage(s)],['net',()=>renderNet(s)],['tune',()=>renderTune(s.gpu_tune,s.gpu)],['svc',()=>renderSvc(s)],['loaded',()=>renderLoaded(s)],['charts',draw]];
  for(const [,f] of parts){try{f();}catch(e){}}
  const fl=$('fanline');if(fl){fl.hidden=!s.fan;fl.textContent=s.fan||'';}

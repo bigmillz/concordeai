@@ -1,0 +1,45 @@
+# The fan calibration (6b505): a 150 s model query, a 600 s one, then a 25-30 minute graphics-card burn
+# (tools/gpu-burn.sh), while the fan service holds the levels it tests; the levels it finds go to
+# /var/lib/ollama1/fan-calibration.json, which the fan service follows (lib/o1fancal.py). polkit lets the
+# admin panel's user (o1admin) START this unit; its Abort starts ollama1-fancal-abort.service, which stops
+# this one. Not started at boot (no [Install]). While it runs, auto sleep and the Sleep button say no
+# (lib/o1sleep.py BUSY_UNITS) and it holds a logind inhibitor.
+#
+# Root, because the card's readings (nvidia-smi), the kernel log, llama-bench's GPU access and the fan
+# service's hold file need it, but boxed in like the quick burn: it writes only /run/ollama1 and
+# /var/lib/ollama1, reads /home only (llama-bench lives in ~/llama-bench), reaches the network only on
+# 127.0.0.1 (Ollama, which lets root in) and gains nothing. DevicePolicy is left open for the card's nodes, as
+# for the quick burn. ExecStopPost takes the hold file away after any end, a kill included; KillMode
+# control-group takes the burn's whole tree with it on a stop.
+[Unit]
+Description=ollama1: calibrate the fans (model queries, then a graphics-card burn), from the admin panel
+After=ollama.service ollama1-fan.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-fancal run
+ExecStopPost=/usr/local/lib/ollama1/bin/ollama1-fancal stop-post
+WorkingDirectory=/run/ollama1
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=75min
+TimeoutStopSec=20
+KillMode=control-group
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1 /var/lib/ollama1
+ProtectHome=read-only
+PrivateTmp=yes
+IPAddressAllow=localhost
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022
