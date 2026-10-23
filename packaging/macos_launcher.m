@@ -47,6 +47,7 @@
 #include <spawn.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #ifndef LAUNCHER_TAG
 #define LAUNCHER_TAG "com.millen.millenai"
@@ -210,6 +211,16 @@ int main(int argc, char *argv[]) {
     setenv("__PYVENV_LAUNCHER__", venvPython.fileSystemRepresentation, 1);
     char *pyargv[] = {(char *)venvPython.fileSystemRepresentation,
                       (char *)main.fileSystemRepresentation, NULL};
-    return bytesMain(2, pyargv);
+    // A QUIT MUST NOT CRASH (6b508, per Patrick: "the app is crashing"):
+    // Py_BytesMain returns after Python has finalized (its atexit work is
+    // done, its files flushed), and leaving this @autoreleasepool then
+    // drained what PyObjC had autoreleased on the main thread. Each one's
+    // dealloc took the GIL of an interpreter that no longer exists
+    // (PyGILState_Ensure -> new_threadstate, SIGSEGV at 0x1cb8), so
+    // closing the window ended in "quit unexpectedly". Leave without
+    // draining it: nothing in it is ours to free.
+    int rc = bytesMain(2, pyargv);
+    fflush(NULL);
+    _exit(rc);
   }
 }
