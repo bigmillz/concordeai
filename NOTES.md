@@ -16165,6 +16165,9 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
 - setup.sh step 11 treated the GPU as found only when Ollama's "inference compute" line said ROCm, so an NVIDIA
   server got a false "Ollama did not report a ROCm GPU" note and a `later` item. It now accepts ROCm or CUDA. The
   gateway's 100%-on-GPU rule was already vendor-neutral (size_vram against size from /api/ps).
+- Follow-up (2026-10-23): the server's next setup still fetched the ROCm component. o1common.DEFAULTS had
+  `"ollama_rocm": True`, and load_config fills defaults in, so want_rocm() always saw an explicit True and never
+  asked the card. The default is now None ("by the card"); test_updater checks want_rocm against DEFAULTS.
 
 ## 6b505 — Fan calibration: the panel finds a quiet, steady working level from measured temperatures (per Patrick)
 
