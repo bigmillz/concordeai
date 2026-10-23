@@ -220,14 +220,14 @@ NetworkManager   0 root 1021 NetworkManager sleep                    NetworkMana
 UPower           0 root 1190 upowerd        sleep                    Pause device polling                     delay
 ollama1          0 root 5120 sh             sleep:handle-power-key   a model is being downloaded              block
 Unattended Upgrades Shutdown 0 root 900 python3 shutdown             Stop ongoing upgrades or perform upgrades block
-Some Tool        1000 pat 77 tool           idle                     keeping the screen on                    block
+Some Tool        1000 alice 77 tool           idle                     keeping the screen on                    block
 """
 
 
 class TestProbes(unittest.TestCase):
     def test_sessions(self):
         self.assertEqual(o1idle.parse_sessions(""), 0)
-        self.assertEqual(o1idle.parse_sessions("  3 1000 pat seat0 tty1 \n 5 1000 pat - -\n"), 2)
+        self.assertEqual(o1idle.parse_sessions("  3 1000 alice seat0 tty1 \n 5 1000 alice - -\n"), 2)
 
     def test_inhibitors_only_block_mode_sleep(self):
         got = o1idle.parse_inhibitors(INHIBIT)

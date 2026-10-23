@@ -261,12 +261,13 @@ seconds until it answers.
 
 ### Images and video (optional)
 
-A server that also runs ComfyUI (`ollama1/tools/install-comfyui.sh`; nothing
-installs it unasked) can make pictures and short clips. Four routes, signed and
+A server that also runs ComfyUI (`sudo ./setup.sh --with-imagegen`, which runs
+`ollama1/tools/install-comfyui.sh`; nothing installs it unasked) can make pictures
+and short clips. Four routes, signed and
 paired-only like every other one. The app never sends a ComfyUI graph: it sends a
 kind, a prompt and a few numbers, and the gateway puts them into a fixed
-template (`lib/o1gen.py`: FLUX.1 schnell fp8 for pictures, Wan 2.1 1.3B for
-video). Anything not listed below is a 400.
+template (`lib/o1gen.py`: FLUX.2 klein 4B for pictures, or FLUX.1 schnell fp8 on
+a server that has only that; Wan 2.1 1.3B for video). Anything not listed below is a 400.
 
 | Call | Notes |
 |---|---|

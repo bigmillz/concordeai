@@ -7856,6 +7856,258 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
     raise RuntimeError("; ".join(errs) or "no image engine")
 
 
+# ==== photoedit: begin ====
+# EDIT THIS PICTURE (6b472, per Patrick: "Build photo editing" after a photo
+# of himself and "different hairstyles" got a refusal in words). A message
+# with a photo attached that asks to CHANGE it runs FLUX.2 klein's edit
+# command (mflux-generate-flux2-edit, mflux 0.19) on this Mac with the photo
+# as the reference. LOCAL ONLY: the photo never goes to a cloud painter or a
+# server, and a failed edit is never retried anywhere else. The segment holds
+# no cloud or server call on purpose; the gauntlet checks that.
+PE_NOTE = "Edited on this computer; your photo wasn’t sent anywhere"
+PE_TIER = "quick"                     # the klein rung: the only edit weights
+PE_BASE = "flux2-klein-4b"
+PE_TOOL = "mflux-generate-flux2-edit"
+PE_ETA_DEFAULT = 45.0                 # measured 32 s warm at 768 px, plus a cold load
+_PE_QUESTION = re.compile(
+    r"^\s*(?:what|which|who|whom|whose|why|how|where|when|is|are|was|were|"
+    r"does|do|did|tell\s+me|describe|explain|identify|read|translate|"
+    r"summari[sz]e|list|count|recommend|suggest)\b", re.I)
+_PE_WOULD = re.compile(
+    r"\b(?:what|how)\s+(?:would|will|might|could)\s+(?:i|he|she|they|we|it|this|"
+    r"my\s+\w+)\s+look\s*(?:like\s+)?(?:with|in|as|if|wearing|having)\b", re.I)
+_PE_PARTS = (r"hair(?:style|cut|line)?s?|background|backdrop|shirt|t-?shirt|outfit|"
+             r"clothes|clothing|jacket|suit|dress|hat|glasses|eyes?|eye\s+colou?r|"
+             r"skin|beard|mustache|moustache|sky|lighting|expression|face|"
+             r"colou?rs?|picture|photo|image|pic")
+_PE_RX = (
+    # change / swap / retouch a named part
+    re.compile(r"\b(?:change|swap|replace|recolou?r|restyle|retouch|edit|alter|"
+               r"modify|touch\s+up)\b\s+(?:out\s+)?(?:the|this|that|my|his|her|"
+               r"their|its|a|an)?\s*(?:\w+\s+)?(?:" + _PE_PARTS + r")\b", re.I),
+    # remove / erase a thing or a person
+    re.compile(r"\b(?:remove|erase|delete|get\s+rid\s+of|take\s+(?:out|away)|"
+               r"cut\s+out)\b\s+(?:the\s+|this\s+|that\s+|my\s+|his\s+|her\s+|"
+               r"their\s+|all\s+(?:the\s+)?|any\s+|everyone\s+|everything\s+)?"
+               r"(?:\w+\s+){0,2}(?:person|people|man|men|woman|women|guy|girl|"
+               r"kid|child|children|background|backdrop|object|car|sign|logo|"
+               r"watermark|text|tree|building|dog|cat|glasses|sunglasses|hat|"
+               r"beard|mustache|moustache|wrinkles|blemish\w*|pimples?|acne|"
+               r"tattoos?|stains?|shadows?|reflection|crowd|strangers?|"
+               r"photobomber|him|her|them|everyone|background\s+people)\b", re.I),
+    # add / give / put a thing on the subject
+    re.compile(r"\b(?:add|put|give|paste|place)\b\s+(?:me|him|her|them|us|"
+               r"my\s+\w+|the\s+\w+)?\s*(?:an?\s+|some\s+|the\s+)?(?:\w+\s+){0,2}"
+               r"(?:hair(?:style|cut)?|buzz\s*cut|crew\s*cut|undercut|pixie|"
+               r"beard|mustache|moustache|sunglasses|glasses|hat|cap|tattoos?|earrings?|necklace|scarf|tie|mask|"
+               r"crown|wings|horns|bangs|fringe|mohawk|afro|ponytail|braids?|"
+               r"dreadlocks|wig|makeup|lipstick|snow|rain|rainbow|sunset|"
+               r"bokeh|filter|border|halo)\b", re.I),
+    re.compile(r"\bput\s+(?:me|him|her|us|them)\s+(?:in|on|at|into|onto|"
+               r"next\s+to|inside)\b", re.I),
+    # show me with / in / as ...
+    re.compile(r"\b(?:show|let\s+me\s+see|i\s+(?:want|d\s+like|would\s+like)"
+               r"\s+to\s+see)\s+(?:me|him|her|us|them)\s+(?:again\s+|also\s+|"
+               r"now\s+)?(?:with|in|as|wearing|having|if)\b", re.I),
+    # try / give a few styles
+    re.compile(r"\btry\b\s+(?:on\s+|out\s+)?(?:an?\s+|some\s+|the\s+|different\s+|"
+               r"other\s+|a\s+few\s+|several\s+|various\s+)?(?:\w+\s+){0,2}"
+               r"(?:hair\w*|bang\w*|beard|mustache|moustache|glasses|sunglasses|"
+               r"hat|buzz\s*cut|mohawk|afro|bald|wig|colou?rs?)\b", re.I),
+    re.compile(r"\b(?:show|give|try|see|make|do|generate|create|gimme)\b.{0,40}?"
+               r"\b(?:different|other|new|various|several|a\s+few|some)\s+"
+               r"(?:hair\s*(?:style|cut|colou?r)s?|haircuts?|hairstyles?|looks|"
+               r"outfits|beards|glasses|hats)\b", re.I),
+    # whole-picture verbs
+    re.compile(r"\b(?:redraw|repaint|reimagine|re-?imagine|cartoonif\w+|"
+               r"colori[sz]e|photoshop|airbrush|de-?age)\b", re.I),
+)
+# make / turn / transform it into something LOOKING different: the rest of
+# the sentence must name a look, so "turn this into a table" stays a read
+_PE_MAKE = re.compile(
+    r"\b(?P<v>make|turn|transform|convert|render|redo)\b\s+(?:me|him|her|them|us|it|"
+    r"this|that|these|the\s+\w+(?:\s+\w+)?|my\s+\w+(?:\s+\w+)?)\b"
+    r"(?!\s+(?:an?|some)\b)(?P<rest>.*)$", re.I | re.S)
+_PE_LOOK = re.compile(
+    r"\b(?:look|looks|appear|older|younger|bald|blond|blonde|brunette|redhead|"
+    r"ginger|grey|gray|black|white|blue|green|red|pink|purple|orange|yellow|"
+    r"brown|silver|gold|smil\w*|taller|thinner|slimmer|muscular|cartoon|anime|"
+    r"pixar|disney|lego|clay|painting|painted|watercolou?r|oil|sketch|drawing|"
+    r"pencil|comic|manga|pop\s*art|cyberpunk|vintage|retro|noir|sepia|"
+    r"polaroid|sunny|sunset|night|dark|darker|bright|brighter|colou?rful|snow|"
+    r"winter|summer|stylis\w+|hair\w*|curly|straight|wavy|short|long|buzz|"
+    r"mohawk|beard|shaved?|clean-shaven|3d|sticker|statue|marble|sharper|"
+    r"clearer|background|sky)\b", re.I)
+
+
+def photo_edit_intent(text: str):
+    """The request to run on the attached photo when the message asks to
+    CHANGE it ("show me with different hairstyles", "make my hair blonde",
+    "remove the person on the left"), else None. Conservative: questions
+    about a photo ("what hairstyle suits me") and plain reads of it never
+    match. Only called when a photo is attached to this message."""
+    t = (text or "").strip()
+    if not t or len(t) > 400:
+        return None
+    t = _img_strip_pre(t) or t
+    if _PE_QUESTION.match(t) and not _PE_WOULD.search(t):
+        return None
+    if _PE_WOULD.search(t) or any(r.search(t) for r in _PE_RX):
+        return t.strip()
+    m = _PE_MAKE.search(t)
+    if m and _PE_LOOK.search(m.group(0)[len(m.group("v")):]):
+        return t.strip()
+    return None
+
+
+# shrink the photo to what the engine holds (long side 1024, sides a
+# multiple of 16, EXIF turn applied) with the engine's own Pillow
+_PE_PREP = (
+    "import sys\n"
+    "from PIL import Image, ImageOps\n"
+    "im = ImageOps.exif_transpose(Image.open(sys.argv[1])).convert('RGB')\n"
+    "w, h = im.size\n"
+    "s = min(1.0, 1024.0 / max(w, h))\n"
+    "w, h = max(256, int(w * s) // 16 * 16), max(256, int(h * s) // 16 * 16)\n"
+    "im.resize((w, h), Image.LANCZOS).save(sys.argv[2])\n"
+    "print('SIZE %d %d' % (w, h))\n")
+# the dev-only stand-in for the engine (hook photoedit-stub, gauntlet): copies
+# the reference to the output, or fails on photoedit-stub=fail
+_PE_STUB = (
+    "import shutil, sys\n"
+    "if sys.argv[3] == 'fail':\n"
+    "    sys.stderr.write('stub engine failed'); sys.exit(1)\n"
+    "shutil.copyfile(sys.argv[1], sys.argv[2])\n")
+
+
+class PhotoEditUnavailable(RuntimeError):
+    """The edit can't run here; the message says why, in a sentence."""
+
+
+def photo_edit_unavailable():
+    """'' when this Mac can edit a photo now, else the sentence that says
+    why not (nothing was sent anywhere)."""
+    if not studio_supported():
+        return ("Editing a photo only works on an Apple silicon Mac for now, "
+                "so it wasn’t edited, and your photo wasn’t sent "
+                "anywhere.")
+    t = studio_tier("image", PE_TIER)
+    tool = os.path.join(STUDIOS["image"]["venv"], "bin", PE_TOOL)
+    if not _studio_engine_ok("image") or not os.path.exists(tool):
+        return ("Editing a photo needs image generation on this Mac: add or "
+                "update it under **Settings › Models › Manage "
+                "models**. Your photo wasn’t sent anywhere.")
+    if not _studio_model_ok("image", PE_TIER) or not _snap_dir(t["repo"]):
+        return ("Editing a photo needs the Quick picture model (%s GB): add "
+                "it under **Settings › Models › Manage models**. "
+                "Your photo wasn’t sent anywhere." % t.get("gb", 4.6))
+    return ""
+
+
+def photo_edit_eta(ctx) -> dict:
+    """The time-left plan for an edit (X-Eta): the median of the edits this
+    profile has timed (their .render.json), else the measured default,
+    flagged as an estimate."""
+    secs = []
+    try:
+        fs = sorted(glob.glob(os.path.join(ctx.path(IMAGE_SUB), "*.render.json")),
+                    key=os.path.getmtime)[-30:]
+        for f in fs:
+            with open(f) as h:
+                d = json.load(h)
+            if d.get("edit") and float(d.get("secs") or 0) > 0:
+                secs.append(float(d["secs"]))
+    except Exception:
+        secs = []
+    if secs:
+        secs.sort()
+        return {"search": 0.0, "models": [], "final": round(secs[len(secs) // 2], 1),
+                "ftok": 0, "est": False}
+    return {"search": 0.0, "models": [], "final": PE_ETA_DEFAULT, "ftok": 0,
+            "est": True}
+
+
+def edit_photo(ctx, b64: str, request: str, sock=None, step=None) -> str:
+    """The edited picture's path, in ctx's pictures. Local FLUX.2 klein
+    only; raises PhotoEditUnavailable (say why), RenderBusy, or a plain
+    error from the engine. Never asks a cloud painter or a server."""
+    stub = _hook_arg("photoedit-stub") or (
+        "ok" if "photoedit-stub" in TEST_HOOKS else "")
+    if not stub:
+        why = photo_edit_unavailable()
+        if why:
+            raise PhotoEditUnavailable(why)
+    try:
+        raw = base64.b64decode(b64, validate=False)
+        if len(raw) < 16:
+            raise ValueError("empty")
+    except Exception:
+        raise PhotoEditUnavailable("I couldn’t read that photo, so nothing "
+                                   "was edited.")
+    if stub and raw.startswith(b"FAIL-STUB"):
+        stub = "fail"                  # the gauntlet's failing engine
+    if not _render_lock.acquire(timeout=5):
+        raise RenderBusy("already making one — ask again when it lands")
+    src = prepped = pf = None
+    out = stage_path(".png")
+    landed = False
+    try:
+        src = stage_path(".src")
+        fd = os.open(src, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+        _vb = os.path.join(STUDIOS["image"]["venv"], "bin")
+        t0 = time.time()
+        w = h = 0
+        if stub:
+            cmd = [sys.executable, "-c", _PE_STUB, src, out, stub]
+        else:
+            prepped = stage_path(".png")
+            rc, tail, cut = _run_render(
+                [os.path.join(_vb, "python3"), "-I", "-c", _PE_PREP, src, prepped],
+                120, sock)
+            if cut:
+                raise RenderBusy("stopped")
+            m = re.search(r"SIZE (\d+) (\d+)", tail)
+            if rc != 0 or not m or not os.path.exists(prepped):
+                raise PhotoEditUnavailable(
+                    "I couldn’t open that photo, so nothing was edited.")
+            w, h = int(m.group(1)), int(m.group(2))
+            t = studio_tier("image", PE_TIER)
+            # the request, then what must not move: a hairstyle ask leaves
+            # the face, the clothes and the background alone
+            ask = (request.strip().rstrip(".") + ". Keep everything else the "
+                   "same: the same person, face, pose, clothes and background.")
+            args = ["--model", _snap_dir(t["repo"]), "--base-model", PE_BASE,
+                    "--image-paths", prepped, "--prompt", "@prompt:prompt",
+                    "--steps", "4", "--guidance", "1.0",
+                    "--seed", str(secrets.randbelow(10 ** 6)),
+                    "--width", str(w), "--height", str(h),
+                    "--no-metadata", "--output", out]
+            cmd, pf = prompt_cmd(os.path.join(_vb, "python3"), "script",
+                                 os.path.join(_vb, PE_TOOL), args,
+                                 {"prompt": ask})
+        rc, tail, cut = _run_render(cmd, 900, sock)
+        if cut:
+            raise RenderBusy("stopped")
+        if rc != 0 or not os.path.exists(out):
+            raise RuntimeError(tail[-200:].strip() or "the engine stopped")
+        _render_note(out, {"w": w, "h": h, "steps": 4, "guidance": 1.0,
+                           "fmt": "png", "seed": 0, "neg": "", "edit": True},
+                     time.time() - t0)
+        final = _media_land(ctx, IMAGE_SUB, out)
+        landed = True
+        return final
+    finally:
+        for p in (src, prepped, pf):
+            drop_run_file(p)
+        if not landed:
+            drop_run_file(out)
+            drop_run_file(os.path.splitext(out)[0] + ".render.json")
+        _render_lock.release()
+# ==== photoedit: end ====
+
+
 # ---------------------------------------------------------------- export
 # FILES OUT (6b295, per Patrick: "add export for all the following formats
 # … performed intelligently, so that if the user asks 'can I export a
@@ -12833,6 +13085,69 @@ def chat_prefix_hash(msgs, n: int) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
+def _chat_snip(t, s, e, before=28, after=90):
+    """One line of a message around a match at t[s:e] (6b480): the words
+    either side with markdown's * # ` dropped and the spacing collapsed, an
+    ellipsis where it was cut. The match itself is kept as written, so the
+    page can find it again in the line and mark it."""
+    def _clean(x):
+        return " ".join(x.split())
+    pre = re.sub(r"[*#`]+", "", t[:s])
+    post = re.sub(r"[*#`]+", "", t[e:])
+    a = _clean(pre[-before * 4:])
+    if a and pre[-1:].isspace():
+        a += " "
+    if len(a) > before:
+        a = a[-before:]
+        sp = a.find(" ")
+        a = "…" + (a[sp + 1:] if 0 <= sp < 12 else a)
+    elif len(_clean(pre)) > len(a.strip()):
+        a = "…" + a
+    b = _clean(post[:after * 4])
+    if b and post[:1].isspace():
+        b = " " + b
+    if len(b) > after:
+        b = b[:after]
+        sp = b.rfind(" ")
+        b = (b[:sp] if sp > after - 16 else b) + "…"
+    elif len(_clean(post)) > len(b.strip()):
+        b += "…"
+    return a + " ".join(t[s:e].split()) + b
+
+
+def chat_search(chats, q, scan=400):
+    """Full-text search over the user's chats (6b269). Returns (ids, hits):
+    the ids of the chats whose title or messages hold q (any case), and per
+    chat {"id", "mi", "snip"} (6b480, per Patrick: the sidebar shows where
+    it matched and opens the chat at it). mi is the first matching
+    message's index in the saved chat, -1 when only the title matched;
+    snip is a line around that match, "" then."""
+    q = (q or "").strip()[:80]
+    ids, hits = [], []
+    if not q:
+        return ids, hits
+    rx = re.compile(re.escape(q), re.I)
+    for c in chats:
+        try:
+            if not isinstance(c, dict):
+                continue
+            mi, snip = -1, ""
+            for i, m in enumerate((c.get("messages") or [])[:scan]):
+                t = m.get("content", "") if isinstance(m, dict) else ""
+                t = t if isinstance(t, str) else str(t)
+                mt = rx.search(t)
+                if mt:
+                    mi, snip = i, _chat_snip(t, mt.start(), mt.end())
+                    break
+            if mi < 0 and not rx.search(str(c.get("title", ""))):
+                continue
+            ids.append(c.get("id"))
+            hits.append({"id": c.get("id"), "mi": mi, "snip": snip})
+        except Exception:
+            continue
+    return ids, hits
+
+
 def _chat_find(chats, cid):
     for i, c in enumerate(chats):
         if isinstance(c, dict) and c.get("id") == cid:
@@ -12998,10 +13313,10 @@ def _chat_op(chats, op, bk=None):
         return {"ok": True}, True
     if kind == "set":
         f, old, new = op.get("field"), op.get("old"), op.get("new")
-        if f not in ("title", "pin", "named", "lane", "pin_at"):
+        if f not in ("title", "pin", "named", "lane", "pin_at", "unread"):
             return {"err": "bad field"}, False
         cur = c.get(f)
-        same = (cur == old or (f in ("pin", "named", "pin_at")
+        same = (cur == old or (f in ("pin", "named", "pin_at", "unread")
                                and not cur and not old))
         if not same:
             return {"conflict": cur}, False
@@ -13019,6 +13334,11 @@ def _chat_op(chats, op, bk=None):
                     or new < 0):
                 return {"err": "bad pin_at"}, False
             c[f] = int(new)
+        elif f == "unread":
+            # an answer came in that the person hasn't seen (6b471)
+            if not isinstance(new, bool):
+                return {"err": "bad unread"}, False
+            c[f] = new
         else:
             c[f] = bool(new)
         return {"ok": True}, True
@@ -22482,6 +22802,23 @@ def server_sleepers(ctx) -> list:
     return out
 
 
+def server_gen_sleepers(ctx, kind: str) -> list:
+    """The sleepers a picture or a video may wake (6b482): server_sleepers whose
+    kit last said it can make `kind` ("image" or "video"). A server that never
+    said so, or said it can't, is left asleep: waking it would only delay this
+    computer's own painter."""
+    if kind not in ("image", "video"):
+        return []
+    ids = set(server_sleepers(ctx))
+    if not ids:
+        return []
+    try:
+        return [e["id"] for e in _srv_read(ctx)
+                if e["id"] in ids and (e.get("gen") or {}).get(kind) is True]
+    except (StoreReadError, NoProfile):
+        return []
+
+
 def server_wake_ask(sids, ctx, status, step, skip, alive=None):
     """The wake of a sleeping server for a question that can go on without it
     (6b461, per Patrick: "start by saying it's waking the server. Give it a
@@ -22533,18 +22870,36 @@ _SRV_GEN_WHY = {"offline": "didn’t answer", "tls": "its certificate didn’t c
                 "gone": "isn’t in Settings any more", "unpaired": "isn’t paired"}
 
 
-def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status) -> bool:
+def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status, skip=None) -> bool:
     what = "picture" if kind == "image" else "video"
     try:
-        # a sleeping server is woken for a question a person asked, here and
-        # nowhere else (6b346); the sidebar's poll never does
-        server_refresh_modes(ctx)
+        # the servers are checked without waking any (6b482): a sleeping one
+        # is woken below, with the step the page shows
+        server_refresh_modes(ctx, wake=False)
     except (StaleProfile, BrokenPipeError, ConnectionResetError):
         raise
     except Exception:
         pass
     for _wn, _wok in server_take_wake_notes():
         status(("Woke %s." if _wok else "%s didn’t wake.") % _srv_plain(_wn))
+    # A SLEEPING SERVER THAT CAN MAKE IT IS WOKEN WITH THE CHAT MODES' STEP
+    # (6b482): "Waking <name>" with ten seconds counting down and the page's
+    # Skip (6b465's server_wake_ask), and only one whose kit said it can make
+    # this. Before, a mode's wake woke any sleeper, one that can't make
+    # pictures too, and a question with no mode woke it silently for up to a
+    # minute (6b346). One that doesn't wake, or is skipped, leaves this
+    # computer's painter (or the cloud's), exactly as before. A format only
+    # this computer writes (a gif, a jpg) wakes nobody.
+    try:
+        _gs = server_gen_sleepers(ctx, kind) if srv_gen_opts(kind, use) is not None else []
+        _gw = (server_wake_ask(_gs, ctx, status, step, skip, lambda: not _client_gone(sock))
+               if _gs else [])
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception:
+        _gw = []
+    if _gw is None:                 # the reader left while it waited
+        return True
     e = server_gen_pick(ctx, kind)
     opts = srv_gen_opts(kind, use) if e is not None else None
     if e is None or opts is None:
@@ -30865,23 +31220,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/api/chats/search"):
             # full-text over the user's own chats (6b269, per Patrick:
             # "search through existing conversations") — titles match
-            # instantly client-side; this covers message CONTENT
+            # instantly client-side; this covers message CONTENT. Since
+            # 6b480 each hit also carries where it matched and a line of
+            # the text around it (chat_search)
             _q = (urllib.parse.parse_qs(urllib.parse.urlparse(
                 self.path).query).get("q", [""])[0] or "")
-            _q = _q.strip().lower()[:80]
-            hits = []
-            if _q:
+            _ids, _hits = [], []
+            if _q.strip():
                 with _chats_lock:
                     _cs = load_chats(self.ctx)
-                for c in _cs:
-                    try:
-                        if _q in str(c.get("title", "")).lower() or any(
-                                _q in str(m.get("content", "")).lower()
-                                for m in (c.get("messages") or [])[:400]):
-                            hits.append(c.get("id"))
-                    except Exception:
-                        continue
-            self._send_json({"ids": hits})
+                _ids, _hits = chat_search(_cs, _q)
+            self._send_json({"ids": _ids, "hits": _hits})
         elif self.path == "/api/memory":
             self._send_json({"facts": _load_memory(self.ctx)})
         elif self.path == "/api/me":
@@ -32828,6 +33177,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             auto_web = False
         if img_subject:
             auto_web = False
+        # EDIT THIS PICTURE (6b472): a photo attached to THIS message and a
+        # request to change it. Never a marked-up copy (6b355's own lane)
+        edit_req = (photo_edit_intent(_ann_q) if images and not _ann
+                    and not export_req else None)
+        if edit_req:
+            auto_web = False
 
         # a selected AGENT owns the request: its best installed model, its
         # specialist system prompt; Research routes to the research flow
@@ -33027,7 +33382,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the only thing that stamps _mlx_last_use, the janitor (which
         # skips a zero stamp) never released it. The warm-up now stamps
         # the clock itself, so anything it loads is reclaimable.
-        _no_text_model = (cloud_only or img_subject or vid_subject
+        _no_text_model = (cloud_only or img_subject or vid_subject or edit_req
                           or (export_req and export_req.get("lane")
                               == "retro"))
         def _start_prewarm():
@@ -33043,8 +33398,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # (the same for a mode: only a roster the mode resolved itself is
         # re-seated after a wake, so a picture, a pick or an agent that took
         # the council leaves the sleeper alone, 6b465)
+        # (and a picture or a video wakes only a server that can make it, in
+        # server_make, 6b482)
         if _ch_wake and (tier not in TIERS or cloud_only or _srv_only or _ag_wake
-                         or _ch_council0 is None or council != _ch_council0):
+                         or _ch_council0 is None or council != _ch_council0
+                         or img_subject or vid_subject):
             _ch_wake = []
         if not (_ag_wake or _ch_wake):
             _start_prewarm()
@@ -33771,7 +34129,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the page decodes it (hdrText)
         self.send_header("X-Models", header_text(xm))
         # the time-left plan (6b459): measured figures, worked out up front
-        _ep = eta_plan(self.ctx, council, messages, bool(query or _links))
+        _ep = (photo_edit_eta(self.ctx) if edit_req else
+               eta_plan(self.ctx, council, messages, bool(query or _links)))
         if _ep:
             self.send_header("X-Eta", json.dumps(_ep, separators=(",", ":")))
         # ANSWER NOW (6b257): an unguessable per-request id the client
@@ -33980,7 +34339,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (_so_c0.split(SERVER_SEP, 1)[0] or "Your server")))
             hb_stop.set()
             return
-        if (img_subject or vid_subject or export_req) and not self._bench_held:
+        if (img_subject or vid_subject or export_req or edit_req) \
+                and not self._bench_held:
             if not bench_hold():
                 emit(AppText(BENCH_BUSY))
                 hb_stop.set()
@@ -34031,7 +34391,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     _sg_use, _sg_n = resolve_overrides("video", _ovr, _pnote)
                     if server_make(user_base, "video", vid_subject, _sg_use,
-                                   _onotes, self.connection, emit, step, status):
+                                   _onotes, self.connection, emit, step, status,
+                                   skip=skip_ev):
                         hb_stop.set()
                         return
                 except (StaleProfile, BrokenPipeError, ConnectionResetError):
@@ -34102,13 +34463,67 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hb_stop.set()
             return
 
+        if edit_req:
+            # LOCAL ONLY (6b472): the photo is edited on this Mac with the
+            # klein edit engine and goes nowhere else: no server, no cloud
+            # painter, and a failure is said, never retried elsewhere.
+            # "<name> Only" and Cloud Only are text routes; the edit runs
+            # here anyway and one line says so (nothing leaves this Mac)
+            _pe_note = ""
+            if _srv_only or cloud_only:
+                _pe_note = (" \u00b7 %s runs text, so this edit ran on this "
+                            "Mac" % ("Cloud Only" if cloud_only else
+                                     (_so_c0.split(SERVER_SEP, 1)[0]
+                                      or "Your server") + " Only"))
+                status("editing on this Mac \u2014 your photo stays here")
+            _pe_why = ("" if "photoedit-stub" in "".join(TEST_HOOKS)
+                       else photo_edit_unavailable())
+            if _pe_why:
+                step("image", "Couldn\u2019t edit the photo", "done",
+                     "nothing was sent")
+                emit(_pe_why)
+                hb_stop.set()
+                return
+            step("image", "Editing your photo", "run", "on this Mac")
+            status("editing your photo \u00b7 on this Mac")
+            try:
+                _b64 = images[0].split(",", 1)[1] \
+                    if images[0].startswith("data:") else images[0]
+                path = edit_photo(self.ctx, _b64, edit_req,
+                                  sock=self.connection)
+                step("image", "Edited the photo", "done", "on this Mac")
+                emit("![%s](/api/image/%s)\n\n*%s%s*"
+                     % ("Edited photo: " + edit_req[:80].replace("]", ""),
+                        os.path.basename(path), PE_NOTE, _pe_note))
+            except RenderBusy as rb:
+                if str(rb) != "stopped":
+                    step("image", "Another render is running", "done", "")
+                    emit("I\u2019m already making a picture \u2014 ask again "
+                         "when it lands, and I\u2019ll edit this one straight "
+                         "after.")
+            except PhotoEditUnavailable as pu:
+                step("image", "Couldn\u2019t edit the photo", "done",
+                     "nothing was sent")
+                emit(str(pu))
+            except StaleProfile:
+                raise
+            except Exception as exc:
+                step("image", "Couldn\u2019t edit the photo", "done",
+                     str(exc)[:70])
+                emit("The picture editor on this Mac hit a snag \u2014 try once "
+                     "more in a moment, and your photo wasn\u2019t sent "
+                     "anywhere. (%s)" % str(exc)[:160])
+            hb_stop.set()
+            return
+
         if img_subject:
             # YOUR SERVER FIRST (6b356): as for a video, above
             if not cloud_only:
                 try:
                     _sg_use, _sg_n = resolve_overrides("image", _ovr, _pnote)
                     if server_make(user_base, "image", img_subject, _sg_use,
-                                   _onotes, self.connection, emit, step, status):
+                                   _onotes, self.connection, emit, step, status,
+                                   skip=skip_ev):
                         hb_stop.set()
                         return
                 except (StaleProfile, BrokenPipeError, ConnectionResetError):
@@ -36081,6 +36496,7 @@ select option{background:#16171b;color:#ececec}
   --accent-dim:rgba(255,255,255,.10);
   --teal:#c8c8c8;            /* was the secondary hue; now a light grey */
   --red:#e26d5a;             /* kept: errors and the update flag */
+  --unread:#4a8cf7;          /* the blue dot on a chat with an unseen answer (6b471) */
   --radius:10px;
   --mono:'IBM Plex Mono',ui-monospace,monospace;
   --sans:'Space Grotesk',system-ui,sans-serif;
@@ -36501,6 +36917,12 @@ body.resizing{cursor:col-resize;user-select:none}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
 }
 .chat-item .ct{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* unread (6b471): a solid blue dot in the row's left padding, out of flow like the
+   pin, so the title text never shifts */
+.chat-item{position:relative}
+.chat-item .cdot{position:absolute;left:2px;top:50%;width:7px;height:7px;
+  margin-top:-3.5px;border-radius:50%;background:var(--unread)}
+.chat-item.unread .ct{color:var(--text)}
 .chat-item .cx{color:var(--faint);visibility:hidden;font-size:13px;padding:0 3px}
 .chat-item:hover .cx{visibility:visible}
 .chat-item .cx:hover{color:var(--red)}
@@ -36515,6 +36937,19 @@ body.resizing{cursor:col-resize;user-select:none}
   outline:none;-webkit-appearance:none}
 #chat-search input::placeholder{color:rgba(255,255,255,.32)}
 #chat-search input:focus{border-color:rgba(255,255,255,.22)}
+/* a search hit's excerpt under its title (6b480, per Patrick): two lines at
+   most, the match marked like find's, the lane named when it is another.
+   Its own [hidden] rule, because it declares display */
+.chat-item.has-snip{flex-wrap:wrap;row-gap:2px}
+.chat-item .csnip{flex:0 0 100%;order:3;min-width:0;display:-webkit-box;
+  -webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  white-space:normal;overflow-wrap:anywhere;font-size:11.5px;line-height:1.35;
+  color:var(--faint)}
+.chat-item .csnip[hidden]{display:none}
+.chat-item .csnip mark{background:rgba(255,214,10,.32);color:var(--text);
+  border-radius:2px;padding:0}
+.chat-item .csnip .clane{font-family:var(--mono);font-size:9px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-right:6px}
 .cgroup{font-family:var(--mono);font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--faint);opacity:.75;
   padding:12px 10px 5px;user-select:none}
@@ -43773,6 +44208,9 @@ async function send(){
   }
   curHid="";liveDrafts=0;
   const isErr=full.trim().startsWith("⚠️")||full.includes("\n⚠️");
+  // seen or not is decided now, as the answer ends (6b471)
+  const goesUnread=unreadDecision(!!full,isErr,wasAborted,myChat,curChat,
+    document.visibilityState!=="hidden");
   if(full&&!isErr&&!aiDiv.querySelector(".mact"))
     msgActions(aiDiv,"assistant",stripTokens(full));
   if(!full&&!wasAborted){
@@ -43823,6 +44261,8 @@ async function send(){
   input.focus();
   // the chat as saved (the stream has closed, so the answer is on disk)
   const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);
+  if(goesUnread&&saved&&unreadDecision(true,false,false,saved.id,curChat,
+      document.visibilityState!=="hidden"))setUnread(saved.id,true);
   if(saved&&!saved.named&&full&&!isErr){
     const first=(saved.messages||[]).find(m=>m.role==="user");
     if(first)nameChat(saved,first.content);
@@ -44044,7 +44484,9 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
   $("#updated-ok").addEventListener("click",()=>{$("#updated-veil").hidden=true;});
 })();
 /* chat search: type-to-filter; three characters on, the server also
-   greps message CONTENT so an answer you remember finds its chat */
+   greps message CONTENT so an answer you remember finds its chat. Since
+   6b480 (per Patrick) it searches every lane, each hit shows a line of
+   the text it matched, and a click opens the chat at that match */
 (function(){
   const inp=$("#chat-q");if(!inp)return;
   let t=null,seq=0;
@@ -44057,7 +44499,7 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
         try{
           const r=await(await api("/api/chats/search?q="
             +encodeURIComponent(q))).json();
-          if(my===seq)window.chatQHits=new Set(r.ids||[]);
+          if(my===seq)window.chatQHits=chatHitMap(r,q);
         }catch(e){window.chatQHits=null;}
       }else window.chatQHits=null;
       if(my===seq)renderChats();
@@ -44189,6 +44631,7 @@ async function loadChatsFromDisk(){
       messages=(c.messages||[]).slice();redrawOpen();
     }
     renderChats();
+    markSeen();
   }catch(e){setTimeout(loadChatsFromDisk,3000);}
 }
 // one chat, as the server saved it: adopted after every answer, so the
@@ -44694,11 +45137,31 @@ async function nameChat(c,text){
     await chatOps([{op:"set",id:c.id,field:"named",old:false,new:true}]);
   }catch(e){c.named=false;}
 }
+// UNREAD (6b471, per Patrick): an answer that finished in a chat the person
+// isn't looking at marks it. Pure: finished = a real answer that ran to its end
+// (not an error notice, not stopped); seen = that chat is open in a visible window.
+function unreadDecision(finished,isErr,stopped,chatId,openId,visible){
+  if(!finished||isErr||stopped)return false;
+  return !(chatId===openId&&visible);
+}
+function setUnread(id,on){
+  const c=chats.find(x=>x.id===id);
+  if(!c||!!c.unread===on)return;
+  c.unread=on;renderChats();
+  // refused or failed: the flag stays on this page for now
+  try{chatOps([{op:"set",id,field:"unread",old:!on,new:on}]).catch(()=>{});}catch(e){}
+}
+function markSeen(){
+  const c=curChat&&chats.find(x=>x.id===curChat);
+  if(c&&c.unread&&document.visibilityState!=="hidden")setUnread(c.id,false);
+}
+document.addEventListener("visibilitychange",markSeen);
+window.addEventListener("focus",markSeen);
 // PINNED and RECENTS (6b467, per Patrick): the sidebar has two sections,
 // not date groups. Recents can be cut to a recent stretch of days; pinned
 // chats are never cut, and a search looks at everything.
 const RECENT_RANGES=[[1,"1 day"],[3,"3 days"],[7,"7 days"],[14,"14 days"],
-  [30,"1 month"],[0,"All"]];
+  [30,"30 days"],[0,"All time"]];
 var recentsDays=0;
 try{const v=parseInt(localStorage.getItem("millen.recentsDays")||"0",10);
   if(RECENT_RANGES.some(r=>r[0]===v))recentsDays=v;}catch(e){}
@@ -44769,6 +45232,46 @@ const OPTS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
 const PIN_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
   +'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
   +'<path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l2 3.2H7z"/></svg>';
+// SEARCH HITS (6b480, per Patrick): the server's answer as a Map id -> hit,
+// stamped with the query it answers, so a reply for an older query never
+// paints its excerpt (or picks the match) for the new one
+function chatHitMap(r,q){
+  const m=new Map();
+  ((r&&r.hits)||[]).forEach(h=>{if(h&&typeof h.id==="string")m.set(h.id,
+    {mi:Number.isInteger(h.mi)?h.mi:-1,snip:typeof h.snip==="string"?h.snip:""});});
+  ((r&&r.ids)||[]).forEach(id=>{if(typeof id==="string"&&!m.has(id))m.set(id,{mi:-1,snip:""});});
+  m.q=q;return m;
+}
+const LANE_NAME={ai:"Chat",code:"Code",funnel:"Funnels"};
+// pure: what a row under a search shows. snip: the line around the match;
+// lane: the lane's name when the chat is in another one (a search reaches
+// every lane); mi: the message to open at, -1 for none
+function chatHitView(hits,id,q,lane,mode){
+  const h=q&&hits&&hits.q===q?hits.get(id):null;
+  const ln=lane||"ai",here=(mode==="code"||mode==="funnel")?mode:"ai";
+  const other=ln!==here&&!(here==="ai"&&ln!=="code"&&ln!=="funnel");
+  return {snip:h&&h.mi>=0?h.snip:"",mi:h&&h.snip?h.mi:-1,
+          lane:q&&other?(LANE_NAME[ln]||"Chat"):""};
+}
+/*@hit-pure-end*/
+// the excerpt is built from nodes, never from HTML: it is the person's text
+function chatSnipPaint(el,v,q){
+  el.textContent="";
+  if(v.lane){const l=document.createElement("span");l.className="clane";
+    l.textContent=v.lane;el.appendChild(l);}
+  findSplit(v.snip,findHits(v.snip,q)).forEach(seg=>{
+    if(!seg.hit){el.appendChild(document.createTextNode(seg.t));return;}
+    const m=document.createElement("mark");m.textContent=seg.t;el.appendChild(m);
+  });
+}
+// a row clicked: the chat opens, and from a search hit in its text the find
+// bar opens on the query at that message (findOpenAt)
+function chatOpenHit(id){
+  const q=window.chatQ||"",c=chats.find(x=>x.id===id);
+  const v=chatHitView(window.chatQHits,id,q,c&&c.lane,uiMode);
+  loadChat(id);
+  if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);
+}
 function renderChats(){
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
@@ -44781,7 +45284,8 @@ function renderChats(){
   const q=(window.chatQ||"").toLowerCase();
   const qOK=c=>!q||(c.title||"").toLowerCase().includes(q)
     ||(window.chatQHits&&window.chatQHits.has(c.id));
-  const mine=chats.filter(c=>laneOK(c)&&qOK(c));
+  // a search reaches every lane (6b480): a hit in a Code chat shows from Chat
+  const mine=chats.filter(c=>(q||laneOK(c))&&qOK(c));
   const sp=recentsSplit(mine,recentsDays,Date.now(),!!q);
   const pv=foldView(sp.pins,foldPinned,!!q,curChat);
   const rv=foldView(sp.shown,foldRecents,!!q,curChat);
@@ -44789,14 +45293,19 @@ function renderChats(){
   const head=(which,name,v)=>'<button type="button" class="fold" data-fold="'+which
     +'" aria-expanded="'+(v.open?"true":"false")+'"><span class="fchev"></span>'
     +name+(v.open?'':'<span class="fldn"> \u00b7 '+v.count+'</span>')+'</button>';
-  const row=c=>
-    '<div class="chat-item'+(c.id===curChat?" active":"")
-    +(c.pin?" pinned":"")+'" data-id="'+esc(c.id)+'">'
+  const views=new Map();
+  const row=c=>{
+    const v=q?chatHitView(window.chatQHits,c.id,window.chatQ,c.lane,uiMode):null;
+    const sn=!!(v&&(v.snip||v.lane));if(sn)views.set(c.id,v);
+    return '<div class="chat-item'+(c.id===curChat?" active":"")
+    +(c.pin?" pinned":"")+(c.unread&&c.id!==curChat?" unread":"")+(sn?" has-snip":"")+'" data-id="'+esc(c.id)+'">'
+    +(c.unread&&c.id!==curChat?'<span class="cdot" role="img" aria-label="unread"></span>':'')
     +'<span class="ct" title="'+esc(c.title||"chat")+'">'
     +esc(c.title||"chat")+'</span>'
     +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin to top")+'">'
     +PIN_SVG+'</span>'
-    +'<span class="cx" title="Delete chat">\u00d7</span></div>';
+    +'<span class="cx" title="Delete chat">\u00d7</span>'
+    +(sn?'<span class="csnip"></span>':'')+'</div>';};
   let html="";
   if(sp.pins.length)
     html+='<div class="cgroup">'+head("pinned","Pinned",pv)+'</div>'+pins.map(row).join("");
@@ -44823,6 +45332,8 @@ function renderChats(){
   if(ra)ra.addEventListener("click",()=>setRecentsDays(0));
   el.querySelectorAll(".chat-item").forEach(it=>{
     const id=it.dataset.id;
+    const sp=it.querySelector(".csnip");
+    if(sp&&views.has(id))chatSnipPaint(sp,views.get(id),window.chatQ);
     it.querySelector(".cx").addEventListener("click",ev=>{
       ev.stopPropagation();deleteChat(id);
     });
@@ -44840,7 +45351,7 @@ function renderChats(){
     it.addEventListener("dblclick",ev=>{
       ev.stopPropagation();startRename(it,id);
     });
-    it.addEventListener("click",()=>loadChat(id));
+    it.addEventListener("click",()=>chatOpenHit(id));
   });
 }
 // RENAME in place — dblclick the title, type, Enter (Esc cancels)
@@ -44926,6 +45437,7 @@ function loadChat(id){
   inner.innerHTML="";
   messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
   renderChats();
+  markSeen();
 }
 renderChats();
 loadChatsFromDisk();
@@ -46519,6 +47031,15 @@ function findCapHits(lists,cap){
 // while an answer streams, a one-letter search is not re-applied on every
 // paint (it waits for the answer to land)
 function findLive(q,streaming){return !streaming||(q||"").length>=2;}
+// opened from a sidebar search hit (6b480): the first mark inside that
+// message, else the first one after it (a turn whose matched words render
+// differently, a link's address say), else -1 (the caller keeps the first)
+function findAtMsg(marks,el){
+  if(!el||!marks.length)return -1;
+  let i=marks.findIndex(m=>el.contains(m));
+  if(i<0)i=marks.findIndex(m=>(el.compareDocumentPosition(m)&4)!==0);
+  return i;
+}
 /*@find-pure-end*/
 const FIND_SKIP="button,script,style,textarea,input,select,svg,canvas,video,"
   +"audio,.who,.mact,.codebar,.worktree,[hidden]";
@@ -46606,18 +47127,42 @@ function findLater(){
   if(findHitEls.some(m=>!m.isConnected)||inner.textContent!==findText
      ||findChat!==curChat)findRun(false);
 }
-function findOpen(){
-  const again=!fb.hidden;
-  fb.hidden=false;
-  fq.focus();fq.select();
-  if(again)return;
+function findWatch(){
   if(!findObs)findObs=new MutationObserver(()=>{
     // a streamed answer (or a chat switch) rewrote the DOM: look again, at
     // most four times a second, and only when it really changed
     if(findWait)return;
     findWait=setTimeout(findLater,250);
   });
+}
+function findOpen(){
+  const again=!fb.hidden;
+  fb.hidden=false;
+  fq.focus();fq.select();
+  if(again)return;
+  findWatch();
   findRun(true);
+}
+// from a sidebar search hit (6b480, per Patrick): the chat is open, the bar
+// takes the query, and the current match is the one in message mi (the
+// saved turn the server matched). The jump is instant and unpins the view,
+// so the open's own glide to the end does not carry it away
+function findOpenAt(q,mi){
+  fb.hidden=false;fq.value=q;
+  findWatch();
+  findRun(false);
+  const el=[...inner.children].filter(x=>x.classList.contains("msg"))[mi];
+  const i=findAtMsg(findHitEls,el);
+  if(i>=0){findCur=i;findPaint();}
+  const t=findCur>=0?findHitEls[findCur]:el;
+  if(t){
+    chatPinned=false;chatGlideTo=0;
+    scroller.style.scrollBehavior="auto";
+    t.scrollIntoView({block:"center"});
+    scroller.style.scrollBehavior="";
+    chatJumpPaint();
+  }
+  fq.focus();
 }
 function findClose(){
   if(findObs)findObs.disconnect();

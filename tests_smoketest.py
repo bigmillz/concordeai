@@ -273,7 +273,7 @@ if not _py_has_nacl(_SMOKE_PY):
 # (6b324) and webstore-fake: the web view's clean-up records what it was
 # asked in run/webstore.json instead of needing a window
 INST = Instance(9901, "A", seed=_seed_a,
-                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake"}).start()
+                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake,photoedit-stub"}).start()
 BASE = INST.base
 KEY = INST.key
 PORT_ = INST.port
@@ -6467,6 +6467,50 @@ def healthy(text):
         f"{len(text)} chars, 3gram x{rep}"
 
 
+# 6b472, per Patrick: "Build photo editing". A photo attached to the message
+# plus a request to CHANGE it runs the local klein edit; everything else is
+# unchanged. The intent is pure; the path runs through a stand-in engine
+# (the dev-only photoedit-stub hook on copy A), never a real model.
+import base64 as _b64m
+_pseg = _MILLENAI_SRC[_MILLENAI_SRC.index("# ==== photoedit: begin ===="):_MILLENAI_SRC.index("# ==== photoedit: end ====")]
+exec(_pseg[_pseg.index("_PE_QUESTION = "):_pseg.index("# shrink the photo")], _ins)
+_pe = _ins["photo_edit_intent"]
+_pe_pos = ["show me with different hairstyles", "make my hair blonde",
+           "give me a buzz cut", "change the background to a beach",
+           "remove the person on the left", "add sunglasses",
+           "make it look like a watercolor painting", "put me on a beach",
+           "what would I look like with a beard", "try different hairstyles on me"]
+_pe_neg = ["what hairstyle suits me", "describe this image", "who is this",
+           "turn this into a table", "make me a list from this",
+           "extract the text", "is the background blurry", "translate this",
+           "show me the text in this image", "draw me a cat"]
+check("photo edit intent: change requests match, questions and reads do not",
+      all(_pe(x) for x in _pe_pos) and not any(_pe(x) for x in _pe_neg),
+      str([x for x in _pe_pos if not _pe(x)] + [x for x in _pe_neg if _pe(x)]))
+check("photo edit: draw-me-a-cat is still a new picture, not an edit",
+      _ii("draw me a cat") == "a cat" and not _pe("draw me a cat"))
+_pe_body = {"model": "", "models": [], "tier": "Fast", "auto_web": False,
+            "images": [_b64m.b64encode(b"\x89PNG\r\n\x1a\nstub-photo-bytes").decode()],
+            "messages": [{"role": "user", "content": "show me with different hairstyles"}]}
+_pe_t = req("/api/chat", "POST", _pe_body, cookie=K, timeout=120)[2].decode("utf-8", "replace")
+_pe_m = re.search(r"\(/api/image/([\w-]+\.png)\)", _pe_t)
+_pe_img = req("/api/image/" + _pe_m.group(1), cookie=K)[2] if _pe_m else b""
+check("photo edit path: an attached photo plus an edit request returns a saved picture and the plain note",
+      bool(_pe_m) and "wasn\u2019t sent anywhere" in _pe_t
+      and _pe_img.endswith(b"stub-photo-bytes"), _pe_t[-200:])
+_pe_body["images"] = [_b64m.b64encode(b"FAIL-STUB" + b"x" * 20).decode()]
+_pe_t2 = req("/api/chat", "POST", _pe_body, cookie=K, timeout=120)[2].decode("utf-8", "replace")
+check("photo edit failure: the reply says why in a sentence, no picture, never 'I cannot generate images of you'",
+      "hit a snag" in _pe_t2 and "![" not in _pe_t2 and "cannot generate" not in _pe_t2
+      and "wasn\u2019t sent anywhere" in _pe_t2, _pe_t2[-200:])
+check("photo edit is local only: no cloud painter, no server, no fallback in its code",
+      not any(w in _pseg for w in ("generate_image(", "GEMINI_API", "urlopen",
+                                    "server_make", "_cloud_all", "server_answer",
+                                    "requests."))
+      and "if edit_req:\n            # LOCAL ONLY" in _MILLENAI_SRC
+      and _MILLENAI_SRC.index("if edit_req:\n            # LOCAL ONLY")
+          < _MILLENAI_SRC.index("if img_subject:\n            # YOUR SERVER FIRST"))
+
 # Fast and Smart merged in 1.20: Fast now runs the strongest fitting
 # model, so it earns the strict health bar
 t = chat({"model": "", "models": [], "tier": "Fast", "auto_web": False,
@@ -9241,6 +9285,12 @@ check("LOC-3: viewing, switching and New chat write nothing",
       and "chatOps(" not in _lc.split("\n}")[0] and "api(" not in _lc.split("\n}")[0]
       and "chatOps(" not in _nc.split("});")[0],
       "%r" % [_rv0])
+# 6b480: the search's hits say where the chat matched
+_sh480 = json.loads(req("/api/chats/search?q=pine")[2] or b"{}")
+_sh480c = next((h for h in _sh480.get("hits") or [] if h.get("id") == _c1), {})
+check("chat search endpoint: a content hit carries its message index and a line around the match (6b480)",
+      _c1 in (_sh480.get("ids") or []) and _sh480c.get("mi") == 0
+      and "pineapple" in (_sh480c.get("snip") or ""), "%r" % _sh480)
 
 # LOC-5: an unreadable chats, memory or settings file answers 503 with its
 # line on every route that reads it, and is left byte for byte; a
@@ -23985,7 +24035,8 @@ def _p8c_slow(src):
     (ServerSlow), like a first word that took too long, says it took too long and falls back WITHOUT marking the server
     down; a refusal or a connection failure still does."""
     downs, said, steps = [], [], []
-    ns = {"server_refresh_modes": lambda ctx: None, "server_take_wake_notes": lambda: [], "_srv_plain": lambda n: n,
+    ns = {"server_refresh_modes": lambda ctx, **k: None, "server_take_wake_notes": lambda: [], "_srv_plain": lambda n: n,
+          "server_gen_sleepers": lambda ctx, kind: [],              # (6b482) nobody asleep
           "server_gen_pick": lambda ctx, kind: {"name": "Desk", "id": "x"}, "srv_gen_opts": lambda kind, use: {"width": 8, "height": 8},
           "ServerGenStopped": type("ServerGenStopped", (Exception,), {}),
           "StaleProfile": type("StaleProfile", (OSError,), {}), "_client_gone": lambda sock: False,
@@ -31737,7 +31788,9 @@ def _g56c_pins(src):
     out["refuse_first"] = ch.index("makes no picture or video (6b339)") < v < i
     sect = _sv_sect(src, "server pictures")
     out["no_cloud"] = not re.search(r"cloud_allowed|gate_ladder|_cloud_all|gemini|GEMINI|_render_lock|bench_hold", sect)
-    out["wakes_only_here"] = "server_refresh_modes(ctx)" in sect and "server_wake_if_down(" not in sect
+    # (6b482) checked without a wake; a sleeper that can make it is woken with the chat modes' step
+    out["wakes_only_here"] = ("server_refresh_modes(ctx, wake=False)" in sect and "server_wake_if_down(" not in sect
+                              and "server_wake_ask(_gs, ctx, status, step, skip," in sect)
     gen = src[src.index("# ---- images and video on your server (6b356)"):src.index("def server_add(ctx, d: dict)")]
     out["nolog"] = not re.search(r"\bprint\(|logging|usage_note", gen + sect)
     out["profile_writer"] = ("ctx.write_bytes(" in sect and not re.search(r"\bopen\(|os\.open\(|fdopen|stage_path|_media_land|write_text|write_bytes\(b", sect))
@@ -35041,6 +35094,148 @@ check("the merger drafts last, before and after a server joins the roster (6b465
       _f465(["B", "A", "C"]) == ["A", "C", "B"] and _f465(["Srv \u00b7 x", "B", "A"]) == ["Srv \u00b7 x", "A", "B"]
       and _f465(["A", "C"], "C") == ["A", "C"] and _f465(["B"]) == ["B"] and _f465(["B", "A"], "", "A") == ["B", "A"])
 # ==== 6b465: end ====
+
+
+# ==== 6b482 a picture wakes only a server that can make it: begin ====
+print("== a picture or a video wakes a sleeping server that can make it, with the Waking step, 10 s and a Skip (6b482) ==")
+# server_make on the servers section and the server pictures section (as 6b356's checks run it), with a
+# server that sleeps and has a card that wakes it (as 6b465's). The server's answers follow one switch:
+# asleep, every request is refused as offline; awake, it answers.
+def _w482_case(src, gen, wake_after=2, skip=False, gone=False, kind="image", use=None):
+    ns, ctx, d, _nt = _g56_make_ns(src)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    t = [1000.0]
+    ns["_srv_wake_clock"] = lambda: t[0]
+
+    def _spin(s_):
+        if t[0] > 9000:
+            raise RuntimeError("the wake never gave up")
+        t[0] += s_
+    ns["_srv_wake_sleep"] = _spin
+    udp = []
+    ns["_srv_udp"] = lambda pkt, addr: udp.append(addr)
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255"]
+    routes, off = _w46_ok_routes(ns)
+    routes["/v1/sleep-config"] = [_SvResp(200, {"enabled": True, "minutes": 30, "supported": True, "wake": [_W46_MAC]})]
+    _w46_router(ns, routes, [])
+    ns["server_sleep_get"](ctx, sid)
+    ns["_srv_update"](ctx, lambda es: (ns["_srv_find"](es, sid).update(gen=gen), {"ok": True})[1])
+    awake, polls, log = [False], [0], []
+
+    def gate(r):
+        def f():
+            if not awake[0]:
+                raise ns["ServerError"]("offline", "Desktop didn’t answer.")
+            return r
+        return f
+
+    def info():
+        polls[0] += 1
+        if wake_after is not None and polls[0] >= wake_after:
+            awake[0] = True
+        return gate(_SvResp(200, {"gpu": {}}))()
+    jid = "/v1/generate/jobs/" + _G56_ID
+    routes.update({"/v1/whoami": [gate(_SvResp(200, {"device_id": "x"}))], "/v1/info": [info],
+                   "/api/tags": [gate(_SvResp(200, {"models": []}))], "/api/ps": [gate(_SvResp(200, {"models": []}))],
+                   "/api/version": [gate(_SvResp(200, {"version": "0.1"}))],
+                   "/v1/generate/capabilities": [gate(_SvResp(200, gen if isinstance(gen, dict) else {}))],
+                   "/v1/generate/jobs": [gate(_SvResp(202, {"id": _G56_ID}))],
+                   jid: [gate(_SvResp(200, {"state": "done", "progress": 1.0,
+                                            "type": "image/png" if kind == "image" else "video/mp4"}))],
+                   jid + "/result": [gate(_g56_file(_G56_PNG if kind == "image" else _G56_MP4))]})
+    _w46_router(ns, routes, log)
+    # last checked over a minute ago: the request checks it again (and finds it asleep)
+    ns["_srv_seen"][sid] = {"at": 1, "reachable": False, "kind": "offline", "err": "off", "gen_at": _real_time()}
+    ns["_srv_wake_at"].clear()
+    ns["_client_gone"] = (lambda sock: True) if gone else (lambda sock: False)
+    ev = _th329.Event()
+    if skip:
+        ev.set()
+    emitted, steps, stats = [], [], []
+    ns["time"] = _G56Time()
+    try:
+        r = ns["server_make"](ctx, kind, "a red balloon", use or {}, [], None, emitted.append,
+                              lambda *a: steps.append(a), stats.append, skip=ev)
+        err = None
+    except Exception as exc:
+        r, err = None, exc
+    ns["time"] = time
+    jobs = [p for _m, p, _b, _s, _t in log if p.startswith("/v1/generate/jobs")]
+    return {"r": r, "err": err, "udp": udp, "steps": steps, "stats": stats, "emitted": emitted, "jobs": jobs,
+            "down": ns["server_label_down"](ctx, "Desktop · x"), "t": t[0] - 1000.0}
+
+
+def _w482(src):
+    out = {}
+    w = _w482_case(src, {"image": True, "video": False})
+    out["woke and made it"] = (w["r"] is True and w["err"] is None and w["udp"]
+                               and w["steps"][0] == ("wake", "Waking Desktop", "run", "10 s")
+                               and ("wake", "Woke Desktop", "done", "") in w["steps"]
+                               and w["steps"][-1][:2] == ("srvgen", "Made the picture on Desktop")
+                               and "Desktop is awake." in w["stats"] and w["stats"][0] == "Waking Desktop..."
+                               and len(w["emitted"]) == 1 and "made on Desktop" in w["emitted"][0])
+    v = _w482_case(src, {"image": False, "video": True}, kind="video")
+    out["a video too"] = v["r"] is True and v["udp"] and v["steps"][0] == ("wake", "Waking Desktop", "run", "10 s")
+    for nm, g, u in (("can't make it", {"image": False, "video": True}, None), ("never said", None, None),
+                     ("a gif is this computer's", {"image": True, "video": True}, {"fmt": "gif"})):
+        n = _w482_case(src, g, use=u, kind="video" if u else "image")
+        out["%s: left asleep" % nm] = (n["r"] is False and not n["udp"] and n["steps"] == [] and n["jobs"] == []
+                                       and n["emitted"] == [] and n["t"] == 0)
+    s = _w482_case(src, {"image": True, "video": True}, wake_after=None, skip=True)
+    out["Skip"] = (s["r"] is False and s["steps"][-1] == ("wake", "Skipped waking Desktop", "done", "")
+                   and "Skipped waking Desktop, going on without it" in s["stats"] and s["jobs"] == []
+                   and s["t"] < 1.5 and s["emitted"] == [])
+    n = _w482_case(src, {"image": True, "video": True}, wake_after=None)
+    out["no answer in 10 s"] = (n["r"] is False and n["steps"][-1] == ("wake", "Desktop didn’t wake in 10 s", "done", "")
+                                and n["jobs"] == [] and n["down"] is True and 10 <= n["t"] <= 13)
+    g = _w482_case(src, {"image": True, "video": True}, wake_after=None, gone=True)
+    out["reader left"] = g["r"] is True and g["jobs"] == [] and g["emitted"] == [] and g["t"] < 4
+    return all(out.values()), out
+
+
+_r482 = _w482(_MILLENAI_SRC)
+check("server pictures (6b482): a sleeping server that can make it is woken with the step, ten seconds and the Skip; "
+      "one that can't, or never said, is left asleep; Skip, no answer and Stop each end the wait",
+      _r482[0], "%r" % (_r482[1],))
+_s482 = _MILLENAI_SRC
+check("server pictures (6b482): the chat modes' wake leaves a picture or a video to server_make, and both "
+      "server_make calls hand it the page's Skip",
+      "or _ch_council0 is None or council != _ch_council0\n                         or img_subject or vid_subject):\n"
+      "            _ch_wake = []" in _s482
+      and _s482.count("_onotes, self.connection, emit, step, status,\n                                   skip=skip_ev):") == 2
+      and "def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status, skip=None) -> bool:" in _s482)
+_M482 = [
+    ("a picture wakes a server that can't make it",
+     '                if e["id"] in ids and (e.get("gen") or {}).get(kind) is True]', '                if e["id"] in ids]'),
+    ("a picture's wake silent again", "        server_refresh_modes(ctx, wake=False)\n    except (StaleProfile,",
+     "        server_refresh_modes(ctx)\n    except (StaleProfile,"),
+    ("no wake for a picture", "        _gs = server_gen_sleepers(ctx, kind) if srv_gen_opts(kind, use) is not None else []\n",
+     "        _gs = []\n"),
+    ("a gif wakes the server", "server_gen_sleepers(ctx, kind) if srv_gen_opts(kind, use) is not None else []",
+     "server_gen_sleepers(ctx, kind)"),
+    ("the Skip not handed on", "server_wake_ask(_gs, ctx, status, step, skip,", "server_wake_ask(_gs, ctx, status, step, None,"),
+    ("the reader leaving goes on to make it", "    if _gw is None:                 # the reader left while it waited\n        return True",
+     "    if _gw is None:                 # the reader left while it waited\n        pass"),
+    ("a mode's wake for a picture", "\n                         or img_subject or vid_subject):\n", "):\n"),
+    ("the page's Skip not handed to server_make", "status,\n                                   skip=skip_ev):", "status):"),
+]
+_m482 = []
+for _d482, _o482, _n482 in _M482:
+    if _MILLENAI_SRC.count(_o482) != 1 and _d482 != "the page's Skip not handed to server_make":
+        _m482.append((_d482, "anchor missing %d" % _MILLENAI_SRC.count(_o482)))
+        continue
+    _x482 = _MILLENAI_SRC.replace(_o482, _n482, 1)
+    try:
+        _ok482 = _w482(_x482)[0] and (
+            "or img_subject or vid_subject):\n            _ch_wake = []" in _x482
+            and _x482.count("skip=skip_ev):") == 2
+            and "def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, status, skip=None) -> bool:" in _x482)
+    except Exception:
+        _ok482 = False
+    _m482.append((_d482, "caught" if not _ok482 else "MISSED"))
+check("server pictures (6b482): %d mutations, each caught" % len(_M482),
+      all(v == "caught" for _d, v in _m482), "%r" % [x for x in _m482 if x[1] != "caught"])
+# ==== 6b482: end ====
 print("== an app update brings model updates: newer weights, new set models, retired ones cleared on servers too (6b445) ==")
 # Per Patrick: "these models should be included when the app itself updates
 # ... it should bring in updates to models, the newest models that we add,
@@ -35566,7 +35761,7 @@ check("sidebar: Pinned and Recents sections, a range menu (1 day to All), no dat
       and 'html+=\'<div class="cgroup recents">\'+head("recents","Recents",rv)' in page
       and '<div class="cgroup">\'+head("pinned","Pinned",pv)' in page
       and '[1,"1 day"],[3,"3 days"],[7,"7 days"],[14,"14 days"],' in page
-      and '[30,"1 month"],[0,"All"]' in page and "millen.recentsDays" in page
+      and '[30,"30 days"],[0,"All time"]' in page and "millen.recentsDays" in page
       and 'class="rall">Show all' in page and "#recents-menu" in page)
 with tempfile.TemporaryDirectory() as _cd:
     _o = lambda ops: _cs["chat_ops"](ops, _cd)["results"]
@@ -35597,6 +35792,109 @@ check("sidebar folds: heading buttons with aria-expanded, one delegated click, s
 check("a pin and its pinned-at stamp survive the chat store's save and load; a bad stamp is refused (6b467)",
       _pr1 == [{"ok": True}, {"ok": True}, {"err": "bad pin_at"}]
       and _ld[_pa].get("pin") is True and _ld[_pa].get("pin_at") == 1760000000000 and not _ld[_pb].get("pin_at"), str(_pr1))
+
+# --- 6b480: the sidebar search shows where a chat matched, and opens it there
+# (per Patrick: "Find in chat"; the find bar itself is 6b352's)
+_ns480 = {"re": re}
+for _n in _ctree.body:
+    if getattr(_n, "name", None) in ("_chat_snip", "chat_search"):
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _ns480)
+_long480 = "word " * 40
+_cs480 = [{"id": "a", "title": "Pineapple talk", "messages": [{"role": "user", "content": "hi"}]},
+          {"id": "b", "title": "x", "messages": [{"content": "q"},
+                                                 {"content": _long480 + "the **PINEAPPLE** is\n\n a fruit " + _long480}]},
+          {"id": "c", "title": "y", "messages": [{"content": "Pineapple first"}]},
+          {"id": "d", "title": "z", "messages": [{"content": "nothing here"}]}, "junk",
+          {"id": "e", "title": "t", "messages": [{"content": ["a", "list"]}, {"content": "a.b and axb"}]}]
+_ids480, _h480 = _ns480["chat_search"](_cs480, "pineapple")
+_hb480 = next((h for h in _h480 if h["id"] == "b"), {})
+check("chat search: ids and hits per chat, the first matching message's index, a one-line excerpt "
+      "with the match as written, -1 and no excerpt for a title-only match (6b480)",
+      _ids480 == ["a", "b", "c"] and [h["mi"] for h in _h480] == [-1, 1, 0]
+      and _h480[0]["snip"] == "" and _h480[2]["snip"] == "Pineapple first"
+      and "the PINEAPPLE is a fruit" in _hb480.get("snip", "")
+      and _hb480["snip"].startswith("\u2026") and _hb480["snip"].endswith("\u2026")
+      and "\n" not in _hb480["snip"] and "*" not in _hb480["snip"] and len(_hb480["snip"]) <= 130
+      and _ns480["chat_search"](_cs480, "  ") == ([], [])
+      and _ns480["chat_search"](_cs480, "a.b")[0] == ["e"]
+      and _ns480["chat_search"](_cs480, "a.b")[1][0]["mi"] == 1, "%r" % (_h480,))
+check("chat search endpoint: hits carry the message index and an excerpt; the page reads them (6b480)",
+      '_ids, _hits = chat_search(_cs, _q)' in _MILLENAI_SRC
+      and 'self._send_json({"ids": _ids, "hits": _hits})' in _MILLENAI_SRC
+      and "window.chatQHits=chatHitMap(r,q);" in page)
+_hj = os.path.join(_SMOKE_TMP, "hits480.js")
+with open(_hj, "w", encoding="utf-8") as fh:
+    fh.write(page[page.index("function chatHitMap(r,q){"):page.index("/*@hit-pure-end*/")]
+             + _jsfn(page, "function findAtMsg(marks,el){") + r"""
+const o={};
+const M=chatHitMap({ids:["a","b","t"],hits:[{id:"a",mi:2,snip:"x pine y"},{id:"b",mi:-1,snip:""},
+  {id:7,mi:1,snip:"bad"},{id:"c",mi:"3",snip:5}]},"pine");
+o.map=M.q==="pine"&&M.size===4&&M.get("a").mi===2&&M.get("t").mi===-1&&M.get("c").mi===-1
+  &&M.get("c").snip===""&&!M.has(7)&&chatHitMap(null,"x").size===0;
+o.here=JSON.stringify(chatHitView(M,"a","pine","ai","ai"))===JSON.stringify({snip:"x pine y",mi:2,lane:""});
+o.other=chatHitView(M,"a","pine","code","ai").lane==="Code"&&chatHitView(M,"a","pine","ai","code").lane==="Chat"
+  &&chatHitView(M,"a","pine","funnel","code").lane==="Funnels"&&chatHitView(M,"a","pine","agents","ai").lane===""
+  &&chatHitView(M,"a","pine",undefined,"funnel").lane==="Chat";
+o.stale=chatHitView(M,"a","pin","ai","ai").snip===""&&chatHitView(M,"a","pin","ai","ai").mi===-1;
+o.title=chatHitView(M,"b","pine","ai","ai").mi===-1&&chatHitView(M,"zz","pine","ai","ai").mi===-1
+  &&chatHitView(M,"a","","code","ai").lane==="";
+const mk=p=>({p}),A=mk(1),B=mk(5),C=mk(9);
+const el=(lo,hi)=>({contains:m=>m.p>=lo&&m.p<=hi,compareDocumentPosition:m=>m.p>hi?4:2});
+o.at=findAtMsg([A,B,C],el(4,6))===1&&findAtMsg([A,B,C],el(2,3))===1&&findAtMsg([A,B,C],el(10,12))===-1
+  &&findAtMsg([],el(0,9))===-1&&findAtMsg([A],undefined)===-1;
+console.log(JSON.stringify(o));
+""")
+_hr = json.loads(subprocess.run(["node", _hj], capture_output=True, text=True, timeout=30).stdout or "{}")
+check("sidebar search hits: the map keeps only well-formed hits for its own query, names another lane, "
+      "and the match to open is the first in that message or after it (node, 6b480)",
+      _hr == {"map": True, "here": True, "other": True, "stale": True, "title": True, "at": True}, str(_hr))
+check("sidebar search UI: every lane while searching, the excerpt built from nodes (no HTML), its own "
+      "[hidden] rule, a click opens the chat and the find bar at the match (6b480)",
+      "const mine=chats.filter(c=>(q||laneOK(c))&&qOK(c));" in page
+      and '(sn?\'<span class="csnip"></span>\':\'\')' in page
+      and "if(sp&&views.has(id))chatSnipPaint(sp,views.get(id),window.chatQ);" in page
+      and 'const m=document.createElement("mark");m.textContent=seg.t;el.appendChild(m);' in page
+      and "innerHTML" not in _jsfn(page, "function chatSnipPaint(el,v,q){")
+      and ".chat-item .csnip[hidden]{display:none}" in page
+      and ".chat-item.has-snip{flex-wrap:wrap;row-gap:2px}" in page
+      and 'it.addEventListener("click",()=>chatOpenHit(id));' in page
+      and "if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);" in page
+      and "const i=findAtMsg(findHitEls,el);" in page
+      and 'scroller.style.scrollBehavior="auto";\n    t.scrollIntoView({block:"center"});' in page
+      and "chatPinned=false;chatGlideTo=0;" in page
+      and "function findOpen(){\n  const again=!fb.hidden;\n  fb.hidden=false;\n  fq.focus();fq.select();\n"
+          "  if(again)return;\n  findWatch();\n  findRun(true);\n}" in page)
+
+# --- 6b471: unread dot ---------------------------------------------------
+_uj = os.path.join(_SMOKE_TMP, "unread471.js")
+with open(_uj, "w", encoding="utf-8") as fh:
+    fh.write(_jsfn(page, "function unreadDecision(finished,isErr,stopped,chatId,openId,visible){") + r"""
+console.log(JSON.stringify([unreadDecision(true,false,false,"a","b",true),unreadDecision(true,false,false,"a","a",true),
+  unreadDecision(true,false,false,"a","a",false),unreadDecision(true,true,false,"a","b",true),
+  unreadDecision(true,false,true,"a","b",true),unreadDecision(false,false,false,"a","b",true)]));
+""")
+_ur = json.loads(subprocess.run(["node", _uj], capture_output=True, text=True, timeout=30).stdout or "[]")
+check("unread decision: finished in another chat marks; in the open, visible chat it does not; hidden window marks; errors, stops and empty answers never (6b471)",
+      _ur == [True, False, True, False, False, False], str(_ur))
+check("unread dot: 7px solid blue, out of flow, aria-label, menu reads 30 days / All time, opening a chat clears it (6b471)",
+      "--unread:#4a8cf7" in page and ".chat-item .cdot{position:absolute;" in page
+      and "width:7px;height:7px" in page and "background:var(--unread)" in page
+      and 'class="cdot" role="img" aria-label="unread"' in page
+      and '[14,"14 days"],' in page and '"1 month"' not in page.split("RECENT_RANGES=")[1][:200]
+      and 'field:"unread"' in page and "markSeen();\n}" in page)
+with tempfile.TemporaryDirectory() as _cd:
+    _o = lambda ops: _cs["chat_ops"](ops, _cd)["results"]
+    _ua = "c" + "u" * 26
+    _o([{"op": "create", "id": _ua, "lane": "ai", "title": "U"}])
+    _ur1 = _o([{"op": "set", "id": _ua, "field": "unread", "old": False, "new": "yes"},
+               {"op": "set", "id": _ua, "field": "unread", "old": False, "new": 1},
+               {"op": "set", "id": _ua, "field": "unread", "old": False, "new": True}])
+    _ul = {c["id"]: c for c in _cs["load_chats"](_cd)}
+    _ur2 = _o([{"op": "set", "id": _ua, "field": "unread", "old": True, "new": False}])
+    _ul2 = {c["id"]: c for c in _cs["load_chats"](_cd)}
+check("unread survives the chat store's save and load, clears, and a non-boolean is refused (6b471)",
+      _ur1 == [{"err": "bad unread"}, {"err": "bad unread"}, {"ok": True}] and _ul[_ua].get("unread") is True
+      and _ur2 == [{"ok": True}] and not _ul2[_ua].get("unread"), str(_ur1) + str(_ur2))
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

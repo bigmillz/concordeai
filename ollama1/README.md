@@ -64,7 +64,7 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 | Admin panel | 127.0.0.1:8432, user `o1admin` |
 | Web terminal (ttyd + `login`) | a UNIX socket in `/run/ollama1/ttyd` (root and the panel's user only), reached only through the panel |
 | Dashboard | tty1 (the monitor), user `o1dash`: the graphical panel (`/dev/fb0`) or the text dashboard. Also `ollama1-top` over SSH |
-| ComfyUI (optional) | 127.0.0.1:8188, only root and the gateway may connect. Not installed by `setup.sh`: `sudo bash tools/install-comfyui.sh` (images and video; see [docs/your-own-server.md](../docs/your-own-server.md)) |
+| ComfyUI (optional) | 127.0.0.1:8188, only root and the gateway may connect. Installed only by `sudo ./setup.sh --with-imagegen` (images and video; see [docs/your-own-server.md](../docs/your-own-server.md)) |
 | Settings | `/etc/ollama1/`: `config.json` (root-only), `devices.json`, `models.allow` |
 | Setup log | `/var/log/ollama1-setup.log` |
 
@@ -87,7 +87,7 @@ Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 3. **Zero Trust must exist once.** If this Cloudflare account has never
    opened Zero Trust, setup stops and says so. The fix is one visit:
    dash.cloudflare.com > **Zero Trust** (left sidebar) > pick a team name
-   (for example `concorde`) > choose the **Free** plan > **Proceed**.
+   (for example `myteam`) > choose the **Free** plan > **Proceed**.
    Cloudflare may ask for a card for the $0 plan.
 
 ## Run it
@@ -122,6 +122,7 @@ it asks for any it can't find, at the terminal):
 | `--wifi on\|off` | Wi-Fi as a backup connection and a second way to wake the server (see "Wi-Fi backup" below). **Off unless you say `--wifi on`** (or `OLLAMA1_WIFI=1`); `on` installs `iw` (and `wpasupplicant` if missing) and the `ollama1-wifi` tool, and sets up no network: `sudo ollama1-wifi set` does. Saved in `setup.env` (`WIFI=`), so a re-run without the flag keeps it |
 | `--leds-length N` | LEDs given to a board header that lists none, 1 to 1024 (default **60**): see "Lights" below. Saved in `setup.env` (`LEDS_LENGTH=`, only when you give it), so a re-run without the flag keeps it |
 | `--gpu-tune` | Opt in (or `OLLAMA1_GPU_TUNE=1`): tune an AMD Navi 21 graphics card, see "Graphics card tuning" below. **Off unless you ask**: without it setup changes nothing about the card and prints one line saying the option exists. By default it raises the power limit to the card's maximum and nothing else; `--gpu-tune-memory N` (0 to 75 MHz) and `--gpu-tune-core N` (0 to 300 MHz, experimental) add the opt-in clock raises, each checked on its own and taken off alone if slower (the memory bump is off by default because on one 6900 XT it made answers 2.4x slower). Saved in `setup.env`, so a re-run without the flag keeps it. `--no-gpu-tune` (or `OLLAMA1_GPU_TUNE=0`) is the explicit off: the card goes back to stock and the choice is saved as off |
+| `--with-imagegen` | Opt in: pictures and short clips on this server. After everything else, setup runs `tools/install-comfyui.sh` as your user: ComfyUI on `127.0.0.1:8188` and its models, FLUX.2 klein 4B for pictures and Wan 2.1 1.3B for clips (about 25 GB* to download; *an estimate). **Off unless you give it**, not saved and not read from the environment, so no image model is ever downloaded without it; giving it again skips what is done and finishes a cut-off download. See [docs/your-own-server.md](../docs/your-own-server.md), "Images and video" |
 
 What you give is saved in `/etc/ollama1/setup.env` (root-only) and the
 server's name and domain in `/etc/ollama1/config.json`, so a re-run needs
@@ -369,7 +370,7 @@ around a little from time to time.
    - Save.
 5. **Copy four values:**
    - each application's **Application Audience (AUD) Tag**;
-   - the **team domain** (like `concorde.cloudflareaccess.com`, under
+   - the **team domain** (like `myteam.cloudflareaccess.com`, under
      **Settings**);
    - the service token's **Client ID**.
 

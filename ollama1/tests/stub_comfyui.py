@@ -29,13 +29,20 @@ GUID = b"258EAFA5-E914-47DA-95CA-" b"C5AB0DC85B11"   # RFC 6455's handshake stri
 
 DEFAULT_NODES = ["CheckpointLoaderSimple", "CLIPTextEncode", "EmptySD3LatentImage", "KSampler", "VAEDecode",
                  "SaveImage", "UNETLoader", "CLIPLoader", "VAELoader", "EmptyHunyuanLatentVideo",
-                 "ModelSamplingSD3", "CreateVideo", "SaveVideo", "SaveAnimatedWEBP"]
-# the file names as the three model folders list them: written out here on purpose, not
-# imported from the gateway, so a renamed model in the templates shows up as a failing test
+                 "ModelSamplingSD3", "CreateVideo", "SaveVideo", "SaveAnimatedWEBP",
+                 # FLUX.2 klein's (6b482)
+                 "ConditioningZeroOut", "CFGGuider", "RandomNoise", "KSamplerSelect", "Flux2Scheduler",
+                 "EmptyFlux2LatentImage", "SamplerCustomAdvanced"]
+KLEIN_NODES = ["ConditioningZeroOut", "CFGGuider", "RandomNoise", "KSamplerSelect", "Flux2Scheduler",
+               "EmptyFlux2LatentImage", "SamplerCustomAdvanced"]
+# the file names as the model folders list them: written out here on purpose, not
+# imported from the gateway, so a renamed model in the templates shows up as a failing test.
+# "CLIPLoader/type" is not a file: it is the text encoder types this ComfyUI can load.
 DEFAULT_FILES = {"CheckpointLoaderSimple/ckpt_name": ["flux1-schnell-fp8.safetensors"],
-                 "UNETLoader/unet_name": ["wan2.1_t2v_1.3B_fp16.safetensors"],
-                 "CLIPLoader/clip_name": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
-                 "VAELoader/vae_name": ["wan_2.1_vae.safetensors"]}
+                 "UNETLoader/unet_name": ["wan2.1_t2v_1.3B_fp16.safetensors", "flux-2-klein-4b.safetensors"],
+                 "CLIPLoader/clip_name": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors", "qwen_3_4b.safetensors"],
+                 "CLIPLoader/type": ["stable_diffusion", "wan", "flux2"],
+                 "VAELoader/vae_name": ["wan_2.1_vae.safetensors", "flux2-vae.safetensors"]}
 
 
 class StubComfy:

@@ -53,6 +53,11 @@
 #                                    OLLAMA1_DASH): auto (the default) draws the graphical panel
 #                                    when a monitor is connected, else the text dashboard; text
 #                                    keeps the text one. Saved in setup.env, so a re-run keeps it
+#   sudo ./setup.sh --with-imagegen  opt in: also make pictures and short clips on this server
+#                                    (tools/install-comfyui.sh, as your user: ComfyUI and its models,
+#                                    about 25 GB* to download, *an estimate). OFF unless given, and
+#                                    not saved: without it no image model is ever downloaded. Safe
+#                                    to give again (what is done is skipped)
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # Settings (each is asked for if it is not given and cannot be found):
@@ -128,6 +133,7 @@ LAN_PUBLIC_OK=0
 SKIP_CF=0
 REMOVE_SETUP_KEY=0
 NO_TMUX=0
+IMAGEGEN=0          # --with-imagegen (6b482): ComfyUI and its models, only when asked
 SWAP_ACTION=""
 SWAP_SIZE=""
 VG_RESERVE_GIB=0
@@ -180,6 +186,7 @@ for a in "$@"; do
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
     --no-tmux) NO_TMUX=1 ;;
+    --with-imagegen) IMAGEGEN=1 ;;
     --no-console-font) export OLLAMA1_DASH_FONT=off ;;
     --lan-public-ok) LAN_PUBLIC_OK=1 ;;
     --gpu-tune|--no-gpu-tune)
@@ -382,6 +389,14 @@ gpu_tune_plan() { # the plan's line for the graphics card (6b361)
   fi
 }
 
+imagegen_plan() { # (6b482) the plan's line for --with-imagegen
+  if [ "$IMAGEGEN" = 1 ]; then
+    printf 'Pictures and short clips (--with-imagegen): ComfyUI as %s, on this machine only, and its models (about 25 GB*, an estimate)' "$ADMIN_USER"
+  else
+    printf 'Pictures and short clips: off unless you ask (--with-imagegen). Nothing is downloaded for them'
+  fi
+}
+
 print_plan() {
   printf '%sollama1 setup: the plan%s\n' "$B" "$N"
   printf '\n   Server name %s, SSH user %s, LAN %s (%s), domain %s, time zone %s\n' \
@@ -409,9 +424,10 @@ print_plan() {
    $(state 'systemctl is-active ollama1-watchdog')    $(watchdog_plan "$WATCHDOG")
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
+   $(state 'systemctl is-active comfyui') 17. $(imagegen_plan)
 
    Not touched: the network settings (netplan, br0), /home, every disk but the models disk.
-   No models are installed.
+   No chat models are installed$( [ "$IMAGEGEN" = 1 ] || printf ', and no image models'; ).
    $(policy_line)
 EOF
 }
@@ -997,12 +1013,12 @@ sleep 2
 for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power ollama1-idle; do
   if systemctl is-active --quiet "$s"; then ok "$s running"; else note "$s is not running: journalctl -u $s"; later "$s did not start: journalctl -u $s"; fi
 done
-# image and video generation is optional and never installed here (6b356): one line says
-# whether the gateway has it, and how to add it
+# image and video generation is optional (6b356): installed only with --with-imagegen (6b482,
+# the last step below); otherwise one line says whether the gateway has it, and how to add it
 if curl -fsS -m 3 http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then
   ok "ComfyUI answers on this machine: the gateway offers image and video generation"
-else
-  note "image and video generation isn't installed (optional): sudo bash $KIT/tools/install-comfyui.sh"
+elif [ "$IMAGEGEN" != 1 ]; then
+  note "image and video generation isn't installed (optional, about 25 GB* to download): sudo ./setup.sh --with-imagegen"
 fi
 if id -nG o1gw | tr ' ' '\n' | grep -qx o1pair; then
   die "the gateway's user o1gw is in the o1pair group, so it could read the pairing code; remove it (gpasswd -d o1gw o1pair) and run setup again"
@@ -1311,6 +1327,20 @@ if [ "$(own_keys)" -gt 0 ] && grep -qF "$CLAUDE_KEY" "$KEYS" 2>/dev/null; then
       note "kept; remove it later with: sudo ./setup.sh --remove-setup-key"
       later "Remove the setup key when you're done with it: sudo ./setup.sh --remove-setup-key"
     fi
+  fi
+fi
+
+# ---- 17. pictures and short clips (6b482) ------------------------------------------------------
+# ONLY with --with-imagegen: ComfyUI and its models through tools/install-comfyui.sh, as the admin
+# user (never root), last, so everything above is in place even if a download is cut off. Without
+# the flag nothing here runs and no image model is downloaded. The installer skips what is done.
+if [ "$IMAGEGEN" = 1 ]; then
+  step "Pictures and short clips (ComfyUI)"
+  if bash "$KIT/tools/install-comfyui.sh" --user "$ADMIN_USER"; then
+    ok "ComfyUI is installed: the gateway offers what its models can make (the app's Settings > Your servers > Test shows it)"
+  else
+    note "the image installer stopped (see above); everything else is set up"
+    later "Finish pictures and clips: sudo ./setup.sh --with-imagegen (a cut-off download carries on)"
   fi
 fi
 

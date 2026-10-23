@@ -16013,3 +16013,262 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
 - setup.sh step 11 treated the GPU as found only when Ollama's "inference compute" line said ROCm, so an NVIDIA
   server got a false "Ollama did not report a ROCm GPU" note and a `later` item. It now accepts ROCm or CUDA. The
   gateway's 100%-on-GPU rule was already vendor-neutral (size_vram against size from /api/ps).
+
+## 6b472 — Edit this picture: an attached photo plus "change it" runs a local edit (per Patrick)
+
+Patrick (2026-10-11): attached a photo of himself and asked for different hairstyles; the app answered in words
+("I cannot generate images of you with different hairstyles"). Asked what to build, he chose: "Build photo editing."
+
+Why it failed: `image_intent()` only matches commissions of NEW pictures from text and is skipped when an image is
+attached; with an image the request went to the vision model; `generate_image` paints text to image only; and he was
+on "Thinking · Ollama1 only", a text model on the server.
+
+- **Feasibility (measured, mflux 0.19.1 in venv-image):** `mflux-generate-flux2-edit --image-paths` exists and takes the
+  klein 4B weights (`mflux-community/flux2-klein-4b-mflux-q4`, the Quick rung) with `--base-model flux2-klein-4b`.
+  Test on a generated sample (768x768 man on a hill, "buzz cut"): edit 31.9 s wall, 16.6 GB peak footprint (the text
+  to image run of the same size: 18.0 s, 15.3 GB). Subject, face, shirt and background held; only the hair changed.
+  Steps 4, guidance 1.0 as for generation.
+- **Intent:** `photo_edit_intent(text)` (segment `photoedit`), only consulted when a photo is attached to THIS message
+  and the message is not the 6b355 draw-on-the-picture lane. Conservative regexes: change/swap/retouch a named part,
+  remove/erase a thing or person, add/give/put a thing on the subject, "show me with/in/as", "try different
+  hairstyles", redraw/repaint/cartoonify, and make/turn/transform only when the rest names a look ("turn this into a
+  table" stays a read). Questions (what/how/is/describe/who...) never match, except "what would I look like with...".
+  No model fallback: the existing code classifies intent by regex only.
+- **Path:** the chat branch `if edit_req:` runs before the new-picture branch. `edit_photo()` writes the photo to run/
+  (0600), shrinks it with the engine's own Pillow (long side 1024, sides a multiple of 16, EXIF turn applied), runs the
+  edit with the request plus "keep everything else the same", lands the PNG in the profile's images (the usual
+  `/api/image/<id>.png`, `.render.json` marked `edit`), and drops every temp file. STEP/STATUS frames as for a painted
+  picture; the time-left plan (`X-Eta`) is the median of this profile's timed edits, else 45 s flagged as an estimate.
+  The reply carries "Edited on this computer; your photo wasn't sent anywhere".
+- **Local only, no fallback:** the segment has no cloud painter, server or fallback call, and a failed edit says why in a
+  sentence ("hit a snag", "I couldn't open that photo", "needs image generation on this Mac: add or update it under
+  Settings > Models > Manage models", "only works on an Apple silicon Mac for now"); never "I cannot generate images of
+  you". Ordinary self-edits are not refused.
+- **"<name> Only" and Cloud Only:** these are text routes, so the edit runs on this Mac anyway (nothing leaves it), with
+  one status line and a tail on the note saying so. Chosen over refusing because the photo stays put either way and
+  refusing is what failed Patrick.
+- **Not covered:** a follow-up with no new photo ("make it shorter") still takes the old text-picture path; only a
+  photo attached to the message is edited. The quality/look on a real face is unseen.
+- Gauntlet: the intent (positives, negatives, "draw me a cat" unchanged), a stand-in engine through `/api/chat`
+  (dev-only hook `photoedit-stub` on copy A; a photo starting `FAIL-STUB` makes it fail), and the no-cloud rule on the
+  segment's source. Not run in full.
+
+## 6b480 — Find in chat (per Patrick)
+
+Asked for: Cmd/Ctrl+F in the open chat, and a sidebar search that reaches message text in every chat.
+
+- **The find bar was already there** (6b352: Cmd+F / Ctrl+F, live marks, "3 of 12", Enter / Shift+Enter,
+  Esc, case-insensitive, re-applied after streaming by a MutationObserver, code blocks and copy untouched).
+  Nothing in it was rebuilt. Its observer setup moved into `findWatch()` so a second opener can share it.
+- **The sidebar search was already full-text** (6b269: titles at once, the server greps message content from
+  three characters on), but it only said WHICH chats matched, only in the lane on screen, and a click opened
+  the chat at its end. Now:
+  - The server's `/api/chats/search` answers `{"ids", "hits"}`; each hit is `{id, mi, snip}`: the first
+    matching message's index in the saved chat (-1 when only the title matched) and one line of text around
+    the match (`chat_search` / `_chat_snip`, pure: whitespace collapsed, markdown's `* # `` dropped, the match
+    as written, an ellipsis where it was cut, about 120 characters). `ids` is unchanged for old pages.
+  - The row shows that line under its title, two lines at most, the match marked like find's marks. The line
+    is built from text nodes and `<mark>` elements (`chatSnipPaint`), never from HTML. Its `.csnip` has its
+    own `[hidden]` rule.
+  - **A search reaches every lane.** A hit in a Code or Funnels chat shows from Chat (and the reverse), its
+    lane named in small caps before the line. Without a query the list is per lane as before. Easy to undo
+    if Patrick prefers per-lane results: `(q||laneOK(c))` in `renderChats`.
+  - **A click opens the chat at the match.** `chatOpenHit` → `loadChat` (which hops lanes) → `findOpenAt(q,mi)`:
+    the find bar opens with the query, every match is marked, and the current one is the first inside message
+    `mi` (or the first after it when that turn's words render differently, a link's address say; else the
+    first). The jump is instant and unpins the view (`chatPinned=false`), so the open's own smooth glide to
+    the end doesn't carry it away. Esc closes as before. A title-only hit just opens the chat.
+  - A reply for an older query never paints its line or picks the match: the hit map carries its query.
+- Single theme: the page has one (dark) palette; the new rules use its tokens and find's mark colour.
+- Checked: ast parse; node --check on the served scripts; jsscan's undeclared names unchanged; style comment
+  opens = closes. A dev copy (9894, temp MILLENAI_HOME) served the page with no unreplaced tokens; the
+  endpoint returned the hits. In the Blink pane on that copy (token stubbed in): "pineapple" gave two rows
+  with lines, the `<b>&` in an answer shown as text; clicking opened the chat with "1 of 1" in the right
+  message and the find box focused; a Code hit from Chat switched lanes and the labels flipped; a 40-turn
+  chat opened at turn 17 with the mark centred and hittable (elementFromPoint), still there 1.5 s later; the
+  match inside a code block left its `code` text intact; Esc left no marks; no overflow at 560 px.
+- Gauntlet: five checks (`chat_search` on its own; the live endpoint on the LOC chat; the hit map, lane
+  names and `findAtMsg` under node; the page's wiring). Five mutations each failed a check.
+- **Not seen:** WKWebView (the shipped renderer) and Windows WebView2 — the look of the two-line clamp, the
+  instant jump and focus there; Cmd+F itself was not re-tried (unchanged since 6b352).
+
+## 6b482 — pictures on the server: FLUX.2 klein, an opt-in setup flag, and the Waking step
+
+The ask: pictures (and a short clip if a 16 GB card can) made on the paired server first (Ryzen 9 5950X, RX 6900
+XT 16 GB, ROCm), this Mac as the fallback, the owner's rule that a task goes to a server with a capable model
+first. **Most of it already existed: 6b356 put ComfyUI behind the gateway** (`lib/o1gen.py`, the
+`/v1/generate/*` job routes, server-first routing in the app, Images and Video chips). This entry is the research
+that was asked for, what it changed, and the gaps it closed. Built on a Mac against stubs; the server was off and
+packed, and nothing touched it.
+
+**Research: which engine fits a 16 GB AMD card today** (checked 2026-10-16; sources below)
+- **ComfyUI (kept).** PyTorch for ROCm, already installed by `tools/install-comfyui.sh`. It runs FLUX.2 klein
+  (Comfy-Org ships the template), Wan 2.1 and 2.2, and has what the gateway needs: `/object_info` to see the
+  files and nodes, `/prompt` + `/history`, step progress on `/ws`, and `/free` to give the card back to Ollama.
+  ComfyUI's own source lists gfx1030 (the 6900 XT) as RDNA2 "don't support bf16", so it computes in fp16; FLUX.2
+  declares fp16 supported (`comfy/supported_models.py`), so that is a supported path. Not yet run on this card*.
+- **stable-diffusion.cpp (not chosen, the fallback idea).** One C++ binary, Vulkan backend, FLUX.2 klein and
+  Wan 2.1/2.2 in its model list, and `sd-server` has an OpenAI-style `POST /v1/images/generations` (and
+  edits). Its README names CUDA, Vulkan, Metal, OpenCL and SYCL, not ROCm (Vulkan would be the AMD path).
+  Unverified: progress on that route, and whether video is served over HTTP at all (the OpenAI layer is
+  images only). It would be a second engine and a rewrite of o1gen; worth it only if ROCm ComfyUI fails on
+  gfx1030.
+- **Ollama's image generation (not usable here).** Experimental since 2026-01-20 (FLUX.2 klein, Z-Image Turbo),
+  **macOS only**, "Windows and Linux support coming soon", CLI only, no documented HTTP route; its release notes
+  from v0.34.3 to v0.40.5 mention no Linux or AMD image generation. One third-party guide claims it on Ubuntu with
+  v0.22: unverified, and contradicted by Ollama's own pages. Revisit: on Linux it would be the simplest (one
+  engine, one unload).
+- **Models.** Pictures: **FLUX.2 [klein] 4B, distilled** (Apache 2.0, 4 steps, text-to-image and editing in one
+  model; BFL says "as little as 13GB VRAM"); ComfyUI's files are the 7.75 GB diffusion model, the 8.04 GB Qwen3
+  4B text encoder and the 0.34 GB VAE (sizes from Hugging Face's API). ComfyUI loads the encoder, encodes, and
+  swaps it out for the diffusion model, so the two are not resident together on 16 GB*. FLUX.1 schnell (6b356's)
+  is one 17.2 GB fp8 checkpoint around a 12B model: three times the parameters per step for a weaker
+  picture. SDXL/Turbo: fits easily, but older quality than either; not added. Video: **Wan 2.1 1.3B stays**
+  (Wan's README: 8.19 GB VRAM, about 4 minutes for 5 s at 480p on an RTX 4090). Wan 2.2 TI2V 5B is 10 GB fp16 +
+  1.4 GB VAE + the 6.7 GB encoder: it would fit only with offloading, and slowly; LTX-2 class models are bigger.
+- **Times on this card** (all estimates*): a 1024x1024 klein picture about 10 to 30 s* warm, plus about 15 to
+  40 s* to load from disk after a chat; schnell about 30 to 60 s* warm; a 2-second Wan clip (33 frames, 832x480)
+  about 3 to 8 minutes*, a 5-second one 10 to 20 minutes* (the app gives a clip 20 minutes). So: **video is
+  feasible only as short clips**, which is what 6b356 built.
+- **Sharing the card with chat** is unchanged from 6b356: the gateway's GPU slot is taken for the job, every
+  Ollama model is unloaded and confirmed first (else the job fails before ComfyUI is asked), it waits up to 30 s
+  for the card to read free, and `/free` after; a chat during a job gets 503 `busy`.
+- **No OpenAI-style `POST /v1/images/generations` on the gateway**, on purpose. The gateway answers only signed
+  requests from paired devices (PROTOCOL.md), so no OpenAI client could call it, and the app already uses the job
+  routes: 202 then polls every 2 s, which survives the tunnel's ~100 s cut-off on a silent response, carries
+  progress and Stop, and counts as use for auto sleep. A synchronous route would sit silent for the whole job. If
+  one is wanted later, it is a thin shim over `Generator.create/status/result`.
+
+**Kit (`ollama1/`)**
+- `lib/o1gen.py`: a FLUX.2 klein template, wired exactly as ComfyUI's own "Text to Image (Flux.2 Klein 4B
+  Distilled)" (UNETLoader, CLIPLoader type `flux2`, CLIPTextEncode, ConditioningZeroOut as the negative,
+  CFGGuider cfg 1, RandomNoise, KSamplerSelect euler, Flux2Scheduler, EmptyFlux2LatentImage,
+  SamplerCustomAdvanced, VAEDecode, SaveImage); the input names were checked against ComfyUI's current source.
+  The probe picks **klein when its three files, its nodes and the `flux2` encoder type are all there**, else
+  **FLUX.1 schnell** (so a server set up by 6b356 keeps working, and so does an older ComfyUI that lists klein's
+  files but can't load them), else no pictures. The job remembers which; the result is read from that template's
+  save node. Caps, routes, whitelist and the app's request are unchanged.
+- `tools/install-comfyui.sh` downloads klein's three files (about 16 GB*) instead of schnell's 17 GB*; the
+  header says an existing schnell file still works and can be deleted once klein's are there, and that FLUX.2
+  needs a ComfyUI from January 2026 or later (`--update`).
+- `setup.sh --with-imagegen` (opt in): after everything else, runs `install-comfyui.sh --user <admin user>`
+  (never root; a failure is a note and a "Still to do" line, not a stop). **Off by default, not saved in
+  setup.env, not read from the environment**, so no image model is downloaded without it. The plan shows it as
+  step 17; without the flag, setup's one line says how to add it. The firewall, polkit and the service's
+  hardening are unchanged (ComfyUI on 127.0.0.1:8188, only root and the gateway's user through the port guard).
+- Tests: `test_generate` gains klein's capability rules (each of its files, nodes and the encoder type falls back
+  to schnell), the klein graph's every input and link, the schnell fallback graph, the six downloads, and setup's
+  flag (it parses, a near miss is refused, the installer runs only inside `if [ "$IMAGEGEN" = 1 ]`, last). The
+  stub ComfyUI lists klein's nodes, files and encoder types. Nine mutants in `mutate.py`, all killed (one by the
+  tests hanging, as some older ones are); every `gen:` mutant was re-run. setup.sh can't be mutated by
+  `mutate.py` (it copies lib, bin, config, systemd and tools only), so its flag is held by static checks.
+
+**App (`millenai.py`)**
+- **A sleeping server that can make it is woken with the chat modes' step** (6b465's `server_wake_ask`):
+  "Waking <name>", ten seconds counting down, and the page's Skip. Only one whose kit last said it can make
+  this kind (`server_gen_sleepers`); one that said it can't, or never said, is left asleep. Before, a picture in
+  a mode went through the modes' wake (any sleeper, even one with no ComfyUI, then re-seated the council for
+  nothing), and a picture with no mode used 6b346's silent wake of up to a minute. Skip, no answer in 10 s
+  (marked down), and Stop (the reader left: nothing is made) each end the wait; this Mac's painter goes on as
+  before. A gif or a jpg (a format only this computer writes) wakes nobody. Both `server_make` calls get the
+  request's Skip event; the modes' wake now leaves pictures and videos to it.
+- Gauntlet: `== a picture or a video wakes a sleeping server that can make it ... (6b482) ==` (the whole
+  server_make on a sleeping server: woke and made it, a video too, can't make it, never said, a gif, Skip, no
+  answer, reader left), a source pin, and eight mutations. 6b356's "wakes only here" pin and 6b357's slow-job stub were
+  updated for the new wake.
+
+**What ran here:** `ast` parse of millenai.py; `test_generate` (64 tests), `test_setuplib`, `test_repo`,
+`test_rootfiles`, `test_stateless`, `test_gputune` one at a time; `mutate.py gen:`; and, in process with no app
+copy, the 6b356, 6b357, 6b465 and 6b482 gauntlet blocks and 6b356's 50 mutations. Not the full gauntlet or the
+full kit suite.
+
+**Needs the real server** (when it is back and not serving; send the output):
+1. `sudo ./setup.sh --with-imagegen` (or, for the ComfyUI installed by hand, `sudo bash
+   ollama1/tools/install-comfyui.sh --update` then `sudo ./setup.sh`).
+2. In the app: Settings > Your servers > Test (the Images chip), one picture, one 2-second clip; time both, and
+   a picture right after a chat (the reload).
+3. If either fails: `journalctl -u comfyui -e`. The things no stub can show: that ComfyUI accepts the klein graph
+   (node and input names were read from its source, not run), that fp16 on gfx1030 makes a real picture (not
+   black or noise), the speeds above, and that the klein download address (`Comfy-Org/flux2-klein`, which
+   Hugging Face now redirects to `Comfy-Org/vae-text-encorder-for-flux-klein-4b`; `curl -L` follows it) still
+   answers.
+
+\* Estimates: sizes from Hugging Face's listings; times scaled from published figures for other cards, not
+measured on this one.
+
+Sources:
+- Ollama, image generation (experimental, macOS): https://ollama.com/blog/image-generation
+- Ollama releases: https://github.com/ollama/ollama/releases
+- ComfyUI's FLUX.2 klein template: https://comfy.org/workflows/image_flux2_klein_text_to_image-814fd547d86e/
+- ComfyUI source (Flux2Scheduler, EmptyFlux2LatentImage, sampler nodes, RDNA2 and bf16, Flux2 dtypes):
+  https://github.com/comfyanonymous/ComfyUI (comfy_extras/nodes_flux.py, comfy_extras/nodes_custom_sampler.py,
+  comfy/model_management.py, comfy/supported_models.py)
+- FLUX.2 klein 4B model card: https://huggingface.co/black-forest-labs/FLUX.2-klein-4B
+- Comfy-Org's files: https://huggingface.co/Comfy-Org/flux2-klein, https://huggingface.co/Comfy-Org/flux1-schnell,
+  https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+- Wan 2.1 (1.3B VRAM and time): https://github.com/Wan-Video/Wan2.1
+- stable-diffusion.cpp: https://github.com/leejet/stable-diffusion.cpp and its server API summary,
+  https://deepwiki.com/leejet/stable-diffusion.cpp/5.2-server-api
+
+## 6b481 — De-personalise the server kit (per Patrick)
+
+Goal: the server kit (`ollama1/`) can be handed to strangers. 6b347 had done the
+heavy part (user, domain, LAN, NIC names, serials as configuration with no
+personal default; made-up fixtures); this pass sweeps what was left and widens
+the guard.
+
+- **Cloudflare team name.** The README and `ollama1-cf-access`'s "no Zero Trust
+  yet" hint gave the maintainer's real team as the example; now `myteam`
+  (`myteam.cloudflareaccess.com` in the README and `test_cloudflare`). Text
+  only, no behaviour change.
+- **Test fixtures.** A user named `pat` in `test_idle` (loginctl/inhibitor
+  samples) and `/home/pat/...` in `test_quickburn` became `alice`.
+- **No code change needed for the owner's install.** Nothing in `bin/`, `lib/`,
+  `config/`, `setup.sh` or `tools/` still carries a personal default: the
+  admin user, domain, LAN range and serials already come from
+  `/etc/ollama1/config.json` (6b347), so the existing server keeps working as is.
+- **`test_repo.TestNoPersonalValues`** now also looks for the Pi's hostname,
+  the private domain, the real Cloudflare team domain and the two real MAC
+  prefixes (colon and dash forms); MACs written with dashes are checked
+  against the made-up ranges too (`02:00:00:00:00:xx` added to them). "Pat"
+  is caught capitalised anywhere and lowercase as data (`/home/pat`, `pat@`,
+  `1000 pat`), not as a variable (`pat = `, `pat.search`). lib/, bin/, tools/,
+  config/ and systemd/ are read from the `OLLAMA1_TEST_*` directories, so a
+  mutant planted there is seen. The "catches" test now also proves clean
+  samples (fake IPs, variables, dates, `PATH=`) pass.
+- **Mutants:** a Pi hostname and real MAC in the cf-access hint, and a
+  dash-written MAC in `o1power.py`; both killed by `test_repo`. (An earlier
+  draft mutated README.md, which `mutate.py` does not copy into its work tree.)
+
+LEFT ON PURPOSE
+- `github.com/bigmillz/concordeai`: the real clone URL, it must work.
+- The needles themselves live in `tests/test_repo.py`, which the scan skips;
+  literals there and in `mutate.py` are split so the email and needle scans
+  don't trip on them.
+- `America/New_York` in fixtures and the `--timezone` hint, `192.168.1.x` /
+  `192.168.0.0/16` in validation tests and the private-range tables: generic
+  values (a plug must be on a private range, so RFC 5737 addresses can't stand
+  in there).
+- NOTES.md and the repo-root files are not part of the kit and not scanned.
+
+## 6b471 — a blue dot on a chat whose answer you haven't seen (per Patrick)
+
+Patrick (2026-10-10): "Similar to Claude, when a response comes in for a chat that's not selected, put a dot next to
+it. Let's go with blue, until it's read. Basically an unread indicator." Same message: the Recents range menu reads
+"1 day, 3 days, 7 days, 14 days, 30 days, All time" (was "1 month" and "All"; the stored values did not change).
+
+- **Stored:** `unread` (bool) on the chat in chats.v2.json, a fourth `set` field next to `pin`/`pin_at`/`named`
+  (`_chat_op`); a non-boolean is refused ("bad unread"). An absent flag and False count as the same. If the server
+  refuses or the call fails, the flag stays on the page until the next reload of the list.
+- **Set:** at the end of `send()`, after `syncChat`. The decision is `unreadDecision(finished,isErr,stopped,chatId,
+  openId,visible)`, pure: true only for a real answer that ran to its end (not an error notice, not stopped, not
+  empty) in a chat that is not open or in a window that is hidden (`document.visibilityState`). It is made as the
+  answer ends and re-checked after the save, so opening the chat during the save wins. This covers the detached
+  bubble path too: it is the same end of `send()`.
+- **Cleared:** `markSeen()` clears the open chat's flag when it is visible: from `loadChat` (click or Cmd+K), on
+  `visibilitychange`/`focus`, and after every `loadChatsFromDisk`.
+- **The dot:** `.cdot`, 7px, `--unread:#4a8cf7` (the app's accent is white, so this is a new token), absolutely
+  positioned in the row's left padding like the pin, so the title does not move; `role="img" aria-label="unread"`;
+  the title goes to full text colour. Pinned, Recents and search rows share `row()`. The open chat never shows one.
+- Gauntlet: `unreadDecision` under node, served-HTML assertions, a chat-store save/load/refuse check. The 6b467
+  menu assertion was reworded for the new labels. Not run in a browser or WKWebView; the look is unseen.
