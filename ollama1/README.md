@@ -2140,6 +2140,58 @@ the server answers at its Wi-Fi address (`Address:` in `status`; the wired
 address is not answered over Wi-Fi, so an SSH session to it ends with the
 cable). Then put it to sleep from the panel and wake it from the app.
 
+## Remote desktop cleanup
+
+On a server with a GNOME desktop and its remote login (gnome-remote-desktop,
+RDP on port 3389, through GDM), a client that goes away leaves its session
+behind: a remote login screen nobody finished, or a logged-in remote desktop
+whose client disconnected. Each one keeps a gnome-remote-desktop daemon
+holding about 230 MiB of the graphics card's memory, and GDM refuses to
+suspend while any exists ("Remote sessions would die on suspend"), so auto
+sleep never happens.
+
+`ollama1-rdp-tidy.timer` runs `ollama1-rdp-tidy` (root) every minute and ends
+them with `loginctl terminate-session <id>`:
+
+- **A remote login screen** (a GDM greeter) with no RDP client: ended on the
+  second look, about a minute after it was first seen without one. The
+  minute rides out the moment a login hands the client over to its new
+  session.
+- **A remote desktop** (a logged-in remote session) with no RDP client for
+  `rdp_tidy_minutes` (30 by default, 5 to 1440). Its clock starts when it is
+  first seen without a client and starts again whenever a client connects.
+- **Only GNOME remote desktop sessions are ever considered**: logind says
+  Remote=yes, Type=wayland, a `gdm-` service, class greeter or user, and no
+  seat or TTY. The screen's own login, console and SSH logins and the
+  per-user manager sessions are never touched.
+- **Nothing is ended while any RDP client is connected.** "No client" means
+  no established TCP connection on local port 3389 at all, on the whole
+  machine, while something listens there. If `ss` can't answer, nothing
+  listens on 3389 (RDP moved to another port, say), or logind can't be
+  asked, nothing is ended. Which session each connection belongs to (the
+  connection's process, its cgroup, `session-<id>.scope` or the user's
+  slice) is worked out and logged as "per-connection view", but not obeyed
+  yet: it becomes the rule only once it has been checked with one connected
+  and one disconnected session.
+
+Settings, in `/etc/ollama1/config.json`:
+
+- `"rdp_tidy": false` turns it off. On by default; on a server without
+  gnome-remote-desktop it does nothing.
+- `"rdp_tidy_minutes": 30`: how long a disconnected remote desktop is kept.
+
+Commands:
+
+- `sudo ollama1-rdp-tidy --dry-run`: what it would do now, session by
+  session, and what blocks sleep. It ends nothing and saves nothing.
+- `sudo ollama1-rdp-tidy status`: the setting and the last pass.
+- `journalctl -u ollama1-rdp-tidy`: a line when what it sees changes, and
+  one per session ended. Lines name the session id, its class and the
+  reason, never a user name or an address.
+
+Its state (when each session was first seen without a client, cleared at a
+reboot) is `/var/lib/ollama1/rdp-tidy.json`, mode 0600.
+
 ## Troubleshooting
 
 | | |

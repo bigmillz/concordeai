@@ -16013,3 +16013,44 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
 - setup.sh step 11 treated the GPU as found only when Ollama's "inference compute" line said ROCm, so an NVIDIA
   server got a false "Ollama did not report a ROCm GPU" note and a `later` item. It now accepts ROCm or CUDA. The
   gateway's 100%-on-GPU rule was already vendor-neutral (size_vram against size from /api/ps).
+
+## 6b506 — Abandoned remote desktop sessions are ended (per Patrick)
+
+- The server runs GNOME with gnome-remote-desktop (RDP on :3389, GDM remote login). Clients that went away left
+  their sessions forever: remote GDM login screens (gdm-greeter-N, dynamic uids from 60580, Class=greeter,
+  Service=gdm-launch-environment) and a logged-in remote desktop (Class=user, Service=gdm-password), all
+  Remote=yes, Type=wayland, no seat. Each kept a gnome-remote-desktop-daemon holding ~230 MiB of VRAM (against
+  the gateway's 768 MiB vram_reserve_mib) and GDM blocked suspend ("Remote sessions would die on suspend"), so
+  auto sleep never fired. logind can't tell connected from disconnected: State, Active and IdleHint stayed
+  active/no either way.
+- Patrick chose: end abandoned remote login screens at once, remote desktops left disconnected 30+ minutes; never
+  an active, connected one. New: lib/o1rdptidy.py (pure parsers and plan(), Tidy runs one pass with injected
+  probes), bin/ollama1-rdp-tidy (run / --dry-run / status), ollama1-rdp-tidy.service (root oneshot, sandboxed like
+  ollama1-idle, writes only /var/lib/ollama1) and .timer (every minute), enabled by setup.sh. A separate timer
+  rather than a hook in ollama1-idle's loop: a fault here can't stop auto sleep's ticks, and the dry run stands on
+  its own. Ended with `loginctl terminate-session <id>`.
+- Only GNOME remote display sessions are considered: Remote=yes, Type=wayland, a gdm- service, class greeter or
+  user, empty Seat and TTY (a missing property is a no). The local greeter c1 on seat0, SSH and console logins
+  and manager sessions never qualify.
+- **v1 safety rule**: a session counts as disconnected only while there is NO established TCP connection on local
+  :3389 at all, machine-wide, and something listens on :3389 (else RDP is on another port and the zero means
+  nothing). If ss or logind can't answer, nothing is ended. Any connection clears every session's clock. The
+  per-session mapping (ss -p pid -> /proc/<pid>/cgroup -> session-<id>.scope, or user-<uid>.slice for a
+  handover daemon under the user's systemd) is computed and logged as "per-connection view" only. It can be
+  promoted to the deciding rule after a live test with one connected and one disconnected session shows it
+  right; until then one connected client keeps every abandoned session too.
+- Login screens end on the second look without a client (>= 45 s apart, so about a minute), not the very first:
+  RDP's login hands the client over to the new session with a reconnect, and a pass landing in that gap must not
+  kill a login in progress. Remote desktops: rdp_tidy_minutes (config.json, default 30, 5..1440) after first seen
+  without a client; the first-seen times live in /var/lib/ollama1/rdp-tidy.json (0600) with the boot id, so a
+  reboot (session ids start again) forgets them.
+- Settings: "rdp_tidy" (default true; anything but true/false turns it off and says so) and "rdp_tidy_minutes",
+  both added to o1common.DEFAULTS. A no-op without gnome-remote-desktop (its daemon or unit file absent).
+- Logs (journal): a line when what it sees changes (the minutes ticking up don't count) and one per session
+  ended or failed to end: session id, class, reason, per-connection view. Never a user name, uid or address; the
+  show-session call doesn't even ask for Name or RemoteHost. Not shown in the admin panel (another change was
+  editing it); `sudo ollama1-rdp-tidy status` prints the last pass.
+- Untested on the live server: whether `ss` works inside the unit's sandbox (if it doesn't, the log says
+  "couldn't list the RDP connections" and nothing is ended), and whether GDM cleans up after a terminated remote
+  greeter without respawning one. Tests: tests/test_rdptidy.py (fixtures of loginctl -j, show-session, ss and
+  cgroups; whole passes on a fake clock) and 11 rdp mutants in tests/mutate.py, all killed.

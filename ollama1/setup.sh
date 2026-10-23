@@ -683,6 +683,7 @@ ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
 ln -sfn "$LIBDIR/bin/ollama1-fan" /usr/local/bin/ollama1-fan
 ln -sfn "$LIBDIR/bin/ollama1-leds" /usr/local/bin/ollama1-leds
 ln -sfn "$LIBDIR/bin/ollama1-watchdog" /usr/local/bin/ollama1-watchdog
+ln -sfn "$LIBDIR/bin/ollama1-rdp-tidy" /usr/local/sbin/ollama1-rdp-tidy
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
@@ -989,6 +990,15 @@ run systemctl enable ollama1-dash.service
 run systemctl enable ollama1-idle.service
 run systemctl restart ollama1-idle.service
 "$LIBDIR/bin/ollama1-idle" wol-setup || note "couldn't set up wake on a magic packet; auto sleep still works, waking it from the app won't"
+# remote desktop cleanup (6b506): every minute, end GNOME remote login screens and remote desktops nobody is
+# connected to (a desktop after rdp_tidy_minutes), never while any RDP client is connected; it keeps their
+# gnome-remote-desktop daemons from holding the card's memory and GDM from blocking sleep. A no-op without
+# gnome-remote-desktop; "rdp_tidy": false in config.json turns it off. `sudo ollama1-rdp-tidy --dry-run` says
+# what it would do.
+run systemctl enable --now ollama1-rdp-tidy.timer
+if [ -e /usr/libexec/gnome-remote-desktop-daemon ] || [ -e /usr/lib/systemd/system/gnome-remote-desktop.service ]; then
+  ok "$("$LIBDIR/bin/ollama1-rdp-tidy" status 2>/dev/null | head -n1) (sudo ollama1-rdp-tidy status)"
+fi
 systemctl stop getty@tty1.service >/dev/null 2>&1 || true
 dash_font_step "$LIBDIR/bin/ollama1-dash" /dev/tty1
 dash_mode_step

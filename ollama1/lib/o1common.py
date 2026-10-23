@@ -124,6 +124,10 @@ DEFAULTS = {
     "power_baseline_w": 40,          # motherboard, RAM, disks, fans
     "power_psu_efficiency": 0.9,
     "power_sleep_w": 3,              # counted while the server sleeps
+    # remote desktop cleanup (6b506, ollama1-rdp-tidy): end GNOME remote login screens and remote desktops
+    # nobody is connected to; does nothing without gnome-remote-desktop
+    "rdp_tidy": True,
+    "rdp_tidy_minutes": 30,          # a disconnected remote desktop is ended after this (5..1440)
     # Tests only: a local fake JWKS. Refused unless allow_insecure_certs_url.
     "certs_url": "",
     "allow_insecure_certs_url": False,

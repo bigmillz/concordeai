@@ -2642,6 +2642,27 @@ MUTANTS = [
      '        if m and SSH_COMMENT in line:', '        if m:', ['test_wifi']),
     ('wifi: status says the link-down setting is in effect when it is not (6b473)', 'lib/o1wifi.py',
      '    return arp_setting("ignore_routes_with_linkdown", iface, proc) >= 1', '    return True', ['test_wifi']),
+    # remote desktop cleanup (6b506): what keeps it from ending a session someone is using
+    ("rdp: a connected client ignored", "lib/o1rdptidy.py", "    if conns > 0:", "    if False:", ["test_rdptidy"]),
+    ("rdp: unknown connections and no listener ignored", "lib/o1rdptidy.py",
+     "    if conns is None or listening is not True:", "    if False:", ["test_rdptidy"]),
+    ("rdp: nothing listening on 3389 not checked", "lib/o1rdptidy.py",
+     "    if conns is None or listening is not True:", "    if conns is None:", ["test_rdptidy"]),
+    ("rdp: a local session considered", "lib/o1rdptidy.py", '    if p.get("Remote") != "yes":', "    if False:",
+     ["test_rdptidy"]),
+    ("rdp: a session with a seat or TTY considered", "lib/o1rdptidy.py",
+     '    if "Seat" not in p or p["Seat"] or "TTY" not in p or p["TTY"]:', "    if False:", ["test_rdptidy"]),
+    ("rdp: any class considered", "lib/o1rdptidy.py", "    return c if c in CLASSES else None",
+     "    return c or None", ["test_rdptidy"]),
+    ("rdp: a login screen ended at the first look", "lib/o1rdptidy.py", "            if gone >= GREETER_GRACE_S:",
+     "            if True:", ["test_rdptidy"]),
+    ("rdp: a reconnect keeps the old clock", "lib/o1rdptidy.py", "        return acts, {}\n",
+     "        return acts, dict(seen)\n", ["test_rdptidy"]),
+    ("rdp: a dry run ends sessions", "lib/o1rdptidy.py", '            if a["do"] == "end" and not dry_run:',
+     '            if a["do"] == "end":', ["test_rdptidy"]),
+    ("rdp: clocks kept across a reboot", "lib/o1rdptidy.py", 'if st.get("boot") == boot else {}',
+     "if True else {}", ["test_rdptidy"]),
+    ("rdp: off ignored", "lib/o1rdptidy.py", "        if not on:", "        if False:", ["test_rdptidy"]),
 ]
 
 
