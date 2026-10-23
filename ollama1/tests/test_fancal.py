@@ -507,7 +507,13 @@ class TestQueryLoad(unittest.TestCase):
         self.assertIsNone(q.poll())
         self.assertFalse(q.thread.is_alive())
         gen = [c for c in self.stub.calls if c[1] == "/api/generate"]
-        self.assertTrue(all(c[2]["stream"] is True and c[2]["model"] == "small:8b" for c in gen))
+        asks = [c for c in gen if "prompt" in c[2]]
+        # the questions stream; anything else is the model let go (keep_alive 0), which can land in the
+        # list before the test looks, under load
+        self.assertGreaterEqual(len(asks), 3)
+        self.assertTrue(all(c[2].get("stream") is True and c[2]["model"] == "small:8b" for c in asks))
+        self.assertTrue(all(c[2].get("keep_alive") in (0, "0") and c[2]["model"] == "small:8b"
+                            for c in gen if c not in asks))
 
     def test_a_model_ollama_doesnt_have_fails_after_three_tries(self):
         q = C.QueryLoad("absent:1b", base="http://127.0.0.1:%d" % self.stub.port, timeout=5)
