@@ -16632,3 +16632,28 @@ the panel, behind Access (the panel's admin identity) and then SSH keys.
   fake API that refuses a type change in place, where door-only remakes the app and saves the new AUD.
 - Unverified until the owner's next try: that the self-hosted app's login page answers 200 for the door host
   (the panel's, the same kind of app, does).
+
+## 6b511 — app2 ships on main: the gauntlet's two real catches, and an MLX engine that can't run Gemma 4 26B
+
+The app2 batch (6b471 unread dot, 6b472 Edit this picture, 6b480 search excerpts, 6b481 the de-personalised kit,
+6b482 pictures on the server) merged onto main as of 6b510. No NOTES number collided, so those keep theirs.
+
+- **edit_photo wrote outside MACHINE_IO.** It put the attached photo into its run/ stage file with a bare
+  `os.open(O_WRONLY|O_CREAT|O_EXCL)` inside a function that takes a ctx, and the profile write lint (1a 5.x) refuses
+  any write outside the profile section that MACHINE_IO doesn't name. The write moves to `_pe_stage_photo(raw)`,
+  listed in MACHINE_IO beside the other run/ stage writers; it drops its file if the write fails.
+- **The bench hold's line changed under four checks.** 6b472 added `edit_req` to the "making something takes the
+  benchmark hold" test and broke the line in two, so the servers check ("making held"), its mutation ("making a
+  picture unheld", anchor missing), the rules review and 6b465's order check all lost their anchor; 6b465's raised
+  and stopped the gauntlet at line 35091. The line is one line again, and the four anchors name `or edit_req`: the
+  checks now also hold that an edit takes the hold. Nothing was loosened.
+- **Not app2: mlx-lm 0.32.2 can't run a quantized MoE on mlx 0.32.2.** At 12:19 on 2026-10-23 the desktop app
+  (build 277) ran 6b497's self-update on the shared venv. Since then every Gemma 4 26B answer dies in the engine:
+  `mx.gather_qmm(...)` gets `global_scale=`, which mlx 0.32.2 has no argument for (TypeError, "generation thread
+  died", HTTP 404). mlx-lm 0.32.2's metadata says `mlx>=0.32.2`, but its switch_layers.py needs mlx 0.32.3 or later
+  (ops.cpp at v0.32.3 and v0.32.4 has the argument; 0.32.2's wheel does not). 6b497's "mlx 0.32.2, the oldest that
+  0.32.2 accepts" took the metadata at its word. The gauntlet's nine live local-answer checks fail on this machine
+  until MLX_ENGINE_REQS pins mlx and mlx-metal 0.32.3+ (with their hashes) and the venv is repaired. Not changed
+  here: it is main's code and the live venv.
+- Kit: test_gputune's test_choice failed here only because the worktree's path has a space ("My Drive") and the
+  test sources setuplib.sh unquoted; it passes from a path without one, and main has fixed it.

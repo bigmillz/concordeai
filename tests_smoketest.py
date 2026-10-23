@@ -20888,7 +20888,7 @@ def _svc_pins(src):
         and "        _vis_local = bool(images) and not _srv_lbl and model_cached(" in ch
         and "                and not _srv_lbl and _vis_srv is None):\n            try:\n                start_model_downloads" in ch,
         # (review) making a picture, a video or a file takes the hold
-        "making held": "        if (img_subject or vid_subject or export_req) and not self._bench_held:\n"
+        "making held": "        if (img_subject or vid_subject or export_req or edit_req) and not self._bench_held:\n"
                        "            if not bench_hold():\n                emit(AppText(BENCH_BUSY))" in ch
         and ch.index("and not self._bench_held:\n            if not bench_hold():")
         < ch.index('        if export_req and export_req["lane"] == "retro":')
@@ -21393,7 +21393,7 @@ _SV_MUT = [
      "    if True:\n        st, js = _srv_json(e, \"POST\", \"/api/show\""),
     ("the picture sent where none reads it", "            if not use:\n", "            if False:\n"),
     ("the badge not naming the reader", "                who, label = use, use", "                label = use"),
-    ("making a picture unheld", "        if (img_subject or vid_subject or export_req) and not self._bench_held:",
+    ("making a picture unheld", "        if (img_subject or vid_subject or export_req or edit_req) and not self._bench_held:",
      "        if False:"),
     ("the painter ignores a benchmark", '    _mine = image_ready()\n    if _mine and _bench["running"]:',
      '    _mine = image_ready()\n    if False:'),
@@ -23487,7 +23487,7 @@ def _p4c_rules(src):
         "no pictures": "        if _srv_only and (img_subject or vid_subject):\n" in ch
         and "            emit(AppText(\"\\u26a0\\ufe0f %s Only can\\u2019t make pictures or \"\n                         \"videos, and nothing was made.\"" in ch
         and ch.index("        if _srv_only and (img_subject or vid_subject):\n")
-        < ch.index("        if (img_subject or vid_subject or export_req) and not self._bench_held:"),
+        < ch.index("        if (img_subject or vid_subject or export_req or edit_req) and not self._bench_held:"),
         # and no agent: refused, the agent not resolved, nothing run
         "no agents": "        if agent_name and srv_only_tier(tier):\n" in ch
         and "            _so_fail = (\"%s Only can\\u2019t run the %s agent, and nothing \"\n                        \"was run.\" % (_so_c0.split(SERVER_SEP, 1)[0]\n" in ch
@@ -35088,7 +35088,7 @@ check("Chat: the mode checks the servers before the headers without waking them,
       < _s465.index("self.end_headers()", _s465.index("self.send_header(\"X-Hurry\", hurry_id)"))
       < _s465.index("def status(text: str):", _hb465 - 6000) < _hb465
       < _s465.index("_cw = server_wake_ask(_ch_wake, self.ctx, status, step, skip_ev,")
-      < _s465.index("if (img_subject or vid_subject or export_req) and not self._bench_held:"),
+      < _s465.index("if (img_subject or vid_subject or export_req or edit_req) and not self._bench_held:"),
       "order")
 _wk465 = _s465[_hb465:_s465.index("# MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER", _hb465)]
 check("Chat: a server that woke is seated now (the mode's roster again, the merger last, the route), a failure leaves the roster, the local engine warms only then (6b465)",

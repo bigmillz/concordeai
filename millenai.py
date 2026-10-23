@@ -34676,8 +34676,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (_so_c0.split(SERVER_SEP, 1)[0] or "Your server")))
             hb_stop.set()
             return
-        if (img_subject or vid_subject or export_req or edit_req) \
-                and not self._bench_held:
+        if (img_subject or vid_subject or export_req or edit_req) and not self._bench_held:
             if not bench_hold():
                 emit(AppText(BENCH_BUSY))
                 hb_stop.set()
