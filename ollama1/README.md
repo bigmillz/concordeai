@@ -410,6 +410,13 @@ unless you turn it on.
      and its app, and touches nothing else. The full run stops rather than
      make a second tunnel when config.json already names one. The token
      needs Zone: Read, DNS: Edit and Access: Apps and Policies: Edit.
+   - Add `--door-service-token` to let the app's service token (the one
+     config.json names) open the door as well, so a script or an agent on
+     the Mac can use it without the daily browser login; your SSH key is
+     still required. It needs Access: Service Tokens: Read too, and is
+     remembered for later runs. On the Mac, the token goes to cloudflared
+     through its environment (`TUNNEL_SERVICE_TOKEN_ID` and
+     `TUNNEL_SERVICE_TOKEN_SECRET`), never on a command line.
 2. Run setup with `--ssh-door`: `sudo ./setup.sh --ssh-door`. It adds the
    route, the sshd line and the port guard, and restarts the tunnel. The
    setting is saved, so later runs keep it.

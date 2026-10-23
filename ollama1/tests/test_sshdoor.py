@@ -425,6 +425,29 @@ class TestCfAccessDoor(unittest.TestCase):
         finally:
             cf.srv.shutdown()
 
+    def test_door_only_with_the_service_token(self):
+        # 6b510: the app's service token (found by its Client ID, never made) opens the door too
+        self.cf.stokens["t1"] = {"id": "t1", "name": "hand-made-app", "client_id": "kept.access", "client_secret": "s"}
+        self.write_cfg(tunnel_id="hand-made-tunnel", service_token_client_id="kept.access")
+        self.assertEqual(self.run_helper(extra=["--ssh-door-only", "--door-service-token"]), 0, self.out)
+        app = self.ssh_app()
+        pols = [self.cf.policies[r["id"]] for r in sorted(app["policies"], key=lambda r: r["precedence"])]
+        self.assertEqual([(p["decision"], p["include"]) for p in pols],
+                         [("allow", [{"email": {"email": U.ADMIN_EMAIL}}]),
+                          ("non_identity", [{"service_token": {"token_id": "t1"}}])])
+        self.assertEqual(list(self.cf.stokens), ["t1"])                    # none made, none rotated
+        self.assertFalse([w for w in self.writes() if "service_tokens" in w[1]])
+        self.assertIs(json.load(open(TC.CONFIG))["ssh_door_service_token"], True)
+        n = len(self.cf.policies)
+        self.assertEqual(self.run_helper(extra=["--ssh-door-only"]), 0, self.out)   # the setting is remembered
+        self.assertEqual((len(self.cf.policies), len(self.ssh_app()["policies"])), (n, 2))
+
+    def test_door_service_token_not_found_still_opens_the_door_for_the_admin(self):
+        self.write_cfg(tunnel_id="hand-made-tunnel", service_token_client_id="missing.access")
+        self.assertEqual(self.run_helper(extra=["--ssh-door-only", "--door-service-token"]), 0, self.out)
+        self.assertIn("isn't added", self.out)
+        self.assertEqual(len(self.ssh_app()["policies"]), 1)
+
     def test_door_only_falls_back_to_self_hosted(self):
         cf = FakeCFNoSSHType()
         try:

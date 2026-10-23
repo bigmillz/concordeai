@@ -16373,3 +16373,9 @@ the panel, behind Access (the panel's admin identity) and then SSH keys.
   fake API that refuses a type change in place, where door-only remakes the app and saves the new AUD.
 - Unverified until the owner's next try: that the self-hosted app's login page answers 200 for the door host
   (the panel's, the same kind of app, does).
+- Also (per Patrick: "Yes, accept the token"): `--door-service-token` with --ssh-door-only adds a second policy to
+  the door, `<name> ssh - service token` (non_identity, the service token whose Client ID config.json names; found,
+  never made or rotated), so the door opens without the browser login that expires every 24 h. Remembered as
+  `ssh_door_service_token` in config.json. A token that can't be listed (no Access: Service Tokens: Read) or found
+  leaves the door to the admin's email login and says so. Tests: the two policies in order, nothing made or
+  rotated, the setting remembered; a missing token still opens the door for the admin.
