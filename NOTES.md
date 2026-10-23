@@ -16358,3 +16358,18 @@ the panel, behind Access (the panel's admin identity) and then SSH keys.
   tunnel by the expected name, and points to --ssh-door-only. Tests in test_sshdoor.py: the full run makes no
   second tunnel; door-only writes only its own three things, twice in a row with no new objects; leaves a
   foreign app alone; needs the tunnel id; falls back to self-hosted.
+
+## 6b510 — The SSH door's app is plain self-hosted (per Patrick)
+
+- After `--ssh-door-only` and setup, Patrick's first `ssh` through the door stopped at "Empty app domain"
+  from `cloudflared access ssh`. The door's hostname redirected to its Access login page as it should, but that
+  page answered 404, where the admin panel's answers 200 with the `cf-access-domain` header cloudflared reads.
+  The one difference between the two apps was the type: the door's was "ssh" (Cloudflare's browser-rendered
+  SSH), the panel's "self_hosted".
+- The helper now makes the door a plain self-hosted app, in the full run and in --ssh-door-only. An existing door
+  app (ours by name) is PUT to self_hosted; if Cloudflare won't change the type in place it is deleted and made
+  again, which gives it a new AUD tag, so setup.sh has to run again to put the new tag in the tunnel's route.
+  The README's dashboard steps say to leave Browser rendering off. Tests: the door types expected self_hosted; a
+  fake API that refuses a type change in place, where door-only remakes the app and saves the new AUD.
+- Unverified until the owner's next try: that the self-hosted app's login page answers 200 for the door host
+  (the panel's, the same kind of app, does).

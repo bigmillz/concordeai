@@ -40,7 +40,7 @@ nothing that is already right):
      --name and --owner); ollama1 in this command's name is the kit's, not yours.
      With the SSH door on (ssh_door in config.json, or --ssh-door), also a
      third application, "<server-name> ssh", for hostname_ssh, with the
-     admin policy and browser-rendered SSH (type "ssh"), and its DNS name
+     admin policy (a plain self-hosted app), and its DNS name
   6. writes the team domain, the AUD tags, the admin email, the service
      token's Client ID and the tunnel id to /etc/ollama1/config.json (0600)
 The service token's Client Secret is shown once on the terminal (never
@@ -301,17 +301,9 @@ def access_step(cf, acct, cfg, admin, interactive, rotate, test_mode=False, ssh_
     gw_aud = app(APP_GATEWAY, cfg["hostname_gateway"], pid_app, {"service_auth_401_redirect": True})
     ssh_aud = None
     if ssh_host:
-        # The SSH door (6b507): the admin's policy (Allow, the admin email), and type "ssh",
-        # which is a self-hosted app with Cloudflare's browser-rendered SSH on. If Cloudflare
-        # refuses that type, the app is made plain self-hosted (cloudflared access ssh works
-        # the same) and the browser terminal is left to one switch in the dashboard.
-        try:
-            ssh_aud = app(APP_SSH, ssh_host, pid_admin, {"type": "ssh"})
-        except Stop as e:
-            say("browser-rendered SSH refused (%s); making %s a plain self-hosted app" % (e, ssh_host))
-            ssh_aud = app(APP_SSH, ssh_host, pid_admin, {})
-            say("for the browser terminal: Zero Trust > Access > Applications > %s > Configure >" % APP_SSH)
-            say("  Browser rendering: SSH > Save")
+        # The SSH door (6b507): the admin's policy (Allow, the admin email), a plain self-hosted app
+        # (6b510: type "ssh", browser-rendered SSH, 404'd its own login page; see door_only_step)
+        ssh_aud = app(APP_SSH, ssh_host, pid_admin, {})
     return tok["client_id"], admin_aud, gw_aud, ssh_aud
 
 
@@ -338,19 +330,24 @@ def door_only_step(cf, acct, ssh_host, admin):
     if cur and cur.get("name") != APP_SSH:
         raise Stop("%s already has an Access application (%r) that this didn't make; it won't change it"
                    % (ssh_host, cur.get("name")))
-    app = {"name": APP_SSH, "domain": ssh_host, "type": "ssh", "session_duration": "24h",
+    # plain self-hosted (6b510): an app of type "ssh" (browser-rendered SSH) answered its own login page with a 404
+    # on the owner's account, and `cloudflared access ssh` stopped at "Empty app domain"
+    app = {"name": APP_SSH, "domain": ssh_host, "type": "self_hosted", "session_duration": "24h",
            "app_launcher_visible": False, "http_only_cookie_attribute": True, "same_site_cookie_attribute": "lax",
            "policies": [{"id": pid, "precedence": 1}]}
-    for kind in ("ssh", "self_hosted"):
-        app["type"] = kind
+    if cur:
         try:
-            res = cf.call("PUT", a + "/apps/%s" % cur["id"], app) if cur else cf.call("POST", a + "/apps", app)
-            break
+            res = cf.call("PUT", a + "/apps/%s" % cur["id"], app)
+            say("Access application %s: brought in line (self-hosted)" % ssh_host)
+            return res["aud"]
         except Stop as e:
-            if kind == "self_hosted":
+            if cur.get("type") == "self_hosted":
                 raise
-            say("browser-rendered SSH refused (%s); making %s a plain self-hosted app" % (e, ssh_host))
-    say("Access application %s: %s" % (ssh_host, "brought in line" if cur else "created"))
+            # an app's type may not change in place: it is ours (by name), so it is made again (a new AUD tag)
+            say("Access application %s: its type can't change (%s); making it again" % (ssh_host, e))
+            cf.call("DELETE", a + "/apps/%s" % cur["id"])
+    res = cf.call("POST", a + "/apps", app)
+    say("Access application %s: created" % ssh_host)
     return res["aud"]
 
 

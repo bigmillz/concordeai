@@ -230,6 +230,16 @@ class FakeCFNoSSHType(TC.FakeCF):
         return super().route(m, p, qs, b)
 
 
+class FakeCFNoTypeChange(TC.FakeCF):
+    """An API that won't change an application's type in place."""
+
+    def route(self, m, p, qs, b):
+        mm = re.match(r"/accounts/[^/]+/access/apps/([^/]+)$", p)
+        if m == "PUT" and mm and b and self.apps.get(mm.group(1), {}).get("type") != b.get("type"):
+            return 400, "the application type can't be changed"
+        return super().route(m, p, qs, b)
+
+
 class TestCfAccessDoor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -294,7 +304,7 @@ class TestCfAccessDoor(unittest.TestCase):
         self.write_cfg(ssh_door=True)
         self.assertEqual(self.run_helper(), 0, self.out)
         app = self.check_door()
-        self.assertEqual(app["type"], "ssh")          # browser-rendered SSH
+        self.assertEqual(app["type"], "self_hosted")  # 6b510: not browser-rendered (its login page 404d)
         self.assertEqual(len(self.cf.apps), 3)
         self.assertEqual(len(self.cf.policies), 2)    # no new policy: the admin's is reused
         self.assertIn("Run setup.sh again", self.out)
@@ -302,7 +312,7 @@ class TestCfAccessDoor(unittest.TestCase):
     def test_door_flag_turns_it_on(self):
         self.write_cfg()
         self.assertEqual(self.run_helper(extra=["--ssh-door"]), 0, self.out)
-        self.assertEqual(self.check_door()["type"], "ssh")
+        self.assertEqual(self.check_door()["type"], "self_hosted")
 
     def test_door_off_changes_nothing(self):
         self.write_cfg()
@@ -340,7 +350,6 @@ class TestCfAccessDoor(unittest.TestCase):
             self.assertEqual(self.run_helper(cf), 0, self.out)
             app = self.check_door(cf)
             self.assertEqual(app["type"], "self_hosted")
-            self.assertIn("Browser rendering: SSH", self.out)
         finally:
             cf.srv.shutdown()
 
@@ -367,7 +376,7 @@ class TestCfAccessDoor(unittest.TestCase):
         self.assertEqual(self.run_helper(extra=["--ssh-door-only"]), 0, self.out)
         self.assertEqual((self.cf.tunnels, self.cf.stokens), ({}, {}))
         app = self.ssh_app()
-        self.assertEqual((app["name"], app["type"]), ("testsrv ssh", "ssh"))
+        self.assertEqual((app["name"], app["type"]), ("testsrv ssh", "self_hosted"))
         self.assertEqual(len(self.cf.apps), 1)
         self.assertEqual([p["name"] for p in self.cf.policies.values()], ["testsrv ssh - admin only"])
         pol = next(iter(self.cf.policies.values()))
@@ -398,6 +407,23 @@ class TestCfAccessDoor(unittest.TestCase):
         self.assertEqual(self.run_helper(extra=["--ssh-door-only"]), 1)
         self.assertIn("no tunnel_id", self.out)
         self.assertEqual(self.writes(), [])
+
+    def test_door_only_turns_a_browser_ssh_app_into_a_plain_one(self):
+        # 6b510: the owner's first door app was type "ssh" and 404'd its login page
+        self.write_cfg(tunnel_id="hand-made-tunnel")
+        self.cf.apps["old"] = {"id": "old", "name": "testsrv ssh", "domain": SSH_HOST, "type": "ssh", "aud": "old-aud"}
+        cf = FakeCFNoTypeChange()
+        try:
+            cf.apps["old"] = dict(self.cf.apps["old"])
+            self.write_cfg(tunnel_id="hand-made-tunnel")
+            self.assertEqual(self.run_helper(cf, extra=["--ssh-door-only"]), 0, self.out)
+            app = self.ssh_app(cf)
+            self.assertEqual(app["type"], "self_hosted")
+            self.assertNotEqual(app["aud"], "old-aud")
+            self.assertEqual(json.load(open(TC.CONFIG))["ssh_aud"], app["aud"])
+            self.assertIn("making it again", self.out)
+        finally:
+            cf.srv.shutdown()
 
     def test_door_only_falls_back_to_self_hosted(self):
         cf = FakeCFNoSSHType()
