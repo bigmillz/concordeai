@@ -16666,3 +16666,20 @@ The app2 batch (6b471 unread dot, 6b472 Edit this picture, 6b480 search excerpts
   here: it is main's code and the live venv.
 - Kit: test_gputune's test_choice failed here only because the worktree's path has a space ("My Drive") and the
   test sources setuplib.sh unquoted; it passes from a path without one, and main has fixed it.
+
+## 6b512 — mlx 0.32.4 with mlx-lm 0.32.2: Gemma 4 26B on MLX answers again (per Patrick)
+
+- Found by the gauntlet of the second app batch: nine local answers (Fast tier, weather, usage, documents) came
+  back "⚠️ The engine rejected the request (HTTP 404)". The desktop app had run 6b497's self-update at 12:19,
+  which put mlx-lm 0.32.2 with mlx and mlx-metal 0.32.2 into the shared venv. mlx-lm 0.32.2's metadata says
+  mlx>=0.32.2, but it calls `mx.gather_qmm(..., global_scale=...)`, which mlx has only from 0.32.3: every
+  quantized MoE model (Gemma 4 26B, a4b) raised a TypeError in the engine's generation thread, and the server
+  answered 404. Patrick's own app couldn't answer with Gemma 4 26B on MLX from then on.
+- MLX_ENGINE_REQS now pins mlx and mlx-metal 0.32.4 (same wheel set: CPython 3.11-3.14 on macOS 14, 15 and 26,
+  arm64; mlx-metal's three), by PyPI's sha256. MLX_PIN = (0, 32, 4) is checked on its own: a venv whose mlx-lm is
+  already 0.32.2 but whose mlx is older is brought up too, and the record's key carries the mlx pin, so 6b497's
+  "done" record doesn't stop the new try. Success needs both versions.
+- Patrick's venv was repaired by hand the same way (pip download --require-hashes, then install --no-index from
+  that folder, no engine running), and Gemma 4 26B answered through mlx_lm on it. The gauntlet's 6b497 checks
+  now expect the 0.32.4 wheels, and two new cases: a venv left on mlx 0.32.2 is upgraded once; mlx 0.32.4 is
+  up to date. A mutant drops the mlx check.

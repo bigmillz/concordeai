@@ -18893,8 +18893,9 @@ def crypto_status() -> dict:
 # build or a system Python. One try per build and Python, again 3 days after
 # a failure. mlx-lm 0.32.2 wants mlx >= 0.32.2 (its mlx-metal with it),
 # transformers >= 5.7 and Python >= 3.11: the three wheels below are pinned
-# by the sha256 PyPI lists (checked 2026-10-21; mlx for CPython 3.11-3.14 on
-# macOS 14, 15 and 26, arm64), installed with no other dependency, so a venv
+# by the sha256 PyPI lists (checked 2026-10-21, mlx and mlx-metal moved to
+# 0.32.4 on 2026-10-23, 6b512; mlx for CPython 3.11-3.14 on macOS 14, 15 and
+# 26, arm64), installed with no other dependency, so a venv
 # whose transformers or Python is too old is left as it is and says why
 # (Gemma 4 12B then stays on Ollama there). The wheels are downloaded first,
 # then installed from that folder while no engine may start (_engine_lock),
@@ -18904,25 +18905,29 @@ def crypto_status() -> dict:
 # MLX row's model_type (MLX_MODEL_TYPES) must load on this pin: the gauntlet
 # checks it against the pin's own module list and type mapping.
 MLX_LM_PIN = (0, 32, 2)
+# mlx itself (6b512): mlx-lm 0.32.2 says mlx>=0.32.2 but calls gather_qmm(global_scale=), which mlx has only from
+# 0.32.3, so on 0.32.2 every quantized MoE answer (Gemma 4 26B on MLX) died with "the engine rejected the request
+# (HTTP 404)". Pinned to 0.32.4, and checked on its own: a venv that took 6b497's 0.32.2 is brought up too.
+MLX_PIN = (0, 32, 4)
 MLX_ENGINE_REQS = r"""mlx-lm==0.32.2 \
     --hash=sha256:5c0991248cfff5872503d74f466d2532dd8cb7fb3670cb9be7a06d7305dadc04
-mlx==0.32.2 \
-    --hash=sha256:238b50d2ee3917c836e73f9446011518b79ff094940eb0107fa6cd17d02a2eca \
-    --hash=sha256:e507dc67d268cf78254e17756f25057198fe74791508fcbd1e6d967673a8d374 \
-    --hash=sha256:e0828c96a6b988afbe6f07cc39adc0470eba9121f7e356623a8fb9d9a6397533 \
-    --hash=sha256:77217798a2b036bae9f213b851d4cde4581893787c9964458b7d471f86036bd6 \
-    --hash=sha256:cf63fd5c32258ab07523b06401c20ee2280bf56e26e991d05bf6fd8a4d42d1f6 \
-    --hash=sha256:68560fd648c5bb900aa6f6765cd74c5a8abaf092d97d73584a57b7545966c227 \
-    --hash=sha256:65d3d29b66045ed8dd2d8e437c8770de325843c364f7b7c38cd8ae90a7eec854 \
-    --hash=sha256:daebf84dfb857d70e87b1b98189a057e691e99a4a2b9f6f64cadebad917f8964 \
-    --hash=sha256:df8c75e509de868fca148dfeb38d92ce956eed386569c87caeb72bd16d2d6962 \
-    --hash=sha256:c99e3b6451bb4a55071cf19594f564435bd88de77008f377e611a40a8bbfb328 \
-    --hash=sha256:8fc433e35a7058e30f7a225c39fce06ba41394fe8e9fd67383b70f0b06de398c \
-    --hash=sha256:3503617e3aa6a8e411df53236d5bca039fcca97556f1ade1c4e5cc8a64de52d2
-mlx-metal==0.32.2 \
-    --hash=sha256:3825fff379dbc107dd3413e564a06caeaa24819910ec49c0439e454c06a1b9b8 \
-    --hash=sha256:55a369250d220b2cf10213a87a2ac1b1a420608c5b35b1df4e7147ac8e32f121 \
-    --hash=sha256:e6abeac9ac5265830c9c1541b6f96e9be37a85c2446763a46ad466c63a3837ab
+mlx==0.32.4 \
+    --hash=sha256:dd0c9070d9c362fe280a0224806b1b47719b154984735041ebcc907e597c08ca \
+    --hash=sha256:fbb3fcf1363a631d05aa5adcb30d07655158be07e09339c1fe62f7267b3a78f5 \
+    --hash=sha256:dfd5269398bb64372137d8c354530b6e81159ce0e92fd1ed7e9140b294fd939a \
+    --hash=sha256:ff1d7be54758ea3a875b8fe54eff13bed17ad9566505e301f5d7851bf869680f \
+    --hash=sha256:f0604cb3015091f285c79c7b7dbfcabcfa9948248728c7bab6e0263513c3d3fe \
+    --hash=sha256:7928869076db6267ab3ebdb253b2c80be1e738b3032c783170bd1d59d460c578 \
+    --hash=sha256:c7375f2d6acd8c72f413d018266ae06387cb9caab31f475f3ff1c5600a7cb4c5 \
+    --hash=sha256:d46dd07f57a65bae00ba7da239ee76ebf87e3202f042808d209b56be3140e416 \
+    --hash=sha256:ef130e3da895c85374b11a6c389acb122893f2ffcbed826b8b62fd45a20b7ad6 \
+    --hash=sha256:f1e6ef441e1e2ce54159022a8fa5597f8ea4f7acf278752049c4f774bbd0501d \
+    --hash=sha256:83adc889ae89057fd9f292ca1a9ee56da43f181fccc7ae48a060d7aadc179eaa \
+    --hash=sha256:1dd56491b44a2bfa217f60da66a5c9c889add7ad9dc2cbcf526389ea31d83bee
+mlx-metal==0.32.4 \
+    --hash=sha256:8019b2db622599267d66cc168b2f0dbf5af929790a6c3b3913e00eabc42a7947 \
+    --hash=sha256:9f0a3cc26d89724434d9684932fc6f3e4e83669d2a895d858ed2c8a55eb84e8b \
+    --hash=sha256:514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936
 """
 MLX_ENGINE_NEEDS = {"python": (3, 11), "transformers": (5, 7, 0)}
 MLX_ENGINE_RECORD = "mlx-engine.json"
@@ -18939,7 +18944,7 @@ def _dist_version(name: str):
         return None
 
 
-def _mlx_engine_why_not(have=None, tf=None, py=None) -> str:
+def _mlx_engine_why_not(have=None, tf=None, py=None, mlx=None) -> str:
     """'' when this copy should bring its venv's mlx-lm up to MLX_LM_PIN now,
     else why not (the arguments stand in for this machine's, in tests)."""
     if not (IS_MAC and IS_ARM):
@@ -18950,7 +18955,8 @@ def _mlx_engine_why_not(have=None, tf=None, py=None) -> str:
     have = _dist_version("mlx-lm") if have is None else have
     if not have:
         return "no MLX engine in this venv"
-    if tuple(have) >= MLX_LM_PIN:
+    mlx = _dist_version("mlx") if mlx is None else mlx
+    if tuple(have) >= MLX_LM_PIN and mlx and tuple(mlx) >= MLX_PIN:
         return "up to date"
     py = tuple(sys.version_info[:2]) if py is None else tuple(py)
     if py < MLX_ENGINE_NEEDS["python"]:
@@ -19018,7 +19024,7 @@ def _ensure_mlx_engine(pip=None, now=None):
         if _crypto_install.get("state") != "installing":
             break
         time.sleep(1)
-    key = "%s %s" % (_crypto_key(), "%d.%d.%d" % MLX_LM_PIN)
+    key = "%s %s+mlx%s" % (_crypto_key(), "%d.%d.%d" % MLX_LM_PIN, "%d.%d.%d" % MLX_PIN)   # 6b512: a new key, a new try
     go, why = _crypto_should_try(_mlx_engine_record(), key, time.time() if now is None else now)
     if not go:
         _mlx_engine.update(state="failed", note=why)
@@ -19034,8 +19040,8 @@ def _ensure_mlx_engine(pip=None, now=None):
         shutil.rmtree(d, ignore_errors=True)
     import importlib
     importlib.invalidate_caches()
-    have = _dist_version("mlx-lm")
-    if ok and have and tuple(have) >= MLX_LM_PIN:
+    have, mlx = _dist_version("mlx-lm"), _dist_version("mlx")
+    if ok and have and tuple(have) >= MLX_LM_PIN and mlx and tuple(mlx) >= MLX_PIN:
         _mlx_engine.update(state="done", note="the MLX engine is %d.%d.%d from the next start" % MLX_LM_PIN)
     else:
         _mlx_engine.update(state="failed", note=why or "the MLX engine didn't update")
