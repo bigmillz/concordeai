@@ -97,6 +97,8 @@ MACHINE_STATE = frozenset((
     "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_fresh",
     # 6b315: the graphics cards, and when the engine update last failed
     "_gpus", "_stage_last", "_proof",
+    # 6b497: the app's own MLX engine update (its state and note, nothing personal)
+    "_mlx_engine",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
@@ -12725,6 +12727,8 @@ MACHINE_IO = frozenset((
     # import time: the dev folder, the crash log and the logs, the
     # subprocess recorder (a dev copy's hook)
     "<module>",
+    # 6b497: the MLX engine self-update: its record, the pip run's temp files, the unpacked wheels
+    "_mlx_engine_record", "_mlx_engine_pip", "_ensure_mlx_engine",
     # run/ notes, locks and the instance lock
     "run_file", "drop_run_file", "sweep_run_files", "single_instance",
     "_write_instance_note", "_write_boot_note", "_drop_instance_note",

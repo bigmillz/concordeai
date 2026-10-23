@@ -33960,7 +33960,7 @@ def _cm_ns(src, providers, **stubs):
           "srv_rank": lambda c, r, e, s: sorted(c, key=lambda m: -(m.get("params") or 0))}
     exec(src[p0:src.index("_dead_loaded = ", p0)], ns)
     t0 = src.index("def _srv_tag_key(tag: str) -> str:")
-    exec(src[t0:src.index("def server_mode_candidates(ctx)", t0)], ns)
+    exec(src[t0:src.index("def server_mode_candidates(ctx", t0)], ns)
     exec(src[a:a_end], ns)
     exec(src[b:b_end], ns)
     ns["_cloud_repair"] = lambda: None
