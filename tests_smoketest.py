@@ -35959,7 +35959,7 @@ def _c97_pin(src):
     for x in _ast0.parse(src).body:
         if isinstance(x, _ast0.Assign) and any(getattr(t, "id", "") in (
                 "CATALOG", "MODEL_INFO", "MLX_REQUIRES", "MLX_MODEL_TYPES", "MLX_LM_PIN", "MLX_ENGINE_REQS",
-                "MLX_ENGINE_NEEDS") for t in x.targets):
+                "MLX_ENGINE_NEEDS", "MLX_PIN") for t in x.targets):
             exec(_ast0.get_source_segment(src, x), ns)
     mlx_rows = {l for l, i in ns["MODEL_INFO"].items() if i["mlx"]}
     types = ns["MLX_MODEL_TYPES"]
@@ -35973,37 +35973,39 @@ def _c97_pin(src):
            "every row loads on the pin": all(loads(t) for t in types.values()),
            "no row needs more than the pin": all(tuple(v) <= tuple(ns["MLX_LM_PIN"])
                                                  for v in ns["MLX_REQUIRES"].values()),
-           "the three wheels, by hash": pins == {"mlx-lm==0.32.2": 1, "mlx==0.32.2": 12, "mlx-metal==0.32.2": 3}
+           # 6b512: mlx and mlx-metal 0.32.4 (gather_qmm's global_scale, which mlx-lm 0.32.2 calls, came in 0.32.3)
+           "the three wheels, by hash": pins == {"mlx-lm==0.32.2": 1, "mlx==0.32.4": 12, "mlx-metal==0.32.4": 3}
            and all(len(h) == 64 for h in re.findall(r"--hash=sha256:([0-9a-f]+)", ns["MLX_ENGINE_REQS"])),
            "what 0.32.2 needs": ns["MLX_ENGINE_NEEDS"] == {"python": (3, 11), "transformers": (5, 7, 0)},
+           "mlx at the version the wheels pin": tuple(ns["MLX_PIN"]) == (0, 32, 4),
            "0.31.3 couldn't (the reason for all this)": types.get("Gemma 4 12B") == "gemma4_unified"}
     m = _s5_mac(src, 48, mlxv=tuple(ns["MLX_LM_PIN"]))
     out["on the pin: Gemma 4 12B on MLX"] = m["MODEL_ROUTES"]["Gemma 4 12B"] == ("mlx", 8908)
     return all(out.values()), {k: v for k, v in out.items() if not v}
 
 
-def _c97_ns(src, have, after, blocker="", py=(3, 14), tf=(5, 14, 1)):
+def _c97_ns(src, have, after, blocker="", py=(3, 14), tf=(5, 14, 1), mlx=(0, 32, 2)):
     """_ensure_mlx_engine on src's own code: an Apple-silicon Mac whose venv
     holds `have`, `after` once pip has run; pip stands in, recording."""
     d = tempfile.mkdtemp(dir=_SMOKE_TMP)
-    st = {"calls": [], "lock_held": [], "v": have}
+    st = {"calls": [], "lock_held": [], "v": have, "mlx": mlx}
     lock = _LH["threading"].Lock()
     ns = dict(_LH, IS_MAC=True, IS_ARM=True, APP_BUILD=999, math=__import__("math"), _engine_lock=lock,
               _crypto_install={"state": "done"}, _crypto_install_blocker=lambda: blocker,
               app_dir=lambda: d, _replace_into=os.replace)
-    _s5_exec(src, ns, {"MLX_LM_PIN", "MLX_ENGINE_REQS", "MLX_ENGINE_NEEDS", "MLX_ENGINE_RECORD", "_mlx_engine",
+    _s5_exec(src, ns, {"MLX_LM_PIN", "MLX_PIN", "MLX_ENGINE_REQS", "MLX_ENGINE_NEEDS", "MLX_ENGINE_RECORD", "_mlx_engine",
                        "_mlx_engine_why_not", "_mlx_engine_record", "_ensure_mlx_engine", "_mlx_engine_pip",
                        "_crypto_key",
                        "_crypto_should_try", "CRYPTO_RETRY_S", "_pip_why"})
-    ns["_dist_version"] = lambda name: st["v"] if name == "mlx-lm" else tf
+    ns["_dist_version"] = lambda name: st["v"] if name == "mlx-lm" else st["mlx"] if name == "mlx" else tf
     ns["sys"] = _types.SimpleNamespace(version="3.14.0 (x)", version_info=py, executable="py")
 
     def pip(args, reqs):
         st["calls"].append(args[0])
         st.setdefault("args", []).append(list(args))
         st["lock_held"].append(lock.locked())
-        if args[0] == "install":
-            st["v"] = after
+        if args[0] == "install" and after is not None:
+            st["v"], st["mlx"] = after, (0, 32, 4)
         return (after is not None, "" if after is not None else "couldn't reach PyPI")
     st["pip"] = pip
     return ns, st
@@ -36023,6 +36025,14 @@ def _c97_run_once(src):
                        and ns["_mlx_engine"]["state"] == "done" and rec["ok"] is True)
     ns["_ensure_mlx_engine"](pip=st["pip"])
     out["then up to date"] = st["calls"] == ["download", "install"] and ns["_mlx_engine"]["note"] == "up to date"
+    # 6b512: a venv 6b497 left on mlx 0.32.2 (mlx-lm already 0.32.2) is brought up, once
+    ns, st = _c97_ns(src, (0, 32, 2), (0, 32, 2))
+    ns["_ensure_mlx_engine"](pip=st["pip"])
+    out["a venv left on mlx 0.32.2 is brought up"] = (st["calls"] == ["download", "install"]
+                                                       and ns["_mlx_engine"]["state"] == "done")
+    ns, st = _c97_ns(src, (0, 32, 2), (0, 32, 2), mlx=(0, 32, 4))
+    ns["_ensure_mlx_engine"](pip=st["pip"])
+    out["mlx 0.32.4 is up to date"] = st["calls"] == [] and ns["_mlx_engine"]["note"] == "up to date"
     ns, st = _c97_ns(src, (0, 31, 3), None)
     ns["_ensure_mlx_engine"](pip=st["pip"])
     first = list(st["calls"])
@@ -36080,7 +36090,9 @@ for _i97, _n97, _o97, _d97 in _c97_run(_MILLENAI_SRC):
 _C97_MUT = [
     ("a pin that can't load Gemma 4 12B", "MLX_LM_PIN = (0, 32, 2)", "MLX_LM_PIN = (0, 31, 3)", [0]),
     ("a row with no type", '    "GPT-OSS 120B": "gpt_oss", ', "    ", [0]),
-    ("a wheel without its hash", "mlx-metal==0.32.2 \\\n    --hash=sha256:3825", "mlx-metal==0.32.2 \\\n    --hash=sha256:", [0]),
+    ("a wheel without its hash", "mlx-metal==0.32.4 \\\n    --hash=sha256:8019", "mlx-metal==0.32.4 \\\n    --hash=sha256:", [0]),
+    ("mlx not checked (6b512)", "    if tuple(have) >= MLX_LM_PIN and mlx and tuple(mlx) >= MLX_PIN:",
+     "    if tuple(have) >= MLX_LM_PIN:", [1]),
     ("installed while engines may start", "            with _engine_lock:                # no engine starts",
      "            if True:                # no engine starts", [1]),
     ("installed straight from the network", '                ok, why = pip(["install", "--no-index", "--find-links", d], MLX_ENGINE_REQS)',
