@@ -21,4 +21,14 @@ ingress:
         required: true
         teamName: @TEAM_NAME@
         audTag: ["@ADMIN_AUD@"]
+  # @SSH_DOOR_BEGIN@ (setup.sh keeps these lines only with the SSH door on, 6b507)
+  - hostname: @SSH_HOST@
+    service: ssh://127.0.0.1:22
+    originRequest:
+      connectTimeout: 10s
+      access:
+        required: true
+        teamName: @TEAM_NAME@
+        audTag: ["@SSH_AUD@"]
+  # @SSH_DOOR_END@
   - service: http_status:404

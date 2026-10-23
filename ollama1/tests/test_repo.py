@@ -109,6 +109,9 @@ class TestRepo(unittest.TestCase):
             if path.endswith("tests/test_repo.py"):
                 continue
             for name, pat in SECRET_PATTERNS:
+                # a pip pin's published wheel hash is no secret (6b497: the app's MLX engine pins)
+                if name == "64-hex string" and re.fullmatch(r"\s*--hash=sha256:[0-9a-f]{64}( \\)?", line):
+                    continue
                 if pat.search(line):
                     hits.append("%s: %s: %s" % (path, name, line.strip()[:100]))
         self.assertEqual(hits, [])

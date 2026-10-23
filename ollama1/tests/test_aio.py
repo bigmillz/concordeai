@@ -154,6 +154,19 @@ class TestPolicy(AioCase):
                 self.assertEqual(self.aio.applied, {1: fans, 2: fans}, phase)
                 self.assertEqual(self.aio.applied_pump, pump, phase)
 
+    def test_working_and_tuning_follow_the_fans_level_with_the_pump_at_extreme(self):
+        # 6b505: the cooler's fans follow a working level under 100% (fan_work_pct, the calibration) and the
+        # calibration's test level; before, they stayed at 100% while working whatever the setting said
+        t = self.settle()
+        for phase, pct in (("working", 50), ("tuning", 40), ("working", 100)):
+            with self.subTest(phase=phase, pct=pct):
+                t += 6
+                self.ago(t, phase, pct)
+                self.assertEqual(self.aio.applied, {1: pct, 2: pct})
+                self.assertEqual(self.aio.applied_pump, "extreme")
+        self.aio.coolant_hot = True
+        self.assertEqual(self.aio.plan(), ("extreme", {1: 100, 2: 100}))   # a hot coolant still wins
+
     def test_deep_idle_takes_the_cooler_fans_to_10_unless_they_stall_there(self):
         t = self.settle()
         for phase, pct, fans in (("deepen", 15, 15), ("deep", 10, 10)):

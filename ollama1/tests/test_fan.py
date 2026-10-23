@@ -210,7 +210,7 @@ class TestLevels(FanCase):
         f = self.up()
         self.assertEqual(set(self.run_for(f, 120)), {"idle20"})
         self.assertTrue(self.tree.at(51))
-        self.assertEqual(set(o1fan.o1work.probes()), {"gpu_busy"})
+        self.assertEqual(set(o1fan.o1work.probes()), {"gpu_busy", "gpu_temp"})   # gpu_temp: heat only (6b505)
 
     def test_the_card_counts_over_50_percent_not_at_it(self):
         for pct, works in ((50, False), (50.5, True), (51, True), (100, True)):
@@ -1722,3 +1722,135 @@ class TestWorkLevel(unittest.TestCase):
         self.assertEqual(o1fan.ramp_pct(o1fan.RAMP_S, 50), o1fan.LOW_PCT)
         self.assertEqual(o1fan.ramp_pct(0), 100)
         self.assertAlmostEqual(o1fan.ramp_exact(o1fan.RAMP_S / 2.0, 50), (50 + o1fan.LOW_PCT) / 2.0)
+
+
+class TestCalibratedLevels(FanCase):
+    """6b505: the fan calibration's hold (phase tuning), the quiet and heavy working levels with their hysteresis, and
+    an NVIDIA card's temperature watched like an AMD card's junction."""
+    WALL = 1_800_000_000
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(lambda: os.path.exists(o1fan.tuning_path()) and os.unlink(o1fan.tuning_path()))
+
+    def hold(self, pct, at=None):
+        from o1common import write_json_atomic
+        write_json_atomic(o1fan.tuning_path(), {"at": self.WALL if at is None else at, "pct": pct})
+
+    def test_the_calibration_holds_the_level_it_asks_for(self):
+        f = self.up()
+        self.hold(40)
+        self.assertEqual(self.go(f, self.clock.t + 2), ("tuning", "fan calibration: testing 40%"))
+        self.assertTrue(self.tree.at(o1fan.pwm_of(40)))
+        self.p["gpu_busy"] = 100                                     # work under it: still the test level
+        self.run_for(f, 6)
+        self.assertEqual(f.phase, "tuning")
+        self.assertTrue(self.tree.at(o1fan.pwm_of(40)))
+        st = json.load(open(o1fan.status_path()))
+        self.assertIn("Fans: 40% (fan calibration: testing 40%)", st["line"])
+        os.unlink(o1fan.tuning_path())                               # the run ended: the work level again
+        self.assertEqual(self.go(f, self.clock.t + 2)[0], "working")
+        self.assertTrue(self.tree.at(255))
+
+    def test_a_stale_or_odd_hold_is_ignored_and_heat_wins(self):
+        f = self.up()
+        for pct, at in ((40, self.WALL - 11), (10, None), (101, None), ("40", None), (True, None), (40, "now")):
+            with self.subTest(pct=pct, at=at):
+                self.hold(pct, at)
+                self.assertEqual(self.go(f, self.clock.t + 2)[0], "idle20")
+        self.hold(30)
+        self.tree.temp("cpu", 81)
+        self.assertEqual(self.go(f, self.clock.t + 2)[0], "hot")
+        self.assertTrue(self.tree.at(255))
+
+    def levels(self, quiet=40, heavy=60):
+        return lambda: {"quiet": quiet, "heavy": heavy, "source": "calibration"}
+
+    def test_quiet_until_a_temperature_nears_its_limit_then_heavy_until_all_are_well_under(self):
+        import o1work
+        f = self.up(levels=self.levels())
+        self.busy(f)
+        self.assertEqual(f.phase, "working")
+        self.assertTrue(self.tree.at(o1fan.pwm_of(40)))
+        self.tree.temp("cpu", 67.9)                                  # 12.1 under the 80 C limit: quiet still
+        self.run_for(f, 4)
+        self.assertTrue(self.tree.at(o1fan.pwm_of(40)))
+        self.tree.temp("cpu", 68)                                    # 12 under: heavy, at once
+        self.go(f, self.clock.t + 1)
+        self.assertTrue(self.tree.at(o1fan.pwm_of(60)))
+        stepped = self.clock.t
+        self.assertIn("heavy level: CPU 68 C (limit 80)", f.why)
+        self.assertIn("heavy level 60%: CPU 68 C (limit 80)", self.lines)
+        self.tree.temp("cpu", 61)                                    # under the step-up, not 20 under: heavy
+        self.run_for(f, 60)
+        self.assertTrue(self.tree.at(o1fan.pwm_of(60)))
+        self.tree.temp("cpu", 59)                                    # 21 under, but not 180 s at heavy yet
+        self.run_for(f, stepped + o1work.STEP_MIN_S - 1 - self.clock.t)
+        self.assertTrue(self.tree.at(o1fan.pwm_of(60)))
+        self.run_for(f, 2)
+        self.assertTrue(self.tree.at(o1fan.pwm_of(40)))              # back to quiet, once
+        st = json.load(open(o1fan.status_path()))
+        self.assertEqual((st["work"], st["heavy"], st["levels"], st["stepped"]), (40, 60, "calibration", False))
+
+    def test_the_hold_after_work_keeps_the_level_it_worked_at(self):
+        f = self.up(levels=self.levels())
+        self.busy(f)
+        self.tree.temp("cpu", 70)
+        self.go(f, self.clock.t + 1)
+        self.tree.temp("cpu", 50)
+        self.quiet(f)
+        self.assertEqual((f.phase, f.pct), ("hold100", 60))
+
+    def test_one_level_means_no_steps(self):
+        f = self.up(levels=self.levels(50, 50))
+        self.busy(f)
+        self.tree.temp("cpu", 75)
+        self.run_for(f, 4)
+        self.assertTrue(self.tree.at(o1fan.pwm_of(50)))
+        self.assertFalse(f.stepped)
+
+    def test_an_nvidia_cards_temperature_is_watched(self):
+        self.p["gpu_temp"] = 50.0
+        f = self.up()
+        st = json.load(open(o1fan.status_path()))
+        self.assertIn({"label": "GPU", "c": 50.0, "limit": o1fan.LIMIT_GPU_NV_C}, st["temps"])
+        self.p["gpu_temp"] = 85.0
+        self.assertEqual(self.go(f, self.clock.t + 2)[0], "hot")
+        self.assertIn("GPU 85 C (limit 85)", f.why)
+        self.p["gpu_temp"] = 76.0                                    # 9 under: still hot (10 C hysteresis)
+        self.assertEqual(self.go(f, self.clock.t + 2)[0], "hot")
+        self.p["gpu_temp"] = 74.0
+        self.assertNotEqual(self.go(f, self.clock.t + 2)[0], "hot")
+        self.p["gpu_temp"] = None                                    # no reading: no row, never a reason
+        self.go(f, self.clock.t + 2)
+        st = json.load(open(o1fan.status_path()))
+        self.assertNotIn("GPU", [t["label"] for t in st["temps"]])
+
+    def test_an_nvidia_card_keeps_deep_idle_off_when_warm(self):
+        f = self.fan()
+        self.assertTrue(f.deep_guard([("cpu:hwmon2", "CPU", 40.0, 80), ("gpu-nvidia:0", "GPU", 61.0, 85)]))
+        f.deep_block = False
+        self.assertFalse(f.deep_guard([("cpu:hwmon2", "CPU", 40.0, 80), ("gpu-nvidia:0", "GPU", 40.0, 85)]))
+
+    def test_the_levels_are_read_again_when_their_files_change(self):
+        import o1work
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        cfg, cal = os.path.join(d, "config.json"), os.path.join(d, "cal.json")
+        L = o1work.Levels(cfg, cal)
+        self.assertEqual(L(), {"quiet": 100, "heavy": 100, "source": "default"})
+        with open(cfg, "w") as fh:
+            json.dump({"fan_work_pct": 50}, fh)
+        self.assertEqual(L(), {"quiet": 50, "heavy": 50, "source": "setting"})
+        with open(cal, "w") as fh:
+            json.dump({"v": 1, "at": 1, "quiet_pct": 40, "heavy_pct": 70}, fh)
+        self.assertEqual(L(), {"quiet": 40, "heavy": 70, "source": "calibration"})
+        with open(cfg, "w") as fh:
+            json.dump({"fan_work_pct": 50, "fan_calibration": "off"}, fh)
+        self.assertEqual(L(), {"quiet": 50, "heavy": 50, "source": "setting"})     # the manual override
+        for bad in ({"v": 2, "at": 1, "quiet_pct": 40, "heavy_pct": 70}, {"v": 1, "at": 1, "quiet_pct": 20, "heavy_pct": 70},
+                    {"v": 1, "at": 1, "quiet_pct": 60, "heavy_pct": 50}, {"v": 1, "quiet_pct": 40, "heavy_pct": 70},
+                    {"v": 1, "at": 1, "quiet_pct": True, "heavy_pct": 70}, [1]):
+            with open(cal, "w") as fh:
+                json.dump(bad, fh)
+            self.assertIsNone(o1work.read_calibration(cal), bad)

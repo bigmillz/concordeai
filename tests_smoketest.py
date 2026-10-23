@@ -2966,7 +2966,8 @@ _pn = {}
 for _x in _ast0.parse(_MILLENAI_SRC).body:
     if isinstance(_x, _ast0.Assign) and any(getattr(_tg, "id", "") in (
             "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "FALLBACK_PORTS",
-            "WINDOWS_ONLY", "OLLAMA_BYTES", "OLLAMA_REQUIRES", "MOE_ROWS")
+            "WINDOWS_ONLY", "OLLAMA_BYTES", "OLLAMA_REQUIRES", "MOE_ROWS",
+            "MLX_REQUIRES")
             for _tg in _x.targets):
         exec(_ast0.get_source_segment(_MILLENAI_SRC, _x), _pn)
 _eng = ({i["port"] for i in _pn["MODEL_INFO"].values() if i["port"]}
@@ -3011,6 +3012,7 @@ for _k, (_arm, _win) in _PLAT.items():
     _pz = dict(MODEL_INFO=_copy.deepcopy(_pn["MODEL_INFO"]),
                WINDOWS_ONLY=_pn["WINDOWS_ONLY"],
                OLLAMA_BYTES=_pn["OLLAMA_BYTES"], IS_ARM=_arm, IS_WIN=_win,
+               MLX_REQUIRES=_pn["MLX_REQUIRES"], MLX_LM_VERSION=None,
                gpu_room_bytes=lambda: 0, giant_fits_here=lambda l: True)
     exec(_MILLENAI_SRC[_MILLENAI_SRC.index("# a model is usable here"):
                        _MILLENAI_SRC.index("MLX_REPOS = {l: i")], _pz)
@@ -6070,7 +6072,8 @@ _S5_NAMES = {"GIANT_GB", "model_is_giant", "giant_fits_here", "machine_budget_by
              "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_set_key",
              "_set_tag_bytes", "model_sets", "_family_of", "model_set_chosen", "model_sets_status",
              "offer_set_labels", "first_set_labels", "FIRST_RUN_SET", "_srv_fits", "_srv_tag_key",
-             "local_set_news", "set_news", "_set_had_get", "_set_had_put"}
+             "local_set_news", "set_news", "_set_had_get", "_set_had_put",
+             "SRV_RAM_ROWS", "SRV_RAM_EXTRA_B"}
 
 
 class _S5VM:
@@ -6088,12 +6091,14 @@ def _s5_exec(src, ns, names):
             exec(_ast.get_source_segment(src, n), ns)
 
 
-def _s5_mac(src, gib, nl=False, gi=False, disk=(), prefs=None):
+def _s5_mac(src, gib, nl=False, gi=False, disk=(), prefs=None, mlxv=None):
     """A simulated Apple-silicon Mac of gib GB on src's own code: the
     catalog, its routes and sizes, the budget, the tiers and the sets."""
     ns = dict(_LH)
     exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
-    ns.update(IS_ARM=True, IS_WIN=False, IS_MAC=True)
+    # MLX_LM_VERSION as an mlx-lm that loads every row (6b494), whatever
+    # this Mac's venv holds: the sets mustn't depend on it
+    ns.update(IS_ARM=True, IS_WIN=False, IS_MAC=True, MLX_LM_VERSION=mlxv)
     exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
     ns["MODEL_MEM_BYTES"] = {l: i["mem"] for l, i in ns["MODEL_INFO"].items()}
     total = gib * (1 << 30)
@@ -6119,8 +6124,9 @@ def _s5_pc(src, key):
     return z
 
 
+# the code ladder's first is a coder since 6b494: Devstral Small 2
 _S5_REC48 = ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B", "Qwen 3.8 27B",
-             "Qwen 3.6 35B MoE", "Qwen 3.5 Vision 9B"]
+             "Qwen 3.6 35B MoE", "Devstral Small 2 24B", "Qwen 3.5 Vision 9B"]
 
 
 def _s5_rules(src):
@@ -6134,7 +6140,9 @@ def _s5_rules(src):
     gi512 = _s5_mac(src, 512, nl=True, gi=True)["model_sets"]()
     pc = _s5_pc(src, "xtx+64")["model_sets"]()
     out["48 GB Mac"] = (m[48]["light"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"]
-                        and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 13
+                        and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 15
+                        # both coders fit 48 GB; Qwen 3 Coder joins in Everything
+                        and m[48]["everything"][-1] == "Qwen 3 Coder 30B MoE"
                         and "GPT-OSS 120B" not in m[48]["everything"] and m[48]["over"] == [])
     out["No limits: Everything only"] = (nl48["light"] == m[48]["light"]
                                          and nl48["recommended"] == m[48]["recommended"]
@@ -6147,7 +6155,7 @@ def _s5_rules(src):
                                                  "DeepSeek R1 8B", "Qwen 3.5 Vision 9B"]
                         and len(m[16]["everything"]) == 9)
     out["128 GB Mac"] = (m[128]["recommended"][3] == "GPT-OSS 120B" and "Gemma 4 26B" in m[128]["recommended"]
-                         and len(m[128]["everything"]) == 14)
+                         and len(m[128]["everything"]) == 16)
     out["giants: only Everything, only with both boxes"] = (
         {"GLM 5.3", "DeepSeek V3.2 671B"} <= set(gi512["everything"])
         and not {"GLM 5.3", "DeepSeek V3.2 671B"} & set(gi512["recommended"])
@@ -6172,7 +6180,11 @@ def _s5_rules(src):
     out["a giant a ladder names stays out"] = "DeepSeek V3.2 671B" not in g["model_sets"]()["recommended"]
     c1 = _s5_mac(src, 48)
     c1["TIERS"] = dict(c1["TIERS"], Thinking=dict(c1["TIERS"]["Thinking"], count=1))
-    out["the code ladder's model"] = "Qwen 3.8 27B" in c1["model_sets"]()["recommended"]
+    out["the code ladder's model"] = "Devstral Small 2 24B" in c1["model_sets"]()["recommended"]
+    # a 16 GB Mac holds neither coder: the ladder falls to a general model
+    # already in, so Recommended doesn't grow there (6b494)
+    out["no coder that doesn't fit"] = not {"Devstral Small 2 24B", "Qwen 3 Coder 30B MoE"} & set(
+        m[16]["everything"])
     d1 = _s5_mac(src, 16)
     d1["MODEL_ROUTES"] = dict(d1["MODEL_ROUTES"], **{"Qwen 3.5 9B": d1["MODEL_ROUTES"]["Qwen 3.5 Vision 9B"]})
     r1 = d1["model_sets"]()["recommended"]
@@ -6208,8 +6220,9 @@ def _s5_status(src):
     s = b["model_sets_status"](set())
     out["48 GB, Light here"] = (s["light"]["state"] == "yours" and s["recommended"]["state"] == "download"
                                 and s["recommended"]["missing"] == ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+                                                                    "Devstral Small 2 24B",
                                                                     "Qwen 3.5 Vision 9B"]
-                                and s["recommended"]["dl_gb"] == round(16.1 + 18.5 + 6.6, 1)
+                                and s["recommended"]["dl_gb"] == round(16.1 + 18.5 + 15.1 + 6.6, 1)
                                 and s["every"] is False and s["mine"] == "light")
     c = _s5_mac(src, 48, disk=set(_S5_REC48), prefs={"model_set": "pro"})
     s = c["model_sets_status"](set())
@@ -31970,7 +31983,7 @@ def _s7_ns(src):
     _s5_exec(src, ns, {"GIANT_GB", "model_is_giant", "TIERS", "MODEL_SETS", "MODEL_SET_NAMES",
                        "MODEL_SET_ALIASES", "QUICK_PAIR", "EVERYDAY_MAX_GB", "MERGE_PREFS",
                        "CODE_LADDER", "VISION_MODEL", "model_set_key", "_set_tag_bytes",
-                       "model_sets", "_family_of"})
+                       "model_sets", "_family_of", "SRV_RAM_ROWS", "SRV_RAM_EXTRA_B"})
     exec(_sv_sect(src, "server model sets"), ns)
     return ns, ctx, d
 
@@ -34000,7 +34013,7 @@ def _cm_ns(src, providers, **stubs):
           "srv_rank": lambda c, r, e, s: sorted(c, key=lambda m: -(m.get("params") or 0))}
     exec(src[p0:src.index("_dead_loaded = ", p0)], ns)
     t0 = src.index("def _srv_tag_key(tag: str) -> str:")
-    exec(src[t0:src.index("def server_mode_candidates(ctx)", t0)], ns)
+    exec(src[t0:src.index("def server_mode_candidates(ctx", t0)], ns)
     exec(src[a:a_end], ns)
     exec(src[b:b_end], ns)
     ns["_cloud_repair"] = lambda: None
@@ -35279,7 +35292,7 @@ def _u45_ns(src):
     ns = dict(_LH, APP_VERSION="9.9", hashlib=_h34, urllib=urllib, threading=_t34)
     exec(re.search(r"^MODEL_SETS = .*$", src, re.M).group(0), ns)
     exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
-    ns.update(IS_ARM=True, IS_WIN=False)
+    ns.update(IS_ARM=True, IS_WIN=False, MLX_LM_VERSION=None)
     exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
     ns["MLX_REPOS"] = {l: i["mlx"] for l, i in ns["MODEL_INFO"].items() if i.get("mlx")}
     exec(_sv_sect(src, "model freshness"), ns)
@@ -35895,6 +35908,490 @@ with tempfile.TemporaryDirectory() as _cd:
 check("unread survives the chat store's save and load, clears, and a non-boolean is refused (6b471)",
       _ur1 == [{"err": "bad unread"}, {"err": "bad unread"}, {"ok": True}] and _ul[_ua].get("unread") is True
       and _ur2 == [{"ok": True}] and not _ul2[_ua].get("unread"), str(_ur1) + str(_ur2))
+
+# --- 6b493: the setup lock is re-entrant: a download froze the whole model setup ---
+_ns493 = {"threading": __import__("threading")}
+exec("_setup_jobs = {}\n_setup_lock = threading.RLock()", _ns493)
+for _n in _ctree.body:
+    if getattr(_n, "name", None) == "_refresh_keep":
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _ns493)
+_out493 = []
+def _t493():
+    with _ns493["_setup_lock"]:
+        _ns493["_setup_jobs"]["m"] = {"refresh": 1, "want_b": 2}
+        _out493.append(_ns493["_refresh_keep"]("m"))
+_th493 = __import__("threading").Thread(target=_t493, daemon=True)
+_th493.start()
+_th493.join(3)
+check("setup lock: re-entrant, so _refresh_keep under it (a download's own call) doesn't freeze model setup (6b493)",
+      "_setup_lock = threading.RLock()" in _MILLENAI_SRC and "_setup_lock = threading.Lock()" not in _MILLENAI_SRC
+      and not _th493.is_alive() and _out493 == [{"refresh": 1, "want_b": 2}], str(_out493))
+# ==== 6b494 coders and Gemma 4 12B: begin ====
+print("== coding models for the presets; Gemma 4 12B on an older mlx-lm (6b494) ==")
+# Per Patrick: Devstral Small 2 24B and Qwen 3 Coder 30B join the catalog, the
+# Code lane prefers them where they fit, Everything holds them where they fit,
+# and Gemma 4 12B (a gemma4_unified build mlx-lm reads from 0.32.0) runs on
+# Ollama on a Mac whose mlx-lm is older. Run on simulated Macs and cards with
+# the real catalog and set code; each rule then broken and shown caught.
+_C94 = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE")
+
+
+def _c94_rows(src):
+    """The two rows as verified on 2026-10-21, their ports free, their
+    Ollama sizes and minimums, the MoE row, the ladders and the page's line."""
+    ns = {}
+    for x in _ast0.parse(src).body:
+        if isinstance(x, _ast0.Assign) and any(getattr(t, "id", "") in (
+                "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "OLLAMA_BYTES", "OLLAMA_REQUIRES",
+                "MOE_ROWS", "MLX_REQUIRES", "CODE_LADDER", "FALLBACK_PORTS") for t in x.targets):
+            exec(_ast0.get_source_segment(src, x), ns)
+    mi = ns["MODEL_INFO"]
+    d, q = mi.get(_C94[0]) or {}, mi.get(_C94[1]) or {}
+    ports = [i["port"] for i in mi.values() if i["port"]] + [r[2] for r in ns["RETIRED_MODELS"].values() if r[2]]
+    ag = {}
+    _s5_exec(src, ag, {"TASK_GUIDE", "AGENTS"})
+    out = {
+        "Devstral's row": (d.get("mlx"), d.get("ollama"), d.get("port"), d.get("gb"), d.get("group"))
+        == ("mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit", "devstral-small-2:24b", 8948, 15.1, "code"),
+        "Qwen 3 Coder's row": (q.get("mlx"), q.get("ollama"), q.get("port"), q.get("gb"), q.get("group"))
+        == ("mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit", "qwen3-coder:30b", 8950, 17.2, "code"),
+        "every engine port its own, even, none in the fallback band": (
+            len(ports) == len(set(ports)) and all(p % 2 == 0 for p in ports)
+            and not set(ports) & set(ns["FALLBACK_PORTS"])),
+        "Ollama's sizes and minimums": (ns["OLLAMA_BYTES"].get("devstral-small-2:24b") == 15_177_374_099
+                                        and ns["OLLAMA_BYTES"].get("qwen3-coder:30b") == 18_556_700_761
+                                        and ns["OLLAMA_REQUIRES"].get("devstral-small-2:24b") == (0, 13, 3)
+                                        and ns["OLLAMA_REQUIRES"].get("qwen3-coder:30b") == (0, 13, 5)),
+        "the 30B is a mixture of experts": _C94[1] in ns["MOE_ROWS"] and _C94[0] not in ns["MOE_ROWS"],
+        "the coders lead the code ladder and the Code lane's agents": (
+            ns["CODE_LADDER"][:2] == _C94
+            and all(ag["AGENTS"][a]["picks"][:2] == list(_C94) for a in ("Coding", "Workspace", "Remote"))),
+        "the page describes both": all('  "%s":"' % l in src for l in _C94),
+        "Gemma 4 12B needs mlx-lm 0.32.0 for MLX": ns["MLX_REQUIRES"] == {"Gemma 4 12B": (0, 32, 0)}}
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c94_gemma(src):
+    """mlx-lm 0.31.3: Gemma 4 12B on Ollama (still offered, Ollama's size), the
+    others on MLX; 0.32.0 and newer, or no mlx-lm found: MLX as before; an
+    MLX-only row an older mlx-lm can't load isn't offered; the version is read
+    from the package record, never by importing mlx_lm."""
+    out = {}
+    old, new, unk = (_s5_mac(src, 48, mlxv=v) for v in ((0, 31, 3), (0, 32, 0), None))
+    out["0.31.3: Ollama"] = (old["MODEL_ROUTES"]["Gemma 4 12B"] == ("ollama", "gemma4:12b")
+                             and old["SUPPORTED"]["Gemma 4 12B"] is True
+                             and old["MODEL_INFO"]["Gemma 4 12B"]["gb"] == 8.0
+                             and old["MODEL_ROUTES"]["Gemma 4 26B"] == ("mlx", 8910)
+                             and old["MODEL_ROUTES"][_C94[0]] == ("mlx", 8948)
+                             and old["model_sets"]()["light"][2] == "Gemma 4 12B")
+    out["0.32.0, unknown: MLX"] = all(m["MODEL_ROUTES"]["Gemma 4 12B"] == ("mlx", 8908) for m in (new, unk))
+    ns = dict(_LH)
+    exec(src[src.index("CATALOG = ["):src.index("GROUP_TITLES = {")], ns)
+    ns.update(IS_ARM=True, IS_WIN=False, MLX_LM_VERSION=(0, 31, 3),
+              MLX_REQUIRES={"Hermes 4 14B": (0, 99, 0)})
+    exec(src[src.index("MODEL_INFO = {c[0]"):src.index("MLX_REPOS = {l: i")], ns)
+    out["an MLX-only row it can't load: not offered"] = (ns["SUPPORTED"]["Hermes 4 14B"] is False
+                                                         and "Hermes 4 14B" not in ns["MODEL_ROUTES"])
+    body = src[src.index("def _mlx_lm_version():"):src.index("MLX_LM_VERSION = _mlx_lm_version()")]
+    out["read, not imported"] = ('_im.version("mlx-lm")' in body and "import mlx_lm" not in body
+                                 and "\nMLX_LM_VERSION = _mlx_lm_version()\n" in src)
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c94_sets(src):
+    """Where the coders fit: a 48 GB Mac's Recommended gains Devstral (the code
+    ladder's first) and Everything both; a 16 GB Mac neither. A card holds a
+    coder only whole: a 16 GB card (the RTX 5070 Ti's 16303 MiB too) neither,
+    a 24 GB card both, Devstral in Recommended."""
+    out = {}
+    m48, m16 = _s5_mac(src, 48)["model_sets"](), _s5_mac(src, 16)["model_sets"]()
+    out["48 GB Mac"] = (_C94[0] in m48["recommended"] and _C94[1] not in m48["recommended"]
+                        and set(_C94) <= set(m48["everything"]))
+    out["16 GB Mac"] = not set(_C94) & set(m16["everything"])
+    # a card's sets need only the catalog and _srv_fits (as _s7_tags reads them)
+    ns = _s5_mac(src, 64)
+    t = {v: _s7_tags(ns, v) for v in (16 * _GI7, 16303 << 20, 24 * _GI7)}
+    co = {"devstral-small-2:24b", "qwen3-coder:30b"}
+    out["16 GB cards: neither"] = all(not co & set(t[v]["everything"]) for v in (16 * _GI7, 16303 << 20))
+    out["24 GB card: both, Devstral in Recommended"] = (co <= set(t[24 * _GI7]["everything"])
+                                                        and "devstral-small-2:24b" in t[24 * _GI7]["recommended"]
+                                                        and "qwen3-coder:30b" not in t[24 * _GI7]["recommended"])
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+_C94_CHECKS = [("the coders' rows: verified repos and tags, their own ports, Ollama's sizes and minimums, "
+                "first in the code ladder and the Code lane's agents", _c94_rows),
+               ("Gemma 4 12B runs on Ollama under an mlx-lm older than 0.32.0, on MLX otherwise; "
+                "an MLX-only row it can't load isn't offered", _c94_gemma),
+               ("the coders in the sets only where they fit: Macs by memory, cards whole", _c94_sets)]
+
+
+def _c94_run(src, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_C94_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _i94, _n94, _o94, _d94 in _c94_run(_MILLENAI_SRC):
+    check(_n94, _o94, "%r" % (_d94,))
+_C94_MUT = [
+    ("the route ignores the mlx-lm", '    if _i["mlx"] and IS_ARM and _i["port"] and _mlx_runs(_l):',
+     '    if _i["mlx"] and IS_ARM and _i["port"]:', [1]),
+    ("offered whatever the mlx-lm", '(i["mlx"] and IS_ARM and _mlx_runs(l))', '(i["mlx"] and IS_ARM)', [1]),
+    ("an unknown mlx-lm counts as old", "    return not need or MLX_LM_VERSION is None or",
+     "    return not need or", [1]),
+    ("the coders not first", 'CODE_LADDER = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",\n               ',
+     'CODE_LADDER = (', [0, 2]),
+    ("a coder seated on a card it spills from", "        return size * 1.05 + (5 << 28) <= vram",
+     "        return size <= vram * 1.2", [2]),
+]
+_c94_caught = []
+for _mn, _ma, _mb, _mw in _C94_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c94_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _c94_run(_ms, _mw)):
+        _c94_caught.append((_mn, "not caught"))
+check("6b494's rules each break a check when broken (%d mutants)" % len(_C94_MUT), not _c94_caught,
+      "%r" % _c94_caught)
+# ==== 6b494 coders and Gemma 4 12B: end ====
+
+# ==== 6b496 coders partly in a server's memory: begin ====
+print("== a server's coders partly in its memory (6b496) ==")
+# Per Patrick: the two coders on a 16 GB card (the RTX 5070 Ti, 64 GB of RAM)
+# as `ram` models, slower; nothing else loosens the card-only rule. The sets
+# for a card and the kit's ram_bytes, the sheet and the apply's `ram` list
+# through the real servers section on the stand-in transport, the Code lane's
+# candidates; each rule then broken and shown caught.
+_TI96 = 16303 << 20                      # the RTX 5070 Ti, as nvidia-smi reports it
+
+
+def _c96_sets(src):
+    """Everything holds both coders partly in memory, flagged; Light and
+    Recommended stay on the card; no other model spills; an old kit (no
+    ram_bytes) or too little memory: no coder; a card they fit whole: no flag."""
+    ns = _s5_mac(src, 64)
+    s = ns["model_sets"]({"vram": _TI96, "ram": 52 << 30})
+    s0 = ns["model_sets"]({"vram": _TI96})
+    s24 = ns["model_sets"]({"vram": _TI96, "ram": 24 << 30})
+    big = ns["model_sets"]({"vram": 24 * _GI7, "ram": 52 << 30})
+    out = {"Everything: both, flagged": set(_C94) <= set(s["everything"]) and s["ram"] == list(_C94),
+           "Light and Recommended on the card": not set(_C94) & set(s["light"] + s["recommended"]),
+           "no other model spills": (s["everything"][:-2] == s0["everything"]
+                                     and not {"Gemma 4 26B", "Qwen 3.8 27B", "Qwen 3.6 35B MoE"} & set(s["everything"])),
+           "an old kit: none": s0["ram"] == [] and not set(_C94) & set(s0["everything"]),
+           "too little memory: only what fits": s24["ram"] == [_C94[0]],
+           "a card they fit whole: no flag": big["ram"] == [] and set(_C94) <= set(big["everything"]),
+           "a Mac's sets: never": ns["model_sets"]()["ram"] == []}
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+_S96_STATE = dict(_S7_STATE, models=[{"name": "llama3.2:1b", "size": 1321098329, "loaded": False}],
+                  vram_bytes=_TI96, ram_bytes=52 << 30, plan=None, jobs=[])
+
+
+def _c96_apply(src):
+    """The sheet marks the coders "card + memory"; the apply sends `ram` for
+    exactly those of its downloads, from this app's own read; a kit without
+    ram_bytes gets no coder and no `ram` key."""
+    ns, ctx, d = _s7_ns(src)
+    _sv_paired(ns, ctx)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+
+    def sheet(state):
+        _sv_fake(ns, [_SvResp(200, state)])
+        return ns["server_models_get"](ctx, sid)
+    v = sheet(_S96_STATE)
+    ev = v["sets"]["everything"]
+    co = ["devstral-small-2:24b", "qwen3-coder:30b"]
+    out = {"the sheet": (ev["ram"] == co and [x["name"] for x in ev["download"] if x.get("ram")] == co
+                         and not any(x.get("ram") for x in v["sets"]["recommended"]["download"]))}
+    add = [x["name"] for x in ev["download"]]
+    sent = _sv_fake(ns, [_SvResp(202, {"ok": True, "jobs": []})])
+    r = ns["server_models_apply"](ctx, sid, {"id": sid, "plan": "everything", "add": add, "remove": [],
+                                             "seen": v["seen"]})
+    body = json.loads(sent[0]["body"]) if sent else {}
+    out["sent with ram"] = r.get("ok") is True and body.get("ram") == co and body.get("add") == add
+    v = sheet(_S96_STATE)
+    sent = _sv_fake(ns, [_SvResp(202, {"ok": True, "jobs": []})])
+    ns["server_models_apply"](ctx, sid, {"id": sid, "plan": "recommended",
+                                         "add": [x["name"] for x in v["sets"]["recommended"]["download"]],
+                                         "remove": [], "seen": v["seen"]})
+    out["no coder, no key"] = bool(sent) and "ram" not in json.loads(sent[0]["body"])
+    old = {k: x for k, x in _S96_STATE.items() if k != "ram_bytes"}
+    v = sheet(old)
+    out["an old kit"] = (v["sets"]["everything"]["ram"] == []
+                         and not set(co) & {x["name"] for x in v["sets"]["everything"]["download"]})
+    return all(out.values()), {k: x for k, x in out.items() if not x}
+
+
+def _c96_seat(src):
+    """The Code lane alone may seat a catalog coder the server holds partly in
+    memory; the modes never; a gpu+ram model that isn't one of them never."""
+    ns = {"re": re}
+    _s5_exec(src, ns, {"SRV_RAM_ROWS", "_srv_ram_coder", "_srv_tag_key", "_srv_flags", "_SRV_FAMILY",
+                       "_SRV_WORD", "_SRV_STEM"})
+    ns.update(MODEL_INFO={"Devstral Small 2 24B": {"ollama": "devstral-small-2:24b"},
+                          "Qwen 3 Coder 30B MoE": {"ollama": "qwen3-coder:30b"}})
+    f = ns["_srv_ram_coder"]
+    body = src[src.index("def server_mode_candidates("):src.index("def server_funnel_pick(")]
+    sk = src[src.index("def server_side_pick("):src.index("def server_side_text(")]
+    ra = src[src.index("def resolve_agent_seat("):src.index("# THE THREE SETS (6b405")]
+    out = {"the coders, partly in memory": (f({"name": "qwen3-coder:30b", "placement": "gpu+ram"})
+                                            and f({"name": "devstral-small-2:24b", "placement": "gpu+ram"})),
+           "nothing else": not any(f(m) for m in (
+               {"name": "qwen3-coder:30b", "placement": "gpu"}, {"name": "gemma4:26b", "placement": "gpu+ram"},
+               {"name": "qwen2.5-coder:32b", "placement": "gpu+ram"}, {"name": "qwen3-coder:30b"})),
+           "asked for, never by default": ("def server_mode_candidates(ctx, coders_in_ram: bool = False)" in body
+                                           and "            elif coders_in_ram and _srv_ram_coder(m):" in body),
+           "the Code lane asks": ('cands = server_mode_candidates(ctx, coders_in_ram=role == "code")' in sk
+                                  and "server_mode_candidates(ctx, coders_in_ram=role == \"code\")" in ra
+                                  and src.count("coders_in_ram=") == 2)}
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c96_page(src):
+    """The sheet's row says "card + memory, slower" for such a download."""
+    js = ("function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}"
+          'function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";}'
+          + _jsfn(src, "function srvSheetHtml(")
+          + r'''process.stdout.write(JSON.stringify({h:srvSheetHtml({dl:[{name:"qwen3-coder:30b",gb:18.6,ram:true},
+  {name:"llama3.2:1b",gb:1.3}],rm:[],keep:0,empty:false})}));''')
+    o = _node_json(js, "s96.js")
+    h = o.get("h", "")
+    return ("qwen3-coder:30b · card + memory, slower</span>" in h
+            and "llama3.2:1b</span>" in h), o
+
+
+_C96_CHECKS = [("a 16 GB card's Everything holds the coders partly in memory, nothing else spills", _c96_sets),
+               ("the sheet marks them and the apply sends `ram` for exactly those; an old kit gets none",
+                _c96_apply),
+               ("only the Code lane seats a coder partly in a server's memory", _c96_seat),
+               ("the sheet's row says card + memory", _c96_page)]
+
+
+def _c96_run(src, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_C96_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _i96, _n96, _o96, _d96 in _c96_run(_MILLENAI_SRC):
+    check(_n96, _o96, "%r" % (_d96,))
+_C96_MUT = [
+    ("any model may spill", "            return (l in SRV_RAM_ROWS and bool(tag)", "            return (bool(tag)", [0]),
+    ("Recommended takes a spilled coder", "            return whole(l) and not model_is_giant(l)",
+     "            return card(l) and not model_is_giant(l)", [0]),
+    ("no memory check", "                    and _set_tag_bytes(tag) * 1.05 + SRV_RAM_EXTRA_B <= ram)",
+     "                    )", [0]),
+    ("the apply forgets ram", "    if ram:\n        body[\"ram\"] = ram\n", "", [1]),
+    ("the modes seat a spilled coder", "def server_mode_candidates(ctx, coders_in_ram: bool = False)",
+     "def server_mode_candidates(ctx, coders_in_ram: bool = True)", [2]),
+    ("any gpu+ram coder", "    return (m.get(\"placement\") == \"gpu+ram\" and _srv_tag_key(m.get(\"name\")) in tags",
+     "    return (m.get(\"placement\") == \"gpu+ram\"", [2]),
+]
+_c96_caught = []
+for _mn, _ma, _mb, _mw in _C96_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c96_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _c96_run(_ms, _mw)):
+        _c96_caught.append((_mn, "not caught"))
+check("6b496's rules each break a check when broken (%d mutants)" % len(_C96_MUT), not _c96_caught,
+      "%r" % _c96_caught)
+# ==== 6b496 coders partly in a server's memory: end ====
+
+# ==== 6b497 the MLX engine follows the app: begin ====
+print("== the MLX engine follows the app: mlx-lm 0.32.2 (6b497) ==")
+# Per Patrick: the next app update brings the venv's mlx-lm 0.31.3 up to
+# 0.32.2 (with its mlx), so Gemma 4 12B goes back to MLX. What mlx-lm 0.32.2
+# loads, as its own wheel has it (mlx_lm/models/*.py and utils.MODEL_REMAPPING,
+# read 2026-10-21 from mlx_lm-0.32.2-py3-none-any.whl): bump this with
+# MLX_LM_PIN, never one without the other.
+_MLX0322 = {"version": (0, 32, 2), "modules": set("""
+Klear afm7 afmoe apertus baichuan_m1 bailing_hybrid bailing_moe bailing_moe_linear bailing_moe_v3
+bitnet cohere cohere2 dbrx deepseek deepseek_v2 deepseek_v3 deepseek_v32 deepseek_v41 dots1 ernie4_5
+ernie4_5_moe exaone exaone4 exaone_moe falcon_h1 gear gemma gemma2 gemma3 gemma3_text gemma3n gemma4
+gemma4_text glm glm4 glm4_moe glm4_moe_lite glm_moe_dsa gpt2 gpt_bigcode gpt_neox gpt_oss gptj granite
+granitemoe granitemoehybrid helium hunyuan hunyuan_v1_dense internlm2 internlm3 iquestloopcoder jamba
+kimi_k25 kimi_k3 kimi_linear kimi_vl laguna lfm2-vl lfm2 lfm2_moe lille-130m llama llama4 llama4_text
+longcat_flash longcat_flash_ngram mamba mamba2 mellum mimo mimo_v2_flash minicpm minicpm3 minimax
+minimax_m3_vl ministral3 mistral3 mistral4 mixtral muse_glimmer muse_spark nanbeige nanochat
+nemotron-nas nemotron nemotron_h olmo olmo2 olmo3 olmo_hybrid olmoe openelm phi phi3 phi3small phimoe
+phixtral pixtral plamo plamo2 plamo3 prism_hadamard_qwen35 qwen qwen2 qwen2_moe qwen2_vl qwen3 qwen3_5
+qwen3_5_moe qwen3_moe qwen3_next qwen3_vl qwen3_vl_moe recurrent_gemma rwkv7 seed_oss smollm3
+solar_open spark2_5 stablelm starcoder2 step3p5 talkie telechat3 youtu_llm""".split()),
+            "remap": {"mistral": "llama", "llava": "mistral3", "phi-msft": "phixtral", "falcon_mamba": "mamba",
+                      "joyai_llm_flash": "deepseek_v3", "kimi_k2": "deepseek_v3", "qwen2_5_vl": "qwen2_vl",
+                      "minimax_m2": "minimax", "iquestcoder": "llama", "xverse": "llama",
+                      "gemma4_unified": "gemma4", "deepseek_v41_text": "deepseek_v41"}}
+
+
+def _c97_pin(src):
+    """The pin is the version above; every catalog MLX row's model_type loads
+    on it; no row needs a newer mlx-lm; exactly the three wheels, each by its
+    hashes, nothing unpinned; and on the pin Gemma 4 12B runs on MLX again."""
+    ns = {}
+    for x in _ast0.parse(src).body:
+        if isinstance(x, _ast0.Assign) and any(getattr(t, "id", "") in (
+                "CATALOG", "MODEL_INFO", "MLX_REQUIRES", "MLX_MODEL_TYPES", "MLX_LM_PIN", "MLX_ENGINE_REQS",
+                "MLX_ENGINE_NEEDS") for t in x.targets):
+            exec(_ast0.get_source_segment(src, x), ns)
+    mlx_rows = {l for l, i in ns["MODEL_INFO"].items() if i["mlx"]}
+    types = ns["MLX_MODEL_TYPES"]
+
+    def loads(t):
+        return _MLX0322["remap"].get(t, t) in _MLX0322["modules"]
+    reqs = [ln.strip() for ln in ns["MLX_ENGINE_REQS"].replace("\\\n", " ").splitlines() if ln.strip()]
+    pins = {r.split()[0]: r.count("--hash=sha256:") for r in reqs}
+    out = {"the pin is the version checked": tuple(ns["MLX_LM_PIN"]) == _MLX0322["version"],
+           "a type for every MLX row": set(types) == mlx_rows,
+           "every row loads on the pin": all(loads(t) for t in types.values()),
+           "no row needs more than the pin": all(tuple(v) <= tuple(ns["MLX_LM_PIN"])
+                                                 for v in ns["MLX_REQUIRES"].values()),
+           "the three wheels, by hash": pins == {"mlx-lm==0.32.2": 1, "mlx==0.32.2": 12, "mlx-metal==0.32.2": 3}
+           and all(len(h) == 64 for h in re.findall(r"--hash=sha256:([0-9a-f]+)", ns["MLX_ENGINE_REQS"])),
+           "what 0.32.2 needs": ns["MLX_ENGINE_NEEDS"] == {"python": (3, 11), "transformers": (5, 7, 0)},
+           "0.31.3 couldn't (the reason for all this)": types.get("Gemma 4 12B") == "gemma4_unified"}
+    m = _s5_mac(src, 48, mlxv=tuple(ns["MLX_LM_PIN"]))
+    out["on the pin: Gemma 4 12B on MLX"] = m["MODEL_ROUTES"]["Gemma 4 12B"] == ("mlx", 8908)
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c97_ns(src, have, after, blocker="", py=(3, 14), tf=(5, 14, 1)):
+    """_ensure_mlx_engine on src's own code: an Apple-silicon Mac whose venv
+    holds `have`, `after` once pip has run; pip stands in, recording."""
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    st = {"calls": [], "lock_held": [], "v": have}
+    lock = _LH["threading"].Lock()
+    ns = dict(_LH, IS_MAC=True, IS_ARM=True, APP_BUILD=999, math=__import__("math"), _engine_lock=lock,
+              _crypto_install={"state": "done"}, _crypto_install_blocker=lambda: blocker,
+              app_dir=lambda: d, _replace_into=os.replace)
+    _s5_exec(src, ns, {"MLX_LM_PIN", "MLX_ENGINE_REQS", "MLX_ENGINE_NEEDS", "MLX_ENGINE_RECORD", "_mlx_engine",
+                       "_mlx_engine_why_not", "_mlx_engine_record", "_ensure_mlx_engine", "_mlx_engine_pip",
+                       "_crypto_key",
+                       "_crypto_should_try", "CRYPTO_RETRY_S", "_pip_why"})
+    ns["_dist_version"] = lambda name: st["v"] if name == "mlx-lm" else tf
+    ns["sys"] = _types.SimpleNamespace(version="3.14.0 (x)", version_info=py, executable="py")
+
+    def pip(args, reqs):
+        st["calls"].append(args[0])
+        st.setdefault("args", []).append(list(args))
+        st["lock_held"].append(lock.locked())
+        if args[0] == "install":
+            st["v"] = after
+        return (after is not None, "" if after is not None else "couldn't reach PyPI")
+    st["pip"] = pip
+    return ns, st
+
+
+def _c97_run_once(src):
+    """Downloaded, then installed from that folder with no engine starting;
+    recorded; a failure waits 3 days; the reasons it doesn't try say so."""
+    out = {}
+    ns, st = _c97_ns(src, (0, 31, 3), (0, 32, 2))
+    ns["_ensure_mlx_engine"](pip=st["pip"])
+    rec = ns["_mlx_engine_record"]()
+    dl, ins = (st.get("args") or [[], []])[:2]
+    out["upgraded"] = (st["calls"] == ["download", "install"] and st["lock_held"] == [False, True]
+                       # installed from the folder it downloaded to, never the network
+                       and dl[:2] == ["download", "--dest"] and ins == ["install", "--no-index", "--find-links", dl[2]]
+                       and ns["_mlx_engine"]["state"] == "done" and rec["ok"] is True)
+    ns["_ensure_mlx_engine"](pip=st["pip"])
+    out["then up to date"] = st["calls"] == ["download", "install"] and ns["_mlx_engine"]["note"] == "up to date"
+    ns, st = _c97_ns(src, (0, 31, 3), None)
+    ns["_ensure_mlx_engine"](pip=st["pip"])
+    first = list(st["calls"])
+    ns["_ensure_mlx_engine"](pip=st["pip"])
+    out["a failure waits"] = (first == ["download"] and st["calls"] == first
+                              and ns["_mlx_engine"]["state"] == "failed" and "tries again" in ns["_mlx_engine"]["note"])
+    rec = ns["_mlx_engine_record"]()
+    ns["_ensure_mlx_engine"](pip=st["pip"], now=rec["at"] + ns["CRYPTO_RETRY_S"] + 1)
+    out["3 days later it tries again"] = st["calls"] == ["download", "download"]
+    why = {}
+    for k, kw in {"py": dict(py=(3, 10)), "tf": dict(tf=(5, 6, 0)), "none": {},
+                  "blocked": dict(blocker="the venv isn't this copy's own")}.items():
+        n2, s2 = _c97_ns(src, None if k == "none" else (0, 31, 3), (0, 32, 2), **kw)
+        n2["_ensure_mlx_engine"](pip=s2["pip"])
+        why[k] = (s2["calls"], n2["_mlx_engine"]["state"], n2["_mlx_engine"]["note"])
+    out["the reasons not to"] = (all(v[0] == [] and v[1] == "skipped" for v in why.values())
+                                 and "Python 3.11" in why["py"][2] and "transformers 5.7" in why["tf"][2]
+                                 and why["none"][2] == "no MLX engine in this venv"
+                                 and why["blocked"][2] == "the venv isn't this copy's own")
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c97_wiring(src):
+    """Started at boot by the copy holding the instance lock, after PyNaCl's;
+    pip with hashes and no dependency; a dev or test copy never installs."""
+    main = src[src.index("    if _INSTANCE_LOCK:\n        ctx_thread(target=_ensure_crypto_deps"):]
+    body = src[src.index("def _mlx_engine_pip("):src.index("def _ensure_mlx_engine(")]
+    return ("        ctx_thread(target=_ensure_mlx_engine, bind=False, daemon=True).start()\n    start_managed_engines()"
+            in main[:400]
+            and all(a in body for a in ('"--only-binary=:all:", "--require-hashes", "--no-deps"', "sys.executable"))
+            and "    why = _crypto_install_blocker()\n" in src[src.index("def _mlx_engine_why_not("):]), ""
+
+
+_C97_CHECKS = [("the MLX engine's pin loads every catalog MLX row, by hash, and puts Gemma 4 12B back on MLX", _c97_pin),
+               ("the engine update: downloaded, installed with no engine starting, once; why not, in words",
+                _c97_run_once),
+               ("started at boot after PyNaCl's, hash-checked, never by a dev copy", _c97_wiring)]
+
+
+def _c97_run(src, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_C97_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _i97, _n97, _o97, _d97 in _c97_run(_MILLENAI_SRC):
+    check(_n97, _o97, "%r" % (_d97,))
+_C97_MUT = [
+    ("a pin that can't load Gemma 4 12B", "MLX_LM_PIN = (0, 32, 2)", "MLX_LM_PIN = (0, 31, 3)", [0]),
+    ("a row with no type", '    "GPT-OSS 120B": "gpt_oss", ', "    ", [0]),
+    ("a wheel without its hash", "mlx-metal==0.32.2 \\\n    --hash=sha256:3825", "mlx-metal==0.32.2 \\\n    --hash=sha256:", [0]),
+    ("installed while engines may start", "            with _engine_lock:                # no engine starts",
+     "            if True:                # no engine starts", [1]),
+    ("installed straight from the network", '                ok, why = pip(["install", "--no-index", "--find-links", d], MLX_ENGINE_REQS)',
+     '                ok, why = pip(["install"], MLX_ENGINE_REQS)', [1]),
+    ("no Python check", '    if py < MLX_ENGINE_NEEDS["python"]:', "    if False:", [1]),
+    ("a failure retried at once", "    if not go:\n        _mlx_engine.update(state=\"failed\", note=why)\n        return",
+     "    if False:\n        pass", [1]),
+]
+_c97_caught = []
+for _mn, _ma, _mb, _mw in _C97_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c97_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _c97_run(_ms, _mw)):
+        _c97_caught.append((_mn, "not caught"))
+check("6b497's rules each break a check when broken (%d mutants)" % len(_C97_MUT), not _c97_caught,
+      "%r" % _c97_caught)
+# ==== 6b497 the MLX engine follows the app: end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

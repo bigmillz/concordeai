@@ -1337,9 +1337,28 @@ class TestCoolDownFollowsTheFans(FanRig):
         self.assertEqual(self.leds.phase, "idle")
 
 
+class TestRedAtTheCalibratedLevel(FanRig):
+    """6b505: the lights are fully red at the working level the fan service reports ("work"), so a calibrated quiet
+    level of 40% is red, not a third of the way there; the calibration's own phase (tuning) is red too."""
+
+    def test_red_follows_the_work_level_in_the_status(self):
+        self.fanst = {"phase": "working", "pct": 40, "level": 40, "work": 40}
+        self.leds.read_fans(self.clock.t)
+        self.assertEqual(self.leds.red_at, 40)
+        self.assertEqual(self.leds.fan_x(), 1.0)
+        self.fanst = {"phase": "ramp", "pct": 30, "level": 30, "work": 40}
+        self.leds.read_fans(self.clock.t)
+        self.assertAlmostEqual(self.leds.fan_x(), 0.5)
+        for bad in (None, "40", True, 10, 150):
+            self.fanst = {"phase": "working", "pct": 40, "work": bad}
+            self.leds.read_fans(self.clock.t)
+            self.assertEqual(self.leds.red_at, 40, bad)               # a bad figure leaves the last good one
+        self.assertIn("tuning", o1leds.FAN_RED_PHASES)
+
+
 class TestTheCardReadingIsTheSharedOne(unittest.TestCase):
     def test_the_service_reads_the_card_through_the_probes_the_fans_use(self):
-        self.assertEqual(set(o1work.probes()), {"gpu_busy"})
+        self.assertEqual(set(o1work.probes()), {"gpu_busy", "gpu_temp"})   # gpu_temp: the NVIDIA card's heat (6b505), never work
         self.assertIs(o1fan.Gpu, o1work.Gpu)
         with open(os.path.join(U.LIB, "o1leds.py")) as f:
             src = f.read()

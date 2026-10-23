@@ -343,7 +343,8 @@ the server kit".
  "jobs": [{"name": "gpt-oss:20b", "action": "pull", "state": "running", "pct": 41, "error": ""}],
  "plan": {"name": "recommended", "at": 1791100000, "by": "Alice's Mac"},
  "disk_free_bytes": 812345678912,
- "vram_bytes": 17163091968}
+ "vram_bytes": 17163091968,
+ "ram_bytes": 60129542144}
 ```
 
 - `models`: what Ollama has on the server's disk, sorted by name; `size` in
@@ -378,8 +379,13 @@ the server kit".
 - `disk_free_bytes`: free space on the models disk (0 if it can't be read).
   `vram_bytes`: the card's VRAM as in `/v1/info`, else the server's configured
   figure, else 0.
+- `ram_bytes` (6b496): the most a `ram` model may ever use here, by the
+  gateway's own fit rule on an idle machine: total system memory less the
+  OS margin (the larger of 8 GiB and 12%), under Ollama's MemoryHigh, plus
+  the card less its reserve only when weight repacking is off. 0 if memory
+  can't be read. A kit without the key takes no `ram` in an apply.
 
-`POST /v1/models/apply` takes exactly these four keys:
+`POST /v1/models/apply` takes exactly these four keys, and one optional key:
 
 ```json
 {"plan": "recommended", "add": ["gpt-oss:20b"], "remove": ["llama3.2:3b"], "seen": "<hex sha256>"}
@@ -395,6 +401,11 @@ the server kit".
   in UTF-8, where `names` are the `name`s in `models` above (the hash of no
   models is the hash of the empty string). It proves the lists were made from
   what is on the server now; if anything changed, nothing is done.
+- `ram` (optional, 6b496): a non-empty list of models from `add`, each once.
+  Their new allow-list lines get the `ram` flag, so they may load partly into
+  system memory (a model the list already names keeps its line as it is).
+  The app sends it only for the coders it sized for a card too small for them,
+  and only to a kit whose state has `ram_bytes`. Anything else is 400.
 
 | Status | `code` | Meaning |
 |---|---|---|

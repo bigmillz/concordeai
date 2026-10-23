@@ -28,7 +28,9 @@ polkit.addRule(function(action, subject) {
         "ollama1-backup.service",
         "ollama1-models-preview.service",
         "ollama1-models-sync.service",
-        "ollama1-power-apply.service"
+        "ollama1-power-apply.service",
+        "ollama1-fancal.service",
+        "ollama1-fancal-abort.service"
     ];
     if (fixed.indexOf(unit) >= 0) {
         return polkit.Result.YES;

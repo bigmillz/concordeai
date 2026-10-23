@@ -376,10 +376,86 @@ around a little from time to time.
 
    Type them when setup asks.
 
+### The SSH door (optional)
+
+SSH normally works only from your home LAN. The SSH door lets you in from
+anywhere, through the same Cloudflare Tunnel as the panel. It is **off**
+unless you turn it on.
+
+- Two locks: Cloudflare Access first (your admin email, like the panel),
+  then sshd with your key. Passwords stay off; the door won't open while
+  password login is on.
+- No port opens at home. cloudflared already connects out; the door is one
+  more route inside the tunnel, to `ssh://127.0.0.1:22`, with cloudflared's
+  own Access check (`audTag`), like the other two routes.
+- sshd lets `<your-user>` in from `127.0.0.1` as well as the LAN. Only
+  cloudflared (and root) may connect to port 22 from the machine itself
+  (`ollama1-nft`), so `127.0.0.1` means the tunnel.
+- Its name is `<server-name>-ssh.<your-domain>` (`hostname_ssh` in
+  config.json, if you want another one).
+
+**Turn it on, with an API token** (the same token as in "The API token"):
+
+1. In a terminal on the server (SSH from the LAN, or the panel's web
+   terminal), in the kit's folder:
+   `sudo ./bin/ollama1-cf-access --ssh-door --no-prompt`
+   - It asks for the token (not shown), makes the DNS name and an Access
+     application `<server-name> ssh` with your admin policy and
+     Cloudflare's browser SSH, and saves its AUD tag. Your existing
+     service token is kept.
+   - Then delete the token in the dashboard.
+2. Run setup with `--ssh-door`: `sudo ./setup.sh --ssh-door`. It adds the
+   route, the sshd line and the port guard, and restarts the tunnel. The
+   setting is saved, so later runs keep it.
+
+Run with a terminal, setup can also ask for the token itself (it offers it
+when the door has no Access app yet).
+
+**Turn it on, without an API token.** In dash.cloudflare.com:
+
+1. **DNS > Records > Add record**: CNAME, name `<server-name>-ssh`,
+   target `<tunnel id>.cfargotunnel.com` (the `tunnel_id` in config.json),
+   Proxied.
+2. **Zero Trust > Access > Applications > Add an application >
+   Self-hosted.** Name `<server-name> ssh`, hostname
+   `<server-name>-ssh.<your-domain>`, session 24 hours.
+3. **Policy:** the one the admin panel uses (Allow, your email). Save.
+4. Open the app again: **Configure > Browser rendering: SSH**. Save.
+5. Copy its **Application Audience (AUD) Tag**, and run
+   `sudo ./setup.sh --ssh-door --ssh-aud <AUD tag>`. (At a terminal,
+   setup also asks for it.)
+
+**Connect from a Mac.** Install cloudflared once (`brew install
+cloudflared`), then add this to `~/.ssh/config`:
+
+```
+Host <server-name>-door
+  HostName <server-name>-ssh.<your-domain>
+  User <your-user>
+  ProxyCommand /opt/homebrew/bin/cloudflared access ssh --hostname %h
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+`ssh <server-name>-door` then opens a browser for the Access login (a
+one-time code to your email) the first time, and every 24 hours; after
+that it is a normal SSH session with your key. On an Intel Mac,
+cloudflared is in `/usr/local/bin`.
+
+**Browser SSH.** Open `https://<server-name>-ssh.<your-domain>` and log in
+to Access; Cloudflare shows a terminal. It still logs in to sshd, which
+takes keys only. The kit does not set up Cloudflare's short-lived SSH
+certificates, so if the browser terminal can't use your key, use the Mac
+way.
+
+**Turn it off:** `sudo ./setup.sh --no-ssh-door`. The route, the sshd line
+and the port guard go; the DNS name and the Access app stay in Cloudflare
+(they lead nowhere). Delete them in the dashboard if you like.
+
 ## After setup
 
-- **SSH:** only your Mac's key can log in, as `<your-user>`, from the home LAN.
-  Passwords and root login are off.
+- **SSH:** only your Mac's key can log in, as `<your-user>`, from the home LAN
+  (and through the SSH door, if you turned it on). Passwords and root login are off.
   - If you removed the setup key, it is only your key.
   - To add another Mac later, log in with the first one and append its key
     to `~/.ssh/authorized_keys`.
@@ -724,7 +800,9 @@ around a little from time to time.
     temperature and power, CPU busy, temperature and speed, and memory,
     with a crosshair that reads out any moment;
   - **Hardware**: the CPU card below, the fans (the phase: working, hold100, ramp,
-    idle20 or deep idle, the level, each fan's rpm and the pump), the lights
+    idle20 or deep idle, the level, each fan's rpm and the pump; the calibration's
+    levels, **Calibrate fans** with its progress, and **Abort** while it runs: see
+    Fans, Fan calibration), the lights
     (their colour now and why), storage (each disk's use, the RAID mirror
     and its check's progress), the services, the network, and GPU tuning
     (what is applied and the last check; it is changed at the server only);
@@ -1028,7 +1106,8 @@ at a level that follows what the server is doing:
 
 | Phase | Level | When |
 |---|---|---|
-| `working` | 100% | the graphics card is over 50% busy, or the CPU is at 60 C or more |
+| `working` | 100%, or the working level | the graphics card is over 50% busy, or the CPU is at 60 C or more (the level: below) |
+| `tuning` | the level it tests | while the fan calibration runs (6b505, below) |
 | `hold100` | 100% | from the moment that ends, for **30 s** (6b460, per the owner) |
 | `ramp` | 100% down to 20% | then a straight line over **90 s**, written in whole 2% steps |
 | `idle20` | 20% | from 120 s after the work ended, and from the start; the lights stay white (6b449) |
@@ -1090,6 +1169,64 @@ benchmark or a burn test shows up as the card over 50%, which is what makes the
 heat). Status and the admin line say which trigger holds it ("the card is 87%
 busy", "CPU 63 C", or both). Auto sleep keeps its own idle rules.
 
+**The working level** (6b495, 6b505). While working, and in the hold after it, the fans run at the working level,
+and the ramp falls from it. It comes from, in order:
+
+1. **the fan calibration's levels** (below), when `/var/lib/ollama1/fan-calibration.json` holds a good result and
+   `/etc/ollama1/config.json` does not say `"fan_calibration": "off"`. There are two: the **quiet** level, which the
+   fans work at, and the **heavy** level, which they move to at once when any watched temperature comes within
+   **12 C** of its limit, and leave only when every temperature is **20 C** under its limit and the heavy level has
+   held **180 s**. Two steady levels with an 8 C band between them: the fans never follow the temperature up and
+   down. The status line says "heavy level: CPU 68 C (limit 80)" while it applies;
+2. **`fan_work_pct`** in `config.json` (a whole number, 30 to 100), for both: the manual setting, and the override
+   when `"fan_calibration": "off"` is set;
+3. **100%**, the default.
+
+The fan service reads these again when either file changes (no restart); the lights are fully red at the working
+level the fan service reports. The temperature override (100%, below) wins over all of them, always. The Corsair
+cooler's fans follow the working level too (6b505; before, they stayed at 100% while working whatever
+`fan_work_pct` said); its pump is extreme while working, as before.
+
+**Fan calibration** (6b505, per the owner: quiet for the household, steady, from measured temperatures). The admin
+panel's Fans card has **Calibrate fans**; it asks first, then starts `ollama1-fancal.service` (root;
+`bin/ollama1-fancal`, `lib/o1fancal.py`). About 40 minutes:
+
+| Step | Load | Fans |
+|---|---|---|
+| 1, 150 s | a real model query (`fan_cal_model` in `config.json`, else `gemma4:12b`) to the server's own Ollama, answer after answer | 100%: the baseline |
+| 2, 600 s | the same query, going on | down the ladder 80, 65, 50, 40, 30%, 120 s a step, while every temperature stays under its ceiling; the first step that doesn't goes back up one and never down again |
+| 3, 25 to 30 min | `tools/gpu-burn.sh` (llama-bench on the same model's file: the card flat out, the processor near idle) | from step 2's level, 300 s a block, only ever up a step when a block fails; it ends at the first block that passes after 25 minutes |
+
+Every temperature the fan service watches (the table below, the NVIDIA card included) gets a **ceiling 10 C under
+its limit**; a sensor already within 13 C of its limit with the fans at 100% gets its own 100% reading plus 3 C, and
+one within 3 C of its limit even at 100% ends the run (nothing to gain; nothing is changed). A block fails when the
+second half's peak (a 6 s average, so a processor's boost spikes don't count) or where the readings are heading (a
+projection of how a first-order rise settles) reaches the ceiling, or at once when a reading is over it, past the
+block's first minute and not falling. The result: **quiet = step 2's level + 10**, **heavy = step 3's level + 10**
+(at least the quiet one; both 30 to 100). The ten points are for a warmer room, dust and age; the 10 C ceiling is
+for the hardware. It is saved in `/var/lib/ollama1/fan-calibration.json` (with every block it judged and the
+ceilings), the samples every 10 s in `/var/lib/ollama1/fan-calibration-log.json`, the last run's end in
+`/var/lib/ollama1/fan-calibration-last.json`; progress is in `/run/ollama1/fancal.json` and on the card.
+
+While it runs the fan service is in phase `tuning` at the level the run asks for, through
+`/run/ollama1/fancal-hold.json`, refreshed every 2 s and ignored once 10 s old, so a dead run can't keep the fans
+low; the temperature override still wins. Auto sleep and the Sleep button say no ("the fans are being calibrated")
+and a logind inhibitor is held.
+
+It **refuses to start** while the server is serving (a request in flight, or one in the last 2 minutes), while a
+download, an update, setup.sh, another burn test or a hold lock is running, when the fan service isn't running or is
+still measuring its fans, when the model isn't installed, when llama-bench isn't there (the Vulkan build
+`tools/gpu-burn.sh` looks for in `~/llama-bench/<release>/llama-bench`: see that script's header), or with no reading from the card. It **stops at once**, saving nothing and
+giving the fans back, on **Abort** (the button starts `ollama1-fancal-abort.service`, which stops the run), a request
+reaching the gateway, any temperature at its limit, a new hardware-error record in the kernel log (an NVIDIA Xid, a
+machine check, a PCIe AER error, an amdgpu ring timeout), the fan service no longer reporting, the load failing or
+the card not getting busy; gpu-burn.sh's own 90 C stop for an NVIDIA card stays. Its files hold numbers and sensor
+names only, never what the model was asked or answered.
+
+`ollama1-fancal status` (no root) shows the saved levels, the ones in force and the last run. To forget a
+calibration: `sudo rm /var/lib/ollama1/fan-calibration.json`, or keep it and set `"fan_calibration": "off"` to use
+`fan_work_pct`. Run it again after changing a fan, the cooler or the case.
+
 **Temperature override.** Any of these at its limit forces 100% whatever the
 load says, until it is 10 C under it; then the normal rule follows:
 
@@ -1097,6 +1234,7 @@ load says, until it is 10 C under it; then the normal rule follows:
 |---|---|
 | CPU (k10temp, Tctl) | 80 C |
 | Graphics card: junction / memory / edge | 90 / 95 / 85 C |
+| An NVIDIA card's one (chip) temperature, from nvidia-smi through the busy reading (6b505) | 85 C |
 | NVMe drives (composite) | 70 C |
 | DIMMs (jc42) | 70 C |
 | Motherboard chip (nct6797) inputs, by `temp*_label`: board, system, AUXTIN and any label it does not know | 70 C |
@@ -1157,7 +1295,8 @@ with the case fans. The cooler follows the same phases:
 
 | Phase | Cooler fans | Pump |
 |---|---|---|
-| `working`, temperature override | 100% | extreme |
+| temperature override | 100% | extreme |
+| `working`, `tuning` | the fans' percent: the working level, 100% unless set or calibrated (6b505); the calibration's test level | extreme |
 | first start (measuring) | 100% | balanced |
 | `hold100`, `ramp` | the same percent as the fans (100%, then falling to 20%) | balanced |
 | `idle20` | 20% (or higher for a fan that stalls) | quiet |
@@ -1211,7 +1350,7 @@ command line; that is your call). Do not run `fancontrol` or another fan
 daemon beside this one.
 
 **Status.** `ollama1-fan status` (no root) shows the level and the phase
-(`working`, `hold100`, `ramp 60%`, `idle20`, `deepen 15%`, `deep`), which outputs it
+(`working`, `tuning`, `hold100`, `ramp 60%`, `idle20`, `deepen 15%`, `deep`), which outputs it
 controls, each fan's setting, rpm and lowest level, the highest temperature
 and the sensor closest to its limit (and every sensor with its limit). The
 admin panel's CPU card shows the same in one line. Logs:
@@ -2140,6 +2279,58 @@ never delays or stops a suspend. The BIOS must allow wake from a PCI-E device
 the server answers at its Wi-Fi address (`Address:` in `status`; the wired
 address is not answered over Wi-Fi, so an SSH session to it ends with the
 cable). Then put it to sleep from the panel and wake it from the app.
+
+## Remote desktop cleanup
+
+On a server with a GNOME desktop and its remote login (gnome-remote-desktop,
+RDP on port 3389, through GDM), a client that goes away leaves its session
+behind: a remote login screen nobody finished, or a logged-in remote desktop
+whose client disconnected. Each one keeps a gnome-remote-desktop daemon
+holding about 230 MiB of the graphics card's memory, and GDM refuses to
+suspend while any exists ("Remote sessions would die on suspend"), so auto
+sleep never happens.
+
+`ollama1-rdp-tidy.timer` runs `ollama1-rdp-tidy` (root) every minute and ends
+them with `loginctl terminate-session <id>`:
+
+- **A remote login screen** (a GDM greeter) with no RDP client: ended on the
+  second look, about a minute after it was first seen without one. The
+  minute rides out the moment a login hands the client over to its new
+  session.
+- **A remote desktop** (a logged-in remote session) with no RDP client for
+  `rdp_tidy_minutes` (30 by default, 5 to 1440). Its clock starts when it is
+  first seen without a client and starts again whenever a client connects.
+- **Only GNOME remote desktop sessions are ever considered**: logind says
+  Remote=yes, Type=wayland, a `gdm-` service, class greeter or user, and no
+  seat or TTY. The screen's own login, console and SSH logins and the
+  per-user manager sessions are never touched.
+- **Nothing is ended while any RDP client is connected.** "No client" means
+  no established TCP connection on local port 3389 at all, on the whole
+  machine, while something listens there. If `ss` can't answer, nothing
+  listens on 3389 (RDP moved to another port, say), or logind can't be
+  asked, nothing is ended. Which session each connection belongs to (the
+  connection's process, its cgroup, `session-<id>.scope` or the user's
+  slice) is worked out and logged as "per-connection view", but not obeyed
+  yet: it becomes the rule only once it has been checked with one connected
+  and one disconnected session.
+
+Settings, in `/etc/ollama1/config.json`:
+
+- `"rdp_tidy": false` turns it off. On by default; on a server without
+  gnome-remote-desktop it does nothing.
+- `"rdp_tidy_minutes": 30`: how long a disconnected remote desktop is kept.
+
+Commands:
+
+- `sudo ollama1-rdp-tidy --dry-run`: what it would do now, session by
+  session, and what blocks sleep. It ends nothing and saves nothing.
+- `sudo ollama1-rdp-tidy status`: the setting and the last pass.
+- `journalctl -u ollama1-rdp-tidy`: a line when what it sees changes, and
+  one per session ended. Lines name the session id, its class and the
+  reason, never a user name or an address.
+
+Its state (when each session was first seen without a client, cleared at a
+reboot) is `/var/lib/ollama1/rdp-tidy.json`, mode 0600.
 
 ## Troubleshooting
 

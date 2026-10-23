@@ -33,7 +33,7 @@ class TestNumbers(unittest.TestCase):
             self.assertFalse(hasattr(o1work, gone), gone)
 
     def test_the_probes_the_services_build_read_only_the_card(self):
-        self.assertEqual(set(o1work.probes()), {"gpu_busy"})
+        self.assertEqual(set(o1work.probes()), {"gpu_busy", "gpu_temp"})   # gpu_temp: the NVIDIA card's heat (6b505), never work
 
     def test_a_reading_is_a_real_number(self):
         for v, want in ((51, 51.0), (50.5, 50.5), (0, 0.0), (None, None), (True, None), ("80", None),

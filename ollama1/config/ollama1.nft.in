@@ -19,5 +19,7 @@ table inet ollama1 {
         tcp dport 11434 fib daddr type local meta skuid != { 0, @UID_OLLAMA@, @UID_O1GW@, @UID_O1ADMIN@ } counter reject with tcp reset
         tcp dport { 8431, 8432 } fib daddr type local meta skuid != { 0, @UID_CLOUDFLARED@ } counter reject with tcp reset
         tcp dport 8188 fib daddr type local meta skuid != { 0, @UID_O1GW@ } counter reject with tcp reset
+        #ssh-door# # the SSH door (6b507): from loopback, only cloudflared (and root) reach sshd
+        #ssh-door# tcp dport 22 fib daddr type local ip saddr 127.0.0.0/8 meta skuid != { 0, @UID_CLOUDFLARED@ } counter reject with tcp reset
     }
 }

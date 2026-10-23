@@ -1,0 +1,20 @@
+# The admin panel's Abort for the fan calibration (6b505): marks that the panel stopped it, then stops
+# ollama1-fancal.service (SIGTERM to the run, which ends its load and gives the fans back at once; the
+# control group after TimeoutStopSec). polkit lets the panel's user START this unit and nothing more: the
+# panel can't stop units itself.
+[Unit]
+Description=ollama1: stop the fan calibration (the admin panel's Abort)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-fancal abort
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=90
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+UMask=0022

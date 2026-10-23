@@ -24,6 +24,15 @@ const cases=[['o1admin','org.freedesktop.systemd1.manage-units','ollama1-restart
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-sleepcfg@on-30;id.service','start','no'],
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-sleepcfg@.service','start','no'],
 ['o1admin','org.freedesktop.login1.reboot',undefined,undefined,'no'],
+// the fan calibration (6b505): the panel starts it and its abort, and can't stop or restart either itself
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fancal.service','start','yes'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fancal-abort.service','start','yes'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fancal.service','stop','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fancal.service','restart','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fan.service','start','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fan.service','stop','no'],
+['o1dash','org.freedesktop.systemd1.manage-units','ollama1-fancal.service','start','no'],
+['o1gw','org.freedesktop.systemd1.manage-units','ollama1-fancal.service','start','no'],
 // a model set from the app (6b410): the gateway's user starts that one unit, and nothing else
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-modelplan.service','start','no'],
 ['o1gw','org.freedesktop.systemd1.manage-units','ollama1-modelplan.service','start','yes'],

@@ -15952,6 +15952,158 @@ Patrick: "spinner is stuck again with vfx off."
 - Gauntlet: the 6b462 check now pins the new rule and the explicit from. Unverified in WKWebView until Patrick's
   next update.
 
+## 6b493 — a model download no longer freezes the app's model setup (per Patrick)
+
+Patrick: "Clicking on everything or any of the model presets doesn't work/respond."
+
+- Cause (seen live, `sample` of the running app: every Python thread in `__psynch_cvwait`, `_download_model`
+  among them): 6b445's `_refresh_keep()` takes `_setup_lock`, and it was called *inside* `with _setup_lock:` by
+  `_download_model` (twice) and by the Ollama pull (twice). `_setup_lock` was a plain `threading.Lock`, so the first
+  download deadlocked its own thread, and every later /api/setup, /api/setup/busy and set-card click waited on it
+  forever. The card click itself was fine (checked in the Blink pane: it reaches the handler and posts the plan).
+- Fix: `_setup_lock = threading.RLock()`: the same thread may take it again; no code uses it with a Condition or a
+  non-blocking acquire. Gauntlet: the lock is an RLock, and `_refresh_keep` called under it finishes (with the old
+  Lock the same check hangs; shown before the change).
+- Until the build with this lands: quit and reopen the app after a frozen download, and don't start downloads.
+
+## 6b494 — Coding models for local and server presets; Gemma 4 12B on MLX (per Patrick)
+
+Patrick: add two coding models so they appear in the Mac (MLX) and server (Ollama) presets, sort the presets so they
+make sense, and fix the broken local Gemma 4 12B. Everything below was checked on 2026-10-21.
+
+- **Two catalog rows** (group "code", after Qwen 3.6 35B MoE; ports 8948 and 8950, the next even ones: every catalog
+  and retired port is still its own). **Devstral Small 2 24B** (`mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit`,
+  15,136,819,784 bytes, mistral3/ministral3; `devstral-small-2:24b`, 15,177,374,099 bytes with its config; mem 16.7):
+  Mistral's agentic coder, 68.0% SWE-bench Verified by Mistral's own card. **Qwen 3 Coder 30B MoE**
+  (`mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit`, 17,197,118,924 bytes, qwen3_moe; `qwen3-coder:30b`,
+  18,556,700,761 bytes; mem 18.7): 3B active, in MOE_ROWS, and "MoE" in its label so the Mac's admission uses 1.3x as
+  for Qwen 3.6 35B MoE. Both MLX builds load on mlx-lm 0.31.3: a model built from each config.json (no weights) has
+  exactly the checkpoint's weight keys after sanitize (925 and 1351 keys). OLLAMA_REQUIRES: devstral 0.13.3
+  (ollama.com/library/devstral-small-2: "requires Ollama 0.13.3 or later"; its manifest has no "requires");
+  qwen3-coder:30b has none anywhere; it uses the 480B's renderer and parser ("qwen3-coder", in Ollama since v0.12.0:
+  commit 4799194 is in v0.12.0, not v0.11.11), so it takes the 480B's 0.13.5. ADV_USE lines for both.
+- **The Code lane prefers them.** CODE_LADDER (the Remote planner and Recommended's code seat) and the Coding,
+  Workspace and Remote agents' picks start with Devstral Small 2, then Qwen 3 Coder; the old order follows for
+  machines that hold neither. A server's coder still comes first where the code already did that
+  (resolve_agent_seat, remote_driver); the server rules are unchanged.
+- **Presets, by the existing fit rules (no fixed lists).** Light is unchanged everywhere. Recommended gains the code
+  ladder's first, so Devstral on a Mac of 24 GB or more and on a 24 GB card (48 GB Mac: 8 models, 82.9 GB; it was 7,
+  66.0 GB); a 16 GB Mac holds neither coder, so its sets are unchanged. Everything holds both wherever they fit (48 GB
+  Mac: 15 models, Qwen 3 Coder last before the No-limits extras; a 24 or 32 GB card: both). Order: the roles first
+  (quick pair, everyday, Fast, merger, Thinking, code, vision), then the rest in catalog order (general models, then
+  the coders), then what is over memory. The coders' place in the catalog gives that, so no sort code was added.
+- **The server's RTX 5070 Ti (16303 MiB) gets neither coder.** A set's model must run whole on the card (_srv_fits:
+  file x1.05 + 1.25 GiB): Devstral needs 17,278,420,083 bytes against 17,094,934,528, Qwen 3 Coder 20,826,713,079.
+  The gateway agrees: its fit_check (weights +5% + 256 MiB + the KV cache) wants about 17.5 GB for Devstral at 8K
+  context against 16.3 GB (VRAM less its 768 MiB reserve), and still 16.5 GB at 2K. A set pulls with no `ram` flag
+  (allow_apply), so a set holding them would install models the gateway then refuses (gpu_fit). Running Qwen 3 Coder
+  there with its experts in RAM would need the kit's set apply to write the `ram` flag for MoE rows (a PROTOCOL
+  change), and with weight repacking on the whole model counts against system RAM: a decision for Patrick, not made
+  here.
+- **Gemma 4 12B: the cause.** Every Gemma 4 12B on the hub is Google's `gemma4_unified` build (google/gemma-4-12B-it,
+  mlx-community's 4bit at all three revisions, the base 4bit, OsaurusAI's MXFP4, unsloth): there is no other build
+  or older revision to switch to. mlx-lm reads it from **0.32.0** (`"gemma4_unified": "gemma4"` in MODEL_REMAPPING and
+  `vision_embedder` skipped in sanitize, ml-explore/mlx-lm#1349; in v0.32.0 and v0.32.2, not in 0.31.3). With 0.32.2
+  (unpacked into a scratch folder, not the app's venv) a model built from the current revision's config (73bcf09,
+  6.77 GB) has exactly the checkpoint's 1324 weight keys after sanitize; 0.31.3 raises "Model type gemma4_unified not
+  supported", as the engine log showed. The venv holds 0.31.3 because the installers run `pip install mlx-lm` with no
+  upgrade, so every Mac set up before 0.32.0 (2026-10-15) has it.
+- **Gemma 4 12B: the fix.** `MLX_REQUIRES` (the oldest mlx-lm an MLX build loads on, beside OLLAMA_REQUIRES) and
+  `MLX_LM_VERSION` (read once from the package record with `importlib.metadata`; nothing imported). A row whose MLX
+  build needs a newer mlx-lm than this Mac's routes to its Ollama tag (Gemma 4 12B: gemma4:12b, 8.0 GB), or isn't
+  offered when it has none; with no mlx-lm found nothing changes. On this Mac, today, Gemma 4 12B becomes an Ollama
+  model: the sets still hold it, the More-models card offers the Ollama download, and the 6.8 GB MLX copy stays on
+  disk (MLX_REPOS still names it, nothing sweeps it). An mlx-lm of 0.32.0 or newer puts it back on MLX at the next
+  start, on the weights already there. OLLAMA_BYTES gemma4:12b and gemma4:26b follow the registry (both pushed again
+  with a draft layer: 7.56 -> 8.02 GB, 18.60 -> 18.73 GB).
+- **For Patrick to decide:** upgrading mlx-lm in the venv (and having the installers ask for `mlx-lm>=0.32.0`). 0.32.2
+  also wants mlx >= 0.32.2 and transformers >= 5.7, so every MLX engine moves with it and should be re-run first.
+  The coders are not kept out of Pro and Max blends or the local merge writer (MERGE_RANK is by size), unlike a
+  server's coder (srv_role_ok); "Max is every model" was his word, so it is left as is.
+- Noticed, not changed: gpt-oss:20b and :120b now say "requires 0.30.0" in the registry and have no OLLAMA_REQUIRES
+  entry; on a 24 GB Mac Gemma 4 26B, Qwen 3.8 27B and now Qwen 3 Coder are offered (75% of memory) but the run-time
+  admission (x1.5, or x1.3 for MoE) rarely lets them load; CLAUDE.md still says the engine ports reach 8944.
+- Gauntlet: `== coding models for the presets; Gemma 4 12B on an older mlx-lm (6b494) ==` (3 checks, 5 mutants), and
+  the 6b405 expectations moved (Recommended on 48 GB holds Devstral; Everything 15 and 16 models). The simulated Macs
+  now fix MLX_LM_VERSION, so the sets don't depend on the venv running the gauntlet. Run here: ast parse of both
+  files; the new block and the 6b405 rules, status and offer checks in isolation (the 24 GB PC case needs the
+  gauntlet's PC sims and wasn't run). The full gauntlet was not run.
+- NOT VERIFIED: neither coder was downloaded or run (no answers, speed or peak memory; mem is an estimate from the
+  rows of their size); Gemma 4 12B on mlx-lm 0.32 is a weight-key match, not a generation; the gemma4:12b Ollama
+  route on a Mac was not exercised; the live gauntlet on this Mac (mlx-lm 0.31.3) will see Gemma 4 12B as an Ollama
+  model.
+
+## 6b496 — The coders on a 16 GB card, partly in the server's memory (per Patrick)
+
+Patrick decided 6b494's open point: Devstral Small 2 24B and Qwen 3 Coder 30B on the server's RTX 5070 Ti (16 GB of
+VRAM, 64 GB of RAM) as models that spill into system memory, slower, without loosening the card-only rule for anything
+else.
+
+- **The kit already had the mechanism**: an allow-list line flagged `ram` lets the gateway load that model partly
+  into system memory (placement `gpu+ram`), alone, after its fit check (weights +5%, 2.5 GiB of compute buffers, the
+  KV cache; with weight repacking on, the default, against system memory alone). What was missing: a set from the
+  app could only write unflagged lines, and the app didn't know how much memory such a model may use.
+- **Kit, minimal.** `GET /v1/models/state` gains `ram_bytes` (`ram_model_room`): the gateway's own budget() rule on an
+  idle machine, from MemTotal: memory less the larger of 8 GiB and 12%, under Ollama's MemoryHigh, plus the card less
+  its reserve only with repacking off. `POST /v1/models/apply` takes one optional key, `ram`: a non-empty list from
+  `add`, each once (400 otherwise); the gateway hands it to root only when present (the request file keeps its old
+  shape otherwise), root checks it again and `allow_apply` writes those new lines as `<tag> ram`. A line already
+  there keeps its flags (the owner's word stands). The root log says "with ram: ...". PROTOCOL.md says all of it.
+  Tests: `TestRamFlag` in tests/test_modelplan.py (5), the state's key list, 4 mutants in tests/mutate.py (all
+  killed). Run one module at a time: test_modelplan (77 OK), test_library, test_gateway, test_repo (OK).
+- **App.** `SRV_RAM_ROWS` names the two coders; `model_sets({"vram", "ram"})` gives one of them a place in a server's
+  **Everything only** when it doesn't fit the card whole and fits `ram_bytes` with the file +5%, 2.5 GiB of buffers and
+  6 GiB for the KV cache at the server's 32K default context (6b492: Devstral's is 5.4 GB at fp16, 40 layers x 8 KV
+  heads x 128; Qwen 3 Coder's 3.2 GB). Light and Recommended stay whole-on-the-card. The sets carry `ram`; the sheet
+  marks those downloads "card + memory, slower" (the pane's own words for gpu+ram); the apply (and the update card's,
+  6b445) sends `ram` for exactly those of its downloads, taken from this app's own read, never from the page, and
+  only to a kit that said `ram_bytes` (an older kit gets no coder and no key). On a 64 GB server (about 52 GiB of room)
+  each fits with 25 GiB or more to spare (they need about 23 and 27 GiB by this rule).
+- **The Code lane seats them.** `server_mode_candidates(ctx, coders_in_ram=True)` (the Code lane's agents and the
+  Remote planner only) adds a model whose placement is `gpu+ram` and whose tag is one of SRV_RAM_ROWS', marked
+  `spill`; the modes, funnels, compositor and side passes never ask for it, so the "never gpu+ram unasked" rule
+  stands for everything else. srv_rank puts a coder first for the code role, the larger first (Qwen 3 Coder 30B).
+- Gauntlet: `== a server's coders partly in its memory (6b496) ==` (4 checks, 6 mutants), run in isolation with the
+  real servers section on the stand-in transport; 6b407 and 6b445 blocks re-run in isolation, passing.
+- NOT VERIFIED: nothing ran on the real server (no pull, no load): the speed of a dense 24B partly in RAM (Devstral)
+  is likely a few tokens a second with repacking on, since the gateway then counts the whole model against RAM and
+  llama.cpp may keep most of it on the CPU (as gpt-oss:120b did); Qwen 3 Coder's 3B active should do better. The
+  OpenAI-style door (6b490) still doesn't apply the RAM handling, as 6b490 noted.
+
+## 6b497 — The MLX engine follows the app: mlx-lm 0.31.3 -> 0.32.2 (per Patrick)
+
+Patrick decided the other open point: upgrade the app's MLX engine in the next app update, so Gemma 4 12B goes back
+to MLX.
+
+- **How the venv got stuck.** build_macos_app.sh and the launcher's first-run bootstrap run `pip install mlx-lm`
+  (unpinned, no --upgrade) once; nothing ever upgrades it, so every venv made before 2026-10-15 holds 0.31.3. An app
+  update replaces the bundle only.
+- **The update.** `_ensure_mlx_engine`, started at boot beside PyNaCl's install (6b327's pattern, after its pip):
+  only the copy holding the instance lock, only on Apple silicon, only into the app's own venv (never a dev or test
+  copy, a frozen build or a system Python: `_crypto_install_blocker`). If the venv's mlx-lm is older than
+  `MLX_LM_PIN` (0.32.2), Python is 3.11+ and transformers 5.7+ (0.32.2's requirements; this venv has 5.14.1), it
+  downloads `MLX_ENGINE_REQS` (mlx-lm 0.32.2, mlx 0.32.2 and mlx-metal 0.32.2, each by the sha256 PyPI lists: 1, 12
+  (CPython 3.11-3.14 on macOS 14/15/26 arm64) and 3 hashes; wheels only, no dependency) into a temporary folder, then
+  installs from that folder while holding `_engine_lock`, so no engine starts on a half-installed mlx. One try per
+  build + Python + pin (`mlx-engine.json`), again 3 days after a failure; each reason it doesn't try is in words
+  (`_mlx_engine`). The routes are read at start, so Gemma 4 12B moves to MLX at the start after the upgrade
+  (MLX_REQUIRES, 6b494), on the 6.8 GB already downloaded. mlx 0.32.2 rather than the newest 0.32.4 (one week old):
+  the oldest that 0.32.2 accepts. The CLI the app runs (`python -m mlx_lm server --model --port`) and its routes are
+  unchanged in 0.32.2.
+- **Every catalog MLX row must load on the pin.** `MLX_MODEL_TYPES`: each MLX build's config.json model_type from
+  the hub (2026-10-21). The gauntlet holds 0.32.2's own module list and MODEL_REMAPPING (read from its wheel) and
+  checks every row's type resolves there, the pin equals that snapshot's version (bump them together), no MLX_REQUIRES
+  exceeds the pin, and the pins are exactly the three wheels by hash.
+- The installers stay unpinned: pinning mlx-lm 0.32.2 there would break a first run on the Command Line Tools'
+  Python 3.9 (mlx-lm 0.32 needs 3.11), where today pip picks an older engine; on 3.9/3.10 the update says why and
+  Gemma 4 12B stays on Ollama.
+- ollama1/tests/test_repo.py: its secret scan now lets a `--hash=sha256:` pin line through (a wheel's published
+  hash is no secret); 16 such lines are new in millenai.py.
+- Gauntlet: `== the MLX engine follows the app: mlx-lm 0.32.2 (6b497) ==` (3 checks, 7 mutants), in isolation.
+- NOT VERIFIED: the install itself (no download was allowed: the hashes come from PyPI's JSON, not from wheels
+  downloaded and hashed here, and pip's choice of the macOS 26 wheel on this macOS was not seen); every MLX model on
+  0.32.2/mlx 0.32.2 (the gauntlet's live engines should be re-run on an upgraded venv); the live venv was not touched.
+
 ## 6b495 — The fans' working level is a setting (per Patrick)
 
 Patrick: "tweak the fan curve so its quieter for my mom — case/cpu fans to maybe 50% instead of 100%, unless temps
@@ -16272,3 +16424,161 @@ it. Let's go with blue, until it's read. Basically an unread indicator." Same me
   the title goes to full text colour. Pinned, Recents and search rows share `row()`. The open chat never shows one.
 - Gauntlet: `unreadDecision` under node, served-HTML assertions, a chat-store save/load/refuse check. The 6b467
   menu assertion was reworded for the new labels. Not run in a browser or WKWebView; the look is unseen.
+
+## 6b505 — Fan calibration: the panel finds a quiet, steady working level from measured temperatures (per Patrick)
+
+Patrick's idea from 6b495: a button that runs a 2-3 minute model query, a 10-minute one, then a 20-30 minute burn,
+records temperatures against fan levels and sets a steady curve, quiet for the household, no hunting.
+
+- **The run** (`lib/o1fancal.py`, `bin/ollama1-fancal`, `ollama1-fancal.service`, root, sandboxed like the quick
+  burn plus `IPAddressAllow=localhost` for Ollama). Step 1, 150 s: a real `/api/generate` stream to 127.0.0.1:11434
+  (root is allowed by the nft rule), answer after answer, fans at 100%: the baseline. Step 2, 600 s: the same query;
+  the fans step down a fixed ladder 80/65/50/40/30%, 120 s a step; the first failing step goes back up one and the
+  descent stops for good. Step 3, 25-30 min: `tools/gpu-burn.sh` (llama-bench on the same model's blob; Ollama's copy
+  is unloaded first so both don't sit in the 16 GB), starting at step 2's level, 300 s blocks, only ever up a step;
+  it ends at the first passing block after 25 min. Model: `fan_cal_model` in config.json, else `gemma4:12b` (the
+  burn tools' default, installed on the server since 6b484).
+- **Judging.** Every sensor the fan service watches gets a ceiling `limit - 10 C`; one already within 13 C of its
+  limit at 100% gets its 100% reading + 3 C; within 3 C at 100% ends the run with nothing changed. A block fails
+  when the second half's peak (6 s moving average: Tctl's boost spikes aren't heat) or the projection reaches the
+  ceiling, or at once when a reading is over it after the block's first 60 s and not falling (so a step back up
+  isn't failed by the heat it inherited). The projection: three equal windows; slowing rise -> m3 + d2²/(d1-d2) (a
+  first-order system's remaining rise); flat/noisy (within 0.5 C) -> m3; just started -> m3 + 2·d2; not slowing ->
+  +8 C (assume the worst). Temperatures come from the fan service's own status file, so the run judges exactly
+  what the override watches.
+- **The target, and why.** Two levels, not one: QUIET = step 2's level + 10 points (what the household's real load,
+  model answers, needs) and HEAVY = step 3's level + 10 (sustained flat-out load), at least the quiet one, both
+  30-100. A single level from the burn alone would run the fans at burn speed for every short answer, which is
+  most of the work; a single level from the queries would leave a long job relying on the 100% override. The
+  fan service works at QUIET and moves to HEAVY at once when any temperature is within 12 C of its limit, back
+  only when all are 20 C under and HEAVY has held 180 s (lib/o1work.py: STEP_UP_MARGIN_C, STEP_DOWN_MARGIN_C,
+  STEP_MIN_S). An 8 C band plus a 3-minute dwell against thermal time constants of minutes means at most a step
+  every few minutes, never a hunt; the hold and the ramp after work start from whichever level it worked at.
+  The 10 C ceiling protects the hardware (it is also the override's hysteresis and the deep-idle margin); the +10
+  points cover what the test room didn't have: a warmer summer room, dust, ageing paste. The override at the limit
+  (100%) is unchanged and always wins.
+- **Applying it.** `/var/lib/ollama1/fan-calibration.json` (v1, quiet_pct, heavy_pct, found, ceilings, the judged
+  blocks). `o1work.levels()`: the calibration unless config.json says `"fan_calibration": "off"`; then
+  `fan_work_pct` (the manual override/fallback); else 100. The fan service re-reads both files when they change
+  (`o1work.Levels`, a stat per tick), so no restart; its status carries work/heavy/levels/stepped, and the lights
+  are red at the reported work level.
+- **The panel.** The Fans card gains a Calibration box: the saved levels, Calibrate fans (asks first; 409 with the
+  reason when serving, busy, already running, the fan service missing/measuring, or the model not installed), and
+  while running the step, the level, the card's busy %, the time left, the 4 sensors nearest their ceilings and the
+  blocks so far, with **Abort**. Abort starts `ollama1-fancal-abort.service` (root), which marks the abort and
+  `systemctl stop`s the run: SIGTERM ends the wait at once, the loads are killed (the burn's whole process tree:
+  GNU timeout makes its own process group, so it walks /proc; KillMode=control-group on a stop), the hold file goes,
+  nothing is saved. Both units are on the panel's polkit list (start only).
+- **During the run** the fan service shows phase `tuning` at the level asked for, via `/run/ollama1/fancal-hold.json`
+  written every 2 s and ignored at 10 s old, so a dead run can't keep the fans low; heat still wins.
+  `ollama1-fancal.service` is in o1sleep.BUSY_UNITS (auto sleep and the Sleep button say no) and the run holds a
+  logind inhibitor. Refusals before start: a request in flight or in the last 2 minutes, busy reasons (pulls,
+  updates, setup, hold locks), running burn/stability tools, the fan service not running/measuring/hot, no CPU
+  temperature, the model or its manifest missing, no llama-bench, no card reading. Safety stops: Abort/stop, the
+  fan service's hot phase or any reading at its limit, a new kernel record (NVRM Xid, MCE, AER, amdgpu ring
+  timeout) checked every 30 s with `journalctl -k --since @start`, the fan service going quiet, a request reaching
+  the gateway (the owner's work comes first), a load failing, the card not busy (no reading over 50% within 90 s,
+  or under 30% average). gpu-burn.sh's own 90 C NVIDIA stop stays. Files hold numbers and sensor names only.
+- **Found on the way, fixed:** (1) the NVIDIA card's temperature was in no fan decision (6b483 noted the fan curve
+  as AMD-only): the shared busy probe already calls nvidia-smi as root, so it now keeps the chip temperature and
+  the fan service adds it as a "GPU" sensor, limit 85 C (as an AMD edge sensor; the burns stop at 90), in the
+  override, deep-idle guard (like a junction, 60 C) and the status. (2) The Corsair cooler's fans ignored
+  `fan_work_pct` while working (its plan hard-coded 100% for `working`): they now follow the fans' level; the pump
+  is still extreme while working. Default behaviour is unchanged (100%).
+- **Tests** (no hardware): `test_fancal.py` (projection, ceilings, ladder; the search on a simulated first-order
+  machine finding 30%/80% and never hunting; a warm card stopping the descent; a near-limit sensor and an idle card
+  ending it; the whole run on a fake clock with the hold file read back through the fan service's reader, the
+  result read back through o1work.levels(); abort, heat, a reading at its limit, the fan service going quiet, a
+  request, an Xid, a failing load, a refusal; stop-post; every refusal; the query load against the Ollama stub; the
+  burn load's tree stop; the units), `test_fan.TestCalibratedLevels` (tuning, stale/odd holds, heat over tuning,
+  quiet->heavy->quiet with its band and dwell, the hold at the level it worked at, the NVIDIA sensor, Levels
+  reloading), test_aio (working/tuning follow the level), test_leds (red at the work level), test_admin (actions,
+  refusals, abort only while running, the card's data cut to known fields, the page), the polkit cases. The admin
+  demo runs a calibration 30x faster; checked in the browser (start, progress, Abort).
+- **Unverified on the server:** the whole run on the real machine (the sandbox's access to nvidia-smi, journalctl
+  and Ollama on localhost; llama-bench's start time with the shader cache; whether gemma4:12b queries keep the
+  5070 Ti over 30% busy); which sensor actually binds (on this board likely the card, NVMe or chipset); the
+  cooler's fans at a level under 100% while the pump is extreme; the lights' red at the quiet level. Needs the kit
+  install (setup.sh) first.
+
+## 6b506 — Abandoned remote desktop sessions are ended (per Patrick)
+
+- The server runs GNOME with gnome-remote-desktop (RDP on :3389, GDM remote login). Clients that went away left
+  their sessions forever: remote GDM login screens (gdm-greeter-N, dynamic uids from 60580, Class=greeter,
+  Service=gdm-launch-environment) and a logged-in remote desktop (Class=user, Service=gdm-password), all
+  Remote=yes, Type=wayland, no seat. Each kept a gnome-remote-desktop-daemon holding ~230 MiB of VRAM (against
+  the gateway's 768 MiB vram_reserve_mib) and GDM blocked suspend ("Remote sessions would die on suspend"), so
+  auto sleep never fired. logind can't tell connected from disconnected: State, Active and IdleHint stayed
+  active/no either way.
+- Patrick chose: end abandoned remote login screens at once, remote desktops left disconnected 30+ minutes; never
+  an active, connected one. New: lib/o1rdptidy.py (pure parsers and plan(), Tidy runs one pass with injected
+  probes), bin/ollama1-rdp-tidy (run / --dry-run / status), ollama1-rdp-tidy.service (root oneshot, sandboxed like
+  ollama1-idle, writes only /var/lib/ollama1) and .timer (every minute), enabled by setup.sh. A separate timer
+  rather than a hook in ollama1-idle's loop: a fault here can't stop auto sleep's ticks, and the dry run stands on
+  its own. Ended with `loginctl terminate-session <id>`.
+- Only GNOME remote display sessions are considered: Remote=yes, Type=wayland, a gdm- service, class greeter or
+  user, empty Seat and TTY (a missing property is a no). The local greeter c1 on seat0, SSH and console logins
+  and manager sessions never qualify.
+- **v1 safety rule**: a session counts as disconnected only while there is NO established TCP connection on local
+  :3389 at all, machine-wide, and something listens on :3389 (else RDP is on another port and the zero means
+  nothing). If ss or logind can't answer, nothing is ended. Any connection clears every session's clock. The
+  per-session mapping (ss -p pid -> /proc/<pid>/cgroup -> session-<id>.scope, or user-<uid>.slice for a
+  handover daemon under the user's systemd) is computed and logged as "per-connection view" only. It can be
+  promoted to the deciding rule after a live test with one connected and one disconnected session shows it
+  right; until then one connected client keeps every abandoned session too.
+- Login screens end on the second look without a client (>= 45 s apart, so about a minute), not the very first:
+  RDP's login hands the client over to the new session with a reconnect, and a pass landing in that gap must not
+  kill a login in progress. Remote desktops: rdp_tidy_minutes (config.json, default 30, 5..1440) after first seen
+  without a client; the first-seen times live in /var/lib/ollama1/rdp-tidy.json (0600) with the boot id, so a
+  reboot (session ids start again) forgets them.
+- Settings: "rdp_tidy" (default true; anything but true/false turns it off and says so) and "rdp_tidy_minutes",
+  both added to o1common.DEFAULTS. A no-op without gnome-remote-desktop (its daemon or unit file absent).
+- Logs (journal): a line when what it sees changes (the minutes ticking up don't count) and one per session
+  ended or failed to end: session id, class, reason, per-connection view. Never a user name, uid or address; the
+  show-session call doesn't even ask for Name or RemoteHost. Not shown in the admin panel (another change was
+  editing it); `sudo ollama1-rdp-tidy status` prints the last pass.
+- Untested on the live server: whether `ss` works inside the unit's sandbox (if it doesn't, the log says
+  "couldn't list the RDP connections" and nothing is ended), and whether GDM cleans up after a terminated remote
+  greeter without respawning one. Tests: tests/test_rdptidy.py (fixtures of loginctl -j, show-session, ss and
+  cgroups; whole passes on a fake clock) and 11 rdp mutants in tests/mutate.py, all killed.
+
+## 6b507 — An optional SSH door through the tunnel (per Patrick)
+
+Patrick is abroad for months. SSH to the server worked only from the home LAN, and the VPN way needs a change on the
+Pi nobody can make from there. He approved SSH through the Cloudflare Tunnel that already carries the gateway and
+the panel, behind Access (the panel's admin identity) and then SSH keys.
+
+- Opt-in: `setup.sh --ssh-door` (`--no-ssh-door` closes it), recorded as `ssh_door: true` in config.json with
+  `hostname_ssh` (default `<server-name>-ssh.<zone>`, like the other two names, so two servers in one zone can't
+  repoint each other's door: dns_step "fixes" any tunnel CNAME on its names) and `ssh_aud`. Off, every file setup
+  writes is byte-for-byte what it was (cloudflared.yml, the sshd drop-in, the nft rules; tests compare against the
+  pre-door rendering).
+- Tunnel: one more ingress rule, `ssh://127.0.0.1:22`, with the same `originRequest.access` check (required,
+  teamName, audTag [ssh_aud]) as the HTTP routes, before the 404. Rendered only when the door is on, its AUD is
+  known and sshd takes it (below); setup.sh renders through setuplib's render_tunnel_yml now, so tests run it.
+- Access: ollama1-cf-access makes "<server-name> ssh" for hostname_ssh with the admin's Allow policy (reused, not a
+  new one) and `type: "ssh"`, which is how the API spells a self-hosted app with browser-rendered SSH (the
+  dashboard's "Browser rendering: SSH"; the Terraform provider lists ssh/vnc/rdp as app types; Cloudflare's docs
+  name no other field). If Cloudflare refuses that type, it falls back to self_hosted and says which switch to
+  flip. `--ssh-door` on the helper turns the door on in config.json too, so the owner can run the helper from the
+  kit checkout at a terminal and then setup once, detached. No token in a file, a log or a command line, as
+  before; the same 6-permission token covers it.
+- No API token: setup's door menu (only at a terminal) prints the dashboard steps and reads the AUD; with no
+  terminal (a detached run) it leaves a `later` line and changes nothing else. `--ssh-aud <AUD>` gives it
+  non-interactively.
+- sshd: AllowUsers gains `<user>@127.0.0.1` (cloudflared connects from there) only while password login is off;
+  setup checks with `sshd -T -C addr=127.0.0.1` that a door connection is keys only (passwordauthentication no,
+  kbdinteractiveauthentication no, authenticationmethods publickey), else restores the old drop-in and stops.
+- PerSourcePenalties (OpenSSH 9.8+; Ubuntu 26.04 has it): 127.0.0.1 is exempted (`PerSourcePenaltyExemptList`,
+  only when this sshd knows the option, probed with `sshd -t -o`). Every door user shares 127.0.0.1, so a penalty
+  there (a few failed key offers, an agent with many keys) would shut the door for everyone, Patrick abroad
+  included, for up to the penalty maximum, and it protects nothing: nobody reaches 127.0.0.1:22 without an Access
+  login first, and the port guard (below) keeps local users off it. The LAN keeps its penalties.
+- nft: with the door on, `ollama1-nft` also resets connections to port 22 from 127.0.0.0/8 by anyone but root and
+  cloudflared, so 127.0.0.1 in AllowUsers means the tunnel. ufw is untouched: port 22 stays LAN only, and nothing
+  new listens (the "What listens" check is unchanged).
+- Browser SSH is switched on but unproven: it logs in to sshd like any client, and the kit sets up no short-lived
+  certificates, so it may have no key to offer; `cloudflared access ssh` as ProxyCommand is the way in.
+- Unverified on the server: everything Cloudflare-side (the `ssh` type, cloudflared's Access check on an ssh://
+  route) and the new nft line under `nft -c`. Tests: tests/test_sshdoor.py (rendering on and off, the drop-in, the
+  guard, the flags, the helper against the fake API with the ssh type and its fallback), six mutants in mutate.py.

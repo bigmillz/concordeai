@@ -153,13 +153,14 @@ def ollama_now(base):
 def check_request(req, now):
     """The request itself, again (the gateway's checks, never trusted).
     Returns (the request, the device's name) or raises Refused."""
-    if set(req) != set(M.REQUEST_KEYS) or req.get("v") != 1:
+    # `ram` (6b496) is the one optional key
+    if set(req) - {M.RAM_KEY} != set(M.REQUEST_KEYS) or req.get("v") != 1:
         raise Refused("bad_request", "not a request this program knows")
     t = req["t"]
     if not isinstance(t, int) or isinstance(t, bool) or abs(now - t) > M.REQUEST_MAX_AGE:
         raise Refused("bad_request", "the request is more than %d seconds old (or from the future): send it again"
                       % M.REQUEST_MAX_AGE)
-    clean, err = M.parse_request({k: req[k] for k in M.KEYS})
+    clean, err = M.parse_request({k: req[k] for k in M.KEYS + (M.RAM_KEY,) if k in req})
     if err:
         raise Refused("bad_request", err)
     dev = req["device"]
@@ -320,7 +321,8 @@ def run(owner_uid=None, base=None, allow_path=None, active_units=o1sleep._active
             raise Refused("busy", "not now: " + M.LIBRARY_BUSY)
         check_server(clean, base, active_units)
         try:
-            added, dropped = L.allow_apply(clean["add"], clean["remove"], allow_path)
+            added, dropped = L.allow_apply(clean["add"], clean["remove"], allow_path,
+                                           ram=clean.get(M.RAM_KEY) or ())
         except (OSError, ValueError, UnicodeDecodeError) as e:
             raise Refused("internal", "the allow-list (/etc/ollama1/models.allow) can't be changed (%s): "
                                       "fix it at the server" % (getattr(e, "strerror", None) or type(e).__name__))
@@ -356,8 +358,9 @@ def run(owner_uid=None, base=None, allow_path=None, active_units=o1sleep._active
     save(rec, keep=True)
     answer(rid, True)
     log("modelplan: applying the %s set for %s (device %s, request %s): add %s; remove %s; allow-list: %d line(s) "
-        "added, %d taken out" % (clean["plan"], who, req["device"], rid, ",".join(clean["add"]) or "-",
-                                 ",".join(clean["remove"]) or "-", len(added), len(dropped)))
+        "added, %d taken out%s" % (clean["plan"], who, req["device"], rid, ",".join(clean["add"]) or "-",
+                                   ",".join(clean["remove"]) or "-", len(added), len(dropped),
+                                   ("; with ram: " + ",".join(clean[M.RAM_KEY])) if clean.get(M.RAM_KEY) else ""))
     try:
         with inhibit(WHY):
             execute(rec, base, allow_path, sleep, tries, log)

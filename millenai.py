@@ -97,6 +97,8 @@ MACHINE_STATE = frozenset((
     "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_fresh",
     # 6b315: the graphics cards, and when the engine update last failed
     "_gpus", "_stage_last", "_proof",
+    # 6b497: the app's own MLX engine update (its state and note, nothing personal)
+    "_mlx_engine",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
@@ -1225,6 +1227,9 @@ CATALOG = [
     # tuned for tool use and structured output — the Research agent's first pick
     ("Hermes 3 8B",        "🪽", "8B",  "core", "mlx-community/Hermes-3-Llama-3.1-8B-4bit",        "hermes3:8b",        8912,  5.5,  4.6, False),
     ("Hermes 4 14B",       "🪽", "14B", "core", "mlx-community/Hermes-4-14B-4bit",                 None,                8936,  9.3,  8.3, False),
+    # 6b494: this repo is Google's gemma4_unified build (every Gemma 4 12B
+    # is; reconverted 2026-06-03/06-08), which mlx-lm loads from 0.32.0 on.
+    # On an older mlx-lm the row runs on Ollama instead (MLX_REQUIRES)
     ("Gemma 4 12B",        "💠", "12B", "core", "mlx-community/gemma-4-12B-it-4bit",               "gemma4:12b",        8908,  8.2,  6.8, True),
     ("Gemma 4 26B",        "🔷", "26B", "core", "mlx-community/gemma-4-26b-a4b-it-4bit",           "gemma4:26b",        8910, 17.0, 15.4, False),
     ("Qwen 3.5 9B",        "🔬", "9B",  "core", "mlx-community/Qwen3.5-9B-4bit",                   "qwen3.5:9b",        8934,  6.9,  6.0, False),
@@ -1236,6 +1241,18 @@ CATALOG = [
     ("GPT-OSS 20B",        "🌀", "20B",  "core", "mlx-community/gpt-oss-20b-MXFP4-Q4",             "gpt-oss:20b",       8914, 13.0, 12.0, False),
     ("Qwen 3.8 27B",       "🐉", "27B",  "big",  "mlx-community/Qwen3.8-27B-4bit",                 "qwen3.8:27b",       8938, 17.6, 16.1, False),
     ("Qwen 3.6 35B MoE",   "🚀", "35B",  "big",  "mlx-community/Qwen3.6-35B-A3B-4bit",             "qwen3.6:35b",       8918, 20.0, 18.5, True),
+    # ---- THE CODERS (6b494, per Patrick: coding models for the Code lane, on
+    # the Mac and on servers). Both checked 2026-10-21 against the HF API and
+    # the Ollama registry; both MLX builds load on mlx-lm 0.31.3 (every weight
+    # key of the checkpoint matched a model built from its config.json, no
+    # weights downloaded). Devstral Small 2: Mistral's agentic coder, dense,
+    # 68.0% on SWE-bench Verified by Mistral's own card (model_type mistral3,
+    # 15,136,819,784 bytes, Apache 2.0). Qwen 3 Coder 30B: 3B active of 30B
+    # (qwen3_moe, 17,197,118,924 bytes, Apache 2.0); "qwen3-coder:30b", never
+    # the bare tag (see the giants below). mem is the file plus the allowance
+    # the rows of their size carry.
+    ("Devstral Small 2 24B", "🛠️", "24B", "code", "mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit", "devstral-small-2:24b", 8948, 16.7, 15.1, False),
+    ("Qwen 3 Coder 30B MoE", "⌨️", "30B", "code", "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",       "qwen3-coder:30b",      8950, 18.7, 17.2, False),
     ("GPT-OSS 120B",       "🌌", "120B", "big",  "mlx-community/gpt-oss-120b-MXFP4-Q4",            "gpt-oss:120b",      8924, 64.0, 61.0, False),
     ("GLM 5.3",            "👑", "744B", "big",  "mlx-community/GLM-5.3-4bit",                     None,                8944, 430.0, 418.3, False),
     ("DeepSeek V3.2 671B", "🌊", "671B", "big",  "mlx-community/DeepSeek-V3.2-4bit",               None,                8942, 390.0, 378.1, False),
@@ -1260,17 +1277,22 @@ WINDOWS_ONLY = {"DeepSeek V3.1 671B", "Qwen 3 Coder 480B"}
 # is sized from here, and its mem keeps the same allowance above it.
 # Which model a preset picks still goes by the catalog size (cat_gb):
 # the "everyday" line and the ties were tuned to it.
+# 6b494, the registry on 2026-10-21: the two coders are new; gemma4:12b and
+# gemma4:26b were pushed again with a draft layer (7.56 -> 8.02 GB and
+# 18.60 -> 18.73 GB), so their figures follow.
 OLLAMA_BYTES = {
     "deepseek-r1:8b": 5_225_376_047,
     "deepseek-v3.1:671b": 404_494_157_743,
-    "gemma4:12b": 7_556_508_396,
+    "devstral-small-2:24b": 15_177_374_099,
+    "gemma4:12b": 8_021_618_941,
     "gemma4:e2b": 4_587_156_505,
-    "gemma4:26b": 18_604_148_513,
+    "gemma4:26b": 18_731_025_629,
     "gpt-oss:120b": 65_369_818_941,
     "gpt-oss:20b": 13_793_441_244,
     "hermes3:8b": 4_661_227_243,
     "llama3.2:1b": 1_321_098_329,
     "ministral-3:14b": 9_082_537_546,
+    "qwen3-coder:30b": 18_556_700_761,
     "qwen3-coder:480b": 290_058_836_445,
     "qwen3.5:9b": 6_594_474_711,
     "qwen3.6:35b": 22_621_314_381,
@@ -1283,11 +1305,18 @@ OLLAMA_BYTES = {
 # when it's too old; a user's own Ollama gets a note saying what to do.
 OLLAMA_REQUIRES = {
     "deepseek-v3.1:671b": (0, 13, 5),
+    # 6b494 (2026-10-21): ollama.com/library/devstral-small-2 says "requires
+    # Ollama 0.13.3 or later" (its manifest carries no "requires")
+    "devstral-small-2:24b": (0, 13, 3),
     # the gemma4 tags were pushed again since: all three require 0.30.9 now
     # (the registry, 2026-10-07)
     "gemma4:12b": (0, 30, 9),
     "gemma4:26b": (0, 30, 9),
     "gemma4:e2b": (0, 30, 9),
+    # 6b494: neither the registry nor the library page gives one for the 30B;
+    # it uses the 480B's renderer and parser ("qwen3-coder", in Ollama from
+    # v0.12.0), so it takes the 480B's figure
+    "qwen3-coder:30b": (0, 13, 5),
     "qwen3-coder:480b": (0, 13, 5),
     "qwen3.5:9b": (0, 17, 1),
     "qwen3.6:35b": (0, 30, 0),
@@ -1299,7 +1328,49 @@ OLLAMA_REQUIRES = {
 # the graphics card, at a usable speed (6b315)
 MOE_ROWS = {"Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.6 35B MoE", "GPT-OSS 120B",
             "GLM 5.3", "DeepSeek V3.2 671B", "DeepSeek V3.1 671B",
-            "Qwen 3 Coder 480B"}
+            "Qwen 3 Coder 480B", "Qwen 3 Coder 30B MoE"}
+
+# THE OLDEST MLX-LM EACH MLX BUILD LOADS ON (6b494, per Patrick: Gemma 4 12B
+# was broken on this Mac). Gemma 4 12B exists only as Google's
+# "gemma4_unified" build (google/gemma-4-12B-it and every conversion of it on
+# the hub, checked 2026-10-21); mlx-lm reads it as a gemma4 from 0.32.0
+# (ml-explore/mlx-lm#1349: the type mapping, and the vision_embedder weights
+# skipped). Before that the engine dies with "Model type gemma4_unified not
+# supported": 0.31.3, which every venv made before 2026-10-15 holds, since
+# the installers never upgrade it. With 0.32.2 every weight key of the
+# current revision (73bcf09) matched a model built from its config.json.
+# A row whose MLX build needs a newer mlx-lm than the one here runs on
+# Ollama instead (its tag), or isn't offered when it has none; with no
+# mlx-lm found, nothing changes. Upgrading mlx-lm brings the row back to MLX
+# at the next start, onto the weights already downloaded.
+MLX_REQUIRES = {
+    "Gemma 4 12B": (0, 32, 0),
+}
+# each MLX build's config.json "model_type", from the hub on 2026-10-21
+# (6b497): the gauntlet checks every one loads on the engine the app
+# installs (MLX_LM_PIN), by that version's module list and type mapping
+MLX_MODEL_TYPES = {
+    "Llama 3.2 1B": "llama", "Gemma 4 E2B": "gemma4", "Ministral 3 14B": "mistral3",
+    "Hermes 3 8B": "llama", "Hermes 4 14B": "qwen3", "Gemma 4 12B": "gemma4_unified",
+    "Gemma 4 26B": "gemma4", "Qwen 3.5 9B": "qwen3_5", "DeepSeek R1 8B": "qwen3",
+    "GPT-OSS 20B": "gpt_oss", "Qwen 3.8 27B": "qwen3_5", "Qwen 3.6 35B MoE": "qwen3_5_moe",
+    "Devstral Small 2 24B": "mistral3", "Qwen 3 Coder 30B MoE": "qwen3_moe",
+    "GPT-OSS 120B": "gpt_oss", "GLM 5.3": "glm_moe_dsa", "DeepSeek V3.2 671B": "deepseek_v32",
+}
+
+
+def _mlx_lm_version():
+    """The installed mlx-lm's version, (0, 31, 3), from its package record
+    (nothing is imported), or None when there is none or it can't be read."""
+    try:
+        import importlib.metadata as _im
+        v = tuple(int(x) for x in re.findall(r"\d+", _im.version("mlx-lm"))[:3])
+        return v or None
+    except Exception:
+        return None
+
+
+MLX_LM_VERSION = _mlx_lm_version()
 
 # PRUNED, NOT FORGOTTEN (6b269, per Patrick: "what models can we prune
 # that are basically redundant or outdated"). Six rows left the
@@ -1878,7 +1949,14 @@ MODEL_INFO = {c[0]: dict(icon=c[1], size=c[2], group=c[3], mlx=c[4],
 # run. The Windows giants are Windows only (6b314): on a Mac, Apple
 # silicon or Intel, they are neither offered nor routed, so a copy
 # pulled by hand in Ollama can't be seated by a tier or a fallback.
-SUPPORTED = {l: bool(((i["mlx"] and IS_ARM) or i["ollama"])
+def _mlx_runs(label: str) -> bool:
+    """Whether the mlx-lm here loads the row's MLX build (MLX_REQUIRES,
+    6b494); True when that isn't known."""
+    need = MLX_REQUIRES.get(label)
+    return not need or MLX_LM_VERSION is None or tuple(MLX_LM_VERSION) >= need
+
+
+SUPPORTED = {l: bool(((i["mlx"] and IS_ARM and _mlx_runs(l)) or i["ollama"])
                      and (IS_WIN or l not in WINDOWS_ONLY))
              for l, i in MODEL_INFO.items()}
 
@@ -1887,7 +1965,7 @@ MODEL_ROUTES = {}
 for _l, _i in MODEL_INFO.items():
     if _l in WINDOWS_ONLY and not IS_WIN:
         continue
-    if _i["mlx"] and IS_ARM and _i["port"]:
+    if _i["mlx"] and IS_ARM and _i["port"] and _mlx_runs(_l):
         MODEL_ROUTES[_l] = ("mlx", _i["port"])
     elif _i["ollama"]:
         MODEL_ROUTES[_l] = ("ollama", _i["ollama"])
@@ -4261,7 +4339,9 @@ AGENTS = {
         # Claude-Code-shaped, honestly scoped: it READS the folder you
         # point it at and answers about YOUR code. No writes, no shell.
         "icon": "\U0001f5c2\ufe0f", "desc": "answers about your own code",
-        "picks": ["Qwen 3.8 27B", "Gemma 4 26B",
+        # the coders first (6b494): both read 256K tokens of a workspace
+        "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+          "Qwen 3.8 27B", "Gemma 4 26B",
           "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Qwen 3.5 9B",
           "Gemma 4 12B"],
         "workspace": True,
@@ -4284,14 +4364,16 @@ AGENTS = {
         # run_remote_agent picks the strongest available driver (cloud
         # when keyed). Lives in the Code tab beside Coding/Workspace.
         "icon": "🛰️", "desc": "runs commands on your server over SSH",
-        "picks": ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+        "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+          "Qwen 3.8 27B", "Qwen 3.6 35B MoE",
           "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B"],
         "remote": True,
         "system": "",       # the loop supplies REMOTE_SYSTEM itself
     },
     "Coding": {
         "icon": "💻", "desc": "working code, tight explanations",
-        "picks": ["Qwen 3.8 27B", "Qwen 3.5 9B",
+        "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+          "Qwen 3.8 27B", "Qwen 3.5 9B",
           "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B"],
         "system": (
             "You are a senior software engineer. Give WORKING code first, "
@@ -4624,7 +4706,9 @@ def resolve_agent_seat(name, ctx=None):
     if not a or not role or ctx is None:
         return label, a, ""
     try:
-        cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m["name"], role)]
+        # the Code lane may seat a coder partly in the server's memory (6b496)
+        cands = [m for m in server_mode_candidates(ctx, coders_in_ram=role == "code")
+                 if srv_role_ok(m["name"], role)]
     except Exception:
         cands = []
     if not cands:
@@ -4687,10 +4771,27 @@ FIRST_RUN_SET = "light"
 EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
 # who writes the merge, best first: merge_pref_label reads it too
 MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
-# the code lane's local planner, strongest first: remote_driver reads it too
-CODE_LADDER = ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
+# the code lane's local planner, strongest first: remote_driver reads it too.
+# The coders lead (6b494, per Patrick): Devstral Small 2, the agentic
+# specialist, then Qwen 3 Coder 30B (MoE, quicker); the general models stay
+# below them for machines that hold neither. Recommended takes the first
+# that fits, so it carries a coder wherever one fits.
+CODE_LADDER = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
+               "Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
                "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Gemma 4 E2B")
 VISION_MODEL = "Qwen 3.5 Vision 9B"
+# A SERVER'S CODERS MAY SPILL INTO ITS MEMORY (6b496, per Patrick: the two
+# coders on a 16 GB card, slower, partly in the server's RAM). Every other
+# row still goes on a server's set only when it fits the card whole. One of
+# these that doesn't fit its card joins the sets as a `ram` model (the kit's
+# allow-list flag: the gateway lets it load into system memory, alone) when
+# the kit says how much memory such a model may use (ram_bytes) and it fits
+# there: the file +5%, the gateway's 2.5 GiB of compute buffers for a split
+# model, and the KV cache at the server's own 32K default context (6b492;
+# Devstral Small 2's is 5.4 GB at fp16: 40 layers, 8 KV heads of 128; Qwen 3
+# Coder's 3.2 GB), allowed 6 GiB.
+SRV_RAM_ROWS = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE")
+SRV_RAM_EXTRA_B = (5 << 29) + (6 << 30)
 
 
 def model_set_key(name) -> str:
@@ -4728,14 +4829,27 @@ def model_sets(target=None) -> dict:
                 if SUPPORTED.get(l) and model_fits_machine(l)]
     else:
         vram = (target or {}).get("vram")
+        ram = (target or {}).get("ram") or 0
 
-        def card(l):
+        def whole(l):
             tag = (MODEL_INFO.get(l) or {}).get("ollama")
             return bool(tag) and _srv_fits(
                 {"placement": "gpu", "size": _set_tag_bytes(tag)}, vram, True)
 
+        def spill(l):
+            # a coder partly in the server's memory (6b496, SRV_RAM_ROWS)
+            tag = (MODEL_INFO.get(l) or {}).get("ollama")
+            return (l in SRV_RAM_ROWS and bool(tag) and bool(vram) and ram > 0
+                    and not whole(l)
+                    and _set_tag_bytes(tag) * 1.05 + SRV_RAM_EXTRA_B <= ram)
+
+        def card(l):
+            return whole(l) or spill(l)
+
         def fits(l):
-            return card(l) and not model_is_giant(l)
+            # Light and Recommended: on the card whole only; a coder partly in
+            # memory joins Everything alone (6b496, pool below)
+            return whole(l) and not model_is_giant(l)
 
         def key(l):
             return _srv_tag_key(MODEL_INFO[l]["ollama"])
@@ -4781,7 +4895,9 @@ def model_sets(target=None) -> dict:
             # the giants box's models: Everything holding one is red, not
             # yellow (per Patrick)
             "giants": ([l for l in out if model_is_giant(l)]
-                       if target is None else [])}
+                       if target is None else []),
+            # a server's rows that go there partly in its memory (6b496)
+            "ram": ([] if target is None else [l for l in out if spill(l)])}
 
 
 def model_set_chosen() -> str:
@@ -6358,7 +6474,10 @@ def start_managed_engines():
 
 
 # ------------------------------------------------------- first-run setup
-_setup_lock = threading.Lock()
+# re-entrant (6b493): _refresh_keep() takes this lock and was called while it was held, by _download_model and
+# the Ollama pull, so the first download froze the app's whole model setup (every set card, /api/setup and the
+# download itself waited on a lock their own thread held)
+_setup_lock = threading.RLock()
 _setup_jobs = {}  # label -> {"status": "downloading"|"done"|"error", "note": str}
 
 
@@ -12860,6 +12979,8 @@ MACHINE_IO = frozenset((
     # import time: the dev folder, the crash log and the logs, the
     # subprocess recorder (a dev copy's hook)
     "<module>",
+    # 6b497: the MLX engine self-update: its record, the pip run's temp files, the unpacked wheels
+    "_mlx_engine_record", "_mlx_engine_pip", "_ensure_mlx_engine",
     # run/ notes, locks and the instance lock
     "run_file", "drop_run_file", "sweep_run_files", "single_instance",
     "_write_instance_note", "_write_boot_note", "_drop_instance_note",
@@ -18748,6 +18869,167 @@ def crypto_status() -> dict:
     return {"ok": ok, "state": state, "note": why}
 
 
+# THE MLX ENGINE FOLLOWS THE APP (6b497, per Patrick: "upgrade the app's MLX
+# engine in the next app update"). The installers run `pip install mlx-lm`
+# once, never again, so every venv made before 2026-10-15 holds mlx-lm
+# 0.31.3, which can't load Gemma 4 12B (gemma4_unified; MLX_REQUIRES). At its
+# start the app brings its own venv's engine to MLX_LM_PIN, in the background,
+# the way PyNaCl comes (6b327): the copy holding the instance lock only, never
+# a dev or test copy (their venv isn't inside their folder), never a frozen
+# build or a system Python. One try per build and Python, again 3 days after
+# a failure. mlx-lm 0.32.2 wants mlx >= 0.32.2 (its mlx-metal with it),
+# transformers >= 5.7 and Python >= 3.11: the three wheels below are pinned
+# by the sha256 PyPI lists (checked 2026-10-21; mlx for CPython 3.11-3.14 on
+# macOS 14, 15 and 26, arm64), installed with no other dependency, so a venv
+# whose transformers or Python is too old is left as it is and says why
+# (Gemma 4 12B then stays on Ollama there). The wheels are downloaded first,
+# then installed from that folder while no engine may start (_engine_lock),
+# so an engine never starts on a half-installed mlx. Engines already running
+# keep the old code until they stop; the routes are read at start, so a row
+# that needed the new engine moves to MLX at the next start. Every catalog
+# MLX row's model_type (MLX_MODEL_TYPES) must load on this pin: the gauntlet
+# checks it against the pin's own module list and type mapping.
+MLX_LM_PIN = (0, 32, 2)
+MLX_ENGINE_REQS = r"""mlx-lm==0.32.2 \
+    --hash=sha256:5c0991248cfff5872503d74f466d2532dd8cb7fb3670cb9be7a06d7305dadc04
+mlx==0.32.2 \
+    --hash=sha256:238b50d2ee3917c836e73f9446011518b79ff094940eb0107fa6cd17d02a2eca \
+    --hash=sha256:e507dc67d268cf78254e17756f25057198fe74791508fcbd1e6d967673a8d374 \
+    --hash=sha256:e0828c96a6b988afbe6f07cc39adc0470eba9121f7e356623a8fb9d9a6397533 \
+    --hash=sha256:77217798a2b036bae9f213b851d4cde4581893787c9964458b7d471f86036bd6 \
+    --hash=sha256:cf63fd5c32258ab07523b06401c20ee2280bf56e26e991d05bf6fd8a4d42d1f6 \
+    --hash=sha256:68560fd648c5bb900aa6f6765cd74c5a8abaf092d97d73584a57b7545966c227 \
+    --hash=sha256:65d3d29b66045ed8dd2d8e437c8770de325843c364f7b7c38cd8ae90a7eec854 \
+    --hash=sha256:daebf84dfb857d70e87b1b98189a057e691e99a4a2b9f6f64cadebad917f8964 \
+    --hash=sha256:df8c75e509de868fca148dfeb38d92ce956eed386569c87caeb72bd16d2d6962 \
+    --hash=sha256:c99e3b6451bb4a55071cf19594f564435bd88de77008f377e611a40a8bbfb328 \
+    --hash=sha256:8fc433e35a7058e30f7a225c39fce06ba41394fe8e9fd67383b70f0b06de398c \
+    --hash=sha256:3503617e3aa6a8e411df53236d5bca039fcca97556f1ade1c4e5cc8a64de52d2
+mlx-metal==0.32.2 \
+    --hash=sha256:3825fff379dbc107dd3413e564a06caeaa24819910ec49c0439e454c06a1b9b8 \
+    --hash=sha256:55a369250d220b2cf10213a87a2ac1b1a420608c5b35b1df4e7147ac8e32f121 \
+    --hash=sha256:e6abeac9ac5265830c9c1541b6f96e9be37a85c2446763a46ad466c63a3837ab
+"""
+MLX_ENGINE_NEEDS = {"python": (3, 11), "transformers": (5, 7, 0)}
+MLX_ENGINE_RECORD = "mlx-engine.json"
+_mlx_engine = {"state": "idle", "note": ""}
+
+
+def _dist_version(name: str):
+    """An installed package's version as a tuple of its first three numbers,
+    from its package record (nothing is imported), or None."""
+    try:
+        import importlib.metadata as _im
+        return tuple(int(x) for x in re.findall(r"\d+", _im.version(name))[:3]) or None
+    except Exception:
+        return None
+
+
+def _mlx_engine_why_not(have=None, tf=None, py=None) -> str:
+    """'' when this copy should bring its venv's mlx-lm up to MLX_LM_PIN now,
+    else why not (the arguments stand in for this machine's, in tests)."""
+    if not (IS_MAC and IS_ARM):
+        return "not an Apple-silicon Mac"
+    why = _crypto_install_blocker()
+    if why:
+        return why
+    have = _dist_version("mlx-lm") if have is None else have
+    if not have:
+        return "no MLX engine in this venv"
+    if tuple(have) >= MLX_LM_PIN:
+        return "up to date"
+    py = tuple(sys.version_info[:2]) if py is None else tuple(py)
+    if py < MLX_ENGINE_NEEDS["python"]:
+        return "the new MLX engine needs Python %d.%d or newer (this venv runs %d.%d)" % (
+            MLX_ENGINE_NEEDS["python"] + py)
+    tf = _dist_version("transformers") if tf is None else tf
+    if not tf or tuple(tf) < MLX_ENGINE_NEEDS["transformers"]:
+        return "the new MLX engine needs transformers 5.7 or newer"
+    return ""
+
+
+def _mlx_engine_record(rec=None):
+    """mlx-engine.json: read it (rec None), or write rec."""
+    path = os.path.join(app_dir(), MLX_ENGINE_RECORD)
+    if rec is None:
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+    try:
+        os.makedirs(app_dir(), exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=app_dir(), prefix=".mlx-engine-", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(rec, f)
+        _replace_into(tmp, path)
+    except OSError:
+        pass
+    return None
+
+
+def _mlx_engine_pip(args: list, reqs: str):
+    """One pip call of this venv's Python over the pins: (ok, why)."""
+    fd, path = tempfile.mkstemp(prefix="mlx-req-", suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(reqs)
+        r = subprocess.run([sys.executable, "-m", "pip"] + list(args)
+                           + ["--quiet", "--disable-pip-version-check", "--no-input", "--timeout", "15",
+                              "--retries", "1", "--only-binary=:all:", "--require-hashes", "--no-deps",
+                              "-r", path], capture_output=True, text=True, timeout=1200)
+    except Exception as exc:
+        return False, "pip didn't run (%s)" % type(exc).__name__
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    if r.returncode != 0:
+        return False, _pip_why((r.stderr or "") + "\n" + (r.stdout or ""))
+    return True, ""
+
+
+def _ensure_mlx_engine(pip=None, now=None):
+    """At a start, on a thread of its own: this venv's mlx-lm at MLX_LM_PIN,
+    or one try at it, or why not (_mlx_engine). Never blocks the boot."""
+    pip = pip or _mlx_engine_pip
+    why = _mlx_engine_why_not()
+    if why:
+        _mlx_engine.update(state="skipped", note=why)
+        return
+    if pip is _mlx_engine_pip:
+        time.sleep(3)                       # PyNaCl's thread, started just before, says "installing" first
+    for _ in range(300):                    # PyNaCl's own pip call first: one pip in the venv at a time
+        if _crypto_install.get("state") != "installing":
+            break
+        time.sleep(1)
+    key = "%s %s" % (_crypto_key(), "%d.%d.%d" % MLX_LM_PIN)
+    go, why = _crypto_should_try(_mlx_engine_record(), key, time.time() if now is None else now)
+    if not go:
+        _mlx_engine.update(state="failed", note=why)
+        return
+    _mlx_engine.update(state="installing", note="")
+    d = tempfile.mkdtemp(prefix="mlx-engine-")
+    try:
+        ok, why = pip(["download", "--dest", d], MLX_ENGINE_REQS)
+        if ok:
+            with _engine_lock:                # no engine starts on a half-installed mlx
+                ok, why = pip(["install", "--no-index", "--find-links", d], MLX_ENGINE_REQS)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    import importlib
+    importlib.invalidate_caches()
+    have = _dist_version("mlx-lm")
+    if ok and have and tuple(have) >= MLX_LM_PIN:
+        _mlx_engine.update(state="done", note="the MLX engine is %d.%d.%d from the next start" % MLX_LM_PIN)
+    else:
+        _mlx_engine.update(state="failed", note=why or "the MLX engine didn't update")
+    print("  (MLX engine: %s)" % _mlx_engine["note"])
+    _mlx_engine_record({"key": key, "ok": _mlx_engine["state"] == "done", "at": int(time.time()),
+                        "note": _mlx_engine["note"]})
+
+
 # why accounts are off: what an account action says, and what the
 # Account pane says (the pane is passive: it sent nothing, review)
 ACCOUNT_OFF = {
@@ -21046,7 +21328,9 @@ def server_only_named(ctx, name: str) -> list:
 # Fast, Thinking and Pro", on by default), answering on its last check,
 # and models whose placement is "gpu" and that fit the card (_srv_fits):
 # never "gpu+ram" (a server's CPU can be unstable under that load) and never
-# a model whose placement is unknown.
+# a model whose placement is unknown. One exception (6b496, per Patrick): the
+# Code lane may seat the catalog's coders (SRV_RAM_ROWS) partly in memory, as
+# the server sets bring them to a card too small for them (_srv_ram_coder).
 #
 # ONE CHOOSER, shared by the tiers, the Code lane and funnels: which of a
 # server's models suits a seat (srv_role_ok) and which suits it best
@@ -21159,10 +21443,21 @@ def _srv_tag_key(tag: str) -> str:
     return t[:-len(":latest")] if t.endswith(":latest") else t
 
 
-def server_mode_candidates(ctx) -> list:
+def _srv_ram_coder(m: dict) -> bool:
+    """A catalog coder the server holds partly in its memory (6b496, per
+    Patrick): placement "gpu+ram" and the tag of an SRV_RAM_ROWS row. Only
+    the Code lane seats one (coders_in_ram); nothing else ever does."""
+    tags = {_srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) for l in SRV_RAM_ROWS}
+    return (m.get("placement") == "gpu+ram" and _srv_tag_key(m.get("name")) in tags
+            and _srv_flags(m.get("name"))["coder"])
+
+
+def server_mode_candidates(ctx, coders_in_ram: bool = False) -> list:
     """The models of ctx's servers the modes may use unasked (see above):
     each a _srv_models row plus server, sid and params. Only ctx's own
-    servers, from their last check."""
+    servers, from their last check. coders_in_ram (the Code lane only,
+    6b496): the catalog's coders that run partly in the server's memory
+    too, marked "spill"."""
     out = []
     try:
         entries = _srv_read(ctx)
@@ -21179,6 +21474,9 @@ def server_mode_candidates(ctx) -> list:
             if _srv_fits(m, vram, True):
                 out.append(dict(m, server=e["name"], sid=e["id"],
                                 params=_srv_params(m["name"])))
+            elif coders_in_ram and _srv_ram_coder(m):
+                out.append(dict(m, server=e["name"], sid=e["id"],
+                                params=_srv_params(m["name"]), spill=True))
     return out
 
 
@@ -21251,8 +21549,10 @@ SRV_SIDE_FIRST_S = 30.0         # a side pass is small: a slow server is left fo
 
 def server_side_pick(ctx, role: str = "fast", effort: str = "fast"):
     """The server model a side pass runs on, or None (no server qualifies).
-    "fast" wants a quick, competent instruction model (srv_rank)."""
-    cands = server_mode_candidates(ctx)
+    "fast" wants a quick, competent instruction model (srv_rank). The Code
+    lane's planner (role "code") may take a coder partly in the server's
+    memory (6b496)."""
+    cands = server_mode_candidates(ctx, coders_in_ram=role == "code")
     if not cands:
         return None
     top = srv_rank(cands, role, effort, server_speeds(ctx))
@@ -22977,7 +23277,9 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
 # with the exact add/remove list shown before anything is deleted"). The
 # sets are model_sets's own, for target {"vram": the card}: a catalog row
 # fits when its Ollama file fits the card whole (_srv_fits), the roles and
-# the nesting as on this computer. The gateway keeps the list and does the
+# the nesting as on this computer. The one exception (6b496): Everything may
+# hold the catalog's coders partly in the server's memory (SRV_RAM_ROWS),
+# sized by the kit's ram_bytes and sent with the apply's `ram` list. The gateway keeps the list and does the
 # work: signed GET /v1/models/state, and POST /v1/models/apply (removals
 # first, then pulls in the order given). `seen` is the sha256 of the model
 # names as this app saw them, so the gateway refuses a list that changed
@@ -23066,7 +23368,10 @@ def _srv_mstate_parse(js):
             if isinstance(mg, list) else [],
             "managed_known": isinstance(mg, list),
             "jobs": _srv_jobs_parse(js.get("jobs")), "plan": plan,
-            "disk_free_bytes": num("disk_free_bytes"), "vram_bytes": num("vram_bytes")}
+            "disk_free_bytes": num("disk_free_bytes"), "vram_bytes": num("vram_bytes"),
+            # the most a `ram` model may use there (6b496); 0 from an older kit,
+            # which then gets no model partly in its memory (nor the "ram" key)
+            "ram_bytes": num("ram_bytes")}
 
 
 def server_sets_view(state: dict, vram) -> dict:
@@ -23075,8 +23380,12 @@ def server_sets_view(state: dict, vram) -> dict:
     server, outside the set, a name the gateway takes; at most 40), how
     many others stay, the GB both ways, "same" and the state ("yours": the
     set last picked there while all of it is there, else the largest set
-    all there; "installed"; "download")."""
-    sets = model_sets({"vram": vram}) if vram else {k: [] for k in MODEL_SETS}
+    all there; "installed"; "download"). A coder that goes there partly in
+    the server's memory (6b496) is marked "ram" in Download and listed in
+    the set's "ram"."""
+    sets = (model_sets({"vram": vram, "ram": state.get("ram_bytes") or 0}) if vram
+            else {k: [] for k in MODEL_SETS})
+    rtags = {MODEL_INFO[l]["ollama"] for l in sets.get("ram") or []}
     names = [m["name"] for m in state["models"]]
     size = {m["name"]: m["size"] for m in state["models"]}
     have = {_srv_tag_key(n) for n in names}
@@ -23086,12 +23395,13 @@ def server_sets_view(state: dict, vram) -> dict:
     for i, k in enumerate(MODEL_SETS):
         tags = [MODEL_INFO[l]["ollama"] for l in sets[k]]
         keys[k] = {_srv_tag_key(t) for t in tags}
-        dl = [{"name": t, "gb": round(_set_tag_bytes(t) / 1e9, 1)}
+        dl = [dict({"name": t, "gb": round(_set_tag_bytes(t) / 1e9, 1)}, **({"ram": True} if t in rtags else {}))
               for t in tags if _srv_tag_key(t) not in have]
         rm = [{"name": n, "gb": round(size.get(n, 0) / 1e9, 1)} for n in names
               if _srv_tag_key(n) not in keys[k] and SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]
         same = next((p for p in MODEL_SETS[:i] if keys[k] and keys[p] == keys[k]), "")
         out["sets"][k] = {"n": len(tags), "tags": tags, "download": dl, "remove": rm,
+                          "ram": [t for t in tags if t in rtags],
                           "keep_n": len(names) - len(rm), "same": same,
                           "dl_gb": round(sum(d["gb"] for d in dl), 1),
                           "free_gb": round(sum(r["gb"] for r in rm), 1)}
@@ -23153,6 +23463,7 @@ def server_models_get(ctx, sid: str) -> dict:
         "seen": view["seen"], "at": time.time(),
         "names": [m["name"] for m in state["models"]],
         "dl": {k: [d["name"] for d in x["download"]] for k, x in view["sets"].items()},
+        "ram": {k: [d["name"] for d in x["download"] if d.get("ram")] for k, x in view["sets"].items()},
         "rm": {k: [r["name"] for r in x["remove"]] for k, x in view["sets"].items()}}
     return dict(view, ok=True, name=e["name"])
 
@@ -23187,6 +23498,11 @@ def server_models_apply(ctx, sid: str, d: dict) -> dict:
             or not set(rm) <= set(ms["rm"].get(plan) or [])):
         return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}
     body = {"plan": plan, "add": list(add), "remove": list(rm), "seen": seen}
+    # the downloads this app's own read sized partly into the server's memory
+    # (6b496); never from the page, and only to a kit that said ram_bytes
+    ram = [t for t in add if t in ((ms.get("ram") or {}).get(plan) or [])]
+    if ram:
+        body["ram"] = ram
     try:
         st, js = _srv_json(e, "POST", "/v1/models/apply", body, timeout=SRV_CONNECT_S)
     except ServerError as se:
@@ -23251,7 +23567,8 @@ def server_update_view(state: dict, vram, remote=None, had=None, unseen=()) -> d
     remote(tag) -> (digest hex, {layer: bytes}) or None (None: no refresh
     check); had: set_news's record for this server; unseen: tags of catalog
     rows no card has shown yet."""
-    sets = model_sets({"vram": vram}) if vram else {k: [] for k in MODEL_SETS}
+    sets = (model_sets({"vram": vram, "ram": state.get("ram_bytes") or 0}) if vram
+            else {k: [] for k in MODEL_SETS})
     tags = {k: [MODEL_INFO[l]["ollama"] for l in sets[k]] for k in MODEL_SETS}
     names = [m["name"] for m in state["models"]]
     have = {_srv_tag_key(n) for n in names}
@@ -23307,6 +23624,9 @@ def server_update_view(state: dict, vram, remote=None, had=None, unseen=()) -> d
            "seen": srv_seen_hash(state.get("seen_names", names)),
            "plan_name": plan or (full[-1] if full else "recommended"),
            "had": nxt}
+    # what goes there partly in its memory (6b496): _srv_apply_now flags them
+    rt = {MODEL_INFO[l]["ollama"] for l in sets.get("ram") or []}
+    out["ram"] = [a["name"] for a in out["add"] if a["name"] in rt]
     out["dl_gb"] = round(sum(a["gb"] for a in out["add"]) + sum(r["gb"] for r in refresh), 1)
     out["free_gb"] = round(sum(r["gb"] for r in out["retire"]), 1)
     out["offer"] = hashlib.sha1(json.dumps(
@@ -23373,6 +23693,9 @@ def servers_updates(ctx, remote=True) -> list:
 def _srv_apply_now(e, v: dict, add: list, remove: list) -> dict:
     """One POST /v1/models/apply of add and remove, made from view v."""
     body = {"plan": v["plan_name"], "add": list(add), "remove": list(remove), "seen": v["seen"]}
+    ram = [t for t in add if t in (v.get("ram") or [])]
+    if ram:
+        body["ram"] = ram       # 6b496: partly in the server's memory
     try:
         st, js = _srv_json(e, "POST", "/v1/models/apply", body, timeout=SRV_CONNECT_S)
     except ServerError as se:
@@ -35299,7 +35622,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
 
 # Where the app goes when 8889 is taken: far from the engines, whose
-# catalog ports climb by two from 8884 (8944 today, and the next row
+# catalog ports climb by two from 8884 (8950 today, and the next row
 # takes the next even port), from ConcordeGo's 9897, from the dev and
 # gauntlet ports (9894, 9895, 9901-9903) and from 9889, the retired web
 # copy's. The gauntlet fails if a catalog or retired port ever lands in
@@ -41463,6 +41786,8 @@ const ADV_USE={
   "GPT-OSS 20B":"strong open reasoning",
   "Qwen 3.8 27B":"heavyweight generalist and coder",
   "Qwen 3.6 35B MoE":"heavyweight generalist, fast for its size",
+  "Devstral Small 2 24B":"agentic coder — the Code lane's first pick",
+  "Qwen 3 Coder 30B MoE":"coder, fast for its size",
   "GPT-OSS 120B":"frontier-class open reasoning",
   "GLM 5.3":"the largest open model \u2014 512 GB Macs",
   "DeepSeek V3.2 671B":"frontier open model \u2014 512 GB Macs",
@@ -48133,7 +48458,9 @@ function srvSheet(d,k,rm){
     empty:!dl.length&&!out.length};
 }
 function srvSheetHtml(sh){
-  const row=m=>'<div class="mrow"><span class="mname">'+esc(m.name)+'</span>'
+  // a coder that goes there partly in the server's memory (6b496): the pane's own words for gpu+ram
+  const row=m=>'<div class="mrow"><span class="mname">'+esc(m.name)
+    +(m.ram?' · card + memory, slower':"")+'</span>'
     +'<span class="msize">'+muGB(m.gb)+'</span></div>';
   return (sh.dl.length?'<div class="og">Download</div>'+sh.dl.map(row).join(""):"")
     +(sh.rm.length?'<div class="og">Remove</div>'+sh.rm.map(row).join(""):"")
@@ -52052,6 +52379,8 @@ if __name__ == "__main__":
     # copy run without it), so two copies never pip into one venv
     if _INSTANCE_LOCK:
         ctx_thread(target=_ensure_crypto_deps, daemon=True).start()
+        # the MLX engine at its pin (6b497), the same way, after PyNaCl's pip
+        ctx_thread(target=_ensure_mlx_engine, bind=False, daemon=True).start()
     start_managed_engines()
     if not HAS_SEARCH:
         print("  (web search disabled — pip install ddgs to enable)")
