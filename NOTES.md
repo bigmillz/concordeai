@@ -16054,3 +16054,44 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
   "couldn't list the RDP connections" and nothing is ended), and whether GDM cleans up after a terminated remote
   greeter without respawning one. Tests: tests/test_rdptidy.py (fixtures of loginctl -j, show-session, ss and
   cgroups; whole passes on a fake clock) and 11 rdp mutants in tests/mutate.py, all killed.
+
+## 6b507 — An optional SSH door through the tunnel (per Patrick)
+
+Patrick is abroad for months. SSH to the server worked only from the home LAN, and the VPN way needs a change on the
+Pi nobody can make from there. He approved SSH through the Cloudflare Tunnel that already carries the gateway and
+the panel, behind Access (the panel's admin identity) and then SSH keys.
+
+- Opt-in: `setup.sh --ssh-door` (`--no-ssh-door` closes it), recorded as `ssh_door: true` in config.json with
+  `hostname_ssh` (default `<server-name>-ssh.<zone>`, like the other two names, so two servers in one zone can't
+  repoint each other's door: dns_step "fixes" any tunnel CNAME on its names) and `ssh_aud`. Off, every file setup
+  writes is byte-for-byte what it was (cloudflared.yml, the sshd drop-in, the nft rules; tests compare against the
+  pre-door rendering).
+- Tunnel: one more ingress rule, `ssh://127.0.0.1:22`, with the same `originRequest.access` check (required,
+  teamName, audTag [ssh_aud]) as the HTTP routes, before the 404. Rendered only when the door is on, its AUD is
+  known and sshd takes it (below); setup.sh renders through setuplib's render_tunnel_yml now, so tests run it.
+- Access: ollama1-cf-access makes "<server-name> ssh" for hostname_ssh with the admin's Allow policy (reused, not a
+  new one) and `type: "ssh"`, which is how the API spells a self-hosted app with browser-rendered SSH (the
+  dashboard's "Browser rendering: SSH"; the Terraform provider lists ssh/vnc/rdp as app types; Cloudflare's docs
+  name no other field). If Cloudflare refuses that type, it falls back to self_hosted and says which switch to
+  flip. `--ssh-door` on the helper turns the door on in config.json too, so the owner can run the helper from the
+  kit checkout at a terminal and then setup once, detached. No token in a file, a log or a command line, as
+  before; the same 6-permission token covers it.
+- No API token: setup's door menu (only at a terminal) prints the dashboard steps and reads the AUD; with no
+  terminal (a detached run) it leaves a `later` line and changes nothing else. `--ssh-aud <AUD>` gives it
+  non-interactively.
+- sshd: AllowUsers gains `<user>@127.0.0.1` (cloudflared connects from there) only while password login is off;
+  setup checks with `sshd -T -C addr=127.0.0.1` that a door connection is keys only (passwordauthentication no,
+  kbdinteractiveauthentication no, authenticationmethods publickey), else restores the old drop-in and stops.
+- PerSourcePenalties (OpenSSH 9.8+; Ubuntu 26.04 has it): 127.0.0.1 is exempted (`PerSourcePenaltyExemptList`,
+  only when this sshd knows the option, probed with `sshd -t -o`). Every door user shares 127.0.0.1, so a penalty
+  there (a few failed key offers, an agent with many keys) would shut the door for everyone, Patrick abroad
+  included, for up to the penalty maximum, and it protects nothing: nobody reaches 127.0.0.1:22 without an Access
+  login first, and the port guard (below) keeps local users off it. The LAN keeps its penalties.
+- nft: with the door on, `ollama1-nft` also resets connections to port 22 from 127.0.0.0/8 by anyone but root and
+  cloudflared, so 127.0.0.1 in AllowUsers means the tunnel. ufw is untouched: port 22 stays LAN only, and nothing
+  new listens (the "What listens" check is unchanged).
+- Browser SSH is switched on but unproven: it logs in to sshd like any client, and the kit sets up no short-lived
+  certificates, so it may have no key to offer; `cloudflared access ssh` as ProxyCommand is the way in.
+- Unverified on the server: everything Cloudflare-side (the `ssh` type, cloudflared's Access check on an ssh://
+  route) and the new nft line under `nft -c`. Tests: tests/test_sshdoor.py (rendering on and off, the drop-in, the
+  guard, the flags, the helper against the fake API with the ssh type and its fallback), six mutants in mutate.py.

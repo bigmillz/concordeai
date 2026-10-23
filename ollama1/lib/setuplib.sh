@@ -206,6 +206,67 @@ watchdog_plan() { # the plan's line for the hardware watchdog (6b399)
   fi
 }
 
+# ---- the SSH door (6b507) ---------------------------------------------------------
+# SSH through the Cloudflare Tunnel, behind Access (the admin's email) and then sshd's keys. OFF unless asked for.
+ssh_door_choice() { # FLAG SAVED -> "on" or "off": the flag (--ssh-door / --no-ssh-door), else config.json's ssh_door
+  # (SAVED is "true" when it is on), else "off". Fails on a flag value it doesn't know.
+  case "$1" in
+    on|off) echo "$1"; return 0 ;;
+    "") ;;
+    *) return 1 ;;
+  esac
+  if [ "$2" = true ]; then echo on; else echo off; fi
+}
+
+ssh_door_plan() { # the plan's line for the SSH door: $1 on|off, $2 its hostname
+  if [ "$1" = on ]; then
+    printf 'SSH door ON: SSH through the tunnel at %s, behind Access (your email) and then your key; sshd also lets %s in from 127.0.0.1 (only cloudflared may connect there); no new port opens. Off: --no-ssh-door' "$2" "${3:-your user}"
+  else
+    printf 'SSH door OFF (default): SSH only from the LAN. On: --ssh-door'
+  fi
+}
+
+valid_aud() { [[ "$1" =~ ^[0-9a-f]{64}$ ]]; }
+
+ssh_door_lines() { # on|off: a template on stdin with its SSH door lines kept (on) or dropped (off). The lines are a
+  # block between @SSH_DOOR_BEGIN@ and @SSH_DOOR_END@ (the marker lines always go), or single lines starting
+  # "#ssh-door# " (the prefix goes). Off leaves exactly what the template made before the door existed.
+  awk -v on="$1" '
+    index($0, "@SSH_DOOR_BEGIN@") { skip = (on != "on"); next }
+    index($0, "@SSH_DOOR_END@") { skip = 0; next }
+    skip { next }
+    index($0, "#ssh-door# ") { if (on != "on") next; sub(/#ssh-door# /, "") }
+    { print }'
+}
+
+render_tunnel_yml() { # TEMPLATE TID TEAM GAUD AAUD GW_HOST ADMIN_HOST [SSH_HOST SSH_AUD] -> the tunnel's config on
+  # stdout; the SSH door's route only when both of its values are given (the caller checks every value's characters)
+  local door=off
+  if [ -n "${8:-}" ] && [ -n "${9:-}" ]; then door=on; fi
+  sed -e "s/@TUNNEL_ID@/$2/" -e "s/@TEAM_NAME@/$3/g" -e "s/@GATEWAY_AUD@/$4/" -e "s/@ADMIN_AUD@/$5/" \
+      -e "s/@GW_HOST@/$6/" -e "s/@ADMIN_HOST@/$7/" -e "s/@SSH_HOST@/${8:-}/" -e "s/@SSH_AUD@/${9:-}/" "$1" \
+    | ssh_door_lines "$door"
+}
+
+ssh_door_sshd_lines() { # yes|no (sshd knows PerSourcePenalties) -> the drop-in's lines for the SSH door
+  printf '%s\n' "# The SSH door (6b507): cloudflared brings in connections Access has checked, from 127.0.0.1."
+  printf '%s\n' "# Keys only, as for the LAN (the lines above)."
+  if [ "$1" = yes ]; then
+    printf '%s\n' "# Every door login shares that address, so one bad key must not shut the door on all of them:"
+    printf '%s\n' "# no per-source penalties for it. Access is the gate there."
+    printf '%s\n' "PerSourcePenaltyExemptList 127.0.0.1"
+  fi
+}
+
+render_sshd_dropin() { # TEMPLATE PASSWORD_LINES ALLOWUSERS DOOR_LINES -> the sshd drop-in on stdout. DOOR_LINES empty
+  # (the door off) leaves exactly what the template made before the door existed.
+  O1_PW="$2" O1_WHO="$3" O1_DOOR="$4" awk '{
+    if ($0 == "@PASSWORD_LINES@") print ENVIRON["O1_PW"]
+    else if ($0 == "@SSH_DOOR_LINES@") { if (ENVIRON["O1_DOOR"] != "") print ENVIRON["O1_DOOR"] }
+    else if ($0 == "AllowUsers @ADMIN_USER_AT_LAN@") print "AllowUsers " ENVIRON["O1_WHO"]
+    else print }' "$1"
+}
+
 saved() { # KEY -> its value from the file an earlier run wrote, if any
   [ -r "$SAVED" ] || return 0
   sed -n "s/^$1=//p" "$SAVED" | head -n1
