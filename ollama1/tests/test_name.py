@@ -43,7 +43,7 @@ class TestDerived(unittest.TestCase):
         n = C.access_names(dict(C.DEFAULTS, server_name="testsrv", owner_label="Alice"))
         self.assertEqual(n, {"tunnel": "testsrv", "token": "testsrv-app", "policy_admin": "testsrv admin - Alice only",
                              "policy_app": "testsrv app - service token", "app_admin": "testsrv admin",
-                             "app_gateway": "testsrv app"})
+                             "app_gateway": "testsrv app", "app_ssh": "testsrv ssh"})   # app_ssh: the SSH door, 6b507
         self.assertEqual(C.access_names(dict(C.DEFAULTS, server_name="testsrv"))["policy_admin"], "testsrv admin only")
 
 

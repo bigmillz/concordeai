@@ -16165,3 +16165,161 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
 - setup.sh step 11 treated the GPU as found only when Ollama's "inference compute" line said ROCm, so an NVIDIA
   server got a false "Ollama did not report a ROCm GPU" note and a `later` item. It now accepts ROCm or CUDA. The
   gateway's 100%-on-GPU rule was already vendor-neutral (size_vram against size from /api/ps).
+
+## 6b505 — Fan calibration: the panel finds a quiet, steady working level from measured temperatures (per Patrick)
+
+Patrick's idea from 6b495: a button that runs a 2-3 minute model query, a 10-minute one, then a 20-30 minute burn,
+records temperatures against fan levels and sets a steady curve, quiet for the household, no hunting.
+
+- **The run** (`lib/o1fancal.py`, `bin/ollama1-fancal`, `ollama1-fancal.service`, root, sandboxed like the quick
+  burn plus `IPAddressAllow=localhost` for Ollama). Step 1, 150 s: a real `/api/generate` stream to 127.0.0.1:11434
+  (root is allowed by the nft rule), answer after answer, fans at 100%: the baseline. Step 2, 600 s: the same query;
+  the fans step down a fixed ladder 80/65/50/40/30%, 120 s a step; the first failing step goes back up one and the
+  descent stops for good. Step 3, 25-30 min: `tools/gpu-burn.sh` (llama-bench on the same model's blob; Ollama's copy
+  is unloaded first so both don't sit in the 16 GB), starting at step 2's level, 300 s blocks, only ever up a step;
+  it ends at the first passing block after 25 min. Model: `fan_cal_model` in config.json, else `gemma4:12b` (the
+  burn tools' default, installed on the server since 6b484).
+- **Judging.** Every sensor the fan service watches gets a ceiling `limit - 10 C`; one already within 13 C of its
+  limit at 100% gets its 100% reading + 3 C; within 3 C at 100% ends the run with nothing changed. A block fails
+  when the second half's peak (6 s moving average: Tctl's boost spikes aren't heat) or the projection reaches the
+  ceiling, or at once when a reading is over it after the block's first 60 s and not falling (so a step back up
+  isn't failed by the heat it inherited). The projection: three equal windows; slowing rise -> m3 + d2²/(d1-d2) (a
+  first-order system's remaining rise); flat/noisy (within 0.5 C) -> m3; just started -> m3 + 2·d2; not slowing ->
+  +8 C (assume the worst). Temperatures come from the fan service's own status file, so the run judges exactly
+  what the override watches.
+- **The target, and why.** Two levels, not one: QUIET = step 2's level + 10 points (what the household's real load,
+  model answers, needs) and HEAVY = step 3's level + 10 (sustained flat-out load), at least the quiet one, both
+  30-100. A single level from the burn alone would run the fans at burn speed for every short answer, which is
+  most of the work; a single level from the queries would leave a long job relying on the 100% override. The
+  fan service works at QUIET and moves to HEAVY at once when any temperature is within 12 C of its limit, back
+  only when all are 20 C under and HEAVY has held 180 s (lib/o1work.py: STEP_UP_MARGIN_C, STEP_DOWN_MARGIN_C,
+  STEP_MIN_S). An 8 C band plus a 3-minute dwell against thermal time constants of minutes means at most a step
+  every few minutes, never a hunt; the hold and the ramp after work start from whichever level it worked at.
+  The 10 C ceiling protects the hardware (it is also the override's hysteresis and the deep-idle margin); the +10
+  points cover what the test room didn't have: a warmer summer room, dust, ageing paste. The override at the limit
+  (100%) is unchanged and always wins.
+- **Applying it.** `/var/lib/ollama1/fan-calibration.json` (v1, quiet_pct, heavy_pct, found, ceilings, the judged
+  blocks). `o1work.levels()`: the calibration unless config.json says `"fan_calibration": "off"`; then
+  `fan_work_pct` (the manual override/fallback); else 100. The fan service re-reads both files when they change
+  (`o1work.Levels`, a stat per tick), so no restart; its status carries work/heavy/levels/stepped, and the lights
+  are red at the reported work level.
+- **The panel.** The Fans card gains a Calibration box: the saved levels, Calibrate fans (asks first; 409 with the
+  reason when serving, busy, already running, the fan service missing/measuring, or the model not installed), and
+  while running the step, the level, the card's busy %, the time left, the 4 sensors nearest their ceilings and the
+  blocks so far, with **Abort**. Abort starts `ollama1-fancal-abort.service` (root), which marks the abort and
+  `systemctl stop`s the run: SIGTERM ends the wait at once, the loads are killed (the burn's whole process tree:
+  GNU timeout makes its own process group, so it walks /proc; KillMode=control-group on a stop), the hold file goes,
+  nothing is saved. Both units are on the panel's polkit list (start only).
+- **During the run** the fan service shows phase `tuning` at the level asked for, via `/run/ollama1/fancal-hold.json`
+  written every 2 s and ignored at 10 s old, so a dead run can't keep the fans low; heat still wins.
+  `ollama1-fancal.service` is in o1sleep.BUSY_UNITS (auto sleep and the Sleep button say no) and the run holds a
+  logind inhibitor. Refusals before start: a request in flight or in the last 2 minutes, busy reasons (pulls,
+  updates, setup, hold locks), running burn/stability tools, the fan service not running/measuring/hot, no CPU
+  temperature, the model or its manifest missing, no llama-bench, no card reading. Safety stops: Abort/stop, the
+  fan service's hot phase or any reading at its limit, a new kernel record (NVRM Xid, MCE, AER, amdgpu ring
+  timeout) checked every 30 s with `journalctl -k --since @start`, the fan service going quiet, a request reaching
+  the gateway (the owner's work comes first), a load failing, the card not busy (no reading over 50% within 90 s,
+  or under 30% average). gpu-burn.sh's own 90 C NVIDIA stop stays. Files hold numbers and sensor names only.
+- **Found on the way, fixed:** (1) the NVIDIA card's temperature was in no fan decision (6b483 noted the fan curve
+  as AMD-only): the shared busy probe already calls nvidia-smi as root, so it now keeps the chip temperature and
+  the fan service adds it as a "GPU" sensor, limit 85 C (as an AMD edge sensor; the burns stop at 90), in the
+  override, deep-idle guard (like a junction, 60 C) and the status. (2) The Corsair cooler's fans ignored
+  `fan_work_pct` while working (its plan hard-coded 100% for `working`): they now follow the fans' level; the pump
+  is still extreme while working. Default behaviour is unchanged (100%).
+- **Tests** (no hardware): `test_fancal.py` (projection, ceilings, ladder; the search on a simulated first-order
+  machine finding 30%/80% and never hunting; a warm card stopping the descent; a near-limit sensor and an idle card
+  ending it; the whole run on a fake clock with the hold file read back through the fan service's reader, the
+  result read back through o1work.levels(); abort, heat, a reading at its limit, the fan service going quiet, a
+  request, an Xid, a failing load, a refusal; stop-post; every refusal; the query load against the Ollama stub; the
+  burn load's tree stop; the units), `test_fan.TestCalibratedLevels` (tuning, stale/odd holds, heat over tuning,
+  quiet->heavy->quiet with its band and dwell, the hold at the level it worked at, the NVIDIA sensor, Levels
+  reloading), test_aio (working/tuning follow the level), test_leds (red at the work level), test_admin (actions,
+  refusals, abort only while running, the card's data cut to known fields, the page), the polkit cases. The admin
+  demo runs a calibration 30x faster; checked in the browser (start, progress, Abort).
+- **Unverified on the server:** the whole run on the real machine (the sandbox's access to nvidia-smi, journalctl
+  and Ollama on localhost; llama-bench's start time with the shader cache; whether gemma4:12b queries keep the
+  5070 Ti over 30% busy); which sensor actually binds (on this board likely the card, NVMe or chipset); the
+  cooler's fans at a level under 100% while the pump is extreme; the lights' red at the quiet level. Needs the kit
+  install (setup.sh) first.
+
+## 6b506 — Abandoned remote desktop sessions are ended (per Patrick)
+
+- The server runs GNOME with gnome-remote-desktop (RDP on :3389, GDM remote login). Clients that went away left
+  their sessions forever: remote GDM login screens (gdm-greeter-N, dynamic uids from 60580, Class=greeter,
+  Service=gdm-launch-environment) and a logged-in remote desktop (Class=user, Service=gdm-password), all
+  Remote=yes, Type=wayland, no seat. Each kept a gnome-remote-desktop-daemon holding ~230 MiB of VRAM (against
+  the gateway's 768 MiB vram_reserve_mib) and GDM blocked suspend ("Remote sessions would die on suspend"), so
+  auto sleep never fired. logind can't tell connected from disconnected: State, Active and IdleHint stayed
+  active/no either way.
+- Patrick chose: end abandoned remote login screens at once, remote desktops left disconnected 30+ minutes; never
+  an active, connected one. New: lib/o1rdptidy.py (pure parsers and plan(), Tidy runs one pass with injected
+  probes), bin/ollama1-rdp-tidy (run / --dry-run / status), ollama1-rdp-tidy.service (root oneshot, sandboxed like
+  ollama1-idle, writes only /var/lib/ollama1) and .timer (every minute), enabled by setup.sh. A separate timer
+  rather than a hook in ollama1-idle's loop: a fault here can't stop auto sleep's ticks, and the dry run stands on
+  its own. Ended with `loginctl terminate-session <id>`.
+- Only GNOME remote display sessions are considered: Remote=yes, Type=wayland, a gdm- service, class greeter or
+  user, empty Seat and TTY (a missing property is a no). The local greeter c1 on seat0, SSH and console logins
+  and manager sessions never qualify.
+- **v1 safety rule**: a session counts as disconnected only while there is NO established TCP connection on local
+  :3389 at all, machine-wide, and something listens on :3389 (else RDP is on another port and the zero means
+  nothing). If ss or logind can't answer, nothing is ended. Any connection clears every session's clock. The
+  per-session mapping (ss -p pid -> /proc/<pid>/cgroup -> session-<id>.scope, or user-<uid>.slice for a
+  handover daemon under the user's systemd) is computed and logged as "per-connection view" only. It can be
+  promoted to the deciding rule after a live test with one connected and one disconnected session shows it
+  right; until then one connected client keeps every abandoned session too.
+- Login screens end on the second look without a client (>= 45 s apart, so about a minute), not the very first:
+  RDP's login hands the client over to the new session with a reconnect, and a pass landing in that gap must not
+  kill a login in progress. Remote desktops: rdp_tidy_minutes (config.json, default 30, 5..1440) after first seen
+  without a client; the first-seen times live in /var/lib/ollama1/rdp-tidy.json (0600) with the boot id, so a
+  reboot (session ids start again) forgets them.
+- Settings: "rdp_tidy" (default true; anything but true/false turns it off and says so) and "rdp_tidy_minutes",
+  both added to o1common.DEFAULTS. A no-op without gnome-remote-desktop (its daemon or unit file absent).
+- Logs (journal): a line when what it sees changes (the minutes ticking up don't count) and one per session
+  ended or failed to end: session id, class, reason, per-connection view. Never a user name, uid or address; the
+  show-session call doesn't even ask for Name or RemoteHost. Not shown in the admin panel (another change was
+  editing it); `sudo ollama1-rdp-tidy status` prints the last pass.
+- Untested on the live server: whether `ss` works inside the unit's sandbox (if it doesn't, the log says
+  "couldn't list the RDP connections" and nothing is ended), and whether GDM cleans up after a terminated remote
+  greeter without respawning one. Tests: tests/test_rdptidy.py (fixtures of loginctl -j, show-session, ss and
+  cgroups; whole passes on a fake clock) and 11 rdp mutants in tests/mutate.py, all killed.
+
+## 6b507 — An optional SSH door through the tunnel (per Patrick)
+
+Patrick is abroad for months. SSH to the server worked only from the home LAN, and the VPN way needs a change on the
+Pi nobody can make from there. He approved SSH through the Cloudflare Tunnel that already carries the gateway and
+the panel, behind Access (the panel's admin identity) and then SSH keys.
+
+- Opt-in: `setup.sh --ssh-door` (`--no-ssh-door` closes it), recorded as `ssh_door: true` in config.json with
+  `hostname_ssh` (default `<server-name>-ssh.<zone>`, like the other two names, so two servers in one zone can't
+  repoint each other's door: dns_step "fixes" any tunnel CNAME on its names) and `ssh_aud`. Off, every file setup
+  writes is byte-for-byte what it was (cloudflared.yml, the sshd drop-in, the nft rules; tests compare against the
+  pre-door rendering).
+- Tunnel: one more ingress rule, `ssh://127.0.0.1:22`, with the same `originRequest.access` check (required,
+  teamName, audTag [ssh_aud]) as the HTTP routes, before the 404. Rendered only when the door is on, its AUD is
+  known and sshd takes it (below); setup.sh renders through setuplib's render_tunnel_yml now, so tests run it.
+- Access: ollama1-cf-access makes "<server-name> ssh" for hostname_ssh with the admin's Allow policy (reused, not a
+  new one) and `type: "ssh"`, which is how the API spells a self-hosted app with browser-rendered SSH (the
+  dashboard's "Browser rendering: SSH"; the Terraform provider lists ssh/vnc/rdp as app types; Cloudflare's docs
+  name no other field). If Cloudflare refuses that type, it falls back to self_hosted and says which switch to
+  flip. `--ssh-door` on the helper turns the door on in config.json too, so the owner can run the helper from the
+  kit checkout at a terminal and then setup once, detached. No token in a file, a log or a command line, as
+  before; the same 6-permission token covers it.
+- No API token: setup's door menu (only at a terminal) prints the dashboard steps and reads the AUD; with no
+  terminal (a detached run) it leaves a `later` line and changes nothing else. `--ssh-aud <AUD>` gives it
+  non-interactively.
+- sshd: AllowUsers gains `<user>@127.0.0.1` (cloudflared connects from there) only while password login is off;
+  setup checks with `sshd -T -C addr=127.0.0.1` that a door connection is keys only (passwordauthentication no,
+  kbdinteractiveauthentication no, authenticationmethods publickey), else restores the old drop-in and stops.
+- PerSourcePenalties (OpenSSH 9.8+; Ubuntu 26.04 has it): 127.0.0.1 is exempted (`PerSourcePenaltyExemptList`,
+  only when this sshd knows the option, probed with `sshd -t -o`). Every door user shares 127.0.0.1, so a penalty
+  there (a few failed key offers, an agent with many keys) would shut the door for everyone, Patrick abroad
+  included, for up to the penalty maximum, and it protects nothing: nobody reaches 127.0.0.1:22 without an Access
+  login first, and the port guard (below) keeps local users off it. The LAN keeps its penalties.
+- nft: with the door on, `ollama1-nft` also resets connections to port 22 from 127.0.0.0/8 by anyone but root and
+  cloudflared, so 127.0.0.1 in AllowUsers means the tunnel. ufw is untouched: port 22 stays LAN only, and nothing
+  new listens (the "What listens" check is unchanged).
+- Browser SSH is switched on but unproven: it logs in to sshd like any client, and the kit sets up no short-lived
+  certificates, so it may have no key to offer; `cloudflared access ssh` as ProxyCommand is the way in.
+- Unverified on the server: everything Cloudflare-side (the `ssh` type, cloudflared's Access check on an ssh://
+  route) and the new nft line under `nft -c`. Tests: tests/test_sshdoor.py (rendering on and off, the drop-in, the
+  guard, the flags, the helper against the fake API with the ssh type and its fallback), six mutants in mutate.py.

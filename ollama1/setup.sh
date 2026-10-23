@@ -53,6 +53,12 @@
 #                                    OLLAMA1_DASH): auto (the default) draws the graphical panel
 #                                    when a monitor is connected, else the text dashboard; text
 #                                    keeps the text one. Saved in setup.env, so a re-run keeps it
+#   sudo ./setup.sh --ssh-door       opt in: the SSH door (6b507), SSH from anywhere through the tunnel at
+#                                    <server-name>-ssh.<your-domain>, behind Access (the admin email) and then your
+#                                    key; no port opens. Needs password login off. Saved in config.json (ssh_door),
+#                                    so a re-run keeps it; its Access app comes from ollama1-cf-access (an API token)
+#                                    or the dashboard (README, "The SSH door"). --no-ssh-door closes it again
+#   sudo ./setup.sh --ssh-aud <AUD>  the SSH door's Access app's AUD tag, for an app made in the dashboard
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # Settings (each is asked for if it is not given and cannot be found):
@@ -140,6 +146,7 @@ A_LEDS_LENGTH=""
 A_WIFI=""
 A_WATCHDOG=""
 A_DASH=""
+A_SSH_DOOR=""; A_SSH_AUD=""
 A_NAME=""; A_USER=""; A_LAN=""; A_ZONE=""; A_OWNER=""; A_TZ=""
 A_OS=""; A_MODELS=""; A_HDD1=""; A_HDD2=""
 prev=""
@@ -154,6 +161,10 @@ for a in "$@"; do
     --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
       set_option "$prev" "$a"; prev=""; continue ;;
   esac
+  if [ "$prev" = --ssh-aud ]; then
+    valid_aud "$a" || { echo "--ssh-aud takes the SSH door app's AUD tag: 64 characters, 0-9 and a-f"; exit 2; }
+    A_SSH_AUD=$a; prev=""; continue
+  fi
   if [ "$prev" = --dash ]; then
     dash_mode_choice "$a" "" "" >/dev/null || { echo "--dash takes text, graphic or auto"; exit 2; }
     A_DASH=$a; prev=""; continue
@@ -179,6 +190,11 @@ for a in "$@"; do
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
+    --ssh-door|--no-ssh-door)
+      want=on; [ "$a" = --ssh-door ] || want=off
+      [ -z "$A_SSH_DOOR" ] || [ "$A_SSH_DOOR" = "$want" ] || { echo "--ssh-door and --no-ssh-door: give one"; exit 2; }
+      A_SSH_DOOR=$want ;;
+    --ssh-aud) ;;
     --no-tmux) NO_TMUX=1 ;;
     --no-console-font) export OLLAMA1_DASH_FONT=off ;;
     --lan-public-ok) LAN_PUBLIC_OK=1 ;;
@@ -213,6 +229,7 @@ wifi_choice "" "${OLLAMA1_WIFI:-}" "" >/dev/null || { echo "OLLAMA1_WIFI takes 1
 leds_choice "" "${OLLAMA1_LEDS:-}" "" >/dev/null || { echo "OLLAMA1_LEDS takes 1 or 0 (on or off)"; exit 2; }
 case "$prev" in --dash) echo "--dash takes text, graphic or auto"; exit 2 ;; esac
 dash_mode_choice "" "${OLLAMA1_DASH:-}" "" >/dev/null || { echo "OLLAMA1_DASH takes text, graphic or auto"; exit 2; }
+[ "$prev" != --ssh-aud ] || { echo "--ssh-aud takes the SSH door app's AUD tag"; exit 2; }
 case "$prev" in --name|--user|--lan|--zone|--owner|--timezone|--os-serial|--models-serial|--hdd1-serial|--hdd2-serial)
   echo "$prev takes a value"; exit 2 ;; esac
 
@@ -302,6 +319,12 @@ resolve_settings() {
   WATCHDOG=$(watchdog_choice "$A_WATCHDOG" "${OLLAMA1_WATCHDOG:-}" "$(saved WATCHDOG)") || die "the saved WATCHDOG in $SAVED is not on or off; give --watchdog on or --watchdog off"
   DASH=$(dash_mode_choice "$A_DASH" "${OLLAMA1_DASH:-}" "$(saved DASH)") \
     || die "the saved DASH in $SAVED is not text, graphic or auto; give --dash"
+  v=""
+  if [ -r "$CONFIG_JSON" ]; then
+    v=$(python3 -c 'import json,sys; print("true" if json.load(open(sys.argv[1])).get("ssh_door") is True else "")' \
+      "$CONFIG_JSON" 2>/dev/null || true)
+  fi
+  SSH_DOOR=$(ssh_door_choice "$A_SSH_DOOR" "$v") || die "--ssh-door: on or off"
 }
 
 # After the relaunch in tmux (a prompt needs the terminal): ask for what is
@@ -351,6 +374,9 @@ derive_hosts() { # the hostnames: config.json's own win, else <name>.<zone>
   if [ -z "$GW_HOST" ] && [ -n "$CF_ZONE" ]; then GW_HOST=$SERVER_NAME.$CF_ZONE; fi
   if [ -z "$ADMIN_HOST" ] && [ -n "$CF_ZONE" ]; then ADMIN_HOST=$SERVER_NAME-admin.$CF_ZONE; fi
   if [ -z "$GW_HOST" ]; then GW_HOST="<server-name>.<your-domain>"; ADMIN_HOST="<server-name>-admin.<your-domain>"; fi
+  SSH_HOST=$(cfg_str hostname_ssh)                    # the SSH door's (6b507), used only when it is on
+  if [ -z "$SSH_HOST" ] && [ -n "$CF_ZONE" ]; then SSH_HOST=$SERVER_NAME-ssh.$CF_ZONE; fi
+  [ -n "$SSH_HOST" ] || SSH_HOST="<server-name>-ssh.<your-domain>"
 }
 
 # ---- disks ----------------------------------------------------------------
@@ -408,6 +434,7 @@ print_plan() {
    $(state '[ -f /etc/ollama1/wifi.json ]')    $(wifi_plan "$WIFI")
    $(state 'systemctl is-active ollama1-watchdog')    $(watchdog_plan "$WATCHDOG")
    $(state 'systemctl is-active ollama1-tunnel') 15. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
+   $(state 'grep -q "ssh://" /etc/ollama1/cloudflared.yml')     $(ssh_door_plan "$SSH_DOOR" "$SSH_HOST" "$ADMIN_USER")
          16. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
    Not touched: the network settings (netplan, br0), /home, every disk but the models disk.
@@ -683,6 +710,7 @@ ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
 ln -sfn "$LIBDIR/bin/ollama1-fan" /usr/local/bin/ollama1-fan
 ln -sfn "$LIBDIR/bin/ollama1-leds" /usr/local/bin/ollama1-leds
 ln -sfn "$LIBDIR/bin/ollama1-watchdog" /usr/local/bin/ollama1-watchdog
+ln -sfn "$LIBDIR/bin/ollama1-rdp-tidy" /usr/local/sbin/ollama1-rdp-tidy
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
@@ -717,7 +745,7 @@ systemctl daemon-reload
 install -d -m 0755 /etc/ollama1 /var/lib/ollama1 /opt/ollama
 sed -e "s/@UID_OLLAMA@/$(id -u ollama)/g" -e "s/@UID_O1GW@/$(id -u o1gw)/g" \
     -e "s/@UID_O1ADMIN@/$(id -u o1admin)/g" -e "s/@UID_CLOUDFLARED@/$(id -u cloudflared)/g" \
-    "$KIT/config/ollama1.nft.in" >/etc/ollama1/ollama1.nft
+    "$KIT/config/ollama1.nft.in" | ssh_door_lines "$SSH_DOOR" >/etc/ollama1/ollama1.nft   # the door's guard: 6b507
 nft -c -f /etc/ollama1/ollama1.nft || die "the nftables rules don't load"
 [ -f /etc/ollama1/models.allow ] || install -m 0644 "$KIT/config/models.allow" /etc/ollama1/models.allow
 chown root:root /etc/ollama1/models.allow; chmod 0644 /etc/ollama1/models.allow
@@ -739,7 +767,8 @@ fi
 LANIP=$(ip -4 -o addr show dev "$LANIF" | awk '{print $4}' | cut -d/ -f1 | head -n1)
 ok "LAN: $LANIF ${LANIP:-no address} (network settings left as they are)"
 
-python3 - "$LANIP" "$SERVER_NAME" "$HOME_LAN" "$CF_ZONE" "$OWNER" "$GW_HOST" "$ADMIN_HOST" <<'PY'
+python3 - "$LANIP" "$SERVER_NAME" "$HOME_LAN" "$CF_ZONE" "$OWNER" "$GW_HOST" "$ADMIN_HOST" \
+  "$SSH_DOOR" "$SSH_HOST" "$A_SSH_AUD" <<'PY'
 import json, os, sys
 path = "/etc/ollama1/config.json"
 cfg = {}
@@ -758,6 +787,16 @@ if zone:
     cfg.setdefault("hostname_admin", admin)
 if owner:
     cfg["owner_label"] = owner
+# the SSH door (6b507): recorded only when it is on or was on; its hostname and AUD stay when it is closed
+door, ssh_host, ssh_aud = sys.argv[8:11]
+if door == "on":
+    cfg["ssh_door"] = True
+    if zone:
+        cfg.setdefault("hostname_ssh", ssh_host)
+elif "ssh_door" in cfg:
+    cfg["ssh_door"] = False
+if ssh_aud:
+    cfg["ssh_aud"] = ssh_aud
 # an NVIDIA card: the gateway can't run nvidia-smi from its sandbox, so its memory is recorded here (6b486);
 # an AMD card is read from sysfs, so 0 ("read it yourself") stays
 import subprocess
@@ -865,8 +904,21 @@ if [ "$PW_OFF" = 1 ]; then
 else
   pw=$'# Password login stays on until '"$KEYS"$'\n# holds a key of your own (besides '"$CLAUDE_KEY"$') and you confirm it. Run setup.sh again.'
 fi
+# The SSH door (6b507): sshd also takes the admin user from 127.0.0.1, where cloudflared brings connections Access
+# has checked; only with password login off, so the door is keys only. Off: the drop-in is exactly what it was.
+who="$ADMIN_USER@$HOME_LAN"; door_lines=""; SSHD_DOOR=off
+if [ "$SSH_DOOR" = on ] && [ "$PW_OFF" = 1 ]; then
+  SSHD_DOOR=on
+  who="$who $ADMIN_USER@127.0.0.1"
+  penalties=no
+  if sshd -t -o PerSourcePenaltyExemptList=127.0.0.1 >/dev/null 2>&1; then penalties=yes; fi   # OpenSSH 9.8 and later
+  door_lines=$(ssh_door_sshd_lines "$penalties")
+elif [ "$SSH_DOOR" = on ]; then
+  note "the SSH door stays shut in sshd while password login is on; it opens once your key is confirmed (this step)"
+  later "SSH door: turn password login off (confirm your key at the SSH step), then run setup again"
+fi
 new=$(mktemp)
-awk -v pw="$pw" -v who="$ADMIN_USER@$HOME_LAN" '{ if ($0 == "@PASSWORD_LINES@") print pw; else if ($0 == "AllowUsers @ADMIN_USER_AT_LAN@") print "AllowUsers " who; else print }' "$KIT/config/10-ollama1-sshd.conf.in" >"$new"
+render_sshd_dropin "$KIT/config/10-ollama1-sshd.conf.in" "$pw" "$who" "$door_lines" >"$new"
 bak=$(mktemp -d)
 [ -f "$DROPIN" ] && cp -a "$DROPIN" "$bak/dropin"
 [ -f "$CLOUDINIT" ] && cp -a "$CLOUDINIT" "$bak/cloudinit"
@@ -899,10 +951,18 @@ if ! echo "$eff" | grep -qx "permitrootlogin no" || ! echo "$eff" | grep -qx "pa
   restore_ssh; rm -rf "$bak"
   die "sshd's effective settings are not what they should be (sshd -T); the previous ones are back"
 fi
+if [ "$SSHD_DOOR" = on ]; then   # what sshd will do for a connection through the door: keys only
+  eff=$(sshd -T -C "user=$ADMIN_USER,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=22" 2>/dev/null || true)
+  if ! echo "$eff" | grep -qix "allowusers $ADMIN_USER@127.0.0.1" || ! echo "$eff" | grep -qx "passwordauthentication no" \
+     || ! echo "$eff" | grep -qx "kbdinteractiveauthentication no" || ! echo "$eff" | grep -qx "authenticationmethods publickey"; then
+    restore_ssh; rm -rf "$bak"
+    die "sshd's settings for the SSH door are not keys only (sshd -T); the previous ones are back"
+  fi
+fi
 rm -rf "$bak"
 systemctl try-reload-or-restart ssh.service
 if [ "$PW_OFF" = 1 ]; then
-  ok "passwords off: only $ADMIN_USER, from $HOME_LAN, with a key; no root login"
+  ok "passwords off: only $ADMIN_USER, from $HOME_LAN$([ "$SSHD_DOOR" = on ] && echo ' and the SSH door (127.0.0.1)'), with a key; no root login"
   note "Keep this session open. From your Mac, open a NEW terminal and check: ssh $ADMIN_USER@${LANIP:-<server-ip>}"
   note "If your agent offers several keys, name yours: ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 $ADMIN_USER@${LANIP:-<server-ip>}"
   later "Before closing this session: check a NEW SSH login with your key works"
@@ -989,6 +1049,15 @@ run systemctl enable ollama1-dash.service
 run systemctl enable ollama1-idle.service
 run systemctl restart ollama1-idle.service
 "$LIBDIR/bin/ollama1-idle" wol-setup || note "couldn't set up wake on a magic packet; auto sleep still works, waking it from the app won't"
+# remote desktop cleanup (6b506): every minute, end GNOME remote login screens and remote desktops nobody is
+# connected to (a desktop after rdp_tidy_minutes), never while any RDP client is connected; it keeps their
+# gnome-remote-desktop daemons from holding the card's memory and GDM from blocking sleep. A no-op without
+# gnome-remote-desktop; "rdp_tidy": false in config.json turns it off. `sudo ollama1-rdp-tidy --dry-run` says
+# what it would do.
+run systemctl enable --now ollama1-rdp-tidy.timer
+if [ -e /usr/libexec/gnome-remote-desktop-daemon ] || [ -e /usr/lib/systemd/system/gnome-remote-desktop.service ]; then
+  ok "$("$LIBDIR/bin/ollama1-rdp-tidy" status 2>/dev/null | head -n1) (sudo ollama1-rdp-tidy status)"
+fi
 systemctl stop getty@tty1.service >/dev/null 2>&1 || true
 dash_font_step "$LIBDIR/bin/ollama1-dash" /dev/tty1
 dash_mode_step
@@ -1148,7 +1217,9 @@ for t in json.load(sys.stdin) or []:
     fi
   fi
   cfg_set tunnel_id "$tid"
-  for h in "$GW_HOST" "$ADMIN_HOST"; do
+  local hosts=("$GW_HOST" "$ADMIN_HOST")
+  if [ "$SSH_DOOR" = on ]; then hosts+=("$SSH_HOST"); fi   # the SSH door's name (6b507)
+  for h in "${hosts[@]}"; do
     if cloudflared tunnel route dns "$TUNNEL_NAME" "$h"; then ok "DNS $h -> tunnel"; else
       note "DNS for $h not set (a record may already exist). In the dashboard: DNS > $h > CNAME $tid.cfargotunnel.com, proxied"
       later "Check the DNS record for $h (CNAME to $tid.cfargotunnel.com)"
@@ -1176,6 +1247,39 @@ with os.fdopen(fd, "w") as f: json.dump(c, f, indent=1, sort_keys=True)
 os.replace(p + ".tmp", p)
 PY
   fi
+  if door_needs_aud; then ssh_door_by_hand; fi
+}
+
+# The SSH door (6b507) without an API token: its Access app is clicked in the dashboard and its AUD typed in
+# here. Its DNS name comes from cloudflared when the browser login was done (cf_by_browser), else from the
+# dashboard too.
+door_needs_aud() { [ "$SSH_DOOR" = on ] && ! cfg_has ssh_aud; }
+have_tty() { { : </dev/tty; } 2>/dev/null; }
+ssh_door_by_hand() {
+  local aud tid
+  tid=$(cfg_str tunnel_id)
+  cat <<EOF
+
+   The SSH door's Access app, in dash.cloudflare.com:
+     1. If setup did not just say "DNS $SSH_HOST -> tunnel": DNS > Records > Add record.
+        CNAME, name $SSH_HOST, target ${tid:-<tunnel id>}.cfargotunnel.com, Proxied.
+     2. Zero Trust > Access > Applications > Add an application > Self-hosted.
+        Name: $SERVER_NAME ssh. Public hostname: $SSH_HOST. Session: 24 hours.
+     3. Policy: the one $ADMIN_HOST uses (Allow, your email). Save.
+     4. Open the app again > Configure > Browser rendering: SSH. Save.
+     5. Copy its Application Audience (AUD) Tag and paste it below.
+EOF
+  printf '   AUD tag of the %s application (Enter: later): ' "$SSH_HOST"
+  read -r aud </dev/tty || aud=""
+  aud=$(printf '%s' "$aud" | tr -d '[:space:]')
+  if [ -z "$aud" ]; then
+    note "SSH door later: no AUD given"
+    later "SSH door: make its Access app (README, \"The SSH door\") and give setup --ssh-aud <AUD>"
+    return 0
+  fi
+  valid_aud "$aud" || { note "that is not an AUD tag (64 characters, 0-9 and a-f); the SSH door waits"; later "SSH door: give setup --ssh-aud <AUD>"; return 0; }
+  cfg_set ssh_aud "$aud"
+  ok "the SSH door's AUD tag saved"
 }
 
 # The default: one API token does the tunnel, DNS and Access. It is read
@@ -1214,11 +1318,36 @@ else
 EOF
     printf '   1, 2 or 3 [1]: '
     read -r choice </dev/tty
+    DOOR_ASKED=1   # both ways below also cover the SSH door when it is on
     case "${choice:-1}" in
       1) cf_by_token ;;
       2) cf_by_browser ;;
       *) note "Cloudflare later" ;;
     esac
+  fi
+  if cf_ready && door_needs_aud && [ "${DOOR_ASKED:-0}" = 0 ]; then   # the SSH door (6b507) on a tunnel already set up
+    if have_tty; then
+      cat <<EOF
+
+   The SSH door needs its own Access app ($SSH_HOST). Choose one:
+     1  Paste a Cloudflare API token: setup makes the DNS name and the app (recommended).
+     2  No API token: click the app in the dashboard and paste its AUD tag.
+     3  Later (the door stays shut; nothing else changes)
+EOF
+      printf '   1, 2 or 3 [1]: '
+      read -r choice </dev/tty || choice=3
+      case "${choice:-1}" in
+        1) cf_by_token ;;
+        2) if [ -f /root/.cloudflared/cert.pem ]; then
+             if HOME=/root cloudflared tunnel route dns "$(cfg_str tunnel_id)" "$SSH_HOST"; then ok "DNS $SSH_HOST -> tunnel"; fi
+           fi
+           ssh_door_by_hand ;;
+        *) note "SSH door later" ;;
+      esac
+    else
+      note "the SSH door needs its Access app, and there is no terminal here to ask for a token"
+      later "SSH door: run sudo ollama1-cf-access in a terminal (an API token), then setup again; or make the app in the dashboard and run setup with --ssh-aud <AUD>"
+    fi
   fi
   if cf_ready; then
     chown root:root /etc/cloudflared/ollama1.json; chmod 0600 /etc/cloudflared/ollama1.json
@@ -1227,11 +1356,21 @@ c = json.load(open("/etc/ollama1/config.json"))
 vals = [c["tunnel_id"], c["access_team_domain"].split(".")[0], c["gateway_aud"], c["admin_aud"]]
 assert all(re.match(r"^[A-Za-z0-9-]+$", v) for v in vals), "unexpected characters in the Cloudflare settings"
 print(*vals)')
-    sed -e "s/@TUNNEL_ID@/$TID/" -e "s/@TEAM_NAME@/$TEAM/g" -e "s/@GATEWAY_AUD@/$GAUD/" -e "s/@ADMIN_AUD@/$AAUD/" \
-        -e "s/@GW_HOST@/$GW_HOST/" -e "s/@ADMIN_HOST@/$ADMIN_HOST/" \
-      "$KIT/config/cloudflared.yml.in" >/etc/ollama1/cloudflared.yml
+    # the SSH door's route (6b507): only while it is on, its app's AUD is known and sshd takes it (keys only)
+    door_host=""; door_aud=""
+    if [ "$SSH_DOOR" = on ] && [ "${SSHD_DOOR:-off}" = on ]; then
+      door_host=$(cfg_str hostname_ssh); door_host=${door_host:-$SSH_HOST}; door_aud=$(cfg_str ssh_aud)
+      if ! valid_zone "$door_host" || ! valid_aud "$door_aud"; then door_host=""; door_aud=""; fi
+    fi
+    render_tunnel_yml "$KIT/config/cloudflared.yml.in" "$TID" "$TEAM" "$GAUD" "$AAUD" "$GW_HOST" "$ADMIN_HOST" \
+      "$door_host" "$door_aud" >/etc/ollama1/cloudflared.yml
     chown root:cloudflared /etc/ollama1/cloudflared.yml; chmod 0640 /etc/ollama1/cloudflared.yml
     ok "tunnel $TID; credential root-only in /etc/cloudflared/ollama1.json"
+    if [ -n "$door_aud" ]; then
+      ok "SSH door open: $door_host -> sshd, behind Access (your email) and your key"
+    elif [ "$SSH_DOOR" = on ]; then
+      note "SSH door shut: it needs its Access app's AUD tag and password login off (see above)"
+    fi
     run systemctl enable ollama1-tunnel.service
     run systemctl restart ollama1-tunnel.service ollama1-gateway.service ollama1-admin.service
     for _ in $(seq 1 20); do curl -fsS http://127.0.0.1:8439/ready >/dev/null 2>&1 && break; sleep 1; done

@@ -12,7 +12,10 @@ never more often than every MIN_WRITE_S seconds.
 The policy follows the fans' phases (lib/o1fan.py):
 
   phase                 fans            pump
-  working, hot          100%            extreme    (the card over 50%, the CPU at 60 C, a sensor at its limit)
+  hot                   100%            extreme    (a sensor at its limit)
+  working, tuning       the fans' %     extreme    (the card over 50%, the CPU at 60 C: the working level, 100% unless
+                                                    fan_work_pct or the fan calibration says less, 6b505; tuning: the
+                                                    calibration's test level)
   calibrating           100%            balanced   (first start: measuring rpm)
   ramp                  the fans' %, falling from 100 to 20 over 60 s    balanced
                         (from the moment the work ends; there is no hold at 100% any more, 6b421)
@@ -266,14 +269,16 @@ class Aio:
         """(pump mode, {fan: percent}) for now."""
         with self.lock:
             phase, fans = self.phase, sorted(self.status["fans"]) or [1, 2]
-        if self.coolant_hot or phase in ("working", "hot"):
+        if self.coolant_hot or phase in ("working", "tuning", "hot"):
             pump = "extreme"
         elif phase in ("hold100", "ramp", "calibrating"):
             pump = "balanced"
         else:
             pump = "quiet"
-        base = 100 if (self.coolant_hot or phase in ("working", "hot", "calibrating")) else \
-            self.pct if phase in ("hold100", "ramp", "deepen", "deep") else 20
+        # (6b505) working follows the fans' level: before, the cooler's fans stayed at 100% while working whatever
+        # fan_work_pct said; the default level is still 100%
+        base = 100 if (self.coolant_hot or phase in ("hot", "calibrating")) else \
+            self.pct if phase in ("working", "tuning", "hold100", "ramp", "deepen", "deep") else 20
         out = {}
         for n in fans:
             L = self.learned.get("aio/fan%d" % n)

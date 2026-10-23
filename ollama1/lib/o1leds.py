@@ -90,7 +90,7 @@ SAMPLE_S = 0.25                   # the card's busy percent is read this often
 RISE_S = o1work.RISE_S            # white to red takes this long (5 s)
 COOL_S = o1work.COOL_S            # red to white on the lights' OWN clock, only with no fan service (60 s); else the fans' (6b466)
 FULL_PCT, LOW_PCT, DEEP_PCT = 100, o1work.IDLE_PCT, o1work.FAN_DEEP_PCT   # the fans' levels: red, white, blue
-FAN_RED_PHASES = ("hold100", "working", "hot", "calibrating")   # the fan phases that are 100% when no percentage is given
+FAN_RED_PHASES = ("hold100", "working", "hot", "calibrating", "tuning")   # the fan phases that are red when no percentage is given
 IDLE_DEEP_S = o1work.IDLE_DEEP_S  # with no fan service: idle this long, then white goes to blue (300 s)
 FAN_DEEP_PHASES = ("deepen", "deep")   # the fan service's phases that mean its deep idle (lib/o1fan.py): blue then
 BLUE_S = o1work.BLUE_S            # white to blue takes this long (90 s)
@@ -604,6 +604,9 @@ class Leds:
                     break
             left = o1work.number(st.get("hold_left"))
             self.fan_left = int(left) if left is not None and left > 0 else 0
+            w = o1work.number(st.get("work"))
+            if w is not None and LOW_PCT < w <= FULL_PCT:
+                self.red_at = w              # (6b505) red at the fans' working level as the fan service has it now
         if self.fan_phase is not None:
             self.fans_seen = now
         if self.fans_said != (self.fan_phase is not None):
@@ -1048,7 +1051,7 @@ def service_step(leds, notify=o1fan.sd_notify, log=print, first=False):
 
 def run_service(log=print):
     leds = Leds(o1work.probes(), log=log)
-    leds.red_at = o1work.work_level()      # red at the fans' work level (6b495)
+    leds.red_at = o1work.levels()["quiet"]   # red at the fans' work level (6b495; the calibration's quiet one, 6b505)
     stop, poke = threading.Event(), threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: (stop.set(), poke.set()))
     signal.signal(signal.SIGINT, lambda *_: (stop.set(), poke.set()))

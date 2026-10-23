@@ -1,0 +1,73 @@
+#!/usr/bin/python3
+"""ollama1-rdp-tidy: end GNOME remote desktop sessions nobody is connected to
+(6b506): a remote login screen at once, a remote desktop after it has been
+disconnected for rdp_tidy_minutes (30). Nothing is ended while any RDP client
+is connected to :3389. See lib/o1rdptidy.py.
+
+  ollama1-rdp-tidy run          one pass (ollama1-rdp-tidy.timer, every minute)
+  sudo ollama1-rdp-tidy --dry-run
+                                say what it would do now, end nothing, save
+                                nothing; also lists what blocks sleep
+  sudo ollama1-rdp-tidy status  the last pass, as the service saved it
+
+Off with "rdp_tidy": false in /etc/ollama1/config.json; it does nothing on a
+server without gnome-remote-desktop. Logs session ids, classes and reasons,
+never a user name or an address.
+"""
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1common  # noqa: E402
+import o1rdptidy  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal
+
+
+def need_root():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("run it with sudo")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "run":
+        need_root()
+        o1rdptidy.Tidy(o1rdptidy.real_probes(), o1common.load_config(), log=log).run()
+    elif cmd in ("--dry-run", "dry-run"):
+        need_root()
+        o1rdptidy.Tidy(o1rdptidy.real_probes(), o1common.load_config(), log=log).run(dry_run=True)
+        try:
+            import o1idle
+            inh = o1idle.inhibitors_blocking()
+            print("blocking sleep now: %s" % ("couldn't ask" if inh is None else "; ".join(inh) or "nothing"))
+        except Exception:
+            pass
+    elif cmd == "status":
+        need_root()
+        st = o1common.read_json_safe(o1rdptidy.state_file(), {}, max_bytes=65536) or {}
+        on, minutes, note = o1rdptidy.settings(o1common.load_config())
+        print("remote desktop cleanup: %s" % (("on, a disconnected remote desktop ends after %d minutes" % minutes)
+                                             if on else (note or "off (rdp_tidy is false)")))
+        if isinstance(st, dict) and st.get("at"):
+            print("last pass %s: %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st["at"])),
+                                        st.get("summary", "")))
+            for ln in st.get("lines") if isinstance(st.get("lines"), list) else []:
+                print("  " + str(ln))
+            le = st.get("last_ended")
+            if isinstance(le, dict) and le.get("at"):
+                print("last ended %d session(s) at %s" % (le.get("count", 0),
+                                                         time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(le["at"]))))
+        else:
+            print("no pass saved yet")
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

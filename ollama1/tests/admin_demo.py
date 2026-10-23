@@ -67,6 +67,8 @@ class Fake:
         self.devices = []
         self.pull = None
         self.actions = {}
+        self.cal_start = None            # a fan calibration running (6b505), 30 times faster than the real one
+        self.cal_end = None
         self.lock = threading.Lock()
 
     def w(self, rel, text):
@@ -280,6 +282,12 @@ class Fake:
               "aio": {"found": True, "name": "Corsair H115i Platinum", "state": "ok", "coolant_c": 31.4,
                       "coolant_hot": False, "pump_rpm": 2900 if busy else 1900, "pump_mode": "extreme", "fans": []},
               "hottest": temps[0], "closest": temps[1], "hot": []}
+        st.update(work=40, heavy=60, levels="calibration", stepped=False)
+        lvl = self.calibration(now, busy)
+        if lvl is not None:
+            st.update(phase="tuning", pct=lvl, why="fan calibration: testing %d%%" % lvl)
+            for o in outs:
+                o["rpm"], o["pwm"] = int(o["rpm"] * lvl / max(pct, 1)), int(2.55 * lvl)
         import o1fan
         st["line"] = o1fan.status_line(st)
         self.wj("run/ollama1/fan.json", st)
@@ -324,6 +332,57 @@ class Fake:
                 self.models[p["model"]] = p["total"] / GIB
                 self.pull = None
 
+    def calibration(self, now, busy):
+        """The fan calibration's files (6b505): a saved result from yesterday; while a run started from the page
+        goes on, its progress at 30 times the real speed, ending in a new result (or aborted). The fans' level."""
+        import o1fancal as C
+        self.wj("run/ollama1/stats/activity.json", {"last": now - 900, "inflight": 0, "at": now})   # quiet: it may start
+        if not os.path.exists(os.path.join(self.root, "var/lib/ollama1/fan-calibration.json")):
+            self.wj("var/lib/ollama1/fan-calibration.json", {
+                "v": 1, "at": int(now) - 26 * 3600, "quiet_pct": 40, "heavy_pct": 60, "model": "qwen3:14b",
+                "found": {"query": 30, "burn": 50}, "margin_pct": 10})
+        if self.cal_start is None:
+            return None
+        t = (now - self.cal_start) * 30
+        total = C.SHORT_S + C.LONG_S + C.BURN_S
+        if self.cal_end is None and t >= total:
+            self.cal_end = ("done", "")
+        if t < C.SHORT_S:
+            stage, pct, blocks = "short", 100, []
+        elif t < C.SHORT_S + C.LONG_S:
+            n = int((t - C.SHORT_S) // C.LONG_BLOCK_S)
+            ladder = [80, 65, 50, 40, 50]
+            stage, pct = "long", ladder[min(n, 4)]
+            blocks = [{"stage": "long", "pct": p, "s": 120, "ok": p != 40, "worst": None if p != 40 else "GPU"}
+                      for p in ladder[:min(n, 4)]]
+        else:
+            n = int((t - C.SHORT_S - C.LONG_S) // C.BURN_BLOCK_S)
+            stage, pct = "burn", 50 if n < 2 else 65
+            blocks = [{"stage": "burn", "pct": 50 if i < 2 else 65, "s": 300, "ok": i != 1, "worst": "GPU"}
+                      for i in range(min(n, 5))]
+        left = max(0, int(total - t))
+        gpu = 62 + (pct < 60) * 8 + (stage == "burn") * 6
+        prog = {"at": int(now), "state": "running", "started": int(self.cal_start), "model": "qwen3:14b",
+                "stage": stage, "stage_text": C.STAGE_TEXT[stage], "pct": pct, "stage_left": 0, "left": left,
+                "gpu_busy": 97 if stage == "burn" else 88, "found": {},
+                "temps": [{"label": "GPU", "c": gpu + self.wave(0, 1, 5), "limit": 85, "ceiling": 75},
+                          {"label": "CPU", "c": 52 + self.wave(0, 2, 7), "limit": 80, "ceiling": 70},
+                          {"label": "NVMe", "c": 48.0, "limit": 70, "ceiling": 60}],
+                "blocks": blocks, "reason": ""}
+        if self.cal_end is not None:
+            prog.update(state=self.cal_end[0], reason=self.cal_end[1], left=0)
+            if self.cal_end[0] == "done":
+                prog["result"] = {"quiet_pct": 60, "heavy_pct": 75}
+                self.wj("var/lib/ollama1/fan-calibration.json", {
+                    "v": 1, "at": int(now), "quiet_pct": 60, "heavy_pct": 75, "model": "qwen3:14b",
+                    "found": {"query": 50, "burn": 65}, "margin_pct": 10})
+            self.wj("var/lib/ollama1/fan-calibration-last.json", prog)
+            self.wj("run/ollama1/fancal.json", prog)
+            self.cal_start = None
+            return None
+        self.wj("run/ollama1/fancal.json", prog)
+        return pct
+
     # -- what the units would have done ---------------------------------------
     def run_unit(self, unit):
         import o1library
@@ -363,6 +422,10 @@ class Fake:
             elif verb == "rmmodel":
                 h = unit.split("@")[1].split(".")[0]
                 self.models = {n: s for n, s in self.models.items() if name_hash(n) != h}
+            elif verb == "fancal":
+                self.cal_start, self.cal_end = time.time(), None
+            elif verb == "fancal-abort":
+                self.cal_end = ("aborted", "stopped from the panel")
             elif verb == "rmdevice":
                 d = unit.split("@")[1].split(".")[0]
                 self.devices = [x for x in self.devices if x["id"] != d]
@@ -462,7 +525,9 @@ def main():
                 "admin_port": U.free_port(), "ollama_url": "http://127.0.0.1:%d" % stub.port, "certs_url": jwks.url,
                 "allow_insecure_certs_url": True, "tunnel_metrics_port": tunnel_metrics(),
                 "ttyd_socket": os.path.join(root, "run/ollama1/ttyd.sock")})
+    cfg["fan_cal_model"] = "qwen3:14b"                  # the fan calibration's model: one the fake Ollama has
     panel, srv, stop = mod.serve(cfg, runner=fake.run_unit)
+    panel.busy = lambda: []                             # no systemd here to ask what runs
 
     def jwt():
         return U.make_jwt(key, U.claims(aud=U.ADMIN_AUD, email=U.ADMIN_EMAIL, type="app", common_name=None))

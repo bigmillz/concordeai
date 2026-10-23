@@ -485,7 +485,8 @@ class TestGraphicalPage(unittest.TestCase):
         page, _ = self.page()
         js = self.script(page)
         acts = set(re.findall(r'data-act="([a-z-]+)"', page))
-        self.assertEqual(acts, {"sleep", "reboot", "shutdown", "restart", "update", "lan", "backup", "pair"})
+        self.assertEqual(acts, {"sleep", "reboot", "shutdown", "restart", "update", "lan", "backup", "pair",
+                                "fancal", "fancal-abort"})                     # the fan calibration (6b505)
         mod = A["mod"]
         reach = {"lan-on": "'lan-on'", "lan-off": "'lan-off'", "library-preview": "act('library-preview'",
                  "library-sync": "act('library-sync',p.id,p.id", "power-apply": "post('/api/power/schedule'"}
@@ -1146,6 +1147,115 @@ class TestModelPlanLine(unittest.TestCase):
                                [False, "Last change: Everything from iPad, T5: +4 -0 (2 failed)"],
                                [False, "Last change: Light from iPad, T5: +1 -0 (stopped before it finished)"],
                                [True, None]])
+
+
+class TestFanCalibration(unittest.TestCase):
+    """6b505: Calibrate fans starts ollama1-fancal.service only when confirmed and the server is quiet; Abort starts
+    its abort unit only while one runs; the card's data comes through cut down to known fields."""
+
+    def setUp(self):
+        import o1fan
+        import o1fancal
+        import o1idle
+        import o1sleep
+        self.C = o1fancal
+        A["started"].clear()
+        self.panel = A["panel"]
+        self.panel.busy = lambda: []
+        self.addCleanup(setattr, self.panel, "busy", o1sleep.busy_reasons)
+        self.panel.cfg["fan_cal_model"] = "small:8b"
+        self.addCleanup(self.panel.cfg.pop, "fan_cal_model", None)
+        self.files = [o1fan.status_path(), o1idle.activity_file(), o1fancal.progress_path(), o1fancal.last_path(),
+                      o1fancal.result_path()]
+        for f in self.files:
+            self.addCleanup(lambda f=f: os.path.exists(f) and os.unlink(f))
+        self.fan = {"at": int(time.time()), "phase": "idle20", "pct": 20, "work": 100, "heavy": 100,
+                    "levels": "default", "stepped": False, "temps": [{"label": "CPU", "c": 40.0, "limit": 80}]}
+        self.act = {"last": time.time() - 600, "inflight": 0, "at": time.time()}
+        self.write()
+
+    def write(self, prog=None):
+        from o1common import write_json_atomic
+        import o1fan
+        import o1idle
+        write_json_atomic(o1fan.status_path(), self.fan)
+        write_json_atomic(o1idle.activity_file(), self.act)
+        if prog is not None:
+            write_json_atomic(self.C.progress_path(), prog)
+
+    def why(self, obj):
+        st, data, _ = post(obj)
+        return st, json.loads(data)["result"]
+
+    def test_it_starts_when_confirmed_and_quiet(self):
+        self.assertEqual(self.why({"action": "fancal"}), (400, "confirm the calibration"))
+        self.assertEqual(self.why({"action": "fancal", "confirm": "fancal"})[0], 202)
+        self.assertEqual(A["started"], ["ollama1-fancal.service"])
+
+    def test_it_refuses_while_serving_or_busy(self):
+        cases = (("act", {"last": time.time(), "inflight": 1, "at": time.time()}, "answering a request"),
+                 ("act", {"last": time.time() - 30, "inflight": 0, "at": time.time()}, "s ago"),
+                 ("act", {"last": 0, "inflight": 0, "at": time.time() - 3600}, "couldn't tell"),
+                 ("fan", dict(self.fan, phase="calibrating"), "still measuring"),
+                 ("fan", dict(self.fan, at=int(time.time()) - 60), "fan service isn't running"),
+                 ("busy", ["a model is being downloaded"], "a model is being downloaded"),
+                 ("model", "absent:1b", "absent:1b isn't installed"))
+        for what, val, want in cases:
+            with self.subTest(want):
+                fan, act = dict(self.fan), dict(self.act)
+                if what == "act":
+                    self.act = val
+                elif what == "fan":
+                    self.fan = val
+                elif what == "busy":
+                    self.panel.busy = lambda: val
+                else:
+                    self.panel.cfg["fan_cal_model"] = val
+                self.write()
+                st, msg = self.why({"action": "fancal", "confirm": "fancal"})
+                self.assertEqual(st, 409)
+                self.assertIn(want, msg)
+                self.fan, self.act, self.panel.busy = fan, act, (lambda: [])
+                self.panel.cfg["fan_cal_model"] = "small:8b"
+                self.write()
+        self.assertEqual(A["started"], [])
+
+    def test_one_at_a_time_and_abort_only_while_running(self):
+        self.assertEqual(self.why({"action": "fancal-abort"}), (409, "no fan calibration is running"))
+        self.write({"at": int(time.time()), "state": "running", "stage": "long", "pct": 50})
+        st, msg = self.why({"action": "fancal", "confirm": "fancal"})
+        self.assertEqual((st, msg), (409, "not now: a calibration is already running"))
+        self.assertEqual(self.why({"action": "fancal-abort"})[0], 202)
+        self.assertEqual(A["started"], ["ollama1-fancal-abort.service"])
+
+    def test_the_card_data(self):
+        from o1common import write_json_atomic
+        self.write({"at": int(time.time()), "state": "running", "stage": "burn", "stage_text": "a graphics-card burn",
+                    "pct": 65, "left": 900, "gpu_busy": 97, "model": "small:8b", "evil": "<script>",
+                    "temps": [{"label": "GPU", "c": 70.5, "limit": 85, "ceiling": 75, "x": 1}] * 9,
+                    "blocks": [{"stage": "long", "pct": 50, "s": 120, "ok": False, "worst": "GPU", "temps": [1]}]})
+        write_json_atomic(self.C.result_path(), {"v": 1, "at": 5, "quiet_pct": 40, "heavy_pct": 60, "model": "m",
+                                                 "found": {"query": 30, "burn": 50}, "blocks": [{"big": "x" * 999}]})
+        A["panel"].state_cache = (0, None)
+        st, raw, _ = get("/api/state")
+        s = json.loads(raw)
+        c = s["fancal"]
+        self.assertEqual(c["run"]["state"], "running")
+        self.assertEqual(len(c["run"]["temps"]), 4)
+        self.assertEqual(c["run"]["temps"][0], {"label": "GPU", "c": 70.5, "limit": 85, "ceiling": 75})
+        self.assertEqual(c["run"]["blocks"], [{"stage": "long", "pct": 50, "s": 120, "ok": False, "worst": "GPU"}])
+        self.assertNotIn("evil", c["run"])
+        self.assertEqual(c["cal"], {"at": 5, "quiet_pct": 40, "heavy_pct": 60, "model": "m",
+                                    "found": {"query": 30, "burn": 50}})
+        self.assertNotIn(b"<script>", raw)
+        self.assertEqual((s["fan_status"]["work"], s["fan_status"]["levels"]), (100, "default"))
+
+    def test_the_page_has_the_card_and_asks_first(self):
+        st, page, _ = get("/")
+        for needle in (b'id="calbox"', b'data-act="fancal"', b'data-act="fancal-abort"', b"function renderCal(",
+                       b"if(a==='fancal'){if(await ask({title:'Calibrate the fans?'", b"act('fancal',null,'fancal',b)",
+                       b"tuning:['Fan calibration','warn']", b"['cal',()=>renderCal(s.fancal,s.fan_status)]"):
+            self.assertIn(needle, page, needle)
 
 
 class TestPolkitMatchesPanel(unittest.TestCase):

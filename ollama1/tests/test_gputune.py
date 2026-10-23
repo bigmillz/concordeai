@@ -1437,9 +1437,10 @@ class TestSystemPieces(unittest.TestCase):
         self.assertIn('ln -sfn "$LIBDIR/bin/ollama1-gpu-tune" /usr/local/sbin/ollama1-gpu-tune', s)
 
     def bash(self, script, **env):
-        r = subprocess.run(["bash", "-c", ". %s; %s" % (os.path.join(U.LIB, "setuplib.sh"), script)],
-                           capture_output=True, text=True, env=dict(os.environ, **env))
-        return r.returncode, r.stdout.strip()
+        r = subprocess.run(["bash", "-c", '. "$O1_SETUPLIB"; ' + script],
+                           capture_output=True, text=True,
+                           env=dict(os.environ, O1_SETUPLIB=os.path.join(U.LIB, "setuplib.sh"), **env))
+        return r.returncode, r.stdout.strip()   # the path through the environment: a checkout path may hold a space
 
     def test_choice(self):
         for args, want in ((('""', '""', '""'), "default"), (("off", '""', '""'), "off"), (('""', "0", '""'), "off"),
