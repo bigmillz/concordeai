@@ -4,7 +4,7 @@ verified. Runs as root (weekly timer, the panel's "apply updates", setup).
 
 1. Reads the latest release from api.github.com/repos/ollama/ollama.
 2. Downloads ollama-linux-amd64 and (for AMD GPUs; --no-rocm or
-   ollama_rocm=false in config.json skips it) its ROCm component (.tar.zst,
+   ollama_rocm=false in config.json skips it; unset, an NVIDIA card skips it) its ROCm component (.tar.zst,
    or .tgz on older releases) and the release's sha256sum.txt.
 3. Each file's SHA-256 must equal sha256sum.txt's line for it, and the
    digest GitHub reports for the asset when it reports one. Any mismatch,
@@ -42,6 +42,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
+import o1gpu  # noqa: E402
 import o1sleep  # noqa: E402
 from o1common import Paths, load_config, write_json_atomic  # noqa: E402
 
@@ -160,6 +161,19 @@ def parse_sums(text):
     return sums
 
 
+def want_rocm(cfg, detect=None):
+    """Whether to fetch the ROCm component: ollama_rocm in config.json when it is set, else yes unless the card is
+    an NVIDIA one (6b501: an RTX 5070 Ti server downloaded 1 GB of ROCm it can't use at every update; the base
+    archive carries CUDA). An unknown card keeps the old answer, yes."""
+    if isinstance(cfg.get("ollama_rocm"), bool):
+        return cfg["ollama_rocm"]
+    try:
+        vendor = (detect or o1gpu.detect)().get("vendor")
+    except Exception:
+        vendor = None
+    return vendor != "nvidia"
+
+
 def pick_assets(release, rocm=True):
     assets = {a["name"]: a for a in release.get("assets", []) if isinstance(a, dict)}
     if "sha256sum.txt" not in assets:
@@ -264,7 +278,7 @@ def attempt(a, opt, versions, cur):
         if cur == tag and not a.force:
             status("current", tag)
             return 0
-        rocm = not a.no_rocm and bool(load_config(Paths.config).get("ollama_rocm", True))
+        rocm = not a.no_rocm and want_rocm(load_config(Paths.config))
         sums_asset, parts = pick_assets(release, rocm)
         sums = parse_sums(fetch(sums_asset["browser_download_url"]).decode("utf-8", "replace"))
         cache = os.path.join(Paths.state, "download")

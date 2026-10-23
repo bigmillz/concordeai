@@ -196,7 +196,7 @@ Every step skips what is already done, so it is safe to run again.
     first, name yours:
     `ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 <your-user>@<server-ip>`.
 11. It installs Ollama from its GitHub release (the linux-amd64 archive plus
-    the ROCm component). Each file must match the release's `sha256sum.txt`.
+    the ROCm component, skipped on an NVIDIA card). Each file must match the release's `sha256sum.txt`.
     The firewall and SSH are done before this long download.
 12. It turns on automatic security updates, cloudflared updates and the
     weekly Ollama update.
@@ -1926,7 +1926,8 @@ not apply. The services, timers, tunnel and config keep working: they live in
 - **Ubuntu security updates and cloudflared:** unattended-upgrades runs
   daily and reboots at 04:00 (the server's time zone) when an update needs it.
 - **Ollama:** `ollama1-update-ollama.timer` runs Sundays around 03:30.
-  - It downloads the release's linux-amd64 archive and the ROCm component.
+  - It downloads the release's linux-amd64 archive and, unless the card is an NVIDIA one (or `ollama_rocm` in
+    config.json says otherwise), the ROCm component. The base archive carries CUDA.
   - Each must match the release's `sha256sum.txt`, and GitHub's own digest
     for the file.
   - It switches to the new version, then checks that it starts. If it

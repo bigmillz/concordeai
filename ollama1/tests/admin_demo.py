@@ -112,6 +112,8 @@ class Fake:
             if sp:
                 self.w(net + n + "/speed", "%d\n" % sp)
                 self.w(net + "br0/brif/" + n, "")
+                self.w(net + n + "/device/uevent", "")       # a physical port: the panel's traffic counts it
+        self.netbytes = [0, 0]
         os.makedirs(os.path.join(self.root, "srv/data"), exist_ok=True)
         self.w("etc/ollama1/models.allow", "qwen3:14b\ngpt-oss:20b ram\nllama3.1:8b\nmistral-small:24b\nnomic-embed-text\n")
         self.devices = [{"id": "3f9a1c0d22b74e61", "name": "Sam's MacBook Pro", "paired_at": "2026-09-02T18:21:04Z"},
@@ -208,6 +210,11 @@ class Fake:
         used = (24 + (3 if busy else 0) + self.wave(0, 0.8, 30)) * GIB
         self.w("proc/meminfo", "MemTotal: %d kB\nMemFree: %d kB\nMemAvailable: %d kB\nSwapTotal: 8388604 kB\nSwapFree: 8388604 kB\n"
                % (64 * GIB // 1024, (64 * GIB - used) // 2048, (64 * GIB - used) // 1024))
+        self.netbytes[0] += int(self.wave(9e6 if busy else 2e5, 3e6 if busy else 1e5, 9))   # bytes a tick, in
+        self.netbytes[1] += int(self.wave(4e5 if busy else 6e4, 2e5 if busy else 3e4, 11))
+        self.w("proc/net/dev", "Inter-| head\n face | head\n    lo: 5 0 0 0 0 0 0 0 5 0 0 0 0 0 0 0\n"
+               "enp5s0: %d 0 0 0 0 0 0 0 %d 0 0 0 0 0 0 0\n   br0: %d 0 0 0 0 0 0 0 %d 0 0 0 0 0 0 0\n"
+               % (self.netbytes[0], self.netbytes[1], self.netbytes[0], self.netbytes[1]))
         self.w("proc/loadavg", "%.2f %.2f %.2f 3/812 44120\n" % (self.wave(2.4 if busy else 0.3, 0.4, 20), 1.71, 1.20))
         self.w("proc/uptime", "%.2f 1000.0\n" % (22 * 3600 + now - self.t0))
         pct = 37.4 + (now - self.t0) / 400.0

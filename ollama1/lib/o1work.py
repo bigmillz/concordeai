@@ -53,6 +53,7 @@ import json
 import time
 
 import o1gpu
+import o1stats
 
 GPU_BUSY_PCT = 50                 # the card over this (strictly) is work
 GPU_CONFIRM_S = 1.5               # ... for this long in a row; and at/under it this long in a row to end it
@@ -111,9 +112,14 @@ class Gpu:
             self.vendor = o1gpu.detect().get("vendor")
         if not self.vendor:
             return None
+        if self.vendor == "nvidia" and os.geteuid() == 0:
+            # one nvidia-smi call gives the whole reading; the gateway's and the panel's sandboxes read it
+            # from here (6b488, 6b500: the panel's gauges too)
+            full = o1stats.gpu_nvidia()
+            if full and full.get("busy_pct") is not None:
+                o1gpu.publish(dict(full, vram_used_bytes=full["vram_used"], vram_total_bytes=full["vram_total"]))
+                return full["busy_pct"]
         u = o1gpu.usage(self.vendor)
-        if self.vendor == "nvidia" and u.get("busy_pct") is not None and os.geteuid() == 0:
-            o1gpu.publish(u)                 # for the gateway's sandbox (6b488)
         return u["busy_pct"]
 
 

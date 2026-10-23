@@ -1089,7 +1089,7 @@ MUTANTS = [
     ("cpu: panel writes the model as markup", "bin/ollama1-admin",
      "$('cpumodel').textContent=c.model||'';", "$('cpumodel').innerHTML=c.model||'';", ["test_cpu"]),
     ("cpu: older 7-column history thrown away", "bin/ollama1-admin",
-     "len(row) in (7, HISTORY_COLS)", "len(row) == HISTORY_COLS", ["test_cpu"]),
+     "len(row) in (7, 9, 11, HISTORY_COLS)", "len(row) == HISTORY_COLS", ["test_cpu"]),
     ("setup: an empty serial matches a disk", "lib/setuplib.sh",
      '  [ -n "$1" ] || return 0   # no serial given: no disk (an empty one would match any)\n', "",
      ["test_setuplib"]),

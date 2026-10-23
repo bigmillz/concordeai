@@ -399,7 +399,7 @@ print_plan() {
    $(state '[ -x $LIBDIR/bin/ollama1-gateway ]')  8. Install the gateway, admin panel, dashboard, pairing tool, updater, units, polkit rule
    $(state 'ufw status | grep -q "Status: active"')  9. Firewall: nothing in except SSH from $HOME_LAN; bridged LAN traffic untouched
    $(state '[ -f /etc/ssh/sshd_config.d/10-ollama1.conf ]') 10. SSH: passwords off, only $ADMIN_USER with a key, no root (after you confirm your key)
-   $(state '[ -L /opt/ollama/current ]') 11. Ollama (ROCm build) from GitHub, checksums verified; GPU only; local only
+   $(state '[ -L /opt/ollama/current ]') 11. Ollama (+ROCm for AMD) from GitHub, checksums verified; GPU only; local only
    $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 04:00 when needed; weekly Ollama update
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen (big console font), timers
    $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
@@ -916,7 +916,7 @@ else
 fi
 
 # ---- 11. Ollama ------------------------------------------------------------------
-step "Ollama (verified download, ROCm build)"
+step "Ollama (verified download; ROCm component for AMD)"
 run systemctl enable --now ollama1-nft.service
 # Ollama's memory cap: all RAM but 8 GiB (MemoryHigh 2 GiB below that), from
 # /proc/meminfo. A load too big for the machine is stopped inside Ollama's
@@ -956,10 +956,10 @@ run systemctl restart ollama.service
 for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS http://127.0.0.1:11434/api/version >/dev/null || die "Ollama did not start: journalctl -u ollama"
 gpuline=$(journalctl -u ollama -b --no-pager -o cat 2>/dev/null | grep -i 'inference compute' | tail -n1 || true)
-if echo "$gpuline" | grep -qi 'rocm'; then
+if echo "$gpuline" | grep -qi -E 'rocm|cuda'; then      # AMD or NVIDIA (6b501)
   ok "Ollama $(curl -fsS http://127.0.0.1:11434/api/version | python3 -c 'import json,sys;print(json.load(sys.stdin)["version"])') sees the GPU: ${gpuline#*msg=}"
 else
-  note "Ollama did not report a ROCm GPU yet: ${gpuline:-no 'inference compute' line}. The gateway refuses anything not 100% on the GPU, so nothing runs on the CPU. Check: journalctl -u ollama | grep -i -E 'rocm|amdgpu|gfx'"
+  note "Ollama did not report a GPU (ROCm or CUDA) yet: ${gpuline:-no 'inference compute' line}. The gateway refuses anything not 100% on the GPU, so nothing runs on the CPU. Check: journalctl -u ollama | grep -i -E 'rocm|cuda|amdgpu|gfx|nvidia'"
   later "Ollama didn't report the GPU at setup time; check journalctl -u ollama"
 fi
 
