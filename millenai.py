@@ -8099,6 +8099,21 @@ _PE_STUB = (
     "shutil.copyfile(sys.argv[1], sys.argv[2])\n")
 
 
+def _pe_stage_photo(raw: bytes) -> str:
+    """The attached photo's bytes in a new 0600 stage file under run/ (the
+    engine's reference); its path. A machine path, never a profile's: the
+    caller drops it when the edit ends (6b510, the gauntlet's write lint)."""
+    src = stage_path(".src")
+    try:
+        fd = os.open(src, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+    except BaseException:
+        drop_run_file(src)
+        raise
+    return src
+
+
 class PhotoEditUnavailable(RuntimeError):
     """The edit can't run here; the message says why, in a sentence."""
 
@@ -8171,10 +8186,7 @@ def edit_photo(ctx, b64: str, request: str, sock=None, step=None) -> str:
     out = stage_path(".png")
     landed = False
     try:
-        src = stage_path(".src")
-        fd = os.open(src, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as f:
-            f.write(raw)
+        src = _pe_stage_photo(raw)
         _vb = os.path.join(STUDIOS["image"]["venv"], "bin")
         t0 = time.time()
         w = h = 0
@@ -12990,6 +13002,8 @@ MACHINE_IO = frozenset((
     # profile only through ctx.adopt
     "_render_note", "_ffmpeg_convert", "ex_table", "ex_calendar", "ex_cards",
     "ex_text",
+    # 6b510: a photo to edit, staged for the klein edit engine (6b472)
+    "_pe_stage_photo",
     # engines, models and their installs
     "_settle_engine_dir", "_studio_install_worker", "_download_ollama_binary",
     "_spawn_ollama_serve", "_stage_native_engine", "_spawn_mlx_engine",
