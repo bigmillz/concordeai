@@ -403,6 +403,13 @@ unless you turn it on.
      Cloudflare's browser SSH, and saves its AUD tag. Your existing
      service token is kept.
    - Then delete the token in the dashboard.
+   - **If the Cloudflare side was set up by hand** (the tunnel, service
+     token and apps made in the dashboard), use
+     `sudo ./bin/ollama1-cf-access --ssh-door-only` instead. It makes only
+     the door's DNS name (on the tunnel config.json names), its own policy
+     and its app, and touches nothing else. The full run stops rather than
+     make a second tunnel when config.json already names one. The token
+     needs Zone: Read, DNS: Edit and Access: Apps and Policies: Edit.
 2. Run setup with `--ssh-door`: `sudo ./setup.sh --ssh-door`. It adds the
    route, the sshd line and the port guard, and restarts the tunnel. The
    setting is saved, so later runs keep it.
