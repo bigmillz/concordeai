@@ -17554,6 +17554,12 @@ check("6b455: the launcher runs the interpreter itself, so the window's process 
            < _MILLENAI_SRC.index("webview.start(private_mode=False,"))
       and "if not (IS_MAC and DEFAULT_APP and _webkit_own_store()):" in _MILLENAI_SRC
       and _a_ok, "%r" % [_a0, _a1, _a2])
+# 6b508 (per Patrick: "the app is crashing"): Py_BytesMain returns after Python finalized; draining the launcher's
+# autorelease pool then deallocated PyObjC objects on a dead interpreter, so every close of the window segfaulted
+_lm508 = _lm443[_lm443.index("int (*bytesMain)"):]
+check("6b508: the launcher leaves without draining its pool once Python has finished (closing the window doesn't crash)",
+      "int rc = bytesMain(2, pyargv);\n    fflush(NULL);\n    _exit(rc);" in _lm508
+      and "return bytesMain(" not in _lm443 and "#include <unistd.h>" in _lm443)
 check("the composer grows with its text: typing, pasting and code that fills it refit it, to 45% of the window",
       "function fitInput(){" in _MILLENAI_SRC and 'input.addEventListener("input",fitInput);' in _MILLENAI_SRC
       and 'set(v){d.set.call(this,v);fitInput();}' in _MILLENAI_SRC

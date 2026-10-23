@@ -16582,3 +16582,20 @@ the panel, behind Access (the panel's admin identity) and then SSH keys.
 - Unverified on the server: everything Cloudflare-side (the `ssh` type, cloudflared's Access check on an ssh://
   route) and the new nft line under `nft -c`. Tests: tests/test_sshdoor.py (rendering on and off, the drop-in, the
   guard, the flags, the helper against the fake API with the ssh type and its fallback), six mutants in mutate.py.
+
+## 6b508 — Closing the window no longer crashes the Mac app (per Patrick)
+
+- Patrick: "looks like the app is crashing now", with a macOS crash report: SIGSEGV at 0x1cb8 on the main thread in
+  `new_threadstate` ← `PyGILState_Ensure` ← PyObjC's `object_method_dealloc` ← `objc_autoreleasePoolPop` ← the
+  launcher's `main`. Every Python thread was already parked in `PyThread_hang_thread`: the interpreter had finalized.
+- Cause: since 6b455 the launcher runs Python in-process with `return bytesMain(2, pyargv);` inside its
+  `@autoreleasepool`. When the window closes, `webview.start()` returns, Python runs its atexit work and finalizes,
+  and `Py_BytesMain` returns. Leaving the pool then drained the objects PyObjC had autoreleased on the main thread;
+  the dealloc of each Python-defined Objective-C object asks for the GIL of an interpreter that no longer exists.
+  Cmd+Q never reached it (AppKit's terminate: calls exit()), which is how it hid; the close box and a window that
+  closes itself did.
+- Fix: `int rc = bytesMain(2, pyargv); fflush(NULL); _exit(rc);`: Python has already done its shutdown, so the
+  process leaves without draining a pool that holds nothing of the launcher's. Reproduced with a stand-in
+  millenai.py that leaves 50 instances of a Python NSObject subclass autoreleased: the shipped launcher exits 139
+  (SIGSEGV), the fixed one 0. Gauntlet check "6b508" pins the three lines. It reaches the app with the next nightly
+  (the updater replaces the whole bundle, launcher included).
