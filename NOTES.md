@@ -16165,6 +16165,9 @@ Patrick: "it opens the login prompt like 1/10 tries. open more sessions maybe?"
 - setup.sh step 11 treated the GPU as found only when Ollama's "inference compute" line said ROCm, so an NVIDIA
   server got a false "Ollama did not report a ROCm GPU" note and a `later` item. It now accepts ROCm or CUDA. The
   gateway's 100%-on-GPU rule was already vendor-neutral (size_vram against size from /api/ps).
+- Follow-up (2026-10-23): the server's next setup still fetched the ROCm component. o1common.DEFAULTS had
+  `"ollama_rocm": True`, and load_config fills defaults in, so want_rocm() always saw an explicit True and never
+  asked the card. The default is now None ("by the card"); test_updater checks want_rocm against DEFAULTS.
 
 ## 6b472 — Edit this picture: an attached photo plus "change it" runs a local edit (per Patrick)
 
@@ -16632,6 +16635,12 @@ the panel, behind Access (the panel's admin identity) and then SSH keys.
   fake API that refuses a type change in place, where door-only remakes the app and saves the new AUD.
 - Unverified until the owner's next try: that the self-hosted app's login page answers 200 for the door host
   (the panel's, the same kind of app, does).
+- Also (per Patrick: "Yes, accept the token"): `--door-service-token` with --ssh-door-only adds a second policy to
+  the door, `<name> ssh - service token` (non_identity, the service token whose Client ID config.json names; found,
+  never made or rotated), so the door opens without the browser login that expires every 24 h. Remembered as
+  `ssh_door_service_token` in config.json. A token that can't be listed (no Access: Service Tokens: Read) or found
+  leaves the door to the admin's email login and says so. Tests: the two policies in order, nothing made or
+  rotated, the setting remembered; a missing token still opens the door for the admin.
 
 ## 6b511 — app2 ships on main: the gauntlet's two real catches, and an MLX engine that can't run Gemma 4 26B
 

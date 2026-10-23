@@ -307,7 +307,7 @@ def access_step(cf, acct, cfg, admin, interactive, rotate, test_mode=False, ssh_
     return tok["client_id"], admin_aud, gw_aud, ssh_aud
 
 
-def door_only_step(cf, acct, ssh_host, admin):
+def door_only_step(cf, acct, ssh_host, admin, token_client_id=""):
     """The SSH door alone (6b509, per the owner: the full run, on an install whose tunnel, service token and apps
     were made by hand in the dashboard under other names, went to create a second tunnel). Only the door's own
     policy and app, by their own names; the tunnel, the service token and the other apps aren't looked at."""
@@ -325,6 +325,31 @@ def door_only_step(cf, acct, ssh_host, admin):
     else:
         pid = cf.call("POST", a + "/policies", body)["id"]
         say("policy %r created" % name)
+    refs = [{"id": pid, "precedence": 1}]
+    if token_client_id:
+        # the app's service token opens the door too (6b510, per the owner: so the door doesn't need a browser
+        # login every 24 h); sshd still wants a key. Found by its Client ID from config.json, never made here.
+        try:
+            toks = cf.call("GET", a + "/service_tokens" + q(per_page=100)) or []
+        except Stop as e:
+            toks = None
+            say("the service token isn't added (%s; the token needs Access: Service Tokens: Read)" % e)
+        tok = next((t for t in toks or [] if t.get("client_id") == token_client_id), None)
+        if toks is not None and tok is None:
+            say("the service token isn't added: no service token has the Client ID in config.json")
+        if tok:
+            tname = APP_SSH + " - service token"
+            tinc = [{"service_token": {"token_id": tok["id"]}}]
+            tbody = {"name": tname, "decision": "non_identity", "include": tinc, "exclude": [], "require": []}
+            tcur = next((p for p in pols if p.get("name") == tname), None)
+            if tcur:
+                if tcur.get("decision") != "non_identity" or tcur.get("include") != tinc:
+                    cf.call("PUT", a + "/policies/%s" % tcur["id"], tbody)
+                tpid = tcur["id"]
+            else:
+                tpid = cf.call("POST", a + "/policies", tbody)["id"]
+            refs.append({"id": tpid, "precedence": 2})
+            say("policy %r ready: the service token %s opens the door too" % (tname, tok.get("name", "")))
     apps = cf.call("GET", a + "/apps" + q(per_page=100)) or []
     cur = next((x for x in apps if (x.get("domain") or "").lower() == ssh_host), None)
     if cur and cur.get("name") != APP_SSH:
@@ -334,7 +359,7 @@ def door_only_step(cf, acct, ssh_host, admin):
     # on the owner's account, and `cloudflared access ssh` stopped at "Empty app domain"
     app = {"name": APP_SSH, "domain": ssh_host, "type": "self_hosted", "session_duration": "24h",
            "app_launcher_visible": False, "http_only_cookie_attribute": True, "same_site_cookie_attribute": "lax",
-           "policies": [{"id": pid, "precedence": 1}]}
+           "policies": refs}
     if cur:
         try:
             res = cf.call("PUT", a + "/apps/%s" % cur["id"], app)
@@ -377,6 +402,8 @@ def main():
     ap.add_argument("--rotate-service-token", action="store_true")
     ap.add_argument("--ssh-door", action="store_true",
                     help="turn the SSH door on (ssh_door in config.json) and make its DNS name and Access app")
+    ap.add_argument("--door-service-token", action="store_true",
+                    help="with --ssh-door-only: the service token in config.json opens the door too (no browser login)")
     ap.add_argument("--ssh-door-only", action="store_true",
                     help="only the SSH door: its DNS name, policy and Access app, on the tunnel config.json names; "
                          "for an install whose Cloudflare side was set up by hand")
@@ -434,7 +461,9 @@ def main():
             zone_id, acct = zones[0]["id"], zones[0]["account"]["id"]
             say("zone %s; the tunnel from config.json (%s); nothing else in Cloudflare is touched" % (zone, tid))
             dns_step(cf, zone_id, [ssh_host], tid)
-            ssh_aud = door_only_step(cf, acct, ssh_host, admin)
+            want_tok = a.door_service_token or raw.get("ssh_door_service_token") is True
+            ssh_aud = door_only_step(cf, acct, ssh_host, admin,
+                                     (cfg.get("service_token_client_id") or "").strip() if want_tok else "")
             raise _DoorDone()
         hosts = [cfg["hostname_gateway"], cfg["hostname_admin"]] + ([ssh_host] if door else [])
         for h in hosts:
@@ -457,6 +486,8 @@ def main():
     except _DoorDone:
         cf.forget()
         raw.update({"ssh_door": True, "hostname_ssh": ssh_host, "ssh_aud": ssh_aud})
+        if a.door_service_token:
+            raw["ssh_door_service_token"] = True
         write_json_atomic(Paths.config, raw, mode=0o600)
         say("\nSaved to %s: the SSH door (on), its hostname and its AUD tag; nothing else changed." % Paths.config)
         say("Run setup.sh again with --ssh-door to open it.")

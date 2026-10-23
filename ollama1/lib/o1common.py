@@ -101,7 +101,8 @@ DEFAULTS = {
     # "none": it doesn't (an SSH tunnel is the way in); signatures still do.
     "access": "cloudflare",
     "cf_zone": "",                   # your Cloudflare zone (setup.sh --zone); the hostnames live in it
-    "ollama_rocm": True,             # install Ollama's ROCm component (AMD GPUs)
+    "ollama_rocm": None,             # Ollama's ROCm component: true/false, or None = by the card (no on NVIDIA;
+                                     # 6b501's choice never ran while this default said True)
     "lan_bind": "",                  # the server's own LAN address (setup.sh writes it)
     "lan_cidr": "",                  # your LAN, like 10.0.0.0/24 (setup.sh --lan writes it)
     "gateway_port": 8431,

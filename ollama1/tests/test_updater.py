@@ -427,6 +427,13 @@ class TestWantRocm(unittest.TestCase):
         self.assertTrue(mod.want_rocm({"ollama_rocm": True}, nv))
         self.assertFalse(mod.want_rocm({"ollama_rocm": False}, amd))
 
+    def test_the_default_config_leaves_it_to_the_card(self):
+        # the shipped default must not answer for the card (it said True, so an NVIDIA server kept fetching ROCm)
+        import o1common
+        mod = load_updater()
+        self.assertFalse(mod.want_rocm(dict(o1common.DEFAULTS), lambda: {"vendor": "nvidia"}))
+        self.assertTrue(mod.want_rocm(dict(o1common.DEFAULTS), lambda: {"vendor": "amd"}))
+
     def test_a_failing_detect_keeps_rocm(self):
         def boom():
             raise OSError("no sysfs")
