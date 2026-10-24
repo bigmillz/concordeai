@@ -1,0 +1,205 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[90.9,59.8,30.9],\"final\":36.1,\"ftok\":331,\"est\":true}",
+  "X-Hurry": "c455db8e067ad459"
+ },
+ "first_byte_s": 5.25,
+ "first_text_s": 70.43,
+ "elapsed_s": 70.44,
+ "events": [
+  {
+   "t": 5.25,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 5.25,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 5.32,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 5.32,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 30.26,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 50.28,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 69.05,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 26
+  },
+  {
+   "t": 69.14,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 26B · 2 of 2"
+  },
+  {
+   "t": 70.43,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 23
+  },
+  {
+   "t": 70.43,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 70.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "275 chars"
+   }
+  },
+  {
+   "t": 70.43,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   5.32,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   30.26,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   50.28,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   69.14,
+   "asking Gemma 4 26B · 2 of 2"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 5.25
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "275 chars",
+   "t_s": 70.43
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 70.43
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 5.32,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 69.05,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — RuntimeError)"
+  },
+  {
+   "t_s": 70.43,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — HTTPError)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "price of a dozen eggs in the US | Sureno",
+   "u": "https://sureno.ai/money/price-dozen-eggs-us-history"
+  },
+  {
+   "t": "This popular restaurant is now charging customers a 50-cent egg...",
+   "u": "https://www.silive.com/business/2025/02/this-popular-restaurant-is-now-charging-customers-a-50-cent-egg-surcharge.html"
+  },
+  {
+   "t": "When A Dozen Eggs Cost More The The Accutal Chicken | TikTok",
+   "u": "https://www.tiktok.com/discover/when-a-dozen-eggs-cost-more-the-the-accutal-chicken"
+  },
+  {
+   "t": "Making an Omelet Without Breaking the Bank – DNYUZ",
+   "u": "https://dnyuz.com/2026/04/22/making-an-omelet-without-breaking-the-bank/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1285,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.24,
+ "rate_gen_tok_s": null,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:27:41",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

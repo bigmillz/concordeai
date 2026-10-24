@@ -1,0 +1,223 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[87.2,60.0,53.8],\"final\":34.2,\"ftok\":393,\"est\":true}",
+  "X-Hurry": "730aa603f828383d"
+ },
+ "first_byte_s": 6.4,
+ "first_text_s": 126.75,
+ "elapsed_s": 126.75,
+ "events": [
+  {
+   "t": 6.4,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 6.4,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 6.43,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 6.43,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 6.43,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 31.43,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 51.45,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 71.47,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 91.5,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 111.52,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 126.74,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 126.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 126.75,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 126.75,
+   "tag": "FIRST_TEXT"
+  }
+ ],
+ "statuses": [
+  [
+   6.43,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   31.43,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   51.45,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   71.47,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   91.5,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   111.52,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 6.4
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 126.75
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 126.75
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 6.43,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 6.43,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 126.74,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Should You Shave Your Head If You're Balding? (2026)",
+   "u": "https://menhaircuts.net/haircuts/should-you-shave-your-head-if-balding/"
+  },
+  {
+   "t": "Buzz Cut or Shaved Bald? Here's How to Choose - Freebird",
+   "u": "https://www.myfreebird.com/blogs/grooming/buzz-cut-or-bald"
+  },
+  {
+   "t": "Should I Shave Or Buzz My Balding Head - hairnthing.com",
+   "u": "https://hairnthing.com/should-i-shave-or-buzz-my-balding-head.html"
+  },
+  {
+   "t": "Buzz Cut vs Bald Shave for Thinning Hair: Which Is Better?",
+   "u": "https://menhaircuts.net/haircuts/buzz-cut-vs-bald-shave-thinning-hair/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1300,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q15",
+ "turn": 1,
+ "category": "health",
+ "topic": "Hairstyles for bald men",
+ "question": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:55:31",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

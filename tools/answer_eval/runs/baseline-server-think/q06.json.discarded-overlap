@@ -1,0 +1,178 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.0,18.6,28.6],\"final\":35.5,\"ftok\":2749,\"est\":false}",
+  "X-Hurry": "72578ea8f3d6b09b"
+ },
+ "first_byte_s": 7.39,
+ "first_text_s": 13.42,
+ "elapsed_s": 13.43,
+ "events": [
+  {
+   "t": 7.39,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 7.39,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 7.39,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 13.42,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 25
+  },
+  {
+   "t": 13.42,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 25
+  },
+  {
+   "t": 13.42,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 25
+  },
+  {
+   "t": 13.42,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 13.42,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "351 chars"
+   }
+  },
+  {
+   "t": 13.42,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   7.39,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 7.39
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "351 chars",
+   "t_s": 13.42
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 13.42
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 13.42,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "(no answer — ServerError)"
+  },
+  {
+   "t_s": 13.42,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "(no answer — server down)"
+  },
+  {
+   "t_s": 13.42,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — server down)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "price of a dozen eggs in the US | Sureno",
+   "u": "https://sureno.ai/money/price-dozen-eggs-us-history"
+  },
+  {
+   "t": "This popular restaurant is now charging customers a 50-cent egg...",
+   "u": "https://www.silive.com/business/2025/02/this-popular-restaurant-is-now-charging-customers-a-50-cent-egg-surcharge.html"
+  },
+  {
+   "t": "When A Dozen Eggs Cost More The The Accutal Chicken | TikTok",
+   "u": "https://www.tiktok.com/discover/when-a-dozen-eggs-cost-more-the-the-accutal-chicken"
+  },
+  {
+   "t": "Making an Omelet Without Breaking the Bank – DNYUZ",
+   "u": "https://dnyuz.com/2026/04/22/making-an-omelet-without-breaking-the-bank/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer": "⚠️ None of Ollama1’s models answered. Ollama1 couldn’t keep gpt-oss:20b in its memory, so it stopped.",
+ "chars": 101,
+ "raw_bytes": 1260,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 1.88,
+ "rate_gen_tok_s": null,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:17:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

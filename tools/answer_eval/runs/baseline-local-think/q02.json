@@ -1,0 +1,223 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[93.3,59.9,47.4],\"final\":28.8,\"ftok\":338,\"est\":true}",
+  "X-Hurry": "68a4a42f896cb856"
+ },
+ "first_byte_s": 5.17,
+ "first_text_s": 125.69,
+ "elapsed_s": 125.69,
+ "events": [
+  {
+   "t": 5.17,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 5.17,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 5.2,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 5.2,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 5.2,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 30.18,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 50.19,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 70.2,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 90.21,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 110.22,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 125.69,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 125.69,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 125.69,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 125.69,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   5.2,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   30.18,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   50.19,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   70.2,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   90.21,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   110.22,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 5.17
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 125.69
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 125.69
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 5.2,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 5.2,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 125.69,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "What’s the Best iPhone to Buy or Avoid Right Now? (2026) | WIRED",
+   "u": "https://www.wired.com/gallery/iphone-buying-guide/"
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/"
+  },
+  {
+   "t": "How Much Does the Newest iPhone Cost? iPhone 17 Pricing Guide",
+   "u": "https://electronics.alibaba.com/buyingguides/iphone-17-pricing-guide-what-you-pay-when-to-wait"
+  },
+  {
+   "t": "Best iPhone 2026: Which iPhone should you buy? | Macworld",
+   "u": "https://www.macworld.com/article/228816/best-iphone-pro-max-duo-ranked.html"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1263,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:14:16",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

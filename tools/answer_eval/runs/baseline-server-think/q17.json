@@ -1,0 +1,275 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.6,19.3,27.6],\"final\":34.5,\"ftok\":2634,\"est\":false}",
+  "X-Hurry": "fbd3b685b9be90ba"
+ },
+ "first_byte_s": 7.91,
+ "first_text_s": 77.97,
+ "elapsed_s": 82.89,
+ "events": [
+  {
+   "t": 7.91,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 7.91,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 7.91,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 14.4,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1169
+  },
+  {
+   "t": 14.4,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 33.43,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 33.43,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 57.94,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 59.12,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 59.12,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 59.12,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 71.7,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 71.7,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 71.7,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 77.97,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 82.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 82.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "7432 chars"
+   }
+  },
+  {
+   "t": 82.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   7.91,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   14.4,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   33.43,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   57.94,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   59.12,
+   "compositing…"
+  ],
+  [
+   59.12,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 7.91
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 71.7
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 82.88
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "7432 chars",
+   "t_s": 82.89
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 82.89
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 14.4,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Top picks for a six‑month stay in Florianópolis**\n\n| Neighborhood | Why it fits your checklist |\n|--------------|----------------------------|\n| **Canasvieiras** | Beachfront, walk‑friendly streets, high‑speed fiber is common, and crime rates are low compared with city centres. |\n| **Lagoa** | Central but still close to the beach, pedestrian‑friendly, many cafés and coworking spaces with gig‑abit internet. |\n| **Jurerê** | Upscale, very safe, short walk to the beach, and most rentals offer dedicated fibre‑optics—ideal if budget allows. |\n\n**Quick notes**\n\n- **Canasvieiras** is the favourite of many expats for its relaxed vibe and ready‑made services (grocery, gyms, bars).  \n- **Lagoa** balances proximity to downtown amenities with beach access; it’s also the hotspot for digital nomads.  \n- **Jurerê** is pricier but guarantees a top‑tier living environment; check rental listings for the most recent price ranges (often 25 % higher than Canasvieiras).  \n\n**Bottom‑line**: If you want the best mix of safety, walkability, beach access, and solid internet, start with Canasvieiras, then consider Lagoa or Jurerê depending on how much you’re willing to spend."
+  },
+  {
+   "t_s": 33.43,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Florianópolis’s best bets for a **foreign renter** (safe, walkable, beach-adjacent, and fast internet) are **Lagoa, Campeche, and Centro**, each with trade-offs for budget and expat life. Here’s the shortlist:\n\n**Lagoa**\n- **Why?** The city’s cultural core: nightlife, cafés, **walkable streets**, and the iconic **Lagoa da Conceição** (swimming, kayaking). **Beach access** to Joaquina (20 min bus/taxi) or Ratones (30 min). **Fastest internet**—business district density means **fiber widely available** (~50-80 Mbps for $30-50/month).\n- **Downsides:** Tourist areas mean **higher rents** ($600-1,200/month for 1-2BR) and **noisy weekends**. Best for **young professionals** or remote workers who thrive in a buzzing scene.\n- **Safety:** Safe by day, but stick to well-lit areas at night (petty theft in bars is the main risk).\n\n**Campeche**\n- **Why?** **Quieter than Lagoa** but still walkable, with **direct beachfront** (Praia de Campeche, a long, uncrowded sand stretch). **Mid-range rents** ($500-900/month) and a **local vibe** (less touristy, more families). Internet is **solid** (~30-60 Mbps for $25-40/month), though not as fast as Lagoa.\n- **Downsides:** **No metro**, so you’ll bus (~10"
+  },
+  {
+   "t_s": 59.12,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "**Jurerê Internacional** and **Beira Mar Norte** are the optimal neighborhoods for a six-month stay that balances safety, pedestrian-friendly infrastructure, and proximity to the beach.\n\n**Jurerê Internacional** is a high-end, gated-style coastal enclave. It is arguably the safest neighborhood on the island and offers a \"resort\" lifestyle where you can walk to various beach clubs, restaurants, and cafes. It is highly favored by expats because it feels self-contained and secure.\n\n**Beira Mar Norte** offers a different \"walkable\" experience. It is a linear urban strip along the coast with a high density of apartments, shops, and cafes. It is much more urban than Jurerê but provides a very high level of safety and consistent pedestrian access along the shoreline.\n\nIf you prefer a \"digital nomad\" atmosphere over a luxury resort feel, **Campeche** is the primary alternative. It has a strong surf culture and many foreigners, but walkability is lower than in Jurerê or Beira Mar Norte; you will likely need a vehicle or ride-share for daily errands.\n\n## Infrastructure and Logistics\n\n**Internet Connectivity**\nHigh-speed **fiber-to-the-home (FTTH)** is the standard in both Jurerê and Beira Ma"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianopolis",
+   "u": "https://nomads.com/neighborhoods/florianopolis"
+  },
+  {
+   "t": "The 49 best neighborhoods to see in Florianopolis",
+   "u": "https://wanderlog.com/list/geoCategory/150944/best-neighborhoods-to-see-in-florianopolis"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/"
+  },
+  {
+   "t": "Where is the Best Place to Live in Florianópolis? | FloripaGuru Blog",
+   "u": "https://floripaguru.com/blog/best-areas-to-live-florianopolis"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer": "The four neighborhoods that line up best with your criteria are **Canasvieiras, Jurerê Internacional, Campeche, and Beira Mar Norte**.  \nThey all have low crime rates compared with the city centre, are easy to walk around, sit next to a beach, and most of them have fibre‑to‑home broadband that can run at 100 Mbps or more.\n\n**Canasvieiras** – The southern beach district.  \n- **Walkability:** Grocery stores, bars, and gyms lie within a 10‑minute walk.  \n- **Beach:** The sand stretches for 2 km right in front of the neighbourhood.  \n- **Internet:** Vivo Fibra and Claro offer 100–200 Mbps plans; most apartments have a dedicated line.  \n- **Rent:** One‑bedroom apartments usually fall between **$600 – $1,200** per month on short‑term platforms. Prices rise in the peak summer months.\n\n**Jurerê Internacional** – A gated, upscale enclave.  \n- **Walkability:** The entire stretch is pedestrian‑friendly, with cafés and beach clubs within a 5‑minute walk.  \n- **Beach:** The beach is only a few metres away.  \n- **Internet:** Fibre‑optical service is standard; speeds of 200 Mbps are common.  \n- **Rent:** 1‑BR rentals are about **$800 – $1,400** per month; the area is the priciest of the four but offers the highest safety rating.\n\n**Campeche** – Quiet, family‑friendly, surf‑culture vibe.  \n- **Walkability:** Narrow streets mean you’ll often need a short taxi or rideshare for errands, but the beach itself is a 2‑minute walk.  \n- **Beach:** Praia de Campeche is a long, uncrowded stretch.  \n- **Internet:** Fibre coverage is decent; typical speeds are 50–80 Mbps.  \n- **Rent:** 1‑BR rentals hover around **$500 – $900** per month, making it a mid‑range option.\n\n**Beira Mar Norte** – Linear urban strip along the coast.  \n- **Walkability:** The entire corridor is a continuous walking path with shops and cafés every few hundred metres.  \n- **Beach:** The beach runs alongside the street, so you’re always within a few steps of the water.  \n- **Internet:** Both Vivo Fibra and Claro provide 100 Mbps plans; most units have a fibre connection.  \n- **Rent:** Prices are similar to Campeche, roughly **$550 – $950** per month.\n\n**Internet and transport**  \nFibre‑to‑home is the norm in Canasvieiras, Jurerê, and Beira Mar Norte, while Campeche’s coverage is slightly patchier but still supports 50–80 Mbps. Public transport is reliable in Lagoa and central areas but less frequent in the beach districts; a rideshare or scooter is handy for short trips.  \n\n**Six‑month rental tips**  \n- Book through local agencies or reputable short‑term sites; most listings show a 50 % deposit plus a security deposit that can be refunded if the apartment is in good condition.  \n- Prices rise steeply in December–February; if you can move a few weeks earlier or later, you’ll find lower rates.  \n- Check the latest crime statistics on the city’s police portal to confirm current safety levels; all four neighborhoods have reported fewer incidents than the downtown core.  \n\nWith these options, you’ll find a place that feels safe, lets you stroll to the beach, and keeps your internet humming—ideal for a six‑month stay.",
+ "chars": 3110,
+ "raw_bytes": 8712,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.38,
+ "rate_gen_tok_s": 158.03,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:32:58",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

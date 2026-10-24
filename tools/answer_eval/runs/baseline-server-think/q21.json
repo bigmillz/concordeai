@@ -1,0 +1,275 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.4,19.4,28.6],\"final\":35.7,\"ftok\":2780,\"est\":false}",
+  "X-Hurry": "364f6d892ebc455f"
+ },
+ "first_byte_s": 11.52,
+ "first_text_s": 101.14,
+ "elapsed_s": 105.75,
+ "events": [
+  {
+   "t": 11.52,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 11.52,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 11.52,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 22.57,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 22.57,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 36.58,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 36.58,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 61.57,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 73.76,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 19
+  },
+  {
+   "t": 73.76,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 73.76,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 92.25,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 92.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 92.25,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 101.14,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 105.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 105.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "6116 chars"
+   }
+  },
+  {
+   "t": 105.75,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   11.52,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   22.57,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   36.58,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   61.57,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   73.76,
+   "compositing…"
+  ],
+  [
+   73.76,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 11.52
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 92.25
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 105.75
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "6116 chars",
+   "t_s": 105.75
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 105.75
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 22.57,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**LATAM** – one cabin bag up to **12 kg** and **55 × 35 × 23 cm**; an extra personal item (handbag, laptop bag, or small backpack) that fits under the seat, max **45 × 35 × 20 cm**.  \n\n**GOL** – cabin bag up to **12 kg** (policy change in Oct 2025) and **55 × 35 × 23 cm**; personal item the same size restriction as LATAM.  \n\n**Azul** – cabin bag up to **10 kg** and **55 × 35 × 20 cm**; personal item max **45 × 35 × 20 cm**.\n\n---\n\n### Packing a three‑week, carry‑on‑only South American trip\n\n| Category | What to bring | Tips |\n|----------|---------------|------|\n| **Clothing** | 6‑7 short‑sleeve tops (mix of breathable cotton and quick‑dry travel fabrics) | Roll tops to save space; use packing cubes. |\n|  | 3‑4 pairs of lightweight pants or skirts | Choose versatile colors that mix and match. |\n|  | 2‑3 lightweight jackets (1 wind‑break and 1 warmer layer) | Pack the warmest one inside the jacket to save room. |\n|  | 1 swimsuit, 1 pair of sandals | Pack the sandals in a pouch to keep them dry. |\n|  | 1 pair of comfortable walking shoes | Bring them in a shoe bag to keep them separate from clothes. |\n|  | 2‑3 pairs of socks, underwear, sleepwear | Pack in a compression bag; add a few "
+  },
+  {
+   "t_s": 36.58,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Here’s the exact breakdown for LATAM, GOL and Azul (as of late 2025/early 2026):\n\n---\n### **Dimensions & Weight Limits**\n**LATAM**\n- **Main carry-on**: Max **56 × 36 × 23 cm** (22 × 14 × 9 in), **8 kg** (17.6 lbs).\n- **Personal item**: Max **45 × 35 × 20 cm** (17.7 × 13.7 × 7.9 in), no weight limit (but must fit under the seat).\n- Includes a **free checked bag** if traveling within South America; otherwise, it’s strictly carry-on only unless you pay for a checked bag (varies by route).\n\n**GOL**\n- **Main carry-on**: **55 × 38 × 23 cm** (21.6 × 15 × 9 in), **12 kg** (26.5 lbs). *Note*: GOL raised this to **12 kg** in October 2025, so it’s now more generous than LATAM.\n- **Personal item**: Same as LATAM (45 × 35 × 20 cm, no weight limit).\n\n**Azul**\n- **Main carry-on**: **55 × 40 × 23 cm** (21.6 × 15.7 × 9 in), **10 kg** (22 lbs). *Azul’s limit is slightly more relaxed than LATAM but stricter than GOL.*\n- **Personal item**: **45 × 35 × 20 cm** (same as others), no weight limit.\n\n---\n### **What to Pack (3 Weeks in South America)**\n1. **Clothing**: Pack **5–7 shirts** (quick-dry or moisture-wicking), **2–3 pairs of pants** (1 lightweight hiking pair), **1–2 dresses** (if applicable), **3"
+  },
+  {
+   "t_s": 73.76,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — empty)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Carry-On Rules for Latin American Airlines (2026 Guide)",
+   "u": "https://carrysizer.com/guides/carry-on-rules-latin-america/"
+  },
+  {
+   "t": "What to Pack for 2 Weeks in Europe (Carry-On Only + Full... - YouTube",
+   "u": "https://www.youtube.com/watch?v=inuLx4Xo6JY"
+  },
+  {
+   "t": "GOL vs LATAM 2026: LATAM Wins for Delta Flyers",
+   "u": "https://travelvient.com/tools/compare/gol-linhas-aereas-vs-latam-airlines/"
+  },
+  {
+   "t": "LATAM Airlines Baggage Allowance 2026: Cabin, Checked Bag Fees...",
+   "u": "https://mail.baggagelimits.co/airline/latam-airlines"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer": "**Carry‑on limits**\n\n- **LATAM** – one cabin bag max **12 kg** and **55 × 35 × 23 cm**; an extra personal item (handbag, laptop bag or small backpack) that fits under the seat, max **45 × 35 × 20 cm**.  \n- **GOL** – one cabin bag max **12 kg** and **55 × 35 × 23 cm**; personal item same size restriction.  \n- **Azul** – one cabin bag max **10 kg** and **55 × 40 × 23 cm**; personal item max **45 × 35 × 20 cm**.  \n\n(If you’re flying in a lower‑fare class, LATAM may allow only 8 kg, so check the fare‑class policy before you pack.)\n\n---\n\n### What to pack for a three‑week, carry‑on‑only South American trip\n\n**Essentials (must‑have)**\n- Passport and any required visas.  \n- Travel insurance card and a copy of the policy.  \n- A small first‑aid kit (band‑ages, pain relievers, motion sickness).  \n- Local currency and a credit card with no foreign‑transaction fee.  \n- A single reusable water bottle (fill after security).  \n- A compact rain poncho and a lightweight, packable jacket.  \n- A small travel sewing kit (needle, thread, safety pins).  \n- A compact day‑pack (fits in the cabin bag) for excursions.  \n\n**Electronics & adapters**\n- Phone, charger, small power bank.  \n- Universal travel adapter that handles 110/220 V and 50/60 Hz (Brazil 127 V/60 Hz, Argentina 220 V/50 Hz).  \n- Headphones and a lightweight travel‑size laptop or tablet if you need it.\n\n**Clothing (quick‑dry, versatile)**\n- 5–7 short‑sleeve tops (cotton or moisture‑wicking).  \n- 3 pairs of lightweight pants or skirts (mix of neutral colors).  \n- 2 lightweight jackets: one wind‑break and one warmer layer for cooler evenings.  \n- 1 swimsuit, 1 pair of sandals, 1 pair of comfortable walking shoes.  \n- 3–4 pairs of underwear, 3–4 pairs of socks, 1 set of sleepwear.  \n- 1 small, fold‑out rain jacket (optional).  \n\n**Packing tricks**\n- Roll clothes and place them in packing cubes or compression bags; heavier items go at the bottom of the bag to keep the weight balanced.  \n- Keep the personal item separate (e.g., a toiletry pouch or a small tote) so you can access it easily.  \n- Weigh the bag with a portable scale before you leave; keep the total at **≤12 kg** for LATAM and GOL, **≤10 kg** for Azul.  \n- If you exceed the limit, the airline may charge a fee of **$150–$300** or require you to check the bag.  \n\n**Safety & convenience**\n- Pack a small travel pillow and eye mask for long flights.  \n- Bring a reusable snack bag and a set of quick‑dry towels.  \n- Keep a copy of your itinerary and emergency contacts in a waterproof pouch.  \n\nWith these limits and a well‑organized, lightweight load, you’ll breeze through security, avoid surprise fees, and have everything you need for a comfortable three‑week adventure in South America.",
+ "chars": 2723,
+ "raw_bytes": 7312,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.44,
+ "rate_gen_tok_s": 147.67,
+ "id": "q21",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Carry-on travel in South America",
+ "question": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:39:52",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

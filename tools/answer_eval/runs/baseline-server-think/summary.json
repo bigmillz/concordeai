@@ -1,0 +1,63 @@
+{
+ "name": "baseline-server-think",
+ "config": "server-think",
+ "where": "server",
+ "started": "2026-10-24T01:54:30",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a2489e260675c0d0a",
+ "head": [
+  "a99681a",
+  "evalbench"
+ ],
+ "questions": [],
+ "server": {
+  "id": "5b346919",
+  "name": "Ollama1",
+  "paired": true,
+  "reachable": true,
+  "auth": true,
+  "err": "",
+  "kind": "",
+  "latency_ms": 608,
+  "gpu": {
+   "vendor": "nvidia",
+   "name": "GeForce RTX 5070 Ti",
+   "vram_bytes": null
+  },
+  "only": {
+   "ok": true,
+   "server": "Ollama1",
+   "model": "gpt-oss:20b",
+   "label": "Ollama1 · gpt-oss:20b",
+   "how": "fits",
+   "why": "",
+   "note": "The strongest model on Ollama1 that fits its card, answering alone. Nothing runs on this computer or in the cloud.",
+   "placement": "gpu",
+   "asleep": false
+  },
+  "models": [
+   "deepseek-r1:8b",
+   "gemma4:12b",
+   "gemma4:e2b",
+   "gpt-oss:20b",
+   "hermes3:8b",
+   "llama3.2:1b",
+   "ministral-3:14b",
+   "qwen3.5:9b"
+  ]
+ },
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "tier": "srv:5b346919:think"
+}

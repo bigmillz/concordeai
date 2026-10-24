@@ -1,0 +1,275 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.3,18.9,28.6],\"final\":35.4,\"ftok\":2727,\"est\":false}",
+  "X-Hurry": "caf421637d5ab8bf"
+ },
+ "first_byte_s": 7.68,
+ "first_text_s": 87.44,
+ "elapsed_s": 90.98,
+ "events": [
+  {
+   "t": 7.68,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 7.68,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 7.68,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 13.99,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 13.99,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 29.59,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 29.59,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 52.71,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 65.36,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 19
+  },
+  {
+   "t": 65.42,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 65.42,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 82.53,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 82.53,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 82.53,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 87.44,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 90.98,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 90.98,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "5706 chars"
+   }
+  },
+  {
+   "t": 90.98,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   7.68,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   13.99,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   29.59,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   52.71,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   65.42,
+   "compositing…"
+  ],
+  [
+   65.42,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 7.68
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 82.53
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 90.98
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "5706 chars",
+   "t_s": 90.98
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 90.98
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 13.99,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Your sweat smells worse because the bacteria on your skin now have more food and your sweat’s composition has shifted.**  \nWhen you eat more protein, spicy or fermented foods, or take certain medications, sweat contains more fatty acids and proteins. Those molecules break down into strong-smelling compounds. Stress and hormonal changes can also push your body to release “stress sweat,” which has a higher concentration of certain acids that odorize faster.\n\n**Fixes in three layers:**\n\n1. **Hygiene & products**  \n   * Shower daily with a mild antibacterial soap to lower bacterial load.  \n   * Apply a clinical antiperspirant (zinc chloride or aluminum chloride) after showering; it blocks sweat glands and reduces moisture.  \n   * Change into breathable cotton or moisture‑wicking fabrics and wash clothes immediately after use.\n\n2. **Diet & hydration**  \n   * Cut back on high‑protein, spicy, and fermented foods for a week to see if odor eases.  \n   * Increase water intake to help dilute sweat and promote kidney clearance.  \n   * Add a probiotic or fermented food that can balance gut bacteria, which influence sweat odor.\n\n3. **Stress & health check**  \n   * Practice deep‑breathing or sh"
+  },
+  {
+   "t_s": 29.59,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Your sweat’s odor is almost always a **bacterial party in your pores**, not the sweat itself — normal sweat is odorless until bacteria on your skin break it down. That said, **two main reasons** now make it smell worse than usual:\n\n- **Stress sweat is chemically different** — it’s richer in nitrogen compounds (like ammonia), which bacteria *love* and which smell sharper than exercise sweat. Cortisol triggers this; even subconscious stress (e.g., staring at your phone too long, financial anxiety) does it.\n- **Your microbiome is off balance** — if you’ve taken antibiotics, changed laundry detergents, or skincare (say, switched to a strong retinol), the bacteria that normally live in your pits are getting wiped out. That leaves *E. coli* and *staph* species overgrowing, producing **sulfur-rich compounds like thioalcohols** — think *rotten eggs*, not just ‘musky armpit’. This is why deodorant stops working: it’s fighting the wrong bugs.\n\n**The fixes that actually shift the chemistry** (not just cover up smell):\n\n- **Aluminum-free antiperspirant with benzoyl peroxide** — yes, it’s a face acne treatment, but it’s the **only OTC product that kills odor bacteria** (not just mask it). Try *"
+  },
+  {
+   "t_s": 65.36,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — empty)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Why Does My Sweat Smell Bad? | Dr. Bhatia Explains - YouTube",
+   "u": "https://www.youtube.com/watch?v=FwKEQgte7JQ"
+  },
+  {
+   "t": "Why Does My Sweat Smell So Bad | TikTok",
+   "u": "https://www.tiktok.com/discover/why-does-my-sweat-smell-so-bad"
+  },
+  {
+   "t": "Here's Why Stress Sweat Smells Worse Than... - Thompson Tee",
+   "u": "https://thompsontee.com/blog/stress-sweat-smells/"
+  },
+  {
+   "t": "Why Does My Sweat Smell and How To Prevent BO | Sure® UK",
+   "u": "https://www.suredeodorant.co.uk/sweat-zone/why-does-my-sweat-smell.html"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer": "Your armpit is smelling stronger because the bacteria on your skin are getting a better “diet” and the sweat itself is changing.  \nWhen you eat a lot of protein, spicy or fermented foods, or are under stress, sweat contains more fatty acids, nitrogen compounds (ammonia) and other molecules that bacteria love to break down into sulfur‑rich or ammonia‑rich odors. Stress also releases more cortisol, which changes the sweat chemistry and can make the odor sharper.\n\n**What to do**\n\n1. **Keep the bacteria in check**  \n   * Shower daily with a gentle, non‑antibacterial soap – regular soap is enough and avoids irritation.  \n   * Apply a clinical antiperspirant containing **zinc chloride** or **aluminum chloride** after you dry off; it blocks sweat glands and reduces moisture.  \n   * Switch to breathable, moisture‑wicking fabrics and wash clothes right after use.  \n   * If a product with a mild antibacterial agent (e.g., triclosan or zinc oxide) works better for you, try it instead of a harsh antibacterial soap.\n\n2. **Adjust what goes into your sweat**  \n   * **Protein‑rich, spicy, or heavily fermented meals** can raise the odor‑producing compounds. Try trimming these for a week and see if the smell eases.  \n   * **Fermented foods or a probiotic supplement** can help balance gut bacteria, which in turn can influence sweat odor. They’re not a cure, but they can keep the bacterial mix more even.  \n   * Stay well‑hydrated; water helps dilute sweat and supports kidney clearance.\n\n3. **Manage stress and look for underlying conditions**  \n   * Short breathing exercises or a 5‑minute meditation can lower adrenaline‑driven “stress sweat.”  \n   * If the odor persists beyond about **four weeks** despite hygiene and diet changes, have your **liver and kidney function** checked—both organs filter toxins that can appear in sweat.  \n   * Consider conditions that can worsen sweat odor, such as **hyperhidrosis, thyroid disorders, diabetes, or kidney disease**. A dermatologist or your primary doctor can run the right tests.\n\n4. **Try a targeted antibacterial rinse (optional)**  \n   * A diluted apple‑cider‑vinegar rinse (1 part ACV to 3 parts water) applied with a cotton pad after showering can lower the skin’s pH, making it less hospitable to odor‑producing bacteria. Use sparingly to avoid irritation.\n\n**Bottom line**  \nThe smell is mainly bacterial, fed by changes in sweat composition and stress. Clean skin, a good antiperspirant, sensible diet tweaks, hydration, and stress relief usually bring it back to normal. If it doesn’t improve, get a medical check‑up to rule out hyperhidrosis or metabolic issues.",
+ "chars": 2626,
+ "raw_bytes": 6781,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.22,
+ "rate_gen_tok_s": 185.45,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:26:32",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

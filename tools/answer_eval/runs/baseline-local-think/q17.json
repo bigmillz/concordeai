@@ -1,0 +1,232 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[86.8,60.0,53.0],\"final\":33.5,\"ftok\":394,\"est\":true}",
+  "X-Hurry": "6be2e439bc008b2f"
+ },
+ "first_byte_s": 2.77,
+ "first_text_s": 123.08,
+ "elapsed_s": 123.09,
+ "events": [
+  {
+   "t": 2.77,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 2.77,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 2.77,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 22.79,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 42.83,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 62.85,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 82.86,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 102.89,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 122.93,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 123.08,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 123.08,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 123.08,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 123.08,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 123.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 123.08,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.77,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   22.79,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   42.83,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   62.85,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   82.86,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   102.89,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   122.93,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 2.77
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 123.08
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 123.08
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 123.08,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 123.08,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 123.08,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianopolis",
+   "u": "https://nomads.com/neighborhoods/florianopolis"
+  },
+  {
+   "t": "The 49 best neighborhoods to see in Florianopolis",
+   "u": "https://wanderlog.com/list/geoCategory/150944/best-neighborhoods-to-see-in-florianopolis"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/"
+  },
+  {
+   "t": "Where is the Best Place to Live in Florianópolis? | FloripaGuru Blog",
+   "u": "https://floripaguru.com/blog/best-areas-to-live-florianopolis"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1408,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T02:01:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

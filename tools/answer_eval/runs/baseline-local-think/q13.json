@@ -1,0 +1,214 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[89.5,61.9,55.8],\"final\":36.2,\"ftok\":393,\"est\":true}",
+  "X-Hurry": "61453f2035dc0f25"
+ },
+ "first_byte_s": 4.78,
+ "first_text_s": 125.06,
+ "elapsed_s": 125.06,
+ "events": [
+  {
+   "t": 4.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 4.78,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 4.8,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 4.8,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 4.8,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 29.79,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 49.81,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 94.25,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 117.44,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 125.06,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 125.06,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 125.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 125.06,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.8,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   29.79,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   49.81,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   94.25,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   117.44,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 4.78
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 125.06
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 125.06
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 4.8,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 4.8,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 125.06,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Is Pizza Healthy? What a Dietitian Wants You to KnowIs Pizza Bad for You? A Look",
+   "u": "https://www.eatingwell.com/article/8055628/is-pizza-healthy/"
+  },
+  {
+   "t": "Is Pizza Bad for You? A Look at the Nutritional Facts",
+   "u": "https://biologyinsights.com/is-pizza-bad-for-you-a-look-at-the-nutritional-facts/"
+  },
+  {
+   "t": "Is Pizza Healthy? Nutrition Tips for Pizza LoversWhy Is Pizza Bad for You? Blood",
+   "u": "https://www.healthline.com/nutrition/is-pizza-healthy"
+  },
+  {
+   "t": "Why Is Pizza Bad for You? Blood Sugar, Fat & More ...",
+   "u": "https://scienceinsights.org/why-is-pizza-bad-for-you-blood-sugar-fat-more/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1310,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:49:57",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

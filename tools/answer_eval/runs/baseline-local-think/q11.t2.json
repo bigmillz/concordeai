@@ -1,0 +1,231 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[89.5,61.5,55.3],\"final\":35.8,\"ftok\":393,\"est\":true}",
+  "X-Hurry": "c6309052d8bc47a1"
+ },
+ "first_byte_s": 4.29,
+ "first_text_s": 124.35,
+ "elapsed_s": 124.35,
+ "events": [
+  {
+   "t": 4.29,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 4.29,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 4.33,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 4.33,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 4.33,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 29.31,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 49.33,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 69.34,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 89.36,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 109.37,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 124.35,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 124.35,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 124.35,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 124.35,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.33,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   29.31,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   49.33,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   69.34,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   89.36,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   109.37,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 4.29
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 124.35
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 124.35
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 4.33,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 4.33,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 124.35,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Types of Magnesium and Their Benefits",
+   "u": "https://www.healthline.com/nutrition/magnesium-types"
+  },
+  {
+   "t": "Best Types of Magnesium Differences Between Forms | Dr. Berg",
+   "u": "https://www.drberg.com/blog/the-best-and-worse-types-of-magnesium"
+  },
+  {
+   "t": "Can You Take Magnesium Glycinate While on Sertraline | TikTok",
+   "u": "https://www.tiktok.com/discover/can-you-take-magnesium-glycinate-while-on-sertraline"
+  },
+  {
+   "t": "Magnesium Citrate vs Glycinate: Which Form for Which Goal",
+   "u": "https://acibademinternational.com/blog/magnesium-citrate-vs-glycinate-which-form-for-which-goal/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1326,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q11",
+ "turn": 2,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "Any problem taking it with sertraline or with a few drinks? And is glycinate really better than citrate or is that marketing?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:44:36",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   },
+   {
+    "role": "assistant",
+    "content": "Magnesium can help reduce anxiety symptoms, but the evidence is strongest when targeting individuals who are already deficient.\n\n## Dosage and Forms\n\nThe standard dosage for **magnesium citrate** is **240 milliliters (mL) per day**, which can be taken orally mixed with water.\n\nFor **magnesium oxide** and **magnesium hydroxide**, the recommended dose is entirely dependent on the specific product being used; you must strictly follow the instructions printed on the packaging.\n\n## Efficacy and Evidence\n\nMagnesium may help alleviate anxiety symptoms, but studies show the benefits are most pronounced in those who are already deficient.\n\nRegarding other forms, such as **magnesium glycinate**, the evidence is weaker. Some sources suggest it might help with relaxation and sleep, but it hasn't been proven in human studies to be highly effective for anxiety specifically.\n\n## Key Considerations\n\nThe evidence suggests that the efficacy of magnesium for anxiety is highly correlated with the **pre-existing deficiency level**. This means that while magnesium is a tool, its impact on anxiety severity is tied to how deficient an individual is.\n\nIf you are looking for immediate guidance on sourcing, you can call **+1-833-302-2533** for assistance."
+   },
+   {
+    "role": "user",
+    "content": "Any problem taking it with sertraline or with a few drinks? And is glycinate really better than citrate or is that marketing?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

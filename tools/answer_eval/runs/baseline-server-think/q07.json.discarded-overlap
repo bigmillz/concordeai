@@ -1,0 +1,178 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[11.9,18.5,28.5],\"final\":35.4,\"ftok\":2749,\"est\":false}",
+  "X-Hurry": "8377c88dd968738c"
+ },
+ "first_byte_s": 5.86,
+ "first_text_s": 11.21,
+ "elapsed_s": 11.21,
+ "events": [
+  {
+   "t": 5.86,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 5.86,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 5.86,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 11.21,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 25
+  },
+  {
+   "t": 11.21,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 25
+  },
+  {
+   "t": 11.21,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 25
+  },
+  {
+   "t": 11.21,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "351 chars"
+   }
+  },
+  {
+   "t": 11.21,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   5.86,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 5.86
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "351 chars",
+   "t_s": 11.21
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 11.21
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 11.21,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "(no answer — ServerError)"
+  },
+  {
+   "t_s": 11.21,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "(no answer — server down)"
+  },
+  {
+   "t_s": 11.21,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — server down)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Driving from Florida to Alaska, Again - Episode 1 - YouTube",
+   "u": "https://www.youtube.com/watch?v=g2FGPPfAFBQ"
+  },
+  {
+   "t": "PeopleFirst",
+   "u": "https://peoplefirst.ril.com/webapp/"
+  },
+  {
+   "t": "Get Driving Directions, Live Traffic & Road Conditions - MapQuest",
+   "u": "https://www.mapquest.com/directions"
+  },
+  {
+   "t": "Tryp.com | Cheap Trips & Travel Deals Worldwide",
+   "u": "https://www.tryp.com/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer": "⚠️ None of Ollama1’s models answered. Ollama1 couldn’t keep gpt-oss:20b in its memory, so it stopped.",
+ "chars": 101,
+ "raw_bytes": 1031,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 2.25,
+ "rate_gen_tok_s": null,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:17:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

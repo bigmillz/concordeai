@@ -1,0 +1,276 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[90.5,66.0,58.2],\"final\":38.7,\"ftok\":390,\"est\":true}",
+  "X-Hurry": "8bf4562858796745"
+ },
+ "first_byte_s": 20.38,
+ "first_text_s": 140.85,
+ "elapsed_s": 140.86,
+ "events": [
+  {
+   "t": 20.38,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 20.38,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 images found"
+   }
+  },
+  {
+   "t": 20.38,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 20.38,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 20.38,
+   "tag": "PLACEHINT",
+   "data": [
+    {
+     "n": "Spanish Immersion",
+     "d": "",
+     "h": ""
+    },
+    {
+     "n": "Spanish Listening",
+     "d": "",
+     "h": ""
+    },
+    {
+     "n": "Language Learning by Immersion",
+     "d": "",
+     "h": ""
+    }
+   ]
+  },
+  {
+   "t": 20.38,
+   "tag": "CTX",
+   "data": {
+    "loc": "not"
+   }
+  },
+  {
+   "t": 20.4,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 20.4,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 20.4,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 45.41,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 65.42,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 85.44,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 105.47,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 125.5,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 140.85,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 140.85,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 140.85,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 140.85,
+   "tag": "FIRST_TEXT"
+  }
+ ],
+ "statuses": [
+  [
+   20.4,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   45.41,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   65.42,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   85.44,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   105.47,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   125.5,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 20.38
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 images found",
+   "t_s": 20.38
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 140.85
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 140.85
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 20.4,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 20.4,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 140.85,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Spanish Immersion: A Day in the Life in Marbella 🇪🇸 - YouTube",
+   "u": "https://www.youtube.com/watch?v=N41PlfbIiMg"
+  },
+  {
+   "t": "9 Best Cities to Learn Spanish in Spain for Language Enthusiasts",
+   "u": "https://www.spanishexpress.co.uk/9-best-cities-to-learn-spanish-in-spain-for-language-enthusiasts/"
+  },
+  {
+   "t": "Spanish Listening : Learn Spanish by listening to native speakers",
+   "u": "https://www.spanishlistening.org/"
+  },
+  {
+   "t": "Language Learning by Immersion | TikTok",
+   "u": "https://www.tiktok.com/discover/language-learning-by-immersion"
+  }
+ ],
+ "photos": [
+  "https://studentvisaspain.com/blog/eixample-aerial.jpg",
+  "https://images.goabroad.com/image/upload/v1/images2/program_content/cover-1531390537.jpg",
+  "https://www.goabroad.com/_next/image?url=https%3A%2F%2Fimages.goabroad.com%2Fimage%2Fupload%2Fh_185%252Cw_400%252Cc_fill%252Cg_faces%3Aauto%252Cfl_progressive%252Cf_auto%2Fv1%2Fimages2%2Fa%2FADOF%2FOJW0bsWiU5ms9AyujclWJf3PwL1LWOykczJMxMZH_1678417108.jpg"
+ ],
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1979,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.12,
+ "rate_gen_tok_s": null,
+ "id": "q18",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Spanish immersion cities",
+ "question": "Best cities to learn Spanish by immersion on a modest budget? I want clear accents, cheap classes, and not a tourist bubble.",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T02:07:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Best cities to learn Spanish by immersion on a modest budget? I want clear accents, cheap classes, and not a tourist bubble."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

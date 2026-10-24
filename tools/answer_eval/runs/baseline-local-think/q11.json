@@ -1,0 +1,221 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Gemma 4 E2B",
+  "X-Eta": "{\"search\":14.0,\"models\":[85.4,60.0],\"final\":38.8,\"ftok\":450,\"est\":true}",
+  "X-Hurry": "8c3c916a7eda6cd9"
+ },
+ "first_byte_s": 5.07,
+ "first_text_s": 138.78,
+ "elapsed_s": 138.78,
+ "events": [
+  {
+   "t": 5.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 5.07,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 5.09,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 30.08,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 50.1,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 70.12,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 90.14,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 110.16,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 2"
+  },
+  {
+   "t": 125.09,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 125.09,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 E2B · 2 of 2"
+  },
+  {
+   "t": 138.78,
+   "tag": "DRAFT",
+   "m": "Gemma 4 E2B",
+   "chars": 1200
+  },
+  {
+   "t": 138.78,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2568 chars"
+   }
+  },
+  {
+   "t": 138.78,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 138.78,
+   "tag": "FIRST_TEXT"
+  }
+ ],
+ "statuses": [
+  [
+   5.09,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   30.08,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   50.1,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   70.12,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   90.14,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   110.16,
+   "asking Qwen 3.8 27B · 1 of 2"
+  ],
+  [
+   125.09,
+   "asking Gemma 4 E2B · 2 of 2"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 5.07
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2568 chars",
+   "t_s": 138.78
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 138.78
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 125.09,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 138.78,
+   "m": "Gemma 4 E2B",
+   "text": "Magnesium can help reduce anxiety symptoms, but the evidence is strongest when targeting individuals who are already deficient.\n\n## Dosage and Forms\n\nThe standard dosage for **magnesium citrate** is **240 milliliters (mL) per day**, which can be taken orally mixed with water.\n\nFor **magnesium oxide** and **magnesium hydroxide**, the recommended dose is entirely dependent on the specific product being used; you must strictly follow the instructions printed on the packaging.\n\n## Efficacy and Evidence\n\nMagnesium may help alleviate anxiety symptoms, but studies show the benefits are most pronounced in those who are already deficient.\n\nRegarding other forms, such as **magnesium glycinate**, the evidence is weaker. Some sources suggest it might help with relaxation and sleep, but it hasn't been proven in human studies to be highly effective for anxiety specifically.\n\n## Key Considerations\n\nThe evidence suggests that the efficacy of magnesium for anxiety is highly correlated with the **pre-existing deficiency level**. This means that while magnesium is a tool, its impact on anxiety severity is tied to how deficient an individual is.\n\nIf you are looking for immediate guidance on sourcing, "
+  }
+ ],
+ "sources": [
+  {
+   "t": "Magnesium and Anxiety | Magnesium Science",
+   "u": "https://magnesiumscience.org/research/magnesium-and-anxiety"
+  },
+  {
+   "t": "Magnesium Dosage: How Much to Take Per Day",
+   "u": "https://www.healthline.com/nutrition/magnesium-dosage"
+  },
+  {
+   "t": "Does Magnesium Help With Anxiety? Benefits, Dosage & Best Forms",
+   "u": "https://villabehavioralhealth.com/does-magnesium-help-with-anxiety/"
+  },
+  {
+   "t": "Magnesium Glycinate Benefits, Side Effects, and... | Mayo Clinic Press",
+   "u": "https://mcpress.mayoclinic.org/nutrition-fitness/magnesium-glycinate-is-this-supplement-helpful-for-you/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Gemma 4 E2B",
+ "searched": true,
+ "answer": "Magnesium can help reduce anxiety symptoms, but the evidence is strongest when targeting individuals who are already deficient.\n\n## Dosage and Forms\n\nThe standard dosage for **magnesium citrate** is **240 milliliters (mL) per day**, which can be taken orally mixed with water.\n\nFor **magnesium oxide** and **magnesium hydroxide**, the recommended dose is entirely dependent on the specific product being used; you must strictly follow the instructions printed on the packaging.\n\n## Efficacy and Evidence\n\nMagnesium may help alleviate anxiety symptoms, but studies show the benefits are most pronounced in those who are already deficient.\n\nRegarding other forms, such as **magnesium glycinate**, the evidence is weaker. Some sources suggest it might help with relaxation and sleep, but it hasn't been proven in human studies to be highly effective for anxiety specifically.\n\n## Key Considerations\n\nThe evidence suggests that the efficacy of magnesium for anxiety is highly correlated with the **pre-existing deficiency level**. This means that while magnesium is a tool, its impact on anxiety severity is tied to how deficient an individual is.\n\nIf you are looking for immediate guidance on sourcing, you can call **+1-833-302-2533** for assistance.",
+ "chars": 1248,
+ "raw_bytes": 3641,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.25,
+ "rate_gen_tok_s": null,
+ "id": "q11",
+ "turn": 1,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:42:29",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
