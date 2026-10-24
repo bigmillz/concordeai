@@ -28200,8 +28200,15 @@ def _loose_rx(claim: str):
 def _tidy_fixed(text: str) -> str:
     """After sentences were replaced or deleted: no empty bullets, no
     double spaces, no runs of blank lines."""
-    out = []
+    out, fence = [], False
     for ln in text.split("\n"):
+        if ln.lstrip().startswith("```"):
+            fence = not fence
+            out.append(ln)
+            continue
+        if fence:                 # code keeps its spacing
+            out.append(ln)
+            continue
         s = ln.rstrip()
         if re.fullmatch(r"\s*(?:[-*\u2022]|\d+[.)])\s*(?:\*\*\s*\*\*)?\s*", s):
             continue              # a bullet whose sentence was deleted
@@ -31160,7 +31167,7 @@ def funnel_images(goal: str, labels: list, budget: float = _FIMG_BUDGET,
 # longer saves turns, so an answer that finishes into a chat nobody is
 # looking at is kept, and a stopped one keeps what was shown.
 _TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
-              "|STEP|APPROVE")
+              "|STEP|APPROVE|RATE")     # RATE: the writer's pace (6b515), the page's twin
 # the page's rules, character for character: JS "." stops at a line
 # break, and JS "$" (unlike Python's) only at the very end
 _TURN_FRAME = re.compile("\x00(" + _TURN_TAGS

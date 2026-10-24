@@ -16683,3 +16683,113 @@ The app2 batch (6b471 unread dot, 6b472 Edit this picture, 6b480 search excerpts
   that folder, no engine running), and Gemma 4 26B answered through mlx_lm on it. The gauntlet's 6b497 checks
   now expect the 0.32.4 wheels, and two new cases: a venv left on mlx 0.32.2 is upgraded once; mlx 0.32.4 is
   up to date. A mutant drops the mlx check.
+
+## 6b515 — The answer craft: one writer and a critic, a brief for the final writer, a fact-check, the writer's own speed (per Patrick)
+
+Patrick (2026-10-24): the final answers were "not even remotely competing" with Claude's. His example, Thinking on
+Ollama1 alone: a council of gpt-oss:20b, ministral-3:14b and gemma4:12b, "2 of 3 drafts contributed", 127 s, the
+footer "2.5 tok/s", and a merged answer that stitched both drafts' stale claims together and invented new ones ("TPU
+v5e packs 16 TB of memory per chip … a full pod of eight chips can reach ≈ 15 exaFLOPS", "Claude 2 runs on a mix of
+Nvidia H200s"), a terse list with no framing, no chip-versus-cluster distinction and nothing for a reader in IT and
+Ops. When he pasted Claude's answer, the app's second reply was good: the models write well when they are given good
+material and a clear brief. Another helper owns the search and the evidence pack (`search-ground`); this build owns
+what happens after the evidence arrives.
+
+**Where the 127 seconds went** (his run, from the usage ledger; each call's start and length):
+gpt-oss:20b draft 17.8 s (1,441 tokens) · ministral-3:14b draft 16.0 s (640 tokens) · gemma4:12b draft 42.2 s (5,412
+tokens, and it did not count) · a reflection pass on gpt-oss 16.6 s (1,751 tokens, almost all hidden reasoning, for "at
+most 6 bullets") · the merge on gpt-oss 8.6 s (1,163 tokens, ~320 visible) · ~25 s before the first draft (the search
+and the server checks). The two weaker drafts and the reflection were 75 of the 127 s, and the merge read each draft cut
+to 1,500 characters (`body`, the "small local merger" cut, also applied to a server compositor with a 32K context), so
+it worked from stumps of 4,000–6,000-character drafts and filled the gaps itself.
+
+Measured again on a dev copy (the same server, the same question, before this build): 98.5 s = search ~10 s, gpt-oss
+12.5 s, ministral 22.7 s, gemma4 26.3 s, reflection 18.7 s, merge 8.5 s. The merged answer carried "~3.5 TFLOP/s
+TF-32" for an H100, "$0.90 per vCPU-hour for a v4 pod", "Google's proprietary 'Solaris' fabric", "Microsoft Maia 100:
+announced but not yet publicly released" and "Meta MTIA … not publicly disclosed" — none of it in the evidence, none of
+it true, all of it stated flatly.
+
+**Why gemma4:12b's draft didn't count.** Not diagnosed in this build. Alone on the server, with the Thinking hint,
+it answered the same question in 27.9 s (3,121 characters), so the model works; in craft mode the third seat is no
+longer asked at all, which removes the question for Thinking.
+
+**What changed, and why.**
+
+1. **The roster (Thinking: `craft=True`).** Measured against the three-draft merge, more weak drafts hurt: in both runs above the two weaker drafts and the
+   reflection took 75 of 127 s (and 67.7 of 98.5 s), and the merge's invented specifics came from them.
+   In craft mode the strongest seat alone drafts; the second seat reads that draft against the question and the
+   evidence as a CRITIC (`CRITIC_INSTRUCTION`: wrong figures, mixed-up units, stale "latest", missing angles; at most 8
+   bullets, "No problems found" when sound) and never drafts; the compositor (the cloud ladder when the cloud is open,
+   else the server's compositor, else this computer's) writes the final from the draft and the notes; the third seat is
+   never asked. The handler passes `craft` for Thinking and for Thinking on one server alone; Pro keeps every draft and
+   its peer review, Max every model. The critic's notes show as a "<model> (review)" chip and a "Reviewing the draft"
+   row; a hurried run (Answer now) skips the critic and the check. The resident-first compositor choice is unchanged:
+   on a 16 GB card the critic's model evicts gpt-oss, so the final pays one load (~5 s) — measured below.
+
+2. **The brief (`ANSWER_BRIEF`, `brief_system`, `final_prompt`).** The final writer's system message is the dated
+   system prompt (its memory, name, persona and LENGTH lines intact) with the brief appended once: today's date and
+   what "current" means against it; the shape — the first sentences settle the question, then the depth that matters,
+   then the practical takeaways, scaled to the ask; units of comparison kept straight and named beside every figure (a
+   chip is not a board, a board is not a pod, dense is not sparse, a list price is not an hourly rate); every specific
+   from the evidence, the material or certain knowledge, never two sources' figures fused or a chip figure scaled to a
+   cluster unshown; what is uncertain said once and plainly; written for the reader the remembered facts describe,
+   without saying so; no filler. The person's LENGTH setting always wins over it. The user message opens with
+   `SYNTH_INSTRUCTION` (its first 200 characters still carry "Write ONE final answer", which the live hook and the stub
+   gateway use to tell a merge), then the question block exactly as the handler built it — the search's "What you just
+   found on the web…" block, its grounding lines, the clock, the THINK_HINT — in its own `=== THE QUESTION … ===`
+   section, so the search helper's lines pass through untouched; then the drafts as `=== MATERIAL ===` and the critic's
+   notes as `=== REVIEW NOTES ===`. The cut follows the pen: 6,000 characters of each draft for a server or cloud
+   compositor, 4,000 for a local model of 9B or more (`MODEL_MEM_BYTES` ≥ 6e9), 1,500 only for a small one. Fast's
+   second pass (REVISE_INSTRUCTION, on this computer and on a server seat) writes under the same brief.
+
+3. **The fact-check (`verify_pass`, `verify_answer`, `apply_fixes`).** Every way out of the merge stage goes through
+   `_done()`: `run_council` taps its own `emit` from the drafts on, so the text on screen (after the last RESET) is
+   known. For an answer of 350+ characters with two or more claim-bearing sentences, and not hurried, the quickest
+   capable model is asked (`verify_pick`: a cloud quick model when the cloud was open to this council; else, for an
+   answer written on a server, the critic's model there — loaded on its card — or the server's quick pick; else the
+   writer itself, whose engine is the one loaded) for a JSON array: every sentence of the answer stating a number, date,
+   year, version, price, name or spec, each `ok`, `wrong` or `unsupported`, with a `fix` (the sentence rewritten so it is
+   true, softened to what is known, or "" to delete it). The sentences are matched exactly (then tolerant of whitespace
+   and curly quotes), longest first, and replaced in place; a fix that balloons or talks about the machinery ("the
+   draft", "the material") is refused; empty bullets and double spaces are tidied. A changed answer is re-sent after a
+   RESET (the page replays the replacement once, 6b463), and the step card says "Checked 12 claims, fixed 2", "Checked
+   12 claims, all held" or "Couldn't check the facts in time — answer kept". The budget is 45 s (30 s for a cloud
+   checker): the checker runs on a thread; past the budget its next token ends its stream and the answer stays as it
+   was. A check that fails in any other way changes nothing. A rewrite that would lose more than 40% of the answer is
+   refused too.
+
+4. **The speed line.** `_stream_guarded` (every final write: the merge, Fast's second pass, a single model) and the
+   cloud composite send a `RATE` frame — the writer's tokens a second from its first word to its last, the tokens, the
+   seconds. The page shows that, and falls back to its own clock measured from the first character after the last RESET
+   (not from the request), and says both: "**41.2 tok/s** · ~320 tokens · wrote in 7.8s · 98.5s total". The "Answer
+   written" row's length is the answer's own, not the frames' (it said 7,421 chars for a 3,095-char answer).
+
+**Before and after.** Graded on the 33-turn answer bench against the baseline, with `search-ground`, alone and
+together: `tools/answer_eval/RESULTS-quality-1.md` (the `quality-1` integration).
+
+**Timing after** (the same GPU question, Ollama1 alone, a dev copy): 66.6 s total (98.5 s before), first text at
+35.0 s (71.3 s before): one draft (gpt-oss, 11.6 s), the review (ministral, 12 s), the final (gpt-oss, RATE 173.9
+tok/s, 837 tokens in 4.8 s), then the check on ministral, 17.4 s: "Checked 17 claims, fixed 3".
+
+**Not changed, on purpose.** gpt-oss's reasoning effort on the server is not raised: Ollama takes a level only through
+`think` on gpt-oss and rejects `think` on models that don't reason, so it needs a capability probe through the gateway
+first (a follow-up). `_resolve_route` still warms this computer's first council model for a mixed roster
+even when craft never asks it. Cloud Only councils get the brief and the check too (the cloud quick ladder checks
+them); the single-provider streams don't.
+
+**Tests.** 30 checks at stub and source level (`_c515_helpers`, `_c515_council`, `_c515_pins`): the brief (once, dated
+today, the LENGTH exception), the final prompt (the brief on the system, the question block intact, the material cut,
+the notes), the critic's prompt and "No problems found", the checker's output parsed through a fence, prose and a
+trailing comma, the fixes (exact, deleted, matched through curly quotes, ok kept, a meta fix refused), `verify_answer`
+over budget and on a failure, `verify_pass` (RESET, the step's words, hurried and short skipped, over budget kept),
+the pick, the RATE frame; `run_council` in craft mode on stand-ins (one writer, the critic, the third seat never asked,
+the final writer's messages, the critic's chip and step, the check's RESET and step, hurried, over budget, without
+craft every seat drafts, the cut follows the pen); the handler, `_stream_guarded` and the page pinned; 11 mutants each
+break a check. The live Thinking check against the stub gateway (6b339's modes) now holds the roster: the first seat
+drafts, the second reviews, the third is not asked, the merge on a model the server holds. The Thinking note of a
+server's mode and the `run_council` signature pin follow. The edges (second commit): the seats craft never asks show as greyed chips ("not asked: Thinking seats one writer and
+one critic") after the drafts, so the ledger reads "2 of 3" with the reason; X-Eta counts two drafting stages for
+Thinking (the writer, the critic); a council whose only surviving draft ships as it stands is checked on that
+draft's model. Finished on the integration: `_tidy_fixed` leaves fenced code's spacing alone, and the server's
+`_TURN_TAGS` knows `RATE` (the page's twin did; a saved chat would have kept the frame as text). The full
+gauntlet ran on `quality-1` (6b516).

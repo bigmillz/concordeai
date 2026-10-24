@@ -9081,7 +9081,9 @@ _corpus = ["plain answer", "draft one\x00RESET\x00the real answer",
            "cut mid-frame \x00STATUS:half", "keep \x00STATUS:line\nbreak\x00 tail",
            "trailing newline\n", "\x00RESET\x00", "only\x00RESET\x00\x00STATUS:x\x00",
            'emoji \U0001f600 \x00DRAFT:{"m":"a","t":"d"}\x00 done',
-           "before\x00RESET\x00after \x00MAP:{}\x00 end\n\n", "partial \x00RES"]
+           "before\x00RESET\x00after \x00MAP:{}\x00 end\n\n", "partial \x00RES",
+           # the writer's pace (6b515) is a frame on both sides, never saved as text
+           'paced\x00RATE:{"tps":31.2,"tok":700,"s":22.4}\x00 answer']
 _tmpjs = os.path.join(_SMOKE_TMP, "store22.js")
 with open(_tmpjs, "w", encoding="utf-8") as fh:
     fh.write(_jseg + "\nconst v=JSON.parse(require('fs').readFileSync(0,'utf8'));"
@@ -9097,7 +9099,7 @@ _pt = [_cs["turn_text"](r) for r in _corpus]
 check("the page and the server hash a chat alike and keep the same text after RESET",
       _jo.get("h") == _ph and _jo.get("t") == _pt
       and _pt[1] == "the real answer" and _pt[2] == "final" and _pt[4] == "cut mid-frame "
-      and _pt[5] == "keep \x00STATUS:line\nbreak\x00 tail",
+      and _pt[5] == "keep \x00STATUS:line\nbreak\x00 tail" and _pt[-1] == "paced answer",
       "%r" % [_jo.get("err"), [a == b for a, b in zip(_jo.get("t") or [], _pt)]])
 
 # what the server saves from a finished stream, as the page builds it
@@ -36497,7 +36499,9 @@ def _c515_helpers(src):
         checked == 5 and fixed == 3 and "495 TFLOPS" in text and "$0.90" not in text and "Solaris" not in text
         and "optical interconnect" in text and "performance per watt" in text and "the draft says" not in text
         and "flexible choice" in text and "  " not in text.replace("\n", "") and not re.search(r"\n- *\n", text)
-        and ns["claim_count"](ans) >= 3)
+        and ns["claim_count"](ans) >= 3
+        # the tidy-up after a fix leaves fenced code's spacing alone
+        and ns["_tidy_fixed"]("a  b\n```py\nx    = 1\n```\n- \nc") == "a b\n```py\nx    = 1\n```\nc")
 
     def run_ok(label, msgs, emit):
         emit(json.dumps([{"claim": "Google charges about $0.90 per vCPU-hour for a v4 pod.", "verdict": "wrong",
