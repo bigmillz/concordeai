@@ -24741,7 +24741,9 @@ def _smc_pins(src):
         "council": "                            bench_allow=[] if _srv_only else req_cloud,\n"
                    '                            comp="" if _srv_only else req_comp,\n'
                    "                            hurry=hurry_ev, srv_only=_srv_only," in ch
-        and '_srv_only and _so_mode == "Thinking"' in ch and 'peer=(tier == "Pro" or (_srv_only and _so_mode == "Pro")),' in ch,
+        and '_srv_only and _so_mode == "Thinking"' in ch and 'peer=(tier == "Pro" or (_srv_only and _so_mode == "Pro")),' in ch
+        # Thinking on one server alone is the craft (6b515): one writer, its critic, a checked final
+        and '                            craft=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),\n' in ch,
         "run_council": "    _bench = [] if srv_only else cloud_bench()\n" in rc
         and "    srv_merge = srv_merge or srv_only      # one server's mode merges there (6b426)\n" in rc
         and "    elif comp in MODEL_ROUTES or srv_only or _pen_kind in (\"local\", \"server\"):\n" in rc
@@ -24931,8 +24933,10 @@ _SM_MUT = [
      "                            comp=req_comp,\n"),
     ("run_council not told", "                            hurry=hurry_ev, srv_only=_srv_only,\n",
      "                            hurry=hurry_ev,\n"),
-    ("no double-check", '                            reflect=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),',
-     '                            reflect=(tier == "Thinking" or (\n                                False)),'),
+    # (6b516) was "no double-check" on reflect=: since 6b515 the craft's critic replaces the reflection for every
+    # Thinking, so reflect=False changed nothing and the mutant went uncaught; the review is the craft now
+    ("no review: the craft off for Thinking on one server", '                            craft=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),',
+     '                            craft=(tier == "Thinking" or (\n                                False)),'),
     ("the wake without seats", "                _w_seats = (server_mode_resolve(_so_wake, _so_mode, self.ctx)\n"
      "                            if _so_mode else [])", "                _w_seats = []"),
     ("the header naming the cloud", "        if (len(council) > 1 and cloud_allowed() and not _srv_only\n",
