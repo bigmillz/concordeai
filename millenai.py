@@ -20552,10 +20552,15 @@ class Grounding:
                         terms.append(w.strip(".'\u2019"))
             self.terms = terms
             rows = []
-            budget = GROUND_SEARCH_S + (2.0 if self.model_queries else 0.0)
+            # the fan-out's deadline: the budget from the start, or six
+            # seconds after the model's queries went out, whichever is
+            # later (a plan that took 5 s must not leave its queries 3 s)
+            search_end = t0 + GROUND_SEARCH_S
+            if self.model_queries:
+                search_end = max(search_end, time.time() + 6.0)
             try:
                 for f in _cf.as_completed(
-                        futs, timeout=max(1.0, budget - (time.time() - t0))):
+                        futs, timeout=max(1.0, search_end - time.time())):
                     try:
                         rows.extend(f.result() or [])
                     except Exception:
