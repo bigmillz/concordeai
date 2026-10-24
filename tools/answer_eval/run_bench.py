@@ -451,6 +451,9 @@ def main():
     ap.add_argument("--lock-dir", default=os.environ.get("EVAL_LOCK_DIR", DEFAULT_LOCK_DIR))
     ap.add_argument("--no-lock", action="store_true")
     ap.add_argument("--pause", type=float, default=2.0, help="seconds between turns")
+    ap.add_argument("--warmup", action="store_true",
+                    help="ask one throwaway question on the tier first (not recorded): the copy learns "
+                         "what the server's card refuses (6b516) and the first seats load before q01")
     args = ap.parse_args()
 
     if args.port in FORBIDDEN_PORTS or 8884 <= args.port <= 8999 and args.port % 2 == 0:
@@ -506,6 +509,15 @@ def main():
             tier = tier.format(sid=srv["id"])
         summary["tier"] = tier
         log("tier %s" % tier)
+        if args.warmup:
+            wb = {"model": "", "models": [], "tier": tier, "auto_web": False, "images": [], "docs": [],
+                  "agent": "", "mode_comp": "",
+                  "messages": [{"role": "user", "content": "Explain in two sentences what a heat sink does."}]}
+            wr = chat(copy, wb, args.max_wait, args.idle)
+            summary["warmup"] = {"elapsed_s": wr["elapsed_s"], "x_models": wr.get("x_models"),
+                                 "drafts": [d.get("m") + ": " + (d.get("text") or "")[:80] for d in wr["drafts"]],
+                                 "answer": (wr.get("answer") or "")[:200]}
+            log("warm-up: %ss, models=%s, %r" % (wr["elapsed_s"], wr.get("x_models"), (wr.get("answer") or "")[:100]))
 
         for q in qs:
             msgs = []
