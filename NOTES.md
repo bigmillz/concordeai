@@ -16959,3 +16959,9 @@ and the checker's rules; stale 6b515 pins and anchors follow the code (craft bet
 `srv_merge`, `return _done()`, a double-check anchor no longer unique), the council's and the servers' test
 namespaces gain `ground_clip` and `srv_note_nofit`, and the mark-down pin and two `server_stream` mutants follow
 the new shape.
+
+The gauntlet on `quality-1`: run 1 (8c7bfc0) 1170/1178: six stale 6b515 pins and anchors, two test namespaces
+without the new helpers, and "vision answers about the pixels" (an empty local answer; it passed on the next
+two runs with no change near it). Run 2 (6623d12) 1181/1182: the server modes' "no double-check" mutant went
+uncaught, because since 6b515 the craft's critic replaces the reflection for every Thinking; it now turns the
+craft off instead, and the pin holds the craft line. Run 3 (b72d004): **1182/1182**, exit 0.
