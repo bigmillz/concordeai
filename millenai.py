@@ -21406,6 +21406,16 @@ class server_first_deadline:
 # per server id: the last check (reachable, models, latency) and the
 # offset to the server's clock; a profile's own, emptied at a switch
 _srv_seen = profile_cache("_srv_seen", {})
+# MODELS THE CARD REFUSED (6b516): a gateway that doesn't report its card's
+# size lets every "gpu" model look like it fits (_srv_fits), so a model
+# pulled onto the server that is too big for the card (qwen3.8:27b on a
+# 16 GB card, seen 2026-10-24) was seated first in every mode, refused
+# with gpu_fit, and marked the whole server down: "None of Ollama1's models
+# answered". A refusal is remembered per server and model, at the size it
+# was listed with (a re-pulled tag of another size is tried again), and
+# such a model counts as not fitting the card until then.
+_srv_nofit = profile_cache("_srv_nofit", {})      # (sid, model) -> (at, size)
+SRV_NOFIT_S = 7 * 86400
 # per server id: the status check running now (an Event); a second
 # ?refresh=1 waits for it instead of starting its own (review of 6b334)
 _srv_busy = profile_cache("_srv_busy", {})
@@ -21874,6 +21884,36 @@ def _srv_fail(e, status: int, js: dict, model: str = "") -> ServerError:
     return se
 
 
+def srv_note_nofit(e, model: str) -> None:
+    """Remember that server e's card refused `model` (gpu_fit, 6b516), and
+    mark it in the last check's rows now, so the next pick skips it."""
+    try:
+        sid, model = e["id"], str(model or "")
+        if not model:
+            return
+        s = _srv_seen.get(sid) or {}
+        rows = [m for m in s.get("models") or [] if isinstance(m, dict)]
+        size = next((m.get("size") or 0 for m in rows if m.get("name") == model), 0)
+        _srv_nofit[(sid, model)] = (time.time(), size)
+        for m in rows:
+            if m.get("name") == model:
+                m["placement"], m["nofit"] = "gpu+ram", True
+    except Exception:
+        pass
+
+
+def srv_is_nofit(sid: str, model: str, size=0) -> bool:
+    """Whether server sid's card refused this model lately at this size."""
+    v = _srv_nofit.get((sid, model))
+    if not v:
+        return False
+    at, was = v
+    if time.time() - at > SRV_NOFIT_S or (size and was and size != was):
+        _srv_nofit.pop((sid, model), None)
+        return False
+    return True
+
+
 def _srv_fail_why(e, status: int, js: dict, model: str = "") -> ServerError:
     name, code = e["name"], str(js.get("code") or "")
     detail = " ".join("".join(ch for ch in str(js.get("error") or "")
@@ -21900,6 +21940,7 @@ def _srv_fail_why(e, status: int, js: dict, model: str = "") -> ServerError:
         return ServerError("busy", "%s is busy with other requests. Try "
                            "again in a moment." % name, code or "busy")
     if code == "gpu_fit":
+        srv_note_nofit(e, model)
         return ServerError("fit", "%s doesn\u2019t fit in %s\u2019s graphics "
                            "memory." % (model or "That model", name), code)
     if code == "gpu_spill" and re.search(r"\(0% on GPU\)", detail):
@@ -23015,6 +23056,11 @@ def _srv_models(e, js: dict, ps=None) -> list:
             continue
         lm = loaded.get(n) or {}
         pl = m.get("placement") or lm.get("placement")
+        _sz = m.get("size") if isinstance(m.get("size"), int) else 0
+        _nofit = pl == "gpu" and not (n in loaded and lm.get("gpu_pct") == 100) \
+            and srv_is_nofit(e.get("id", ""), n, _sz)
+        if _nofit:
+            pl = "gpu+ram"         # the card refused it (6b516): it doesn't fit whole
         pct = m.get("gpu_pct") if m.get("gpu_pct") is not None else lm.get("gpu_pct")
         out.append({"name": n, "label": e["name"] + SERVER_SEP + n,
                     "placement": pl if pl in ("gpu", "gpu+ram") else "unknown",
@@ -23022,6 +23068,7 @@ def _srv_models(e, js: dict, ps=None) -> list:
                                 and not isinstance(pct, bool)
                                 and 0 <= pct <= 100 else None),
                     "loaded": n in loaded,
+                    **({"nofit": True} if _nofit else {}),
                     "size": (int(m["size"]) if isinstance(m.get("size"), int)
                              and not isinstance(m.get("size"), bool) else 0)})
     return sorted(out, key=lambda x: x["name"])
@@ -28341,6 +28388,7 @@ def run_council(labels: list, messages: list, emit, status,
     drafts = []
     _srv_used = []           # the server models this council used, in order (6b344)
     _srv_errs = []           # your own servers' refusals (6b334)
+    _model_fail = set()      # seats whose model can't run there (fit, missing: 6b516)
     # ANSWER NOW (6b257): pressed mid-run, the button trades quality
     # for speed — skip what hasn't started, shorten every wait, hand
     # the merge to the fastest pen. Checked between waits, never
@@ -28574,8 +28622,13 @@ def run_council(labels: list, messages: list, emit, status,
         if _err:
             if type(_err[0]).__name__ == "ServerError":
                 _srv_errs.append(str(_err[0]))     # said if none answers
-                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],
-                                 str(_err[0]))
+                if getattr(_err[0], "kind", "") in ("fit", "missing"):
+                    # that MODEL can't run there (6b516): the server is up,
+                    # its other seats are still asked
+                    _model_fail.add(label)
+                else:
+                    server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],
+                                     str(_err[0]))
             took_part(label, f"(no answer — {type(_err[0]).__name__})")
             return
         # the merger gets answers, never the reasoning that produced them
@@ -28633,6 +28686,16 @@ def run_council(labels: list, messages: list, emit, status,
         if _hurried():
             _deadline = min(_deadline, time.time() + 5)
 
+    # THE WRITER COULDN'T RUN (6b516): in craft mode one seat drafts, so a
+    # model the card refused (or that isn't installed) left no draft at all.
+    # The critic's seat writes instead and the next seat reviews.
+    while (critic_lbl and labels and labels[0] in _model_fail and not _hurried()
+           and not any(not d[1].startswith("(no answer") for d in drafts)):
+        labels = [critic_lbl]
+        critic_lbl = _unasked[0] if _unasked else ""
+        _unasked = _unasked[1:]
+        _draft_one(1, labels[0], max(_srv_deadline, time.time() + SRV_DRAFT_S),
+                   bool(server_label(labels[0])))
     for _lbl in _unasked:
         # the seats craft never asks (6b515): a greyed chip says why, so the
         # ledger reads "2 of 3" with the reason instead of a model gone
