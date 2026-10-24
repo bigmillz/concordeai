@@ -16683,3 +16683,111 @@ The app2 batch (6b471 unread dot, 6b472 Edit this picture, 6b480 search excerpts
   that folder, no engine running), and Gemma 4 26B answered through mlx_lm on it. The gauntlet's 6b497 checks
   now expect the 0.32.4 wheels, and two new cases: a venv left on mlx 0.32.2 is upgraded once; mlx 0.32.4 is
   up to date. A mutant drops the mlx check.
+
+## 6b514 — Grounded web search: the question is planned, the sources filtered and read, the answer cited (per Patrick)
+
+Patrick, 2026-10-24: the answers are "not even remotely competing" with Claude. The question was "What is the
+most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what
+are others using?" (Thinking, Ollama1 only: gpt-oss:20b, ministral-3:14b, gemma4:12b). The four sources were
+claude.ai's sign-in page, a "free Claude" farm (veoaifree.com), a Pluralsight "What is Claude AI?" and a YouTube
+how-to; the models named the H200, TPU v5e and MI300X as current and invented specs ("TPU v5e packs 16 TB").
+
+**Why it searched for "Claude".** The plain web path (`else: snippets = run_search(query)`) sent the whole
+25-word question, verbatim, as ONE query to `_ddg_text(query, 4)` and kept four snippets. Reproduced with
+ddgs 9.14.4 on that exact string: bing returned nothing after 10 s ("No results found"); the fallback engine
+locked onto the only proper noun and returned claude.ai, veoaifree.com/claude, the Pluralsight explainer, the
+YouTube guide and chatai.org — Tom's Hardware's GPU hierarchy sat sixth, past the limit of four. Nothing was
+filtered (a sign-in page is a "source"), nothing was read (snippets only, ~200 characters each), and the user
+turn said "Today is Saturday" and nothing about the model's own age, so the drafts answered from 2024 memory.
+The places path had query-building, host ranking and page reads (6b237, 6b240, 6b242); the plain path had
+none of it.
+
+**Now (the `grounded web search (6b514)` section, before the usage ledger):**
+- `plan_queries()`: never the question itself. Sub-questions split on `?`, `;` and ", and what/which/is…";
+  each becomes a keyword query (scaffolding and fillers out, names kept in their own casing); a thin
+  sub-question ("What is Claude using") borrows the richest one's names ("Anthropic Claude GPU TPU AI 2026");
+  a product name that is also a common word gets its maker (`_GQ_MAKER`: Claude → Anthropic, Gemini → Google,
+  Copilot → Microsoft…); a question about now carries the year, one about today/this week the month
+  (`_gq_stamp`); a comparison searches each side on its own (`_gq_sides`: "iPhone 17 Pro vs Pixel 10 Pro camera"
+  → "iPhone 17 Pro camera", "Pixel 10 Pro camera"; "GPU … or TPU" → both); a compact query for the whole when
+  the question has parts. Rules give at most 4; a model adds up to 2 angles (`GROUND_PLAN`, `plan_lines`):
+  the person's server first (6b357, `server_side_text`, 120 tokens), a cloud utility model when cloud power is
+  on, this computer's MLX engine when it is already up and idle (`_engine_up` and a non-blocking try of
+  `_engine_lock`); a plan later than 5 s is not waited for — the rules' queries stand alone.
+- The searches run all at once (`ctx_executor`), each query on two engines: `_ddg_text` (bing first, as before)
+  and `_ddg_more` (ddgs's "auto" pick). Measured: on "Anthropic Claude GPU TPU AI 2026" bing returned the
+  sign-in page, the product page and a 2023 article; the other engine returned anthropic.com's own 2026 post.
+  From here only those two engines answer at all (duckduckgo, google, brave: "No results found" in a second);
+  one call takes 4–10 s, so the fan-out has an 8 s budget and keeps what landed.
+- `rank_sources()`: dropped outright — sign-in pages (`_SRC_LOGIN_RX`, `/login|/signin|/account` paths),
+  "free AI" farms (`_SRC_FARM_RX`: "for free", "no signup", "unlimited … free"), video and social hosts (no
+  text to read), pages largely in another script (`_src_foreign`; Devanagari vowel marks count as letters,
+  which hid half a Hindi page behind its English loanwords), a bare homepage with a two-word title, near-
+  duplicates (`_src_key`: www/m/amp, query, fragment, trailing slash, /amp, index.html; same title), a host's
+  third page. Scored: the question's terms in the title (×2) and snippet, a name counting double; +3 for the
+  asked-about name in the host when the page also speaks to the question (NVIDIA → nvidia.com, Anthropic →
+  anthropic.com — but not claude.com's bare product page); `_src_quality`: +2 reference and major outlets
+  (`_SRC_GOOD_HOSTS`), +1 .gov/.edu, +1 docs paths, −2 content farms and guess forums (`_SRC_DEMOTE_HOSTS`,
+  the places path's `_JUNK_HOSTS` included), −1 a headline-long slug; for a question about now, +2 within a
+  year, −2 older than two (`_src_date` reads the URL's /2026/06/, "Jun 1, 2026", "1 June 2026", "June 2026",
+  a bare year; a date after today is a misread). Each query seats its best two first (`per_query`, the rows
+  carry `_q`), so the sub-question with the rarer words isn't crowded out by the one with the common ones —
+  without it the Anthropic query's pages never made the pack (measured); the seats survive the cut after the
+  reads.
+- `_page_read()`: the top 10 candidates fetched in parallel (7 s budget), public addresses only
+  (`_link_public`) with every redirect hop re-checked (`_LinkRedirects`, the pasted-links standard), a browser
+  User-Agent (a bare one is 403'd), 600 KB each. Scripts, nav, header, footer, aside, forms out; `<article>` or
+  `<main>` preferred when it holds the body; lines under 40 characters and boilerplate (cookies, subscribe,
+  sign in, all rights reserved…) dropped; the title, `article:published_time`/`datePublished`/`<time>` and, when
+  pictures were asked for, og:image kept. A page that prints "SEO Keywords:" / "Meta Description:" is a farm
+  (seen live: matchless-marketing.com ranked first until this), one that reads as another script once fetched
+  is out, one with no paragraph on the question sinks a point and its snippet stands in.
+- `_pick_passages()`: the paragraphs carrying the question's terms (numbers a little extra), in page order,
+  each cut at a sentence end within the source's share; the lede when none scores.
+- `evidence_pack()`: "WEB EVIDENCE gathered 2026-10-24, 8 sources, numbered for citing:", then per source
+  `[n] title — host — date`, the URL, its passages. Sized to 9,000 characters (~2.3K tokens: a 32K server
+  context keeps room for the drafts and the merge), ~900 per source.
+- `grounded_turn()`: the evidence first, the rules after it (an instruction buried before 9 KB of pages is
+  forgotten, 6b242), the question last. The rules: today's date; "your training data ends before today and is
+  OUT OF DATE"; a fact about the present comes from the evidence and nowhere else, never invented or recalled;
+  cite the source number in square brackets after each fact, [1] or [2][4], only numbers listed; where the
+  evidence does not cover part of the question, say so in one clause (stable background may come uncited);
+  off-topic results are noise; never describe your own data access. With nothing found the turn says so and
+  tells the model to date its memory, never "right now". `GROUND_SYSTEM` adds one grounding line to the dated
+  system prompt (which the merge keeps), so the compositor keeps the [n] marks and the facts to the sources.
+- The handler: the search starts before the headers (beside the engine pre-warm, 6b243) with a placeholder
+  turn, and `_ground.wait()` finishes it after them, where `step()` exists: "Searching the web · 4 queries",
+  "Reading 8 sources…", "Read the pages · 8 pages · 27 passages". The pack then takes the question's place in
+  the one dict `full_messages` holds (the clock line and the Thinking hint kept around it); `_tl_search.rows`
+  carries the sources in the pack's order with their dates, and the SOURCES row shows up to 8 (was 5). A
+  question asked again within ten minutes reuses its evidence (`_ground_cache`). Weather, places, listings,
+  bookish and pasted-link paths are untouched; the Research tier's own planner too.
+- The page: `[1]`, `[1][3]`, `[2, 4]` render as small pills (`sup.cite`) that open source n — the message's own
+  source chips, in order, through one delegated handler, so a reloaded chat works and a markdown link or
+  `arr[1]` in code is left alone.
+
+**Measured.** Rules-only grounding of the GPU question, four runs: 24–48 engine hits → 8 sources, 4–8 pages
+read, 27–36 passages, 6.9–7.5 KB pack, 8.7–14.9 s end to end (search 5.4–8.0 s, reads 2.1–6.9 s); the
+search starts beside the engine load, so a cold engine hides most of it. Per-query engine time 3.3–10 s.
+Before/after answers (Fast, Gemma 4 26B on this Mac — Patrick's run was Thinking on Ollama1; the search
+path is the same): BEFORE, 19 s: sources claude.ai, veoaifree.com, pluralsight.com, youtube.com; "The current
+heavyweight in AI hardware is the NVIDIA Blackwell B200 … Google's TPU v5p … Anthropic uses a combination of
+high-end NVIDIA GPUs", no citations. AFTER: not run in this build (the engines lock was held by the eval
+bench's Thinking baseline); the bench's server-Thinking run of this branch measures it
+(`tools/answer_eval/RESULTS-quality-1.md`, on the `quality-1` integration).
+
+**Honest limits.** The engines are what they are: from this network only bing and ddgs's "auto" pick answer,
+their lists shift between runs, and a rules-only plan for a fuzzy superlative ("most powerful GPU … for AI")
+pulls consumer best-GPU guides as readily as data-centre news; the model's plan is what adds "NVIDIA Vera
+Rubin" or "Anthropic Trainium" angles, and it only runs when a model is free in time. Ranking heuristics
+pick the better of what the engines return; they can't conjure a primary source the engines didn't list.
+A search API with freshness and site filters would be the next real step, as 6b240 said for places.
+
+Gauntlet: 31 checks (`# ==== 6b514`): the planner on nine questions (never the verbatim question, the year /
+month / neither, names copied exactly, comparison sides, the model's lines merged after the sub-questions,
+`plan_lines`), the filters and ranking on fifteen canned hits (every junk class, duplicates, host cap, vendor
+pages first, the 2021 page marked down only for a question about now, dates), the reader on a canned page
+(main text only, date, picture, browser User-Agent, the SEO-tell farm, a picture/PDF/private/.example address
+refused, redirects checked), passages, the pack and the turn, the Grounding thread with the web stubbed
+(phases, the model's plan on both engines, junk out, the cache, a late planner not waited for, a dead web),
+the handler's wiring from the text, and renderMD's chips in node plus the served page's handler and style.
