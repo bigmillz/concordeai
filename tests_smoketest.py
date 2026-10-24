@@ -36421,10 +36421,10 @@ check("6b497's rules each break a check when broken (%d mutants)" % len(_C97_MUT
 # Grounding thread out of the source with the engine and the web stubbed, the
 # page's citation chips in node, and the handler's wiring from the text.
 print("== grounded web search (6b514) ==")
-import copy as _copy14, html as _html14, threading as _th14, types as _t14
+import copy as _copy14, html as _html14, threading as _th14, types as _t14, unicodedata as _ud14
 _g14 = {"re": re, "time": time, "json": json, "html": _html14, "copy": _copy14,
         "threading": _th14, "urllib": urllib, "socket": socket, "sys": sys, "os": os,
-        "DEV_HOME": "", "HAS_SEARCH": True}
+        "unicodedata": _ud14, "DEV_HOME": "", "HAS_SEARCH": True}
 _exec_names(_g14, {"_NOPAD", "strftime_np", "strip_greeting", "_PREAMBLE_RX", "_FRESH_PATTERNS",
                    "_ASKY_RX", "_BOOKING_RX", "_PLACE_NOUNS", "strip_think", "strip_special",
                    "END_TOKENS", "NUL", "_THINK_RE", "_JUNK_HOSTS", "_GOOD_HOSTS",
@@ -36570,9 +36570,10 @@ def _urlopen14(req, timeout=0):
     return _Resp14(_HTML14.encode("utf-8"), "text/html; charset=utf-8")
 
 
-_g14["urllib"] = _t14.SimpleNamespace(request=_t14.SimpleNamespace(Request=urllib.request.Request,
-                                                                   urlopen=_urlopen14),
-                                      parse=urllib.parse)
+# the reader's one network call is the seam; the public-address check keeps
+# its shape rules without a DNS lookup (these hosts don't resolve)
+_g14["_page_open"] = lambda req, timeout=0: _urlopen14(req, timeout)
+_g14["_link_public"] = _g14["_link_shape_ok"]
 # (.example is a reserved local name the reader refuses, so these hosts aren't)
 _pg14 = _g14["_page_read"]("https://news.rubintest.com/2026/06/rubin", want_photo=True) or {}
 _paras14 = list(_pg14.get("paras") or [])
@@ -36588,13 +36589,16 @@ check("the reader sends a browser User-Agent, never Python's (the 403 trap)",
       _reqs14 and _reqs14[-1].get_header("User-agent", "").startswith("Mozilla/5.0 (Macintosh")
       and "Python-urllib" not in _reqs14[-1].get_header("User-agent", ""), "")
 _pf14 = _g14["_page_read"]("https://farm.rubintest.com/post")
-check("a page that prints its own SEO scaffolding is a farm; a picture, a PDF and a private address are not read",
+check("a page that prints its own SEO scaffolding is a farm; a picture, a PDF and a private address are not read, "
+      "and every redirect hop is checked like the page",
       _pf14 is not None and _pf14.get("junk") == "farm"
       and _g14["_page_read"]("https://x.rubintest.com/image.png") is None
       and _g14["_page_read"]("https://x.rubintest.com/paper.pdf") is None
       and _g14["_page_read"]("http://127.0.0.1:9896/secret") is None
       and _g14["_page_read"]("https://news.example/2026/06/rubin") is None
-      and not any("127.0.0.1" in r.full_url or "news.example" in r.full_url for r in _reqs14),
+      and not any("127.0.0.1" in r.full_url or "news.example" in r.full_url for r in _reqs14)
+      and "urllib.request.build_opener(_LinkRedirects).open(req, timeout=timeout)" in _MILLENAI_SRC
+      and "if not _link_public(url) or url.lower().split(\"?\")[0].endswith(\".pdf\"):" in _MILLENAI_SRC,
       "%r" % (_pf14,))
 _pp14 = _g14["_pick_passages"](_paras14, ["Vera", "Rubin", "GPU", "Anthropic", "Claude"], cap=600)
 check("the passages kept are the ones that bear on the question, in page order, the weather left out",
@@ -36656,7 +36660,9 @@ def _pr14(url, want_photo=False, timeout=6.0):
                       "An unrelated paragraph about the weather during the keynote in Santa Clara."]}
 
 
+_more14 = []
 _g14["_ddg_text"], _g14["_page_read"] = _ddg14, _pr14
+_g14["_ddg_more"] = lambda q, limit=8: (_more14.append(q), [])[1]
 _ph14 = []
 _gr14 = _g14["ground_start"](_GPUQ14, planner=lambda p: "NVIDIA Vera Rubin specs 2026\nAnthropic Trainium TPU 2026")
 _gr14.wait(lambda ph, g: _ph14.append((ph, len(g.queries), len(g.sources))), 20.0)
@@ -36666,10 +36672,11 @@ check("the grounding runs plan -> search -> read -> done and reports each phase 
       and _phn14 == sorted(_phn14, key=["plan", "search", "read", "done"].index)
       and len(_phn14) == len(set(_phn14)) and not _gr14.timed_out and not _gr14.error,
       "%r %r" % (_ph14, _gr14.error))
-check("the model's plan rides beside the rules' queries and every query is searched",
+check("the model's plan rides beside the rules' queries and every query is searched, on both engines",
       _gr14.model_queries == ["NVIDIA Vera Rubin specs 2026", "Anthropic Trainium TPU 2026"]
-      and set(_gr14.queries) <= set(_calls14) and len(_gr14.queries) <= _g14["GROUND_QUERIES"]
-      and len(_gr14.queries) >= 4, "%r %r" % (_gr14.queries, _calls14))
+      and set(_gr14.queries) <= set(_calls14) and set(_gr14.queries) <= set(_more14)
+      and len(_gr14.queries) <= _g14["GROUND_QUERIES"]
+      and len(_gr14.queries) >= 4, "%r %r %r" % (_gr14.queries, _calls14, _more14))
 _src14 = _gr14.snapshot()[0]
 check("junk never reaches the pack; the pages read are the sources numbered; the pack carries their passages",
       _src14 and not any(s["host"] in ("claude.ai", "farm.rubintest.com") for s in _src14)

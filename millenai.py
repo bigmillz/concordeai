@@ -19626,6 +19626,22 @@ _GQ_MODIFIERS = frozenset(
     " great strongest highest lowest".split())
 
 
+def _ddg_more(query: str, limit: int = GROUND_PER_QUERY) -> list:
+    """A second engine's hits for the same query (ddgs's "auto" pick,
+    which from here is never bing), beside _ddg_text's bing-first list.
+    Measured on "Anthropic Claude GPU TPU AI 2026": bing returned the
+    claude.ai sign-in page, the product page and a 2023 article; the
+    other engine returned anthropic.com's own 2026 post. Never raises."""
+    if not HAS_SEARCH:
+        return []
+    proxy = _search_proxy() if IS_WIN else None
+    try:
+        return (DDGS(proxy=proxy) if proxy else DDGS()).text(
+            query, max_results=limit, backend="auto") or []
+    except Exception:
+        return []
+
+
 def _gq_tokens(text: str) -> list:
     return re.findall(r"[$\u20ac\u00a3]?[A-Za-z0-9][A-Za-z0-9.'\u2019+/-]*",
                       str(text or ""))
@@ -20038,6 +20054,8 @@ def _src_quality(host: str, path: str = "") -> int:
         q += 1
     if any(d in host for d in _SRC_DEMOTE_HOSTS):
         q -= 2
+    if len(path) > 90:
+        q -= 1          # a whole headline for a slug is a content farm's habit
     return q
 
 
@@ -20059,24 +20077,31 @@ def _term_hits(terms, text: str, ents=()) -> int:
 
 
 def _src_foreign(text: str) -> bool:
-    """Mostly another script than the question's: a Hindi or Chinese page
-    is no evidence for an English answer."""
-    letters = [c for c in str(text or "") if c.isalpha()]
+    """Largely another script than the question's: a Hindi or Chinese page
+    is no evidence for an English answer. Vowel marks count as letters
+    (Devanagari's aren't isalpha(), which hid half a Hindi page behind its
+    English loanwords)."""
+    letters = [c for c in str(text or "")
+               if c.isalpha() or (ord(c) > 0x024F
+                                  and unicodedata.category(c).startswith("M"))]
     if len(letters) < 20:
         return False
     other = sum(1 for c in letters if ord(c) > 0x024F)
-    return other / len(letters) > 0.3
+    return other / len(letters) > 0.25
 
 
 def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
-                 today=None, limit: int = GROUND_SOURCES) -> list:
+                 today=None, limit: int = GROUND_SOURCES, per_query: int = 2) -> list:
     """Engine hits -> the sources worth reading, best first: junk dropped
     (_src_junk), a page in another script, a bare homepage, near-
     duplicates and third pages of a host dropped, then scored by the
     question's terms in the title and snippet (a name counting double),
     the asked-about name in the host (a vendor's own page, when the page
     also speaks to the question), the host's standing (_src_quality) and,
-    for a question about now, the page's date."""
+    for a question about now, the page's date. Each query that found hits
+    seats its best `per_query` first (a row's "_q"), so the sub-question
+    with the rarer words isn't crowded out by the one with the common
+    ones; the rest fill by score."""
     today = today or time.localtime()
     ents = [e for e in entities if len(e) >= 3]
     el = [e.lower() for e in ents]
@@ -20087,7 +20112,7 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         body = str(r.get("body") or "").strip()
         if _src_junk({"url": url, "title": title, "body": body}):
             continue
-        if _src_foreign(title + " " + body):
+        if _src_foreign(title) or _src_foreign(body):
             continue
         host = _src_host(url)
         path = urllib.parse.urlsplit(url).path or ""
@@ -20096,6 +20121,9 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         key = _src_key(url)
         tkey = _src_title_key(title)
         if key in seen_keys or (tkey and tkey in seen_titles):
+            for s in out:
+                if s["key"] == key or (tkey and s["tkey"] == tkey):
+                    s["qs"].add(str(r.get("_q") or ""))
             continue
         rel = 2 * _term_hits(terms, title, ents) + _term_hits(terms, body, ents)
         # the vendor's own page, when it says something beyond its own name
@@ -20112,20 +20140,42 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
             rec = 2 if 0 <= ago <= 12 else (0 if ago < 0 or ago <= 24 else -2)
         score = rel + in_host + qual + rec - (5 if rel == 0 and not in_host else 0)
         out.append({"title": title or host, "body": body, "url": url,
-                    "host": host, "date": date, "score": score, "paras": []})
+                    "host": host, "date": date, "score": score, "paras": [],
+                    "key": key, "tkey": tkey, "qs": {str(r.get("_q") or "")}})
         seen_keys.add(key)
         if tkey:
             seen_titles.add(tkey)
     out.sort(key=lambda s: -s["score"])
     kept = []
-    for s in out:
-        if per_host.get(s["host"], 0) >= 2:
-            continue
+
+    def take(s, seat=False):
+        if s in kept or per_host.get(s["host"], 0) >= 2:
+            return
         per_host[s["host"]] = per_host.get(s["host"], 0) + 1
+        s["seat"] = seat
         kept.append(s)
+    # each query's best first, in the queries' order, two rounds; a seated
+    # source stays ahead of the fill when the pack is cut after the reads
+    queries = []
+    for r in rows:
+        q = str((r.get("_q") if isinstance(r, dict) else "") or "")
+        if q and q not in queries:
+            queries.append(q)
+    for _round in range(per_query):
+        for q in queries:
+            for s in out:
+                if q in s["qs"] and s not in kept and s["score"] > 0:
+                    take(s, seat=True)
+                    break
+    for s in out:
         if len(kept) >= limit:
             break
-    return kept
+        take(s)
+    for s in kept:
+        s.pop("key", None)
+        s.pop("tkey", None)
+        s["qs"] = sorted(s["qs"])
+    return kept[:limit]
 
 
 # ----- reading a page
@@ -20144,26 +20194,34 @@ _PAGE_BOILER_RX = re.compile(
     r"rate this)\b")
 # a page that prints its own SEO scaffolding is a content farm's
 _PAGE_FARM_RX = re.compile(
-    r"(?im)^(?:seo keywords|meta description|focus keyword|target keywords?|"
+    r"(?im)^\s*(?:seo keywords|meta description|focus keyword|target keywords?|"
     r"primary keyword)\s*:")
 _PAGE_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
             "(KHTML, like Gecko) Version/17.4 Safari/605.1.15")
+
+
+def _page_open(req, timeout: float):
+    """The reader's one network call: every redirect hop is checked like
+    the page itself (_LinkRedirects, as the pasted links do), so a result
+    can't bounce the fetch onto this computer or the LAN."""
+    return urllib.request.build_opener(_LinkRedirects).open(req, timeout=timeout)
 
 
 def _page_read(url: str, want_photo: bool = False, timeout: float = 6.0) -> dict:
     """{'title', 'date', 'paras', 'image'} of a public web page, or None.
     The main text only: scripts, navigation, headers, footers and asides
     stripped, the <article>/<main> preferred when it holds the body,
-    boilerplate lines dropped. A browser User-Agent, since a bare one is
-    403'd at many edges (CLAUDE.md's trap)."""
+    boilerplate lines dropped. Public addresses only (_link_public: the
+    name must resolve to global addresses), a browser User-Agent, since a
+    bare one is 403'd at many edges (CLAUDE.md's trap)."""
     try:
-        if not _link_shape_ok(url) or url.lower().split("?")[0].endswith(".pdf"):
+        if not _link_public(url) or url.lower().split("?")[0].endswith(".pdf"):
             return None
         req = urllib.request.Request(url, headers={
             "User-Agent": _PAGE_UA,
             "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5",
             "Accept-Language": "en-US,en;q=0.9"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with _page_open(req, timeout) as r:
             ctype = (r.headers.get("Content-Type") or "").lower()
             if "html" not in ctype and "xml" not in ctype:
                 return None
@@ -20272,10 +20330,15 @@ def evidence_pack(sources: list, terms: list, today=None,
             n, re.sub(r"\s+", " ", s.get("title") or s.get("host") or "")[:120],
             s.get("host") or "", when))
         lines.append("    %s" % (s.get("url") or "")[:160])
-        if s.get("paras"):
+        snippet = re.sub(r"\s+", " ", s.get("body") or "")[:share]
+        if s.get("paras") and _para_hits(s["paras"], terms):
             ps = _pick_passages(s["paras"], terms, cap=share)
+        elif s.get("paras") and snippet:
+            # a page that gave text but none on the question (a script-
+            # built page's shell): the engine's snippet says more
+            ps = [snippet] + _pick_passages(s["paras"], terms, cap=max(100, share - len(snippet)))[:1]
         else:
-            ps = [re.sub(r"\s+", " ", s.get("body") or "")[:share]] if s.get("body") else []
+            ps = [snippet] if snippet else []
         for p in ps:
             lines.append("    %s" % p)
             n_pass += 1
@@ -20437,15 +20500,29 @@ class Grounding:
                     if e.lower() not in [x.lower() for x in ents]:
                         ents.append(e)
             self._set_phase("search")
-            ex = ctx_executor(3)
+            # every query at once, on two engines each: one call takes
+            # four to nine seconds, so a pool of three left the fourth
+            # query outside the budget; and the engines' lists differ
+            # (_ddg_more), which is where a vendor's own page comes from
+            ex = ctx_executor(2 * GROUND_QUERIES)
             per_q = self.t.setdefault("queries", {})
 
-            def _timed(s):
+            def _timed(s, more=False):
                 _ts = time.time()
-                got = _ddg_text(s, GROUND_PER_QUERY)
-                per_q[s] = (len(got), round(time.time() - _ts, 1))
+                got = (_ddg_more if more else _ddg_text)(s, GROUND_PER_QUERY)
+                n, t_ = per_q.get(s, (0, 0.0))
+                per_q[s] = (n + len(got), max(t_, round(time.time() - _ts, 1)))
+                for r in got:
+                    if isinstance(r, dict):
+                        r["_q"] = s        # which query found it (rank_sources seats each)
                 return got
-            futs = {ex.submit(_timed, s): s for s in rules}
+
+            def _submit(s):
+                futs[ex.submit(_timed, s)] = s
+                futs[ex.submit(_timed, s, True)] = s
+            futs = {}
+            for s in rules:
+                _submit(s)
             plan_box = []
             if self.planner is not None:
                 prompt = GROUND_PLAN.format(
@@ -20460,7 +20537,7 @@ class Grounding:
                          if not any(_gq_same(e, x) for x in self.queries)]
                 extra = extra[:max(0, GROUND_QUERIES - len(self.queries))]
                 for s in extra:
-                    futs[ex.submit(_timed, s)] = s
+                    _submit(s)
                 self.model_queries = extra
                 self.queries += extra
             self.t["plan"] = round(time.time() - t0, 2)
@@ -20511,9 +20588,15 @@ class Grounding:
                     if page.get("junk"):
                         s["junk"] = page["junk"]
                         continue
+                    if _src_foreign(" ".join(page.get("paras") or [])[:3000]):
+                        s["junk"] = "foreign"     # an English snippet over a Hindi page
+                        continue
                     if page.get("paras"):
                         s["paras"] = page["paras"]
-                    s["date"] = s.get("date") or page.get("date") or ""
+                    pdate = page.get("date") or ""
+                    if pdate[:7] > time.strftime("%Y-%m", self.today):
+                        pdate = ""           # a date after today is a misread
+                    s["date"] = s.get("date") or pdate
                     if not s.get("title") or s["title"] == s.get("host"):
                         s["title"] = page.get("title") or s.get("title")
                     if page.get("image") and page["image"] not in self.photos:
@@ -20523,12 +20606,13 @@ class Grounding:
             ex2.shutdown(wait=False, cancel_futures=True)
             self.t["read"] = round(time.time() - t1, 2)
             # read again by what the pages held: one with passages on the
-            # question rises, a farm is out, one that gave nothing sinks
+            # question rises, a farm is out, one that gave nothing sinks;
+            # the seats each query won stay ahead of the fill
             for s in cands:
                 if s.get("paras"):
                     s["score"] += 2 if _para_hits(s["paras"], terms) else -1
             final = sorted((s for s in cands if not s.get("junk")),
-                           key=lambda s: -s["score"])[:GROUND_SOURCES]
+                           key=lambda s: (0 if s.get("seat") else 1, -s["score"]))[:GROUND_SOURCES]
             self._publish(final, terms)
             self.t["total"] = round(time.time() - t0, 2)
             if DEV_HOME:
