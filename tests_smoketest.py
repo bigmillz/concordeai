@@ -9081,7 +9081,9 @@ _corpus = ["plain answer", "draft one\x00RESET\x00the real answer",
            "cut mid-frame \x00STATUS:half", "keep \x00STATUS:line\nbreak\x00 tail",
            "trailing newline\n", "\x00RESET\x00", "only\x00RESET\x00\x00STATUS:x\x00",
            'emoji \U0001f600 \x00DRAFT:{"m":"a","t":"d"}\x00 done',
-           "before\x00RESET\x00after \x00MAP:{}\x00 end\n\n", "partial \x00RES"]
+           "before\x00RESET\x00after \x00MAP:{}\x00 end\n\n", "partial \x00RES",
+           # the writer's pace (6b515) is a frame on both sides, never saved as text
+           'paced\x00RATE:{"tps":31.2,"tok":700,"s":22.4}\x00 answer']
 _tmpjs = os.path.join(_SMOKE_TMP, "store22.js")
 with open(_tmpjs, "w", encoding="utf-8") as fh:
     fh.write(_jseg + "\nconst v=JSON.parse(require('fs').readFileSync(0,'utf8'));"
@@ -9097,7 +9099,7 @@ _pt = [_cs["turn_text"](r) for r in _corpus]
 check("the page and the server hash a chat alike and keep the same text after RESET",
       _jo.get("h") == _ph and _jo.get("t") == _pt
       and _pt[1] == "the real answer" and _pt[2] == "final" and _pt[4] == "cut mid-frame "
-      and _pt[5] == "keep \x00STATUS:line\nbreak\x00 tail",
+      and _pt[5] == "keep \x00STATUS:line\nbreak\x00 tail" and _pt[-1] == "paced answer",
       "%r" % [_jo.get("err"), [a == b for a, b in zip(_jo.get("t") or [], _pt)]])
 
 # what the server saves from a finished stream, as the page builds it
@@ -11951,8 +11953,15 @@ check("one cloud gate: an Advanced list narrows but never opens it; Cloud Only o
 # review: the answer got the cloud badge and its title went to that
 # provider)
 _rc26 = dict(_LH)
+# the answer craft's helpers go with run_council (6b515)
+_CRAFT_NAMES = {"ANSWER_BRIEF", "_BRIEF_MARK", "_brief_today", "answer_brief", "brief_system",
+                "_EVIDENCE_HEAD", "final_prompt", "CRITIC_INSTRUCTION", "critic_prompt", "critic_notes",
+                "VERIFY_BUDGET_S", "VERIFY_CLOUD_S", "VERIFY_MIN_CHARS", "VERIFY_SYSTEM",
+                "VERIFY_INSTRUCTION", "_CLAIM_RX", "_SENT_RX", "_FIX_META_RX", "claim_count",
+                "verify_prompt", "parse_claims", "_loose_rx", "_tidy_fixed", "apply_fixes",
+                "verify_answer", "verify_pick", "verify_pass", "rate_frame"}
 _exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
-                    "PEER_INSTRUCTION"})
+                    "PEER_INSTRUCTION"} | _CRAFT_NAMES)
 _rc_calls = []
 _GQC = {"base": _GQ26, "name": "Groq", "model": "qwen/qwen3.8-27b", "key": "k"}
 
@@ -23430,7 +23439,7 @@ def _p2c_pins(src):
         and "    _srv_deadline = max(_local_deadline, time.time() + SRV_DRAFT_S" in rc
         and "    LOCAL_CAP = 120.0" in rc and "        _jd = time.time() + min(LOCAL_CAP, max(15.0, _left))" in rc
         and "                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):" in rc
-        and "hurry=None, srv_first_s=None, srv_merge=False) -> None:" in rc
+        and "hurry=None, srv_first_s=None, srv_merge=False,\n                craft: bool = False, report=None) -> None:" in rc
         and "                            srv_first_s=(60.0 if _seat_fb else None),\n"
             "                            srv_merge=(tier in TIERS and not cloud_only))" in ch,
         "council caps": "                _capped(label, lambda _l=label, _p=parts: run_model(" in rc
@@ -24505,8 +24514,9 @@ def _smc_seats(src):
     dry = "Nothing runs on this computer or in the cloud."
     got["state"] = (s3["ok"] and s3["mode"] == "Thinking" and s3["title"] == "Thinking · Pat’s Lab only"
                     and s3["models"] == t[0] and s3["label"] == t[0][0] and s3["server"] == "Pat’s Lab"
-                    and s3["note"] == "3 models on Pat’s Lab draft, one double-checks them, then Pat’s Lab writes "
-                                      "the merge there. " + dry
+                    # one writer, a critic, a checked final (6b515)
+                    and s3["note"] == "The strongest model on Pat’s Lab drafts, a second reviews it, then Pat’s Lab "
+                                      "writes the final answer there and a quick model checks its facts. " + dry
                     and sf["note"].endswith(dry) and "second pass" in sf["note"] and sf["models"] == f[0]
                     and "It seats" not in sp["note"] and sp["note"].startswith("5 models on Pat’s Lab draft")
                     and sp["note"].endswith(dry))
@@ -25712,12 +25722,15 @@ def _modes_live39(inst, sid, svn, only=None):
             time.sleep(2.5)
             sc = [c for c in _chats39()[n_st:] if text in str(c[2]["messages"][-1]["content"])]
             isme = lambda c: "Write ONE final answer" in str(c[2]["messages"][-1]["content"])[:200]
-            # what the server held when the merge came: the models used last before it (drafts, then a peer review)
+            # what the server held when the merge came: the models used last before it (drafts, then a peer review,
+            # or Thinking's critic since 6b515: its model is on the card too)
             cut = next((k for k, c in enumerate(sc) if isme(c)), len(sc))
-            order = [c[2]["model"] for c in sc[:cut] if not str(c[2]["messages"][-1]["content"]).startswith("You are reviewing")]
+            order = [c[2]["model"] for c in sc[:cut]]
+            isrev = lambda c: str(c[2]["messages"][-1]["content"]).startswith("You are reviewing a draft answer")
             return {"status": s_, "models": [x_.strip() for x_ in urllib.parse.unquote(h_.get("X-Models", "")).split(",")
                                              if x_.strip()], "text": t_, "loc": _loc39(inst)[n_loc:],
-                    "drafted": {c[2]["model"] for c in sc}, "frames": fr_,
+                    "drafted": {c[2]["model"] for c in sc if not isrev(c) and not isme(c)}, "frames": fr_,
+                    "reviewed": [c[2]["model"] for c in sc if isrev(c)],      # the critic's requests (6b515)
                     "merged": [c[2]["model"] for c in sc if isme(c)],
                     # the last two models that drafted are the ones the server still holds (two at a time)
                     "resident": list(dict.fromkeys(reversed(order)))[:2]}
@@ -25731,9 +25744,11 @@ def _modes_live39(inst, sid, svn, only=None):
                 and f["drafted"] == {tag(srv("Fast")[0])})
             got["Fast: nothing on this computer"] = f["loc"] == []
             th = run("Thinking", "say hello in one word 339t")
-            got["Thinking: the server's three seats draft"] = (
+            # (6b515) Thinking seats three, but one writer drafts, the second seat reviews the draft, and the third
+            # is never asked: the answer brief's roster, measured against three sequential drafts
+            got["Thinking: the first seat drafts, the second reviews it, the third is not asked"] = (
                 th["status"] == 200 and len(srv("Thinking")) == 3 and th["models"] == tiers["Thinking"]["models"]
-                and {tag(l) for l in srv("Thinking")} <= th["drafted"])
+                and th["drafted"] == {tag(srv("Thinking")[0])} and th["reviewed"] == [tag(srv("Thinking")[1])])
             # (6b344) the merge is the server's too: nothing at all runs here, the merge request reaches the server, on
             # a model it still holds from the drafts (a card of 16 GB holds two), and no local pen writes it
             got["Thinking: no engine warmed or started, and nothing run here"] = th["loc"] == []
@@ -36771,6 +36786,351 @@ check("the chips open the message's own source chips (delegated, so a reloaded c
       and "a.click()" in _page14 and ".msg.ai .body sup.cite{" in _page14
       and '<sup class="cite" data-n="' in _page14, "")
 # ==== 6b514 grounded web search: end ====
+# ==== 6b515 the answer craft: begin ====
+# Patrick (2026-10-24): the answers were "not even remotely competing" with Claude's. Thinking seats one
+# writer and a critic instead of three drafts; the final writer gets a brief (today's date, the shape, the
+# reader, the units, what is uncertain, no filler) on top of the dated system prompt, with the question block
+# intact in its own section; what was shown is fact-checked inside a budget and re-sent after a RESET when a
+# claim was wrong; the page's speed line is the writer's own pace. Stub and source level here; the live Thinking
+# check against the stub gateway (6b339's modes, above) holds the roster end to end.
+import threading as _t515
+import time as _tm515
+import contextlib as _cl515
+
+
+def _c515_helpers(src):
+    """The craft's helpers out of the source, on stand-ins: the brief, the final prompt, the critic, the
+    checker's parsing and fixes, the budget, the pick, the speed frame."""
+    class Ctl(str):
+        pass
+
+    class Gone(Exception):
+        pass
+    ns = {"re": re, "json": json, "time": _tm515, "threading": _t515, "Ctl": Ctl, "NUL": "\0",
+          "_DraftAbandoned": Gone, "strip_think": lambda t: t,
+          "SYNTH_INSTRUCTION": "Below ... Write ONE final answer ...",
+          "ctx_thread": lambda target, daemon=True: _t515.Thread(target=target, daemon=daemon),
+          "server_label": lambda l: isinstance(l, str) and " · " in l, "SERVER_SEP": " · ",
+          "MODEL_ROUTES": {"Gemma 4 26B": ("mlx", 8944)}, "fast_cloud_ladder": lambda: [],
+          "cloud_text": lambda *a, **k: "", "bound_ctx": lambda: None,
+          "server_first_deadline": lambda s: _cl515.nullcontext(), "run_model": None}
+    # the question-block cut lives with the grounded search (quality-1: the checker keeps the question's end)
+    exec(src[src.index("def ground_clip("):src.index("def _ground_key(")], ns)
+    exec(src[src.index("ANSWER_BRIEF = ("):src.index("\n\n\nRESEARCH_PLAN = (")], ns)
+    got = {}
+    b = ns["brief_system"]({"role": "system", "content": "SYS"})
+    today = _tm515.strftime("%A, %B ") + (_tm515.strftime("%d").lstrip("0")) + _tm515.strftime(", %Y")
+    got["the brief, once, dated today"] = (b["content"].startswith("SYS\n\n") and "THE BRIEF FOR THIS ANSWER" in b["content"]
+                                           and ns["brief_system"](b)["content"].count("THE BRIEF FOR THIS ANSWER") == 1
+                                           and today in b["content"] and "Never say that you know who they are" in b["content"]
+                                           and "a single chip is not a board" in b["content"]
+                                           and "except a LENGTH instruction" in b["content"])
+    fp = ns["final_prompt"]({"role": "system", "content": "SYS"}, "QBLOCK What you just found on the web", ["d1 " * 50, "d2"],
+                            "note A\nnote B", cut=40)
+    u = fp[1]["content"]
+    got["the final prompt: the brief on the system, the question block intact, the material cut, the notes"] = (
+        fp[0]["role"] == "system" and "THE BRIEF" in fp[0]["content"] and u.startswith("Below ... Write ONE final answer")
+        and "=== THE QUESTION" in u and "QBLOCK What you just found on the web" in u and "MATERIAL: 2 draft answers" in u
+        and "[answer 1]\n" + ("d1 " * 50)[:40] + "\n" in u and "REVIEW NOTES" in u and "note B" in u
+        and "MATERIAL: 1 draft answer to" in ns["final_prompt"]({}, "Q", ["only"], "")[1]["content"]
+        and "REVIEW NOTES" not in ns["final_prompt"]({}, "Q", ["only"], "")[1]["content"])
+    cp = ns["critic_prompt"]("QQ", ["draft one"])
+    got["the critic's prompt and notes"] = (cp[0]["role"] == "system" and "reviewer" in cp[0]["content"]
+                                            and "=== DRAFT ===" in cp[1]["content"] and "QQ" in cp[1]["content"]
+                                            and cp[1]["content"].startswith("You are reviewing a draft answer")
+                                            and ns["critic_notes"]("No problems found.") == ""
+                                            and ns["critic_notes"]("- WRONG: x") == "- WRONG: x")
+    ans = ("The H100 has 80 GB of HBM3 and about 3.5 TFLOP/s of TF32 throughput. Google charges about $0.90 per "
+           "vCPU-hour for a v4 pod.\n\n- **Scale**: Google's proprietary “Solaris” fabric stitches pods "
+           "together.\n- Nvidia GPUs remain the flexible choice.\n\nTPUs deliver higher performance per watt for dense "
+           "matrix work.")
+    out = ("Here you go:\n```json\n[" + json.dumps(
+        {"claim": "The H100 has 80 GB of HBM3 and about 3.5 TFLOP/s of TF32 throughput.", "verdict": "wrong",
+         "fix": "The H100 has 80 GB of HBM3 and roughly 495 TFLOPS of dense TF32 throughput."}) + ",\n" + json.dumps(
+        {"claim": "Google charges about $0.90 per vCPU-hour for a v4 pod.", "verdict": "unsupported", "fix": ""}) + ",\n" + json.dumps(
+        {"claim": "Google's proprietary \"Solaris\" fabric stitches pods together.", "verdict": "unsupported",
+         "fix": "Google's own optical interconnect stitches pods together."}) + ",\n" + json.dumps(
+        {"claim": "TPUs deliver higher performance per watt for dense matrix work.", "verdict": "ok", "fix": ""}) + ",\n" + json.dumps(
+        {"claim": "Nvidia GPUs remain the flexible choice.", "verdict": "wrong",
+         "fix": "As the draft says, the material shows otherwise."}) + ",]\n```")
+    items = ns["parse_claims"](out)
+    text, checked, fixed = ns["apply_fixes"](ans, items)
+    got["the checker's output: fence, prose and a trailing comma parsed; garbage is None"] = (
+        isinstance(items, list) and len(items) == 5 and ns["parse_claims"]("I cannot judge this.") is None)
+    got["the fixes: exact, deleted, matched through curly quotes, ok kept, one about the machinery refused"] = (
+        checked == 5 and fixed == 3 and "495 TFLOPS" in text and "$0.90" not in text and "Solaris" not in text
+        and "optical interconnect" in text and "performance per watt" in text and "the draft says" not in text
+        and "flexible choice" in text and "  " not in text.replace("\n", "") and not re.search(r"\n- *\n", text)
+        and ns["claim_count"](ans) >= 3
+        # the tidy-up after a fix leaves fenced code's spacing alone
+        and ns["_tidy_fixed"]("a  b\n```py\nx    = 1\n```\n- \nc") == "a b\n```py\nx    = 1\n```\nc")
+
+    def run_ok(label, msgs, emit):
+        emit(json.dumps([{"claim": "Google charges about $0.90 per vCPU-hour for a v4 pod.", "verdict": "wrong",
+                          "fix": "Google bills TPU v4 by the chip-hour."}]))
+
+    def run_slow(label, msgs, emit):
+        _tm515.sleep(1.2)
+        emit("[]")
+
+    def run_bad(label, msgs, emit):
+        raise RuntimeError("engine died")
+    res = ns["verify_answer"](run_ok, "L", "Q", ["m1"], ans, budget_s=5)
+    t0 = _tm515.time()
+    res2 = ns["verify_answer"](run_slow, "L", "Q", [], ans, budget_s=0.3)
+    got["verify_answer: applied; over budget is None, promptly; a failure is None"] = (
+        res and res["fixed"] == 1 and "chip-hour" in res["text"] and res["checked"] == 1
+        and res2 is None and _tm515.time() - t0 < 1.0 and ns["verify_answer"](run_bad, "L", "Q", [], ans, budget_s=2) is None)
+    frames, texts, steps = [], [], []
+
+    def emit(c):
+        (frames if isinstance(c, Ctl) else texts).append(str(c))
+
+    def step(sid, l, s="run", d=""):
+        steps.append((sid, l, s, d))
+    ns["run_model"] = run_ok
+    rep = {"material": ["m1"], "merger": "Gemma 4 26B", "writer": "Gemma 4 26B", "question": "Q", "merged": True,
+           "hurried": False}
+    long = ans + " More text follows here to pass the minimum length for a check. " * 6
+    r = ns["verify_pass"](long, rep, [{"role": "user", "content": "Q"}], emit, [].append, step, False)
+    got["verify_pass: on the writer here, a RESET then the fixed text, the step says what it fixed"] = (
+        r.get("ran") and r.get("rewritten") and frames == ["\0RESET\0"] and len(texts) == 1 and "chip-hour" in texts[0]
+        and steps[0][:3] == ("verify", "Checking the facts", "run") and steps[-1][1] == "Checked 1 claim, fixed 1"
+        and steps[-1][2] == "done")
+    frames.clear(), texts.clear(), steps.clear()
+    r_h = ns["verify_pass"](long, dict(rep, hurried=True), [], emit, [].append, step, False)
+    r_s = ns["verify_pass"]("short", rep, [], emit, [].append, step, False)
+    ns["run_model"] = run_slow
+    ns["VERIFY_BUDGET_S"] = 0.3
+    r_t = ns["verify_pass"](long, rep, [], emit, [].append, step, False)
+    got["verify_pass: hurried and short skip it; over budget keeps the answer and says so"] = (
+        r_h == {"ran": False} and r_s == {"ran": False} and not frames and not texts and r_t.get("timeout")
+        and steps[-1][1].startswith("Couldn’t check the facts in time"))
+    ns["fast_cloud_ladder"] = lambda: [{"name": "Groq", "model": "x"}]
+    srv_rep = dict(rep, writer="Desk · gpt-oss:20b", merger="Desk · gpt-oss:20b", critic="Desk · ministral-3:14b")
+    got["the pick: the cloud when open, the server's critic model, the writer here, none for a closed cloud writer"] = (
+        ns["verify_pick"](rep, True)[0] == "cloud" and ns["verify_pick"](rep, False) == ("local", "Gemma 4 26B", "Gemma 4 26B")
+        and ns["verify_pick"](srv_rep, False) == ("server", "Desk · ministral-3:14b", "Desk · ministral-3:14b")
+        and ns["verify_pick"](dict(rep, writer="cloud:opus"), False) == ("", "", ""))
+    fr = []
+    ns["rate_frame"](fr.append, _tm515.time() - 2.0, 800)
+    d = json.loads(fr[0][6:-1]) if fr else {}
+    ns["rate_frame"](fr.append, 0, 800)
+    ns["rate_frame"](fr.append, _tm515.time(), 0)
+    got["the speed frame: the writer's tokens a second, nothing without a first word"] = (
+        len(fr) == 1 and fr[0].startswith("\0RATE:") and 90 <= d.get("tps", 0) <= 110 and d.get("tok") == 200
+        and 1.9 <= d.get("s", 0) <= 2.3)
+    return got
+
+
+def _c515_council(src):
+    """run_council in craft mode on stand-ins: the roster, the critic and its chip, the final writer's messages,
+    the fact-check's RESET and step; hurried; over budget; without craft every seat drafts; the cut follows the pen."""
+    R, got_msgs = [], []
+    FIX = json.dumps([{"claim": "The card has 16 TB of memory per chip.", "verdict": "wrong",
+                       "fix": "The card has 16 GB of memory."}])
+    LONG = "The card has 16 TB of memory per chip. " + "It ships in 2024 with 80 GB of HBM3 and runs at 700 W. " * 8
+
+    def rm(label, msgs, emit, thinking=False):
+        c = str(msgs[-1].get("content", ""))
+        R.append((label, c[:40]))
+        if c.startswith("You are reviewing a draft answer"):
+            emit("- WRONG: 16 TB per chip is implausible; the card has 16 GB")
+        elif c.startswith("Below are a question"):
+            emit(FIX)
+        else:
+            emit("draft from " + label)
+
+    def sg(label, msgs, emit, status, fb, note):
+        got_msgs.append((label, msgs))
+        emit(LONG)
+        return True
+
+    def go(labels, run=rm, msgs=None, **kw):
+        ns, calls = _p2_council(src, run, _stream_guarded=sg, **kw.pop("over", {}))
+        out, fr, st = [], [], []
+        ns["run_council"](list(labels), msgs or [{"role": "system", "content": "SYS"},
+                                                 {"role": "user", "content": "q What you just found on the web"}],
+                          lambda c: (fr if isinstance(c, _RcCtl) else out).append(c), st.append, **kw)
+        return ns, out, fr, st
+    got = {}
+    ns, out, fr, st = go(["Desk · a", "Desk · b", "Desk · c"], craft=True)
+    got["one writer drafts; the second seat reviews it; the third is never asked"] = (
+        [l for l, c in R if c.startswith("q")] == ["Desk · a"]
+        and [l for l, c in R if c.startswith("You are reviewing a draft answer")] == ["Desk · b"]
+        and not any(l == "Desk · c" for l, c in R))
+    m = got_msgs[0][1] if got_msgs else [{}, {}]
+    got["the final writer's messages: the brief on the dated system, the question block, the notes"] = (
+        len(got_msgs) == 1 and m[0].get("role") == "system" and str(m[0].get("content", "")).startswith("SYS")
+        and "THE BRIEF FOR THIS ANSWER" in m[0]["content"] and str(m[1].get("content", "")).startswith("S")
+        and "=== THE QUESTION" in m[1]["content"] and "q What you just found on the web" in m[1]["content"]
+        and "REVIEW NOTES" in m[1]["content"] and "16 TB per chip is implausible" in m[1]["content"]
+        and "[answer 1]\ndraft from Desk · a" in m[1]["content"])
+    got["the critic's chip and step"] = (
+        any("DRAFT:" in f and "(review)" in f and "16 TB per chip" in f for f in fr)
+        and any('"id": "review"' in f and "Reviewing the draft" in f for f in fr)
+        and any('"id": "review"' in f and "Reviewed the draft" in f and "1 note" in f for f in fr))
+    got["the fact-check on the critic's model: a RESET, the fixed text, the step"] = (
+        [l for l, c in R if c.startswith("Below are a question")] == ["Desk · b"]
+        and any(str(f) == "\0RESET\0" for f in fr) and out and out[-1].startswith("The card has 16 GB of memory.")
+        and "16 TB" not in out[-1] and any('"id": "verify"' in f and "Checking the facts" in f for f in fr)
+        and any('"id": "verify"' in f and "Checked 1 claim, fixed 1" in f and '"s": "done"' in f for f in fr))
+    R.clear(), got_msgs.clear()
+    ev = _t515.Event()
+    ev.set()
+    ns2, out2, fr2, _ = go(["Desk · a", "Desk · b"], craft=True, hurry=ev)
+    got["hurried: the writer still drafts, no critic, no check"] = (
+        [l for l, c in R if c.startswith("q")] == ["Desk · a"]
+        and not any(c.startswith("You are reviewing") for l, c in R)
+        and not any("RESET" in f for f in fr2) and not any('"id": "verify"' in f for f in fr2) and out2 == [LONG])
+
+    def rm_slow(label, msgs, emit, thinking=False):
+        if str(msgs[-1].get("content", "")).startswith("Below are a question"):
+            _tm515.sleep(1.2)
+        rm(label, msgs, emit)
+    R.clear(), got_msgs.clear()
+    ns3, calls3 = _p2_council(src, rm_slow, _stream_guarded=sg)
+    ns3["VERIFY_BUDGET_S"] = 0.3
+    out3, fr3 = [], []
+    t0 = _tm515.time()
+    ns3["run_council"](["Desk · a", "Desk · b"], [{"role": "user", "content": "q"}],
+                       lambda c: (fr3 if isinstance(c, _RcCtl) else out3).append(c), [].append, craft=True)
+    got["over budget: the answer ships as it is, said in the step, within the budget"] = (
+        not any("RESET" in f for f in fr3) and out3 == [LONG] and _tm515.time() - t0 < 4
+        and any('"id": "verify"' in f and "in time" in f and "answer kept" in f for f in fr3))
+    R.clear(), got_msgs.clear()
+    go(["Desk · a", "Desk · b", "Desk · c"])
+    got["without craft every seat drafts, no critic, and the brief still rides the final"] = (
+        sorted(l for l, c in R if c.startswith("q")) == ["Desk · a", "Desk · b", "Desk · c"]
+        and not any(c.startswith("You are reviewing") for l, c in R)
+        and got_msgs and "THE BRIEF FOR THIS ANSWER" in got_msgs[-1][1][0]["content"])
+
+    def rm_long(label, msgs, emit, thinking=False):
+        emit("x" * 5000)
+    got_msgs.clear()
+    go(["Desk · a", "Desk · b"], run=rm_long)
+    srv_cut = got_msgs[-1][1][1]["content"] if got_msgs else ""
+    got_msgs.clear()
+    go(["Gemma 4 26B", "Llama"], run=rm_long,
+       over=dict(MODEL_ROUTES={"Gemma 4 26B": ("mlx", 1), "Llama": ("mlx", 2)}, MERGE_RANK=["Gemma 4 26B", "Llama"],
+                 MODEL_MEM_BYTES={"Gemma 4 26B": 16e9, "Llama": 2e9}))
+    big_cut = got_msgs[-1][1][1]["content"] if got_msgs else ""
+    got_msgs.clear()
+    go(["Llama", "Gemma 4 26B"], run=rm_long,
+       over=dict(MODEL_ROUTES={"Gemma 4 26B": ("mlx", 1), "Llama": ("mlx", 2)}, MERGE_RANK=["Llama", "Gemma 4 26B"],
+                 MODEL_MEM_BYTES={"Gemma 4 26B": 16e9, "Llama": 2e9}))
+    small_cut = got_msgs[-1][1][1]["content"] if got_msgs else ""
+    got["the cut follows the pen: whole drafts for a server, 4,000 for a big local model, 1,500 for a small one"] = (
+        "x" * 5000 in srv_cut and "x" * 4000 in big_cut and "x" * 4001 not in big_cut
+        and "x" * 1500 in small_cut and "x" * 1501 not in small_cut)
+    return got
+
+
+def _c515_pins(src):
+    """Where the craft meets the handler, run_council, _stream_guarded and the page: pinned."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    rc = src[src.index("def run_council("):src.index("\n\n\nRESEARCH_PLAN = (")]
+    sg = src[src.index("def _stream_guarded("):src.index("def _detruncate(")]
+    return {
+        "the handler asks for craft on Thinking, and on Thinking on one server alone":
+            'craft=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),\n'
+            "                            srv_merge=(tier in TIERS and not cloud_only))" in ch,
+        "the roster": "    if craft and not max_mode and len(labels) >= 2:\n        critic_lbl = labels[1]\n"
+                      "        _unasked = labels[2:]            # said in the ledger, never asked\n"
+                      "        labels = labels[:1]\n" in rc
+                      and '        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")' in rc,
+        "every way out of the stage is checked": rc.count("return _done()") >= 9
+                                                  and "        verify_pass(\"\".join(_shown).strip(), report, messages, _emit0,\n" in rc,
+        "the final prompt and its cuts": "    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)\n" in rc
+                                          and "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut)\n"
+                                              "    synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000)\n" in rc,
+        "the critic is capped like a draft": "            _capped(_critic, lambda: run_model(\n"
+                                             "                _critic, critic_prompt(question, _texts), parts.append))" in rc,
+        "the speed frame from every guarded stream": "            rate_frame(emit, _t_first[0], sum(len(c) for c in seen))\n"
+                                                      "            return True" in sg,
+        "Fast's second pass writes under the brief too": src.count("brief_system(full_messages[0])") == 3,
+        "the answer's own length on the card": '"%d chars" % (shown_n[0] or sent[0])' in ch,
+        "the page reads RATE, measures from the first character after the last RESET, and says both times":
+            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE";' in src
+            and "RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}}," in src
+            and "if(cut!==genCut){genCut=cut;genT0=0;}\n      if(full.length&&!genT0)genT0=lastChunkT;" in src
+            and "const tps=(rateInfo&&rateInfo.tps>0)?rateInfo.tps:lastRate;" in src
+            and '" tokens · wrote in "+wrote.toFixed(1)+"s · "+secs.toFixed(1)+"s total"' in src,
+        "the page's step card knows the review and the check":
+            'const STEP_ORDER=["wake","search","read","geo","council","review","draft","polish","verify","places"];' in src
+            and "review:8,draft:30,polish:8,verify:6" in src and 'if(isCouncil)stepPlan.push("verify");' in src,
+        "the mode says what it does": '"desc": "a draft, a review, a fact-checked final"' in src,
+    }
+
+
+def _c515_all(src):
+    out = {}
+    for fn in (_c515_helpers, _c515_council, _c515_pins):
+        try:
+            for k, v in fn(src).items():
+                out[fn.__name__[6:] + ": " + k] = bool(v)
+        except Exception as e_:
+            out[fn.__name__[6:] + ": raised"] = False
+            out[fn.__name__[6:] + ": raised %r" % (e_,)] = False
+    return out
+
+
+for _n515, _o515 in _c515_all(_MILLENAI_SRC).items():
+    check("6b515 the answer craft — " + _n515, _o515, "")
+_C515_MUT = [
+    ("every seat drafts under craft", "    if craft and not max_mode and len(labels) >= 2:\n        critic_lbl = labels[1]",
+     "    if False:\n        critic_lbl = labels[1]"),
+    ("no critic", "    if craft and not _hurried():\n        _critic = critic_lbl or merger",
+     "    if False:\n        _critic = critic_lbl or merger"),
+    ("the brief left off the final", '    return [brief_system(sys_msg, now), {"role": "user", "content": u}]',
+     '    return [dict(sys_msg), {"role": "user", "content": u}]'),
+    ("the question block left out of the final", '         + "\\n\\n=== %s ===\\n%s" % (_EVIDENCE_HEAD, question)\n', ""),
+    ("no RESET before the fixed answer", '        emit(Ctl(NUL + "RESET" + NUL))\n        emit(new)\n        out["rewritten"] = True',
+     '        emit(new)\n        out["rewritten"] = True'),
+    ("the check with no budget", "    th.join(timeout=budget_s)\n    if th.is_alive():", "    th.join()\n    if th.is_alive():"),
+    ("a hurried run still checked", '    if not report or report.get("hurried") or len(text or "") < VERIFY_MIN_CHARS:',
+     '    if not report or len(text or "") < VERIFY_MIN_CHARS:'),
+    ("a fix about the machinery accepted", "        if fix and (len(fix) > 3 * len(claim) + 80 or _FIX_META_RX.search(fix)):\n            continue",
+     "        if False:\n            continue"),
+    ("no speed frame", "            rate_frame(emit, _t_first[0], sum(len(c) for c in seen))\n            return True",
+     "            return True"),
+    ("the cut not following the pen", "    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)", "    _cut = 1500"),
+    ("the critic's notes not carried", "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut)",
+     "    synth = final_prompt(messages[0], question, _texts, '', cut=_cut)"),
+]
+_c515_caught = []
+for _mn, _ma, _mb in _C515_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c515_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c515_all(_ms).values()):
+        _c515_caught.append((_mn, "not caught"))
+check("6b515's rules each break a check when broken (%d mutants)" % len(_C515_MUT), not _c515_caught,
+      "%r" % _c515_caught)
+# ==== 6b515 the answer craft: end ====
+# ==== quality-1 (6b516) the two answer builds together: begin ====
+# The grounded turn (6b514) is the evidence (up to 9 KB), then the rules, then the question; the answer
+# craft (6b515) and Fast's second pass cut the question block with a plain [:8000] / [:5000], which kept
+# the pages and dropped the rules and the question itself. ground_clip keeps the end whole.
+print("== quality-1: the grounded turn survives every cut (6b516) ==")
+_q16 = {"re": re, "time": time, "strftime_np": lambda f, t: time.strftime(f.replace("%-d", "%d"), t)}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("GROUND_RULES = ("):_MILLENAI_SRC.index("def _ground_key(")], _q16)
+_pack16 = "WEB EVIDENCE gathered today, 8 sources:\n" + "\n".join("[%d] page %d\n    %s" % (i, i, "x" * 1000) for i in range(1, 9))
+_turn16 = _q16["grounded_turn"]("most powerful GPU now", _pack16)
+_c16a = _q16["ground_clip"](_turn16, 5000)
+_c16b = _q16["ground_clip"](_turn16, 12000)
+check("a clipped grounded turn keeps the rules and the question, and the evidence's head",
+      len(_turn16) > 9000 and len(_c16a) <= 5000 and _c16a.endswith("PROMPT: most powerful GPU now")
+      and "GROUNDING RULES:" in _c16a and _c16a.startswith("What you just found on the web")
+      and "[1] page 1" in _c16a and _c16b == _turn16 and _q16["ground_clip"]("short", 10) == "short"
+      and _q16["ground_clip"]("y" * 9000, 3000).endswith("y" * 1000) and len(_q16["ground_clip"]("y" * 9000, 3000)) <= 3000,
+      "%d %d" % (len(_turn16), len(_c16a)))
+check("the checker and Fast's second passes cut the question with ground_clip, never a bare slice",
+      _MILLENAI_SRC.count('ground_clip(full_messages[-1]["content"], 10000)') == 3
+      and 'full_messages[-1]["content"][:5000]' not in _MILLENAI_SRC
+      and '"\\n\\n=== QUESTION ===\\n" + ground_clip(question, 12000)' in _MILLENAI_SRC, "")
+# ==== quality-1 (6b516): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

@@ -4257,7 +4257,7 @@ TIERS = {
     # turbo pref already gives Fast the cloud when one exists. Old
     # clients still sending Best are aliased to Fast in do_POST.
     "Thinking": {
-        "icon": "\U0001f9e0", "desc": "reasons it through, blended",
+        "icon": "\U0001f9e0", "desc": "a draft, a review, a fact-checked final",
         # strongest-first ladder: whatever the machine holds and the user
         # has installed autoselects \u2014 a Titan rig leads with the 235B, a
         # 16 GB laptop lands on Phi-4, nobody configures anything
@@ -20405,6 +20405,23 @@ def grounded_turn(query: str, pack: str, today=None) -> str:
             % (query, pack, GROUND_RULES.format(today=day), query))
 
 
+def ground_clip(block: str, cap: int) -> str:
+    """A question block cut to `cap` characters without losing its end
+    (quality-1): a grounded turn is the evidence, then the rules, then the
+    question, so a plain [:cap] kept the pages and dropped the rules and
+    the question itself. The tail from the rules on (or the last 2,000
+    characters) is kept whole; the evidence gives way."""
+    t = str(block or "")
+    if len(t) <= cap:
+        return t
+    i = t.rfind("\n\nToday is ")
+    tail = t[i:] if 0 <= i and len(t) - i <= cap // 2 else t[-min(2000, cap // 3):]
+    head = t[:max(0, cap - len(tail) - 3)]
+    if "\n" in head:
+        head = head.rsplit("\n", 1)[0]
+    return head + "\n\u2026" + tail
+
+
 def _ground_key(question: str) -> str:
     return re.sub(r"\s+", " ", str(question or "").strip().lower())[:300]
 
@@ -22453,10 +22470,14 @@ def server_mode_state(e, mode: str, speeds=None) -> dict:
         note = "Only one model on %s suits %s, so it answers alone." % (n, mode)
     elif mode == "Max":
         note = "Every model on %s drafts (%d), then one writes the final answer there." % (n, k)
+    elif mode == "Thinking":
+        # one writer, a critic, a checked final (6b515)
+        note = ("The strongest model on %s drafts, a second reviews it, then %s "
+                "writes the final answer there and a quick model checks its facts."
+                % (n, n))
     else:
-        note = ("%d models on %s draft, %s, then %s writes the merge there."
-                % (k, n, "one double-checks them" if mode == "Thinking"
-                   else "each rewrites its own from all of them", n))
+        note = ("%d models on %s draft, each rewrites its own from all of them, "
+                "then %s writes the merge there." % (k, n, n))
         if mode == "Pro" and of > k:
             note += (" It seats %d of its %d: that many fit in the time a blend has."
                      % (k, of))
@@ -27843,10 +27864,11 @@ def bench_status(ctx=None) -> dict:
 # the answer, confident flowing prose, no filler, no bullet-spam — without
 # ever claiming any identity.
 SYNTH_INSTRUCTION = (
-    "Below are several draft answers to the same question. Write ONE "
-    "final answer that keeps every correct and useful detail and drops "
-    "repetition. If the drafts disagree on a fact, state the correct "
-    "information plainly.\n"
+    "Below, in marked sections, are the question and one or more draft "
+    "answers to it. Write ONE final answer that keeps every correct and "
+    "useful detail and drops repetition. If the drafts disagree on a "
+    "fact, state the better-supported information plainly; a specific "
+    "only one weak draft asserts, and nothing else backs, is left out.\n"
     "VOICE — follow all of these:\n"
     "- Open with the answer itself. Never restate the question, never "
     "start with filler like 'Great question' or 'Certainly', never a "
@@ -27965,9 +27987,12 @@ def _stream_guarded(label: str, msgs: list, emit, status,
     """
     for attempt in (1, 2):
         seen = []
+        _t_first = [0.0]       # when the first word landed (6b515: the speed line)
 
         def guarded(chunk):
             seen.append(chunk)
+            if not _t_first[0] and str(chunk).strip():
+                _t_first[0] = time.time()
             if len(seen) % 40 == 0 and _looks_degenerate("".join(seen)):
                 raise _Degenerate
             emit(chunk)
@@ -27976,6 +28001,7 @@ def _stream_guarded(label: str, msgs: list, emit, status,
             run_model(label, msgs, guarded)
             if _looks_degenerate("".join(seen)):
                 raise _Degenerate
+            rate_frame(emit, _t_first[0], sum(len(c) for c in seen))
             return True
         except _Degenerate:
             emit(Ctl(f"{NUL}RESET{NUL}"))  # tells the UI to discard the garbage
@@ -28247,8 +28273,16 @@ def run_council(labels: list, messages: list, emit, status,
                 cloud_only: bool = False, srv_only: bool = False,
                 bench_allow=None, comp: str = "", pen: str = "",
                 cloud_plan=None, max_mode=False,
-                hurry=None, srv_first_s=None, srv_merge=False) -> None:
+                hurry=None, srv_first_s=None, srv_merge=False,
+                craft: bool = False, report=None) -> None:
     """Ask each selected model in turn, then stream a merged answer.
+
+    craft (6b515, Thinking): one strong writer drafts, the next seat reads
+    the draft as a critic, and the compositor writes the final from the
+    draft and the notes, under the answer brief; then the facts are checked
+    (verify_pass) and a changed answer is re-sent after a RESET. report: a
+    dict the stage fills in (material, merger, writer), for the callers and
+    the tests that look.
 
     Sequential on purpose: only one MLX engine can be resident at a time
     (each pins its whole model in RAM), so parallel calls would thrash.
@@ -28283,6 +28317,26 @@ def run_council(labels: list, messages: list, emit, status,
             usable.append(l)
     # sequential generation — cap the roster so a run stays minutes, not hours
     labels = (usable or labels[:1])[:(40 if max_mode else 12)]
+    # ONE WRITER, ONE CRITIC (6b515, per Patrick: the answers were "not even
+    # remotely competing"). Measured on his Thinking run: the two weaker
+    # drafts took 58 of 127 seconds and the merge stitched their stale
+    # claims together. In craft mode the strongest seat alone drafts; the
+    # next seat reads that draft as a critic (below), and never drafts.
+    critic_lbl, _unasked = "", []
+    if craft and not max_mode and len(labels) >= 2:
+        critic_lbl = labels[1]
+        _unasked = labels[2:]            # said in the ledger, never asked
+        labels = labels[:1]
+
+    def _step_frame(sid, label, state="run", detail=""):
+        """A row of the page's progress card (the handler's step(), from
+        here): never breaks an answer."""
+        try:
+            emit(Ctl(NUL + "STEP:" + json.dumps(
+                {"id": sid, "l": label, "s": state,
+                 "d": str(detail)[:70]}) + NUL))
+        except Exception:
+            pass
 
     drafts = []
     _srv_used = []           # the server models this council used, in order (6b344)
@@ -28579,6 +28633,13 @@ def run_council(labels: list, messages: list, emit, status,
         if _hurried():
             _deadline = min(_deadline, time.time() + 5)
 
+    for _lbl in _unasked:
+        # the seats craft never asks (6b515): a greyed chip says why, so the
+        # ledger reads "2 of 3" with the reason instead of a model gone
+        # missing (after the drafts, so the page's time-left milestones
+        # count only real drafts)
+        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")
+
     good = [d for d in drafts if not d[1].startswith("(no answer")]
     if not good and srv_only:
         # a mode on one server alone (6b426): said, and nothing else is tried
@@ -28592,9 +28653,44 @@ def run_council(labels: list, messages: list, emit, status,
                           + _srv_errs[0])
     if not good:
         raise RuntimeError("none of the selected models answered")
-    if len(good) == 1:
+
+    # THE FACT-CHECK READS WHAT WAS SHOWN (6b515): from here on, every
+    # emit is tapped, so the final text (what follows the last RESET) is
+    # known when the stage ends, and each way out of the stage goes
+    # through _done(), which checks it. The cloud was open to this
+    # council when its seats drafted (above); the checker may use it then.
+    _shown = []
+    _emit0 = emit
+    _cloud_open = bool(cloud_only or (max_mode and cloud_plan is not None)
+                       or (bool(_bench) and cloud_allowed()))
+
+    def emit(c):      # noqa: F811 — the tap; the earlier closures see it too
+        if isinstance(c, Ctl):
+            if str(c) == NUL + "RESET" + NUL:
+                del _shown[:]
+        elif c:
+            _shown.append(str(c))
+        _emit0(c)
+    if report is None:
+        report = {}
+    report.update(material=[t for _l, t in good], critic=critic_lbl,
+                  question=messages[-1]["content"] if messages else "",
+                  craft=bool(craft), hurried=_hurried(), merged=False)
+
+    def _done():
+        report["hurried"] = _hurried()
+        try:
+            verify_pass("".join(_shown).strip(), report, messages, _emit0,
+                        status, _step_frame, _cloud_open)
+        except (StaleProfile, BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception:
+            pass          # the answer is on screen; a failed check changes nothing
+        return None
+    if len(good) == 1 and not craft:
+        report.update(writer=good[0][0], merger=good[0][0])   # checked on its own model
         emit(good[0][1])  # only one survived — nothing to merge
-        return
+        return _done()
 
     # PEER REVIEW (Power mode, per Patrick): every contributor reads ALL
     # the drafts and rewrites its own best answer from them; Gemma then
@@ -28734,48 +28830,76 @@ def run_council(labels: list, messages: list, emit, status,
     # whole (6000 chars is ~a full long answer; their contexts are six
     # to seven figures); the local merger keeps the tight cut that
     # stops repetition loops.
-    body = "\n\n".join(f"[answer {n}]\n{t[:1500]}"
+    # THE CUT FOLLOWS THE PEN (6b515): a server's compositor reads the
+    # drafts whole too (its context is 32K and up), and a local model of
+    # 9B or more reads 4,000 characters of each; only a small local merger
+    # keeps the 1,500 cut. Patrick's merge was written from 1,500-character
+    # stumps of 6,000-character drafts, and stitched what was left.
+    try:
+        _big_local = MODEL_MEM_BYTES.get(merger, 0) >= 6e9
+    except Exception:
+        _big_local = False
+    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)
+    body = "\n\n".join(f"[answer {n}]\n{t[:_cut]}"
                        for n, (_l, t) in enumerate(good, 1))
     body_full = "\n\n".join(f"[answer {n}]\n{t[:6000]}"
                             for n, (_l, t) in enumerate(good, 1))
+    _texts = [t for _l, t in good]
 
-    # REFLECTION (Thinking tier): before writing the final answer, the
-    # merger reads the drafts as a critic and lists concrete problems —
-    # wrong facts, gaps, waffle — and the synthesis prompt then carries
-    # those notes. Critique-then-revise reliably beats a straight merge;
-    # blending alone regresses toward the average draft. Best-effort:
-    # any failure just means merging without notes.
+    # THE CRITIC (6b515, craft): the next seat reads the writer's draft
+    # against the question and the evidence and lists what is wrong,
+    # mixed up, stale or missing; the final writer carries those notes.
+    # REFLECTION (Thinking tier, the older path): before writing the final
+    # answer, the merger reads the drafts as a critic and lists concrete
+    # problems — wrong facts, gaps, waffle — and the synthesis prompt then
+    # carries those notes. Critique-then-revise reliably beats a straight
+    # merge; blending alone regresses toward the average draft.
+    # Best-effort: any failure just means writing without notes.
     notes = ""
-    if reflect and len(good) > 1 and not _hurried():
+    if craft and not _hurried():
+        _critic = critic_lbl or merger
+        status(f"{_critic} is reviewing the draft")
+        _step_frame("review", "Reviewing the draft", "run", _critic)
+        try:
+            parts = []
+            _capped(_critic, lambda: run_model(
+                _critic, critic_prompt(question, _texts), parts.append))
+            notes = critic_notes(strip_think("".join(parts)))
+            if server_label(_critic):
+                _srv_used.append(_critic)      # resident on the card now
+        except Exception:
+            notes = ""
+        if notes:
+            try:
+                emit(Ctl(NUL + "DRAFT:" + json.dumps(
+                    {"m": _critic + " (review)", "t": notes[:1200]}) + NUL))
+            except Exception:
+                pass
+        _step_frame("review", "Reviewed the draft", "done",
+                    ("%d note%s" % (notes.count("\n") + 1,
+                                    "" if notes.count("\n") == 0 else "s"))
+                    if notes else "no problems found")
+        report["notes"] = notes
+    elif reflect and len(good) > 1 and not _hurried():
         status(f"{merger} is double-checking the drafts")
         try:
             parts = []
             _capped(merger, lambda: run_model(merger, [
                 messages[0],
                 {"role": "user", "content":
-                 "You are reviewing draft answers before a final version "
-                 "is written. List, tersely, the concrete problems to fix: "
-                 "factual claims that look wrong or contradict each other, "
-                 "missing angles a good answer needs, and filler to drop. "
-                 "At most 6 bullet points, no praise, no rewrite.\n\n"
+                 CRITIC_INSTRUCTION + "\n\n"
                  f"QUESTION: {question}\n\n{body}"}], parts.append))
-            notes = strip_think("".join(parts)).strip()[:1200]
+            notes = critic_notes(strip_think("".join(parts)))
         except Exception:
             notes = ""
 
-    def _synth(b):
-        return [
-            messages[0],  # keep the dated system prompt
-            {"role": "user",
-             "content": f"{SYNTH_INSTRUCTION}\n\nQUESTION: {question}"
-                        f"\n\n{b}"
-                        + (f"\n\nA careful reviewer flagged these issues — "
-                           f"your final answer must fix them without "
-                           f"mentioning the review:\n{notes}"
-                           if notes else "")},
-        ]
-    synth = _synth(body)                # local merger: tight cut
-    synth_full = _synth(body_full)      # cloud rungs: the whole drafts
+    # THE FINAL WRITER'S PROMPT (6b515): the dated system prompt with the
+    # answer brief on it, then the question block intact in its own marked
+    # section (its evidence and grounding lines included), the drafts as
+    # material, and the notes.
+    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut)
+    synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000)
+    report.update(merger=merger, merged=True)
     # The drafts were each checked, but the merge never was — so a merger
     # that melted down streamed its collapse straight to the reader with
     # nothing in the way. Watch it as it arrives, and if it goes, throw away
@@ -28796,9 +28920,12 @@ def run_council(labels: list, messages: list, emit, status,
     # made with the reader.
     def _stream_composite(_cc) -> bool:
         got = []
+        _t_first = [0.0]
 
         def _tap(t):
             got.append(t)
+            if not _t_first[0] and str(t).strip():
+                _t_first[0] = time.time()
             emit(t)
         try:
             ok = cloud_stream_conf(_cc, synth_full, _tap)
@@ -28806,6 +28933,8 @@ def run_council(labels: list, messages: list, emit, status,
             ok = False
         text = strip_think("".join(got))
         if ok and len(text) > 120 and not _looks_degenerate(text):
+            report["writer"] = "cloud:" + str(_cc.get("model") or _cc.get("name") or "")
+            rate_frame(emit, _t_first[0], sum(len(c) for c in got))
             return True
         # a merge thrown away didn't write the answer (6b326): no cloud
         # badge, no cloud title, memory or pins from its provider
@@ -28855,9 +28984,9 @@ def run_council(labels: list, messages: list, emit, status,
         # strongest draft ships as it stands — a local merge would break
         # the one promise this tier makes
         if _walk_ladder():
-            return
+            return _done()
         emit(good[0][1])
-        return
+        return _done()
     # the cloud writes the merge only when cloud power is on (6b326, 0a
     # 5.5): a named cloud compositor or the run's own cloud list used to
     # reach the cloud with the switch off; now they only pick WHICH cloud
@@ -28865,21 +28994,22 @@ def run_council(labels: list, messages: list, emit, status,
         # the person's cloud pen (6b442); a mode on one server with no pen of its
         # own there shows the best draft, as before
         if _walk_ladder():
-            return
+            return _done()
         if srv_only and _merge_srv is None:
             emit(good[0][1])
-            return
+            return _done()
     elif comp in MODEL_ROUTES or srv_only or _pen_kind in ("local", "server"):
         pass          # the user chose a LOCAL pen, or one server (6b426) — no cloud ladder
     elif max_mode and cloud_plan is not None:
         # Max opens the cloud whatever cloud power says: its own rungs first
         # (Claude, Kimi K3, Gemini, Groq), then the server's, then this computer's
         if _walk_ladder():
-            return
+            return _done()
     elif cloud_allowed():
         if _walk_ladder():
-            return
+            return _done()
     run_mark(compositor=merger)
+    report["writer"] = merger
     if _merge_srv is not None:
         # THE MERGE ON THE SERVER: the same first-word deadline and "marked
         # down" rules as a draft. Before its first word a failure falls to
@@ -28920,7 +29050,7 @@ def run_council(labels: list, messages: list, emit, status,
                 _ok = _stream_guarded(merger, synth, _memit, status, good[0][1],
                                       "showing the best single answer")
             _srv_step("done" if _ok else "fail", merger, emit)
-            return
+            return _done()
         except (StaleProfile, BrokenPipeError, ConnectionResetError):
             # the person stopped, closed the window or switched profiles:
             # the server did nothing wrong, and nobody waits for a fallback
@@ -28934,7 +29064,7 @@ def run_council(labels: list, messages: list, emit, status,
                     emit("\n\n\u26a0\ufe0f " + _why)
                 except Exception:
                     pass
-                return
+                return None          # cut short: nothing to check
             status("%s didn\u2019t write the merge, so %s" % (
                 _name, "%s writes it here" % _merge_fb if _merge_fb
                 else "the best single answer is shown"))
@@ -28944,6 +29074,7 @@ def run_council(labels: list, messages: list, emit, status,
                         {"r": [_merge_fb], "w": "mix", "m": ", ".join(
                             list(dict.fromkeys(list(labels) + [_merge_fb])))}) + NUL))
                     run_mark(compositor=_merge_fb)
+                    report["writer"] = _merge_fb
                     _srv_step("run", _merge_fb, emit)
                     _stream_guarded(_merge_fb, synth, emit, status, good[0][1],
                                     "showing the best single answer")
@@ -28956,7 +29087,7 @@ def run_council(labels: list, messages: list, emit, status,
                     emit(good[0][1])
                 except Exception:
                     pass
-            return
+            return _done()
     try:
         with server_first_deadline(srv_first_s if server_label(merger)
                                    else None):
@@ -28968,6 +29099,7 @@ def run_council(labels: list, messages: list, emit, status,
             if _merge_fb:
                 # the server didn't write it: this computer's copy does
                 run_mark(compositor=_merge_fb)
+                report["writer"] = _merge_fb
                 _stream_guarded(_merge_fb, synth, emit, status, good[0][1],
                                 "showing the best single answer")
             else:
@@ -28978,6 +29110,478 @@ def run_council(labels: list, messages: list, emit, status,
                 emit(good[0][1])
             except Exception:
                 pass
+    return _done()
+
+
+# ===================================== the answer craft (6b515, per Patrick)
+# Patrick (2026-10-24): the final answers were "not even remotely competing"
+# with Claude's. Measured on his own Thinking run (Ollama1 alone, three
+# drafts, 127 s): 58 s went to the two weaker drafts and 17 s to a
+# reflection pass, and the merge was written from 1,500-character stumps of
+# the drafts, stitched their stale claims together and invented new ones
+# ("16 TB of memory per chip"). What changed, here and in run_council:
+#   THE BRIEF (ANSWER_BRIEF, brief_system, final_prompt): the final writer
+#   gets a system brief on top of the dated system prompt \u2014 today's date,
+#   the shape (the answer first, then the depth that matters, then the
+#   takeaways), the reader (pitched to what memory says of their work), the
+#   units kept straight (a chip is not a cluster), what is uncertain said
+#   so, no filler. The question block the search built \u2014 its evidence and
+#   grounding lines \u2014 is passed intact in its own marked section.
+#   THE CRITIC (CRITIC_INSTRUCTION, critic_prompt): in craft mode the next
+#   seat reads the writer's draft and lists what is wrong, mixed up, stale
+#   or missing; the final writer carries the notes.
+#   THE FACT-CHECK (VERIFY_INSTRUCTION, verify_answer, verify_pass): once
+#   the final has streamed, the quickest capable model lists every claim
+#   carrying a number, date, name, version or spec, judges each against the
+#   evidence and the material, and the wrong or unsupported ones are
+#   replaced or softened by exact-sentence substitution; a changed answer is
+#   re-sent after a RESET. Inside a budget: a check that runs over ships the
+#   answer as it is. The card says "Checked 12 claims, fixed 2".
+#   THE SPEED LINE (rate_frame): the writer's own generation speed reaches
+#   the page in a RATE frame, instead of the whole run's seconds over the
+#   final length ("2.5 tok/s" for a 127-second council).
+ANSWER_BRIEF = (
+    "THE BRIEF FOR THIS ANSWER (where it differs from the general notes "
+    "above, the brief wins, except a LENGTH instruction: that is the "
+    "person's own setting and always wins):\n"
+    "- Today is {today}. 'Current', 'latest', 'now' and 'this year' are "
+    "measured from this date, not from your training. A fact that may have "
+    "moved since gets a date flag in world-facing words ('as of {month}', "
+    "'reported in \u2026'), never 'as of my training data'.\n"
+    "- Shape: the first one or two sentences settle the question \u2014 the "
+    "verdict, the number, the name \u2014 with no preamble, no restating of the "
+    "question and no title. Then the depth that matters, in the order the "
+    "reader needs it: the mechanism, the comparison, the figures, each "
+    "paragraph carrying something new. Then the practical takeaways: what "
+    "it means for the reader, what to do or watch for. Scale this to the "
+    "ask \u2014 a one-line fact gets one line, a real question gets the whole "
+    "shape.\n"
+    "- Keep the units of comparison straight and say which one you mean: "
+    "a single chip is not a board, a board is not a rack or a pod, a "
+    "per-device figure is not a cluster figure, a peak sparse number is not "
+    "a dense one, a list price is not an hourly cloud rate. Name the unit "
+    "beside every figure.\n"
+    "- Every specific \u2014 number, date, version, name, spec, price \u2014 comes "
+    "from the evidence the app gathered, from the material below, or from "
+    "stable general knowledge you are certain of. Never fuse two sources' "
+    "figures into a new one, never scale a chip figure up to a cluster "
+    "without showing the arithmetic, never fill a gap with a plausible "
+    "number. Where the material disagrees, give the better-supported figure "
+    "and say so in a clause; where nothing supports a specific, leave it "
+    "out or call it uncertain.\n"
+    "- Say what is uncertain or changing, plainly and once ('vendors quote "
+    "this differently', 'not public', 'varies with the configuration'). A "
+    "confident sentence is one you would bet on.\n"
+    "- Write for the reader the remembered facts describe. Someone in IT or "
+    "operations gets the operational specifics \u2014 procurement, power and "
+    "cooling, interconnect, availability, what to buy or rent \u2014 not a "
+    "primer; a newcomer gets the concepts first. Never say that you know "
+    "who they are.\n"
+    "- No filler: no summary that repeats the body, no 'in short' that "
+    "restates it, no 'I hope this helps', no offer of more. Stop when the "
+    "information stops."
+)
+_BRIEF_MARK = "THE BRIEF FOR THIS ANSWER"
+
+
+def _brief_today(now=None) -> tuple:
+    """("Saturday, October 24, 2026", "October 2026"), without the
+    platform-bound %-d (6b317: Windows has no such directive)."""
+    t = time.localtime(now) if now else time.localtime()
+    day = time.strftime("%d", t).lstrip("0") or "0"
+    return (time.strftime("%A, %B ", t) + day + time.strftime(", %Y", t),
+            time.strftime("%B %Y", t))
+
+
+def answer_brief(now=None) -> str:
+    today, month = _brief_today(now)
+    return ANSWER_BRIEF.replace("{today}", today).replace("{month}", month)
+
+
+def brief_system(sys_msg, now=None) -> dict:
+    """The (dated) system message with the answer brief appended, once."""
+    m = dict(sys_msg) if isinstance(sys_msg, dict) else {"role": "system",
+                                                          "content": ""}
+    c = str(m.get("content") or "")
+    if _BRIEF_MARK not in c:
+        m["content"] = (c + "\n\n" if c else "") + answer_brief(now)
+    m["role"] = "system"
+    return m
+
+
+_EVIDENCE_HEAD = ("THE QUESTION, as the person asked it, with any evidence "
+                  "the app gathered (the person never sees an evidence "
+                  "block: restate what you use from it)")
+
+
+def final_prompt(sys_msg, question: str, drafts: list, notes: str = "",
+                 cut: int = 6000, now=None) -> list:
+    """The final writer's messages: the dated system prompt with the brief,
+    then SYNTH_INSTRUCTION, the question block intact in its own marked
+    section, the drafts as material (each cut to `cut` characters) and the
+    critic's notes when there are any."""
+    drafts = [str(t) for t in (drafts or []) if str(t).strip()]
+    body = "\n\n".join("[answer %d]\n%s" % (n, t[:cut])
+                       for n, t in enumerate(drafts, 1))
+    n = len(drafts)
+    u = (SYNTH_INSTRUCTION
+         + "\n\n=== %s ===\n%s" % (_EVIDENCE_HEAD, question)
+         + "\n\n=== MATERIAL: %d draft answer%s to the question ===\n%s"
+         % (n, "" if n == 1 else "s", body)
+         + ("\n\n=== REVIEW NOTES: a careful reviewer flagged these "
+            "problems in the material; the final answer must fix them "
+            "without mentioning the review ===\n" + notes if notes else "")
+         + "\n\nWrite the final answer now, following the brief.")
+    return [brief_system(sys_msg, now), {"role": "user", "content": u}]
+
+
+CRITIC_INSTRUCTION = (
+    "You are reviewing a draft answer before the final version is written. "
+    "Read the question (with any evidence the app gathered) and the draft, "
+    "then list the concrete problems to fix \u2014 tersely, one bullet each, at "
+    "most 8 bullets, in this order of importance:\n"
+    "- WRONG: a number, date, name, version or spec that contradicts the "
+    "evidence or is implausible. Quote it, then the correct figure, or "
+    "'unsupported' when nothing backs it.\n"
+    "- MIXED UP: a unit confusion (a chip for a board, a board for a pod or "
+    "cluster, per device for total, dense for sparse, a list price for an "
+    "hourly rate), or two facts fused into one.\n"
+    "- STALE: a 'current' or 'latest' claim that the evidence or today's "
+    "date says has moved on.\n"
+    "- MISSING: an angle the question needs that the draft skipped. Say "
+    "what to add, in one line.\n"
+    "No praise, no rewrite, no preamble. If the draft is sound, reply "
+    "exactly: No problems found."
+)
+
+
+def critic_prompt(question: str, drafts: list, now=None) -> list:
+    """The critic's messages: a lean dated system line (no memory, no voice
+    rules: it writes notes, not an answer), the question block intact, and
+    the drafts (up to three, 6,000 characters each)."""
+    today, _m = _brief_today(now)
+    drafts = [str(t) for t in (drafts or []) if str(t).strip()][:3]
+    body = "\n\n".join("[draft %d]\n%s" % (n, t[:6000])
+                       for n, t in enumerate(drafts, 1))
+    return [{"role": "system", "content":
+             "You are a rigorous technical reviewer. Today is %s. You have "
+             "no tools; you only read and judge." % today},
+            {"role": "user", "content":
+             CRITIC_INSTRUCTION + "\n\n=== QUESTION ===\n" + question
+             + "\n\n=== DRAFT%s ===\n" % ("S" if len(drafts) > 1 else "")
+             + body}]
+
+
+def critic_notes(text: str) -> str:
+    """The critic's notes for the final writer: '' for 'No problems found'
+    (or nothing usable), else the bullets, capped."""
+    t = (text or "").strip()
+    if not t or re.match(r"^\W*no (?:real |major |significant )?problems? "
+                         r"(?:were )?found\b", t, re.I):
+        return ""
+    return t[:1500]
+
+
+# ---- the fact-check
+VERIFY_BUDGET_S = 45.0       # longer than this and the answer ships as it is
+VERIFY_CLOUD_S = 30.0        # a cloud checker is quicker, or it isn't worth it
+VERIFY_MIN_CHARS = 350       # shorter answers carry too little to check
+VERIFY_SYSTEM = ("You are a meticulous fact-checker. Today is %s. You "
+                 "answer with JSON only, nothing else.")
+VERIFY_INSTRUCTION = (
+    "Below are a question (with any evidence the app gathered), the "
+    "material an answer was written from, and the ANSWER. Find every "
+    "sentence of the ANSWER that states a NUMBER, DATE, YEAR, VERSION, "
+    "PRICE, NAME or SPEC as fact, and judge each one:\n"
+    "- ok: the evidence or the material supports it, or it is stable "
+    "general knowledge you are certain of\n"
+    "- wrong: it contradicts the evidence or the material, fuses two "
+    "facts, or confuses units (a chip for a cluster, per device for "
+    "total, a list price for an hourly rate)\n"
+    "- unsupported: nothing supports it and you cannot vouch for it\n"
+    "Reply with ONLY a JSON array, one object per sentence judged: "
+    "{\"claim\": \"<the sentence, copied from the ANSWER exactly, "
+    "character for character>\", \"verdict\": \"ok\" | \"wrong\" | "
+    "\"unsupported\", \"fix\": \"<for wrong or unsupported: the sentence "
+    "rewritten so that it is true, or softened to what is actually known, "
+    "in the answer's own voice; an empty string to delete it>\"}. For ok "
+    "the fix is \"\". No prose before or after the array, no code fence."
+)
+_CLAIM_RX = re.compile(
+    r"\d|\b(?:v|version )\d|\b[A-Z][a-z]+(?: [A-Z][A-Za-z0-9]+)+\b")
+_SENT_RX = re.compile(r"(?<=[.!?])\s+|\n+")
+_FIX_META_RX = re.compile(
+    r"\b(?:the )?(?:draft|material|evidence block|fact[- ]check(?:er)?|"
+    r"reviewer|the answer above)\b", re.I)
+
+
+def claim_count(text: str) -> int:
+    """How many sentences of an answer carry a figure, a version or a
+    proper name \u2014 what a fact-check would look at."""
+    return sum(1 for s in _SENT_RX.split(text or "")
+               if len(s.strip()) >= 12 and _CLAIM_RX.search(s))
+
+
+def verify_prompt(question: str, material: list, answer: str, now=None) -> list:
+    today, _m = _brief_today(now)
+    mat = "\n\n".join("[material %d]\n%s" % (n, str(t)[:2500])
+                      for n, t in enumerate((material or [])[:3], 1)) or "(none)"
+    return [{"role": "system", "content": VERIFY_SYSTEM % today},
+            {"role": "user", "content":
+             VERIFY_INSTRUCTION + "\n\n=== QUESTION ===\n" + ground_clip(question, 12000)
+             + "\n\n=== MATERIAL ===\n" + mat
+             + "\n\n=== ANSWER ===\n" + str(answer)[:12000]}]
+
+
+def parse_claims(out: str):
+    """The checker's JSON array, or None when there isn't one to be had."""
+    t = (out or "").strip()
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t, flags=re.S).strip()
+    i, j = t.find("["), t.rfind("]")
+    if i < 0 or j <= i:
+        return None
+    body = t[i:j + 1]
+    for cand in (body, re.sub(r",\s*([\]}])", r"\1", body)):
+        try:
+            v = json.loads(cand)
+        except ValueError:
+            continue
+        if isinstance(v, list):
+            return v
+    return None
+
+
+def _loose_rx(claim: str):
+    """The claim as a regex tolerant of whitespace and straight/curly
+    quotes, for a sentence the checker copied almost exactly."""
+    parts = []
+    for w in claim.split():
+        p = ""
+        for ch in w:
+            if ch in "'\u2019":
+                p += "['\u2019]"
+            elif ch in "\"\u201c\u201d":
+                p += "[\"\u201c\u201d]"
+            else:
+                p += re.escape(ch)
+        parts.append(p)
+    return re.compile(r"\s+".join(parts)) if parts else None
+
+
+def _tidy_fixed(text: str) -> str:
+    """After sentences were replaced or deleted: no empty bullets, no
+    double spaces, no runs of blank lines."""
+    out, fence = [], False
+    for ln in text.split("\n"):
+        if ln.lstrip().startswith("```"):
+            fence = not fence
+            out.append(ln)
+            continue
+        if fence:                 # code keeps its spacing
+            out.append(ln)
+            continue
+        s = ln.rstrip()
+        if re.fullmatch(r"\s*(?:[-*\u2022]|\d+[.)])\s*(?:\*\*\s*\*\*)?\s*", s):
+            continue              # a bullet whose sentence was deleted
+        s = re.sub(r"(?<=\S)  +(?=\S)", " ", s)
+        s = re.sub(r"\s+([.,;:!?])", r"\1", s)
+        out.append(s)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+def apply_fixes(answer: str, items) -> tuple:
+    """(text, checked, fixed): the checker's wrong and unsupported claims
+    replaced by their fixes (deleted on an empty fix) where the claim is
+    found in the answer; the longest claims first, so a short one inside a
+    long one can't pre-empt it. A fix that talks about the machinery, or
+    balloons, is refused."""
+    text = answer or ""
+    checked = fixed = 0
+    rows = []
+    for it in items if isinstance(items, list) else []:
+        if not isinstance(it, dict):
+            continue
+        claim = str(it.get("claim") or "").strip()
+        verdict = str(it.get("verdict") or "").strip().lower()
+        fix = it.get("fix")
+        fix = str(fix).strip() if isinstance(fix, str) else ""
+        if len(claim) < 12:
+            continue
+        checked += 1
+        if verdict not in ("wrong", "unsupported"):
+            continue
+        rows.append((claim, fix))
+    rows.sort(key=lambda r: -len(r[0]))
+    for claim, fix in rows:
+        if fix and (len(fix) > 3 * len(claim) + 80 or _FIX_META_RX.search(fix)):
+            continue
+        if fix == claim:
+            continue
+        i = text.find(claim)
+        if i >= 0:
+            j = i + len(claim)
+        else:
+            rx = _loose_rx(claim)
+            m = rx.search(text) if rx else None
+            if not m:
+                continue
+            i, j = m.start(), m.end()
+        text = text[:i] + fix + text[j:]
+        fixed += 1
+    if fixed:
+        text = _tidy_fixed(text)
+    return text, checked, fixed
+
+
+def verify_answer(run, label: str, question: str, material: list,
+                  answer: str, budget_s: float = VERIFY_BUDGET_S, now=None):
+    """Run the checker (run(label, messages, emit)) inside budget_s and
+    apply what it found: {"text", "checked", "fixed", "secs"}, or None when
+    it didn't finish in time, failed, or sent nothing usable. A checker
+    that runs over is told to stop at its next token."""
+    msgs = verify_prompt(question, material, answer, now)
+    parts, box, stop = [], [], threading.Event()
+
+    def _collect(chunk):
+        if stop.is_set():
+            raise _DraftAbandoned()
+        parts.append(chunk)
+
+    def _go():
+        try:
+            run(label, msgs, _collect)
+        except _DraftAbandoned:
+            pass
+        except Exception as exc:        # noqa: BLE001 \u2014 recorded below
+            box.append(exc)
+    t0 = time.time()
+    th = ctx_thread(target=_go, daemon=True)
+    th.start()
+    th.join(timeout=budget_s)
+    if th.is_alive():
+        stop.set()
+        return None
+    if box:
+        return None
+    items = parse_claims(strip_think("".join(parts)))
+    if items is None:
+        return None
+    text, checked, fixed = apply_fixes(answer, items)
+    return {"text": text, "checked": checked, "fixed": fixed,
+            "secs": round(time.time() - t0, 1)}
+
+
+def verify_pick(report: dict, cloud_ok: bool) -> tuple:
+    """(kind, who, name): the quickest capable checker. A cloud quick model
+    when the cloud is open to this council; else, for an answer written on
+    a server, the critic's model there (loaded on its card now) or the
+    server's quick pick, else the writer itself; for an answer written
+    here, the writer (its engine is the one loaded). ("", "", "") when no
+    model can take it."""
+    writer = str(report.get("writer") or report.get("merger") or "")
+    if cloud_ok:
+        try:
+            fl = fast_cloud_ladder()
+        except Exception:
+            fl = []
+        if fl:
+            return "cloud", fl[0], str(fl[0].get("name") or "cloud")
+    if writer.startswith("cloud:"):
+        return "", "", ""
+    if server_label(writer):
+        srv = writer.split(SERVER_SEP, 1)[0]
+        critic = str(report.get("critic") or "")
+        if server_label(critic) and critic.split(SERVER_SEP, 1)[0] == srv \
+                and critic != writer:
+            return "server", critic, critic
+        try:
+            m = server_side_pick(bound_ctx(), "fast")
+        except Exception:
+            m = None
+        if m is not None and m.get("server") == srv and m.get("label") != writer:
+            return "server", m["label"], m["label"]
+        return "server", writer, writer
+    if writer and writer in MODEL_ROUTES:
+        return "local", writer, writer
+    return "", "", ""
+
+
+def verify_pass(text: str, report: dict, messages: list, emit, status,
+                step, cloud_ok: bool = False) -> dict:
+    """The fact-check of a finished answer (6b515): skipped for a hurried
+    run, a short answer or one with nothing to check; otherwise the step
+    card shows "Checking the facts", then "Checked N claims, fixed M" (or
+    "all held", or "Couldn't check the facts in time \u2014 answer kept"), and
+    a changed answer is re-sent after a RESET. Returns what happened."""
+    out = {"ran": False}
+    if not report or report.get("hurried") or len(text or "") < VERIFY_MIN_CHARS:
+        return out
+    n_cl = claim_count(text)
+    if n_cl < 2:
+        return out
+    kind, who, name = verify_pick(report, cloud_ok)
+    if not kind:
+        return out
+    out.update(ran=True, who=name)
+    step("verify", "Checking the facts", "run", name)
+    try:
+        status("checking the facts with %s" % name)
+    except Exception:
+        pass
+    question = str(report.get("question") or (messages[-1]["content"] if messages else ""))
+    material = list(report.get("material") or [])
+    if kind == "cloud":
+        budget = VERIFY_CLOUD_S
+        conf = dict(who, role="utility")
+
+        def run(_l, m, e):
+            e(cloud_text(conf, m, timeout=int(budget), max_tokens=2000, quiet=True))
+    else:
+        budget = VERIFY_BUDGET_S
+
+        def run(l, m, e):
+            with server_first_deadline(30.0 if server_label(l) else None):
+                run_model(l, m, e)
+    res = verify_answer(run, who if kind != "cloud" else "", question,
+                        material, text, budget_s=budget)
+    if res is None:
+        step("verify", "Couldn\u2019t check the facts in time \u2014 answer kept",
+             "done", name)
+        out["timeout"] = True
+        return out
+    out.update(checked=res["checked"], fixed=res["fixed"], secs=res["secs"])
+    plural = "" if res["checked"] == 1 else "s"
+    new = (res["text"] or "").strip()
+    if res["fixed"] and new and new != text.strip() \
+            and len(new) >= 0.6 * len(text.strip()):
+        emit(Ctl(NUL + "RESET" + NUL))
+        emit(new)
+        out["rewritten"] = True
+        step("verify", "Checked %d claim%s, fixed %d" % (
+            res["checked"], plural, res["fixed"]), "done", name)
+    else:
+        step("verify", "Checked %d claim%s, all held" % (res["checked"], plural)
+             if not res["fixed"] else
+             "Checked %d claim%s \u2014 kept as written" % (res["checked"], plural),
+             "done", name)
+    return out
+
+
+def rate_frame(emit, t_first: float, chars: int) -> None:
+    """The writer's own speed for the page's line (6b515): tokens a second
+    from its first word to its last, the tokens, the seconds. Nothing
+    when it wrote for under a third of a second or wrote nothing."""
+    if not t_first or chars <= 0:
+        return
+    s = time.time() - t_first
+    if s < 0.3:
+        return
+    try:
+        emit(Ctl(NUL + "RATE:" + json.dumps(
+            {"tps": round(chars / 4.0 / s, 1), "tok": chars // 4,
+             "s": round(s, 1)}) + NUL))
+    except Exception:
+        pass
 
 
 RESEARCH_PLAN = (
@@ -31734,7 +32338,7 @@ def funnel_images(goal: str, labels: list, budget: float = _FIMG_BUDGET,
 # longer saves turns, so an answer that finishes into a chat nobody is
 # looking at is kept, and a stopped one keeps what was shown.
 _TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
-              "|STEP|APPROVE")
+              "|STEP|APPROVE|RATE")     # RATE: the writer's pace (6b515), the page's twin
 # the page's rules, character for character: JS "." stops at a line
 # break, and JS "$" (unlike Python's) only at the very end
 _TURN_FRAME = re.compile("\x00(" + _TURN_TAGS
@@ -35671,8 +36275,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the page decodes it (hdrText)
         self.send_header("X-Models", header_text(xm))
         # the time-left plan (6b459): measured figures, worked out up front
+        # Thinking's shape since 6b515: one writer and a critic draft-and-review,
+        # the rest of the roster is never asked, so the plan counts two stages
+        _craft_eta = (tier == "Thinking" or (_srv_only and _so_mode == "Thinking")) \
+            and len(council) > 2 and not images
         _ep = (photo_edit_eta(self.ctx) if edit_req else
-               eta_plan(self.ctx, council, messages, bool(query or _links)))
+               eta_plan(self.ctx, council[:2] if _craft_eta else council,
+                        messages, bool(query or _links)))
         if _ep:
             self.send_header("X-Eta", json.dumps(_ep, separators=(",", ":")))
         # ANSWER NOW (6b257): an unguessable per-request id the client
@@ -35728,6 +36337,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         ctx_thread(target=_heartbeat, daemon=True).start()
 
         sent = [0]
+        shown_n = [0]       # characters of the answer on screen (6b515)
 
         answer_buf = []
 
@@ -35743,6 +36353,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not chunk:
                 return
             sent[0] += len(chunk)
+            if isinstance(chunk, Ctl):
+                if str(chunk) == NUL + "RESET" + NUL:
+                    shown_n[0] = 0
+            else:
+                shown_n[0] += len(chunk)
             answer_buf.append(chunk)
             _write(chunk.encode("utf-8"))
 
@@ -36407,9 +37022,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # Fast on that server alone (6b426): its one model, and Fast's
                 # second pass on it; nothing stands behind it (fallback "")
                 def _so_revise(_d):
-                    _sq = (full_messages[-1]["content"][:5000]
+                    _sq = (ground_clip(full_messages[-1]["content"], 10000)
                            if (query or docs) else prompt)
-                    return [full_messages[0],
+                    return [brief_system(full_messages[0]),     # the brief (6b515)
                             {"role": "user", "content":
                              REVISE_INSTRUCTION + "QUESTION: " + _sq
                              + "\n\nFIRST DRAFT:\n" + _d[:6000]}]
@@ -36435,6 +37050,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             hurry=hurry_ev, srv_only=_srv_only,
                             max_mode=bool(_srv_only and _so_mode == "Max"), pen=mode_pen,
                             srv_first_s=(60.0 if _seat_fb else None),
+                            # Thinking: one writer, a critic, a checked final (6b515)
+                            craft=(tier == "Thinking" or (
+                                _srv_only and _so_mode == "Thinking")),
                             srv_merge=(tier in TIERS and not cloud_only))
             else:
                 lbl = route_label or model_name
@@ -36530,9 +37148,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             and _is_substantive(prompt))
 
                     def _revise(_d):
-                        _sq = (full_messages[-1]["content"][:5000]
+                        _sq = (ground_clip(full_messages[-1]["content"], 10000)
                                if (query or docs) else prompt)
-                        return [full_messages[0],
+                        return [brief_system(full_messages[0]),     # the brief (6b515)
                                 {"role": "user", "content":
                                  REVISE_INSTRUCTION + "QUESTION: " + _sq
                                  + "\n\nFIRST DRAFT:\n" + _d[:6000]}]
@@ -36582,11 +37200,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         # with "you haven't attached the file" (the
                         # anti-invention rule doing its job on the
                         # wrong evidence — seen in the gauntlet).
-                        src_q = (full_messages[-1]["content"][:5000]
+                        src_q = (ground_clip(full_messages[-1]["content"], 10000)
                                  if (query or docs) else prompt)
                         _stream_guarded(
                             lbl,
-                            [full_messages[0],
+                            [brief_system(full_messages[0]),     # the brief (6b515)
                              {"role": "user",
                               "content": REVISE_INSTRUCTION
                               + "QUESTION: " + src_q
@@ -36721,8 +37339,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not _gone:
                 try:
                     if sent[0]:
+                        # the answer's own length, not the frames' (6b515:
+                        # it said 7,421 chars for a 3,095-char answer)
                         step("draft", "Answer written", "done",
-                             "%d chars" % sent[0])
+                             "%d chars" % (shown_n[0] or sent[0]))
                         step("polish", "Sharpened", "done", "")
                     # OSM already named the venues and knows where they are,
                     # so the local extraction pass is pure cost — pin them
@@ -44750,7 +45370,7 @@ let curHid="",liveDrafts=0,hurriedNow=false,wakeSkipNow=false;
 // the server bars poll fast while a server is writing the answer (6b461)
 let srvBoost=false;
 let runT0=0,runTier="";
-const STEP_ORDER=["wake","search","read","geo","council","draft","polish","places"];
+const STEP_ORDER=["wake","search","read","geo","council","review","draft","polish","verify","places"];
 function resetSteps(host){steps=[];stepHost=host;
   stepPlan=[];answerChars=0;streamDone=false;
   dispPct=0;lastTween=0;etaTxt="";
@@ -44842,7 +45462,7 @@ function paintSteps(){
   // known at stream start from the search header and the tier — and
   // give the running phase its real sub-progress (council i-of-n,
   // drafting from streamed characters). Never 100% before the end.
-  const W={search:10,read:10,geo:5,council:35,draft:30,polish:8,places:7};
+  const W={search:10,read:10,geo:5,council:35,review:8,draft:30,polish:8,verify:6,places:7};
   const seen={};steps.forEach(s2=>{seen[s2.id]=s2;});
   const plan={};
   (stepPlan.length?stepPlan:Object.keys(seen)).forEach(id=>{plan[id]=1;});
@@ -45552,6 +46172,9 @@ async function send(){
   resetSteps(body);
   abortCtl=new AbortController();
   let full="",t0=performance.now(),tokEst=0,lastRate=0,wasAborted=false,searched=false,status=null,drafts=[],sources=null,photos=null,mapd=null,locCtx="",places=null,placeHint=null;
+  // the writer's pace (6b515): the server's RATE frame when it sent one, else
+  // the page's own clock from the first character shown after the last RESET
+  let rateInfo=null,genT0=0,genCut=-1,lastChunkT=0;
   const seenStatus=[];
   let srvWho="";         // the server that answered, if one did (6b334)
   lastModels="";
@@ -45641,8 +46264,10 @@ async function send(){
     // the phase plan for THIS run — what the bar measures against
     stepPlan=[];
     if(searched)stepPlan.push("search","read","geo");
-    if((lastModels||"").split(",").length>1)stepPlan.push("council");
+    const isCouncil=(lastModels||"").split(",").length>1;
+    if(isCouncil)stepPlan.push("council");
     stepPlan.push("draft","polish");
+    if(isCouncil)stepPlan.push("verify");     // the fact-check (6b515)
 
     // the label speaks plainly (6b223, per Patrick): "Running… a, b"
     // with every simultaneously active model, then "Compositor: name" —
@@ -45708,6 +46333,7 @@ async function send(){
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
                 }catch(e){}},
         STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);},
+        RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}},   // the writer's pace (6b515)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
                      if(!drafts.some(x=>x.m===d.m))drafts.push(d);
@@ -45744,8 +46370,14 @@ async function send(){
       // streamed before it is gone (streamText), the replacement kept
       const cut=raw.lastIndexOf("\u0000RESET\u0000");
       tokEst=full.length/4;
-      const secs=(performance.now()-t0)/1000;
-      lastRate=secs>0.3?tokEst/secs:0;
+      // THE SPEED IS THE WRITER'S (6b515, per Patrick: "2.5 tok/s" was the
+      // whole council's 127 seconds over the final length). Measured from
+      // the first character of the text on screen, after the last RESET.
+      lastChunkT=performance.now();
+      if(cut!==genCut){genCut=cut;genT0=0;}
+      if(full.length&&!genT0)genT0=lastChunkT;
+      const gsecs=genT0?(lastChunkT-genT0)/1000:0;
+      lastRate=gsecs>0.3?tokEst/gsecs:0;
       setToks(lastRate,"streaming");
       // a RESET replays the replacement ONCE, when it arrives (6b463, per
       // Patrick: "started streaming all over again while flickering").
@@ -45852,9 +46484,14 @@ async function send(){
     // a server model's name is its own, not a provider's (6b334):
     // "<server name> · gpt-oss:20b" never reads as the cloud
     const where=whereBadge(lastModels,srvWho);
+    // the writer's own pace when the server measured it (RATE), else the
+    // page's measure from the first character shown; the run's total beside it
+    const tps=(rateInfo&&rateInfo.tps>0)?rateInfo.tps:lastRate;
+    const wrote=(rateInfo&&rateInfo.s>0)?rateInfo.s
+      :(genT0?Math.max(0.1,(lastChunkT-genT0)/1000):secs);
     meta.innerHTML='<span class="wbadge">'+esc(where)+'</span>'
-      +"<b>"+lastRate.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
-      +" tokens · "+secs.toFixed(1)+"s";
+      +"<b>"+tps.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
+      +" tokens · wrote in "+wrote.toFixed(1)+"s · "+secs.toFixed(1)+"s total";
     aiDiv.appendChild(meta);
     const rec={role:"assistant",content:full};
     if(drafts.length)rec.drafts=drafts;
@@ -46206,7 +46843,7 @@ function chatHash(msgs,n){
 // handler in `on`), then only what follows the last RESET: what the
 // page shows, and what the server saves (turn_text() is its twin; 0b
 // L5, R-2-22, one corpus checks both)
-const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE";
+const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE";
 const FRAME_RX=new RegExp("\u0000("+FRAME_TAGS+"):(.*?)\u0000","g");
 const FRAME_PART=new RegExp("\u0000(?:"+FRAME_TAGS+"):[^\u0000]*$");
 function streamText(raw,on){
