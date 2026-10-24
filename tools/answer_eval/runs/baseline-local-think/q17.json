@@ -4,15 +4,15 @@
   "X-Accel-Buffering": "no",
   "X-Web-Search": "1",
   "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
-  "X-Eta": "{\"search\":14.0,\"models\":[86.8,60.0,53.0],\"final\":33.5,\"ftok\":394,\"est\":true}",
-  "X-Hurry": "6be2e439bc008b2f"
+  "X-Eta": "{\"search\":14.0,\"models\":[78.8,60.0,48.9],\"final\":29.6,\"ftok\":357,\"est\":true}",
+  "X-Hurry": "d7cc81eada03d7a4"
  },
- "first_byte_s": 2.77,
- "first_text_s": 123.08,
- "elapsed_s": 123.09,
+ "first_byte_s": 8.19,
+ "first_text_s": 128.71,
+ "elapsed_s": 128.71,
  "events": [
   {
-   "t": 2.77,
+   "t": 8.19,
    "tag": "STEP",
    "step": {
     "id": "search",
@@ -22,69 +22,65 @@
    }
   },
   {
-   "t": 2.77,
+   "t": 8.19,
    "tag": "SOURCES",
    "n": 4
   },
   {
-   "t": 2.77,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 22.79,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 42.83,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 62.85,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 82.86,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 102.89,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 122.93,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 123.08,
-   "tag": "DRAFT",
-   "m": "Qwen 3.8 27B",
-   "chars": 22
-  },
-  {
-   "t": 123.08,
+   "t": 8.21,
    "tag": "DRAFT",
    "m": "Qwen 3.6 35B MoE",
    "chars": 24
   },
   {
-   "t": 123.08,
+   "t": 8.21,
    "tag": "DRAFT",
    "m": "Gemma 4 26B",
    "chars": 24
   },
   {
-   "t": 123.08,
-   "tag": "FIRST_TEXT"
+   "t": 8.21,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
   },
   {
-   "t": 123.08,
+   "t": 28.22,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 48.25,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 68.26,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 88.29,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 108.32,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 128.35,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 128.71,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 128.71,
    "tag": "STEP",
    "step": {
     "id": "draft",
@@ -94,7 +90,11 @@
    }
   },
   {
-   "t": 123.08,
+   "t": 128.71,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 128.71,
    "tag": "STEP",
    "step": {
     "id": "polish",
@@ -106,32 +106,32 @@
  ],
  "statuses": [
   [
-   2.77,
-   "asking Qwen 3.8 27B · 1 of 3"
+   8.21,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   22.79,
-   "asking Qwen 3.8 27B · 1 of 3"
+   28.22,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   42.83,
-   "asking Qwen 3.8 27B · 1 of 3"
+   48.25,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   62.85,
-   "asking Qwen 3.8 27B · 1 of 3"
+   68.26,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   82.86,
-   "asking Qwen 3.8 27B · 1 of 3"
+   88.29,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   102.89,
-   "asking Qwen 3.8 27B · 1 of 3"
+   108.32,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   122.93,
-   "asking Qwen 3.8 27B · 1 of 3"
+   128.35,
+   "asking Qwen 3.8 27B · 1 of 1"
   ]
  ],
  "steps": [
@@ -140,70 +140,71 @@
    "l": "Searched the web",
    "s": "done",
    "d": "4 sources",
-   "t_s": 2.77
+   "t_s": 8.19
   },
   {
    "id": "draft",
    "l": "Answer written",
    "s": "done",
    "d": "272 chars",
-   "t_s": 123.08
+   "t_s": 128.71
   },
   {
    "id": "polish",
    "l": "Sharpened",
    "s": "done",
    "d": "",
-   "t_s": 123.08
+   "t_s": 128.71
   }
  ],
  "drafts": [
   {
-   "t_s": 123.08,
-   "m": "Qwen 3.8 27B",
-   "text": "(no answer — too slow)"
-  },
-  {
-   "t_s": 123.08,
+   "t_s": 8.21,
    "m": "Qwen 3.6 35B MoE",
    "text": "(no answer — low memory)"
   },
   {
-   "t_s": 123.08,
+   "t_s": 8.21,
    "m": "Gemma 4 26B",
    "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 128.71,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
   }
  ],
  "sources": [
   {
-   "t": "Best Neighborhoods in Florianopolis",
-   "u": "https://nomads.com/neighborhoods/florianopolis"
+   "t": "Florianópolis: The Expat Guide Updated (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-expat-guide"
   },
   {
-   "t": "The 49 best neighborhoods to see in Florianopolis",
-   "u": "https://wanderlog.com/list/geoCategory/150944/best-neighborhoods-to-see-in-florianopolis"
+   "t": "Living in Florianópolis: The 2026 Expat Guide | The Rio Times",
+   "u": "https://www.riotimesonline.com/living-in-florianopolis-expat-guide-2026/"
   },
   {
-   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
-   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/"
+   "t": "Where to Stay in Florianópolis by Neighborhoods",
+   "u": "https://www.thelocalescape.com/post/where-to-stay-in-florianópolis"
   },
   {
-   "t": "Where is the Best Place to Live in Florianópolis? | FloripaGuru Blog",
-   "u": "https://floripaguru.com/blog/best-areas-to-live-florianopolis"
+   "t": "Melhores bairros de Florianópolis para morar em 2026",
+   "u": "https://regenteimoveis.com.br/guia/bairros-de-florianopolis/melhores-bairros-florianopolis-para-morar/"
   }
  ],
  "photos": null,
- "run": "baseline-local-think",
+ "run_frames": [],
  "resets": 0,
  "truncated": false,
  "error": "",
  "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
  "searched": true,
+ "answer_raw": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "chars": 69,
- "raw_bytes": 1408,
+ "raw_bytes": 1407,
  "is_error_answer": true,
- "rate_ui_tok_s": 0.14,
+ "rate_ui_tok_s": 0.13,
  "rate_gen_tok_s": null,
  "id": "q17",
  "turn": 1,
@@ -212,7 +213,8 @@
  "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
  "tier": "Thinking",
  "config": "local-think",
- "asked_at": "2026-10-24T02:01:26",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T03:10:40",
  "request": {
   "model": "",
   "models": [],

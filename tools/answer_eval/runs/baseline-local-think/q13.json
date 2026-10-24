@@ -4,15 +4,15 @@
   "X-Accel-Buffering": "no",
   "X-Web-Search": "1",
   "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
-  "X-Eta": "{\"search\":14.0,\"models\":[89.5,61.9,55.8],\"final\":36.2,\"ftok\":393,\"est\":true}",
-  "X-Hurry": "61453f2035dc0f25"
+  "X-Eta": "{\"search\":14.0,\"models\":[82.7,60.1,49.3],\"final\":30.4,\"ftok\":382,\"est\":true}",
+  "X-Hurry": "fa46d50bd68ec1e3"
  },
- "first_byte_s": 4.78,
- "first_text_s": 125.06,
- "elapsed_s": 125.06,
+ "first_byte_s": 2.94,
+ "first_text_s": 123.36,
+ "elapsed_s": 123.36,
  "events": [
   {
-   "t": 4.78,
+   "t": 2.94,
    "tag": "STEP",
    "step": {
     "id": "search",
@@ -22,59 +22,69 @@
    }
   },
   {
-   "t": 4.78,
+   "t": 2.94,
    "tag": "SOURCES",
    "n": 4
   },
   {
-   "t": 4.8,
-   "tag": "DRAFT",
-   "m": "Qwen 3.6 35B MoE",
-   "chars": 24
-  },
-  {
-   "t": 4.8,
-   "tag": "DRAFT",
-   "m": "Gemma 4 26B",
-   "chars": 24
-  },
-  {
-   "t": 4.8,
+   "t": 2.97,
    "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 1"
+   "text": "asking Qwen 3.8 27B · 1 of 3"
   },
   {
-   "t": 29.79,
+   "t": 22.97,
    "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 1"
+   "text": "asking Qwen 3.8 27B · 1 of 3"
   },
   {
-   "t": 49.81,
+   "t": 42.99,
    "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 1"
+   "text": "asking Qwen 3.8 27B · 1 of 3"
   },
   {
-   "t": 94.25,
+   "t": 63.01,
    "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 1"
+   "text": "asking Qwen 3.8 27B · 1 of 3"
   },
   {
-   "t": 117.44,
+   "t": 83.03,
    "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 1"
+   "text": "asking Qwen 3.8 27B · 1 of 3"
   },
   {
-   "t": 125.06,
+   "t": 103.06,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 123.09,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 123.36,
    "tag": "DRAFT",
    "m": "Qwen 3.8 27B",
    "chars": 22
   },
   {
-   "t": 125.06,
+   "t": 123.36,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 123.36,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 123.36,
    "tag": "FIRST_TEXT"
   },
   {
-   "t": 125.06,
+   "t": 123.36,
    "tag": "STEP",
    "step": {
     "id": "draft",
@@ -84,7 +94,7 @@
    }
   },
   {
-   "t": 125.06,
+   "t": 123.36,
    "tag": "STEP",
    "step": {
     "id": "polish",
@@ -96,24 +106,32 @@
  ],
  "statuses": [
   [
-   4.8,
-   "asking Qwen 3.8 27B · 1 of 1"
+   2.97,
+   "asking Qwen 3.8 27B · 1 of 3"
   ],
   [
-   29.79,
-   "asking Qwen 3.8 27B · 1 of 1"
+   22.97,
+   "asking Qwen 3.8 27B · 1 of 3"
   ],
   [
-   49.81,
-   "asking Qwen 3.8 27B · 1 of 1"
+   42.99,
+   "asking Qwen 3.8 27B · 1 of 3"
   ],
   [
-   94.25,
-   "asking Qwen 3.8 27B · 1 of 1"
+   63.01,
+   "asking Qwen 3.8 27B · 1 of 3"
   ],
   [
-   117.44,
-   "asking Qwen 3.8 27B · 1 of 1"
+   83.03,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   103.06,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   123.09,
+   "asking Qwen 3.8 27B · 1 of 3"
   ]
  ],
  "steps": [
@@ -122,68 +140,69 @@
    "l": "Searched the web",
    "s": "done",
    "d": "4 sources",
-   "t_s": 4.78
+   "t_s": 2.94
   },
   {
    "id": "draft",
    "l": "Answer written",
    "s": "done",
    "d": "272 chars",
-   "t_s": 125.06
+   "t_s": 123.36
   },
   {
    "id": "polish",
    "l": "Sharpened",
    "s": "done",
    "d": "",
-   "t_s": 125.06
+   "t_s": 123.36
   }
  ],
  "drafts": [
   {
-   "t_s": 4.8,
+   "t_s": 123.36,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 123.36,
    "m": "Qwen 3.6 35B MoE",
    "text": "(no answer — low memory)"
   },
   {
-   "t_s": 4.8,
+   "t_s": 123.36,
    "m": "Gemma 4 26B",
    "text": "(no answer — low memory)"
-  },
-  {
-   "t_s": 125.06,
-   "m": "Qwen 3.8 27B",
-   "text": "(no answer — too slow)"
   }
  ],
  "sources": [
   {
-   "t": "Is Pizza Healthy? What a Dietitian Wants You to KnowIs Pizza Bad for You? A Look",
-   "u": "https://www.eatingwell.com/article/8055628/is-pizza-healthy/"
+   "t": "Good Pizza Vs. Bad Pizza: A Photo Guide | Thought Catalog",
+   "u": "https://thoughtcatalog.com/christopher-hudspeth/2013/06/good-pizza-vs-bad-pizza-a-photo-guide-2/"
   },
   {
-   "t": "Is Pizza Bad for You? A Look at the Nutritional Facts",
-   "u": "https://biologyinsights.com/is-pizza-bad-for-you-a-look-at-the-nutritional-facts/"
+   "t": "Is Hawaiian Pizza Actually Healthier Than Other Pizza?",
+   "u": "https://www.mashed.com/289461/is-hawaiian-pizza-actually-healthier-than-other-pizza/"
   },
   {
-   "t": "Is Pizza Healthy? Nutrition Tips for Pizza LoversWhy Is Pizza Bad for You? Blood",
-   "u": "https://www.healthline.com/nutrition/is-pizza-healthy"
+   "t": "How often is it OK to eat pizza?",
+   "u": "https://www.calendar-canada.ca/frequently-asked-questions/how-often-is-it-ok-to-eat-pizza"
   },
   {
-   "t": "Why Is Pizza Bad for You? Blood Sugar, Fat & More ...",
-   "u": "https://scienceinsights.org/why-is-pizza-bad-for-you-blood-sugar-fat-more/"
+   "t": "Chefs Weigh In: Is Chicago Deep Dish Pizza Really Pizza? | Eater",
+   "u": "https://www.eater.com/2014/3/21/6257627/chefs-weigh-in-is-chicago-deep-dish-pizza-really-pizza"
   }
  ],
  "photos": null,
- "run": "baseline-local-think",
+ "run_frames": [],
  "resets": 0,
  "truncated": false,
  "error": "",
  "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
  "searched": true,
+ "answer_raw": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "chars": 69,
- "raw_bytes": 1310,
+ "raw_bytes": 1422,
  "is_error_answer": true,
  "rate_ui_tok_s": 0.14,
  "rate_gen_tok_s": null,
@@ -194,7 +213,8 @@
  "question": "Is pizza actually bad for you? How often is fine?",
  "tier": "Thinking",
  "config": "local-think",
- "asked_at": "2026-10-24T01:49:57",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T03:04:16",
  "request": {
   "model": "",
   "models": [],

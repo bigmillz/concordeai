@@ -4,15 +4,15 @@
   "X-Accel-Buffering": "no",
   "X-Web-Search": "1",
   "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
-  "X-Eta": "{\"search\":14.0,\"models\":[85.2,60.1,51.9],\"final\":32.6,\"ftok\":406,\"est\":true}",
-  "X-Hurry": "9d7067ea452bf969"
+  "X-Eta": "{\"search\":14.0,\"models\":[77.8,60.1,49.5],\"final\":30.3,\"ftok\":367,\"est\":true}",
+  "X-Hurry": "00acefa613789981"
  },
- "first_byte_s": 4.17,
- "first_text_s": 124.6,
- "elapsed_s": 124.6,
+ "first_byte_s": 3.8,
+ "first_text_s": 124.32,
+ "elapsed_s": 124.32,
  "events": [
   {
-   "t": 4.17,
+   "t": 3.8,
    "tag": "STEP",
    "step": {
     "id": "search",
@@ -22,65 +22,60 @@
    }
   },
   {
-   "t": 4.17,
+   "t": 3.8,
    "tag": "SOURCES",
    "n": 4
   },
   {
-   "t": 4.19,
+   "t": 3.83,
    "tag": "DRAFT",
    "m": "Qwen 3.6 35B MoE",
    "chars": 24
   },
   {
-   "t": 4.19,
+   "t": 3.83,
    "tag": "DRAFT",
    "m": "Gemma 4 26B",
    "chars": 24
   },
   {
-   "t": 4.19,
+   "t": 3.83,
    "tag": "STATUS",
    "text": "asking Qwen 3.8 27B · 1 of 1"
   },
   {
-   "t": 24.19,
+   "t": 28.82,
    "tag": "STATUS",
    "text": "asking Qwen 3.8 27B · 1 of 1"
   },
   {
-   "t": 44.23,
+   "t": 48.85,
    "tag": "STATUS",
    "text": "asking Qwen 3.8 27B · 1 of 1"
   },
   {
-   "t": 64.26,
+   "t": 68.88,
    "tag": "STATUS",
    "text": "asking Qwen 3.8 27B · 1 of 1"
   },
   {
-   "t": 84.28,
+   "t": 88.91,
    "tag": "STATUS",
    "text": "asking Qwen 3.8 27B · 1 of 1"
   },
   {
-   "t": 104.29,
+   "t": 108.93,
    "tag": "STATUS",
    "text": "asking Qwen 3.8 27B · 1 of 1"
   },
   {
-   "t": 124.33,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 1"
-  },
-  {
-   "t": 124.6,
+   "t": 124.32,
    "tag": "DRAFT",
    "m": "Qwen 3.8 27B",
    "chars": 22
   },
   {
-   "t": 124.6,
+   "t": 124.32,
    "tag": "STEP",
    "step": {
     "id": "draft",
@@ -90,7 +85,7 @@
    }
   },
   {
-   "t": 124.6,
+   "t": 124.32,
    "tag": "STEP",
    "step": {
     "id": "polish",
@@ -100,37 +95,33 @@
    }
   },
   {
-   "t": 124.6,
+   "t": 124.32,
    "tag": "FIRST_TEXT"
   }
  ],
  "statuses": [
   [
-   4.19,
+   3.83,
    "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   24.19,
+   28.82,
    "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   44.23,
+   48.85,
    "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   64.26,
+   68.88,
    "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   84.28,
+   88.91,
    "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   104.29,
-   "asking Qwen 3.8 27B · 1 of 1"
-  ],
-  [
-   124.33,
+   108.93,
    "asking Qwen 3.8 27B · 1 of 1"
   ]
  ],
@@ -140,36 +131,36 @@
    "l": "Searched the web",
    "s": "done",
    "d": "4 sources",
-   "t_s": 4.17
+   "t_s": 3.8
   },
   {
    "id": "draft",
    "l": "Answer written",
    "s": "done",
    "d": "272 chars",
-   "t_s": 124.6
+   "t_s": 124.32
   },
   {
    "id": "polish",
    "l": "Sharpened",
    "s": "done",
    "d": "",
-   "t_s": 124.6
+   "t_s": 124.32
   }
  ],
  "drafts": [
   {
-   "t_s": 4.19,
+   "t_s": 3.83,
    "m": "Qwen 3.6 35B MoE",
    "text": "(no answer — low memory)"
   },
   {
-   "t_s": 4.19,
+   "t_s": 3.83,
    "m": "Gemma 4 26B",
    "text": "(no answer — low memory)"
   },
   {
-   "t_s": 124.6,
+   "t_s": 124.32,
    "m": "Qwen 3.8 27B",
    "text": "(no answer — too slow)"
   }
@@ -193,15 +184,16 @@
   }
  ],
  "photos": null,
- "run": "baseline-local-think",
+ "run_frames": [],
  "resets": 0,
  "truncated": false,
  "error": "",
  "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
  "searched": true,
+ "answer_raw": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "chars": 69,
- "raw_bytes": 1350,
+ "raw_bytes": 1312,
  "is_error_answer": true,
  "rate_ui_tok_s": 0.14,
  "rate_gen_tok_s": null,
@@ -212,7 +204,8 @@
  "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
  "tier": "Thinking",
  "config": "local-think",
- "asked_at": "2026-10-24T02:20:44",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T03:21:23",
  "request": {
   "model": "",
   "models": [],

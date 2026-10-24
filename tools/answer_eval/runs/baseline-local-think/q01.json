@@ -4,15 +4,15 @@
   "X-Accel-Buffering": "no",
   "X-Web-Search": "1",
   "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
-  "X-Eta": "{\"search\":14.0,\"models\":[35.0,60.0,60.0],\"final\":40.4,\"ftok\":450,\"est\":true}",
-  "X-Hurry": "be19d752a5400573"
+  "X-Eta": "{\"search\":14.0,\"models\":[35.1,60.1,60.1],\"final\":40.5,\"ftok\":450,\"est\":true}",
+  "X-Hurry": "d5fd4f9580232e14"
  },
- "first_byte_s": 9.42,
- "first_text_s": 129.92,
- "elapsed_s": 129.92,
+ "first_byte_s": 5.22,
+ "first_text_s": 125.63,
+ "elapsed_s": 125.63,
  "events": [
   {
-   "t": 9.42,
+   "t": 5.22,
    "tag": "STEP",
    "step": {
     "id": "search",
@@ -22,64 +22,64 @@
    }
   },
   {
-   "t": 9.42,
+   "t": 5.22,
    "tag": "SOURCES",
    "n": 4
   },
   {
-   "t": 9.44,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 34.43,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 54.43,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 74.45,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 94.47,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 114.48,
-   "tag": "STATUS",
-   "text": "asking Qwen 3.8 27B · 1 of 3"
-  },
-  {
-   "t": 129.92,
-   "tag": "DRAFT",
-   "m": "Qwen 3.8 27B",
-   "chars": 22
-  },
-  {
-   "t": 129.92,
+   "t": 5.25,
    "tag": "DRAFT",
    "m": "Qwen 3.6 35B MoE",
    "chars": 24
   },
   {
-   "t": 129.92,
+   "t": 5.25,
    "tag": "DRAFT",
    "m": "Gemma 4 26B",
    "chars": 24
   },
   {
-   "t": 129.92,
+   "t": 5.25,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 30.25,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 50.27,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 70.3,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 90.33,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 110.36,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 125.63,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 125.63,
    "tag": "FIRST_TEXT"
   },
   {
-   "t": 129.92,
+   "t": 125.63,
    "tag": "STEP",
    "step": {
     "id": "draft",
@@ -89,7 +89,7 @@
    }
   },
   {
-   "t": 129.92,
+   "t": 125.63,
    "tag": "STEP",
    "step": {
     "id": "polish",
@@ -101,28 +101,28 @@
  ],
  "statuses": [
   [
-   9.44,
-   "asking Qwen 3.8 27B · 1 of 3"
+   5.25,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   34.43,
-   "asking Qwen 3.8 27B · 1 of 3"
+   30.25,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   54.43,
-   "asking Qwen 3.8 27B · 1 of 3"
+   50.27,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   74.45,
-   "asking Qwen 3.8 27B · 1 of 3"
+   70.3,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   94.47,
-   "asking Qwen 3.8 27B · 1 of 3"
+   90.33,
+   "asking Qwen 3.8 27B · 1 of 1"
   ],
   [
-   114.48,
-   "asking Qwen 3.8 27B · 1 of 3"
+   110.36,
+   "asking Qwen 3.8 27B · 1 of 1"
   ]
  ],
  "steps": [
@@ -131,70 +131,71 @@
    "l": "Searched the web",
    "s": "done",
    "d": "4 sources",
-   "t_s": 9.42
+   "t_s": 5.22
   },
   {
    "id": "draft",
    "l": "Answer written",
    "s": "done",
    "d": "272 chars",
-   "t_s": 129.92
+   "t_s": 125.63
   },
   {
    "id": "polish",
    "l": "Sharpened",
    "s": "done",
    "d": "",
-   "t_s": 129.92
+   "t_s": 125.63
   }
  ],
  "drafts": [
   {
-   "t_s": 129.92,
-   "m": "Qwen 3.8 27B",
-   "text": "(no answer — too slow)"
-  },
-  {
-   "t_s": 129.92,
+   "t_s": 5.25,
    "m": "Qwen 3.6 35B MoE",
    "text": "(no answer — low memory)"
   },
   {
-   "t_s": 129.92,
+   "t_s": 5.25,
    "m": "Gemma 4 26B",
    "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 125.63,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
   }
  ],
  "sources": [
   {
-   "t": "Sign in to Claude, Anthropic's AI assistant for problem solvers.",
-   "u": "https://claude.ai/"
+   "t": "GPU vs TPU vs LPU vs NPU: The 2026 Accelerator Comparison ...",
+   "u": "https://clusterbid.com/blog/gpu-vs-tpu-vs-lpu-vs-npu-comparison-guide"
   },
   {
-   "t": "Unlimited Claude AI Pro for Free - No Signup or Login - Veo AI Free",
-   "u": "https://veoaifree.com/claude/"
+   "t": "GPU Leaderboard 2026 — TFLOPS/$, Bandwidth/$, TFLOPS/Watt",
+   "u": "https://www.computecomparison.com/gpu-leaderboard"
   },
   {
-   "t": "What is Claude AI? Anthropic's LLM vs ChatGPT | Pluralsight",
-   "u": "https://www.pluralsight.com/resources/blog/ai-and-data/what-is-claude-ai"
+   "t": "Computer Chip Rankings 2026 — Top AI Chips, CPUs, GPUs & Acc",
+   "u": "https://chip.computer/rankings"
   },
   {
-   "t": "How to Use Claude AI? | A to Z Guide to Claude... - YouTube",
-   "u": "https://www.youtube.com/watch?v=HR-JauWHQMM"
+   "t": "TPU vs GPU Compared for AI Training and Inference",
+   "u": "https://telnyx.com/resources/tpu-vs-gpu"
   }
  ],
  "photos": null,
- "run": "baseline-local-think",
+ "run_frames": [],
  "resets": 0,
  "truncated": false,
  "error": "",
  "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
  "searched": true,
+ "answer_raw": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
  "chars": 69,
- "raw_bytes": 1225,
+ "raw_bytes": 1238,
  "is_error_answer": true,
- "rate_ui_tok_s": 0.13,
+ "rate_ui_tok_s": 0.14,
  "rate_gen_tok_s": null,
  "id": "q01",
  "turn": 1,
@@ -203,7 +204,8 @@
  "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
  "tier": "Thinking",
  "config": "local-think",
- "asked_at": "2026-10-24T01:08:01",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T02:46:40",
  "request": {
   "model": "",
   "models": [],
