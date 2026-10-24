@@ -86,7 +86,21 @@ def main():
             print("- drafts skipped: " + "; ".join("%dx %s (%s)" % (n, m, why) for (m, why), n in skipped.most_common()))
         resets = sum(r.get("resets", 0) for r in recs)
         if resets:
-            print("- RESET frames (a merge collapsed mid-stream): %d" % resets)
+            # a merge that collapsed mid-stream, or (6b515) the fact-check re-sending a corrected answer
+            print("- RESET frames (a collapsed merge, or a fact-check's corrected re-send): %d" % resets)
+        ver = [s.get("l", "") for r in recs for s in r.get("steps") or []
+               if isinstance(s, dict) and s.get("id") == "verify" and s.get("s") == "done"]
+        if ver:
+            fixed = sum(1 for v in ver if "fixed" in v)
+            late = sum(1 for v in ver if "in time" in v)
+            print("- fact-check (6b515): ran %d, changed the answer %d, held %d, out of time %d"
+                  % (len(ver), fixed, len(ver) - fixed - late, late))
+        rates = [r["rate_writer"]["tps"] for r in recs if isinstance(r.get("rate_writer"), dict)
+                 and r["rate_writer"].get("tps")]
+        if rates:
+            rates.sort()
+            print("- the final writer's own pace (RATE, 6b515): median %.1f tok/s over %d answers"
+                  % (rates[len(rates) // 2], len(rates)))
         print()
 
 
