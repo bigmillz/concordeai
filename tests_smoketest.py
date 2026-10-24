@@ -19755,7 +19755,7 @@ def _bm_srv_ns(src):
         i = src.index(start)
         return src[i:src.index(end, i)]
     for part in ("class ServerError(RuntimeError):", "class ServerSlow(ServerError):", "def _srv_span(",
-                 "def _srv_js(", "def _srv_fail(", "def _srv_fail_why(", "def ollama_internal(",
+                 "def _srv_js(", "def _srv_fail(", "def srv_note_nofit(", "def _srv_fail_why(", "def ollama_internal(",
                  "_OLLAMA_INTERNAL_PREFIXES = ", "_OLLAMA_SHA_TAG = ", "SERVER_SEP = ", "SRV_CONNECT_S = "):
         exec(piece(part, "\n\n\n" if part.startswith(("class", "def")) else "\n"), ns)
     exec(piece("SRV_PAIR_LOST = ", "\n\n"), ns)       # two lines each, with SRV_NO_CRYPTO under it
@@ -21367,13 +21367,13 @@ _SV_MUT = [
     ("no retry after a replay", '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew", "replay"):',
      '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew",):'),
     ("the server's clock ignored", "        skew = float(js.get(\"server_time\")) - time.time()", "        skew = 0.0"),
-    ("retried forever", "        for attempt in (0, 1):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\"",
+    ("retried forever", "        for attempt in (0, 1, 2):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\"",
      "        for attempt in (0, 0, 0):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\""),
     ("an error line read as text", '                if obj.get("error"):\n                    # a failure after the 200 is the stream\'s last line\n                    raise _srv_fail(e, 0, obj, model)',
      '                if False:\n                    raise _srv_fail(e, 0, obj, model)'),
     ("the whole turn sent", '        t = {"role": m["role"], "content": str(m.get("content") or "")}', '        t = dict(m)'),
-    ("keep_alive sent", '"stream": True,\n                       "options": dict({"temperature": 0.75},',
-     '"stream": True, "keep_alive": "45s",\n                       "options": dict({"temperature": 0.75},'),
+    ("keep_alive sent", '"stream": True,\n                           "options": dict({"temperature": 0.75},',
+     '"stream": True, "keep_alive": "45s",\n                           "options": dict({"temperature": 0.75},'),
     ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0)', 'usage_note(label, "local", messages, sent[0], last, t0)'),
     ("a guess for an unknown placement", '"placement": pl if pl in ("gpu", "gpu+ram") else "unknown",', '"placement": pl if pl in ("gpu", "gpu+ram") else "gpu",'),
     ("embeddings offered", ' or "embed" in n.lower() \\\n', ' \\\n'),
@@ -23090,6 +23090,7 @@ def _p2_council(src, run_model, **over):
           # a server marked down is down (6b339, final review), by the name before the separator
           "server_label_down": lambda ctx, label: label.split(" \u00b7 ", 1)[0] in {d[0] for d in downs}}
     ns.update(over)
+    exec(src[src.index("def ground_clip("):src.index("def _ground_key(")], ns)   # the checker's cut (6b516)
     exec(rc, ns)
     ns["_downs"] = downs
     return ns, calls
@@ -23441,12 +23442,15 @@ def _p2c_pins(src):
         and "                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):" in rc
         and "hurry=None, srv_first_s=None, srv_merge=False,\n                craft: bool = False, report=None) -> None:" in rc
         and "                            srv_first_s=(60.0 if _seat_fb else None),\n"
+            "                            # Thinking: one writer, a critic, a checked final (6b515)\n"
+            "                            craft=(tier == \"Thinking\" or (\n"
+            "                                _srv_only and _so_mode == \"Thinking\")),\n"
             "                            srv_merge=(tier in TIERS and not cloud_only))" in ch,
         "council caps": "                _capped(label, lambda _l=label, _p=parts: run_model(" in rc
         and "            _capped(merger, lambda: run_model(merger, [" in rc
         and "        with server_first_deadline(srv_first_s if server_label(merger)\n                                   else None):" in rc
         and "            if on_server:\n                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0]," in rc
-        and "                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                 str(_err[0]))" in rc,
+        and "                else:\n                    server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                     str(_err[0]))" in rc,
         "merge on the server": "    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES and _pen_kind != \"local\":" in rc
         and "                # the server didn't write it: this computer's copy does" in rc,
         "page badge": '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
@@ -23790,7 +23794,8 @@ def _p6c_page(src):
         "frame read": '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
         "modes only": "                            srv_merge=(tier in TIERS and not cloud_only))" in ch
         and "    if srv_merge and comp not in MODEL_ROUTES and not cloud_only and _pen_kind != \"local\":\n" in src,
-        "cloud first": src.index("    elif cloud_allowed():\n        if _walk_ladder():\n            return\n    run_mark(compositor=merger)\n    if _merge_srv is not None:")
+        "cloud first": src.index("    elif cloud_allowed():\n        if _walk_ladder():\n            return _done()\n    run_mark(compositor=merger)\n"
+                                 "    report[\"writer\"] = merger\n    if _merge_srv is not None:")
         > 0,
     }
     return all(got.values()), [got, o]
@@ -24335,8 +24340,8 @@ _P2_MUT = [
     ("a council's reflection uncapped", '            _capped(merger, lambda: run_model(merger, [', '            (lambda f: f())(lambda: run_model(merger, ['),
     ("a server merge with no deadline", '        with server_first_deadline(srv_first_s if server_label(merger)\n                                   else None):', '        if True:'),
     ("a seat's draft with no deadline", '                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):', '                if True:'),
-    ("a failed server draft not marked down", '                _srv_errs.append(str(_err[0]))     # said if none answers\n                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                 str(_err[0]))',
-     '                _srv_errs.append(str(_err[0]))     # said if none answers'),
+    ("a failed server draft not marked down", '                else:\n                    server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                     str(_err[0]))',
+     '                else:\n                    pass'),
     ("the saved OFF not counted", 'd.get("cloud") is not False and _saved_cloud\n                         and cloud_allowed())', 'd.get("cloud") is not False\n                         and cloud_allowed())'),
     ("the flag read from the page only", '            use_cloud = (d.get("cloud") is not False and _saved_cloud\n                         and cloud_allowed())', '            use_cloud = cloud_allowed()'),
     ("the flag not sent", '        cloud:fnCloudLoaded?fnCloudOn:undefined,\n        after_len:fn', '        after_len:fn'),
@@ -24926,8 +24931,8 @@ _SM_MUT = [
      "                            comp=req_comp,\n"),
     ("run_council not told", "                            hurry=hurry_ev, srv_only=_srv_only,\n",
      "                            hurry=hurry_ev,\n"),
-    ("no double-check", '                                _srv_only and _so_mode == "Thinking")),',
-     "                                False)),"),
+    ("no double-check", '                            reflect=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),',
+     '                            reflect=(tier == "Thinking" or (\n                                False)),'),
     ("the wake without seats", "                _w_seats = (server_mode_resolve(_so_wake, _so_mode, self.ctx)\n"
      "                            if _so_mode else [])", "                _w_seats = []"),
     ("the header naming the cloud", "        if (len(council) > 1 and cloud_allowed() and not _srv_only\n",
@@ -37165,6 +37170,45 @@ check("a refusal of the model, not the server: the server stays up, the gpu_fit 
       and "while (critic_lbl and labels and labels[0] in _model_fail and not _hurried()" in _rc16
       and _rc16.index("while (critic_lbl and labels") < _rc16.index("    for _lbl in _unasked:")
       and '    if code == "gpu_fit":\n        srv_note_nofit(e, model)\n' in _MILLENAI_SRC, "")
+
+# THE SERVER'S CONTEXT, AN EMPTY FINAL WRITER, THE CRITIC'S NOTES (6b516): the bench's quality-1 run had two
+# empty answers (a ~31 KB final prompt in the gateway's default 8,192 tokens) and the craft run's judges
+# traced inventions to the critic's MISSING notes ("add celebrity examples").
+_cx16 = {}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("SRV_CTX_DEFAULT = 8192"):_MILLENAI_SRC.index("def server_stream(")], _cx16)
+_f16 = _cx16["srv_ctx_for"]
+check("a server request asks for the context its prompt needs: none up to the gateway's 8,192, then 4,096 steps, at most 32K",
+      _f16([{"role": "user", "content": "x" * 3000}]) == 0
+      and _f16([{"role": "system", "content": "s" * 10500}, {"role": "user", "content": "u" * 20500}]) == 16384
+      and _f16([{"role": "user", "content": "u" * 400000}]) == 32768
+      and _f16([{"role": "user", "content": "u" * 15000}], max_tokens=200) == 0
+      and _f16(None) == 0, "%r" % [_f16([{"role": "user", "content": "u" * 20500}])])
+_ss16 = _MILLENAI_SRC[_MILLENAI_SRC.index("def server_stream("):_MILLENAI_SRC.index("def _srv_reads_pictures(")]
+check("the longer context is asked for and, if the card can't hold it, dropped for the gateway's own (never noted as too big)",
+      "_ctx = srv_ctx_for(messages, max_tokens)" in _ss16 and '**({"num_ctx": int(ctx)} if ctx else {}))' in _ss16
+      and 'if _ctx and js.get("code") == "gpu_fit":' in _ss16
+      and _ss16.index('if _ctx and js.get("code") == "gpu_fit":') < _ss16.index("raise _srv_fail(e, resp.status, js, model)"), "")
+check("an empty final writer leaves the best draft standing, checked; the critic names angles, never specifics",
+      'if good and not "".join(_shown).strip():' in _rc16
+      and _rc16.index('if good and not "".join(_shown).strip():') < _rc16.index("verify_pass(\"\".join(_shown).strip()")
+      and "never supply a figure, name, example, study" in _MILLENAI_SRC
+      and "Never invent a figure, name, example or source to satisfy" in _MILLENAI_SRC, "")
+_af16 = {"re": re, "json": json}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("_CLAIM_RX = re.compile("):_MILLENAI_SRC.index("def verify_answer(")], _af16)
+_ans16 = ("Rent runs R$4,000 a month in Lagoa [2]. Because a lease may involve deposits, landlords vary.\n"
+          "- **Bus**: Line 330 runs every 10 minutes.\n- Amazon ships to Bolivia and Peru.")
+_t16, _c16, _x16 = _af16["apply_fixes"](_ans16, [
+    {"claim": "Rent runs R$4,000 a month in Lagoa", "verdict": "unsupported", "fix": "Rent varies in Lagoa"},
+    {"claim": "a lease may involve deposits", "verdict": "unsupported",
+     "fix": "a lease may involve deposits, but no source addresses this"},
+    {"claim": "Line 330 runs every 10 minutes.", "verdict": "unsupported", "fix": ""},
+    {"claim": "Amazon ships to Bolivia and Peru.", "verdict": "wrong",
+     "fix": "Amazon ships to Peru (no evidence supports Bolivia)."}])
+check("the fact-check replaces whole sentences only, and never with a line about its sources",
+      _x16 == 2 and "Rent varies in Lagoa [2]." in _t16 and "Line 330" not in _t16 and "- **Bus**:" not in _t16
+      and "no source" not in _t16 and "no evidence" not in _t16 and "Bolivia and Peru." in _t16
+      and "a lease may involve deposits, landlords vary." in _t16
+      and "never mentioning sources, evidence or this" in _MILLENAI_SRC, "%r" % [_t16, _x16])
 # ==== quality-1 (6b516): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks

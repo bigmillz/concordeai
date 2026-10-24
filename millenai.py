@@ -22003,6 +22003,31 @@ def _srv_messages(messages: list) -> list:
     return out
 
 
+# THE SERVER'S CONTEXT FOLLOWS THE PROMPT (6b516): the gateway gives every
+# request 8,192 tokens unless it asks for more (ollama1 PROTOCOL.md:
+# options.num_ctx, default 8192), and the app never asked. Grounded evidence
+# (6b514, ~9 KB), the final writer's brief and its uncut draft (6b515) made
+# the final prompt ~31 KB, about 8K tokens: gpt-oss spent what was left on
+# its reasoning and two bench answers came back empty. A prompt that, with
+# room to answer, doesn't fit 8,192 asks for the context that holds it.
+SRV_CTX_DEFAULT = 8192
+SRV_CTX_MAX = 32768
+SRV_CTX_REPLY = 3072        # room to answer (gpt-oss reasons before it writes)
+
+
+def srv_ctx_for(messages, max_tokens: int = 0) -> int:
+    """The num_ctx a server request asks for: 0 (the gateway's 8,192) when
+    the prompt, at a cautious 3 characters a token, and room to answer fit
+    it; else the context that holds them, in 4,096 steps, at most
+    SRV_CTX_MAX."""
+    chars = sum(len(str(m.get("content") or "")) for m in messages or []
+                if isinstance(m, dict))
+    need = chars // 3 + (int(max_tokens) if max_tokens else SRV_CTX_REPLY) + 256
+    if need <= SRV_CTX_DEFAULT:
+        return 0
+    return min(SRV_CTX_MAX, -(-need // 4096) * 4096)
+
+
 def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict:
     """Stream one answer from the thread's profile's server model `label`,
     signed, calling emit(text) as it arrives. Ollama's last line comes
@@ -22018,11 +22043,16 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
         raise ServerError("crypto", SRV_NO_CRYPTO)
     import http.client as _hc
     import socket as _socket
-    body = json.dumps({"model": model, "messages": _srv_messages(messages),
-                       "stream": True,
-                       "options": dict({"temperature": 0.75},
-                                       **({"num_predict": int(max_tokens)} if max_tokens else {}))},
-                      separators=(",", ":")).encode("utf-8")
+    _ctx = srv_ctx_for(messages, max_tokens)
+
+    def _body(ctx):
+        return json.dumps({"model": model, "messages": _srv_messages(messages),
+                           "stream": True,
+                           "options": dict({"temperature": 0.75},
+                                           **({"num_predict": int(max_tokens)} if max_tokens else {}),
+                                           **({"num_ctx": int(ctx)} if ctx else {}))},
+                          separators=(",", ":")).encode("utf-8")
+    body = _body(_ctx)
     t0, sent, last, got_any = time.time(), [0], {}, [False]
     # an explicit pick and "<name> Only" wait as long as a model load takes
     # (minutes); a mode's server seat or a funnel asks for a short first-token
@@ -22031,7 +22061,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
     _first = getattr(_srv_first, "s", None) or SRV_FIRST_S
     try:
         skew = _srv_skew(e)
-        for attempt in (0, 1):
+        for attempt in (0, 1, 2):
             conn, resp = _srv_send(e, "POST", "/api/chat", body, True,
                                    SRV_CONNECT_S, skew, wait=_first)
             if resp.status == 200:
@@ -22046,6 +22076,12 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
             if attempt == 0 and resp.status == 401 and js.get("code") in (
                     "clock_skew", "replay"):
                 skew = _srv_note_skew(e, js)
+                continue
+            if _ctx and js.get("code") == "gpu_fit":
+                # the card can't hold the longer context (6b516): the
+                # gateway's own, and the model is NOT noted as too big
+                _ctx = 0
+                body = _body(0)
                 continue
             raise _srv_fail(e, resp.status, js, model)
         try:
@@ -28570,7 +28606,7 @@ def run_council(labels: list, messages: list, emit, status,
         with _run_lock:
             _started[0] += 1
             _nth = _started[0]
-        status(f"asking {label} · {_nth} of {len(labels)}")
+        status(f"asking {label} · {_nth} of {max(len(labels), _nth)}")
         parts = []
         _err = []
         _stop = threading.Event()
@@ -28750,6 +28786,15 @@ def run_council(labels: list, messages: list, emit, status,
 
     def _done():
         report["hurried"] = _hurried()
+        if good and not "".join(_shown).strip():
+            # the final writer streamed nothing visible (6b516: two bench
+            # answers came back empty): the best draft stands, and is checked
+            try:
+                emit(good[0][1])
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                pass
         try:
             verify_pass("".join(_shown).strip(), report, messages, _emit0,
                         status, _step_frame, _cloud_open)
@@ -29301,7 +29346,11 @@ def final_prompt(sys_msg, question: str, drafts: list, notes: str = "",
          % (n, "" if n == 1 else "s", body)
          + ("\n\n=== REVIEW NOTES: a careful reviewer flagged these "
             "problems in the material; the final answer must fix them "
-            "without mentioning the review ===\n" + notes if notes else "")
+            "without mentioning the review. A wrong or unsupported claim is "
+            "corrected from the evidence or dropped; a missing angle is "
+            "covered only with what the evidence states or you are certain "
+            "of. Never invent a figure, name, example or source to satisfy "
+            "a note: skip a note you can't satisfy ===\n" + notes if notes else "")
          + "\n\nWrite the final answer now, following the brief.")
     return [brief_system(sys_msg, now), {"role": "user", "content": u}]
 
@@ -29319,8 +29368,10 @@ CRITIC_INSTRUCTION = (
     "hourly rate), or two facts fused into one.\n"
     "- STALE: a 'current' or 'latest' claim that the evidence or today's "
     "date says has moved on.\n"
-    "- MISSING: an angle the question needs that the draft skipped. Say "
-    "what to add, in one line.\n"
+    "- MISSING: an angle the question needs that the draft skipped. Name "
+    "the angle in one line; never supply a figure, name, example, study "
+    "or source to put in it (6b516: the writer invented whatever a note "
+    "asked for).\n"
     "No praise, no rewrite, no preamble. If the draft is sound, reply "
     "exactly: No problems found."
 )
@@ -29375,7 +29426,8 @@ VERIFY_INSTRUCTION = (
     "character for character>\", \"verdict\": \"ok\" | \"wrong\" | "
     "\"unsupported\", \"fix\": \"<for wrong or unsupported: the sentence "
     "rewritten so that it is true, or softened to what is actually known, "
-    "in the answer's own voice; an empty string to delete it>\"}. For ok "
+    "in the answer's own voice, never mentioning sources, evidence or this "
+    "check; an empty string to delete it>\"}. Copy whole sentences only. For ok "
     "the fix is \"\". No prose before or after the array, no code fence."
 )
 _CLAIM_RX = re.compile(
@@ -29384,6 +29436,29 @@ _SENT_RX = re.compile(r"(?<=[.!?])\s+|\n+")
 _FIX_META_RX = re.compile(
     r"\b(?:the )?(?:draft|material|evidence block|fact[- ]check(?:er)?|"
     r"reviewer|the answer above)\b", re.I)
+# A FIX THAT TALKS ABOUT ITS SOURCES (6b516): the checker softened claims to
+# "(no evidence supports Bolivia)" and "but no source addresses this", which
+# the grounding rules ban ("never describe your own data access") and which
+# read as machinery. Refused unless the claim itself said it.
+_FIX_SOURCE_RX = re.compile(
+    r"\b(?:no|any|the|these|those|provided|listed|available|cited) "
+    r"(?:sources?|evidence)\b|\bevidence\b|\bsources? (?:provided|listed|"
+    r"above|here|given)\b|\b(?:not|isn['\u2019]t|aren['\u2019]t) (?:supported|"
+    r"confirmed|verified|backed) by\b", re.I)
+
+
+def _whole_sentence(text: str, i: int, j: int) -> bool:
+    """Whether text[i:j] stands as a sentence (6b516): it starts the text, a
+    line, a bullet, a bold label or follows a sentence's end, and it ends
+    one. A clause replaced inside a sentence left fragments like
+    "specifics., but no source addresses this,"."""
+    before = text[:i].rstrip(" \t*_\u202f")
+    if before and before[-1] not in ".!?:\n-\u2022)>":
+        return False
+    after = text[j:].lstrip(" \t*_)\"\u201d\u2019\u202f")
+    claim = text[i:j].rstrip(" *_)\"\u201d\u2019")
+    return (not after or after[0] in "\n.!?;" or claim[-1:] in ".!?;:"
+            or bool(re.match(r"(?:\[\d+\])+\s*[.!?]?(?:\s|$)", after)))
 
 
 def claim_count(text: str) -> int:
@@ -29452,8 +29527,8 @@ def _tidy_fixed(text: str) -> str:
             out.append(ln)
             continue
         s = ln.rstrip()
-        if re.fullmatch(r"\s*(?:[-*\u2022]|\d+[.)])\s*(?:\*\*\s*\*\*)?\s*", s):
-            continue              # a bullet whose sentence was deleted
+        if re.fullmatch(r"\s*(?:[-*\u2022]|\d+[.)])\s*(?:\*\*[^*\n]{0,48}\*\*\s*:?)?\s*", s):
+            continue              # a bullet whose sentence was deleted (its label too, 6b516)
         s = re.sub(r"(?<=\S)  +(?=\S)", " ", s)
         s = re.sub(r"\s+([.,;:!?])", r"\1", s)
         out.append(s)
@@ -29488,6 +29563,8 @@ def apply_fixes(answer: str, items) -> tuple:
             continue
         if fix == claim:
             continue
+        if fix and _FIX_SOURCE_RX.search(fix) and not _FIX_SOURCE_RX.search(claim):
+            continue          # talks about its sources (6b516)
         i = text.find(claim)
         if i >= 0:
             j = i + len(claim)
@@ -29497,6 +29574,8 @@ def apply_fixes(answer: str, items) -> tuple:
             if not m:
                 continue
             i, j = m.start(), m.end()
+        if not _whole_sentence(text, i, j):
+            continue          # a clause: replacing it breaks the sentence (6b516)
         text = text[:i] + fix + text[j:]
         fixed += 1
     if fixed:
