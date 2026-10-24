@@ -36459,7 +36459,8 @@ def _c515_helpers(src):
     got["the brief, once, dated today"] = (b["content"].startswith("SYS\n\n") and "THE BRIEF FOR THIS ANSWER" in b["content"]
                                            and ns["brief_system"](b)["content"].count("THE BRIEF FOR THIS ANSWER") == 1
                                            and today in b["content"] and "Never say that you know who they are" in b["content"]
-                                           and "a single chip is not a board" in b["content"])
+                                           and "a single chip is not a board" in b["content"]
+                                           and "except a LENGTH instruction" in b["content"])
     fp = ns["final_prompt"]({"role": "system", "content": "SYS"}, "QBLOCK What you just found on the web", ["d1 " * 50, "d2"],
                             "note A\nnote B", cut=40)
     u = fp[1]["content"]
@@ -36669,7 +36670,9 @@ def _c515_pins(src):
             'craft=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),\n'
             "                            srv_merge=(tier in TIERS and not cloud_only))" in ch,
         "the roster": "    if craft and not max_mode and len(labels) >= 2:\n        critic_lbl = labels[1]\n"
-                      "        labels = labels[:1]\n" in rc,
+                      "        _unasked = labels[2:]            # said in the ledger, never asked\n"
+                      "        labels = labels[:1]\n" in rc
+                      and '        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")' in rc,
         "every way out of the stage is checked": rc.count("return _done()") >= 9
                                                   and "        verify_pass(\"\".join(_shown).strip(), report, messages, _emit0,\n" in rc,
         "the final prompt and its cuts": "    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)\n" in rc

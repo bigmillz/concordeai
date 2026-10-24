@@ -27151,9 +27151,10 @@ def run_council(labels: list, messages: list, emit, status,
     # drafts took 58 of 127 seconds and the merge stitched their stale
     # claims together. In craft mode the strongest seat alone drafts; the
     # next seat reads that draft as a critic (below), and never drafts.
-    critic_lbl = ""
+    critic_lbl, _unasked = "", []
     if craft and not max_mode and len(labels) >= 2:
         critic_lbl = labels[1]
+        _unasked = labels[2:]            # said in the ledger, never asked
         labels = labels[:1]
 
     def _step_frame(sid, label, state="run", detail=""):
@@ -27461,6 +27462,13 @@ def run_council(labels: list, messages: list, emit, status,
         if _hurried():
             _deadline = min(_deadline, time.time() + 5)
 
+    for _lbl in _unasked:
+        # the seats craft never asks (6b515): a greyed chip says why, so the
+        # ledger reads "2 of 3" with the reason instead of a model gone
+        # missing (after the drafts, so the page's time-left milestones
+        # count only real drafts)
+        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")
+
     good = [d for d in drafts if not d[1].startswith("(no answer")]
     if not good and srv_only:
         # a mode on one server alone (6b426): said, and nothing else is tried
@@ -27509,6 +27517,7 @@ def run_council(labels: list, messages: list, emit, status,
             pass          # the answer is on screen; a failed check changes nothing
         return None
     if len(good) == 1 and not craft:
+        report.update(writer=good[0][0], merger=good[0][0])   # checked on its own model
         emit(good[0][1])  # only one survived — nothing to merge
         return _done()
 
@@ -27962,7 +27971,8 @@ def run_council(labels: list, messages: list, emit, status,
 #   final length ("2.5 tok/s" for a 127-second council).
 ANSWER_BRIEF = (
     "THE BRIEF FOR THIS ANSWER (where it differs from the general notes "
-    "above, the brief wins):\n"
+    "above, the brief wins, except a LENGTH instruction: that is the "
+    "person's own setting and always wins):\n"
     "- Today is {today}. 'Current', 'latest', 'now' and 'this year' are "
     "measured from this date, not from your training. A fact that may have "
     "moved since gets a date flag in world-facing words ('as of {month}', "
@@ -35042,8 +35052,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the page decodes it (hdrText)
         self.send_header("X-Models", header_text(xm))
         # the time-left plan (6b459): measured figures, worked out up front
+        # Thinking's shape since 6b515: one writer and a critic draft-and-review,
+        # the rest of the roster is never asked, so the plan counts two stages
+        _craft_eta = (tier == "Thinking" or (_srv_only and _so_mode == "Thinking")) \
+            and len(council) > 2 and not images
         _ep = (photo_edit_eta(self.ctx) if edit_req else
-               eta_plan(self.ctx, council, messages, bool(query or _links)))
+               eta_plan(self.ctx, council[:2] if _craft_eta else council,
+                        messages, bool(query or _links)))
         if _ep:
             self.send_header("X-Eta", json.dumps(_ep, separators=(",", ":")))
         # ANSWER NOW (6b257): an unguessable per-request id the client
