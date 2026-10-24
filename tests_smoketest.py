@@ -37159,6 +37159,9 @@ check("a model the card refused stops counting as fitting (now and at the next c
 _rc16 = _MILLENAI_SRC[_MILLENAI_SRC.index("def run_council("):_MILLENAI_SRC.index("# ===================================== the answer craft (6b515")]
 check("a refusal of the model, not the server: the server stays up, the gpu_fit source records it, craft's writer is replaced",
       'if getattr(_err[0], "kind", "") in ("fit", "missing"):' in _rc16 and "_model_fail.add(label)" in _rc16
+      # and a hiccup of craft's one writer hands the pen to the critic's seat, once
+      and 'elif critic_lbl and label == labels[0] and not _craft_retry \\\n                        and getattr(_err[0], "transient", False):' in _rc16
+      and "_craft_retry.append(label)" in _rc16
       and "while (critic_lbl and labels and labels[0] in _model_fail and not _hurried()" in _rc16
       and _rc16.index("while (critic_lbl and labels") < _rc16.index("    for _lbl in _unasked:")
       and '    if code == "gpu_fit":\n        srv_note_nofit(e, model)\n' in _MILLENAI_SRC, "")

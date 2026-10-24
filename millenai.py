@@ -28389,6 +28389,7 @@ def run_council(labels: list, messages: list, emit, status,
     _srv_used = []           # the server models this council used, in order (6b344)
     _srv_errs = []           # your own servers' refusals (6b334)
     _model_fail = set()      # seats whose model can't run there (fit, missing: 6b516)
+    _craft_retry = []        # craft's writer replaced once after a hiccup (6b516)
     # ANSWER NOW (6b257): pressed mid-run, the button trades quality
     # for speed — skip what hasn't started, shorten every wait, hand
     # the merge to the fastest pen. Checked between waits, never
@@ -28625,6 +28626,13 @@ def run_council(labels: list, messages: list, emit, status,
                 if getattr(_err[0], "kind", "") in ("fit", "missing"):
                     # that MODEL can't run there (6b516): the server is up,
                     # its other seats are still asked
+                    _model_fail.add(label)
+                elif critic_lbl and label == labels[0] and not _craft_retry \
+                        and getattr(_err[0], "transient", False):
+                    # craft's one writer hit a hiccup (a dropped line, busy,
+                    # 6b516: "stopped answering partway through" left a
+                    # bench answer empty): the critic's seat writes, once
+                    _craft_retry.append(label)
                     _model_fail.add(label)
                 else:
                     server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],
