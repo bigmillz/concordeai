@@ -134,6 +134,10 @@ DEFAULTS = {
     # nobody is connected to; does nothing without gnome-remote-desktop
     "rdp_tidy": True,
     "rdp_tidy_minutes": 30,          # a disconnected remote desktop is ended after this (5..1440)
+    # the log guard (6b517, ollama1-logguard; it reads these itself, see lib/o1logguard.py)
+    "logguard_max_bytes": 2 << 30,   # a log over this keeps its last 64 MiB (256 MiB..20 GiB)
+    "logguard_min_free_bytes": 8 << 30,   # under this free on /, the biggest logs are trimmed (1..64 GiB)
+    "logguard_files": [],            # more logs in /var/log to guard, added to syslog, kern.log, auth.log, ufw.log
     # Tests only: a local fake JWKS. Refused unless allow_insecure_certs_url.
     "certs_url": "",
     "allow_insecure_certs_url": False,

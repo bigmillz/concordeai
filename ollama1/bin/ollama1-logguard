@@ -1,0 +1,90 @@
+#!/usr/bin/python3
+"""ollama1-logguard: keep any log from filling the root disk (6b517). A log in
+/var/log over logguard_max_bytes (2 GiB) keeps its last 64 MiB, in place; with
+under logguard_min_free_bytes (8 GiB) free on / the biggest logs over 256 MiB
+are trimmed until there is, then the journal is vacuumed to 500M. Nothing is
+ever deleted, nothing outside /var/log is touched. See lib/o1logguard.py.
+
+  ollama1-logguard run          one pass (ollama1-logguard.timer, every minute)
+  sudo ollama1-logguard --dry-run
+                                say what it would trim now; trims nothing
+  sudo ollama1-logguard status  the settings, the guarded logs, the free
+                                space and the last trims
+
+Settings in /etc/ollama1/config.json: logguard_max_bytes (256 MiB to 20 GiB),
+logguard_min_free_bytes (1 to 64 GiB), logguard_files (more logs to guard,
+added to syslog, kern.log, auth.log and ufw.log). Logs file names and sizes,
+never what is in a log.
+"""
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1logguard as G  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal
+
+
+def need_root():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("run it with sudo")
+
+
+def status():
+    cfg = G.load_config()
+    s = G.settings(cfg)
+    g = G.Guard(cfg, log=log)
+    print("log guard: a log over %s keeps its last %s; with under %s free on / every log over %s is trimmed, "
+          "biggest first" % (G.fmt(s["max_bytes"]), G.fmt(G.KEEP_BYTES), G.fmt(s["min_free"]), G.fmt(G.LOWDISK_FLOOR)))
+    for n in s["notes"]:
+        print("  note: " + n)
+    rows = []
+    for parts in s["files"]:
+        path = os.path.join(G.LOG_ROOT, *parts)
+        try:
+            st = os.stat(path, follow_symlinks=False)
+            rows.append("%s %s" % (g.show(parts), G.fmt(st.st_size)))
+        except OSError:
+            rows.append("%s (none)" % g.show(parts))
+    print("guarded: " + ", ".join(rows))
+    try:
+        print("root filesystem: %s free" % G.fmt(G.free_bytes()))
+    except OSError:
+        print("root filesystem: couldn't ask")
+    st = g.load_state()
+    lt = st.get("last_trim") if isinstance(st.get("last_trim"), dict) else None
+    if lt and isinstance(lt.get("at"), int):
+        print("last trim %s: %s, %s to %s (%s); %s trim(s) in all" % (
+            time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(lt["at"])), G.label(lt.get("file", "?")),
+            G.fmt(lt.get("old")), G.fmt(lt.get("new")), G.label(lt.get("why", "")), st.get("count", "?")))
+    else:
+        print("no trim yet")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "run":
+        need_root()
+        out = G.Guard(log=log).run()
+        sys.exit(1 if out["errors"] else 0)
+    elif cmd in ("--dry-run", "dry-run"):
+        need_root()
+        out = G.Guard(log=log).run(dry_run=True)
+        for n in G.settings(G.load_config())["notes"]:
+            print("note: " + n)
+        print("dry run: %d log(s) would be trimmed%s" % (len(out["trims"]),
+                                                        "; the root filesystem is under the minimum" if out["low"] else ""))
+    elif cmd == "status":
+        need_root()
+        status()
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

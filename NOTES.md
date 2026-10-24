@@ -16683,3 +16683,56 @@ The app2 batch (6b471 unread dot, 6b472 Edit this picture, 6b480 search excerpts
   that folder, no engine running), and Gemma 4 26B answered through mlx_lm on it. The gauntlet's 6b497 checks
   now expect the 0.32.4 wheels, and two new cases: a venv left on mlx 0.32.2 is upgraded once; mlx 0.32.4 is
   up to date. A mutant drops the mlx check.
+
+## 6b517 — The log guard: no log may fill the server's root disk again (per Patrick)
+
+- 2026-10-24: the server (Ubuntu 26.04, RTX 5070 Ti, open driver 615.71) hung. A failed suspend left the NVIDIA
+  driver logging two assertion lines (`NVRM: nvAssertFailedNoLog: … rs_server.c:1382` / `alloc_free.c:360`)
+  hundreds of millions of times; in about 5 hours rsyslog wrote 119 GB to /var/log/syslog and 118 GB to
+  /var/log/kern.log, filled the 295 GB root disk, and the box needed a power cycle by a relative at the house.
+  The journal was fine (833 MB, its own cap). Daily logrotate can't keep up with ~47 GB an hour. Patrick is
+  abroad for months and the server is on Wi-Fi only, so nothing may let a log fill / again, and nothing in this
+  change may risk remote access.
+- New: lib/o1logguard.py, bin/ollama1-logguard (run / --dry-run / status), ollama1-logguard.service (root
+  oneshot) and .timer (OnBootSec=1min, OnUnitActiveSec=1min, AccuracySec=10s). Size rule: syslog, kern.log,
+  auth.log, ufw.log (always; `logguard_files` only adds), plus any /var/log/*.log, over `logguard_max_bytes`
+  (2 GiB, clamped 256 MiB..20 GiB) keep their last 64 MiB from a line start. Low-disk rule: under
+  `logguard_min_free_bytes` (8 GiB, clamped 1..64 GiB) free on /, every file in /var/log over 256 MiB, biggest
+  first, until free is back; only if that wasn't enough, `journalctl --vacuum-size=500M` (so the journal, the
+  record of what went wrong, stays when trimming the text logs suffices). Sizes are the space a file really
+  takes (st_blocks), so a sparse file doesn't count as big.
+- In place, same inode, for rsyslog's O_APPEND handle: the tail is read into memory (a full disk needs no room
+  for a copy), what was appended during the read is read after it (up to 16 rounds), ftruncate(0), then the
+  tail is appended back through an O_APPEND fd, so a line rsyslog writes in between lands before it rather than
+  being overwritten. Only lines written between the last read and the truncate can be lost. A file that shrank
+  meanwhile (copytruncate) is left alone. FALLOC_FL_COLLAPSE_RANGE would lose nothing but needs ctypes and
+  can't be tested on the Mac; not used.
+- Safety: every path is opened from an O_NOFOLLOW handle on /var/log, one component at a time (openat), never
+  "..", never through a symlink; a file with st_nlink != 1 (a hard link to /etc/shadow, say) or on another
+  st_dev is refused, as are FIFOs, sockets, devices, *.gz/xz/zst/…, *.journal and the journal's folder, and
+  wtmp/btmp/lastlog/faillog. Nothing is deleted (the only unlink is of its own temp state file). The lock is an
+  flock on the /var/log directory fd itself: no lock file, no disk space. A broken or missing config.json runs
+  the defaults; there is no off switch in config (systemctl disable is the way).
+- The unit: ProtectSystem=strict, ReadWritePaths=/var/log -/var/lib/ollama1 -/run/log/journal, PrivateNetwork,
+  IPAddressDeny=any, AF_UNIX only, CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH (the logs are
+  syslog:adm 0640), @system-service, MemoryMax=256M (the 64 MiB tail in memory). **No PrivateTmp**: systemd
+  makes the private /tmp on the root disk and could fail to start the guard on a full one. No dependency on any
+  other kit unit.
+- Standalone: o1logguard imports only the stdlib (it reads config.json itself, with its own defaults, mirrored
+  in o1common.DEFAULTS), so tools/install-logguard.sh can install it on the running server without a setup run
+  (which restarts the firewall, SSH and the tunnel) and without replacing any library the rest of the kit is
+  using: it copies the program, its library, the two units and the /usr/local/sbin link, daemon-reload, enables
+  and starts the timer, runs one pass and prints list-timers. setup.sh enables it right after the units are
+  installed, before the firewall step, so a setup that stops later still leaves it on.
+- The admin panel and the status JSON don't show it (it would need the panel restarted, which the standalone
+  install doesn't do); `sudo ollama1-logguard status` prints the settings, the guarded logs, the free space and
+  the last trim from /var/lib/ollama1/logguard.json (0600).
+- Not tried on the live server yet: the unit's sandbox (journalctl --vacuum inside it, CAP_DAC_OVERRIDE on
+  syslog's files). If it fails, `systemctl status ollama1-logguard` says so and the timer keeps trying every
+  minute. The NVIDIA assertion loop itself (the failed suspend) is not fixed here.
+- Tests: tests/test_logguard.py (a fixture /var/log tree with scaled-down sizes and a faked free space: the tail
+  in place on the same inode, a concurrent O_APPEND writer, lines appended during the read, a file shrunk
+  meanwhile, under-limit files untouched to the mtime, biggest first and stopping once there is room, the
+  journal vacuum, symlinked files and folders, hard links, "..", a symlinked /var/log, FIFOs, the lock, the
+  clamps, nothing deleted, the units, setup.sh, and the installer against a fake root and a fake systemctl,
+  whose installed copy runs on its own with python3 -I). 21 logguard mutants in tests/mutate.py, all killed.
