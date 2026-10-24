@@ -1,0 +1,223 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[85.2,60.1,52.0],\"final\":32.7,\"ftok\":401,\"est\":true}",
+  "X-Hurry": "eb6ea32c11831338"
+ },
+ "first_byte_s": 4.03,
+ "first_text_s": 124.44,
+ "elapsed_s": 124.44,
+ "events": [
+  {
+   "t": 4.03,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 4.03,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 4.05,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 4.05,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 4.05,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 29.06,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 49.09,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 69.12,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 89.14,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 109.16,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 124.44,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 124.44,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 124.44,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 124.44,
+   "tag": "FIRST_TEXT"
+  }
+ ],
+ "statuses": [
+  [
+   4.05,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   29.06,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   49.09,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   69.12,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   89.14,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   109.16,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 4.03
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 124.44
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 124.44
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 4.05,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 4.05,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 124.44,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Quality of Life Index by City 2026 Mid-Year",
+   "u": "https://www.numbeo.com/quality-of-life/rankings.jsp"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life... - Business Insider",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026"
+  },
+  {
+   "t": "World Air Quality Ranking | IQAir USA",
+   "u": "https://www.iqair.com/world-air-quality-ranking"
+  },
+  {
+   "t": "Cleanest Cities in the World 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/world-city-rankings/cleanest-cities-in-the-world"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1283,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T02:14:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

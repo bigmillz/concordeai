@@ -1,0 +1,232 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[85.0,60.0,51.6],\"final\":32.3,\"ftok\":405,\"est\":true}",
+  "X-Hurry": "46d4d8be9d1eed2c"
+ },
+ "first_byte_s": 4.91,
+ "first_text_s": 125.33,
+ "elapsed_s": 125.33,
+ "events": [
+  {
+   "t": 4.91,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 4.91,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 4.94,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 4.94,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 4.94,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 24.95,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 44.96,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 65.0,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 85.03,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 105.05,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 125.07,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 125.33,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 125.33,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 125.33,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 125.33,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.94,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   24.95,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   44.96,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   65.0,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   85.03,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   105.05,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   125.07,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 4.91
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 125.33
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 125.33
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 4.94,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 4.94,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 125.33,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "U.S. Expat Retirement Accounts: 401 (k) and IRA Guide",
+   "u": "https://www.greenbacktaxservices.com/knowledge-center/expat-retirement-planning/"
+  },
+  {
+   "t": "Receiving an Inheritance in Brazil",
+   "u": "https://www.brazilcounsel.com/blog/receiving-an-inheritance-in-brazil"
+  },
+  {
+   "t": "Cross-Border Estate Planning: What Happens if you Die Abroad ...",
+   "u": "https://trustandwill.com/learn/dying-abroad"
+  },
+  {
+   "t": "Inheritance in Brazil: A complete guide - Martin Law Firm",
+   "u": "https://markdmartin.com/inheritance-in-brazil-a-complete-guide/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1315,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T02:27:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
