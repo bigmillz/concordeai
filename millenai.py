@@ -19503,6 +19503,1071 @@ def run_search(query: str) -> str:
     return ctx
 
 
+# ------------------------------------------------ grounded web search (6b514)
+# WHY (6b514, per Patrick, 2026-10-24: the answers are "not even remotely
+# competing" with Claude). Asked "What is the most powerful GPU in the world
+# right now, or TPU, or anything being used for AI? What is Claude using, and
+# what are others using?", run_search() sent the whole 25-word question,
+# verbatim, to the engine as ONE query and kept four hits. Bing answers a
+# question that long with nothing (10 s, reproduced), the fallback engine
+# locked onto the only proper noun in it and returned claude.ai's sign-in
+# page, a "free Claude" farm, a "What is Claude AI?" explainer and a YouTube
+# how-to; nothing about chips, and the models answered from training data,
+# naming the H200 and TPU v5e as current with invented specs. Four faults:
+#   1. THE QUESTION WAS THE QUERY. plan_queries() turns it into short
+#      keyword searches: one per sub-question (a thin one borrows the
+#      topic of the richest), one compact query for the whole, each side of
+#      a comparison apart, the year on a question about now, the maker on
+#      a product name that is also a common word ("Anthropic Claude"), and
+#      the fastest free model adds angles when one answers within 5 s
+#      (the rules' queries stand alone when none does).
+#   2. NOTHING WAS FILTERED. rank_sources() drops sign-in pages, "free AI"
+#      farms, video and social pages and near-duplicates, caps a host at
+#      two, ranks a page on the asked-about vendor's own site, major
+#      outlets, docs, Wikipedia and .gov/.edu first, and prefers recent
+#      pages when the question is about now.
+#   3. ONLY SNIPPETS WERE READ. The top pages are fetched in parallel
+#      (_page_read, a browser User-Agent: a bare one is 403'd) and the
+#      passages that bear on the question kept (_pick_passages).
+#   4. NOTHING TOLD THE MODEL ITS MEMORY WAS STALE. The evidence pack
+#      (evidence_pack) is numbered, dated and sized for a 32K context, and
+#      grounded_turn() carries today's date, "your training data is out of
+#      date", current facts from the evidence only, say what it doesn't
+#      cover, cite as [1], [2]; the page turns each [n] into a chip.
+# The search starts before the headers (beside the engine pre-warm, 6b243)
+# and finishes after them, so the page sees "Searching the web · 4 queries"
+# and "Reading 6 sources…" as steps instead of a silent wait; a question
+# asked again within ten minutes reuses its evidence.
+GROUND_QUERIES = 6          # searches per question, the model's included
+GROUND_RULE_QUERIES = 4     # of them, the rules' own (the model adds the rest)
+GROUND_PER_QUERY = 8        # hits asked of the engine per query
+GROUND_SOURCES = 8          # sources in the evidence pack, and in the sources row
+GROUND_READ = 10            # pages fetched for their text (in parallel; spares replace farms)
+GROUND_PLAN_S = 5.0         # a model's plan arriving later than this isn't waited for
+GROUND_SEARCH_S = 8.0       # the search fan-out's budget
+GROUND_READ_S = 7.0         # the page reads' budget
+GROUND_TOTAL_S = 18.0       # the handler waits no longer: what is in hand is used
+GROUND_PACK_CHARS = 9000    # the pack: ~2.3K tokens, so a 32K context keeps room for drafts
+GROUND_SRC_CHARS = 1000     # one source's passages
+GROUND_PASSAGE_CHARS = 340  # one passage
+GROUND_PAGE_BYTES = 600_000
+GROUND_CACHE_S = 600.0      # Try again / a regenerate reuses the evidence
+GROUND_PENDING = "(web evidence is being gathered)"
+_ground_cache = profile_cache("_ground_cache", {})   # question key -> (fetched_at, Grounding)
+_ground_lock = threading.Lock()
+
+# a sentence boundary or a joined second question: "…for AI? What is Claude
+# using, and what are others using" is three parts
+_GQ_SPLIT_RX = re.compile(
+    r"\s*[?;!]+\s*|\.\s+(?=[A-Z])|,?\s+(?:and|but|also|plus)\s+"
+    r"(?=(?:what|whats|what's|which|who|whose|when|where|why|how|is|are|was|"
+    r"were|does|do|did|can|could|should|would|will)\b)", re.I)
+# a question about NOW: the year goes on its queries
+_GQ_NOW_RX = re.compile(
+    r"\b(right now|now|currently|current|latest|newest|most recent|recent|"
+    r"recently|today|tonight|this (?:year|month|week|weekend)|these days|"
+    r"nowadays|as of (?:now|today)|at the moment|up to date|so far|anymore|"
+    r"any more|upcoming|still|yet|new|newer|newest|next)\b", re.I)
+# a question about THIS week's events: the month and year
+_GQ_MONTH_RX = re.compile(
+    r"\b(today|tonight|yesterday|this (?:week|weekend))\b", re.I)
+# phrases that carry no search value, removed whole before the words are weighed
+_GQ_PHRASES = ("in the world", "right now", "out there", "at the moment",
+               "these days", "nowadays", "as of now", "as of today",
+               "this year", "this month", "this week", "this weekend",
+               "do you know", "can you tell me", "could you tell me",
+               "i want to know", "i'd like to know", "i wonder", "tell me",
+               "please", "being used", "up to date", "on earth", "ever made")
+# question scaffolding and glue; superlatives (most, best, biggest) stay,
+# they shape what the engine returns
+_GQ_FILLER = frozenset("""
+    a an the this that these those any some all every each
+    what whats what's which who whom whose when where why how is are was were be
+    been being am do does did can could should would will shall may might must
+    have has had having i you we they he she it me him her us them my your our
+    their his its mine yours of to in on at for from by with about into over
+    under between as than then there here and or but nor so if because while
+    whether not no yes
+    use used using uses get got gets make made makes know knows tell say said
+    call called go going want wants need needs mean means meant think thinks
+    look looks find give come let
+    really actually basically just also still even very much many more lot
+    lots kind sort thing things stuff something anything everything nothing
+    someone anyone everyone others other else exactly okay ok like
+    currently current latest newest recent recently today tonight now yet
+    already anymore
+""".split())
+_GQ_STARTERS = frozenset(
+    "what whats which who whom whose when where why how is are was were do does"
+    " did can could should would will may might shall tell give explain compare"
+    " describe list name show".split())
+# a product name that is also a common word, or a search engine's favourite
+# product page: the engine wants the maker beside it (seen live: "Claude"
+# alone returned claude.ai's sign-in page and a "free Claude" farm)
+_GQ_MAKER = {"claude": "Anthropic", "chatgpt": "OpenAI", "gemini": "Google",
+             "copilot": "Microsoft", "grok": "xAI", "llama": "Meta",
+             "siri": "Apple", "alexa": "Amazon", "sora": "OpenAI"}
+# "GPU … or TPU", "iPhone 17 Pro vs Pixel 10 Pro", "compare Rust and Go":
+# each side gets a search of its own as well (_gq_sides)
+_GQ_COMPARE_RX = re.compile(
+    r"\b(vs\.?|versus|compare|compared|comparison|difference|differences|"
+    r"better|worse|against|or|than)\b", re.I)
+_GQ_CONNECTORS = frozenset("vs vs. versus or than against and".split())
+# words that describe the comparison itself, not a side of it
+_GQ_COMPARE_WORDS = frozenset(
+    "vs versus compare compared comparison difference differences better worse"
+    " against than between which".split())
+_GQ_NOW_WORDS = frozenset(
+    "now currently current latest newest recent recently today tonight still"
+    " yet new newer newest next upcoming anymore".split())
+# qualifiers a thin sub-question needn't borrow from the lead
+_GQ_MODIFIERS = frozenset(
+    "most best biggest largest fastest smallest cheapest powerful top good"
+    " great strongest highest lowest".split())
+
+
+def _gq_tokens(text: str) -> list:
+    return re.findall(r"[$\u20ac\u00a3]?[A-Za-z0-9][A-Za-z0-9.'\u2019+/-]*",
+                      str(text or ""))
+
+
+def _gq_entity(tok: str, first: bool) -> bool:
+    """A name the search must keep as written: an acronym (GPU, AWS), a
+    model number (H200, TPU7x, M4), a camel-cased name (iPhone, macOS), or
+    a capitalised word that isn't the question's own scaffolding."""
+    t = tok.strip(".'\u2019")
+    if not t or t[:1] in "$\u20ac\u00a3":
+        return False
+    if re.search(r"\d", t) and re.search(r"[A-Za-z]", t):
+        return True
+    if t.isupper() and 3 <= len(t) <= 6:
+        return True        # GPU, AWS, NVDA; a two-letter one (AI, US, TV) is a plain word
+    if re.search(r"[a-z][A-Z]", t):
+        return True
+    low = t.lower()
+    if t[:1].isupper():
+        if first:
+            return low not in _GQ_STARTERS and low not in _GQ_FILLER
+        return True
+    return False
+
+
+def _gq_terms(text: str) -> tuple:
+    """(terms, entities) of one sub-question: its content words in order,
+    scaffolding and fillers removed, entities in their own casing (a
+    repeated plain word is kept once; a repeated name stays, 'Pixel 10
+    Pro' after 'iPhone 17 Pro')."""
+    work = str(text or "")
+    for ph in _GQ_PHRASES:
+        work = re.sub(r"\b%s\b" % re.escape(ph), " ", work, flags=re.I)
+    terms, ents = [], []
+    for i, tok in enumerate(_gq_tokens(work)):
+        t = tok.strip(".'\u2019/-")
+        low = t.lower()
+        if not t:
+            continue
+        if _gq_entity(t, i == 0):
+            terms.append(t)
+            ents.append(t)
+            continue
+        if low in [x.lower() for x in terms]:
+            continue
+        if low in _GQ_FILLER or low in _GQ_NOW_WORDS or len(t.strip("$\u20ac\u00a3")) < 2:
+            continue
+        if re.fullmatch(r"\d{4}", t) and 1990 <= int(t) <= 2100:
+            terms.append(t)          # a year the person named is a term
+            continue
+        terms.append(t if t.isupper() else low)
+    return terms, ents
+
+
+def _gq_sides(text: str, allow_and: bool = False) -> list:
+    """The sides of a comparison in one sub-question: the run of names
+    right after a connector (vs, versus, or, than; 'and' only in a
+    'compare …' question) and the run, or the nearest name within six
+    words, before it. 'iPhone 17 Pro vs Pixel 10 Pro camera' ->
+    ['iPhone 17 Pro', 'Pixel 10 Pro']; 'GPU in the world right now, or
+    TPU' -> ['GPU', 'TPU']."""
+    toks = _gq_tokens(str(text or ""))
+    clean = [t.strip(".'\u2019,") for t in toks]
+
+    def namey(i):
+        t = clean[i]
+        return bool(t) and (_gq_entity(t, False) or (t.isdigit() and len(t) <= 4))
+
+    def run_after(i):
+        j, out = i, []
+        while j < len(clean) and namey(j) and not (
+                out and clean[j].isdigit() and not clean[j - 1][:1].isupper()):
+            out.append(clean[j])
+            j += 1
+        return out
+
+    def run_before(i):
+        j, out = i - 1, []
+        while j >= 0 and namey(j):
+            out.insert(0, clean[j])
+            j -= 1
+        if not out:
+            for k in range(i - 1, max(-1, i - 7), -1):
+                if namey(k) and not clean[k].isdigit():
+                    return [clean[k]]
+        return out
+    sides = []
+    for i, t in enumerate(clean):
+        low = t.lower()
+        if low not in _GQ_CONNECTORS or (low == "and" and not allow_and):
+            continue
+        a, b = run_before(i), run_after(i + 1)
+        if not a or not b:
+            continue
+        # the run after a connector stops before a plain noun: "Pixel 10
+        # Pro camera" is the side "Pixel 10 Pro"
+        for s in (" ".join(a), " ".join(b)):
+            if (s.lower() not in [x.lower() for x in sides]
+                    and s.lower() not in _GQ_COMPARE_WORDS and not s.isdigit()):
+                sides.append(s)
+    return sides
+
+
+def _gq_makers(terms: list) -> list:
+    """'Claude' -> 'Anthropic Claude' unless the maker is named already."""
+    out = []
+    have = {t.lower() for t in terms}
+    for t in terms:
+        mk = _GQ_MAKER.get(t.lower())
+        if mk and mk.lower() not in have:
+            out.append(mk)
+            have.add(mk.lower())
+        out.append(t)
+    return out
+
+
+def _gq_join(terms: list, stamp: str) -> str:
+    q = " ".join(terms[:9])
+    if stamp and not re.search(r"\b20\d\d\b", q):
+        q += " " + stamp
+    return q.strip()
+
+
+def _gq_same(a: str, b: str) -> bool:
+    """The same search in other clothes: equal word sets, the year aside."""
+    ta = {w for w in re.findall(r"[a-z0-9]+", a.lower()) if not re.fullmatch(r"20\d\d", w)}
+    tb = {w for w in re.findall(r"[a-z0-9]+", b.lower()) if not re.fullmatch(r"20\d\d", w)}
+    return bool(ta) and ta == tb
+
+
+def _gq_stamp(question: str, today) -> str:
+    """'' / '2026' / 'October 2026': what a query about now carries."""
+    if _GQ_MONTH_RX.search(question):
+        return strftime_np("%B %Y", today)
+    if _GQ_NOW_RX.search(question) or _FRESH_PATTERNS[3].search(question):
+        return time.strftime("%Y", today)
+    return ""
+
+
+def plan_queries(question: str, today=None, planned=(), limit: int = GROUND_QUERIES) -> list:
+    """The web searches for a question, never the question itself: one per
+    sub-question (a thin one borrows the richest one's topic), the model's
+    lines next (`planned`), one compact query for the whole, then each side
+    of a comparison; the year rides a question about now, the maker rides an
+    ambiguous product name. At most `limit`, no two alike."""
+    today = today or time.localtime()
+    q = strip_greeting(str(question or "")).strip()
+    q = _PREAMBLE_RX.sub("", q, count=1).strip() or q
+    q = re.sub(r"^\s*/search\s+", "", q)
+    stamp = _gq_stamp(q, today)
+    subs = []
+    for part in _GQ_SPLIT_RX.split(q):
+        part = (part or "").strip(" ,")
+        if not part:
+            continue
+        terms, ents = _gq_terms(part)
+        if terms:
+            subs.append((terms, ents))
+    if not subs:
+        terms, ents = _gq_terms(q)
+        subs = [(terms, ents)] if terms else []
+    if not subs:
+        return [q[:120]] if q else []
+    lead = max(subs, key=lambda s: len(s[0]))
+    out = []
+
+    def add(terms):
+        s = _gq_join(_gq_makers(list(terms)), stamp)
+        if s and len(s.split()) >= 2 and not any(_gq_same(s, x) for x in out):
+            out.append(s)
+    for terms, ents in subs:
+        t = list(terms)
+        if len(t) < 3 and terms is not lead[0]:
+            # "What is Claude using" names Claude and nothing else: the
+            # topic is upstream, in the richest sub-question (its names
+            # first, then its nouns, never its qualifiers)
+            for w in lead[1] + [x for x in lead[0] if x not in lead[1]
+                                and x.lower() not in _GQ_MODIFIERS]:
+                if w.lower() not in [x.lower() for x in t] and len(t) < 5:
+                    t.append(w)
+        add(t)
+    # the model's angles, when it answered in time
+    for ln in planned or ():
+        ln = str(ln or "").strip()
+        if 5 < len(ln) < 120 and len(ln.split()) <= 12:
+            if not any(_gq_same(ln, x) for x in out):
+                out.append(ln)
+    # a comparison: each side on its own, the other sides left out
+    if _GQ_COMPARE_RX.search(q):
+        sides = []
+        allow_and = bool(re.search(r"\b(compare|comparison|difference|between)\b", q, re.I))
+        for part in _GQ_SPLIT_RX.split(q):
+            for s in _gq_sides(part or "", allow_and):
+                if s.lower() not in [x.lower() for x in sides]:
+                    sides.append(s)
+        if len(sides) >= 2:
+            side_words = {w.lower() for s in sides for w in s.split()}
+            base = [w for w in lead[0]
+                    if w.lower() not in side_words
+                    and w.lower() not in _GQ_COMPARE_WORDS]
+            for s in sides[:3]:
+                add(s.split() + base[:5])
+    # the whole question, compactly, when it has more than one part
+    whole = []
+    for terms, _e in subs:
+        for w in terms:
+            if w.lower() not in [x.lower() for x in whole]:
+                whole.append(w)
+    if len(subs) > 1 and whole:
+        add(whole[:8])
+    return out[:limit]
+
+
+GROUND_PLAN = (
+    "Today is {today}. Write the web search queries that would find the facts "
+    "needed to answer the question below: one short keyword query per part of "
+    "the question, at most 3, one per line, no numbering, no quotes, no "
+    "commentary.\n"
+    "Rules: copy every product name, version, model number, place and date "
+    "EXACTLY as written (an unfamiliar name is newer than you, not a typo); a "
+    "product name that is also a common word gets its maker (\"Anthropic "
+    "Claude\", \"Google Gemini\"); a query about what is latest, current or "
+    "happening now ends with the year {year}; never answer the question.\n\n"
+    "QUESTION: ")
+
+
+def plan_lines(text: str) -> list:
+    """The queries in a model's plan: one per line, numbering, bullets and
+    quotes stripped, preambles and answers (long lines) dropped."""
+    out = []
+    for ln in strip_think(strip_special(str(text or ""))).splitlines():
+        ln = re.sub(r'^[\s\d.)\-*\u2022"\u201c\u201d\']+', "", ln).strip(' "\'*\u201c\u201d')
+        ln = re.sub(r"\?+$", "", ln).strip()
+        if not (5 < len(ln) < 120) or len(ln.split()) > 12:
+            continue
+        if re.match(r"(?i)(here|sure|queries|search(es)?|the )\b.*:$", ln):
+            continue
+        if ln.lower() not in [x.lower() for x in out]:
+            out.append(ln)
+    return out[:3]
+
+
+# ----- the sources: what is dropped, what ranks, when a page was written
+_SRC_LOGIN_RX = re.compile(
+    r"\b(?:sign|log)\s*-?\s*in\b|\blogin\b|\bsign\s*-?\s*up\b|\bsignup\b|"
+    r"\bregister\b|\bcreate (?:an?|your|free) account\b|\bforgot (?:your )?"
+    r"password\b|\bmy account\b|\baccount settings\b", re.I)
+_SRC_LOGIN_PATH_RX = re.compile(
+    r"/(?:log-?in|sign-?in|sign-?up|register|auth|account|accounts|oauth)"
+    r"(?:[/?#.]|$)", re.I)
+_SRC_FARM_RX = re.compile(
+    r"\bfor free\b|\bno (?:sign-?up|login|registration|credit card)\b|"
+    r"\bunlimited\b.{0,30}\bfree\b|\bfree (?:online|unlimited|download|chat|"
+    r"access|trial)\b|\bwithout (?:login|sign-?up|registration)\b|\bcoupon|"
+    r"\bpromo code|\bcrack(?:ed)?\b|\bmod apk\b|\bapk\b|\bgiveaway\b|"
+    r"\b100% free\b|\bfree\b.{0,12}\bno (?:sign|log)", re.I)
+_SRC_VIDEO_HOSTS = ("youtube.com", "youtu.be", "tiktok.com", "vimeo.com",
+                    "dailymotion.com", "twitch.tv", "rumble.com",
+                    "bilibili.com")
+_SRC_SOCIAL_HOSTS = ("pinterest.", "facebook.com", "instagram.com", "x.com",
+                     "twitter.com", "threads.net", "snapchat.com", "t.me",
+                     "linkedin.com/posts", "linkedin.com/pulse")
+_SRC_DEMOTE_HOSTS = ("quora.com", "answers.com", "brainly.", "coursehero.",
+                     "scribd.com", "slideshare.", "reddit.com", "medium.com",
+                     "linkedin.com", "glassdoor.", "aliexpress.", "ebay.",
+                     "wikihow.", "fandom.com", "studocu.", "chegg.com",
+                     "pdfcoffee", "yumpu.", "issuu.") + _JUNK_HOSTS
+# what a careful person opens first: reference, the wires, the big papers,
+# the serious trade press. A vendor's own page ranks through the entity
+# rule in rank_sources (the asked-about name in the host), not a list.
+_SRC_GOOD_HOSTS = (
+    "wikipedia.org", "britannica.com", "reuters.com", "apnews.com",
+    "bbc.co.uk", "bbc.com", "nytimes.com", "wsj.com", "ft.com",
+    "bloomberg.com", "theguardian.com", "washingtonpost.com",
+    "economist.com", "cnbc.com", "cnn.com", "npr.org", "axios.com",
+    "theverge.com", "arstechnica.com", "wired.com", "techcrunch.com",
+    "tomshardware.com", "anandtech.com", "servethehome.com",
+    "semianalysis.com", "nextplatform.com", "hpcwire.com",
+    "theregister.com", "zdnet.com", "engadget.com", "9to5mac.com",
+    "macrumors.com", "appleinsider.com", "theinformation.com",
+    "nature.com", "science.org", "arxiv.org", "nih.gov", "cdc.gov",
+    "who.int", "mayoclinic.org", "investopedia.com", "nerdwallet.com",
+    "consumerreports.org", "espn.com", "imdb.com", "github.com",
+    "stackoverflow.com", "huggingface.co", "mozilla.org", "python.org")
+_SRC_DOCS_RX = re.compile(
+    r"^(?:docs|developer|developers|learn|support|help|wiki|kb)\.|/docs?/|"
+    r"/documentation/|/manual/|/reference/|/help/|/support/", re.I)
+_SRC_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep",
+               "oct", "nov", "dec")
+_SRC_DATE_RXS = (
+    re.compile(r"\b(20[12]\d)-(\d{2})-(\d{2})\b"),
+    re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?"
+               r"\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20[12]\d)\b", re.I),
+    re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|"
+               r"aug|sep|oct|nov|dec)[a-z]*\.?,?\s+(20[12]\d)\b", re.I),
+    re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
+               r"\.?,?\s+(20[12]\d)\b", re.I),
+)
+_SRC_URL_DATE_RX = re.compile(r"/(20[12]\d)/(\d{1,2})(?:/(\d{1,2}))?(?:/|$)")
+_SRC_META_DATE_RX = re.compile(
+    r'(?:article:published_time|datePublished|article:modified_time|'
+    r'dateModified|og:updated_time|"pubdate"|name="date"|itemprop="datePublished")'
+    r'[^>]{0,80}?(20[12]\d-\d{2}-\d{2})|<time[^>]+datetime="(20[12]\d-\d{2}-\d{2})',
+    re.I)
+
+
+def _src_host(url: str) -> str:
+    try:
+        h = (urllib.parse.urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return ""
+    for pre in ("www.", "m.", "amp.", "mobile."):
+        if h.startswith(pre):
+            h = h[len(pre):]
+    return h
+
+
+def _src_key(url: str) -> str:
+    """One page, however it is linked: no scheme, www, query, fragment,
+    trailing slash, AMP suffix or index page."""
+    try:
+        p = urllib.parse.urlsplit(url)
+    except ValueError:
+        return url
+    path = re.sub(r"/(?:amp|index\.html?)/?$", "", (p.path or "").lower()).rstrip("/")
+    return _src_host(url) + path
+
+
+def _src_title_key(title: str) -> str:
+    t = re.sub(r"\s*[|\u2013\u2014-]\s*[^|\u2013\u2014-]{2,40}$", "", str(title or ""))
+    return re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()[:70]
+
+
+def _src_date_text(text: str) -> str:
+    """'2026-06-01', '2026-06' or '2026' from prose, the most specific first."""
+    text = str(text or "")
+    m = _SRC_DATE_RXS[0].search(text)
+    if m:
+        return "%s-%s-%s" % m.groups()
+    m = _SRC_DATE_RXS[1].search(text)
+    if m:
+        mo = _SRC_MONTHS.index(m.group(1)[:3].lower()) + 1
+        return "%s-%02d-%02d" % (m.group(3), mo, int(m.group(2)))
+    m = _SRC_DATE_RXS[2].search(text)
+    if m:
+        mo = _SRC_MONTHS.index(m.group(2)[:3].lower()) + 1
+        return "%s-%02d-%02d" % (m.group(3), mo, int(m.group(1)))
+    m = _SRC_DATE_RXS[3].search(text)
+    if m:
+        mo = _SRC_MONTHS.index(m.group(1)[:3].lower()) + 1
+        return "%s-%02d" % (m.group(2), mo)
+    years = re.findall(r"\b(20[12]\d)\b", text)
+    return max(years) if years else ""
+
+
+def _src_date(row: dict) -> str:
+    """When a hit was written, as far as its URL and snippet say."""
+    m = _SRC_URL_DATE_RX.search(str(row.get("url") or row.get("href") or ""))
+    if m and 1 <= int(m.group(2)) <= 12:
+        return "%s-%02d" % (m.group(1), int(m.group(2))) + (
+            "-%02d" % int(m.group(3)) if m.group(3) and 1 <= int(m.group(3)) <= 31 else "")
+    return _src_date_text(str(row.get("body") or "")) or \
+        _src_date_text(str(row.get("title") or ""))
+
+
+def _src_months_ago(date: str, today) -> int:
+    """Whole months between a 'YYYY[-MM[-DD]]' and today; -1 when unknown."""
+    m = re.match(r"(20\d\d)(?:-(\d\d))?", date or "")
+    if not m:
+        return -1
+    y, mo = int(m.group(1)), int(m.group(2) or 6)
+    return max(0, (today.tm_year - y) * 12 + (today.tm_mon - mo))
+
+
+def _src_junk(row: dict) -> str:
+    """Why a hit is unusable, or ''. A sign-in page, a 'free AI' farm, a
+    video or social page (no text to read) never reach a model."""
+    url = str(row.get("url") or row.get("href") or "")
+    title = str(row.get("title") or "")
+    body = str(row.get("body") or "")
+    host = _src_host(url)
+    path = (urllib.parse.urlsplit(url).path or "") if url else ""
+    if not url or not host:
+        return "no url"
+    if any(host == v or host.endswith("." + v) for v in _SRC_VIDEO_HOSTS):
+        return "video"
+    if any(s in host or s in (host + path) for s in _SRC_SOCIAL_HOSTS):
+        return "social"
+    # the farm first: "Unlimited Claude for free, no signup" is a farm
+    # that mentions signing up, not a sign-up page
+    if _SRC_FARM_RX.search(title) or (
+            _SRC_FARM_RX.search(body) and not any(
+                host == g or host.endswith("." + g) for g in _SRC_GOOD_HOSTS)):
+        return "farm"
+    if _SRC_LOGIN_RX.search(title) or _SRC_LOGIN_PATH_RX.search(path):
+        return "login"
+    return ""
+
+
+def _src_quality(host: str, path: str = "") -> int:
+    """+2 a reference or major outlet, +1 .gov/.edu, +1 docs; -2 a
+    content farm, a forum of guesses or directory spam."""
+    q = 0
+    if any(host == g or host.endswith("." + g) for g in _SRC_GOOD_HOSTS):
+        q = 2
+    elif re.search(r"\.(?:gov|edu|mil)(?:\.[a-z]{2})?$", host):
+        q = 1
+    if _SRC_DOCS_RX.search(host + path):
+        q += 1
+    if any(d in host for d in _SRC_DEMOTE_HOSTS):
+        q -= 2
+    return q
+
+
+def _term_hits(terms, text: str, ents=()) -> int:
+    """The query terms the text carries, a name (`ents`) counting double
+    (a short term whole, a longer one as a prefix: 'chip' finds 'chips')."""
+    low = " " + str(text or "").lower() + " "
+    el = {e.lower() for e in ents}
+    n = 0
+    for t in terms:
+        t = t.lower()
+        if len(t) <= 3 or t.isdigit():
+            hit = bool(re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(t), low))
+        else:
+            hit = bool(re.search(r"(?<![a-z0-9])%s" % re.escape(t), low))
+        if hit:
+            n += 2 if t in el else 1
+    return n
+
+
+def _src_foreign(text: str) -> bool:
+    """Mostly another script than the question's: a Hindi or Chinese page
+    is no evidence for an English answer."""
+    letters = [c for c in str(text or "") if c.isalpha()]
+    if len(letters) < 20:
+        return False
+    other = sum(1 for c in letters if ord(c) > 0x024F)
+    return other / len(letters) > 0.3
+
+
+def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
+                 today=None, limit: int = GROUND_SOURCES) -> list:
+    """Engine hits -> the sources worth reading, best first: junk dropped
+    (_src_junk), a page in another script, a bare homepage, near-
+    duplicates and third pages of a host dropped, then scored by the
+    question's terms in the title and snippet (a name counting double),
+    the asked-about name in the host (a vendor's own page, when the page
+    also speaks to the question), the host's standing (_src_quality) and,
+    for a question about now, the page's date."""
+    today = today or time.localtime()
+    ents = [e for e in entities if len(e) >= 3]
+    el = [e.lower() for e in ents]
+    seen_keys, seen_titles, per_host, out = set(), set(), {}, []
+    for r in rows:
+        url = str(r.get("url") or r.get("href") or "").strip()
+        title = str(r.get("title") or "").strip()
+        body = str(r.get("body") or "").strip()
+        if _src_junk({"url": url, "title": title, "body": body}):
+            continue
+        if _src_foreign(title + " " + body):
+            continue
+        host = _src_host(url)
+        path = urllib.parse.urlsplit(url).path or ""
+        if path.strip("/") == "" and len(title.split()) < 4:
+            continue        # a bare homepage never holds the answer
+        key = _src_key(url)
+        tkey = _src_title_key(title)
+        if key in seen_keys or (tkey and tkey in seen_titles):
+            continue
+        rel = 2 * _term_hits(terms, title, ents) + _term_hits(terms, body, ents)
+        # the vendor's own page, when it says something beyond its own name
+        own = [e for e in el if e.replace(" ", "") in host.replace("-", "")]
+        topical = _term_hits([t for t in terms if t.lower() not in own], title + " " + body)
+        in_host = 3 if own and topical else 0
+        qual = _src_quality(host, path)
+        date = _src_date({"url": url, "body": body, "title": title})
+        if date and date[:7] > time.strftime("%Y-%m", today):
+            date = ""       # a date after today is a misread
+        rec = 0
+        if nowish:
+            ago = _src_months_ago(date, today)
+            rec = 2 if 0 <= ago <= 12 else (0 if ago < 0 or ago <= 24 else -2)
+        score = rel + in_host + qual + rec - (5 if rel == 0 and not in_host else 0)
+        out.append({"title": title or host, "body": body, "url": url,
+                    "host": host, "date": date, "score": score, "paras": []})
+        seen_keys.add(key)
+        if tkey:
+            seen_titles.add(tkey)
+    out.sort(key=lambda s: -s["score"])
+    kept = []
+    for s in out:
+        if per_host.get(s["host"], 0) >= 2:
+            continue
+        per_host[s["host"]] = per_host.get(s["host"], 0) + 1
+        kept.append(s)
+        if len(kept) >= limit:
+            break
+    return kept
+
+
+# ----- reading a page
+_PAGE_DROP_RX = re.compile(
+    r"(?is)<(script|style|noscript|svg|iframe|form|nav|header|footer|aside|"
+    r"template|button|select|canvas|video|audio|figure)\b[^>]*>.*?</\1\s*>")
+_PAGE_BLOCK_RX = re.compile(
+    r"(?i)</(?:p|div|li|h[1-6]|tr|blockquote|section|article|dd|dt|pre|"
+    r"table|ul|ol)>|<br\s*/?>|<hr\s*/?>|</?(?:p|li|h[1-6]|tr|div)\b[^>]*>")
+_PAGE_BOILER_RX = re.compile(
+    r"(?i)\b(cookie|cookies|consent|subscribe|newsletter|sign in|log in|"
+    r"sign up|all rights reserved|privacy policy|terms of (?:use|service)|"
+    r"advertisement|sponsored|share this|related (?:articles|stories|posts)|"
+    r"read more|skip to (?:main )?content|accept all|manage preferences|"
+    r"javascript is (?:disabled|required)|enable javascript|follow us|"
+    r"rate this)\b")
+# a page that prints its own SEO scaffolding is a content farm's
+_PAGE_FARM_RX = re.compile(
+    r"(?im)^(?:seo keywords|meta description|focus keyword|target keywords?|"
+    r"primary keyword)\s*:")
+_PAGE_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+            "(KHTML, like Gecko) Version/17.4 Safari/605.1.15")
+
+
+def _page_read(url: str, want_photo: bool = False, timeout: float = 6.0) -> dict:
+    """{'title', 'date', 'paras', 'image'} of a public web page, or None.
+    The main text only: scripts, navigation, headers, footers and asides
+    stripped, the <article>/<main> preferred when it holds the body,
+    boilerplate lines dropped. A browser User-Agent, since a bare one is
+    403'd at many edges (CLAUDE.md's trap)."""
+    try:
+        if not _link_shape_ok(url) or url.lower().split("?")[0].endswith(".pdf"):
+            return None
+        req = urllib.request.Request(url, headers={
+            "User-Agent": _PAGE_UA,
+            "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5",
+            "Accept-Language": "en-US,en;q=0.9"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            ctype = (r.headers.get("Content-Type") or "").lower()
+            if "html" not in ctype and "xml" not in ctype:
+                return None
+            raw = r.read(GROUND_PAGE_BYTES)
+        enc = "utf-8"
+        m = re.search(r"charset=([\w-]+)", ctype) or re.search(
+            rb'charset=["\']?([\w-]+)', raw[:4000])
+        if m:
+            enc = m.group(1) if isinstance(m.group(1), str) else m.group(1).decode("ascii", "ignore")
+        try:
+            html_txt = raw.decode(enc, "replace")
+        except LookupError:
+            html_txt = raw.decode("utf-8", "replace")
+        page = {"title": "", "date": "", "paras": [], "image": ""}
+        m = re.search(r'property=["\']og:title["\'][^>]*?content=["\']([^"\']+)', html_txt) or \
+            re.search(r"(?is)<title[^>]*>(.*?)</title>", html_txt)
+        if m:
+            page["title"] = html.unescape(re.sub(r"\s+", " ", m.group(1))).strip()[:160]
+        m = _SRC_META_DATE_RX.search(html_txt)
+        if m:
+            page["date"] = m.group(1) or m.group(2) or ""
+        if want_photo:
+            m = re.search(r'property=["\']og:image["\'][^>]*?content=["\'](https://[^"\']+)', html_txt) or \
+                re.search(r'content=["\'](https://[^"\']+)["\'][^>]*?property=["\']og:image', html_txt)
+            if m:
+                page["image"] = m.group(1)[:400]
+        body = _PAGE_DROP_RX.sub(" ", html_txt)
+        body = re.sub(r"(?s)<!--.*?-->", " ", body)
+        m = re.search(r"(?is)<article\b[^>]*>(.*?)</article>", body) or \
+            re.search(r"(?is)<main\b[^>]*>(.*?)</main>", body)
+        if m and len(re.sub(r"<[^>]+>", "", m.group(1))) >= 600:
+            body = m.group(1)
+        body = _PAGE_BLOCK_RX.sub("\n", body)
+        body = re.sub(r"(?s)<[^>]+>", " ", body)
+        body = html.unescape(body)
+        if _PAGE_FARM_RX.search(body):
+            page["junk"] = "farm"
+            return page
+        paras = []
+        for ln in body.split("\n"):
+            ln = re.sub(r"[ \t\r\f\v\u00a0]+", " ", ln).strip()
+            if len(ln) < 40 and not (re.search(r"\d", ln) and len(ln) >= 25):
+                continue
+            if _PAGE_BOILER_RX.search(ln) and len(ln) < 140:
+                continue
+            if paras and paras[-1] == ln:
+                continue
+            paras.append(ln[:1200])
+            if sum(len(p) for p in paras) > 40_000:
+                break
+        page["paras"] = paras
+        return page
+    except Exception:
+        return None
+
+
+def _para_hits(paras: list, terms: list) -> int:
+    """How many paragraphs carry a query term: what a read page is worth."""
+    return sum(1 for p in paras if _term_hits(terms, p))
+
+
+def _pick_passages(paras: list, terms: list, cap: int = GROUND_SRC_CHARS,
+                   each: int = GROUND_PASSAGE_CHARS) -> list:
+    """The paragraphs that bear on the question — the ones carrying its
+    terms, numbers counted a little extra — in page order, each cut at a
+    sentence end, within `cap` characters. The lede when none scores."""
+    scored = []
+    for i, p in enumerate(paras):
+        hits = _term_hits(terms, p)
+        if hits:
+            scored.append((hits + (0.5 if re.search(r"\d", p) else 0)
+                           - i * 0.001, i, p))
+    pick = sorted(scored, key=lambda x: -x[0])[:6] if scored else \
+        [(0, i, p) for i, p in enumerate(paras[:2])]
+    out, used = [], 0
+    for _s, _i, p in sorted(pick, key=lambda x: x[1]):
+        if len(p) > each:
+            cut = p[:each]
+            m = re.search(r"^.{%d,}?[.!?](?=\s|$)" % int(each * 0.55), cut)
+            p = (m.group(0) if m else cut.rsplit(" ", 1)[0]) + ("" if m else "\u2026")
+        if used + len(p) > cap and out:
+            break
+        out.append(p)
+        used += len(p)
+    return out
+
+
+def evidence_pack(sources: list, terms: list, today=None,
+                  budget: int = GROUND_PACK_CHARS) -> tuple:
+    """(text, passages): the numbered evidence a model reads. Each source
+    is a title, host and date line, its URL, then its passages (the
+    snippet when the page gave no text). Sized to `budget`: a 32K context
+    keeps room for the drafts and the merge."""
+    today = today or time.localtime()
+    if not sources:
+        return "", 0
+    share = max(300, min(GROUND_SRC_CHARS,
+                         (budget - 220 * len(sources)) // max(1, len(sources))))
+    lines, n_pass = [], 0
+    lines.append("WEB EVIDENCE gathered %s, %d source%s, numbered for citing:"
+                 % (time.strftime("%Y-%m-%d", today), len(sources),
+                    "" if len(sources) == 1 else "s"))
+    for n, s in enumerate(sources, 1):
+        when = s.get("date") or "date unknown"
+        lines.append("[%d] %s \u2014 %s \u2014 %s" % (
+            n, re.sub(r"\s+", " ", s.get("title") or s.get("host") or "")[:120],
+            s.get("host") or "", when))
+        lines.append("    %s" % (s.get("url") or "")[:160])
+        if s.get("paras"):
+            ps = _pick_passages(s["paras"], terms, cap=share)
+        else:
+            ps = [re.sub(r"\s+", " ", s.get("body") or "")[:share]] if s.get("body") else []
+        for p in ps:
+            lines.append("    %s" % p)
+            n_pass += 1
+        lines.append("")
+    text = "\n".join(lines).rstrip()
+    if len(text) > budget:
+        text = text[:budget].rsplit("\n", 1)[0]
+    return text, n_pass
+
+
+GROUND_RULES = (
+    "Today is {today}. Your training data ends before today and is OUT OF "
+    "DATE for anything current: newer products, versions, prices, leaders "
+    "and events exist that you have never seen.\n"
+    "GROUNDING RULES:\n"
+    "- A fact about the present (what exists now; what is latest, newest, "
+    "biggest or most powerful; a price, spec, date or version; who uses or "
+    "runs what) comes from the evidence above and nowhere else. Never "
+    "invent or recall one: a spec, number or product name no source states "
+    "is left out.\n"
+    "- Cite the source number in square brackets straight after each fact "
+    "it supports, like [1], or [2][4] for two, using only the numbers "
+    "listed above. Never cite a number that isn't listed.\n"
+    "- Where the evidence does not cover part of the question, say so in "
+    "one plain clause (what you'd check, and where). Stable background, "
+    "how a thing works, long-standing facts, may come from your own "
+    "knowledge, uncited; a current fact never does.\n"
+    "- Any result that does not help answer is noise: never mention, "
+    "summarize or apologize for an off-topic result; the reader must never "
+    "learn what the search happened to return.\n"
+    "- Never describe your own data access: 'the evidence', 'the sources "
+    "above', 'the snippets', 'I can't pull live data' are banned. Speak as "
+    "yourself ('I found', 'as of June 2026').\n")
+GROUND_NONE = (
+    "Your web search for '{query}' found nothing usable; the reader can't "
+    "see this.\n"
+    "Today is {today}. Your training data ends before today and is out of "
+    "date for anything current. Answer from what you reliably know, label "
+    "any fact that may have changed with the month it was last true for you "
+    "(never present it as 'right now'), and say in one clause what to check "
+    "and where.\n")
+# the shared system prompt's one grounding line (the merge keeps the system
+# prompt, so the compositor reads this too): the [n] marks survive the merge
+GROUND_SYSTEM = (
+    "\n\nGROUNDING (web evidence): the user's message carries numbered web "
+    "sources gathered today. Facts about the present come from them, each "
+    "marked with its source number in square brackets, like [2], which the "
+    "app turns into a link: keep those marks in the final answer, never "
+    "renumber or invent one. Where the sources are silent, say so plainly. "
+    "Your training data is out of date.")
+
+
+def grounded_turn(query: str, pack: str, today=None) -> str:
+    """The user turn a grounded question becomes: the evidence first,
+    the rules after it (an instruction buried before 9 KB of pages is
+    forgotten, 6b242), the question last."""
+    today = today or time.localtime()
+    day = strftime_np("%A, %B %-d, %Y", today)
+    if not pack:
+        return GROUND_NONE.format(query=query, today=day) + "PROMPT: %s" % query
+    return ("What you just found on the web about '%s' \u2014 the reader can "
+            "NEVER see this block, so restate anything you use, and cite it:\n"
+            "%s\n\n%sPROMPT: %s"
+            % (query, pack, GROUND_RULES.format(today=day), query))
+
+
+def _ground_key(question: str) -> str:
+    return re.sub(r"\s+", " ", str(question or "").strip().lower())[:300]
+
+
+class Grounding:
+    """One question's grounded search, on its own thread: started before
+    the response headers (beside the engine pre-warm), waited for after
+    them, so the page sees each phase as a step. `planner(prompt)` is the
+    fastest free model's plan (or None); phases: plan -> search -> read ->
+    done. Whatever is in hand when the handler's wait runs out is used:
+    the snippets-only pack is built as soon as the search lands."""
+
+    def __init__(self, question: str, planner=None, want_photos: bool = False,
+                 today=None):
+        self.question = str(question or "")
+        self.planner = planner
+        self.want_photos = want_photos
+        self.today = today or time.localtime()
+        self.queries, self.model_queries, self.terms = [], [], []
+        self.hits, self.sources, self.pack, self.photos = 0, [], "", []
+        self.n_read, self.n_passages, self.dropped = 0, 0, 0
+        self.phase, self.timed_out, self.error, self.t = "plan", False, "", {}
+        self.done = threading.Event()
+        self._tick = threading.Event()
+        self._lock = threading.Lock()      # sources and pack change together
+
+    def snapshot(self) -> tuple:
+        """(sources, pack, n_read, n_passages) as one consistent set: the
+        numbering in the pack is the order of the sources row."""
+        with self._lock:
+            return (list(self.sources), self.pack, self.n_read, self.n_passages)
+
+    def _publish(self, sources, terms):
+        pack, n_pass = evidence_pack(sources, terms, self.today)
+        with self._lock:
+            self.sources, self.pack, self.n_passages = sources, pack, n_pass
+            self.n_read = sum(1 for s in sources if s.get("paras"))
+
+    def start(self):
+        key = _ground_key(self.question)
+        with _ground_lock:
+            hit = _ground_cache.get(key)
+        if hit and time.time() - hit[0] < GROUND_CACHE_S and (
+                hit[1].photos or not self.want_photos):
+            self._adopt(hit[1])
+            self.phase = "done"
+            self.done.set()
+            return self
+        ctx_thread(target=self._run, daemon=True).start()
+        return self
+
+    def _adopt(self, other):
+        for k in ("queries", "model_queries", "terms", "hits", "sources",
+                  "pack", "photos", "n_read", "n_passages", "dropped", "t"):
+            setattr(self, k, copy.deepcopy(getattr(other, k)))
+        self.cached = True
+
+    def _set_phase(self, ph: str):
+        self.phase = ph
+        self._tick.set()
+
+    def wait(self, on_phase=None, timeout: float = GROUND_TOTAL_S):
+        """Block until done or `timeout`, calling on_phase(phase, self) as
+        each phase begins (and once for the phase already under way)."""
+        end = time.time() + timeout
+        last = None
+        while True:
+            if self.phase != last:
+                last = self.phase
+                if on_phase is not None:
+                    try:
+                        on_phase(last, self)
+                    except Exception:
+                        pass
+            if self.done.is_set() or time.time() >= end:
+                break
+            self._tick.wait(min(0.25, max(0.01, end - time.time())))
+            self._tick.clear()
+        self.timed_out = not self.done.is_set()
+        return self
+
+    def _run(self):
+        import concurrent.futures as _cf
+        t0 = time.time()
+        try:
+            q = self.question
+            nowish = bool(_gq_stamp(q, self.today))
+            rules = plan_queries(q, self.today, limit=GROUND_RULE_QUERIES)
+            self.queries = list(rules)
+            ents = []
+            for part in _GQ_SPLIT_RX.split(q):
+                for e in _gq_terms(part or "")[1]:
+                    if e.lower() not in [x.lower() for x in ents]:
+                        ents.append(e)
+            self._set_phase("search")
+            ex = ctx_executor(3)
+            per_q = self.t.setdefault("queries", {})
+
+            def _timed(s):
+                _ts = time.time()
+                got = _ddg_text(s, GROUND_PER_QUERY)
+                per_q[s] = (len(got), round(time.time() - _ts, 1))
+                return got
+            futs = {ex.submit(_timed, s): s for s in rules}
+            plan_box = []
+            if self.planner is not None:
+                prompt = GROUND_PLAN.format(
+                    today=strftime_np("%A, %B %-d, %Y", self.today),
+                    year=time.strftime("%Y", self.today)) + q[:600]
+                pt = ctx_thread(target=lambda: plan_box.append(self.planner(prompt)),
+                                daemon=True)
+                pt.start()
+                pt.join(timeout=max(0.0, GROUND_PLAN_S - (time.time() - t0)))
+                extra = plan_lines(plan_box[0] if plan_box else "")
+                extra = [e for e in extra
+                         if not any(_gq_same(e, x) for x in self.queries)]
+                extra = extra[:max(0, GROUND_QUERIES - len(self.queries))]
+                for s in extra:
+                    futs[ex.submit(_timed, s)] = s
+                self.model_queries = extra
+                self.queries += extra
+            self.t["plan"] = round(time.time() - t0, 2)
+            terms = []
+            for s in self.queries:
+                for w in _gq_tokens(s):
+                    wl = w.strip(".'\u2019").lower()
+                    if (wl and wl not in [x.lower() for x in terms]
+                            and not re.fullmatch(r"20\d\d", wl)
+                            and wl not in _GQ_FILLER
+                            and wl not in [m.lower() for m in strftime_np("%B", self.today).split()]):
+                        terms.append(w.strip(".'\u2019"))
+            self.terms = terms
+            rows = []
+            budget = GROUND_SEARCH_S + (2.0 if self.model_queries else 0.0)
+            try:
+                for f in _cf.as_completed(
+                        futs, timeout=max(1.0, budget - (time.time() - t0))):
+                    try:
+                        rows.extend(f.result() or [])
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            ex.shutdown(wait=False, cancel_futures=True)
+            self.hits = len(rows)
+            self.t["search"] = round(time.time() - t0, 2)
+            # a few spare candidates: a page that turns out to be a farm
+            # or empty when read gives its place to the next one
+            cands = rank_sources(rows, terms, ents, nowish, self.today,
+                                 limit=GROUND_SOURCES + 4)
+            self.dropped = len(rows) - len(cands)
+            self._publish(cands[:GROUND_SOURCES], terms)
+            self._set_phase("read")
+            t1 = time.time()
+            ex2 = ctx_executor(GROUND_READ)
+            futs2 = {ex2.submit(_page_read, s["url"], self.want_photos): s
+                     for s in cands[:GROUND_READ]}
+            try:
+                for f in _cf.as_completed(futs2, timeout=GROUND_READ_S):
+                    s = futs2[f]
+                    try:
+                        page = f.result()
+                    except Exception:
+                        page = None
+                    if not page:
+                        continue
+                    if page.get("junk"):
+                        s["junk"] = page["junk"]
+                        continue
+                    if page.get("paras"):
+                        s["paras"] = page["paras"]
+                    s["date"] = s.get("date") or page.get("date") or ""
+                    if not s.get("title") or s["title"] == s.get("host"):
+                        s["title"] = page.get("title") or s.get("title")
+                    if page.get("image") and page["image"] not in self.photos:
+                        self.photos.append(page["image"])
+            except Exception:
+                pass
+            ex2.shutdown(wait=False, cancel_futures=True)
+            self.t["read"] = round(time.time() - t1, 2)
+            # read again by what the pages held: one with passages on the
+            # question rises, a farm is out, one that gave nothing sinks
+            for s in cands:
+                if s.get("paras"):
+                    s["score"] += 2 if _para_hits(s["paras"], terms) else -1
+            final = sorted((s for s in cands if not s.get("junk")),
+                           key=lambda s: -s["score"])[:GROUND_SOURCES]
+            self._publish(final, terms)
+            self.t["total"] = round(time.time() - t0, 2)
+            if DEV_HOME:
+                # a dev copy's log tells what was searched and read (the
+                # eval bench and the NOTES measurements read it)
+                print("ground: %s | queries=%r model=%r | hits=%d kept=%d read=%d "
+                      "passages=%d pack=%d | %s" % (
+                          _ground_key(q)[:60], self.queries, self.model_queries,
+                          self.hits, len(final), self.n_read, self.n_passages,
+                          len(self.pack),
+                          " ".join("%s=%s" % (k, v) for k, v in self.t.items()
+                                   if k != "queries")),
+                      file=sys.stderr, flush=True)
+            if final:
+                with _ground_lock:
+                    if len(_ground_cache) > 24:
+                        _ground_cache.clear()
+                    _ground_cache[_ground_key(q)] = (time.time(), self)
+        except Exception as exc:
+            self.error = str(exc)[:200]
+        finally:
+            self.phase = "done"
+            self.done.set()
+            self._tick.set()
+
+
+def ground_start(question: str, planner=None, want_photos: bool = False):
+    """Begin a question's grounded search (never raises; a failure leaves
+    an empty pack and the turn says the search found nothing)."""
+    g = Grounding(question, planner=planner, want_photos=want_photos)
+    try:
+        return g.start()
+    except Exception as exc:
+        g.error = str(exc)[:200]
+        g.phase = "done"
+        g.done.set()
+        return g
+
+
 # ------------------------------------------------------------------ usage
 # THE USAGE LEDGER (6b325, per Patrick: "in the settings, let's add a tab
 # called usage and show the user stats"). One record per model call,
@@ -33766,6 +34831,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # "/search …" forces a lookup; otherwise auto-search decides.
         bookish = False
         placey = False
+        _ground = None           # the grounded search (6b514), finished after the headers
+        _think_tail, _clock_line = "", ""
         # the Remote agent never gets web text in its task, not even on
         # /search: a page could steer a root shell (6b309, review)
         query, forced = None, (prompt.lower().startswith("/search")
@@ -33964,7 +35031,49 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "site:fandango.com OR site:boxofficemojo.com")
                         + "\n" + run_search(query))
                 else:
-                    snippets = run_search(query)
+                    # GROUNDED SEARCH (6b514, per Patrick): planned queries,
+                    # filtered sources, pages read, numbered evidence. It
+                    # runs beside the engine pre-warm and finishes after the
+                    # headers (below, where step() exists), so the page sees
+                    # each phase; the turn holds a placeholder until then.
+                    def _ground_planner(ask_text, _lbl=route_label, _co=cloud_only,
+                                        _ctx=self.ctx):
+                        """The fastest free model's query plan: the person's
+                        server first (6b357), a cloud utility model when
+                        cloud power is on, this computer's engine when it is
+                        already up and idle; '' when none answers in time."""
+                        ask = [{"role": "user", "content": ask_text}]
+                        if not _co:
+                            try:
+                                out = server_side_text(ask, _ctx, max_tokens=120)
+                            except Exception:
+                                out = None
+                            if out:
+                                return out
+                        try:
+                            for _c in gate_ladder(fast_cloud_ladder(utility=True),
+                                                  None, _co):
+                                out = cloud_text(_c, ask, timeout=6,
+                                                 max_tokens=120, quiet=True)
+                                if out:
+                                    return out
+                        except Exception:
+                            pass
+                        try:
+                            _k, _p = MODEL_ROUTES.get(_lbl, (None, None))
+                            if (_k == "mlx" and not _co and _engine_up(_p)
+                                    and _engine_lock.acquire(blocking=False)):
+                                _engine_lock.release()   # nobody is loading
+                                parts = []
+                                run_model(_lbl, ask, parts.append)
+                                return "".join(parts)
+                        except Exception:
+                            pass
+                        return ""
+                    _ground = ground_start(
+                        query, planner=_ground_planner,
+                        want_photos=bool(_WANTS_IMAGES.search(prompt)))
+                    snippets = GROUND_PENDING
                 # ASKED FOR PICTURES, SO FETCH SOME (6b244, per Patrick).
                 # Photos were only ever harvested on the PLACE path —
                 # run_search reads snippets and never opens a page, so a
@@ -34321,7 +35430,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             "is not.")
         if tier == "Thinking" and messages:
             messages[-1] = dict(messages[-1])
-            messages[-1]["content"] += "\n\n" + THINK_HINT
+            _think_tail = "\n\n" + THINK_HINT
+            messages[-1]["content"] += _think_tail
         # WORKSPACE: the chosen agent reads the user's own folder — the
         # files ride under the question so they can't be mistaken for
         # instructions
@@ -34441,11 +35551,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # open/closed verdict inverted. The user turn is the one
             # place no model ignores.
             messages[-1] = dict(messages[-1])
-            messages[-1]["content"] = (
+            _clock_line = (
                 "[for time-sensitive parts: it is %s%s]\n"
                 % (_venue_stamp("%A %-I:%M%p"),
-                   "" if getattr(_tl_search, "tz", "") else " where I am")
-                + str(messages[-1]["content"]))
+                   "" if getattr(_tl_search, "tz", "") else " where I am"))
+            messages[-1]["content"] = _clock_line + str(messages[-1]["content"])
         full_messages = [dated_system] + messages
 
         # stream plain text back; the browser reads it progressively
@@ -34926,6 +36036,54 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hb_stop.set()
             return
 
+        # GROUNDED SEARCH, FINISHED HERE (6b514): the plan and the fan-out
+        # started before the headers; the page sees each phase as a step
+        # while the reads finish, then the evidence pack takes the
+        # question's place in the user turn. That dict is the one
+        # full_messages holds, so the drafts and the merge both read it,
+        # and the system prompt gains its one grounding line.
+        if _ground is not None:
+            def _ground_phase(ph, g):
+                if ph == "search":
+                    nq = len(g.queries)
+                    status("Searching the web\u2026")
+                    step("search", "Searching the web", "run",
+                         "%d quer%s" % (nq, "y" if nq == 1 else "ies"))
+                elif ph == "read":
+                    n = len(g.sources)
+                    step("search", "Searched the web", "done",
+                         "%d source%s" % (n, "" if n == 1 else "s"))
+                    if n:
+                        nr = min(n, GROUND_READ)
+                        status("Reading %d source%s\u2026" % (n, "" if n == 1 else "s"))
+                        step("read", "Reading the pages", "run",
+                             "%d page%s" % (nr, "" if nr == 1 else "s"))
+            try:
+                _ground.wait(_ground_phase, GROUND_TOTAL_S)
+            except Exception:
+                pass
+            _gsrc, _gpack, _gread, _gpass = _ground.snapshot()
+            _tl_search.rows = [{"t": (s.get("title") or s.get("host") or "")[:80],
+                                "u": s.get("url") or "", "d": s.get("date") or ""}
+                               for s in _gsrc if s.get("url")]
+            if _ground.photos:
+                _tl_search.photos = list(_ground.photos)
+            if _gsrc:
+                step("read", "Read the pages", "done",
+                     "%d page%s \u00b7 %d passage%s" % (
+                         _gread, "" if _gread == 1 else "s",
+                         _gpass, "" if _gpass == 1 else "s"))
+                dated_system["content"] += GROUND_SYSTEM
+            _gturn = grounded_turn(query, _gpack)
+            if getattr(_tl_search, "photos", None) and _WANTS_IMAGES.search(prompt):
+                _gturn += ("\n\n[The interface is displaying %d relevant "
+                           "photo(s) from the sources directly beneath your "
+                           "answer. Do NOT say you cannot show images \u2014 "
+                           "describe what they show and carry on.]"
+                           % len(_tl_search.photos))
+            messages[-1]["content"] = _clock_line + _gturn + _think_tail
+            full_messages[-1] = messages[-1]
+
         # the search ran earlier on THIS thread — hand the client its
         # structured hits so the answer carries a clickable sources row
         if query:
@@ -34939,7 +36097,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if getattr(_tl_search, "geo", None):
                 step("geo", "Located it on the map", "done",
                      (getattr(_tl_search, "geo") or {}).get("name", ""))
-            src_rows = getattr(_tl_search, "rows", [])[:5]
+            src_rows = getattr(_tl_search, "rows", [])[:GROUND_SOURCES]
             if src_rows:
                 try:
                     _write((NUL + "SOURCES:" + json.dumps(src_rows) + NUL)
@@ -38323,6 +39481,15 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .srcchip img{width:16px;height:16px;border-radius:4px;flex:none}
 .srcchip:hover{background:rgba(255,255,255,.13);
   border-color:rgba(255,255,255,.3)}
+/* citation chips (6b514): [n] in a grounded answer is a small pill that
+   opens source n (the message's source chips, in order) */
+.msg.ai .body sup.cite{display:inline-block;font:600 10px/1 var(--mono);
+  color:var(--accent);background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.16);border-radius:999px;
+  padding:2px 5px;margin:0 1px 0 2px;vertical-align:super;cursor:pointer;
+  transition:background .15s,border-color .15s}
+.msg.ai .body sup.cite:hover{background:rgba(255,255,255,.17);
+  border-color:rgba(255,255,255,.34)}
 /* photos + pinned map under an answer — the Fable treatment */
 .photorow{display:flex;gap:8px;margin:14px 0 2px;flex-wrap:wrap}
 .photorow img{height:118px;max-width:190px;object-fit:cover;
@@ -43160,6 +44327,14 @@ function renderMD(raw){
       +(a||"image")+"</a>");
   s=s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
     (_,t,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+"</a>");
+  // CITATIONS (6b514): a grounded answer marks each fact with its source
+  // number, [2] or [1][3] or [1, 3]. Each becomes a small chip that opens
+  // that source (the message's own source chips, in order; the delegated
+  // handler beside the chevron's). Never a markdown link's [text](url),
+  // never inside code (arr[1] is an index).
+  s=s.split(/(<code>[\s\S]*?<\/code>)/).map((seg,k)=>k%2?seg:seg.replace(
+    /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\](?!\()/g,(_,ns)=>ns.split(/\s*,\s*/)
+    .map(n=>'<sup class="cite" data-n="'+n+'" title="source '+n+'">'+n+'</sup>').join(""))).join("");
   // PIPE TABLES — models reach for them constantly and they used to
   // render as raw pipes
   // a header and a divider with no rows under them (small models end an answer
@@ -43765,6 +44940,26 @@ inner.addEventListener("click",e=>{
   if(!list)return;
   list.hidden=!list.hidden;
   box.classList.toggle("open",!list.hidden);
+});
+// CITATION CHIPS (6b514): [n] opens the message's nth source chip — the
+// same anchors the disclosure holds, so a reloaded chat works too.
+// Delegated, for the same reason as the chevron above.
+const citeChip=c=>{
+  const msg=c.closest(".msg");
+  const chips=msg?msg.querySelectorAll(".srcchip"):[];
+  return chips[(parseInt(c.dataset.n,10)||0)-1]||null;
+};
+inner.addEventListener("click",e=>{
+  const c=e.target.closest&&e.target.closest("sup.cite");
+  if(!c)return;
+  const a=citeChip(c);
+  if(a){e.preventDefault();a.click();}
+});
+inner.addEventListener("mouseover",e=>{
+  const c=e.target.closest&&e.target.closest("sup.cite");
+  if(!c||c.dataset.titled)return;
+  const a=citeChip(c);
+  if(a){c.title=(a.title||"")+" — "+a.textContent;c.dataset.titled="1";}
 });
 // COPY (6b464, per Patrick: "copying over a block of code doesn't work").
 // One helper, used by the code cards and the answer's copy button. The

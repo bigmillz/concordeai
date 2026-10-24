@@ -36411,6 +36411,360 @@ check("6b497's rules each break a check when broken (%d mutants)" % len(_C97_MUT
       "%r" % _c97_caught)
 # ==== 6b497 the MLX engine follows the app: end ====
 
+# ==== 6b514 grounded web search (per Patrick): begin ====
+# THE "CLAUDE" SEARCH (6b514, per Patrick: the answers are "not even remotely
+# competing" with Claude). Asked about the most powerful GPU or TPU and what
+# Claude runs on, the app searched its 25-word question verbatim, kept four
+# hits, and got claude.ai's sign-in page, a "free Claude" farm, an explainer
+# and a YouTube how-to; the models answered from training data. These run the
+# planner, the source filters, the page reader, the evidence pack and the
+# Grounding thread out of the source with the engine and the web stubbed, the
+# page's citation chips in node, and the handler's wiring from the text.
+print("== grounded web search (6b514) ==")
+import copy as _copy14, html as _html14, threading as _th14, types as _t14
+_g14 = {"re": re, "time": time, "json": json, "html": _html14, "copy": _copy14,
+        "threading": _th14, "urllib": urllib, "socket": socket, "sys": sys, "os": os,
+        "DEV_HOME": "", "HAS_SEARCH": True}
+_exec_names(_g14, {"_NOPAD", "strftime_np", "strip_greeting", "_PREAMBLE_RX", "_FRESH_PATTERNS",
+                   "_ASKY_RX", "_BOOKING_RX", "_PLACE_NOUNS", "strip_think", "strip_special",
+                   "END_TOKENS", "NUL", "_THINK_RE", "_JUNK_HOSTS", "_GOOD_HOSTS",
+                   "_link_shape_ok", "_ip_public", "_LOCAL_HOST_RX"})
+_g14_lo = _MILLENAI_SRC.index("# ------------------------------------------------ grounded web search (6b514)")
+_g14_hi = _MILLENAI_SRC.index("# ------------------------------------------------------------------ usage", _g14_lo)
+_g14_lines = (_MILLENAI_SRC.count("\n", 0, _g14_lo) + 1, _MILLENAI_SRC.count("\n", 0, _g14_hi) + 1)
+for _n14 in _ctree.body:
+    if _g14_lines[0] <= _n14.lineno < _g14_lines[1]:
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n14), _g14)
+_Y14 = time.strftime("%Y")
+_GPUQ14 = ("What is the most powerful GPU in the world right now, or TPU, or anything "
+           "being used for AI? What is Claude using, and what are others using?")
+
+# ---- the planner: rules
+_pq14 = _g14["plan_queries"](_GPUQ14)
+check("the planner never searches the question itself: one keyword query per sub-question, "
+      "GPU/TPU and Anthropic Claude apart, each short",
+      bool(_pq14) and all(q.lower() != _GPUQ14.lower() for q in _pq14) and len(_pq14) >= 2
+      and all(len(q.split()) <= 12 for q in _pq14)
+      and any("GPU" in q and "TPU" in q for q in _pq14)
+      and any("Anthropic" in q and "Claude" in q for q in _pq14), "%r" % _pq14)
+_pq14b = _g14["plan_queries"]("how does a heat pump work")
+_pq14c = _g14["plan_queries"]("what happened in the news today")
+check("a question about now carries the year, one about this week the month, a timeless one neither",
+      all(_Y14 in q for q in _pq14) and _pq14b and not any(re.search(r"\b20\d\d\b", q) for q in _pq14b)
+      and _pq14c and all(time.strftime("%B %Y") in q for q in _pq14c),
+      "%r %r %r" % (_pq14, _pq14b, _pq14c))
+_pq14d = _g14["plan_queries"]("what's new in macOS 26 Tahoe")
+_pq14e = _g14["plan_queries"]("iPhone 17 Pro vs Pixel 10 Pro camera, which is better?")
+check("names and versions are copied exactly; a comparison searches each side on its own",
+      _pq14d and "macOS 26 Tahoe" in _pq14d[0]
+      and any(q.startswith("iPhone 17 Pro") and "Pixel" not in q for q in _pq14e)
+      and any(q.startswith("Pixel 10 Pro") and "iPhone" not in q for q in _pq14e),
+      "%r %r" % (_pq14d, _pq14e))
+_pq14f = _g14["plan_queries"](_GPUQ14, planned=[_pq14[0], "NVIDIA Vera Rubin specs 2026"])
+check("a model's plan adds angles after the sub-questions and never a duplicate",
+      "NVIDIA Vera Rubin specs 2026" in _pq14f
+      and sum(1 for q in _pq14f if _g14["_gq_same"](q, _pq14[0])) == 1
+      and _pq14f.index("NVIDIA Vera Rubin specs 2026") >= 2, "%r" % _pq14f)
+_pl14 = _g14["plan_lines"]('Here are the queries:\n1. "NVIDIA Vera Rubin specs 2026"\n'
+                            '- Anthropic Trainium TPU 2026\n* most powerful AI chip 2026 benchmark\n'
+                            'The most powerful GPU is the H100 which was released in 2022 and has 80GB of memory')
+check("a model's plan is read line by line: numbering, bullets and quotes off, an answer dropped",
+      _pl14 == ["NVIDIA Vera Rubin specs 2026", "Anthropic Trainium TPU 2026",
+                "most powerful AI chip 2026 benchmark"], "%r" % _pl14)
+
+# ---- the sources: filters, duplicates, ranking, dates
+_rows14 = [
+    {"title": "Sign in to Claude, Anthropic's AI assistant for problem solvers.", "href": "https://claude.ai/", "body": "Claude"},
+    {"title": "Unlimited Claude AI Pro for Free - No Signup or Login - Veo AI Free", "href": "https://veoaifree.com/claude/", "body": "Claude GPU"},
+    {"title": "How to Use Claude AI? | A to Z Guide to Claude... - YouTube", "href": "https://www.youtube.com/watch?v=HR-JauWHQMM", "body": "Claude"},
+    {"title": "What is Claude AI? Anthropic's LLM vs ChatGPT | Pluralsight", "href": "https://www.pluralsight.com/resources/blog/ai-and-data/what-is-claude-ai", "body": "Claude is a family of models"},
+    {"title": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware", "href": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html", "body": "GPU rankings for AI, Oct 2026"},
+    {"title": "NVIDIA Vera Rubin NVL144: the next AI GPU platform", "href": "https://www.nvidia.com/en-us/data-center/vera-rubin/", "body": "The Vera Rubin GPU for AI, shipping 2026"},
+    {"title": "NVIDIA Vera Rubin NVL144: the next AI GPU platform", "href": "https://nvidia.com/en-us/data-center/vera-rubin/amp/", "body": "dup"},
+    {"title": "NVIDIA Blackwell Ultra for AI", "href": "https://www.nvidia.com/en-us/data-center/blackwell-ultra/", "body": "GPU AI 2026"},
+    {"title": "NVIDIA Hopper H100 GPU", "href": "https://www.nvidia.com/en-us/data-center/h100/", "body": "GPU AI"},
+    {"title": "The best AI GPU of 2021", "href": "https://oldblog.example/2021/03/best-gpu/", "body": "the most powerful GPU for AI in 2021"},
+    {"title": "Google TPU Update — AI Workloads के लिए कैसे बन रहे हैं Powerful",
+     "href": "https://aitechnews.co.in/blog/x", "body": "TPU एक step और आगे है — ये chip सिर्फ और सिर्फ AI calculations के लिए design की गई है"},
+    {"title": "Claude", "href": "https://claude.com/", "body": "Claude by Anthropic"},
+    {"title": "Anthropic expands its use of Google Cloud TPUs", "href": "https://www.anthropic.com/news/tpus", "body": "Anthropic runs Claude on TPU, Trainium and GPU"},
+    {"title": "r/LocalLLaMA: best GPU for AI", "href": "https://www.reddit.com/r/LocalLLaMA/comments/abc/best_gpu", "body": "GPU AI 2026"},
+    {"title": "Best GPU for AI (group)", "href": "https://www.facebook.com/groups/ai/posts/1", "body": "GPU AI"},
+]
+_terms14 = ["most", "powerful", "GPU", "TPU", "AI", "Anthropic", "Claude"]
+_ents14 = ["GPU", "TPU", "Claude", "Anthropic", "NVIDIA"]
+_rk14 = _g14["rank_sources"](_rows14, _terms14, _ents14, True, time.localtime(), limit=8)
+_hosts14 = [s["host"] for s in _rk14]
+check("sign-in pages, 'free AI' farms, video and social pages, another script and a bare homepage "
+      "never reach the model",
+      _rk14 and not any(h in ("claude.ai", "veoaifree.com", "youtube.com", "aitechnews.co.in",
+                               "claude.com", "facebook.com") for h in _hosts14), "%r" % _hosts14)
+check("near-duplicates collapse (www, amp) and a host gets two pages at most",
+      _hosts14.count("nvidia.com") == 2 and sum(1 for s in _rk14 if "vera-rubin" in s["url"]) == 1,
+      "%r" % _hosts14)
+_rk14f = _g14["rank_sources"](_rows14, _terms14, _ents14, False, time.localtime(), limit=8)
+_old_t = next((s["score"] for s in _rk14 if s["host"] == "oldblog.example"), None)
+_old_f = next((s["score"] for s in _rk14f if s["host"] == "oldblog.example"), None)
+check("the asked-about vendors' own pages rank first; a 2021 page is marked down only for a question about now",
+      set(_hosts14[:2]) == {"nvidia.com", "anthropic.com"}
+      and _old_t is not None and _old_f is not None and _old_f - _old_t == 2
+      and _hosts14.index("oldblog.example") > _hosts14.index("tomshardware.com"),
+      "%r %r %r" % (_hosts14, _old_t, _old_f))
+check("why a hit is junk, by name",
+      _g14["_src_junk"]({"url": "https://claude.ai/login", "title": "Sign in"}) == "login"
+      and _g14["_src_junk"]({"url": "https://x.y/a", "title": "Unlimited Claude for free, no signup"}) == "farm"
+      and _g14["_src_junk"]({"url": "https://youtu.be/abc", "title": "How to"}) == "video"
+      and _g14["_src_junk"]({"url": "https://www.instagram.com/p/1", "title": "post"}) == "social"
+      and _g14["_src_junk"]({"url": "https://www.nvidia.com/x", "title": "Vera Rubin"}) == "", "")
+check("a page's date is read from its URL or its snippet, the most specific form first; a date after today is a misread",
+      _g14["_src_date"]({"url": "https://x.y/2026/06/01/rubin"}) == "2026-06-01"
+      and _g14["_src_date"]({"url": "https://x.y/a", "body": "Published Jun 1, 2026 — Rubin ships"}) == "2026-06-01"
+      and _g14["_src_date"]({"url": "https://x.y/a", "body": "1 June 2026: Rubin ships"}) == "2026-06-01"
+      and _g14["_src_date"]({"url": "https://x.y/a", "body": "In June 2026 Rubin ships"}) == "2026-06"
+      and _g14["_src_date"]({"url": "https://x.y/a", "title": "GPU hierarchy 2026"}) == "2026"
+      and _g14["_src_date"]({"url": "https://x.y/a", "title": "GPU hierarchy"}) == ""
+      and not any(s["date"] for s in _g14["rank_sources"](
+          [{"title": "GPU AI", "href": "https://x.y/2031/01/a", "body": "GPU"}], ["GPU"], [], True)), "")
+
+# ---- reading a page: the main text, the date, the User-Agent, the farms
+_HTML14 = ("<html><head><title>NVIDIA Vera Rubin ships — Example News</title>"
+           '<meta property="og:title" content="NVIDIA Vera Rubin ships this autumn">'
+           '<meta property="article:published_time" content="2026-06-01T10:00:00Z">'
+           '<meta property="og:image" content="https://img.example/rubin.jpg">'
+           "<script>var x=1;</script><style>.a{}</style></head><body>"
+           "<nav><a>Home</a><a>Sign in to your account here</a></nav>"
+           "<header>Example News, the site header, long enough to pass for a paragraph of text</header>"
+           "<article><p>Accept all cookies to continue reading this article on our website today.</p>"
+           "<p>Vera Rubin, NVIDIA's next GPU platform, entered full production in June 2026 and ships to "
+           "cloud providers this autumn. Each Rubin GPU delivers up to 50 petaflops of inference.</p>"
+           "<p>The weather in Santa Clara was mild, and the keynote ran long, with a musical interlude "
+           "that nobody had asked for and everyone politely sat through.</p>"
+           "<p>Anthropic trains and runs Claude on AWS Trainium, Google TPUs and NVIDIA GPUs, the "
+           "company said in a statement that day.</p></article>"
+           "<footer>All rights reserved. Privacy policy. Terms of use apply to this site.</footer>"
+           "</body></html>")
+_FARM14 = ("<html><body><article><p>SEO Keywords: most powerful AI 2026, best GPU</p>"
+           "<p>Meta Description: the most powerful AI model ever built is here for your business.</p>"
+           "<p>The RTX 5090 is the most powerful consumer GPU ever built for AI workloads today.</p></article></body></html>")
+_reqs14 = []
+
+
+class _Resp14:
+    def __init__(self, body, ctype):
+        self._b, self.headers = body, {"Content-Type": ctype}
+    def read(self, n=-1):
+        return self._b
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+
+
+def _urlopen14(req, timeout=0):
+    _reqs14.append(req)
+    u = req.full_url
+    if "farm" in u:
+        return _Resp14(_FARM14.encode(), "text/html; charset=utf-8")
+    if "image" in u:
+        return _Resp14(b"\x89PNG", "image/png")
+    return _Resp14(_HTML14.encode("utf-8"), "text/html; charset=utf-8")
+
+
+_g14["urllib"] = _t14.SimpleNamespace(request=_t14.SimpleNamespace(Request=urllib.request.Request,
+                                                                   urlopen=_urlopen14),
+                                      parse=urllib.parse)
+# (.example is a reserved local name the reader refuses, so these hosts aren't)
+_pg14 = _g14["_page_read"]("https://news.rubintest.com/2026/06/rubin", want_photo=True) or {}
+_paras14 = list(_pg14.get("paras") or [])
+_pt14 = "\n".join(_paras14)
+check("a page is read for its main text: navigation, header, footer, scripts and boilerplate out, "
+      "title, date and picture in",
+      bool(_pg14) and _pg14.get("title") == "NVIDIA Vera Rubin ships this autumn"
+      and _pg14.get("date") == "2026-06-01" and _pg14.get("image") == "https://img.example/rubin.jpg"
+      and "50 petaflops" in _pt14 and "AWS Trainium" in _pt14
+      and "Sign in" not in _pt14 and "cookies" not in _pt14 and "rights reserved" not in _pt14
+      and "site header" not in _pt14, "%r" % (_paras14,))
+check("the reader sends a browser User-Agent, never Python's (the 403 trap)",
+      _reqs14 and _reqs14[-1].get_header("User-agent", "").startswith("Mozilla/5.0 (Macintosh")
+      and "Python-urllib" not in _reqs14[-1].get_header("User-agent", ""), "")
+_pf14 = _g14["_page_read"]("https://farm.rubintest.com/post")
+check("a page that prints its own SEO scaffolding is a farm; a picture, a PDF and a private address are not read",
+      _pf14 is not None and _pf14.get("junk") == "farm"
+      and _g14["_page_read"]("https://x.rubintest.com/image.png") is None
+      and _g14["_page_read"]("https://x.rubintest.com/paper.pdf") is None
+      and _g14["_page_read"]("http://127.0.0.1:9896/secret") is None
+      and _g14["_page_read"]("https://news.example/2026/06/rubin") is None
+      and not any("127.0.0.1" in r.full_url or "news.example" in r.full_url for r in _reqs14),
+      "%r" % (_pf14,))
+_pp14 = _g14["_pick_passages"](_paras14, ["Vera", "Rubin", "GPU", "Anthropic", "Claude"], cap=600)
+check("the passages kept are the ones that bear on the question, in page order, the weather left out",
+      len(_pp14) == 2 and "50 petaflops" in _pp14[0] and "AWS Trainium" in _pp14[1]
+      and not any("weather" in p for p in _pp14), "%r" % _pp14)
+_long14 = ["Rubin " + ("word " * 120) + "end. " + ("more " * 40)]
+_pc14 = _g14["_pick_passages"](_long14, ["Rubin"], cap=400, each=200)
+check("a long passage is cut at a sentence end within its share",
+      len(_pc14) == 1 and len(_pc14[0]) <= 210 and _pc14[0].endswith(("end.", "…")), "%r" % _pc14)
+
+# ---- the evidence pack and the turn
+_srcs14 = [{"title": "NVIDIA Vera Rubin ships", "host": "nvidia.com", "date": "2026-06-01",
+            "url": "https://www.nvidia.com/x", "body": "snippet", "paras": list(_paras14)},
+           {"title": "GPU hierarchy", "host": "tomshardware.com", "date": "",
+            "url": "https://www.tomshardware.com/y", "body": "the snippet text of the hit", "paras": []}]
+_pack14, _np14 = _g14["evidence_pack"](_srcs14, ["Vera", "Rubin", "GPU", "Anthropic", "Claude"])
+check("the evidence pack: numbered sources with title, host, date and URL, their passages under them, "
+      "the snippet when a page gave no text",
+      _pack14.startswith("WEB EVIDENCE gathered " + time.strftime("%Y-%m-%d"))
+      and "[1] NVIDIA Vera Rubin ships — nvidia.com — 2026-06-01\n    https://www.nvidia.com/x" in _pack14
+      and "[2] GPU hierarchy — tomshardware.com — date unknown" in _pack14
+      and "    the snippet text of the hit" in _pack14 and "50 petaflops" in _pack14
+      and "weather" not in _pack14 and _np14 == 3, _pack14[:300])
+check("the pack is sized to its budget (a 32K context keeps room for the drafts)",
+      len(_g14["evidence_pack"](_srcs14, ["Rubin"], budget=700)[0]) <= 700
+      and _g14["GROUND_PACK_CHARS"] <= 12000, "")
+_turn14 = _g14["grounded_turn"]("most powerful GPU", _pack14)
+_none14 = _g14["grounded_turn"]("most powerful GPU", "")
+check("the grounded turn: evidence first, then today's date, 'training data ... OUT OF DATE', current "
+      "facts from the evidence only, cite as [1], say what it doesn't cover, the question last",
+      _turn14.index("WEB EVIDENCE") < _turn14.index("GROUNDING RULES")
+      and ("Today is " + _g14["strftime_np"]("%A, %B %-d, %Y")) in _turn14
+      and "training data ends before today" in _turn14 and "OUT OF DATE" in _turn14
+      and "comes from the evidence above and nowhere else" in _turn14
+      and "like [1], or [2][4]" in _turn14 and "does not cover part of the question" in _turn14
+      and _turn14.rstrip().endswith("PROMPT: most powerful GPU"), _turn14[-400:])
+check("with nothing found the turn says so, dates the model's memory and never invents a 'right now'",
+      "found nothing usable" in _none14 and "out of date" in _none14 and "[1]" not in _none14
+      and "never present it as 'right now'" in _none14, _none14[:200])
+
+# ---- the Grounding thread, web stubbed: phases, the model's plan, the cache, a late planner, a dead web
+_calls14, _pages14 = [], []
+
+
+def _ddg14(q, limit=8):
+    _calls14.append(q)
+    time.sleep(0.05)
+    slug = re.sub(r"\W+", "-", q.lower())
+    return [{"title": "Sign in to Claude", "href": "https://claude.ai/", "body": "Claude"},
+            {"title": "Claude for free no signup", "href": "https://farm.rubintest.com/" + slug, "body": "GPU TPU"},
+            {"title": "NVIDIA on %s" % q, "href": "https://www.nvidia.com/%s" % slug, "body": "Vera Rubin GPU TPU AI 2026 " + q},
+            {"title": "Reuters: %s" % q, "href": "https://www.reuters.com/%s" % slug, "body": "GPU TPU Anthropic Claude 2026 " + q}]
+
+
+def _pr14(url, want_photo=False, timeout=6.0):
+    _pages14.append(url)
+    return {"title": "", "date": "2026-06-01", "image": "",
+            "paras": ["The Vera Rubin GPU delivers 50 petaflops for AI in 2026, NVIDIA says.",
+                      "An unrelated paragraph about the weather during the keynote in Santa Clara."]}
+
+
+_g14["_ddg_text"], _g14["_page_read"] = _ddg14, _pr14
+_ph14 = []
+_gr14 = _g14["ground_start"](_GPUQ14, planner=lambda p: "NVIDIA Vera Rubin specs 2026\nAnthropic Trainium TPU 2026")
+_gr14.wait(lambda ph, g: _ph14.append((ph, len(g.queries), len(g.sources))), 20.0)
+_phn14 = [p[0] for p in _ph14]
+check("the grounding runs plan -> search -> read -> done and reports each phase once, with its counts",
+      _phn14[-1] == "done" and "search" in _phn14 and "read" in _phn14
+      and _phn14 == sorted(_phn14, key=["plan", "search", "read", "done"].index)
+      and len(_phn14) == len(set(_phn14)) and not _gr14.timed_out and not _gr14.error,
+      "%r %r" % (_ph14, _gr14.error))
+check("the model's plan rides beside the rules' queries and every query is searched",
+      _gr14.model_queries == ["NVIDIA Vera Rubin specs 2026", "Anthropic Trainium TPU 2026"]
+      and set(_gr14.queries) <= set(_calls14) and len(_gr14.queries) <= _g14["GROUND_QUERIES"]
+      and len(_gr14.queries) >= 4, "%r %r" % (_gr14.queries, _calls14))
+_src14 = _gr14.snapshot()[0]
+check("junk never reaches the pack; the pages read are the sources numbered; the pack carries their passages",
+      _src14 and not any(s["host"] in ("claude.ai", "farm.rubintest.com") for s in _src14)
+      and _gr14.pack.startswith("WEB EVIDENCE") and "[1]" in _gr14.pack and "50 petaflops" in _gr14.pack
+      and "weather" not in _gr14.pack and _gr14.n_read >= 1 and len(_pages14) >= 1
+      and _gr14.t.get("total", 99) < 10, "%r" % [s["host"] for s in _src14])
+_n14 = len(_calls14)
+_gr14b = _g14["ground_start"](_GPUQ14)
+_gr14b.wait(None, 5.0)
+check("a question asked again reuses its evidence: no second search, the same pack",
+      len(_calls14) == _n14 and getattr(_gr14b, "cached", False) and _gr14b.pack == _gr14.pack
+      and _gr14b.phase == "done", "")
+_g14["GROUND_PLAN_S"] = 0.3
+_t14b = time.time()
+_gr14c = _g14["ground_start"]("what's the newest Pixel phone", planner=lambda p: (time.sleep(1.5), "Pixel 11 specs 2026")[1])
+_gr14c.wait(None, 10.0)
+_el14 = time.time() - _t14b
+check("a planner slower than its budget is not waited for: the rules' queries stand alone",
+      _gr14c.model_queries == [] and _gr14c.queries and not _gr14c.timed_out and _el14 < 4.0,
+      "%r %.1fs" % (_gr14c.queries, _el14))
+
+
+def _dead14(q, limit=8):
+    raise RuntimeError("offline")
+
+
+_g14["_ddg_text"] = _dead14
+_gr14d = _g14["ground_start"]("who is the current UN secretary general")
+_gr14d.wait(None, 10.0)
+check("a dead web ends the grounding cleanly: no sources, an empty pack, the turn says nothing was found",
+      _gr14d.phase == "done" and _gr14d.sources == [] and _gr14d.pack == "" and not _gr14d.timed_out
+      and "found nothing usable" in _g14["grounded_turn"]("who is the current UN secretary general", _gr14d.pack), "")
+
+# ---- the handler's wiring, from the text
+_hs14 = _MILLENAI_SRC[_MILLENAI_SRC.index("def do_POST(self)"):]
+_i_start14 = _hs14.index("_ground = ground_start(")
+_i_hdr14 = _hs14.index("self.end_headers()", _i_start14)
+_i_wait14 = _hs14.index("_ground.wait(_ground_phase, GROUND_TOTAL_S)")
+_i_srcs14 = _hs14.index("# the search ran earlier on THIS thread")
+check("the plain web path starts the grounded search before the headers and finishes it after them, "
+      "before the sources row; the verbatim run_search is gone from that path",
+      _i_start14 < _i_hdr14 < _i_wait14 < _i_srcs14
+      and "                else:\n                    snippets = run_search(query)" not in _MILLENAI_SRC
+      and "snippets = GROUND_PENDING" in _hs14
+      and "_ground = None           # the grounded search (6b514)" in _hs14, "")
+check("the evidence takes the question's place in the one dict the drafts and the merge both read, "
+      "with the clock line and the Thinking hint kept, and the system prompt gains its grounding line",
+      "messages[-1][\"content\"] = _clock_line + _gturn + _think_tail" in _hs14
+      and "full_messages[-1] = messages[-1]" in _hs14
+      and "dated_system[\"content\"] += GROUND_SYSTEM" in _hs14
+      and "_think_tail = \"\\n\\n\" + THINK_HINT" in _hs14
+      and "messages[-1][\"content\"] = _clock_line + str(messages[-1][\"content\"])" in _hs14
+      and "keep those marks in the final answer" in _MILLENAI_SRC, "")
+check("the page sees the phases as steps: searching with the query count, reading with the page count, read with passages",
+      'step("search", "Searching the web", "run",' in _hs14
+      and 'status("Reading %d source%s\\u2026"' in _hs14
+      and 'step("read", "Reading the pages", "run",' in _hs14
+      and '"%d page%s \\u00b7 %d passage%s"' in _hs14
+      and "src_rows = getattr(_tl_search, \"rows\", [])[:GROUND_SOURCES]" in _hs14, "")
+check("the planner asks the fastest free model: the person's server, a cloud utility model with cloud power on, "
+      "an idle local engine; and the weather, places, listings and deep paths are untouched",
+      "server_side_text(ask, _ctx, max_tokens=120)" in _hs14
+      and "gate_ladder(fast_cloud_ladder(utility=True)," in _hs14
+      and "_engine_lock.acquire(blocking=False)" in _hs14
+      and "snippets, matched = place_search(query)" in _hs14
+      and "snippets = weather_snippets(query)" in _hs14
+      and "snippets = run_search_deep(srch, pages=3)" in _hs14
+      and "site:rottentomatoes.com" in _hs14, "")
+
+# ---- the page: [n] becomes a chip that opens source n (renderMD in node, the handlers in the text)
+_cite_js14 = (re.search(r"function esc\(s\)\{.*?;\}\n", _MILLENAI_SRC, re.S).group(0)
+              + "const flowDiagram=c=>c,annSlot=()=>null,hilite=c=>c,dlBox=()=>'',api=()=>'';\n"
+              + _jsfn(_MILLENAI_SRC, "function renderMD(raw){")
+              + r'''
+const out=renderMD("Rubin ships this autumn [1][3]. Ironwood has 192 GB [2, 4].\nSee [the post](https://x.y/z) and `a[1]` in code. Not a cite: [12](https://a.b).");
+process.stdout.write(JSON.stringify({chips:(out.match(/<sup class="cite" data-n="(\d+)"/g)||[]).length,
+  ns:(out.match(/data-n="(\d+)"/g)||[]).map(m=>m.replace(/\D/g,"")),
+  links:(out.match(/<a href="https:\/\/(x\.y\/z|a\.b)"/g)||[]).length,
+  code:out.indexOf("<code>a[1]</code>")>=0}));''')
+try:
+    _cf14 = os.path.join(_SMOKE_TMP, "cite14.js")
+    open(_cf14, "w").write(_cite_js14)
+    _co14 = json.loads(subprocess.run(["node", _cf14], capture_output=True, text=True, timeout=30).stdout)
+except Exception as _e14:
+    _co14 = {"err": str(_e14)}
+check("the page turns [1][3] and [2, 4] into four citation chips, leaves markdown links and code alone (node)",
+      _co14.get("chips") == 4 and _co14.get("ns") == ["1", "3", "2", "4"] and _co14.get("links") == 2
+      and _co14.get("code") is True, "%r" % _co14)
+_page14 = req("/", token=False)[2].decode("utf-8", "replace")
+check("the chips open the message's own source chips (delegated, so a reloaded chat works), and are styled",
+      "const citeChip=c=>{" in _page14 and 'e.target.closest("sup.cite")' in _page14
+      and "a.click()" in _page14 and ".msg.ai .body sup.cite{" in _page14
+      and '<sup class="cite" data-n="' in _page14, "")
+# ==== 6b514 grounded web search: end ====
+
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
 passed = sum(1 for _n, o, _d in RESULTS if o)
