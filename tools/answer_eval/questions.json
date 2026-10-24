@@ -1,0 +1,961 @@
+{
+  "version": 1,
+  "as_of": "2026-10-24",
+  "note": "Thirty questions in the owner's own register, drawn from the topics in his sidebar, plus three follow-up turns. Each turn carries a reference sheet: what a great answer must get right as of as_of, the URLs checked on that date, and the traps (stale or invented claims a local model is prone to). Numbers marked ~ are estimates from the sources, not quotes. Categories: fresh (needs search), compare, health, travel, money, reasoning, technical. Turn 2 of a question is graded as a follow-up.",
+  "categories": {
+    "fresh": "fast-changing facts that need a web search: hardware, prices, releases, rates",
+    "compare": "two or more options weighed with numbers",
+    "health": "health and practical advice",
+    "travel": "travel and places",
+    "money": "money, work and life decisions",
+    "reasoning": "arithmetic and reasoning with a checkable answer",
+    "technical": "a short technical explanation"
+  },
+  "questions": [
+    {
+      "id": "q01",
+      "category": "fresh",
+      "topic": "AI hardware leaders",
+      "turns": [
+        {
+          "q": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+          "reference": {
+            "key_facts": [
+              "Nvidia: Blackwell Ultra (B300 / GB300 NVL72; 288 GB HBM3e per GPU, ~1.5x GB200 at the rack) is the top accelerator shipping in volume in October 2026. The next generation, Vera Rubin (Rubin GPU with 288 GB HBM4; NVL72 rack claimed ~5x Blackwell inference throughput), is in full production with first customer shipments in fall 2026: Google Cloud's A5X (Vera Rubin NVL72) reaches GA in November 2026; Nvidia showed containerised Vera Rubin 'AI factory' pods at GTC Berlin on 21 Oct 2026 for early-2027 delivery. Rubin Ultra is slated for H2 2027.",
+              "Google: Ironwood (TPU v7 / TPU7x) is generally available since April 2026 (4,614 FP8 TFLOPS and 192 GB HBM3E per chip; 9,216-chip pods, ~42.5 FP8 exaflops). The eighth generation was announced in April 2026 as two chips, TPU 8t (training, 216 GB HBM3e, ~12.6 FP4 PFLOPS) and TPU 8i (inference, 288 GB HBM); availability is later than Ironwood's and should be described as announced, not current.",
+              "AMD: MI350/MI355X are shipping; the MI450/MI455X 'Helios' 72-GPU racks (432 GB HBM4 per GPU) are in production for H2 2026 deliveries, with OpenAI (6 GW deal, first GW in H2 2026), Meta (1 GW in 2026, up to 6 GW), Microsoft Azure and Oracle as first customers.",
+              "Amazon: Trainium2 is in volume use (Project Rainier); Trainium3 is due later in 2026.",
+              "Claude: Anthropic says it trains and serves Claude on AWS Trainium (over one million Trainium2 chips; Amazon is its primary training partner, with an April 2026 deal for up to 5 GW), Google TPUs (the October 2025 deal for up to one million TPUs, with more than a gigawatt coming online in 2026, expanded with Google and Broadcom for 2027), and Nvidia GPUs through cloud partners. It announced an in-house chip-design team in August 2026.",
+              "Others: OpenAI runs mostly on Nvidia (GB200/GB300 through Microsoft, Oracle, CoreWeave) and is adding AMD MI450 from H2 2026 and Broadcom custom silicon; Google trains Gemini on its own TPUs; Meta uses Nvidia plus AMD and its own MTIA; xAI runs Nvidia (Colossus).",
+              "A great answer says 'as of October 2026', separates a single chip from a rack/pod, and distinguishes 'shipping now' (Blackwell Ultra, Ironwood, MI355X, Trainium2) from 'announced/ramping' (Vera Rubin, TPU 8, MI450)."
+            ],
+            "traps": [
+              "Naming the H100/H200, TPU v5e/v5p or MI300X as the current leaders: they are 2023-2024 parts, two generations back.",
+              "'TPU v5e packs 16 TB of memory per chip' (it has 16 GB of HBM2).",
+              "'Claude 2 runs on H200s' (Claude 2 is a 2023 model; the H200 shipped in 2024; Anthropic's stated platforms are Trainium, TPUs and Nvidia GPUs).",
+              "Saying Anthropic runs only on Nvidia, or only on Trainium.",
+              "Quoting dates like 'H200 announced September 2024' or 'MI300X launched October 2024' (H200 was announced Nov 2023; MI300X Dec 2023).",
+              "Treating the search results about 'what is Claude' / claude.ai sign-in pages as sources for chips."
+            ],
+            "sources": [
+              "https://www.cnbc.com/2026/10/21/nvidia-announces-vera-rubin-racks-that-can-be-shipped-on-a-truck-.html",
+              "https://www.thundercompute.com/blog/nvidia-rubin-architecture",
+              "https://shattered.io/google-cloud-a5x-vera-rubin-960000-gpus-november-ga-2026/",
+              "https://www.nvidia.com/en-us/data-center/dgx-b300/",
+              "https://blog.google/innovation-and-ai/infrastructure-and-cloud/google-cloud/ironwood-tpu-age-of-inference/",
+              "https://blog.google/innovation-and-ai/infrastructure-and-cloud/google-cloud/eighth-generation-tpu-agentic-era/",
+              "https://www.tomshardware.com/tech-industry/semiconductors/google-splits-its-tpu-into-two-chips-for-the-first-time-with-training-and-inference-variants",
+              "https://www.anthropic.com/news/google-broadcom-partnership-compute",
+              "https://www.anthropic.com/news/anthropic-amazon-compute",
+              "https://www.cnbc.com/2025/10/23/anthropic-google-cloud-deal-tpu.html",
+              "https://www.igorslab.de/en/amd-helios-in-production-mi455x-epyc-venice-openai-challenge-nvidia-ai-racks/",
+              "https://www.datacenterdynamics.com/en/news/meta-and-amd-sign-mutli-year-agreement-for-6gw-gpu-deployment/"
+            ],
+            "ideal": "Lead with 'as of October 2026: Blackwell Ultra now, Vera Rubin arriving; Ironwood for TPUs with TPU 8 announced', then Claude's three platforms, then one line each for OpenAI, Google, Meta, xAI. Six to ten sentences, no table."
+          }
+        },
+        {
+          "q": "I feel like Claude's response beat you. explain more",
+          "reference": {
+            "key_facts": [
+              "The assistant cannot see Claude's answer; a great reply says so in a clause and does not invent what Claude said.",
+              "It owns the concrete errors of its first answer (stale chips named as current, wrong specs, wrong Claude platform) and gives the corrected October 2026 picture: Blackwell Ultra shipping, Vera Rubin ramping, Ironwood GA with TPU 8 announced, MI450 arriving H2 2026, Anthropic on Trainium + TPUs + Nvidia.",
+              "It explains why it went wrong in plain terms: the web search returned pages about Claude the product, not chips, so the first answer came from training memory that stops before 2025.",
+              "It stays short and direct, in the asker's register."
+            ],
+            "traps": [
+              "Fabricating Claude's answer ('Claude correctly identified the Rubin and TPU v8 architectures', 'Claude mentioned a tri-pod strategy').",
+              "Repeating the stale claims (H200, MI300X, TPU v5e) while 'explaining'.",
+              "Flattery or a lecture on how AI hardware changes every 6-12 months instead of the corrected facts."
+            ],
+            "sources": [
+              "https://www.cnbc.com/2026/10/21/nvidia-announces-vera-rubin-racks-that-can-be-shipped-on-a-truck-.html",
+              "https://blog.google/innovation-and-ai/infrastructure-and-cloud/google-cloud/eighth-generation-tpu-agentic-era/",
+              "https://www.anthropic.com/news/google-broadcom-partnership-compute"
+            ],
+            "ideal": "One clause admitting it can't see Claude's reply, then 'here is what I got wrong and the current picture', five to eight sentences."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q02",
+      "category": "fresh",
+      "topic": "Latest iPhone and upgrade value",
+      "turns": [
+        {
+          "q": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+          "reference": {
+            "key_facts": [
+              "Apple announced the iPhone 18 Pro and iPhone 18 Pro Max on 9 September 2026 (pre-orders that week), plus its first foldable, the iPhone Duo.",
+              "Prices: iPhone 18 Pro from $1,199 (256 GB; Apple's own page quotes $1,199 for the 256 GB Pro), iPhone 18 Pro Max from $1,299, iPhone Duo from $1,999; both Pros are $100 above last year's and a 2 TB option exists for the first time.",
+              "The standard iPhone 18 is NOT out: Apple split the line and the non-Pro iPhone 18 is expected in spring 2027. The iPhone 17 ($899 after a $100 rise), iPhone 17e, iPhone Air and iPhone 16 stay on sale.",
+              "Upgrade verdict for an iPhone 14 (2022): a large real jump in chip, cameras, battery and screen, and the 14 has maybe two to three more years of iOS updates; the value move is the $899 iPhone 17 or waiting for the spring 2027 iPhone 18 unless the Pro camera/zoom matters. Trade-in and the memory-price-driven increases are worth a line.",
+              "Prices and the 2026 memory shortage should be dated ('as of October 2026')."
+            ],
+            "traps": [
+              "Naming the iPhone 16 Pro or 17 Pro as the newest, or saying the iPhone 18 (non-Pro) is on sale.",
+              "Quoting $999 for the Pro or $1,199 for the Pro Max (last year's prices).",
+              "Inventing camera megapixels, chip names or battery figures as facts without a source."
+            ],
+            "sources": [
+              "https://www.macrumors.com/2026/09/09/iphone-18-pro-pricing/",
+              "https://www.macrumors.com/2026/09/09/iphone-18-pro-preorders-release-date-announced/",
+              "https://www.bgr.com/2254261/iphone-18-pro-vs-iphone-duo-price-apple-september-2026/",
+              "https://www.apple.com/shop/buy-iphone"
+            ],
+            "ideal": "Newest = iPhone 18 Pro/Pro Max (Sept 2026) at $1,199/$1,299, Duo $1,999; the base 18 comes in spring 2027; then a one-paragraph verdict for a 14 owner with the cheaper paths."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q03",
+      "category": "fresh",
+      "topic": "Fastest DigitalOcean server",
+      "turns": [
+        {
+          "q": "What's the fastest DigitalOcean server I can rent right now for running a small LLM, and what's the cheapest droplet that would run a 7B model at all? Monthly prices please.",
+          "reference": {
+            "key_facts": [
+              "DigitalOcean's GPU Droplets (docs pricing page, verified 25 Aug 2026), on-demand per GPU-hour: NVIDIA RTX 4000 Ada $0.76 (~$555/month if left running), L40S $1.57 and RTX 6000 Ada $1.57 (~$1,150/month), AMD MI300X $2.59, MI325X $3.80, NVIDIA H100 $4.41 (~$3,200/month; 8x $35.28), H200 $4.47 (~$3,260/month; 8x $35.76); spot preview: MI350X $2.46, MI355X $2.97, NVIDIA B300 $6.17/hr.",
+              "'Fastest' single GPU you can rent on DO for LLM inference: the H200 (141 GB HBM3e) on demand, or a B300 spot instance; for a 'small LLM' (7-14B) an RTX 4000 Ada (20 GB) or L40S (48 GB) is the sensible pick and far cheaper.",
+              "GPU Droplets bill while powered off: you must destroy them to stop paying.",
+              "Cheapest droplet that runs a 7B model at all: CPU-only, a 4-bit 7B needs ~4-5 GB of RAM, so an 8 GB Basic Droplet (~$48/month; a 4 GB one at ~$24 is marginal) runs Ollama at a few tokens per second; the $4-6/month droplets (512 MB-1 GB) cannot. (Basic Droplet prices are DigitalOcean's standard tiers; confirm on digitalocean.com/pricing/droplets.)",
+              "Flag the hidden costs: bandwidth, block storage, and that a rented 8x H100 is overkill for anything under 70B."
+            ],
+            "traps": [
+              "Old GPU prices ($2.99-3.39/hr for an H100) stated as current without a date.",
+              "Claiming a $5 droplet runs a 7B model.",
+              "Saying DigitalOcean has no GPUs, or inventing GPU types it doesn't list.",
+              "Monthly prices computed from the hourly rate without saying so (730 hours)."
+            ],
+            "sources": [
+              "https://docs.digitalocean.com/products/droplets/details/pricing/",
+              "https://www.digitalocean.com/products/gradient/gpu-droplets",
+              "https://www.digitalocean.com/pricing/droplets"
+            ],
+            "ideal": "Two lines: fastest (H200 on demand, ~$4.47/hr ≈ $3,260/month; B300 spot) with the 'you don't need that for a small model, take an RTX 4000 Ada at $0.76/hr' verdict; cheapest workable (8 GB Basic, ~$48/month, CPU, slow). Then the power-off billing gotcha."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q04",
+      "category": "fresh",
+      "topic": "Fed funds rate",
+      "turns": [
+        {
+          "q": "What's the current federal funds rate and what did the Fed do at its most recent meeting?",
+          "reference": {
+            "key_facts": [
+              "The target range is 3.75%-4.00%.",
+              "At the most recent meeting (15-16 September 2026) the FOMC RAISED the range by 25 bp, from 3.50-3.75% to 3.75-4.00%, by a 12-0 vote: the first increase since 2023. The statement cited solid growth, strong productivity and investment, a little-changed unemployment rate, and inflation that 'remains high'.",
+              "The next meeting is 27-28 October 2026 (not yet held on the bench date); the September projections' median had the end-2026 rate around 4.1-4.4%.",
+              "Earlier in 2026 the rate was held at 3.50-3.75% (June, July)."
+            ],
+            "traps": [
+              "Quoting 4.25-4.50% or 5.25-5.50% (2024-2025 ranges) as current.",
+              "Describing the September move as a cut or a hold.",
+              "Reporting an October 2026 decision that has not happened.",
+              "Inventing a vote count other than 12-0 or dissenters by name."
+            ],
+            "sources": [
+              "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+              "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+            ],
+            "ideal": "Two sentences: the range and the September hike with its date and reason; one more on the October 27-28 meeting being next. Dated."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q05",
+      "category": "fresh",
+      "topic": "Latest Claude vs ChatGPT models",
+      "turns": [
+        {
+          "q": "What's the latest Claude model from Anthropic and how does it stack up against the latest ChatGPT model? Which one would you use for coding?",
+          "reference": {
+            "key_facts": [
+              "Anthropic's current lineup (platform.claude.com, Oct 2026): Claude Fable 5.1 (the most capable, for demanding reasoning and long-horizon agentic work; $10/$50 per MTok), Claude Opus 5.5 (the recommended default for agentic coding and knowledge work; $4/$20), Claude Sonnet 5.5 and Claude Haiku 5.5; all with 1M-token context. Older Fable 5, Opus 5 and 4.x models are legacy.",
+              "OpenAI's current family is GPT-6: GPT-6 Astra (announced 3 Sept 2026, limited availability), GPT-6 Sol and GPT-6 Luna (22 Sept 2026, API/Codex/ChatGPT Work), GPT-6.1 Sol (29 Sept 2026), and GPT-6 rolled out to all ChatGPT users on 7 Oct 2026 (Sol for paid tiers, Luna for Free/Go).",
+              "No like-for-like public SWE-bench comparison exists: each vendor's launch table compares against the other's previous model; independent indices (e.g. Artificial Analysis) put Opus 5.5 at or near the top. A great answer says 'both are frontier; pick by tooling and price' and names the tooling: Claude Code / Opus 5.5 vs Codex / GPT-6 Sol.",
+              "It flags that this changes monthly and dates its claims."
+            ],
+            "traps": [
+              "Claude 3.5 Sonnet, Claude 3 Opus, Claude 4 Opus or 'Claude 2' as the latest; GPT-4o, GPT-4.5 or GPT-5 as the latest ChatGPT model.",
+              "Invented benchmark percentages presented as measured head-to-head results.",
+              "'Claude is only good at writing, ChatGPT at code' style generalisations with nothing behind them."
+            ],
+            "sources": [
+              "https://platform.claude.com/docs/en/about-claude/models/overview",
+              "https://openai.com/index/gpt-6-for-everyone/",
+              "https://openai.com/index/introducing-gpt-6-sol-and-luna/",
+              "https://openai.com/index/gpt-6-astra-next-generation-work/",
+              "https://www.gradually.ai/en/llm-comparison/claude-opus-5.5-vs-gpt-6-sol/"
+            ],
+            "ideal": "Name Fable 5.1 / Opus 5.5 and GPT-6 (Sol/Luna/Astra) with their dates, say the honest comparison (no clean head-to-head; both frontier), give one recommendation for coding with the reason (tooling, price), flag the churn."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q06",
+      "category": "fresh",
+      "topic": "Egg prices",
+      "turns": [
+        {
+          "q": "How much is a dozen eggs in the US right now compared to a year ago?",
+          "reference": {
+            "key_facts": [
+              "BLS average price, Grade A large eggs, US city average (series APU0000708111): September 2026 $2.27 a dozen (same as August 2026; June 2026 was the low at $2.14).",
+              "A year ago, September 2025: $3.49, so prices are down about 35% year on year, after the avian-flu spike that peaked at $6.23 in March 2025.",
+              "A great answer cites BLS/FRED with the month, notes store prices vary (organic/cage-free higher, warehouse clubs lower), and says the data runs a month behind."
+            ],
+            "traps": [
+              "'$3-4 a dozen right now' or 'prices are still rising' (that was 2025).",
+              "Citing the March 2025 peak ($6.23) or 2024 prices as current.",
+              "Precise figures with no source or month."
+            ],
+            "sources": [
+              "https://fred.stlouisfed.org/series/APU0000708111",
+              "https://fred.stlouisfed.org/data/APU0000708111.txt"
+            ],
+            "ideal": "One sentence with both numbers, source and months; one sentence of context (the 2025 bird-flu spike unwound)."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q07",
+      "category": "compare",
+      "topic": "Flying vs driving",
+      "turns": [
+        {
+          "q": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+          "reference": {
+            "key_facts": [
+              "Driving: ~1,280 miles each way, ~19-20 hours of driving, realistically two days each way or one very long day. Fuel at the October 2026 national average (~$4.35/gal, EIA week of 5 Oct 2026; AAA ~$4.41 on 1 Oct) and 30 mpg: ~85 gallons for the round trip ≈ $370. I-95 tolls (NJ Turnpike, Delaware, Maryland, Virginia) ~$40-60 each way ≈ $100. One overnight each way ~$120-180 → $250-350 if you don't drive straight through. Out-of-pocket ≈ $720-820, plus wear and depreciation (~$0.20-0.25 a mile marginal ≈ $500-650; the IRS rate of ~$0.70/mile would say ~$1,800 full cost). Four travel days.",
+              "Flying: NYC-MIA/FLL round trips typically $160-380 per person (Kayak), basic-economy sales ~$110-150; two people ≈ $320-760, plus checked bags ($70-140) and airport transit ($60-160) → ~$450-1,050. A rental car in Miami for a week (~$300-500) is the hidden cost the drive avoids.",
+              "Verdict: roughly a wash on cash (both ~$700-1,000 for two); flying saves about four days; driving wins if you want a car in Miami and have the time. State the assumptions (mpg, fares) and that fares move.",
+              "Gas is ~40% above a year ago in 2026, worth a flag for someone who hasn't driven far lately."
+            ],
+            "traps": [
+              "Gas at $3.00-3.50 (2025 prices) without a date.",
+              "'Driving is far cheaper' without counting tolls, hotel nights and the Miami rental car.",
+              "Exact airfares stated as facts for a specific date without a source.",
+              "Ignoring that the drive is ~20 hours each way."
+            ],
+            "sources": [
+              "https://www.kayak.com/flight-routes/New-York-NYC/Miami-MIA",
+              "https://fred.stlouisfed.org/series/GASREGW",
+              "https://gasprices.aaa.com/national-average-dips-following-record-setting-september/",
+              "https://www.bts.gov/newsroom/motor-fuel-prices-september-2026-0"
+            ],
+            "ideal": "Two short cost stacks with the assumptions, then a one-sentence verdict (a wash on money; fly unless you need the car), under 200 words."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q08",
+      "category": "compare",
+      "topic": "Train vs air NYC-Boston",
+      "turns": [
+        {
+          "q": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?",
+          "reference": {
+            "key_facts": [
+              "Train: Acela (Moynihan/Penn to South Station) about 3h35-3h50 city centre to city centre, typically $85-230 one way (often ~$150; the NextGen Acela sets have been in service since August 2025); Northeast Regional 4h-4h30, ~$30-130 (advance fares often $50-80). Door to door the train is close to its timetable: both stations are downtown.",
+              "Flying: ~1h15 in the air, but door to door 3.5-4+ hours (get to JFK/LGA/EWR, security, taxi from Logan); fares roughly $100-320 one way, ~$170-360 round trip, plus airport transit ($30-80 each way).",
+              "Bus (Megabus/Peter Pan/FlixBus/OurBus): 4.5-5 hours, $20-45; the budget option.",
+              "Verdict: the train. Acela if time matters, Regional on a budget; fly only if connecting onward or living next to an airport. Mention booking ahead and the Night Owl/discount fares."
+            ],
+            "traps": [
+              "Acela in '2.5 hours' or 'high-speed rail like Europe'.",
+              "Treating the flight's 75 minutes as the door-to-door time.",
+              "Invented exact fares as if quoted today."
+            ],
+            "sources": [
+              "https://www.shopback.com/blog/travel/amtrak-acela-vs-northeast-regional-vs-brightline-us-2026-rail",
+              "https://www.kayak.com/flight-routes/NYC/BOS",
+              "https://www.jetblue.com/en/flights-from-new-york-to-boston"
+            ],
+            "ideal": "Verdict first (train), then the three options as short bold-name lines with time and fare ranges, then the one case for flying."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q09",
+      "category": "compare",
+      "topic": "Cost of living comparison",
+      "turns": [
+        {
+          "q": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?",
+          "reference": {
+            "key_facts": [
+              "Lisbon is by far the most expensive of the three: a one-bedroom in the centre ~€1,250-1,450 (~$1,450-1,700; Numbeo-based figures cited in 2026 guides), €1,000+ outside; $4k is comfortable but not lavish, and housing is the squeeze.",
+              "Medellín is the cheapest: a one-bedroom ~COP 1.5-3 million (~$365-730) in most neighbourhoods, $1,200-1,700 in premium El Poblado; $4k lives very well (eating out, gym, domestic help).",
+              "Florianópolis sits between: a furnished one-bedroom in Campeche or Lagoa da Conceição ~R$3,500-4,800 a month including condomínio (~$700-950 at roughly R$5.0-5.1 to the dollar in 2026; a 2026 Loft survey puts Campeche's average rent for 30-65 m² units at R$3,605 before condo fees); Jurerê Internacional is far pricier. Add condomínio and IPTU to any Brazilian rent.",
+              "Ranking on how far $4k stretches: Medellín > Florianópolis > Lisbon. Mention the practicalities that change the answer: visas (Portugal D7/D8 digital nomad, Colombia digital-nomad visa, Brazil digital-nomad or retirement visa), safety (Medellín's varies sharply by barrio), healthcare, and that the real is around R$5/USD in 2026 (it was R$5.5-6 in 2024-25), so Brazil is dearer in dollars than two years ago."
+            ],
+            "traps": [
+              "Lisbon described as cheap (pre-2020 rents) or Medellín rents of $200 citywide.",
+              "Florianópolis prices in dollars with no exchange rate or month, or ignoring condo fees.",
+              "Invented precise 'cost of living indices' with no source."
+            ],
+            "sources": [
+              "https://www.globalcitizensolutions.com/cost-of-living-in-lisbon",
+              "https://colombiamove.com/average-rent-in-medellin-2026-by-neighborhood/",
+              "https://www.nsctotal.com.br/?p=7476285",
+              "https://www.olx.com.br/imoveis/aluguel/loft/estado-sc/florianopolis-e-regiao/all",
+              "https://pluang.com/en/tools/currency-converter/usd-brl"
+            ],
+            "ideal": "Ranking in the first sentence, then one short block per city with the rent range in local currency and dollars, then the two practicalities (visa, safety) that could change the pick."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "category": "compare",
+      "topic": "Ollama vs MLX on an M4 Pro",
+      "turns": [
+        {
+          "q": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?",
+          "reference": {
+            "key_facts": [
+              "MLX (mlx-lm) is the faster engine on Apple silicon: community benchmarks show ~1.4-1.6x llama.cpp on dense models and up to ~3x on MoE models (e.g. Qwen3.5-35B-A3B: Ollama's old llama.cpp path ~48 tok/s vs mlx-lm ~132 tok/s on an M4 Max). The lead narrows on large dense models where memory bandwidth is the ceiling.",
+              "The gap mostly closed in March 2026: Ollama 0.19 (30 Mar 2026) switched its Mac backend to MLX on 32 GB+ Macs, roughly doubling decode speed (58 → 112 tok/s in Ollama's own test). So 'recent Ollama ≈ MLX; old Ollama much slower' is the correct 2026 answer, and the asker should check their Ollama version.",
+              "M4 Pro has 273 GB/s memory bandwidth, so a dense 4-bit model decodes at roughly bandwidth/size: ~15 tok/s for a 17 GB (27B) model, ~10 for 20+ GB. MoE models (3B active) run 60-100+ tok/s.",
+              "Biggest realistic model on 48 GB: a ~30-35B model at 4-bit (17-20 GB) with room for context and the OS, e.g. Gemma 4 26B, Qwen3.8 27B, Qwen3.6-35B-A3B; a 70B at 4-bit (~40 GB) technically loads but leaves no headroom and swaps — not realistic for daily use. Leave ~8-10 GB for macOS and apps.",
+              "Prompt processing on long contexts is the weak spot of both (minutes for 40k tokens)."
+            ],
+            "traps": [
+              "'Ollama is faster' or 'Ollama uses the GPU better' without the 0.19 MLX change.",
+              "Claiming a 70B runs comfortably on 48 GB.",
+              "Inventing tok/s figures as measurements for this exact machine."
+            ],
+            "sources": [
+              "https://levelup.gitconnected.com/ollama-mlx-nearly-doubles-llm-speed-on-your-mac-58-to-112-tok-s-and-your-old-models-get-none-of-fd1a9ec531fb",
+              "https://aiagentskit.com/blog/ollama-mlx-mac-setup-speed/",
+              "https://markaicode.com/benchmarks/cuda-gemma-4-m4-max-memory-benchmark/",
+              "https://lilting.ch/en/articles/ollama-mlx-apple-silicon-preview"
+            ],
+            "ideal": "Verdict (MLX, but Ollama 0.19+ closed most of the gap), the bandwidth rule of thumb with two numbers, the realistic ceiling (~30-35B 4-bit), and one flag about long prompts."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q11",
+      "category": "health",
+      "topic": "Magnesium for anxiety",
+      "turns": [
+        {
+          "q": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+          "reference": {
+            "key_facts": [
+              "The evidence is suggestive but weak: Boyle et al. 2017 (Nutrients) systematic review found 4 of 8 anxiety studies positive, all low quality; a 2024 Cureus review (Rawji et al.) found small, mixed trials; no large RCT in diagnosed anxiety disorders. Benefit is most plausible if intake is low.",
+              "Trial doses are roughly 200-400 mg of elemental magnesium a day; the tolerable upper level for supplemental magnesium is 350 mg/day elemental (NIH ODS) — higher is mainly a laxative problem. Read the ELEMENTAL amount: a '500 mg glycinate' capsule may hold ~70-100 mg of magnesium.",
+              "Forms: glycinate (bisglycinate), citrate, malate, threonate are well absorbed; oxide poorly. No head-to-head trial shows one form beats another for anxiety; citrate is more laxative, glycinate gentler and often taken at night. Form matters less than dose and consistency (give it 4-6 weeks).",
+              "Cautions: kidney disease (can't excrete the excess), and it's an adjunct, not a treatment for an anxiety disorder; the asker is quitting nicotine, which raises anxiety short term — a line on that is a plus, not a requirement."
+            ],
+            "traps": [
+              "'Magnesium cures/treats anxiety' or a named RCT with precise effect sizes that doesn't exist ('a 2023 Johns Hopkins trial found 40% reduction').",
+              "Doses of 800-1,000 mg as routine advice.",
+              "Claiming glycinate is proven superior for anxiety."
+            ],
+            "sources": [
+              "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5452159/",
+              "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11136869/",
+              "https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/"
+            ],
+            "ideal": "Dose and form in the first two sentences (200-400 mg elemental, glycinate or citrate, evening), then an honest two-sentence verdict on the evidence, then the elemental-label and kidney cautions."
+          }
+        },
+        {
+          "q": "Any problem taking it with sertraline or with a few drinks? And is glycinate really better than citrate or is that marketing?",
+          "reference": {
+            "key_facts": [
+              "Sertraline: no clinically significant interaction is documented between magnesium supplements and sertraline (interaction checkers list none); the 'serotonin syndrome' and 'binds sertraline in the gut' claims on supplement blogs have no primary source. Magnesium does bind some drugs (tetracycline/quinolone antibiotics, levothyroxine, bisphosphonates) — not SSRIs — so no spacing needed, though taking it at a different time of day is harmless. Tell the prescriber anyway.",
+              "Alcohol: a few drinks are fine; alcohol increases urinary magnesium loss, so heavy or regular drinking depletes magnesium rather than making the supplement dangerous. Magnesium won't blunt a hangover meaningfully.",
+              "Glycinate vs citrate: mostly marketing. Both absorb well (comparable elemental content ~14-16% by weight); citrate is more likely to loosen stools; glycinate's glycine may help sleep a little. No trial shows glycinate works better for anxiety. Pick by gut tolerance and price."
+            ],
+            "traps": [
+              "Warning of serotonin syndrome from magnesium + sertraline.",
+              "Telling the asker to stop sertraline or to space magnesium hours away from it as a hard rule.",
+              "Asserting glycinate is 'clinically proven' better."
+            ],
+            "sources": [
+              "https://hellopharmacist.com/drug-herbal-interactions/magnesium-sertraline",
+              "https://www.drugs.com/answers/magnesium-affect-sertraline-3566564.html",
+              "https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/"
+            ],
+            "ideal": "Three short answers in order: sertraline (no known interaction; mention it to the prescriber), drinks (fine; heavy drinking depletes), glycinate vs citrate (marketing; tolerance decides)."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q12",
+      "category": "health",
+      "topic": "Sweat smell",
+      "turns": [
+        {
+          "q": "Why does my sweat smell worse than it used to and what actually fixes it?",
+          "reference": {
+            "key_facts": [
+              "Sweat itself is nearly odourless; the smell is skin bacteria (Staphylococcus hominis, Corynebacterium) breaking down apocrine sweat (armpits, groin) into thioalcohols and fatty acids. A change means more apocrine/stress sweat, more bacteria, or a diet/medication/health change.",
+              "Common causes of a change: stress and anxiety (apocrine sweat), hormonal shifts with age, diet (red meat, garlic/onion, cruciferous veg, alcohol, very high protein or keto → ammonia), medications (SSRIs like sertraline and bupropion increase sweating; nicotine withdrawal can too), synthetic shirts that hold bacteria, hyperhidrosis, trichomycosis (bacterial coating on hair).",
+              "Red flags for a doctor: fruity (ketoacidosis), ammonia (kidney, or just low-carb), fishy (trimethylaminuria), bleach-like (liver/kidney), night sweats with weight loss.",
+              "What works: an aluminium-chloride antiperspirant (10-20%, e.g. Driclor/Certain Dri) applied to dry skin AT NIGHT, not a deodorant; wash the pits with benzoyl peroxide 4-5% wash or chlorhexidine for a couple of weeks to knock back the bacteria; trim or shave; cotton/merino instead of polyester and wash shirts hot or with an enzyme/oxygen booster (polyester keeps the smell); for true hyperhidrosis glycopyrronium wipes (Qbrexza) or oral glycopyrrolate via a doctor."
+            ],
+            "traps": [
+              "'Detox', 'toxins leaving the body', or 'sweat smells because of what you eat' as the whole answer.",
+              "Recommending only a stronger deodorant.",
+              "Invented statistics about body odour."
+            ],
+            "sources": [
+              "https://www.aad.org/public/everyday-care/skin-care-basics/hygiene/body-odor",
+              "https://my.clevelandclinic.org/health/symptoms/17865-body-odor"
+            ],
+            "ideal": "One sentence on the mechanism, a short list of the likely causes of a change (stress, meds, diet, fabrics), then the fix stack in order of effect (night-time aluminium chloride, antibacterial wash, fabrics/laundry), then the red flags."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q13",
+      "category": "health",
+      "topic": "Pizza and health",
+      "turns": [
+        {
+          "q": "Is pizza actually bad for you? How often is fine?",
+          "reference": {
+            "key_facts": [
+              "Not inherently: a typical NY cheese slice is ~250-350 kcal with ~600-800 mg sodium; two or three slices is a 700-1,000 kcal, 1,500-2,000 mg sodium meal. Pizza is among the top sources of sodium and saturated fat in the US diet (USDA/NHANES), because of portion, cheese and processed meat, not because dough and tomato are harmful.",
+              "Once or twice a week fits a normal diet if the rest of the day balances it; what matters is the whole week's pattern, not the food.",
+              "Make it better: thin crust, more vegetables, skip pepperoni/sausage, two slices plus a salad, water not soda; a Neapolitan or homemade pizza is lighter than a chain's stuffed crust.",
+              "Fit: the asker wants a straight answer with numbers, not a lecture."
+            ],
+            "traps": [
+              "'Pizza is healthy' or 'pizza is junk food, avoid it' as absolutes.",
+              "Invented studies ('a 2019 study found pizza eaters live longer').",
+              "Precise calorie counts presented as universal."
+            ],
+            "sources": [
+              "https://fdc.nal.usda.gov/",
+              "https://nutritionsource.hsph.harvard.edu/salt-and-sodium/"
+            ],
+            "ideal": "Direct answer in the first sentence (no; 1-2 times a week is fine), the numbers for a typical slice, the three things that make it worse and how to fix them, under 150 words."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q14",
+      "category": "health",
+      "topic": "Morning people and happiness",
+      "turns": [
+        {
+          "q": "Are morning people really happier, or is that a myth? Can a night owl actually switch?",
+          "reference": {
+            "key_facts": [
+              "Half true: many studies and a 2021 meta-analytic update find evening chronotypes report more depressive symptoms and somewhat lower well-being, but the effects are modest, correlational, and largely explained by social jetlag (owls forced onto lark schedules), lost sleep and personality; an owl on an owl-friendly schedule is not measurably less happy.",
+              "Chronotype is partly genetic (dozens of loci) and shifts with age, so a full conversion is unrealistic; but a 1-2 hour advance is achievable: a 2019 University of Birmingham study (Facer-Childs et al., Sleep Medicine) moved night owls ~2 hours earlier in three weeks with fixed wake times, bright light soon after waking, dimmer evenings, earlier meals, no caffeine after mid-afternoon and morning exercise, with self-reported depression and stress improving.",
+              "What actually shifts the clock: morning bright light (outdoors or 10,000 lux), evening dimness, consistent wake time including weekends, meal and exercise timing; melatonin 0.5 mg a few hours before the target bedtime helps some. Evening screen-dimming alone does little.",
+              "Flag the trade: forcing an early schedule without the light cues just produces a sleep-deprived owl."
+            ],
+            "traps": [
+              "'Morning people are happier, studies prove it' with made-up percentages.",
+              "'You can't change your chronotype' (you can shift it by an hour or two).",
+              "Invented study names or sample sizes."
+            ],
+            "sources": [
+              "https://pmc.ncbi.nlm.nih.gov/articles/PMC8184740",
+              "https://research.birmingham.ac.uk/en/publications/resetting-the-late-timing-of-night-owls-has-a-positive-impact-on-/",
+              "https://pmc.ncbi.nlm.nih.gov/articles/PMC8722381"
+            ],
+            "ideal": "Verdict in one sentence (half true; it's mostly schedule mismatch), the evidence in two, then a five-step shift protocol with the realistic 1-2 hour ceiling."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q15",
+      "category": "health",
+      "topic": "Hairstyles for bald men",
+      "turns": [
+        {
+          "q": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?",
+          "reference": {
+            "key_facts": [
+              "Clear best for a bald crown with a horseshoe: take the sides down to match — a short buzz all over (#1-#2 guard, 3-6 mm) or a clean shave. Keeping longer sides with a bald top (the horseshoe) is the one look to avoid; a comb-over too.",
+              "Lowest total maintenance: a #1-#2 buzz with your own clippers every 1-2 weeks, no styling, no products (~5 minutes). A clean shave looks sharpest but needs a razor or electric shaver every 2-3 days, scalp moisturiser and sunscreen. A #0 'skin fade' at a barber every 2-3 weeks sits between.",
+              "Face/head shape: a beard or stubble balances a shaved head; a #2 buzz softens a very round head; sunscreen on the scalp daily either way.",
+              "If it's early thinning rather than bald, finasteride/minoxidil can hold the line but won't regrow a bald crown — one sentence, not a detour."
+            ],
+            "traps": [
+              "Recommending a comb-over, long sides, or 'grow it out'.",
+              "Hair-growth product pitches as the main answer.",
+              "Invented 'studies show bald men are seen as more dominant' with precise numbers."
+            ],
+            "sources": [
+              "https://www.aad.org/public/diseases/hair-loss/treatment/tips"
+            ],
+            "ideal": "A one-line pick (buzz #1-#2, or shave if you'll keep up with it), why the horseshoe loses, maintenance for each in a line, beard and sunscreen. Under 150 words."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q16",
+      "category": "health",
+      "topic": "Family support for quitting",
+      "turns": [
+        {
+          "q": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+          "reference": {
+            "key_facts": [
+              "Tell them what support looks like, specifically, before the hard days: e.g. 'don't ask me how it's going every day; if I'm snappy for the next two weeks it's withdrawal, not you; distract me when I'm pacing; don't smoke/vape around me; celebrate week one and month one; if I slip, no lecture — ask what I want to do next'. Give them a job, not a role as monitor.",
+              "Give them the timeline so the irritability makes sense: withdrawal peaks around days 3-7 and fades over 2-4 weeks; cravings last 3-5 minutes.",
+              "Agree a check-in cadence YOU choose (e.g. a Sunday 'how's it going') so it's support, not surveillance; you can share a quit app streak instead of answering questions.",
+              "Use the tools that double quit rates: nicotine replacement (patch + gum/lozenge), varenicline, 1-800-QUIT-NOW or SmokefreeTXT; tell the family 'the patch is part of the plan', so they don't call it cheating.",
+              "Fit: the asker said quitting nicotine (he vapes/smokes and uses pouches); direct tone, no moralising."
+            ],
+            "traps": [
+              "Generic 'communicate openly and set boundaries' with no script.",
+              "Moralising about nicotine or telling him to quit cold turkey without aids.",
+              "Invented statistics about family support."
+            ],
+            "sources": [
+              "https://smokefree.gov/help-others-quit/how-to-support-your-quitter",
+              "https://www.cdc.gov/tobacco/campaign/tips/quit-smoking/index.html"
+            ],
+            "ideal": "A short script the asker can say to his family, the withdrawal timeline in one line, the cadence trick, the aids. Direct, warm, under 200 words."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q17",
+      "category": "travel",
+      "topic": "Florianópolis neighborhoods",
+      "turns": [
+        {
+          "q": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+          "reference": {
+            "key_facts": [
+              "The two picks that meet all four: Lagoa da Conceição (the island's social hub: restaurants, cafés, coworking, walkable centre, on the lagoon with Praia Mole/Joaquina 10 minutes away; noisy in summer) and Campeche (flat, beachfront, surf, residential, growing café scene, quieter; farther from nightlife). Both are safe by Brazilian city standards and have fibre internet (300-700 Mbps for ~R$100-150/month from Claro, Vivo or local ISPs).",
+              "Alternatives and why not: Jurerê Internacional (upscale, calm beach, very expensive, dead off-season), Centro/Beira-Mar Norte (urban, services, no swimmable beach), Trindade (university, cheap, no beach), Barra da Lagoa (fisher village, cheaper, surf, less walkable), Ingleses/Canasvieiras (north, Argentine tourists in summer, cheaper off-season, car needed), Santo Antônio de Lisboa (quiet, colonial, no beach to speak of).",
+              "Practicalities: six months is 'aluguel por temporada' (up to 90 days per contract) or a monthly Airbnb; a standard lease needs a CPF and a guarantor or seguro-fiança; rents are quoted excluding condomínio and IPTU; prices double in December-February; a car helps everywhere except Lagoa and Centro.",
+              "Price orientation (Oct 2026): furnished one-bedrooms ~R$3,500-4,800/month including condo in Lagoa or Campeche (a 2026 Loft survey has Campeche's average rent for 30-65 m² units at R$3,605 before condo); Jurerê far higher."
+            ],
+            "traps": [
+              "Calling Jurerê a budget pick, or Centro 'on the beach'.",
+              "Describing Florianópolis as dangerous (it's among Brazil's safer capitals).",
+              "Invented street names, exact listings or internet speeds as facts."
+            ],
+            "sources": [
+              "https://www.nsctotal.com.br/?p=7476285",
+              "https://www.olx.com.br/imoveis/aluguel/loft/estado-sc/florianopolis-e-regiao/all",
+              "https://expatistan.com/price/rent/florianopolis/USD"
+            ],
+            "ideal": "Two picks with a line each on why, three or four runners-up with the one reason each fails a criterion, then the six-month rental practicalities. Under 250 words."
+          }
+        },
+        {
+          "q": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+          "reference": {
+            "key_facts": [
+              "Picks one (Lagoa da Conceição for walkability and social life, or Campeche for beach and quiet) and says why in a sentence; no 'it depends' list.",
+              "Price: a furnished one-bedroom in either runs about R$3,500-4,800 a month including condomínio in October 2026 (listings: Lagoa one-bedrooms ~R$3,800-4,500 plus ~R$650 condo; Campeche averages R$3,605 for small units before condo), which is roughly $700-950 at about R$5.0-5.1 per dollar (mid-2026 rate; say which rate you used). Short-term/Airbnb monthly rates run 20-50% higher, and December-February doubles.",
+              "Names the add-ons: condomínio (R$300-650), IPTU, utilities, and that 'mobiliado' listings are the filter word on OLX/Zap/VivaReal/QuintoAndar."
+            ],
+            "traps": [
+              "Dollar prices with no exchange rate, or an old rate (R$6 = 2024-25; R$4 = pre-2020).",
+              "A precise 'R$2,200' or 'US$450' presented as the going rate without a source.",
+              "Refusing to pick."
+            ],
+            "sources": [
+              "https://www.nsctotal.com.br/?p=7476285",
+              "https://www.olx.com.br/imoveis/aluguel/loft/estado-sc/florianopolis-e-regiao/all",
+              "https://pluang.com/en/tools/currency-converter/usd-brl"
+            ],
+            "ideal": "One pick, one reason, one price range in R$ and $ with the rate stated, the add-ons in a line."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q18",
+      "category": "travel",
+      "topic": "Spanish immersion cities",
+      "turns": [
+        {
+          "q": "Best cities to learn Spanish by immersion on a modest budget? I want clear accents, cheap classes, and not a tourist bubble.",
+          "reference": {
+            "key_facts": [
+              "Strong picks that fit all three: Guanajuato or Querétaro (Mexico: clear central-Mexican Spanish, cheap, few English-speaking tourists; Oaxaca is clear but more touristy), Bogotá or Medellín (Colombia: Bogotá's accent is famously neutral; private lessons ~$10-15/hour; Medellín's paisa accent is clear but sing-song), Quito or Cuenca (Ecuador: slow, clear highland Spanish; among the cheapest), Sucre (Bolivia: the cheapest classes, ~$6-9/hour, very clear Spanish), Xela/Quetzaltenango (Guatemala: 1:1 school + homestay ~$150-250/week; Antigua is the classic but is a tourist bubble).",
+              "Spain if preferred: Salamanca, Valladolid or Granada (clear Castilian, cheaper than Madrid/Barcelona); avoid Barcelona for Spanish (Catalan everywhere) and the costas.",
+              "Avoid for the accent goal: Caribbean coasts and Chile (fast, dropped consonants), Buenos Aires (rioplatense 'sh' and voseo; great city, atypical Spanish), resort towns (English bubbles).",
+              "Budget shape: group classes $150-300/week, private $8-15/hour in Latin America; homestays with meals $150-250/week; rent $300-600/month; the asker is relocating to Latin America, so Mexico/Colombia/Ecuador are the practical choices."
+            ],
+            "traps": [
+              "Recommending Barcelona, Cancún or Buenos Aires for a neutral accent.",
+              "Invented school names and prices as facts.",
+              "A list of twelve cities with no pick."
+            ],
+            "sources": [
+              "https://www.spanishstudies.org/",
+              "https://www.numbeo.com/cost-of-living/"
+            ],
+            "ideal": "Three to five picks with the one reason each, one line on where not to go for accent, a budget line. Under 200 words."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q19",
+      "category": "travel",
+      "topic": "Cheapest places to travel",
+      "turns": [
+        {
+          "q": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other.",
+          "reference": {
+            "key_facts": [
+              "The all-in winners from NYC for Dec 2026-Feb 2027 are short-haul Latin America: Mexico (Mexico City/Oaxaca/Mérida: round trips ~$250-450, $50-80 a day → ~$1,200-1,600 for two weeks), Colombia (Medellín/Bogotá: ~$300-500 flights, $40-70 a day → ~$1,100-1,500), Guatemala, the Dominican Republic (~$250-400 flights; resorts cost more than towns). Puerto Rico needs no passport (~$150-300) but costs US prices on the ground.",
+              "Southeast Asia and India have the lowest daily costs ($25-50) but $900-1,200 fares and 20+ hours each way, so two weeks lands at ~$1,500-2,000 — comparable, not cheaper, and you lose two days.",
+              "Southern/Eastern Europe off-season (Lisbon, Seville, Budapest, Kraków): ~$450-700 round trips, $70-110 a day → ~$1,500-2,200; cold but empty.",
+              "Timing rules: avoid the Christmas-New Year fortnight (fares double), fly Tuesday/Wednesday, book 5-8 weeks out; 2026 fares are up with fuel. Give one recommendation (Mexico or Colombia) and say why."
+            ],
+            "traps": [
+              "'Thailand/Vietnam is cheapest' without the fare and travel time.",
+              "Invented exact fares for specific dates.",
+              "A list of ten countries with no total."
+            ],
+            "sources": [
+              "https://www.kayak.com/flight-routes/New-York-NYC/Miami-MIA",
+              "https://www.islands.com/2069815/best-affordable-travel-destinations-2026/",
+              "https://www.yahoo.com/lifestyle/articles/best-affordable-destinations-travel-2026-133000725.html"
+            ],
+            "ideal": "A pick with its two-week total, two alternatives with totals, one line on why Asia isn't cheaper for two weeks, the timing rules."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q20",
+      "category": "travel",
+      "topic": "Top global living cities",
+      "turns": [
+        {
+          "q": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+          "reference": {
+            "key_facts": [
+              "EIU Global Liveability Index 2026 (published June 2026, 173 cities, survey May 2026): 1 Copenhagen (98/100, second year running), 2 Vienna, 3 Melbourne, 4 Sydney, 5 Zurich, 6 Geneva, 7 Osaka, 8 Adelaide, 9 Vancouver, 10 Tokyo; nine Asian cities in the top 20; Honolulu is the top US city at 25th; Damascus last.",
+              "Mercer Quality of Living: Mercer's most recent published city ranking is the 2024 edition (Zurich 1, Vienna 2, Geneva 3; 241 cities); no 2026 edition is confirmed — an answer must not quote 'Mercer 2026' positions.",
+              "Other lists measure different things: Monocle's Quality of Life survey (lifestyle, summer issue), Numbeo's crowd-sourced index, Oxford Economics' Global Cities Index (economics-weighted; New York leads), InterNations' Expat City Ranking (expat satisfaction, Valencia/Málaga-type winners). A great answer says what each measures and that none measures 'where you would be happy'.",
+              "Mentions what the rankings weight (stability, healthcare, education, infrastructure, culture/environment) and the cost-of-living blind spot."
+            ],
+            "traps": [
+              "'Vienna is #1 in the 2026 EIU index' (Vienna led 2022-2024; Copenhagen since 2025).",
+              "Quoting a 2026 Mercer ranking or positions.",
+              "Invented scores or positions beyond the published top 10."
+            ],
+            "sources": [
+              "https://www.businesstoday.in/latest/trends/story/planning-to-move-abroad-these-are-the-worlds-10-most-liveable-cities-in-2026-541841-2026-07-08",
+              "https://www.falstaff.com/en/news/copenhagen-named-the-worlds-most-liveable-city-followed-by-vienna",
+              "https://www.mercer.com/en-us/insights/total-rewards/talent-mobility-insights/quality-of-living-city-ranking/"
+            ],
+            "ideal": "EIU 2026 top 10 with the date, one line on Mercer (2024 is the latest), one line on what the other lists measure, and the caveat that these are expat-liveability lists."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q21",
+      "category": "travel",
+      "topic": "Carry-on travel in South America",
+      "turns": [
+        {
+          "q": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?",
+          "reference": {
+            "key_facts": [
+              "All three Brazilian carriers follow the ANAC reference: one carry-on up to 10 kg, max 55 x 35 x 25 cm INCLUDING handles and wheels (115 cm linear), plus one personal item that fits under the seat (LATAM: 45 x 35 x 20 cm). Gate scales are used in Brazil; 10 kg is enforced. Fare class matters: LATAM's Basic fares on some international routes and GOL/Azul promo fares can restrict the overhead bag; Azul's allowance varies by destination — check the fare rules.",
+              "A US 22 x 14 x 9 in roller (56 x 36 x 23 cm) is slightly over LATAM's length; a 35-40 L soft bag is the safe choice.",
+              "Pack for 3 weeks with laundry every 5-7 days (lavanderias are everywhere): 5 tops incl. 2 merino, 2 pants/1 shorts, light rain shell, one warm layer (Andes/Patagonia or air-con buses), 1 pair walking shoes + sandals, 7 socks/underwear, swimwear, toiletries ≤100 ml, universal adapter (Brazil type N; 127/220 V varies by city), small med kit, copies of passport. Target 7-8 kg packed so the 10 kg cap survives souvenirs.",
+              "Date it: rules as of October 2026; verify on latam.com, voegol.com.br, voeazul.com.br before flying."
+            ],
+            "traps": [
+              "US-style 'no weight limit' or 22 x 14 x 9 in as the rule.",
+              "7 kg or 8 kg (other regions' limits) or 12 kg.",
+              "Omitting that the 10 kg is weighed at the gate."
+            ],
+            "sources": [
+              "https://brasilturis.com.br/2025/07/07/bagagem-de-mao-sem-surpresas-regras-atualizadas-de-latam-gol-e-azul/",
+              "https://travelpodium.com/blogs/latam-airlines-baggage-policy",
+              "https://www.dgabc.com.br/Noticia/4244196/bagagem-de-mao-o-que-e-permitido-levar-nas-companhias-aereas-brasileiras"
+            ],
+            "ideal": "The limits in two lines (same for all three; the fare-class caveat), then a compact packing list with the weight target."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q22",
+      "category": "money",
+      "topic": "Jobs without a degree",
+      "turns": [
+        {
+          "q": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+          "reference": {
+            "key_facts": [
+              "BLS medians (May 2024 OOH figures, the latest widely cited; BLS 2025 data may differ by a few percent): elevator and escalator installers $106,580 (4-year paid apprenticeship, union, hard to get into), electrical power-line installers $92,560 (3-4 year apprenticeship, outdoor, risky), electricians $62,350 median but $106k top decile (4-5 year paid apprenticeship), plumbers/pipefitters ~$62,970 (4-5 years), HVAC technicians ~$59,000 (6-12 month program + licence), commercial truck drivers ~$57,000 (CDL in 4-8 weeks), police officers ~$74,000 (academy, months), nuclear power reactor operators ~$120,000 (years of training), air traffic controllers $144,580 (FAA academy, age limit 31, selective; the exception, not a 'realistic' pick).",
+              "Realistic top five for an adult career changer, with time to first paycheck: electrician or plumber apprenticeship (paid from day one, 4-5 years to journeyman), lineman (3-4 years), HVAC (under a year), CDL trucking (weeks, pay ~$55-75k with experience), IT support/network tech with certs (CompTIA/AWS/CCNA, 3-9 months, $55-75k) — relevant for someone with an IT background.",
+              "Say pay is national median and varies by union, state and overtime; dated to the BLS release."
+            ],
+            "traps": [
+              "Presenting 2026 'medians' that don't exist, or inflated figures ('electricians make $100k on average').",
+              "Air traffic controller as a quick no-degree job without the FAA academy, age limit and selectivity.",
+              "A list of twenty jobs with no times-to-entry."
+            ],
+            "sources": [
+              "https://www.bls.gov/ooh/construction-and-extraction/elevator-installers-and-repairers.htm",
+              "https://www.bls.gov/ooh/installation-maintenance-and-repair/line-installers-and-repairers.htm",
+              "https://www.bls.gov/ooh/construction-and-extraction/electricians.htm",
+              "https://www.bls.gov/ooh/transportation-and-material-moving/air-traffic-controllers.htm",
+              "https://www.biginterview.com/resources/10-highest-paying-jobs-without-a-college-degree-in-2026"
+            ],
+            "ideal": "Five bold-name lines: job — median pay (BLS, year) — time and path to get in; one line on the standout exceptions (ATC, elevator) and why they're hard to enter."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q23",
+      "category": "money",
+      "topic": "AI job displacement",
+      "turns": [
+        {
+          "q": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+          "reference": {
+            "key_facts": [
+              "Best evidence so far: Stanford's 'Canaries in the Coal Mine' (Brynjolfsson, Chandar, Chen; ADP payroll data; original Aug 2025, updated Aug 2026 with data through June 2026): no economy-wide displacement yet, but employment of 22-25-year-olds in the most AI-exposed occupations is now ~19% below where it would be (13% in 2025), mostly through reduced hiring rather than layoffs; experienced workers in the same occupations are flat or growing. Employer surveys (2026) name IT and technical support among the roles most often slated for AI replacement (~47%), but those are intentions, not measured losses.",
+              "For IT ops specifically: tier-1 helpdesk, ticket triage, routine scripting and documentation are the exposed parts; ownership of infrastructure, incident command, security, networks, vendor and cost management, and anything physical are the durable parts. BLS projects network and computer systems administrator jobs roughly flat to declining (about -3% 2024-34) while information security analysts grow ~29% and cloud/platform roles grow.",
+              "Honest risk statement: moderate over five years for a mid-career sysadmin; high for entry-level helpdesk; the salary and headcount pressure shows up as fewer junior hires and more scope per person, not pink slips.",
+              "What to do (concrete, fits the asker): move toward platform/cloud infrastructure (Terraform, Kubernetes, AWS/Azure certs), security or identity (Security+, then CISSP/CCSP), and 'AI ops' (running inference, GPUs, local models — he already does this); become the person who deploys and governs the AI tools; keep the hands-on hardware/network skills; document outcomes, not tasks."
+            ],
+            "traps": [
+              "'AI will replace all sysadmins by 2030' or 'no risk at all'.",
+              "Goldman's '300 million jobs' or similar headline numbers presented as a forecast for his job.",
+              "No numbers at all, or invented study results."
+            ],
+            "sources": [
+              "https://digitaleconomy.stanford.edu/app/uploads/2026/08/Canaries_August2026.pdf",
+              "https://siepr.stanford.edu/publications/working-paper/canaries-coal-mine-six-facts-about-recent-employment-effects-artificial",
+              "https://www.bls.gov/ooh/computer-and-information-technology/network-and-computer-systems-administrators.htm",
+              "https://hackr.io/blog/companies-eye-ai-for-tech-department-replacement"
+            ],
+            "ideal": "A one-sentence honest risk verdict, the Stanford evidence in two sentences with the numbers and date, which parts of IT ops are exposed vs durable, then a four-point plan tailored to a sysadmin with his background."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q24",
+      "category": "money",
+      "topic": "Retirement visa and inheritance",
+      "turns": [
+        {
+          "q": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+          "reference": {
+            "key_facts": [
+              "The apartment follows Brazilian law regardless of your will or nationality (Brazilian courts have exclusive jurisdiction over real estate in Brazil): forced heirship reserves 50% of the Brazilian estate for 'necessary heirs' (descendants, ascendants, spouse/partner); you can will only the other half. It goes through a Brazilian inventário (judicial, or extrajudicial at a notary if all heirs agree and are adults), typically 6-18 months, with ITCMD state tax — Santa Catarina's is progressive, about 1% to 7% (the constitutional ceiling is 8%; rates and brackets changed with Lei 19.053/2024, so confirm the current table), plus notary/lawyer fees (~2-5%). Heirs abroad need a CPF and usually a Brazilian attorney-in-fact.",
+              "US accounts: for a US citizen the estate is taxed by the US on worldwide assets, with a $15 million federal exemption in 2026 (One Big Beautiful Bill Act, indexed, no sunset), so most estates owe nothing federally; the accounts pass by beneficiary designation/TOD or US probate under US law. Whether Brazil can tax foreign-situs assets of a resident decedent is unsettled: the Supreme Court (STF, 2021) barred states from taxing foreign inheritances without a federal complementary law, and the 2023 tax reform (EC 132) lets states tax them meanwhile — so a Brazilian tax resident's foreign accounts may face ITCMD claims; get a Brazilian estate lawyer's read before moving.",
+              "Practical plan: a Brazilian will for the Brazilian assets (and a US will/trust for US assets), beneficiary designations on US accounts, consider whether to hold the apartment at all vs rent, keep records of the purchase and remittances (Central Bank registration), and note the US-Brazil lack of an estate-tax treaty.",
+              "The heirs are not 'hit' by Brazilian rules on the US accounts; they are hit on the apartment (forced share, ITCMD, Brazilian probate)."
+            ],
+            "traps": [
+              "'Brazil has a 30% inheritance tax' or 'no inheritance tax'.",
+              "'The US has no estate tax' or quoting the 2017-2025 exemption (~$13-14M) as current without the 2026 $15M figure.",
+              "Claiming forced heirship reaches US accounts automatically, or that a US will controls Brazilian real estate.",
+              "Invented statute numbers or court cases."
+            ],
+            "sources": [
+              "https://oliveiralawyers.com/services/family-law/brazils-forced-heirship/",
+              "https://www.ribeirocavalcante.com.br/inheritance-for-foreigners-in-brazil-2026/",
+              "https://zsassociados.com/services/itcmd-rates-by-state/",
+              "https://www.morganlewis.com/pubs/2025/08/estate-tax-alert-new-15-million-federal-exemption-becomes-law"
+            ],
+            "ideal": "Apartment first (Brazilian law, 50% forced share, inventário, SC ITCMD ~1-7%), then US accounts (US estate tax with the $15M exemption; the unsettled ITCMD-on-foreign-assets point), then a three-item plan. Flag that this needs a Brazilian estate lawyer; no hedging wall."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q25",
+      "category": "money",
+      "topic": "Rent or buy before relocating",
+      "turns": [
+        {
+          "q": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+          "reference": {
+            "key_facts": [
+              "Rent. Buying and selling within one or two years costs roughly 8-10% of the price round trip (closing 2-5%, selling 5-6% commissions, transfer taxes — in NYC add mansion tax above $1M and mortgage recording tax) and prices rarely rise enough in 24 months to cover it; with 30-year mortgage rates around 7.3-7.4% (Freddie Mac, mid-October 2026, the highest in about two years) the carry cost is high too.",
+              "The exceptions: you already own (then the question is sell vs rent it out — renting from abroad means a manager at 8-10% and US tax filing); or you'd buy as an investment you intend to keep for 5+ years, which is a different decision.",
+              "Keep liquidity for the move: visa financial proof (Brazil's retirement visa wants ~US$2,000/month of income), deposits, FX, and a cushion; a flexible lease or month-to-month near the end beats any purchase.",
+              "Fit: the asker is in Brooklyn planning Latin America; one clear answer, no 'it depends' essay."
+            ],
+            "traps": [
+              "'Buying always builds equity' or 'rent is throwing money away'.",
+              "Ignoring transaction costs or quoting 2021 mortgage rates (3%).",
+              "A long pros-and-cons table with no verdict."
+            ],
+            "sources": [
+              "https://fred.stlouisfed.org/series/MORTGAGE30US",
+              "https://tradingeconomics.com/united-states/30-year-mortgage-rate/news/588887"
+            ],
+            "ideal": "Verdict in the first sentence (rent), the transaction-cost arithmetic and the 2026 mortgage rate in two sentences, the two exceptions, the liquidity point. Under 180 words."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q26",
+      "category": "money",
+      "topic": "Amazon in South America",
+      "turns": [
+        {
+          "q": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+          "reference": {
+            "key_facts": [
+              "Only Brazil has a real Amazon retail operation in South America: amazon.com.br (books from 2012, full retail from 2017, Fulfillment by Amazon since 2020, Prime, a dozen-plus fulfilment centres). Mexico (amazon.com.mx, since 2015) is the other Latin American marketplace but is North America.",
+              "The leaked 2022 plans to launch marketplaces in Colombia (Feb 2023) and Chile (April 2023) never happened — Amazon paused that expansion; what launched there in 2023 was Prime Video channels, and an AWS cloud region is due in Chile by end-2026. There is no amazon.cl or amazon.com.co store as of October 2026.",
+              "Elsewhere (Argentina, Chile, Colombia, Peru, Uruguay) people can order from amazon.com with international shipping and import duties (AmazonGlobal) — slow and taxed — so most don't.",
+              "What people use: Mercado Libre dominates the continent (about $50 billion GMV in 2025, 18 countries, its own logistics network and fintech Mercado Pago), plus Shopee, Magazine Luiza, Casas Bahia and Shein/Temu/AliExpress in Brazil (Brazil added a 20% import tax on sub-$50 parcels in 2024), Falabella/Linio in Chile, Peru and Colombia, and Tiendamia-style forwarders for US goods."
+            ],
+            "traps": [
+              "Claiming Amazon marketplaces exist in Colombia, Chile or Argentina.",
+              "'Amazon is not in Brazil' or 'Amazon launched in Brazil in 2020'.",
+              "Invented launch dates or market-share figures."
+            ],
+            "sources": [
+              "https://www.marketplacepulse.com/articles/amazon-paused-global-expansion-in-2023",
+              "https://senalnews.com/en/digital/amazon-launches-prime-video-channels-and-prime-video-store-in-chile-and-colombia/amp",
+              "https://nocnocstore.com/resources/top-online-marketplaces-to-sell-in-latin-america-in-2026",
+              "https://seekingalpha.com/news/4443084-amazon-invests-over-4b-in-aws-infrastructure-in-chile"
+            ],
+            "ideal": "Brazil yes (with the dates), everywhere else no (the shelved 2023 plan, Prime Video and AWS only), the cross-border option in a clause, then Mercado Libre and the local players."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q27",
+      "category": "reasoning",
+      "topic": "Package vs separate booking",
+      "turns": [
+        {
+          "q": "A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 nights. Which is cheaper and by how much? Then redo it if the hotel adds a 12% tax that isn't in the $95.",
+          "reference": {
+            "key_facts": [
+              "Separately: 11 x $95 = $1,045; plus $1,350 = $2,395. Separate is cheaper by $5.",
+              "With 12% hotel tax: $1,045 x 1.12 = $1,170.40; total $2,520.40. The package is now cheaper by $120.40.",
+              "A great answer shows both lines, and adds one caveat: check whether the package price itself excludes taxes/resort fees and compare cancellation terms, since $5 is noise."
+            ],
+            "traps": [
+              "Using 10 nights, or taxing the flight too.",
+              "Saying the package is cheaper in both cases, or getting $115/$125 instead of $120.40.",
+              "Burying the numbers in a paragraph."
+            ],
+            "sources": [],
+            "ideal": "Two short calculations with the verdict after each; one caveat line. Under 100 words."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q28",
+      "category": "reasoning",
+      "topic": "Hybrid break-even",
+      "turns": [
+        {
+          "q": "I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for $27,000. Gas is $3.40. How many years until B breaks even on fuel alone?",
+          "reference": {
+            "key_facts": [
+              "Car A: 14,000 / 24 = 583.3 gallons x $3.40 = $1,983.33 a year. Car B: 14,000 / 48 = 291.7 gallons x $3.40 = $991.67 a year. Fuel saving: $991.67 a year.",
+              "Price gap $5,000 / $991.67 ≈ 5.04 years — about five years on fuel alone.",
+              "Good extras: at today's ~$4.35 national average the break-even falls to ~3.9 years; hybrids also save on brakes, and the gap narrows further with incentives or widens with insurance; none required for full marks."
+            ],
+            "traps": [
+              "Arithmetic slips (e.g. $1,190 a year saving, 2.5 or 10 years).",
+              "Forgetting the $5,000 price difference and comparing fuel only.",
+              "A long table for a two-line calculation."
+            ],
+            "sources": [],
+            "ideal": "Three lines of arithmetic and the answer (~5 years), optionally one sensitivity line."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q29",
+      "category": "reasoning",
+      "topic": "Airbnb review and pricing analysis",
+      "turns": [
+        {
+          "q": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+          "reference": {
+            "key_facts": [
+              "Trust the 212-review 4.6 as the more reliable estimate of what a stay is like: its mean has a standard error around 0.04 stars vs ~0.15-0.2 for 18 reviews, and small counts are inflated by early-stay effects (friends, lenient first guests, hosts trying hard). But context matters: Airbnb ratings are compressed near the top (most listings 4.7-4.9; 'Guest Favourite' needs ~4.9+), so 4.6 is below average and the 1-3 star reviews should be read for the reason (cleanliness/accuracy = avoid; noise/location = maybe fine). Check Superhost status, response rate and recency; a 4.9 from 18 with recent, detailed reviews is a reasonable bet, just higher variance.",
+              "Pricing a 2-bedroom in Florianópolis for 30+ nights: start from comps (Airbnb filtered to monthly stays in your bairro, plus 'mobiliado' listings on OLX/Zap/QuintoAndar as the floor), then set the monthly rate 25-40% below 30 x your nightly rate; in Campeche or Lagoa that lands roughly R$5,000-8,000 a month furnished including utilities in 2026 (Jurerê higher); seasonality: December-February can carry double nightly rates and short stays, so monthly discounts belong to April-November; include a cleaning fee, a utilities cap, and a deposit via Airbnb; Brazilian law treats stays up to 90 days as 'temporada' (longer becomes a normal lease with tenant protections) and rental income is taxable (carnê-leão).",
+              "Gives one concrete opening price and the test: 70%+ occupancy in two months → raise 10%."
+            ],
+            "traps": [
+              "'Higher stars always wins' with no sample-size reasoning, or invented statistics about Airbnb averages.",
+              "Dollar-only pricing with no local comps, or a precise 'R$3,200' pulled from nowhere.",
+              "Ignoring the 90-day temporada rule."
+            ],
+            "sources": [
+              "https://www.nsctotal.com.br/?p=7476285",
+              "https://expatistan.com/price/rent/florianopolis/USD"
+            ],
+            "ideal": "Verdict on the ratings with the sample-size logic in two sentences and the 'Airbnb grades are compressed' caveat, then a five-step pricing method with a Florianópolis range and the seasonality and 90-day points."
+          }
+        }
+      ]
+    },
+    {
+      "id": "q30",
+      "category": "technical",
+      "topic": "Quantization explained",
+      "turns": [
+        {
+          "q": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+          "reference": {
+            "key_facts": [
+              "It stores each weight in 4 bits instead of 16 (bf16/fp16), in groups (typically 32-128 weights) with a per-group scale (and sometimes zero-point/offset), so a 27B model drops from ~54 GB to ~15-17 GB and a 7B from ~14 GB to ~4-5 GB. Activations and (usually) the KV cache stay 16-bit; compute dequantizes on the fly or uses int kernels.",
+              "Why it's faster: decoding is memory-bandwidth-bound (every token reads all weights), so a quarter of the bytes ≈ 2-3x the tokens per second on the same hardware.",
+              "Quality: for 7B+ models 4-bit costs little (perplexity up a few percent, benchmark drops of ~1-3 points); losses grow for small models (<3B), for long multi-step reasoning and exact code/math, and below 4 bits (3-bit and 2-bit degrade sharply). Modern schemes (AWQ, GPTQ, GGUF Q4_K_M, MLX 4-bit group-64, NF4; GPT-OSS ships MXFP4 natively) keep sensitive layers or outliers at higher precision.",
+              "When it matters: when the model doesn't fit otherwise — a bigger 4-bit model almost always beats a smaller 16-bit one at the same memory; prefer 8-bit when memory allows and quality is paramount; measure on your own task."
+            ],
+            "traps": [
+              "'4-bit means four decimal places' or confusing quantization with pruning/distillation.",
+              "'Quantization makes the model half as smart'.",
+              "Claiming it speeds up prompt processing (compute-bound) as much as decoding."
+            ],
+            "sources": [
+              "https://arxiv.org/abs/2306.00978",
+              "https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md"
+            ],
+            "ideal": "Four to six sentences: what is stored, the memory and bandwidth arithmetic with one example, the quality trade-off with its exceptions, and the rule of thumb (bigger model at 4-bit beats smaller at 16-bit)."
+          }
+        }
+      ]
+    }
+  ]
+}

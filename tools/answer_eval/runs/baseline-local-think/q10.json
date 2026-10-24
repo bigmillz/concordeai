@@ -1,0 +1,234 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[78.4,60.0,49.5],\"final\":30.4,\"ftok\":400,\"est\":true}",
+  "X-Hurry": "e43c1122704da2d6"
+ },
+ "first_byte_s": 6.74,
+ "first_text_s": 127.07,
+ "elapsed_s": 127.07,
+ "events": [
+  {
+   "t": 6.74,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 6.74,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 6.76,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 6.76,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 6.76,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 26.77,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 46.8,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 66.82,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 86.84,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 106.87,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 126.9,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 127.07,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 127.07,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 127.07,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 127.07,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   6.76,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   26.77,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   46.8,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   66.82,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   86.84,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   106.87,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   126.9,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 6.74
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 127.07
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 127.07
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 6.76,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 6.76,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 127.07,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Ollama vs MLX: Which Local Model Stack for Claude Code? (M4 Mac...",
+   "u": "https://macstripe.com/en/blog/articles/mlx-vs-ollama-apple-silicon-ai/mlx-vs-ollama-apple-silicon-ai.html"
+  },
+  {
+   "t": "How to Run LLMs Locally on Mac (M1–M4 Guide)... — CanItRun",
+   "u": "https://canitrun.dev/guides/run-llms-on-mac/"
+  },
+  {
+   "t": "Ollama MLX on Apple Silicon in 2026: What 2× Faster Inference...",
+   "u": "https://runaihome.com/blog/ollama-mlx-apple-silicon-2026/"
+  },
+  {
+   "t": "Mac mini M4 local LLM guide: the best model for every RAM tier",
+   "u": "https://www.popularai.org/p/best-local-llm-mac-mini-m4-2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer_raw": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1382,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q10",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Ollama vs MLX on an M4 Pro",
+ "question": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T02:58:19",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,225 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[78.8,60.2,49.4],\"final\":30.2,\"ftok\":367,\"est\":true}",
+  "X-Hurry": "43580b9d7d4cca4b"
+ },
+ "first_byte_s": 4.04,
+ "first_text_s": 124.07,
+ "elapsed_s": 124.07,
+ "events": [
+  {
+   "t": 4.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 4.04,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 4.06,
+   "tag": "DRAFT",
+   "m": "Qwen 3.6 35B MoE",
+   "chars": 24
+  },
+  {
+   "t": 4.06,
+   "tag": "DRAFT",
+   "m": "Gemma 4 26B",
+   "chars": 24
+  },
+  {
+   "t": 4.06,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 24.06,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 44.09,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 64.12,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 84.14,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 104.18,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 1"
+  },
+  {
+   "t": 124.07,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 124.07,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "272 chars"
+   }
+  },
+  {
+   "t": 124.07,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 124.07,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.06,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   24.06,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   44.09,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   64.12,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   84.14,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ],
+  [
+   104.18,
+   "asking Qwen 3.8 27B · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 4.04
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "272 chars",
+   "t_s": 124.07
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 124.07
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 4.06,
+   "m": "Qwen 3.6 35B MoE",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 4.06,
+   "m": "Gemma 4 26B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 124.07,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Amazon (company) - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Amazon_(company)"
+  },
+  {
+   "t": "AmazonGlobal Export Countries and... - Amazon Customer Service",
+   "u": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GCBBSZMUXA6U2P8R"
+  },
+  {
+   "t": "Work Day in My Life as an Amazon Prime Now Shopper... - YouTube",
+   "u": "https://www.youtube.com/watch?v=5-0g0J0z4kE"
+  },
+  {
+   "t": "Amazon and the Labor Shortage - The New York Times",
+   "u": "https://www.nytimes.com/2021/12/01/podcasts/the-daily/amazon-pandemic-labor-shortage.html"
+  }
+ ],
+ "photos": null,
+ "run_frames": [],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Qwen 3.6 35B MoE, Gemma 4 26B",
+ "searched": true,
+ "answer_raw": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "answer": "⚠️ Backend error — RuntimeError: none of the selected models answered",
+ "chars": 69,
+ "raw_bytes": 1271,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.14,
+ "rate_gen_tok_s": null,
+ "id": "q26",
+ "turn": 1,
+ "category": "money",
+ "topic": "Amazon in South America",
+ "question": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T03:27:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

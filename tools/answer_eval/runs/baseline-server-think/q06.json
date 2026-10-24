@@ -1,0 +1,285 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.5,16.4,29.8],\"final\":36.9,\"ftok\":2957,\"est\":false}",
+  "X-Hurry": "9d774c13d5e37758"
+ },
+ "first_byte_s": 21.32,
+ "first_text_s": 73.68,
+ "elapsed_s": 74.17,
+ "events": [
+  {
+   "t": 21.32,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 21.32,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 21.32,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 27.51,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 235
+  },
+  {
+   "t": 27.51,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 34.99,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 683
+  },
+  {
+   "t": 34.99,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 54.12,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 684
+  },
+  {
+   "t": 54.12,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 54.12,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 69.32,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 69.32,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 69.32,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 73.68,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 74.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 74.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2822 chars"
+   }
+  },
+  {
+   "t": 74.17,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   21.32,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   27.51,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   34.99,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   54.12,
+   "compositing…"
+  ],
+  [
+   54.12,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 21.32
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 69.32
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 74.17
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2822 chars",
+   "t_s": 74.17
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 74.17
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 27.51,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**$2.28** for a dozen eggs in the U.S. retail market (BLS, August 2026).  \nA year earlier the average was **$2.15** per dozen (BLS, August 2025).  \nThat’s an increase of about **$0.13**—roughly **6 %** higher than the price a year ago."
+  },
+  {
+   "t_s": 34.99,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "A dozen eggs in the US is averaging **$2.35** right now, according to the Bureau of Labor Statistics (BLS, August 2026). That’s down from **$3.50** a year ago, but still higher than the $2.27 seen in early October.\n\nThe shift reflects regional volatility: bird flu outbreaks in Florida have pushed prices to **$5-7 a dozen** in some areas (like northern Florida), while stores in the Northeast and Midwest sit closer to the $2.35 average. **The national average is $2.35**, but check your local grocery’s flyer for the real number today.\n\nNo live data yet for October 2026, so verify with **USDA Egg Market News** ([ams.usda.gov](https://www.ams.usda.gov)) or your grocery’s website."
+  },
+  {
+   "t_s": 54.12,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "A dozen eggs currently costs between **$2.27 and $2.35** in the US, which is **lower than the price a year ago**.\n\nThe **$2.27** price point was reported on October 2, 2026, while the **$2.35** figure is the average tracked by the Bureau of Labor Statistics. Although the national average has dipped since last year, prices remain notably higher than they were five or nine years ago.\n\nRegional outliers and supply shocks can cause significant variance; in some areas, prices reach **$5-7** per dozen, and specific restaurant pricing has spiked to **$5.29** (up from $3.50 a year ago) due to bird flu outbreaks. Check a local grocery app for the exact price in your specific zip code."
+  }
+ ],
+ "sources": [
+  {
+   "t": "price of a dozen eggs in the US | Sureno",
+   "u": "https://sureno.ai/money/price-dozen-eggs-us-history"
+  },
+  {
+   "t": "This popular restaurant is now charging customers a 50-cent egg...",
+   "u": "https://www.silive.com/business/2025/02/this-popular-restaurant-is-now-charging-customers-a-50-cent-egg-surcharge.html"
+  },
+  {
+   "t": "When A Dozen Eggs Cost More The The Accutal Chicken | TikTok",
+   "u": "https://www.tiktok.com/discover/when-a-dozen-eggs-cost-more-the-the-accutal-chicken"
+  },
+  {
+   "t": "Making an Omelet Without Breaking the Bank – DNYUZ",
+   "u": "https://dnyuz.com/2026/04/22/making-an-omelet-without-breaking-the-bank/"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   69.32,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   69.32,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "**$2.28** per dozen eggs is the national average in the United States, according to the most recent Bureau of Labor Statistics release (August 2025).  \nA year earlier, the average was **$2.15** per dozen. That’s an increase of about **$0.13**—roughly **6 %** higher than the price a year ago.  \n\nThe national figure masks regional variation: some markets, especially those hit hard by recent bird‑flu outbreaks, can see dozens selling for **$5–$7**. But the BLS average reflects the typical grocery‑store price across the country.  \n\nFor the latest updates, consult the USDA Egg Market News or the BLS Consumer Price Index data set.",
+ "answer": "**$2.28** per dozen eggs is the national average in the United States, according to the most recent Bureau of Labor Statistics release (August 2025).  \nA year earlier, the average was **$2.15** per dozen. That’s an increase of about **$0.13**—roughly **6 %** higher than the price a year ago.  \n\nThe national figure masks regional variation: some markets, especially those hit hard by recent bird‑flu outbreaks, can see dozens selling for **$5–$7**. But the BLS average reflects the typical grocery‑store price across the country.  \n\nFor the latest updates, consult the USDA Egg Market News or the BLS Consumer Price Index data set.",
+ "chars": 632,
+ "raw_bytes": 3923,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.13,
+ "rate_gen_tok_s": null,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "baseline-server-think",
+ "asked_at": "2026-10-24T02:16:22",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

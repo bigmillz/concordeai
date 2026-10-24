@@ -1,0 +1,311 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+  "X-Eta": "{\"search\":14.0,\"models\":[76.6,84.5,70.9],\"final\":54.5,\"ftok\":584,\"est\":false}",
+  "X-Hurry": "d8e2d4b0515858d8"
+ },
+ "first_byte_s": 2.98,
+ "first_text_s": 230.08,
+ "elapsed_s": 238.33,
+ "events": [
+  {
+   "t": 2.98,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 2.98,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 3.0,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 23.02,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 43.05,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 63.08,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 83.1,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 103.13,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 123.17,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 123.5,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 123.5,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 148.2,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 168.23,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 177.6,
+   "tag": "DRAFT",
+   "m": "Ministral 3 14B",
+   "chars": 1200
+  },
+  {
+   "t": 177.6,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 198.27,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 213.45,
+   "tag": "DRAFT",
+   "m": "Gemma 4 12B",
+   "chars": 1200
+  },
+  {
+   "t": 213.45,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 213.45,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is double-checking the drafts"
+  },
+  {
+   "t": 227.53,
+   "tag": "RUN",
+   "run": {
+    "c": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 230.08,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 238.32,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "5280 chars"
+   }
+  },
+  {
+   "t": 238.33,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.0,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   23.02,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   43.05,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   63.08,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   83.1,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   103.13,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   123.17,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   123.5,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   148.2,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   168.23,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   177.6,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   198.27,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   213.45,
+   "compositing…"
+  ],
+  [
+   213.45,
+   "Gemma 4 26B is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 2.98
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "5280 chars",
+   "t_s": 238.32
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 238.33
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 123.5,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 177.6,
+   "m": "Ministral 3 14B",
+   "text": "If you move to Brazil on a retirement visa and die there, your **US accounts and Brazilian apartment will not automatically transfer to your heirs**—but the process is a minefield of laws, taxes, and bureaucracy. Here’s the straight line it would follow, with the key traps and the one reliable path:\n\n### **1. US Accounts (Banks, Investments, Retirement)**\n- **Accounts owned individually (no beneficiary)** will go through **your US estate** via probate in the US court where you’re listed (usually your last address).\n- **Your US heirs file a claim with the executor** of your estate, who will handle the paperwork to liquidate or transfer the funds. Expect **US estate taxes only if your total estate exceeds $13.61 million** (2026 federal exemption—check the IRS site for updates).\n- **US banks and brokers will freeze access** the moment you die; your heirs must present a **court-issued letter of authorization** (not a death certificate alone). Some smaller foreign branches are slow or refuse to engage.\n\n### **2. Brazilian Apartment (Real Estate)**\n- **If registered in your name alone**, it’s part of your **Brazilian estate**. Heirs must:\n  - **File for succession** in Brazil’s courts (u"
+  },
+  {
+   "t_s": 213.45,
+   "m": "Gemma 4 12B",
+   "text": "Your US accounts generally remain governed by US law, while your Brazilian apartment and the inheritance of Brazilian assets will likely fall under Brazilian jurisdiction. Because Brazil's tax system is aggressive regarding \"Situs\" (location-based) assets, your heirs will likely face Brazilian inheritance taxes and formalities for the real estate, regardless of where they reside.\n\n**US Accounts and Assets**\nYour US bank accounts, brokerage accounts, and any personal property located in the US are governed by **US federal and state law**. Since these assets are not located in Brazil, they are typically not subject to Brazilian inheritance taxes. Your heirs will likely follow the standard US probate process or your designated beneficiaries in a will or trust. \n\n**Brazilian Real Estate**\nThe apartment you purchase in Brazil is a \"Situs\" asset. Because it is located in Brazil, it is subject to **Brazilian inheritance law**. This includes the \"ITCMD\" (Inheritance and Transfer Tax), which is a state-level tax in Brazil.\n\n**Inheritance Complexity**\nBrazil generally follows a \"forced heirship\" rule (succession rights), which can sometimes conflict with US \"testamentary freedom\" (the right "
+  }
+ ],
+ "sources": [
+  {
+   "t": "MOVING TO NEW YORK ALONE first luxury apartment...",
+   "u": "https://www.youtube.com/watch?v=KcM-Hr3dj2Y"
+  },
+  {
+   "t": "Nonimmigrant Visa - Instructions Page",
+   "u": "https://ceac.state.gov/GenNIV/Default.aspx"
+  },
+  {
+   "t": "Ответ: Open the brackets. Use Present Simple or Present Continuous.",
+   "u": "https://www.euroki.org/koza/open-the-brackets-use-present-simple-or-present-continuous-mind-the-type-of-a-sentence-i-feel-tired-n"
+  },
+  {
+   "t": "Mellina Tey - Before I Move On - перевод текста песни на русский",
+   "u": "https://lyrhub.com/track/Mellina-Tey/Before-I-Move-On/translation/ru"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   227.53,
+   {
+    "c": "Gemma 4 26B"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+ "searched": true,
+ "answer_raw": "Your US accounts and your Brazilian apartment will be governed by two different legal systems, meaning your heirs will have to navigate both US probate and Brazilian succession laws simultaneously.\n\n## US Accounts and Assets\nYour US-based bank accounts, brokerage accounts, and retirement funds are governed by **US federal and state law**. Because these assets are located in the United States, they are typically not subject to Brazilian inheritance taxes.\n\nIf you have designated beneficiaries (POD/TOD) on your accounts, the transfer is usually streamlined. If there are no beneficiaries, the assets will go through **US probate** based on your last US legal residence. Your heirs would then follow standard US procedures to settle the estate. Regarding federal estate taxes, the current exemption is approximately **$13.61 million per person**—though this is subject to significant changes due to sunsetting laws in 2026—so check the current IRS threshold for your specific filing year.\n\n## Brazilian Real Estate\nThe apartment in Brazil is a \"situs\" asset, meaning it is physically located in Brazil and falls under **Brazilian jurisdiction**. Even if you are a US resident, your heirs will have to follow Brazilian law to transfer the title of the property.\n\nThe process involves:\n*   **Succession proceedings:** Heirs must file for succession in a Brazilian court or via a public notary (depending on the presence of a will and minors). This requires a **Brazilian lawyer** and can cost roughly **4% to 6% of the property value** in legal fees and notary costs.\n*   **ITCMD (State Tax):** This is the inheritance and donation tax. Rates vary by state; for example, São Paulo’s rate is currently capped at **4%**, while other states may have higher brackets.\n\n## The Conflict of Laws\nThe biggest risk for a US citizen moving to Brazil is the conflict between **US testamentary freedom** and **Brazilian forced heirship** (known as *legítima*). \n\nIn the US, you generally have the right to leave your assets to anyone you choose. However, Brazilian law often dictates that a specific portion of your estate (the \"reserved portion\") **must** go to \"necessary heirs\" (such as children or spouses). If your Brazilian will leaves the apartment entirely to a friend or a charity, Brazilian authorities may refuse to recognize that distribution if it infringes on the legal rights of your forced heirs.\n\nTo manage this, you should maintain clear, separate estate plans: a **US-based will or trust** to handle your domestic assets, and a **separate Brazilian will** specifically addressing your Brazilian real estate to satisfy local probate requirements.",
+ "answer": "Your US accounts and your Brazilian apartment will be governed by two different legal systems, meaning your heirs will have to navigate both US probate and Brazilian succession laws simultaneously.\n\n## US Accounts and Assets\nYour US-based bank accounts, brokerage accounts, and retirement funds are governed by **US federal and state law**. Because these assets are located in the United States, they are typically not subject to Brazilian inheritance taxes.\n\nIf you have designated beneficiaries (POD/TOD) on your accounts, the transfer is usually streamlined. If there are no beneficiaries, the assets will go through **US probate** based on your last US legal residence. Your heirs would then follow standard US procedures to settle the estate. Regarding federal estate taxes, the current exemption is approximately **$13.61 million per person**—though this is subject to significant changes due to sunsetting laws in 2026—so check the current IRS threshold for your specific filing year.\n\n## Brazilian Real Estate\nThe apartment in Brazil is a \"situs\" asset, meaning it is physically located in Brazil and falls under **Brazilian jurisdiction**. Even if you are a US resident, your heirs will have to follow Brazilian law to transfer the title of the property.\n\nThe process involves:\n*   **Succession proceedings:** Heirs must file for succession in a Brazilian court or via a public notary (depending on the presence of a will and minors). This requires a **Brazilian lawyer** and can cost roughly **4% to 6% of the property value** in legal fees and notary costs.\n*   **ITCMD (State Tax):** This is the inheritance and donation tax. Rates vary by state; for example, São Paulo’s rate is currently capped at **4%**, while other states may have higher brackets.\n\n## The Conflict of Laws\nThe biggest risk for a US citizen moving to Brazil is the conflict between **US testamentary freedom** and **Brazilian forced heirship** (known as *legítima*). \n\nIn the US, you generally have the right to leave your assets to anyone you choose. However, Brazilian law often dictates that a specific portion of your estate (the \"reserved portion\") **must** go to \"necessary heirs\" (such as children or spouses). If your Brazilian will leaves the apartment entirely to a friend or a charity, Brazilian authorities may refuse to recognize that distribution if it infringes on the legal rights of your forced heirs.\n\nTo manage this, you should maintain clear, separate estate plans: a **US-based will or trust** to handle your domestic assets, and a **separate Brazilian will** specifically addressing your Brazilian real estate to satisfy local probate requirements.",
+ "chars": 2653,
+ "raw_bytes": 6793,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.78,
+ "rate_gen_tok_s": 80.39,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T03:25:24",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,302 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+  "X-Eta": "{\"search\":14.0,\"models\":[73.6,60.0,60.0],\"final\":41.4,\"ftok\":450,\"est\":true}",
+  "X-Hurry": "1b464c039dfae4b9"
+ },
+ "first_byte_s": 2.19,
+ "first_text_s": 206.09,
+ "elapsed_s": 212.5,
+ "events": [
+  {
+   "t": 2.19,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 2.19,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 2.22,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 22.23,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 42.26,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 62.29,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 82.3,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 102.32,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 122.35,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 122.51,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 122.51,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 147.38,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 155.66,
+   "tag": "DRAFT",
+   "m": "Ministral 3 14B",
+   "chars": 1200
+  },
+  {
+   "t": 155.66,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 177.41,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 188.16,
+   "tag": "DRAFT",
+   "m": "Gemma 4 12B",
+   "chars": 1200
+  },
+  {
+   "t": 188.16,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 188.16,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is double-checking the drafts"
+  },
+  {
+   "t": 203.14,
+   "tag": "RUN",
+   "run": {
+    "c": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 206.09,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 212.5,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "4484 chars"
+   }
+  },
+  {
+   "t": 212.5,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.22,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   22.23,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   42.26,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   62.29,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   82.3,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   102.32,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   122.35,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   122.51,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   147.38,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   155.66,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   177.41,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   188.16,
+   "compositing…"
+  ],
+  [
+   188.16,
+   "Gemma 4 26B is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 2.19
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "4484 chars",
+   "t_s": 212.5
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 212.5
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 122.51,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 155.66,
+   "m": "Ministral 3 14B",
+   "text": "The **newest iPhone as of October 24, 2026** is the **iPhone 17 Pro**, released this month. Apple offers it in a **Pro Fusion camera system with 48MP**, Dynamic Island, and more punch than the previous Pro Max. There’s no iPhone 17 Pro Max — Apple dropped the Max suffix this cycle.\n\n**Prices** (check Apple’s [US store](https://www.apple.com/shop/buy-iphone) for current stock):\n- **128GB**: **$999**\n- **256GB**: **$1,099**\n- **512GB**: **$1,299**\n- (Trade-in credit of ~$200-400 reduces that further.)\n\n**Is it worth upgrading from an iPhone 14?**\nNo — unless you’re a **content creator or heavy videographer**, the jump from an iPhone 14 Pro Max feels more like polish than a must-have. Your 14 Pro Max still has **A16 Bionic performance** (now in last-gen MacBooks), a **12MP shooter** that’s 80% of what the 48MP system offers, and **plenty of headroom for day-to-day**. Here’s what you’d *really* get:\n- **Pro camera fusion**: 48MP sensor with macro photography and night mode on the ultra-wide. Useful for food shots or night shots, but not critical for most users.\n- **Dynamic Island**: Finally replaces the notch, but only on the Pro models.\n- **USB-C**: The iPhone 14’s Lightning costs $0 "
+  },
+  {
+   "t_s": 188.16,
+   "m": "Gemma 4 12B",
+   "text": "The **iPhone 16 Pro** and **iPhone 16 Pro Max** are the latest flagship models available from Apple.\n\nThe **iPhone 16 Pro** starts at **$999** and the **iPhone 16 Pro Max** starts at **$1,199** (Prices as of September 2024).\n\nWhether it is worth upgrading from an iPhone 14 depends on your specific hardware bottlenecks, but for most users, the answer is **no**. The iPhone 14 remains a capable device that supports the latest iOS features and handles standard high-resolution photography and multitasking without significant lag.\n\n## Performance and Hardware Gains\nSince you have a background in IT and ops, the architectural changes are what matter most here. Apple transitioned to the **A18 Pro chip** with the 16 series, which includes a **16-core Neural Engine** designed specifically for \"Apple Intelligence\" (on-device AI processing).\n\nThe iPhone 14 lacks the **8GB of RAM** required to run these new generative AI features. If you are not interested in Apple's new AI stack, the performance delta between the A14/A15 (in the 14 series) and the A18 Pro is negligible for daily workflows.\n\n## Display and Connectivity\nThe 16 Pro series introduces several hardware iterations that the 14 lacks:\n"
+  }
+ ],
+ "sources": [
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/"
+  },
+  {
+   "t": "Is It Worth Upgrades from The 14 Pro Max to 17 Pro Max | TikTok",
+   "u": "https://www.tiktok.com/discover/is-it-worth-upgrades-from-the-14-pro-max-to-17-pro-max"
+  },
+  {
+   "t": "iPhone 14 Review: Irrelevant, soon to be obsolete | iMore",
+   "u": "https://www.imore.com/iphone/iphone-14-review"
+  },
+  {
+   "t": "lifewire.com/what-is-the-newest-iphone-6746797",
+   "u": "https://www.lifewire.com/what-is-the-newest-iphone-6746797"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   203.14,
+   {
+    "c": "Gemma 4 26B"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+ "searched": true,
+ "answer_raw": "The **iPhone 17 Pro Max** is the newest flagship model, with base prices starting around **$1,199** for the Pro and **$1,299** for the Pro Max (prices may vary based on storage capacity; check Apple's US store for current inventory).\n\nFor most users, upgrading from an iPhone 14 is **not necessary** right now. The iPhone 14 remains a powerful device for daily tasks, and the jump to the 17 series represents iterative refinement rather than a revolutionary shift in utility.\n\n## The Upgrade Delta\nIf you are coming from an iPhone 14, the hardware differences focus on specific professional workflows and connectivity:\n\n*   **Camera System**: The 17 Pro Max features a **48MP Pro Fusion camera system**, offering significant improvements in resolution and sensor capabilities over the 12MP sensors on the succeeded 14 series.\n*   **Connectivity**: You move from the Lightning port to **USB-C**, which offers faster data transfer speeds and better ecosystem compatibility.\n*   **Display & Interface**: The 17 series utilizes the **Dynamic Island** and advanced display tech that the 14 lacks.\n*   **AI and Processing**: The newer chips provide more headroom for on-device AI tasks and better power efficiency.\n\n## The Value Proposition\nYour decision hinges on whether you are a **content creator** or a heavy mobile videographer. If you aren't using the phone as a primary production tool, the performance of the iPhone 14 is still more than sufficient for standard apps, social media, and communication.\n\nThe most significant variable is your **trade-in value**. The iPhone 14 still holds decent value for trade-in credits (likely in the **$200–$400** range depending on condition and model), which can offset the cost of the new hardware. If you aren't hitting hardware bottlenecks today, holding onto your 14 is the more fiscally sound move.",
+ "answer": "The **iPhone 17 Pro Max** is the newest flagship model, with base prices starting around **$1,199** for the Pro and **$1,299** for the Pro Max (prices may vary based on storage capacity; check Apple's US store for current inventory).\n\nFor most users, upgrading from an iPhone 14 is **not necessary** right now. The iPhone 14 remains a powerful device for daily tasks, and the jump to the 17 series represents iterative refinement rather than a revolutionary shift in utility.\n\n## The Upgrade Delta\nIf you are coming from an iPhone 14, the hardware differences focus on specific professional workflows and connectivity:\n\n*   **Camera System**: The 17 Pro Max features a **48MP Pro Fusion camera system**, offering significant improvements in resolution and sensor capabilities over the 12MP sensors on the succeeded 14 series.\n*   **Connectivity**: You move from the Lightning port to **USB-C**, which offers faster data transfer speeds and better ecosystem compatibility.\n*   **Display & Interface**: The 17 series utilizes the **Dynamic Island** and advanced display tech that the 14 lacks.\n*   **AI and Processing**: The newer chips provide more headroom for on-device AI tasks and better power efficiency.\n\n## The Value Proposition\nYour decision hinges on whether you are a **content creator** or a heavy mobile videographer. If you aren't using the phone as a primary production tool, the performance of the iPhone 14 is still more than sufficient for standard apps, social media, and communication.\n\nThe most significant variable is your **trade-in value**. The iPhone 14 still holds decent value for trade-in credits (likely in the **$200–$400** range depending on condition and model), which can offset the cost of the new hardware. If you aren't hitting hardware bottlenecks today, holding onto your 14 is the more fiscally sound move.",
+ "chars": 1843,
+ "raw_bytes": 5688,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.17,
+ "rate_gen_tok_s": 71.88,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "run": "baseline-local-think",
+ "asked_at": "2026-10-24T02:50:15",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

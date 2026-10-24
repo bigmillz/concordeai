@@ -1,0 +1,266 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.3,19.8,30.5],\"final\":37.9,\"ftok\":2997,\"est\":false}",
+  "X-Hurry": "c2d393bbc1b902f0"
+ },
+ "first_byte_s": 10.41,
+ "first_text_s": 71.42,
+ "elapsed_s": 73.99,
+ "events": [
+  {
+   "t": 10.41,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 10.41,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 10.41,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 16.37,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 16.37,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 32.46,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 32.49,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 49.07,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 49.18,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 49.18,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 64.69,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 64.69,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 64.69,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 71.42,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 73.97,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 73.98,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "6041 chars"
+   }
+  },
+  {
+   "t": 73.98,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   10.41,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   16.37,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   32.49,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   49.18,
+   "compositing…"
+  ],
+  [
+   49.18,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 10.41
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 64.69
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 73.97
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "6041 chars",
+   "t_s": 73.98
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 73.98
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 16.37,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Pizza isn’t inherently a “bad” food, but the way it’s made and how often you eat it matters.  \n- **Occasional slice** – 1–2 slices a week, especially from a homemade or whole‑grain version, fit comfortably into a balanced diet.  \n- **Daily pizza** – The Feb 20 2026 article warns that eating pizza every day can raise sodium, saturated‑fat intake and disrupt gut health, leading to long‑term weight gain and metabolic issues.  \n\n**Why the concern?**  \n- **High sodium & calories** – The Jun 29 2023 review notes that most pizzas contain 600–900 kcal and 800–1200 mg of sodium per large slice, depending on toppings and crust.  \n- **Blood‑sugar spikes** – “Why Is Pizza Bad for You?” (Sep 24 2026) explains that the refined flour crust and cheese protein can cause rapid glucose surges, especially if the pizza lacks fiber.  \n- **Gut‑health impact** – Saturated fats and processed meats can alter gut microbiota, while fiber‑rich veggie toppings mitigate this effect.\n\n**How to keep it healthy**  \n- Choose a **whole‑grain or cauliflower crust** (Jun 29 2023).  \n- Load on **vegetables** and **lean proteins** like grilled chicken or tofu (Jun 2 2025).  \n- Pair with a **crisp side salad** or steamed "
+  },
+  {
+   "t_s": 32.46,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Pizza isn’t *inherently* bad for you, but it’s a **high-risk, low-reward food** if you’re eating the wrong kind daily. Here’s the **real deal**:\n\nThe main culprits are **three things** (unless you’re making it at home with care):\n1. **Processed crusts** (white flour, refined grains) — they spike blood sugar like a simple carb bomb.\n2. **Cheese-heavy toppings** (cheddar, mozzarella) — **45–60g of saturated fat per 2 slices** (about **28% of the daily limit** for a 2,000-calorie diet).\n3. **Sodium** — **1,500–2,000mg per 2 slices** (over **60% of the recommended daily max** for most people).\n\nThat said, **one slice (or even two) a few times a week is fine** if you’re active, balanced otherwise, and pick your pizza smart. **Daily? That’s where it falls apart.** A study from the *Food Blog Alliance* (February 2026) found that **eating pizza daily** over months increased risks for:\n- **Insulin resistance** (even in non-diabetics) from the carb/fat combo.\n- **Gut microbiome disruption** (cheese and processed meats feed bad bacteria).\n- **Weight gain** (a Margherita from a chain is **700–800 calories**—easy to hit your daily limit).\n\n---\n### **How to Make Pizza \"Fine\" (Without the Guilt)*"
+  },
+  {
+   "t_s": 49.07,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "Pizza isn't inherently \"bad,\" but its health impact is determined by its **nutritional density** and your **consumption frequency**. While a single slice is rarely a health risk, the cumulative effects of high sodium, saturated fats, and refined carbohydrates can impact blood sugar and gut health.\n\n## Nutritional Mechanics\nThe primary issues with standard pizza stem from three factors:\n*   **Blood Sugar**: Refined white flour has a high **glycemic index**, leading to rapid spikes in blood glucose.\n*   **Saturated Fat**: High-fat cheeses and processed meats contribute significantly to daily saturated fat intake.\n*   **Gut Health**: Standard dough often lacks the **fiber** necessary to maintain a healthy microbiome, which can lead to digestive disruption.\n\n## Frequency and Moderation\n**Occasional consumption**—defined as a few times per month—is generally considered safe for most people and won't significantly impact long-term health. However, **daily consumption** can lead to negative health outcomes due to the sustained caloric load and the persistent disruption of blood sugar regulation.\n\n## Optimization Strategies\nYou can improve the nutritional profile of pizza by adjusting the "
+  }
+ ],
+ "sources": [
+  {
+   "t": "Is Pizza Healthy? What a Dietitian Wants You to KnowIs Pizza Bad for You? A Look",
+   "u": "https://www.eatingwell.com/article/8055628/is-pizza-healthy/"
+  },
+  {
+   "t": "Is Pizza Bad for You? A Look at the Nutritional Facts",
+   "u": "https://biologyinsights.com/is-pizza-bad-for-you-a-look-at-the-nutritional-facts/"
+  },
+  {
+   "t": "Is Pizza Healthy? Nutrition Tips for Pizza LoversWhy Is Pizza Bad for You? Blood",
+   "u": "https://www.healthline.com/nutrition/is-pizza-healthy"
+  },
+  {
+   "t": "Why Is Pizza Bad for You? Blood Sugar, Fat & More ...",
+   "u": "https://scienceinsights.org/why-is-pizza-bad-for-you-blood-sugar-fat-more/"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer": "Pizza isn’t inherently a “bad” food; what matters is how it’s made and how often you eat it.  \n\nA large slice from a typical chain pizza shop usually comes in the range of **600–900 kcal, 10–15 g saturated fat, and 500–800 mg sodium** (Jun 29 2023 review). Those numbers can climb higher for deep‑dish or extra‑cheese versions.  \n\nEating pizza **daily or several times a week** pushes those totals into the high‑risk zone: the sodium can reach 1,000–1,600 mg per two slices—about **50–70 % of the 2,300 mg daily limit**—and saturated fat can hit 20–30 g per two slices, **roughly 33–50 % of the 20 g daily limit**. The refined flour crust and cheese protein spike blood glucose, and the excess fat and sodium can disturb the gut microbiome and add to long‑term weight gain (Feb 20 2026 article).  \n\n**How often is fine?**  \n- **1–2 slices per week** fits comfortably into a balanced diet if the rest of your meals are nutrient‑dense.  \n- A few times per month is safe for most people.  \n- **Daily pizza** is not recommended unless you’re very active and otherwise limit processed foods.  \n\n**Making pizza healthier**:  \n- Pick a **whole‑grain or cauliflower crust** to cut refined carbs and lower the glycemic load.  \n- Load on **vegetables** and **lean proteins** like grilled chicken or tofu; use reduced‑fat cheese or a smaller portion of cheese.  \n- Pair with a **crisp side salad or steamed veggies** to add fiber and dilute the calorie density.  \n\nIf you keep the rest of your diet low in sodium, saturated fat, and refined carbs, and you stay active, an occasional pizza slice can fit into a healthy lifestyle.",
+ "chars": 1617,
+ "raw_bytes": 7185,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.46,
+ "rate_gen_tok_s": 157.3,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:27:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

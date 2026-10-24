@@ -1,0 +1,5 @@
+# regenerable from runs/ + questions.json with judge_packet.py
+packets/
+batches/
+# a copy's stdout can be long; kept locally for post-mortems
+runs/*/devcopy.log

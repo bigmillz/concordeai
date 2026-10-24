@@ -1,0 +1,284 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+  "X-Eta": "{\"search\":14.0,\"models\":[85.4,118.8,72.0],\"final\":55.1,\"ftok\":565,\"est\":false}",
+  "X-Hurry": "4c6146e6188506dd"
+ },
+ "first_byte_s": 3.63,
+ "first_text_s": 218.61,
+ "elapsed_s": 227.82,
+ "events": [
+  {
+   "t": 3.63,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 3.63,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 3.65,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 28.64,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 48.67,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 68.7,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 88.72,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 108.74,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 124.05,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 124.06,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 148.77,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 166.64,
+   "tag": "DRAFT",
+   "m": "Ministral 3 14B",
+   "chars": 1200
+  },
+  {
+   "t": 166.64,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 188.82,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 201.44,
+   "tag": "DRAFT",
+   "m": "Gemma 4 12B",
+   "chars": 1200
+  },
+  {
+   "t": 201.45,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 201.45,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is double-checking the drafts"
+  },
+  {
+   "t": 215.88,
+   "tag": "RUN",
+   "run": {
+    "c": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 218.61,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 227.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "5449 chars"
+   }
+  },
+  {
+   "t": 227.82,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.65,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   28.64,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   48.67,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   68.7,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   88.72,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   108.74,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   124.06,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   148.77,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   166.64,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   188.82,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   201.45,
+   "compositing…"
+  ],
+  [
+   201.45,
+   "Gemma 4 26B is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 3.63
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "5449 chars",
+   "t_s": 227.82
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 227.82
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 124.05,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 166.64,
+   "m": "Ministral 3 14B",
+   "text": "Set boundaries early, and frame them as **self-care** — that’s the only way they’ll stick.\n\nWhen they poke, deflect with a neutral script that keeps them out of the details:\n**\"I’m doing great — got a system, so no need to track my progress.\"**\nIf they press harder, redirect:\n**\"Honestly, the more I talk about it, the more I slip — same reason I won’t log my calories if I’m dieting.\"**\n\n**Your brain fog will spike in the first 3-5 days**, and this is where they’ll “help.” Acknowledge it as temporary but real:\n*\"I’ve got brain fog for sure — a few more days and it’ll be easier to focus.\"* (It’s true, and it stops the guilt.)\n\n**Hard non-negotiables to preempt:**\n- **No “checking in” messages.** Text them once a day for 5 minutes max — otherwise, they’ll treat it like a support hotline.\n- **No “but what if you slip?”** — a slip is fine. A lecture is not. If they ask, say, *“I’ll handle it,”* and end the sentence.\n- **No food substitutes.** If they offer candy or gum, laugh and say, *“Tried it — made me crave more. I’m doing a toothpick trick instead.”*\n\n**When they mean well but overstep**, use the **‘I’ statement + redirect** combo:\n*\"I’m actually feeling really good, but I need to "
+  },
+  {
+   "t_s": 201.44,
+   "m": "Gemma 4 12B",
+   "text": "The most effective way to stop the nagging is to preempt it by defining the \"Rules of Engagement\" for your family before you actually start the withdrawal process. Most family members nag because they are anxious about your health and don't know how to express that anxiety productively; by providing a clear roadmap, you shift the role from \"policing\" you to \"supporting\" the plan.\n\n## Set Clear Boundaries and Communication Channels\nTell them exactly what you need from them and, just as importantly, what you *don't* want. Be explicit about the difference between being \"checked up on\" and being \"supported.\"\n\n**Designate a \"Safe Word\" or Signal:** If you find yourself getting overwhelmed or irritable due to withdrawal, give them a simple phrase like \"I'm in a high-stress zone right now.\" This signals that you need space without them feeling like they've done something wrong or that you're failing.\n\n**Define the \"Nagging Zone\":** Tell them explicitly: \"When you ask me if I've had a cigarette or if I'm still trying, it feels like a setback. If you want to help, please [offer a specific action] instead.\" \n\n## Provide a Concrete Plan\nFamilies tend to hover when they feel the situation is c"
+  }
+ ],
+ "sources": [
+  {
+   "t": "How to Deal with The Emotions After Quitting Vaing | TikTok",
+   "u": "https://www.tiktok.com/discover/how-to-deal-with-the-emotions-after-quitting-vaing"
+  },
+  {
+   "t": "Why Oral Habits Persist After Quitting Smoking or Vaping – BreatheFree",
+   "u": "https://breathefree.shop/de/blogs/blog/why-oral-habits-persist-after-quitting"
+  },
+  {
+   "t": "How to Quit Smoking | Quit Smoking | Tips From Former... | CDC",
+   "u": "https://www.cdc.gov/tobacco/campaign/tips/quit-smoking/index.html"
+  },
+  {
+   "t": "Quitting Nicotine Accountability Thread. | Canadian Brawn Forums",
+   "u": "https://canadianbrawn.com/threads/quitting-nicotine-accountability-thread.9471/page-8"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+ "searched": true,
+ "answer": "You need to frame your boundaries as a matter of success rather than a reaction to their interference, shifting the conversation from their anxiety to your specific needs.\n\nThe most effective way to stop the nagging is to define your \"Rules of Engagement\" before the withdrawal symptoms hit. Most family members hover because they are anxious and don't know how to express that concern productively; by providing a clear roadmap, you give them a way to help that doesn't involve policing you.\n\n**Set explicit boundaries on communication**\nTell them exactly what you need and, just as importantly, what you do not want. Be explicit about the difference between being \"checked up on\" and being supported.\n\nIf they ask, use a neutral script to deflect: **\"I’ve got a system in place, so there's no need to track my progress or check in.\"**\n\nIf they press harder, redirect: **\"Honestly, the more we talk about this, the harder it is to focus. If you want to help, please just [insert specific action, e.g., help with dinner or keep the house quiet] instead.\"**\n\n**Prepare for the \"Brain Fog\" window**\nIn the first few days, your irritability and brain fog may spike. This is often when family members try to \"help\" by asking how you're doing, which can feel like an interrogation. Acknowledge the symptom to preempt the lecture: **\"I'm experiencing some brain fog right now—it's a normal part of the process and it will pass. I just need some space to focus.\"**\n\n**Manage oral fixation and food triggers**\nIf family members offer snacks or sweets as substitutes, they might inadvertently trigger cravings. If you are using non-food substitutes like a toothpick or a resistance necklace to manage oral fixation, tell them clearly: **\"I'm using [substitute] to handle the habit. Please don't offer sweets or snacks, as they actually make the cravings harder to manage.\"**\n\n**Use a \"Stress Signal\" to manage conflict**\nWhen you are in a high-stress zone or feeling particularly irritable due to withdrawal, give them a simple phrase or signal, such as **\"I'm in a high-stress zone right now.\"** This signals that you need space without making them feel like they have personally caused a setback. It allows you to step away from a conversation before a \"check-in\" turns into an argument.\n\n**Handle slips with a closed loop**\nIf you do slip, they may try to lecture you or ask \"what happened.\" This is the time to end the conversation immediately. A slip is a data point, not a failure. Tell them: **\"I'll handle it. I don't need to troubleshoot this right now.\"** If they continue to press, remind them that talking about the slip is what makes it harder to get back on track.",
+ "chars": 2669,
+ "raw_bytes": 6788,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.93,
+ "rate_gen_tok_s": 72.45,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:59:21",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
