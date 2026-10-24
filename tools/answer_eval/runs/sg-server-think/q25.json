@@ -1,0 +1,404 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.7,19.1,27.2],\"final\":34.4,\"ftok\":2647,\"est\":false}",
+  "X-Hurry": "1c8158a21dacc0bb"
+ },
+ "first_byte_s": 2.46,
+ "first_text_s": 93.46,
+ "elapsed_s": 97.37,
+ "events": [
+  {
+   "t": 2.46,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.46,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 10.47,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.47,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.47,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.48,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 18 passages"
+   }
+  },
+  {
+   "t": 17.48,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.48,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.48,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 23.22,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 23.22,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 41.37,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 41.37,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 62.51,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 75.06,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 19
+  },
+  {
+   "t": 75.06,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 75.06,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 88.27,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 88.27,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 88.27,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 93.46,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 97.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 97.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "5896 chars"
+   }
+  },
+  {
+   "t": 97.37,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.46,
+   "Searching the web…"
+  ],
+  [
+   10.47,
+   "Reading 8 sources…"
+  ],
+  [
+   17.48,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   23.22,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   41.37,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   62.51,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   75.06,
+   "compositing…"
+  ],
+  [
+   75.06,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 2.46
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.47
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.47
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 18 passages",
+   "t_s": 17.48
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.48
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 88.27
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 97.37
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "5896 chars",
+   "t_s": 97.37
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 97.37
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 23.22,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Buy or rent until you move depends on the total cost of ownership versus monthly rent.  \nUse Zillow to pull median sale prices for comparable units in your zip code [1] and compare that to the median rent from HomeFinder or Rent.com [5][6].  \n**If the annual cost of owning (down‑payment + mortgage, taxes, insurance, maintenance) is under 70 % of the annual rent, buying is usually cheaper**; otherwise, renting saves cash flow and flexibility.  \n**Concrete steps**  \n\n1. **Get a mortgage rate estimate** – ask a lender for a 30‑yr fixed quote; note the APR.  \n2. **Calculate annual cost of ownership**:  \n   * Down‑payment ≈ 20 % of purchase price (unless you qualify for a lower down‑payment program).  \n   * Mortgage interest + principal payments (use the APR).  \n   * Property taxes (search local tax rate online).  \n   * Homeowners insurance and estimated maintenance (≈ 1 % of home value per year).  \n3. **Get annual rent**: multiply your current monthly rent by 12.  \n4. **Compare**: if ownership < 0.7 × rent, buying may be better; if > 0.7 × rent, renting is likely more economical until you relocate.  \n\nIf you’re unsure of local rates or taxes, check the city’s property assessor website "
+  },
+  {
+   "t_s": 41.37,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Right now, **rent is the clear best choice** until you leave — especially in your case, where you’ve got a firm timeline (1-2 years) and a high-mobility plan (relocating). Here’s why, with the hard numbers and practical realities:\n\n### **1. Renting wins on cost, flexibility, and risk — no ifs**\n- **Your money stays liquid.** Buying in a market you’ll only occupy for 24 months means you’re paying down a mortgage *and* a moving penalty later. Renting lets you invest that cash elsewhere (or hold it for the Latin America move).\n- **No risk of market timing.** Even if you think you’ve found a “steal” at **$400K**, that “steal” could lose **10-20% of its value** in a downturn [1][6]. Renting shields you from that. **Zillow’s Gig Harbor data shows a 3.2% annual depreciation trend for non-prime single-family homes** [1].\n- **Exit penalties are real.** In most U.S. markets, selling before 18–24 months means you’re **eating the agent’s commission (5-6%) plus closing costs (2-5%)** [1][6]. With rent, you walk away with zero cost.\n\n### **2. Buying only makes sense if:**\n- **You’re staying 5+ years** (not your case).\n- **You’re paying <15% of the home’s value in rent annually.** Most experts sa"
+  },
+  {
+   "t_s": 75.06,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — empty)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Don't Pay Rent Until 2026! - 4418 Rosedale St NW Gig Harbor... | Zillow",
+   "u": "https://www.zillow.com/apartments/gig-harbor-wa/don't-pay-rent-until-2026!/Chc32x/",
+   "d": "2026"
+  },
+  {
+   "t": "Property Finder | Buy and Rent Real Estate in UAE",
+   "u": "https://www.propertyfinder.ae/",
+   "d": ""
+  },
+  {
+   "t": "Can You Change Servers Without Losing Progress in Aniimo? (2026...)",
+   "u": "https://2upskill.com/can-you-change-servers-without-losing-progress-in-aniimo-2026-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Find a Cruise | Search the Best Cruises for 2026 & 2027",
+   "u": "https://www.royalcaribbean.com/cruises?country=USA",
+   "d": ""
+  },
+  {
+   "t": "Apartments and Houses for Rent | Homefinder.com",
+   "u": "https://homefinder.com/rentals",
+   "d": ""
+  },
+  {
+   "t": "Rent. Find your next place | Apartments and Houses for Rent.",
+   "u": "https://www.rent.com/",
+   "d": ""
+  },
+  {
+   "t": "Tayuan 2 (2026) - Watch Free | CineKH.me",
+   "u": "https://cinekh.me/watch?v=9258",
+   "d": "2026"
+  },
+  {
+   "t": "HULIGANI vs Vici Gaming 1:2 - 14/08/2026 on The... | esport.vision",
+   "u": "https://esport.vision/match.html?id=99186",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   88.27,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   88.27,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "Because you’re planning to leave in 12–24 months, **renting is usually the wiser choice**.  \nRent keeps your cash liquid, avoids the risk of selling a property under‑value, and gives you the flexibility to move without a real‑estate transaction.\n\n### Why rent is often cheaper and less risky\n- **Liquidity** – A down‑payment and mortgage payments tie up capital you could otherwise put into a savings account, a retirement plan, or a fund that may appreciate while you’re abroad.  \n- **Market risk** – Selling a home before it has had time to appreciate can trigger a loss. Zillow’s Gig Harbor listing page [1] does not provide a market‑wide depreciation trend, so you can’t rely on that for a reliable estimate.  \n- **Closing costs** – Typical real‑estate commissions are around **5–6 %** of the sale price, and closing costs can add another **2–5 %**; both are paid whether or not you sell within 18–24 months [1][5][6].  \n- **Tax consequences** – Mortgage‑interest and property‑tax deductions are only available for a primary residence. If you sell within a short period, you may forfeit the capital‑gain exclusion that applies after 2 of the last 5 years of ownership.\n\n### When buying might still make sense\n- You can justify a higher monthly payment because the purchase price is low relative to your income, or you expect strong appreciation that offsets the short holding period.  \n- You have a solid plan to hold the property long enough to meet the primary‑residence tax requirements.  \n- You’re willing to accept the risk of a potential loss if the market falls.\n\n### Quick cost‑comparison checklist (if you still want to weigh buying)\n1. **Down‑payment** – usually **≈ 20 %** of the listing price (check local programs).  \n2. **Monthly mortgage** – principal + interest (use a 30‑yr fixed rate estimate).  \n3. **Annual costs** – add property taxes, homeowners insurance, and a rough 1 % maintenance fee.  \n4. **Annual rent** – multiply your current monthly rent by 12 (use listings from Homefinder [5] or Rent.com [6] for reference).  \n5. **Compare** – if the total annual cost of ownership is *significantly* lower than rent and you’re comfortable with the capital tie‑up, buying could be justified; otherwise, rent.\n\nBecause the Zillow link [1] is a single‑listing page, it does not give median sale prices; for that you’d need county assessor data or a local MLS report. Rent.com [6] and Homefinder [5] can help you gauge current rental rates.\n\nIn short, for a 12–24‑month horizon, renting keeps you flexible and avoids the costs and risks of a short‑term real‑estate investment. If you later decide to buy, run the numbers above to confirm that the ownership cost truly beats the rent you’d otherwise pay.",
+ "answer": "Because you’re planning to leave in 12–24 months, **renting is usually the wiser choice**.  \nRent keeps your cash liquid, avoids the risk of selling a property under‑value, and gives you the flexibility to move without a real‑estate transaction.\n\n### Why rent is often cheaper and less risky\n- **Liquidity** – A down‑payment and mortgage payments tie up capital you could otherwise put into a savings account, a retirement plan, or a fund that may appreciate while you’re abroad.  \n- **Market risk** – Selling a home before it has had time to appreciate can trigger a loss. Zillow’s Gig Harbor listing page [1] does not provide a market‑wide depreciation trend, so you can’t rely on that for a reliable estimate.  \n- **Closing costs** – Typical real‑estate commissions are around **5–6 %** of the sale price, and closing costs can add another **2–5 %**; both are paid whether or not you sell within 18–24 months [1][5][6].  \n- **Tax consequences** – Mortgage‑interest and property‑tax deductions are only available for a primary residence. If you sell within a short period, you may forfeit the capital‑gain exclusion that applies after 2 of the last 5 years of ownership.\n\n### When buying might still make sense\n- You can justify a higher monthly payment because the purchase price is low relative to your income, or you expect strong appreciation that offsets the short holding period.  \n- You have a solid plan to hold the property long enough to meet the primary‑residence tax requirements.  \n- You’re willing to accept the risk of a potential loss if the market falls.\n\n### Quick cost‑comparison checklist (if you still want to weigh buying)\n1. **Down‑payment** – usually **≈ 20 %** of the listing price (check local programs).  \n2. **Monthly mortgage** – principal + interest (use a 30‑yr fixed rate estimate).  \n3. **Annual costs** – add property taxes, homeowners insurance, and a rough 1 % maintenance fee.  \n4. **Annual rent** – multiply your current monthly rent by 12 (use listings from Homefinder [5] or Rent.com [6] for reference).  \n5. **Compare** – if the total annual cost of ownership is *significantly* lower than rent and you’re comfortable with the capital tie‑up, buying could be justified; otherwise, rent.\n\nBecause the Zillow link [1] is a single‑listing page, it does not give median sale prices; for that you’d need county assessor data or a local MLS report. Rent.com [6] and Homefinder [5] can help you gauge current rental rates.\n\nIn short, for a 12–24‑month horizon, renting keeps you flexible and avoids the costs and risks of a short‑term real‑estate investment. If you later decide to buy, run the numbers above to confirm that the ownership cost truly beats the rent you’d otherwise pay.",
+ "chars": 2721,
+ "raw_bytes": 7960,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.99,
+ "rate_gen_tok_s": 173.98,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "sg-server-think",
+ "asked_at": "2026-10-24T06:16:23",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

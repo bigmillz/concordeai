@@ -1,0 +1,169 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.2,16.5],\"final\":18.8,\"ftok\":570,\"est\":false}",
+  "X-Hurry": "f286b727fad95ded"
+ },
+ "first_byte_s": 1.72,
+ "first_text_s": 9.82,
+ "elapsed_s": 9.82,
+ "events": [
+  {
+   "t": 1.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 1.72,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 1.72,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 9.82,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 25
+  },
+  {
+   "t": 9.82,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 9.82,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 9.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "81 chars"
+   }
+  },
+  {
+   "t": 9.82,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   1.72,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 1.72
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "81 chars",
+   "t_s": 9.82
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 9.82
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 9.82,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "(no answer — ServerError)"
+  },
+  {
+   "t_s": 9.82,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Magnesium and Anxiety | Magnesium Science",
+   "u": "https://magnesiumscience.org/research/magnesium-and-anxiety"
+  },
+  {
+   "t": "Magnesium Dosage: How Much to Take Per Day",
+   "u": "https://www.healthline.com/nutrition/magnesium-dosage"
+  },
+  {
+   "t": "Does Magnesium Help With Anxiety? Benefits, Dosage & Best Forms",
+   "u": "https://villabehavioralhealth.com/does-magnesium-help-with-anxiety/"
+  },
+  {
+   "t": "Magnesium Supplementation for Anxiety: Benefits, Types & Dosage",
+   "u": "https://drbrighten.com/magnesium-supplement-and-anxiety/"
+  }
+ ],
+ "photos": null,
+ "run_frames": [],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "⚠️ None of Ollama1’s models answered. Ollama1 stopped answering partway through.",
+ "answer": "⚠️ None of Ollama1’s models answered. Ollama1 stopped answering partway through.",
+ "chars": 80,
+ "raw_bytes": 1089,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 2.04,
+ "rate_gen_tok_s": null,
+ "id": "q11",
+ "turn": 1,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "ac-server-think",
+ "asked_at": "2026-10-24T06:41:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

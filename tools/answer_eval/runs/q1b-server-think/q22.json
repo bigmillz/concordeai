@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.6,15.2],\"final\":17.1,\"ftok\":450,\"est\":false}",
+  "X-Hurry": "dedb6eb13f17c53b"
+ },
+ "first_byte_s": 4.71,
+ "first_text_s": 51.47,
+ "elapsed_s": 67.66,
+ "events": [
+  {
+   "t": 4.71,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.71,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 12.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.72,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.72,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.64,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 34 passages"
+   }
+  },
+  {
+   "t": 16.64,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.64,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.64,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 30.32,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 982
+  },
+  {
+   "t": 30.32,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 30.33,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 30.33,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 30.33,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 40.25,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 40.25,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "8 notes"
+   }
+  },
+  {
+   "t": 40.25,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 40.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 40.25,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 51.47,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 53.73,
+   "tag": "RATE",
+   "data": {
+    "tps": 156.4,
+    "tok": 353,
+    "s": 2.3
+   }
+  },
+  {
+   "t": 53.73,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 53.73,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 53.73,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 67.65,
+   "tag": "RESET"
+  },
+  {
+   "t": 67.65,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 11 claims, fixed 5",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 67.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1347 chars"
+   }
+  },
+  {
+   "t": 67.65,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.71,
+   "Searching the web…"
+  ],
+  [
+   12.72,
+   "Reading 8 sources…"
+  ],
+  [
+   16.64,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   30.33,
+   "compositing…"
+  ],
+  [
+   30.33,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   53.73,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 4.71
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.72
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.72
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 34 passages",
+   "t_s": 16.64
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.64
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 30.33
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "8 notes",
+   "t_s": 40.25
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 40.25
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 53.73
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 53.73
+  },
+  {
+   "id": "verify",
+   "l": "Checked 11 claims, fixed 5",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 67.65
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1347 chars",
+   "t_s": 67.65
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 67.65
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 30.32,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Commercial Pilot** – *$80 k–$200 k* per year.  Requires a commercial pilot license from the FAA, usually 18–24 months of flight school plus time to earn the necessary ratings. [8]  \n\n**Power Lineman** – *$90 k–$150 k* per year.  Earned through a 3–4‑year apprenticeship that covers electrical safety and rigging. [8]  \n\n**Oil & Gas Supervisor / Operator** – *$100 k–$200 k* per year.  Needs 3–5 years of on‑the‑job experience plus industry‑specific safety training. [8]  \n\n**Heavy Equipment Operator** – *$80 k–$140 k* per year.  A 2–3 year apprenticeship teaches machine handling, maintenance and safety protocols. [8]  \n\n**Elevator Mechanic** – *$90 k–$140 k* per year.  Involves a 3–4 year apprenticeship focused on electrical systems and elevator maintenance. [8]  \n\nThese five roles consistently rank at the top of lists for high earnings without a four‑year degree and are reachable through apprenticeships, certifications, or industry‑specific training rather than college."
+  },
+  {
+   "t_s": 30.32,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 40.25,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"18–24 months of flight school\" for a **Commercial Pilot** is too short—FAA certification typically requires **2–4 years** (including flight hours and exams). The range should be **2–4 years** [8].\n- **WRONG**: \"3–4-year apprenticeship\" for **Power Lineman** is plausible, but no source confirms it—cite only **$90k–$150k** [8] without unsupported timeframes.\n- **MISSING**: Entry-level **time-to-first-job** (e.g., after certification) for **Oil & Gas Supervisor**—no source specifies how long experience takes to qualify.\n- **MIXED UP**: \"2–3-year apprenticeship\" for **Heavy Equipment Operator** conflates training duration with total onboarding time; no source confirms this; omit or cite a stable industry standard (e.g., OSHA/NCCER).\n- **MISSING**: **Cost of training** (e.g., flight school, apprenticeship fees) for each job—critical for \"realistic\" assessment.\n- **MISSING**: **U.S. vs. Canada salary divergence** (e.g., Alberta-specific pay) for **Oil & Gas/Elevator Mechanics**—no U.S. median given.\n- **STALE**: **$80k–$200k** for **Commercial Pilot** is outdated if [8] cites **Canada-only** figures; no U.S. range is confirmed (check [1][7]).\n- **WRONG**: \"3–4-year apprenti"
+  }
+ ],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume GeniusBest Jobs Without",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "12 Powerful & Surprising Entry-Level Jobs That Pay Well Without...",
+   "u": "https://danzok.com/entry-level-jobs-without-degree-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "investopedia.com/personal-finance/top-highest-paying-jobs",
+   "u": "https://www.investopedia.com/personal-finance/top-highest-paying-jobs/",
+   "d": "2021"
+  },
+  {
+   "t": "Top 10 AI Undress Tools 2026 — Definitive Rankings | UndressHer AI",
+   "u": "https://undress-her.com/rankings",
+   "d": "2026"
+  },
+  {
+   "t": "PayInRussia — Easy Way to Pay in Russia for Tourists",
+   "u": "https://payinrussia.com/",
+   "d": ""
+  },
+  {
+   "t": "17 Low-Stress Jobs That Pay Well Without a Degree (2026)",
+   "u": "https://nichehacks.com/low-stress-jobs-that-pay-well-without-a-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "Best Paying Jobs Without a Degree in Canada",
+   "u": "https://www.finalroundai.com/blog/best-paying-jobs-without-degree-canada",
+   "d": "2026-07-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   40.25,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   40.25,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 156.4,
+  "tok": 353,
+  "s": 2.3
+ },
+ "answer_raw": "Commercial pilot – $80 k–$200 k (Canadian figures) [8]. U.S. salary data are not provided. Getting a commercial pilot license typically takes 18–24 months of flight school plus time to earn the necessary ratings, though exact durations vary. After licensing, the first‑job turnaround is usually a few months, though training costs (flight school fees, instructor time, aircraft rental) are not listed in the sources.\n\nPower lineman – **$90 k–$150 k** (Canadian figures) [8]. The pay comes from a 3–4-year apprenticeship that covers electrical safety and rigging, as per typical industry standards. U.S. salary data are not provided.\n\nOil & gas supervisor / operator – **$100 k–$200 k** (Canadian figures) [8]. Entry‑level roles normally require **3–5 years of on‑the‑job experience** plus industry‑specific safety training; the exact time to first job is not specified. U.S. figures are not listed.\n\nHeavy equipment operator – **$80 k–$140 k** (Canadian figures) [8]. Apprenticeships for heavy equipment operators usually take 2–3 years, covering machine handling, maintenance, and safety protocols. U.S. salary data are absent.\n\nElevator mechanic – **$90 k–$140 k** (Canadian figures) [8]. The trade is usually entered via a 3–4 year apprenticeship focused on electrical systems and elevator maintenance. U.S. salary information is not available.",
+ "answer": "Commercial pilot – $80 k–$200 k (Canadian figures) [8]. U.S. salary data are not provided. Getting a commercial pilot license typically takes 18–24 months of flight school plus time to earn the necessary ratings, though exact durations vary. After licensing, the first‑job turnaround is usually a few months, though training costs (flight school fees, instructor time, aircraft rental) are not listed in the sources.\n\nPower lineman – **$90 k–$150 k** (Canadian figures) [8]. The pay comes from a 3–4-year apprenticeship that covers electrical safety and rigging, as per typical industry standards. U.S. salary data are not provided.\n\nOil & gas supervisor / operator – **$100 k–$200 k** (Canadian figures) [8]. Entry‑level roles normally require **3–5 years of on‑the‑job experience** plus industry‑specific safety training; the exact time to first job is not specified. U.S. figures are not listed.\n\nHeavy equipment operator – **$80 k–$140 k** (Canadian figures) [8]. Apprenticeships for heavy equipment operators usually take 2–3 years, covering machine handling, maintenance, and safety protocols. U.S. salary data are absent.\n\nElevator mechanic – **$90 k–$140 k** (Canadian figures) [8]. The trade is usually entered via a 3–4 year apprenticeship focused on electrical systems and elevator maintenance. U.S. salary information is not available.",
+ "chars": 1347,
+ "raw_bytes": 8378,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.98,
+ "rate_gen_tok_s": 20.8,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q1b-server-think",
+ "asked_at": "2026-10-24T08:48:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

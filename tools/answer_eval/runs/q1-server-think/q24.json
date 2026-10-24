@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.1,14.7],\"final\":16.6,\"ftok\":422,\"est\":false}",
+  "X-Hurry": "30d58775768cd3df"
+ },
+ "first_byte_s": 4.84,
+ "first_text_s": 38.42,
+ "elapsed_s": 53.1,
+ "events": [
+  {
+   "t": 4.84,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.84,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 12.85,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.85,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.85,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 31 passages"
+   }
+  },
+  {
+   "t": 15.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.06,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.06,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 22.31,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 22.31,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 22.31,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 22.31,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 22.31,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 29.78,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 805
+  },
+  {
+   "t": 29.78,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "2 notes"
+   }
+  },
+  {
+   "t": 29.78,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 29.78,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 29.78,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 38.42,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 41.41,
+   "tag": "RATE",
+   "data": {
+    "tps": 172.5,
+    "tok": 516,
+    "s": 3.0
+   }
+  },
+  {
+   "t": 41.41,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 41.41,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 41.41,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 53.1,
+   "tag": "RESET"
+  },
+  {
+   "t": 53.1,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 8 claims, fixed 1",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 53.1,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2062 chars"
+   }
+  },
+  {
+   "t": 53.1,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.84,
+   "Searching the web…"
+  ],
+  [
+   12.85,
+   "Reading 8 sources…"
+  ],
+  [
+   15.06,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   22.31,
+   "compositing…"
+  ],
+  [
+   22.31,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   41.41,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 4.84
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.85
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.85
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 31 passages",
+   "t_s": 15.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.06
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 22.31
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "2 notes",
+   "t_s": 29.78
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 29.78
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 41.41
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 41.41
+  },
+  {
+   "id": "verify",
+   "l": "Checked 8 claims, fixed 1",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 53.1
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2062 chars",
+   "t_s": 53.1
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 53.1
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 22.31,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Your U.S. accounts stay under U.S. law and will be handled by the U.S. court system, but the apartment you own in Brazil is subject to Brazilian inheritance law.  \nIn practice that means:\n\n| Asset | Governing law | What your U.S. heirs face | What they must do in Brazil |\n|-------|---------------|---------------------------|------------------------------|\n| U.S. bank accounts, stocks, etc. | U.S. probate law | No Brazilian taxes or rules apply | File U.S. estate paperwork, claim assets, pay U.S. estate taxes if any |\n| Brazilian apartment | Brazilian Civil Code (Law 10406/2002) | Not directly taxed by Brazil on the U.S. side | Initiate Brazilian succession proceedings, pay any local inheritance tax, transfer the property title to heirs |\n\n### Why the split happens\n- **U.S. assets** are governed by the jurisdiction where they’re held. Even if you die abroad, the U.S. court that handled your estate will manage the distribution of those assets.  \n- **Brazilian property** is considered a *Brazilian asset*; Brazilian law applies to its succession, regardless of the heirs’ nationality. The estate must be registered in a Brazilian court, and the heirs must comply with Brazilian succession"
+  },
+  {
+   "t_s": 22.31,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 29.78,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"VITEM XIV is valid for up to one year, while the resulting initial residence period can be granted for up to two years\" [5] — evidence shows **VITEM XIV is the retirement visa**, not tied to the residence permit duration (which is governed by RN 40/2019 rules, no explicit max length cited here). The visa itself is temporary (1 year renewable once), but residence status duration is unstated.\n- **MISSING**: Clarify that **U.S. accounts are only subject to U.S. probate/inheritance tax rules** (no Brazilian impact), but US heirs may still owe **Brazilian inheritance tax on the apartment** if they are considered \"domiciled\" or have other ties (e.g., dual citizenship). Add: *\"Foreign heirs may also face Brazilian tax if they are tax residents or deemed domiciled per Brazilian law [4].\"*"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Brazil Retirement Visa 2026: Retire as a Foreign Pensioner",
+   "u": "https://getbrazilvisa.com/brazil-retirement-visa",
+   "d": "2026"
+  },
+  {
+   "t": "Retire in Brazil: visa, tax & cost of living guide for Americans",
+   "u": "https://www.taxesforexpats.com/country-guides/brazil/retire-in-brazil.html",
+   "d": "2026-09-11"
+  },
+  {
+   "t": "Brazil Inheritance Law: Guide for Brazilians Living in the U.S.",
+   "u": "https://accordinglaw.com/brazil-inheritance-law-guide-for-brazilians-living-in-the-u-s/",
+   "d": "2026-01-06"
+  },
+  {
+   "t": "Will in Brazil | Brazilian Will | Inheritance Tax Laws",
+   "u": "https://www.globalpropertyguide.com/latin-america/brazil/inheritance",
+   "d": "2021-08-01"
+  },
+  {
+   "t": "Brazil Retirement Visa: How VITEM XIV Works in 2026",
+   "u": "https://www.globalcitizensolutions.com/brazil-retirement-visa/",
+   "d": "2026"
+  },
+  {
+   "t": "Brazil Retirement Visa 2026: Requirements & How to Apply",
+   "u": "https://www.ribeirocavalcante.com.br/brazil-retirement-visa-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Brazil Retirement Visa Requirements and How to Apply - LegalClarity",
+   "u": "https://legalclarity.org/brazil-retirement-visa-requirements-and-how-to-apply/",
+   "d": "2026-05-31"
+  },
+  {
+   "t": "Brazil Retirement Visa for Foreigners | Oliveira Lawyers",
+   "u": "https://oliveiralawyers.com/services/immigration/retirement-visa/",
+   "d": "2026-10-12"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   29.78,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   29.78,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 172.5,
+  "tok": 516,
+  "s": 3.0
+ },
+ "answer_raw": "Your U.S. accounts stay under U.S. law; the Brazilian apartment is governed by Brazilian inheritance law.\n\n**U.S. assets** – If you own bank accounts, stocks, or other property in the United States, they will be handled by the U.S. probate system. No Brazilian taxes or rules apply to those holdings, even if you die in Brazil. U.S. heirs will need to file U.S. estate paperwork, obtain letters of administration, and pay any U.S. estate or inheritance taxes that arise.\n\n**Brazilian apartment** – A property located in Brazil is a Brazilian asset. Upon your death, it falls under the Civil Code (Law 10406/2002) and Brazilian succession rules. The estate must be registered in a Brazilian court, and heirs must comply with local inheritance procedures, which can take **six months to several years** if contested [3][4][5].\n\nKey points of Brazilian succession:\n- **Mandatory share** – Half of the estate must go to “necessary heirs” (spouse, children) unless a valid will allocates it differently [4].\n- **Foreign heirs** – They can inherit, but they must file a succession case in Brazil. If they are **tax‑resident or deemed domiciled** in Brazil, they may also owe Brazilian inheritance tax [4].\n- **Will limits** – A will written in Brazil can help clarify distribution, but it cannot override the mandatory share for necessary heirs [4].\n\nPractical steps for U.S. heirs:\n\n1. **Notify U.S. institutions** about your death and request probate documents.\n2. **File U.S. probate** (if required) to settle U.S. assets.\n3. **Hire a Brazilian attorney** to open a succession case for the apartment.\n4. **Pay any applicable Brazilian inheritance tax** and complete the title transfer.\n5. **Close any Brazilian bank accounts** linked to the property’s mortgage, if applicable.\n\nIn short, your heirs in the U.S. will not face Brazilian inheritance rules on your U.S. accounts, but they will need to navigate Brazilian succession for the apartment, and foreign heirs may owe Brazilian inheritance tax if they are **tax-resident or deemed domiciled** in Brazil [3][4].",
+ "answer": "Your U.S. accounts stay under U.S. law; the Brazilian apartment is governed by Brazilian inheritance law.\n\n**U.S. assets** – If you own bank accounts, stocks, or other property in the United States, they will be handled by the U.S. probate system. No Brazilian taxes or rules apply to those holdings, even if you die in Brazil. U.S. heirs will need to file U.S. estate paperwork, obtain letters of administration, and pay any U.S. estate or inheritance taxes that arise.\n\n**Brazilian apartment** – A property located in Brazil is a Brazilian asset. Upon your death, it falls under the Civil Code (Law 10406/2002) and Brazilian succession rules. The estate must be registered in a Brazilian court, and heirs must comply with local inheritance procedures, which can take **six months to several years** if contested [3][4][5].\n\nKey points of Brazilian succession:\n- **Mandatory share** – Half of the estate must go to “necessary heirs” (spouse, children) unless a valid will allocates it differently [4].\n- **Foreign heirs** – They can inherit, but they must file a succession case in Brazil. If they are **tax‑resident or deemed domiciled** in Brazil, they may also owe Brazilian inheritance tax [4].\n- **Will limits** – A will written in Brazil can help clarify distribution, but it cannot override the mandatory share for necessary heirs [4].\n\nPractical steps for U.S. heirs:\n\n1. **Notify U.S. institutions** about your death and request probate documents.\n2. **File U.S. probate** (if required) to settle U.S. assets.\n3. **Hire a Brazilian attorney** to open a succession case for the apartment.\n4. **Pay any applicable Brazilian inheritance tax** and complete the title transfer.\n5. **Close any Brazilian bank accounts** linked to the property’s mortgage, if applicable.\n\nIn short, your heirs in the U.S. will not face Brazilian inheritance rules on your U.S. accounts, but they will need to navigate Brazilian succession for the apartment, and foreign heirs may owe Brazilian inheritance tax if they are **tax-resident or deemed domiciled** in Brazil [3][4].",
+ "chars": 2062,
+ "raw_bytes": 9335,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.71,
+ "rate_gen_tok_s": 35.12,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q1-server-think",
+ "asked_at": "2026-10-24T07:25:21",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -16901,3 +16901,61 @@ Thinking (the writer, the critic); a council whose only surviving draft ships as
 draft's model. Finished on the integration: `_tidy_fixed` leaves fenced code's spacing alone, and the server's
 `_TURN_TAGS` knows `RATE` (the page's twin did; a saved chat would have kept the frame as text). The full
 gauntlet ran on `quality-1` (6b516).
+
+## 6b516 — quality-1: the grounded search and the answer craft together, measured on the answer bench
+
+The two answer builds (6b514 grounded search, 6b515 the answer craft) and the answer bench (`tools/answer_eval/`)
+merged onto `quality-1` from origin/main a99681a. Conflicts were only the appended NOTES entries and gauntlet
+blocks; both kept, in order. The bench's results: `tools/answer_eval/RESULTS-quality-1.md`.
+
+**Integration fixes, where the two builds meet.**
+- `ground_clip()`: the grounded turn is evidence, then rules, then the question; the craft's fact-check cut the
+  question block at 8,000 characters and Fast's second passes at 5,000, which kept the pages and dropped the
+  rules and the question. The cut now keeps the tail from the rules on (10,000 for the revise passes, 12,000 for
+  the checker).
+- `_TURN_TAGS` knows `RATE` (6b515 taught the page, not the server's saved-turn twin), and the bench's frame
+  list too.
+- **The server's context follows the prompt** (`srv_ctx_for`, `SRV_CTX_*`). The gateway gives a request 8,192
+  tokens unless it asks (ollama1 PROTOCOL.md); the app never asked. With the evidence pack, the brief and the
+  uncut draft the final writer's prompt reached 5.4K tokens on the GPU question (the bench's ledger), and on
+  two bench answers (q21, q22) gpt-oss spent the rest of the context reasoning and the person saw nothing.
+  A prompt that, at 3 characters a token plus 3,072 to answer, doesn't fit 8,192 asks for the context that
+  holds it, in 4,096 steps up to 32K; a `gpu_fit` at the longer context retries at the gateway's own and is not
+  remembered as too big. And a final writer that streams nothing leaves the best draft standing, checked.
+- **The critic and the fact-check stopped inventing and splicing.** Judges traced 17 flags in 13 craft answers
+  to the reviewer's notes ("add celebrity examples" became "the cast of The Mandalorian"); the critic now names
+  a missing angle and never a figure, name, example or source, and the final writer never invents to satisfy a
+  note. The checker's fixes are applied to whole sentences only (a clause replaced in place left
+  "specifics., but no source addresses this,"), a fix that talks about sources or evidence is refused, and a
+  bullet left with only its bold label goes with its sentence.
+
+**A model the card refuses no longer takes the server down.** Since the baseline, Ollama1 gained
+`qwen3.8:27b` (too big for its 16 GB card) and `devstral-small-2:24b`; its gateway reports no card size, so
+`_srv_fits` let every "gpu" model fit and every server mode seated qwen first. The `gpu_fit` refusal marked the
+whole server down: "None of Ollama1's models answered. qwen3.8:27b doesn't fit in Ollama1's graphics memory",
+six turns of six, and the shipped app does the same today. Now `srv_note_nofit` remembers the refusal per
+server, model and size (a re-pulled tag of another size is tried again; 7 days), the model's row reads
+`gpu+ram` with `nofit`, a `fit` or `missing` refusal never marks the server down, and in craft mode the critic's
+seat writes when the writer's model can't run, or once after a hiccup ("stopped answering partway through"
+left an answer-craft bench answer empty). The status line says "2 of 2", not "2 of 1".
+
+**Measured** (33 turns, server Thinking, Opus judges; the baseline's answers re-graded by Opus: 3.1, not the
+Fable judges' 3.6): quality-1 overall **3.4** (search-ground alone 3.2, answer-craft alone 3.3, the first
+integration 3.2), within this bench's noise; high-severity hallucinations **111 → 44**, fewer on 23 of 33
+turns; grounded 2.9 → 4.1, correct 3.3 → 4.0; depth 3.9 → 3.4 and fit 4.2 → 3.8 went down; first visible text
+median 78 → 49 s, wall time 83 → 63 s. The GPU question still names Ironwood the "fifth generation" and Claude
+3.5 Sonnet, from blogs and a 2023 Decrypt piece: no invented chip, but no primary source either. What's next,
+ranked, is in RESULTS: search that reaches primary sources, grounded follow-ups, the critic's WRONG notes made
+to stick, depth, no search for arithmetic, the kit reporting its card's size.
+
+The bench gained `--warmup` (one throwaway turn first, so a copy learns what the card refuses before q01),
+RATE frames recorded as the writer's own pace, and `stats.py` reports the fact-check's outcomes.
+`bench-sg` and `bench-ac` are bench-only branches: each build plus the refused-model fix, so both could be
+measured on today's server.
+
+Gauntlet: 9 checks (`# ==== quality-1 (6b516)`): the clip, the refusal memory and its scope, the server staying
+up and craft's replacement writer, the context sizing and its fallback, the empty-writer fallback, the critic's
+and the checker's rules; stale 6b515 pins and anchors follow the code (craft between `srv_first_s` and
+`srv_merge`, `return _done()`, a double-check anchor no longer unique), the council's and the servers' test
+namespaces gain `ground_clip` and `srv_note_nofit`, and the mark-down pin and two `server_stream` mutants follow
+the new shape.

@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.8,15.1],\"final\":17.0,\"ftok\":453,\"est\":false}",
+  "X-Hurry": "08921b41e8236345"
+ },
+ "first_byte_s": 4.25,
+ "first_text_s": 49.57,
+ "elapsed_s": 59.4,
+ "events": [
+  {
+   "t": 4.25,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.25,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 12.26,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.26,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.26,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.53,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 22 passages"
+   }
+  },
+  {
+   "t": 17.53,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.53,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.53,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 28.37,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 28.37,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 28.37,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 28.37,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 28.37,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 37.96,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 37.96,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "15 notes"
+   }
+  },
+  {
+   "t": 37.96,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 37.96,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 37.96,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 49.57,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 51.31,
+   "tag": "RATE",
+   "data": {
+    "tps": 206.3,
+    "tok": 358,
+    "s": 1.7
+   }
+  },
+  {
+   "t": 51.31,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 51.31,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 51.31,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 59.39,
+   "tag": "RESET"
+  },
+  {
+   "t": 59.39,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 3 claims, fixed 1",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 59.39,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1338 chars"
+   }
+  },
+  {
+   "t": 59.39,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.25,
+   "Searching the web…"
+  ],
+  [
+   12.26,
+   "Reading 8 sources…"
+  ],
+  [
+   17.53,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   28.37,
+   "compositing…"
+  ],
+  [
+   28.37,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   51.31,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 4.25
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.26
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.26
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 22 passages",
+   "t_s": 17.53
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.53
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 28.37
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "15 notes",
+   "t_s": 37.96
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 37.96
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 51.31
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 51.31
+  },
+  {
+   "id": "verify",
+   "l": "Checked 3 claims, fixed 1",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 59.39
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1338 chars",
+   "t_s": 59.39
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 59.39
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 28.37,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Pizza isn’t inherently “bad” – it’s a high‑calorie, high‑sodium food that can fit into a balanced diet if you choose the right toppings and keep portions reasonable.  \n- **Calorie & sodium**: A single slice of Pizza Hut’s Buffalo Chicken is only **260 cal** but carries a high sodium load; the Veggie Lover’s slice tops the healthy list with **12 g of protein** and more fiber from tomatoes, peppers and olives [3].  \n- **Topping choice matters**: Lean proteins (grilled chicken, turkey) and plenty of vegetables reduce saturated fat and boost micronutrients, while processed meats and extra cheese push calories and sodium up.  \n- **Frequency**: Eating a slice or two once or twice a week is generally fine for most people, provided you balance the rest of the day with vegetables, whole grains and lean protein. If you’re watching weight or sodium, limit to once a week.  \n- **Safety of leftovers**: Leftover pizza kept in the fridge is safe for up to **five days**; frozen pizza can last up to six months if stored properly [2].\n\nBottom line: pizza can be part of a healthy diet when you pick lower‑calorie, vegetable‑rich options and keep portions moderate—once a week is a typical guideline for "
+  },
+  {
+   "t_s": 28.37,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 37.96,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- WRONG: **\"A single slice of Pizza Hut’s Buffalo Chicken is only **260 cal**\"** → *unsupported* (no calorie count given for a *single slice*; source lists **260 calories per slice** but does not specify portion size, possibly implying the entire pizza or a standard slice—ambiguous) [3].\n\n- MIXED UP: **\"Leftover pizza kept in the fridge is safe for up to **five days**\"** → *fused with a frozen pizza claim*; the 5-day fridge rule applies to *ordered/pre-made pizza* (e.g., Papa John’s/Dominos) **and not** homemade or restaurant leftovers (which may spoil sooner) [2].\n\n- MISSING: **Nutritional trade-offs for frozen vs. fresh pizza** (e.g., preservatives, added oils, or lower quality ingredients in frozen options).\n\n- MISSING: **Sodium-specific guidance** (e.g., whether the Veggie Lover’s slice’s sodium content is high/low compared to average, or how it compares to other pizza options).\n\n- MISSING: **Individual health contexts** (e.g., how frequency guidelines might differ for people with hypertension, diabetes, or specific dietary restrictions like gluten-free).\n\n- MISSING: **Sustainability or ethical considerations** (e.g., environmental impact of delivery, labor conditions in pizza "
+  }
+ ],
+ "sources": [
+  {
+   "t": "Galaxy Pizza Bad Fallingbostel",
+   "u": "https://galaxypizza-fallingbostel.de/",
+   "d": ""
+  },
+  {
+   "t": "The Quickest Way To Tell If Pizza Has Gone Bad, Fresh Or Frozen",
+   "u": "https://www.tastingtable.com/1206056/the-quickest-way-to-tell-if-pizza-has-gone-bad-fresh-or-frozen/",
+   "d": "2023-02-21"
+  },
+  {
+   "t": "Pizza Hut Menu: 16 Best & Worst Orders According to a Nutritionist",
+   "u": "https://www.eatthis.com/healthy-pizza-hut-menu-items/",
+   "d": "2024-02-10"
+  },
+  {
+   "t": "Online Pizza Delivery from Oven Story",
+   "u": "https://www.ovenstory.in/",
+   "d": ""
+  },
+  {
+   "t": "Pizza bomber",
+   "u": "https://en.wikipedia.org/wiki/Pizza_bomber",
+   "d": "2018"
+  },
+  {
+   "t": "Pizzeria & Lieferservice in Bad Vilbel | Il-Sorriso",
+   "u": "https://il-sorriso-pizzeria.de/",
+   "d": "2025-05-04"
+  },
+  {
+   "t": "Fini Pizza NYC slice shop in Brooklyn, NY.",
+   "u": "https://www.finipizza.com/",
+   "d": ""
+  },
+  {
+   "t": "Unpopular pizza opinion: Pineapple isn't the worst thing to... | ResetEra",
+   "u": "https://www.resetera.com/threads/unpopular-pizza-opinion-pineapple-isnt-the-worst-thing-to-put-on-pizza.267141/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   37.96,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   37.96,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 206.3,
+  "tok": 358,
+  "s": 1.7
+ },
+ "answer_raw": "Pizza isn’t inherently bad—it’s a calorie‑dense, sodium‑rich food that can fit into a balanced diet if you choose lower‑calorie, vegetable‑rich toppings and moderate portions.\n\nThe Pizza Hut Veggie Lover’s slice delivers **12 g of protein** and plenty of fiber from tomatoes, peppers, mushrooms, olives, and onions [3].\n\nIf you keep portions to one or two slices and balance the rest of the day with vegetables, whole grains, and lean protein, eating pizza **once or twice a week** is usually fine for most adults.\n\nPeople with hypertension, diabetes, or sodium‑restricted diets might want to limit pizza to once a week or skip high‑sodium toppings.\n\nLeftover pizza from a take‑out chain stays safe in the refrigerator for up to **five days**; frozen pizzas, if stored properly, can be eaten for up to **six months** past their best‑by date [2].\n\nFrozen pizzas often contain preservatives and may use lower‑quality oils and cheeses, which can increase sodium and reduce nutrient density compared with fresh, homemade versions.\n\nIf you’re concerned about calories or sodium, choose a thin‑crust pizza with plenty of vegetables, skip extra cheese, and watch portion size.\n\nOverall, pizza can be part of a healthy diet when you pay attention to toppings, portion size, and frequency; most people can enjoy it safely **once or twice a week**.",
+ "answer": "Pizza isn’t inherently bad—it’s a calorie‑dense, sodium‑rich food that can fit into a balanced diet if you choose lower‑calorie, vegetable‑rich toppings and moderate portions.\n\nThe Pizza Hut Veggie Lover’s slice delivers **12 g of protein** and plenty of fiber from tomatoes, peppers, mushrooms, olives, and onions [3].\n\nIf you keep portions to one or two slices and balance the rest of the day with vegetables, whole grains, and lean protein, eating pizza **once or twice a week** is usually fine for most adults.\n\nPeople with hypertension, diabetes, or sodium‑restricted diets might want to limit pizza to once a week or skip high‑sodium toppings.\n\nLeftover pizza from a take‑out chain stays safe in the refrigerator for up to **five days**; frozen pizzas, if stored properly, can be eaten for up to **six months** past their best‑by date [2].\n\nFrozen pizzas often contain preservatives and may use lower‑quality oils and cheeses, which can increase sodium and reduce nutrient density compared with fresh, homemade versions.\n\nIf you’re concerned about calories or sodium, choose a thin‑crust pizza with plenty of vegetables, skip extra cheese, and watch portion size.\n\nOverall, pizza can be part of a healthy diet when you pay attention to toppings, portion size, and frequency; most people can enjoy it safely **once or twice a week**.",
+ "chars": 1338,
+ "raw_bytes": 8251,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.63,
+ "rate_gen_tok_s": 34.03,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q1b-server-think",
+ "asked_at": "2026-10-24T08:38:09",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

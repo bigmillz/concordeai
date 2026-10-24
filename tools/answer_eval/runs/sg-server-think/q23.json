@@ -1,0 +1,404 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.6,18.8,27.6],\"final\":34.8,\"ftok\":2718,\"est\":false}",
+  "X-Hurry": "7c301a3e9a878562"
+ },
+ "first_byte_s": 2.58,
+ "first_text_s": 87.36,
+ "elapsed_s": 90.1,
+ "events": [
+  {
+   "t": 2.58,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.58,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.58,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.58,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.58,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.03,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 24 passages"
+   }
+  },
+  {
+   "t": 15.03,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.03,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.03,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 21.27,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 21.27,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 42.64,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 44.37,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 44.37,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 62.3,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 62.3,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 62.3,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 80.08,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 80.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 80.09,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 87.36,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 90.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 90.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "6627 chars"
+   }
+  },
+  {
+   "t": 90.09,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.58,
+   "Searching the web…"
+  ],
+  [
+   10.58,
+   "Reading 8 sources…"
+  ],
+  [
+   15.03,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   21.27,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   42.64,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   44.37,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   62.3,
+   "compositing…"
+  ],
+  [
+   62.3,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 2.58
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.58
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.58
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 24 passages",
+   "t_s": 15.03
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.03
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 80.09
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 90.09
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "6627 chars",
+   "t_s": 90.09
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 90.09
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 21.27,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**AI will displace some routine sysadmin tasks, but not the whole role, over the next five years.**  \nThe World Economic Forum projects that about **22 % of global jobs will be disrupted by 2030**—a figure that includes many operational positions—yet a net gain of **78 million jobs** is expected as new roles emerge [1].  \n\nIn the U.S., a 2026 SHRM survey shows that automation and AI are already reshaping IT employment, with many sysadmin functions moving toward *Infrastructure as Code*, continuous monitoring, and AI‑driven incident response [3].  \n\nPractical evidence from 2026 shows AI‑assisted CLI tools (e.g., Qwen Code) can automate repetitive tasks such as package installation, config generation, and service orchestration, but they still require human oversight for complex logic and troubleshooting [5].  \n\n**What to do now:**  \n- **Master IaC and cloud orchestration.** Terraform, Pulumi, and Kubernetes are the core skill set that makes your job harder to automate entirely.  \n- **Learn AI Ops tooling.** Familiarize yourself with platforms that combine machine‑learning alerting (e.g., Splunk, Datadog AIOps) and automated remediation.  \n- **Shift into Platform Engineering or SRE.**"
+  },
+  {
+   "t_s": 44.37,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "**AI won’t erase sysadmin jobs outright, but it’ll gut ~40% of your daily tasks by 2030 — and the roles that survive will demand a **full career pivot** toward platform engineering and IaC.** The tools exist now to automate 70-80% of low-cognitive maintenance [1][3][6], but **the remaining 20-30% of \"high-trust\" work** (crises, security audits, and hybrid cloud orchestration) will still need hands. Here’s the hard truth and what to do about it.\n\n---\n\n### **The Risk Breakdown (Next Five Years)**\n**Your core sysadmin tasks are being eaten alive by three trends:**\n1. **AI-first CLI tools (e.g., Qwen Code, GitHub Copilot for CLI)**\n   - Already handling **package management, config file generation, and even basic troubleshooting** [5].\n   - Example: Describing a server setup in plain English now generates **valid Nginx configs, Kubernetes manifests, and even DNS records** — and catches errors in minutes [5].\n   - **But:** These tools still need **expert guardrails** for edge cases (e.g., custom hardware, legacy systems).\n\n2. **The \"sysadmin tax\" is collapsing**\n   - **BLS AI Exposure Categories (2026 update) rate sysadmin work as **~60% automatable** in 5 years** [2].\n   - **Microsoft’"
+  },
+  {
+   "t_s": 62.3,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "The displacement risk for your role over the next five years is centered on **task automation** rather than job elimination [1]. While **22% of jobs** globally are expected to face disruption by 2030, the broader trend suggests a net gain in employment as roles are transformed rather than erased [1]. In IT operations, the risk is that manual, repetitive \"toil\" will be offloaded to AI, requiring you to move \"up the stack\" into higher-level orchestration.\n\n## The Shift: From Sysadmin to Infrastructure Engineering\nThe role of the sysadmin is evolving into **Infrastructure Engineering** [6]. This involves moving away from the manual management of individual servers toward the **orchestration of entire fleets** of distributed, containerized resources.\n\nThe core transition involves:\n- **Infrastructure as Code (IaC)**: Making automation the standard for all provisioning [6].\n- **Platform Engineering**: Managing the internal developer platforms and shared infrastructure [6].\n- **SRE (Site Reliability Engineering)**: Applying software engineering principles to system operations [6].\n\n## Where AI fits in your workflow\nAI tools are currently most effective at handling **repetitive, multi-part"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "Will AI Take My Job? Free AI Job Risk Checker (2026 Data ...",
+   "u": "https://promptslove.com/free-tools/will-ai-take-my-job/",
+   "d": "2026"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S. Employment",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "200+ AI Job Displacement Statistics (2026 Trends) - DesignRush",
+   "u": "https://www.designrush.com/agency/ai-companies/trends/ai-job-displacement-statistics",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "I Ditched Claude Code and Now Using Open Source Qwen AI for Real...",
+   "u": "https://itsfoss.com/qwen-code-sysadmin-tasks/",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Sysadmin 2026: DevOps, Platform Engineering o Híbrido? – Dodoo.it...",
+   "u": "https://www.dodoo.it/es/sysadmin-2026-devops-platform-engineering-o-hibrido/",
+   "d": "2026"
+  },
+  {
+   "t": "Sysadmins of the North",
+   "u": "https://www.saotn.org/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "What is the difference between Sysadmin and DevOps Engineer?",
+   "u": "https://devops.stackexchange.com/questions/157/what-is-the-difference-between-sysadmin-and-devops-engineer",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   80.08,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   80.09,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "AI will replace some routine sysadmin tasks, but it won’t swallow the whole role over the next five years. The World Economic Forum projects that **about 22 % of global jobs will be disrupted by 2030**—a figure that includes many operational positions—yet a net gain of **78 million jobs** is expected once displacement is offset by new roles [1].  \n\nThe most vulnerable day‑to‑day activities are the low‑cognitive, repetitive ones: **patching, log‑file parsing, and basic incident triage**. AI‑driven CLI assistants, such as Qwen Code, can fetch binaries, generate config files, orchestrate services, and run sanity checks with little human intervention, yet they still need oversight for edge cases or legacy systems [5].  \n\nAutomation is already reshaping IT employment in the U.S.; a 2026 SHRM survey shows that many sysadmin functions are shifting toward **Infrastructure as Code (IaC)**, continuous monitoring, and AI‑driven incident response [3]. In parallel, the role is evolving into **Platform Engineering** and **Site Reliability Engineering (SRE)**, where orchestration of distributed, containerized resources is the norm rather than manual server upkeep [6].  \n\nOlder job‑risk calculators still rely on a 2013 Oxford automation study whose predictions were inaccurate, whereas newer tools blend 2026 BLS AI Exposure categories with real Copilot conversation data to assess task‑level exposure [2].  \n\n**What to do now**\n\n- **Master IaC and cloud orchestration.** Terraform, Pulumi, and Kubernetes are core skills that make your job harder to automate entirely.  \n- **Learn AI Ops tooling.** Familiarize yourself with platforms that combine machine‑learning alerting and automated remediation, and use them to augment rather than replace your workflow.  \n- **Shift into Platform Engineering or SRE.** These roles emphasize end‑to‑end reliability and are less likely to be fully replaced, reflecting the 2026 trend of sysadmins becoming infrastructure engineers [6].  \n- **Stay current on AI‑powered troubleshooting.** Keep an eye on emerging code‑generation models and automation frameworks to stay ahead of the curve.  \n\nIn short, AI will automate a good portion of the routine toil in your day, but the higher‑level decision making, hybrid‑cloud orchestration, and reliability engineering you provide will keep the role alive—and even grow it—over the next five years.",
+ "answer": "AI will replace some routine sysadmin tasks, but it won’t swallow the whole role over the next five years. The World Economic Forum projects that **about 22 % of global jobs will be disrupted by 2030**—a figure that includes many operational positions—yet a net gain of **78 million jobs** is expected once displacement is offset by new roles [1].  \n\nThe most vulnerable day‑to‑day activities are the low‑cognitive, repetitive ones: **patching, log‑file parsing, and basic incident triage**. AI‑driven CLI assistants, such as Qwen Code, can fetch binaries, generate config files, orchestrate services, and run sanity checks with little human intervention, yet they still need oversight for edge cases or legacy systems [5].  \n\nAutomation is already reshaping IT employment in the U.S.; a 2026 SHRM survey shows that many sysadmin functions are shifting toward **Infrastructure as Code (IaC)**, continuous monitoring, and AI‑driven incident response [3]. In parallel, the role is evolving into **Platform Engineering** and **Site Reliability Engineering (SRE)**, where orchestration of distributed, containerized resources is the norm rather than manual server upkeep [6].  \n\nOlder job‑risk calculators still rely on a 2013 Oxford automation study whose predictions were inaccurate, whereas newer tools blend 2026 BLS AI Exposure categories with real Copilot conversation data to assess task‑level exposure [2].  \n\n**What to do now**\n\n- **Master IaC and cloud orchestration.** Terraform, Pulumi, and Kubernetes are core skills that make your job harder to automate entirely.  \n- **Learn AI Ops tooling.** Familiarize yourself with platforms that combine machine‑learning alerting and automated remediation, and use them to augment rather than replace your workflow.  \n- **Shift into Platform Engineering or SRE.** These roles emphasize end‑to‑end reliability and are less likely to be fully replaced, reflecting the 2026 trend of sysadmins becoming infrastructure engineers [6].  \n- **Stay current on AI‑powered troubleshooting.** Keep an eye on emerging code‑generation models and automation frameworks to stay ahead of the curve.  \n\nIn short, AI will automate a good portion of the routine toil in your day, but the higher‑level decision making, hybrid‑cloud orchestration, and reliability engineering you provide will keep the role alive—and even grow it—over the next five years.",
+ "chars": 2382,
+ "raw_bytes": 8903,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.61,
+ "rate_gen_tok_s": 217.34,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "sg-server-think",
+ "asked_at": "2026-10-24T06:13:13",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
