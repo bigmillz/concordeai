@@ -62,7 +62,7 @@ CONFIGS = {
 }
 
 # the wire protocol, as the page reads it (FRAME_TAGS in millenai.py)
-FRAME_TAGS = "RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE"
+FRAME_TAGS = "RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE"  # RATE: 6b515
 FRAME_RX = re.compile("\0(" + FRAME_TAGS + "):(.*?)\0", re.S)
 FRAME_PART = re.compile("\0(?:" + FRAME_TAGS + "):[^\0]*$")
 RESET = "\0RESET\0"
@@ -356,6 +356,9 @@ def chat(copy, body, max_wait, idle):
                     ev["n"] = len(d) if isinstance(d, list) else None
                 elif tag == "PHOTOS":
                     rec["photos"] = d
+                elif tag == "RATE":
+                    rec["rate_writer"] = d       # the final writer's own pace (6b515)
+                    ev["data"] = d
                 else:
                     ev["data"] = d
             rec["events"].append(ev)
