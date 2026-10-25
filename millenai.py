@@ -19638,7 +19638,9 @@ GROUND_MODEL_QUERIES = 2    # the model's own angles
 GROUND_PER_QUERY = 8        # hits asked of the engine per query
 GROUND_SOURCES = 8          # sources in the evidence pack, and in the sources row
 GROUND_READ = 10            # pages fetched for their text (in parallel; spares replace farms)
-GROUND_PLAN_S = 5.0         # a model's plan arriving later than this isn't waited for
+GROUND_PLAN_S = 8.0         # a model's plan arriving later than this isn't waited for
+                            # (6b518: the plan seat answers in 5-8 s through the
+                            # gateway, ~3 s of it the round trip; at 5 s 2 of 30 landed)
 GROUND_SEARCH_S = 8.0       # the search fan-out's budget
 GROUND_HINT_S = 11.0        # ... and the primary-source queries' (6b518: a site: query
                             # took 10-13 s beside ten others, and 8 s kept none)
@@ -29254,6 +29256,12 @@ def run_council(labels: list, messages: list, emit, status,
         text = strip_think("".join(parts))
         if _looks_degenerate(text):
             # a runaway repetition loop would poison the merge prompt
+            if critic_lbl and label == labels[0] and not _craft_retry:
+                # craft's one writer looped (6b518: q21 on the bench, after
+                # every page read failed, ended "None of Ollama1's models
+                # answered"): the critic's seat writes, once, as for a hiccup
+                _craft_retry.append(label)
+                _model_fail.add(label)
             took_part(label, "(no answer — degenerate output)")
             return
         if text:
