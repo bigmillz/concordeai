@@ -17134,8 +17134,17 @@ memory pressure and macOS's thermal state (macOS gives apps no temperature witho
 busy, VRAM, RAM, tok/s, temperature and power; then "What changed". The load frame comes every 4 s from a sampler
 thread (`rubin_load`: `gpu_utilization`, psutil, `mem_pressure`, the gateway's /v1/usage, which never keeps the
 server awake). The scan line and the live dot are off under reduced motion and with visual effects off. The menu
-row sits under Max ("until you stop it"), its pop-out lists the machines and says what it promises; the chip says
-"Vera Rubin"; the time-left line and Answer now stay off for it; the saved answer's line is its record.
+row sits under Max with no words beside its name (6b458: only Max says "all models"); its pop-out says "Throws
+everything at one question and keeps improving it until you stop it", lists the machines and when it stops; the
+chip says "Vera Rubin"; the time-left line and Answer now stay off for it; the saved answer's line is its record.
+
+**quality-2 merged in (40e9fe7, 6b518).** Conflicts only in the appended NOTES entries and gauntlet blocks (both
+kept, 6b518 first). Each round's critic is now quality-2's: the persona goes in, its lines that bring a number or a
+name from nowhere are dropped (`critic_filter`), a WRONG the evidence settles rides to the writers as a mandatory
+correction (`final_prompt(corrections=…)`) and to the fact-check as a known error (`verify_answer(known=…)`), and a
+revision's closing recap is trimmed (`trim_recap`) before it is judged. The recorded live runs below are from
+before the merge. Vera Rubin's picks are written out in its entry: setting them from Fast's at load mutated `TIERS`,
+which the state lint refuses; a check keeps the two lists equal.
 
 **The score, and what the live runs taught.** The first run on the Mac alone: Gemma judging Gemma's first answer
 gave it 10.0 of 10, and nothing could beat it. So judges now name weaknesses before scoring and are told to be
@@ -17174,10 +17183,16 @@ pages). The server kit's /v1/usage reports no temperature or power, so those rea
 `power_w` the day the kit sends them). Each round is about two minutes with both machines; four hours is ~100
 rounds, but three stalled rounds end it long before.
 
-Gauntlet: 43 checks and one over 13 mutants (`# ==== VERA RUBIN (6b519)`): the score, a judge's reply, two judges averaged,
+Gauntlet: 44 checks and one over 13 mutants (`# ==== VERA RUBIN (6b519)`): the score, a judge's reply, two judges averaged,
 the acceptance rule, the stop rules, the evidence's numbering, citations, the plan, the weak points and their
 searches, the reader, the counted faults, the yardstick, the server's card rule, the cloud switch, one job per
 machine; the loop on stand-ins (three stalled rounds settle it, an improvement replaces and a worse revision never
 does, inside the margin isn't one, Stop mid-round, the ceiling, nothing new runs no writer, the frames, the sources
 row growing, no machine at all); the tier, the handler, the saved turn and the console pinned. The 6b515 pin of
 `FRAME_TAGS` gains `RUBIN`.
+
+The gauntlet on `rubin` after the merge: run 1 (f06138d) stopped early on the merge's own state lint (a stale read;
+the next run passed it), two 6b458/6b292 checks (the row's words, the console's `body.novideo` rule) and a copy left
+holding 9902 by the killed baseline run; run 2 (def7dc1) **1242/1244**: two mutant anchors (the server meter's
+`/v1/usage` read and Max's `"available": n > 0`) were no longer unique because Vera Rubin's code repeated them;
+run 3 (04c6286): **1244/1244**, exit 0.
