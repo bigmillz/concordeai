@@ -37477,6 +37477,13 @@ def _r519_helpers(src):
         and ns["rubin_apply_mech"]({0: {"score": 8.0, "crit": {"grounded": 8, "correct": 8, "complete": 8,
                                                               "clear": 8, "fit": 8}}},
                                    ["The provided sources do not say [1]."], 3)[0]["crit"]["clear"] == 7.25)
+    yd = ns["rubin_yardstick"]
+    got["one yardstick: where the judges put the winner between the first answer and 10, on the first score"] = (
+        yd(5.0, 5.0, 7.0) == 7.0 and yd(5.4, 4.0, 7.2) == 7.85 and yd(9.0, 5.0, 9.0) == 9.8
+        and yd(6.3, 4.0, 10.0) == 10.0 and yd(6.0, 7.0, 6.5) == 6.0 and yd(0.0, None, 7.3) == 7.3)
+    got["a judge's pick of the yardstick is no verdict between the best and a revision"] = (
+        "    if not rubin_accept(best_now, w_score, [p for p in picks if p != a_i]):" in src
+        and "        texts.append(st.anchor)" in src)
     jw = ns["rubin_judge_parse"]('{"weak": {"A": ["no price", "  vague  "]}, "scores": {"A": {"grounded": 6}}, "best": "A"}', ["A"])
     got["a judge's weaknesses are kept for the next writers"] = jw["weak"] == {"A": ["no price", "vague"]}
     got["the reader the judges judge fit for: the name, the facts, the length"] = (
@@ -37688,6 +37695,8 @@ _R519_MUT = [
     ("a model too big for the card", "            if _srv_fits(m, vram, bool(probe)):", "            if True:"),
     ("the cloud regardless of the switch", "    if cloud_allowed() if cloud_ok is None else cloud_ok:", "    if True:"),
     ("the frame not lifted from the saved turn", '              "|RUBIN")', '              "")'),
+    ("the yardstick dropped", "    return round(max(1.0, min(10.0, anchor_score + frac * (10.0 - anchor_score))), 2)",
+     "    return round(cand_now, 2)"),
     ("the improved answer not sent", "    io.answer(w_text + rubin_footer(st))\n    return True", "    return True"),
 ]
 _r519_caught = []

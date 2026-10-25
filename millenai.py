@@ -32688,7 +32688,7 @@ class RubinLane:
                 return round(self.live_chars / 4.0 / s, 1)
         return 0.0
 
-    def call(self, model, messages, job, stop, budget):
+    def call(self, model, messages, job, stop, budget, raw=False):
         """One model call on this machine: (text, "") or ("", why). Waits its
         turn; gives up past `budget` seconds or when `stop` is set, and the
         call's next token then ends its stream (an engine or the gateway stops
@@ -32732,6 +32732,10 @@ class RubinLane:
                     self.tps = round(self.live_chars / 4.0 / s, 1)
             if err:
                 e0 = err[0]
+                if getattr(e0, "slow", False):
+                    return "", "too slow"
+                if getattr(e0, "transient", False):
+                    return "", "busy"         # the server's hiccup, not a refusal: asked again next round
                 if getattr(e0, "kind", "") in ("fit", "missing") and model in self.models \
                         and len(self.models) > 1:
                     self.models.remove(model)       # that model can't run there (6b516)
@@ -32739,7 +32743,7 @@ class RubinLane:
             text = strip_think("".join(parts)).strip()
             if not text:
                 return "", "empty"
-            if _looks_degenerate(text):
+            if not raw and _looks_degenerate(text):
                 return "", "degenerate"
             return text, ""
         finally:
@@ -32913,6 +32917,22 @@ def rubin_apply_mech(res, texts, n_sources):
     return out
 
 
+def rubin_yardstick(anchor_score, anchor_now, cand_now):
+    """The score shown for a new best answer, on one yardstick for the whole
+    run: where the judges put it between the first answer and a perfect 10 in
+    the same judging, laid on the first answer's own score. Judged halfway from
+    the first answer to 10, it shows halfway from the first answer's score to
+    10. (A plain lead added to the first score ran past 10 by the third round,
+    seen live: judged beside stronger answers the first one drops.) Without a
+    first score, the judging's own."""
+    if not anchor_score or anchor_now is None:
+        return round(max(1.0, min(10.0, cand_now)), 2)
+    room = 10.0 - anchor_now
+    frac = (1.0 if cand_now >= anchor_now else 0.0) if room <= 0 else (cand_now - anchor_now) / room
+    frac = max(0.0, min(1.0, frac))
+    return round(max(1.0, min(10.0, anchor_score + frac * (10.0 - anchor_score))), 2)
+
+
 def rubin_accept(best_now, cand, picks=(), margin=RUBIN_MARGIN):
     """Whether the strongest revision replaces the best answer: the judges'
     mean puts it at least `margin` above the best IN THE SAME JUDGING (scores
@@ -32964,6 +32984,7 @@ class RubinState:
         self.changed, self.reason, self.done = "", "", False
         self.last_notes = ""
         self.weak = []                     # the judges' weaknesses of the best answer, for the next writers
+        self.anchor, self.anchor_score = "", 0.0   # the first answer and its score: every round's yardstick
 
     # ---- the evidence
     def add_sources(self, rows, terms=(), keep_all=False):
@@ -33119,6 +33140,13 @@ def rubin_note_items(notes):
     return out
 
 
+_RUBIN_NOTE_META = re.compile(
+    r"\b(?:the |this |that )?(?:evidence|draft|answer|question|text|response|reviewer|material|"
+    r"sources?|snippets?)(?: (?:asks?|says?|states?|claims?|lists?|mentions?|gives?|shows?|"
+    r"provides?|offers?|cites?|calls? for|needs?))?\b|\b(?:unsupported|implausible|missing|"
+    r"incorrect|not supported|no evidence)\b", re.I)
+
+
 def rubin_queries(st, notes, gaps):
     """What this round searches for, at most RUBIN_SEARCHES: each a
     (sub-question, its planned queries). The open parts first (with the
@@ -33130,7 +33158,11 @@ def rubin_queries(st, notes, gaps):
         items.append((p["q"], qs))
     for kind, txt in rubin_note_items(notes):
         t = re.sub(r"[\"“”']", "", txt)
-        t = re.split(r"\s+(?:—|--|->|→)\s+|;\s", t)[0][:160]
+        t = re.split(r"\s+(?:—|--|->|→)\s+|;\s|\s\(", t)[0][:160]
+        # "the evidence says", "the question asks", "the draft claims": the
+        # reviewer's words, not the subject (seen live as search queries)
+        t = _RUBIN_NOTE_META.sub(" ", t)
+        t = re.sub(r"\s+", " ", t).strip(" .,:;")
         if kind in ("WRONG", "STALE", "MIXED UP", "MISSING") and len(t.split()) >= 2:
             items.append((t, []))
     out, seen = [], set()
@@ -33503,7 +33535,7 @@ def rubin_judge(st, lanes, answers, stop, seed=0):
 
     def one(lane):
         m = lane.order()[0]            # the model resident there now: no load to judge
-        txt, _why = lane.call(m, msgs, "judging", stop, _rubin_budget(st, "judge"))
+        txt, _why = lane.call(m, msgs, "judging", stop, _rubin_budget(st, "judge"), raw=True)
         return rubin_judge_parse(txt, letters) if txt else None
     got = _rubin_par([(one, (l,)) for l in judges])
     comb, picks, whys = rubin_combine(got, letters)
@@ -33520,22 +33552,31 @@ def rubin_check(st, lanes, text, writer_lane, stop):
     """The fact-check of a new best answer against the evidence it cites
     (quality-1's verify_answer): on a machine that didn't write it when
     there is one. (text, checked, fixed)."""
-    others = [l for l in lanes if l is not writer_lane and l.kind in ("mac", "server") and not l.down]
-    lane = (others or [l for l in lanes if l.kind in ("mac", "server") and not l.down] or [None])[0]
+    # a server first (its quick models answer the checker's JSON; this Mac's
+    # big model sent nothing usable twice in the live runs), one that didn't
+    # write the answer before one that did, this Mac last
+    ok = [l for l in lanes if l.kind in ("mac", "server") and not l.down]
+    ok.sort(key=lambda l: (l.kind != "server", l is writer_lane))
+    lane = (ok or [None])[0]
     if lane is None or len(text) < VERIFY_MIN_CHARS or claim_count(text) < 2:
         return text, 0, 0
     cited = rubin_cites(text, len(st.sources))[0]
     block = rubin_block(st, cited, RUBIN_CHECK_PACK)
     m = lane.order()[0]
 
+    why_ = []
+
     def run(_l, msgs, emit):
-        txt, why = lane.call(m, msgs, "fact-checking", stop, _rubin_budget(st, "check"))
+        txt, why = lane.call(m, msgs, "fact-checking", stop, _rubin_budget(st, "check"), raw=True)
         if not txt:
+            why_.append(why)
             raise RuntimeError(why or "no check")
         emit(txt)
     res = verify_answer(run, "", block, [], text, budget_s=_rubin_budget(st, "check") + 30)
     if DEV_HOME:
-        print("rubin: check on %s: %s" % (lane.name, "nothing usable" if not res else
+        print("rubin: check on %s: %s" % (lane.name, ("nothing usable (%s)" % (why_[0] if why_ else
+                                                                             "no claims list"))
+                                          if not res else
                                           "%d checked, %d fixed" % (res["checked"], res["fixed"])),
               file=sys.stderr, flush=True)
     if not res:
@@ -33636,6 +33677,10 @@ def rubin_round(st, lanes, stop, io, search=None):
     # 4. the judges, blind, the current best among the revisions
     phase("judging %d revision%s" % (len(cands), "" if len(cands) == 1 else "s"))
     texts = [st.best["text"]] + [c[2] for c in cands]
+    a_i = None
+    if st.anchor and st.anchor != st.best["text"]:
+        a_i = len(texts)                 # the first answer rides along as the yardstick
+        texts.append(st.anchor)
     res, picks, whys, n_j = rubin_judge(st, lanes, texts, stop, seed=n)
     if rubin_should_stop(st, stop) in ("stopped", "gone"):
         return False
@@ -33644,13 +33689,13 @@ def rubin_round(st, lanes, stop, io, search=None):
                        new=new_n, drafts=len(cands))
     res = rubin_apply_mech(res, texts, len(st.sources))       # the counted points off
     best_now = (res.get(0) or {}).get("score", 0.0)
-    win = max(range(1, len(texts)), key=lambda i: (res.get(i) or {}).get("score", 0.0))
+    win = max(range(1, len(cands) + 1), key=lambda i: (res.get(i) or {}).get("score", 0.0))
     w_score = (res.get(win) or {}).get("score", 0.0)
     for lane in {c[0] for c in cands}:
         # a cloud writer earns its seat (the paid-API rule): it stays while its
         # revisions win at least once in three rounds
         lane.rounds = getattr(lane, "rounds", 0) + 1
-    if not rubin_accept(best_now, w_score, picks):
+    if not rubin_accept(best_now, w_score, [p for p in picks if p != a_i]):
         # the score shown stays the one the answer won with: a judging of an
         # unchanged answer moves by noise alone, and the line would wander
         st.weak = (res.get(0) or {}).get("weak") or st.weak
@@ -33672,8 +33717,10 @@ def rubin_round(st, lanes, stop, io, search=None):
         st.checked += ck
         st.fixed += fx
     gain = w_score - best_now
-    st.best = {"text": w_text, "score": round(w_score, 2), "crit": (res.get(win) or {}).get("crit", {}),
-               "by": w_lbl, "round": n}
+    a_now = (res.get(a_i) or {}).get("score") if a_i is not None else best_now
+    shown = rubin_yardstick(st.anchor_score, a_now, w_score)
+    st.best = {"text": w_text, "score": shown, "crit": (res.get(win) or {}).get("crit", {}),
+               "by": w_lbl, "round": n, "judged": round(w_score, 2)}
     st.weak = (res.get(win) or {}).get("weak") or []
     st.best_ever = max(st.best_ever, w_score)
     st.stalls = 0
@@ -33683,7 +33730,9 @@ def rubin_round(st, lanes, stop, io, search=None):
         (" · %d new source%s" % (new_n, "" if new_n == 1 else "s")) if new_n else "")
     st.history_rows.append({"r": n, "score": st.best["score"], "improved": True, "by": w_lbl,
                             "why": why, "new": new_n, "drafts": len(cands),
-                            "secs": round(time.time() - t0)})
+                            "secs": round(time.time() - t0), "judged": round(w_score, 2),
+                            "best_now": round(best_now, 2),
+                            "first_now": round(a_now, 2) if a_now is not None else None})
     io.answer(w_text + rubin_footer(st))
     return True
 
@@ -33759,9 +33808,11 @@ def _rubin_log(st):
     """A dev copy's log says how each round went (the NOTES measurements read it)."""
     if DEV_HOME and st.history_rows:
         r = st.history_rows[-1]
-        print("rubin: round %d score=%.2f improved=%s by=%s new=%s drafts=%s secs=%s el=%ds | %s" % (
-            r["r"], r["score"], r["improved"], r.get("by") or "-", r.get("new"), r.get("drafts"),
-            r.get("secs"), st.elapsed(), st.changed[:200]), file=sys.stderr, flush=True)
+        print("rubin: round %d score=%.2f improved=%s by=%s new=%s drafts=%s secs=%s el=%ds "
+              "judged=%s best_now=%s first_now=%s | %s" % (
+                  r["r"], r["score"], r["improved"], r.get("by") or "-", r.get("new"), r.get("drafts"),
+                  r.get("secs"), st.elapsed(), r.get("judged"), r.get("best_now"), r.get("first_now"),
+                  st.changed[:200]), file=sys.stderr, flush=True)
 
 
 def rubin_plan(st, lanes, stop, prefer=None):
@@ -33772,7 +33823,8 @@ def rubin_plan(st, lanes, stop, prefer=None):
         m = prefer.order()[0] if prefer.kind == "server" else prefer.models[0]
         today = strftime_np("%A, %B %-d, %Y", st.today)
         txt, _w = prefer.call(m, [{"role": "user", "content": RUBIN_PLAN.format(today=today)
-                                   + st.question[:1500]}], "planning", stop, RUBIN_CALL_S["plan"])
+                                   + st.question[:1500]}], "planning", stop, RUBIN_CALL_S["plan"],
+                              raw=True)
     st.plan = rubin_plan_parse(txt, st.question, st.today)
     return st.plan
 
@@ -33864,6 +33916,7 @@ def run_rubin(question, messages, emit, status, step, stop, ctx=None, ground=Non
                 st.best.update(score=res[0]["score"], crit=res[0]["crit"])
                 st.best_ever = res[0]["score"]
                 st.weak = res[0].get("weak") or []
+            st.anchor, st.anchor_score = st.best["text"], st.best["score"]
         st.history_rows.append({"r": 0, "score": st.best["score"], "improved": True,
                                 "by": st.best["by"], "why": "the first answer", "new": len(st.sources),
                                 "drafts": st.drafts, "secs": round(st.elapsed())})
@@ -33882,9 +33935,11 @@ def run_rubin(question, messages, emit, status, step, stop, ctx=None, ground=Non
                 io.frame(rubin_snapshot(st, lanes))
                 if stop.wait(min(wait, max(0.0, st.ceiling_s - st.elapsed()))):
                     continue
+            _n_rows = len(st.history_rows)
             rubin_round(st, lanes, stop, io, search)
             io.frame(rubin_snapshot(st, lanes))
-            _rubin_log(st)
+            if len(st.history_rows) > _n_rows:
+                _rubin_log(st)
         return st
     finally:
         done_ev.set()
@@ -48311,7 +48366,7 @@ async function send(){
     // Vera Rubin's line is its record, not the first writer's pace (6b519)
     const rbS=rubinLive&&rubinLive.div===aiDiv?rubinLive.st:null;
     if(rbS)meta.innerHTML='<span class="wbadge">'+esc(where)+'</span><b>Vera Rubin</b> · '
-      +(rbS.round||0)+" round"+(rbS.round===1?"":"s")+" · "+(rbS.read||0)+" sources read · "
+      +(rbS.spark||[]).length+" round"+((rbS.spark||[]).length===1?"":"s")+" · "+(rbS.read||0)+" sources read · "
       +(rbS.drafts||0)+" drafts · "+rbClock(rbS.el||secs)+" total";
     aiDiv.appendChild(meta);
     const rec={role:"assistant",content:full};
