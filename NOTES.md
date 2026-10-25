@@ -16965,3 +16965,114 @@ without the new helpers, and "vision answers about the pixels" (an empty local a
 two runs with no change near it). Run 2 (6623d12) 1181/1182: the server modes' "no double-check" mutant went
 uncaught, because since 6b515 the craft's critic replaces the reflection for every Thinking; it now turns the
 craft off instead, and the pin holds the craft line. Run 3 (b72d004): **1182/1182**, exit 0.
+
+
+## 6b519 — Vera Rubin: one question, every machine, round after round until Stop (per Patrick)
+
+Patrick (2026-10-24): "a feature to emulate a Vera Rubin … I know it's going to take a lot of processing power,
+but where it just sits there and will show Vera Rubin and just goes and goes and goes." His choices: it runs until
+Stop or until three rounds in a row bring no improvement; the best answer so far is always the one on screen; the
+console shows the work (rounds, sources read, drafts, claims checked and fixed, the score rising, the time) and
+both machines' load; the name is exactly "Vera Rubin"; cloud models only when his "Use cloud power" switch is on.
+Built on `quality-1` (6b514 grounded search, 6b515 the craft); everything new lives in its own section
+(`# ==== VERA RUBIN (6b519)`, between the funnel images and the turn writer) so `quality-2`'s changes to the
+critic, the follow-ups, the plan and the arithmetic merge cleanly. Shared code got small marked hooks only: the
+tier entry, `/api/tiers`' row, one `elif` in the handler (before Max), `"|RUBIN"` in `_TURN_TAGS` and the page's
+`FRAME_TAGS`, the menu row, the send button, the time-left line.
+
+**The loop (`run_rubin`).**
+- **Round 0.** The handler's grounded search (6b514) is the first evidence and keeps its numbers. The server
+  writes the first answer exactly as Thinking does (`run_council(craft=True)`: gpt-oss:20b writes, ministral-3:14b
+  reviews and fact-checks, the merge on the server) while this Mac plans the question (`RUBIN_PLAN`: 2 to 5 parts,
+  the evidence each needs, 1 or 2 queries each). The plan's parts the answer leaves open are searched, and the two
+  judges score it. Without a server the Mac plans first, then writes the craft answer itself.
+- **Each round after.** 1. Weak points: a critic on each machine (`critic_prompt`, quality-1's, reused) plus the
+  plan's parts the answer doesn't settle (`rubin_gaps`: under half a part's words, names counted twice, in the
+  answer). 2. Targeted searches for exactly those (`rubin_queries`, at most 3: the open parts with the plan's own
+  queries, the critics' doubtful claims and missing angles with the reviewer's words stripped), each a full
+  `Grounding` (plan, two engines, filters, page reads, passages) with the plan's queries as its model lines; new
+  sources join the pack under the next free numbers (`RubinState.add_sources`, at most 24, a page once), so every
+  [n] keeps meaning one page and the sources row grows in place. 3. Competing revisions, one per writer: the Mac's
+  strongest model (Fast's ladder: Gemma 4 26B here) and the server's two best that fit its card (gpt-oss:20b,
+  ministral-3:14b), each where it lives, side by side; `final_prompt` (quality-1's) with the best answer as the
+  material and the round's notes (the focus, the open parts, the critics', what the judges marked down, the
+  counted faults, the new source numbers) as review notes. 4. Two judges, one per machine, in parallel, on the best
+  answer and the revisions (and the first answer, as the yardstick) under shuffled letters: `RUBIN_JUDGE`, a fixed
+  rubric (grounded .25, correct .25, complete .2, clear .15, fit .15 against the reader the chat's own memory and
+  persona describe), each answer's three weaknesses first, then scores. Counted points come off every answer alike
+  (`rubin_mech`: claim sentences with no source mark up to 3 off grounded, marks past the pack, talk about "the
+  sources" off clear). 5. Only an improvement replaces the best (`rubin_accept`): the judges' mean puts the
+  strongest revision at least `RUBIN_MARGIN` (0.25 of 10) above the best in the same judging, and no judge picked
+  the best. The new best is fact-checked against the evidence it cites (`verify_answer`, quality-1's, on the
+  server's resident model first) and sent after a RESET with its one-line record.
+- **Stop rules** (`rubin_should_stop`): Stop (the console's button, or the send button's first ■ during a run;
+  both use the request's hurry id, the Answer-now channel), three stalled rounds, the ceiling (`RUBIN_CEILING_S`,
+  4 h), or the reader gone. A round cut by Stop is not recorded; the best answer is sent once more with its record
+  ("… · stopped by you") and the stream ends normally, so the page saves it whole.
+- **Budget sanity.** A round with nothing new to work on (no new source, no open part, the critics' notes the same
+  as last round's and nothing counted against the answer) runs no writer and counts as stalled; after a stalled
+  round the next waits 20 s, then 60 s. Every call has a budget (`RUBIN_CALL_S`) inside the ceiling; a server that
+  refuses three times sits the run out; a transient server hiccup is just asked again next round.
+- **The machines.** Each machine is a `RubinLane` with one lock: one job at a time on the server's card (the
+  gateway's rule) and on this Mac's engine; a server lane starts each round with the model already on its card (one
+  swap a round). A server model is seated only if the gateway lists it as "gpu", its size is known and fits the
+  card whole (weights ×1.05 + the gateway's 1.25 GiB margin, `_srv_fits` with the card size; Ollama1's /v1/info
+  doesn't say it, so it is read once from /v1/usage's `vram_total_bytes`), no coder, not refused lately
+  (`srv_is_nofit`), and the server's "Use for Fast, Thinking and Pro" switch on. qwen3.8:27b (17 GB) is never sent.
+  The cloud's strongest writer joins only with the cloud switch on, and stays only while its revisions win at least
+  once in three rounds (the paid-API rule); judges are always local.
+
+**The console** (`rubin-js`): the RUBIN frames drawn above the answer as its sibling (the stream's repaints never
+touch it): VERA RUBIN, the phase, Stop; round, sources read (and in the pack), drafts, claims checked and fixed,
+the score with its line, elapsed (a timer, not rAF); a box per machine: this Mac's GPU, CPU, memory, tok/s,
+memory pressure and macOS's thermal state (macOS gives apps no temperature without admin rights), the server's GPU
+busy, VRAM, RAM, tok/s, temperature and power; then "What changed". The load frame comes every 4 s from a sampler
+thread (`rubin_load`: `gpu_utilization`, psutil, `mem_pressure`, the gateway's /v1/usage, which never keeps the
+server awake). The scan line and the live dot are off under reduced motion and with visual effects off. The menu
+row sits under Max ("until you stop it"), its pop-out lists the machines and says what it promises; the chip says
+"Vera Rubin"; the time-left line and Answer now stay off for it; the saved answer's line is its record.
+
+**The score, and what the live runs taught.** The first run on the Mac alone: Gemma judging Gemma's first answer
+gave it 10.0 of 10, and nothing could beat it. So judges now name weaknesses before scoring and are told to be
+harsh, and counted faults come off. The first run with the server: improvements were accepted, but the score line
+fell (9.5, 8.3, 8.5): the best re-judged beside stronger revisions scores lower. So the first answer rides along in
+every judging as the yardstick, and the score shown (`rubin_yardstick`) is where the judges put the winner between
+the first answer and a perfect 10 in that judging, laid on the first answer's own score: it rises only with the
+answer and never runs past 10 (a plain lead added to the first score did, by round 3). The collapse detector
+(`_looks_degenerate`) read the fact-check's repeated `{"verdict": "ok", "fix": ""}` rows as a loop and threw every
+check away; JSON calls skip it now.
+
+**Measured** (the GPU question q01, persona.json, a dev copy on 9899 with Ollama1 paired, both machines, stopped
+after round 3; 404 s; the dev log's `rubin:` lines; `judged` is the winner's mean in its own judging):
+
+| round | score shown | winner | judged | best then | first answer then | new sources | took |
+|---|---|---|---|---|---|---|---|
+| 0 | 7.38 | Ollama1 · gpt-oss:20b (craft) | — | — | — | 8 (+ plan's) | 58 s |
+| 1 | 8.76 | Gemma 4 26B (this Mac) | 8.00 | 5.77 | 5.77 | 12 | 95 s |
+| 2 | 9.13 | Ollama1 · gpt-oss:20b | 7.98 | 6.32 | 3.90 | 4 | 120 s |
+| 3 | 9.46 | Ollama1 · ministral-3:14b | 8.84 | 8.55 | 4.35 | 0 | 117 s |
+
+43 pages read, 24 in the pack, 10 drafts, 27 claims checked and 4 fixed. The final answer names Blackwell Ultra
+(Shakti Cloud's 20,000 GPUs, GB300 NVL72), Trillium (v6e) and Ironwood (v7: 192 GiB HBM3e, 7.37 TB/s, 9,216-chip
+pods), Anthropic on Google's TPUs with Broadcom's 3.5 GW from 2027, Meta adopting TPUs, AMD MI350/MI400, all cited;
+quality-1's answer to the same question (RESULTS-quality-1.md) named the "fifth-generation" TPU and Claude 3.5
+Sonnet. It still carries errors a local judge can't see: it calls the GB202 (the RTX 5090's die) the Blackwell
+Ultra's and gives it "50× better performance per watt", calls Trillium the per-chip record holder over Ironwood,
+and doesn't name Vera Rubin. An earlier run (before the yardstick) stopped after round 3 at 6.3 → 9.3 → 9.3 → (10.0)
+with an answer naming the B200, the MI355X's 288 GB against Blackwell's 180–192 GB and Ironwood as the seventh
+generation. The console with both machines busy: `vera-rubin-console.jpg` (the run's scratchpad).
+
+**Honest limits.** The judges are the same local models that write, so the score measures what they can see:
+structure, citations, coverage of the plan, fit to the persona; a confident wrong spec from a real page passes
+them. The search is still what limits the facts (RESULTS-quality-1: the engines rarely return the vendors' own
+pages). The server kit's /v1/usage reports no temperature or power, so those read "n/a" (the app takes `temp_c` and
+`power_w` the day the kit sends them). Each round is about two minutes with both machines; four hours is ~100
+rounds, but three stalled rounds end it long before.
+
+Gauntlet: 43 checks and one over 13 mutants (`# ==== VERA RUBIN (6b519)`): the score, a judge's reply, two judges averaged,
+the acceptance rule, the stop rules, the evidence's numbering, citations, the plan, the weak points and their
+searches, the reader, the counted faults, the yardstick, the server's card rule, the cloud switch, one job per
+machine; the loop on stand-ins (three stalled rounds settle it, an improvement replaces and a worse revision never
+does, inside the margin isn't one, Stop mid-round, the ceiling, nothing new runs no writer, the frames, the sources
+row growing, no machine at all); the tier, the handler, the saved turn and the console pinned. The 6b515 pin of
+`FRAME_TAGS` gains `RUBIN`.
