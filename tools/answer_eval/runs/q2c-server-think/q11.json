@@ -1,0 +1,468 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.3,14.2],\"final\":15.8,\"ftok\":329,\"est\":false}",
+  "X-Hurry": "cba0cdc4f0a607c1"
+ },
+ "first_byte_s": 3.61,
+ "first_text_s": 46.67,
+ "elapsed_s": 61.03,
+ "events": [
+  {
+   "t": 3.61,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.61,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 14.59,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.59,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.59,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.23,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 17.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.23,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.23,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 27.31,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 27.31,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 27.37,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 27.37,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 27.37,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 37.55,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 37.55,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "4 notes · 1 dropped"
+   }
+  },
+  {
+   "t": 37.55,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 37.55,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 37.55,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 46.67,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 48.77,
+   "tag": "RATE",
+   "data": {
+    "tps": 192.7,
+    "tok": 404,
+    "s": 2.1
+   }
+  },
+  {
+   "t": 48.77,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 48.77,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 48.77,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 61.03,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 7 claims, all held",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 61.03,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1618 chars"
+   }
+  },
+  {
+   "t": 61.03,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.61,
+   "Searching the web…"
+  ],
+  [
+   14.59,
+   "Reading 8 sources…"
+  ],
+  [
+   17.23,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   27.37,
+   "compositing…"
+  ],
+  [
+   27.37,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   48.77,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 3.61
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.59
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.59
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 17.23
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.23
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 27.37
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "4 notes · 1 dropped",
+   "t_s": 37.55
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 37.55
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 48.77
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 48.77
+  },
+  {
+   "id": "verify",
+   "l": "Checked 7 claims, all held",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 61.03
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1618 chars",
+   "t_s": 61.03
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 61.03
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 27.31,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Answer**  \nA daily dose of **≈ 300 mg elemental magnesium**—ideally split into a morning and an evening dose—has been used in most anxiety‑related trials. The form that most research points to as tolerable and potentially effective is **magnesium glycinate**; magnesium **taurate** is also cited for anxiety with a cardiovascular angle.  \n\n**Evidence quality**  \nThe body of evidence is modest: a systematic review found **15 trials** (7 of which reported anxiety outcomes) but noted heterogeneity in dosage, formulation, and study size, limiting firm conclusions. The trials that did show benefit used about 300 mg elemental magnesium per day. [4]  \n\n**Safety**  \nThe NIH upper tolerable limit for supplemental magnesium is **350 mg/day**; exceeding this requires medical supervision to avoid diarrhea or hypotension. [1]  \n\n**Other useful forms**  \n- **Citrate** has better absorption than oxide but is not the top choice for anxiety.  \n- **Glycinate** is the preferred form for PMS and mild‑to‑moderate anxiety, while **taurate** may be chosen for heart‑related anxiety. [1][5][6]  \n\n**Bottom line**  \nTake roughly 300 mg elemental magnesium daily, preferably as glycinate (or taurate if you hav"
+  },
+  {
+   "t_s": 27.31,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 37.55,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"A daily dose of **≈ 300 mg elemental magnesium**—ideally split into a morning and an evening dose—has been used in most anxiety‑related trials.\" -> \"Trials of magnesium for anxiety and stress typically gave about **300 mg of elemental magnesium daily, sometimes split** between a morning and an evening dose\" [1][2]. The draft overstates the *ideal* split without acknowledging it's *sometimes* used.\n- **WRONG**: \"magnesium **taurate** is also cited for anxiety with a cardiovascular angle\" -> \"**Magnesium Taurate (Good for Heart-Related Anxiety)**\" [1] (draft claims broader anxiety use, source specifies *heart-related*).\n- **CONTRADICTS**: \"magnesium **citrate** has better absorption than oxide but is not the top choice for anxiety\" — but earlier draft cites glycinate as the preferred form for anxiety and PMS [1][5][6], while citrate is only preferred for bloating/constipation [6].\n- **WRONG**: \"The form that most research points to as tolerable and potentially effective is **magnesium glycinate**\" -> Glycinate is the preferred form **for PMS** [6], and the evidence does not establish it as the *universal* best for anxiety (sources only note it as one of several options "
+  }
+ ],
+ "sources": [
+  {
+   "t": "Best Magnesium Form for Anxiety: Evidence-Based Guide",
+   "u": "https://mitohealth.com/guide/best-magnesium-form-for-anxiety",
+   "d": "2026-01-28"
+  },
+  {
+   "t": "The Effects of Magnesium Supplementation on Subjective ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5452159/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium for Hangxiety Relief: What the 2023–2025 Clinical Trials...",
+   "u": "https://www.joinreframeapp.com/articles/magnesium-hangxiety-relief-clinical-trials-2023-2025",
+   "d": "2025"
+  },
+  {
+   "t": "Examining the Effects of Supplemental Magnesium on Self-Reported...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11136869/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium Forms Compared: Glycinate vs Citrate vs Oxide",
+   "u": "https://purecityresearch.org/magnesium/",
+   "d": "2026-10-03"
+  },
+  {
+   "t": "Magnesium’s Impact on PMS Relief | BioSphere Nutrition",
+   "u": "https://www.biospherenutrition.co.nz/blogs/magnesium/magnesium-for-premenstrual-syndrome-pms",
+   "d": "2026-02-26"
+  },
+  {
+   "t": "Does Magnesium Help with Anxiety? Evidence and Safety Guide...",
+   "u": "https://www.boltpharmacy.co.uk/guide/does-magnesium-help-with-anxiety",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Magnesium Glycinate Benefits, Side Effects, and... | Mayo Clinic Press",
+   "u": "https://mcpress.mayoclinic.org/nutrition-fitness/magnesium-glycinate-is-this-supplement-helpful-for-you/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   37.55,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   37.55,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 192.7,
+  "tok": 404,
+  "s": 2.1
+ },
+ "answer_raw": "A practical approach is to take about **300 mg of elemental magnesium per day**, split into a morning and an evening dose if that fits your routine, using a form such as **magnesium glycinate** or **magnesium taurate**. The evidence is modest but suggests a modest benefit for mild‑to‑moderate anxiety.  \n\nThe systematic review that gathered 15 interventional studies—seven of which reported anxiety outcomes—found that most trials used roughly 300 mg of elemental magnesium daily and that the results were heterogeneous, limiting firm conclusions. [4]  \n\nMagnesium glycinate is one of the forms that has appeared in those trials; it is also highlighted as a good option for PMS and for people who prefer a well‑tolerated supplement. Magnesium taurate is noted for its cardiovascular benefits and is sometimes chosen when heart‑related anxiety is a concern. Citrate has better absorption than oxide, but evidence for its anxiolytic effect is limited; oxide is generally not preferred for anxiety. [1][5][6]  \n\nThe National Institutes of Health set an upper tolerable limit of **350 mg of supplemental magnesium per day**; doses above that should be taken under medical supervision because they can cause diarrhea or low blood pressure. [1]  \n\nFor people with premenstrual syndrome, magnesium can help with physical symptoms, and combining it with vitamin B6 can enhance mood and anxiety relief. [6]  \n\nSo, start with **300 mg elemental magnesium daily** in a form like glycinate or taurate, split between morning and evening, and keep the dose under the 350‑mg threshold unless a healthcare provider advises otherwise.",
+ "answer": "A practical approach is to take about **300 mg of elemental magnesium per day**, split into a morning and an evening dose if that fits your routine, using a form such as **magnesium glycinate** or **magnesium taurate**. The evidence is modest but suggests a modest benefit for mild‑to‑moderate anxiety.  \n\nThe systematic review that gathered 15 interventional studies—seven of which reported anxiety outcomes—found that most trials used roughly 300 mg of elemental magnesium daily and that the results were heterogeneous, limiting firm conclusions. [4]  \n\nMagnesium glycinate is one of the forms that has appeared in those trials; it is also highlighted as a good option for PMS and for people who prefer a well‑tolerated supplement. Magnesium taurate is noted for its cardiovascular benefits and is sometimes chosen when heart‑related anxiety is a concern. Citrate has better absorption than oxide, but evidence for its anxiolytic effect is limited; oxide is generally not preferred for anxiety. [1][5][6]  \n\nThe National Institutes of Health set an upper tolerable limit of **350 mg of supplemental magnesium per day**; doses above that should be taken under medical supervision because they can cause diarrhea or low blood pressure. [1]  \n\nFor people with premenstrual syndrome, magnesium can help with physical symptoms, and combining it with vitamin B6 can enhance mood and anxiety relief. [6]  \n\nSo, start with **300 mg elemental magnesium daily** in a form like glycinate or taurate, split between morning and evening, and keep the dose under the 350‑mg threshold unless a healthcare provider advises otherwise.",
+ "chars": 1618,
+ "raw_bytes": 7305,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.63,
+ "rate_gen_tok_s": 28.17,
+ "id": "q11",
+ "turn": 1,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2c-server-think",
+ "asked_at": "2026-10-25T00:34:46",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

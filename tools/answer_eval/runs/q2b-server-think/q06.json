@@ -1,0 +1,425 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[18.6,18.0],\"final\":19.7,\"ftok\":300,\"est\":false}",
+  "X-Hurry": "b82163378158fc78"
+ },
+ "first_byte_s": 3.15,
+ "first_text_s": 44.65,
+ "elapsed_s": 45.16,
+ "events": [
+  {
+   "t": 3.15,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.15,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 14.15,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.15,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.15,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 19.72,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 22 passages"
+   }
+  },
+  {
+   "t": 19.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 19.72,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 19.72,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 29.24,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 146
+  },
+  {
+   "t": 29.24,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 29.24,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 29.24,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 29.24,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 35.99,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 268
+  },
+  {
+   "t": 35.99,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "2 notes"
+   }
+  },
+  {
+   "t": 35.99,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 35.99,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 35.99,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 44.65,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 45.16,
+   "tag": "RATE",
+   "data": {
+    "tps": 138.8,
+    "tok": 71,
+    "s": 0.5
+   }
+  },
+  {
+   "t": 45.16,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 45.16,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "287 chars"
+   }
+  },
+  {
+   "t": 45.16,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.15,
+   "Searching the web…"
+  ],
+  [
+   14.15,
+   "Reading 8 sources…"
+  ],
+  [
+   19.72,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   29.24,
+   "compositing…"
+  ],
+  [
+   29.24,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 3.15
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.15
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.15
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 22 passages",
+   "t_s": 19.72
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 19.72
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 29.24
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "2 notes",
+   "t_s": 35.99
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 35.99
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 45.16
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "287 chars",
+   "t_s": 45.16
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 45.16
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 29.24,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "A dozen Grade A large eggs now cost **$2.27** in the United States [1][2].  \nThat price is **about 35 % lower** than it was a year earlier [1][2]."
+  },
+  {
+   "t_s": 29.24,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 35.99,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- WRONG: \"a dozen Grade A large eggs now cost **$2.27**\" -> \"$2.27 in September 2026\" [1][2]. (The evidence does not state the price for October 2026.)\n- CONTRADICTS: \"about 35 % lower\" and \"34.9 % lower than a year ago\" [2] (mismatched precision; 35% is unsupported)."
+  }
+ ],
+ "sources": [
+  {
+   "t": "Egg Prices Today: Average Price Of Eggs Per Dozen + Chart (2026)",
+   "u": "https://coopeduplife.com/egg-prices/",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "Average egg price per dozen (2026) | Basket Report",
+   "u": "https://basketreport.com/prices/eggs/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "CPI: Average Price Data - U.S. Bureau of Labor Statistics",
+   "u": "https://www.bls.gov/cpi/factsheets/average-prices.htm",
+   "d": "2026-05-20"
+  },
+  {
+   "t": "Food Inflation and the Outlook for Beef Prices - farmdoc daily",
+   "u": "https://farmdocdaily.illinois.edu/2026/10/food-inflation-and-the-outlook-for-beef-prices.html",
+   "d": "2026-10"
+  },
+  {
+   "t": "Average price data (in U.S. dollars), selected items",
+   "u": "https://www.bls.gov/charts/consumer-price-index/consumer-price-index-average-price-data.htm",
+   "d": ""
+  },
+  {
+   "t": "Egg prices have soared 60% in a year. Here's why. - CBS News",
+   "u": "https://www.cbsnews.com/news/eggs-prices-2022-chicken-bird-flu-inflation-cpi/",
+   "d": "2023-01-17"
+  },
+  {
+   "t": "Egg Prices by Year (1980–2026): Price History & Inflation",
+   "u": "https://www.in2013dollars.com/Eggs/price-inflation",
+   "d": "2026"
+  },
+  {
+   "t": "Price of Dozen Eggs in April? Wettquoten & Prognosen | Polymarket",
+   "u": "https://polymarket.com/de/event/price-of-dozen-eggs-in-april-799/will-a-dozen-eggs-cost-between-1pt752pt00-in-april",
+   "d": "2026-05-12"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   35.99,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   35.99,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 138.8,
+  "tok": 71,
+  "s": 0.5
+ },
+ "answer_raw": "A dozen Grade A large eggs cost **$2.27** in the United States, according to the most recent BLS release for September 2026 [1][2]. That price is **34.9 % lower** than it was a year earlier, and it has been unchanged from August 2026 [1][2]. No October 2026 data have been published yet.",
+ "answer": "A dozen Grade A large eggs cost **$2.27** in the United States, according to the most recent BLS release for September 2026 [1][2]. That price is **34.9 % lower** than it was a year earlier, and it has been unchanged from August 2026 [1][2]. No October 2026 data have been published yet.",
+ "chars": 287,
+ "raw_bytes": 3583,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 1.59,
+ "rate_gen_tok_s": 140.69,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2b-server-think",
+ "asked_at": "2026-10-24T23:44:42",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

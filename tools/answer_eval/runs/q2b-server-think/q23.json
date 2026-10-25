@@ -1,0 +1,481 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[20.7,19.6],\"final\":21.4,\"ftok\":386,\"est\":false}",
+  "X-Hurry": "6a9ab40d54b67253"
+ },
+ "first_byte_s": 2.89,
+ "first_text_s": 76.39,
+ "elapsed_s": 96.21,
+ "events": [
+  {
+   "t": 2.89,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.89,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 13.89,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.89,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 13.89,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 19.97,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 23 passages"
+   }
+  },
+  {
+   "t": 19.97,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 19.97,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 19.97,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 42.89,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 42.89,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 42.89,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 42.89,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 42.89,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 62.93,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 63.65,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 63.65,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "8 notes"
+   }
+  },
+  {
+   "t": 63.65,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 63.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 63.65,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 76.39,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 79.85,
+   "tag": "RATE",
+   "data": {
+    "tps": 188.3,
+    "tok": 651,
+    "s": 3.5
+   }
+  },
+  {
+   "t": 79.85,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 79.85,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 79.85,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 96.21,
+   "tag": "RESET"
+  },
+  {
+   "t": 96.21,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 16 claims, fixed 2",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 96.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2593 chars"
+   }
+  },
+  {
+   "t": 96.21,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.89,
+   "Searching the web…"
+  ],
+  [
+   13.89,
+   "Reading 8 sources…"
+  ],
+  [
+   19.97,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   42.89,
+   "compositing…"
+  ],
+  [
+   42.89,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   62.93,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   79.85,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 2.89
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.89
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 13.89
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 23 passages",
+   "t_s": 19.97
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 19.97
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 42.89
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "8 notes",
+   "t_s": 63.65
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 63.65
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 79.85
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 79.85
+  },
+  {
+   "id": "verify",
+   "l": "Checked 16 claims, fixed 2",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 96.21
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2593 chars",
+   "t_s": 96.21
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 96.21
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 42.89,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Risk level**: The evidence shows that AI is already automating routine admin chores—e.g., generating config files, running sanity checks, and wiring services—yet it has not replaced the broader judgment, troubleshooting, and design work that defines a sysadmin role.  Therefore, in the next five years the displacement risk for a typical on‑prem or hybrid‑cloud sysadmin is **moderate** rather than imminent.\n\n**Why moderate**  \n- Source [2] documents a real‑world experiment where an AI CLI (Qwen Code) helped set up a web server and manage packages, but it still required human oversight for environment‑specific decisions.  \n- Source [5] outlines a roadmap that moves sysadmins toward DevOps, emphasizing repeatable pipelines, containerisation, and cloud‑native practices—skills that AI tools *augment* rather than replace.  \n- Source [4] shows AI hiring and scheduling tools that increase productivity by up to 30 % but do not eliminate the need for experienced operators.  \n- No source provides a numeric probability of full automation of a sysadmin’s core responsibilities within five years.\n\n**What you should do now**\n\n1. **Shift toward the DevOps‑to‑cloud continuum**  \n   - Learn Git‑base"
+  },
+  {
+   "t_s": 42.89,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 63.65,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- WRONG: **\"moderate rather than imminent\"** -> no source states a risk category (only notes AI automation of *routine* tasks in [2], productivity gains via AI tools in [4], and a DevOps transition roadmap in [5]).\n- UNSUPPORTED: **\"typical on‑prem or hybrid‑cloud sysadmin\"** — no source specifies deployment contexts.\n- MISSING: **job displacement metrics** (quantified risk, e.g., % of sysadmin tasks automated or outsourced by AI, no source provides this).\n- MISSING: **current salary or demand shifts** (no source addresses pay ranges, job growth, or contraction for sysadmins or DevOps roles).\n- MISSING: **AI’s impact on legacy systems** (no source covers how AI handles non-cloud/legacy infrastructure, a core sysadmin domain).\n- CONTRADICTS: **\"AI hasn’t replaced broader judgment, troubleshooting, and design work\"** vs. **\"AI hiring and scheduling tools increase productivity by up to 30%\" [4]** — the latter suggests some displacement of manual coordination, not just augmentation.\n- STRUCTURE: **recap buried** — opening claim (\"moderate risk\") and closing summary repeat identical points without recap framing.\n- STRUCTURE: **steps 2 and 5 overlap** — \"experiment with AI tools\" vs. \"fo"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Dev Ops & SysAdmin, QA Archives - Remote Work Hub",
+   "u": "https://remoteworkhub.com/job-category/dev-ops-sysadminqa/",
+   "d": ""
+  },
+  {
+   "t": "I Ditched Claude Code and Now Using Open Source Qwen AI for Real...",
+   "u": "https://itsfoss.com/qwen-code-sysadmin-tasks/",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Will Robots Take My Job?",
+   "u": "https://willrobotstakemyjob.com/",
+   "d": ""
+  },
+  {
+   "t": "Hire workers through our AI-powered platform | Job&Talent",
+   "u": "https://www.jobandtalent.com/",
+   "d": ""
+  },
+  {
+   "t": "SysAdmin to DevOps in 2026: A Practical Transition Roadmap",
+   "u": "https://sysadmin.co.in/sysadmin-to-devops-2026-roadmap/",
+   "d": "2026-09-21"
+  },
+  {
+   "t": "We Work Remotely: Advanced Remote Job Search",
+   "u": "https://weworkremotely.com/",
+   "d": ""
+  },
+  {
+   "t": "Estimating displacement risk using data-driven approaches: Flood...",
+   "u": "https://story.internal-displacement.org/estimating-displacement-risk-using-data-driven-approaches-flood-and-drought-displacement-risk-in-the-horn-of-africa/",
+   "d": ""
+  },
+  {
+   "t": "One degree of global warming causes a 50% increase in population...",
+   "u": "https://phys.org/news/2021-03-degree-global-population-displacement.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   63.65,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   63.65,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 188.3,
+  "tok": 651,
+  "s": 3.5
+ },
+ "answer_raw": "AI is already automating routine admin chores—config‑file generation, package wiring, sanity checks—but it has not replaced the higher‑level judgment, troubleshooting, or design work that defines a sysadmin. In the next five years the displacement risk is **low to moderate, not imminent**; no source gives a numeric probability of full automation.\n\nEvidence: an AI CLI (Qwen Code) helped set up a web server and manage packages, yet it still required human oversight for environment‑specific decisions [2]. AI‑driven hiring and scheduling tools can boost productivity by up to **30 %** [4]. A DevOps transition roadmap lists repeatable pipelines, containerisation, and cloud‑native practices as priorities that AI can augment but not replace [5].\n\nThere is **no published metric** on how many sysadmin tasks could be automated or outsourced in five years, and **no source covers AI’s effect on legacy or non‑cloud infrastructure**—a core part of many ops roles.\n\n### What to do now\n\n**1. Shift toward DevOps‑cloud practices**\nLearn Git‑based desired‑state management, multi‑stage Dockerfiles, and Compose for local stacks—skills highlighted in the roadmap [5]. Add IaC tools (Terraform, Pulumi) and CI/CD pipelines to your toolkit; these areas see the most AI‑powered automation but still need human design.\n\n**2. Become “AI‑fluent” in ops**\nExperiment with AI-powered tools that assist in generating boilerplate code and running diagnostics, but focus on refining and validating their outputs. Stay updated on AI advancements within orchestration and automation tools, but prioritize understanding their limitations alongside their capabilities.\n\n**3. Focus on high‑judgment tasks**\nIncident‑management, security operations, and capacity planning require contextual reasoning that AI has not mastered. Pursue certifications that signal expertise in these areas (e.g., CISSP, AWS Security Specialty, SRE).\n\n**4. Explore remote and flexible roles**\nDevOps and Sysadmin positions are available on a remote basis, offering flexibility to work for organisations that value hybrid skills [6]. Contract or part‑time work can let you test new tools without a full‑time commitment.\n\n**5. Stay informed**\nFollow professional forums, newsletters, and conferences where practitioners discuss the limits of automation. Knowing what’s emerging helps you decide when to adopt or resist new AI capabilities.\n\nBy up‑skilling in cloud‑native DevOps, mastering AI‑assisted automation, and concentrating on judgment‑heavy responsibilities, you can keep your role relevant and resilient over the next five years.",
+ "answer": "AI is already automating routine admin chores—config‑file generation, package wiring, sanity checks—but it has not replaced the higher‑level judgment, troubleshooting, or design work that defines a sysadmin. In the next five years the displacement risk is **low to moderate, not imminent**; no source gives a numeric probability of full automation.\n\nEvidence: an AI CLI (Qwen Code) helped set up a web server and manage packages, yet it still required human oversight for environment‑specific decisions [2]. AI‑driven hiring and scheduling tools can boost productivity by up to **30 %** [4]. A DevOps transition roadmap lists repeatable pipelines, containerisation, and cloud‑native practices as priorities that AI can augment but not replace [5].\n\nThere is **no published metric** on how many sysadmin tasks could be automated or outsourced in five years, and **no source covers AI’s effect on legacy or non‑cloud infrastructure**—a core part of many ops roles.\n\n### What to do now\n\n**1. Shift toward DevOps‑cloud practices**\nLearn Git‑based desired‑state management, multi‑stage Dockerfiles, and Compose for local stacks—skills highlighted in the roadmap [5]. Add IaC tools (Terraform, Pulumi) and CI/CD pipelines to your toolkit; these areas see the most AI‑powered automation but still need human design.\n\n**2. Become “AI‑fluent” in ops**\nExperiment with AI-powered tools that assist in generating boilerplate code and running diagnostics, but focus on refining and validating their outputs. Stay updated on AI advancements within orchestration and automation tools, but prioritize understanding their limitations alongside their capabilities.\n\n**3. Focus on high‑judgment tasks**\nIncident‑management, security operations, and capacity planning require contextual reasoning that AI has not mastered. Pursue certifications that signal expertise in these areas (e.g., CISSP, AWS Security Specialty, SRE).\n\n**4. Explore remote and flexible roles**\nDevOps and Sysadmin positions are available on a remote basis, offering flexibility to work for organisations that value hybrid skills [6]. Contract or part‑time work can let you test new tools without a full‑time commitment.\n\n**5. Stay informed**\nFollow professional forums, newsletters, and conferences where practitioners discuss the limits of automation. Knowing what’s emerging helps you decide when to adopt or resist new AI capabilities.\n\nBy up‑skilling in cloud‑native DevOps, mastering AI‑assisted automation, and concentrating on judgment‑heavy responsibilities, you can keep your role relevant and resilient over the next five years.",
+ "chars": 2593,
+ "raw_bytes": 10891,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.74,
+ "rate_gen_tok_s": 32.71,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2b-server-think",
+ "asked_at": "2026-10-25T00:15:22",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

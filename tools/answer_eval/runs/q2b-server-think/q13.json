@@ -1,0 +1,486 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[18.7,17.5],\"final\":19.1,\"ftok\":306,\"est\":false}",
+  "X-Hurry": "d2c513c4e705463a"
+ },
+ "first_byte_s": 2.72,
+ "first_text_s": 96.59,
+ "elapsed_s": 121.2,
+ "events": [
+  {
+   "t": 2.72,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.85,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 29 passages"
+   }
+  },
+  {
+   "t": 17.85,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.85,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.85,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 35.49,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 35.49,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 35.49,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 35.49,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 35.49,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 57.76,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 66.81,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 66.81,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "6 notes · 1 dropped"
+   }
+  },
+  {
+   "t": 66.81,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 66.81,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 66.81,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 87.77,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 96.59,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 98.92,
+   "tag": "RATE",
+   "data": {
+    "tps": 167.3,
+    "tok": 390,
+    "s": 2.3
+   }
+  },
+  {
+   "t": 98.92,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 98.92,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 98.92,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 121.2,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 9 claims, all held",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 121.2,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1560 chars"
+   }
+  },
+  {
+   "t": 121.2,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.72,
+   "Searching the web…"
+  ],
+  [
+   13.71,
+   "Reading 8 sources…"
+  ],
+  [
+   17.85,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   35.49,
+   "compositing…"
+  ],
+  [
+   35.49,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   57.76,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   87.77,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   98.92,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 2.72
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.71
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 13.71
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 29 passages",
+   "t_s": 17.85
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.85
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 35.49
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "6 notes · 1 dropped",
+   "t_s": 66.81
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 66.81
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 98.92
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 98.92
+  },
+  {
+   "id": "verify",
+   "l": "Checked 9 claims, all held",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 121.2
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1560 chars",
+   "t_s": 121.2
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 121.2
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 35.49,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Pizza isn’t inherently “bad,” but the typical commercial pizza is high in calories, sodium, and saturated fat, which can contribute to weight gain and cardiovascular strain if eaten in excess.  \n\n- **Pizza Hut’s Veggie Lover’s** delivers about **12 g of protein** per slice and is one of the healthiest choices on a U.S. chain menu [8].  \n- **Buffalo Chicken** on the same menu is only **260 calories per slice**, but its sodium content is high; it’s the lowest‑carb option on the menu [8].  \n- A standard slice from most fast‑food chains averages **300–400 calories** and **20–30 g of fat**, with sodium often exceeding **700 mg** per slice [8].\n\nBecause of those nutrient profiles, a practical guideline is to keep pizza consumption to **once or twice a week** and to choose a lower‑calorie or veggie‑heavy option when possible. Over‑frequency, especially with high‑fat, high‑sodium versions, can push you over daily caloric or sodium limits.  \n\nIf you do indulge, leftovers can be safely eaten:\n\n- **Refrigerated** pizza stays good for up to **five days** [1].\n- **Frozen** pizza that’s been stored properly can be cooked and eaten up to **six months** past its “best by” date [1].\n\nSo, pizza is n"
+  },
+  {
+   "t_s": 35.49,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 66.81,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG:** \"Pizza Hut’s Veggie Lover’s delivers about **12 g of protein** per slice\" -> \"Veggie Lover’s pie supplies a respectable **12 grams of protein** *per entire pie*\" [8]. The draft misquotes per slice vs. per pie.\n- **WRONG:** \"Buffalo Chicken [...] is only **260 calories per slice**\" -> \"Buffalo Chicken is one of the restaurant’s better-for-you pizza options, with just **260 calories per slice**\" (but the draft omits the critical qualifier: *the lowest-carb pizza on Pizza Hut’s menu*—which is a key health trade-off) [8].\n- **UNSUPPORTED:** \"A standard slice from most fast‑food chains averages **300–400 calories** and **20–30 g of fat**, with sodium often exceeding **700 mg** per slice\" — no source states a range for fast-food chains; only Pizza Hut’s Buffalo Chicken (260 cal/slice) and Veggie Lover’s (12g protein/entire pie) are cited.\n- **MISSING:** \"Sulfite sensitivity\" in pizza crusts [4] is not addressed, despite being a documented trigger for asthma and allergic reactions in certain populations.\n- **MISSING:** The draft ignores **storage risks** (e.g., cross-contamination, freezer burn) beyond the \"five days/ six months\" rule, which are critical for leftover safety.\n"
+  }
+ ],
+ "sources": [
+  {
+   "t": "The Quickest Way To Tell If Pizza Has Gone Bad, Fresh Or Frozen",
+   "u": "https://www.tastingtable.com/1206056/the-quickest-way-to-tell-if-pizza-has-gone-bad-fresh-or-frozen/",
+   "d": "2023-02-21"
+  },
+  {
+   "t": "Migraines in Children: Symptoms, Causes & Treatment | Cleveland Clinic",
+   "u": "https://my.clevelandclinic.org/health/diseases/9637-migraines-in-children-and-adolescents",
+   "d": "2023-09-06"
+  },
+  {
+   "t": "Pizza bomber",
+   "u": "https://en.wikipedia.org/wiki/Pizza_bomber",
+   "d": "2018"
+  },
+  {
+   "t": "Sulfite Allergy & Sensitivity: Symptoms, Tests & Treatments",
+   "u": "https://my.clevelandclinic.org/health/diseases/11323-sulfite-sensitivity",
+   "d": "2024-04-24"
+  },
+  {
+   "t": "12 Absolute Best Pizza Joints In Washington State",
+   "u": "https://www.tastingtable.com/2273017/best-pizza-spots-washington-state/",
+   "d": "2026-10-06"
+  },
+  {
+   "t": "Fine Pizza - Google Play'de Uygulamalar",
+   "u": "https://play.google.com/store/apps/details?id=com.ordrz.finepizza&hl=tr",
+   "d": ""
+  },
+  {
+   "t": "Pizzeria & Lieferservice in Bad Vilbel | Il-Sorriso",
+   "u": "https://il-sorriso-pizzeria.de/",
+   "d": "2025-05-04"
+  },
+  {
+   "t": "Pizza Hut Menu: 16 Best & Worst Orders According to a Nutritionist",
+   "u": "https://www.eatthis.com/healthy-pizza-hut-menu-items/",
+   "d": "2024-02-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   66.81,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   66.81,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 167.3,
+  "tok": 390,
+  "s": 2.3
+ },
+ "answer_raw": "Pizza itself isn’t a poison—what matters is what you put on it and how often you eat it. Commercial pizza tends to be **high in calories, sodium, and saturated fat** [8], so if you eat it too often it can push you over daily caloric or sodium limits and contribute to weight gain or cardiovascular strain.\n\nOn the healthier side, Pizza Hut’s **Buffalo Chicken** delivers **260 calories per slice** and is the **lowest‑carb** option on that chain’s menu [8]. The **Veggie Lover’s** pie provides a **respectable 12 grams of protein** per whole pie, making it a more nutritious choice than many meat‑heavy options [8].\n\nSome people must also watch for **sulfite sensitivity**. Pizza crusts can contain sulfites—preservatives that prevent browning—so those with asthma or sulfite allergies can experience wheezing, coughing, or hives when they eat pizza [4].\n\n**Frequency**: limiting pizza to **once or twice a week** and picking lower‑calorie or veggie‑heavy varieties keeps it within a balanced diet. Over‑frequency, especially with high‑fat, high‑sodium versions, can quickly raise your intake of bad fats and salt.\n\n**Storage**: refrigerated leftovers stay safe for up to **five days** [1], and properly stored frozen pizza can be cooked and eaten for up to **six months** past its “best by” date [1]. Still, keep leftovers at 40 °F or lower, reheat to **165 °F** before eating, and avoid refreezing or eating pizza that shows signs of freezer burn or cross‑contamination.\n\nSo, pizza isn’t automatically bad; it’s a matter of portion, toppings, and moderation.",
+ "answer": "Pizza itself isn’t a poison—what matters is what you put on it and how often you eat it. Commercial pizza tends to be **high in calories, sodium, and saturated fat** [8], so if you eat it too often it can push you over daily caloric or sodium limits and contribute to weight gain or cardiovascular strain.\n\nOn the healthier side, Pizza Hut’s **Buffalo Chicken** delivers **260 calories per slice** and is the **lowest‑carb** option on that chain’s menu [8]. The **Veggie Lover’s** pie provides a **respectable 12 grams of protein** per whole pie, making it a more nutritious choice than many meat‑heavy options [8].\n\nSome people must also watch for **sulfite sensitivity**. Pizza crusts can contain sulfites—preservatives that prevent browning—so those with asthma or sulfite allergies can experience wheezing, coughing, or hives when they eat pizza [4].\n\n**Frequency**: limiting pizza to **once or twice a week** and picking lower‑calorie or veggie‑heavy varieties keeps it within a balanced diet. Over‑frequency, especially with high‑fat, high‑sodium versions, can quickly raise your intake of bad fats and salt.\n\n**Storage**: refrigerated leftovers stay safe for up to **five days** [1], and properly stored frozen pizza can be cooked and eaten for up to **six months** past its “best by” date [1]. Still, keep leftovers at 40 °F or lower, reheat to **165 °F** before eating, and avoid refreezing or eating pizza that shows signs of freezer burn or cross‑contamination.\n\nSo, pizza isn’t automatically bad; it’s a matter of portion, toppings, and moderation.",
+ "chars": 1560,
+ "raw_bytes": 7397,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 3.22,
+ "rate_gen_tok_s": 15.85,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2b-server-think",
+ "asked_at": "2026-10-24T23:56:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -16965,3 +16965,105 @@ without the new helpers, and "vision answers about the pixels" (an empty local a
 two runs with no change near it). Run 2 (6623d12) 1181/1182: the server modes' "no double-check" mutant went
 uncaught, because since 6b515 the craft's critic replaces the reflection for every Thinking; it now turns the
 craft off instead, and the pin holds the craft line. Run 3 (b72d004): **1182/1182**, exit 0.
+
+## 6b518 — quality-2: no search for arithmetic, a critic held to the evidence, corrections that stick, grounded follow-ups, a query plan that lands, primary sources (per Patrick)
+
+Round 2 of the answer push, on `quality-2` from `quality-1` (c52dc6c). Round 1 (6b516) had cut high-severity
+hallucinations 111 → 44 but left the overall at 3.4: search ran on pure arithmetic (q27's verdict flipped),
+the critic invented and the writer ignored its right catches, follow-ups had no sources (1.7), the model's
+query plan never landed (`model=[]` 28/28), no primary source came back, and depth and fit fell. The bench,
+the judges and the config are round 1's (`tools/answer_eval/RESULTS-quality-2.md` has every number).
+
+**1. Arithmetic on the person's own figures searches nothing** (`reasoning_parts`, `self_contained_reasoning`,
+`SC_HINT`, before `needs_search`). Rules only: each part of a question is a premise (a statement with figures),
+an ask (arithmetic or a judgement on them: "which is cheaper", "by how much", "how many years", "break even",
+"which should I trust"), context, or a world part (a current, typical or local figure, a named thing, "how
+should I price it"). Three figures or more, an ask, no world part: no search, and the turn says the figures are
+premises to work from, shown in a line, uncited. A mixed question (q29) searches its world part only: the
+planner drops premises and sums. `needs_search` also answers a question mark anywhere ("Cheapest places to
+travel from NYC this winter? Flights plus living costs, not just one or the other." never searched).
+Measured: q27 and q28 searched 0 of 6 times, 19–32 s instead of 59–66 s; q28 scored 9 on all three runs (5).
+
+**2. The critic is held to what the app has.** `CRITIC_INSTRUCTION` labels every line (WRONG with the draft's
+words quoted and the evidence's figure and [n]; UNSUPPORTED; CONTRADICTS; MISSING, the angle only; STRUCTURE,
+including the person's standing instructions, which it now gets), may not write a number, name, place,
+product, example or source the evidence or the draft lacks, and treats the question's own figures as
+premises. `critic_filter` then drops each line that brings a number or a proper noun found in neither the
+evidence, the drafts nor the question (round 1's "Bela Vista", "a July 2026 guide lists $320–$420"), and an
+UNSUPPORTED note on a figure the evidence states (round 1's q04 "first hike since 2023"). 25–32 lines a run
+dropped. It still mis-steers sometimes: in one run it "corrected" a right B300 to the A100 from a 2020 press
+release the hints had brought in, so a source more than a year older than the newest in the pack never backs
+a correction (`_correction_backed`).
+
+**3. Corrections stick.** A WRONG note whose corrected figure the evidence states in one sentence with the
+claim (from a source that isn't stale), or an UNSUPPORTED note on a figure nothing states, becomes a
+correction (`critic_corrections`): a mandatory "CORRECTIONS TO APPLY" block in the final prompt
+(`corrections_block`), a string check after writing (`corrections_stuck`), and the ones that didn't take go to
+the fact-check as "KNOWN ERRORS" its array must judge and fix (`verify_prompt(known=)`); the card says
+"Applied the review's corrections · n of n". Measured: 6, 3 and 2 corrections, every one applied by the writer.
+The bar is strict on purpose (a bad correction costs more than a missed one), so most notes stay notes.
+
+**4. Follow-ups carry their evidence.** A grounded turn is kept by the person's words for 3 hours
+(`_ground_turns`, `ground_prior`); a follow-up keeps the earlier sources, 1–4 numbered as before
+(`merge_prior`), searches only what it adds (`followup_new_terms`; the earlier question's names ride its
+parts through `plan_queries(topic=)`), and "explain more" searches nothing (`Grounding(search=False)`, "Kept
+the earlier sources · nothing new to look up"). When the person mentions another assistant's reply that isn't
+pasted (`other_ai_note`; Patrick pastes Claude's answers when he wants them compared) the turn says the model
+can't see it, never to describe or grade it, and to say where its own answer was wrong; the brief says the
+same. Measured: follow-ups 1.7 → 2.7, 2.7, 2.0; "I don't see Claude's reply" on two runs of three.
+
+**5. The query plan lands.** Not the deadline and not the parser: logged live, the planner's
+`server_side_pick` came back None at 0.00 s, because on a mode on one server alone (Patrick's "Ollama1 Only,
+Thinking") that server's models are not among the modes' candidates. The plan now runs on the council's own
+non-reasoning seat (`ground_plan_seat`: the critic's model, which the last fact-check left on the card; never
+gpt-oss, whose 160 tokens would all be reasoning), inside `server_ctx_sticky()` so it asks for the context the
+model is loaded with (Ollama reloads a model whose num_ctx changes: 7.5 s), and is waited for 8 s (the
+gateway's round trip is ~3 s; at 5 s, 2 of 30 landed; at 8 s, 14 of 28). The prompt asks for the primary
+source. **Primary sources by question type** (`ground_hints`, no paid API): FRED and BLS for a price, the
+Fed's statement for its rate, BLS's Occupational Outlook Handbook for pay, the vendor for its product, the
+airline for its bags, the IRS, travel.state.gov, NIH and Cleveland Clinic, Numbeo, the EIU, Wikipedia for
+where a company operates, as `site:` queries (bing and ddgs honour it) sent first to one engine with an 11 s
+budget (`GROUND_HINT_S`: beside ten other calls they took 10–13 s, and 8 s kept none); a page on the hinted
+host that speaks to the question ranks up (`rank_sources(primary=)`). Searched answers with a primary-host
+source: 8 of 29 → 20, 22, 17 of 30. Also: a compact URL date is read (`…/monetary20260916a.htm`), and for a
+question about now a page from this month or last ranks above an older 2026 one (the July FOMC statement had
+beaten September's). Tokens are read in any script ("Florianópolis" was searched as "Florian polis"), the
+asker's "I" is never a name, a how-to-answer part ("Keep it short and technical") is no query, and a part
+with no name of its own borrows the lead's. The limit, measured from this network: BLS, NIH ODS, Mayo Clinic,
+Azul, OpenAI and travel.state.gov answer a script 403, Numbeo 503, FRED and LATAM time out; those stand on
+their snippets, which rarely hold the figure (q06's September egg price).
+
+**6. Depth and fit.** The grounded turn pulls out "KEY FIGURES IN THAT EVIDENCE" (`evidence_figures`); a
+slow-moving figure the evidence lacks may come from memory as a dated "typically" range; the brief says to
+follow the person's standing instructions to the letter, name the best option, use prose without tables, and
+never answer with only a pointer elsewhere; a closing recap paragraph is trimmed (`trim_recap`, re-sent with
+the check's RESET). A looping writer hands the draft to the critic's seat, as a hiccup already did (q21 was
+"None of Ollama1's models answered"). **A higher reasoning effort for the final writer** goes through
+(`think` passes the gateway; only gpt-oss is asked, by tag; a 400 retries without it), but `"high"` spent ~55
+s reasoning on the GPU question (writer 12 → 60 s, first text 107 s), so `FINAL_THINK` is None (the model's
+default) and a dev copy may try another (`MILLENAI_FINAL_THINK`). The level rides the writer's own system
+message (`_think`), read only by `server_stream`.
+
+**Measured** (33 turns, server Thinking, Opus judges, three full runs): overall 3.4, 3.8, 3.5 (quality-1 3.4,
+baseline 3.1) — inside the bench's noise against quality-1 (paired +0.06 / +0.39 / +0.09, SE ~0.25–0.3; two
+runs of near-identical code differ by 0.3); high-severity hallucinations 44 → 35, 38, 37; grounded 4.1 → 4.4,
+4.7, 4.4; reasoning 5.7 → 6.4 (mean); follow-ups 1.7 → 2.4 (mean); fit 3.8 → 4.0–4.1; depth 3.4 → 3.5; first
+text median 49 → 51, 55, 51 s. Fresh (3.0 mean) and travel (2.8) are not reliably better. Verdict in RESULTS:
+safe to merge as a step, not a quality release.
+
+The bench gained stats for the critic's drops, the corrections, the kept follow-up sources and the plan's
+landing (`stats.py`), and the dev log's ground line lists each query's hits and seconds.
+
+Gauntlet: 17 checks (`# ==== quality-2 (6b518)`): the classifier on q27/q28/q29 and the world-wanting
+controls, the planner's skipped parts and scripts, the hints by type, the primary host ranking up, the plan
+seat and its sticky context, the unseen-reply note and a follow-up's new words, the prior merge's numbering,
+the earlier evidence found by the person's words and reused with no search, the handler's wiring, the
+critic's filter and the false "unsupported", the corrections' backing (one sentence, not stale), their block,
+string check and the checker's KNOWN ERRORS, the recap trim, the council's wiring, the key figures and the
+note in the grounded turn, the reasoning level only for gpt-oss and its refusal retry. Stale pins and anchors
+follow the code (each named where it changed): the two-engine check (site: and compact queries ask one), the
+6b515 pins of the verify call, the final prompt's cuts and the critic's call, the hurried-run and notes
+mutants, the server code's retry-loop and keep_alive anchors, the 6b516 empty-writer pin; the 6b515 council
+fixture's question now carries the figure its critic note uses (a note bringing a number from nowhere is
+dropped now); the council namespaces gain the new helpers; the new per-thread and per-model engine state is
+declared in MACHINE_STATE.

@@ -1,0 +1,276 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":0.0,\"models\":[16.7,15.1],\"final\":17.0,\"ftok\":390,\"est\":false}",
+  "X-Hurry": "624dda437478e0a6"
+ },
+ "first_byte_s": 4.95,
+ "first_text_s": 22.5,
+ "elapsed_s": 23.22,
+ "events": [
+  {
+   "t": 4.95,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 7.99,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 340
+  },
+  {
+   "t": 7.99,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 8.0,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 8.0,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 8.0,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 15.02,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 579
+  },
+  {
+   "t": 15.02,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "5 notes · 1 dropped"
+   }
+  },
+  {
+   "t": 15.02,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 15.02,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 15.02,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 22.5,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.22,
+   "tag": "RATE",
+   "data": {
+    "tps": 113.5,
+    "tok": 81,
+    "s": 0.7
+   }
+  },
+  {
+   "t": 23.22,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 23.22,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "326 chars"
+   }
+  },
+  {
+   "t": 23.22,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.95,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   8.0,
+   "compositing…"
+  ],
+  [
+   8.0,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 8.0
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "5 notes · 1 dropped",
+   "t_s": 15.02
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 15.02
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 23.22
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "326 chars",
+   "t_s": 23.22
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.22
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 7.99,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "The separate‑booking option costs **$2,395**, which is **$5 cheaper** than the $2,400 package.\n\nIf the hotel’s $95 nightly rate excludes a 12 % tax, the nightly cost becomes $106.40.  \nHotel total for 11 nights: 106.40 × 11 = $1,170.40.  \nAdd the flight: 1,170.40 + 1,350 = **$2,520.40**.  \nThis is **$120.40 more** than the $2,400 package."
+  },
+  {
+   "t_s": 7.99,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 15.02,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- CONTRADICTS: *\"the separate-booking option costs **$2,395**, which is **$5 cheaper**\"* —\n  but the package is $2,400, so the separate option is **$5 *cheaper*** (correct).\n  *However*, the draft *also* states **\"$5 cheaper\"** as the verdict, which is accurate, but the phrasing in the bullet is redundant and confusingly mixed with the correct arithmetic—**WRONG** to claim contradiction where none exists (the draft’s own math is correct).\n  (This is a false alarm due to draft self-consistency; ignore the bullet.)\n- **No problems found in the arithmetic or tax adjustment.**"
+  }
+ ],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   15.02,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   15.02,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": false,
+ "rate_writer": {
+  "tps": 113.5,
+  "tok": 81,
+  "s": 0.7
+ },
+ "answer_raw": "The separate booking totals **$2,395**, which is **$5 cheaper** than the $2,400 package.\n\nIf the $95 nightly rate excludes a 12 % tax, the adjusted nightly cost is $106.40.  \nHotel total for 11 nights: 106.40 × 11 = **$1,170.40**.  \nAdd the flight: 1,350 + 1,170.40 = **$2,520.40**, which is **$120.40 more** than the package.",
+ "answer": "The separate booking totals **$2,395**, which is **$5 cheaper** than the $2,400 package.\n\nIf the $95 nightly rate excludes a 12 % tax, the adjusted nightly cost is $106.40.  \nHotel total for 11 nights: 106.40 × 11 = **$1,170.40**.  \nAdd the flight: 1,350 + 1,170.40 = **$2,520.40**, which is **$120.40 more** than the package.",
+ "chars": 326,
+ "raw_bytes": 2418,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 3.51,
+ "rate_gen_tok_s": 113.19,
+ "id": "q27",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Package vs separate booking",
+ "question": "A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 nights. Which is cheaper and by how much? Then redo it if the hotel adds a 12% tax that isn't in the $95.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2b-server-think",
+ "asked_at": "2026-10-25T00:19:04",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 nights. Which is cheaper and by how much? Then redo it if the hotel adds a 12% tax that isn't in the $95."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
