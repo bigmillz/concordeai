@@ -34315,10 +34315,10 @@ def rubin_server_load(e) -> dict:
     out = {"ok": False, "gpu": None, "vram_used": None, "vram_total": None,
            "ram_used": None, "ram_total": None, "temp": None, "power": None}
     try:
-        st, js = _srv_json(e, "GET", "/v1/usage", timeout=SRV_USAGE_S)
+        code, js = _srv_json(e, "GET", "/v1/usage", timeout=SRV_USAGE_S)
     except Exception:
         return out
-    if st != 200 or not isinstance(js, dict):
+    if code != 200 or not isinstance(js, dict):
         return out
     g, r = _srv_usage_gpu(js), _srv_usage_ram(js)
     raw = js.get("gpu") if isinstance(js.get("gpu"), dict) else {}
@@ -34465,7 +34465,7 @@ def rubin_tier_row(ctx) -> dict:
     cloud = [l.name for l in lanes if l.kind == "cloud"]
     n = len(models) + len(cloud)
     return {"desc": TIERS[RUBIN_TIER]["desc"], "models": models, "cloud": cloud, "skipped": [],
-            "available": n > 0, "count": n,
+            "available": bool(n), "count": n,
             "why": "" if n else ("Nothing can run it: download a model under Settings › Models "
                                  "or pair a server."),
             "note": ("It stops when you press Stop, or when %d rounds in a row bring nothing "
