@@ -101,6 +101,42 @@ def main():
             rates.sort()
             print("- the final writer's own pace (RATE, 6b515): median %.1f tok/s over %d answers"
                   % (rates[len(rates) // 2], len(rates)))
+        # quality-2 (6b518): the critic's notes checked, the corrections, the earlier sources kept
+        def _steps(r, sid):
+            return [s for s in r.get("steps") or [] if isinstance(s, dict) and s.get("id") == sid
+                    and s.get("s") == "done"]
+        import re as _re
+        dropped = corr = 0
+        for r in recs:
+            for s in _steps(r, "review")[-1:]:
+                d = s.get("d", "")
+                m = _re.search(r"(\d+) dropped", d)
+                dropped += int(m.group(1)) if m else 0
+                m = _re.search(r"(\d+) corrections?", d)
+                corr += int(m.group(1)) if m else 0
+        fixes = [s.get("d", "") for r in recs for s in _steps(r, "fix")[-1:]]
+        if dropped or corr or fixes:
+            applied = total = by_check = 0
+            for d in fixes:
+                m = _re.match(r"(\d+) of (\d+)", d)
+                if m:
+                    applied += int(m.group(1))
+                    total += int(m.group(2))
+                m = _re.search(r"(\d+) by the check", d)
+                by_check += int(m.group(1)) if m else 0
+            print("- critic (6b518): %d note lines dropped (a number or name from nowhere, or a false "
+                  "'unsupported'); %d corrections in %d answers, %d applied (%d of them by the fact-check)"
+                  % (dropped, total or corr, len(fixes), applied, by_check))
+        prior = sum(1 for r in recs if _steps(r, "prior"))
+        if prior:
+            print("- follow-ups that kept the earlier sources (6b518): %d" % prior)
+        log = os.path.join(HERE, "runs", run, "devcopy.log")
+        if os.path.exists(log):
+            with open(log, encoding="utf-8", errors="replace") as fh:
+                lines = [ln for ln in fh if ln.startswith("ground:")]
+            if lines:
+                landed = sum(1 for ln in lines if "model=[]" not in ln)
+                print("- the model's query plan landed: %d of %d grounded searches" % (landed, len(lines)))
         print()
 
 

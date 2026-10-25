@@ -11959,9 +11959,15 @@ _CRAFT_NAMES = {"ANSWER_BRIEF", "_BRIEF_MARK", "_brief_today", "answer_brief", "
                 "VERIFY_BUDGET_S", "VERIFY_CLOUD_S", "VERIFY_MIN_CHARS", "VERIFY_SYSTEM",
                 "VERIFY_INSTRUCTION", "_CLAIM_RX", "_SENT_RX", "_FIX_META_RX", "claim_count",
                 "verify_prompt", "parse_claims", "_loose_rx", "_tidy_fixed", "apply_fixes",
-                "verify_answer", "verify_pick", "verify_pass", "rate_frame"}
+                "verify_answer", "verify_pick", "verify_pass", "rate_frame",
+                # quality-2 (6b518): the critic's notes checked, the corrections, the recap, the writer's effort
+                "_NOTE_LABEL_RX", "_NOTE_QUOTE_RX", "_NOTE_NUM_RX", "_NOTE_WORD_STOP", "_num_key",
+                "_note_corpus", "_note_new_specifics", "critic_filter", "_evidence_has", "critic_corrections",
+                "_correction_backed", "corrections_block", "_squash", "corrections_stuck", "_RECAP_RX", "trim_recap",
+                "FINAL_THINK", "final_think_level"}
+_rc26["DEV_HOME"] = ""
 _exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
-                    "PEER_INSTRUCTION"} | _CRAFT_NAMES)
+                    "PEER_INSTRUCTION", "_srv_think", "server_think"} | _CRAFT_NAMES)
 _rc_calls = []
 _GQC = {"base": _GQ26, "name": "Groq", "model": "qwen/qwen3.8-27b", "key": "k"}
 
@@ -23087,6 +23093,8 @@ def _p2_council(src, run_model, **over):
           "server_compositor": lambda ctx, drafted=(): None,
           "bound_ctx": lambda: None, "ServerError": type("ServerError", (RuntimeError,), {}),
           "server_first_deadline": _RcDeadline, "server_mark_down": lambda ctx, name, why: downs.append((name, why)),
+          # the final writer's reasoning level (6b518): a stand-in context, no dev overrides
+          "server_think": lambda level: __import__("contextlib").nullcontext(), "DEV_HOME": "", "os": os,
           # a server marked down is down (6b339, final review), by the name before the separator
           "server_label_down": lambda ctx, label: label.split(" \u00b7 ", 1)[0] in {d[0] for d in downs}}
     ns.update(over)
@@ -36452,7 +36460,10 @@ _g14 = {"re": re, "time": time, "json": json, "html": _html14, "copy": _copy14,
 _exec_names(_g14, {"_NOPAD", "strftime_np", "strip_greeting", "_PREAMBLE_RX", "_FRESH_PATTERNS",
                    "_ASKY_RX", "_BOOKING_RX", "_PLACE_NOUNS", "strip_think", "strip_special",
                    "END_TOKENS", "NUL", "_THINK_RE", "_JUNK_HOSTS", "_GOOD_HOSTS",
-                   "_link_shape_ok", "_ip_public", "_LOCAL_HOST_RX"})
+                   "_link_shape_ok", "_ip_public", "_LOCAL_HOST_RX",
+                   # quality-2 (6b518): the planner skips arithmetic parts, the hints read names
+                   "_SC_SPLIT_RX", "_SC_NUM_RX", "_SC_ASK_RX", "_SC_WORLD_RX", "_SC_Q_START_RX",
+                   "_sc_entities", "reasoning_parts", "self_contained_reasoning"})
 _g14_lo = _MILLENAI_SRC.index("# ------------------------------------------------ grounded web search (6b514)")
 _g14_hi = _MILLENAI_SRC.index("# ------------------------------------------------------------------ usage", _g14_lo)
 _g14_lines = (_MILLENAI_SRC.count("\n", 0, _g14_lo) + 1, _MILLENAI_SRC.count("\n", 0, _g14_hi) + 1)
@@ -36698,7 +36709,12 @@ check("the grounding runs plan -> search -> read -> done and reports each phase 
       "%r %r" % (_ph14, _gr14.error))
 check("the model's plan rides beside the rules' queries and every query is searched, on both engines",
       _gr14.model_queries == ["NVIDIA Vera Rubin specs 2026", "Anthropic Trainium TPU 2026"]
-      and set(_gr14.queries) <= set(_calls14) and set(_gr14.queries) <= set(_more14)
+      # (6b518) the primary-source site: queries and the compact whole-question one ask one engine;
+      # the sub-questions and the model's angles ask both
+      and set(_gr14.queries) <= set(_calls14)
+      and set([q for q in _gr14.queries if q not in _gr14.hint_queries
+               and q not in _gr14.model_queries][:3] + _gr14.model_queries) <= set(_more14)
+      and not set(_gr14.hint_queries) & set(_more14)
       and len(_gr14.queries) <= _g14["GROUND_QUERIES"]
       and len(_gr14.queries) >= 4, "%r %r %r" % (_gr14.queries, _calls14, _more14))
 _src14 = _gr14.snapshot()[0]
@@ -37214,6 +37230,173 @@ check("the fact-check replaces whole sentences only, and never with a line about
       and "a lease may involve deposits, landlords vary." in _t16
       and "never mentioning sources, evidence or this" in _MILLENAI_SRC, "%r" % [_t16, _x16])
 # ==== quality-1 (6b516): end ====
+# ==== quality-2 (6b518) answers, round 2: begin ====
+# Round 1 (quality-1) halved the hallucinations but searched arithmetic (q27's verdict flipped), the critic
+# invented and the writer ignored its right catches, follow-ups ran with no sources, the model's query plan
+# never landed (model=[] in 28 of 28: the server pick was None on a mode on one server alone) and the
+# search never reached the primary source. NOTES 6b518.
+print("== quality-2: arithmetic, the critic, corrections, follow-ups, the plan, primary sources (6b518) ==")
+_g18 = _g14
+_exec_names(_g18, {"_SC_SPLIT_RX", "_SC_NUM_RX", "_SC_ASK_RX", "_SC_WORLD_RX", "_SC_Q_START_RX",
+                   "_sc_entities", "reasoning_parts", "self_contained_reasoning", "SC_HINT",
+                   "needs_search", "_NO_SEARCH", "_FRESH_WORDS", "_SELF_CONTAINED", "_VENUE_RX", "_ZIP_RX",
+                   "_NEARBY_RX", "_WORLDLY_RX", "_SRV_WORD", "_SRV_STEM", "_SRV_FAMILY", "_srv_flags",
+                   "srv_role_ok"})
+_g18["server_label"] = lambda l: isinstance(l, str) and " · " in l
+_g18["SERVER_SEP"] = " · "
+_Q27 = ("A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 "
+        "nights. Which is cheaper and by how much? Then redo it if the hotel adds a 12% tax that isn't in the $95.")
+_Q28 = ("I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for "
+        "$27,000. Gas is $3.40. How many years until B breaks even on fuel alone?")
+_Q29 = ("Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more "
+        "and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?")
+check("arithmetic on the person's own figures needs no search; a part that wants the world still does",
+      _g18["self_contained_reasoning"](_Q27) and _g18["self_contained_reasoning"](_Q28)
+      and not _g18["self_contained_reasoning"](_Q29)
+      and not _g18["needs_search"](_Q27) and not _g18["needs_search"](_Q28) and _g18["needs_search"](_Q29)
+      and not _g18["self_contained_reasoning"]("Is $4,000 a month enough to live in Lisbon?")
+      and not _g18["self_contained_reasoning"]("Which is cheaper over 5 years, a Prius or a Civic, at $3.40 gas?")
+      and _g18["needs_search"]("Cheapest places to travel from NYC this winter for two weeks? Flights plus "
+                               "living costs, not just one or the other."), "")
+_pq18 = _g18["plan_queries"](_Q29)
+_pq18b = _g18["plan_queries"]("Explain what 4-bit quantization does to an LLM. Keep it short and technical.")
+check("the planner searches neither premises nor sums nor how-to-answer parts, and keeps names in any script",
+      _pq18 and not any("4.6" in q or "212" in q or "trust" in q for q in _pq18)
+      and any("Florianópolis" in q for q in _pq18)
+      and not any("Keep" in q or "technical" in q.split()[:1] for q in _pq18b)
+      and "Medellín" in " ".join(_g18["plan_queries"]("Cost of living in Medellín vs Lisbon?")),
+      "%r %r" % (_pq18, _pq18b))
+_gh18 = lambda q: [h for h, _x in _g18["ground_hints"](q, lead=(_g18["plan_queries"](q) or [""])[0])]
+check("primary sources by question type: the statistics agency, the Fed, the airline, the vendor; nothing for a poem",
+      any("site:fred.stlouisfed.org" in h for h in _gh18("How much is a dozen eggs in the US right now?"))
+      and any("site:federalreserve.gov" in h for h in _gh18("What's the current federal funds rate?"))
+      and any("site:latamairlines.com" in h for h in _gh18("What are the carry-on limits on LATAM?"))
+      and any("site:apple.com/newsroom" in h for h in _gh18("What's the newest iPhone right now?"))
+      and _gh18("write a short poem about the sea") == []
+      and len(_g18["ground_hints"]("GPU TPU Claude Gemini LATAM GOL Azul eggs Fed", lead="a b")) <= _g18["GROUND_HINT_QUERIES"],
+      "%r" % _gh18("How much is a dozen eggs in the US right now?"))
+_rows18 = [{"title": "Egg prices fall again", "href": "https://www.someblog.com/eggs", "body": "eggs price dozen", "_q": "a"},
+           {"title": "Average Price: Eggs, dozen", "href": "https://fred.stlouisfed.org/series/APU0000708111",
+            "body": "eggs price dozen average", "_q": "b"}]
+_rk18 = _g18["rank_sources"](_rows18, ["eggs", "price", "dozen"], [], True, per_query=0,
+                             primary=["fred.stlouisfed.org"])
+check("a page on the hinted primary host ranks first when it speaks to the question",
+      _rk18 and _rk18[0]["host"] == "fred.stlouisfed.org", "%r" % [s["host"] for s in _rk18])
+check("the query plan runs on the council's own non-reasoning seat (the critic's), never a reasoning model",
+      _g18["ground_plan_seat"](["S · gpt-oss:20b", "S · ministral-3:14b", "S · gemma4:12b"])
+      == "S · ministral-3:14b"
+      and _g18["ground_plan_seat"](["S · gpt-oss:20b"]) == ""
+      and _g18["ground_plan_seat"](["Gemma 4 26B"]) == ""
+      and "_seat = ground_plan_seat(_cn)" in _hs14
+      and "server_stream(_seat, ask, parts.append, 160)" in _hs14
+      # the plan asks for the context its model is loaded with, so the card doesn't reload it
+      and "server_ctx_sticky():" in _hs14
+      and "_was = _srv_ctx_seen.get((e.get(\"id\"), model))" in _MILLENAI_SRC, "")
+# follow-ups
+check("another assistant's reply the person mentions but didn't paste: the model is told it can't see it",
+      "cannot see it" in _g18["other_ai_note"]("I feel like Claude's response beat you. explain more")
+      and _g18["other_ai_note"]("Claude said: \"" + "x" * 200 + "\" do you agree?") == ""
+      and _g18["other_ai_note"]("what is Claude using for chips?") == ""
+      and _g18["followup_new_terms"]("I feel like Claude's response beat you. explain more") == []
+      and "furnished" in _g18["followup_new_terms"]("Pick one and tell me what a furnished one-bedroom there runs"),
+      "")
+_pr18 = [{"url": "https://a.com/%d" % i, "title": "p%d" % i} for i in range(1, 9)]
+_nw18 = [{"url": "https://b.com/%d" % i, "title": "n%d" % i} for i in range(1, 6)] + [{"url": "https://a.com/2"}]
+_mp18 = _g18["merge_prior"](_pr18, _nw18)
+check("a follow-up keeps the earlier turn's first sources numbered as before, then its new ones, no repeats",
+      [s["url"] for s in _mp18[:4]] == ["https://a.com/%d" % i for i in range(1, 5)]
+      and _mp18[4]["url"] == "https://b.com/1" and len(_mp18) == 8
+      and len({s["url"] for s in _mp18}) == 8, "%r" % [s["url"] for s in _mp18])
+
+
+def _web18(q, limit=8):
+    return [{"title": "Rubin GPU news %s" % q, "href": "https://www.reuters.com/" + re.sub(r"\W+", "-", q),
+             "body": "Vera Rubin GPU TPU 2026 " + q}]
+
+
+_calls18 = []
+_g18["_ddg_text"] = lambda q, limit=8: (_calls18.append(q), _web18(q))[1]
+_g18["_ddg_more"] = lambda q, limit=8: []
+_g18["_page_read"] = lambda url, want_photo=False, timeout=6.0: None
+_g18["_ground_cache"].clear()
+_t18 = _g18["ground_start"]("What is the most powerful GPU right now?", turn_key="tk18")
+_t18.wait(None, 15.0)
+_msgs18 = [{"role": "user", "content": "tk18"}, {"role": "assistant", "content": "a"},
+           {"role": "user", "content": "explain more"}]
+_pv18 = _g18["ground_prior"](_msgs18)
+_n18 = len(_calls18)
+_r18 = _g18["ground_start"]("explain more", prior=_pv18, search=False)
+_r18.wait(None, 5.0)
+check("the earlier turn's evidence is found by the person's words and reused with no search when nothing is new",
+      _t18.sources and _pv18 is _t18 and len(_calls18) == _n18 and _r18.pack == _t18.pack
+      and _r18.phase == "done" and getattr(_r18, "reused", False)
+      and _g18["ground_prior"]([{"role": "user", "content": "never asked"}, {"role": "assistant", "content": "a"},
+                                {"role": "user", "content": "more"}]) is None, "")
+check("the handler carries a follow-up's evidence, searches only what it adds, and passes the notes",
+      "_g_prior = ground_prior(messages)" in _hs14 and "prior=_g_prior, search=not _g_reuse" in _hs14
+      and "turn_key=_ground_key(prompt)" in _hs14 and "_g_reuse = not _fu_new" in _hs14
+      and "grounded_turn(query, _gpack, note=_oai_note)" in _hs14
+      and "SC_HINT if self_contained_reasoning(strip_greeting(prompt))" in _hs14, "")
+# the critic, the corrections
+_c18 = {"re": re, "json": json, "time": time, "threading": threading, "os": os, "DEV_HOME": "",
+        "ground_clip": lambda t, c: t, "SYNTH_INSTRUCTION": "Below ... Write ONE final answer ..."}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("ANSWER_BRIEF = ("):_MILLENAI_SRC.index("\n\n\nRESEARCH_PLAN = (")], _c18)
+_ev18 = ("[1] Ironwood GA — cloud.google.com\n    Ironwood, the seventh-generation TPU, is generally available "
+         "with 192 GB per chip. The Fed raised rates for the first time since 2023. Older cards used Ada.")
+_dr18 = ("Google's Ironwood is the fifth-generation TPU. The RTX 5090 (Blackwell) leads. It costs $2.50/hr. "
+         "The Fed's move was the first hike since 2023.")
+_notes18 = "\n".join([
+    '- WRONG: "Ironwood is the fifth-generation TPU" -> the seventh-generation TPU [1]',
+    '- WRONG: "The RTX 5090 (Blackwell)" -> it is Ada architecture [1]',
+    '- UNSUPPORTED: "It costs $2.50/hr" — no source gives an hourly price',
+    '- UNSUPPORTED: "the first hike since 2023" — not confirmed',
+    '- MISSING: geographic variability (e.g., adjacent districts like Bela Vista)',
+    '- MISSING: a July 2026 guide lists $320–$420',
+    '- MISSING: how the person should rent the chips'])
+_k18, _d18 = _c18["critic_filter"](_notes18, [_ev18, _dr18], "2026")
+_cr18 = _c18["critic_corrections"](_k18, _ev18, [_dr18])
+check("the critic's lines that bring a name or a number from nowhere are dropped, and so is a false 'unsupported'",
+      "Bela Vista" not in _k18 and "$320" not in _k18 and "first hike since 2023" not in _k18
+      and "how the person should rent the chips" in _k18 and "fifth-generation" in _k18
+      and "Ada" in _k18 and len(_d18) == 3, "%r" % _d18)
+check("a correction the evidence states (in one sentence with the claim) is kept; a word merely in the pack is not",
+      [c["kind"] for c in _cr18] == ["wrong", "unsupported"]
+      and _cr18[0]["quote"] == "Ironwood is the fifth-generation TPU" and _cr18[0]["src"] == 1
+      and _cr18[1]["quote"] == "It costs $2.50/hr", "%r" % _cr18)
+_fp18 = _c18["final_prompt"]({"role": "system", "content": "SYS"}, "Q", ["d"], "n", corrections=_cr18)[1]["content"]
+_vp18 = _c18["verify_prompt"]("Q", ["d"], "A", known=_cr18)[1]["content"]
+check("the corrections ride the final prompt as a mandatory block, are checked after writing, and reach the checker",
+      "CORRECTIONS TO APPLY" in _fp18 and "seventh-generation TPU [1] instead" in _fp18
+      and _fp18.index("CORRECTIONS TO APPLY") < _fp18.index("Write the final answer now")
+      and "KNOWN ERRORS" in _vp18 and "$2.50/hr" in _vp18
+      and len(_c18["corrections_stuck"]("Google's **Ironwood is the fifth-generation TPU**.", _cr18)) == 1
+      and _c18["corrections_stuck"]("Ironwood is the seventh-generation TPU.", _cr18) == []
+      and "CORRECTIONS" not in _c18["final_prompt"]({}, "Q", ["d"], "")[1]["content"], "")
+check("a closing recap goes; a short answer or a closing paragraph that isn't one stays",
+      _c18["trim_recap"]("A" * 90 + ".\n\nB" + "b" * 90 + ".\n\nC.\n\n**Bottom line:** A again.")
+      == "A" * 90 + ".\n\nB" + "b" * 90 + ".\n\nC."
+      and _c18["trim_recap"]("A.\n\n**Bottom line:** A.") == "A.\n\n**Bottom line:** A."
+      and _c18["trim_recap"]("A.\n\nB.\n\nC carries news.") == "A.\n\nB.\n\nC carries news.", "")
+_rc18 = _MILLENAI_SRC[_MILLENAI_SRC.index("def run_council("):_MILLENAI_SRC.index("# ===================================== the answer craft (6b515")]
+check("the council checks the critic's notes, carries the corrections, trims the recap and counts what stuck",
+      "critic_filter(\n                notes, [question] + list(_texts)" in _rc18
+      and "critic_corrections(notes, question, _texts)" in _rc18
+      and "corrections=_corrs)" in _rc18 and "corrections_stuck(_final, _corr)" in _rc18
+      and "trim_recap(_final)" in _rc18 and '"Applied the review\\u2019s corrections"' in _rc18
+      and "critic_prompt(question, _texts, persona=_persona)" in _rc18, "")
+_gt18 = _g18["grounded_turn"]("eggs price", "WEB EVIDENCE gathered today, 1 source:\n[1] Eggs — bls.gov — 2026\n"
+                              "    https://bls.gov/x\n    A dozen eggs averaged $2.27 in September 2026, down from $3.49.",
+                              note="[NOTE18]")
+check("the grounded turn pulls the evidence's figures out for the writer and carries the conversation note last",
+      "KEY FIGURES IN THAT EVIDENCE" in _gt18 and "- [1] A dozen eggs averaged $2.27" in _gt18
+      and _gt18.index("KEY FIGURES") < _gt18.index("GROUNDING RULES") < _gt18.index("[NOTE18]")
+      < _gt18.index("PROMPT: eggs price") and "marked 'typically'" in _gt18, "")
+_ss18 = _MILLENAI_SRC[_MILLENAI_SRC.index("def server_stream("):_MILLENAI_SRC.index("def _srv_reads_pictures(")]
+check("the final writer's reasoning level goes only to gpt-oss, and a server that refuses it is asked without it",
+      'SRV_THINK_MODELS.match(str(model or ""))' in _ss18 and 'd["think"] = _think_box[0]' in _ss18
+      and "if _think_box[0] and resp.status == 400:" in _ss18
+      and _MILLENAI_SRC.count("server_think(final_think_level() if craft else None)") == 2, "")
+# ==== quality-2 (6b518): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

@@ -5667,6 +5667,93 @@ def strip_greeting(p: str) -> str:
     return p
 
 
+# SELF-CONTAINED REASONING (6b518, per Patrick). Round 1 searched pure
+# arithmetic: q27's merge cited flight-booking pages and flipped the verdict
+# ("package beats separate by $5", backwards), q28's added a bogus [7] to a
+# sensitivity line. A question whose figures are all the person's own and
+# whose every asking part is arithmetic, or a judgement on those figures,
+# needs no world fact. Rules only, no model: each part is a premise (a
+# statement carrying the person's numbers), an ask about them, context, or
+# a part that wants the world (a current, typical or local figure, a named
+# thing to look up). Mixed questions (q29: two ratings to weigh, then "how
+# should I price it in Florianópolis") still search, for the world part only.
+_SC_SPLIT_RX = re.compile(r"(?<=[.?!;])\s+")
+_SC_NUM_RX = re.compile(r"(?<![\w.])(?:R\$|[$€£])?\d[\d,]*(?:\.\d+)?%?")
+_SC_ASK_RX = re.compile(
+    r"\b(?:which (?:one |option |deal |of (?:the|them|these|those) (?:two |three )?)?"
+    r"(?:is|was|would be|works out|comes out) (?:cheaper|better|more|less|faster|"
+    r"the (?:better|best|cheaper) (?:deal|value|option))|"
+    r"which (?:\w+ )?should i (?:trust|pick|choose|take|believe|go with)|"
+    r"by how much|how much (?:cheaper|more|less|longer|faster|would|will|do|does|is it|"
+    r"do i save|would i save)|how many (?:years|months|weeks|days|hours|miles|trips|"
+    r"nights|payments)|how long (?:until|before|to)|break(?:s)?[- ]?even|"
+    r"pays? (?:for )?(?:itself|back|off)|payback|calculate|compute|work (?:it )?out|"
+    r"what(?:'s| is| are| would be) the (?:total|difference|monthly|yearly|annual|"
+    r"cost per|price per|break)|redo (?:it|the math|that|this)|recalculate|"
+    r"what if|is it worth (?:it|paying))\b", re.I)
+_SC_WORLD_RX = re.compile(
+    r"\b(?:right now|currently|current|today|latest|newest|these days|nowadays|"
+    r"this (?:year|month|week|winter|summer)|typical(?:ly)?|average|going rate|"
+    r"market rate|how should i (?:price|charge)|what should i (?:charge|ask)|"
+    r"where (?:can|should|do|is|are)|who |news|near me|rules?|law|legal|tax(?:es)? "
+    r"on|regulations?)\b", re.I)
+_SC_Q_START_RX = re.compile(
+    r"^\s*(?:and |so |then |also |but )?(?:who|what|whats|what's|when|where|which|"
+    r"why|how|is|are|does|do|did|can|could|should|would|will)\b", re.I)
+
+
+def _sc_entities(part: str) -> list:
+    """Names in one part, beyond its first word: a capitalised word that
+    is not a one-letter label ("Car B"), "I", or a unit."""
+    toks = re.findall(r"[^\W\d_][\w’'+-]*", part)
+    return [t for i, t in enumerate(toks) if i and t[:1].isupper()
+            and len(t) > 1 and t not in ("I", "I'm", "I’m", "I'd", "I've")]
+
+
+def reasoning_parts(question: str) -> list:
+    """[(part, kind)] of a question, kind one of "premise" (a statement
+    with the person's figures), "ask" (arithmetic or a judgement on them),
+    "context" (a statement without figures) and "world"."""
+    out = []
+    for part in _SC_SPLIT_RX.split(str(question or "")):
+        part = (part or "").strip(" ,;:")
+        asked = part.endswith("?")
+        part = part.rstrip("?!. ").strip()
+        if len(part) < 3:
+            continue
+        nums = len(_SC_NUM_RX.findall(part))
+        asky = bool(_SC_ASK_RX.search(part))
+        worldly = bool(_SC_WORLD_RX.search(part))
+        is_q = asked or bool(_SC_Q_START_RX.match(part)) or asky
+        if asky and not worldly and not _sc_entities(part):
+            kind = "ask"
+        elif not is_q and not worldly and nums:
+            kind = "premise"
+        elif not is_q and not worldly:
+            kind = "context"
+        else:
+            kind = "world"
+        out.append((part, kind))
+    return out
+
+
+def self_contained_reasoning(question: str) -> bool:
+    """True when every figure the answer needs is in the question (three
+    or more of them) and every asking part is arithmetic or a judgement on
+    them: no search, and the writer works from the premises (6b518)."""
+    parts = reasoning_parts(question)
+    if not parts or any(k == "world" for _p, k in parts):
+        return False
+    nums = sum(len(_SC_NUM_RX.findall(p)) for p, _k in parts)
+    return nums >= 3 and any(k == "ask" for _p, k in parts)
+
+
+SC_HINT = ("[This is arithmetic on the figures given above: they are the "
+           "person's own premises, not claims to check. Work from them "
+           "only, show the arithmetic in a line or two, state the result "
+           "first, and cite nothing.]")
+
+
 def needs_search(prompt: str) -> bool:
     """Heuristic: does answering this require information from after the
     model's training cutoff? Cheap and deliberately conservative."""
@@ -5675,6 +5762,8 @@ def needs_search(prompt: str) -> bool:
     p = strip_greeting(prompt)
     if len(p) < 8 or _NO_SEARCH.match(p):
         return False
+    if self_contained_reasoning(p):
+        return False         # the person's own numbers, nothing to look up (6b518)
     low = p.lower()
     if any(w in low for w in _FRESH_WORDS):
         return True
@@ -5692,7 +5781,11 @@ def needs_search(prompt: str) -> bool:
     if (_VENUE_RX.search(low) or _ZIP_RX.search(low)
             or _NEARBY_RX.search(low)):
         return True
-    return bool(_WORLDLY_RX.search(p) or p.rstrip().endswith("?"))
+    # a question mark anywhere asks (6b518: "Cheapest places to travel from
+    # NYC this winter for two weeks? Flights plus living costs, not just one
+    # or the other." ended on a full stop and never searched)
+    return bool(_WORLDLY_RX.search(p) or p.rstrip().endswith("?")
+                or re.search(r"\w\?(?:\s|$)", p))
 
 # words that mean "same subject, different day" — they carry no entity
 _REL_WORDS = frozenset("""
@@ -19538,13 +19631,17 @@ def run_search(query: str) -> str:
 # and finishes after them, so the page sees "Searching the web · 4 queries"
 # and "Reading 6 sources…" as steps instead of a silent wait; a question
 # asked again within ten minutes reuses its evidence.
-GROUND_QUERIES = 6          # searches per question, the model's included
-GROUND_RULE_QUERIES = 4     # of them, the rules' own (the model adds the rest)
+GROUND_QUERIES = 9          # searches per question, the hints' and the model's included
+GROUND_RULE_QUERIES = 4     # of them, the rules' own (the hints and the model add the rest)
+GROUND_HINT_QUERIES = 3     # primary-source queries by question type (6b518), one engine each
+GROUND_MODEL_QUERIES = 2    # the model's own angles
 GROUND_PER_QUERY = 8        # hits asked of the engine per query
 GROUND_SOURCES = 8          # sources in the evidence pack, and in the sources row
 GROUND_READ = 10            # pages fetched for their text (in parallel; spares replace farms)
 GROUND_PLAN_S = 5.0         # a model's plan arriving later than this isn't waited for
 GROUND_SEARCH_S = 8.0       # the search fan-out's budget
+GROUND_HINT_S = 11.0        # ... and the primary-source queries' (6b518: a site: query
+                            # took 10-13 s beside ten others, and 8 s kept none)
 GROUND_READ_S = 7.0         # the page reads' budget
 GROUND_TOTAL_S = 18.0       # the handler waits no longer: what is in hand is used
 GROUND_PACK_CHARS = 9000    # the pack: ~2.3K tokens, so a 32K context keeps room for drafts
@@ -19554,6 +19651,10 @@ GROUND_PAGE_BYTES = 600_000
 GROUND_CACHE_S = 600.0      # Try again / a regenerate reuses the evidence
 GROUND_PENDING = "(web evidence is being gathered)"
 _ground_cache = profile_cache("_ground_cache", {})   # question key -> (fetched_at, Grounding)
+# a turn's evidence by the person's own words (6b518): a follow-up carries it
+_ground_turns = profile_cache("_ground_turns", {})   # turn key -> (at, Grounding)
+GROUND_TURN_S = 3 * 3600.0
+GROUND_PRIOR_KEEP = 4       # a follow-up keeps the earlier turn's first sources, numbered as before
 _ground_lock = threading.Lock()
 
 # a sentence boundary or a joined second question: "…for AI? What is Claude
@@ -19591,6 +19692,8 @@ _GQ_FILLER = frozenset("""
     use used using uses get got gets make made makes know knows tell say said
     call called go going want wants need needs mean means meant think thinks
     look looks find give come let
+    i'm i’m im i've i’ve i'd i’d i'll i’ll own roughly realistically
+    probably maybe kinda
     really actually basically just also still even very much many more lot
     lots kind sort thing things stuff something anything everything nothing
     someone anyone everyone others other else exactly okay ok like
@@ -19600,7 +19703,15 @@ _GQ_FILLER = frozenset("""
 _GQ_STARTERS = frozenset(
     "what whats which who whom whose when where why how is are was were do does"
     " did can could should would will may might shall tell give explain compare"
-    " describe list name show".split())
+    " describe list name show keep pick make help please be any so then also"
+    " and but".split())
+# a part that only says how to answer ("Keep it short and technical",
+# "explain more"): nothing to search (6b518)
+_GQ_INSTRUCT = frozenset(
+    "keep short shorter brief briefly concise technical simple simply detail"
+    " detailed explain elaborate expand clarify more less plain english words"
+    " sentences sentence paragraph paragraphs bullet bullets list format quick"
+    " quickly deeper depth again further step steps".split())
 # a product name that is also a common word, or a search engine's favourite
 # product page: the engine wants the maker beside it (seen live: "Claude"
 # alone returned claude.ai's sign-in page and a "free Claude" farm)
@@ -19643,7 +19754,9 @@ def _ddg_more(query: str, limit: int = GROUND_PER_QUERY) -> list:
 
 
 def _gq_tokens(text: str) -> list:
-    return re.findall(r"[$\u20ac\u00a3]?[A-Za-z0-9][A-Za-z0-9.'\u2019+/-]*",
+    # letters of any script (6b518: "Florianópolis" was searched as
+    # "Florian polis", "Medellín" as "Medell")
+    return re.findall(r"[$\u20ac\u00a3]?[^\W_][\w.'\u2019+/-]*",
                       str(text or ""))
 
 
@@ -19654,6 +19767,8 @@ def _gq_entity(tok: str, first: bool) -> bool:
     t = tok.strip(".'\u2019")
     if not t or t[:1] in "$\u20ac\u00a3":
         return False
+    if t.lower().replace("\u2019", "'") in ("i", "i'm", "i've", "i'd", "i'll"):
+        return False         # the asker, never a name (6b518)
     if re.search(r"\d", t) and re.search(r"[A-Za-z]", t):
         return True
     if t.isupper() and 3 <= len(t) <= 6:
@@ -19782,23 +19897,45 @@ def _gq_stamp(question: str, today) -> str:
     return ""
 
 
-def plan_queries(question: str, today=None, planned=(), limit: int = GROUND_QUERIES) -> list:
+def plan_queries(question: str, today=None, planned=(), limit: int = GROUND_QUERIES,
+                 topic: str = "") -> list:
     """The web searches for a question, never the question itself: one per
     sub-question (a thin one borrows the richest one's topic), the model's
     lines next (`planned`), one compact query for the whole, then each side
     of a comparison; the year rides a question about now, the maker rides an
-    ambiguous product name. At most `limit`, no two alike."""
+    ambiguous product name. At most `limit`, no two alike. `topic` (6b518):
+    a follow-up's earlier question, whose words ride every part that names
+    nothing of its own ("what a furnished one-bedroom there runs" is about
+    Florianópolis); it is never searched alone."""
     today = today or time.localtime()
     q = strip_greeting(str(question or "")).strip()
     q = _PREAMBLE_RX.sub("", q, count=1).strip() or q
     q = re.sub(r"^\s*/search\s+", "", q)
     stamp = _gq_stamp(q, today)
+    # THE PARTS WORTH SEARCHING (6b518): a question with arithmetic in it
+    # searches neither its premises nor its sums ("Two Airbnbs: one is 4.6
+    # stars from 212 reviews" was a query), and a part that only says how
+    # to answer ("Keep it short and technical") is no query at all
+    try:
+        _rp = reasoning_parts(q)
+    except Exception:
+        _rp = []
+    _skip = set()
+    if any(k == "ask" for _p, k in _rp):
+        _skip = {re.sub(r"\W+", " ", p_).strip().lower() for p_, k in _rp
+                 if k == "ask" or (k == "premise" and len(_SC_NUM_RX.findall(p_)) >= 2)}
     subs = []
     for part in _GQ_SPLIT_RX.split(q):
         part = (part or "").strip(" ,")
         if not part:
             continue
+        _pk = re.sub(r"\W+", " ", part).strip().lower()
+        if _skip and any(_pk and (_pk in k_ or k_ in _pk) for k_ in _skip):
+            continue
         terms, ents = _gq_terms(part)
+        if terms and all(t.lower() in _GQ_INSTRUCT or t.lower() in _GQ_FILLER
+                         for t in terms):
+            continue
         if terms:
             subs.append((terms, ents))
     if not subs:
@@ -19808,6 +19945,18 @@ def plan_queries(question: str, today=None, planned=(), limit: int = GROUND_QUER
         return [q[:120]] if q else []
     lead = max(subs, key=lambda s: len(s[0]))
     out = []
+    if topic:
+        _tt, _te = _gq_terms(re.sub(r"\b20\d\d\b", " ", str(topic)))
+        _tt = [w for w in _tt if w.lower() not in _GQ_MODIFIERS][:5]
+        # the topic's names lead, its other words close (a query is cut at 9)
+        def _with_topic(t_):
+            low_ = [x.lower() for x in t_]
+            head = [w for w in _te if w.lower() not in low_]
+            core_ = [w for w in t_ if w.lower() not in ("pick", "one", "runs", "per")]
+            tail = [w for w in _tt if w not in _te and w.lower() not in low_]
+            return head + core_ + tail
+        subs = [(_with_topic(t_) if not e_ else t_, e_ or list(_te)) for t_, e_ in subs]
+        lead = max(subs, key=lambda s: len(s[0]))
 
     def add(terms):
         s = _gq_join(_gq_makers(list(terms)), stamp)
@@ -19815,7 +19964,9 @@ def plan_queries(question: str, today=None, planned=(), limit: int = GROUND_QUER
             out.append(s)
     for terms, ents in subs:
         t = list(terms)
-        if len(t) < 3 and terms is not lead[0]:
+        # a sub-question with no name of its own ("Door to door time,
+        # typical cost") is about the lead's names too (6b518)
+        if (len(t) < 3 or (not ents and lead[1])) and terms is not lead[0]:
             # "What is Claude using" names Claude and nothing else: the
             # topic is upstream, in the richest sub-question (its names
             # first, then its nouns, never its qualifiers)
@@ -19856,11 +20007,135 @@ def plan_queries(question: str, today=None, planned=(), limit: int = GROUND_QUER
     return out[:limit]
 
 
+# PRIMARY SOURCES BY QUESTION TYPE (6b518, per Patrick). Round 1's search
+# reached aggregators and listicles and almost never the source itself: no
+# BLS or FRED for egg prices (q06 answered with a 2022 figure though the
+# September 2026 average existed), no DigitalOcean pricing page, no vendor
+# launch post, no airline's own baggage page. Each rule below names the
+# primary source for one kind of question and a keyword query restricted to
+# it with the engines' own `site:` operator (measured from here: bing and
+# ddgs's "auto" both honour it, e.g. "FOMC statement September 2026
+# site:federalreserve.gov" returns the 16 September statement first). They
+# run on one engine each beside the rules' queries, and a source from the
+# hinted site ranks up (rank_sources' `primary`). No paid search API.
+_GH_ITEMS = (r"eggs?|milk|bread|gas(?:oline)?|beef|chicken|coffee|butter|"
+             r"electricity|bananas|groceries|rice|sugar|diesel")
+_GH_RULES = (
+    # (question regex, query templates with their host)
+    (r"\b(?:price|prices|cost|costs|costing|how much|cheaper|expensive)\b.{0,60}\b(?P<item>%s)\b|"
+     r"\b(?P<item2>%s)\b.{0,40}\b(?:price|prices|cost|costs)\b|\bdozen eggs\b" % (_GH_ITEMS, _GH_ITEMS),
+     (("average price {item} site:fred.stlouisfed.org", "fred.stlouisfed.org"),
+      ("average price {item} {month} site:bls.gov", "bls.gov"),
+      # the statistics sites often refuse a script's read; the news of the
+      # latest monthly release carries the figure (released a month behind)
+      ("{item} prices {last_month} CPI", ""))),
+    (r"\b(?:inflation|cpi|consumer price index)\b",
+     (("consumer price index {month} site:bls.gov", "bls.gov"),)),
+    (r"\b(?:fed(?:eral)? funds|fomc|federal reserve|the fed\b|fed (?:rate|meeting|decision))",
+     (("FOMC statement {year} site:federalreserve.gov", "federalreserve.gov"),
+      ("federal funds effective rate site:fred.stlouisfed.org", "fred.stlouisfed.org"))),
+    (r"\b(?:jobs?|careers?|occupations?|trades?)\b.{0,60}\b(?:pay|paying|salary|salaries|"
+     r"wages?|earn)\b|\b(?:pay|salary|salaries|wages?)\b.{0,40}\b(?:jobs?|careers?)\b|"
+     r"\b(?:take|replace|automate)s? my job\b|\bdisplacement\b",
+     (("{core} median pay outlook site:bls.gov/ooh", "bls.gov"),)),
+    (r"\b(?:visa|visas|residency|residence permit|entry requirements?|passport)\b",
+     (("{core} site:travel.state.gov", "travel.state.gov"),)),
+    (r"\b(?:estate tax|inheritance|inherit|heirs?|gift tax|capital gains|irs)\b",
+     (("{core} estate tax site:irs.gov", "irs.gov"),)),
+    (r"\b(?:dose|dosage|supplements?|vitamins?|magnesium|zinc|melatonin|creatine|"
+     r"interactions?|interacts?|side effects?|sertraline|ssri)\b",
+     (("{core} site:nih.gov", "nih.gov"), ("{core} site:my.clevelandclinic.org", "clevelandclinic.org"))),
+    (r"\b(?:sweat|odou?r|smell|bald|balding|hair loss|insomnia|sleep|chronotype|"
+     r"morning people|night owl|nicotine|smoking|vaping|quit(?:ting)?|calories|"
+     r"healthy|unhealthy|bad for you)\b",
+     (("{core} site:my.clevelandclinic.org", "clevelandclinic.org"), ("{core} site:nih.gov", "nih.gov"))),
+    (r"\b(?:liveab|livab|quality of life|best cities to live|cities to live)",
+     (("Global Liveability Index {year} EIU", "eiu.com"),)),
+    (r"\b(?:cost of living|living costs|rent(?:al)? prices?|stretch|rents?\b.{0,40}\bmonth|"
+     r"one-bedroom|1-bedroom|studio apartment|furnished)\b",
+     (("{places} cost of living site:numbeo.com", "numbeo.com"),)),
+    # where a company operates, what a thing is: background on Wikipedia
+    (r"\b(?:operates?|operating|available in|which countries|present in|expand(?:ed)? (?:to|into))\b",
+     (("{places} site:en.wikipedia.org", "wikipedia.org"),)),
+)
+# a vendor named in the question: its own site, where launches and prices live
+_GH_VENDORS = (
+    (r"\b(?:anthropic|claude)\b", "Anthropic Claude {topic}", "anthropic.com"),
+    (r"\b(?:openai|chatgpt|gpt-?\d)", "OpenAI {topic}", "openai.com"),
+    (r"\b(?:nvidia|gpus?|blackwell)\b", "NVIDIA data center GPU {year}", "nvidianews.nvidia.com"),
+    (r"\btpus?\b", "Google Cloud TPU {year}", "cloud.google.com"),
+    (r"\bgemini\b", "Gemini model {year}", "blog.google"),
+    (r"\biphone\b", "iPhone {year}", "apple.com/newsroom"),
+    (r"\bdigitalocean\b", "DigitalOcean {topic} pricing", "digitalocean.com"),
+    (r"\bamd\b|\binstinct\b", "AMD Instinct {year}", "amd.com"),
+    (r"\bollama\b", "Ollama {topic}", "ollama.com"),
+    (r"\blatam\b", "LATAM carry-on baggage allowance", "latamairlines.com"),
+    (r"\bgol\b", "GOL carry-on baggage", "voegol.com.br"),
+    (r"\bazul\b", "Azul carry-on baggage", "voeazul.com.br"),
+    (r"\bamtrak\b|\bacela\b", "Amtrak {topic}", "amtrak.com"),
+)
+
+
+def ground_hints(question: str, today=None, lead: str = "") -> list:
+    """[(query, host)]: at most GROUND_HINT_QUERIES searches restricted to
+    the primary source for this kind of question (6b518) — the statistics
+    agency for a price, the Fed for its rate, the vendor for its own
+    product, the airline for its bags, Wikipedia for background when
+    nothing else fits. `lead` is the rules' first query (its words are the
+    topic)."""
+    today = today or time.localtime()
+    q = str(question or "")
+    year = time.strftime("%Y", today)
+    month = strftime_np("%B %Y", today)
+    _lm = time.localtime(time.mktime((today.tm_year, today.tm_mon, 1, 12, 0, 0, 0, 0, -1)) - 86400)
+    last_month = strftime_np("%B %Y", _lm)
+    lead_terms = [w for w in str(lead or "").split() if not re.fullmatch(r"20\d\d", w)]
+    core = " ".join(lead_terms[:4])         # an engine finds little for a long site: query
+    ents = []
+    for part in _GQ_SPLIT_RX.split(q):
+        # names past each part's first word (a capitalised opener is grammar)
+        for e in _sc_entities(part or ""):
+            if e.lower() not in [x.lower() for x in ents] and e not in (
+                    "American", "Americans", "US", "USA", "U.S."):
+                ents.append(e)
+    places = " ".join(ents[:3])
+    out = []
+
+    def add(tpl, host, **kw):
+        topic = kw.pop("topic", "")
+        qs = tpl.format(core=core, year=year, month=month, places=places,
+                        topic=topic, last_month=last_month, **kw)
+        qs = re.sub(r"\s+", " ", qs).strip()
+        if len(qs.split()) >= 2 and qs.lower() not in [x[0].lower() for x in out]:
+            out.append((qs, host))
+    for rx, tpls in _GH_RULES:
+        m = re.search(rx, q, re.I)
+        if not m:
+            continue
+        item = (m.groupdict().get("item") or m.groupdict().get("item2") or "eggs").lower()
+        if "{places}" in tpls[0][0] and not places:
+            continue
+        if "{core}" in tpls[0][0] and not core:
+            continue
+        for tpl, host in tpls:
+            add(tpl, host, item=item)
+    for rx, tpl, host in _GH_VENDORS:
+        if re.search(rx, q, re.I):
+            vend = {w.lower() for w in re.findall(r"[a-z]+", tpl.lower())}
+            topic = " ".join(w for w in lead_terms if w.lower() not in vend)
+            topic = " ".join(topic.split()[:3])
+            add(tpl + " site:" + host, host.split("/")[0], topic=topic)
+    return out[:GROUND_HINT_QUERIES]
+
+
 GROUND_PLAN = (
     "Today is {today}. Write the web search queries that would find the facts "
-    "needed to answer the question below: one short keyword query per part of "
-    "the question, at most 3, one per line, no numbering, no quotes, no "
-    "commentary.\n"
+    "needed to answer the question below, aimed at the PRIMARY source where "
+    "there is one: the maker's own site for its products and prices, the "
+    "government agency that publishes a statistic, the official page for a "
+    "visa, a law or an airline's rules. At most 2 short keyword queries, one "
+    "per line, no numbering, no quotes, no commentary; end a query with "
+    "site:<domain> only when you are sure of the official domain.\n"
     "Rules: copy every product name, version, model number, place and date "
     "EXACTLY as written (an unfamiliar name is newer than you, not a typo); a "
     "product name that is also a common word gets its maker (\"Anthropic "
@@ -19884,6 +20159,26 @@ def plan_lines(text: str) -> list:
             out.append(ln)
     return out[:3]
 
+
+
+def ground_plan_seat(council) -> str:
+    """The council's own server seat that writes the query plan (6b518):
+    the first one that isn't a reasoning model, a coder or a picture
+    reader (srv_role_ok's "fast"), preferring the second seat — in
+    Thinking that is the critic, whose model the last fact-check left on
+    the card. '' when the council has no such seat."""
+    seats = [l for l in (council or ()) if server_label(l)]
+    order = seats[1:2] + seats[:1] + seats[2:]
+    for l in order:
+        name = l.split(SERVER_SEP, 1)[1] if SERVER_SEP in l else l
+        if re.match(r"(?i)(?:gpt-oss|deepseek-r1|qwq|magistral)\b", name):
+            continue          # reasons first: 160 tokens of thinking, no query
+        try:
+            if srv_role_ok(name, "fast"):
+                return l
+        except Exception:
+            continue
+    return ""
 
 # ----- the sources: what is dropped, what ranks, when a page was written
 _SRC_LOGIN_RX = re.compile(
@@ -20091,7 +20386,8 @@ def _src_foreign(text: str) -> bool:
 
 
 def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
-                 today=None, limit: int = GROUND_SOURCES, per_query: int = 2) -> list:
+                 today=None, limit: int = GROUND_SOURCES, per_query: int = 2,
+                 primary=()) -> list:
     """Engine hits -> the sources worth reading, best first: junk dropped
     (_src_junk), a page in another script, a bare homepage, near-
     duplicates and third pages of a host dropped, then scored by the
@@ -20101,7 +20397,9 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
     for a question about now, the page's date. Each query that found hits
     seats its best `per_query` first (a row's "_q"), so the sub-question
     with the rarer words isn't crowded out by the one with the common
-    ones; the rest fill by score."""
+    ones; the rest fill by score. `primary`: the hosts the question's
+    type names as its primary sources (ground_hints, 6b518): a page there
+    that speaks to the question ranks up."""
     today = today or time.localtime()
     ents = [e for e in entities if len(e) >= 3]
     el = [e.lower() for e in ents]
@@ -20130,6 +20428,8 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         own = [e for e in el if e.replace(" ", "") in host.replace("-", "")]
         topical = _term_hits([t for t in terms if t.lower() not in own], title + " " + body)
         in_host = 3 if own and topical else 0
+        if topical >= 2 and any(host == h or host.endswith("." + h) for h in primary or ()):
+            in_host = max(in_host, 3)          # the primary source itself, on the question (6b518)
         qual = _src_quality(host, path)
         date = _src_date({"url": url, "body": body, "title": title})
         if date and date[:7] > time.strftime("%Y-%m", today):
@@ -20366,6 +20666,13 @@ GROUND_RULES = (
     "one plain clause (what you'd check, and where). Stable background, "
     "how a thing works, long-standing facts, may come from your own "
     "knowledge, uncited; a current fact never does.\n"
+    "- Use the figures the evidence gives: a number it states beats "
+    "'no source gives a price'. A slow-moving figure the question needs "
+    "and the evidence lacks (a typical fare, rent, dose, size limit or pay "
+    "range) may come from your own knowledge as a rough range, marked "
+    "'typically' and dated to when you last knew it ('typically $60\u2013120 "
+    "one way, as of 2025'), never cited and never as today's quote. What is "
+    "newest, who leads, or today's price or rate never comes from memory.\n"
     "- Any result that does not help answer is noise: never mention, "
     "summarize or apologize for an off-topic result; the reader must never "
     "learn what the search happened to return.\n"
@@ -20391,18 +20698,66 @@ GROUND_SYSTEM = (
     "Your training data is out of date.")
 
 
-def grounded_turn(query: str, pack: str, today=None) -> str:
-    """The user turn a grounded question becomes: the evidence first,
-    the rules after it (an instruction buried before 9 KB of pages is
-    forgotten, 6b242), the question last."""
+_FIG_STOP = frozenset(
+    "the and for with that this from what which when where how are was were"
+    " is it its you your they their has have had will would can could about"
+    " into than then there here more most much many any some".split())
+
+
+def evidence_figures(pack: str, query: str, limit: int = 10, each: int = 220) -> list:
+    """The evidence's concrete figures for the writer (6b518: depth fell in
+    round 1 because the writer said "no source gives a price" when a page
+    held one): the pack's sentences that carry a number (not just a year)
+    and one of the question's words, each with its source number, at most
+    `limit`, in source order. Self-contained (re only)."""
+    words = {w for w in re.findall(r"[^\W\d_]{3,}", str(query or "").lower())
+             if w not in _FIG_STOP}
+    out, n, seen = [], 0, set()
+    for ln in str(pack or "").split("\n"):
+        m = re.match(r"\[(\d+)\] ", ln)
+        if m:
+            n = int(m.group(1))
+            continue
+        if not n or not ln.startswith("    ") or ln.strip().startswith("http"):
+            continue
+        for sent in re.split(r"(?<=[.!?])\s+", ln.strip()):
+            sent = sent.strip()
+            nums = re.findall(r"\d[\d,.]*", sent)
+            if not nums or all(re.fullmatch(r"(?:19|20)\d\d", x.rstrip(".,")) for x in nums):
+                continue
+            low = sent.lower()
+            if not any(w in low for w in words) or len(sent) < 25:
+                continue
+            key = re.sub(r"\W+", "", low)[:80]
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append("[%d] %s" % (n, sent[:each].rstrip() + ("\u2026" if len(sent) > each else "")))
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def grounded_turn(query: str, pack: str, today=None, note: str = "") -> str:
+    """The user turn a grounded question becomes: the evidence first, its
+    concrete figures pulled out (6b518), the rules after them (an
+    instruction buried before 9 KB of pages is forgotten, 6b242), any note
+    about the conversation (another assistant's unseen reply, 6b518), the
+    question last."""
     today = today or time.localtime()
     day = strftime_np("%A, %B %-d, %Y", today)
+    tail = ("%s\n\n" % note) if note else ""
     if not pack:
-        return GROUND_NONE.format(query=query, today=day) + "PROMPT: %s" % query
+        return (GROUND_NONE.format(query=query, today=day) + tail
+                + "PROMPT: %s" % query)
+    figs = evidence_figures(pack, query)
+    fig_block = ("\n\nKEY FIGURES IN THAT EVIDENCE (use the ones that answer "
+                 "the question, each with its source number):\n"
+                 + "\n".join("- " + f for f in figs)) if figs else ""
     return ("What you just found on the web about '%s' \u2014 the reader can "
             "NEVER see this block, so restate anything you use, and cite it:\n"
-            "%s\n\n%sPROMPT: %s"
-            % (query, pack, GROUND_RULES.format(today=day), query))
+            "%s%s\n\n%s%sPROMPT: %s"
+            % (query, pack, fig_block, GROUND_RULES.format(today=day), tail, query))
 
 
 def ground_clip(block: str, cap: int) -> str:
@@ -20435,12 +20790,18 @@ class Grounding:
     the snippets-only pack is built as soon as the search lands."""
 
     def __init__(self, question: str, planner=None, want_photos: bool = False,
-                 today=None):
+                 today=None, prior=None, search: bool = True, turn_key: str = ""):
         self.question = str(question or "")
         self.planner = planner
         self.want_photos = want_photos
         self.today = today or time.localtime()
         self.queries, self.model_queries, self.terms = [], [], []
+        self.hint_queries, self.primary = [], []
+        self.prior = prior         # a follow-up's earlier grounded turn (6b518)
+        self.search = bool(search) or prior is None   # False: that evidence alone
+        self.turn_key = turn_key
+        # a follow-up's earlier question: its words ride this one's parts
+        self.topic = (prior.queries[0] if prior is not None and prior.queries else "")
         self.hits, self.sources, self.pack, self.photos = 0, [], "", []
         self.n_read, self.n_passages, self.dropped = 0, 0, 0
         self.phase, self.timed_out, self.error, self.t = "plan", False, "", {}
@@ -20461,6 +20822,16 @@ class Grounding:
             self.n_read = sum(1 for s in sources if s.get("paras"))
 
     def start(self):
+        if not self.search:
+            # A FOLLOW-UP WITH NOTHING NEW TO LOOK UP (6b518: "explain more"):
+            # the earlier turn's evidence, numbered as before, no search
+            self._adopt(self.prior)
+            self.cached = False
+            self.reused = True
+            self.phase = "done"
+            self._remember()
+            self.done.set()
+            return self
         key = _ground_key(self.question)
         with _ground_lock:
             hit = _ground_cache.get(key)
@@ -20468,14 +20839,25 @@ class Grounding:
                 hit[1].photos or not self.want_photos):
             self._adopt(hit[1])
             self.phase = "done"
+            self._remember()
             self.done.set()
             return self
         ctx_thread(target=self._run, daemon=True).start()
         return self
 
+    def _remember(self):
+        """Keep this turn's evidence for its follow-ups (6b518)."""
+        if not self.turn_key or not self.sources:
+            return
+        with _ground_lock:
+            if len(_ground_turns) > 48:
+                _ground_turns.clear()
+            _ground_turns[self.turn_key] = (time.time(), self)
+
     def _adopt(self, other):
         for k in ("queries", "model_queries", "terms", "hits", "sources",
-                  "pack", "photos", "n_read", "n_passages", "dropped", "t"):
+                  "pack", "photos", "n_read", "n_passages", "dropped", "t",
+                  "hint_queries", "primary"):
             setattr(self, k, copy.deepcopy(getattr(other, k)))
         self.cached = True
 
@@ -20509,8 +20891,17 @@ class Grounding:
         try:
             q = self.question
             nowish = bool(_gq_stamp(q, self.today))
-            rules = plan_queries(q, self.today, limit=GROUND_RULE_QUERIES)
+            rules = plan_queries(q, self.today, limit=GROUND_RULE_QUERIES,
+                                 topic=self.topic)
             self.queries = list(rules)
+            # the primary sources for this kind of question (6b518)
+            try:
+                hints = ground_hints((self.topic + ". " + q) if self.topic else q,
+                                     self.today, rules[0] if rules else "")
+            except Exception:
+                hints = []
+            self.hint_queries = [h for h, _host in hints]
+            self.primary = [host for _h, host in hints if host]
             ents = []
             for part in _GQ_SPLIT_RX.split(q):
                 for e in _gq_terms(part or "")[1]:
@@ -20534,12 +20925,21 @@ class Grounding:
                         r["_q"] = s        # which query found it (rank_sources seats each)
                 return got
 
-            def _submit(s):
+            def _submit(s, both=True):
                 futs[ex.submit(_timed, s)] = s
-                futs[ex.submit(_timed, s, True)] = s
+                if both:
+                    futs[ex.submit(_timed, s, True)] = s
             futs = {}
-            for s in rules:
-                _submit(s)
+            # a site: query asks one engine (the two return the same pages),
+            # and goes out first: it is the slowest to come back
+            for s in self.hint_queries:
+                if not any(_gq_same(s, x) for x in self.queries):
+                    _submit(s, both=False)
+            for i, s in enumerate(rules):
+                # the compact whole-question query repeats the parts: one engine
+                _submit(s, both=i < 3)
+            self.queries += [s for s in self.hint_queries
+                             if not any(_gq_same(s, x) for x in rules)]
             plan_box = []
             if self.planner is not None:
                 prompt = GROUND_PLAN.format(
@@ -20552,7 +20952,8 @@ class Grounding:
                 extra = plan_lines(plan_box[0] if plan_box else "")
                 extra = [e for e in extra
                          if not any(_gq_same(e, x) for x in self.queries)]
-                extra = extra[:max(0, GROUND_QUERIES - len(self.queries))]
+                extra = extra[:max(0, min(GROUND_MODEL_QUERIES,
+                                          GROUND_QUERIES - len(self.queries)))]
                 for s in extra:
                     _submit(s)
                 self.model_queries = extra
@@ -20560,7 +20961,7 @@ class Grounding:
             self.t["plan"] = round(time.time() - t0, 2)
             terms = []
             for s in self.queries:
-                for w in _gq_tokens(s):
+                for w in _gq_tokens(re.sub(r"\bsite:\S+", " ", s)):
                     wl = w.strip(".'\u2019").lower()
                     if (wl and wl not in [x.lower() for x in terms]
                             and not re.fullmatch(r"20\d\d", wl)
@@ -20572,9 +20973,9 @@ class Grounding:
             # the fan-out's deadline: the budget from the start, or six
             # seconds after the model's queries went out, whichever is
             # later (a plan that took 5 s must not leave its queries 3 s)
-            search_end = t0 + GROUND_SEARCH_S
+            search_end = t0 + (GROUND_HINT_S if self.hint_queries else GROUND_SEARCH_S)
             if self.model_queries:
-                search_end = max(search_end, time.time() + 6.0)
+                search_end = max(search_end, time.time() + 5.0)
             try:
                 for f in _cf.as_completed(
                         futs, timeout=max(1.0, search_end - time.time())):
@@ -20590,7 +20991,7 @@ class Grounding:
             # a few spare candidates: a page that turns out to be a farm
             # or empty when read gives its place to the next one
             cands = rank_sources(rows, terms, ents, nowish, self.today,
-                                 limit=GROUND_SOURCES + 4)
+                                 limit=GROUND_SOURCES + 4, primary=self.primary)
             self.dropped = len(rows) - len(cands)
             self._publish(cands[:GROUND_SOURCES], terms)
             self._set_phase("read")
@@ -20635,7 +21036,12 @@ class Grounding:
                     s["score"] += 2 if _para_hits(s["paras"], terms) else -1
             final = sorted((s for s in cands if not s.get("junk")),
                            key=lambda s: (0 if s.get("seat") else 1, -s["score"]))[:GROUND_SOURCES]
+            if self.prior is not None:
+                final = merge_prior(self.prior.sources, final)
+                terms = list(dict.fromkeys(list(self.prior.terms or []) + terms))
+                self.terms = terms
             self._publish(final, terms)
+            self._remember()
             self.t["total"] = round(time.time() - t0, 2)
             if DEV_HOME:
                 # a dev copy's log tells what was searched and read (the
@@ -20646,7 +21052,10 @@ class Grounding:
                           self.hits, len(final), self.n_read, self.n_passages,
                           len(self.pack),
                           " ".join("%s=%s" % (k, v) for k, v in self.t.items()
-                                   if k != "queries")),
+                                   if k != "queries")
+                          + " | per-query " + "; ".join(
+                              "%s: %s hits %ss" % (k[:40], v[0], v[1])
+                              for k, v in (self.t.get("queries") or {}).items())),
                       file=sys.stderr, flush=True)
             if final:
                 with _ground_lock:
@@ -20661,10 +21070,103 @@ class Grounding:
             self._tick.set()
 
 
-def ground_start(question: str, planner=None, want_photos: bool = False):
+def merge_prior(prior: list, new: list, keep: int = GROUND_PRIOR_KEEP,
+                limit: int = GROUND_SOURCES) -> list:
+    """A follow-up's sources (6b518): the earlier turn's first `keep`,
+    still numbered 1..keep as the earlier answer cited them, then this
+    turn's new ones, then the rest of the earlier ones, to `limit`; a page
+    already in the list is not repeated."""
+    out, seen = [], set()
+
+    def put(s):
+        k = _src_key(str(s.get("url") or ""))
+        if k in seen or len(out) >= limit:
+            return
+        seen.add(k)
+        out.append(s)
+    for s in (prior or [])[:keep]:
+        put(copy.deepcopy(s))
+    for s in new or []:
+        put(s)
+    for s in (prior or [])[keep:]:
+        put(copy.deepcopy(s))
+    return out
+
+
+def ground_prior(messages):
+    """The grounded evidence of the person's previous turn, or None: the
+    user message before the last answer, as they wrote it (6b518)."""
+    msgs = [m for m in (messages or []) if isinstance(m, dict)]
+    if len(msgs) < 3 or msgs[-1].get("role") != "user":
+        return None
+    prev = next((m for m in reversed(msgs[:-1]) if m.get("role") == "user"), None)
+    if prev is None:
+        return None
+    key = _ground_key(prev.get("content") or "")
+    with _ground_lock:
+        hit = _ground_turns.get(key)
+    if hit and time.time() - hit[0] < GROUND_TURN_S and hit[1].sources:
+        return hit[1]
+    return None
+
+
+# A FOLLOW-UP'S NEW QUESTION (6b518): what it asks beyond the earlier turn.
+# "I feel like Claude's response beat you. explain more" asks nothing new
+# (the earlier evidence is enough); "Pick one and tell me what a furnished
+# one-bedroom there runs per month, in reais and dollars" does.
+_OTHER_AI_NAMES = (r"claude|chatgpt|chat gpt|gpt-?\d[\w.]*|gemini|copilot|grok|"
+                   r"perplexity|deepseek|mistral|le chat|meta ai|llama")
+_OTHER_AI_RX = re.compile(
+    r"\b(?P<who>%s)(?:['\u2019]s)?\s+(?:own\s+)?(?:response|answer|reply|output|"
+    r"version|take|one|result)s?\b|\b(?P<who2>%s)\s+(?:said|says|told|wrote|"
+    r"answered|gave|got|beat|did|nailed|was right|is right|explained)\b|"
+    r"\b(?:another|the other|a different) (?:ai|assistant|model|chatbot|bot)\b"
+    % (_OTHER_AI_NAMES, _OTHER_AI_NAMES), re.I)
+_FU_META = frozenset(
+    "feel felt like beat beats better worse wrong right response answer reply"
+    " explain elaborate expand more deeper detail details why again please"
+    " think thought seems seemed sure really you your yours".split())
+
+
+def other_ai_note(text: str) -> str:
+    """A line for the model when the person mentions another assistant's
+    reply without pasting it (6b518; the owner pastes Claude's answers when
+    he wants them compared): it can't see that reply, so it says so and
+    never describes it. '' when no such mention, or when it is pasted."""
+    t = str(text or "")
+    m = _OTHER_AI_RX.search(t)
+    if not m:
+        return ""
+    if len(t) > 700 or t.count("\n") >= 4 or re.search(r'["\u201c][^"\u201d]{120,}', t):
+        return ""             # pasted: it's right there in the message
+    who = (m.group("who") or m.group("who2") or "another assistant").strip()
+    who = who[:1].upper() + who[1:] if who.islower() else who
+    return ("[The person mentions %s's reply, which is NOT in this "
+            "conversation: you cannot see it. Say so in one short clause, "
+            "never guess or describe what it said, and don't claim it was "
+            "right or wrong. Then do what they ask: a fuller, better-grounded "
+            "answer than your previous one, saying plainly where your "
+            "previous answer was wrong or thin.]" % who)
+
+
+def followup_new_terms(text: str) -> list:
+    """The content words a follow-up adds, beyond the meta talk ("explain
+    more", "Claude's response beat you"): [] when it asks nothing new."""
+    t = _OTHER_AI_RX.sub(" ", str(text or ""))
+    terms, _e = _gq_terms(t)
+    return [w for w in terms if w.lower() not in _FU_META
+            and w.lower() not in _GQ_INSTRUCT and w.lower() not in _GQ_FILLER
+            and not re.fullmatch(_OTHER_AI_NAMES, w.lower())]
+
+
+def ground_start(question: str, planner=None, want_photos: bool = False,
+                 prior=None, search: bool = True, turn_key: str = ""):
     """Begin a question's grounded search (never raises; a failure leaves
-    an empty pack and the turn says the search found nothing)."""
-    g = Grounding(question, planner=planner, want_photos=want_photos)
+    an empty pack and the turn says the search found nothing). prior: a
+    follow-up's earlier grounded turn, carried forward (6b518); search
+    False: that turn's evidence alone."""
+    g = Grounding(question, planner=planner, want_photos=want_photos,
+                  prior=prior, search=search, turn_key=turn_key)
     try:
         return g.start()
     except Exception as exc:
@@ -21389,6 +21891,55 @@ _srv_first = threading.local()
 SRV_DOWN_S = 60                 # a server that just failed a mode is skipped this long
 
 
+_srv_think = threading.local()
+# THE FINAL WRITER THINKS HARDER (6b518, per Patrick): gpt-oss takes a
+# reasoning level ("low", "medium", "high") through Ollama's `think`, which
+# the gateway passes through (ollama1 PROTOCOL.md: chat's known fields).
+# Only gpt-oss is asked, by its tag (Ollama rejects `think` on a model that
+# doesn't reason); a server that refuses the field is asked again without
+# it, and that model isn't asked again this run.
+SRV_THINK_MODELS = re.compile(r"^gpt-oss(?::|$)", re.I)
+SRV_THINK_EXTRA = 4096         # room for the longer reasoning in the context
+_srv_think_refused = set()
+# THE CONTEXT A MODEL IS LOADED WITH (6b518): Ollama reloads a model whose
+# num_ctx changes, so a short side pass (the query plan) on the model the
+# last fact-check left on the card reloaded it (7.5 s, past the plan's 5 s)
+# because the check had asked for 12-16K. A pass inside server_ctx_sticky()
+# asks for the context that model was last loaded with, when it holds the
+# prompt, so the weights already on the card answer.
+_srv_ctx_seen = {}             # (server id, model) -> the num_ctx last sent (0: the gateway's own)
+_srv_sticky = threading.local()
+
+
+class server_ctx_sticky:
+    """with server_ctx_sticky(): server calls on this thread reuse the
+    context their model was last loaded with, when it is enough."""
+
+    def __enter__(self):
+        self.prev = getattr(_srv_sticky, "on", False)
+        _srv_sticky.on = True
+        return self
+
+    def __exit__(self, *a):
+        _srv_sticky.on = self.prev
+
+
+class server_think:
+    """with server_think("high"): server calls on this thread ask a model
+    that takes a reasoning level for that one."""
+
+    def __init__(self, level):
+        self.level = level
+
+    def __enter__(self):
+        self.prev = getattr(_srv_think, "level", None)
+        _srv_think.level = self.level
+        return self
+
+    def __exit__(self, *a):
+        _srv_think.level = self.prev
+
+
 class server_first_deadline:
     """with server_first_deadline(30): calls to a server on this thread give
     up on a first word after 30 seconds (None: the long wait)."""
@@ -22044,14 +22595,30 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
     import http.client as _hc
     import socket as _socket
     _ctx = srv_ctx_for(messages, max_tokens)
+    _think = getattr(_srv_think, "level", None)
+    if not (_think and SRV_THINK_MODELS.match(str(model or ""))
+            and (e.get("id"), model) not in _srv_think_refused):
+        _think = None
+    if _think:
+        # the longer reasoning counts against the context (6b518)
+        _ctx = max(_ctx, min(SRV_CTX_MAX, -(-(srv_ctx_for(messages, max_tokens) or SRV_CTX_DEFAULT)
+                                          // 4096) * 4096 + SRV_THINK_EXTRA))
+    _think_box = [_think]
+    if getattr(_srv_sticky, "on", False):
+        _was = _srv_ctx_seen.get((e.get("id"), model))
+        if _was is not None and (_was or SRV_CTX_DEFAULT) >= (_ctx or SRV_CTX_DEFAULT):
+            _ctx = _was
+    _srv_ctx_seen[(e.get("id"), model)] = _ctx
 
     def _body(ctx):
-        return json.dumps({"model": model, "messages": _srv_messages(messages),
-                           "stream": True,
-                           "options": dict({"temperature": 0.75},
-                                           **({"num_predict": int(max_tokens)} if max_tokens else {}),
-                                           **({"num_ctx": int(ctx)} if ctx else {}))},
-                          separators=(",", ":")).encode("utf-8")
+        d = {"model": model, "messages": _srv_messages(messages),
+             "stream": True,
+             "options": dict({"temperature": 0.75},
+                             **({"num_predict": int(max_tokens)} if max_tokens else {}),
+                             **({"num_ctx": int(ctx)} if ctx else {}))}
+        if _think_box[0]:
+            d["think"] = _think_box[0]
+        return json.dumps(d, separators=(",", ":")).encode("utf-8")
     body = _body(_ctx)
     t0, sent, last, got_any = time.time(), [0], {}, [False]
     # an explicit pick and "<name> Only" wait as long as a model load takes
@@ -22061,7 +22628,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
     _first = getattr(_srv_first, "s", None) or SRV_FIRST_S
     try:
         skew = _srv_skew(e)
-        for attempt in (0, 1, 2):
+        for attempt in (0, 1, 2, 3):
             conn, resp = _srv_send(e, "POST", "/api/chat", body, True,
                                    SRV_CONNECT_S, skew, wait=_first)
             if resp.status == 200:
@@ -22081,7 +22648,15 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
                 # the card can't hold the longer context (6b516): the
                 # gateway's own, and the model is NOT noted as too big
                 _ctx = 0
+                _srv_ctx_seen[(e.get("id"), model)] = 0
                 body = _body(0)
+                continue
+            if _think_box[0] and resp.status == 400:
+                # the server didn't take the reasoning level (6b518): asked
+                # again without it, and not asked again this run
+                _srv_think_refused.add((e.get("id"), model))
+                _think_box[0] = None
+                body = _body(_ctx)
                 continue
             raise _srv_fail(e, resp.status, js, model)
         try:
@@ -28795,9 +29370,25 @@ def run_council(labels: list, messages: list, emit, status,
                 raise
             except Exception:
                 pass
+        _final = "".join(_shown).strip()
+        # THE CORRECTIONS, CHECKED (6b518): the quoted wrong words still in
+        # the answer are what the writer didn't take; the fact-check gets
+        # them as known errors, and the card says how many stuck
+        _corr = report.get("corrections") or []
+        report["stuck"] = corrections_stuck(_final, _corr) if _corr else []
+        report["stuck_after_writer"] = len(report["stuck"])
+        _trim = trim_recap(_final) if report.get("craft") else _final
         try:
-            verify_pass("".join(_shown).strip(), report, messages, _emit0,
-                        status, _step_frame, _cloud_open)
+            report["verify"] = verify_pass(
+                _trim, report, messages, _emit0, status, _step_frame,
+                _cloud_open, changed=_trim != _final)
+            if _corr:
+                left = report.get("stuck_after_check", report["stuck_after_writer"])
+                _by_check = report["stuck_after_writer"] - left
+                _step_frame("fix", "Applied the review\u2019s corrections", "done",
+                            "%d of %d%s" % (len(_corr) - left, len(_corr),
+                                            " \u00b7 %d by the check" % _by_check
+                                            if _by_check else ""))
         except (StaleProfile, BrokenPipeError, ConnectionResetError):
             raise
         except Exception:
@@ -28976,25 +29567,47 @@ def run_council(labels: list, messages: list, emit, status,
         _critic = critic_lbl or merger
         status(f"{_critic} is reviewing the draft")
         _step_frame("review", "Reviewing the draft", "run", _critic)
+        _persona = ""
+        try:
+            _pm = re.search(r'standing instructions for how you should respond, in '
+                            r'their own words:\n"(.*?)"\n',
+                            str((messages[0] or {}).get("content") or ""), re.S)
+            _persona = _pm.group(1).strip() if _pm else ""
+        except Exception:
+            _persona = ""
         try:
             parts = []
             _capped(_critic, lambda: run_model(
-                _critic, critic_prompt(question, _texts), parts.append))
+                _critic, critic_prompt(question, _texts, persona=_persona), parts.append))
             notes = critic_notes(strip_think("".join(parts)))
             if server_label(_critic):
                 _srv_used.append(_critic)      # resident on the card now
         except Exception:
             notes = ""
+        # THE NOTES, CHECKED AGAINST WHAT THE APP HAS (6b518): a line that
+        # brings a number or a name from nowhere goes; a WRONG the evidence
+        # backs becomes a correction the final answer must carry
+        try:
+            report["critic_raw"] = notes
+            notes, report["critic_dropped"] = critic_filter(
+                notes, [question] + list(_texts), time.strftime("%Y"))
+            report["corrections"] = critic_corrections(notes, question, _texts)
+        except Exception:
+            report["corrections"] = []
         if notes:
             try:
                 emit(Ctl(NUL + "DRAFT:" + json.dumps(
                     {"m": _critic + " (review)", "t": notes[:1200]}) + NUL))
             except Exception:
                 pass
+        _nd = len(report.get("critic_dropped") or [])
+        _nc = len(report.get("corrections") or [])
         _step_frame("review", "Reviewed the draft", "done",
-                    ("%d note%s" % (notes.count("\n") + 1,
-                                    "" if notes.count("\n") == 0 else "s"))
-                    if notes else "no problems found")
+                    (("%d note%s" % (notes.count("\n") + 1,
+                                     "" if notes.count("\n") == 0 else "s"))
+                     if notes else "no problems found")
+                    + (" \u00b7 %d correction%s" % (_nc, "" if _nc == 1 else "s") if _nc else "")
+                    + (" \u00b7 %d dropped" % _nd if _nd else ""))
         report["notes"] = notes
     elif reflect and len(good) > 1 and not _hurried():
         status(f"{merger} is double-checking the drafts")
@@ -29013,8 +29626,11 @@ def run_council(labels: list, messages: list, emit, status,
     # answer brief on it, then the question block intact in its own marked
     # section (its evidence and grounding lines included), the drafts as
     # material, and the notes.
-    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut)
-    synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000)
+    _corrs = report.get("corrections") or []
+    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut,
+                         corrections=_corrs)
+    synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000,
+                              corrections=_corrs)
     report.update(merger=merger, merged=True)
     # The drafts were each checked, but the merge never was — so a merger
     # that melted down streamed its collapse straight to the reader with
@@ -29162,7 +29778,8 @@ def run_council(labels: list, messages: list, emit, status,
         except Exception:
             pass
         try:
-            with server_first_deadline(srv_first_s):
+            with server_first_deadline(srv_first_s), \
+                    server_think(final_think_level() if craft else None):
                 _ok = _stream_guarded(merger, synth, _memit, status, good[0][1],
                                       "showing the best single answer")
             _srv_step("done" if _ok else "fail", merger, emit)
@@ -29206,7 +29823,8 @@ def run_council(labels: list, messages: list, emit, status,
             return _done()
     try:
         with server_first_deadline(srv_first_s if server_label(merger)
-                                   else None):
+                                   else None), \
+                server_think(final_think_level() if craft else None):
             _stream_guarded(merger, synth, emit, status, good[0][1],
                             "showing the best single answer")
     except Exception:
@@ -29288,16 +29906,44 @@ ANSWER_BRIEF = (
     "- Say what is uncertain or changing, plainly and once ('vendors quote "
     "this differently', 'not public', 'varies with the configuration'). A "
     "confident sentence is one you would bet on.\n"
-    "- Write for the reader the remembered facts describe. Someone in IT or "
+    "- Write for the reader the remembered facts and the person's standing "
+    "instructions describe, and follow those instructions to the letter "
+    "(where they ask for no recap, one best option, exact numbers or "
+    "commands, that is what they get). Someone in IT or "
     "operations gets the operational specifics \u2014 procurement, power and "
     "cooling, interconnect, availability, what to buy or rent \u2014 not a "
     "primer; a newcomer gets the concepts first. Never say that you know "
     "who they are.\n"
-    "- No filler: no summary that repeats the body, no 'in short' that "
-    "restates it, no 'I hope this helps', no offer of more. Stop when the "
-    "information stops."
+    "- When there is a clear best option, name it and say why in a line; "
+    "don't list five. A chat answer is prose with bold on the few things "
+    "that matter: no headings and no table unless the question asked for "
+    "a comparison of several things on several measures.\n"
+    "- Another assistant's reply that the person mentions is visible only "
+    "if it is pasted into the conversation. If it isn't, say in one clause "
+    "that you can't see it, and never describe, guess or grade what it "
+    "said.\n"
+    "- No filler: no summary that repeats the body, no closing 'Bottom "
+    "line' or 'In short' paragraph that restates it, no 'I hope this "
+    "helps', no offer of more. Stop when the information stops."
 )
 _BRIEF_MARK = "THE BRIEF FOR THIS ANSWER"
+# the final writer's reasoning level on a server model that takes one
+# (server_think, 6b518); a dev copy may try another (MILLENAI_FINAL_THINK).
+# None is the model's own default (gpt-oss: medium). Measured on the bench's
+# GPU question, Ollama1: "high" spent ~55 s reasoning before 344 visible
+# tokens (the writer's stage 12 s -> 60 s, first text 107 s), past the 60 s
+# first-text target, so the default stays.
+FINAL_THINK = None
+
+
+def final_think_level():
+    if DEV_HOME:
+        v = os.environ.get("MILLENAI_FINAL_THINK", "").strip().lower()
+        if v in ("low", "medium", "high"):
+            return v
+        if v in ("off", "none", "default"):
+            return None
+    return FINAL_THINK
 
 
 def _brief_today(now=None) -> tuple:
@@ -29331,11 +29977,12 @@ _EVIDENCE_HEAD = ("THE QUESTION, as the person asked it, with any evidence "
 
 
 def final_prompt(sys_msg, question: str, drafts: list, notes: str = "",
-                 cut: int = 6000, now=None) -> list:
+                 cut: int = 6000, now=None, corrections=()) -> list:
     """The final writer's messages: the dated system prompt with the brief,
     then SYNTH_INSTRUCTION, the question block intact in its own marked
-    section, the drafts as material (each cut to `cut` characters) and the
-    critic's notes when there are any."""
+    section, the drafts as material (each cut to `cut` characters), the
+    critic's notes when there are any, and the corrections the evidence
+    backs (6b518), which the final answer must carry."""
     drafts = [str(t) for t in (drafts or []) if str(t).strip()]
     body = "\n\n".join("[answer %d]\n%s" % (n, t[:cut])
                        for n, t in enumerate(drafts, 1))
@@ -29351,36 +29998,47 @@ def final_prompt(sys_msg, question: str, drafts: list, notes: str = "",
             "covered only with what the evidence states or you are certain "
             "of. Never invent a figure, name, example or source to satisfy "
             "a note: skip a note you can't satisfy ===\n" + notes if notes else "")
+         + corrections_block(corrections)
          + "\n\nWrite the final answer now, following the brief.")
     return [brief_system(sys_msg, now), {"role": "user", "content": u}]
 
 
 CRITIC_INSTRUCTION = (
     "You are reviewing a draft answer before the final version is written. "
-    "Read the question (with any evidence the app gathered) and the draft, "
-    "then list the concrete problems to fix \u2014 tersely, one bullet each, at "
-    "most 8 bullets, in this order of importance:\n"
-    "- WRONG: a number, date, name, version or spec that contradicts the "
-    "evidence or is implausible. Quote it, then the correct figure, or "
-    "'unsupported' when nothing backs it.\n"
-    "- MIXED UP: a unit confusion (a chip for a board, a board for a pod or "
-    "cluster, per device for total, dense for sparse, a list price for an "
-    "hourly rate), or two facts fused into one.\n"
-    "- STALE: a 'current' or 'latest' claim that the evidence or today's "
-    "date says has moved on.\n"
-    "- MISSING: an angle the question needs that the draft skipped. Name "
-    "the angle in one line; never supply a figure, name, example, study "
+    "You only point at problems: you add nothing of your own. Read the "
+    "question (with any evidence the app gathered, its sources numbered "
+    "[1], [2] …) and the draft, then list the problems, tersely, one "
+    "bullet each, at most 8, most important first, each starting with its "
+    "label:\n"
+    "- WRONG: \"<the draft's words, quoted exactly>\" -> <the correct "
+    "figure or name, exactly as the evidence states it> [n]. Only when a "
+    "numbered source contradicts the draft, and give that source's number.\n"
+    "- UNSUPPORTED: \"<the draft's words, quoted exactly>\" — a current "
+    "figure, name or date that no source states.\n"
+    "- CONTRADICTS: two parts of the draft disagree, its verdict doesn't "
+    "follow from its own figures, or it mixes up units (a chip for a pod, "
+    "per device for total, a list price for an hourly rate).\n"
+    "- MISSING: an angle the question asks for that the draft skipped. Name "
+    "the angle in a few words; never supply a figure, name, example, study "
     "or source to put in it (6b516: the writer invented whatever a note "
     "asked for).\n"
-    "No praise, no rewrite, no preamble. If the draft is sound, reply "
-    "exactly: No problems found."
+    "- STRUCTURE: the answer is buried, a closing recap repeats the body, "
+    "a list or table where prose fits, or it ignores the person's standing "
+    "instructions.\n"
+    "Rules: never write a number, name, place, product, example or source "
+    "that is not already in the evidence or the draft. The question's own "
+    "figures are the person's premises, never 'unsupported'. Another "
+    "assistant's reply the person mentions is unseen unless pasted: a draft "
+    "that describes it is WRONG. No praise, no rewrite, no preamble. If the "
+    "draft is sound, reply exactly: No problems found."
 )
 
 
-def critic_prompt(question: str, drafts: list, now=None) -> list:
+def critic_prompt(question: str, drafts: list, now=None, persona: str = "") -> list:
     """The critic's messages: a lean dated system line (no memory, no voice
-    rules: it writes notes, not an answer), the question block intact, and
-    the drafts (up to three, 6,000 characters each)."""
+    rules: it writes notes, not an answer), the question block intact, the
+    drafts (up to three, 6,000 characters each), and the person's standing
+    instructions when they set any (6b518: fit is the critic's to check)."""
     today, _m = _brief_today(now)
     drafts = [str(t) for t in (drafts or []) if str(t).strip()][:3]
     body = "\n\n".join("[draft %d]\n%s" % (n, t[:6000])
@@ -29389,7 +30047,10 @@ def critic_prompt(question: str, drafts: list, now=None) -> list:
              "You are a rigorous technical reviewer. Today is %s. You have "
              "no tools; you only read and judge." % today},
             {"role": "user", "content":
-             CRITIC_INSTRUCTION + "\n\n=== QUESTION ===\n" + question
+             CRITIC_INSTRUCTION
+             + ("\n\n=== THE PERSON'S STANDING INSTRUCTIONS ===\n" + persona[:1200]
+                if persona else "")
+             + "\n\n=== QUESTION ===\n" + question
              + "\n\n=== DRAFT%s ===\n" % ("S" if len(drafts) > 1 else "")
              + body}]
 
@@ -29402,6 +30063,238 @@ def critic_notes(text: str) -> str:
                          r"(?:were )?found\b", t, re.I):
         return ""
     return t[:1500]
+
+
+# ---- the critic's notes, checked (6b518, per Patrick)
+# Round 1: 17 judge flags in 13 answers traced to the critic, which
+# "corrected" with figures of its own ("a July 2026 guide"), suggested
+# places from elsewhere ("Bela Vista", a São Paulo district, in a
+# Florianópolis answer) and called correct facts unsupported ("first hike
+# since 2023"), while in five answers the writer ignored its correct
+# catches. Now each note line is read against what the app has: a line
+# that brings a number or a name found in neither the evidence nor the
+# drafts nor the question is dropped; an UNSUPPORTED note on a figure the
+# evidence does state is dropped; and a WRONG note whose correction the
+# evidence states, or an UNSUPPORTED one on a figure nothing states,
+# becomes a correction the final answer must carry (corrections_block),
+# checked after writing (corrections_stuck) and handed to the fact-check.
+_NOTE_LABEL_RX = re.compile(
+    r"^\s*(?:[-*•]|\d+[.)])?\s*\**\s*(WRONG|UNSUPPORTED|CONTRADICTS|MIXED UP|"
+    r"STALE|MISSING|STRUCTURE)\b\**\s*:?\s*", re.I)
+_NOTE_QUOTE_RX = re.compile(r"[\"“]([^\"”]{3,300})[\"”]")
+_NOTE_NUM_RX = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
+_NOTE_WORD_STOP = frozenset(
+    "WRONG UNSUPPORTED CONTRADICTS MIXED UP STALE MISSING STRUCTURE The A An "
+    "I It Its This That These Those No Not Only Never Add Name Say Use Give "
+    "Cite Quote Draft Evidence Source Sources Answer Question Note Notes Both "
+    "One Two Three Four Five Six Seven Eight Nine Ten First Second Third Then "
+    "Also But And Or If When Where Which What Who Why How Today Yes "
+    "January February March April May June July August September October "
+    "November December Monday Tuesday Wednesday Thursday Friday Saturday "
+    "Sunday OK Here There Per".split())
+
+
+def _num_key(n: str) -> str:
+    t = n.replace(",", "")
+    if "." in t:
+        t = t.rstrip("0").rstrip(".")
+    return t
+
+
+def _note_corpus(texts) -> tuple:
+    """(lowercased text, {number keys}) of what the critic may draw on."""
+    low = " ".join(str(t or "") for t in texts)
+    return low.lower(), {_num_key(n) for n in _NOTE_NUM_RX.findall(low)}
+
+
+def _note_new_specifics(line: str, corpus: tuple, year: str = "") -> list:
+    """The numbers and names a note line brings that the corpus lacks
+    (quoted text included: a "quote" not in the draft is invented too).
+    Small counts (0-9), [n] marks, this year and short acronyms are never
+    counted; a capitalised word opening a sentence counts only when it
+    starts a run of names ("Bela Vista") or carries a digit."""
+    low, nums = corpus
+    t = re.sub(r"\[\d+\]", " ", str(line or ""))
+    t = _NOTE_LABEL_RX.sub("", t, count=1)
+    new = []
+    for n in _NOTE_NUM_RX.findall(t):
+        k = _num_key(n)
+        if len(k) == 1 or k == year or k in nums:
+            continue
+        new.append(n)
+    toks = list(re.finditer(r"[^\W\d_][\w'’.+-]*", t))
+    for i, m in enumerate(toks):
+        w = re.sub(r"['\u2019]s$", "", m.group(0)).strip(".'\u2019+-")
+        if len(w) < 3 or not w[:1].isupper() or w in _NOTE_WORD_STOP:
+            continue
+        if w.isupper() and len(w) <= 3:
+            continue
+        before = t[:m.start()].rstrip()
+        if not before or before[-1] in ".:!?\"\u201c(;\u2014\u2192>*_-":
+            nxt = toks[i + 1].group(0) if i + 1 < len(toks) else ""
+            if not (nxt[:1].isupper() or re.search(r"\d|[a-z][A-Z]", w)):
+                continue
+        if w.lower() not in low:
+            new.append(w)
+    return new
+
+
+def critic_filter(notes: str, corpus_texts, year: str = "") -> tuple:
+    """(kept notes, dropped lines): the critic's lines that bring a number
+    or a name absent from the evidence, the drafts and the question are
+    dropped, and so is an UNSUPPORTED note about a figure the evidence
+    does state (6b518)."""
+    if not notes:
+        return "", []
+    corpus = _note_corpus(corpus_texts)
+    kept, dropped = [], []
+    for ln in str(notes).split("\n"):
+        if not ln.strip():
+            continue
+        if _note_new_specifics(ln, corpus, year):
+            dropped.append(ln.strip())
+            continue
+        m = _NOTE_LABEL_RX.match(ln)
+        if m and m.group(1).upper() == "UNSUPPORTED":
+            q = _NOTE_QUOTE_RX.search(ln)
+            qnums = [_num_key(n) for n in _NOTE_NUM_RX.findall(q.group(1))] if q else []
+            qnums = [n for n in qnums if len(n) > 1]
+            if qnums and all(n in corpus[1] for n in qnums) and _evidence_has(corpus_texts[0], qnums):
+                dropped.append(ln.strip())     # the evidence states it: not unsupported
+                continue
+        kept.append(ln.rstrip())
+    return "\n".join(kept).strip(), dropped
+
+
+def _evidence_has(evidence: str, nums) -> bool:
+    ev = {_num_key(n) for n in _NOTE_NUM_RX.findall(str(evidence or ""))}
+    return bool(nums) and all(n in ev for n in nums)
+
+
+def critic_corrections(notes: str, evidence: str, drafts) -> list:
+    """The corrections the evidence backs (6b518): [{"kind", "quote",
+    "right", "src"}]. WRONG: the quote is the draft's own words and the
+    correction's figures (or names) are in the evidence. UNSUPPORTED: the
+    quote is the draft's own and carries a figure the evidence and the
+    question never state. At most 6."""
+    out = []
+    dl = " ".join(str(d or "") for d in drafts or []).lower()
+    ev = str(evidence or "")
+    evl = ev.lower()
+    for ln in str(notes or "").split("\n"):
+        m = _NOTE_LABEL_RX.match(ln)
+        if not m:
+            continue
+        kind = m.group(1).upper()
+        if kind not in ("WRONG", "UNSUPPORTED", "STALE"):
+            continue
+        q = _NOTE_QUOTE_RX.search(ln)
+        if not q:
+            continue
+        quote = q.group(1).strip()
+        if len(quote) < 4 or re.sub(r"\s+", " ", quote.lower()) not in re.sub(r"\s+", " ", dl):
+            continue                 # not the draft's words: nothing to fix
+        rest = ln[q.end():]
+        src = re.search(r"\[(\d+)\]", rest)
+        right = re.sub(r"^\s*(?:->|→|=>|—|-|:|should be|is actually|actually)\s*", "", rest)
+        right = re.sub(r"\s*(?:\[\d+\])+\s*\.?\s*$", "", right).strip(" .;")
+        if kind in ("WRONG", "STALE"):
+            if not right or len(right) > 200 or not _correction_backed(quote, right, ev):
+                continue
+            out.append({"kind": "wrong", "quote": quote, "right": right,
+                        "src": int(src.group(1)) if src else 0})
+        else:
+            qn = [_num_key(n) for n in _NOTE_NUM_RX.findall(quote)]
+            qn = [n for n in qn if len(n) > 1]
+            evn = {_num_key(n) for n in _NOTE_NUM_RX.findall(ev)}
+            if not qn or any(n in evn for n in qn):
+                continue
+            out.append({"kind": "unsupported", "quote": quote, "right": "", "src": 0})
+        if len(out) >= 6:
+            break
+    return out
+
+
+_CORR_STOP = frozenset(
+    "that this with from only actually should instead correct correctly states "
+    "stated evidence source sources draft which their there these those were "
+    "what when where says said write wrong right number figure name exactly "
+    "about than then more less also just been being have into same".split())
+
+
+def _correction_backed(quote: str, right: str, evidence: str) -> bool:
+    """Whether the evidence states the correction (6b518): the specifics
+    it brings beyond the quote (numbers, names) all stand in ONE sentence
+    of the evidence that also shares a word with the quote. A figure that
+    is merely somewhere in the pack doesn't count: the critic once
+    "corrected" a Blackwell card to Ada because the word was in the pack."""
+    qlow = quote.lower()
+    qn = {_num_key(n) for n in _NOTE_NUM_RX.findall(quote)}
+    new_n = [k for k in (_num_key(n) for n in _NOTE_NUM_RX.findall(right))
+             if len(k) > 1 and k not in qn]
+    new_w = [w for w in re.findall(r"[^\W\d_][\w-]{3,}", right)
+             if w not in _NOTE_WORD_STOP and w.lower() not in _CORR_STOP
+             and w.lower() not in qlow]
+    if not new_n and not new_w:
+        return False
+    qwords = {w for w in re.findall(r"[^\W\d_]{4,}", qlow)} - {"that", "with", "from", "this"}
+    for sent in re.split(r"(?<=[.!?])\s+|\n+", str(evidence or "")):
+        sl = sent.lower()
+        sn = {_num_key(n) for n in _NOTE_NUM_RX.findall(sent)}
+        if all(k in sn for k in new_n) and all(w.lower() in sl for w in new_w) \
+                and (any(w in sl for w in qwords) or qn & sn):
+            return True
+    return False
+
+
+def corrections_block(corrections) -> str:
+    """The final prompt's mandatory section (6b518): each correction as an
+    instruction the answer must follow, '' when there are none."""
+    rows = []
+    for c in corrections or ():
+        if c.get("kind") == "wrong":
+            rows.append("- The draft says \"%s\". That is wrong: write %s%s instead."
+                        % (c["quote"], c["right"], " [%d]" % c["src"] if c.get("src") else ""))
+        else:
+            rows.append("- The draft says \"%s\", and no source states it: leave it "
+                        "out, or say plainly that it isn't known." % c["quote"])
+    if not rows:
+        return ""
+    return ("\n\n=== CORRECTIONS TO APPLY (mandatory: the evidence settles each "
+            "one; the final answer must not repeat the wrong words, and never "
+            "mentions this list) ===\n" + "\n".join(rows))
+
+
+def _squash(t: str) -> str:
+    return re.sub(r"[\s*_`]+", " ", str(t or "").lower().replace("’", "'")).strip()
+
+
+def corrections_stuck(answer: str, corrections) -> list:
+    """The corrections the answer didn't take: its text still carries the
+    quoted wrong words (a cheap string check, 6b518)."""
+    a = _squash(answer)
+    return [c for c in corrections or () if _squash(c.get("quote")) and _squash(c.get("quote")) in a]
+
+
+# A CLOSING RECAP (6b518): the person's standing instructions say no recap,
+# and five of six round-1 health answers still ended with one. A last
+# paragraph that opens with a summary marker, after at least two others,
+# goes.
+_RECAP_RX = re.compile(
+    r"^\s*(?:[#>*_\s]*)(?:bottom line|in short|in summary|to sum (?:it )?up|"
+    r"summary|tl;?dr|the takeaway|key takeaway|overall,|all in all|in a nutshell)\b",
+    re.I)
+
+
+def trim_recap(text: str) -> str:
+    t = str(text or "").rstrip()
+    paras = re.split(r"\n\s*\n", t)
+    if len(paras) < 3:
+        return t
+    last = paras[-1]
+    if not _RECAP_RX.match(last) or len(last) > 0.4 * len(t) or "```" in last:
+        return t
+    return "\n\n".join(paras[:-1]).rstrip()
 
 
 # ---- the fact-check
@@ -29468,14 +30361,30 @@ def claim_count(text: str) -> int:
                if len(s.strip()) >= 12 and _CLAIM_RX.search(s))
 
 
-def verify_prompt(question: str, material: list, answer: str, now=None) -> list:
+def verify_prompt(question: str, material: list, answer: str, now=None,
+                  known=()) -> list:
+    """The checker's messages; `known` (6b518): the corrections the answer
+    didn't take, each a sentence the checker must mark and fix."""
     today, _m = _brief_today(now)
     mat = "\n\n".join("[material %d]\n%s" % (n, str(t)[:2500])
                       for n, t in enumerate((material or [])[:3], 1)) or "(none)"
+    kn = ""
+    if known:
+        rows = []
+        for c in known:
+            if c.get("kind") == "wrong":
+                rows.append("- the words \"%s\" are wrong; the evidence says %s%s"
+                            % (c["quote"], c["right"], " [%d]" % c["src"] if c.get("src") else ""))
+            else:
+                rows.append("- the words \"%s\" state a figure no source gives" % c["quote"])
+        kn = ("\n\n=== KNOWN ERRORS (a reviewer checked these against the "
+              "evidence: the sentence of the ANSWER that holds each one MUST be "
+              "in your array, judged wrong or unsupported, with its fix) ===\n"
+              + "\n".join(rows))
     return [{"role": "system", "content": VERIFY_SYSTEM % today},
             {"role": "user", "content":
              VERIFY_INSTRUCTION + "\n\n=== QUESTION ===\n" + ground_clip(question, 12000)
-             + "\n\n=== MATERIAL ===\n" + mat
+             + "\n\n=== MATERIAL ===\n" + mat + kn
              + "\n\n=== ANSWER ===\n" + str(answer)[:12000]}]
 
 
@@ -29584,12 +30493,13 @@ def apply_fixes(answer: str, items) -> tuple:
 
 
 def verify_answer(run, label: str, question: str, material: list,
-                  answer: str, budget_s: float = VERIFY_BUDGET_S, now=None):
+                  answer: str, budget_s: float = VERIFY_BUDGET_S, now=None,
+                  known=()):
     """Run the checker (run(label, messages, emit)) inside budget_s and
     apply what it found: {"text", "checked", "fixed", "secs"}, or None when
     it didn't finish in time, failed, or sent nothing usable. A checker
     that runs over is told to stop at its next token."""
-    msgs = verify_prompt(question, material, answer, now)
+    msgs = verify_prompt(question, material, answer, now, known)
     parts, box, stop = [], [], threading.Event()
 
     def _collect(chunk):
@@ -29657,20 +30567,35 @@ def verify_pick(report: dict, cloud_ok: bool) -> tuple:
 
 
 def verify_pass(text: str, report: dict, messages: list, emit, status,
-                step, cloud_ok: bool = False) -> dict:
+                step, cloud_ok: bool = False, changed: bool = False) -> dict:
     """The fact-check of a finished answer (6b515): skipped for a hurried
     run, a short answer or one with nothing to check; otherwise the step
     card shows "Checking the facts", then "Checked N claims, fixed M" (or
     "all held", or "Couldn't check the facts in time \u2014 answer kept"), and
-    a changed answer is re-sent after a RESET. Returns what happened."""
+    a changed answer is re-sent after a RESET. Returns what happened.
+    `changed` (6b518): `text` already differs from what was shown (a
+    closing recap trimmed), so it is re-sent even when nothing is fixed.
+    The corrections the writer didn't take (report["stuck"]) go to the
+    checker as known errors, and are counted again after it."""
     out = {"ran": False}
-    if not report or report.get("hurried") or len(text or "") < VERIFY_MIN_CHARS:
+    stuck = list((report or {}).get("stuck") or [])
+
+    def _resend_if_changed():
+        if changed and text.strip():
+            emit(Ctl(NUL + "RESET" + NUL))
+            emit(text)
+            out["rewritten"] = True
+    if not report or report.get("hurried") or (
+            len(text or "") < VERIFY_MIN_CHARS and not stuck):
+        _resend_if_changed()
         return out
     n_cl = claim_count(text)
-    if n_cl < 2:
+    if n_cl < 2 and not stuck:
+        _resend_if_changed()
         return out
     kind, who, name = verify_pick(report, cloud_ok)
     if not kind:
+        _resend_if_changed()
         return out
     out.update(ran=True, who=name)
     step("verify", "Checking the facts", "run", name)
@@ -29693,15 +30618,19 @@ def verify_pass(text: str, report: dict, messages: list, emit, status,
             with server_first_deadline(30.0 if server_label(l) else None):
                 run_model(l, m, e)
     res = verify_answer(run, who if kind != "cloud" else "", question,
-                        material, text, budget_s=budget)
+                        material, text, budget_s=budget, known=stuck)
     if res is None:
         step("verify", "Couldn\u2019t check the facts in time \u2014 answer kept",
              "done", name)
         out["timeout"] = True
+        _resend_if_changed()
         return out
     out.update(checked=res["checked"], fixed=res["fixed"], secs=res["secs"])
     plural = "" if res["checked"] == 1 else "s"
     new = (res["text"] or "").strip()
+    if stuck:
+        report["stuck_after_check"] = len(corrections_stuck(
+            new if res["fixed"] else text, stuck))
     if res["fixed"] and new and new != text.strip() \
             and len(new) >= 0.6 * len(text.strip()):
         emit(Ctl(NUL + "RESET" + NUL))
@@ -29710,6 +30639,7 @@ def verify_pass(text: str, report: dict, messages: list, emit, status,
         step("verify", "Checked %d claim%s, fixed %d" % (
             res["checked"], plural, res["fixed"]), "done", name)
     else:
+        _resend_if_changed()
         step("verify", "Checked %d claim%s, all held" % (res["checked"], plural)
              if not res["fixed"] else
              "Checked %d claim%s \u2014 kept as written" % (res["checked"], plural),
@@ -35675,6 +36605,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         bookish = False
         placey = False
         _ground = None           # the grounded search (6b514), finished after the headers
+        try:
+            _oai_note = other_ai_note(strip_greeting(prompt)) if auto_web else ""
+        except Exception:
+            _oai_note = ""
         _think_tail, _clock_line = "", ""
         # the Remote agent never gets web text in its task, not even on
         # /search: a page could steer a root shell (6b309, review)
@@ -35713,6 +36647,30 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 prev = _thread_terms(messages, avoid=p2)
                 if prev:
                     query = prev + " " + p2
+        # A FOLLOW-UP CARRIES ITS EVIDENCE (6b518, per Patrick). Round 1's
+        # follow-ups scored 1.7: "explain more" and "pick one and price it"
+        # ran with no sources at all, and the writer invented what Claude had
+        # said. When the person's previous turn was grounded, this turn reads
+        # that evidence (numbered as before) and searches only for what it
+        # adds; a follow-up that adds nothing searches nothing.
+        _g_prior, _g_reuse = None, False
+        if (auto_web and not forced and not _lk_urls and not ag_remote
+                and not TIERS.get(tier, {}).get("research")):
+            try:
+                _g_prior = ground_prior(messages)
+            except Exception:
+                _g_prior = None
+            if _g_prior is not None:
+                p3 = strip_greeting(prompt)
+                p3 = _PREAMBLE_RX.sub("", p3, count=1).strip() or p3
+                _fu_new = followup_new_terms(p3)
+                if not query:
+                    # the earlier question's words ride this one's parts
+                    # (Grounding.topic), so the query is the follow-up itself
+                    query = p3 or prompt.strip()
+                    _g_reuse = not _fu_new
+                elif not _fu_new:
+                    _g_reuse = True
 
         if query:
             _tl_search.rows = []   # keep-alive reuses threads — no stale rows
@@ -35880,13 +36838,46 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # headers (below, where step() exists), so the page sees
                     # each phase; the turn holds a placeholder until then.
                     def _ground_planner(ask_text, _lbl=route_label, _co=cloud_only,
-                                        _ctx=self.ctx):
-                        """The fastest free model's query plan: the person's
-                        server first (6b357), a cloud utility model when
-                        cloud power is on, this computer's engine when it is
-                        already up and idle; '' when none answers in time."""
+                                        _ctx=self.ctx, _cn=tuple(council or ())):
+                        """The fastest free model's query plan: a model of
+                        this council's own server first (6b518), then the
+                        person's server for the modes (6b357), a cloud
+                        utility model when cloud power is on, this
+                        computer's engine when it is already up and idle;
+                        '' when none answers in time."""
                         ask = [{"role": "user", "content": ask_text}]
                         if not _co:
+                            # THE PLAN NEVER LANDED (6b518): 28 of 28 bench
+                            # plans had model=[]. Not the deadline: the
+                            # server pick came back None at once, because a
+                            # mode on one server alone ("Ollama1 Only, Thinking",
+                            # the owner's setup) seats that server's models
+                            # outside the modes' candidates, so
+                            # server_side_pick had nothing to choose from. The
+                            # plan now runs on the council's own non-reasoning
+                            # seat (the critic's model: the one the last fact-
+                            # check left on the card, so nothing new loads);
+                            # a reasoning model would spend its 160 tokens
+                            # thinking and write no query.
+                            _seat = ground_plan_seat(_cn)
+                            if _seat:
+                                _t0, parts, _err = time.time(), [], ""
+                                try:
+                                    with server_first_deadline(GROUND_PLAN_S + 4), \
+                                            server_ctx_sticky():
+                                        server_stream(_seat, ask, parts.append, 160)
+                                except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                                    raise
+                                except Exception as _e:
+                                    _err = repr(_e)[:160]
+                                out = strip_think("".join(parts))
+                                if DEV_HOME:
+                                    print("ground-plan: seat=%r secs=%.2f out=%r%s" % (
+                                        _seat, time.time() - _t0, out[:200],
+                                        (" err=" + _err) if _err else ""),
+                                        file=sys.stderr, flush=True)
+                                if out:
+                                    return out
                             try:
                                 out = server_side_text(ask, _ctx, max_tokens=120)
                             except Exception:
@@ -35915,7 +36906,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         return ""
                     _ground = ground_start(
                         query, planner=_ground_planner,
-                        want_photos=bool(_WANTS_IMAGES.search(prompt)))
+                        want_photos=bool(_WANTS_IMAGES.search(prompt)),
+                        prior=_g_prior, search=not _g_reuse,
+                        turn_key=_ground_key(prompt))
                     snippets = GROUND_PENDING
                 # ASKED FOR PICTURES, SO FETCH SOME (6b244, per Patrick).
                 # Photos were only ever harvested on the PLACE path —
@@ -36399,6 +37392,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 % (_venue_stamp("%A %-I:%M%p"),
                    "" if getattr(_tl_search, "tz", "") else " where I am"))
             messages[-1]["content"] = _clock_line + str(messages[-1]["content"])
+        # (6b518) the person's own arithmetic: no search ran, and the writer
+        # and the critic are told the figures are premises; a mention of
+        # another assistant's unseen reply: the model says it can't see it
+        if messages and not _ground and auto_web:
+            _extra = [x for x in (
+                SC_HINT if self_contained_reasoning(strip_greeting(prompt)) else "",
+                _oai_note) if x]
+            if _extra:
+                messages[-1] = dict(messages[-1])
+                messages[-1]["content"] = (str(messages[-1]["content"]) + "\n\n"
+                                           + "\n\n".join(_extra))
         full_messages = [dated_system] + messages
 
         # stream plain text back; the browser reads it progressively
@@ -36928,7 +37932,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          _gread, "" if _gread == 1 else "s",
                          _gpass, "" if _gpass == 1 else "s"))
                 dated_system["content"] += GROUND_SYSTEM
-            _gturn = grounded_turn(query, _gpack)
+            if getattr(_ground, "prior", None) is not None:
+                step("prior", "Kept the earlier sources", "done",
+                     "%d source%s%s" % (len(_ground.prior.sources),
+                                        "" if len(_ground.prior.sources) == 1 else "s",
+                                        "" if _ground.search else " \u00b7 nothing new to look up"))
+            _gturn = grounded_turn(query, _gpack, note=_oai_note)
             if getattr(_tl_search, "photos", None) and _WANTS_IMAGES.search(prompt):
                 _gturn += ("\n\n[The interface is displaying %d relevant "
                            "photo(s) from the sources directly beneath your "
