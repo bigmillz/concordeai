@@ -37363,6 +37363,12 @@ check("a correction the evidence states (in one sentence with the claim) is kept
       [c["kind"] for c in _cr18] == ["wrong", "unsupported"]
       and _cr18[0]["quote"] == "Ironwood is the fifth-generation TPU" and _cr18[0]["src"] == 1
       and _cr18[1]["quote"] == "It costs $2.50/hr", "%r" % _cr18)
+_ev18b = ("WEB EVIDENCE\n[1] NVIDIA Ampere \u2014 nvidianews.nvidia.com \u2014 2020-05-14\n    The A100 is the most "
+          "powerful data center GPU.\n[2] Blackwell \u2014 x.com \u2014 2026-09-01\n    The B300 ships.")
+check("a source years older than the rest of the pack never 'corrects' the draft",
+      not _c18["_correction_backed"]("the B300 is the most powerful data center GPU", "the A100 [1]", _ev18b)
+      and _c18["_correction_backed"]("the B300 is the most powerful data center GPU", "the A100 [1]",
+                                     _ev18b.replace("2020-05-14", "2026-05-14")), "")
 _fp18 = _c18["final_prompt"]({"role": "system", "content": "SYS"}, "Q", ["d"], "n", corrections=_cr18)[1]["content"]
 _vp18 = _c18["verify_prompt"]("Q", ["d"], "A", known=_cr18)[1]["content"]
 check("the corrections ride the final prompt as a mandatory block, are checked after writing, and reach the checker",

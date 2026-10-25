@@ -20301,6 +20301,11 @@ def _src_date(row: dict) -> str:
     if m and 1 <= int(m.group(2)) <= 12:
         return "%s-%02d" % (m.group(1), int(m.group(2))) + (
             "-%02d" % int(m.group(3)) if m.group(3) and 1 <= int(m.group(3)) <= 31 else "")
+    # a compact stamp in the path (6b518: the Fed's ".../monetary20260916a.htm")
+    m = re.search(r"/[a-z_-]*(20[12]\d)(0[1-9]|1[0-2])([0-3]\d)[a-z]?(?:\.html?)?(?:[/?#]|$)",
+                  str(row.get("url") or row.get("href") or ""))
+    if m and 1 <= int(m.group(3)) <= 31:
+        return "%s-%s-%s" % m.groups()
     return _src_date_text(str(row.get("body") or "")) or \
         _src_date_text(str(row.get("title") or ""))
 
@@ -20440,6 +20445,8 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         if nowish:
             ago = _src_months_ago(date, today)
             rec = 2 if 0 <= ago <= 12 else (0 if ago < 0 or ago <= 24 else -2)
+            if 0 <= ago <= 1 and len(date) >= 7:
+                rec += 1      # this month or last: the latest of several 2026 pages (6b518)
         score = rel + in_host + qual + rec - (5 if rel == 0 and not in_host else 0)
         out.append({"title": title or host, "body": body, "url": url,
                     "host": host, "date": date, "score": score, "paras": [],
@@ -29911,6 +29918,10 @@ ANSWER_BRIEF = (
     "number. Where the material disagrees, give the better-supported figure "
     "and say so in a clause; where nothing supports a specific, leave it "
     "out or call it uncertain.\n"
+    "- Never answer with only a pointer elsewhere ('check the listings', "
+    "'consult a local site'): when the evidence lacks a figure the person "
+    "asked for, give your best typical range, marked 'typically' and dated, "
+    "then say where to confirm it.\n"
     "- Say what is uncertain or changing, plainly and once ('vendors quote "
     "this differently', 'not public', 'varies with the configuration'). A "
     "confident sentence is one you would bet on.\n"
@@ -30246,7 +30257,19 @@ def _correction_backed(quote: str, right: str, evidence: str) -> bool:
     if not new_n and not new_w:
         return False
     qwords = {w for w in re.findall(r"[^\W\d_]{4,}", qlow)} - {"that", "with", "from", "this"}
+    # a source more than a year older than the newest the pack holds never
+    # corrects the draft (6b518: a 2020 Ampere press release "corrected" a
+    # right B300 to the A100)
+    years = [int(y) for y in re.findall(r"^\[\d+\] .* \u2014 (20\d\d)", str(evidence or ""), re.M)]
+    newest = max(years) if years else 0
+    stale = False
     for sent in re.split(r"(?<=[.!?])\s+|\n+", str(evidence or "")):
+        hm = re.match(r"\[\d+\] .* \u2014 (?:(20\d\d)|date unknown)", sent)
+        if hm:
+            stale = bool(hm.group(1)) and newest and int(hm.group(1)) < newest - 1
+            continue
+        if stale:
+            continue
         sl = sent.lower()
         sn = {_num_key(n) for n in _NOTE_NUM_RX.findall(sent)}
         if all(k in sn for k in new_n) and all(w.lower() in sl for w in new_w) \
