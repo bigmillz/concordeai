@@ -114,6 +114,10 @@ MACHINE_STATE = frozenset((
     # (6b339, per Patrick: server first) the first-word deadline of the
     # call in flight on this thread: a number of seconds, nothing personal
     "_srv_first",
+    # (6b518) the final writer's reasoning level on this thread, the (server,
+    # model) pairs that refused one, the context each server model was last
+    # loaded with and the thread's "reuse it" flag: engine facts, nothing personal
+    "_srv_think", "_srv_think_refused", "_srv_ctx_seen", "_srv_sticky",
     # (6b346) the wakes this thread did for the question in hand: (server name,
     # woke?), taken (and so emptied) before each chat resolves and again
     # right after the headers, so none outlives its request or its profile
@@ -22604,7 +22608,8 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
     import http.client as _hc
     import socket as _socket
     _ctx = srv_ctx_for(messages, max_tokens)
-    _think = getattr(_srv_think, "level", None)
+    _think = getattr(_srv_think, "level", None) or next(
+        (m.get("_think") for m in messages or [] if isinstance(m, dict) and m.get("_think")), None)
     if not (_think and SRV_THINK_MODELS.match(str(model or ""))
             and (e.get("id"), model) not in _srv_think_refused):
         _think = None
@@ -29646,6 +29651,10 @@ def run_council(labels: list, messages: list, emit, status,
                          corrections=_corrs)
     synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000,
                               corrections=_corrs)
+    # the final writer's reasoning level (6b518) rides its own system message,
+    # read by server_stream only (a cloud or local writer never sees the key)
+    if craft and server_label(merger) and final_think_level():
+        synth[0]["_think"] = final_think_level()
     report.update(merger=merger, merged=True)
     # The drafts were each checked, but the merge never was — so a merger
     # that melted down streamed its collapse straight to the reader with
@@ -29793,8 +29802,7 @@ def run_council(labels: list, messages: list, emit, status,
         except Exception:
             pass
         try:
-            with server_first_deadline(srv_first_s), \
-                    server_think(final_think_level() if craft else None):
+            with server_first_deadline(srv_first_s):
                 _ok = _stream_guarded(merger, synth, _memit, status, good[0][1],
                                       "showing the best single answer")
             _srv_step("done" if _ok else "fail", merger, emit)
@@ -29838,8 +29846,7 @@ def run_council(labels: list, messages: list, emit, status,
             return _done()
     try:
         with server_first_deadline(srv_first_s if server_label(merger)
-                                   else None), \
-                server_think(final_think_level() if craft else None):
+                                   else None):
             _stream_guarded(merger, synth, emit, status, good[0][1],
                             "showing the best single answer")
     except Exception:

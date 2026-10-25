@@ -21373,13 +21373,13 @@ _SV_MUT = [
     ("no retry after a replay", '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew", "replay"):',
      '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew",):'),
     ("the server's clock ignored", "        skew = float(js.get(\"server_time\")) - time.time()", "        skew = 0.0"),
-    ("retried forever", "        for attempt in (0, 1, 2):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\"",
-     "        for attempt in (0, 0, 0):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\""),
+    ("retried forever", "        for attempt in (0, 1, 2, 3):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\"",
+     "        for attempt in (0, 0, 0, 0):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\""),
     ("an error line read as text", '                if obj.get("error"):\n                    # a failure after the 200 is the stream\'s last line\n                    raise _srv_fail(e, 0, obj, model)',
      '                if False:\n                    raise _srv_fail(e, 0, obj, model)'),
     ("the whole turn sent", '        t = {"role": m["role"], "content": str(m.get("content") or "")}', '        t = dict(m)'),
-    ("keep_alive sent", '"stream": True,\n                           "options": dict({"temperature": 0.75},',
-     '"stream": True, "keep_alive": "45s",\n                           "options": dict({"temperature": 0.75},'),
+    ("keep_alive sent", '"stream": True,\n             "options": dict({"temperature": 0.75},',
+     '"stream": True, "keep_alive": "45s",\n             "options": dict({"temperature": 0.75},'),
     ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0)', 'usage_note(label, "local", messages, sent[0], last, t0)'),
     ("a guess for an unknown placement", '"placement": pl if pl in ("gpu", "gpu+ram") else "unknown",', '"placement": pl if pl in ("gpu", "gpu+ram") else "gpu",'),
     ("embeddings offered", ' or "embed" in n.lower() \\\n', ' \\\n'),
@@ -36974,8 +36974,11 @@ def _c515_council(src):
     def go(labels, run=rm, msgs=None, **kw):
         ns, calls = _p2_council(src, run, _stream_guarded=sg, **kw.pop("over", {}))
         out, fr, st = [], [], []
+        # (6b518) the evidence carries the figures the critic's note uses: a note bringing a number from
+        # nowhere is dropped now
         ns["run_council"](list(labels), msgs or [{"role": "system", "content": "SYS"},
-                                                 {"role": "user", "content": "q What you just found on the web"}],
+                                                 {"role": "user", "content": "q What you just found on the web: "
+                                                  "the card has 16 GB, so 16 TB per chip is implausible"}],
                           lambda c: (fr if isinstance(c, _RcCtl) else out).append(c), st.append, **kw)
         return ns, out, fr, st
     got = {}
@@ -37064,13 +37067,18 @@ def _c515_pins(src):
                       "        _unasked = labels[2:]            # said in the ledger, never asked\n"
                       "        labels = labels[:1]\n" in rc
                       and '        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")' in rc,
+        # (6b518) the check reads the answer with a closing recap trimmed, and records what it did
         "every way out of the stage is checked": rc.count("return _done()") >= 9
-                                                  and "        verify_pass(\"\".join(_shown).strip(), report, messages, _emit0,\n" in rc,
+                                                  and "            report[\"verify\"] = verify_pass(\n"
+                                                      "                _trim, report, messages, _emit0, status, _step_frame,\n" in rc,
         "the final prompt and its cuts": "    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)\n" in rc
-                                          and "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut)\n"
-                                              "    synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000)\n" in rc,
+                                          # (6b518) the corrections ride both cuts
+                                          and "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut,\n"
+                                              "                         corrections=_corrs)\n"
+                                              "    synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000,\n"
+                                              "                              corrections=_corrs)\n" in rc,
         "the critic is capped like a draft": "            _capped(_critic, lambda: run_model(\n"
-                                             "                _critic, critic_prompt(question, _texts), parts.append))" in rc,
+                                             "                _critic, critic_prompt(question, _texts, persona=_persona), parts.append))" in rc,
         "the speed frame from every guarded stream": "            rate_frame(emit, _t_first[0], sum(len(c) for c in seen))\n"
                                                       "            return True" in sg,
         "Fast's second pass writes under the brief too": src.count("brief_system(full_messages[0])") == 3,
@@ -37113,15 +37121,15 @@ _C515_MUT = [
     ("no RESET before the fixed answer", '        emit(Ctl(NUL + "RESET" + NUL))\n        emit(new)\n        out["rewritten"] = True',
      '        emit(new)\n        out["rewritten"] = True'),
     ("the check with no budget", "    th.join(timeout=budget_s)\n    if th.is_alive():", "    th.join()\n    if th.is_alive():"),
-    ("a hurried run still checked", '    if not report or report.get("hurried") or len(text or "") < VERIFY_MIN_CHARS:',
-     '    if not report or len(text or "") < VERIFY_MIN_CHARS:'),
+    ("a hurried run still checked", '    if not report or report.get("hurried") or (\n            len(text or "") < VERIFY_MIN_CHARS and not stuck):',
+     '    if not report or (\n            len(text or "") < VERIFY_MIN_CHARS and not stuck):'),
     ("a fix about the machinery accepted", "        if fix and (len(fix) > 3 * len(claim) + 80 or _FIX_META_RX.search(fix)):\n            continue",
      "        if False:\n            continue"),
     ("no speed frame", "            rate_frame(emit, _t_first[0], sum(len(c) for c in seen))\n            return True",
      "            return True"),
     ("the cut not following the pen", "    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)", "    _cut = 1500"),
-    ("the critic's notes not carried", "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut)",
-     "    synth = final_prompt(messages[0], question, _texts, '', cut=_cut)"),
+    ("the critic's notes not carried", "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut,",
+     "    synth = final_prompt(messages[0], question, _texts, '', cut=_cut,"),
 ]
 _c515_caught = []
 for _mn, _ma, _mb in _C515_MUT:
@@ -37210,7 +37218,8 @@ check("the longer context is asked for and, if the card can't hold it, dropped f
       and _ss16.index('if _ctx and js.get("code") == "gpu_fit":') < _ss16.index("raise _srv_fail(e, resp.status, js, model)"), "")
 check("an empty final writer leaves the best draft standing, checked; the critic names angles, never specifics",
       'if good and not "".join(_shown).strip():' in _rc16
-      and _rc16.index('if good and not "".join(_shown).strip():') < _rc16.index("verify_pass(\"\".join(_shown).strip()")
+      # (6b518) the check now reads the answer with its closing recap trimmed
+      and _rc16.index('if good and not "".join(_shown).strip():') < _rc16.index("report[\"verify\"] = verify_pass(")
       and "never supply a figure, name, example, study" in _MILLENAI_SRC
       and "Never invent a figure, name, example or source to satisfy" in _MILLENAI_SRC, "")
 _af16 = {"re": re, "json": json}
@@ -37401,7 +37410,8 @@ _ss18 = _MILLENAI_SRC[_MILLENAI_SRC.index("def server_stream("):_MILLENAI_SRC.in
 check("the final writer's reasoning level goes only to gpt-oss, and a server that refuses it is asked without it",
       'SRV_THINK_MODELS.match(str(model or ""))' in _ss18 and 'd["think"] = _think_box[0]' in _ss18
       and "if _think_box[0] and resp.status == 400:" in _ss18
-      and _MILLENAI_SRC.count("server_think(final_think_level() if craft else None)") == 2, "")
+      and 'synth[0]["_think"] = final_think_level()' in _MILLENAI_SRC
+      and 'm.get("_think") for m in messages' in _ss18, "")
 # ==== quality-2 (6b518): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
