@@ -1,0 +1,395 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[11.5,17.8,27.9],\"final\":34.8,\"ftok\":2814,\"est\":false}",
+  "X-Hurry": "cd840d18d4830532"
+ },
+ "first_byte_s": 2.46,
+ "first_text_s": 73.16,
+ "elapsed_s": 76.48,
+ "events": [
+  {
+   "t": 2.46,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.46,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 6.89,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.89,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.89,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.35,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 10.36,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.36,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.36,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 15.22,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1021
+  },
+  {
+   "t": 15.22,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 33.84,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 33.84,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 51.28,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 51.28,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 51.28,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 68.14,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 68.14,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 68.14,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 73.16,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 76.48,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 76.48,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "6035 chars"
+   }
+  },
+  {
+   "t": 76.48,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.46,
+   "Searching the web…"
+  ],
+  [
+   6.89,
+   "Reading 8 sources…"
+  ],
+  [
+   10.36,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   15.22,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   33.84,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   51.28,
+   "compositing…"
+  ],
+  [
+   51.28,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 2.46
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.89
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.89
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 10.35
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.36
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 68.14
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 76.48
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "6035 chars",
+   "t_s": 76.48
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 76.48
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 15.22,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Set a clear quit date, share the plan, and ask your family for *supportive* language, not check‑ins.  \n- **Tell them the date** and your concrete steps (e.g., “I’m quitting on Friday and will use nicotine gum for the first week” [3]).  \n- **Give them a list of supportive phrases** instead of nagging: “I’m proud of you,” “Let me know if you need a distraction,” “It’s okay to feel frustrated” [4].  \n- **Ask them to respect boundaries**: no frequent calls or “Are you still smoking?” — replace those with a weekly check‑in on progress, not status updates.  \n- **Encourage exercise**; a quick walk can offset cravings and mood swings [1].  \n- **Help you set up a low‑triggers home** (no cigarettes, no vaping devices) and offer to keep the space tidy for you.  \n- **If cravings hit, let them know you’re using gum or a quick distraction** and ask them to give space instead of asking “What are you doing?” [8].  \n\nUse these steps, and you’ll turn nagging into encouragement and give yourself the best chance to stay quit."
+  },
+  {
+   "t_s": 33.84,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Get your family on board by **framing this as a shared project, not a lecture** — it cuts through defensiveness. **Start with a single conversation** where you name the *why* (your cravings, mood swings, or even the cost of nicotine) in plain language: *“I’m quitting on [quit date], and my brain’s gonna go through hell for a bit. I need your help to avoid being derailed by well-meaning but endless check-ins.”* Then **assign them a role** — not a chore.\n\n**Here’s the playbook:**\n\n**1. Set the boundaries up front.**\nNagging thrives on ambiguity. After your kickoff chat, **write down the rules in a shared doc or whiteboard** — visible, unnegotiable, and *specific*. Examples:\n- *“No questions about cravings after [time X] — if I’m open to talking, I’ll bring it up.”*\n- *“If you offer nicotine as a ‘treat’ (even ‘just one vape!’), I’m walking out.”*\n- *“One support check-in per day max, from one person.”*\nThis **shifts accountability** from their behavior to the rules themselves [4]. Nagging fades when the “ask” becomes invisible.\n\n**2. Redirect their energy.**\nFamily support often defaults to “helping” via micromanagement. **Give them a tangible, non-intrusive way to contribute** — som"
+  },
+  {
+   "t_s": 51.28,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "The most effective way to stop the nagging is to **establish a clear communication protocol** with your family. Most nagging is a byproduct of their anxiety; they want to help but lack a specific role in your recovery process. You need to move them from **active monitoring** (nagging) to **passive support** by defining the \"rules of engagement.\"\n\n## Establish a Communication Protocol\nThink of this as setting a **Service Level Agreement (SLA)** for your recovery. Instead of letting them guess how to help, give them a specific \"job description\" and a set of boundaries.\n\n**Define the \"No-Go\" zones.** Tell them clearly: \"I appreciate that you're worried, but constant check-ins actually increase my stress, which triggers my cravings.\" You need to explicitly state that **checking up on you** is a counter-productive tactic.\n\n**Schedule \"Status Updates.\"** If they need to know you're doing well, agree on a specific time or method for updates (e.g., a text at the end of the day or a quick mention at dinner). This removes the need for them to \"probe\" you constantly because they know the data is coming.\n\n**Share the \"Project Plan.\"** Tell them your **specific quit date** [3] and your plan for"
+  }
+ ],
+ "sources": [
+  {
+   "t": "How Long Does Depression Last After Quitting Nicotine?",
+   "u": "https://blog.sober.day/depression-after-quitting-nicotine/",
+   "d": "2026-09-29"
+  },
+  {
+   "t": "Home | The Family Check-Up",
+   "u": "https://thefamilycheckup.com/",
+   "d": ""
+  },
+  {
+   "t": "Steps to Success: 5 Tips For Quitting Nicotine - Blogger, Interrupted",
+   "u": "https://bloggerinterrupted.com/steps-to-success-5-tips-for-quitting-nicotine/",
+   "d": "2023-07-01"
+  },
+  {
+   "t": "What to Say Instead of Nagging. Phrases That Build... — Palme School",
+   "u": "https://www.palmeschool.com/usa/blog/what-to-say-instead-of-nagging/",
+   "d": "2026-09-09"
+  },
+  {
+   "t": "I’m quitting nicotine | Looksmax.org - Men's Self-Improvement...",
+   "u": "https://looksmax.org/threads/im-quitting-nicotine.2397752/",
+   "d": ""
+  },
+  {
+   "t": "Nicotine Withdrawals: Symptoms, Side-Effects, and Duration",
+   "u": "https://www.webmd.com/smoking-cessation/understanding-nicotine-withdrawal-symptoms",
+   "d": ""
+  },
+  {
+   "t": "Biblical Insights On Nagging Parents: Guidance And... | ShunChild",
+   "u": "https://shunchild.com/article/what-does-the-bible-say-about-nagging-parents",
+   "d": "2026-01-26"
+  },
+  {
+   "t": "Quitting smoking: 10 ways to resist tobacco cravings - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/nicotine-dependence/in-depth/nicotine-craving/art-20045454",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   68.14,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   68.14,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "Set a clear quit date, tell your family exactly what you need, and keep the conversation focused on support instead of checking.  \nTell them the date and the concrete steps you’ll take—e.g., “I’m quitting on Friday and will use nicotine gum for the first week” [3].  \n\nAsk them to use **encouraging language** rather than nagging.  The article on “What to Say Instead of Nagging” notes that families can replace repeated questions with supportive phrases [4].  Offer them a short list of approved words: “I’m proud of you,” “Let me know if you need a distraction,” “It’s okay to feel frustrated.”  \n\nSet **boundaries** up front.  After the kickoff chat, write the rules in a shared note or whiteboard:  \n- No questions about cravings after 8 pm unless you ask.  \n- One check‑in per day, from one person.  \n- If a family member offers nicotine, you’ll say no.  \nThis turns nagging into a clear protocol.  \n\nMove the family’s energy into **positive actions**.  Encourage a brief, scheduled “craving buddy” slot—one person sits with you for 10 minutes during peak withdrawal hours [6].  Keep it short so it feels useful, not micromanaging.  \n\nExercise is a proven way to lift mood and blunt cravings.  A brisk 10‑minute walk can take the edge off both cravings and low mood [1].  \n\nKnow what withdrawal looks like.  Within a day or two of quitting, you’ll feel a surge in appetite, headaches, and a dip in dopamine [6].  Take OTC pain relievers, stay hydrated, and use nicotine gum or lozenges when cravings hit [8].  \n\nFinally, professional or medical support isn’t covered in the sources, but many people find counseling, prescription therapy, or structured support groups helpful.  You may want to check with a doctor or a local smoking‑cessation program for guidance.",
+ "answer": "Set a clear quit date, tell your family exactly what you need, and keep the conversation focused on support instead of checking.  \nTell them the date and the concrete steps you’ll take—e.g., “I’m quitting on Friday and will use nicotine gum for the first week” [3].  \n\nAsk them to use **encouraging language** rather than nagging.  The article on “What to Say Instead of Nagging” notes that families can replace repeated questions with supportive phrases [4].  Offer them a short list of approved words: “I’m proud of you,” “Let me know if you need a distraction,” “It’s okay to feel frustrated.”  \n\nSet **boundaries** up front.  After the kickoff chat, write the rules in a shared note or whiteboard:  \n- No questions about cravings after 8 pm unless you ask.  \n- One check‑in per day, from one person.  \n- If a family member offers nicotine, you’ll say no.  \nThis turns nagging into a clear protocol.  \n\nMove the family’s energy into **positive actions**.  Encourage a brief, scheduled “craving buddy” slot—one person sits with you for 10 minutes during peak withdrawal hours [6].  Keep it short so it feels useful, not micromanaging.  \n\nExercise is a proven way to lift mood and blunt cravings.  A brisk 10‑minute walk can take the edge off both cravings and low mood [1].  \n\nKnow what withdrawal looks like.  Within a day or two of quitting, you’ll feel a surge in appetite, headaches, and a dip in dopamine [6].  Take OTC pain relievers, stay hydrated, and use nicotine gum or lozenges when cravings hit [8].  \n\nFinally, professional or medical support isn’t covered in the sources, but many people find counseling, prescription therapy, or structured support groups helpful.  You may want to check with a doctor or a local smoking‑cessation program for guidance.",
+ "chars": 1768,
+ "raw_bytes": 8248,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.78,
+ "rate_gen_tok_s": 133.13,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "sg-server-think",
+ "asked_at": "2026-10-24T06:00:56",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

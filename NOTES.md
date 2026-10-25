@@ -16684,6 +16684,288 @@ The app2 batch (6b471 unread dot, 6b472 Edit this picture, 6b480 search excerpts
   now expect the 0.32.4 wheels, and two new cases: a venv left on mlx 0.32.2 is upgraded once; mlx 0.32.4 is
   up to date. A mutant drops the mlx check.
 
+## 6b514 — Grounded web search: the question is planned, the sources filtered and read, the answer cited (per Patrick)
+
+Patrick, 2026-10-24: the answers are "not even remotely competing" with Claude. The question was "What is the
+most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what
+are others using?" (Thinking, Ollama1 only: gpt-oss:20b, ministral-3:14b, gemma4:12b). The four sources were
+claude.ai's sign-in page, a "free Claude" farm (veoaifree.com), a Pluralsight "What is Claude AI?" and a YouTube
+how-to; the models named the H200, TPU v5e and MI300X as current and invented specs ("TPU v5e packs 16 TB").
+
+**Why it searched for "Claude".** The plain web path (`else: snippets = run_search(query)`) sent the whole
+25-word question, verbatim, as ONE query to `_ddg_text(query, 4)` and kept four snippets. Reproduced with
+ddgs 9.14.4 on that exact string: bing returned nothing after 10 s ("No results found"); the fallback engine
+locked onto the only proper noun and returned claude.ai, veoaifree.com/claude, the Pluralsight explainer, the
+YouTube guide and chatai.org — Tom's Hardware's GPU hierarchy sat sixth, past the limit of four. Nothing was
+filtered (a sign-in page is a "source"), nothing was read (snippets only, ~200 characters each), and the user
+turn said "Today is Saturday" and nothing about the model's own age, so the drafts answered from 2024 memory.
+The places path had query-building, host ranking and page reads (6b237, 6b240, 6b242); the plain path had
+none of it.
+
+**Now (the `grounded web search (6b514)` section, before the usage ledger):**
+- `plan_queries()`: never the question itself. Sub-questions split on `?`, `;` and ", and what/which/is…";
+  each becomes a keyword query (scaffolding and fillers out, names kept in their own casing); a thin
+  sub-question ("What is Claude using") borrows the richest one's names ("Anthropic Claude GPU TPU AI 2026");
+  a product name that is also a common word gets its maker (`_GQ_MAKER`: Claude → Anthropic, Gemini → Google,
+  Copilot → Microsoft…); a question about now carries the year, one about today/this week the month
+  (`_gq_stamp`); a comparison searches each side on its own (`_gq_sides`: "iPhone 17 Pro vs Pixel 10 Pro camera"
+  → "iPhone 17 Pro camera", "Pixel 10 Pro camera"; "GPU … or TPU" → both); a compact query for the whole when
+  the question has parts. Rules give at most 4; a model adds up to 2 angles (`GROUND_PLAN`, `plan_lines`):
+  the person's server first (6b357, `server_side_text`, 120 tokens), a cloud utility model when cloud power is
+  on, this computer's MLX engine when it is already up and idle (`_engine_up` and a non-blocking try of
+  `_engine_lock`); a plan later than 5 s is not waited for — the rules' queries stand alone.
+- The searches run all at once (`ctx_executor`), each query on two engines: `_ddg_text` (bing first, as before)
+  and `_ddg_more` (ddgs's "auto" pick). Measured: on "Anthropic Claude GPU TPU AI 2026" bing returned the
+  sign-in page, the product page and a 2023 article; the other engine returned anthropic.com's own 2026 post.
+  From here only those two engines answer at all (duckduckgo, google, brave: "No results found" in a second);
+  one call takes 4–10 s, so the fan-out has an 8 s budget and keeps what landed.
+- `rank_sources()`: dropped outright — sign-in pages (`_SRC_LOGIN_RX`, `/login|/signin|/account` paths),
+  "free AI" farms (`_SRC_FARM_RX`: "for free", "no signup", "unlimited … free"), video and social hosts (no
+  text to read), pages largely in another script (`_src_foreign`; Devanagari vowel marks count as letters,
+  which hid half a Hindi page behind its English loanwords), a bare homepage with a two-word title, near-
+  duplicates (`_src_key`: www/m/amp, query, fragment, trailing slash, /amp, index.html; same title), a host's
+  third page. Scored: the question's terms in the title (×2) and snippet, a name counting double; +3 for the
+  asked-about name in the host when the page also speaks to the question (NVIDIA → nvidia.com, Anthropic →
+  anthropic.com — but not claude.com's bare product page); `_src_quality`: +2 reference and major outlets
+  (`_SRC_GOOD_HOSTS`), +1 .gov/.edu, +1 docs paths, −2 content farms and guess forums (`_SRC_DEMOTE_HOSTS`,
+  the places path's `_JUNK_HOSTS` included), −1 a headline-long slug; for a question about now, +2 within a
+  year, −2 older than two (`_src_date` reads the URL's /2026/06/, "Jun 1, 2026", "1 June 2026", "June 2026",
+  a bare year; a date after today is a misread). Each query seats its best two first (`per_query`, the rows
+  carry `_q`), so the sub-question with the rarer words isn't crowded out by the one with the common ones —
+  without it the Anthropic query's pages never made the pack (measured); the seats survive the cut after the
+  reads.
+- `_page_read()`: the top 10 candidates fetched in parallel (7 s budget), public addresses only
+  (`_link_public`) with every redirect hop re-checked (`_LinkRedirects`, the pasted-links standard), a browser
+  User-Agent (a bare one is 403'd), 600 KB each. Scripts, nav, header, footer, aside, forms out; `<article>` or
+  `<main>` preferred when it holds the body; lines under 40 characters and boilerplate (cookies, subscribe,
+  sign in, all rights reserved…) dropped; the title, `article:published_time`/`datePublished`/`<time>` and, when
+  pictures were asked for, og:image kept. A page that prints "SEO Keywords:" / "Meta Description:" is a farm
+  (seen live: matchless-marketing.com ranked first until this), one that reads as another script once fetched
+  is out, one with no paragraph on the question sinks a point and its snippet stands in.
+- `_pick_passages()`: the paragraphs carrying the question's terms (numbers a little extra), in page order,
+  each cut at a sentence end within the source's share; the lede when none scores.
+- `evidence_pack()`: "WEB EVIDENCE gathered 2026-10-24, 8 sources, numbered for citing:", then per source
+  `[n] title — host — date`, the URL, its passages. Sized to 9,000 characters (~2.3K tokens: a 32K server
+  context keeps room for the drafts and the merge), ~900 per source.
+- `grounded_turn()`: the evidence first, the rules after it (an instruction buried before 9 KB of pages is
+  forgotten, 6b242), the question last. The rules: today's date; "your training data ends before today and is
+  OUT OF DATE"; a fact about the present comes from the evidence and nowhere else, never invented or recalled;
+  cite the source number in square brackets after each fact, [1] or [2][4], only numbers listed; where the
+  evidence does not cover part of the question, say so in one clause (stable background may come uncited);
+  off-topic results are noise; never describe your own data access. With nothing found the turn says so and
+  tells the model to date its memory, never "right now". `GROUND_SYSTEM` adds one grounding line to the dated
+  system prompt (which the merge keeps), so the compositor keeps the [n] marks and the facts to the sources.
+- The handler: the search starts before the headers (beside the engine pre-warm, 6b243) with a placeholder
+  turn, and `_ground.wait()` finishes it after them, where `step()` exists: "Searching the web · 4 queries",
+  "Reading 8 sources…", "Read the pages · 8 pages · 27 passages". The pack then takes the question's place in
+  the one dict `full_messages` holds (the clock line and the Thinking hint kept around it); `_tl_search.rows`
+  carries the sources in the pack's order with their dates, and the SOURCES row shows up to 8 (was 5). A
+  question asked again within ten minutes reuses its evidence (`_ground_cache`). Weather, places, listings,
+  bookish and pasted-link paths are untouched; the Research tier's own planner too.
+- The page: `[1]`, `[1][3]`, `[2, 4]` render as small pills (`sup.cite`) that open source n — the message's own
+  source chips, in order, through one delegated handler, so a reloaded chat works and a markdown link or
+  `arr[1]` in code is left alone.
+
+**Measured.** Rules-only grounding of the GPU question, four runs: 24–48 engine hits → 8 sources, 4–8 pages
+read, 27–36 passages, 6.9–7.5 KB pack, 8.7–14.9 s end to end (search 5.4–8.0 s, reads 2.1–6.9 s); the
+search starts beside the engine load, so a cold engine hides most of it. Per-query engine time 3.3–10 s.
+Before/after answers (Fast, Gemma 4 26B on this Mac — Patrick's run was Thinking on Ollama1; the search
+path is the same): BEFORE, 19 s: sources claude.ai, veoaifree.com, pluralsight.com, youtube.com; "The current
+heavyweight in AI hardware is the NVIDIA Blackwell B200 … Google's TPU v5p … Anthropic uses a combination of
+high-end NVIDIA GPUs", no citations. AFTER: not run in this build (the engines lock was held by the eval
+bench's Thinking baseline); the bench's server-Thinking run of this branch measures it
+(`tools/answer_eval/RESULTS-quality-1.md`, on the `quality-1` integration).
+
+**Honest limits.** The engines are what they are: from this network only bing and ddgs's "auto" pick answer,
+their lists shift between runs, and a rules-only plan for a fuzzy superlative ("most powerful GPU … for AI")
+pulls consumer best-GPU guides as readily as data-centre news; the model's plan is what adds "NVIDIA Vera
+Rubin" or "Anthropic Trainium" angles, and it only runs when a model is free in time. Ranking heuristics
+pick the better of what the engines return; they can't conjure a primary source the engines didn't list.
+A search API with freshness and site filters would be the next real step, as 6b240 said for places.
+
+Gauntlet: 31 checks (`# ==== 6b514`): the planner on nine questions (never the verbatim question, the year /
+month / neither, names copied exactly, comparison sides, the model's lines merged after the sub-questions,
+`plan_lines`), the filters and ranking on fifteen canned hits (every junk class, duplicates, host cap, vendor
+pages first, the 2021 page marked down only for a question about now, dates), the reader on a canned page
+(main text only, date, picture, browser User-Agent, the SEO-tell farm, a picture/PDF/private/.example address
+refused, redirects checked), passages, the pack and the turn, the Grounding thread with the web stubbed
+(phases, the model's plan on both engines, junk out, the cache, a late planner not waited for, a dead web),
+the handler's wiring from the text, and renderMD's chips in node plus the served page's handler and style.
+
+## 6b515 — The answer craft: one writer and a critic, a brief for the final writer, a fact-check, the writer's own speed (per Patrick)
+
+Patrick (2026-10-24): the final answers were "not even remotely competing" with Claude's. His example, Thinking on
+Ollama1 alone: a council of gpt-oss:20b, ministral-3:14b and gemma4:12b, "2 of 3 drafts contributed", 127 s, the
+footer "2.5 tok/s", and a merged answer that stitched both drafts' stale claims together and invented new ones ("TPU
+v5e packs 16 TB of memory per chip … a full pod of eight chips can reach ≈ 15 exaFLOPS", "Claude 2 runs on a mix of
+Nvidia H200s"), a terse list with no framing, no chip-versus-cluster distinction and nothing for a reader in IT and
+Ops. When he pasted Claude's answer, the app's second reply was good: the models write well when they are given good
+material and a clear brief. Another helper owns the search and the evidence pack (`search-ground`); this build owns
+what happens after the evidence arrives.
+
+**Where the 127 seconds went** (his run, from the usage ledger; each call's start and length):
+gpt-oss:20b draft 17.8 s (1,441 tokens) · ministral-3:14b draft 16.0 s (640 tokens) · gemma4:12b draft 42.2 s (5,412
+tokens, and it did not count) · a reflection pass on gpt-oss 16.6 s (1,751 tokens, almost all hidden reasoning, for "at
+most 6 bullets") · the merge on gpt-oss 8.6 s (1,163 tokens, ~320 visible) · ~25 s before the first draft (the search
+and the server checks). The two weaker drafts and the reflection were 75 of the 127 s, and the merge read each draft cut
+to 1,500 characters (`body`, the "small local merger" cut, also applied to a server compositor with a 32K context), so
+it worked from stumps of 4,000–6,000-character drafts and filled the gaps itself.
+
+Measured again on a dev copy (the same server, the same question, before this build): 98.5 s = search ~10 s, gpt-oss
+12.5 s, ministral 22.7 s, gemma4 26.3 s, reflection 18.7 s, merge 8.5 s. The merged answer carried "~3.5 TFLOP/s
+TF-32" for an H100, "$0.90 per vCPU-hour for a v4 pod", "Google's proprietary 'Solaris' fabric", "Microsoft Maia 100:
+announced but not yet publicly released" and "Meta MTIA … not publicly disclosed" — none of it in the evidence, none of
+it true, all of it stated flatly.
+
+**Why gemma4:12b's draft didn't count.** Not diagnosed in this build. Alone on the server, with the Thinking hint,
+it answered the same question in 27.9 s (3,121 characters), so the model works; in craft mode the third seat is no
+longer asked at all, which removes the question for Thinking.
+
+**What changed, and why.**
+
+1. **The roster (Thinking: `craft=True`).** Measured against the three-draft merge, more weak drafts hurt: in both runs above the two weaker drafts and the
+   reflection took 75 of 127 s (and 67.7 of 98.5 s), and the merge's invented specifics came from them.
+   In craft mode the strongest seat alone drafts; the second seat reads that draft against the question and the
+   evidence as a CRITIC (`CRITIC_INSTRUCTION`: wrong figures, mixed-up units, stale "latest", missing angles; at most 8
+   bullets, "No problems found" when sound) and never drafts; the compositor (the cloud ladder when the cloud is open,
+   else the server's compositor, else this computer's) writes the final from the draft and the notes; the third seat is
+   never asked. The handler passes `craft` for Thinking and for Thinking on one server alone; Pro keeps every draft and
+   its peer review, Max every model. The critic's notes show as a "<model> (review)" chip and a "Reviewing the draft"
+   row; a hurried run (Answer now) skips the critic and the check. The resident-first compositor choice is unchanged:
+   on a 16 GB card the critic's model evicts gpt-oss, so the final pays one load (~5 s) — measured below.
+
+2. **The brief (`ANSWER_BRIEF`, `brief_system`, `final_prompt`).** The final writer's system message is the dated
+   system prompt (its memory, name, persona and LENGTH lines intact) with the brief appended once: today's date and
+   what "current" means against it; the shape — the first sentences settle the question, then the depth that matters,
+   then the practical takeaways, scaled to the ask; units of comparison kept straight and named beside every figure (a
+   chip is not a board, a board is not a pod, dense is not sparse, a list price is not an hourly rate); every specific
+   from the evidence, the material or certain knowledge, never two sources' figures fused or a chip figure scaled to a
+   cluster unshown; what is uncertain said once and plainly; written for the reader the remembered facts describe,
+   without saying so; no filler. The person's LENGTH setting always wins over it. The user message opens with
+   `SYNTH_INSTRUCTION` (its first 200 characters still carry "Write ONE final answer", which the live hook and the stub
+   gateway use to tell a merge), then the question block exactly as the handler built it — the search's "What you just
+   found on the web…" block, its grounding lines, the clock, the THINK_HINT — in its own `=== THE QUESTION … ===`
+   section, so the search helper's lines pass through untouched; then the drafts as `=== MATERIAL ===` and the critic's
+   notes as `=== REVIEW NOTES ===`. The cut follows the pen: 6,000 characters of each draft for a server or cloud
+   compositor, 4,000 for a local model of 9B or more (`MODEL_MEM_BYTES` ≥ 6e9), 1,500 only for a small one. Fast's
+   second pass (REVISE_INSTRUCTION, on this computer and on a server seat) writes under the same brief.
+
+3. **The fact-check (`verify_pass`, `verify_answer`, `apply_fixes`).** Every way out of the merge stage goes through
+   `_done()`: `run_council` taps its own `emit` from the drafts on, so the text on screen (after the last RESET) is
+   known. For an answer of 350+ characters with two or more claim-bearing sentences, and not hurried, the quickest
+   capable model is asked (`verify_pick`: a cloud quick model when the cloud was open to this council; else, for an
+   answer written on a server, the critic's model there — loaded on its card — or the server's quick pick; else the
+   writer itself, whose engine is the one loaded) for a JSON array: every sentence of the answer stating a number, date,
+   year, version, price, name or spec, each `ok`, `wrong` or `unsupported`, with a `fix` (the sentence rewritten so it is
+   true, softened to what is known, or "" to delete it). The sentences are matched exactly (then tolerant of whitespace
+   and curly quotes), longest first, and replaced in place; a fix that balloons or talks about the machinery ("the
+   draft", "the material") is refused; empty bullets and double spaces are tidied. A changed answer is re-sent after a
+   RESET (the page replays the replacement once, 6b463), and the step card says "Checked 12 claims, fixed 2", "Checked
+   12 claims, all held" or "Couldn't check the facts in time — answer kept". The budget is 45 s (30 s for a cloud
+   checker): the checker runs on a thread; past the budget its next token ends its stream and the answer stays as it
+   was. A check that fails in any other way changes nothing. A rewrite that would lose more than 40% of the answer is
+   refused too.
+
+4. **The speed line.** `_stream_guarded` (every final write: the merge, Fast's second pass, a single model) and the
+   cloud composite send a `RATE` frame — the writer's tokens a second from its first word to its last, the tokens, the
+   seconds. The page shows that, and falls back to its own clock measured from the first character after the last RESET
+   (not from the request), and says both: "**41.2 tok/s** · ~320 tokens · wrote in 7.8s · 98.5s total". The "Answer
+   written" row's length is the answer's own, not the frames' (it said 7,421 chars for a 3,095-char answer).
+
+**Before and after.** Graded on the 33-turn answer bench against the baseline, with `search-ground`, alone and
+together: `tools/answer_eval/RESULTS-quality-1.md` (the `quality-1` integration).
+
+**Timing after** (the same GPU question, Ollama1 alone, a dev copy): 66.6 s total (98.5 s before), first text at
+35.0 s (71.3 s before): one draft (gpt-oss, 11.6 s), the review (ministral, 12 s), the final (gpt-oss, RATE 173.9
+tok/s, 837 tokens in 4.8 s), then the check on ministral, 17.4 s: "Checked 17 claims, fixed 3".
+
+**Not changed, on purpose.** gpt-oss's reasoning effort on the server is not raised: Ollama takes a level only through
+`think` on gpt-oss and rejects `think` on models that don't reason, so it needs a capability probe through the gateway
+first (a follow-up). `_resolve_route` still warms this computer's first council model for a mixed roster
+even when craft never asks it. Cloud Only councils get the brief and the check too (the cloud quick ladder checks
+them); the single-provider streams don't.
+
+**Tests.** 30 checks at stub and source level (`_c515_helpers`, `_c515_council`, `_c515_pins`): the brief (once, dated
+today, the LENGTH exception), the final prompt (the brief on the system, the question block intact, the material cut,
+the notes), the critic's prompt and "No problems found", the checker's output parsed through a fence, prose and a
+trailing comma, the fixes (exact, deleted, matched through curly quotes, ok kept, a meta fix refused), `verify_answer`
+over budget and on a failure, `verify_pass` (RESET, the step's words, hurried and short skipped, over budget kept),
+the pick, the RATE frame; `run_council` in craft mode on stand-ins (one writer, the critic, the third seat never asked,
+the final writer's messages, the critic's chip and step, the check's RESET and step, hurried, over budget, without
+craft every seat drafts, the cut follows the pen); the handler, `_stream_guarded` and the page pinned; 11 mutants each
+break a check. The live Thinking check against the stub gateway (6b339's modes) now holds the roster: the first seat
+drafts, the second reviews, the third is not asked, the merge on a model the server holds. The Thinking note of a
+server's mode and the `run_council` signature pin follow. The edges (second commit): the seats craft never asks show as greyed chips ("not asked: Thinking seats one writer and
+one critic") after the drafts, so the ledger reads "2 of 3" with the reason; X-Eta counts two drafting stages for
+Thinking (the writer, the critic); a council whose only surviving draft ships as it stands is checked on that
+draft's model. Finished on the integration: `_tidy_fixed` leaves fenced code's spacing alone, and the server's
+`_TURN_TAGS` knows `RATE` (the page's twin did; a saved chat would have kept the frame as text). The full
+gauntlet ran on `quality-1` (6b516).
+
+## 6b516 — quality-1: the grounded search and the answer craft together, measured on the answer bench
+
+The two answer builds (6b514 grounded search, 6b515 the answer craft) and the answer bench (`tools/answer_eval/`)
+merged onto `quality-1` from origin/main a99681a. Conflicts were only the appended NOTES entries and gauntlet
+blocks; both kept, in order. The bench's results: `tools/answer_eval/RESULTS-quality-1.md`.
+
+**Integration fixes, where the two builds meet.**
+- `ground_clip()`: the grounded turn is evidence, then rules, then the question; the craft's fact-check cut the
+  question block at 8,000 characters and Fast's second passes at 5,000, which kept the pages and dropped the
+  rules and the question. The cut now keeps the tail from the rules on (10,000 for the revise passes, 12,000 for
+  the checker).
+- `_TURN_TAGS` knows `RATE` (6b515 taught the page, not the server's saved-turn twin), and the bench's frame
+  list too.
+- **The server's context follows the prompt** (`srv_ctx_for`, `SRV_CTX_*`). The gateway gives a request 8,192
+  tokens unless it asks (ollama1 PROTOCOL.md); the app never asked. With the evidence pack, the brief and the
+  uncut draft the final writer's prompt reached 5.4K tokens on the GPU question (the bench's ledger), and on
+  two bench answers (q21, q22) gpt-oss spent the rest of the context reasoning and the person saw nothing.
+  A prompt that, at 3 characters a token plus 3,072 to answer, doesn't fit 8,192 asks for the context that
+  holds it, in 4,096 steps up to 32K; a `gpu_fit` at the longer context retries at the gateway's own and is not
+  remembered as too big. And a final writer that streams nothing leaves the best draft standing, checked.
+- **The critic and the fact-check stopped inventing and splicing.** Judges traced 17 flags in 13 craft answers
+  to the reviewer's notes ("add celebrity examples" became "the cast of The Mandalorian"); the critic now names
+  a missing angle and never a figure, name, example or source, and the final writer never invents to satisfy a
+  note. The checker's fixes are applied to whole sentences only (a clause replaced in place left
+  "specifics., but no source addresses this,"), a fix that talks about sources or evidence is refused, and a
+  bullet left with only its bold label goes with its sentence.
+
+**A model the card refuses no longer takes the server down.** Since the baseline, Ollama1 gained
+`qwen3.8:27b` (too big for its 16 GB card) and `devstral-small-2:24b`; its gateway reports no card size, so
+`_srv_fits` let every "gpu" model fit and every server mode seated qwen first. The `gpu_fit` refusal marked the
+whole server down: "None of Ollama1's models answered. qwen3.8:27b doesn't fit in Ollama1's graphics memory",
+six turns of six, and the shipped app does the same today. Now `srv_note_nofit` remembers the refusal per
+server, model and size (a re-pulled tag of another size is tried again; 7 days), the model's row reads
+`gpu+ram` with `nofit`, a `fit` or `missing` refusal never marks the server down, and in craft mode the critic's
+seat writes when the writer's model can't run, or once after a hiccup ("stopped answering partway through"
+left an answer-craft bench answer empty). The status line says "2 of 2", not "2 of 1".
+
+**Measured** (33 turns, server Thinking, Opus judges; the baseline's answers re-graded by Opus: 3.1, not the
+Fable judges' 3.6): quality-1 overall **3.4** (search-ground alone 3.2, answer-craft alone 3.3, the first
+integration 3.2), within this bench's noise; high-severity hallucinations **111 → 44**, fewer on 23 of 33
+turns; grounded 2.9 → 4.1, correct 3.3 → 4.0; depth 3.9 → 3.4 and fit 4.2 → 3.8 went down; first visible text
+median 78 → 49 s, wall time 83 → 63 s. The GPU question still names Ironwood the "fifth generation" and Claude
+3.5 Sonnet, from blogs and a 2023 Decrypt piece: no invented chip, but no primary source either. What's next,
+ranked, is in RESULTS: search that reaches primary sources, grounded follow-ups, the critic's WRONG notes made
+to stick, depth, no search for arithmetic, the kit reporting its card's size.
+
+The bench gained `--warmup` (one throwaway turn first, so a copy learns what the card refuses before q01),
+RATE frames recorded as the writer's own pace, and `stats.py` reports the fact-check's outcomes.
+`bench-sg` and `bench-ac` are bench-only branches: each build plus the refused-model fix, so both could be
+measured on today's server.
+
+Gauntlet: 9 checks (`# ==== quality-1 (6b516)`): the clip, the refusal memory and its scope, the server staying
+up and craft's replacement writer, the context sizing and its fallback, the empty-writer fallback, the critic's
+and the checker's rules; stale 6b515 pins and anchors follow the code (craft between `srv_first_s` and
+`srv_merge`, `return _done()`, a double-check anchor no longer unique), the council's and the servers' test
+namespaces gain `ground_clip` and `srv_note_nofit`, and the mark-down pin and two `server_stream` mutants follow
+the new shape.
+
+The gauntlet on `quality-1`: run 1 (8c7bfc0) 1170/1178: six stale 6b515 pins and anchors, two test namespaces
+without the new helpers, and "vision answers about the pixels" (an empty local answer; it passed on the next
+two runs with no change near it). Run 2 (6623d12) 1181/1182: the server modes' "no double-check" mutant went
+uncaught, because since 6b515 the craft's critic replaces the reflection for every Thinking; it now turns the
+craft off instead, and the pin holds the craft line. Run 3 (b72d004): **1182/1182**, exit 0.
+
 ## 6b517 — The log guard: no log may fill the server's root disk again (per Patrick)
 
 - 2026-10-24: the server (Ubuntu 26.04, RTX 5070 Ti, open driver 615.71) hung. A failed suspend left the NVIDIA
@@ -16736,3 +17018,109 @@ The app2 batch (6b471 unread dot, 6b472 Edit this picture, 6b480 search excerpts
   journal vacuum, symlinked files and folders, hard links, "..", a symlinked /var/log, FIFOs, the lock, the
   clamps, nothing deleted, the units, setup.sh, and the installer against a fake root and a fake systemctl,
   whose installed copy runs on its own with python3 -I). 21 logguard mutants in tests/mutate.py, all killed.
+
+## 6b518 — quality-2: no search for arithmetic, a critic held to the evidence, corrections that stick, grounded follow-ups, a query plan that lands, primary sources (per Patrick)
+
+Round 2 of the answer push, on `quality-2` from `quality-1` (c52dc6c). Round 1 (6b516) had cut high-severity
+hallucinations 111 → 44 but left the overall at 3.4: search ran on pure arithmetic (q27's verdict flipped),
+the critic invented and the writer ignored its right catches, follow-ups had no sources (1.7), the model's
+query plan never landed (`model=[]` 28/28), no primary source came back, and depth and fit fell. The bench,
+the judges and the config are round 1's (`tools/answer_eval/RESULTS-quality-2.md` has every number).
+
+**1. Arithmetic on the person's own figures searches nothing** (`reasoning_parts`, `self_contained_reasoning`,
+`SC_HINT`, before `needs_search`). Rules only: each part of a question is a premise (a statement with figures),
+an ask (arithmetic or a judgement on them: "which is cheaper", "by how much", "how many years", "break even",
+"which should I trust"), context, or a world part (a current, typical or local figure, a named thing, "how
+should I price it"). Three figures or more, an ask, no world part: no search, and the turn says the figures are
+premises to work from, shown in a line, uncited. A mixed question (q29) searches its world part only: the
+planner drops premises and sums. `needs_search` also answers a question mark anywhere ("Cheapest places to
+travel from NYC this winter? Flights plus living costs, not just one or the other." never searched).
+Measured: q27 and q28 searched 0 of 6 times, 19–32 s instead of 59–66 s; q28 scored 9 on all three runs (5).
+
+**2. The critic is held to what the app has.** `CRITIC_INSTRUCTION` labels every line (WRONG with the draft's
+words quoted and the evidence's figure and [n]; UNSUPPORTED; CONTRADICTS; MISSING, the angle only; STRUCTURE,
+including the person's standing instructions, which it now gets), may not write a number, name, place,
+product, example or source the evidence or the draft lacks, and treats the question's own figures as
+premises. `critic_filter` then drops each line that brings a number or a proper noun found in neither the
+evidence, the drafts nor the question (round 1's "Bela Vista", "a July 2026 guide lists $320–$420"), and an
+UNSUPPORTED note on a figure the evidence states (round 1's q04 "first hike since 2023"). 25–32 lines a run
+dropped. It still mis-steers sometimes: in one run it "corrected" a right B300 to the A100 from a 2020 press
+release the hints had brought in, so a source more than a year older than the newest in the pack never backs
+a correction (`_correction_backed`).
+
+**3. Corrections stick.** A WRONG note whose corrected figure the evidence states in one sentence with the
+claim (from a source that isn't stale), or an UNSUPPORTED note on a figure nothing states, becomes a
+correction (`critic_corrections`): a mandatory "CORRECTIONS TO APPLY" block in the final prompt
+(`corrections_block`), a string check after writing (`corrections_stuck`), and the ones that didn't take go to
+the fact-check as "KNOWN ERRORS" its array must judge and fix (`verify_prompt(known=)`); the card says
+"Applied the review's corrections · n of n". Measured: 6, 3 and 2 corrections, every one applied by the writer.
+The bar is strict on purpose (a bad correction costs more than a missed one), so most notes stay notes.
+
+**4. Follow-ups carry their evidence.** A grounded turn is kept by the person's words for 3 hours
+(`_ground_turns`, `ground_prior`); a follow-up keeps the earlier sources, 1–4 numbered as before
+(`merge_prior`), searches only what it adds (`followup_new_terms`; the earlier question's names ride its
+parts through `plan_queries(topic=)`), and "explain more" searches nothing (`Grounding(search=False)`, "Kept
+the earlier sources · nothing new to look up"). When the person mentions another assistant's reply that isn't
+pasted (`other_ai_note`; Patrick pastes Claude's answers when he wants them compared) the turn says the model
+can't see it, never to describe or grade it, and to say where its own answer was wrong; the brief says the
+same. Measured: follow-ups 1.7 → 2.7, 2.7, 2.0; "I don't see Claude's reply" on two runs of three.
+
+**5. The query plan lands.** Not the deadline and not the parser: logged live, the planner's
+`server_side_pick` came back None at 0.00 s, because on a mode on one server alone (Patrick's "Ollama1 Only,
+Thinking") that server's models are not among the modes' candidates. The plan now runs on the council's own
+non-reasoning seat (`ground_plan_seat`: the critic's model, which the last fact-check left on the card; never
+gpt-oss, whose 160 tokens would all be reasoning), inside `server_ctx_sticky()` so it asks for the context the
+model is loaded with (Ollama reloads a model whose num_ctx changes: 7.5 s), and is waited for 8 s (the
+gateway's round trip is ~3 s; at 5 s, 2 of 30 landed; at 8 s, 14 of 28). The prompt asks for the primary
+source. **Primary sources by question type** (`ground_hints`, no paid API): FRED and BLS for a price, the
+Fed's statement for its rate, BLS's Occupational Outlook Handbook for pay, the vendor for its product, the
+airline for its bags, the IRS, travel.state.gov, NIH and Cleveland Clinic, Numbeo, the EIU, Wikipedia for
+where a company operates, as `site:` queries (bing and ddgs honour it) sent first to one engine with an 11 s
+budget (`GROUND_HINT_S`: beside ten other calls they took 10–13 s, and 8 s kept none); a page on the hinted
+host that speaks to the question ranks up (`rank_sources(primary=)`). Searched answers with a primary-host
+source: 8 of 29 → 20, 22, 17 of 30. Also: a compact URL date is read (`…/monetary20260916a.htm`), and for a
+question about now a page from this month or last ranks above an older 2026 one (the July FOMC statement had
+beaten September's). Tokens are read in any script ("Florianópolis" was searched as "Florian polis"), the
+asker's "I" is never a name, a how-to-answer part ("Keep it short and technical") is no query, and a part
+with no name of its own borrows the lead's. The limit, measured from this network: BLS, NIH ODS, Mayo Clinic,
+Azul, OpenAI and travel.state.gov answer a script 403, Numbeo 503, FRED and LATAM time out; those stand on
+their snippets, which rarely hold the figure (q06's September egg price).
+
+**6. Depth and fit.** The grounded turn pulls out "KEY FIGURES IN THAT EVIDENCE" (`evidence_figures`); a
+slow-moving figure the evidence lacks may come from memory as a dated "typically" range; the brief says to
+follow the person's standing instructions to the letter, name the best option, use prose without tables, and
+never answer with only a pointer elsewhere; a closing recap paragraph is trimmed (`trim_recap`, re-sent with
+the check's RESET). A looping writer hands the draft to the critic's seat, as a hiccup already did (q21 was
+"None of Ollama1's models answered"). **A higher reasoning effort for the final writer** goes through
+(`think` passes the gateway; only gpt-oss is asked, by tag; a 400 retries without it), but `"high"` spent ~55
+s reasoning on the GPU question (writer 12 → 60 s, first text 107 s), so `FINAL_THINK` is None (the model's
+default) and a dev copy may try another (`MILLENAI_FINAL_THINK`). The level rides the writer's own system
+message (`_think`), read only by `server_stream`.
+
+**Measured** (33 turns, server Thinking, Opus judges, three full runs): overall 3.4, 3.8, 3.5 (quality-1 3.4,
+baseline 3.1) — inside the bench's noise against quality-1 (paired +0.06 / +0.39 / +0.09, SE ~0.25–0.3; two
+runs of near-identical code differ by 0.3); high-severity hallucinations 44 → 35, 38, 37; grounded 4.1 → 4.4,
+4.7, 4.4; reasoning 5.7 → 6.4 (mean); follow-ups 1.7 → 2.4 (mean); fit 3.8 → 4.0–4.1; depth 3.4 → 3.5; first
+text median 49 → 51, 55, 51 s. Fresh (3.0 mean) and travel (2.8) are not reliably better. Verdict in RESULTS:
+safe to merge as a step, not a quality release.
+
+The bench gained stats for the critic's drops, the corrections, the kept follow-up sources and the plan's
+landing (`stats.py`), and the dev log's ground line lists each query's hits and seconds.
+
+Gauntlet: 17 checks (`# ==== quality-2 (6b518)`): the classifier on q27/q28/q29 and the world-wanting
+controls, the planner's skipped parts and scripts, the hints by type, the primary host ranking up, the plan
+seat and its sticky context, the unseen-reply note and a follow-up's new words, the prior merge's numbering,
+the earlier evidence found by the person's words and reused with no search, the handler's wiring, the
+critic's filter and the false "unsupported", the corrections' backing (one sentence, not stale), their block,
+string check and the checker's KNOWN ERRORS, the recap trim, the council's wiring, the key figures and the
+note in the grounded turn, the reasoning level only for gpt-oss and its refusal retry. Stale pins and anchors
+follow the code (each named where it changed): the two-engine check (site: and compact queries ask one), the
+6b515 pins of the verify call, the final prompt's cuts and the critic's call, the hurried-run and notes
+mutants, the server code's retry-loop and keep_alive anchors, the 6b516 empty-writer pin; the 6b515 council
+fixture's question now carries the figure its critic note uses (a note bringing a number from nowhere is
+dropped now); the council namespaces gain the new helpers; the new per-thread and per-model engine state is
+declared in MACHINE_STATE.
+
+The gauntlet on `quality-2`: run 1 (fd0039a, partly edited mid-run) stopped on a stale 6b516 pin (the verify
+call's text) after failing the new state's MACHINE_STATE lint, two server and two craft mutant anchors and
+three 6b515 pins, all named above and fixed; run 2 (2a97eba): **1199/1199**, exit 0.

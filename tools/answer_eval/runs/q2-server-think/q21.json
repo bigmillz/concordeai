@@ -1,0 +1,279 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.7,13.7],\"final\":15.3,\"ftok\":289,\"est\":false}",
+  "X-Hurry": "3d8d0c2b7af1ed02"
+ },
+ "first_byte_s": 4.04,
+ "first_text_s": 36.36,
+ "elapsed_s": 36.36,
+ "events": [
+  {
+   "t": 4.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 15.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 15.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 22.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "0 pages · 8 passages"
+   }
+  },
+  {
+   "t": 22.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 22.04,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 22.04,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 36.36,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 31
+  },
+  {
+   "t": 36.36,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 36.36,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 36.36,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "70 chars"
+   }
+  },
+  {
+   "t": 36.36,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.04,
+   "Searching the web…"
+  ],
+  [
+   15.04,
+   "Reading 8 sources…"
+  ],
+  [
+   22.04,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 4.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 15.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "0 pages · 8 passages",
+   "t_s": 22.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 22.04
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "70 chars",
+   "t_s": 36.36
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 36.36
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 36.36,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "(no answer — degenerate output)"
+  },
+  {
+   "t_s": 36.36,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Packing Light for South America: Weight Compliance Tips – Titantrek",
+   "u": "https://titantrekstore.com/blogs/travel-guides/packing-light-for-south-america-weight-compliance-tips",
+   "d": "2025-03-25"
+  },
+  {
+   "t": "Gol vs. Latam vs. Azul Recommendation for Heavy Carry On?",
+   "u": "https://www.tripadvisor.com/ShowTopic-g303631-i2161-k14569763-Gol_vs_Latam_vs_Azul_Recommendation_for_Heavy_Carry_On-Sao_Paulo_State_of_Sao_Paulo.html",
+   "d": ""
+  },
+  {
+   "t": "Two Weeks South America Itinerary: 3 trips by local experts",
+   "u": "https://across-southamerica.com/post/two-weeks-south-america-itinerary/",
+   "d": "2026-05-15"
+  },
+  {
+   "t": "Carry-on baggage | LATAM Airlines",
+   "u": "https://www.latamairlines.com/us/en/experience/prepare-your-trip/baggage/carry-on",
+   "d": ""
+  },
+  {
+   "t": "Carry-On for São Paulo: LATAM, Azul, GOL and GRU vs CGH",
+   "u": "https://carrysizer.com/guides/carry-on-for-sao-paulo-trip/",
+   "d": "2026-09-30"
+  },
+  {
+   "t": "3 Weeks In South America | The 5 Best Itineraries To Do It",
+   "u": "https://threeweektraveller.com/3-weeks-south-america-itinerary/",
+   "d": ""
+  },
+  {
+   "t": "Madrugada de ofertas! Latam Gol e Azul têm até 30% de desconto...",
+   "u": "https://www.melhoresdestinos.com.br/promocao/passagens-aereas-nacionais-22-10-25",
+   "d": "2025-10-30"
+  },
+  {
+   "t": "3 Weeks South America Itinerary: Peru, Bolivia & Chile Travel Route",
+   "u": "https://thedailypackers.com/3-weeks-south-america-itinerary/",
+   "d": "2025-12-15"
+  }
+ ],
+ "photos": null,
+ "run_frames": [],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "⚠️ None of Ollama1’s models answered. Nothing was sent anywhere else.",
+ "answer": "⚠️ None of Ollama1’s models answered. Nothing was sent anywhere else.",
+ "chars": 69,
+ "raw_bytes": 2369,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.47,
+ "rate_gen_tok_s": null,
+ "id": "q21",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Carry-on travel in South America",
+ "question": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2-server-think",
+ "asked_at": "2026-10-24T23:23:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

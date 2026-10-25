@@ -1,0 +1,288 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.8,14.6],\"final\":16.4,\"ftok\":417,\"est\":false}",
+  "X-Hurry": "a27d9995acba01c6"
+ },
+ "first_byte_s": 0.0,
+ "first_text_s": 22.09,
+ "elapsed_s": 22.09,
+ "events": [
+  {
+   "t": 0.0,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.0,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.01,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.01,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.4,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 21 passages"
+   }
+  },
+  {
+   "t": 11.4,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.4,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.4,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 21.67,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 25
+  },
+  {
+   "t": 21.67,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 1"
+  },
+  {
+   "t": 22.09,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 25
+  },
+  {
+   "t": 22.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "81 chars"
+   }
+  },
+  {
+   "t": 22.09,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.09,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.0,
+   "Searching the web…"
+  ],
+  [
+   8.01,
+   "Reading 8 sources…"
+  ],
+  [
+   11.4,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   21.67,
+   "asking Ollama1 · ministral-3:14b · 2 of 1"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.0
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.01
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.01
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 21 passages",
+   "t_s": 11.4
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.4
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "81 chars",
+   "t_s": 22.09
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 22.09
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 21.67,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "(no answer — ServerError)"
+  },
+  {
+   "t_s": 22.09,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "(no answer — ServerError)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "How Long Does Depression Last After Quitting Nicotine?",
+   "u": "https://blog.sober.day/depression-after-quitting-nicotine/",
+   "d": "2026-09-29"
+  },
+  {
+   "t": "Home | The Family Check-Up",
+   "u": "https://thefamilycheckup.com/",
+   "d": ""
+  },
+  {
+   "t": "Nicotine Addiction Treatment - Get Help Today",
+   "u": "https://www.addictioncenter.com/nicotine/treatment/",
+   "d": "2025-12-18"
+  },
+  {
+   "t": "9 Tips How to Build Family Habits Without Nagging - MagnifyMinds",
+   "u": "https://magnifymind.com/build-family-habits-without-nagging/",
+   "d": "2025-01-30"
+  },
+  {
+   "t": "What to Say Instead of Nagging. Phrases That Build... — Palme School",
+   "u": "https://www.palmeschool.com/usa/blog/what-to-say-instead-of-nagging/",
+   "d": "2026-09-09"
+  },
+  {
+   "t": "Biblical Insights On Nagging Parents: Guidance And... | ShunChild",
+   "u": "https://shunchild.com/article/what-does-the-bible-say-about-nagging-parents",
+   "d": "2026-01-26"
+  },
+  {
+   "t": "How to Quit Nicotine The Ultimate Guide by MELO Labs - TryMeloAir",
+   "u": "https://new.trymeloair.com/how-to-quit-nicotine/",
+   "d": ""
+  },
+  {
+   "t": "Quitting smoking: 10 ways to resist tobacco cravings - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/nicotine-dependence/in-depth/nicotine-craving/art-20045454",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "⚠️ None of Ollama1’s models answered. Ollama1 stopped answering partway through.",
+ "answer": "⚠️ None of Ollama1’s models answered. Ollama1 stopped answering partway through.",
+ "chars": 80,
+ "raw_bytes": 2199,
+ "is_error_answer": true,
+ "rate_ui_tok_s": 0.91,
+ "rate_gen_tok_s": null,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q1-server-think",
+ "asked_at": "2026-10-24T07:17:22",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

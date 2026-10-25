@@ -1,0 +1,410 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.1,14.3],\"final\":16.1,\"ftok\":398,\"est\":false}",
+  "X-Hurry": "72b7907855733b86"
+ },
+ "first_byte_s": 6.18,
+ "first_text_s": 39.51,
+ "elapsed_s": 39.86,
+ "events": [
+  {
+   "t": 6.18,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 6.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 14.19,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "5 sources"
+   }
+  },
+  {
+   "t": 14.19,
+   "tag": "STATUS",
+   "text": "Reading 5 sources…"
+  },
+  {
+   "t": 14.19,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "5 pages"
+   }
+  },
+  {
+   "t": 17.49,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 23 passages"
+   }
+  },
+  {
+   "t": 17.49,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "5 sources"
+   }
+  },
+  {
+   "t": 17.49,
+   "tag": "SOURCES",
+   "n": 5
+  },
+  {
+   "t": 17.49,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 25.22,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 186
+  },
+  {
+   "t": 25.22,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 25.22,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 25.22,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 25.22,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 32.11,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 556
+  },
+  {
+   "t": 32.11,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "11 notes"
+   }
+  },
+  {
+   "t": 32.11,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 32.11,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 32.11,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 39.51,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 39.86,
+   "tag": "RATE",
+   "data": {
+    "tps": 159.8,
+    "tok": 55,
+    "s": 0.3
+   }
+  },
+  {
+   "t": 39.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 39.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "222 chars"
+   }
+  },
+  {
+   "t": 39.86,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   6.18,
+   "Searching the web…"
+  ],
+  [
+   14.19,
+   "Reading 5 sources…"
+  ],
+  [
+   17.49,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   25.22,
+   "compositing…"
+  ],
+  [
+   25.22,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 6.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "5 sources",
+   "t_s": 14.19
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "5 pages",
+   "t_s": 14.19
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 23 passages",
+   "t_s": 17.49
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "5 sources",
+   "t_s": 17.49
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 25.22
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "11 notes",
+   "t_s": 32.11
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 32.11
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 39.86
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "222 chars",
+   "t_s": 39.86
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 39.86
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 25.22,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**$4.25 for a dozen large grade‑A eggs** in December 2023, a 60 % jump from the previous year [2].  \n\nI don’t have a 2026 figure; check the latest USDA or CPI data for the current price."
+  },
+  {
+   "t_s": 25.22,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 32.11,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- WRONG: \"$4.25 for a dozen large grade-A eggs in **December 2023**\" → source says **December 2022** [2]. Quote the correct date.\n\n- WRONG: claims a **60% jump from the previous year** [2] → source says this was for **December 2022 vs. December 2021**; no 2026 comparison exists.\n\n- MISSING: a **current price for 2026** (neither draft nor evidence provides one).\n\n- MISSING: **date of the 60% figure** (December 2022, not \"a year ago\" in 2026).\n\n- MISSING: **clarification that the 60% figure is outdated** (no 2026 data).\n\nNo problems found beyond these."
+  }
+ ],
+ "sources": [
+  {
+   "t": "More Than 1.5 Million Dozen Eggs Recalled For Salmonella Risk",
+   "u": "https://www.delish.com/food-news/a73249158/egg-recall-salmonella-risk/",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Egg prices have soared 60% in a year. Here's why. - CBS News",
+   "u": "https://www.cbsnews.com/news/eggs-prices-2022-chicken-bird-flu-inflation-cpi/",
+   "d": "2023-01-17"
+  },
+  {
+   "t": "How to Make Jammy Eggs (Perfect Every Time!) - Minimalist Baker",
+   "u": "https://minimalistbaker.com/how-to-make-jammy-eggs/",
+   "d": "2023-04-04"
+  },
+  {
+   "t": "Pigeon Eggs Are Edible, But Here's Why They're Not So Common",
+   "u": "https://www.tastingtable.com/1749214/are-pigeon-eggs-good-to-eat/",
+   "d": "2024-12-31"
+  },
+  {
+   "t": "How to Make Hard Boiled Eggs Recipe - Love and Lemons",
+   "u": "https://www.loveandlemons.com/how-to-make-hard-boiled-eggs/",
+   "d": "2025-04-13"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   32.11,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   32.11,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 159.8,
+  "tok": 55,
+  "s": 0.3
+ },
+ "answer_raw": "**$4.25 for a dozen large grade‑A eggs** was the average price in December 2022, a **60 % rise** from December 2021 [2].  \n\nNo 2026 price is in the sources I found; check the latest USDA or CPI data for the current figure.",
+ "answer": "**$4.25 for a dozen large grade‑A eggs** was the average price in December 2022, a **60 % rise** from December 2021 [2].  \n\nNo 2026 price is in the sources I found; check the latest USDA or CPI data for the current figure.",
+ "chars": 222,
+ "raw_bytes": 3357,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 1.39,
+ "rate_gen_tok_s": null,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q1b-server-think",
+ "asked_at": "2026-10-24T08:29:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

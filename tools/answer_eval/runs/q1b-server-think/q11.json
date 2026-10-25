@@ -1,0 +1,468 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.9,15.0],\"final\":16.8,\"ftok\":441,\"est\":false}",
+  "X-Hurry": "1ade77e26d24dcb3"
+ },
+ "first_byte_s": 3.75,
+ "first_text_s": 48.01,
+ "elapsed_s": 58.66,
+ "events": [
+  {
+   "t": 3.75,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.75,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 11.76,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.76,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.76,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 15 passages"
+   }
+  },
+  {
+   "t": 18.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.78,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.78,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 28.94,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1165
+  },
+  {
+   "t": 28.94,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 28.94,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 28.94,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 28.94,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 37.36,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 37.36,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "8 notes"
+   }
+  },
+  {
+   "t": 37.36,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 37.36,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 37.36,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 48.01,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 49.63,
+   "tag": "RATE",
+   "data": {
+    "tps": 178.8,
+    "tok": 289,
+    "s": 1.6
+   }
+  },
+  {
+   "t": 49.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 49.63,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 49.63,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 58.66,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 4 claims, all held",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 58.66,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1158 chars"
+   }
+  },
+  {
+   "t": 58.66,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.75,
+   "Searching the web…"
+  ],
+  [
+   11.76,
+   "Reading 8 sources…"
+  ],
+  [
+   18.78,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   28.94,
+   "compositing…"
+  ],
+  [
+   28.94,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   49.63,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 3.75
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.76
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.76
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 15 passages",
+   "t_s": 18.78
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.78
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 28.94
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "8 notes",
+   "t_s": 37.36
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 37.36
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 49.63
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 49.63
+  },
+  {
+   "id": "verify",
+   "l": "Checked 4 claims, all held",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 58.66
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1158 chars",
+   "t_s": 58.66
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 58.66
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 28.94,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Magnesium glycinate (or other glycine‑bound chelates) is the only form that has been studied in several small trials and is consistently reported as well‑tolerated.  Doses of **≈ 200–300 mg elemental magnesium per day** (roughly 1–1.5 mmol) produced modest reductions in self‑reported anxiety symptoms in adults with mild anxiety [2][3].  \n\nOther forms such as magnesium citrate or oxide have appeared in the literature, but the data are sparser and the trials are often confounded by a laxative effect that can mask benefits [2].  \n\nThe evidence base is **moderate to low quality**: most studies are short‑term (≤ 4 weeks), have small sample sizes, and vary in their dosing regimens.  A systematic review noted these methodological limitations and found no clear dose‑response relationship—more magnesium does not necessarily mean greater benefit [1][3][7].  \n\nIn short, a daily **200–300 mg elemental magnesium** supplied as a glycine chelate appears to provide the best balance of efficacy and tolerability for mild anxiety, but the overall evidence remains limited and should be viewed as complementary to, not a replacement for, established anxiety treatments."
+  },
+  {
+   "t_s": 28.94,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 37.36,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: Claim that **≈200–300 mg** is the only dose range cited; the evidence lists **75–360 mg** as the range for positive outcomes ([3]).\n- **WRONG**: \"Several small trials\" unsupported; no study count or sample sizes beyond vague references to small/short-term trials.\n- **MIXED UP**: Implies *only* glycine-bound chelates are studied; **citrate/oxide appear in literature** ([2]—though data is sparser and confounded).\n- **MISSING**: **Form-specific dose recommendations** (e.g., whether 75–360 mg applies only to glycinate or includes other forms).\n- **MISSING**: **Evidence on duration**—whether studies used single doses or daily supplementation ([5] notes \"time length of administration\" as critical).\n- **MISSING**: **Comparison to placebo**—whether reductions in anxiety were statistically significant vs. baseline/control ([5] mentions standardized instruments but no effect sizes).\n- **MISSING**: **Mechanism precision**—how glycine-bound magnesium differs mechanistically (beyond tolerability) from other forms ([2][6] mention glycine’s sleep/side-effect benefits but no anxiety-specific detail).\n- **MISSING**: **Population specificity**—whether evidence applies to general anxiety"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Does Magnesium Help with Anxiety? Evidence and Safety Guide...",
+   "u": "https://www.boltpharmacy.co.uk/guide/does-magnesium-help-with-anxiety",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Magnesium Supplement UK — Forms & Evidence Guide",
+   "u": "https://www.kojo.life/blogs/journal/magnesium-complete-guide-forms-evidence",
+   "d": ""
+  },
+  {
+   "t": "Does Magnesium Help With Anxiety? Benefits, Dosage & Best Forms",
+   "u": "https://villabehavioralhealth.com/does-magnesium-help-with-anxiety/",
+   "d": ""
+  },
+  {
+   "t": "Best Magnesium Form For Sleep Optimization | Hants",
+   "u": "https://bookings.hants.gov.uk/sleep-supplements-7",
+   "d": ""
+  },
+  {
+   "t": "Examining the Effects of Supplemental Magnesium on Self-Reported...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11136869/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium Glycinate Benefits, Side Effects, and... | Mayo Clinic Press",
+   "u": "https://mcpress.mayoclinic.org/nutrition-fitness/magnesium-glycinate-is-this-supplement-helpful-for-you/",
+   "d": ""
+  },
+  {
+   "t": "What Magnesium Actually Does to Your Mental Health",
+   "u": "https://www.reachlink.com/advice/medication/magnesium-mental-health/",
+   "d": "2026-09-21"
+  },
+  {
+   "t": "Magnesium for Anxiety: How You Can Fight Anxiety and Feel Better",
+   "u": "https://www.healthline.com/health/magnesium-anxiety",
+   "d": "2010"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   37.36,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   37.36,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 178.8,
+  "tok": 289,
+  "s": 1.6
+ },
+ "answer_raw": "A daily dose of about **200–300 mg elemental magnesium** supplied as a **glycine‑chelate (magnesium glycinate)** is the most consistently studied form that has shown modest reductions in self‑reported anxiety among adults with mild anxiety [2][3].  \n\nStudies report a broader range of **75–360 mg elemental magnesium** as the doses that produced positive outcomes, but there is no clear linear dose‑response; higher amounts do not necessarily mean greater benefit [3].  \n\nThe evidence base is **moderate to low quality**: most trials lasted ≤ 4 weeks, had small sample sizes, and varied in dosing regimens.  A systematic review noted these methodological limitations and the absence of a robust dose‑response curve [1][5].  \n\nOther forms such as citrate or oxide appear in the literature, but data are sparse and often confounded by laxative effects, making them less attractive for anxiety relief [2].  \n\nOverall, the available evidence supports a modest benefit for mild anxiety with magnesium glycinate at 200–300 mg/day, but the findings are tentative and should be viewed as complementary to, not a substitute for, established anxiety treatments [7][6].",
+ "answer": "A daily dose of about **200–300 mg elemental magnesium** supplied as a **glycine‑chelate (magnesium glycinate)** is the most consistently studied form that has shown modest reductions in self‑reported anxiety among adults with mild anxiety [2][3].  \n\nStudies report a broader range of **75–360 mg elemental magnesium** as the doses that produced positive outcomes, but there is no clear linear dose‑response; higher amounts do not necessarily mean greater benefit [3].  \n\nThe evidence base is **moderate to low quality**: most trials lasted ≤ 4 weeks, had small sample sizes, and varied in dosing regimens.  A systematic review noted these methodological limitations and the absence of a robust dose‑response curve [1][5].  \n\nOther forms such as citrate or oxide appear in the literature, but data are sparse and often confounded by laxative effects, making them less attractive for anxiety relief [2].  \n\nOverall, the available evidence supports a modest benefit for mild anxiety with magnesium glycinate at 200–300 mg/day, but the findings are tentative and should be viewed as complementary to, not a substitute for, established anxiety treatments [7][6].",
+ "chars": 1158,
+ "raw_bytes": 6787,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.94,
+ "rate_gen_tok_s": 27.18,
+ "id": "q11",
+ "turn": 1,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q1b-server-think",
+ "asked_at": "2026-10-24T08:34:56",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

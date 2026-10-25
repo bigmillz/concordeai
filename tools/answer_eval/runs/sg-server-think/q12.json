@@ -1,0 +1,404 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[11.4,17.6,28.0],\"final\":34.9,\"ftok\":2813,\"est\":false}",
+  "X-Hurry": "6e2438f8a6676ceb"
+ },
+ "first_byte_s": 3.72,
+ "first_text_s": 80.71,
+ "elapsed_s": 84.14,
+ "events": [
+  {
+   "t": 3.72,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 11.28,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.28,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.28,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.49,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 39 passages"
+   }
+  },
+  {
+   "t": 14.49,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.49,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.49,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 24.05,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 24.05,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 36.17,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 36.17,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 58.79,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 59.85,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 59.85,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 59.85,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 76.9,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 76.9,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 76.9,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 80.71,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 84.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 84.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "7055 chars"
+   }
+  },
+  {
+   "t": 84.14,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.72,
+   "Searching the web…"
+  ],
+  [
+   11.28,
+   "Reading 8 sources…"
+  ],
+  [
+   14.49,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   24.05,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   36.17,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   58.79,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   59.85,
+   "compositing…"
+  ],
+  [
+   59.85,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 3.72
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.28
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.28
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 39 passages",
+   "t_s": 14.49
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.49
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 76.9
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 84.13
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "7055 chars",
+   "t_s": 84.13
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 84.14
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 24.05,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Your body’s “stress” sweat comes from the apocrine glands (underarms, groin, scalp) and is richer in proteins and lipids than the watery eccrine sweat you produce while jogging. When the bacteria on your skin feed on those richer secretions, they produce volatile fatty acids that smell much stronger than normal sweat. Stress, anxiety, and even certain medications can amplify this effect, and the higher the humidity or sweat volume, the more time bacteria have to work [1][4][6].\n\nBecause the sweat itself isn’t the odor, the fix is to stop the bacteria from having a food source, stop the sweat from piling up, or both. In practice that means:\n\n1. **Hygiene first** – shower within an hour of heavy sweating, using an antibacterial or pH‑balanced soap that removes both sweat and surface bacteria. A quick rinse with cool water can also lower skin temperature and reduce bacterial activity.  \n2. **Control moisture** – apply a clinical‑strength antiperspirant containing aluminum chloride (or a similar compound) to the armpits; this blocks the ducts of the apocrine glands and keeps sweat from reaching the skin surface. Choose a product that is specifically formulated for “deep‑night” or “high"
+  },
+  {
+   "t_s": 36.17,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Your sweat smells worse than usual because **stress (or anxiety) is now triggering your apocrine glands**—the ones packed with proteins, fats, and oils [1][2][4][5][6]. When you’re under pressure, adrenaline fires them up, dumping nutrient-rich sweat that **bacteria on your skin devour like a buffet** [1][4][7]. That breakdown releases acids and stink compounds (like the ones in a German study that isolated **six distinct body-odor types** from bacterial byproducts) [7]. Meanwhile, regular (eccrine) sweat—just water and salts—gets broken down slower, so it smells milder [1][3][6].\n\nThe other likely culprit: **you’ve switched to antiperspirants**. Aluminum compounds in them **clog pores** until they finally give up and produce a concentrated batch of smelly sweat all at once [3][7]. (A user study found the smell spike hit around **a week after starting**—same timing you’d see if bacteria built up in a dammed-up river) [3].\n\nFor **immediate fixes**, try these combos:\n- **Bacteria-blocking washes** (like a 10% benzoyl peroxide cleanser or **Wellfizz’s Stop Sudden Odor** spray) cut the food source—**apply dry to pits after sweating** [6].\n- **Stress-sweat hack**: Keep a **2% salicylic "
+  },
+  {
+   "t_s": 59.85,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "Your sweat likely smells worse because your body is shifting from producing water-heavy **eccrine sweat** to protein-rich **apocrine sweat** triggered by stress or adrenaline [1, 3, 5, 7].\n\nWhile eccrine glands produce mostly water for cooling, apocrine glands (found in the armpits and groin) secrete a milky substance containing **proteins and fats** [4, 7]. Bacteria on your skin break down these organic compounds into acids, which is what creates the actual odor [4, 6, 7].\n\nIf your baseline odor has changed recently, it is likely due to one of the following factors:\n\n*   **Increased Stress.** Chronic stress or higher adrenaline levels trigger the apocrine glands more frequently, producing \"smelly\" sweat [1, 2].\n*   **Chemical Shifts.** Certain **medicines** (such as antidepressants), diet, or medical conditions like **diabetes and kidney/liver disease** can alter your sweat's chemical composition [6].\n*   **Workout Intensity.** High-intensity cardio can force more **metabolic byproducts** into your sweat, providing more \"fuel\" for bacteria to break down into odor [8].\n\nTo fix the issue, the most effective approach is a two-pronged strategy:\n\n**Manage the adrenaline trigger.** Sinc"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Stress Sweat v Regular Sweat; Why it smells worse and how to...",
+   "u": "https://drbaileyskincare.com/blogs/blog/stress-sweat-v-regular-sweat-why-it-smells-worse-and-how-to-manage-it",
+   "d": ""
+  },
+  {
+   "t": "Here's Why Stress Sweat Smells Worse Than Normal Sweat",
+   "u": "https://thompsontee.com/blogs/news/stress-sweat-smells",
+   "d": "2021-10-04"
+  },
+  {
+   "t": "Can Antiperspirants Make Your Sweat Smell Worse? - Science World",
+   "u": "https://www.scienceworld.ca/stories/can-antiperspirants-make-your-sweat-smell-worse/",
+   "d": "2018-03-21"
+  },
+  {
+   "t": "Anxiety Can Make Your Sweat Smell Worse, Because... | HuffPost Life",
+   "u": "https://www.huffpost.com/entry/anxiety-sweat-smells-worse-than-regular-sweat_n_570553cee4b0b90ac27103a7",
+   "d": "2016-04-07"
+  },
+  {
+   "t": "Why does anxious sweat smell worse? | Podcasts | Naked Scientists",
+   "u": "https://www.thenakedscientists.com/podcasts/question-week/why-does-anxious-sweat-smell-worse",
+   "d": ""
+  },
+  {
+   "t": "Why Does My Sweat Smell Worse Than Usual? | Stop Sudden Odor",
+   "u": "https://wellfizz.com/why-does-my-sweat-smell-worse-than-usual/",
+   "d": "2026-02-05"
+  },
+  {
+   "t": "Why Antiperspirant Makes You Smell Worse | Thrive Market",
+   "u": "https://thrivemarket.com/blog/heres-why-antiperspirant-makes-you-smell-worse-and-what-to-use-instead",
+   "d": "2016-03-23"
+  },
+  {
+   "t": "Why do I smell worse after cardio vs weights? – MAGS Skin",
+   "u": "https://magsskin.com/blogs/magsazine/why-do-i-smell-worse-after-cardio-vs-weights",
+   "d": "2026-03-23"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   76.9,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   76.9,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "The scent you’re noticing comes from **stress‑driven sweat** that comes from the **apocrine glands** in your armpits, groin and scalp. These glands secrete a milky fluid rich in proteins and lipids, unlike the watery eccrine sweat that is produced during exercise. When the bacteria that live on your skin feed on those richer secretions, they produce volatile fatty acids that smell much stronger than ordinary sweat【1】【4】【6】.\n\nA few things can make that odor worse or change how it’s produced:\n\n* **Higher stress or adrenaline** turns on the apocrine glands more often, and the resulting sweat is richer in nutrients for bacteria【1】【2】【4】.\n* **Intense cardio** pushes the body to release more metabolic byproducts that also feed bacteria, so you may notice a stronger smell after a run or sprint rather than a light jog【8】.\n* **Certain medications**—especially antidepressants, and conditions such as diabetes, kidney or liver disease—can alter sweat chemistry and increase odor【6】.\n* **Antiperspirants** that block sweat ducts can help, but if they’re not used properly (or if they’re left on dry skin and create a residue that bacteria feed on) they can actually intensify the smell【3】【7】.\n\nThe most reliable way to reduce the odor is a two‑pronged approach: keep the bacteria starved and keep the sweat from reaching the skin surface.\n\n1. **Hygiene first** – shower within an hour of heavy sweating, using an antibacterial or pH‑balanced soap that removes both sweat and surface bacteria. A quick cool‑water rinse can lower skin temperature and slow bacterial activity.  \n2. **Control moisture** – apply a clinical‑strength antiperspirant that contains **aluminum chloride** (or a similar compound) to the armpits before bed or before a stressful event. This blocks the ducts of the apocrine glands and prevents sweat from reaching the skin. If you notice a flare‑up after a week of use, try a different formulation or reduce the amount; some users find that a heavy residue can feed bacteria.  \n3. **Mask, don’t ignore** – after the antiperspirant has dried, you can apply a deodorant that neutralises acids (often with baking‑soda or activated charcoal) to cover any residual odor. Avoid products that simply mask the smell without addressing bacteria, as they can worsen the problem when the residue stays on the skin.  \n\nIf you’re on medications that increase sweating or if you have a medical condition that may affect sweat composition, discuss these issues with your doctor—sometimes adjusting the medication or treating the underlying condition can improve the odor.  \n\nBy combining good hygiene, a proper antiperspirant and a deodorant that targets bacteria, you can cut the food source for odor‑producing microbes and keep your sweat from smelling worse than it used to.",
+ "answer": "The scent you’re noticing comes from **stress‑driven sweat** that comes from the **apocrine glands** in your armpits, groin and scalp. These glands secrete a milky fluid rich in proteins and lipids, unlike the watery eccrine sweat that is produced during exercise. When the bacteria that live on your skin feed on those richer secretions, they produce volatile fatty acids that smell much stronger than ordinary sweat【1】【4】【6】.\n\nA few things can make that odor worse or change how it’s produced:\n\n* **Higher stress or adrenaline** turns on the apocrine glands more often, and the resulting sweat is richer in nutrients for bacteria【1】【2】【4】.\n* **Intense cardio** pushes the body to release more metabolic byproducts that also feed bacteria, so you may notice a stronger smell after a run or sprint rather than a light jog【8】.\n* **Certain medications**—especially antidepressants, and conditions such as diabetes, kidney or liver disease—can alter sweat chemistry and increase odor【6】.\n* **Antiperspirants** that block sweat ducts can help, but if they’re not used properly (or if they’re left on dry skin and create a residue that bacteria feed on) they can actually intensify the smell【3】【7】.\n\nThe most reliable way to reduce the odor is a two‑pronged approach: keep the bacteria starved and keep the sweat from reaching the skin surface.\n\n1. **Hygiene first** – shower within an hour of heavy sweating, using an antibacterial or pH‑balanced soap that removes both sweat and surface bacteria. A quick cool‑water rinse can lower skin temperature and slow bacterial activity.  \n2. **Control moisture** – apply a clinical‑strength antiperspirant that contains **aluminum chloride** (or a similar compound) to the armpits before bed or before a stressful event. This blocks the ducts of the apocrine glands and prevents sweat from reaching the skin. If you notice a flare‑up after a week of use, try a different formulation or reduce the amount; some users find that a heavy residue can feed bacteria.  \n3. **Mask, don’t ignore** – after the antiperspirant has dried, you can apply a deodorant that neutralises acids (often with baking‑soda or activated charcoal) to cover any residual odor. Avoid products that simply mask the smell without addressing bacteria, as they can worsen the problem when the residue stays on the skin.  \n\nIf you’re on medications that increase sweating or if you have a medical condition that may affect sweat composition, discuss these issues with your doctor—sometimes adjusting the medication or treating the underlying condition can improve the odor.  \n\nBy combining good hygiene, a proper antiperspirant and a deodorant that targets bacteria, you can cut the food source for odor‑producing microbes and keep your sweat from smelling worse than it used to.",
+ "chars": 2785,
+ "raw_bytes": 9493,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.27,
+ "rate_gen_tok_s": 202.99,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "sg-server-think",
+ "asked_at": "2026-10-24T05:55:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,126 @@
+{
+ "name": "baseline-local-think",
+ "config": "local-think",
+ "where": "local",
+ "started": "2026-10-24T02:44:34",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a2489e260675c0d0a",
+ "head": [
+  "2821021",
+  "evalbench"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 125.63,
+   "chars": 69,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 212.5,
+   "chars": 1843,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 108.52,
+   "chars": 402,
+   "error": ""
+  },
+  {
+   "file": "q07.json",
+   "elapsed_s": 242.69,
+   "chars": 2375,
+   "error": ""
+  },
+  {
+   "file": "q10.json",
+   "elapsed_s": 127.07,
+   "chars": 69,
+   "error": ""
+  },
+  {
+   "file": "q11.t2.json",
+   "elapsed_s": 229.96,
+   "chars": 2395,
+   "error": ""
+  },
+  {
+   "file": "q13.json",
+   "elapsed_s": 123.36,
+   "chars": 69,
+   "error": ""
+  },
+  {
+   "file": "q15.json",
+   "elapsed_s": 251.46,
+   "chars": 1751,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 128.71,
+   "chars": 69,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 270.9,
+   "chars": 2281,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 241.79,
+   "chars": 2295,
+   "error": ""
+  },
+  {
+   "file": "q22.json",
+   "elapsed_s": 124.32,
+   "chars": 69,
+   "error": ""
+  },
+  {
+   "file": "q24.json",
+   "elapsed_s": 238.33,
+   "chars": 2653,
+   "error": ""
+  },
+  {
+   "file": "q26.json",
+   "elapsed_s": 124.07,
+   "chars": 69,
+   "error": ""
+  },
+  {
+   "file": "q28.json",
+   "elapsed_s": 205.13,
+   "chars": 590,
+   "error": ""
+  },
+  {
+   "file": "q30.json",
+   "elapsed_s": 120.49,
+   "chars": 1160,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "tier": "Thinking",
+ "finished": "2026-10-24T03:33:02"
+}

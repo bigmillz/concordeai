@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.1,14.0],\"final\":15.6,\"ftok\":317,\"est\":false}",
+  "X-Hurry": "00162eeae20b27c7"
+ },
+ "first_byte_s": 0.0,
+ "first_text_s": 48.26,
+ "elapsed_s": 60.5,
+ "events": [
+  {
+   "t": 0.0,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.29,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.29,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.29,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.21,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 23 passages"
+   }
+  },
+  {
+   "t": 15.21,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.21,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.21,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 26.34,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 26.34,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 26.34,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 26.34,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 26.34,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 38.17,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 38.17,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "7 notes"
+   }
+  },
+  {
+   "t": 38.17,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 38.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 38.17,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 48.26,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 49.94,
+   "tag": "RATE",
+   "data": {
+    "tps": 181.4,
+    "tok": 306,
+    "s": 1.7
+   }
+  },
+  {
+   "t": 49.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 49.94,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 49.94,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 60.5,
+   "tag": "RESET"
+  },
+  {
+   "t": 60.5,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 8 claims, fixed 1",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 60.5,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1043 chars"
+   }
+  },
+  {
+   "t": 60.5,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.0,
+   "Searching the web…"
+  ],
+  [
+   10.29,
+   "Reading 8 sources…"
+  ],
+  [
+   15.21,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   26.34,
+   "compositing…"
+  ],
+  [
+   26.34,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   49.94,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.01
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.29
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.29
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 23 passages",
+   "t_s": 15.21
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.21
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 26.34
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "7 notes",
+   "t_s": 38.17
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 38.17
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 49.94
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 49.94
+  },
+  {
+   "id": "verify",
+   "l": "Checked 8 claims, fixed 1",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 60.5
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1043 chars",
+   "t_s": 60.5
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 60.5
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 26.34,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Pizza can be part of a healthy diet, but it’s often **high in sodium, saturated fat, refined carbs, and added sugars**—all of which can raise blood pressure, contribute to heart disease, and weight gain.  \n- **600–900 mg of sodium per slice** of commercial pepperoni pizza [1]; two slices already hit 1,200–1,800 mg, leaving little room for the rest of your day’s intake if you’re aiming for the 2,300 mg daily limit.  \n- The combination of **high sodium, saturated fats, and refined carbs** is linked to heart disease, high blood pressure, and obesity [2].  \n- Large portions can encourage over‑eating and excess calories, which further fuels weight gain [8].\n\n**How often is fine?**  \n- **Occasional indulgence**—once or twice a week, sticking to 1–2 slices, keeps you within a reasonable sodium budget and allows you to balance the meal with vegetables or a side salad.  \n- If you’re on a sodium‑restricted diet, limit pizza to **once a month** or choose a lower‑sodium, whole‑grain crust with lean toppings.  \n- For those with sulfite sensitivity, be aware that some pizza doughs contain sulfites that can trigger asthma or allergy symptoms [3].\n\nIn short, pizza isn’t inherently “bad,” but its t"
+  },
+  {
+   "t_s": 26.34,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 38.17,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **UNSUPPORTED**: \"Large portions can encourage over-eating and excess calories\" — no source states this is a current or primary concern tied to pizza specifically (evidence [8] is theoretical and unrelated to pizza as a meal).\n- **UNSUPPORTED**: \"choose a lower-sodium, whole-grain crust with lean toppings\" — no source provides or cites examples of lower-sodium pizza options or their sodium content.\n- **MISSING**: *sulfite sensitivity frequency/impact* — the draft lists sulfite warnings [3] but does not address how common sulfite-triggered reactions are in pizza consumers or whether sulfites are standard in commercial pizza dough.\n- **WRONG**: \"1,200–1,800 mg\" -> \"1,200–1,800 mg\" (correct calculation of 2 slices at 600–900 mg each) but then misapplied later as a *daily intake* range in the same sentence (conflicts with [1]’s 2,300 mg limit). The draft’s sodium budget framing is also unsupported (e.g., no source ties 1–2 slices/week to a balanced sodium intake).\n- **CONTRADICTS**: \"Pizza isn’t inherently ‘bad’\" vs. its opening sentence (\"**high in sodium, saturated fat, refined carbs, and added sugars**—all of which can raise blood pressure...\") — the verdict should not weaken the "
+  }
+ ],
+ "sources": [
+  {
+   "t": "6 Reasons Why Pizza Is Bad For You - coursepivot.com",
+   "u": "https://coursepivot.com/blog/6-reasons-why-pizza-is-bad-for-you/",
+   "d": "2026-06-24"
+  },
+  {
+   "t": "15 Reasons Why Pizza Is Bad for Health - foodbears.com",
+   "u": "https://foodbears.com/why-pizza-is-bad-for-health/",
+   "d": "2023-07-02"
+  },
+  {
+   "t": "Sulfite Allergy & Sensitivity: Symptoms, Tests & Treatments",
+   "u": "https://my.clevelandclinic.org/health/diseases/11323-sulfite-sensitivity",
+   "d": "2024-04-24"
+  },
+  {
+   "t": "Migraines in Children: Symptoms, Causes & Treatment | Cleveland Clinic",
+   "u": "https://my.clevelandclinic.org/health/diseases/9637-migraines-in-children-and-adolescents",
+   "d": "2023-09-06"
+  },
+  {
+   "t": "12 Absolute Best Pizza Joints In Washington State",
+   "u": "https://www.tastingtable.com/2273017/best-pizza-spots-washington-state/",
+   "d": "2026-10-06"
+  },
+  {
+   "t": "Fine Pizza - Google Play'de Uygulamalar",
+   "u": "https://play.google.com/store/apps/details?id=com.ordrz.finepizza&hl=tr",
+   "d": ""
+  },
+  {
+   "t": "Keep the Beat: Heart Healthy Recipes - NHLBI, NIH",
+   "u": "https://www.nhlbi.nih.gov/sites/default/files/publications/03-2921.pdf",
+   "d": ""
+  },
+  {
+   "t": "Portion Size: What We Know and What We Need to Know - PMC",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4337741/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   38.17,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   38.17,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 181.4,
+  "tok": 306,
+  "s": 1.7
+ },
+ "answer_raw": "Pizza is **high in sodium (600‑900 mg per slice)**, saturated fats, refined carbs, and added sugars [1][2].\nTwo slices already deliver **1,200‑1,800 mg of sodium**, leaving most people little room before reaching the 2,300 mg daily limit [1].\nThose nutrients are linked to heart disease, high blood pressure, and obesity [2].\n\nThere is **no evidence that eating large portions of pizza specifically causes over‑eating**; the claim that large portions encourage excess calories is unsupported [8].\n\nSome commercial pizza dough contains sulfites, which can trigger asthma or allergy symptoms in sensitive individuals [3]. The frequency of such reactions in pizza consumers isn’t documented, but those with sulfite sensitivity should avoid dough that lists sulfites.\n\n- **Once or twice a week** with 1‑2 slices, balanced with vegetables or a side salad, keeps sodium and calorie intake moderate.\n- If you must limit sodium, consider lower‑sodium options or homemade crust.\n- Daily pizza would likely exceed most people’s sodium and calorie goals.",
+ "answer": "Pizza is **high in sodium (600‑900 mg per slice)**, saturated fats, refined carbs, and added sugars [1][2].\nTwo slices already deliver **1,200‑1,800 mg of sodium**, leaving most people little room before reaching the 2,300 mg daily limit [1].\nThose nutrients are linked to heart disease, high blood pressure, and obesity [2].\n\nThere is **no evidence that eating large portions of pizza specifically causes over‑eating**; the claim that large portions encourage excess calories is unsupported [8].\n\nSome commercial pizza dough contains sulfites, which can trigger asthma or allergy symptoms in sensitive individuals [3]. The frequency of such reactions in pizza consumers isn’t documented, but those with sulfite sensitivity should avoid dough that lists sulfites.\n\n- **Once or twice a week** with 1‑2 slices, balanced with vegetables or a side salad, keeps sodium and calorie intake moderate.\n- If you must limit sodium, consider lower‑sodium options or homemade crust.\n- Daily pizza would likely exceed most people’s sodium and calorie goals.",
+ "chars": 1043,
+ "raw_bytes": 7971,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.31,
+ "rate_gen_tok_s": 21.3,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2-server-think",
+ "asked_at": "2026-10-24T23:14:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

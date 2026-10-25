@@ -1,0 +1,275 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.6,21.1,26.1],\"final\":32.2,\"ftok\":2117,\"est\":false}",
+  "X-Hurry": "b80d439581fcfb8a"
+ },
+ "first_byte_s": 7.48,
+ "first_text_s": 66.1,
+ "elapsed_s": 73.94,
+ "events": [
+  {
+   "t": 7.48,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 7.48,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 7.48,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 13.72,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1057
+  },
+  {
+   "t": 13.72,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 31.06,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 31.06,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 52.51,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 53.21,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 53.22,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 53.22,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is double-checking the drafts"
+  },
+  {
+   "t": 63.86,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 63.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 63.86,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · ministral-3:14b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 66.1,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 73.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 73.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "6129 chars"
+   }
+  },
+  {
+   "t": 73.94,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   7.48,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   13.72,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   31.06,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   52.51,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   53.22,
+   "compositing…"
+  ],
+  [
+   53.22,
+   "Ollama1 · ministral-3:14b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 7.48
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 63.86
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 73.94
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "6129 chars",
+   "t_s": 73.94
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 73.94
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 13.72,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "The newest iPhone on the market is the **iPhone 18 Pro Max**, launched in September 2026.  \nIt starts at **$1,199** in the U.S. retail price (Macworld, Sep 26 2026).  \n\nApple’s trade‑in program gives you up to **$600 credit** if you bring in an iPhone 14 Pro (Apple, Oct 1 2026), so you’re looking at roughly **$599** out‑of‑pocket if you upgrade from that model.  \n\n**Is it worth upgrading from an iPhone 14?**  \n- **Pros**: The A18 P chip delivers a 15 % CPU boost and 20 % GPU improvement over the A16, the camera system now has a 200 MP main sensor and a new periscope telephoto, and the ProMotion display runs at 120 Hz with deeper HDR support.  \n- **Cons**: Battery life gains are modest (≈ 2 h extra on a full charge), and the price‑plus‑trade‑in still costs more than most mid‑range phones.  \n\nIf you rely on the phone for high‑resolution photography, gaming, or future‑proofing for 6G networks, the upgrade is a solid choice. If you’re satisfied with the 14’s performance and battery, you can hold off until the next cycle for a better price point."
+  },
+  {
+   "t_s": 31.06,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "As of **Saturday, October 24, 2026**, the **newest iPhone is the iPhone 18 Pro Max** (released late 2025), but the **mainstream flagships right now are the iPhone 17 Pro and iPhone 17 Pro Max** — the standard iPhone 17 is no longer Apple’s focus. Here’s the breakdown for your question:\n\n### **Pricing (US, new, direct from Apple or carrier unlocked)**\nThe **iPhone 17 Pro Max** starts at **$1,199** (128GB), with the 256GB/512GB variants at **$1,349/$1,649**. The **iPhone 17 Pro** is **$999** (128GB), **$1,149** (256GB). Trade-in credit can drop this by **$200-$400** if you’re upgrading from an iPhone 14.\n\nCarrier deals (Verizon, AT&T, etc.) often shave **$100-$200** off, but those are tied to 2-year contracts or trade-in. The **iPhone Duo** (dual-display concept) is still pre-order only, priced at **$1,299** (128GB), but WIRED’s hands-on suggests it’s niche — no upgrade for most people.\n\n### **Is it worth upgrading from an iPhone 14?**\n**No.** Here’s why:\n- The **iPhone 14** (released 2022) still has the **A15 Bionic chip**, which is **80%+ as fast** as the **A17 Pro** in the iPhone 17 Pro Max. Benchmark gaps are shrinking, and daily tasks (camera, browsing, apps) don’t feel slower.\n"
+  },
+  {
+   "t_s": 53.21,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "The **iPhone 18 Pro** and **iPhone 18 Pro Max** are the newest flagship models as of October 2026 (Macworld, Oct 22, 2026). The **iPhone Duo** is also currently in the lineup as a new form factor.\n\nSpecific pricing for the iPhone 18 Pro is not provided in current data, though the **iPhone 17 Pricing Guide (Sep 3, 2026)** establishes the recent price floor for the flagship series.\n\nUpgrading from an **iPhone 14** is a substantial leap that justifies the move due to three primary architectural shifts:\n\n**SoC and NPU Architecture** — You are moving from the **A15 Bionic** to the **A18 Pro**. The A18 Pro features a redesigned architecture specifically optimized for **on-device LLMs** and generative AI. The iPhone 14 lacks the specialized neural processing units required to run the latest \"Apple Intelligence\" features natively and efficiently.\n\n**Display Refresh and Brightness** — If you are currently using a base iPhone 14, you are limited to a **60Hz refresh rate**. The 18 Pro utilizes **ProMotion (120Hz)** and a significantly higher peak nit count, which provides a much smoother UI experience and better visibility in high-ambient-light environments.\n\n**Thermal Management** — Apple ha"
+  }
+ ],
+ "sources": [
+  {
+   "t": "What’s the Best iPhone to Buy or Avoid Right Now? (2026) | WIRED",
+   "u": "https://www.wired.com/gallery/iphone-buying-guide/"
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/"
+  },
+  {
+   "t": "How Much Does the Newest iPhone Cost? iPhone 17 Pricing Guide",
+   "u": "https://electronics.alibaba.com/buyingguides/iphone-17-pricing-guide-what-you-pay-when-to-wait"
+  },
+  {
+   "t": "Best iPhone 2026: Which iPhone should you buy? | Macworld",
+   "u": "https://www.macworld.com/article/228816/best-iphone-pro-max-duo-ranked.html"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer": "The newest iPhone you can buy right now is the **iPhone 17 Pro Max** (Macworld, **Oct 22, 2026**), with the **iPhone 17 Pro** as its smaller sibling. **No iPhone 18 or iPhone Duo** is in retail stores yet; the Duo remains pre-order only at **$1,299** (WIRED, **Sep 2026**) and isn’t a mainstream upgrade. The **iPhone 17 (non-Pro)** exists but is no longer Apple’s focus—stick to the Pro models for the latest specs.\n\n### **Pricing (US, direct from Apple)**\n| Model               | Base (128GB) | 256GB  | 512GB  | Max      |\n|---------------------|-------------|--------|--------|----------|\n| **iPhone 17 Pro**   | **$999**    | $1,149 | $1,449 | —        |\n| **iPhone 17 Pro Max** | **$1,199** | $1,349 | $1,649 | **$1,899** |\n\nCarrier deals (AT&T, Verizon) may drop **$100–$200** off these prices with trade-ins or contracts. **Trade-in credit** for an **iPhone 14 Pro** is **$600 max** (Apple, **Oct 1, 2026**), cutting the Pro Max to **~$599** out of pocket. The base iPhone 14 trades in for far less—**$200–$300**—so upgrading from it will cost **$700+**.\n\n### **Is it worth upgrading from an iPhone 14?**\n**No, unless you need one of these:**\n- **ProMotion (120Hz) display** (smoother scrolling, animations).\n- **5x periscope zoom** (for photography; the iPhone 14’s 3x is still decent).\n- **1TB storage** (Pro Max only; the 14 maxed at 512GB).\n- **Future-proofing for AI tasks** (the A17 Pro chip in the 17 Pro Max handles on-device AI better than the iPhone 14’s A15, but the gap isn’t dramatic for everyday use).\n\n**The A15 in your iPhone 14 is still 80%+ as fast** as the A17 Pro (Macworld), and battery life improves by **~2 hours**—hardly a dealbreaker. If you’re happy with your 14, **wait for the iPhone 18** (expected late 2027) or stick with it for another 2 years. The 17 Pro/Max is a **minor evolutionary step**, not a revolutionary one.",
+ "chars": 1857,
+ "raw_bytes": 7195,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.28,
+ "rate_gen_tok_s": 59.22,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:14:13",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,227 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":0.0,\"models\":[10.5,14.3,24.6],\"final\":32.4,\"ftok\":2968,\"est\":false}",
+  "X-Hurry": "37e4ccbcd03aae08"
+ },
+ "first_byte_s": 4.13,
+ "first_text_s": 59.89,
+ "elapsed_s": 62.11,
+ "events": [
+  {
+   "t": 4.13,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 8.57,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 766
+  },
+  {
+   "t": 8.57,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 21.01,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 21.01,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 40.62,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 40.62,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 40.62,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 55.89,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 55.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 55.89,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 59.89,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 62.11,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 62.11,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "5161 chars"
+   }
+  },
+  {
+   "t": 62.11,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.13,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   8.57,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   21.01,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   40.62,
+   "compositing…"
+  ],
+  [
+   40.62,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 55.89
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 62.11
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "5161 chars",
+   "t_s": 62.11
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 62.11
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 8.57,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "4‑bit quantization compresses each weight tensor from 16/32‑bit floats to just 4 bits per value, typically using schemes like GPTQ or AWQ that learn per‑tensor scales and zero‑points.  \nThe **effect** is a 8×–16× reduction in memory and a proportional speed‑up for tensor‑core or FP8‑friendly hardware, but the model’s expressive capacity drops because the weight distribution is coarsely binned; this can raise perplexity by a few percent and hurt delicate downstream tasks.  \nIt **matters** when you need to run a large LLM on an 8‑GB GPU, in a cost‑sensitive cloud inference setup, or on edge devices—where the memory savings outweigh the slight accuracy loss—and less so when you’re fine‑tuning on a task that requires the full precision of the original weights."
+  },
+  {
+   "t_s": 21.01,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "4-bit quantization truncates an LLM’s weight tensors from **32-bit (FP32) floating-point** to **4-bit integers** (typically INT4), reducing memory footprint by **~80%** and cutting inference costs by **40-60%**. It works by:\n- Clipping the original FP32 weights to a range (e.g., -6.0 to +6.0), scaling them to 4-bit precision.\n- Using symmetric quantization (positive/negative values) or asymmetric (e.g., for activations) to preserve relative magnitudes.\n- Often paired with **groups** (e.g., 32 weights quantized together to reduce reconstruction error) or **per-channel** scaling.\n\n**Where it matters**:\n- **Edge devices**: FP32 inference demands **~4x more memory** than 4-bit; a 1B-parameter model drops from **8GB → ~2GB** RAM.\n- **Batch inference**: Latency improves because fewer bits means **faster memory access** and **higher throughput** (e.g., 4-bit models hit **2-3x more tokens/sec** on the same GPU).\n- **Cost-sensitive workloads**: Cloud providers (e.g., vLLM, llama.cpp) charge by **input/output tokens**, and 4-bit halves the token budget for the same dollar.\n\n**Where it doesn’t**:\n- **Training**: Backpropagation is unstable with 4-bit gradients—training uses **8-bit (INT8) or "
+  },
+  {
+   "t_s": 40.62,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "4-bit quantization compresses a model's weight tensors from **16-bit floating point (FP16/BF16)** to **4-bit integers (INT4)** or specialized formats like **NF4** (NormalFloat4). This process maps the high-precision weight values into a much smaller discrete space, reducing the memory footprint of the model by approximately **75%**.\n\nModern implementations like **GPTQ** and **AWQ** (the current standards for production inference) use **block-wise quantization**. Instead of quantizing every weight independently—which would cause massive precision loss—they group weights into blocks and calculate a **scaling factor** for each block. This minimizes **quantization noise** (the difference between the original and compressed value), ensuring the model's **perplexity** remains stable enough for high-quality generation.\n\n## When it actually matters\n\n**VRAM Capacity**\nThis is the primary driver for most users. A **70B parameter** model requires roughly **140GB of VRAM** in FP16. Quantizing it to 4-bit brings that down to **~35-40GB**, allowing the model to run on a single **24GB consumer GPU** (like an RTX 3090/4090) or a pair of them. It's the difference between \"it won't run\" and \"it runs"
+  }
+ ],
+ "sources": null,
+ "photos": null,
+ "run": "baseline-server-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": false,
+ "answer": "4‑bit quantization shrinks each weight from 16‑ or 32‑bit floating‑point to a 4‑bit integer (INT4) or a normal‑float‑4 (NF4) code.  GPTQ and AWQ do this in **blocks**—each block gets its own scale and zero‑point—so the quantization noise stays small.  \n\nThe result is a **4‑to‑8× reduction in memory**: a 1 B‑parameter model drops from about **4 GB (FP32)** to **≈0.5 GB (4‑bit)**; a 70 B model falls from ~140 GB (FP16) to ~35–40 GB (4‑bit).  Because the weights are smaller, fewer bytes move between VRAM and compute, so inference can be faster, but the gain is **implementation‑dependent**—most GPUs have no native 4‑bit tensor core, so you’ll see only a modest throughput boost when the runtime is tuned for INT4.  \n\nAccuracy typically suffers by **~1–3 % in perplexity** or a few percent on downstream tasks, depending on the model and quantization algorithm.  That’s usually acceptable for many inference workloads, but 4‑bit is **not suitable for training or fine‑tuning**; back‑propagation requires at least 8‑bit or FP16 precision.  \n\nUse 4‑bit when you need to run a large LLM on limited VRAM, on edge hardware, or in a cost‑sensitive cloud setting where the memory savings outweigh the small accuracy drop.  Avoid it for precision‑critical applications or any scenario that requires full‑precision gradients.",
+ "chars": 1319,
+ "raw_bytes": 5609,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.31,
+ "rate_gen_tok_s": 148.54,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "asked_at": "2026-10-24T01:54:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,422 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[12.1,18.5,27.3],\"final\":34.3,\"ftok\":2666,\"est\":false}",
+  "X-Hurry": "d690d4223aaef656"
+ },
+ "first_byte_s": 2.66,
+ "first_text_s": 124.52,
+ "elapsed_s": 124.73,
+ "events": [
+  {
+   "t": 2.66,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.66,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.59,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 32 passages"
+   }
+  },
+  {
+   "t": 14.59,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.59,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.59,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 24.37,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 24.37,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 47.73,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 49.09,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 49.09,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 72.77,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 79.0,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 19
+  },
+  {
+   "t": 79.01,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 79.01,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 96.43,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 96.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 96.43,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 117.83,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 124.52,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 124.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 124.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "3984 chars"
+   }
+  },
+  {
+   "t": 124.72,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.66,
+   "Searching the web…"
+  ],
+  [
+   10.67,
+   "Reading 8 sources…"
+  ],
+  [
+   14.59,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   24.37,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   47.73,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   49.09,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   72.77,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   79.01,
+   "compositing…"
+  ],
+  [
+   79.01,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ],
+  [
+   117.83,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 2.66
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.67
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.67
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 32 passages",
+   "t_s": 14.59
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.59
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 96.43
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 124.72
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "3984 chars",
+   "t_s": 124.72
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 124.72
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 24.37,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Top five high‑paying jobs you can land without a four‑year degree (2026)**  \n(typical U.S. median pay shown in parentheses; time to qualify in parentheses)\n\n| Rank | Job | Typical median pay | How long to qualify | Source |\n|------|-----|--------------------|---------------------|--------|\n| 1 | **Electrician** | **$70 – $100 k** | 4–5 yr apprenticeship (incl. 8‑yr license) | [8] |\n| 2 | **HVAC Technician** | **$55 – $80 k** | 1–2 yr trade school + 6‑month certification | [8] |\n| 3 | **Commercial Pilot** | **$110 – $130 k** | 1–2 yr flight school + FAA CPL + ATPL | [8] |\n| 4 | **Dental Hygienist** | **$85 – $95 k** | 2‑yr associate + state licensure | [8][2] |\n| 5 | **Paralegal** | **$60 – $75 k** | 1–2 yr certificate program | [8] |\n\n- **Why these work** – They all require a *certification, license, or apprenticeship* rather than a bachelor’s, and they’re listed among the 12 entry‑level jobs that pay well without a degree in 2026 [1].  \n- **Low‑stress options** – Dental hygienists and paralegals appear in the low‑stress list that still commands solid pay [2].  \n- **Training path** – Apprenticeships (electrician, HVAC) are the fastest routes because the training is paid and hands"
+  },
+  {
+   "t_s": 49.09,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "**Here are five realistic, high-paying jobs you can land without a degree** — all with clear pay ranges and entry timelines, based on 2026 data. The best ones now are either **skilled trades** (highest starting pay), **tech certs** (fastest growth), or **license-backed roles** (most schedule control). I’ve excluded commission-heavy sales jobs unless they’re truly low-stress, and skipped fields that require years of prior experience (like aviation).\n\n### **1. Real Estate Broker**\n**Pay:** **$60,000–$150,000+** (U.S. medians) — **$70k–$120k/year** after 2–3 years with a book of clients [8][2].\n**Time to entry:** **3–6 months** (varies by state). You’ll need a **real estate agent license** (~$200–$400 for course + exam) and **pre-licensing education** (~60–150 hours). Top earners build a client base in hot markets like NYC or Austin; part-time brokers can scale to full-time in **1–2 years**.\n**Why?** No degree, no boss — you set your own hours, but success hinges on networking and local market knowledge. **Fastest no-degree path to $100k/year** if you hustle [2][8].\n\n### **2. Air Traffic Controller**\n**Pay:** **$70,000–$120,000** (U.S. starting salary: **$65k–$75k**) [8]. Top controll"
+  },
+  {
+   "t_s": 79.0,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — empty)"
+  }
+ ],
+ "sources": [
+  {
+   "t": "12 Powerful & Surprising Entry-Level Jobs That Pay Well Without...",
+   "u": "https://danzok.com/entry-level-jobs-without-degree-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "17 Low-Stress Jobs That Pay Well Without a Degree (2026)",
+   "u": "https://nichehacks.com/low-stress-jobs-that-pay-well-without-a-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "Movies with Long Takes That Amaze | The Reel - films.io",
+   "u": "https://films.io/list/2026/04/27/best-long-takes-movies/",
+   "d": "2026-04-27"
+  },
+  {
+   "t": "investopedia.com/personal-finance/top-highest-paying-jobs",
+   "u": "https://www.investopedia.com/personal-finance/top-highest-paying-jobs/",
+   "d": "2021"
+  },
+  {
+   "t": "Best Long Takes in Cinema History (September 2026)",
+   "u": "https://www.requiemforadream.com/best-long-takes-in-cinema-history/",
+   "d": "2026-05-10"
+  },
+  {
+   "t": "Top 10 AI Undress Tools 2026 — Definitive Rankings | UndressHer AI",
+   "u": "https://undress-her.com/rankings",
+   "d": "2026"
+  },
+  {
+   "t": "PayInRussia — Easy Way to Pay in Russia for Tourists",
+   "u": "https://payinrussia.com/",
+   "d": ""
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   96.43,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   96.43,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "Electrician – median **$70‑$100 k** in the U.S.; you finish a **4‑5‑year apprenticeship** and pass a state exam. [1][8]\n\nHVAC Technician – median **$55‑$80 k**; most people go through a **3‑4‑year apprenticeship** before qualifying. [1][8]\n\nDental Hygienist – median **$85‑$95 k**; the route is a **2‑year associate degree** followed by state licensure. [1][8]\n\nCommercial Pilot – median **$60‑$70 k**; to get a commercial license you need **250 flight‑hour hours**, and an airline transport pilot license requires **1,500 hours** plus training. [1]\n\nAir Traffic Controller – median **$65‑$120 k**; you must complete FAA training, pass the **AT‑SUAT exam**, and succeed in a highly selective hiring process. [1]",
+ "answer": "Electrician – median **$70‑$100 k** in the U.S.; you finish a **4‑5‑year apprenticeship** and pass a state exam. [1][8]\n\nHVAC Technician – median **$55‑$80 k**; most people go through a **3‑4‑year apprenticeship** before qualifying. [1][8]\n\nDental Hygienist – median **$85‑$95 k**; the route is a **2‑year associate degree** followed by state licensure. [1][8]\n\nCommercial Pilot – median **$60‑$70 k**; to get a commercial license you need **250 flight‑hour hours**, and an airline transport pilot license requires **1,500 hours** plus training. [1]\n\nAir Traffic Controller – median **$65‑$120 k**; you must complete FAA training, pass the **AT‑SUAT exam**, and succeed in a highly selective hiring process. [1]",
+ "chars": 711,
+ "raw_bytes": 6215,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 1.43,
+ "rate_gen_tok_s": null,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "sg-server-think",
+ "asked_at": "2026-10-24T06:11:41",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -9081,7 +9081,9 @@ _corpus = ["plain answer", "draft one\x00RESET\x00the real answer",
            "cut mid-frame \x00STATUS:half", "keep \x00STATUS:line\nbreak\x00 tail",
            "trailing newline\n", "\x00RESET\x00", "only\x00RESET\x00\x00STATUS:x\x00",
            'emoji \U0001f600 \x00DRAFT:{"m":"a","t":"d"}\x00 done',
-           "before\x00RESET\x00after \x00MAP:{}\x00 end\n\n", "partial \x00RES"]
+           "before\x00RESET\x00after \x00MAP:{}\x00 end\n\n", "partial \x00RES",
+           # the writer's pace (6b515) is a frame on both sides, never saved as text
+           'paced\x00RATE:{"tps":31.2,"tok":700,"s":22.4}\x00 answer']
 _tmpjs = os.path.join(_SMOKE_TMP, "store22.js")
 with open(_tmpjs, "w", encoding="utf-8") as fh:
     fh.write(_jseg + "\nconst v=JSON.parse(require('fs').readFileSync(0,'utf8'));"
@@ -9097,7 +9099,7 @@ _pt = [_cs["turn_text"](r) for r in _corpus]
 check("the page and the server hash a chat alike and keep the same text after RESET",
       _jo.get("h") == _ph and _jo.get("t") == _pt
       and _pt[1] == "the real answer" and _pt[2] == "final" and _pt[4] == "cut mid-frame "
-      and _pt[5] == "keep \x00STATUS:line\nbreak\x00 tail",
+      and _pt[5] == "keep \x00STATUS:line\nbreak\x00 tail" and _pt[-1] == "paced answer",
       "%r" % [_jo.get("err"), [a == b for a, b in zip(_jo.get("t") or [], _pt)]])
 
 # what the server saves from a finished stream, as the page builds it
@@ -11951,8 +11953,21 @@ check("one cloud gate: an Advanced list narrows but never opens it; Cloud Only o
 # review: the answer got the cloud badge and its title went to that
 # provider)
 _rc26 = dict(_LH)
+# the answer craft's helpers go with run_council (6b515)
+_CRAFT_NAMES = {"ANSWER_BRIEF", "_BRIEF_MARK", "_brief_today", "answer_brief", "brief_system",
+                "_EVIDENCE_HEAD", "final_prompt", "CRITIC_INSTRUCTION", "critic_prompt", "critic_notes",
+                "VERIFY_BUDGET_S", "VERIFY_CLOUD_S", "VERIFY_MIN_CHARS", "VERIFY_SYSTEM",
+                "VERIFY_INSTRUCTION", "_CLAIM_RX", "_SENT_RX", "_FIX_META_RX", "claim_count",
+                "verify_prompt", "parse_claims", "_loose_rx", "_tidy_fixed", "apply_fixes",
+                "verify_answer", "verify_pick", "verify_pass", "rate_frame",
+                # quality-2 (6b518): the critic's notes checked, the corrections, the recap, the writer's effort
+                "_NOTE_LABEL_RX", "_NOTE_QUOTE_RX", "_NOTE_NUM_RX", "_NOTE_WORD_STOP", "_num_key",
+                "_note_corpus", "_note_new_specifics", "critic_filter", "_evidence_has", "critic_corrections",
+                "_correction_backed", "corrections_block", "_squash", "corrections_stuck", "_RECAP_RX", "trim_recap",
+                "FINAL_THINK", "final_think_level"}
+_rc26["DEV_HOME"] = ""
 _exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
-                    "PEER_INSTRUCTION"})
+                    "PEER_INSTRUCTION", "_srv_think", "server_think"} | _CRAFT_NAMES)
 _rc_calls = []
 _GQC = {"base": _GQ26, "name": "Groq", "model": "qwen/qwen3.8-27b", "key": "k"}
 
@@ -19746,7 +19761,7 @@ def _bm_srv_ns(src):
         i = src.index(start)
         return src[i:src.index(end, i)]
     for part in ("class ServerError(RuntimeError):", "class ServerSlow(ServerError):", "def _srv_span(",
-                 "def _srv_js(", "def _srv_fail(", "def _srv_fail_why(", "def ollama_internal(",
+                 "def _srv_js(", "def _srv_fail(", "def srv_note_nofit(", "def _srv_fail_why(", "def ollama_internal(",
                  "_OLLAMA_INTERNAL_PREFIXES = ", "_OLLAMA_SHA_TAG = ", "SERVER_SEP = ", "SRV_CONNECT_S = "):
         exec(piece(part, "\n\n\n" if part.startswith(("class", "def")) else "\n"), ns)
     exec(piece("SRV_PAIR_LOST = ", "\n\n"), ns)       # two lines each, with SRV_NO_CRYPTO under it
@@ -21358,13 +21373,13 @@ _SV_MUT = [
     ("no retry after a replay", '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew", "replay"):',
      '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew",):'),
     ("the server's clock ignored", "        skew = float(js.get(\"server_time\")) - time.time()", "        skew = 0.0"),
-    ("retried forever", "        for attempt in (0, 1):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\"",
-     "        for attempt in (0, 0, 0):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\""),
+    ("retried forever", "        for attempt in (0, 1, 2, 3):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\"",
+     "        for attempt in (0, 0, 0, 0):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\""),
     ("an error line read as text", '                if obj.get("error"):\n                    # a failure after the 200 is the stream\'s last line\n                    raise _srv_fail(e, 0, obj, model)',
      '                if False:\n                    raise _srv_fail(e, 0, obj, model)'),
     ("the whole turn sent", '        t = {"role": m["role"], "content": str(m.get("content") or "")}', '        t = dict(m)'),
-    ("keep_alive sent", '"stream": True,\n                       "options": dict({"temperature": 0.75},',
-     '"stream": True, "keep_alive": "45s",\n                       "options": dict({"temperature": 0.75},'),
+    ("keep_alive sent", '"stream": True,\n             "options": dict({"temperature": 0.75},',
+     '"stream": True, "keep_alive": "45s",\n             "options": dict({"temperature": 0.75},'),
     ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0)', 'usage_note(label, "local", messages, sent[0], last, t0)'),
     ("a guess for an unknown placement", '"placement": pl if pl in ("gpu", "gpu+ram") else "unknown",', '"placement": pl if pl in ("gpu", "gpu+ram") else "gpu",'),
     ("embeddings offered", ' or "embed" in n.lower() \\\n', ' \\\n'),
@@ -23078,9 +23093,12 @@ def _p2_council(src, run_model, **over):
           "server_compositor": lambda ctx, drafted=(): None,
           "bound_ctx": lambda: None, "ServerError": type("ServerError", (RuntimeError,), {}),
           "server_first_deadline": _RcDeadline, "server_mark_down": lambda ctx, name, why: downs.append((name, why)),
+          # the final writer's reasoning level (6b518): a stand-in context, no dev overrides
+          "server_think": lambda level: __import__("contextlib").nullcontext(), "DEV_HOME": "", "os": os,
           # a server marked down is down (6b339, final review), by the name before the separator
           "server_label_down": lambda ctx, label: label.split(" \u00b7 ", 1)[0] in {d[0] for d in downs}}
     ns.update(over)
+    exec(src[src.index("def ground_clip("):src.index("def _ground_key(")], ns)   # the checker's cut (6b516)
     exec(rc, ns)
     ns["_downs"] = downs
     return ns, calls
@@ -23430,14 +23448,17 @@ def _p2c_pins(src):
         and "    _srv_deadline = max(_local_deadline, time.time() + SRV_DRAFT_S" in rc
         and "    LOCAL_CAP = 120.0" in rc and "        _jd = time.time() + min(LOCAL_CAP, max(15.0, _left))" in rc
         and "                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):" in rc
-        and "hurry=None, srv_first_s=None, srv_merge=False) -> None:" in rc
+        and "hurry=None, srv_first_s=None, srv_merge=False,\n                craft: bool = False, report=None) -> None:" in rc
         and "                            srv_first_s=(60.0 if _seat_fb else None),\n"
+            "                            # Thinking: one writer, a critic, a checked final (6b515)\n"
+            "                            craft=(tier == \"Thinking\" or (\n"
+            "                                _srv_only and _so_mode == \"Thinking\")),\n"
             "                            srv_merge=(tier in TIERS and not cloud_only))" in ch,
         "council caps": "                _capped(label, lambda _l=label, _p=parts: run_model(" in rc
         and "            _capped(merger, lambda: run_model(merger, [" in rc
         and "        with server_first_deadline(srv_first_s if server_label(merger)\n                                   else None):" in rc
         and "            if on_server:\n                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0]," in rc
-        and "                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                 str(_err[0]))" in rc,
+        and "                else:\n                    server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                     str(_err[0]))" in rc,
         "merge on the server": "    elif merger in MODEL_ROUTES and comp not in MODEL_ROUTES and _pen_kind != \"local\":" in rc
         and "                # the server didn't write it: this computer's copy does" in rc,
         "page badge": '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
@@ -23781,7 +23802,8 @@ def _p6c_page(src):
         "frame read": '                  else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
         "modes only": "                            srv_merge=(tier in TIERS and not cloud_only))" in ch
         and "    if srv_merge and comp not in MODEL_ROUTES and not cloud_only and _pen_kind != \"local\":\n" in src,
-        "cloud first": src.index("    elif cloud_allowed():\n        if _walk_ladder():\n            return\n    run_mark(compositor=merger)\n    if _merge_srv is not None:")
+        "cloud first": src.index("    elif cloud_allowed():\n        if _walk_ladder():\n            return _done()\n    run_mark(compositor=merger)\n"
+                                 "    report[\"writer\"] = merger\n    if _merge_srv is not None:")
         > 0,
     }
     return all(got.values()), [got, o]
@@ -24326,8 +24348,8 @@ _P2_MUT = [
     ("a council's reflection uncapped", '            _capped(merger, lambda: run_model(merger, [', '            (lambda f: f())(lambda: run_model(merger, ['),
     ("a server merge with no deadline", '        with server_first_deadline(srv_first_s if server_label(merger)\n                                   else None):', '        if True:'),
     ("a seat's draft with no deadline", '                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):', '                if True:'),
-    ("a failed server draft not marked down", '                _srv_errs.append(str(_err[0]))     # said if none answers\n                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                 str(_err[0]))',
-     '                _srv_errs.append(str(_err[0]))     # said if none answers'),
+    ("a failed server draft not marked down", '                else:\n                    server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                     str(_err[0]))',
+     '                else:\n                    pass'),
     ("the saved OFF not counted", 'd.get("cloud") is not False and _saved_cloud\n                         and cloud_allowed())', 'd.get("cloud") is not False\n                         and cloud_allowed())'),
     ("the flag read from the page only", '            use_cloud = (d.get("cloud") is not False and _saved_cloud\n                         and cloud_allowed())', '            use_cloud = cloud_allowed()'),
     ("the flag not sent", '        cloud:fnCloudLoaded?fnCloudOn:undefined,\n        after_len:fn', '        after_len:fn'),
@@ -24505,8 +24527,9 @@ def _smc_seats(src):
     dry = "Nothing runs on this computer or in the cloud."
     got["state"] = (s3["ok"] and s3["mode"] == "Thinking" and s3["title"] == "Thinking · Pat’s Lab only"
                     and s3["models"] == t[0] and s3["label"] == t[0][0] and s3["server"] == "Pat’s Lab"
-                    and s3["note"] == "3 models on Pat’s Lab draft, one double-checks them, then Pat’s Lab writes "
-                                      "the merge there. " + dry
+                    # one writer, a critic, a checked final (6b515)
+                    and s3["note"] == "The strongest model on Pat’s Lab drafts, a second reviews it, then Pat’s Lab "
+                                      "writes the final answer there and a quick model checks its facts. " + dry
                     and sf["note"].endswith(dry) and "second pass" in sf["note"] and sf["models"] == f[0]
                     and "It seats" not in sp["note"] and sp["note"].startswith("5 models on Pat’s Lab draft")
                     and sp["note"].endswith(dry))
@@ -24726,7 +24749,9 @@ def _smc_pins(src):
         "council": "                            bench_allow=[] if _srv_only else req_cloud,\n"
                    '                            comp="" if _srv_only else req_comp,\n'
                    "                            hurry=hurry_ev, srv_only=_srv_only," in ch
-        and '_srv_only and _so_mode == "Thinking"' in ch and 'peer=(tier == "Pro" or (_srv_only and _so_mode == "Pro")),' in ch,
+        and '_srv_only and _so_mode == "Thinking"' in ch and 'peer=(tier == "Pro" or (_srv_only and _so_mode == "Pro")),' in ch
+        # Thinking on one server alone is the craft (6b515): one writer, its critic, a checked final
+        and '                            craft=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),\n' in ch,
         "run_council": "    _bench = [] if srv_only else cloud_bench()\n" in rc
         and "    srv_merge = srv_merge or srv_only      # one server's mode merges there (6b426)\n" in rc
         and "    elif comp in MODEL_ROUTES or srv_only or _pen_kind in (\"local\", \"server\"):\n" in rc
@@ -24916,8 +24941,10 @@ _SM_MUT = [
      "                            comp=req_comp,\n"),
     ("run_council not told", "                            hurry=hurry_ev, srv_only=_srv_only,\n",
      "                            hurry=hurry_ev,\n"),
-    ("no double-check", '                                _srv_only and _so_mode == "Thinking")),',
-     "                                False)),"),
+    # (6b516) was "no double-check" on reflect=: since 6b515 the craft's critic replaces the reflection for every
+    # Thinking, so reflect=False changed nothing and the mutant went uncaught; the review is the craft now
+    ("no review: the craft off for Thinking on one server", '                            craft=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),',
+     '                            craft=(tier == "Thinking" or (\n                                False)),'),
     ("the wake without seats", "                _w_seats = (server_mode_resolve(_so_wake, _so_mode, self.ctx)\n"
      "                            if _so_mode else [])", "                _w_seats = []"),
     ("the header naming the cloud", "        if (len(council) > 1 and cloud_allowed() and not _srv_only\n",
@@ -25712,12 +25739,15 @@ def _modes_live39(inst, sid, svn, only=None):
             time.sleep(2.5)
             sc = [c for c in _chats39()[n_st:] if text in str(c[2]["messages"][-1]["content"])]
             isme = lambda c: "Write ONE final answer" in str(c[2]["messages"][-1]["content"])[:200]
-            # what the server held when the merge came: the models used last before it (drafts, then a peer review)
+            # what the server held when the merge came: the models used last before it (drafts, then a peer review,
+            # or Thinking's critic since 6b515: its model is on the card too)
             cut = next((k for k, c in enumerate(sc) if isme(c)), len(sc))
-            order = [c[2]["model"] for c in sc[:cut] if not str(c[2]["messages"][-1]["content"]).startswith("You are reviewing")]
+            order = [c[2]["model"] for c in sc[:cut]]
+            isrev = lambda c: str(c[2]["messages"][-1]["content"]).startswith("You are reviewing a draft answer")
             return {"status": s_, "models": [x_.strip() for x_ in urllib.parse.unquote(h_.get("X-Models", "")).split(",")
                                              if x_.strip()], "text": t_, "loc": _loc39(inst)[n_loc:],
-                    "drafted": {c[2]["model"] for c in sc}, "frames": fr_,
+                    "drafted": {c[2]["model"] for c in sc if not isrev(c) and not isme(c)}, "frames": fr_,
+                    "reviewed": [c[2]["model"] for c in sc if isrev(c)],      # the critic's requests (6b515)
                     "merged": [c[2]["model"] for c in sc if isme(c)],
                     # the last two models that drafted are the ones the server still holds (two at a time)
                     "resident": list(dict.fromkeys(reversed(order)))[:2]}
@@ -25731,9 +25761,11 @@ def _modes_live39(inst, sid, svn, only=None):
                 and f["drafted"] == {tag(srv("Fast")[0])})
             got["Fast: nothing on this computer"] = f["loc"] == []
             th = run("Thinking", "say hello in one word 339t")
-            got["Thinking: the server's three seats draft"] = (
+            # (6b515) Thinking seats three, but one writer drafts, the second seat reviews the draft, and the third
+            # is never asked: the answer brief's roster, measured against three sequential drafts
+            got["Thinking: the first seat drafts, the second reviews it, the third is not asked"] = (
                 th["status"] == 200 and len(srv("Thinking")) == 3 and th["models"] == tiers["Thinking"]["models"]
-                and {tag(l) for l in srv("Thinking")} <= th["drafted"])
+                and th["drafted"] == {tag(srv("Thinking")[0])} and th["reviewed"] == [tag(srv("Thinking")[1])])
             # (6b344) the merge is the server's too: nothing at all runs here, the merge request reaches the server, on
             # a model it still holds from the drafts (a card of 16 GB holds two), and no local pen writes it
             got["Thinking: no engine warmed or started, and nothing run here"] = th["loc"] == []
@@ -36410,6 +36442,977 @@ for _mn, _ma, _mb, _mw in _C97_MUT:
 check("6b497's rules each break a check when broken (%d mutants)" % len(_C97_MUT), not _c97_caught,
       "%r" % _c97_caught)
 # ==== 6b497 the MLX engine follows the app: end ====
+
+# ==== 6b514 grounded web search (per Patrick): begin ====
+# THE "CLAUDE" SEARCH (6b514, per Patrick: the answers are "not even remotely
+# competing" with Claude). Asked about the most powerful GPU or TPU and what
+# Claude runs on, the app searched its 25-word question verbatim, kept four
+# hits, and got claude.ai's sign-in page, a "free Claude" farm, an explainer
+# and a YouTube how-to; the models answered from training data. These run the
+# planner, the source filters, the page reader, the evidence pack and the
+# Grounding thread out of the source with the engine and the web stubbed, the
+# page's citation chips in node, and the handler's wiring from the text.
+print("== grounded web search (6b514) ==")
+import copy as _copy14, html as _html14, threading as _th14, types as _t14, unicodedata as _ud14
+_g14 = {"re": re, "time": time, "json": json, "html": _html14, "copy": _copy14,
+        "threading": _th14, "urllib": urllib, "socket": socket, "sys": sys, "os": os,
+        "unicodedata": _ud14, "DEV_HOME": "", "HAS_SEARCH": True}
+_exec_names(_g14, {"_NOPAD", "strftime_np", "strip_greeting", "_PREAMBLE_RX", "_FRESH_PATTERNS",
+                   "_ASKY_RX", "_BOOKING_RX", "_PLACE_NOUNS", "strip_think", "strip_special",
+                   "END_TOKENS", "NUL", "_THINK_RE", "_JUNK_HOSTS", "_GOOD_HOSTS",
+                   "_link_shape_ok", "_ip_public", "_LOCAL_HOST_RX",
+                   # quality-2 (6b518): the planner skips arithmetic parts, the hints read names
+                   "_SC_SPLIT_RX", "_SC_NUM_RX", "_SC_ASK_RX", "_SC_WORLD_RX", "_SC_Q_START_RX",
+                   "_sc_entities", "reasoning_parts", "self_contained_reasoning"})
+_g14_lo = _MILLENAI_SRC.index("# ------------------------------------------------ grounded web search (6b514)")
+_g14_hi = _MILLENAI_SRC.index("# ------------------------------------------------------------------ usage", _g14_lo)
+_g14_lines = (_MILLENAI_SRC.count("\n", 0, _g14_lo) + 1, _MILLENAI_SRC.count("\n", 0, _g14_hi) + 1)
+for _n14 in _ctree.body:
+    if _g14_lines[0] <= _n14.lineno < _g14_lines[1]:
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n14), _g14)
+_Y14 = time.strftime("%Y")
+_GPUQ14 = ("What is the most powerful GPU in the world right now, or TPU, or anything "
+           "being used for AI? What is Claude using, and what are others using?")
+
+# ---- the planner: rules
+_pq14 = _g14["plan_queries"](_GPUQ14)
+check("the planner never searches the question itself: one keyword query per sub-question, "
+      "GPU/TPU and Anthropic Claude apart, each short",
+      bool(_pq14) and all(q.lower() != _GPUQ14.lower() for q in _pq14) and len(_pq14) >= 2
+      and all(len(q.split()) <= 12 for q in _pq14)
+      and any("GPU" in q and "TPU" in q for q in _pq14)
+      and any("Anthropic" in q and "Claude" in q for q in _pq14), "%r" % _pq14)
+_pq14b = _g14["plan_queries"]("how does a heat pump work")
+_pq14c = _g14["plan_queries"]("what happened in the news today")
+check("a question about now carries the year, one about this week the month, a timeless one neither",
+      all(_Y14 in q for q in _pq14) and _pq14b and not any(re.search(r"\b20\d\d\b", q) for q in _pq14b)
+      and _pq14c and all(time.strftime("%B %Y") in q for q in _pq14c),
+      "%r %r %r" % (_pq14, _pq14b, _pq14c))
+_pq14d = _g14["plan_queries"]("what's new in macOS 26 Tahoe")
+_pq14e = _g14["plan_queries"]("iPhone 17 Pro vs Pixel 10 Pro camera, which is better?")
+check("names and versions are copied exactly; a comparison searches each side on its own",
+      _pq14d and "macOS 26 Tahoe" in _pq14d[0]
+      and any(q.startswith("iPhone 17 Pro") and "Pixel" not in q for q in _pq14e)
+      and any(q.startswith("Pixel 10 Pro") and "iPhone" not in q for q in _pq14e),
+      "%r %r" % (_pq14d, _pq14e))
+_pq14f = _g14["plan_queries"](_GPUQ14, planned=[_pq14[0], "NVIDIA Vera Rubin specs 2026"])
+check("a model's plan adds angles after the sub-questions and never a duplicate",
+      "NVIDIA Vera Rubin specs 2026" in _pq14f
+      and sum(1 for q in _pq14f if _g14["_gq_same"](q, _pq14[0])) == 1
+      and _pq14f.index("NVIDIA Vera Rubin specs 2026") >= 2, "%r" % _pq14f)
+_pl14 = _g14["plan_lines"]('Here are the queries:\n1. "NVIDIA Vera Rubin specs 2026"\n'
+                            '- Anthropic Trainium TPU 2026\n* most powerful AI chip 2026 benchmark\n'
+                            'The most powerful GPU is the H100 which was released in 2022 and has 80GB of memory')
+check("a model's plan is read line by line: numbering, bullets and quotes off, an answer dropped",
+      _pl14 == ["NVIDIA Vera Rubin specs 2026", "Anthropic Trainium TPU 2026",
+                "most powerful AI chip 2026 benchmark"], "%r" % _pl14)
+
+# ---- the sources: filters, duplicates, ranking, dates
+_rows14 = [
+    {"title": "Sign in to Claude, Anthropic's AI assistant for problem solvers.", "href": "https://claude.ai/", "body": "Claude"},
+    {"title": "Unlimited Claude AI Pro for Free - No Signup or Login - Veo AI Free", "href": "https://veoaifree.com/claude/", "body": "Claude GPU"},
+    {"title": "How to Use Claude AI? | A to Z Guide to Claude... - YouTube", "href": "https://www.youtube.com/watch?v=HR-JauWHQMM", "body": "Claude"},
+    {"title": "What is Claude AI? Anthropic's LLM vs ChatGPT | Pluralsight", "href": "https://www.pluralsight.com/resources/blog/ai-and-data/what-is-claude-ai", "body": "Claude is a family of models"},
+    {"title": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware", "href": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html", "body": "GPU rankings for AI, Oct 2026"},
+    {"title": "NVIDIA Vera Rubin NVL144: the next AI GPU platform", "href": "https://www.nvidia.com/en-us/data-center/vera-rubin/", "body": "The Vera Rubin GPU for AI, shipping 2026"},
+    {"title": "NVIDIA Vera Rubin NVL144: the next AI GPU platform", "href": "https://nvidia.com/en-us/data-center/vera-rubin/amp/", "body": "dup"},
+    {"title": "NVIDIA Blackwell Ultra for AI", "href": "https://www.nvidia.com/en-us/data-center/blackwell-ultra/", "body": "GPU AI 2026"},
+    {"title": "NVIDIA Hopper H100 GPU", "href": "https://www.nvidia.com/en-us/data-center/h100/", "body": "GPU AI"},
+    {"title": "The best AI GPU of 2021", "href": "https://oldblog.example/2021/03/best-gpu/", "body": "the most powerful GPU for AI in 2021"},
+    {"title": "Google TPU Update — AI Workloads के लिए कैसे बन रहे हैं Powerful",
+     "href": "https://aitechnews.co.in/blog/x", "body": "TPU एक step और आगे है — ये chip सिर्फ और सिर्फ AI calculations के लिए design की गई है"},
+    {"title": "Claude", "href": "https://claude.com/", "body": "Claude by Anthropic"},
+    {"title": "Anthropic expands its use of Google Cloud TPUs", "href": "https://www.anthropic.com/news/tpus", "body": "Anthropic runs Claude on TPU, Trainium and GPU"},
+    {"title": "r/LocalLLaMA: best GPU for AI", "href": "https://www.reddit.com/r/LocalLLaMA/comments/abc/best_gpu", "body": "GPU AI 2026"},
+    {"title": "Best GPU for AI (group)", "href": "https://www.facebook.com/groups/ai/posts/1", "body": "GPU AI"},
+]
+_terms14 = ["most", "powerful", "GPU", "TPU", "AI", "Anthropic", "Claude"]
+_ents14 = ["GPU", "TPU", "Claude", "Anthropic", "NVIDIA"]
+_rk14 = _g14["rank_sources"](_rows14, _terms14, _ents14, True, time.localtime(), limit=8)
+_hosts14 = [s["host"] for s in _rk14]
+check("sign-in pages, 'free AI' farms, video and social pages, another script and a bare homepage "
+      "never reach the model",
+      _rk14 and not any(h in ("claude.ai", "veoaifree.com", "youtube.com", "aitechnews.co.in",
+                               "claude.com", "facebook.com") for h in _hosts14), "%r" % _hosts14)
+check("near-duplicates collapse (www, amp) and a host gets two pages at most",
+      _hosts14.count("nvidia.com") == 2 and sum(1 for s in _rk14 if "vera-rubin" in s["url"]) == 1,
+      "%r" % _hosts14)
+_rk14f = _g14["rank_sources"](_rows14, _terms14, _ents14, False, time.localtime(), limit=8)
+_old_t = next((s["score"] for s in _rk14 if s["host"] == "oldblog.example"), None)
+_old_f = next((s["score"] for s in _rk14f if s["host"] == "oldblog.example"), None)
+check("the asked-about vendors' own pages rank first; a 2021 page is marked down only for a question about now",
+      set(_hosts14[:2]) == {"nvidia.com", "anthropic.com"}
+      and _old_t is not None and _old_f is not None and _old_f - _old_t == 2
+      and _hosts14.index("oldblog.example") > _hosts14.index("tomshardware.com"),
+      "%r %r %r" % (_hosts14, _old_t, _old_f))
+check("why a hit is junk, by name",
+      _g14["_src_junk"]({"url": "https://claude.ai/login", "title": "Sign in"}) == "login"
+      and _g14["_src_junk"]({"url": "https://x.y/a", "title": "Unlimited Claude for free, no signup"}) == "farm"
+      and _g14["_src_junk"]({"url": "https://youtu.be/abc", "title": "How to"}) == "video"
+      and _g14["_src_junk"]({"url": "https://www.instagram.com/p/1", "title": "post"}) == "social"
+      and _g14["_src_junk"]({"url": "https://www.nvidia.com/x", "title": "Vera Rubin"}) == "", "")
+check("a page's date is read from its URL or its snippet, the most specific form first; a date after today is a misread",
+      _g14["_src_date"]({"url": "https://x.y/2026/06/01/rubin"}) == "2026-06-01"
+      and _g14["_src_date"]({"url": "https://x.y/a", "body": "Published Jun 1, 2026 — Rubin ships"}) == "2026-06-01"
+      and _g14["_src_date"]({"url": "https://x.y/a", "body": "1 June 2026: Rubin ships"}) == "2026-06-01"
+      and _g14["_src_date"]({"url": "https://x.y/a", "body": "In June 2026 Rubin ships"}) == "2026-06"
+      and _g14["_src_date"]({"url": "https://x.y/a", "title": "GPU hierarchy 2026"}) == "2026"
+      and _g14["_src_date"]({"url": "https://x.y/a", "title": "GPU hierarchy"}) == ""
+      and not any(s["date"] for s in _g14["rank_sources"](
+          [{"title": "GPU AI", "href": "https://x.y/2031/01/a", "body": "GPU"}], ["GPU"], [], True)), "")
+
+# ---- reading a page: the main text, the date, the User-Agent, the farms
+_HTML14 = ("<html><head><title>NVIDIA Vera Rubin ships — Example News</title>"
+           '<meta property="og:title" content="NVIDIA Vera Rubin ships this autumn">'
+           '<meta property="article:published_time" content="2026-06-01T10:00:00Z">'
+           '<meta property="og:image" content="https://img.example/rubin.jpg">'
+           "<script>var x=1;</script><style>.a{}</style></head><body>"
+           "<nav><a>Home</a><a>Sign in to your account here</a></nav>"
+           "<header>Example News, the site header, long enough to pass for a paragraph of text</header>"
+           "<article><p>Accept all cookies to continue reading this article on our website today.</p>"
+           "<p>Vera Rubin, NVIDIA's next GPU platform, entered full production in June 2026 and ships to "
+           "cloud providers this autumn. Each Rubin GPU delivers up to 50 petaflops of inference.</p>"
+           "<p>The weather in Santa Clara was mild, and the keynote ran long, with a musical interlude "
+           "that nobody had asked for and everyone politely sat through.</p>"
+           "<p>Anthropic trains and runs Claude on AWS Trainium, Google TPUs and NVIDIA GPUs, the "
+           "company said in a statement that day.</p></article>"
+           "<footer>All rights reserved. Privacy policy. Terms of use apply to this site.</footer>"
+           "</body></html>")
+_FARM14 = ("<html><body><article><p>SEO Keywords: most powerful AI 2026, best GPU</p>"
+           "<p>Meta Description: the most powerful AI model ever built is here for your business.</p>"
+           "<p>The RTX 5090 is the most powerful consumer GPU ever built for AI workloads today.</p></article></body></html>")
+_reqs14 = []
+
+
+class _Resp14:
+    def __init__(self, body, ctype):
+        self._b, self.headers = body, {"Content-Type": ctype}
+    def read(self, n=-1):
+        return self._b
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+
+
+def _urlopen14(req, timeout=0):
+    _reqs14.append(req)
+    u = req.full_url
+    if "farm" in u:
+        return _Resp14(_FARM14.encode(), "text/html; charset=utf-8")
+    if "image" in u:
+        return _Resp14(b"\x89PNG", "image/png")
+    return _Resp14(_HTML14.encode("utf-8"), "text/html; charset=utf-8")
+
+
+# the reader's one network call is the seam; the public-address check keeps
+# its shape rules without a DNS lookup (these hosts don't resolve)
+_g14["_page_open"] = lambda req, timeout=0: _urlopen14(req, timeout)
+_g14["_link_public"] = _g14["_link_shape_ok"]
+# (.example is a reserved local name the reader refuses, so these hosts aren't)
+_pg14 = _g14["_page_read"]("https://news.rubintest.com/2026/06/rubin", want_photo=True) or {}
+_paras14 = list(_pg14.get("paras") or [])
+_pt14 = "\n".join(_paras14)
+check("a page is read for its main text: navigation, header, footer, scripts and boilerplate out, "
+      "title, date and picture in",
+      bool(_pg14) and _pg14.get("title") == "NVIDIA Vera Rubin ships this autumn"
+      and _pg14.get("date") == "2026-06-01" and _pg14.get("image") == "https://img.example/rubin.jpg"
+      and "50 petaflops" in _pt14 and "AWS Trainium" in _pt14
+      and "Sign in" not in _pt14 and "cookies" not in _pt14 and "rights reserved" not in _pt14
+      and "site header" not in _pt14, "%r" % (_paras14,))
+check("the reader sends a browser User-Agent, never Python's (the 403 trap)",
+      _reqs14 and _reqs14[-1].get_header("User-agent", "").startswith("Mozilla/5.0 (Macintosh")
+      and "Python-urllib" not in _reqs14[-1].get_header("User-agent", ""), "")
+_pf14 = _g14["_page_read"]("https://farm.rubintest.com/post")
+check("a page that prints its own SEO scaffolding is a farm; a picture, a PDF and a private address are not read, "
+      "and every redirect hop is checked like the page",
+      _pf14 is not None and _pf14.get("junk") == "farm"
+      and _g14["_page_read"]("https://x.rubintest.com/image.png") is None
+      and _g14["_page_read"]("https://x.rubintest.com/paper.pdf") is None
+      and _g14["_page_read"]("http://127.0.0.1:9896/secret") is None
+      and _g14["_page_read"]("https://news.example/2026/06/rubin") is None
+      and not any("127.0.0.1" in r.full_url or "news.example" in r.full_url for r in _reqs14)
+      and "urllib.request.build_opener(_LinkRedirects).open(req, timeout=timeout)" in _MILLENAI_SRC
+      and "if not _link_public(url) or url.lower().split(\"?\")[0].endswith(\".pdf\"):" in _MILLENAI_SRC,
+      "%r" % (_pf14,))
+_pp14 = _g14["_pick_passages"](_paras14, ["Vera", "Rubin", "GPU", "Anthropic", "Claude"], cap=600)
+check("the passages kept are the ones that bear on the question, in page order, the weather left out",
+      len(_pp14) == 2 and "50 petaflops" in _pp14[0] and "AWS Trainium" in _pp14[1]
+      and not any("weather" in p for p in _pp14), "%r" % _pp14)
+_long14 = ["Rubin " + ("word " * 120) + "end. " + ("more " * 40)]
+_pc14 = _g14["_pick_passages"](_long14, ["Rubin"], cap=400, each=200)
+check("a long passage is cut at a sentence end within its share",
+      len(_pc14) == 1 and len(_pc14[0]) <= 210 and _pc14[0].endswith(("end.", "…")), "%r" % _pc14)
+
+# ---- the evidence pack and the turn
+_srcs14 = [{"title": "NVIDIA Vera Rubin ships", "host": "nvidia.com", "date": "2026-06-01",
+            "url": "https://www.nvidia.com/x", "body": "snippet", "paras": list(_paras14)},
+           {"title": "GPU hierarchy", "host": "tomshardware.com", "date": "",
+            "url": "https://www.tomshardware.com/y", "body": "the snippet text of the hit", "paras": []}]
+_pack14, _np14 = _g14["evidence_pack"](_srcs14, ["Vera", "Rubin", "GPU", "Anthropic", "Claude"])
+check("the evidence pack: numbered sources with title, host, date and URL, their passages under them, "
+      "the snippet when a page gave no text",
+      _pack14.startswith("WEB EVIDENCE gathered " + time.strftime("%Y-%m-%d"))
+      and "[1] NVIDIA Vera Rubin ships — nvidia.com — 2026-06-01\n    https://www.nvidia.com/x" in _pack14
+      and "[2] GPU hierarchy — tomshardware.com — date unknown" in _pack14
+      and "    the snippet text of the hit" in _pack14 and "50 petaflops" in _pack14
+      and "weather" not in _pack14 and _np14 == 3, _pack14[:300])
+check("the pack is sized to its budget (a 32K context keeps room for the drafts)",
+      len(_g14["evidence_pack"](_srcs14, ["Rubin"], budget=700)[0]) <= 700
+      and _g14["GROUND_PACK_CHARS"] <= 12000, "")
+_turn14 = _g14["grounded_turn"]("most powerful GPU", _pack14)
+_none14 = _g14["grounded_turn"]("most powerful GPU", "")
+check("the grounded turn: evidence first, then today's date, 'training data ... OUT OF DATE', current "
+      "facts from the evidence only, cite as [1], say what it doesn't cover, the question last",
+      _turn14.index("WEB EVIDENCE") < _turn14.index("GROUNDING RULES")
+      and ("Today is " + _g14["strftime_np"]("%A, %B %-d, %Y")) in _turn14
+      and "training data ends before today" in _turn14 and "OUT OF DATE" in _turn14
+      and "comes from the evidence above and nowhere else" in _turn14
+      and "like [1], or [2][4]" in _turn14 and "does not cover part of the question" in _turn14
+      and _turn14.rstrip().endswith("PROMPT: most powerful GPU"), _turn14[-400:])
+check("with nothing found the turn says so, dates the model's memory and never invents a 'right now'",
+      "found nothing usable" in _none14 and "out of date" in _none14 and "[1]" not in _none14
+      and "never present it as 'right now'" in _none14, _none14[:200])
+
+# ---- the Grounding thread, web stubbed: phases, the model's plan, the cache, a late planner, a dead web
+_calls14, _pages14 = [], []
+
+
+def _ddg14(q, limit=8):
+    _calls14.append(q)
+    time.sleep(0.05)
+    slug = re.sub(r"\W+", "-", q.lower())
+    return [{"title": "Sign in to Claude", "href": "https://claude.ai/", "body": "Claude"},
+            {"title": "Claude for free no signup", "href": "https://farm.rubintest.com/" + slug, "body": "GPU TPU"},
+            {"title": "NVIDIA on %s" % q, "href": "https://www.nvidia.com/%s" % slug, "body": "Vera Rubin GPU TPU AI 2026 " + q},
+            {"title": "Reuters: %s" % q, "href": "https://www.reuters.com/%s" % slug, "body": "GPU TPU Anthropic Claude 2026 " + q}]
+
+
+def _pr14(url, want_photo=False, timeout=6.0):
+    _pages14.append(url)
+    return {"title": "", "date": "2026-06-01", "image": "",
+            "paras": ["The Vera Rubin GPU delivers 50 petaflops for AI in 2026, NVIDIA says.",
+                      "An unrelated paragraph about the weather during the keynote in Santa Clara."]}
+
+
+_more14 = []
+_g14["_ddg_text"], _g14["_page_read"] = _ddg14, _pr14
+_g14["_ddg_more"] = lambda q, limit=8: (_more14.append(q), [])[1]
+_ph14 = []
+_gr14 = _g14["ground_start"](_GPUQ14, planner=lambda p: "NVIDIA Vera Rubin specs 2026\nAnthropic Trainium TPU 2026")
+_gr14.wait(lambda ph, g: _ph14.append((ph, len(g.queries), len(g.sources))), 20.0)
+_phn14 = [p[0] for p in _ph14]
+check("the grounding runs plan -> search -> read -> done and reports each phase once, with its counts",
+      _phn14[-1] == "done" and "search" in _phn14 and "read" in _phn14
+      and _phn14 == sorted(_phn14, key=["plan", "search", "read", "done"].index)
+      and len(_phn14) == len(set(_phn14)) and not _gr14.timed_out and not _gr14.error,
+      "%r %r" % (_ph14, _gr14.error))
+check("the model's plan rides beside the rules' queries and every query is searched, on both engines",
+      _gr14.model_queries == ["NVIDIA Vera Rubin specs 2026", "Anthropic Trainium TPU 2026"]
+      # (6b518) the primary-source site: queries and the compact whole-question one ask one engine;
+      # the sub-questions and the model's angles ask both
+      and set(_gr14.queries) <= set(_calls14)
+      and set([q for q in _gr14.queries if q not in _gr14.hint_queries
+               and q not in _gr14.model_queries][:3] + _gr14.model_queries) <= set(_more14)
+      and not set(_gr14.hint_queries) & set(_more14)
+      and len(_gr14.queries) <= _g14["GROUND_QUERIES"]
+      and len(_gr14.queries) >= 4, "%r %r %r" % (_gr14.queries, _calls14, _more14))
+_src14 = _gr14.snapshot()[0]
+check("junk never reaches the pack; the pages read are the sources numbered; the pack carries their passages",
+      _src14 and not any(s["host"] in ("claude.ai", "farm.rubintest.com") for s in _src14)
+      and _gr14.pack.startswith("WEB EVIDENCE") and "[1]" in _gr14.pack and "50 petaflops" in _gr14.pack
+      and "weather" not in _gr14.pack and _gr14.n_read >= 1 and len(_pages14) >= 1
+      and _gr14.t.get("total", 99) < 10, "%r" % [s["host"] for s in _src14])
+_n14 = len(_calls14)
+_gr14b = _g14["ground_start"](_GPUQ14)
+_gr14b.wait(None, 5.0)
+check("a question asked again reuses its evidence: no second search, the same pack",
+      len(_calls14) == _n14 and getattr(_gr14b, "cached", False) and _gr14b.pack == _gr14.pack
+      and _gr14b.phase == "done", "")
+_g14["GROUND_PLAN_S"] = 0.3
+_t14b = time.time()
+_gr14c = _g14["ground_start"]("what's the newest Pixel phone", planner=lambda p: (time.sleep(1.5), "Pixel 11 specs 2026")[1])
+_gr14c.wait(None, 10.0)
+_el14 = time.time() - _t14b
+check("a planner slower than its budget is not waited for: the rules' queries stand alone",
+      _gr14c.model_queries == [] and _gr14c.queries and not _gr14c.timed_out and _el14 < 4.0,
+      "%r %.1fs" % (_gr14c.queries, _el14))
+
+
+def _dead14(q, limit=8):
+    raise RuntimeError("offline")
+
+
+_g14["_ddg_text"] = _dead14
+_gr14d = _g14["ground_start"]("who is the current UN secretary general")
+_gr14d.wait(None, 10.0)
+check("a dead web ends the grounding cleanly: no sources, an empty pack, the turn says nothing was found",
+      _gr14d.phase == "done" and _gr14d.sources == [] and _gr14d.pack == "" and not _gr14d.timed_out
+      and "found nothing usable" in _g14["grounded_turn"]("who is the current UN secretary general", _gr14d.pack), "")
+
+# ---- the handler's wiring, from the text
+_hs14 = _MILLENAI_SRC[_MILLENAI_SRC.index("def do_POST(self)"):]
+_i_start14 = _hs14.index("_ground = ground_start(")
+_i_hdr14 = _hs14.index("self.end_headers()", _i_start14)
+_i_wait14 = _hs14.index("_ground.wait(_ground_phase, GROUND_TOTAL_S)")
+_i_srcs14 = _hs14.index("# the search ran earlier on THIS thread")
+check("the plain web path starts the grounded search before the headers and finishes it after them, "
+      "before the sources row; the verbatim run_search is gone from that path",
+      _i_start14 < _i_hdr14 < _i_wait14 < _i_srcs14
+      and "                else:\n                    snippets = run_search(query)" not in _MILLENAI_SRC
+      and "snippets = GROUND_PENDING" in _hs14
+      and "_ground = None           # the grounded search (6b514)" in _hs14, "")
+check("the evidence takes the question's place in the one dict the drafts and the merge both read, "
+      "with the clock line and the Thinking hint kept, and the system prompt gains its grounding line",
+      "messages[-1][\"content\"] = _clock_line + _gturn + _think_tail" in _hs14
+      and "full_messages[-1] = messages[-1]" in _hs14
+      and "dated_system[\"content\"] += GROUND_SYSTEM" in _hs14
+      and "_think_tail = \"\\n\\n\" + THINK_HINT" in _hs14
+      and "messages[-1][\"content\"] = _clock_line + str(messages[-1][\"content\"])" in _hs14
+      and "keep those marks in the final answer" in _MILLENAI_SRC, "")
+check("the page sees the phases as steps: searching with the query count, reading with the page count, read with passages",
+      'step("search", "Searching the web", "run",' in _hs14
+      and 'status("Reading %d source%s\\u2026"' in _hs14
+      and 'step("read", "Reading the pages", "run",' in _hs14
+      and '"%d page%s \\u00b7 %d passage%s"' in _hs14
+      and "src_rows = getattr(_tl_search, \"rows\", [])[:GROUND_SOURCES]" in _hs14, "")
+check("the planner asks the fastest free model: the person's server, a cloud utility model with cloud power on, "
+      "an idle local engine; and the weather, places, listings and deep paths are untouched",
+      "server_side_text(ask, _ctx, max_tokens=120)" in _hs14
+      and "gate_ladder(fast_cloud_ladder(utility=True)," in _hs14
+      and "_engine_lock.acquire(blocking=False)" in _hs14
+      and "snippets, matched = place_search(query)" in _hs14
+      and "snippets = weather_snippets(query)" in _hs14
+      and "snippets = run_search_deep(srch, pages=3)" in _hs14
+      and "site:rottentomatoes.com" in _hs14, "")
+
+# ---- the page: [n] becomes a chip that opens source n (renderMD in node, the handlers in the text)
+_cite_js14 = (re.search(r"function esc\(s\)\{.*?;\}\n", _MILLENAI_SRC, re.S).group(0)
+              + "const flowDiagram=c=>c,annSlot=()=>null,hilite=c=>c,dlBox=()=>'',api=()=>'';\n"
+              + _jsfn(_MILLENAI_SRC, "function renderMD(raw){")
+              + r'''
+const out=renderMD("Rubin ships this autumn [1][3]. Ironwood has 192 GB [2, 4].\nSee [the post](https://x.y/z) and `a[1]` in code. Not a cite: [12](https://a.b).");
+process.stdout.write(JSON.stringify({chips:(out.match(/<sup class="cite" data-n="(\d+)"/g)||[]).length,
+  ns:(out.match(/data-n="(\d+)"/g)||[]).map(m=>m.replace(/\D/g,"")),
+  links:(out.match(/<a href="https:\/\/(x\.y\/z|a\.b)"/g)||[]).length,
+  code:out.indexOf("<code>a[1]</code>")>=0}));''')
+try:
+    _cf14 = os.path.join(_SMOKE_TMP, "cite14.js")
+    open(_cf14, "w").write(_cite_js14)
+    _co14 = json.loads(subprocess.run(["node", _cf14], capture_output=True, text=True, timeout=30).stdout)
+except Exception as _e14:
+    _co14 = {"err": str(_e14)}
+check("the page turns [1][3] and [2, 4] into four citation chips, leaves markdown links and code alone (node)",
+      _co14.get("chips") == 4 and _co14.get("ns") == ["1", "3", "2", "4"] and _co14.get("links") == 2
+      and _co14.get("code") is True, "%r" % _co14)
+_page14 = req("/", token=False)[2].decode("utf-8", "replace")
+check("the chips open the message's own source chips (delegated, so a reloaded chat works), and are styled",
+      "const citeChip=c=>{" in _page14 and 'e.target.closest("sup.cite")' in _page14
+      and "a.click()" in _page14 and ".msg.ai .body sup.cite{" in _page14
+      and '<sup class="cite" data-n="' in _page14, "")
+# ==== 6b514 grounded web search: end ====
+# ==== 6b515 the answer craft: begin ====
+# Patrick (2026-10-24): the answers were "not even remotely competing" with Claude's. Thinking seats one
+# writer and a critic instead of three drafts; the final writer gets a brief (today's date, the shape, the
+# reader, the units, what is uncertain, no filler) on top of the dated system prompt, with the question block
+# intact in its own section; what was shown is fact-checked inside a budget and re-sent after a RESET when a
+# claim was wrong; the page's speed line is the writer's own pace. Stub and source level here; the live Thinking
+# check against the stub gateway (6b339's modes, above) holds the roster end to end.
+import threading as _t515
+import time as _tm515
+import contextlib as _cl515
+
+
+def _c515_helpers(src):
+    """The craft's helpers out of the source, on stand-ins: the brief, the final prompt, the critic, the
+    checker's parsing and fixes, the budget, the pick, the speed frame."""
+    class Ctl(str):
+        pass
+
+    class Gone(Exception):
+        pass
+    ns = {"re": re, "json": json, "time": _tm515, "threading": _t515, "Ctl": Ctl, "NUL": "\0",
+          "_DraftAbandoned": Gone, "strip_think": lambda t: t,
+          "SYNTH_INSTRUCTION": "Below ... Write ONE final answer ...",
+          "ctx_thread": lambda target, daemon=True: _t515.Thread(target=target, daemon=daemon),
+          "server_label": lambda l: isinstance(l, str) and " · " in l, "SERVER_SEP": " · ",
+          "MODEL_ROUTES": {"Gemma 4 26B": ("mlx", 8944)}, "fast_cloud_ladder": lambda: [],
+          "cloud_text": lambda *a, **k: "", "bound_ctx": lambda: None,
+          "server_first_deadline": lambda s: _cl515.nullcontext(), "run_model": None}
+    # the question-block cut lives with the grounded search (quality-1: the checker keeps the question's end)
+    exec(src[src.index("def ground_clip("):src.index("def _ground_key(")], ns)
+    exec(src[src.index("ANSWER_BRIEF = ("):src.index("\n\n\nRESEARCH_PLAN = (")], ns)
+    got = {}
+    b = ns["brief_system"]({"role": "system", "content": "SYS"})
+    today = _tm515.strftime("%A, %B ") + (_tm515.strftime("%d").lstrip("0")) + _tm515.strftime(", %Y")
+    got["the brief, once, dated today"] = (b["content"].startswith("SYS\n\n") and "THE BRIEF FOR THIS ANSWER" in b["content"]
+                                           and ns["brief_system"](b)["content"].count("THE BRIEF FOR THIS ANSWER") == 1
+                                           and today in b["content"] and "Never say that you know who they are" in b["content"]
+                                           and "a single chip is not a board" in b["content"]
+                                           and "except a LENGTH instruction" in b["content"])
+    fp = ns["final_prompt"]({"role": "system", "content": "SYS"}, "QBLOCK What you just found on the web", ["d1 " * 50, "d2"],
+                            "note A\nnote B", cut=40)
+    u = fp[1]["content"]
+    got["the final prompt: the brief on the system, the question block intact, the material cut, the notes"] = (
+        fp[0]["role"] == "system" and "THE BRIEF" in fp[0]["content"] and u.startswith("Below ... Write ONE final answer")
+        and "=== THE QUESTION" in u and "QBLOCK What you just found on the web" in u and "MATERIAL: 2 draft answers" in u
+        and "[answer 1]\n" + ("d1 " * 50)[:40] + "\n" in u and "REVIEW NOTES" in u and "note B" in u
+        and "MATERIAL: 1 draft answer to" in ns["final_prompt"]({}, "Q", ["only"], "")[1]["content"]
+        and "REVIEW NOTES" not in ns["final_prompt"]({}, "Q", ["only"], "")[1]["content"])
+    cp = ns["critic_prompt"]("QQ", ["draft one"])
+    got["the critic's prompt and notes"] = (cp[0]["role"] == "system" and "reviewer" in cp[0]["content"]
+                                            and "=== DRAFT ===" in cp[1]["content"] and "QQ" in cp[1]["content"]
+                                            and cp[1]["content"].startswith("You are reviewing a draft answer")
+                                            and ns["critic_notes"]("No problems found.") == ""
+                                            and ns["critic_notes"]("- WRONG: x") == "- WRONG: x")
+    ans = ("The H100 has 80 GB of HBM3 and about 3.5 TFLOP/s of TF32 throughput. Google charges about $0.90 per "
+           "vCPU-hour for a v4 pod.\n\n- **Scale**: Google's proprietary “Solaris” fabric stitches pods "
+           "together.\n- Nvidia GPUs remain the flexible choice.\n\nTPUs deliver higher performance per watt for dense "
+           "matrix work.")
+    out = ("Here you go:\n```json\n[" + json.dumps(
+        {"claim": "The H100 has 80 GB of HBM3 and about 3.5 TFLOP/s of TF32 throughput.", "verdict": "wrong",
+         "fix": "The H100 has 80 GB of HBM3 and roughly 495 TFLOPS of dense TF32 throughput."}) + ",\n" + json.dumps(
+        {"claim": "Google charges about $0.90 per vCPU-hour for a v4 pod.", "verdict": "unsupported", "fix": ""}) + ",\n" + json.dumps(
+        {"claim": "Google's proprietary \"Solaris\" fabric stitches pods together.", "verdict": "unsupported",
+         "fix": "Google's own optical interconnect stitches pods together."}) + ",\n" + json.dumps(
+        {"claim": "TPUs deliver higher performance per watt for dense matrix work.", "verdict": "ok", "fix": ""}) + ",\n" + json.dumps(
+        {"claim": "Nvidia GPUs remain the flexible choice.", "verdict": "wrong",
+         "fix": "As the draft says, the material shows otherwise."}) + ",]\n```")
+    items = ns["parse_claims"](out)
+    text, checked, fixed = ns["apply_fixes"](ans, items)
+    got["the checker's output: fence, prose and a trailing comma parsed; garbage is None"] = (
+        isinstance(items, list) and len(items) == 5 and ns["parse_claims"]("I cannot judge this.") is None)
+    got["the fixes: exact, deleted, matched through curly quotes, ok kept, one about the machinery refused"] = (
+        checked == 5 and fixed == 3 and "495 TFLOPS" in text and "$0.90" not in text and "Solaris" not in text
+        and "optical interconnect" in text and "performance per watt" in text and "the draft says" not in text
+        and "flexible choice" in text and "  " not in text.replace("\n", "") and not re.search(r"\n- *\n", text)
+        and ns["claim_count"](ans) >= 3
+        # the tidy-up after a fix leaves fenced code's spacing alone
+        and ns["_tidy_fixed"]("a  b\n```py\nx    = 1\n```\n- \nc") == "a b\n```py\nx    = 1\n```\nc")
+
+    def run_ok(label, msgs, emit):
+        emit(json.dumps([{"claim": "Google charges about $0.90 per vCPU-hour for a v4 pod.", "verdict": "wrong",
+                          "fix": "Google bills TPU v4 by the chip-hour."}]))
+
+    def run_slow(label, msgs, emit):
+        _tm515.sleep(1.2)
+        emit("[]")
+
+    def run_bad(label, msgs, emit):
+        raise RuntimeError("engine died")
+    res = ns["verify_answer"](run_ok, "L", "Q", ["m1"], ans, budget_s=5)
+    t0 = _tm515.time()
+    res2 = ns["verify_answer"](run_slow, "L", "Q", [], ans, budget_s=0.3)
+    got["verify_answer: applied; over budget is None, promptly; a failure is None"] = (
+        res and res["fixed"] == 1 and "chip-hour" in res["text"] and res["checked"] == 1
+        and res2 is None and _tm515.time() - t0 < 1.0 and ns["verify_answer"](run_bad, "L", "Q", [], ans, budget_s=2) is None)
+    frames, texts, steps = [], [], []
+
+    def emit(c):
+        (frames if isinstance(c, Ctl) else texts).append(str(c))
+
+    def step(sid, l, s="run", d=""):
+        steps.append((sid, l, s, d))
+    ns["run_model"] = run_ok
+    rep = {"material": ["m1"], "merger": "Gemma 4 26B", "writer": "Gemma 4 26B", "question": "Q", "merged": True,
+           "hurried": False}
+    long = ans + " More text follows here to pass the minimum length for a check. " * 6
+    r = ns["verify_pass"](long, rep, [{"role": "user", "content": "Q"}], emit, [].append, step, False)
+    got["verify_pass: on the writer here, a RESET then the fixed text, the step says what it fixed"] = (
+        r.get("ran") and r.get("rewritten") and frames == ["\0RESET\0"] and len(texts) == 1 and "chip-hour" in texts[0]
+        and steps[0][:3] == ("verify", "Checking the facts", "run") and steps[-1][1] == "Checked 1 claim, fixed 1"
+        and steps[-1][2] == "done")
+    frames.clear(), texts.clear(), steps.clear()
+    r_h = ns["verify_pass"](long, dict(rep, hurried=True), [], emit, [].append, step, False)
+    r_s = ns["verify_pass"]("short", rep, [], emit, [].append, step, False)
+    ns["run_model"] = run_slow
+    ns["VERIFY_BUDGET_S"] = 0.3
+    r_t = ns["verify_pass"](long, rep, [], emit, [].append, step, False)
+    got["verify_pass: hurried and short skip it; over budget keeps the answer and says so"] = (
+        r_h == {"ran": False} and r_s == {"ran": False} and not frames and not texts and r_t.get("timeout")
+        and steps[-1][1].startswith("Couldn’t check the facts in time"))
+    ns["fast_cloud_ladder"] = lambda: [{"name": "Groq", "model": "x"}]
+    srv_rep = dict(rep, writer="Desk · gpt-oss:20b", merger="Desk · gpt-oss:20b", critic="Desk · ministral-3:14b")
+    got["the pick: the cloud when open, the server's critic model, the writer here, none for a closed cloud writer"] = (
+        ns["verify_pick"](rep, True)[0] == "cloud" and ns["verify_pick"](rep, False) == ("local", "Gemma 4 26B", "Gemma 4 26B")
+        and ns["verify_pick"](srv_rep, False) == ("server", "Desk · ministral-3:14b", "Desk · ministral-3:14b")
+        and ns["verify_pick"](dict(rep, writer="cloud:opus"), False) == ("", "", ""))
+    fr = []
+    ns["rate_frame"](fr.append, _tm515.time() - 2.0, 800)
+    d = json.loads(fr[0][6:-1]) if fr else {}
+    ns["rate_frame"](fr.append, 0, 800)
+    ns["rate_frame"](fr.append, _tm515.time(), 0)
+    got["the speed frame: the writer's tokens a second, nothing without a first word"] = (
+        len(fr) == 1 and fr[0].startswith("\0RATE:") and 90 <= d.get("tps", 0) <= 110 and d.get("tok") == 200
+        and 1.9 <= d.get("s", 0) <= 2.3)
+    return got
+
+
+def _c515_council(src):
+    """run_council in craft mode on stand-ins: the roster, the critic and its chip, the final writer's messages,
+    the fact-check's RESET and step; hurried; over budget; without craft every seat drafts; the cut follows the pen."""
+    R, got_msgs = [], []
+    FIX = json.dumps([{"claim": "The card has 16 TB of memory per chip.", "verdict": "wrong",
+                       "fix": "The card has 16 GB of memory."}])
+    LONG = "The card has 16 TB of memory per chip. " + "It ships in 2024 with 80 GB of HBM3 and runs at 700 W. " * 8
+
+    def rm(label, msgs, emit, thinking=False):
+        c = str(msgs[-1].get("content", ""))
+        R.append((label, c[:40]))
+        if c.startswith("You are reviewing a draft answer"):
+            emit("- WRONG: 16 TB per chip is implausible; the card has 16 GB")
+        elif c.startswith("Below are a question"):
+            emit(FIX)
+        else:
+            emit("draft from " + label)
+
+    def sg(label, msgs, emit, status, fb, note):
+        got_msgs.append((label, msgs))
+        emit(LONG)
+        return True
+
+    def go(labels, run=rm, msgs=None, **kw):
+        ns, calls = _p2_council(src, run, _stream_guarded=sg, **kw.pop("over", {}))
+        out, fr, st = [], [], []
+        # (6b518) the evidence carries the figures the critic's note uses: a note bringing a number from
+        # nowhere is dropped now
+        ns["run_council"](list(labels), msgs or [{"role": "system", "content": "SYS"},
+                                                 {"role": "user", "content": "q What you just found on the web: "
+                                                  "the card has 16 GB, so 16 TB per chip is implausible"}],
+                          lambda c: (fr if isinstance(c, _RcCtl) else out).append(c), st.append, **kw)
+        return ns, out, fr, st
+    got = {}
+    ns, out, fr, st = go(["Desk · a", "Desk · b", "Desk · c"], craft=True)
+    got["one writer drafts; the second seat reviews it; the third is never asked"] = (
+        [l for l, c in R if c.startswith("q")] == ["Desk · a"]
+        and [l for l, c in R if c.startswith("You are reviewing a draft answer")] == ["Desk · b"]
+        and not any(l == "Desk · c" for l, c in R))
+    m = got_msgs[0][1] if got_msgs else [{}, {}]
+    got["the final writer's messages: the brief on the dated system, the question block, the notes"] = (
+        len(got_msgs) == 1 and m[0].get("role") == "system" and str(m[0].get("content", "")).startswith("SYS")
+        and "THE BRIEF FOR THIS ANSWER" in m[0]["content"] and str(m[1].get("content", "")).startswith("S")
+        and "=== THE QUESTION" in m[1]["content"] and "q What you just found on the web" in m[1]["content"]
+        and "REVIEW NOTES" in m[1]["content"] and "16 TB per chip is implausible" in m[1]["content"]
+        and "[answer 1]\ndraft from Desk · a" in m[1]["content"])
+    got["the critic's chip and step"] = (
+        any("DRAFT:" in f and "(review)" in f and "16 TB per chip" in f for f in fr)
+        and any('"id": "review"' in f and "Reviewing the draft" in f for f in fr)
+        and any('"id": "review"' in f and "Reviewed the draft" in f and "1 note" in f for f in fr))
+    got["the fact-check on the critic's model: a RESET, the fixed text, the step"] = (
+        [l for l, c in R if c.startswith("Below are a question")] == ["Desk · b"]
+        and any(str(f) == "\0RESET\0" for f in fr) and out and out[-1].startswith("The card has 16 GB of memory.")
+        and "16 TB" not in out[-1] and any('"id": "verify"' in f and "Checking the facts" in f for f in fr)
+        and any('"id": "verify"' in f and "Checked 1 claim, fixed 1" in f and '"s": "done"' in f for f in fr))
+    R.clear(), got_msgs.clear()
+    ev = _t515.Event()
+    ev.set()
+    ns2, out2, fr2, _ = go(["Desk · a", "Desk · b"], craft=True, hurry=ev)
+    got["hurried: the writer still drafts, no critic, no check"] = (
+        [l for l, c in R if c.startswith("q")] == ["Desk · a"]
+        and not any(c.startswith("You are reviewing") for l, c in R)
+        and not any("RESET" in f for f in fr2) and not any('"id": "verify"' in f for f in fr2) and out2 == [LONG])
+
+    def rm_slow(label, msgs, emit, thinking=False):
+        if str(msgs[-1].get("content", "")).startswith("Below are a question"):
+            _tm515.sleep(1.2)
+        rm(label, msgs, emit)
+    R.clear(), got_msgs.clear()
+    ns3, calls3 = _p2_council(src, rm_slow, _stream_guarded=sg)
+    ns3["VERIFY_BUDGET_S"] = 0.3
+    out3, fr3 = [], []
+    t0 = _tm515.time()
+    ns3["run_council"](["Desk · a", "Desk · b"], [{"role": "user", "content": "q"}],
+                       lambda c: (fr3 if isinstance(c, _RcCtl) else out3).append(c), [].append, craft=True)
+    got["over budget: the answer ships as it is, said in the step, within the budget"] = (
+        not any("RESET" in f for f in fr3) and out3 == [LONG] and _tm515.time() - t0 < 4
+        and any('"id": "verify"' in f and "in time" in f and "answer kept" in f for f in fr3))
+    R.clear(), got_msgs.clear()
+    go(["Desk · a", "Desk · b", "Desk · c"])
+    got["without craft every seat drafts, no critic, and the brief still rides the final"] = (
+        sorted(l for l, c in R if c.startswith("q")) == ["Desk · a", "Desk · b", "Desk · c"]
+        and not any(c.startswith("You are reviewing") for l, c in R)
+        and got_msgs and "THE BRIEF FOR THIS ANSWER" in got_msgs[-1][1][0]["content"])
+
+    def rm_long(label, msgs, emit, thinking=False):
+        emit("x" * 5000)
+    got_msgs.clear()
+    go(["Desk · a", "Desk · b"], run=rm_long)
+    srv_cut = got_msgs[-1][1][1]["content"] if got_msgs else ""
+    got_msgs.clear()
+    go(["Gemma 4 26B", "Llama"], run=rm_long,
+       over=dict(MODEL_ROUTES={"Gemma 4 26B": ("mlx", 1), "Llama": ("mlx", 2)}, MERGE_RANK=["Gemma 4 26B", "Llama"],
+                 MODEL_MEM_BYTES={"Gemma 4 26B": 16e9, "Llama": 2e9}))
+    big_cut = got_msgs[-1][1][1]["content"] if got_msgs else ""
+    got_msgs.clear()
+    go(["Llama", "Gemma 4 26B"], run=rm_long,
+       over=dict(MODEL_ROUTES={"Gemma 4 26B": ("mlx", 1), "Llama": ("mlx", 2)}, MERGE_RANK=["Llama", "Gemma 4 26B"],
+                 MODEL_MEM_BYTES={"Gemma 4 26B": 16e9, "Llama": 2e9}))
+    small_cut = got_msgs[-1][1][1]["content"] if got_msgs else ""
+    got["the cut follows the pen: whole drafts for a server, 4,000 for a big local model, 1,500 for a small one"] = (
+        "x" * 5000 in srv_cut and "x" * 4000 in big_cut and "x" * 4001 not in big_cut
+        and "x" * 1500 in small_cut and "x" * 1501 not in small_cut)
+    return got
+
+
+def _c515_pins(src):
+    """Where the craft meets the handler, run_council, _stream_guarded and the page: pinned."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    rc = src[src.index("def run_council("):src.index("\n\n\nRESEARCH_PLAN = (")]
+    sg = src[src.index("def _stream_guarded("):src.index("def _detruncate(")]
+    return {
+        "the handler asks for craft on Thinking, and on Thinking on one server alone":
+            'craft=(tier == "Thinking" or (\n                                _srv_only and _so_mode == "Thinking")),\n'
+            "                            srv_merge=(tier in TIERS and not cloud_only))" in ch,
+        "the roster": "    if craft and not max_mode and len(labels) >= 2:\n        critic_lbl = labels[1]\n"
+                      "        _unasked = labels[2:]            # said in the ledger, never asked\n"
+                      "        labels = labels[:1]\n" in rc
+                      and '        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")' in rc,
+        # (6b518) the check reads the answer with a closing recap trimmed, and records what it did
+        "every way out of the stage is checked": rc.count("return _done()") >= 9
+                                                  and "            report[\"verify\"] = verify_pass(\n"
+                                                      "                _trim, report, messages, _emit0, status, _step_frame,\n" in rc,
+        "the final prompt and its cuts": "    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)\n" in rc
+                                          # (6b518) the corrections ride both cuts
+                                          and "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut,\n"
+                                              "                         corrections=_corrs)\n"
+                                              "    synth_full = final_prompt(messages[0], question, _texts, notes, cut=6000,\n"
+                                              "                              corrections=_corrs)\n" in rc,
+        "the critic is capped like a draft": "            _capped(_critic, lambda: run_model(\n"
+                                             "                _critic, critic_prompt(question, _texts, persona=_persona), parts.append))" in rc,
+        "the speed frame from every guarded stream": "            rate_frame(emit, _t_first[0], sum(len(c) for c in seen))\n"
+                                                      "            return True" in sg,
+        "Fast's second pass writes under the brief too": src.count("brief_system(full_messages[0])") == 3,
+        "the answer's own length on the card": '"%d chars" % (shown_n[0] or sent[0])' in ch,
+        "the page reads RATE, measures from the first character after the last RESET, and says both times":
+            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE";' in src
+            and "RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}}," in src
+            and "if(cut!==genCut){genCut=cut;genT0=0;}\n      if(full.length&&!genT0)genT0=lastChunkT;" in src
+            and "const tps=(rateInfo&&rateInfo.tps>0)?rateInfo.tps:lastRate;" in src
+            and '" tokens · wrote in "+wrote.toFixed(1)+"s · "+secs.toFixed(1)+"s total"' in src,
+        "the page's step card knows the review and the check":
+            'const STEP_ORDER=["wake","search","read","geo","council","review","draft","polish","verify","places"];' in src
+            and "review:8,draft:30,polish:8,verify:6" in src and 'if(isCouncil)stepPlan.push("verify");' in src,
+        "the mode says what it does": '"desc": "a draft, a review, a fact-checked final"' in src,
+    }
+
+
+def _c515_all(src):
+    out = {}
+    for fn in (_c515_helpers, _c515_council, _c515_pins):
+        try:
+            for k, v in fn(src).items():
+                out[fn.__name__[6:] + ": " + k] = bool(v)
+        except Exception as e_:
+            out[fn.__name__[6:] + ": raised"] = False
+            out[fn.__name__[6:] + ": raised %r" % (e_,)] = False
+    return out
+
+
+for _n515, _o515 in _c515_all(_MILLENAI_SRC).items():
+    check("6b515 the answer craft — " + _n515, _o515, "")
+_C515_MUT = [
+    ("every seat drafts under craft", "    if craft and not max_mode and len(labels) >= 2:\n        critic_lbl = labels[1]",
+     "    if False:\n        critic_lbl = labels[1]"),
+    ("no critic", "    if craft and not _hurried():\n        _critic = critic_lbl or merger",
+     "    if False:\n        _critic = critic_lbl or merger"),
+    ("the brief left off the final", '    return [brief_system(sys_msg, now), {"role": "user", "content": u}]',
+     '    return [dict(sys_msg), {"role": "user", "content": u}]'),
+    ("the question block left out of the final", '         + "\\n\\n=== %s ===\\n%s" % (_EVIDENCE_HEAD, question)\n', ""),
+    ("no RESET before the fixed answer", '        emit(Ctl(NUL + "RESET" + NUL))\n        emit(new)\n        out["rewritten"] = True',
+     '        emit(new)\n        out["rewritten"] = True'),
+    ("the check with no budget", "    th.join(timeout=budget_s)\n    if th.is_alive():", "    th.join()\n    if th.is_alive():"),
+    ("a hurried run still checked", '    if not report or report.get("hurried") or (\n            len(text or "") < VERIFY_MIN_CHARS and not stuck):',
+     '    if not report or (\n            len(text or "") < VERIFY_MIN_CHARS and not stuck):'),
+    ("a fix about the machinery accepted", "        if fix and (len(fix) > 3 * len(claim) + 80 or _FIX_META_RX.search(fix)):\n            continue",
+     "        if False:\n            continue"),
+    ("no speed frame", "            rate_frame(emit, _t_first[0], sum(len(c) for c in seen))\n            return True",
+     "            return True"),
+    ("the cut not following the pen", "    _cut = 6000 if server_label(merger) else (4000 if _big_local else 1500)", "    _cut = 1500"),
+    ("the critic's notes not carried", "    synth = final_prompt(messages[0], question, _texts, notes, cut=_cut,",
+     "    synth = final_prompt(messages[0], question, _texts, '', cut=_cut,"),
+]
+_c515_caught = []
+for _mn, _ma, _mb in _C515_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c515_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c515_all(_ms).values()):
+        _c515_caught.append((_mn, "not caught"))
+check("6b515's rules each break a check when broken (%d mutants)" % len(_C515_MUT), not _c515_caught,
+      "%r" % _c515_caught)
+# ==== 6b515 the answer craft: end ====
+# ==== quality-1 (6b516) the two answer builds together: begin ====
+# The grounded turn (6b514) is the evidence (up to 9 KB), then the rules, then the question; the answer
+# craft (6b515) and Fast's second pass cut the question block with a plain [:8000] / [:5000], which kept
+# the pages and dropped the rules and the question itself. ground_clip keeps the end whole.
+print("== quality-1: the grounded turn survives every cut (6b516) ==")
+_q16 = {"re": re, "time": time, "strftime_np": lambda f, t: time.strftime(f.replace("%-d", "%d"), t)}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("GROUND_RULES = ("):_MILLENAI_SRC.index("def _ground_key(")], _q16)
+_pack16 = "WEB EVIDENCE gathered today, 8 sources:\n" + "\n".join("[%d] page %d\n    %s" % (i, i, "x" * 1000) for i in range(1, 9))
+_turn16 = _q16["grounded_turn"]("most powerful GPU now", _pack16)
+_c16a = _q16["ground_clip"](_turn16, 5000)
+_c16b = _q16["ground_clip"](_turn16, 12000)
+check("a clipped grounded turn keeps the rules and the question, and the evidence's head",
+      len(_turn16) > 9000 and len(_c16a) <= 5000 and _c16a.endswith("PROMPT: most powerful GPU now")
+      and "GROUNDING RULES:" in _c16a and _c16a.startswith("What you just found on the web")
+      and "[1] page 1" in _c16a and _c16b == _turn16 and _q16["ground_clip"]("short", 10) == "short"
+      and _q16["ground_clip"]("y" * 9000, 3000).endswith("y" * 1000) and len(_q16["ground_clip"]("y" * 9000, 3000)) <= 3000,
+      "%d %d" % (len(_turn16), len(_c16a)))
+check("the checker and Fast's second passes cut the question with ground_clip, never a bare slice",
+      _MILLENAI_SRC.count('ground_clip(full_messages[-1]["content"], 10000)') == 3
+      and 'full_messages[-1]["content"][:5000]' not in _MILLENAI_SRC
+      and '"\\n\\n=== QUESTION ===\\n" + ground_clip(question, 12000)' in _MILLENAI_SRC, "")
+
+# A MODEL THE CARD REFUSED (6b516): Ollama1 gained qwen3.8:27b (too big for its 16 GB card) and its gateway
+# doesn't report the card's size, so every server mode seated it first; the gpu_fit refusal marked the whole
+# server down and every answer was "None of Ollama1's models answered". Now the refusal is remembered per
+# model and size, the model counts as not fitting, the server stays up, and craft's writer is replaced.
+_nf16 = {"re": re, "time": time, "_srv_seen": {"s1": {"models": [
+    {"name": "big:27b", "placement": "gpu", "size": 17_000_000_000},
+    {"name": "ok:20b", "placement": "gpu", "size": 13_000_000_000}]}}, "_srv_nofit": {}, "SRV_NOFIT_S": 7 * 86400,
+    "SERVER_SEP": " \u00b7 ", "_SRV_LABEL_RX": re.compile(r"[\w.:/+-]{1,120}"),
+    "_SRV_CLOUD_TAG": re.compile(r"(^|[-:])cloud$", re.I), "ollama_internal": lambda m: False}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("def srv_note_nofit("):_MILLENAI_SRC.index("def _srv_fail_why(")], _nf16)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("def _srv_models("):_MILLENAI_SRC.index("def server_check(")], _nf16)
+_e16 = {"id": "s1", "name": "Box"}
+_nf16["srv_note_nofit"](_e16, "big:27b")
+_rows16 = {m["name"]: m for m in _nf16["_srv_seen"]["s1"]["models"]}
+_tags16 = {"models": [{"name": "big:27b", "placement": "gpu", "size": 17_000_000_000},
+                      {"name": "ok:20b", "placement": "gpu", "size": 13_000_000_000}]}
+_m16 = {m["name"]: m for m in _nf16["_srv_models"](_e16, _tags16)}
+_m16b = {m["name"]: m for m in _nf16["_srv_models"](_e16, {"models": [
+    {"name": "big:27b", "placement": "gpu", "size": 9_000_000_000}]})}
+check("a model the card refused stops counting as fitting (now and at the next check), at its size only",
+      _rows16["big:27b"]["placement"] == "gpu+ram" and _rows16["ok:20b"]["placement"] == "gpu"
+      and _m16["big:27b"]["placement"] == "gpu+ram" and _m16["big:27b"].get("nofit") is True
+      and _m16["ok:20b"]["placement"] == "gpu" and "nofit" not in _m16["ok:20b"]
+      and _m16b["big:27b"]["placement"] == "gpu" and not _nf16["srv_is_nofit"]("s1", "big:27b"),
+      "%r" % [_rows16, _m16, _m16b])
+_rc16 = _MILLENAI_SRC[_MILLENAI_SRC.index("def run_council("):_MILLENAI_SRC.index("# ===================================== the answer craft (6b515")]
+check("a refusal of the model, not the server: the server stays up, the gpu_fit source records it, craft's writer is replaced",
+      'if getattr(_err[0], "kind", "") in ("fit", "missing"):' in _rc16 and "_model_fail.add(label)" in _rc16
+      # and a hiccup of craft's one writer hands the pen to the critic's seat, once
+      and 'elif critic_lbl and label == labels[0] and not _craft_retry \\\n                        and getattr(_err[0], "transient", False):' in _rc16
+      and "_craft_retry.append(label)" in _rc16
+      and "while (critic_lbl and labels and labels[0] in _model_fail and not _hurried()" in _rc16
+      and _rc16.index("while (critic_lbl and labels") < _rc16.index("    for _lbl in _unasked:")
+      and '    if code == "gpu_fit":\n        srv_note_nofit(e, model)\n' in _MILLENAI_SRC, "")
+
+# THE SERVER'S CONTEXT, AN EMPTY FINAL WRITER, THE CRITIC'S NOTES (6b516): the bench's quality-1 run had two
+# empty answers (a ~31 KB final prompt in the gateway's default 8,192 tokens) and the craft run's judges
+# traced inventions to the critic's MISSING notes ("add celebrity examples").
+_cx16 = {}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("SRV_CTX_DEFAULT = 8192"):_MILLENAI_SRC.index("def server_stream(")], _cx16)
+_f16 = _cx16["srv_ctx_for"]
+check("a server request asks for the context its prompt needs: none up to the gateway's 8,192, then 4,096 steps, at most 32K",
+      _f16([{"role": "user", "content": "x" * 3000}]) == 0
+      and _f16([{"role": "system", "content": "s" * 10500}, {"role": "user", "content": "u" * 20500}]) == 16384
+      and _f16([{"role": "user", "content": "u" * 400000}]) == 32768
+      and _f16([{"role": "user", "content": "u" * 15000}], max_tokens=200) == 0
+      and _f16(None) == 0, "%r" % [_f16([{"role": "user", "content": "u" * 20500}])])
+_ss16 = _MILLENAI_SRC[_MILLENAI_SRC.index("def server_stream("):_MILLENAI_SRC.index("def _srv_reads_pictures(")]
+check("the longer context is asked for and, if the card can't hold it, dropped for the gateway's own (never noted as too big)",
+      "_ctx = srv_ctx_for(messages, max_tokens)" in _ss16 and '**({"num_ctx": int(ctx)} if ctx else {}))' in _ss16
+      and 'if _ctx and js.get("code") == "gpu_fit":' in _ss16
+      and _ss16.index('if _ctx and js.get("code") == "gpu_fit":') < _ss16.index("raise _srv_fail(e, resp.status, js, model)"), "")
+check("an empty final writer leaves the best draft standing, checked; the critic names angles, never specifics",
+      'if good and not "".join(_shown).strip():' in _rc16
+      # (6b518) the check now reads the answer with its closing recap trimmed
+      and _rc16.index('if good and not "".join(_shown).strip():') < _rc16.index("report[\"verify\"] = verify_pass(")
+      and "never supply a figure, name, example, study" in _MILLENAI_SRC
+      and "Never invent a figure, name, example or source to satisfy" in _MILLENAI_SRC, "")
+_af16 = {"re": re, "json": json}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("_CLAIM_RX = re.compile("):_MILLENAI_SRC.index("def verify_answer(")], _af16)
+_ans16 = ("Rent runs R$4,000 a month in Lagoa [2]. Because a lease may involve deposits, landlords vary.\n"
+          "- **Bus**: Line 330 runs every 10 minutes.\n- Amazon ships to Bolivia and Peru.")
+_t16, _c16, _x16 = _af16["apply_fixes"](_ans16, [
+    {"claim": "Rent runs R$4,000 a month in Lagoa", "verdict": "unsupported", "fix": "Rent varies in Lagoa"},
+    {"claim": "a lease may involve deposits", "verdict": "unsupported",
+     "fix": "a lease may involve deposits, but no source addresses this"},
+    {"claim": "Line 330 runs every 10 minutes.", "verdict": "unsupported", "fix": ""},
+    {"claim": "Amazon ships to Bolivia and Peru.", "verdict": "wrong",
+     "fix": "Amazon ships to Peru (no evidence supports Bolivia)."}])
+check("the fact-check replaces whole sentences only, and never with a line about its sources",
+      _x16 == 2 and "Rent varies in Lagoa [2]." in _t16 and "Line 330" not in _t16 and "- **Bus**:" not in _t16
+      and "no source" not in _t16 and "no evidence" not in _t16 and "Bolivia and Peru." in _t16
+      and "a lease may involve deposits, landlords vary." in _t16
+      and "never mentioning sources, evidence or this" in _MILLENAI_SRC, "%r" % [_t16, _x16])
+# ==== quality-1 (6b516): end ====
+# ==== quality-2 (6b518) answers, round 2: begin ====
+# Round 1 (quality-1) halved the hallucinations but searched arithmetic (q27's verdict flipped), the critic
+# invented and the writer ignored its right catches, follow-ups ran with no sources, the model's query plan
+# never landed (model=[] in 28 of 28: the server pick was None on a mode on one server alone) and the
+# search never reached the primary source. NOTES 6b518.
+print("== quality-2: arithmetic, the critic, corrections, follow-ups, the plan, primary sources (6b518) ==")
+_g18 = _g14
+_exec_names(_g18, {"_SC_SPLIT_RX", "_SC_NUM_RX", "_SC_ASK_RX", "_SC_WORLD_RX", "_SC_Q_START_RX",
+                   "_sc_entities", "reasoning_parts", "self_contained_reasoning", "SC_HINT",
+                   "needs_search", "_NO_SEARCH", "_FRESH_WORDS", "_SELF_CONTAINED", "_VENUE_RX", "_ZIP_RX",
+                   "_NEARBY_RX", "_WORLDLY_RX", "_SRV_WORD", "_SRV_STEM", "_SRV_FAMILY", "_srv_flags",
+                   "srv_role_ok"})
+_g18["server_label"] = lambda l: isinstance(l, str) and " · " in l
+_g18["SERVER_SEP"] = " · "
+_Q27 = ("A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 "
+        "nights. Which is cheaper and by how much? Then redo it if the hotel adds a 12% tax that isn't in the $95.")
+_Q28 = ("I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for "
+        "$27,000. Gas is $3.40. How many years until B breaks even on fuel alone?")
+_Q29 = ("Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more "
+        "and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?")
+check("arithmetic on the person's own figures needs no search; a part that wants the world still does",
+      _g18["self_contained_reasoning"](_Q27) and _g18["self_contained_reasoning"](_Q28)
+      and not _g18["self_contained_reasoning"](_Q29)
+      and not _g18["needs_search"](_Q27) and not _g18["needs_search"](_Q28) and _g18["needs_search"](_Q29)
+      and not _g18["self_contained_reasoning"]("Is $4,000 a month enough to live in Lisbon?")
+      and not _g18["self_contained_reasoning"]("Which is cheaper over 5 years, a Prius or a Civic, at $3.40 gas?")
+      and _g18["needs_search"]("Cheapest places to travel from NYC this winter for two weeks? Flights plus "
+                               "living costs, not just one or the other."), "")
+_pq18 = _g18["plan_queries"](_Q29)
+_pq18b = _g18["plan_queries"]("Explain what 4-bit quantization does to an LLM. Keep it short and technical.")
+check("the planner searches neither premises nor sums nor how-to-answer parts, and keeps names in any script",
+      _pq18 and not any("4.6" in q or "212" in q or "trust" in q for q in _pq18)
+      and any("Florianópolis" in q for q in _pq18)
+      and not any("Keep" in q or "technical" in q.split()[:1] for q in _pq18b)
+      and "Medellín" in " ".join(_g18["plan_queries"]("Cost of living in Medellín vs Lisbon?")),
+      "%r %r" % (_pq18, _pq18b))
+_gh18 = lambda q: [h for h, _x in _g18["ground_hints"](q, lead=(_g18["plan_queries"](q) or [""])[0])]
+check("primary sources by question type: the statistics agency, the Fed, the airline, the vendor; nothing for a poem",
+      any("site:fred.stlouisfed.org" in h for h in _gh18("How much is a dozen eggs in the US right now?"))
+      and any("site:federalreserve.gov" in h for h in _gh18("What's the current federal funds rate?"))
+      and any("site:latamairlines.com" in h for h in _gh18("What are the carry-on limits on LATAM?"))
+      and any("site:apple.com/newsroom" in h for h in _gh18("What's the newest iPhone right now?"))
+      and _gh18("write a short poem about the sea") == []
+      and len(_g18["ground_hints"]("GPU TPU Claude Gemini LATAM GOL Azul eggs Fed", lead="a b")) <= _g18["GROUND_HINT_QUERIES"],
+      "%r" % _gh18("How much is a dozen eggs in the US right now?"))
+_rows18 = [{"title": "Egg prices fall again", "href": "https://www.someblog.com/eggs", "body": "eggs price dozen", "_q": "a"},
+           {"title": "Average Price: Eggs, dozen", "href": "https://fred.stlouisfed.org/series/APU0000708111",
+            "body": "eggs price dozen average", "_q": "b"}]
+_rk18 = _g18["rank_sources"](_rows18, ["eggs", "price", "dozen"], [], True, per_query=0,
+                             primary=["fred.stlouisfed.org"])
+check("a page on the hinted primary host ranks first when it speaks to the question",
+      _rk18 and _rk18[0]["host"] == "fred.stlouisfed.org", "%r" % [s["host"] for s in _rk18])
+check("the query plan runs on the council's own non-reasoning seat (the critic's), never a reasoning model",
+      _g18["ground_plan_seat"](["S · gpt-oss:20b", "S · ministral-3:14b", "S · gemma4:12b"])
+      == "S · ministral-3:14b"
+      and _g18["ground_plan_seat"](["S · gpt-oss:20b"]) == ""
+      and _g18["ground_plan_seat"](["Gemma 4 26B"]) == ""
+      and "_seat = ground_plan_seat(_cn)" in _hs14
+      and "server_stream(_seat, ask, parts.append, 160)" in _hs14
+      # the plan asks for the context its model is loaded with, so the card doesn't reload it
+      and "server_ctx_sticky():" in _hs14
+      and "_was = _srv_ctx_seen.get((e.get(\"id\"), model))" in _MILLENAI_SRC, "")
+# follow-ups
+check("another assistant's reply the person mentions but didn't paste: the model is told it can't see it",
+      "cannot see it" in _g18["other_ai_note"]("I feel like Claude's response beat you. explain more")
+      and _g18["other_ai_note"]("Claude said: \"" + "x" * 200 + "\" do you agree?") == ""
+      and _g18["other_ai_note"]("what is Claude using for chips?") == ""
+      and _g18["followup_new_terms"]("I feel like Claude's response beat you. explain more") == []
+      and "furnished" in _g18["followup_new_terms"]("Pick one and tell me what a furnished one-bedroom there runs"),
+      "")
+_pr18 = [{"url": "https://a.com/%d" % i, "title": "p%d" % i} for i in range(1, 9)]
+_nw18 = [{"url": "https://b.com/%d" % i, "title": "n%d" % i} for i in range(1, 6)] + [{"url": "https://a.com/2"}]
+_mp18 = _g18["merge_prior"](_pr18, _nw18)
+check("a follow-up keeps the earlier turn's first sources numbered as before, then its new ones, no repeats",
+      [s["url"] for s in _mp18[:4]] == ["https://a.com/%d" % i for i in range(1, 5)]
+      and _mp18[4]["url"] == "https://b.com/1" and len(_mp18) == 8
+      and len({s["url"] for s in _mp18}) == 8, "%r" % [s["url"] for s in _mp18])
+
+
+def _web18(q, limit=8):
+    return [{"title": "Rubin GPU news %s" % q, "href": "https://www.reuters.com/" + re.sub(r"\W+", "-", q),
+             "body": "Vera Rubin GPU TPU 2026 " + q}]
+
+
+_calls18 = []
+_g18["_ddg_text"] = lambda q, limit=8: (_calls18.append(q), _web18(q))[1]
+_g18["_ddg_more"] = lambda q, limit=8: []
+_g18["_page_read"] = lambda url, want_photo=False, timeout=6.0: None
+_g18["_ground_cache"].clear()
+_t18 = _g18["ground_start"]("What is the most powerful GPU right now?", turn_key="tk18")
+_t18.wait(None, 15.0)
+_msgs18 = [{"role": "user", "content": "tk18"}, {"role": "assistant", "content": "a"},
+           {"role": "user", "content": "explain more"}]
+_pv18 = _g18["ground_prior"](_msgs18)
+_n18 = len(_calls18)
+_r18 = _g18["ground_start"]("explain more", prior=_pv18, search=False)
+_r18.wait(None, 5.0)
+check("the earlier turn's evidence is found by the person's words and reused with no search when nothing is new",
+      _t18.sources and _pv18 is _t18 and len(_calls18) == _n18 and _r18.pack == _t18.pack
+      and _r18.phase == "done" and getattr(_r18, "reused", False)
+      and _g18["ground_prior"]([{"role": "user", "content": "never asked"}, {"role": "assistant", "content": "a"},
+                                {"role": "user", "content": "more"}]) is None, "")
+check("the handler carries a follow-up's evidence, searches only what it adds, and passes the notes",
+      "_g_prior = ground_prior(messages)" in _hs14 and "prior=_g_prior, search=not _g_reuse" in _hs14
+      and "turn_key=_ground_key(prompt)" in _hs14 and "_g_reuse = not _fu_new" in _hs14
+      and "grounded_turn(query, _gpack, note=_oai_note)" in _hs14
+      and "SC_HINT if self_contained_reasoning(strip_greeting(prompt))" in _hs14, "")
+# the critic, the corrections
+_c18 = {"re": re, "json": json, "time": time, "threading": threading, "os": os, "DEV_HOME": "",
+        "ground_clip": lambda t, c: t, "SYNTH_INSTRUCTION": "Below ... Write ONE final answer ..."}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("ANSWER_BRIEF = ("):_MILLENAI_SRC.index("\n\n\nRESEARCH_PLAN = (")], _c18)
+_ev18 = ("[1] Ironwood GA — cloud.google.com\n    Ironwood, the seventh-generation TPU, is generally available "
+         "with 192 GB per chip. The Fed raised rates for the first time since 2023. Older cards used Ada.")
+_dr18 = ("Google's Ironwood is the fifth-generation TPU. The RTX 5090 (Blackwell) leads. It costs $2.50/hr. "
+         "The Fed's move was the first hike since 2023.")
+_notes18 = "\n".join([
+    '- WRONG: "Ironwood is the fifth-generation TPU" -> the seventh-generation TPU [1]',
+    '- WRONG: "The RTX 5090 (Blackwell)" -> it is Ada architecture [1]',
+    '- UNSUPPORTED: "It costs $2.50/hr" — no source gives an hourly price',
+    '- UNSUPPORTED: "the first hike since 2023" — not confirmed',
+    '- MISSING: geographic variability (e.g., adjacent districts like Bela Vista)',
+    '- MISSING: a July 2026 guide lists $320–$420',
+    '- MISSING: how the person should rent the chips'])
+_k18, _d18 = _c18["critic_filter"](_notes18, [_ev18, _dr18], "2026")
+_cr18 = _c18["critic_corrections"](_k18, _ev18, [_dr18])
+check("the critic's lines that bring a name or a number from nowhere are dropped, and so is a false 'unsupported'",
+      "Bela Vista" not in _k18 and "$320" not in _k18 and "first hike since 2023" not in _k18
+      and "how the person should rent the chips" in _k18 and "fifth-generation" in _k18
+      and "Ada" in _k18 and len(_d18) == 3, "%r" % _d18)
+check("a correction the evidence states (in one sentence with the claim) is kept; a word merely in the pack is not",
+      [c["kind"] for c in _cr18] == ["wrong", "unsupported"]
+      and _cr18[0]["quote"] == "Ironwood is the fifth-generation TPU" and _cr18[0]["src"] == 1
+      and _cr18[1]["quote"] == "It costs $2.50/hr", "%r" % _cr18)
+_ev18b = ("WEB EVIDENCE\n[1] NVIDIA Ampere \u2014 nvidianews.nvidia.com \u2014 2020-05-14\n    The A100 is the most "
+          "powerful data center GPU.\n[2] Blackwell \u2014 x.com \u2014 2026-09-01\n    The B300 ships.")
+check("a source years older than the rest of the pack never 'corrects' the draft",
+      not _c18["_correction_backed"]("the B300 is the most powerful data center GPU", "the A100 [1]", _ev18b)
+      and _c18["_correction_backed"]("the B300 is the most powerful data center GPU", "the A100 [1]",
+                                     _ev18b.replace("2020-05-14", "2026-05-14")), "")
+_fp18 = _c18["final_prompt"]({"role": "system", "content": "SYS"}, "Q", ["d"], "n", corrections=_cr18)[1]["content"]
+_vp18 = _c18["verify_prompt"]("Q", ["d"], "A", known=_cr18)[1]["content"]
+check("the corrections ride the final prompt as a mandatory block, are checked after writing, and reach the checker",
+      "CORRECTIONS TO APPLY" in _fp18 and "seventh-generation TPU [1] instead" in _fp18
+      and _fp18.index("CORRECTIONS TO APPLY") < _fp18.index("Write the final answer now")
+      and "KNOWN ERRORS" in _vp18 and "$2.50/hr" in _vp18
+      and len(_c18["corrections_stuck"]("Google's **Ironwood is the fifth-generation TPU**.", _cr18)) == 1
+      and _c18["corrections_stuck"]("Ironwood is the seventh-generation TPU.", _cr18) == []
+      and "CORRECTIONS" not in _c18["final_prompt"]({}, "Q", ["d"], "")[1]["content"], "")
+check("a closing recap goes; a short answer or a closing paragraph that isn't one stays",
+      _c18["trim_recap"]("A" * 90 + ".\n\nB" + "b" * 90 + ".\n\nC.\n\n**Bottom line:** A again.")
+      == "A" * 90 + ".\n\nB" + "b" * 90 + ".\n\nC."
+      and _c18["trim_recap"]("A.\n\n**Bottom line:** A.") == "A.\n\n**Bottom line:** A."
+      and _c18["trim_recap"]("A.\n\nB.\n\nC carries news.") == "A.\n\nB.\n\nC carries news.", "")
+_rc18 = _MILLENAI_SRC[_MILLENAI_SRC.index("def run_council("):_MILLENAI_SRC.index("# ===================================== the answer craft (6b515")]
+check("the council checks the critic's notes, carries the corrections, trims the recap and counts what stuck",
+      "critic_filter(\n                notes, [question] + list(_texts)" in _rc18
+      and "critic_corrections(notes, question, _texts)" in _rc18
+      and "corrections=_corrs)" in _rc18 and "corrections_stuck(_final, _corr)" in _rc18
+      and "trim_recap(_final)" in _rc18 and '"Applied the review\\u2019s corrections"' in _rc18
+      and "critic_prompt(question, _texts, persona=_persona)" in _rc18, "")
+_gt18 = _g18["grounded_turn"]("eggs price", "WEB EVIDENCE gathered today, 1 source:\n[1] Eggs — bls.gov — 2026\n"
+                              "    https://bls.gov/x\n    A dozen eggs averaged $2.27 in September 2026, down from $3.49.",
+                              note="[NOTE18]")
+check("the grounded turn pulls the evidence's figures out for the writer and carries the conversation note last",
+      "KEY FIGURES IN THAT EVIDENCE" in _gt18 and "- [1] A dozen eggs averaged $2.27" in _gt18
+      and _gt18.index("KEY FIGURES") < _gt18.index("GROUNDING RULES") < _gt18.index("[NOTE18]")
+      < _gt18.index("PROMPT: eggs price") and "marked 'typically'" in _gt18, "")
+_ss18 = _MILLENAI_SRC[_MILLENAI_SRC.index("def server_stream("):_MILLENAI_SRC.index("def _srv_reads_pictures(")]
+check("the final writer's reasoning level goes only to gpt-oss, and a server that refuses it is asked without it",
+      'SRV_THINK_MODELS.match(str(model or ""))' in _ss18 and 'd["think"] = _think_box[0]' in _ss18
+      and "if _think_box[0] and resp.status == 400:" in _ss18
+      and 'synth[0]["_think"] = final_think_level()' in _MILLENAI_SRC
+      and 'm.get("_think") for m in messages' in _ss18, "")
+# ==== quality-2 (6b518): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

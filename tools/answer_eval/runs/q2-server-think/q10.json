@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.0,14.2],\"final\":15.8,\"ftok\":331,\"est\":false}",
+  "X-Hurry": "d30dacf6e594eb97"
+ },
+ "first_byte_s": 5.44,
+ "first_text_s": 57.58,
+ "elapsed_s": 70.34,
+ "events": [
+  {
+   "t": 5.44,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 5.44,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 16.44,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.44,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 16.44,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 22.85,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 39 passages"
+   }
+  },
+  {
+   "t": 22.85,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 22.85,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 22.85,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 33.89,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 690
+  },
+  {
+   "t": 33.89,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 33.89,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 33.89,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 33.89,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 45.12,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 425
+  },
+  {
+   "t": 45.12,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "3 notes · 5 dropped"
+   }
+  },
+  {
+   "t": 45.12,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 45.12,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 45.12,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 57.58,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 59.08,
+   "tag": "RATE",
+   "data": {
+    "tps": 122.8,
+    "tok": 184,
+    "s": 1.5
+   }
+  },
+  {
+   "t": 59.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 59.08,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 59.08,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 70.34,
+   "tag": "RESET"
+  },
+  {
+   "t": 70.34,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 6 claims, fixed 1",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 70.34,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "693 chars"
+   }
+  },
+  {
+   "t": 70.34,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   5.44,
+   "Searching the web…"
+  ],
+  [
+   16.44,
+   "Reading 8 sources…"
+  ],
+  [
+   22.85,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   33.89,
+   "compositing…"
+  ],
+  [
+   33.89,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   59.08,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 5.44
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.44
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 16.44
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 39 passages",
+   "t_s": 22.85
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 22.85
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 33.89
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "3 notes · 5 dropped",
+   "t_s": 45.12
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 45.12
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 59.08
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 59.08
+  },
+  {
+   "id": "verify",
+   "l": "Checked 6 claims, fixed 1",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 70.34
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "693 chars",
+   "t_s": 70.34
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 70.34
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 33.89,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**MLX beats Ollama on an M4 Pro 48 GB** – on the same machine the Apple‑native MLX backend decodes roughly *60‑70 tokens/s* for a 35 B‑MoE model, versus about *35 tokens/s* with Ollama 0.19 [5][7]. MLX also uses ~50 % less memory for the same model, so it leaves more headroom for large contexts.\n\n**Largest model you can run comfortably** – the M4 Pro’s 48 GB of unified memory (≈44.5 GB available for the model after macOS overhead) supports **Qwen 3.5‑35 B‑A3B** (a 35 B‑MoE) at full‑precision or Q4 quantisation without swapping [1]. With Q4 quantisation you can even fit a 70 B model at usable speeds, but the 35 B‑MoE is the sweet spot for predictable latency and memory usage [2][6]."
+  },
+  {
+   "t_s": 33.89,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 45.12,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: **\"Ollama 0.19\"** -> **Ollama 0.31.2** [3] (specific version cited, not \"0.19\")\n- **WRONG**: **\"35 tokens/s with Ollama\"** -> **~35 tok/s via Ollama on an *M4 Max*** [7] (draft misapplies M4 Max benchmark to M4 Pro)\n- **CONTRADICTS**: Draft claims **MLX uses ~50% less memory** but cites [7] for an **M4 Max**, not M4 Pro; no M4 Pro memory efficiency for MLX is stated in sources [3][5][6] (only [7] for M4 Max)."
+  }
+ ],
+ "sources": [
+  {
+   "t": "Best AI Models for Mac Mini M4 Pro (48 GB) | llmrun",
+   "u": "https://llmrun.dev/device/mac-mini-m4-pro-48gb",
+   "d": ""
+  },
+  {
+   "t": "MacBook Pro M4 Pro 48GB (48 GB) — What AI Models Can It Run ...",
+   "u": "https://canitrun.net/hardware/macs/macbook-pro-m4-pro-48gb",
+   "d": ""
+  },
+  {
+   "t": "Ollama Hosting on Dedicated Mac minis, from $99/mo",
+   "u": "https://macyou.co/ollama-hosting",
+   "d": ""
+  },
+  {
+   "t": "How to Run LLMs on a Mac (2026): Ollama, LM Studio & MLX",
+   "u": "https://llmhardware.io/guides/how-to-run-llms-on-mac",
+   "d": "2026-10-03"
+  },
+  {
+   "t": "Ollama MLX on Apple Silicon in 2026: What 2× Faster Inference...",
+   "u": "https://runaihome.com/blog/ollama-mlx-apple-silicon-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Mac Mini M4 Pro Ollama Benchmark 2026: Llama... | The AI Desk",
+   "u": "https://ai-desk.tech/blog/mac-mini-m4-pro-ollama-benchmark",
+   "d": "2026"
+  },
+  {
+   "t": "Best Way to Run Qwen 3.5 on Mac: MLX vs Ollama Speed Test",
+   "u": "https://insiderllm.com/guides/qwen35-mac-mlx-vs-ollama/",
+   "d": "2026-04-29"
+  },
+  {
+   "t": "mlx-community/AREX-2-4bit · Hugging Face",
+   "u": "https://huggingface.co/mlx-community/AREX-2-4bit",
+   "d": "2026-09-29"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   45.12,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   45.12,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 122.8,
+  "tok": 184,
+  "s": 1.5
+ },
+ "answer_raw": "MLX is noticeably faster than Ollama on a 48‑GB M4 Pro.\nOllama 0.19 runs a 35B MoE model at slower speeds than MLX on an M4 Pro, with MLX providing roughly twice the decode speed of Ollama on the same hardware. [5].\n\nThe M4 Pro’s 48 GB of unified memory leaves about **44.5 GB** for a model after macOS overhead [1].\nWith that headroom you can comfortably load a full‑precision **Qwen 3.5‑35 B‑A3B** model (the largest MoE that fits without swapping).\nIf you quantise to Q4, the same machine can also handle a **70 B** model at usable speeds [2][6].\n\nSo, use MLX for the best inference speed, and aim for a 35 B MoE full‑precision model or a 70 B Q4 model as the upper limit on a 48‑GB M4 Pro.",
+ "answer": "MLX is noticeably faster than Ollama on a 48‑GB M4 Pro.\nOllama 0.19 runs a 35B MoE model at slower speeds than MLX on an M4 Pro, with MLX providing roughly twice the decode speed of Ollama on the same hardware. [5].\n\nThe M4 Pro’s 48 GB of unified memory leaves about **44.5 GB** for a model after macOS overhead [1].\nWith that headroom you can comfortably load a full‑precision **Qwen 3.5‑35 B‑A3B** model (the largest MoE that fits without swapping).\nIf you quantise to Q4, the same machine can also handle a **70 B** model at usable speeds [2][6].\n\nSo, use MLX for the best inference speed, and aim for a 35 B MoE full‑precision model or a 70 B Q4 model as the upper limit on a 48‑GB M4 Pro.",
+ "chars": 693,
+ "raw_bytes": 5752,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.46,
+ "rate_gen_tok_s": 13.58,
+ "id": "q10",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Ollama vs MLX on an M4 Pro",
+ "question": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2-server-think",
+ "asked_at": "2026-10-24T23:10:43",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

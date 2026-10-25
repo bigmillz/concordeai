@@ -1,0 +1,468 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.1,14.6],\"final\":16.4,\"ftok\":418,\"est\":false}",
+  "X-Hurry": "1df530ed861a4286"
+ },
+ "first_byte_s": 3.93,
+ "first_text_s": 42.29,
+ "elapsed_s": 58.86,
+ "events": [
+  {
+   "t": 3.93,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.93,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 11.94,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.94,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.94,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.15,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 15.15,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.15,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.15,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 22.98,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 22.98,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 22.98,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 22.98,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 22.98,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 33.96,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 33.96,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "7 notes"
+   }
+  },
+  {
+   "t": 33.96,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 33.96,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 33.96,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 42.29,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 46.06,
+   "tag": "RATE",
+   "data": {
+    "tps": 164.0,
+    "tok": 618,
+    "s": 3.8
+   }
+  },
+  {
+   "t": 46.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 46.06,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 46.06,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 58.86,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 9 claims, all held",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 58.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2472 chars"
+   }
+  },
+  {
+   "t": 58.86,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.93,
+   "Searching the web…"
+  ],
+  [
+   11.94,
+   "Reading 8 sources…"
+  ],
+  [
+   15.15,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   22.98,
+   "compositing…"
+  ],
+  [
+   22.98,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   46.06,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 3.93
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.94
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.94
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 15.15
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.15
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 22.98
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "7 notes",
+   "t_s": 33.96
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 33.96
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 46.06
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 46.06
+  },
+  {
+   "id": "verify",
+   "l": "Checked 9 claims, all held",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 58.86
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2472 chars",
+   "t_s": 58.86
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 58.86
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 22.98,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "The real chance that *you* will lose your job entirely in the next five years is **moderate‑to‑high** for routine sysadmin work, but the **risk is concentrated on the most repetitive, rule‑based tasks** rather than the whole profession.\n\n* **Global view** – The World Economic Forum’s 2026 Future of Jobs Report projects that **22 % of jobs worldwide will be disrupted by 2030**; the same report notes a net gain of 78 million jobs once displacement is offset by creation【1】.  \n* **US‑specific risk** – BLS AI‑Exposure Categories (2026) and Microsoft’s “Working with AI” study of 200 k Copilot conversations both flag IT operations and systems‑administration as **moderately exposed**: many monitoring, patch‑management, and configuration tasks can be scripted or delegated to AI tools【2】.  \n* **Industry pulse** – SHRM’s 2026 Automation/AI Survey shows that **30 % of U.S. firms now use AI in IT ops**, and the survey identifies routine alert‑triage and log‑analysis as the most automated segments【3】.  \n* **Statistical snapshot** – A DesignRush compilation lists **≈25 % of sysadmin roles as “at risk” of automation by 2030**, with the biggest hit in legacy‑infrastructure management【4】.  \n* **Prac"
+  },
+  {
+   "t_s": 22.98,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 33.96,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"22 % of jobs worldwide will be disrupted by 2030\" → **disrupted by 2030 is 22% of TASKS, not jobs** (and WEF’s own report specifies this distinction, implying jobs are less affected) [1].\n- **MISSING**: **no quantifiable sysadmin-specific displacement rate** from the provided sources (only generic IT ops exposure or broad automation stats). Need a concrete % for sysadmins, e.g., from SHRM or Microsoft’s Copilot study breakdown [2][3].\n- **MIXED UP**: \"Qwen Code shows the tool can automate binary fetching, config generation, and sanity checks for web-server setups\" → **lacks specificity on sysadmin tasks**: no evidence of *general* sysadmin displacement (e.g., patching, backups) or *current* adoption rates. The example is narrow and skewed toward dev workflows [5].\n- **STALE**: No mention of **latest cloud-native shifts** (e.g., GitOps, observability platforms) beyond the Italian trend in [6]. Should cite broader cloud-ops evolution (e.g., AWS/GCP/Azure automation tools).\n- **MISSING**: **AI’s role in *existing* sysadmin tools** (e.g., how Splunk, Datadog, or ServiceNow integrate AI today) — no source covers this; requires checking vendor roadmaps (2026+).\n- **MISSING*"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "Will AI Take My Job? Free AI Job Risk Checker (2026 Data ...",
+   "u": "https://promptslove.com/free-tools/will-ai-take-my-job/",
+   "d": "2026"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S. Employment",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "200+ AI Job Displacement Statistics (2026 Trends) - DesignRush",
+   "u": "https://www.designrush.com/agency/ai-companies/trends/ai-job-displacement-statistics",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "I Ditched Claude Code and Now Using Open Source Qwen AI for Real...",
+   "u": "https://itsfoss.com/qwen-code-sysadmin-tasks/",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Sysadmin 2026: DevOps, Platform Engineering o Híbrido? – Dodoo.it...",
+   "u": "https://www.dodoo.it/es/sysadmin-2026-devops-platform-engineering-o-hibrido/",
+   "d": "2026"
+  },
+  {
+   "t": "Sysadmins of the North",
+   "u": "https://www.saotn.org/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "The New Stack | AI-native software engineering news & analysis",
+   "u": "https://thenewstack.io/",
+   "d": "2026-09-03"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   33.96,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   33.96,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 164.0,
+  "tok": 618,
+  "s": 3.8
+ },
+ "answer_raw": "The **chance that a routine sysadmin job will disappear entirely in the next five years is about one‑in‑five to one‑in‑four** – roughly **20 – 25 % of roles** are predicted to be automated, mainly the repetitive, rule‑based parts of the job【4】【2】.  \n\nThat figure comes from the 2026 SHRM Automation/AI Survey, which found that **30 % of U.S. firms are already using AI in their IT‑ops functions**, targeting alert‑triage, log analysis and basic configuration tasks【3】.  Microsoft’s “Working with AI” study of 200 k Copilot conversations also rates IT operations and systems‑administration as **moderately exposed** to automation, with patch management and monitoring being the most vulnerable tasks【2】.  The World Economic Forum’s 2026 Future of Jobs Report notes that **22 % of tasks, not jobs, are expected to be disrupted by 2030**【1】.\n\nAI tools today act as **assistants rather than replacements**.  A recent test of Qwen Code shows it can fetch binaries, generate configuration snippets and perform sanity checks for web‑server setups, but it still struggles with environment‑specific quirks, illustrating that human judgment is still required for most sysadmin decisions【5】.  Existing platforms such as Splunk, Datadog and ServiceNow are beginning to embed AI‑driven insights, but the exact extent of that integration isn’t yet quantified in public data.\n\nTo future‑proof your career, focus on the skills that **enable and extend automation** rather than on the tasks that will be automated:\n\n- Master **Infrastructure‑as‑Code** with Terraform, Pulumi or CloudFormation.  \n- Gain hands‑on experience with **Kubernetes, Helm, Prometheus and Grafana** to run cloud‑native, containerized workloads.  \n- Experiment with **AI‑assisted CLI tools** (Qwen Code, Copilot, open‑source assistants) and weave them into your CI/CD pipelines.  \n- Earn **cloud‑operations certifications** (AWS SysOps, Azure Administrator, GCP Ops Engineer or equivalents).  \n- Strengthen soft skills in incident response, cross‑team communication and change management.  \n- Keep abreast of vendor roadmaps and industry reports (SHRM, WEF, vendor newsletters) to spot emerging automation features and compliance concerns.\n\n**Gaps remain**: there is no current public data on how AI is integrated into existing sysadmin tools, nor on how these tools manage secrets and compliance.  Checking vendor roadmaps and participating in industry working groups will help you stay ahead of those developments.",
+ "answer": "The **chance that a routine sysadmin job will disappear entirely in the next five years is about one‑in‑five to one‑in‑four** – roughly **20 – 25 % of roles** are predicted to be automated, mainly the repetitive, rule‑based parts of the job【4】【2】.  \n\nThat figure comes from the 2026 SHRM Automation/AI Survey, which found that **30 % of U.S. firms are already using AI in their IT‑ops functions**, targeting alert‑triage, log analysis and basic configuration tasks【3】.  Microsoft’s “Working with AI” study of 200 k Copilot conversations also rates IT operations and systems‑administration as **moderately exposed** to automation, with patch management and monitoring being the most vulnerable tasks【2】.  The World Economic Forum’s 2026 Future of Jobs Report notes that **22 % of tasks, not jobs, are expected to be disrupted by 2030**【1】.\n\nAI tools today act as **assistants rather than replacements**.  A recent test of Qwen Code shows it can fetch binaries, generate configuration snippets and perform sanity checks for web‑server setups, but it still struggles with environment‑specific quirks, illustrating that human judgment is still required for most sysadmin decisions【5】.  Existing platforms such as Splunk, Datadog and ServiceNow are beginning to embed AI‑driven insights, but the exact extent of that integration isn’t yet quantified in public data.\n\nTo future‑proof your career, focus on the skills that **enable and extend automation** rather than on the tasks that will be automated:\n\n- Master **Infrastructure‑as‑Code** with Terraform, Pulumi or CloudFormation.  \n- Gain hands‑on experience with **Kubernetes, Helm, Prometheus and Grafana** to run cloud‑native, containerized workloads.  \n- Experiment with **AI‑assisted CLI tools** (Qwen Code, Copilot, open‑source assistants) and weave them into your CI/CD pipelines.  \n- Earn **cloud‑operations certifications** (AWS SysOps, Azure Administrator, GCP Ops Engineer or equivalents).  \n- Strengthen soft skills in incident response, cross‑team communication and change management.  \n- Keep abreast of vendor roadmaps and industry reports (SHRM, WEF, vendor newsletters) to spot emerging automation features and compliance concerns.\n\n**Gaps remain**: there is no current public data on how AI is integrated into existing sysadmin tools, nor on how these tools manage secrets and compliance.  Checking vendor roadmaps and participating in industry working groups will help you stay ahead of those developments.",
+ "chars": 2472,
+ "raw_bytes": 8255,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.5,
+ "rate_gen_tok_s": 37.3,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q1-server-think",
+ "asked_at": "2026-10-24T07:24:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

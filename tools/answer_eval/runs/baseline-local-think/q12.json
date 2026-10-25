@@ -1,0 +1,259 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+  "X-Eta": "{\"search\":14.0,\"models\":[85.4,118.7,73.9],\"final\":57.3,\"ftok\":628,\"est\":false}",
+  "X-Hurry": "30afd8aea081536e"
+ },
+ "first_byte_s": 7.01,
+ "first_text_s": 192.38,
+ "elapsed_s": 192.38,
+ "events": [
+  {
+   "t": 7.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 7.01,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 7.03,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 32.03,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 52.04,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 72.05,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 92.07,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 112.08,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 127.05,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 127.05,
+   "tag": "DRAFT",
+   "m": "Ministral 3 14B",
+   "chars": 24
+  },
+  {
+   "t": 127.05,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 2 of 3"
+  },
+  {
+   "t": 147.11,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 2 of 3"
+  },
+  {
+   "t": 167.13,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 2 of 3"
+  },
+  {
+   "t": 187.15,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 2 of 3"
+  },
+  {
+   "t": 192.38,
+   "tag": "DRAFT",
+   "m": "Gemma 4 12B",
+   "chars": 1200
+  },
+  {
+   "t": 192.38,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 192.38,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "4949 chars"
+   }
+  },
+  {
+   "t": 192.38,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   7.03,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   32.03,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   52.04,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   72.05,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   92.07,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   112.08,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   127.05,
+   "asking Gemma 4 12B · 2 of 3"
+  ],
+  [
+   147.11,
+   "asking Gemma 4 12B · 2 of 3"
+  ],
+  [
+   167.13,
+   "asking Gemma 4 12B · 2 of 3"
+  ],
+  [
+   187.15,
+   "asking Gemma 4 12B · 2 of 3"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 7.01
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "4949 chars",
+   "t_s": 192.38
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 192.38
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 127.05,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 127.05,
+   "m": "Ministral 3 14B",
+   "text": "(no answer — low memory)"
+  },
+  {
+   "t_s": 192.38,
+   "m": "Gemma 4 12B",
+   "text": "Sweat itself is fundamentally odorless; the smell comes from bacteria on your skin breaking down the proteins and lipids in sweat into volatile organic compounds. If your odor has intensified, it usually points to a change in your **microbiome**, your **metabolic state**, or the **chemical composition** of the sweat itself.\n\nThe primary reason for a change in odor is often the shift from eccrine sweat (mostly water/electingtes) to **apocrine sweat**. Apocrine glands, located mainly in the armpits and groin, produce a thicker fluid rich in lipids and proteins. When bacteria feast on these, they produce the pungent musk associated with body odor.\n\n## Why the change is happening\n\n**Stress and Adrenaline**\nStress triggers a different physiological response than heat or exercise. When you are stressed, your body releases **cortisol and adrenaline**, which can alter the chemical makeup of the sweat and trigger apocrine glands more intensely. This \"stress sweat\" often has a more pungent, sharp odor because it is being pushed out faster and contains different protein profiles.\n\n**Microbiome Shifts**\nAs you age or change your diet, the bacterial ecosystem on your skin can shift. A higher co"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Why Does My Sweat Smell Bad? | Dr. Bhatia Explains - YouTube",
+   "u": "https://www.youtube.com/watch?v=FwKEQgte7JQ"
+  },
+  {
+   "t": "Why Does My Sweat Smell So Bad | TikTok",
+   "u": "https://www.tiktok.com/discover/why-does-my-sweat-smell-so-bad"
+  },
+  {
+   "t": "Here's Why Stress Sweat Smells Worse Than... - Thompson Tee",
+   "u": "https://thompsontee.com/blog/stress-sweat-smells/"
+  },
+  {
+   "t": "Why Does My Sweat Smell and How To Prevent BO | Sure® UK",
+   "u": "https://www.suredeodorant.co.uk/sweat-zone/why-does-my-sweat-smell.html"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+ "searched": true,
+ "answer": "Sweat itself is fundamentally odorless; the smell comes from bacteria on your skin breaking down the proteins and lipids in sweat into volatile organic compounds. If your odor has intensified, it usually points to a change in your **microbiome**, your **metabolic state**, or the **chemical composition** of the sweat itself.\n\nThe primary reason for a change in odor is often the shift from eccrine sweat (mostly water/electingtes) to **apocrine sweat**. Apocrine glands, located mainly in the armpits and groin, produce a thicker fluid rich in lipids and proteins. When bacteria feast on these, they produce the pungent musk associated with body odor.\n\n## Why the change is happening\n\n**Stress and Adrenaline**\nStress triggers a different physiological response than heat or exercise. When you are stressed, your body releases **cortisol and adrenaline**, which can alter the chemical makeup of the sweat and trigger apocrine glands more intensely. This \"stress sweat\" often has a more pungent, sharp odor because it is being pushed out faster and contains different protein profiles.\n\n**Microbiome Shifts**\nAs you age or change your diet, the bacterial ecosystem on your skin can shift. A higher concentration of **Corynebacterium** or **Staphylococci** can lead to more aggressive breakdown of sweat. Factors like increased insulin resistance, hormonal shifts, or even a change in your **gut microbiome** can manifest as changes in skin flora and odor.\n\n**Dietary and Metabolic Factors**\nSpecific compounds can be excreted through sweat glands. If your liver or kidneys are under stress, or if you have a high intake of **sulfurous foods** (like garlic, onions, or certain spices), those compounds can linger in your system. Additionally, a decrease in hydration can make sweat more concentrated, making the odor more \"potent\" as it sits on the skin.\n\n## What actually fixes it\n\n**Target the Bacteria**\nSince the smell is a byproduct of bacterial action, the most effective fix is reducing the bacterial load.\n*   **Benzoyl Peroxide Wash:** Using a **5% or 10% benzoyl peroxide** wash in the shower acts as a powerful antimicrobial. It kills the bacteria that rot the sweat.\n*   **Glycolic Acid:** Applying a **5-7% glycolic acid** toner or spray to your armpits can lower the skin's pH. Most odor-causing bacteria thrive in a neutral environment; making the skin more acidic makes it hostile for them to survive.\n\n**Manage the Sweat Chemistry**\nIf the issue is the high lipid/protein content of apocrine sweat:\n*   **Antiperspirant vs. Deodorant:** Make sure you are using an **aluminum zirconium_tech_chloride** based antiperspirant. These physically block the sweat glands from releasing the fluid in the first place.\n*   **Timing:** Apply your antiperspirant **at night** before bed. This allows the product to plug the sweat ducts while they are inactive, ensuring a more effective seal than if you only apply it in the morning when you're already sweating.\n\n**Systemic Support**\nIf the odor is persistent and accompanied by other symptoms, it may be a sign of metabolic shifts.\n*   **Hydration:** Increasing water intake thins out the concentration of sweat compounds.\n*   **Probiotics:** While less direct, maintaining gut health supports a balanced internal microbiome, which can influence systemic inflammatory markers and skin health.\n\nIf you notice specific \"fruity\" or \"ammonia-like\" smells, these are often signs of metabolic issues like diabetes or kidney/liver strain. In those cases, the fix is medical intervention rather than topical treatment.",
+ "chars": 3565,
+ "raw_bytes": 6078,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.63,
+ "rate_gen_tok_s": null,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T01:47:50",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

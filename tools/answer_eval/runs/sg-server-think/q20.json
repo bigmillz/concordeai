@@ -1,0 +1,404 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[11.8,18.4,27.6],\"final\":34.7,\"ftok\":2725,\"est\":false}",
+  "X-Hurry": "f49e8267a21de0bb"
+ },
+ "first_byte_s": 4.18,
+ "first_text_s": 84.74,
+ "elapsed_s": 87.21,
+ "events": [
+  {
+   "t": 4.18,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.02,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 20 passages"
+   }
+  },
+  {
+   "t": 17.02,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.02,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.02,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 24.67,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 24.67,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 39.69,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 39.69,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 57.63,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 1200
+  },
+  {
+   "t": 57.63,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 57.63,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 79.27,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 79.44,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 79.44,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 79.44,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 84.74,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 87.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 87.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "5846 chars"
+   }
+  },
+  {
+   "t": 87.21,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.18,
+   "Searching the web…"
+  ],
+  [
+   12.18,
+   "Reading 8 sources…"
+  ],
+  [
+   17.02,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   24.67,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   39.69,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   57.63,
+   "compositing…"
+  ],
+  [
+   57.63,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ],
+  [
+   79.27,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 4.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.18
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.18
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 20 passages",
+   "t_s": 17.02
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.02
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 79.44
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 87.21
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "5846 chars",
+   "t_s": 87.21
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 87.21
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 24.67,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Paris** tops the 2026 Monocle Quality‑of‑Life survey, beating every other city in the 20‑city list [2].\n\n**Canberra** is the leader in the 2026 Oxford Economics Global Cities Index for quality of life; the Australian capital is ranked first among the 1,000 cities examined [4].\n\nIn the same Oxford Economics report, **New York City** is #1 on the overall Global Cities Index, but only one U.S. city meets the high bar for the quality‑of‑life sub‑score—its name isn’t listed in the excerpt [3].\n\nNumbeo’s 2026 mid‑year Quality‑of‑Life Index shows a top‑five cluster that includes **Sydney**, **Tokyo**, **Berlin**, **Delhi**, and **New York**; the order within the cluster isn’t specified in the snippet [7].\n\nBusiness Insider’s roundup of Oxford Economics data notes that eight U.S. cities appear in the overall top‑20, yet for the quality‑of‑life category only one U.S. city qualifies—again, the name isn’t given [3].\n\nU.S. News ranks 850+ U.S. cities and lists 250 as “best places to live” for 2025‑26, but it does not single out a world‑wide leader in this category [5].\n\nIf you need the precise ranking positions or the missing city names from Oxford Economics, the full reports on their sites "
+  },
+  {
+   "t_s": 39.69,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Right now, **Paris** is the #1 city for quality of life in **2026**, according to **Monocle’s latest rankings** [2], which have placed European cities in the top spot for three years running (Paris this year, Munich in 2025, Vienna in 2024). **Canberra, Australia** led **Oxford Economics’ 2026 Global Cities Index** [4], though its focus was slightly broader—**Seoul** and **Vienna** were consistently in the top three across multiple studies [1][4].\n\n### **The 2026 Top 5 by Quality of Life**\nThese rankings vary by methodology—some weight **safety, healthcare, culture, and environment** over pure economics. Here’s what stands out:\n\n| **Rank** | **City**          | **Primary Ranking Source** | **Key Strengths**                                                                 |\n|----------|-------------------|----------------------------|---------------------------------------------------------------------------------|\n| **1**    | Paris             | Monocle [2]                | Safety, public trust, 24-hour culture, healthcare, and cultural amenities.     |\n| **2**    | Seoul             | Monocle [1]                | Late-night economy, safety, efficient transit, and air quality impro"
+  },
+  {
+   "t_s": 57.63,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "**Paris** is the top-ranked city for quality of life in 2026 according to Monocle's global rankings, continuing a three-year trend of European cities holding the summit [2].\n\nThe \"best\" city depends heavily on which specific metrics the ranking prioritizes. Different organizations weigh economic output, environmental factors, and social livability differently.\n\n## Ranking Breakdowns\n\n**Monocle Quality of Life (2026)**\nThis ranking emphasizes urban livability over simple economic metrics like GDP. **Paris** claimed the top spot this year, following **Munich** in 2025 and **Vienna** in 2024 [2]. \n\n**Oxford Economics Global Cities Index (2026)**\nThis index evaluates 1,000 cities across economics, human capital, environment, and quality of life. \n*   **Overall Winner:** **New York** is ranked **No. 1** globally [3].\n*   **Quality of Life Specific:** When isolating the quality of life category (which accounts for 25% of the overall score), **Canberra** takes the top spot [3][4].\n*   **U.S. Performance:** **San Jose** is the highest-ranked U.S. city in this specific quality of life category, sitting at **13th** [4].\n\n**Numbeo Quality of Life Index (Mid-Year 2026)**\nNumbeo provides a snap"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Quality of Life survey 2026: The 20 most liveable cities in ...",
+   "u": "https://monocle.com/affairs/urbanism/qol/quality-of-life-2026-most-liveable-cities/",
+   "d": "2026-07"
+  },
+  {
+   "t": "Top City Rankings 2026: Quality of Life & Livability | City ...",
+   "u": "https://cityandlocal.com/best-in-city/quality-of-life-livability-top-city-rankings-2026",
+   "d": "2026-06-26"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life, Ranked ...",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Top 10 Cities With the Best Quality of Life in 2026 - Life ...",
+   "u": "https://en.tempo.co/read/2122228/top-10-cities-with-the-best-quality-of-life-in-2026",
+   "d": "2026"
+  },
+  {
+   "t": "The Top 250 Best Places to Live in the U.S. in 2026-2027 | U.S. News",
+   "u": "https://realestate.usnews.com/places/rankings/best-places-to-live",
+   "d": "2026"
+  },
+  {
+   "t": "Quality of life 2026 in country comparison",
+   "u": "https://www.worlddata.info/quality-of-life.php",
+   "d": "2026"
+  },
+  {
+   "t": "Quality of Life Index by City 2026 Mid-Year",
+   "u": "https://www.numbeo.com/quality-of-life/rankings.jsp",
+   "d": "2026"
+  },
+  {
+   "t": "Largest Cities by Population 2026",
+   "u": "https://worldpopulationreview.com/cities",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   79.44,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   79.44,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "Paris tops Monocle’s 2026 Quality‑of‑Life survey, beating every other city in the 20‑city list [2].  \nOxford Economics calls **New York** the overall leader of its 2026 Global Cities Index, but when the index isolates the quality‑of‑life component—worth 25 % of the total score—**Canberra** sits at the top [3][4]. In that same quality‑of‑life ranking, the only U.S. city that breaks into the top 20 is **San Jose**, which lands at 13th [4].  \nNumbeo’s mid‑year 2026 Quality‑of‑Life Index shows a cluster of high‑ranked cities that includes **Sydney**, **Tokyo**, **Berlin**, **Delhi**, **New York**, **Prague**, **London**, **Beijing**, and **Rio de Janeiro** [7].  \nBusiness Insider’s roundup of the Oxford Economics data notes that eight U.S. cities appear in the overall top 20 of the Global Cities Index, yet only one U.S. city qualifies for the quality‑of‑life sub‑score [3].  \nU.S. News publishes a list of the best places to live in the U.S. for 2025‑26 but does not single out a global leader in quality of life [5].  \n\nNo other source in the evidence set names a global top‑city outside the three mentioned above. Monocle mentions **Seoul** in its discussion of safety and 24‑hour culture, but the snippet does not provide a rank [1], and Vienna is not listed as the Oxford Economics quality‑of‑life leader [4]. If you need the full ranking order or the other cities in each list, the complete reports on the respective sites will give those details.",
+ "answer": "Paris tops Monocle’s 2026 Quality‑of‑Life survey, beating every other city in the 20‑city list [2].  \nOxford Economics calls **New York** the overall leader of its 2026 Global Cities Index, but when the index isolates the quality‑of‑life component—worth 25 % of the total score—**Canberra** sits at the top [3][4]. In that same quality‑of‑life ranking, the only U.S. city that breaks into the top 20 is **San Jose**, which lands at 13th [4].  \nNumbeo’s mid‑year 2026 Quality‑of‑Life Index shows a cluster of high‑ranked cities that includes **Sydney**, **Tokyo**, **Berlin**, **Delhi**, **New York**, **Prague**, **London**, **Beijing**, and **Rio de Janeiro** [7].  \nBusiness Insider’s roundup of the Oxford Economics data notes that eight U.S. cities appear in the overall top 20 of the Global Cities Index, yet only one U.S. city qualifies for the quality‑of‑life sub‑score [3].  \nU.S. News publishes a list of the best places to live in the U.S. for 2025‑26 but does not single out a global leader in quality of life [5].  \n\nNo other source in the evidence set names a global top‑city outside the three mentioned above. Monocle mentions **Seoul** in its discussion of safety and 24‑hour culture, but the snippet does not provide a rank [1], and Vienna is not listed as the Oxford Economics quality‑of‑life leader [4]. If you need the full ranking order or the other cities in each list, the complete reports on the respective sites will give those details.",
+ "chars": 1460,
+ "raw_bytes": 8077,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.19,
+ "rate_gen_tok_s": 147.77,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "sg-server-think",
+ "asked_at": "2026-10-24T06:07:55",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,315 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.9,16.6],\"final\":18.7,\"ftok\":564,\"est\":false}",
+  "X-Hurry": "6ba9e2d47da191a1"
+ },
+ "first_byte_s": 9.24,
+ "first_text_s": 30.56,
+ "elapsed_s": 31.91,
+ "events": [
+  {
+   "t": 9.24,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 9.24,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 9.24,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 17.11,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1029
+  },
+  {
+   "t": 17.11,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 17.11,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 17.11,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 17.11,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 23.43,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 639
+  },
+  {
+   "t": 23.43,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "3 notes"
+   }
+  },
+  {
+   "t": 23.43,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 23.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 23.43,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 30.56,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 31.91,
+   "tag": "RATE",
+   "data": {
+    "tps": 213.0,
+    "tok": 286,
+    "s": 1.3
+   }
+  },
+  {
+   "t": 31.91,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 31.91,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1145 chars"
+   }
+  },
+  {
+   "t": 31.91,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   9.24,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   17.11,
+   "compositing…"
+  ],
+  [
+   17.11,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 9.24
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 17.11
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "3 notes",
+   "t_s": 23.43
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 23.43
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 31.91
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1145 chars",
+   "t_s": 31.91
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 31.91
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 17.11,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Morning people tend to report higher happiness, but the link isn’t a hard‑and‑fast rule for everyone.  \nA LifeHack article notes that “waking up early may indeed make one happy as a lark,” linking early rising with mood and proactive energy.  \n\nThat said, **happiness isn’t determined solely by chronotype**—personal habits, work fit, and social support all play major roles.  \n\nCan a night owl shift? Yes. A “Chronotype” study shows that the body clock is **plastic**; a clinically tested protocol can move extreme night owls **two hours earlier** by adjusting light exposure, sleep timing, and routine.  \n\nHowever, the same research warns that night owls may suffer **structural brain differences** that could lead to negative health outcomes, especially when their natural rhythm clashes with societal schedules.  \n\nSo the myth that morningness guarantees happiness is only partially true, and night owls can become more “lark‑like” with effort—though the transition may take months and won’t erase all biological differences."
+  },
+  {
+   "t_s": 17.11,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 23.43,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"Can a night owl shift? **Yes.** A 'Chronotype' study shows...\" → **Unsupported study source**. The evidence only cites *this specific article* (\"*The real science of your body clock*\" from *Chronotype*), not a peer-reviewed study. Clarify: *\"Chronotype* article details a protocol that...\" (no claim of broader study backing).\n\n- **MISSING**: No **timeframe for shifts**—how *long* the \"clinically tested\" protocol took or how stable the change is (e.g., temporary vs. permanent). Draft mentions \"months\" but only as a guess; add: *\"The article notes shifts took **weeks to months** and may not persist without maintenance.\"*"
+  }
+ ],
+ "sources": [
+  {
+   "t": "This Is Why Morning People Are More Likely To Be... - LifeHack",
+   "u": "https://www.lifehack.org/313462/this-why-morning-people-are-more-likely-successful-backed-science"
+  },
+  {
+   "t": "Chronotype: Can a Night Owl Really Become a Morning Person?",
+   "u": "https://kashmiril.com/blogs/journal/morning-people-vs-night-owls"
+  },
+  {
+   "t": "Why you shouldn’t try to be a morning person",
+   "u": "https://www.bbc.com/worklife/article/20171114-why-you-shouldnt-try-to-be-a-morning-person"
+  },
+  {
+   "t": "The differences between night owls and morning larks",
+   "u": "https://www.avogel.co.uk/health/sleep/the-differences-between-night-owls-and-morning-larks/"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   23.43,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   23.43,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 213.0,
+  "tok": 286,
+  "s": 1.3
+ },
+ "answer_raw": "Morning‑rising people often report feeling happier, but the link isn’t a hard rule for everyone. A LifeHack piece notes that “waking up early may indeed make one happy as a lark,” tying early wake‑ups to better mood and proactive energy. Yet **happiness depends on habits, job fit, and social support as much as on your chronotype**.\n\nNight owls can shift their rhythms. The “Chronotype” article outlines a clinically tested protocol that moves extreme night‑owl schedules **two hours earlier** by adjusting light exposure, sleep timing, and daily routine. The same piece says the shift usually takes **weeks to months** and may fade if the new pattern isn’t maintained. It also warns that night owls sometimes show structural brain differences that could lead to health problems when their natural rhythm clashes with typical work schedules.\n\nSo the idea that morningness guarantees happiness is only partially true; while early rising can boost mood for many, it’s not the sole determinant. Night owls can become more “lark‑like” with effort, but the transition requires consistent practice and may not erase underlying biological differences.",
+ "answer": "Morning‑rising people often report feeling happier, but the link isn’t a hard rule for everyone. A LifeHack piece notes that “waking up early may indeed make one happy as a lark,” tying early wake‑ups to better mood and proactive energy. Yet **happiness depends on habits, job fit, and social support as much as on your chronotype**.\n\nNight owls can shift their rhythms. The “Chronotype” article outlines a clinically tested protocol that moves extreme night‑owl schedules **two hours earlier** by adjusting light exposure, sleep timing, and daily routine. The same piece says the shift usually takes **weeks to months** and may fade if the new pattern isn’t maintained. It also warns that night owls sometimes show structural brain differences that could lead to health problems when their natural rhythm clashes with typical work schedules.\n\nSo the idea that morningness guarantees happiness is only partially true; while early rising can boost mood for many, it’s not the sole determinant. Night owls can become more “lark‑like” with effort, but the transition requires consistent practice and may not erase underlying biological differences.",
+ "chars": 1145,
+ "raw_bytes": 4735,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.97,
+ "rate_gen_tok_s": 212.04,
+ "id": "q14",
+ "turn": 1,
+ "category": "health",
+ "topic": "Morning people and happiness",
+ "question": "Are morning people really happier, or is that a myth? Can a night owl actually switch?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "ac-server-think",
+ "asked_at": "2026-10-24T06:44:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Are morning people really happier, or is that a myth? Can a night owl actually switch?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

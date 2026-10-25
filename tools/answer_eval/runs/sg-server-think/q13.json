@@ -1,0 +1,404 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[11.4,17.5,28.0],\"final\":35.0,\"ftok\":2824,\"est\":false}",
+  "X-Hurry": "1b4b1f143eda4587"
+ },
+ "first_byte_s": 3.01,
+ "first_text_s": 81.73,
+ "elapsed_s": 83.37,
+ "events": [
+  {
+   "t": 3.01,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 8.11,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.11,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.11,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.64,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 12.64,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.64,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.64,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  },
+  {
+   "t": 17.17,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 931
+  },
+  {
+   "t": 17.17,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · ministral-3:14b · 2 of 3"
+  },
+  {
+   "t": 32.88,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b",
+   "chars": 1200
+  },
+  {
+   "t": 32.88,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 53.08,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gemma4:12b · 3 of 3"
+  },
+  {
+   "t": 60.88,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 811
+  },
+  {
+   "t": 60.88,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 60.88,
+   "tag": "STATUS",
+   "text": "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  },
+  {
+   "t": 75.9,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 75.9,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 75.9,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  },
+  {
+   "t": 81.73,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 83.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 83.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "4761 chars"
+   }
+  },
+  {
+   "t": 83.37,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.01,
+   "Searching the web…"
+  ],
+  [
+   8.11,
+   "Reading 8 sources…"
+  ],
+  [
+   12.64,
+   "asking Ollama1 · gpt-oss:20b · 1 of 3"
+  ],
+  [
+   17.17,
+   "asking Ollama1 · ministral-3:14b · 2 of 3"
+  ],
+  [
+   32.88,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   53.08,
+   "asking Ollama1 · gemma4:12b · 3 of 3"
+  ],
+  [
+   60.88,
+   "compositing…"
+  ],
+  [
+   60.88,
+   "Ollama1 · gpt-oss:20b is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 3.01
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.11
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.11
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 12.64
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.64
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 75.9
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 83.37
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "4761 chars",
+   "t_s": 83.37
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 83.37
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 17.17,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Pizza isn’t inherently bad**—its health impact depends on the toppings, crust, and portion size.  \n- A **vegetarian‑style pizza** (e.g., Pizza Hut’s Veggie Lover’s pie) delivers about **12 g of protein** and plenty of fiber from tomatoes, peppers, mushrooms, olives, and onions, and is listed as one of the healthiest options on that menu.  \n- A **meat‑heavy or cheese‑heavy pizza** can be high in calories (Buffalo Chicken slices at ~260 cal) and sodium, so frequent consumption may raise the risk of weight gain and hypertension.  \n\n**How often?**  Eating pizza **1–2 times per week** is generally fine if you keep portions moderate and choose balanced toppings.  Excessive consumption of high‑fat, high‑sodium varieties should be limited to avoid long‑term health risks.  \n\n**Storage note:** Leftover pizza is safe to eat for up to **five days in the refrigerator** or up to **six months if frozen** when stored properly.  [2]"
+  },
+  {
+   "t_s": 32.88,
+   "m": "Ollama1 · ministral-3:14b",
+   "text": "Pizza isn’t *inherently* bad for you, but **it’s not the healthiest meal on the planet**—depends on how often you eat it, what’s on it, and how it’s made. One slice of a standard cheese pizza (thin crust, **~300-400 calories**, ~10g protein, ~15g fat) is fine occasionally, but **daily or weekly fast-food pizza** (especially deep-dish, thick crust, or loaded with greasy toppings) piles on sodium, refined carbs, and saturated fat fast. Here’s the breakdown:\n\n**Nutrition landmines in average fast-food pizza:**\n- **Sodium**: A single slice of Domino’s or Pizza Hut cheese can hit **~500-800mg**—nearly a third of the **2,300mg/day** max the USDA recommends [8]. Daily pizza = easy hypertension territory.\n- **Refined carbs**: Most crusts (even “thin”) are high-glycemic white flour. A two-slice meal? That’s **40-60g carbs**—about the same as a bagel. Skip the bread basket, or your insulin spikes.\n- **Saturated fat**: Pepperoni, sausage, and processed cheeses (like cheese blends) push **5-10g fat per slice**. Occasional = no sweat; daily = your LDL cholesterol starts playing the long game.\n- **Additives**: Some fast-food pizzas use **potassium sorbate** or calcium propionate** as preservativ"
+  },
+  {
+   "t_s": 60.88,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "Pizza isn't inherently bad, but its health impact depends on the **specific ingredients** and **nutritional profile** of the variety chosen.\n\nThe sources don't provide a specific frequency for consumption; I'd check the **USDA Dietary Guidelines** for specific daily sodium and calorie limits to determine a personalized frequency.\n\nSpecific varieties offer different profiles:\n- **Veggie Lover's** (Pizza Hut) is a healthier option providing **fiber and antioxidants** and **12 grams of protein** [8].\n- **Buffalo Chicken** is a **low-carb** alternative at **260 calories** per slice, though it is **high in sodium** [8].\n\nRegarding storage safety for leftovers:\n- **Refrigerated pizza** is safe for up to **five days** [2].\n- **Frozen pizza** remains safe for up to **six months** past the \"best by\" date [2]."
+  }
+ ],
+ "sources": [
+  {
+   "t": "Galaxy Pizza Bad Fallingbostel",
+   "u": "https://galaxypizza-fallingbostel.de/",
+   "d": ""
+  },
+  {
+   "t": "The Quickest Way To Tell If Pizza Has Gone Bad, Fresh Or Frozen",
+   "u": "https://www.tastingtable.com/1206056/the-quickest-way-to-tell-if-pizza-has-gone-bad-fresh-or-frozen/",
+   "d": "2023-02-21"
+  },
+  {
+   "t": "Online Pizza Delivery from Oven Story",
+   "u": "https://www.ovenstory.in/",
+   "d": ""
+  },
+  {
+   "t": "Unpopular pizza opinion: Pineapple isn't the worst thing to... | ResetEra",
+   "u": "https://www.resetera.com/threads/unpopular-pizza-opinion-pineapple-isnt-the-worst-thing-to-put-on-pizza.267141/",
+   "d": ""
+  },
+  {
+   "t": "Pizza bomber",
+   "u": "https://en.wikipedia.org/wiki/Pizza_bomber",
+   "d": "2018"
+  },
+  {
+   "t": "Pizzeria & Lieferservice in Bad Vilbel | Il-Sorriso",
+   "u": "https://il-sorriso-pizzeria.de/",
+   "d": "2025-05-04"
+  },
+  {
+   "t": "Pizza",
+   "u": "https://www.pizzabella-manufaktur.de/pizza.html",
+   "d": ""
+  },
+  {
+   "t": "Pizza Hut Menu: 16 Best & Worst Orders According to a Nutritionist",
+   "u": "https://www.eatthis.com/healthy-pizza-hut-menu-items/",
+   "d": "2024-02-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   75.9,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   75.9,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "answer_raw": "Pizza itself isn’t poisonous—its health impact hinges on what’s on it and how much you eat.  \nA **vegetarian‑style pizza** like the Veggie Lover’s at Pizza Hut delivers about **12 g of protein** and loads of fiber from tomatoes, peppers, mushrooms, olives and onions, making it one of the healthiest options on that menu【8】.  \nA **meat‑heavy or cheese‑heavy slice** can carry high calories (e.g., Buffalo Chicken is about **260 cal per slice**【8】) and a lot of sodium, so eating it frequently can raise weight and blood‑pressure risks.  \n\n**How often is fine?**  \nIf you keep portions moderate and choose balanced toppings, **1–2 slices a week** is generally safe.  Eating fast‑food pizza daily—especially thick‑crust or loaded with greasy meats—adds excess sodium, saturated fat and refined carbs that can accumulate over time.  \n\n**Storage safety**  \nLeftover pizza stays safe for **up to five days in the refrigerator** or **up to six months in the freezer** when stored properly【2】.  \n\nSo, pizza isn’t inherently bad, but like any convenience food, moderate consumption and mindful choices keep it from becoming a health hazard.",
+ "answer": "Pizza itself isn’t poisonous—its health impact hinges on what’s on it and how much you eat.  \nA **vegetarian‑style pizza** like the Veggie Lover’s at Pizza Hut delivers about **12 g of protein** and loads of fiber from tomatoes, peppers, mushrooms, olives and onions, making it one of the healthiest options on that menu【8】.  \nA **meat‑heavy or cheese‑heavy slice** can carry high calories (e.g., Buffalo Chicken is about **260 cal per slice**【8】) and a lot of sodium, so eating it frequently can raise weight and blood‑pressure risks.  \n\n**How often is fine?**  \nIf you keep portions moderate and choose balanced toppings, **1–2 slices a week** is generally safe.  Eating fast‑food pizza daily—especially thick‑crust or loaded with greasy meats—adds excess sodium, saturated fat and refined carbs that can accumulate over time.  \n\n**Storage safety**  \nLeftover pizza stays safe for **up to five days in the refrigerator** or **up to six months in the freezer** when stored properly【2】.  \n\nSo, pizza isn’t inherently bad, but like any convenience food, moderate consumption and mindful choices keep it from becoming a health hazard.",
+ "chars": 1132,
+ "raw_bytes": 6746,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 3.39,
+ "rate_gen_tok_s": 172.56,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "sg-server-think",
+ "asked_at": "2026-10-24T05:56:56",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

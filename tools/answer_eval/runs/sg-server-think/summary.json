@@ -1,0 +1,275 @@
+{
+ "name": "sg-server-think",
+ "config": "server-think",
+ "where": "server",
+ "started": "2026-10-24T05:35:19",
+ "repo": "/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad/q1/wt-sg",
+ "head": [
+  "2038e86",
+  "bench-sg"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 87.49,
+   "chars": 1685,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 72.35,
+   "chars": 2327,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 87.34,
+   "chars": 1847,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 96.41,
+   "chars": 2244,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 57.43,
+   "chars": 913,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 86.46,
+   "chars": 2109,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 60.33,
+   "chars": 662,
+   "error": ""
+  },
+  {
+   "file": "q07.json",
+   "elapsed_s": 94.25,
+   "chars": 927,
+   "error": ""
+  },
+  {
+   "file": "q08.json",
+   "elapsed_s": 90.11,
+   "chars": 1375,
+   "error": ""
+  },
+  {
+   "file": "q09.json",
+   "elapsed_s": 94.39,
+   "chars": 1815,
+   "error": ""
+  },
+  {
+   "file": "q10.json",
+   "elapsed_s": 93.83,
+   "chars": 1209,
+   "error": ""
+  },
+  {
+   "file": "q11.json",
+   "elapsed_s": 71.31,
+   "chars": 1682,
+   "error": ""
+  },
+  {
+   "file": "q11.t2.json",
+   "elapsed_s": 77.09,
+   "chars": 1204,
+   "error": ""
+  },
+  {
+   "file": "q12.json",
+   "elapsed_s": 84.14,
+   "chars": 2785,
+   "error": ""
+  },
+  {
+   "file": "q13.json",
+   "elapsed_s": 83.37,
+   "chars": 1132,
+   "error": ""
+  },
+  {
+   "file": "q14.json",
+   "elapsed_s": 71.05,
+   "chars": 1628,
+   "error": ""
+  },
+  {
+   "file": "q15.json",
+   "elapsed_s": 86.69,
+   "chars": 1386,
+   "error": ""
+  },
+  {
+   "file": "q16.json",
+   "elapsed_s": 76.48,
+   "chars": 1768,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 98.54,
+   "chars": 959,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 52.02,
+   "chars": 583,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 87.79,
+   "chars": 3170,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 83.36,
+   "chars": 1831,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 87.21,
+   "chars": 1460,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 97.5,
+   "chars": 1549,
+   "error": ""
+  },
+  {
+   "file": "q22.json",
+   "elapsed_s": 124.73,
+   "chars": 711,
+   "error": ""
+  },
+  {
+   "file": "q23.json",
+   "elapsed_s": 90.1,
+   "chars": 2382,
+   "error": ""
+  },
+  {
+   "file": "q24.json",
+   "elapsed_s": 88.7,
+   "chars": 1812,
+   "error": ""
+  },
+  {
+   "file": "q25.json",
+   "elapsed_s": 97.37,
+   "chars": 2721,
+   "error": ""
+  },
+  {
+   "file": "q26.json",
+   "elapsed_s": 84.1,
+   "chars": 893,
+   "error": ""
+  },
+  {
+   "file": "q27.json",
+   "elapsed_s": 79.79,
+   "chars": 517,
+   "error": ""
+  },
+  {
+   "file": "q28.json",
+   "elapsed_s": 81.7,
+   "chars": 505,
+   "error": ""
+  },
+  {
+   "file": "q29.json",
+   "elapsed_s": 82.37,
+   "chars": 1737,
+   "error": ""
+  },
+  {
+   "file": "q30.json",
+   "elapsed_s": 70.75,
+   "chars": 2154,
+   "error": ""
+  }
+ ],
+ "server": {
+  "id": "5b346919",
+  "name": "Ollama1",
+  "paired": true,
+  "reachable": true,
+  "auth": true,
+  "err": "",
+  "kind": "",
+  "latency_ms": 1808,
+  "gpu": {
+   "vendor": "nvidia",
+   "name": "GeForce RTX 5070 Ti",
+   "vram_bytes": null
+  },
+  "only": {
+   "ok": true,
+   "server": "Ollama1",
+   "model": "qwen3.8:27b",
+   "label": "Ollama1 · qwen3.8:27b",
+   "how": "fits",
+   "why": "",
+   "note": "The strongest model on Ollama1 that fits its card, answering alone. Nothing runs on this computer or in the cloud.",
+   "placement": "gpu",
+   "asleep": false
+  },
+  "models": [
+   "deepseek-r1:8b",
+   "devstral-small-2:24b",
+   "gemma4:12b",
+   "gemma4:e2b",
+   "gpt-oss:20b",
+   "hermes3:8b",
+   "llama3.2:1b",
+   "ministral-3:14b",
+   "qwen3.5:9b",
+   "qwen3.8:27b"
+  ]
+ },
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "tier": "srv:5b346919:think",
+ "warmup": {
+  "elapsed_s": 26.53,
+  "x_models": "Ollama1 · qwen3.8:27b, Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b",
+  "drafts": [
+   "Ollama1 · qwen3.8:27b: (no answer — ServerError)",
+   "Ollama1 · gpt-oss:20b: A heat sink is a metal block that **absorbs** heat from a component, spreading i",
+   "Ollama1 · ministral-3:14b: A **heat sink** disperses heat away from a hot component (like a CPU or transist"
+  ],
+  "answer": "A **heat sink** conducts heat from a hot component into its metal body, then spreads that energy across a large fin surface where **convection** to the surrounding air removes it.  \nCommon materials a"
+ },
+ "finished": "2026-10-24T06:23:14"
+}

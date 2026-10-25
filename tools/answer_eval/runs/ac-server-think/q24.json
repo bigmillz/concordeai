@@ -1,0 +1,358 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[13.9,16.7],\"final\":19.0,\"ftok\":583,\"est\":false}",
+  "X-Hurry": "90eaf4c2b951a49a"
+ },
+ "first_byte_s": 13.81,
+ "first_text_s": 39.55,
+ "elapsed_s": 61.57,
+ "events": [
+  {
+   "t": 13.81,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 13.81,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 13.81,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 20.62,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 20.62,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 20.68,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 20.68,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 20.68,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 29.79,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 29.79,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "5 notes"
+   }
+  },
+  {
+   "t": 29.79,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 29.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 29.79,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 39.55,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 41.95,
+   "tag": "RATE",
+   "data": {
+    "tps": 161.5,
+    "tok": 387,
+    "s": 2.4
+   }
+  },
+  {
+   "t": 41.95,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 41.95,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 41.95,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 61.56,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Couldn’t check the facts in time — answer kept",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 61.57,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1550 chars"
+   }
+  },
+  {
+   "t": 61.57,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   13.81,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   20.68,
+   "compositing…"
+  ],
+  [
+   20.68,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   41.95,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 13.81
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 20.68
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "5 notes",
+   "t_s": 29.79
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 29.79
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 41.95
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 41.95
+  },
+  {
+   "id": "verify",
+   "l": "Couldn’t check the facts in time — answer kept",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 61.56
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1550 chars",
+   "t_s": 61.57
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 61.57
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 20.62,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "If you retire in Brazil and pass away there, your U.S. retirement accounts (401(k), IRA, etc.) stay under U.S. tax rules. **They’ll be treated as part of your U.S. estate** and your heirs will inherit them according to your will or U.S. intestate succession, with the usual U.S. estate‑tax reporting (e.g., Form 706). Brazil does **not** tax those accounts unless you transfer them into a Brazilian bank, so the heirs in the U.S. are not subject to Brazilian inheritance rules on those assets.\n\nYour Brazilian apartment, however, is a local asset. When you die, it must go through Brazil’s probate process (“inventário”). The heirs who inherit the property will be liable for the **Brazilian inheritance tax (ITCMD)**, which ranges from **0 % to 8 %** of the property’s value depending on the state, and must be paid within the statutory period. If the heirs are U.S. residents, they will also need to report the inherited Brazilian property on their U.S. tax return (Form 3520‑A) and may face U.S. estate‑tax obligations on the worldwide value of the estate.\n\nIn short:\n\n* **U.S. accounts** → inherited by U.S. heirs under U.S. law; no Brazilian tax on those accounts.  \n* **Brazilian apartment** → "
+  },
+  {
+   "t_s": 20.62,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 29.79,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"Brazil does **not** tax those accounts unless you transfer them into a Brazilian bank\" — Brazil imposes no withholding tax on U.S.-sited retirement accounts, but heirs may still face tax consequences in both countries. Delete \"Brazil does **not** tax those accounts unless...\" and clarify that U.S. retirement accounts are *not subject to Brazilian inheritance tax* but *U.S. heirs may owe U.S. estate taxes* (depending on estate size) and *foreign reporting requirements* (FBAR/FinCEN 114 if asset values exceed thresholds).\n- **MISSING**: Specify that **U.S. retirement accounts** are exempt from Brazil’s *ITCDM* (inheritance tax) but **U.S. beneficiaries may owe U.S. estate tax** if the estate exceeds the federal exemption ($13.61M as of 2026, IRS).\n- **MISSING**: Add that the **Brazilian apartment** may trigger **U.S. gift tax reporting** if transferred to heirs before death (e.g., under $18,000 annual exclusion) and that **probate delays** in Brazil could freeze asset transfers for months/years.\n- **MIXED UP**: \"ITCMD ranges from **0% to 8%**\" — correct range is **0% to 8% or 4%** depending on state (e.g., São Paulo: 4%; Rio: 8%), but **no inheritance tax for spouses/li"
+  }
+ ],
+ "sources": [
+  {
+   "t": "U.S. Expat Retirement Accounts: 401 (k) and IRA Guide",
+   "u": "https://www.greenbacktaxservices.com/knowledge-center/expat-retirement-planning/"
+  },
+  {
+   "t": "Receiving an Inheritance in Brazil",
+   "u": "https://www.brazilcounsel.com/blog/receiving-an-inheritance-in-brazil"
+  },
+  {
+   "t": "Cross-Border Estate Planning: What Happens if you Die Abroad ...",
+   "u": "https://trustandwill.com/learn/dying-abroad"
+  },
+  {
+   "t": "Inheritance in Brazil: A complete guide - Martin Law Firm",
+   "u": "https://markdmartin.com/inheritance-in-brazil-a-complete-guide/"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   29.79,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   29.79,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 161.5,
+  "tok": 387,
+  "s": 2.4
+ },
+ "answer_raw": "**U.S. retirement accounts (401(k), IRA, etc.)** stay under U.S. tax rules.  \nBrazil does **not** impose its inheritance tax (ITCMD) on those assets, but if the total value of the U.S. estate exceeds the 2026 federal exemption of **$13.61 million**, the heirs may owe U.S. estate tax. They also need to file an **FBAR** (FinCEN 114) if the combined foreign holdings exceed **$10 000** and, if the estate is large enough, a **Form 706**.\n\n**Your Brazilian apartment** is a local asset that must go through Brazil’s probate (“inventário”). The heirs will face **Brazilian inheritance tax (ITCMD)**, which ranges from **0 % to 8 %** depending on the state (e.g., São Paulo 4 %, Rio de Janeiro 8 %). Some states exempt spouses or direct lineal heirs, so the exact rate depends on where the property is located. Probate can take months or even years, so the transfer of ownership may be delayed.\n\nBecause the apartment is a foreign asset, U.S. heirs must also file **Form 3520‑A** to report the inherited property and may be subject to U.S. estate tax on the worldwide value of the estate.\n\nIf you transfer the apartment to heirs before you die, the U.S. **gift‑tax reporting** rules apply: any transfer above the annual exclusion of **$18 000** (2026) must be reported on **Form 709**.\n\nTo keep the estate from getting tangled in both jurisdictions, consider drafting a dual‑jurisdiction will, possibly placing the Brazilian property in a trust, and seek advice from both a U.S. estate attorney and a Brazilian notary experienced with expatriate estates.",
+ "answer": "**U.S. retirement accounts (401(k), IRA, etc.)** stay under U.S. tax rules.  \nBrazil does **not** impose its inheritance tax (ITCMD) on those assets, but if the total value of the U.S. estate exceeds the 2026 federal exemption of **$13.61 million**, the heirs may owe U.S. estate tax. They also need to file an **FBAR** (FinCEN 114) if the combined foreign holdings exceed **$10 000** and, if the estate is large enough, a **Form 706**.\n\n**Your Brazilian apartment** is a local asset that must go through Brazil’s probate (“inventário”). The heirs will face **Brazilian inheritance tax (ITCMD)**, which ranges from **0 % to 8 %** depending on the state (e.g., São Paulo 4 %, Rio de Janeiro 8 %). Some states exempt spouses or direct lineal heirs, so the exact rate depends on where the property is located. Probate can take months or even years, so the transfer of ownership may be delayed.\n\nBecause the apartment is a foreign asset, U.S. heirs must also file **Form 3520‑A** to report the inherited property and may be subject to U.S. estate tax on the worldwide value of the estate.\n\nIf you transfer the apartment to heirs before you die, the U.S. **gift‑tax reporting** rules apply: any transfer above the annual exclusion of **$18 000** (2026) must be reported on **Form 709**.\n\nTo keep the estate from getting tangled in both jurisdictions, consider drafting a dual‑jurisdiction will, possibly placing the Brazilian property in a trust, and seek advice from both a U.S. estate attorney and a Brazilian notary experienced with expatriate estates.",
+ "chars": 1550,
+ "raw_bytes": 6076,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.29,
+ "rate_gen_tok_s": 17.6,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "ac-server-think",
+ "asked_at": "2026-10-24T06:55:02",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

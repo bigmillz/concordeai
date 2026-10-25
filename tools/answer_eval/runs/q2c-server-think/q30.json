@@ -1,0 +1,319 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":0.0,\"models\":[10.1,9.7],\"final\":11.5,\"ftok\":358,\"est\":false}",
+  "X-Hurry": "6f71516be74282cb"
+ },
+ "first_byte_s": 4.62,
+ "first_text_s": 30.25,
+ "elapsed_s": 38.95,
+ "events": [
+  {
+   "t": 4.62,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 11.97,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 900
+  },
+  {
+   "t": 11.97,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 11.97,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 11.97,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 20.25,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 578
+  },
+  {
+   "t": 20.25,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "2 notes · 4 dropped"
+   }
+  },
+  {
+   "t": 20.25,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 20.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 20.25,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 30.25,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 31.79,
+   "tag": "RATE",
+   "data": {
+    "tps": 141.7,
+    "tok": 218,
+    "s": 1.5
+   }
+  },
+  {
+   "t": 31.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 31.79,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 31.79,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 38.95,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 3 claims, all held",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 38.95,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "872 chars"
+   }
+  },
+  {
+   "t": 38.95,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.62,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   11.97,
+   "compositing…"
+  ],
+  [
+   11.97,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   31.79,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 11.97
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "2 notes · 4 dropped",
+   "t_s": 20.25
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 20.25
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 31.79
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 31.79
+  },
+  {
+   "id": "verify",
+   "l": "Checked 3 claims, all held",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 38.95
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "872 chars",
+   "t_s": 38.95
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 38.95
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 11.97,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "4‑bit quantization maps each weight (and sometimes activations) from 32‑bit floating‑point to a 4‑bit integer, so the **model size shrinks by ~8×** and memory bandwidth drops accordingly. The conversion uses a per‑block scale and zero‑point so that the low‑precision values can be rescaled back to the original range during inference.  \n\nBecause the precision is so low, the model incurs a small drop in perplexity or BLEU, but for many downstream tasks the loss is often < 2 %. The trade‑off is valuable **when inference must fit in limited GPU memory or when many copies of a model must run in parallel**, such as on edge devices, server‑side multi‑tenant inference, or when you want to batch several 30‑B models on a single 8‑GB GPU.  In contrast, training with 4‑bit weights is rarely practical, and for high‑precision research or safety‑critical applications the added error can be unacceptable."
+  },
+  {
+   "t_s": 11.97,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 20.25,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"the **model size shrinks by ~8×**\" -> \"the **model size shrinks by ~8×** (for weights only; activations, if also quantized, may vary based on implementation)\" — [draft’s logic ignores potential mixed-precision paths where activations aren’t quantized] [no source needed, as the draft omits activations’ variable role].\n- **CONTRADICTS**: \"the trade-off is valuable **when inference must fit in limited GPU memory or when many copies of a model must run in parallel**\" → later says \"several 30-B models on a single 8-GB GPU\" (30B > 8GB, regardless of quantization)."
+  }
+ ],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   20.25,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   20.25,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": false,
+ "rate_writer": {
+  "tps": 141.7,
+  "tok": 218,
+  "s": 1.5
+ },
+ "answer_raw": "4‑bit quantization compresses every weight from a 32‑bit float to a 4‑bit integer, shrinking the weight tensor by **≈8×** (activations, if also quantized, can add extra savings). The process stores a per‑block scale and zero‑point, so during inference the integer is rescaled back to a float‑like range. Because the precision is low, you lose a few percent in perplexity/BLEU, but for most downstream tasks the drop stays under **2 %**. Training with 4‑bit weights is rarely practical, and the added error can be unacceptable for high‑precision or safety‑critical work. The real advantage shows up when you need to fit a model into limited GPU memory or run many copies of it concurrently—common in edge deployments or multi‑tenant inference. A 30‑B model still exceeds an 8‑GB GPU even after 4‑bit quantization, but smaller models (e.g., 6‑B or 13‑B) can fit comfortably.",
+ "answer": "4‑bit quantization compresses every weight from a 32‑bit float to a 4‑bit integer, shrinking the weight tensor by **≈8×** (activations, if also quantized, can add extra savings). The process stores a per‑block scale and zero‑point, so during inference the integer is rescaled back to a float‑like range. Because the precision is low, you lose a few percent in perplexity/BLEU, but for most downstream tasks the drop stays under **2 %**. Training with 4‑bit weights is rarely practical, and the added error can be unacceptable for high‑precision or safety‑critical work. The real advantage shows up when you need to fit a model into limited GPU memory or run many copies of it concurrently—common in edge deployments or multi‑tenant inference. A 30‑B model still exceeds an 8‑GB GPU even after 4‑bit quantization, but smaller models (e.g., 6‑B or 13‑B) can fit comfortably.",
+ "chars": 872,
+ "raw_bytes": 3860,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.6,
+ "rate_gen_tok_s": 25.06,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2c-server-think",
+ "asked_at": "2026-10-25T00:57:15",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

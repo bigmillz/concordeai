@@ -1,0 +1,311 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+  "X-Eta": "{\"search\":14.0,\"models\":[83.9,108.9,71.5],\"final\":55.4,\"ftok\":583,\"est\":false}",
+  "X-Hurry": "1aa6138eecac2a61"
+ },
+ "first_byte_s": 6.38,
+ "first_text_s": 264.09,
+ "elapsed_s": 273.14,
+ "events": [
+  {
+   "t": 6.38,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 6.38,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 6.4,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 26.41,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 46.44,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 66.47,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 86.5,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 106.51,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 126.54,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 126.82,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 126.82,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 151.58,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 171.6,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 191.63,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 202.72,
+   "tag": "DRAFT",
+   "m": "Ministral 3 14B",
+   "chars": 1200
+  },
+  {
+   "t": 202.72,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 226.69,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 246.43,
+   "tag": "DRAFT",
+   "m": "Gemma 4 12B",
+   "chars": 1200
+  },
+  {
+   "t": 246.43,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 246.43,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is double-checking the drafts"
+  },
+  {
+   "t": 261.37,
+   "tag": "RUN",
+   "run": {
+    "c": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 264.09,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 273.14,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "5629 chars"
+   }
+  },
+  {
+   "t": 273.14,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   6.4,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   26.41,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   46.44,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   66.47,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   86.5,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   106.51,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   126.54,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   126.82,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   151.58,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   171.6,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   191.63,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   202.72,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   226.69,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   246.43,
+   "compositing…"
+  ],
+  [
+   246.43,
+   "Gemma 4 26B is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 6.38
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "5629 chars",
+   "t_s": 273.14
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 273.14
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 126.82,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 202.72,
+   "m": "Ministral 3 14B",
+   "text": "AI won’t outright *replace* IT ops/sysadmin jobs in the next five years, but **it will redefine them**. The risk isn’t job loss—it’s **relegation to what’s left after automation**. Right now, **full replacement is 5-10% of your tasks max**, but **20-40% of your time could shift to far harder problems** (e.g., fixing AI misconfigurations, auditing agent logic, or wrangling LLM hallucinations in runbooks). The **worst-case scenario** is you end up as a “human safety net”—**debugging what the AI can’t**, which burns you out faster than your old job did.\n\n### **The Real Risk by Function (2026–2030)**\nYour **highest-displacement** tasks are the ones AI can do **faster, cheaper, and at scale**. Right now, those are:\n- **Basic scripting and automation** (40–60% risk)\n  - Tools like **AutoGen** (Microsoft) or **LangChain** (now with agents) can already **auto-write and deploy light-weight scripts** for routine tasks (user provisioning, log parsing). By 2028, **enterprise AI agents will handle 80% of your runbooks** if your org adopts them.\n- **Incident triage and basic troubleshooting** (35–55% risk)\n  - AI like **GPT-4 + Observability data** (e.g., Datadog’s AI assistant) already **flags "
+  },
+  {
+   "t_s": 246.43,
+   "m": "Gemma 4 12B",
+   "text": "The displacement risk for a systems administrator or IT ops professional over the next five years is **low to moderate** in terms of total job loss, but **high** in terms of role evolution. You aren't being replaced by a robot; you are being displaced from the \"manual labor\" of IT—the repetitive configuration, log monitoring, and basic troubleshooting that occupies the bulk of a sysadmin's day.\n\nThe transition is moving toward a \"Human-in-the-Loop\" model where the AI handles the high-volume, low-complexity tasks (writing bash scripts, generating YAML files, summarizing logs), while you shift into an **orchestrator** role. \n\n## The Displacement Risk\n\n**Automated Remediation** is the primary threat. Tools are becoming proficient at identifying and fixing \"known-knowns\"—common server errors, disk space issues, and routine deployment failures. This shrinks the value of being a \"firefighter\" who simply knows which command to run.\n\n**Coding Co-pilots** have already lowered the ceiling for infrastructure-as-code (IaC). If your value is solely in writing Terraform or Ansible scripts, your output is being commoditized. Because you have an IT ops and systems background, your advantage is **c"
+  }
+ ],
+ "sources": [
+  {
+   "t": "How will Artificial Intelligence Affect Jobs 2026-2030 | Nexford University",
+   "u": "https://www.nexford.edu/insights/how-will-ai-affect-jobs"
+  },
+  {
+   "t": "Will Robots Take My Job?",
+   "u": "https://willrobotstakemyjob.com/"
+  },
+  {
+   "t": "I built 5 AI Agents in 36 Minutes to save me 20+ hours of work a week",
+   "u": "https://www.youtube.com/watch?v=_qr7ogLpTJs"
+  },
+  {
+   "t": "This A.I. Company Wants to Take Your Job - The New York Times",
+   "u": "https://www.nytimes.com/2025/06/11/technology/ai-mechanize-jobs.html"
+  }
+ ],
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+ "searched": true,
+ "answer": "AI won't replace the role of a sysadmin, but it will strip away the manual labor that currently fills your ticket queue. The real risk is not a total loss of employment, but a shift where your value moves from \"the person who runs the commands\" to the person who manages the systems that run the commands.\n\n## The Displacement Landscape\n\nYour primary displacement risk comes from **Automated Remediation** and **Agentic Workflows**. AI is becoming proficient at identifying and fixing \"known-knowns\"—routine server errors, disk space issues, and standard deployment failures.\n\n**Scripting and IaC** — Tools like GitHub Copilot or specialized agents can already write and deploy light-weight scripts for user provisioning or log parsing. If your primary value is solely writing Terraform, Ansible, or Bash, that output is being commoditized. By 2028, enterprise-grade agents will likely handle the majority of routine runbooks, leaving you to act as the final approver or the person who explains why the AI's suggestion failed.\n\n**Incident Triage** — With AI integrated into observability platforms (like Datadog or New Relic), the \"firefighter\" role is shrinking. AI can flag anomalies and draft the initial root-cause analysis. You won't be replaced, but the time spent on manual troubleshooting will drop sharply, forcing you to solve much harder, higher-level architectural problems to justify your seat.\n\n## How to Stay Competitive\n\nTo avoid being relegated to a \"human safety net\" who simply debugs what the AI misses, you must move toward higher-complexity domains that require human-level context and oversight.\n\n**Pivot to Platform Engineering** — Instead of managing individual servers or local clusters, focus on building the platforms that host these AI-driven workflows. This means mastering Kubernetes, service meshes, and CI/CD pipelines at a deep level, ensuring the infrastructure is robust enough to support automated agents.\n\n**Master LLMOps and AI Infrastructure** — The rise of AI creates a massive demand for specialized hardware management. Learning to manage GPU clusters, optimize inference-heavy workloads, and handle the unique networking/storage requirements of AI-native compute will put you in a different category than a generalist sysadmin.\n\n**Focus on Security, Compliance, and Audit** — AI lacks the ability to understand business risk or regulatory nuances. Moving into security-focused operations (SecOps) or compliance auditing—where you verify that AI-generated configurations meet corporate policy—is a high-value, human-centric role that automation cannot easily replicate.\n\n**Deepen your understanding of Agentic Logic** — As companies deploy autonomous agents to manage their networks, they will need experts who can audit the logic of those agents. Understanding how to troubleshoot \"hallucinations\" in automated workflows or managing the identity/access permissions of non-human entities will be a core part of the job.",
+ "chars": 2962,
+ "raw_bytes": 6961,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.71,
+ "rate_gen_tok_s": 81.82,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T02:25:19",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

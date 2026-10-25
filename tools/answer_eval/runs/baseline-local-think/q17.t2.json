@@ -1,0 +1,280 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+  "X-Eta": "{\"search\":0.0,\"models\":[73.0,100.7,59.5],\"final\":42.6,\"ftok\":566,\"est\":false}",
+  "X-Hurry": "f7f8abdaf2942f9b"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 235.44,
+ "elapsed_s": 242.71,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 20.06,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 40.08,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 60.11,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 80.15,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 100.17,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 120.2,
+   "tag": "STATUS",
+   "text": "asking Qwen 3.8 27B · 1 of 3"
+  },
+  {
+   "t": 120.41,
+   "tag": "DRAFT",
+   "m": "Qwen 3.8 27B",
+   "chars": 22
+  },
+  {
+   "t": 120.41,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 145.23,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 165.25,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 185.27,
+   "tag": "STATUS",
+   "text": "asking Ministral 3 14B · 2 of 3"
+  },
+  {
+   "t": 187.87,
+   "tag": "DRAFT",
+   "m": "Ministral 3 14B",
+   "chars": 1200
+  },
+  {
+   "t": 187.87,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 210.32,
+   "tag": "STATUS",
+   "text": "asking Gemma 4 12B · 3 of 3"
+  },
+  {
+   "t": 218.75,
+   "tag": "DRAFT",
+   "m": "Gemma 4 12B",
+   "chars": 1200
+  },
+  {
+   "t": 218.75,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 218.75,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is double-checking the drafts"
+  },
+  {
+   "t": 233.33,
+   "tag": "RUN",
+   "run": {
+    "c": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 235.44,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 242.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "4875 chars"
+   }
+  },
+  {
+   "t": 242.71,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   20.06,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   40.08,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   60.11,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   80.15,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   100.17,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   120.2,
+   "asking Qwen 3.8 27B · 1 of 3"
+  ],
+  [
+   120.41,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   145.23,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   165.25,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   185.27,
+   "asking Ministral 3 14B · 2 of 3"
+  ],
+  [
+   187.87,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   210.32,
+   "asking Gemma 4 12B · 3 of 3"
+  ],
+  [
+   218.75,
+   "compositing…"
+  ],
+  [
+   218.75,
+   "Gemma 4 26B is double-checking the drafts"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "4875 chars",
+   "t_s": 242.71
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 242.71
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 120.41,
+   "m": "Qwen 3.8 27B",
+   "text": "(no answer — too slow)"
+  },
+  {
+   "t_s": 187.87,
+   "m": "Ministral 3 14B",
+   "text": "Florianópolis is split between the tourist-heavy north (beaches, bars, more expensive) and the quieter, residential south (better for long-term stays). For a **safe, walkable, furnished one-bedroom with fast internet and easy beach access**, **Jurerê Internacional** is your best bet — it’s the foreigner-friendly zone, packed with expats, daycare-friendly, and still close to quiet beaches. If you want a slightly calmer vibe with a more upscale feel, **Canoas** is the backup.\n\nHere’s the breakdown of what a **furnished 1BR** costs in October 2026 (morning light, no pool is fine — pool adds 10-15%), plus the internet speed you can realistically expect:\n\n---\n### **1. Jurerê Internacional (Verdict: Best for your needs)**\n- **Monthly rent (reais):** **R$ 3,200–4,500**\n- **Monthly rent (USD):** **$650–$920**\n- **Internet:** **~100–150 Mbps (Vivo or Claro)** — reliable enough for light work (~$50–60/mo).\n- **Why here?**\n  - **Safety:** Low crime, expat-heavy, lots of surveillance.\n  - **Walkability:** Groceries (Zaffari, Na halvejinha), pharmacies, and cafés within 5-10 mins. Beach (Praia de Jurerê) is a 15-min stroll.\n  - **Beach access:** Quieter than Lagoa/Praia Mole, with good surfing."
+  },
+  {
+   "t_s": 218.75,
+   "m": "Gemma 4 12B",
+   "text": "**Jurerá** is your best bet for a six-month stay because it balances high-end infrastructure with a more authentic, less-congested vibe than the tourist hotspots.\n\nWhile most of Florianópolis is car-dependent, Jurerá offers the most \"walkable\" lifestyle on the island. It features a sophisticated mix of upscale restaurants, boutique cafes, and a beach and surf path that makes it easy to navigate on foot or by bike. It stays significantly quieter than Canasvieiras or Lagoa da Vitória, which can feel like construction zones or crowded beach clubs.\n\nFor a foreigner, the neighborhood offers a high standard of safety and infrastructure. It is a pocket of \"beach life\" where you can walk to the water, but it still feels like a residential community.\n\n## The Cost of Living\nFor a high-quality, furnished one-bedroom apartment in Jurer3a, you should expect to pay between **R$ 6,000 and R$ 8,500 per month**.\n\nAt the current exchange rate (roughly **R$ 5.50 to R$ 5.70 per USD**), this translates to roughly **$1,050 to $1,500 USD per month**.\n\nNote that many high-end rentals in this area require a \"guarantee\" in the form of a Brazilian bank deposit (usually 3 months' rent) or a Brazilian guaranto"
+  }
+ ],
+ "sources": null,
+ "photos": null,
+ "run": "baseline-local-think",
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Qwen 3.8 27B, Ministral 3 14B, Gemma 4 12B",
+ "searched": false,
+ "answer": "You should pick **Jurerê Internacional** for a balanced mix of safety, infrastructure, and ease of living.\n\nWhile most of Florianópolis requires a car to get around, Jurerê Internacional is one of the few areas where you can realistically live a walkable lifestyle, with groceries, cafes, and the beach accessible on foot. It offers a higher standard of security and a more sophisticated residential feel compared to the crowded tourist hubs like Canasvieiras.\n\nFor a high-quality, furnished one-bedroom in this neighborhood, expect to pay between **R$ 6,000 and R$ 8,500** per month. At current exchange rates, this is roughly **$1,050–$1,500 USD**. \n\n## Important Cost Nuances\nWhen budgeting, you must account for two factors that can significantly shift your monthly outflow:\n\n*   **Condomínio (HOA fees):** In Brazil, building fees are often listed separately from the base rent. For a furnished apartment in a prime area, expect these fees to add another **20–30%** to your monthly housing cost.\n*   **Seasonal Surges:** Rent in Florianópolis is highly elastic. While the rates above reflect October pricing, costs can spike during the peak summer months (December–February). If your stay overlaps with the summer high season, you should budget at the higher end of the scale or negotiate a fixed rate upfront.\n\n## Logistics and Infrastructure\nThe area features reliable fiber-optic internet, typically ranging from **100–500 Mbps**, making it suitable for remote work. Because the waters in Jurerê are famously calm and shallow, it is not a primary surfing destination; if you are looking for heavy swells, you would need to head to different parts of the island.\n\nSecuring a six-month rental as a foreigner usually requires a specific strategy. Since many standard Brazilian leases are annual and require a local guarantor (*fiador*), you will likely need to negotiate a short-term contract with an upfront deposit or a higher monthly premium to bypass the need for local paperwork. For these types of stays, platforms like Airbnb (using monthly booking discounts) or local Facebook groups for \"Locação Florianópolis\" are the most effective ways to find available furnished units.",
+ "chars": 2187,
+ "raw_bytes": 5609,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.25,
+ "rate_gen_tok_s": 75.21,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Thinking",
+ "config": "local-think",
+ "asked_at": "2026-10-24T02:05:31",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "⚠️ Backend error — RuntimeError: none of the selected models answered"
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

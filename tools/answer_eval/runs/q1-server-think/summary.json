@@ -1,0 +1,276 @@
+{
+ "name": "q1-server-think",
+ "config": "server-think",
+ "where": "server",
+ "started": "2026-10-24T07:00:35",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/quality-1",
+ "head": [
+  "8c7bfc0",
+  "quality-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 65.41,
+   "chars": 862,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 51.06,
+   "chars": 1661,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 51.27,
+   "chars": 1123,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 54.1,
+   "chars": 817,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 44.45,
+   "chars": 668,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 57.91,
+   "chars": 954,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 45.68,
+   "chars": 1232,
+   "error": ""
+  },
+  {
+   "file": "q07.json",
+   "elapsed_s": 61.98,
+   "chars": 655,
+   "error": ""
+  },
+  {
+   "file": "q08.json",
+   "elapsed_s": 57.19,
+   "chars": 1605,
+   "error": ""
+  },
+  {
+   "file": "q09.json",
+   "elapsed_s": 53.23,
+   "chars": 1565,
+   "error": ""
+  },
+  {
+   "file": "q10.json",
+   "elapsed_s": 61.95,
+   "chars": 961,
+   "error": ""
+  },
+  {
+   "file": "q11.json",
+   "elapsed_s": 54.06,
+   "chars": 1546,
+   "error": ""
+  },
+  {
+   "file": "q11.t2.json",
+   "elapsed_s": 52.03,
+   "chars": 1309,
+   "error": ""
+  },
+  {
+   "file": "q12.json",
+   "elapsed_s": 53.42,
+   "chars": 1430,
+   "error": ""
+  },
+  {
+   "file": "q13.json",
+   "elapsed_s": 56.84,
+   "chars": 1776,
+   "error": ""
+  },
+  {
+   "file": "q14.json",
+   "elapsed_s": 59.64,
+   "chars": 2000,
+   "error": ""
+  },
+  {
+   "file": "q15.json",
+   "elapsed_s": 48.9,
+   "chars": 1314,
+   "error": ""
+  },
+  {
+   "file": "q16.json",
+   "elapsed_s": 22.09,
+   "chars": 80,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 53.28,
+   "chars": 1857,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 34.19,
+   "chars": 457,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 61.07,
+   "chars": 1525,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 40.6,
+   "chars": 840,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 51.7,
+   "chars": 1375,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 55.08,
+   "chars": 0,
+   "error": ""
+  },
+  {
+   "file": "q22.json",
+   "elapsed_s": 53.14,
+   "chars": 0,
+   "error": ""
+  },
+  {
+   "file": "q23.json",
+   "elapsed_s": 58.86,
+   "chars": 2472,
+   "error": ""
+  },
+  {
+   "file": "q24.json",
+   "elapsed_s": 53.1,
+   "chars": 2062,
+   "error": ""
+  },
+  {
+   "file": "q25.json",
+   "elapsed_s": 52.29,
+   "chars": 1688,
+   "error": ""
+  },
+  {
+   "file": "q26.json",
+   "elapsed_s": 54.58,
+   "chars": 1422,
+   "error": ""
+  },
+  {
+   "file": "q27.json",
+   "elapsed_s": 45.42,
+   "chars": 572,
+   "error": ""
+  },
+  {
+   "file": "q28.json",
+   "elapsed_s": 51.31,
+   "chars": 461,
+   "error": ""
+  },
+  {
+   "file": "q29.json",
+   "elapsed_s": 59.68,
+   "chars": 1120,
+   "error": ""
+  },
+  {
+   "file": "q30.json",
+   "elapsed_s": 38.86,
+   "chars": 1733,
+   "error": ""
+  }
+ ],
+ "server": {
+  "id": "5b346919",
+  "name": "Ollama1",
+  "paired": true,
+  "reachable": true,
+  "auth": true,
+  "err": "",
+  "kind": "",
+  "latency_ms": 595,
+  "gpu": {
+   "vendor": "nvidia",
+   "name": "GeForce RTX 5070 Ti",
+   "vram_bytes": null
+  },
+  "only": {
+   "ok": true,
+   "server": "Ollama1",
+   "model": "qwen3.8:27b",
+   "label": "Ollama1 · qwen3.8:27b",
+   "how": "fits",
+   "why": "",
+   "note": "The strongest model on Ollama1 that fits its card, answering alone. Nothing runs on this computer or in the cloud.",
+   "placement": "gpu",
+   "asleep": false
+  },
+  "models": [
+   "deepseek-r1:8b",
+   "devstral-small-2:24b",
+   "gemma4:12b",
+   "gemma4:e2b",
+   "gpt-oss:20b",
+   "hermes3:8b",
+   "llama3.2:1b",
+   "ministral-3:14b",
+   "qwen3-coder:30b",
+   "qwen3.5:9b",
+   "qwen3.8:27b"
+  ]
+ },
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "tier": "srv:5b346919:think",
+ "warmup": {
+  "elapsed_s": 16.03,
+  "x_models": "Ollama1 · qwen3.8:27b, Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b",
+  "drafts": [
+   "Ollama1 · qwen3.8:27b: (no answer — ServerError)",
+   "Ollama1 · gpt-oss:20b: A heat sink dissipates heat from a component by conducting it to a larger metal ",
+   "Ollama1 · ministral-3:14b (review): - **MISSING**: The draft doesn’t explain how heat dissipation is enhanced (e.g.,"
+  ],
+  "answer": "A **heat sink** transfers heat from a hot component to a larger metal surface that radiates the energy into the air; by increasing surface area—usually with **fins**—and applying **thermal interface m"
+ },
+ "finished": "2026-10-24T07:30:38"
+}
