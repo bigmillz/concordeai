@@ -17217,4 +17217,5 @@ The gauntlet on `rubin` after the merge: run 1 (f06138d) stopped early on the me
 the next run passed it), two 6b458/6b292 checks (the row's words, the console's `body.novideo` rule) and a copy left
 holding 9902 by the killed baseline run; run 2 (def7dc1) **1242/1244**: two mutant anchors (the server meter's
 `/v1/usage` read and Max's `"available": n > 0`) were no longer unique because Vera Rubin's code repeated them;
-run 3 (04c6286): **1244/1244**, exit 0.
+run 3 (04c6286): **1244/1244**, exit 0. After the Mac-only run's two fixes, run 4 (999b02f): **1245/1245**,
+exit 0.
