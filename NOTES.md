@@ -17191,6 +17191,28 @@ does, inside the margin isn't one, Stop mid-round, the ceiling, nothing new runs
 row growing, no machine at all); the tier, the handler, the saved turn and the console pinned. The 6b515 pin of
 `FRAME_TAGS` gains `RUBIN`.
 
+**After the merge, this Mac alone (2026-10-25).** Ollama1 was unreachable from before 14:05 (no ping, the tunnel
+down), so the server lane was not exercised live after the merge; the dev copy was unpaired and nothing more was
+sent to it. The last model requests Vera Rubin sent the server were in the 01:20 run, the last at 01:27:49 (it
+answered; the one before it was the call Stop cut short). Earlier on the 25th a copy started at 14:05 with the
+pairing still in place: its routine reachability check before the question found nothing and no server lane was
+seated (no model request, no wake: the run's card shows none), and it was stopped and unpaired at 14:16. The
+Mac-only run (the GPU question, Gemma 4 26B writing, reviewing, judging and checking; stopped after round 3, 4 min):
+
+| round | score shown | judged (winner / best / first answer) | new sources | took |
+|---|---|---|---|---|
+| 0 | 8.90 | — | 8 | 77 s |
+| 1 | 9.53 | 9.55 / 8.95 / 8.95 | 0 | 43 s |
+| 2 | 8.97 | 9.72 / 9.40 / 9.70 | 12 | 62 s |
+| 3 | 8.97 (judges didn't answer) | — | 4 | 56 s |
+
+Two faults showed, both fixed after it: one judge re-scored the first answer above the old best, so the yardstick
+drew an improvement lower (9.53 to 8.97): the score shown for a new best is now never below the one it replaced; and
+the round-2 fact-check (Gemma checking Gemma) deleted the winner's correct GB300 NVL72 sentences as unsupported, and
+the answer shipped as "hardware options … include various high-performance systems [8]": a check's text is never
+judged, so it may now cut at most 15% of the answer (`RUBIN_CHECK_KEEP`), past that the judged text stands. One
+judge on one machine is the weak spot of a Mac-only run: its own answers, its own noise, no second opinion.
+
 The gauntlet on `rubin` after the merge: run 1 (f06138d) stopped early on the merge's own state lint (a stale read;
 the next run passed it), two 6b458/6b292 checks (the row's words, the console's `body.novideo` rule) and a copy left
 holding 9902 by the killed baseline run; run 2 (def7dc1) **1242/1244**: two mutant anchors (the server meter's

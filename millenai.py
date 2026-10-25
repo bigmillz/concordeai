@@ -33517,6 +33517,7 @@ RUBIN_BACKOFF_S = (0.0, 20.0, 60.0)   # the pause before a round, by stalled rou
 RUBIN_MAX_SOURCES = 24          # the pack's sources; new ones after this are not added
 RUBIN_PACK_CHARS = 20000        # ~6K tokens: a 16K context keeps room for the answer and the notes
 RUBIN_CHECK_PACK = 9000         # the fact-check's pack: the sources the answer cites first
+RUBIN_CHECK_KEEP = 0.85         # a fact-check that would cut more of the answer than this keeps is refused
 RUBIN_JUDGE_PACK = 12000
 RUBIN_SEARCHES = 3              # targeted searches a round
 RUBIN_LOAD_S = 4.0              # the machine panel's sample period (the gateway asks: every few seconds at most)
@@ -34561,7 +34562,12 @@ def rubin_check(st, lanes, text, writer_lane, stop):
     if not res:
         return text, 0, 0
     new = (res["text"] or "").strip()
-    if res["fixed"] and new and len(new) >= 0.6 * len(text):
+    # THE CHECK MAY CORRECT, NOT GUT (seen live, the Mac alone): the judged
+    # winner's GB300 NVL72 sentences were deleted as "unsupported" and the
+    # answer shipped as a hollow lead line. The check's text is never judged,
+    # so it may cost at most RUBIN_CHECK_KEEP of the answer; past that the
+    # judged text stands
+    if res["fixed"] and new and len(new) >= RUBIN_CHECK_KEEP * len(text):
         return new, res["checked"], res["fixed"]
     return text, res["checked"], 0
 
@@ -34715,7 +34721,9 @@ def rubin_round(st, lanes, stop, io, search=None):
         st.fixed += fx
     gain = w_score - best_now
     a_now = (res.get(a_i) or {}).get("score") if a_i is not None else best_now
-    shown = rubin_yardstick(st.anchor_score, a_now, w_score)
+    # never below the score it replaced (seen live: one judge put the first
+    # answer above the old best, and an improvement drew a falling line)
+    shown = max(st.best["score"], rubin_yardstick(st.anchor_score, a_now, w_score))
     st.best = {"text": w_text, "score": shown, "crit": (res.get(win) or {}).get("crit", {}),
                "by": w_lbl, "round": n, "judged": round(w_score, 2)}
     st.weak = (res.get(win) or {}).get("weak") or []

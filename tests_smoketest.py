@@ -37680,6 +37680,10 @@ def _r519_helpers(src):
     got["one yardstick: where the judges put the winner between the first answer and 10, on the first score"] = (
         yd(5.0, 5.0, 7.0) == 7.0 and yd(5.4, 4.0, 7.2) == 7.85 and yd(9.0, 5.0, 9.0) == 9.8
         and yd(6.3, 4.0, 10.0) == 10.0 and yd(6.0, 7.0, 6.5) == 6.0 and yd(0.0, None, 7.3) == 7.3)
+    got["an improvement never shows a lower score than the answer it replaced; a check may not gut the answer"] = (
+        'shown = max(st.best["score"], rubin_yardstick(st.anchor_score, a_now, w_score))' in src
+        and 'if res["fixed"] and new and len(new) >= RUBIN_CHECK_KEEP * len(text):' in src
+        and "RUBIN_CHECK_KEEP = 0.85" in src)
     got["a judge's pick of the yardstick is no verdict between the best and a revision"] = (
         "    if not rubin_accept(best_now, w_score, [p for p in picks if p != a_i]):" in src
         and "        texts.append(st.anchor)" in src)
@@ -37909,6 +37913,8 @@ _R519_MUT = [
     ("the frame not lifted from the saved turn", '              "|RUBIN")', '              "")'),
     ("the yardstick dropped", "    return round(max(1.0, min(10.0, anchor_score + frac * (10.0 - anchor_score))), 2)",
      "    return round(cand_now, 2)"),
+    ("a falling line on an improvement", '    shown = max(st.best["score"], rubin_yardstick(st.anchor_score, a_now, w_score))',
+     "    shown = rubin_yardstick(st.anchor_score, a_now, w_score)"),
     ("the improved answer not sent", "    io.answer(w_text + rubin_footer(st))\n    return True", "    return True"),
 ]
 _r519_caught = []
