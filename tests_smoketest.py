@@ -37060,7 +37060,7 @@ def _c515_pins(src):
         "Fast's second pass writes under the brief too": src.count("brief_system(full_messages[0])") == 3,
         "the answer's own length on the card": '"%d chars" % (shown_n[0] or sent[0])' in ch,
         "the page reads RATE, measures from the first character after the last RESET, and says both times":
-            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE";' in src
+            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|RUBIN";' in src
             and "RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}}," in src
             and "if(cut!==genCut){genCut=cut;genT0=0;}\n      if(full.length&&!genT0)genT0=lastChunkT;" in src
             and "const tps=(rateInfo&&rateInfo.tps>0)?rateInfo.tps:lastRate;" in src
@@ -37214,6 +37214,495 @@ check("the fact-check replaces whole sentences only, and never with a line about
       and "a lease may involve deposits, landlords vary." in _t16
       and "never mentioning sources, evidence or this" in _MILLENAI_SRC, "%r" % [_t16, _x16])
 # ==== quality-1 (6b516): end ====
+# ==== VERA RUBIN (6b519) the extreme-effort mode: begin ====
+# Patrick (2026-10-24): "a feature to emulate a Vera Rubin ... where it just sits there and will show Vera Rubin
+# and just goes and goes and goes." The loop (run_rubin) on stand-in machines: the stop rules (Stop, three
+# rounds without improvement, the ceiling), only an improvement replaces the answer, the frames, one job at a
+# time per machine, the server's card rule, the cloud only when it is on; then the tier, the handler, the saved
+# turn and the console pinned in the source, and the mutants.
+print("== Vera Rubin (6b519) ==")
+import threading as _t519
+import time as _tm519
+import random as _r519
+import contextlib as _cl519
+
+
+def _r519_ns(src):
+    """The section out of the source, on the real grounded-search and craft helpers (6b514/6b515) and stand-ins
+    for the machines, the web and the page."""
+    class Ctl(str):
+        pass
+
+    class AppText(str):
+        pass
+
+    class Gone(Exception):
+        pass
+
+    class Stale(Exception):
+        pass
+    ns = dict(_g14)
+    ns.update({"Ctl": Ctl, "AppText": AppText, "NUL": "\0", "_DraftAbandoned": Gone, "StaleProfile": Stale,
+               "threading": _t519, "time": _tm519, "random": _r519, "json": json, "re": re,
+               "strip_think": lambda t: t, "_looks_degenerate": lambda t: False,
+               "ctx_thread": lambda target, args=(), daemon=True: _t519.Thread(target=target, args=args, daemon=daemon),
+               "profile_cache": lambda n, v: v, "cloud_text": lambda *a, **k: "",
+               "server_first_deadline": lambda s: _cl519.nullcontext(), "run_model": None, "run_council": None,
+               "SYNTH_INSTRUCTION": "Below ... Write ONE final answer ...", "server_label": lambda l: " · " in str(l),
+               "SERVER_SEP": " · ", "MODEL_ROUTES": {}, "fast_cloud_ladder": lambda: [], "bound_ctx": lambda: None,
+               "gpu_utilization": lambda: 41.0, "HAS_PSUTIL": False, "psutil": None, "mem_pressure": lambda: 22.0,
+               "IS_MAC": False, "SRV_USAGE_S": 3, "_srv_json": lambda e, m, p, timeout=3: (404, {}),
+               "_srv_read": lambda ctx: [], "_srv_paired": lambda e: bool(e.get("paired")), "_srv_seen": {},
+               "srv_is_nofit": lambda sid, m, size=0: False, "server_speeds": lambda ctx: {},
+               "resolve_tier": lambda n: ["Gemma 4 26B"], "cloud_allowed": lambda: False,
+               "compositor_ladder": lambda: [{"name": "Claude", "model": "opus"}],
+               "TIERS": {"Vera Rubin": {"desc": "throws everything at one question"}}})
+    _exec_names(ns, {"_srv_fits", "_srv_params", "srv_rank", "srv_role_ok", "_srv_flags", "_SRV_WORD",
+                     "_SRV_STEM", "_SRV_FAMILY", "_srv_usage_gpu", "_srv_usage_ram", "_SRV_PARAMS_RX"})
+    exec(src[src.index("ANSWER_BRIEF = ("):src.index("\n\n\nRESEARCH_PLAN = (")], ns)
+    exec(src[src.index("# ==== VERA RUBIN (6b519): begin ===="):src.index("# ==== VERA RUBIN (6b519): end ====")], ns)
+    ns["RUBIN_BACKOFF_S"] = (0.0, 0.05, 0.05)
+    return ns
+
+
+_R519_Q = "What is the most powerful AI chip right now, and what does Anthropic run Claude on?"
+
+
+class _R519Ground:
+    """A finished grounded search: n new sources, each read."""
+    _n = [0]
+
+    def __init__(self, q, k=2):
+        self.terms = ["chip", "Anthropic"]
+        self.rows = []
+        for _i in range(k):
+            _R519Ground._n[0] += 1
+            j = _R519Ground._n[0]
+            self.rows.append({"url": "https://news%d.example/p%d" % (j, j), "title": "Page %d" % j,
+                              "host": "news%d.example" % j, "date": "2026-10-0%d" % (1 + j % 9),
+                              "body": "snippet %d" % j, "paras": ["Paragraph %d about the chip and Anthropic." % j]})
+
+    def wait(self, on_phase=None, timeout=0):
+        return self
+
+    def snapshot(self):
+        return list(self.rows), "", len(self.rows), len(self.rows)
+
+
+def _r519_run(src, script, ns=None, stop_at=None, ceiling=60.0, sample=False, lanes_kw=None, with_search=True,
+              stall_n=3, new_sources=True, same_notes=False):
+    """One run on stand-ins. script(kind, lane, round, n) -> the QUALITY a revision gets. Every answer carries
+    QUALITY=x; the stand-in judges score each answer by it, so a verdict is the script's. Returns
+    (state, frames, texts, calls, peak jobs per machine)."""
+    ns = ns or _r519_ns(src)
+    frames, texts, calls = [], [], []
+    active, peak = {}, {}
+    lk = _t519.Lock()
+    stop = _t519.Event()
+    rnd = {"n": 0}
+
+    def fake(lane, model, msgs, collect):
+        u = str(msgs[-1]["content"])
+        with lk:
+            active[lane.name] = active.get(lane.name, 0) + 1
+            peak[lane.name] = max(peak.get(lane.name, 0), active[lane.name])
+        try:
+            _tm519.sleep(0.01)
+            if u.startswith("Plan the research"):
+                kind = "plan"
+                collect(json.dumps({"parts": [{"q": "Which is the fastest chip?", "need": "vendor specs",
+                                               "search": ["fastest AI chip 2026"]},
+                                              {"q": "What does Claude run on?", "need": "Anthropic's posts",
+                                               "search": ["Anthropic Claude TPU Trainium 2026"]}]}))
+            elif u.startswith("You are reviewing a draft answer"):
+                kind = "critic"
+                k = 0 if same_notes else rnd["n"]
+                collect("- MISSING: the interconnect between the chips, angle %d\n"
+                        "- WRONG: 'the B200 is the newest in round %d' — unsupported" % (k, k))
+            elif u.startswith("You judge a contest"):
+                kind = "judge"
+                sc = {}
+                for L, body in re.findall(r"=== ANSWER ([A-Z]) ===\n(.*?)(?=\n\n=== ANSWER |\Z)", u, re.S):
+                    m = re.search(r"QUALITY=(\d+(?:\.\d+)?)", body)
+                    q = float(m.group(1)) if m else 1.0
+                    sc[L] = {"grounded": q, "correct": q, "complete": q, "clear": q, "fit": q}
+                best = max(sc, key=lambda k: sc[k]["grounded"]) if sc else "A"
+                collect("```json\n" + json.dumps({"scores": sc, "best": best, "why": "covers the interconnect"}) + "\n```")
+            elif u.startswith("Below are a question"):
+                kind = "check"
+                collect("[]")
+            else:
+                kind = "write"
+                q = script(kind, lane, rnd["n"], len(calls))
+                if stop_at is not None and stop_at(lane, rnd["n"]):
+                    stop.set()
+                collect(("Revised answer by %s in round %d, QUALITY=%s [1]. " % (lane.name, rnd["n"], q))
+                        + "The chip has 288 GB of HBM4 [1]. Anthropic runs Claude on TPUs [2]. " * 8)
+            calls.append((kind, lane.name, model, rnd["n"]))
+        finally:
+            with lk:
+                active[lane.name] -= 1
+
+    def council(labels, messages, emit, status, **kw):
+        calls.append(("first", labels[0], kw.get("craft"), 0))
+        emit(ns["Ctl"]("\0STEP:" + json.dumps({"id": "verify", "l": "Checked 4 claims, fixed 1", "s": "done"}) + "\0"))
+        emit("First answer, QUALITY=5 [1]. " + "The fastest chip is the B200 [1]. Claude runs on GPUs [2]. " * 8)
+
+    def search(q, qs):
+        return _R519Ground(q, 2 if new_sources else 0)
+    L = ns["RubinLane"]
+    kw = lanes_kw or {}
+    lanes = kw.get("lanes") or [L("mac", "This Mac", ["Gemma 4 26B"], run=fake),
+                                L("server", "Box", ["Box · gpt-oss:20b", "Box · ministral-3:14b"], run=fake, sid="s1")]
+    for l in lanes:
+        l._run = fake
+    orig_round = ns["rubin_round"]
+
+    def counted_round(*a, **k):
+        rnd["n"] += 1
+        return orig_round(*a, **k)
+    ns["rubin_round"] = counted_round
+
+    def emit(c):
+        (frames if isinstance(c, ns["Ctl"]) else texts).append(str(c))
+    ns["rubin_mac_load"] = lambda: {"gpu": 55.0, "cpu": 30.0, "mem_used": 3 << 30, "mem_total": 48 << 30,
+                                    "pressure": 20.0, "thermal": "nominal"}
+    ns["rubin_server_load"] = lambda e: {"ok": True, "gpu": 97, "vram_used": 14 << 30, "vram_total": 16 << 30,
+                                         "ram_used": 9 << 30, "ram_total": 62 << 30, "temp": None, "power": None}
+    ground = _R519Ground(_R519_Q, 3)
+    t0 = _tm519.time()
+    st = ns["run_rubin"](_R519_Q, [{"role": "system", "content": "SYS"}, {"role": "user", "content": _R519_Q}],
+                         emit, lambda t: None, lambda *a: None, stop, ground=ground, lanes=lanes,
+                         servers={"s1": {"id": "s1"}}, search=search if with_search else (lambda q, qs: _R519Ground(q, 0)),
+                         council=council, ceiling_s=ceiling, stall_n=stall_n, sample=sample)
+    return st, frames, texts, calls, peak, _tm519.time() - t0
+
+
+def _r519_frames(frames, kind):
+    out = []
+    for f in frames:
+        if f.startswith("\0RUBIN:"):
+            d = json.loads(f[7:-1])
+            if d.get("k") == kind:
+                out.append(d)
+    return out
+
+
+def _r519_helpers(src):
+    ns = _r519_ns(src)
+    got = {}
+    sc = ns["rubin_score"]
+    got["the score: the rubric's weighted mean, each criterion held to 1-10"] = (
+        sc({"grounded": 10, "correct": 10, "complete": 10, "clear": 10, "fit": 10}) == 10.0
+        and sc({"grounded": 8, "correct": 6, "complete": 4, "clear": 10, "fit": 2}) == 6.1
+        and sc({"grounded": 40}) == 10.0 and sc({}) == 0.0 and sc(None) == 0.0)
+    jp = ns["rubin_judge_parse"]
+    one = jp('Sure:\n```json\n{"scores": {"A": {"grounded": 7, "correct": "8", "complete": 6, "clear": 7, "fit": 7},'
+             ' "B": {"grounded": 9, "correct": 9, "complete": 9, "clear": 9, "fit": 9},}, "best": "b", "why": "more sources"}\n```',
+             ["A", "B"])
+    got["a judge's reply: through a fence, a string number and a trailing comma; a missing answer voids it"] = (
+        one and one["best"] == "B" and one["scores"]["A"]["correct"] == 8.0 and one["why"] == "more sources"
+        and jp('{"scores": {"A": {"grounded": 7}}, "best": "A"}', ["A", "B"]) is None
+        and jp("I think B is better.", ["A", "B"]) is None
+        and jp('{"scores": {"A": {"grounded": 7}}, "best": "Z"}', ["A"])["best"] == "")
+    comb, picks, whys = ns["rubin_combine"]([one, None, jp('{"scores": {"A": {"grounded": 5, "correct": 6, "complete": 6, '
+                                                            '"clear": 5, "fit": 5}, "B": {"grounded": 7, "correct": 7, '
+                                                            '"complete": 7, "clear": 7, "fit": 7}}, "best": "B"}', ["A", "B"])],
+                                            ["A", "B"])
+    got["two judges are averaged, one that didn't answer is left out"] = (
+        comb["B"]["crit"]["grounded"] == 8.0 and comb["A"]["crit"]["correct"] == 7.0 and picks == ["B", "B"]
+        and 7.9 <= comb["B"]["score"] <= 8.1)
+    acc = ns["rubin_accept"]
+    got["only an improvement replaces the answer: the margin in the same judging, and no judge for the old one"] = (
+        acc(6.0, 6.25, [1]) and not acc(6.0, 6.2, [1]) and not acc(6.0, 7.5, [1, 0]) and acc(6.0, 7.5, [1, -1])
+        and not acc(8.0, 7.0, [1]))
+    S = ns["RubinState"]
+    st = S(_R519_Q, ceiling_s=100, stall_n=3)
+    ev = _t519.Event()
+    stop_rules = [ns["rubin_should_stop"](st, ev)]
+    st.stalls = 3
+    stop_rules.append(ns["rubin_should_stop"](st, ev))
+    st.stalls = 0
+    stop_rules.append(ns["rubin_should_stop"](st, ev, now=st.t0 + 101))
+    ev.set()
+    stop_rules.append(ns["rubin_should_stop"](st, ev))
+
+    class _IO:
+        gone = BrokenPipeError()
+    st.io = _IO()
+    stop_rules.append(ns["rubin_should_stop"](st, ev))
+    got["the stop rules: none, three stalled rounds, the ceiling, Stop, the reader gone"] = (
+        stop_rules == ["", "settled", "ceiling", "stopped", "gone"])
+    st = S(_R519_Q)
+    a = st.add_sources(_R519Ground(_R519_Q, 3).rows, ["chip"])
+    rows2 = _R519Ground(_R519_Q, 2).rows
+    b = st.add_sources(rows2 + [dict(rows2[0], url=rows2[0]["url"] + "?utm=x")], ["Anthropic"])
+    c = st.add_sources([{"url": "https://thin.example/a", "title": "t"}])
+    d = st.add_sources([{"url": "https://thin.example/b", "title": "t"}], keep_all=True)
+    pk = ns["rubin_pack"](st)
+    pk2 = ns["rubin_pack"](st, only=[5], budget=1500)
+    got["the evidence: stable numbers, a page once, a thin row only from the handler's own pack, pages read counted"] = (
+        (a, b, c, d) == (3, 2, 0, 1) and len(st.sources) == 6 and len(st.read_urls) == 5
+        and [r["u"] for r in st.rows()][3] == rows2[0]["url"]
+        and "[1] Page" in pk and "[5] Page" in pk and "6 sources" in pk and pk.index("[1] ") < pk.index("[5] ")
+        and pk2.index("[5] ") < (pk2.index("[1] ") if "[1] " in pk2 else 10 ** 6))
+    got["citations: [2][7] and [2, 4] read, a mark past the pack counted"] = (
+        ns["rubin_cites"]("a [2][7] b [2, 4] c [9] arr", 7) == ([2, 4, 7], 1))
+    plan = ns["rubin_plan_parse"]('{"parts": [{"q": "Which chip is fastest?", "need": "specs", "search": ["fastest AI chip 2026", "x", "y"]}]}',
+                                  _R519_Q)
+    plan0 = ns["rubin_plan_parse"]("no json here", _R519_Q)
+    got["the plan: the model's parts (two queries each at most), else the question's own parts"] = (
+        plan == [{"q": "Which chip is fastest?", "need": "specs", "search": ["fastest AI chip 2026", "x"]}]
+        and len(plan0) == 2 and all(p["search"] for p in plan0))
+    st.plan = [{"q": "What does Anthropic run Claude on?", "need": "", "search": ["Anthropic Claude TPU 2026"]},
+               {"q": "Which chip has the most memory?", "need": "", "search": ["AI chip HBM4 memory 2026"]}]
+    st.best["text"] = "Anthropic runs Claude on TPUs and Trainium."
+    gaps = ns["rubin_gaps"](st)
+    items = ns["rubin_queries"](st, "- WRONG: 'the B200 is the newest' — it is not\n- MISSING: power and cooling\n- praise", gaps)
+    st.searched.add(ns["_ground_key"]("power and cooling"))
+    items2 = ns["rubin_queries"](st, "- MISSING: power and cooling", [])
+    got["the weak points: the plan's open part, the critic's doubtful claim and missing angle, no search twice"] = (
+        [p["q"] for p in gaps] == ["Which chip has the most memory?"]
+        and items == [("Which chip has the most memory?", ["AI chip HBM4 memory 2026"]),
+                      ("the B200 is the newest", []), ("power and cooling", [])]
+        and items2 == [])
+    rd = ns["rubin_reader"]("x\n\nFrom earlier conversations you remember these facts about the user:\n- works in IT ops\n"
+                            "Never OPEN an answer...\n\nThe user's name is Pat \u2014 they told you so\n\nLENGTH: Keep it short.")
+    off, said = ns["rubin_mech"]("Rubin has 288 GB of HBM4 [1]. It ships in 2026. The provided sources do not "
+                                 "name a price. Blackwell Ultra doubles it [9].", 3)
+    off0, said0 = ns["rubin_mech"]("Rubin has 288 GB of HBM4 [1]. Blackwell Ultra doubles it [2, 3].", 3)
+    got["the counted part of the score: bare figures, marks past the pack, talk about the sources"] = (
+        off.get("grounded", 0) > 1.5 and off.get("clear") == 0.75 and len(said) == 3
+        and "carry no source number" in said[0] and off0 == {} and said0 == []
+        and ns["rubin_apply_mech"]({0: {"score": 8.0, "crit": {"grounded": 8, "correct": 8, "complete": 8,
+                                                              "clear": 8, "fit": 8}}},
+                                   ["The provided sources do not say [1]."], 3)[0]["crit"]["clear"] == 7.25)
+    jw = ns["rubin_judge_parse"]('{"weak": {"A": ["no price", "  vague  "]}, "scores": {"A": {"grounded": 6}}, "best": "A"}', ["A"])
+    got["a judge's weaknesses are kept for the next writers"] = jw["weak"] == {"A": ["no price", "vague"]}
+    got["the reader the judges judge fit for: the name, the facts, the length"] = (
+        "Name: Pat" in rd and "works in IT ops" in rd and "Keep it short." in rd
+        and "smart general reader" in ns["rubin_reader"](""))
+    ft = ns["rubin_footer"](st)
+    got["the record saved with the answer"] = ft.startswith("\n\n*Vera Rubin \u00b7 0 rounds") and "sources read" in ft
+    # the server's card: only what fits it whole, never a coder, never a refusal, the switch respected
+    ns["_srv_read"] = lambda ctx: [{"id": "s1", "name": "Box", "paired": True},
+                                   {"id": "s2", "name": "Off", "paired": True, "prefer": False}]
+    G = 1 << 30
+    ns["_srv_seen"] = {"s1": {"at": 1, "reachable": True, "auth": True, "gpu": {"vram_bytes": None}, "models": [
+        {"name": "qwen3.8:27b", "placement": "gpu", "size": 17 * G},
+        {"name": "gpt-oss:20b", "placement": "gpu", "size": 13 * G},
+        {"name": "devstral-small-2:24b", "placement": "gpu", "size": 14 * G},
+        {"name": "ministral-3:14b", "placement": "gpu", "size": 9 * G},
+        {"name": "gemma4:12b", "placement": "gpu", "size": 8 * G, "nofit": True},
+        {"name": "big:30b", "placement": "gpu+ram", "size": 18 * G}]},
+        "s2": {"at": 1, "reachable": True, "auth": True, "gpu": {"vram_bytes": 24 * G},
+               "models": [{"name": "llama:8b", "placement": "gpu", "size": 5 * G}]}}
+    ns["rubin_server_load"] = lambda e: {"vram_total": 16 * G}
+    ln = ns["rubin_server_lanes"](None)
+    ns["rubin_server_load"] = lambda e: {"vram_total": None}
+    ns["_rubin_vram"].clear()
+    ln0 = ns["rubin_server_lanes"](None)
+    got["the server's lane: its two best that fit the 16 GB card whole, no coder, no refused model, the switch respected"] = (
+        len(ln) == 1 and ln[0][0].models == ["Box · gpt-oss:20b", "Box · ministral-3:14b"] and ln[0][0].kind == "server"
+        and ln0 == [])
+    ns["cloud_allowed"] = lambda: False
+    l1, _s1 = ns["rubin_lanes"](None, mac_label="Gemma 4 26B")
+    ns["cloud_allowed"] = lambda: True
+    l2, _s2 = ns["rubin_lanes"](None, mac_label="Gemma 4 26B")
+    got["the cloud works on it only while the person's cloud switch is on"] = (
+        [l.kind for l in l1] == ["mac"] and [l.kind for l in l2] == ["mac", "cloud"] and l2[1].name == "Claude")
+    act, pk, outs = [0], [0], []
+    lk = _t519.Lock()
+
+    def slow(lane_, m, msgs, collect):
+        with lk:
+            act[0] += 1
+            pk[0] = max(pk[0], act[0])
+        _tm519.sleep(0.3)
+        with lk:
+            act[0] -= 1
+        collect("text from " + m)
+    one = ns["RubinLane"]("server", "Box", ["a"], run=slow)
+    ev2 = _t519.Event()
+    ths = [_t519.Thread(target=lambda: outs.append(one.call("a", [], "x", ev2, 10))) for _i in range(2)]
+    [t.start() for t in ths]
+    [t.join() for t in ths]
+    got["a machine runs one job at a time, whoever asks"] = pk[0] == 1 and outs == [("text from a", "")] * 2
+    lane = ns["RubinLane"]("server", "Box", ["a", "b"])
+    lane.resident = "b"
+    got["a server lane starts with the model already on its card (one swap a round)"] = (
+        lane.order() == ["b", "a"] and ns["RubinLane"]("server", "Box", ["a", "b"]).order() == ["a", "b"])
+    return got
+
+
+def _r519_loop(src):
+    got = {}
+    # 1. nothing better comes: three stalled rounds, then it settles on the first answer
+    st, fr, tx, calls, peak, secs = _r519_run(src, lambda *a: 5.0)
+    rounds = [r["r"] for r in st.history_rows]
+    got["three rounds in a row without an improvement end it (settled), the first answer standing"] = (
+        st.reason == "settled" and rounds == [0, 1, 2, 3] and st.best["text"].startswith("First answer, QUALITY=5")
+        and not any(r["improved"] for r in st.history_rows[1:]) and st.stalls == 3)
+    got["round 0 writes as Thinking does (the craft), the plan on the other machine beside it"] = (
+        ("first", "Box · gpt-oss:20b", True, 0) in calls and any(c[0] == "plan" and c[1] == "This Mac" for c in calls)
+        and st.plan and st.checked >= 4 and st.fixed >= 1)
+    got["every round: both machines review, every writer revises, both machines judge"] = (
+        sum(1 for c in calls if c[0] == "write" and c[3] == 1) == 3
+        and {c[1] for c in calls if c[0] == "critic" and c[3] == 1} == {"This Mac", "Box"}
+        and {c[1] for c in calls if c[0] == "judge" and c[3] == 1} == {"This Mac", "Box"})
+    got["one job at a time on each machine (the gateway's rule, one engine here)"] = (
+        peak and all(v == 1 for v in peak.values()))
+    last = tx[-1] if tx else ""
+    got["the end: the best answer sent once more after a RESET, with its record"] = (
+        last.startswith("First answer, QUALITY=5") and "*Vera Rubin \u00b7 4 rounds" in last
+        and "no further improvement" in last and any(f == "\0RESET\0" for f in fr))
+    # 2. an improvement replaces it; a later revision that is no better doesn't
+    seq = {1: 7.0}
+    st, fr, tx, calls, peak, secs = _r519_run(src, lambda k, lane, n, i: seq.get(n, 6.0)
+                                              if lane.name == "This Mac" else 4.0)
+    imp = [r for r in st.history_rows if r["improved"] and r["r"] > 0]
+    got["a better revision replaces the answer (judged in the same round), a worse one never does"] = (
+        len(imp) == 1 and imp[0]["r"] == 1 and imp[0]["by"] == "Gemma 4 26B" and "QUALITY=7.0" in st.best["text"]
+        and st.best["score"] == 7.0 and st.reason == "settled" and [r["r"] for r in st.history_rows] == [0, 1, 2, 3, 4]
+        and any("QUALITY=7.0" in t for t in tx[:-1]) and "QUALITY=7.0" in tx[-1]
+        and not any("QUALITY=6.0" in t or "QUALITY=4.0" in t for t in tx))
+    got["the score rises only with the answer: 5.0 then 7.0, and the sparkline says so"] = (
+        _r519_frames(fr, "state")[-1]["spark"][:2] == [5.0, 7.0] and _r519_frames(fr, "state")[-1]["score"] == 7.0)
+    st2, fr2, tx2, _c2, _p2, _s2 = _r519_run(src, lambda k, lane, n, i: 5.2 if lane.name == "This Mac" else 4.0)
+    got["a revision inside the margin (5.2 against 5.0) is not an improvement"] = (
+        not any(r["improved"] for r in st2.history_rows[1:]) and "QUALITY=5" in st2.best["text"])
+    # 3. Stop: pressed while the revisions are being written; the round is cut, the best answer ends it cleanly
+    st, fr, tx, calls, peak, secs = _r519_run(src, lambda *a: 9.0, stop_at=lambda lane, n: n == 2, ceiling=15.0)
+    got["Stop mid-round: it ends promptly with the best answer so far, the cut round unrecorded"] = (
+        st.reason == "stopped" and secs < 20 and [r["r"] for r in st.history_rows] == [0, 1]
+        and "QUALITY=9.0" in st.best["text"] and tx[-1].startswith("Revised answer") and "stopped by you" in tx[-1]
+        and not any(c[0] == "judge" and c[3] == 2 for c in calls))
+    # 4. the ceiling: the safety net ends a run that would go on
+    st, fr, tx, calls, peak, secs = _r519_run(src, lambda k, lane, n, i: 5.0 + 0.3 * n, ceiling=0.6)
+    got["the ceiling ends a run that keeps improving"] = (
+        st.reason == "ceiling" and "time limit reached" in tx[-1] and secs < 30)
+    # 5. budget sanity: a round with nothing new (the same notes, no source, no open part) runs no writer
+    ns = _r519_ns(src)
+    st, fr, tx, calls, peak, secs = _r519_run(src, lambda *a: 5.0, ns=ns, new_sources=False, same_notes=True)
+    w = [c for c in calls if c[0] == "write"]
+    got["a round with nothing new to work on runs no writer and counts as stalled"] = (
+        st.reason == "settled" and {c[3] for c in w} == {1} and len(st.history_rows) == 4
+        and "nothing new to work on" in st.history_rows[-1].get("why", "") + st.changed)
+    # 6. the frames the console reads
+    st, fr, tx, calls, peak, secs = _r519_run(src, lambda *a: 5.0, sample=True)
+    sts, lds, sta = _r519_frames(fr, "state"), _r519_frames(fr, "load"), _r519_frames(fr, "start")
+    srcf = [json.loads(f[9:-1]) for f in fr if f.startswith("\0SOURCES:")]
+    got["the frames: start (the machines), state (round, counters, score, phase), load (both machines)"] = (
+        len(sta) == 1 and [x["n"] for x in sta[0]["lanes"]] == ["This Mac", "Box"]
+        and len(sts) >= 8 and sts[-1]["done"] and sts[-1]["reason"] == "settled" and sts[-1]["round"] == 3
+        and all(k in sts[-1] for k in ("read", "sources", "drafts", "checked", "fixed", "score", "spark", "el",
+                                       "changed", "phase", "lanes", "stalls"))
+        and lds and lds[-1]["m"][0]["name"] == "This Mac" and lds[-1]["m"][1]["gpu"] == 97
+        and lds[-1]["m"][1]["vram_total"] == 16 << 30 and "tps" in lds[-1]["m"][0])
+    got["the sources row grows, the first pages keeping their numbers"] = (
+        len(srcf) >= 2 and len(srcf[-1]) > len(srcf[0]) and srcf[-1][:len(srcf[0])] == srcf[0])
+    # 7. no machine at all: said, and nothing runs
+    ns = _r519_ns(src)
+    out = []
+    st = ns["run_rubin"](_R519_Q, [{"role": "user", "content": "q"}], out.append, None, None, _t519.Event(), lanes=[],
+                         sample=False)
+    got["with no model here and no server, it says so and nothing runs"] = (
+        out and "needs a model on this Mac or a paired server" in out[0] and not st.history_rows)
+    return got
+
+
+def _r519_pins(src):
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    page = src[src.index('HTML_CONTENT = r"""'):]
+    return {
+        "the tier: its name exactly, its honest line, its own loop, Fast's ladder on this Mac":
+            '    "Vera Rubin": {\n        "icon": "\\U0001f52d",\n'
+            '        "desc": "throws everything at one question and keeps improving it until you stop it",\n'
+            '        "picks": [], "count": 1, "rubin": True,\n    },\n' in src
+            and 'TIERS["Vera Rubin"]["picks"] = list(TIERS["Fast"]["picks"])' in src
+            and 'RUBIN_TIER = "Vera Rubin"' in src,
+        "/api/tiers has its row": '                if t.get("rubin"):\n'
+                                  '                    # Vera Rubin (6b519): this Mac, the servers, the cloud only when on\n'
+                                  '                    out[name] = rubin_tier_row(self.ctx)\n' in src,
+        "the handler runs it on its own, with the Stop channel and the handler's evidence, before Max":
+            '            elif _rubin and not images:' in ch
+            and "                run_rubin(prompt, full_messages, memit, status, step, hurry_ev,\n"
+                "                          ctx=self.ctx, ground=_ground, web=bool(auto_web))" in ch
+            and ch.index("            elif _rubin and not images:") < ch.index("            elif _max and (_max_bench")
+            and '_rubin = bool(TIERS.get(tier, {}).get("rubin")) if isinstance(tier, str) else False' in ch,
+        "the saved turn lifts the frame out, as the page does": '"|RUBIN")' in src
+            and 'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|RUBIN";' in src,
+        "the console: drawn from the frames beside the body, its clock on a timer, its Stop delegated":
+            "RUBIN:j=>{const k=/^\\{\"k\":\"(\\w+)\"/.exec(j);if(k)rbFr[k[1]]=j;}," in page
+            and "if(sig!==rbSeen){rbSeen=sig;searched=true;rubinPaint(aiDiv,rbFr);}" in page
+            and "aiDiv.insertBefore(con,b||null);" in page and "live.tick=setInterval(()=>{" in page
+            and 'const b=e.target.closest&&e.target.closest(".rbstop");' in page
+            and "inner.addEventListener(\"click\",e=>{\n  const b=e.target.closest&&e.target.closest(\".rbstop\");" in page
+            and 'api("/api/chat/hurry",{method:"POST",headers:{"Content-Type":"application/json"},\n    body:JSON.stringify({hid:curHid})})' in page
+            and "if(rubinLive&&rubinLive.div===aiDiv)rubinEnd();" in page,
+        "the console says it all: the title, the counters, the score's line, both machines, what changed":
+            '<span class="rbtitle">VERA RUBIN</span>' in page and 'stat("Sources read"' in page
+            and 'stat("Claims"' in page and 'stat("Score"' in page and "rbSpark(st.spark)" in page
+            and 'stat("Elapsed"' in page and 'rbBar("VRAM"' in page and 'rbBar("GPU",m.gpu)+rbBar("CPU",m.cpu)' in page
+            and "<b>What changed</b>" in page and " tok/s</span>" in page,
+        "reduced motion and visual effects off still the console's motion":
+            "@media (prefers-reduced-motion:reduce){.rbcon::before,.rblive{animation:none}" in page
+            and "body.novideo .rbcon::before,body.novideo .rblive{animation:none}" in page,
+        "the send button's first press stops it cleanly; no countdown, no Answer now":
+            "generating?(rubinStop()||abortCtl.abort()):sendSafe()" in page
+            and 'etaTxt=(runTier!=="Vera Rubin"&&!streamDone' in page
+            and 'const nowBtn=(runTier!=="Vera Rubin"&&curHid' in page,
+        "the menu: under Max, its few words, its pop-out, the chip says its name":
+            '+(TIER_META["Vera Rubin"]?modeRow("Vera Rubin",TIER_META["Vera Rubin"].icon,"Vera Rubin",' in page
+            and '"Vera Rubin":"until you stop it"' in page and 'else if(name==="Vera Rubin")h=rubinTierPopHtml(info);' in page
+            and "Throws everything at one question and keeps improving it until you stop it." in page
+            and 'if(t==="Vera Rubin")return "Vera Rubin";' in page,
+        "the saved answer's line is its record": "if(rbS)meta.innerHTML='<span class=\"wbadge\">'+esc(where)+'</span><b>Vera Rubin</b> · '" in page,
+    }
+
+
+def _r519_all(src):
+    out = {}
+    for fn in (_r519_helpers, _r519_loop, _r519_pins):
+        try:
+            for k, v in fn(src).items():
+                out[fn.__name__[6:] + ": " + k] = bool(v)
+        except Exception as e_:
+            out[fn.__name__[6:] + ": raised %r" % (e_,)] = False
+    return out
+
+
+for _n519, _o519 in _r519_all(_MILLENAI_SRC).items():
+    check("6b519 Vera Rubin — " + _n519, _o519, "")
+_R519_MUT = [
+    ("no margin", "    if cand < best_now + margin:\n        return False", "    if cand < best_now:\n        return False"),
+    ("a split verdict accepted", "    return not any(p == 0 for p in picks)", "    return True"),
+    ("one stall too many", "    if st.stalls >= st.stall_n:", "    if st.stalls > st.stall_n:"),
+    ("Stop not heard", '    if stop.is_set():\n        return "stopped"', '    if False:\n        return "stopped"'),
+    ("no ceiling", "    if now - st.t0 >= st.ceiling_s:", "    if False:"),
+    ("the end not re-sent", '            io.answer(st.best["text"] + rubin_footer(st, final=True))', "            pass"),
+    ("a round with nothing new still writes", "    if not new_n and not gaps and (not notes_list or nkey == st.last_notes) \\\n",
+     "    if False and (not notes_list or nkey == st.last_notes) \\\n"),
+    ("two jobs at once on a machine", "        while not self.lock.acquire(timeout=0.5):\n",
+     "        self.lock = threading.Lock()\n        while not self.lock.acquire(timeout=0.5):\n"),
+    ("a model too big for the card", "            if _srv_fits(m, vram, bool(probe)):", "            if True:"),
+    ("the cloud regardless of the switch", "    if cloud_allowed() if cloud_ok is None else cloud_ok:", "    if True:"),
+    ("the frame not lifted from the saved turn", '              "|RUBIN")', '              "")'),
+    ("the improved answer not sent", "    io.answer(w_text + rubin_footer(st))\n    return True", "    return True"),
+]
+_r519_caught = []
+_r519_eh, _t519.excepthook = _t519.excepthook, (lambda _a: None)   # a broken lock's thread dies loudly
+for _mn, _ma, _mb in _R519_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _r519_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_r519_all(_ms).values()):
+        _r519_caught.append((_mn, "not caught"))
+_t519.excepthook = _r519_eh
+check("6b519's rules each break a check when broken (%d mutants)" % len(_R519_MUT), not _r519_caught,
+      "%r" % _r519_caught)
+# ==== VERA RUBIN (6b519): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

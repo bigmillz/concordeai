@@ -4292,6 +4292,17 @@ TIERS = {
         "icon": "\U0001f680", "desc": "every model: here, your servers, the cloud",
         "picks": [], "count": 99, "all": True, "max": True,
     },
+    # VERA RUBIN (6b519, per Patrick: "emulate a Vera Rubin ... where it just
+    # sits there and ... just goes and goes and goes"): one question, this
+    # Mac's strongest model and the server's best, round after round, until
+    # Stop or three rounds in a row bring nothing better. Its own section
+    # (run_rubin) does the work; the seat here is this Mac's model, so the
+    # handler warms the engine it will use. Its picks are Fast's (below).
+    "Vera Rubin": {
+        "icon": "\U0001f52d",
+        "desc": "throws everything at one question and keeps improving it until you stop it",
+        "picks": [], "count": 1, "rubin": True,
+    },
     # CLOUD ONLY (6b233, per Patrick): the frontier keys answer and this
     # machine stays cold — no Ollama, no MLX engine load, no local merge,
     # no local memory pass. Every working key drafts in parallel and the
@@ -4306,6 +4317,9 @@ TIERS = {
         "cloud_only": True,
     },
 }
+
+# Vera Rubin's seat on this Mac is the strongest that fits: Fast's ladder (6b519)
+TIERS["Vera Rubin"]["picks"] = list(TIERS["Fast"]["picks"])
 
 # ------------------------------------------------------------- agents
 # Task specialists, named for what they're GOOD AT. An agent is a strong
@@ -32481,6 +32495,1417 @@ def funnel_images(goal: str, labels: list, budget: float = _FIMG_BUDGET,
 # ==== funnel images: end ====
 
 
+# ==== VERA RUBIN (6b519): begin ====
+# Patrick (2026-10-24): "a feature to emulate a Vera Rubin ... I know it's going
+# to take a lot of processing power, but where it just sits there and will show
+# Vera Rubin and just goes and goes and goes." One question, every machine he
+# has: this Mac's strongest MLX model and the paired server's best models that
+# fit its card work on it round after round, and a console shows the work and
+# both machines' load while they do. His rules: it runs until Stop, or until
+# RUBIN_STALL_ROUNDS rounds in a row bring no improvement (a ceiling of
+# RUBIN_CEILING_S is the safety net); the best answer so far is always the one
+# on screen; cloud models only when his "Use cloud power" switch is on.
+#
+# THE LOOP (run_rubin):
+#   round 0  the question is planned (its parts and the evidence each needs) on
+#            one machine while the other writes the first answer exactly as
+#            Thinking does (6b515: one writer, a critic, the brief, the
+#            fact-check) from the grounded search (6b514); a judge scores it.
+#   round n  1. the weak points: a critic on each machine reads the best answer
+#               (critic_prompt), and the plan's parts the answer doesn't
+#               settle are found by their words (rubin_gaps);
+#            2. targeted searches for exactly those (Grounding per gap, its
+#               queries planned from the gap), new sources joined to the pack
+#               under stable numbers, so every [n] keeps meaning one page;
+#            3. competing revisions, one per writer: the Mac's model and the
+#               server's two best, each where it lives, one job at a time per
+#               machine (the gateway's one-job rule; one MLX engine here);
+#               final_prompt with the best answer as material and the weak
+#               points as the review notes;
+#            4. two judges (one per machine, in parallel, blind letters in a
+#               shuffled order) score every revision and the current best on
+#               a fixed rubric (RUBIN_CRITERIA); a revision replaces the best
+#               only when the judges' mean puts it RUBIN_MARGIN above the best
+#               in the same judging and no judge picked the best (rubin_accept);
+#            5. the new best is fact-checked against the evidence it cites
+#               (verify_answer) and re-sent after a RESET.
+#   A round with nothing new to work on (no new source, no open part, and the
+#   critics' notes empty or the same as last round's) skips
+#   the writers and counts as a stalled round; after a stalled round the next
+#   one waits RUBIN_BACKOFF_S, so the machines aren't burned on rounds that
+#   change nothing.
+# Stop (the console's button, or the send button once) sets the request's
+# hurry Event: every call under way is told to stop at its next token and the
+# best answer is sent once more with its record, cleanly. The console reads the
+# RUBIN frames (rubin_snapshot, rubin_load); the page saves the last answer
+# sent, as for every answer, with the sources row and a one-line record.
+RUBIN_TIER = "Vera Rubin"
+RUBIN_STALL_ROUNDS = 3          # rounds in a row with no improvement end the run
+RUBIN_CEILING_S = 4 * 3600.0    # the safety net
+RUBIN_MARGIN = 0.25             # a revision must beat the best by this (1-10) in the same judging
+RUBIN_BACKOFF_S = (0.0, 20.0, 60.0)   # the pause before a round, by stalled rounds so far
+RUBIN_MAX_SOURCES = 24          # the pack's sources; new ones after this are not added
+RUBIN_PACK_CHARS = 20000        # ~6K tokens: a 16K context keeps room for the answer and the notes
+RUBIN_CHECK_PACK = 9000         # the fact-check's pack: the sources the answer cites first
+RUBIN_JUDGE_PACK = 12000
+RUBIN_SEARCHES = 3              # targeted searches a round
+RUBIN_LOAD_S = 4.0              # the machine panel's sample period (the gateway asks: every few seconds at most)
+RUBIN_SRV_FIRST_S = 120.0       # a server call's first word (a model load, the gateway's queue)
+RUBIN_CALL_S = {"plan": 90, "critic": 150, "write": 420, "judge": 240, "check": 120}
+RUBIN_CRITERIA = (("grounded", 0.25), ("correct", 0.25), ("complete", 0.2),
+                  ("clear", 0.15), ("fit", 0.15))
+RUBIN_WRITERS_SRV = 2           # the server's best models that write each round
+_RUBIN_NUM = re.compile(r"\[(\d{1,3}(?:\s*,\s*\d{1,3})*)\]")    # [3], [2, 4] (the page's own forms)
+
+RUBIN_PLAN = (
+    "Plan the research for the question below before anyone answers it. "
+    "Today is {today}. Split it into the 2 to 5 parts a complete answer must "
+    "settle. For each part say what evidence would settle it, and give 1 or 2 "
+    "web search queries that would find that evidence: keyword queries, names "
+    "copied exactly as written, the year when it is about now. Never answer "
+    "the question.\n"
+    "Reply with ONLY JSON, nothing before or after it: {{\"parts\": [{{\"q\": "
+    "\"the part as a short question\", \"need\": \"the evidence that settles "
+    "it\", \"search\": [\"query one\", \"query two\"]}}]}}\n\nQUESTION: ")
+
+RUBIN_JUDGE = (
+    "You judge a contest between answers to one question. Today is {today}. "
+    "Score EVERY answer on five criteria, 1 to 10 each, against the numbered "
+    "web evidence and today's date:\n"
+    "- grounded: each fact about the present is backed by the evidence and "
+    "marked with its source number like [3]; nothing is invented, and no [n] "
+    "points at a source that doesn't say it.\n"
+    "- correct: no wrong figure, date, name or version, no mixed-up units (a "
+    "chip for a cluster, a list price for an hourly rate), no stale 'latest'.\n"
+    "- complete: it settles every part of the question listed below, with the "
+    "depth each part needs.\n"
+    "- clear: it leads with the answer, each paragraph adds something new, no "
+    "filler, no repetition, no talk about its own sources or process.\n"
+    "- fit: it suits the reader described below, at the length they asked for.\n"
+    "Be harsh. Length is not a virtue by itself, and a confident wrong claim "
+    "costs more than a missing one. 10 means nothing at all could be improved, "
+    "9 is what a domain expert would write with these sources, 6 to 7 is a "
+    "good answer with real gaps, 5 is usable with clear flaws, 1 is wrong or "
+    "useless. FIRST name each answer's three biggest weaknesses (a specific "
+    "claim, a missing part, a sentence that wanders), THEN score it. The labels "
+    "are in random order and say nothing about who wrote what.\n"
+    "Reply with ONLY one JSON object, nothing before or after it: "
+    "{{\"weak\": {{\"A\": [\"weakness\", \"weakness\", \"weakness\"], ... one "
+    "entry per answer}}, \"scores\": {{\"A\": {{\"grounded\": 6, \"correct\": 7, "
+    "\"complete\": 5, \"clear\": 7, \"fit\": 6}}, ... one entry per answer}}, "
+    "\"best\": \"A\", \"why\": \"what the best answer does better than the rest, "
+    "under 20 words, naming no letter\"}}")
+
+RUBIN_FOCUS = {
+    "grounded": "back every current fact with its source number, and drop what no source supports",
+    "correct": "fix every figure, date, name and unit the notes question, from the evidence",
+    "complete": "settle the parts of the question the answer leaves open",
+    "clear": "lead with the answer, cut repetition and filler, make every paragraph earn its place",
+    "fit": "write for the reader described: their role, what they need to decide, the length they set",
+}
+
+
+class RubinIO:
+    """Everything the loop writes to the page, in one place and one lock:
+    the RUBIN frames, the steps, the answer (after a RESET). A write that
+    fails (the reader left, the profile changed) marks the run gone and
+    never raises inside a worker; the loop re-raises it at the end."""
+
+    def __init__(self, emit, status=None, step=None, stop=None):
+        self._emit, self._status, self._step = emit, status, step
+        self.lock = threading.Lock()
+        self.gone = None
+        self.stop = stop             # set when the reader leaves: every call stops at its next token
+
+    def _w(self, x):
+        if self.gone is not None:
+            return
+        with self.lock:
+            try:
+                self._emit(x)
+            except Exception as exc:          # noqa: BLE001 — re-raised by the loop
+                self.gone = exc
+                if self.stop is not None:
+                    self.stop.set()
+
+    def frame(self, obj):
+        self._w(Ctl(NUL + "RUBIN:" + json.dumps(obj, separators=(",", ":")) + NUL))
+
+    def ctl(self, tag, obj):
+        self._w(Ctl(NUL + tag + ":" + json.dumps(obj) + NUL))
+
+    def answer(self, text):
+        self._w(Ctl(NUL + "RESET" + NUL))
+        self._w(str(text))
+
+    def status(self, text):
+        if self._status is not None and self.gone is None:
+            try:
+                self._status(text)
+            except Exception as exc:          # noqa: BLE001
+                self.gone = exc
+
+    def step(self, sid, label, state="run", detail=""):
+        if self._step is not None and self.gone is None:
+            try:
+                self._step(sid, label, state, detail)
+            except Exception:
+                pass
+
+
+class RubinLane:
+    """One machine's worker (this Mac, one paired server, or the cloud): its
+    models run one at a time, because a server's card holds one job at a time
+    (the gateway's rule) and this Mac one MLX engine. `models`: labels, the
+    strongest first (a cloud lane's are its confs). The panel reads busy,
+    model, tps and the live pace of the call under way."""
+
+    def __init__(self, kind, name, models, run=None, sid=""):
+        self.kind, self.name, self.sid = kind, name, sid
+        self.models = list(models)
+        self.lock = threading.Lock()
+        self.busy, self.model, self.resident = "", "", ""
+        self.tps, self.live_t0, self.live_chars = 0.0, 0.0, 0
+        self.fails, self.calls, self.down = 0, 0, False
+        self.rounds, self.wins, self.last_win = 0, 0, 0
+        self._run = run or _rubin_run
+
+    def label_of(self, m):
+        return str(m.get("name") or "cloud") if isinstance(m, dict) else str(m)
+
+    def order(self):
+        """The writers, the one already resident first (one swap a round, not two)."""
+        ms = list(self.models)
+        for i, m in enumerate(ms):
+            if self.label_of(m) == self.resident:
+                return [m] + ms[:i] + ms[i + 1:]
+        return ms
+
+    def live_tps(self):
+        if self.live_t0 and self.live_chars:
+            s = time.time() - self.live_t0
+            if s > 0.5:
+                return round(self.live_chars / 4.0 / s, 1)
+        return 0.0
+
+    def call(self, model, messages, job, stop, budget):
+        """One model call on this machine: (text, "") or ("", why). Waits its
+        turn; gives up past `budget` seconds or when `stop` is set, and the
+        call's next token then ends its stream (an engine or the gateway stops
+        generating)."""
+        end = time.time() + max(5.0, float(budget))
+        while not self.lock.acquire(timeout=0.5):
+            if stop.is_set() or time.time() >= end:
+                return "", "stopped" if stop.is_set() else "busy"
+        label = self.label_of(model)
+        parts, err, quit_ = [], [], threading.Event()
+        try:
+            self.busy, self.model, self.calls = job, label, self.calls + 1
+            self.live_t0, self.live_chars = 0.0, 0
+
+            def collect(chunk):
+                if quit_.is_set() or stop.is_set():
+                    raise _DraftAbandoned()
+                if chunk and not self.live_t0:
+                    self.live_t0 = time.time()
+                parts.append(chunk)
+                self.live_chars += len(chunk or "")
+
+            def go():
+                try:
+                    self._run(self, model, messages, collect)
+                except _DraftAbandoned:
+                    pass
+                except Exception as exc:      # noqa: BLE001 — returned as the why
+                    err.append(exc)
+            th = ctx_thread(target=go, daemon=True)
+            th.start()
+            while th.is_alive() and time.time() < end and not stop.is_set():
+                th.join(timeout=0.5)
+            if th.is_alive():
+                quit_.set()
+                return "", "stopped" if stop.is_set() else "too slow"
+            self.resident = label
+            if self.live_t0 and self.live_chars:
+                s = time.time() - self.live_t0
+                if s > 0.3:
+                    self.tps = round(self.live_chars / 4.0 / s, 1)
+            if err:
+                e0 = err[0]
+                if getattr(e0, "kind", "") in ("fit", "missing") and model in self.models \
+                        and len(self.models) > 1:
+                    self.models.remove(model)       # that model can't run there (6b516)
+                return "", str(e0)[:160] or type(e0).__name__
+            text = strip_think("".join(parts)).strip()
+            if not text:
+                return "", "empty"
+            if _looks_degenerate(text):
+                return "", "degenerate"
+            return text, ""
+        finally:
+            self.busy, self.model = "", ""
+            self.live_t0, self.live_chars = 0.0, 0
+            self.lock.release()
+
+
+def _rubin_run(lane, model, messages, collect):
+    """A lane's model call: a cloud conf through its provider, a server's
+    model through the gateway (a model load gets RUBIN_SRV_FIRST_S), this
+    Mac's through its engine."""
+    if lane.kind == "cloud":
+        t = cloud_text(dict(model), messages, timeout=180, max_tokens=4000, quiet=True)
+        if t:
+            collect(t)
+        return
+    if lane.kind == "server":
+        with server_first_deadline(RUBIN_SRV_FIRST_S):
+            run_model(model, messages, collect)
+        return
+    run_model(model, messages, collect)
+
+
+def rubin_score(scores) -> float:
+    """One answer's weighted mean of RUBIN_CRITERIA (1-10); 0.0 without scores."""
+    if not isinstance(scores, dict):
+        return 0.0
+    tot = wsum = 0.0
+    for k, w in RUBIN_CRITERIA:
+        v = scores.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            tot += max(1.0, min(10.0, float(v))) * w
+            wsum += w
+    return round(tot / wsum, 2) if wsum else 0.0
+
+
+def _rubin_json(text):
+    """The first JSON object in a model's reply (through a fence, prose, a
+    trailing comma), or None."""
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", (text or "").strip(), flags=re.S)
+    i, j = t.find("{"), t.rfind("}")
+    if i < 0 or j <= i:
+        return None
+    body = t[i:j + 1]
+    for cand in (body, re.sub(r",\s*([\]}])", r"\1", body)):
+        try:
+            v = json.loads(cand)
+        except ValueError:
+            continue
+        if isinstance(v, dict):
+            return v
+    return None
+
+
+def rubin_judge_parse(text, letters):
+    """{"scores": {letter: {criterion: n}}, "best": letter, "why": str} from
+    one judge's reply, only for the letters asked about and only when every
+    one of them was scored; None otherwise."""
+    d = _rubin_json(text)
+    if not d or not isinstance(d.get("scores"), dict):
+        return None
+    out = {}
+    for L in letters:
+        s = d["scores"].get(L)
+        if not isinstance(s, dict):
+            return None
+        row = {}
+        for k, _w in RUBIN_CRITERIA:
+            v = s.get(k)
+            try:
+                row[k] = max(1.0, min(10.0, float(v)))
+            except (TypeError, ValueError):
+                pass
+        if not row:
+            return None
+        out[L] = row
+    best = str(d.get("best") or "").strip().upper()[:1]
+    weak = d.get("weak") if isinstance(d.get("weak"), dict) else {}
+    return {"scores": out, "best": best if best in letters else "",
+            "why": re.sub(r"\s+", " ", str(d.get("why") or ""))[:160],
+            "weak": {L: [re.sub(r"\s+", " ", str(w)).strip()[:200] for w in (weak.get(L) or [])
+                         if isinstance(w, str) and w.strip()][:3] for L in letters}}
+
+
+def rubin_combine(judged, letters):
+    """The judges' verdicts averaged: {letter: {"score", "crit": {k: mean}}},
+    plus each judge's own pick. A judge that didn't answer isn't counted."""
+    judged = [j for j in judged if j]
+    out = {}
+    for L in letters:
+        crit = {}
+        for k, _w in RUBIN_CRITERIA:
+            vs = [j["scores"][L][k] for j in judged if k in j["scores"].get(L, {})]
+            if vs:
+                crit[k] = round(sum(vs) / len(vs), 2)
+        out[L] = {"score": rubin_score(crit), "crit": crit}
+    for L in letters:
+        out[L]["weak"] = [w for j in judged for w in (j.get("weak") or {}).get(L, [])]
+    return out, [j.get("best", "") for j in judged], [j.get("why", "") for j in judged]
+
+
+def rubin_cites(text, n_sources):
+    """(the source numbers an answer cites, how many marks point past the
+    pack's last source)."""
+    nums = [int(x) for g in _RUBIN_NUM.findall(text or "") for x in re.split(r"\s*,\s*", g)]
+    good = sorted({n for n in nums if 1 <= n <= n_sources})
+    return good, sum(1 for n in nums if n < 1 or n > n_sources)
+
+
+# THE MEASURABLE PART (6b519, seen live): a judge reading its own machine's
+# answer scored it 10 of 10 in round 0, and nothing could ever beat it. So every
+# answer, the best and the revisions alike, also loses points for what can be
+# counted: figures and names with no source number (grounded), marks that point
+# past the pack (grounded), talk about "the sources" (clear). It gives a
+# lenient judge's ceiling room, and the writers a target they can see: the
+# same counts go into their notes.
+_RUBIN_META_RX = re.compile(
+    r"\b(?:the |these |those )?(?:provided |available |listed |given )?(?:sources?|evidence|"
+    r"search results|snippets)(?: provided| above| given| listed)? (?:do(?:es)? not|don['\u2019]t|"
+    r"doesn['\u2019]t|say|says|show|shows|mention|mentions|name|names|list|lists|confirm|"
+    r"confirms|indicate|indicates|suggest|suggests|state|states)\b"
+    r"|\b(?:provided|available) (?:sources?|evidence|search results|snippets)\b"
+    r"|\bas of my (?:training|knowledge)|\bmy (?:training data|knowledge cutoff)"
+    r"|\bI (?:can(?:no|['\u2019])t|cannot|don['\u2019]t have (?:access|the ability)) "
+    r"(?:browse|access|search|look up)", re.I)
+
+
+def rubin_mech(text, n_sources):
+    """({criterion: points off}, [what was counted, for the writers]): the
+    share of claim-bearing sentences without a source mark (up to 3 off
+    grounded, only when there is evidence to cite), marks past the pack (1
+    each, up to 2), sentences about the sources or the model's own data (0.75
+    each, up to 2 off clear)."""
+    off, said = {}, []
+    sents = [x for x in _SENT_RX.split(text or "") if len(x.strip()) >= 12]
+    claims = [x for x in sents if _CLAIM_RX.search(x)]
+    if n_sources and claims:
+        bare = [x for x in claims if not _RUBIN_NUM.search(x)]
+        if bare:
+            off["grounded"] = round(3.0 * len(bare) / len(claims), 2)
+            said.append("%d of %d sentences that state a figure, date or name carry no source "
+                        "number: cite the source for each, or drop it if no source says it"
+                        % (len(bare), len(claims)))
+    bad = rubin_cites(text, n_sources)[1]
+    if bad:
+        off["grounded"] = off.get("grounded", 0.0) + min(2.0, float(bad))
+        said.append("%d source mark%s point%s past the last source: cite only listed numbers"
+                    % (bad, "" if bad == 1 else "s", "s" if bad == 1 else ""))
+    meta = len(_RUBIN_META_RX.findall(text or ""))
+    if meta:
+        off["clear"] = min(2.0, 0.75 * meta)
+        said.append("%d sentence%s talk%s about 'the sources' or your own data: state the facts "
+                    "plainly instead" % (meta, "" if meta == 1 else "s", "s" if meta == 1 else ""))
+    return off, said
+
+
+def rubin_apply_mech(res, texts, n_sources):
+    """The judges' scores with each answer's counted points off (rubin_mech)."""
+    out = {}
+    for i, t in enumerate(texts):
+        r = res.get(i)
+        if not r:
+            continue
+        off, _said = rubin_mech(t, n_sources)
+        c = dict(r["crit"])
+        for k, v in off.items():
+            if k in c:
+                c[k] = round(max(1.0, c[k] - v), 2)
+        out[i] = dict(r, crit=c, score=rubin_score(c), judged=r["score"])
+    return out
+
+
+def rubin_accept(best_now, cand, picks=(), margin=RUBIN_MARGIN):
+    """Whether the strongest revision replaces the best answer: the judges'
+    mean puts it at least `margin` above the best IN THE SAME JUDGING (scores
+    from different judgings are not compared), and no judge picked the best
+    answer as the best of the lot (a split verdict is not an improvement).
+    picks: each judge's pick as an index of the answers judged, 0 the best."""
+    if cand < best_now + margin:
+        return False
+    return not any(p == 0 for p in picks)
+
+
+def rubin_should_stop(st, stop, now=None) -> str:
+    """Why the loop ends now, or "": "stopped" (Stop), "gone" (the reader
+    left), "ceiling" (the safety net), "settled" (RUBIN_STALL_ROUNDS rounds
+    in a row brought no improvement)."""
+    now = time.time() if now is None else now
+    if st.io is not None and st.io.gone is not None:
+        return "gone"
+    if stop.is_set():
+        return "stopped"
+    if now - st.t0 >= st.ceiling_s:
+        return "ceiling"
+    if st.stalls >= st.stall_n:
+        return "settled"
+    return ""
+
+
+class RubinState:
+    """One Vera Rubin run: the question, its plan, the evidence (numbered once,
+    for good), the best answer, the record of every round and the counters
+    the console shows."""
+
+    def __init__(self, question, sys_msg=None, history="", reader="", today=None,
+                 ceiling_s=RUBIN_CEILING_S, stall_n=RUBIN_STALL_ROUNDS, io=None):
+        self.question = str(question or "")
+        self.sys_msg = sys_msg if isinstance(sys_msg, dict) else {"role": "system", "content": ""}
+        self.history, self.reader = history, reader
+        self.today = today or time.localtime()
+        self.ceiling_s, self.stall_n, self.io = float(ceiling_s), int(stall_n), io
+        self.t0 = time.time()
+        self.plan = []                     # [{"q", "need", "search": [..]}]
+        self.sources, self.terms = [], []
+        self._keys, self.read_urls, self.searched = set(), set(), set()
+        self.best = {"text": "", "score": 0.0, "crit": {}, "by": "", "round": 0}
+        self.best_ever = 0.0
+        self.round, self.stalls, self.phase = 0, 0, "planning"
+        self.drafts = self.checked = self.fixed = self.searches = 0
+        self.history_rows = []             # one per round: r, score, improved, by, why, new, drafts, secs
+        self.changed, self.reason, self.done = "", "", False
+        self.last_notes = ""
+        self.weak = []                     # the judges' weaknesses of the best answer, for the next writers
+
+    # ---- the evidence
+    def add_sources(self, rows, terms=(), keep_all=False):
+        """Join a search's sources to the pack under the next free numbers
+        (a source already in it keeps its own); counts every page read. The
+        number of sources added. keep_all: the handler's own pack, already
+        numbered on the page, goes in whole and in order."""
+        added = 0
+        for s in rows or []:
+            url = str(s.get("url") or "")
+            if not url:
+                continue
+            if s.get("paras"):
+                self.read_urls.add(_src_key(url))
+            k = _src_key(url)
+            if k in self._keys or len(self.sources) >= RUBIN_MAX_SOURCES:
+                continue
+            if not keep_all and not (s.get("paras") or s.get("body")):
+                continue
+            s = dict(s)
+            s["_terms"] = list(terms or self.terms)
+            self._keys.add(k)
+            self.sources.append(s)
+            added += 1
+        for t in terms or ():
+            if t.lower() not in [x.lower() for x in self.terms]:
+                self.terms.append(t)
+        return added
+
+    def rows(self):
+        """The SOURCES frame: the page's chips, in the pack's numbering."""
+        return [{"t": (s.get("title") or s.get("host") or "")[:80],
+                 "u": s.get("url") or "", "d": s.get("date") or ""} for s in self.sources]
+
+    def elapsed(self):
+        return time.time() - self.t0
+
+
+def rubin_pack(st, only=None, budget=RUBIN_PACK_CHARS):
+    """The evidence a model reads, in evidence_pack's own format and under
+    the run's numbers: every source (or the numbers in `only` first, then the
+    rest while the budget lasts), each source's passages picked with the
+    words of the search that found it."""
+    n_all = len(st.sources)
+    if not n_all:
+        return ""
+    order = list(range(n_all))
+    if only:
+        first = [n - 1 for n in only if 1 <= n <= n_all]
+        order = first + [i for i in order if i not in first]
+    share = max(300, min(GROUND_SRC_CHARS, (budget - 220 * n_all) // max(1, n_all)))
+    head = ("WEB EVIDENCE gathered %s, %d source%s, numbered for citing:"
+            % (time.strftime("%Y-%m-%d", st.today), n_all, "" if n_all == 1 else "s"))
+    out, used = [head], len(head)
+    for i in order:
+        s = st.sources[i]
+        txt, _n = evidence_pack([s], s.get("_terms") or st.terms, st.today, budget=share + 400)
+        body = txt.split("\n", 1)[1] if "\n" in txt else ""
+        body = re.sub(r"^\[1\] ", "[%d] " % (i + 1), body, count=1)
+        if used + len(body) > budget and len(out) > 1:
+            break
+        out.append(body)
+        used += len(body) + 2
+    return "\n\n".join(out)
+
+
+def rubin_block(st, only=None, budget=RUBIN_PACK_CHARS):
+    """The question block every model of the run reads: the conversation so
+    far (when there is one), then the grounded turn with the run's pack."""
+    pack = rubin_pack(st, only, budget)
+    turn = grounded_turn(st.question, pack, st.today)
+    return (st.history + "\n\n" + turn) if st.history else turn
+
+
+def rubin_reader(sys_text) -> str:
+    """Who the answer is for, from the chat's own system prompt: the name,
+    the remembered facts and the standing instructions the person set."""
+    t = str(sys_text or "")
+    out = []
+    m = re.search(r"The user's name is ([^\n]{1,80}?) —", t)
+    if m:
+        out.append("Name: " + m.group(1))
+    m = re.search(r"you remember these facts about the user:\n(.*?)\nNever OPEN", t, re.S)
+    if m:
+        out.append("Known about them: " + re.sub(r"\s+", " ", m.group(1))[:900])
+    m = re.search(r"standing instructions for how you should respond, in their own words:\n\"(.*?)\"\n", t, re.S)
+    if m:
+        out.append("Their standing instructions: " + re.sub(r"\s+", " ", m.group(1))[:600])
+    m = re.search(r"\nLENGTH: ([^\n]{1,200})", t)
+    if m:
+        out.append("Length they set: " + m.group(1)[:200])
+    return "\n".join(out) or "Nothing is known about the reader; judge fit for a smart general reader."
+
+
+def rubin_history(messages) -> str:
+    """The conversation before the question, briefly, for a follow-up: the
+    last four turns, each cut."""
+    turns = [m for m in (messages or [])[1:-1] if isinstance(m, dict)
+             and m.get("role") in ("user", "assistant")][-4:]
+    if not turns:
+        return ""
+    return "EARLIER IN THIS CONVERSATION (for context):\n" + "\n".join(
+        "%s: %s" % ("Person" if m["role"] == "user" else "You",
+                    re.sub(r"\s+", " ", str(m.get("content") or ""))[:1200]) for m in turns)
+
+
+def rubin_plan_parse(text, question, today=None):
+    """The plan's parts from the planner's reply; the rules' own parts (the
+    question's sub-questions and their planned queries, plan_queries) when
+    the reply has none."""
+    d = _rubin_json(text)
+    parts = []
+    for p in (d or {}).get("parts") or []:
+        if not isinstance(p, dict) or not str(p.get("q") or "").strip():
+            continue
+        qs = [re.sub(r"\s+", " ", str(x)).strip()[:120] for x in (p.get("search") or [])
+              if isinstance(x, str) and str(x).strip()][:2]
+        parts.append({"q": str(p["q"]).strip()[:200], "need": str(p.get("need") or "").strip()[:200],
+                      "search": qs})
+    if parts:
+        return parts[:5]
+    out = []
+    for part in [x for x in _GQ_SPLIT_RX.split(str(question or "")) if x and len(x.split()) >= 3][:4] \
+            or [str(question or "")]:
+        out.append({"q": part.strip()[:200], "need": "", "search": plan_queries(part, today, limit=2)})
+    return out
+
+
+def rubin_gaps(st, text=None):
+    """The plan's parts the answer doesn't settle yet: fewer than half of a
+    part's own words (its names count twice) appear in the answer."""
+    low = str(st.best["text"] if text is None else text).lower()
+    gaps = []
+    for p in st.plan:
+        terms, ents = _gq_terms(p.get("q") or "")
+        if not terms:
+            continue
+        w = sum(2 if t in ents else 1 for t in terms)
+        hit = sum((2 if t in ents else 1) for t in terms if t.lower() in low)
+        if hit < 0.5 * w:
+            gaps.append(p)
+    return gaps
+
+
+def rubin_note_items(notes):
+    """The critics' bullets, as (kind, text): WRONG, MIXED UP, STALE, MISSING."""
+    out = []
+    for ln in str(notes or "").splitlines():
+        m = re.match(r"\s*(?:[-*•]|\d+[.)])?\s*\**\s*(WRONG|MIXED UP|STALE|MISSING)\**\s*[:—-]\s*(.+)",
+                     ln, re.I)
+        if m:
+            out.append((m.group(1).upper(), m.group(2).strip()))
+    return out
+
+
+def rubin_queries(st, notes, gaps):
+    """What this round searches for, at most RUBIN_SEARCHES: each a
+    (sub-question, its planned queries). The open parts first (with the
+    plan's own queries), then the critics' doubtful claims (a check of the
+    claim) and missing angles, never a search the run already made."""
+    items = []
+    for p in gaps:
+        qs = [q for q in p.get("search") or [] if q.lower() not in st.searched]
+        items.append((p["q"], qs))
+    for kind, txt in rubin_note_items(notes):
+        t = re.sub(r"[\"“”']", "", txt)
+        t = re.split(r"\s+(?:—|--|->|→)\s+|;\s", t)[0][:160]
+        if kind in ("WRONG", "STALE", "MIXED UP", "MISSING") and len(t.split()) >= 2:
+            items.append((t, []))
+    out, seen = [], set()
+    for q, qs in items:
+        k = _ground_key(q)
+        if k in seen or k in st.searched:
+            continue
+        seen.add(k)
+        out.append((q, qs))
+        if len(out) >= RUBIN_SEARCHES:
+            break
+    return out
+
+
+def rubin_search(st, items, start=None, wait_s=GROUND_TOTAL_S + 6):
+    """The targeted searches (two at a time): each item a Grounding of its
+    sub-question with the plan's queries added as the model's lines, so the
+    grounded search's planning, filters, page reads and passages all apply.
+    The number of new sources joined to the pack."""
+    start = start or (lambda q, qs: ground_start(q, planner=(lambda _p, _qs=qs: "\n".join(_qs))
+                                                 if qs else None))
+    added = 0
+    for i in range(0, len(items), 2):
+        gs = []
+        for q, qs in items[i:i + 2]:
+            st.searched.add(_ground_key(q))
+            for x in qs:
+                st.searched.add(x.lower())
+            st.searches += 1
+            try:
+                gs.append(start(q, qs))
+            except Exception:
+                pass
+        for g in gs:
+            try:
+                g.wait(timeout=wait_s)
+                srcs, _pack, _nr, _np = g.snapshot()
+                added += st.add_sources(srcs, getattr(g, "terms", []) or [])
+            except Exception:
+                pass
+    return added
+
+
+def rubin_judge_messages(st, answers, letters):
+    """The judge's messages: the rubric, the reader, the plan's parts, the
+    evidence the answers cite, then the answers under their letters."""
+    cited = []
+    for t in answers:
+        for n in rubin_cites(t, len(st.sources))[0]:
+            if n not in cited:
+                cited.append(n)
+    today = strftime_np("%A, %B %-d, %Y", st.today)
+    parts = "\n".join("- " + p["q"] for p in st.plan) or "- (the question as asked)"
+    body = ("=== THE QUESTION ===\n" + st.question
+            + ("\n\n" + st.history if st.history else "")
+            + "\n\n=== ITS PARTS ===\n" + parts
+            + "\n\n=== THE READER ===\n" + st.reader
+            + "\n\n=== THE EVIDENCE ===\n" + (rubin_pack(st, cited, RUBIN_JUDGE_PACK) or "(no web evidence)")
+            + "".join("\n\n=== ANSWER %s ===\n%s" % (L, str(t)[:7000]) for L, t in zip(letters, answers)))
+    return [{"role": "system", "content": "You are a strict, fair judge. You answer with JSON only."},
+            {"role": "user", "content": RUBIN_JUDGE.format(today=today) + "\n\n" + body}]
+
+
+def rubin_focus(crit):
+    """This round's focus: the best answer's weakest criterion."""
+    if not crit:
+        return "complete"
+    return min(crit, key=lambda k: (crit[k], [c for c, _w in RUBIN_CRITERIA].index(k)))
+
+
+def rubin_notes(st, critic_notes_list, gaps, new_n, focus):
+    """The review notes the writers carry this round."""
+    lines = ["FOCUS THIS ROUND: %s." % RUBIN_FOCUS.get(focus, RUBIN_FOCUS["complete"])]
+    if gaps:
+        lines.append("PARTS THE ANSWER DOESN'T SETTLE YET:")
+        lines += ["- %s%s" % (p["q"], (" (needs: %s)" % p["need"]) if p.get("need") else "") for p in gaps]
+    seen = set()
+    merged = []
+    for n in critic_notes_list:
+        for ln in str(n or "").splitlines():
+            k = re.sub(r"\W+", " ", ln.lower()).strip()
+            if k and k not in seen:
+                seen.add(k)
+                merged.append(ln.rstrip())
+    if merged:
+        lines.append("REVIEWERS' NOTES:")
+        lines += merged[:14]
+    weak = list(dict.fromkeys(st.weak or []))[:6]
+    _off, counted = rubin_mech(st.best["text"], len(st.sources))
+    if weak or counted:
+        lines.append("WHAT THE JUDGES MARKED DOWN:")
+        lines += ["- " + w for w in weak + counted]
+    if new_n:
+        a = len(st.sources) - new_n + 1
+        lines.append("NEW EVIDENCE: sources [%d] to [%d] were added this round; use what bears "
+                     "on the question, with its number." % (a, len(st.sources)))
+    lines.append("Keep every part of the current answer that is right, its [n] marks included; "
+                 "cite only the numbers listed in the evidence. Write the whole improved answer, "
+                 "not a list of changes.")
+    return "\n".join(lines)
+
+
+def rubin_footer(st, final=False):
+    """The answer's one-line record, saved with it."""
+    n = len(st.history_rows)          # round 0 and every round that finished
+    m = int(st.elapsed() // 60)
+    bits = ["Vera Rubin", "%d round%s" % (n, "" if n == 1 else "s"),
+            "%d source%s read" % (len(st.read_urls), "" if len(st.read_urls) == 1 else "s"),
+            "%d draft%s" % (st.drafts, "" if st.drafts == 1 else "s")]
+    if st.checked:
+        bits.append("%d claim%s checked, %d fixed" % (st.checked, "" if st.checked == 1 else "s", st.fixed))
+    if st.best["score"]:
+        bits.append("score %.1f/10" % st.best["score"])
+    bits.append(("%d min" % m) if m else "%d s" % int(st.elapsed()))
+    if final and st.reason:
+        bits.append({"stopped": "stopped by you", "settled": "no further improvement",
+                     "ceiling": "time limit reached"}.get(st.reason, st.reason))
+    return "\n\n*" + " · ".join(bits) + "*"
+
+
+def rubin_snapshot(st, lanes):
+    """The console's state frame."""
+    return {"k": "state", "round": st.round, "phase": st.phase, "el": round(st.elapsed(), 1),
+            "sources": len(st.sources), "read": len(st.read_urls), "searches": st.searches,
+            "drafts": st.drafts, "checked": st.checked, "fixed": st.fixed,
+            "score": st.best["score"], "crit": st.best["crit"], "by": st.best["by"],
+            "spark": [r["score"] for r in st.history_rows][-40:], "stalls": st.stalls,
+            "stall_n": st.stall_n, "ceiling": st.ceiling_s, "changed": st.changed[:240],
+            "reason": st.reason, "done": st.done,
+            "plan": [p["q"][:90] for p in st.plan][:5],
+            "lanes": [{"n": l.name, "k": l.kind, "busy": l.busy, "m": l.model,
+                       "down": l.down} for l in lanes]}
+
+
+# ---- the machine panel
+def rubin_mac_load() -> dict:
+    """This Mac now: GPU and CPU busy, memory used and its pressure, the
+    thermal state macOS tells apps (nominal, fair, serious, critical; it
+    gives no temperature without admin rights)."""
+    out = {"gpu": None, "cpu": None, "mem_used": None, "mem_total": None,
+           "pressure": None, "thermal": None}
+    try:
+        out["gpu"] = gpu_utilization()
+    except Exception:
+        pass
+    if HAS_PSUTIL:
+        try:
+            out["cpu"] = psutil.cpu_percent(interval=None)
+            vm = psutil.virtual_memory()
+            out["mem_used"], out["mem_total"] = vm.total - vm.available, vm.total
+        except Exception:
+            pass
+    try:
+        out["pressure"] = mem_pressure()
+    except Exception:
+        pass
+    if IS_MAC:
+        try:
+            from Foundation import NSProcessInfo      # pyobjc, with pywebview
+            out["thermal"] = ("nominal", "fair", "serious", "critical")[
+                int(NSProcessInfo.processInfo().thermalState())]
+        except Exception:
+            pass
+    return out
+
+
+def rubin_server_load(e) -> dict:
+    """One server's card now, from the gateway's /v1/usage (one signed GET;
+    it loads nothing and never keeps the server awake): busy, VRAM, its
+    memory; a temperature and power draw only if the kit reports them (the
+    kit of 2026-10 doesn't: the panel says so)."""
+    out = {"ok": False, "gpu": None, "vram_used": None, "vram_total": None,
+           "ram_used": None, "ram_total": None, "temp": None, "power": None}
+    try:
+        st, js = _srv_json(e, "GET", "/v1/usage", timeout=SRV_USAGE_S)
+    except Exception:
+        return out
+    if st != 200 or not isinstance(js, dict):
+        return out
+    g, r = _srv_usage_gpu(js), _srv_usage_ram(js)
+    raw = js.get("gpu") if isinstance(js.get("gpu"), dict) else {}
+
+    def num(v, hi):
+        return v if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= hi else None
+    if g["vram_total_bytes"] and isinstance(e, dict) and e.get("id"):
+        _rubin_vram[e["id"]] = g["vram_total_bytes"]
+    out.update(ok=True, gpu=g["busy_pct"], vram_used=g["vram_used_bytes"],
+               vram_total=g["vram_total_bytes"], ram_used=r["used_bytes"], ram_total=r["total_bytes"],
+               temp=num(raw.get("temp_c"), 150), power=num(raw.get("power_w"), 2000))
+    return out
+
+
+def rubin_load(lanes, servers, mac=None, srv=None) -> dict:
+    """The panel's load frame: this Mac and each server lane, with each
+    machine's tokens a second (the call under way, else its last)."""
+    mac = mac or rubin_mac_load
+    srv = srv or rubin_server_load
+    rows = []
+    m = dict(mac())
+    ml = next((l for l in lanes if l.kind == "mac"), None)
+    m.update(name="This Mac", model=ml.model if ml else "", busy=ml.busy if ml else "",
+             tps=(ml.live_tps() or ml.tps) if ml else 0.0, kind="mac")
+    rows.append(m)
+    for l in lanes:
+        if l.kind != "server":
+            continue
+        e = servers.get(l.sid)
+        u = dict(srv(e)) if e is not None else {"ok": False}
+        u.update(name=l.name, model=l.model, busy=l.busy, tps=l.live_tps() or l.tps, kind="server")
+        rows.append(u)
+    return {"k": "load", "m": rows}
+
+
+def rubin_sampler(io, lanes, servers, stop, period=RUBIN_LOAD_S):
+    """The panel's sampler thread: a load frame every `period` seconds
+    until the run ends."""
+    def run():
+        while not stop.wait(period):
+            if io.gone is not None:
+                return
+            try:
+                io.frame(rubin_load(lanes, servers))
+            except Exception:
+                pass
+    t = ctx_thread(target=run, daemon=True)
+    t.start()
+    return t
+
+
+# ---- who works
+_rubin_vram = profile_cache("_rubin_vram", {})     # server id -> its card's bytes, read from /v1/usage
+
+
+def rubin_server_lanes(ctx, probe=True):
+    """[(lane, entry)] for each paired server the person lets the modes use
+    (its "Use for Fast, Thinking and Pro" switch on) that answered its last
+    check: its models for a thinking seat (srv_role_ok "think") that run
+    whole on its card, strongest first, RUBIN_WRITERS_SRV of them. A card
+    whose size the gateway's /v1/info doesn't report is read from /v1/usage
+    (its vram_total_bytes), so a model too big for it is never sent: weights
+    plus the gateway's margin must fit (_srv_fits), and a model the card
+    refused lately is out (srv_is_nofit, 6b516). probe=False (the menu's
+    row): no network read; a card of unknown size lists its "gpu" models."""
+    out = []
+    try:
+        entries = _srv_read(ctx)
+    except Exception:
+        return out
+    speeds = None
+    for e in entries:
+        if not _srv_paired(e) or e.get("prefer") is False:
+            continue
+        s = _srv_seen.get(e["id"]) or {}
+        if not s.get("at") or s.get("err") or not s.get("reachable") or not s.get("auth"):
+            continue
+        vram = (s.get("gpu") or {}).get("vram_bytes") or _rubin_vram.get(e["id"])
+        if not vram and probe:
+            try:
+                vram = rubin_server_load(e).get("vram_total")
+            except Exception:
+                vram = None
+            if vram:
+                _rubin_vram[e["id"]] = vram
+        if not vram and probe:
+            continue          # a card of unknown size gets nothing sent unasked (6b339's rule)
+        cands = []
+        for m in s.get("models") or []:
+            if not isinstance(m, dict) or not m.get("name") or m.get("nofit"):
+                continue
+            if srv_is_nofit(e["id"], m["name"], m.get("size") or 0):
+                continue
+            if vram and (not isinstance(m.get("size"), int) or m["size"] <= 0):
+                continue      # a size it doesn't say can't be checked against the card
+            if _srv_fits(m, vram, bool(probe)):
+                cands.append(dict(m, label=e["name"] + SERVER_SEP + m["name"], server=e["name"],
+                                  sid=e["id"], params=_srv_params(m["name"])))
+        if speeds is None:
+            speeds = server_speeds(ctx)
+        ranked = srv_rank(cands, "think", "normal", speeds)
+        if ranked:
+            out.append((RubinLane("server", e["name"], [m["label"] for m in ranked[:RUBIN_WRITERS_SRV]],
+                                  sid=e["id"]), e))
+    return out
+
+
+def rubin_mac_model():
+    """This Mac's strongest model that fits now (Fast's ladder), or ""."""
+    try:
+        r = resolve_tier("Fast")
+    except Exception:
+        r = []
+    return r[0] if r else ""
+
+
+def rubin_lanes(ctx, mac_label=None, cloud_ok=None, probe=True):
+    """Every machine that works on the question: this Mac, the servers, and
+    the cloud's strongest writer only while the person's cloud switch is on."""
+    lanes, servers = [], {}
+    mac_label = rubin_mac_model() if mac_label is None else mac_label
+    if mac_label:
+        lanes.append(RubinLane("mac", "This Mac", [mac_label]))
+    for lane, e in rubin_server_lanes(ctx, probe):
+        lanes.append(lane)
+        servers[lane.sid] = e
+    if cloud_allowed() if cloud_ok is None else cloud_ok:
+        try:
+            lad = compositor_ladder()
+        except Exception:
+            lad = []
+        if lad:
+            lanes.append(RubinLane("cloud", str(lad[0].get("name") or "Cloud"), [lad[0]]))
+    return lanes, servers
+
+
+def rubin_tier_row(ctx) -> dict:
+    """/api/tiers' row for Vera Rubin: what works on it, whether anything can."""
+    try:
+        lanes, _s = rubin_lanes(ctx, probe=False)
+    except Exception:
+        lanes = []
+    models = [l.label_of(m) for l in lanes if l.kind != "cloud" for m in l.models]
+    cloud = [l.name for l in lanes if l.kind == "cloud"]
+    n = len(models) + len(cloud)
+    return {"desc": TIERS[RUBIN_TIER]["desc"], "models": models, "cloud": cloud, "skipped": [],
+            "available": n > 0, "count": n,
+            "why": "" if n else ("Nothing can run it: download a model under Settings › Models "
+                                 "or pair a server."),
+            "note": ("It stops when you press Stop, or when %d rounds in a row bring nothing "
+                     "better, and keeps this Mac%s busy the whole time." % (RUBIN_STALL_ROUNDS, " and your server" if any(
+                         l.kind == "server" for l in lanes) else ""))
+            + (" Cloud power is on, so %s writes a revision each round while its revisions keep "
+               "winning." % cloud[0] if cloud else " Nothing is sent to the cloud.")}
+
+
+# ---- one round
+def _rubin_par(jobs):
+    """Run (fn, args) jobs side by side; their results in order."""
+    res = [None] * len(jobs)
+
+    def one(i, fn, a):
+        try:
+            res[i] = fn(*a)
+        except Exception:
+            res[i] = None
+    ths = [ctx_thread(target=one, args=(i, fn, a), daemon=True) for i, (fn, a) in enumerate(jobs)]
+    for t in ths:
+        t.start()
+    for t in ths:
+        t.join()
+    return res
+
+
+def _rubin_budget(st, kind):
+    left = st.ceiling_s - st.elapsed()
+    return max(5.0, min(float(RUBIN_CALL_S[kind]), left))
+
+
+def rubin_judge(st, lanes, answers, stop, seed=0):
+    """The judges (one per machine, side by side) on `answers` (the current
+    best first): ({index: {"score", "crit"}}, picks as indexes or -1, whys).
+    The letters are shuffled per round, so a position isn't a verdict."""
+    rnd = random.Random(seed)
+    idx = list(range(len(answers)))
+    rnd.shuffle(idx)
+    letters = [chr(65 + i) for i in range(len(answers))]
+    shown = [answers[i] for i in idx]           # letter k shows answers[idx[k]]
+    msgs = rubin_judge_messages(st, shown, letters)
+    judges = [l for l in lanes if l.kind in ("mac", "server") and not l.down][:2] or \
+        [l for l in lanes if not l.down][:1]
+
+    def one(lane):
+        m = lane.order()[0]            # the model resident there now: no load to judge
+        txt, _why = lane.call(m, msgs, "judging", stop, _rubin_budget(st, "judge"))
+        return rubin_judge_parse(txt, letters) if txt else None
+    got = _rubin_par([(one, (l,)) for l in judges])
+    comb, picks, whys = rubin_combine(got, letters)
+    # "Answer B is clearer than A" means nothing on the console: the letters become names
+    names = {L: ("the current answer" if idx[k] == 0 else "a revision") for k, L in enumerate(letters)}
+    whys = [re.sub(r"\b[Aa]nswer ([A-Z])\b|\b([A-Z])\b(?= (?:is|has|does|covers|gives|adds|cites))",
+                   lambda m: names.get(m.group(1) or m.group(2), m.group(0)), w) for w in whys]
+    by_idx = {idx[k]: comb[L] for k, L in enumerate(letters)}
+    pick_idx = [idx[letters.index(p)] if p in letters else -1 for p in picks]
+    return by_idx, pick_idx, [w for w in whys if w], sum(1 for g in got if g)
+
+
+def rubin_check(st, lanes, text, writer_lane, stop):
+    """The fact-check of a new best answer against the evidence it cites
+    (quality-1's verify_answer): on a machine that didn't write it when
+    there is one. (text, checked, fixed)."""
+    others = [l for l in lanes if l is not writer_lane and l.kind in ("mac", "server") and not l.down]
+    lane = (others or [l for l in lanes if l.kind in ("mac", "server") and not l.down] or [None])[0]
+    if lane is None or len(text) < VERIFY_MIN_CHARS or claim_count(text) < 2:
+        return text, 0, 0
+    cited = rubin_cites(text, len(st.sources))[0]
+    block = rubin_block(st, cited, RUBIN_CHECK_PACK)
+    m = lane.order()[0]
+
+    def run(_l, msgs, emit):
+        txt, why = lane.call(m, msgs, "fact-checking", stop, _rubin_budget(st, "check"))
+        if not txt:
+            raise RuntimeError(why or "no check")
+        emit(txt)
+    res = verify_answer(run, "", block, [], text, budget_s=_rubin_budget(st, "check") + 30)
+    if DEV_HOME:
+        print("rubin: check on %s: %s" % (lane.name, "nothing usable" if not res else
+                                          "%d checked, %d fixed" % (res["checked"], res["fixed"])),
+              file=sys.stderr, flush=True)
+    if not res:
+        return text, 0, 0
+    new = (res["text"] or "").strip()
+    if res["fixed"] and new and len(new) >= 0.6 * len(text):
+        return new, res["checked"], res["fixed"]
+    return text, res["checked"], 0
+
+
+def _rubin_notes_key(notes_list):
+    return " ".join(sorted(re.sub(r"\W+", " ", str(n).lower()).strip() for n in notes_list))[:4000]
+
+
+def rubin_round(st, lanes, stop, io, search=None):
+    """One round after the first answer (see the section's head): weak
+    points, targeted searches, competing revisions, the judges, the check.
+    True when the best answer improved. A round the Stop button (or the
+    reader leaving) cut short is not recorded and changes nothing."""
+    t0 = time.time()
+    st.round += 1
+    n = st.round
+
+    def phase(p, line=None):
+        st.phase = p
+        io.frame(rubin_snapshot(st, lanes))
+        io.status("Vera Rubin · round %d · %s" % (n, line or p))
+
+    def stalled(why, **row):
+        st.stalls += 1
+        st.changed = why
+        r = {"r": n, "score": st.best["score"], "improved": False, "by": "", "why": "",
+             "new": 0, "drafts": 0, "secs": round(time.time() - t0)}
+        r.update(row)
+        st.history_rows.append(r)
+        return False
+
+    # 1. the weak points: a critic on each machine, and the plan's open parts
+    phase("finding the weak points")
+    block = rubin_block(st)
+    writers = [l for l in lanes if l.kind in ("mac", "server") and not l.down]
+
+    def critic(lane):
+        txt, _why = lane.call(lane.order()[0], critic_prompt(block, [st.best["text"]]), "reviewing",
+                              stop, _rubin_budget(st, "critic"))
+        return critic_notes(txt) if txt else ""
+    notes_list = [x for x in _rubin_par([(critic, (l,)) for l in writers[:2]]) if x]
+    gaps = rubin_gaps(st)
+    if rubin_should_stop(st, stop) in ("stopped", "gone"):
+        return False
+    # 2. targeted searches for exactly those
+    items = rubin_queries(st, "\n".join(notes_list), gaps)
+    new_n = 0
+    if items:
+        phase("searching for %d weak point%s" % (len(items), "" if len(items) == 1 else "s"))
+        new_n = rubin_search(st, items, start=search)
+        if new_n:
+            io.ctl("SOURCES", st.rows())
+    if rubin_should_stop(st, stop) in ("stopped", "gone"):
+        return False
+    nkey = _rubin_notes_key(notes_list)
+    if not new_n and not gaps and (not notes_list or nkey == st.last_notes) \
+            and not rubin_mech(st.best["text"], len(st.sources))[1]:
+        # NOTHING NEW TO WORK ON (budget sanity): the same notes as last round,
+        # no open part, no new source. No writer runs; the round is stalled.
+        return stalled("Round %d: nothing new to work on (%s), so no machine rewrote it." % (
+            n, "the reviewers repeated themselves" if notes_list else "the reviewers found nothing to fix"))
+    st.last_notes = nkey
+    # 3. competing revisions, one per writer, each on its own machine
+    focus = rubin_focus(st.best["crit"])
+    notes = rubin_notes(st, notes_list, gaps, new_n, focus)
+    phase("writing revisions", "writing revisions (focus: %s)" % focus)
+    msgs = final_prompt(st.sys_msg, rubin_block(st), [st.best["text"]], notes, cut=8000)
+
+    def write(lane):
+        got = []
+        for m in lane.order():
+            if stop.is_set():
+                break
+            txt, why = lane.call(m, msgs, "writing a revision", stop, _rubin_budget(st, "write"))
+            if txt and len(txt) > 200 and len(txt) >= 0.4 * len(st.best["text"]):
+                got.append((lane, lane.label_of(m), txt))
+            elif why and why not in ("stopped", "too slow", "empty", "degenerate", "busy"):
+                lane.fails += 1
+                if lane.fails >= 3:
+                    lane.down = True          # three refusals in a row: it sits the rest out
+        if got:
+            lane.fails = 0
+        return got
+    cands = []
+    for g in _rubin_par([(write, (l,)) for l in lanes if not l.down]):
+        cands += g or []
+    if rubin_should_stop(st, stop) in ("stopped", "gone"):
+        return False
+    st.drafts += len(cands)
+    if not cands:
+        return stalled("Round %d: no revision came back in time." % n, new=new_n)
+    # 4. the judges, blind, the current best among the revisions
+    phase("judging %d revision%s" % (len(cands), "" if len(cands) == 1 else "s"))
+    texts = [st.best["text"]] + [c[2] for c in cands]
+    res, picks, whys, n_j = rubin_judge(st, lanes, texts, stop, seed=n)
+    if rubin_should_stop(st, stop) in ("stopped", "gone"):
+        return False
+    if not n_j:
+        return stalled("Round %d: the judges didn't answer, so the answer stands." % n,
+                       new=new_n, drafts=len(cands))
+    res = rubin_apply_mech(res, texts, len(st.sources))       # the counted points off
+    best_now = (res.get(0) or {}).get("score", 0.0)
+    win = max(range(1, len(texts)), key=lambda i: (res.get(i) or {}).get("score", 0.0))
+    w_score = (res.get(win) or {}).get("score", 0.0)
+    for lane in {c[0] for c in cands}:
+        # a cloud writer earns its seat (the paid-API rule): it stays while its
+        # revisions win at least once in three rounds
+        lane.rounds = getattr(lane, "rounds", 0) + 1
+    if not rubin_accept(best_now, w_score, picks):
+        # the score shown stays the one the answer won with: a judging of an
+        # unchanged answer moves by noise alone, and the line would wander
+        st.weak = (res.get(0) or {}).get("weak") or st.weak
+        _rubin_cloud_due(st, lanes)
+        return stalled("Round %d: no revision beat the answer (the strongest scored %.1f, the "
+                       "answer %.1f in the same judging)." % (n, w_score, best_now),
+                       new=new_n, drafts=len(cands), score=st.best["score"])
+    w_lane, w_lbl, w_text = cands[win - 1]
+    w_lane.wins = getattr(w_lane, "wins", 0) + 1
+    w_lane.last_win = n
+    _rubin_cloud_due(st, lanes)
+    # 5. the new best, fact-checked against the evidence it cites
+    if not stop.is_set():
+        phase("fact-checking the new answer", "fact-checking")
+        try:
+            w_text, ck, fx = rubin_check(st, lanes, w_text, w_lane, stop)
+        except Exception:
+            ck = fx = 0
+        st.checked += ck
+        st.fixed += fx
+    gain = w_score - best_now
+    st.best = {"text": w_text, "score": round(w_score, 2), "crit": (res.get(win) or {}).get("crit", {}),
+               "by": w_lbl, "round": n}
+    st.weak = (res.get(win) or {}).get("weak") or []
+    st.best_ever = max(st.best_ever, w_score)
+    st.stalls = 0
+    why = whys[0] if whys else ""
+    st.changed = "Round %d: %s's revision won, +%.1f%s%s." % (
+        n, w_lbl, gain, (" · " + why.rstrip(".")) if why else "",
+        (" · %d new source%s" % (new_n, "" if new_n == 1 else "s")) if new_n else "")
+    st.history_rows.append({"r": n, "score": st.best["score"], "improved": True, "by": w_lbl,
+                            "why": why, "new": new_n, "drafts": len(cands),
+                            "secs": round(time.time() - t0)})
+    io.answer(w_text + rubin_footer(st))
+    return True
+
+
+def _rubin_cloud_due(st, lanes):
+    """The paid-API rule for a cloud writer: three rounds of its revisions
+    without a win and it sits the rest of the run out, said in the console."""
+    for l in lanes:
+        if l.kind == "cloud" and not l.down and getattr(l, "rounds", 0) >= 3 \
+                and st.round - getattr(l, "last_win", 0) >= 3:
+            l.down = True
+            st.changed += " %s stopped writing: none of its last three revisions won." % l.name
+
+
+def rubin_first(st, lanes, messages, stop, io, council=None):
+    """Round 0: the first answer, written as Thinking writes it (6b515's
+    craft through run_council: one writer, a critic, the brief, the
+    fact-check) on the server when there is one, else on this Mac; shown as
+    it streams. The text on screen afterwards, or ""."""
+    srv = next((l for l in lanes if l.kind == "server" and not l.down), None)
+    mac = next((l for l in lanes if l.kind == "mac"), None)
+    shown, counts = [], {"drafts": 0, "checked": 0, "fixed": 0}
+
+    def tap(c):
+        if isinstance(c, Ctl):
+            s = str(c)
+            if s == NUL + "RESET" + NUL:
+                del shown[:]
+            elif s.startswith(NUL + "DRAFT:") and "(no answer" not in s and "(review)" not in s:
+                counts["drafts"] += 1
+            elif s.startswith(NUL + "STEP:") and '"verify"' in s:
+                m = re.search(r"Checked (\d+) claims?(?:, fixed (\d+))?", s)
+                if m:
+                    counts["checked"], counts["fixed"] = int(m.group(1)), int(m.group(2) or 0)
+        elif c:
+            shown.append(str(c))
+        io._w(c)
+        if io.gone is not None:
+            raise BrokenPipeError("the reader left")
+    council = council or run_council
+    plans = []
+    if srv is not None:
+        plans.append((srv, list(srv.models[:2]) if len(srv.models) > 1 else [srv.models[0], srv.models[0]],
+                      dict(srv_only=True, srv_merge=True)))
+    if mac is not None:
+        plans.append((mac, [mac.models[0], mac.models[0]], {}))
+    for lane, labels, kw in plans:
+        if stop.is_set():
+            break
+        del shown[:]
+        with lane.lock:
+            lane.busy, lane.model = "writing the first answer", lane.label_of(labels[0])
+            try:
+                council(labels, messages, tap, io.status, hurry=stop, craft=True, **kw)
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                pass
+            finally:
+                lane.busy, lane.model = "", ""
+                lane.resident = lane.label_of(labels[-1])
+        text = "".join(shown).strip()
+        if text and not text.startswith("⚠️"):
+            st.best.update(text=text, by=lane.label_of(labels[0]), round=0)
+            st.drafts += max(1, counts["drafts"])
+            st.checked += counts["checked"]
+            st.fixed += counts["fixed"]
+            return text
+    return ""
+
+
+def _rubin_log(st):
+    """A dev copy's log says how each round went (the NOTES measurements read it)."""
+    if DEV_HOME and st.history_rows:
+        r = st.history_rows[-1]
+        print("rubin: round %d score=%.2f improved=%s by=%s new=%s drafts=%s secs=%s el=%ds | %s" % (
+            r["r"], r["score"], r["improved"], r.get("by") or "-", r.get("new"), r.get("drafts"),
+            r.get("secs"), st.elapsed(), st.changed[:200]), file=sys.stderr, flush=True)
+
+
+def rubin_plan(st, lanes, stop, prefer=None):
+    """The question's plan, on `prefer` (the machine the first answer isn't
+    using), else the rules' own."""
+    txt = ""
+    if prefer is not None:
+        m = prefer.order()[0] if prefer.kind == "server" else prefer.models[0]
+        today = strftime_np("%A, %B %-d, %Y", st.today)
+        txt, _w = prefer.call(m, [{"role": "user", "content": RUBIN_PLAN.format(today=today)
+                                   + st.question[:1500]}], "planning", stop, RUBIN_CALL_S["plan"])
+    st.plan = rubin_plan_parse(txt, st.question, st.today)
+    return st.plan
+
+
+def run_rubin(question, messages, emit, status, step, stop, ctx=None, ground=None,
+              lanes=None, servers=None, search=None, council=None, web=True,
+              ceiling_s=RUBIN_CEILING_S, stall_n=RUBIN_STALL_ROUNDS, sample=True):
+    """VERA RUBIN (6b519): see the section's head. `ground`: the handler's
+    grounded search of the question (6b514), when it ran; `stop`: the
+    request's hurry Event (Stop). Writes through emit; returns the state."""
+    io = RubinIO(emit, status, step, stop)
+    sys_msg = messages[0] if messages and messages[0].get("role") == "system" else {"role": "system", "content": ""}
+    st = RubinState(question, sys_msg, rubin_history(messages), rubin_reader(sys_msg.get("content")),
+                    ceiling_s=ceiling_s, stall_n=stall_n, io=io)
+    if lanes is None:
+        lanes, servers = rubin_lanes(ctx)
+    servers = servers or {}
+    if not [l for l in lanes if l.kind in ("mac", "server")]:
+        io._w(AppText("⚠️ Vera Rubin needs a model on this Mac or a paired server, and "
+                      "neither can answer right now."))
+        return st
+    io.frame({"k": "start", "tier": RUBIN_TIER, "stall_n": st.stall_n, "ceiling": st.ceiling_s,
+              "lanes": [{"n": l.name, "k": l.kind, "models": [l.label_of(m) for m in l.models]}
+                        for l in lanes]})
+    sampler = None
+    done_ev = threading.Event()
+    if sample:
+        io.frame(rubin_load(lanes, servers))
+        sampler = rubin_sampler(io, lanes, servers, done_ev)
+    try:
+        # the evidence the handler already gathered keeps its numbers
+        if ground is not None:
+            srcs, _p, _r, _n = ground.snapshot()
+            st.add_sources(srcs, getattr(ground, "terms", []) or [], keep_all=True)
+            st.searches += 1
+        elif web:
+            st.phase = "searching the web"
+            io.frame(rubin_snapshot(st, lanes))
+            g = (search or (lambda q, qs: ground_start(q)))(question, [])
+            try:
+                g.wait(timeout=GROUND_TOTAL_S)
+                srcs, _p, _r, _n = g.snapshot()
+                st.add_sources(srcs, getattr(g, "terms", []) or [])
+            except Exception:
+                pass
+            st.searches += 1
+            if st.sources:
+                io.ctl("SOURCES", st.rows())
+        first_msgs = [dict(m) for m in messages]
+        if ground is None and st.sources:
+            first_msgs[-1]["content"] = grounded_turn(question, rubin_pack(st, budget=GROUND_PACK_CHARS))
+            first_msgs[0] = dict(first_msgs[0], content=str(first_msgs[0].get("content") or "") + GROUND_SYSTEM)
+            st.sys_msg = first_msgs[0]
+        # round 0: the plan beside the first answer (on the other machine), then the first answer judged
+        srv = next((l for l in lanes if l.kind == "server"), None)
+        mac = next((l for l in lanes if l.kind == "mac"), None)
+        other = mac if srv is not None else None
+        st.phase = "writing the first answer"
+        io.frame(rubin_snapshot(st, lanes))
+        if other is None:
+            rubin_plan(st, lanes, stop, srv or mac)
+            first = rubin_first(st, lanes, first_msgs, stop, io, council)
+        else:
+            res = _rubin_par([(rubin_first, (st, lanes, first_msgs, stop, io, council)),
+                              (rubin_plan, (st, lanes, stop, other))])
+            first = res[0] or ""
+        if not st.plan:
+            st.plan = rubin_plan_parse("", question, st.today)
+        if not first:
+            st.reason = "gone" if io.gone is not None else ("stopped" if stop.is_set() else "failed")
+            if io.gone is None and not stop.is_set():
+                io._w(AppText("⚠️ Vera Rubin couldn’t write a first answer: none of "
+                              "its models answered."))
+            return st
+        if web and st.plan and not stop.is_set():
+            # the plan's parts the first answer leaves open are searched now
+            items = [(p["q"], p.get("search") or []) for p in rubin_gaps(st)][:RUBIN_SEARCHES]
+            if items:
+                st.phase = "searching for the plan's open parts"
+                io.frame(rubin_snapshot(st, lanes))
+                if rubin_search(st, items, start=search):
+                    io.ctl("SOURCES", st.rows())
+        if not stop.is_set():
+            st.phase = "judging the first answer"
+            io.frame(rubin_snapshot(st, lanes))
+            res, _p, _w, n_j = rubin_judge(st, lanes, [st.best["text"]], stop, seed=0)
+            res = rubin_apply_mech(res, [st.best["text"]], len(st.sources))
+            if n_j and res.get(0):
+                st.best.update(score=res[0]["score"], crit=res[0]["crit"])
+                st.best_ever = res[0]["score"]
+                st.weak = res[0].get("weak") or []
+        st.history_rows.append({"r": 0, "score": st.best["score"], "improved": True,
+                                "by": st.best["by"], "why": "the first answer", "new": len(st.sources),
+                                "drafts": st.drafts, "secs": round(st.elapsed())})
+        st.changed = "Round 0: %s wrote the first answer%s." % (
+            st.best["by"] or "the writer",
+            (", scored %.1f" % st.best["score"]) if st.best["score"] else "")
+        _rubin_log(st)
+        while True:
+            why = rubin_should_stop(st, stop)
+            if why:
+                st.reason = why
+                break
+            wait = RUBIN_BACKOFF_S[min(st.stalls, len(RUBIN_BACKOFF_S) - 1)]
+            if wait:
+                st.phase = "pausing %ds before the next round" % int(wait)
+                io.frame(rubin_snapshot(st, lanes))
+                if stop.wait(min(wait, max(0.0, st.ceiling_s - st.elapsed()))):
+                    continue
+            rubin_round(st, lanes, stop, io, search)
+            io.frame(rubin_snapshot(st, lanes))
+            _rubin_log(st)
+        return st
+    finally:
+        done_ev.set()
+        st.done = True
+        st.phase = "done"
+        if not st.reason:
+            st.reason = "gone" if io.gone is not None else "stopped"
+        if st.best["text"] and io.gone is None:
+            io.answer(st.best["text"] + rubin_footer(st, final=True))
+        try:
+            io.frame(rubin_snapshot(st, lanes))
+            if sample:
+                io.frame(rubin_load(lanes, servers))
+        except Exception:
+            pass
+        if io.gone is not None and isinstance(io.gone, (StaleProfile, BrokenPipeError,
+                                                       ConnectionResetError)):
+            raise io.gone
+# ==== VERA RUBIN (6b519): end ====
+
+
 
 # ------------------------------------------ the turn writer (0b 5.4)
 # The server saves each question when it arrives and each answer as it
@@ -32488,7 +33913,8 @@ def funnel_images(goal: str, labels: list, budget: float = _FIMG_BUDGET,
 # longer saves turns, so an answer that finishes into a chat nobody is
 # looking at is kept, and a stopped one keeps what was shown.
 _TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
-              "|STEP|APPROVE|RATE")     # RATE: the writer's pace (6b515), the page's twin
+              "|STEP|APPROVE|RATE"      # RATE: the writer's pace (6b515), the page's twin
+              "|RUBIN")                 # Vera Rubin's console (6b519)
 # the page's rules, character for character: JS "." stops at a line
 # break, and JS "$" (unlike Python's) only at the very end
 _TURN_FRAME = re.compile("\x00(" + _TURN_TAGS
@@ -33396,6 +34822,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if t.get("max"):
                     # every model there is (6b440): its own row
                     out[name] = max_tier_row(self.ctx)
+                    continue
+                if t.get("rubin"):
+                    # Vera Rubin (6b519): this Mac, the servers, the cloud only when on
+                    out[name] = rubin_tier_row(self.ctx)
                     continue
                 try:
                     chosen = [x["label"] for x in resolve_tier_seats(name, self.ctx)]
@@ -35194,6 +36624,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # MAX (6b440): every model; choosing it opens the cloud as Cloud Only does
         _max = bool(TIERS.get(tier, {}).get("max")) if isinstance(tier, str) else False
         _max_bench = cloud_bench() if _max else []
+        # VERA RUBIN (6b519): its own loop (run_rubin), dispatched below
+        _rubin = bool(TIERS.get(tier, {}).get("rubin")) if isinstance(tier, str) else False
         if cloud_only and _title_cid:
             _cloud_only_chats[(self.ctx.name, _title_cid)] = time.time()
         # ADVANCED overrides (6b248, per Patrick): a custom run names its
@@ -37154,6 +38586,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             elif (TIERS.get(tier, {}).get("research")
                   or ag_research) and not _links_n:
                 run_research(council, full_messages, memit, status)
+            elif _rubin and not images:
+                # VERA RUBIN (6b519, per Patrick): one question, every machine,
+                # round after round until Stop (the hurry id) or three rounds in
+                # a row bring nothing better; the handler's grounded search is
+                # its first evidence
+                run_rubin(prompt, full_messages, memit, status, step, hurry_ev,
+                          ctx=self.ctx, ground=_ground, web=bool(auto_web))
             elif _max and (_max_bench or len(council) > 1) and not images:
                 # MAX (6b440): every local and server seat drafts as in Pro, every
                 # cloud model drafts beside them, and the merge is written by
@@ -40064,6 +41503,76 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   border:1px solid rgba(255,255,255,.25);border-radius:999px;
   padding:2px 9px;cursor:pointer;margin-left:auto;flex:none}
 .wtskip:hover{border-color:rgba(255,255,255,.5)}
+/* ---- VERA RUBIN's console (6b519): the run's work and both machines' load,
+   above the answer it keeps improving. Dark glass like the work tree, the
+   numbers in the mono face, one cool accent for what is live. Its motion (the
+   scan along the top, the live dot) is decoration only: off for reduced motion
+   and with visual effects off; every number is plain text. */
+.rbcon{--rb:#8fd8ea;--rb-dim:rgba(143,216,234,.16);position:relative;
+  margin:0 0 14px;padding:13px 14px 12px;border-radius:12px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(10,14,18,.78),rgba(6,7,10,.6));
+  border:1px solid rgba(143,216,234,.22);
+  box-shadow:0 0 0 1px rgba(0,0,0,.35) inset,0 10px 30px rgba(0,0,0,.25);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);font-family:var(--sans)}
+.rbcon::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--rb),transparent);
+  background-size:40% 100%;background-repeat:no-repeat;opacity:.8;
+  animation:rbScan 3.2s linear infinite}
+.rbcon.done::before{animation:none;background:rgba(143,216,234,.25);background-size:100% 100%}
+@keyframes rbScan{from{background-position:-40% 0}to{background-position:140% 0}}
+.rbhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rbtitle{font-family:var(--disp);font-size:12px;letter-spacing:.32em;color:#f2f6f8;
+  text-shadow:0 0 14px rgba(143,216,234,.35);white-space:nowrap}
+.rblive{width:7px;height:7px;border-radius:50%;background:var(--rb);flex:none;
+  box-shadow:0 0 8px var(--rb);animation:rbPulse 1.6s ease-in-out infinite}
+.rbcon.done .rblive{animation:none;background:var(--faint);box-shadow:none}
+@keyframes rbPulse{50%{opacity:.35}}
+.rbphase{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.03em;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 160px}
+.rbstop{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:#fff;background:rgba(226,109,90,.16);border:1px solid rgba(226,109,90,.55);
+  border-radius:999px;padding:4px 12px;cursor:pointer;margin-left:auto;flex:none}
+.rbstop:hover{background:rgba(226,109,90,.3)}
+.rbstop[disabled]{color:var(--faint);background:none;border-color:rgba(255,255,255,.14);cursor:default}
+.rbstop[hidden]{display:none}
+.rbstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;margin:12px 0 10px}
+.rbstat{padding:7px 9px 6px;border-radius:9px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.06);min-width:0}
+.rbk{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbv{display:block;font-family:var(--mono);font-size:19px;font-weight:500;color:#f4f7f9;
+  line-height:1.25;margin-top:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rbv small{font-size:10.5px;color:var(--faint);font-weight:400;margin-left:3px}
+.rbstat.score .rbv{color:var(--rb)}
+.rbspark{display:block;width:100%;height:20px;margin-top:3px}
+.rbspark polyline{fill:none;stroke:var(--rb);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.rbspark circle{fill:var(--rb)}
+.rbmach{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px}
+.rbbox{padding:9px 10px 8px;border-radius:9px;background:rgba(0,0,0,.22);
+  border:1px solid rgba(255,255,255,.07);min-width:0}
+.rbbox.idle{opacity:.82}
+.rbbh{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;min-width:0}
+.rbbn{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:#eef3f5;white-space:nowrap}
+.rbbw{font-size:10.5px;color:var(--faint);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rbbw b{color:var(--dim);font-weight:500}
+.rbm{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:8px;margin:3px 0}
+.rbml{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--faint)}
+.rbbar{height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden}
+.rbbar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#c9d4da,var(--rb));
+  box-shadow:0 0 6px rgba(143,216,234,.35);transition:width .6s ease}
+.rbmv{font-family:var(--mono);font-size:10px;color:var(--dim);white-space:nowrap;
+  font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
+.rbfoot{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-family:var(--mono);
+  font-size:9.5px;color:var(--faint)}
+.rbfoot b{color:var(--text);font-weight:500}
+.rbchg{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07);
+  font-size:11.5px;line-height:1.5;color:var(--dim)}
+.rbchg b{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--rb);font-weight:500;margin-right:6px}
+.rbplan{margin-top:6px;font-size:10.5px;color:var(--faint);line-height:1.45}
+@media (prefers-reduced-motion:reduce){.rbcon::before,.rblive{animation:none}.rbbar i{transition:none}}
+body.novideo .rbcon::before,body.novideo .rblive{animation:none}
 .wtskip[disabled]{color:var(--faint);border-color:rgba(255,255,255,.12);cursor:default}
 /* the living pinwheel (5.2): Claude has its flower — ours spins the
    identity gradient beside whatever is in motion */
@@ -43612,6 +45121,8 @@ function detHtml(name,info,ci){
   let h;
   // Max (6b440): every model, said plainly, with the cost warning
   if(name==="Max")h=maxTierPopHtml(info);
+  // Vera Rubin (6b519): what works on it, and what it promises
+  else if(name==="Vera Rubin")h=rubinTierPopHtml(info);
   // Cloud Only's modes (6b440): the models it would ask, or why it can't
   else if(cloudTierParse(name).mode)h=cloudTierPopHtml(name,info);
   // a server's modes (6b337, 6b426): what it runs, or why it can't
@@ -44136,6 +45647,9 @@ function engMainRows(){
   return ["Fast","Thinking","Pro","Max"].filter(n=>TIER_META[n]).map(n=>
     modeRow(n,TIER_META[n].icon,n,MODE_LABEL[n]||"",!!tierOff[n],"","",tier===n))
     .join("")
+    // VERA RUBIN (6b519): the one mode that runs until it is stopped, under Max
+    +(TIER_META["Vera Rubin"]?modeRow("Vera Rubin",TIER_META["Vera Rubin"].icon,"Vera Rubin",
+      MODE_LABEL["Vera Rubin"]||"",!!tierOff["Vera Rubin"],"rubin","",tier==="Vera Rubin"):"")
     +cloudMenuRow()
     // one row per paired server: its modes open in a sub-menu beside it (6b337)
     +srvMenuRows()
@@ -45672,10 +47186,10 @@ function paintSteps(){
       etaShownT?(nowT-etaShownT)/1000:0);
     etaShownT=nowT;
   }catch(e){}
-  etaTxt=(!streamDone&&el2>5&&eta>=3)
+  etaTxt=(runTier!=="Vera Rubin"&&!streamDone&&el2>5&&eta>=3)
     ?(eta>=90?"~"+Math.round(eta/60)+" min left"
              :"~"+Math.round(eta)+"s left"):"";
-  const nowBtn=(curHid&&liveDrafts>0&&!streamDone)
+  const nowBtn=(runTier!=="Vera Rubin"&&curHid&&liveDrafts>0&&!streamDone)
     ?(hurriedNow
       ?'<button class="wtnow" disabled>Hurrying it along…</button>'
       :'<button class="wtnow">Answer now</button>'):"";
@@ -45985,6 +47499,148 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
   return div;
 }
 
+/* ------------------------------------------------- Vera Rubin's console */
+// ==== rubin-js: begin ====
+// VERA RUBIN (6b519, per Patrick: "where it just sits there and will show Vera
+// Rubin and just goes and goes and goes"): the server's RUBIN frames drawn as a
+// console above the answer. It is the answer's sibling, not inside .body, so
+// the stream's repaints (body.innerHTML, every drip frame) never touch it; its
+// Stop is delegated from the chat (below), never bound to the button itself.
+// The clock ticks on a timer, not rAF (a hidden pane never fires rAF).
+let rubinLive=null;    // the run on screen: {div, stopping, done, el0, at, frames, tick}
+function rbPct(v){return v==null||!Number.isFinite(+v)?null:Math.max(0,Math.min(100,+v));}
+function rbGB(b){return b==null?"?":(b/1073741824).toFixed(b>=10*1073741824?0:1);}
+function rbClock(s){
+  s=Math.max(0,Math.floor(s||0));
+  const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;
+  return (h?h+":"+String(m).padStart(2,"0"):String(m))+":"+String(x).padStart(2,"0");
+}
+function rbBar(lbl,pct,txt){
+  const p=rbPct(pct);
+  return '<div class="rbm"><span class="rbml">'+lbl+'</span><span class="rbbar"><i style="width:'
+    +(p==null?0:p.toFixed(0))+'%"></i></span><span class="rbmv">'
+    +esc(txt!=null?txt:(p==null?"n/a":Math.round(p)+"%"))+'</span></div>';
+}
+// the score after each round, as a line: its own range, so a rise of half a point shows
+function rbSpark(v){
+  v=(v||[]).filter(x=>typeof x==="number"&&x>0);
+  if(v.length<2)return "";
+  const lo=Math.max(0,Math.min(...v)-0.4),hi=Math.min(10,Math.max(...v)+0.4),rg=Math.max(0.5,hi-lo);
+  const pts=v.map((x,i)=>[(i/(v.length-1))*96+2,20-((x-lo)/rg)*17]);
+  const last=pts[pts.length-1];
+  return '<svg class="rbspark" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true"><polyline points="'
+    +pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")+'"/><circle cx="'+last[0].toFixed(1)
+    +'" cy="'+last[1].toFixed(1)+'" r="1.8"/></svg>';
+}
+function rbMachine(m){
+  const busy=m.busy?'<b>'+esc(m.busy)+'</b>'+(m.model?' · '+esc(m.model):""):"idle";
+  let h='<div class="rbbox'+(m.busy?"":" idle")+'"><div class="rbbh"><span class="rbbn">'+esc(m.name||"")
+    +'</span><span class="rbbw">'+busy+'</span></div>';
+  const tps=m.tps>0?'<span><b>'+(+m.tps).toFixed(m.tps>=100?0:1)+'</b> tok/s</span>':'<span>— tok/s</span>';
+  if(m.kind==="mac"){
+    h+=rbBar("GPU",m.gpu)+rbBar("CPU",m.cpu)
+      +rbBar("MEM",m.mem_total?m.mem_used/m.mem_total*100:null,
+        m.mem_total?rbGB(m.mem_used)+" / "+rbGB(m.mem_total)+" GB":null)
+      +'<div class="rbfoot">'+tps
+      +'<span>pressure <b>'+(m.pressure==null?"n/a":Math.round(m.pressure)+"%")+'</b></span>'
+      +'<span title="macOS gives apps a thermal state, not a temperature">thermal <b>'
+      +esc(m.thermal||"n/a")+'</b></span></div>';
+  }else if(m.ok===false){
+    h+='<div class="rbfoot"><span>not answering right now</span></div>';
+  }else{
+    h+=rbBar("GPU",m.gpu)
+      +rbBar("VRAM",m.vram_total?m.vram_used/m.vram_total*100:null,
+        m.vram_total?rbGB(m.vram_used)+" / "+rbGB(m.vram_total)+" GB":null)
+      +rbBar("RAM",m.ram_total?m.ram_used/m.ram_total*100:null,
+        m.ram_total?rbGB(m.ram_used)+" / "+rbGB(m.ram_total)+" GB":null)
+      +'<div class="rbfoot">'+tps
+      +'<span title="the server kit doesn’t report it yet">temp <b>'+(m.temp==null?"n/a":Math.round(m.temp)+"°C")+'</b></span>'
+      +'<span title="the server kit doesn’t report it yet">power <b>'+(m.power==null?"n/a":Math.round(m.power)+" W")+'</b></span></div>';
+  }
+  return h+'</div>';
+}
+const RB_END={stopped:"Stopped. This is the best answer it reached.",
+  settled:"Finished: three rounds in a row brought nothing better.",
+  ceiling:"Finished: it reached its time limit.",gone:"Stopped.",
+  failed:"It couldn’t write a first answer."};
+function rubinHtml(st,ld,live){
+  const done=!!(st.done||live.done);
+  const el=done?(st.el||0):(live.el0+(performance.now()-live.at)/1000);
+  const phase=done?(RB_END[st.reason]||"Finished."):(live.stopping?"stopping… finishing with the best answer"
+    :(st.round?"round "+st.round+" · ":"")+(st.phase||"starting"));
+  const stat=(k,v,cls,extra)=>'<div class="rbstat'+(cls?" "+cls:"")+'"><span class="rbk">'+k+'</span><span class="rbv">'+v+'</span>'+(extra||"")+'</div>';
+  let h='<div class="rbhead"><i class="rblive"></i><span class="rbtitle">VERA RUBIN</span>'
+    +'<span class="rbphase">'+esc(phase)+'</span>'
+    +'<button type="button" class="rbstop"'+(done?" hidden":"")+(live.stopping?" disabled":"")+'>'
+    +(live.stopping?"Stopping…":"Stop")+'</button></div>';
+  h+='<div class="rbstats">'
+    +stat("Round",String(st.round||0),"","")
+    +stat("Sources read",String(st.read||0)+'<small>'+(st.sources||0)+' in pack</small>')
+    +stat("Drafts",String(st.drafts||0))
+    +stat("Claims",String(st.checked||0)+'<small>'+(st.fixed||0)+' fixed</small>')
+    +stat("Score",st.score?(+st.score).toFixed(1)+'<small>/10</small>':"—","score",rbSpark(st.spark))
+    +stat("Elapsed",'<span class="rbel">'+rbClock(el)+'</span>')
+    +'</div>';
+  if(ld&&Array.isArray(ld.m)&&ld.m.length)h+='<div class="rbmach">'+ld.m.map(rbMachine).join("")+'</div>';
+  if(st.changed)h+='<div class="rbchg"><b>What changed</b>'+esc(st.changed)+'</div>';
+  if(st.stalls&&!done)h+='<div class="rbplan">'+st.stalls+' of '+(st.stall_n||3)
+    +' rounds without an improvement: it stops at '+(st.stall_n||3)+'.</div>';
+  return h;
+}
+// fr: the last RUBIN frame of each kind ({start, state, load}), as sent
+function rubinPaint(aiDiv,fr){
+  if(!aiDiv)return;
+  if(!rubinLive||rubinLive.div!==aiDiv)
+    rubinLive={div:aiDiv,stopping:false,done:false,el0:0,at:performance.now(),frames:{},tick:0};
+  const live=rubinLive;
+  let con=aiDiv.querySelector(".rbcon");
+  if(!con){
+    con=document.createElement("div");con.className="rbcon";
+    const b=aiDiv.querySelector(".body");
+    aiDiv.insertBefore(con,b||null);
+  }
+  let st={},ld=null;
+  try{st=fr.state?JSON.parse(fr.state):{};}catch(e){st={};}
+  try{ld=fr.load?JSON.parse(fr.load):null;}catch(e){ld=null;}
+  if(fr.state!==live.frames.state){live.el0=+st.el||0;live.at=performance.now();}
+  live.frames=Object.assign({},fr);live.st=st;live.ld=ld;
+  if(st.done)live.done=true;
+  con.classList.toggle("done",!!live.done);
+  con.innerHTML=rubinHtml(st,ld,live);
+  if(!live.tick&&!live.done){
+    // the clock between frames: a timer (fires in a hidden window, unlike rAF)
+    live.tick=setInterval(()=>{
+      if(live.done||!live.div.isConnected){clearInterval(live.tick);live.tick=0;return;}
+      const c=live.div.querySelector(".rbel");
+      if(c)c.textContent=rbClock(live.el0+(performance.now()-live.at)/1000);
+    },1000);
+  }
+  if(live.done&&live.tick){clearInterval(live.tick);live.tick=0;}
+}
+// the stream ended (any way): the console says so and stops its clock
+function rubinEnd(){
+  if(!rubinLive)return;
+  rubinLive.done=true;
+  rubinPaint(rubinLive.div,rubinLive.frames);
+}
+// STOP, CLEANLY: the request's hurry id (the same channel as Answer now) tells
+// the loop to finish with the best answer it has; the stream then ends on its
+// own and the answer is saved whole. The send button's ■ does the same on its
+// first press during a run; a second press cuts the stream as it always did.
+function rubinStop(){
+  if(!rubinLive||rubinLive.done||rubinLive.stopping||!curHid)return false;
+  rubinLive.stopping=true;
+  api("/api/chat/hurry",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({hid:curHid})}).catch(()=>{});
+  rubinPaint(rubinLive.div,rubinLive.frames);
+  return true;
+}
+inner.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest(".rbstop");
+  if(b&&!b.disabled)rubinStop();
+});
+// ==== rubin-js: end ====
+
 /* -------------------------------------------------------- tok/s meter */
 // throughput readout was removed from the panel; per-message tok/s still
 // appears under each answer
@@ -46023,7 +47679,8 @@ function sendSafe(){
 input.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendSafe();}
 });
-sendBtn.addEventListener("click",()=>{ generating?abortCtl.abort():sendSafe(); });
+// during a Vera Rubin run the first ■ stops it cleanly, a second cuts the stream (6b519)
+sendBtn.addEventListener("click",()=>{ generating?(rubinStop()||abortCtl.abort()):sendSafe(); });
 
 /* ------------------------------------------------------ image paste */
 // paste a screenshot/photo straight into the composer: it becomes a chip,
@@ -46322,6 +47979,8 @@ async function send(){
   resetSteps(body);
   abortCtl=new AbortController();
   let full="",t0=performance.now(),tokEst=0,lastRate=0,wasAborted=false,searched=false,status=null,drafts=[],sources=null,photos=null,mapd=null,locCtx="",places=null,placeHint=null;
+  // Vera Rubin's frames (6b519): the last of each kind, and what was last drawn
+  const rbFr={};let rbSeen="";rubinLive=null;
   // the writer's pace (6b515): the server's RATE frame when it sent one, else
   // the page's own clock from the first character shown after the last RESET
   let rateInfo=null,genT0=0,genCut=-1,lastChunkT=0;
@@ -46484,6 +48143,7 @@ async function send(){
                 }catch(e){}},
         STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);},
         RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}},   // the writer's pace (6b515)
+        RUBIN:j=>{const k=/^\{"k":"(\w+)"/.exec(j);if(k)rbFr[k[1]]=j;},   // Vera Rubin (6b519)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
                      if(!drafts.some(x=>x.m===d.m))drafts.push(d);
@@ -46510,6 +48170,11 @@ async function send(){
                  try{const ad=JSON.parse(j);
                    if(!apSeen.has(ad.jid)){apSeen.add(ad.jid);
                      showApprove(aiDiv,ad);}}catch(e){}}});
+      // Vera Rubin's console, drawn when its frames change (6b519)
+      if(rbFr.start||rbFr.state){
+        const sig=(rbFr.state||"")+"\u0001"+(rbFr.load||"");
+        if(sig!==rbSeen){rbSeen=sig;searched=true;rubinPaint(aiDiv,rbFr);}
+      }
       if(drafts.length||(status&&/of \d+/.test(status)))
         paintDrafts(aiDiv,drafts,true,status);
       // the council reports into the SAME tree the searches use
@@ -46561,6 +48226,7 @@ async function send(){
     }
   }
 
+  if(rubinLive&&rubinLive.div===aiDiv)rubinEnd();      // its clock stops (6b519)
   aiDiv.classList.remove("live");
   collapseSteps(searched?sources:null);   // sources fold in with the steps
   // at rest the label credits the LINEUP, not the last runner: single
@@ -46642,6 +48308,11 @@ async function send(){
     meta.innerHTML='<span class="wbadge">'+esc(where)+'</span>'
       +"<b>"+tps.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
       +" tokens · wrote in "+wrote.toFixed(1)+"s · "+secs.toFixed(1)+"s total";
+    // Vera Rubin's line is its record, not the first writer's pace (6b519)
+    const rbS=rubinLive&&rubinLive.div===aiDiv?rubinLive.st:null;
+    if(rbS)meta.innerHTML='<span class="wbadge">'+esc(where)+'</span><b>Vera Rubin</b> · '
+      +(rbS.round||0)+" round"+(rbS.round===1?"":"s")+" · "+(rbS.read||0)+" sources read · "
+      +(rbS.drafts||0)+" drafts · "+rbClock(rbS.el||secs)+" total";
     aiDiv.appendChild(meta);
     const rec={role:"assistant",content:full};
     if(drafts.length)rec.drafts=drafts;
@@ -46993,7 +48664,7 @@ function chatHash(msgs,n){
 // handler in `on`), then only what follows the last RESET: what the
 // page shows, and what the server saves (turn_text() is its twin; 0b
 // L5, R-2-22, one corpus checks both)
-const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE";
+const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|RUBIN";   // RUBIN: Vera Rubin's console (6b519)
 const FRAME_RX=new RegExp("\u0000("+FRAME_TAGS+"):(.*?)\u0000","g");
 const FRAME_PART=new RegExp("\u0000(?:"+FRAME_TAGS+"):[^\u0000]*$");
 function streamText(raw,on){
@@ -50750,7 +52421,7 @@ function srvMenuRows(){
 // (6b458, per Patrick: "Remove the descriptions next to each of these. They
 // should be self-explanatory. Except for Max: next to that just have 'all
 // models'"): a row says nothing beside its name, except Max and a reason
-const MODE_LABEL={Max:"all models"};
+const MODE_LABEL={Max:"all models","Vera Rubin":"until you stop it"};   // (6b519: it never ends on its own soon)
 const SRV_MODE_DESC={max:"all models"};
 function srvSubRows(s){
   const t="srv:"+s.id,ok=srvPickable(s),ms=s.models||[];
@@ -50891,6 +52562,17 @@ function maxTierPopHtml(info){
         +cl.map(m=>'<div class="mline mcloud">'+esc(m)+' <i>· cloud</i></div>').join(""))
     +'<span class="note warn">'+esc(info.warn||"Uses every model, including paid cloud keys.")+'</span>';
 }
+// Vera Rubin's bubble (6b519): the machines and models it keeps busy, the promise, or why it is off
+function rubinTierPopHtml(info){
+  const loc=info.models||[],cl=info.cloud||[];
+  return "<b>Vera Rubin</b>"
+    +'<div class="mline">Throws everything at one question and keeps improving it until you stop it.</div>'
+    +(info.available===false
+      ?'<div class="mline">'+esc(info.why||"nothing can run it")+'</div>'
+      :loc.map(m=>'<div class="mline">'+esc(m)+(m.indexOf(SRV_SEP)>=0?' <i>· your server</i>':' <i>· this Mac</i>')+'</div>').join("")
+        +cl.map(m=>'<div class="mline mcloud">'+esc(m)+' <i>· cloud</i></div>').join(""))
+    +'<span class="note">'+esc(info.note||"")+'</span>';
+}
 // the chip: "Fast · Claude", "Gemini only", "Thinking · cloud only"
 function cloudTierShown(t){
   const p=cloudTierParse(t),inf=tierInfo[t]||{};
@@ -50902,6 +52584,7 @@ function cloudTierShown(t){
 function tierShown(t){
   if(cloudTierParse(t).mode)return cloudTierShown(t);
   if(t==="Max")return "Max";            // every model: the chip names no seat (6b440)
+  if(t==="Vera Rubin")return "Vera Rubin";   // every machine (6b519)
   if(!isSrvMode(t)){
     // Fast, Thinking or Pro routed to a server says so: "Fast · <your server's name> gpt-oss:20b"
     const sv=((tierInfo[t]||{}).models||[]).filter(m=>m.indexOf(SRV_SEP)>=0);
