@@ -42703,7 +42703,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   color:var(--rb);font-weight:500;margin-right:6px}
 .rbplan{margin-top:6px;font-size:10.5px;color:var(--faint);line-height:1.45}
 @media (prefers-reduced-motion:reduce){.rbcon::before,.rblive{animation:none}.rbbar i{transition:none}}
-body.novideo .rbcon::before,body.novideo .rblive{animation:none}
+.novideo .rbcon::before,.novideo .rblive{animation:none}
 .wtskip[disabled]{color:var(--faint);border-color:rgba(255,255,255,.12);cursor:default}
 /* the living pinwheel (5.2): Claude has its flower — ours spins the
    identity gradient beside whatever is in motion */
@@ -53552,7 +53552,7 @@ function srvMenuRows(){
 // (6b458, per Patrick: "Remove the descriptions next to each of these. They
 // should be self-explanatory. Except for Max: next to that just have 'all
 // models'"): a row says nothing beside its name, except Max and a reason
-const MODE_LABEL={Max:"all models","Vera Rubin":"until you stop it"};   // (6b519: it never ends on its own soon)
+const MODE_LABEL={Max:"all models"};
 const SRV_MODE_DESC={max:"all models"};
 function srvSubRows(s){
   const t="srv:"+s.id,ok=srvPickable(s),ms=s.models||[];

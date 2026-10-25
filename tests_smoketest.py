@@ -37866,14 +37866,14 @@ def _r519_pins(src):
             and "<b>What changed</b>" in page and " tok/s</span>" in page,
         "reduced motion and visual effects off still the console's motion":
             "@media (prefers-reduced-motion:reduce){.rbcon::before,.rblive{animation:none}" in page
-            and "body.novideo .rbcon::before,body.novideo .rblive{animation:none}" in page,
+            and ".novideo .rbcon::before,.novideo .rblive{animation:none}" in page,
         "the send button's first press stops it cleanly; no countdown, no Answer now":
             "generating?(rubinStop()||abortCtl.abort()):sendSafe()" in page
             and 'etaTxt=(runTier!=="Vera Rubin"&&!streamDone' in page
             and 'const nowBtn=(runTier!=="Vera Rubin"&&curHid' in page,
-        "the menu: under Max, its few words, its pop-out, the chip says its name":
+        "the menu: under Max, no words on its row (6b458), its pop-out, the chip says its name":
             '+(TIER_META["Vera Rubin"]?modeRow("Vera Rubin",TIER_META["Vera Rubin"].icon,"Vera Rubin",' in page
-            and '"Vera Rubin":"until you stop it"' in page and 'else if(name==="Vera Rubin")h=rubinTierPopHtml(info);' in page
+            and 'const MODE_LABEL={Max:"all models"};' in page and 'else if(name==="Vera Rubin")h=rubinTierPopHtml(info);' in page
             and "Throws everything at one question and keeps improving it until you stop it." in page
             and 'if(t==="Vera Rubin")return "Vera Rubin";' in page,
         "the saved answer's line is its record": "if(rbS)meta.innerHTML='<span class=\"wbadge\">'+esc(where)+'</span><b>Vera Rubin</b> · '" in page,
