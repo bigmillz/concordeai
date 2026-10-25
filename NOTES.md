@@ -17067,3 +17067,7 @@ mutants, the server code's retry-loop and keep_alive anchors, the 6b516 empty-wr
 fixture's question now carries the figure its critic note uses (a note bringing a number from nowhere is
 dropped now); the council namespaces gain the new helpers; the new per-thread and per-model engine state is
 declared in MACHINE_STATE.
+
+The gauntlet on `quality-2`: run 1 (fd0039a, partly edited mid-run) stopped on a stale 6b516 pin (the verify
+call's text) after failing the new state's MACHINE_STATE lint, two server and two craft mutant anchors and
+three 6b515 pins, all named above and fixed; run 2 (2a97eba): **1199/1199**, exit 0.
