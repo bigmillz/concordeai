@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.1,14.1],\"final\":15.6,\"ftok\":321,\"est\":false}",
+  "X-Hurry": "d8471ca6bf9d2852"
+ },
+ "first_byte_s": 4.02,
+ "first_text_s": 43.1,
+ "elapsed_s": 55.21,
+ "events": [
+  {
+   "t": 4.02,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.02,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 13.38,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.38,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 13.38,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.37,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 33 passages"
+   }
+  },
+  {
+   "t": 15.37,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.37,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.37,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 25.98,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 25.98,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 25.98,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 25.98,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 25.98,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 36.17,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 36.17,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "8 notes"
+   }
+  },
+  {
+   "t": 36.17,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 36.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 36.17,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 43.1,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 46.22,
+   "tag": "RATE",
+   "data": {
+    "tps": 186.0,
+    "tok": 579,
+    "s": 3.1
+   }
+  },
+  {
+   "t": 46.22,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 46.22,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 46.22,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 55.21,
+   "tag": "RESET"
+  },
+  {
+   "t": 55.21,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 7 claims, fixed 1",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 55.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2340 chars"
+   }
+  },
+  {
+   "t": 55.21,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.02,
+   "Searching the web…"
+  ],
+  [
+   13.38,
+   "Reading 8 sources…"
+  ],
+  [
+   15.37,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   25.98,
+   "compositing…"
+  ],
+  [
+   25.98,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   46.22,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 4.02
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.38
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 13.38
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 33 passages",
+   "t_s": 15.37
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.37
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 25.98
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "8 notes",
+   "t_s": 36.17
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 36.17
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 46.22
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 46.22
+  },
+  {
+   "id": "verify",
+   "l": "Checked 7 claims, fixed 1",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 55.21
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2340 chars",
+   "t_s": 55.21
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 55.21
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 25.98,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Apocrine (stress) sweat** is the main culprit for a stronger odor compared with regular eccrine sweat.  \nIt contains proteins and fats that regular sweat lacks, giving bacteria a richer food source to produce odor‑generating acids [1][3][6].\n\nBecause of the extra nutrients, **bacteria on the skin break down the sweat faster**, releasing sulfur‑containing compounds that smell distinctly bad.  Different bacterial species create different “smells” and can make the odor more intense if they thrive in the moist, protein‑rich environment of stress sweat [5][1][7].\n\n**Stress, anxiety, or hormonal changes** are the usual triggers that ramp up apocrine gland activity.  When the body is under pressure, adrenaline releases more of this “nervous” sweat, and the cycle of sweating can actually *increase* the odor rather than diminish it [1][2][3].\n\n### How to fix it\n\n| Fix | Why it helps | Key product notes |\n|-----|--------------|-------------------|\n| **Reduce stress** | Fewer stress‑induced sweat glands fire, lowering protein‑rich sweat | Meditation, breathing, exercise |\n| **Switch to an antiperspirant** (not just deodorant) | Antiperspirants block sweat ducts with aluminum salts, cutting "
+  },
+  {
+   "t_s": 25.98,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 36.17,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- WRONG: **\"apocrine (stress) sweat\" -> \"apocrine sweat\" [2][3][5]** (stress sweat is a *type* of apocrine sweat, not synonymous with it).\n- CONTRADICTS: \"antiperspirant [...] cuts the amount of sweat\" **vs.** the table’s antiperspirant note (\"prevent sweat\") + evidence that it blocks ducts [7]—clarify that it *prevents* sweat entirely, not just reduces volume.\n- CONTRADICTS: \"apocrine sweat [...] milky, white liquid\" [5] **vs.** draft’s claim that it \"contains proteins and fats\" (it does, but the draft omits that it’s *also* odorless unless bacteria act on it—[5] contradicts the draft’s implication that the proteins/fats alone cause odor).\n- MISSING: **mechanism of \"stress sweat\" amplification** (why stress sweat triggers *more* bacteria activity than regular sweat in the same environment).\n- MISSING: **scalp-specific causes** (question didn’t limit scope; evidence includes scalp odor as a potential trigger [4]).\n- MISSING: **eccrine sweat’s role in worsening odor** (evidence notes eccrine sweat is mostly water [6], but draft doesn’t explain why *both* gland types might interact in odor).\n- STRUCTURE: **table format misfires**—steps like \"wash clothes often\" and \"apply body wipes\""
+  }
+ ],
+ "sources": [
+  {
+   "t": "Here's Why Stress Sweat Smells Worse Than Normal Sweat",
+   "u": "https://thompsontee.com/blogs/news/stress-sweat-smells",
+   "d": "2021-10-04"
+  },
+  {
+   "t": "Stress Sweat v Regular Sweat; Why it smells worse and how to...",
+   "u": "https://drbaileyskincare.com/blogs/blog/stress-sweat-v-regular-sweat-why-it-smells-worse-and-how-to-manage-it",
+   "d": ""
+  },
+  {
+   "t": "Anxiety Can Make Your Sweat Smell Worse, Because... | HuffPost Life",
+   "u": "https://www.huffpost.com/entry/anxiety-sweat-smells-worse-than-regular-sweat_n_570553cee4b0b90ac27103a7",
+   "d": "2016-04-07"
+  },
+  {
+   "t": "Smelly Scalp: Causes, Shampoos & At-Home Treatments",
+   "u": "https://my.clevelandclinic.org/health/symptoms/24751-smelly-scalp",
+   "d": "2023-02-20"
+  },
+  {
+   "t": "Why Antiperspirant Makes You Smell Worse | Thrive Market",
+   "u": "https://thrivemarket.com/blog/heres-why-antiperspirant-makes-you-smell-worse-and-what-to-use-instead",
+   "d": "2016-03-23"
+  },
+  {
+   "t": "What Is Sweat & Why Do We Sweat? | Cleveland Clinic",
+   "u": "https://my.clevelandclinic.org/health/body/sweat",
+   "d": "2024-08-15"
+  },
+  {
+   "t": "Can Antiperspirants Make Your Sweat Smell Worse? - Science World",
+   "u": "https://www.scienceworld.ca/stories/can-antiperspirants-make-your-sweat-smell-worse/",
+   "d": "2018-03-21"
+  },
+  {
+   "t": "What Causes Body Odor? 7 Causes of Bad Sweat Smell",
+   "u": "https://www.ejisinc.com/blogs/news/what-causes-body-odor",
+   "d": "2020-01-15"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   36.17,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   36.17,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 186.0,
+  "tok": 579,
+  "s": 3.1
+ },
+ "answer_raw": "Your body still makes the same sweat, but the mix of glands and the bacteria that live on you have shifted.\n\n**Apocrine (stress) sweat** comes from the same glands that produce body odor. It contains proteins and fats that eccrine sweat lacks, giving skin bacteria a richer food source. When the body is under stress, adrenaline ramps up apocrine activity, so more of this nutrient‑rich fluid pours out. Bacteria then break it down into acids and sulfur‑related compounds, which give the distinct “bad” smell you notice. The sweat itself is odorless; the odor originates from bacterial metabolism.\n\nEccrine sweat is mostly water—about **99 %**—and carries a little salt, so on its own it tends to smell mild. When apocrine sweat mixes with eccrine sweat, the extra protein content can accelerate bacterial growth, making the overall odor stronger. The average person produces roughly a litre of sweat a day from around 3 million glands [7][6].\n\nScalp odor follows the same principle: sweat, skin cells, and sebum build up and feed bacteria, especially if hair care practices leave residue behind. Keeping the scalp clean and dry helps reduce this source of odor [4].\n\nFixes that actually cut the smell focus on the two drivers—more sweat and bacterial activity:\n\n* **Reduce the trigger** – Stress‑management techniques (mindful breathing, short walks, or even a quick stretch) lower adrenaline, so fewer apocrine glands fire.\n* **Prevent sweat from reaching the skin** – Antiperspirants use aluminum salts to block sweat ducts, effectively stopping sweat from emerging. Antiperspirants significantly reduce sweat production, but they don’t stop it entirely. [7].\n* **Kill or suppress the bacteria** – Antibacterial deodorants (with zinc‑oxide or chlorhexidine) or antibacterial soaps remove microbes before they can metabolize sweat.\n* **Keep the area dry and clean** – Wash clothes in hot water, dry them fully, and use talc‑based powders or cornstarch to absorb moisture.\n* **If the problem persists** – A dermatologist can check for skin conditions or hormonal imbalances that might be driving excess apocrine activity and may prescribe stronger antiperspirants or topical treatments.\n\nBy tackling both the source (stress‑induced apocrine sweat) and the microbes that turn it into odor, you’ll bring the smell back to a manageable level.",
+ "answer": "Your body still makes the same sweat, but the mix of glands and the bacteria that live on you have shifted.\n\n**Apocrine (stress) sweat** comes from the same glands that produce body odor. It contains proteins and fats that eccrine sweat lacks, giving skin bacteria a richer food source. When the body is under stress, adrenaline ramps up apocrine activity, so more of this nutrient‑rich fluid pours out. Bacteria then break it down into acids and sulfur‑related compounds, which give the distinct “bad” smell you notice. The sweat itself is odorless; the odor originates from bacterial metabolism.\n\nEccrine sweat is mostly water—about **99 %**—and carries a little salt, so on its own it tends to smell mild. When apocrine sweat mixes with eccrine sweat, the extra protein content can accelerate bacterial growth, making the overall odor stronger. The average person produces roughly a litre of sweat a day from around 3 million glands [7][6].\n\nScalp odor follows the same principle: sweat, skin cells, and sebum build up and feed bacteria, especially if hair care practices leave residue behind. Keeping the scalp clean and dry helps reduce this source of odor [4].\n\nFixes that actually cut the smell focus on the two drivers—more sweat and bacterial activity:\n\n* **Reduce the trigger** – Stress‑management techniques (mindful breathing, short walks, or even a quick stretch) lower adrenaline, so fewer apocrine glands fire.\n* **Prevent sweat from reaching the skin** – Antiperspirants use aluminum salts to block sweat ducts, effectively stopping sweat from emerging. Antiperspirants significantly reduce sweat production, but they don’t stop it entirely. [7].\n* **Kill or suppress the bacteria** – Antibacterial deodorants (with zinc‑oxide or chlorhexidine) or antibacterial soaps remove microbes before they can metabolize sweat.\n* **Keep the area dry and clean** – Wash clothes in hot water, dry them fully, and use talc‑based powders or cornstarch to absorb moisture.\n* **If the problem persists** – A dermatologist can check for skin conditions or hormonal imbalances that might be driving excess apocrine activity and may prescribe stronger antiperspirants or topical treatments.\n\nBy tackling both the source (stress‑induced apocrine sweat) and the microbes that turn it into odor, you’ll bring the smell back to a manageable level.",
+ "chars": 2340,
+ "raw_bytes": 10446,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.6,
+ "rate_gen_tok_s": 48.31,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2-server-think",
+ "asked_at": "2026-10-24T23:13:51",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

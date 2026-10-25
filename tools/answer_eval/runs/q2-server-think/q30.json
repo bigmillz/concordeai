@@ -1,0 +1,332 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":0.0,\"models\":[10.5,9.4],\"final\":11.1,\"ftok\":286,\"est\":false}",
+  "X-Hurry": "7d6aec47b50c2d2a"
+ },
+ "first_byte_s": 4.33,
+ "first_text_s": 59.71,
+ "elapsed_s": 75.27,
+ "events": [
+  {
+   "t": 4.33,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 24.34,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 28.17,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 988
+  },
+  {
+   "t": 28.17,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 28.18,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 28.18,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 28.18,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 44.37,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 458
+  },
+  {
+   "t": 44.37,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "3 notes · 5 dropped"
+   }
+  },
+  {
+   "t": 44.37,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 44.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 44.37,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 59.71,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 60.93,
+   "tag": "RATE",
+   "data": {
+    "tps": 191.1,
+    "tok": 233,
+    "s": 1.2
+   }
+  },
+  {
+   "t": 60.93,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 60.93,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 60.93,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 75.27,
+   "tag": "RESET"
+  },
+  {
+   "t": 75.27,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 3 claims, fixed 2",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 75.27,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "938 chars"
+   }
+  },
+  {
+   "t": 75.27,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.33,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   24.34,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   28.18,
+   "compositing…"
+  ],
+  [
+   28.18,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   60.93,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 28.18
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "3 notes · 5 dropped",
+   "t_s": 44.37
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 44.37
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 60.93
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 60.93
+  },
+  {
+   "id": "verify",
+   "l": "Checked 3 claims, fixed 2",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 75.27
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "938 chars",
+   "t_s": 75.27
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 75.27
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 28.17,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "4‑bit quantization replaces the 32‑bit floating‑point weights in a language model with 4‑bit integer representations, shrinking the model size by roughly **8×** and cutting GPU memory traffic.  \nThe trade‑off is a loss of numerical precision: small weight differences that influence logits can be rounded, which typically reduces perplexity by a few percent and can hurt downstream tasks that depend on fine‑grained probability distinctions.  \n\nIt matters most when you need to run a large LLM on limited hardware—edge devices, inference‑only GPUs with < 8 GB VRAM, or when you want to serve many concurrent requests with tight latency budgets. In those cases the memory savings and bandwidth reduction outweigh the modest accuracy dip. If you’re fine‑tuning or training from scratch, or if the application is highly sensitive to small prediction shifts (e.g., medical diagnostics), 4‑bit quantization is usually avoided or combined with careful calibration and post‑training adjustments."
+  },
+  {
+   "t_s": 28.17,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 44.37,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **CONTRADICTS:** \"reduces perplexity by a few percent\" — earlier states it hurts downstream tasks; *quantization raises perplexity* (lower = better).\n- **CONTRADICTS:** \"4-bit quantization is usually avoided or combined with careful calibration\" — later says it is used in limited-hardware cases where the trade-off is acceptable.\n- **WRONG:** \"GPU memory traffic\" -> refers to memory *bandwidth*, not traffic (no source defines \"traffic\" in this context)."
+  }
+ ],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   44.37,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   44.37,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": false,
+ "rate_writer": {
+  "tps": 191.1,
+  "tok": 233,
+  "s": 1.2
+ },
+ "answer_raw": "4‑bit quantization replaces each 32-bit floating-point weight in an LLM with a 4-bit integer, shrinking the model size by roughly **8×** and cutting GPU memory *traffic*.\nThe trade-off is a loss of numerical precision: the finer gradations of weight values are rounded, which **typically reduces perplexity by a few percent** and can hurt downstream tasks that rely on subtle probability differences.\n\nIt matters most when you must run a large model on constrained hardware—edge devices, inference‑only GPUs with less than 8 GB VRAM, or when you need to serve many concurrent requests with tight latency budgets. In those scenarios the memory‑bandwidth savings outweigh the modest accuracy dip.\n\nFor fine‑tuning, training from scratch, or highly sensitive applications (e.g., medical diagnostics), 4‑bit quantization is usually avoided or used only with careful per‑layer calibration and post‑training adjustments to keep errors in check.",
+ "answer": "4‑bit quantization replaces each 32-bit floating-point weight in an LLM with a 4-bit integer, shrinking the model size by roughly **8×** and cutting GPU memory *traffic*.\nThe trade-off is a loss of numerical precision: the finer gradations of weight values are rounded, which **typically reduces perplexity by a few percent** and can hurt downstream tasks that rely on subtle probability differences.\n\nIt matters most when you must run a large model on constrained hardware—edge devices, inference‑only GPUs with less than 8 GB VRAM, or when you need to serve many concurrent requests with tight latency budgets. In those scenarios the memory‑bandwidth savings outweigh the modest accuracy dip.\n\nFor fine‑tuning, training from scratch, or highly sensitive applications (e.g., medical diagnostics), 4‑bit quantization is usually avoided or used only with careful per‑layer calibration and post‑training adjustments to keep errors in check.",
+ "chars": 938,
+ "raw_bytes": 4852,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 3.12,
+ "rate_gen_tok_s": 15.07,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2-server-think",
+ "asked_at": "2026-10-24T23:33:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

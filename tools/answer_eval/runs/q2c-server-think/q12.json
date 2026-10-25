@@ -1,0 +1,468 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.2,14.1],\"final\":15.8,\"ftok\":332,\"est\":false}",
+  "X-Hurry": "e9098614a5b59d7f"
+ },
+ "first_byte_s": 2.99,
+ "first_text_s": 47.95,
+ "elapsed_s": 68.62,
+ "events": [
+  {
+   "t": 2.99,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.99,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 14.37,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.37,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.37,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.28,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 26 passages"
+   }
+  },
+  {
+   "t": 16.28,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.28,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.28,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 27.4,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 27.4,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 27.46,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 27.46,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 27.46,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 39.53,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 39.53,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "6 notes"
+   }
+  },
+  {
+   "t": 39.53,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 39.53,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 39.53,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 47.95,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 51.37,
+   "tag": "RATE",
+   "data": {
+    "tps": 180.5,
+    "tok": 616,
+    "s": 3.4
+   }
+  },
+  {
+   "t": 51.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 51.37,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 51.37,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 68.62,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Couldn’t check the facts in time — answer kept",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 68.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2467 chars"
+   }
+  },
+  {
+   "t": 68.62,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.99,
+   "Searching the web…"
+  ],
+  [
+   14.37,
+   "Reading 8 sources…"
+  ],
+  [
+   16.28,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   27.46,
+   "compositing…"
+  ],
+  [
+   27.46,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   51.37,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 2.99
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.37
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.37
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 26 passages",
+   "t_s": 16.28
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.28
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 27.46
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "6 notes",
+   "t_s": 39.53
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 39.53
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 51.37
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 51.37
+  },
+  {
+   "id": "verify",
+   "l": "Couldn’t check the facts in time — answer kept",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 68.62
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2467 chars",
+   "t_s": 68.62
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 68.62
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 27.4,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "**Why the odor has sharpened**\n\n- **Stress‑induced sweat is richer in proteins and fats** than exercise sweat, giving bacteria more food to grow on and creating a stronger stink [3][7].  \n- **Apocrine glands**, the “body‑odor” glands, are activated by adrenaline and are located in hairy areas (underarms, groin, scalp). Their milky secretions are almost odorless until bacteria break them down [4].  \n- **Hormonal or metabolic shifts** (e.g., puberty, pregnancy, thyroid changes) can alter sweat composition, making it smell harsher [2].  \n- **Antiperspirants that block pores** can trap sweat and bacteria, sometimes amplifying odor [5].  \n- **Increased skin moisture and hair** create a perfect environment for bacteria, especially if hygiene lapses [6].\n\n**What actually works**\n\n1. **Hygiene** – shower daily, wash underarms with antibacterial soap, and dry thoroughly.  \n2. **Antiperspirant choice** – use a clinical‑strength product with aluminum chloride; avoid fragrances that can irritate skin [5].  \n3. **Clothing** – wear breathable, moisture‑wicking fabrics; change clothes after sweat‑heavy activities.  \n4. **Laundry** – wash towels and clothing in hot water (≥60 °C) with a detergent "
+  },
+  {
+   "t_s": 27.4,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 39.53,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- WRONG: **\"7 Causes of Bad Sweat Smell\"** → the evidence lists \"What Causes Body Odor? 7 Causes of Bad Sweat Smell\" as the title, but does not list or describe any specific \"7 causes\" in the snippet [2]. The snippet only refers to it as a title and does not provide enumerated causes.\n- WRONG: **\"What Can Covid-19 Teach Us About the Mysteries of Smell?\"** → This phrase is part of a *list of topics* in the snippet [1], not a standalone fact or answer to the question [1].\n- WRONG: **\"We’re told in Biology 101 that sweat is the body’s natural thermoregulation system...\"** → This is a *general claim* in the snippet [5], but no direct evidence from the snippet states that this is a *current* or *specific* cause of why sweat smells worse *today* than it used to, nor does it provide a direct answer to why the smell has *changed* over time.\n- **OUT-OF-DATE**: **\"wash towels and clothing in hot water (≥60 °C)\"** — The evidence does not specify whether this is still a best practice or if newer laundry detergents, fabrics, or washing machines have rendered this outdated. Modern energy efficiency trends may discourage this method (2025+).\n- **OUT-OF-DATE**: **\"clinical-strength product with al"
+  }
+ ],
+ "sources": [
+  {
+   "t": "News: Body Odor May Smell Worse to You Than... (The New York ...",
+   "u": "https://www.ncbi.nlm.nih.gov/search/research-news/15460/",
+   "d": "2012-01-01"
+  },
+  {
+   "t": "What Causes Body Odor? 7 Causes of Bad Sweat Smell",
+   "u": "https://www.ejisinc.com/blogs/news/what-causes-body-odor",
+   "d": "2020-01-15"
+  },
+  {
+   "t": "Here's Why Stress Sweat Smells Worse Than Normal Sweat",
+   "u": "https://thompsontee.com/blogs/news/stress-sweat-smells",
+   "d": "2021-10-04"
+  },
+  {
+   "t": "Stress Sweat v Regular Sweat; Why it smells worse and how to...",
+   "u": "https://drbaileyskincare.com/blogs/blog/stress-sweat-v-regular-sweat-why-it-smells-worse-and-how-to-manage-it",
+   "d": ""
+  },
+  {
+   "t": "Why Antiperspirant Makes You Smell Worse | Thrive Market",
+   "u": "https://thrivemarket.com/blog/heres-why-antiperspirant-makes-you-smell-worse-and-what-to-use-instead",
+   "d": "2016-03-23"
+  },
+  {
+   "t": "Smelling Sickness - NIH News in Health",
+   "u": "https://newsinhealth.nih.gov/2018/09/smelling-sickness",
+   "d": "2018-09"
+  },
+  {
+   "t": "Anxiety Can Make Your Sweat Smell Worse, Because... | HuffPost Life",
+   "u": "https://www.huffpost.com/entry/anxiety-sweat-smells-worse-than-regular-sweat_n_570553cee4b0b90ac27103a7",
+   "d": "2016-04-07"
+  },
+  {
+   "t": "Advancing frontiers in skin offensive odor management: from ...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/40056222/",
+   "d": "2025-03-08"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   39.53,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   39.53,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 180.5,
+  "tok": 616,
+  "s": 3.4
+ },
+ "answer_raw": "Your sweat has gotten harsher mainly because the composition and the skin environment have changed. **Stress‑induced sweat** is richer in proteins and fats than exercise sweat, giving bacteria more food to grow on and producing a stronger odor [3][7]. The glands that release this “nervous” sweat are **apocrine glands** located in hairy areas (underarms, groin, scalp); their milky secretions are almost odorless until bacteria break them down [4]. Hormonal or metabolic shifts—such as puberty, pregnancy, or thyroid changes—can alter sweat chemistry, making it smell harsher [2]. When antiperspirants block pores, sweat and bacteria can become trapped, sometimes amplifying odor [5]. Finally, increased skin moisture and hair create a perfect environment for bacteria, especially if hygiene lapses [6].\n\n**What actually works**\n\n1. **Hygiene** – shower daily, wash underarms with an antibacterial soap, and dry thoroughly.  \n2. **Antiperspirant choice** – use a clinical‑strength product containing aluminum chloride; avoid fragrance‑laden formulas that can irritate skin [5].  \n3. **Clothing** – wear breathable, moisture‑wicking fabrics; change clothes after sweat‑heavy activities.  \n4. **Laundry** – wash towels and clothing in hot water (≥60 °C) with a detergent that kills bacteria [2] (the evidence does not state whether newer detergents or energy‑efficient machines have changed this recommendation).  \n5. **Diet** – cut back on spicy foods, onions, garlic, and alcohol; these can influence sweat odor [2].  \n6. **Stress management** – practice relaxation techniques, exercise, or therapy to lower adrenaline‑driven sweat [3][7].  \n7. **Medical check‑up** – if the change is sudden, severe, or accompanied by rash, consult a dermatologist or endocrinologist; conditions like hyperhidrosis or infections may need prescription treatment [8].\n\n**Quick fixes to try tonight**\n\n- Wash underarms with antibacterial soap, dry, and apply a light layer of antiperspirant.  \n- Wear fresh, breathable clothing the next day.  \n- If the odor persists, schedule a dermatologist visit to rule out underlying skin or hormonal issues.\n\nThe evidence does not provide a specific list of the “7 causes” mentioned in the title of source [2]; it only references the article. It also does not specify any updated laundry practices beyond the hot‑water recommendation. For any new products or guidelines released after 2025, check current dermatology or consumer‑health resources.",
+ "answer": "Your sweat has gotten harsher mainly because the composition and the skin environment have changed. **Stress‑induced sweat** is richer in proteins and fats than exercise sweat, giving bacteria more food to grow on and producing a stronger odor [3][7]. The glands that release this “nervous” sweat are **apocrine glands** located in hairy areas (underarms, groin, scalp); their milky secretions are almost odorless until bacteria break them down [4]. Hormonal or metabolic shifts—such as puberty, pregnancy, or thyroid changes—can alter sweat chemistry, making it smell harsher [2]. When antiperspirants block pores, sweat and bacteria can become trapped, sometimes amplifying odor [5]. Finally, increased skin moisture and hair create a perfect environment for bacteria, especially if hygiene lapses [6].\n\n**What actually works**\n\n1. **Hygiene** – shower daily, wash underarms with an antibacterial soap, and dry thoroughly.  \n2. **Antiperspirant choice** – use a clinical‑strength product containing aluminum chloride; avoid fragrance‑laden formulas that can irritate skin [5].  \n3. **Clothing** – wear breathable, moisture‑wicking fabrics; change clothes after sweat‑heavy activities.  \n4. **Laundry** – wash towels and clothing in hot water (≥60 °C) with a detergent that kills bacteria [2] (the evidence does not state whether newer detergents or energy‑efficient machines have changed this recommendation).  \n5. **Diet** – cut back on spicy foods, onions, garlic, and alcohol; these can influence sweat odor [2].  \n6. **Stress management** – practice relaxation techniques, exercise, or therapy to lower adrenaline‑driven sweat [3][7].  \n7. **Medical check‑up** – if the change is sudden, severe, or accompanied by rash, consult a dermatologist or endocrinologist; conditions like hyperhidrosis or infections may need prescription treatment [8].\n\n**Quick fixes to try tonight**\n\n- Wash underarms with antibacterial soap, dry, and apply a light layer of antiperspirant.  \n- Wear fresh, breathable clothing the next day.  \n- If the odor persists, schedule a dermatologist visit to rule out underlying skin or hormonal issues.\n\nThe evidence does not provide a specific list of the “7 causes” mentioned in the title of source [2]; it only references the article. It also does not specify any updated laundry practices beyond the hot‑water recommendation. For any new products or guidelines released after 2025, check current dermatology or consumer‑health resources.",
+ "chars": 2467,
+ "raw_bytes": 8260,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.99,
+ "rate_gen_tok_s": 29.84,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2c-server-think",
+ "asked_at": "2026-10-25T00:37:02",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

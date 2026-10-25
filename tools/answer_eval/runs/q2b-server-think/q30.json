@@ -1,0 +1,319 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":0.0,\"models\":[14.5,15.0],\"final\":16.8,\"ftok\":385,\"est\":false}",
+  "X-Hurry": "29312bc8393a9ca6"
+ },
+ "first_byte_s": 4.91,
+ "first_text_s": 26.54,
+ "elapsed_s": 41.69,
+ "events": [
+  {
+   "t": 4.91,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 10.5,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 10.5,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 10.56,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 10.56,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 10.56,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 18.83,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 580
+  },
+  {
+   "t": 18.83,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "4 notes · 4 dropped"
+   }
+  },
+  {
+   "t": 18.83,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 18.83,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 18.83,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 26.54,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 30.65,
+   "tag": "RATE",
+   "data": {
+    "tps": 174.5,
+    "tok": 717,
+    "s": 4.1
+   }
+  },
+  {
+   "t": 30.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 30.65,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 30.65,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 41.69,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 10 claims, all held",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 41.69,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2869 chars"
+   }
+  },
+  {
+   "t": 41.69,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.91,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   10.56,
+   "compositing…"
+  ],
+  [
+   10.56,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   30.65,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 10.56
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "4 notes · 4 dropped",
+   "t_s": 18.83
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 18.83
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 30.65
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 30.65
+  },
+  {
+   "id": "verify",
+   "l": "Checked 10 claims, all held",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 41.69
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2869 chars",
+   "t_s": 41.69
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 41.69
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 10.5,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "4‑bit quantization turns each weight from a 32‑bit float into a 4‑bit integer (often signed int4).  \nThe transform is usually a linear mapping  \n\n\\[\nw_{\\text{quant}} = \\operatorname{round}\\!\\left(\\frac{w - \\min}{\\max - \\min}\\times 15\\right)-8,\n\\]\n\nso that the full float range \\([\\,\\min ,\\,\\max\\,]\\) is compressed into 16 discrete levels.  \nActivations can be quantized similarly, but most 4‑bit pipelines use *weight‑only* quantization to keep runtime hardware simpler.\n\n**When it matters**\n\n| Scenario | Benefit | Caveat |\n|----------|---------|--------|\n| **Memory‑constrained inference** (e.g., 7 B on an 8 GB GPU) | Cuts weight memory to **1/8** of FP16, freeing VRAM for larger batch sizes or higher‑rank models. | Requires careful calibration; naive quantization can drop accuracy 2–4 % on language‑generation metrics. |\n| **Edge or mobile deployment** | Enables on‑device inference with negligible bandwidth for model loading and faster warm‑start. | May need per‑layer scaling factors and extra compute for de‑quantization; not all accelerators support 4‑bit operations natively. |\n| **Cost‑sensitive cloud inference** | Reduces storage and memory‑bandwidth costs, often enough to switch fro"
+  },
+  {
+   "t_s": 10.5,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 18.83,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- CONTRADICTS: \"weight-only quantization\" vs. table’s \"activations can be quantized similarly\" — the draft claims exclusivity in one place but acknowledges flexibility in another.\n- MISSING: **precision loss for dynamic ranges** (e.g., outliers in residual streams or attention weights) beyond calibration trade-offs.\n- MISSING: **quantization method’s impact on attention mechanisms** (e.g., whether softmax gradients stabilize under int4).\n- MISSING: **fine-tuning caveat for gradient checkpointing** (4-bit updates may break gradient accumulation in memory-constrained setups)."
+  }
+ ],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   18.83,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   18.83,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": false,
+ "rate_writer": {
+  "tps": 174.5,
+  "tok": 717,
+  "s": 4.1
+ },
+ "answer_raw": "4‑bit quantization compresses every 32‑bit weight into a **4‑bit signed integer** (16 discrete levels), shrinking the weight tensor to **1/8** the size of FP32 and to **1/4** of FP16.\n\nThe usual mapping is  \n\n\\[\nw_{\\text{q}}=\\operatorname{round}\\!\\left(\\frac{w-\\min}{\\max-\\min}\\times15\\right)-8,\n\\]\n\nwhere *min* and *max* are per‑layer calibration values.  \nMost production pipelines use **weight‑only** quantization because it keeps the runtime hardware simple, but activations can be quantized in the same way if the accelerator supports int4 math.\n\n### What the math does to the model\n\n* **Dynamic‑range sensitivity** – If a layer contains a few extreme outliers, the linear map can push many useful weights into a single quantization bin, increasing error. Per‑layer scaling and zero‑point calibration mitigate this but cannot fully eliminate it.  \n* **Attention mechanics** – The soft‑max in self‑attention uses the dot‑product of quantized queries and keys. While int4 dot‑products are fine for forward passes, the resulting logits can be noisier, slightly degrading probability calibration. In practice, the impact on perplexity is usually below 1 % when the scaling is tuned.  \n* **Gradient flow** – During fine‑tuning, the weights stay in int4, but gradients are still accumulated in float32 (or float16). If you enable gradient checkpointing, the reduced precision can break accumulation in the backward pass; most frameworks therefore keep the checkpointed activations in higher precision or disable checkpointing for int4 models.\n\n### When 4‑bit matters\n\n| Scenario | Benefit | Caveat |\n|----------|---------|--------|\n| **Memory‑constrained inference** (e.g., a 7 B model on an 8 GB GPU) | **8×** memory savings lets you fit the model or run larger batches. | Requires careful calibration; typical accuracy loss is **2–4 %** on generation benchmarks. |\n| **Edge or mobile deployment** | Enables on‑device inference with minimal model download and fast warm‑start. | Hardware must support int4 ops; otherwise you need extra CPU de‑quantization, which can offset the speed gain. |\n| **Cost‑sensitive cloud inference** | Reduces storage and bandwidth, sometimes allowing cheaper GPU or CPU instances. | The same accuracy trade‑off applies; validate against your SLA. |\n| **Fine‑tuning or LoRA updates** | QLoRA keeps weights at int4 while gradients stay high‑precision, allowing training on modest GPUs. | Requires a quantization‑aware training pipeline; gradient checkpointing can break with 4‑bit, so either avoid it or use float‑32 checkpoints. |\n\n### Bottom line\n\nIf you must squeeze a large LLM into limited memory or run it on low‑power hardware, 4‑bit quantization is the go‑to choice. For cloud inference where top‑level accuracy is critical, stay with **8‑bit** or **FP16** unless you’ve validated that the 2–4 % drop is acceptable for your workload.",
+ "answer": "4‑bit quantization compresses every 32‑bit weight into a **4‑bit signed integer** (16 discrete levels), shrinking the weight tensor to **1/8** the size of FP32 and to **1/4** of FP16.\n\nThe usual mapping is  \n\n\\[\nw_{\\text{q}}=\\operatorname{round}\\!\\left(\\frac{w-\\min}{\\max-\\min}\\times15\\right)-8,\n\\]\n\nwhere *min* and *max* are per‑layer calibration values.  \nMost production pipelines use **weight‑only** quantization because it keeps the runtime hardware simple, but activations can be quantized in the same way if the accelerator supports int4 math.\n\n### What the math does to the model\n\n* **Dynamic‑range sensitivity** – If a layer contains a few extreme outliers, the linear map can push many useful weights into a single quantization bin, increasing error. Per‑layer scaling and zero‑point calibration mitigate this but cannot fully eliminate it.  \n* **Attention mechanics** – The soft‑max in self‑attention uses the dot‑product of quantized queries and keys. While int4 dot‑products are fine for forward passes, the resulting logits can be noisier, slightly degrading probability calibration. In practice, the impact on perplexity is usually below 1 % when the scaling is tuned.  \n* **Gradient flow** – During fine‑tuning, the weights stay in int4, but gradients are still accumulated in float32 (or float16). If you enable gradient checkpointing, the reduced precision can break accumulation in the backward pass; most frameworks therefore keep the checkpointed activations in higher precision or disable checkpointing for int4 models.\n\n### When 4‑bit matters\n\n| Scenario | Benefit | Caveat |\n|----------|---------|--------|\n| **Memory‑constrained inference** (e.g., a 7 B model on an 8 GB GPU) | **8×** memory savings lets you fit the model or run larger batches. | Requires careful calibration; typical accuracy loss is **2–4 %** on generation benchmarks. |\n| **Edge or mobile deployment** | Enables on‑device inference with minimal model download and fast warm‑start. | Hardware must support int4 ops; otherwise you need extra CPU de‑quantization, which can offset the speed gain. |\n| **Cost‑sensitive cloud inference** | Reduces storage and bandwidth, sometimes allowing cheaper GPU or CPU instances. | The same accuracy trade‑off applies; validate against your SLA. |\n| **Fine‑tuning or LoRA updates** | QLoRA keeps weights at int4 while gradients stay high‑precision, allowing training on modest GPUs. | Requires a quantization‑aware training pipeline; gradient checkpointing can break with 4‑bit, so either avoid it or use float‑32 checkpoints. |\n\n### Bottom line\n\nIf you must squeeze a large LLM into limited memory or run it on low‑power hardware, 4‑bit quantization is the go‑to choice. For cloud inference where top‑level accuracy is critical, stay with **8‑bit** or **FP16** unless you’ve validated that the 2–4 % drop is acceptable for your workload.",
+ "chars": 2869,
+ "raw_bytes": 6228,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.2,
+ "rate_gen_tok_s": 47.34,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2b-server-think",
+ "asked_at": "2026-10-25T00:21:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[15.0,13.5],\"final\":15.2,\"ftok\":278,\"est\":false}",
+  "X-Hurry": "252bf7453f365f08"
+ },
+ "first_byte_s": 3.83,
+ "first_text_s": 52.94,
+ "elapsed_s": 70.32,
+ "events": [
+  {
+   "t": 3.83,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.83,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 14.84,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.84,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.84,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.76,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 20 passages"
+   }
+  },
+  {
+   "t": 18.76,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.76,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.76,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 33.06,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1200
+  },
+  {
+   "t": 33.06,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 33.06,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 33.06,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 33.06,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 43.19,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1112
+  },
+  {
+   "t": 43.19,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "6 notes · 2 dropped"
+   }
+  },
+  {
+   "t": 43.19,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 43.19,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 43.19,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 52.94,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 55.86,
+   "tag": "RATE",
+   "data": {
+    "tps": 182.3,
+    "tok": 531,
+    "s": 2.9
+   }
+  },
+  {
+   "t": 55.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 55.86,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 55.86,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 70.32,
+   "tag": "RESET"
+  },
+  {
+   "t": 70.32,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 10 claims, fixed 2",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 70.32,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2124 chars"
+   }
+  },
+  {
+   "t": 70.32,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.83,
+   "Searching the web…"
+  ],
+  [
+   14.84,
+   "Reading 8 sources…"
+  ],
+  [
+   18.76,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   33.06,
+   "compositing…"
+  ],
+  [
+   33.06,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   55.86,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 3.83
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.84
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.84
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 20 passages",
+   "t_s": 18.76
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.76
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 33.06
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "6 notes · 2 dropped",
+   "t_s": 43.19
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 43.19
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 55.86
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 55.86
+  },
+  {
+   "id": "verify",
+   "l": "Checked 10 claims, fixed 2",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 70.32
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2124 chars",
+   "t_s": 70.32
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 70.32
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 33.06,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Short answer: AI **won’t wholesale replace a sysadmin in the next five years**—it will automate many routine tasks, but the role will evolve rather than vanish.  \n\n**Displacement risk**  \n- The World Economic Forum projects that about **22 % of jobs worldwide will be disrupted by 2030**, yet the same study forecasts a **net gain of 78 million jobs** when displacement is offset by new roles [1][8].  \n- The BLS‑based risk calculator used in the 2026 job‑risk tool rates sysadmin‑type occupations in the **“moderate exposure”** category, meaning AI can handle a significant portion of repetitive duties but not the whole job [2].  \n- AI‑driven CLI helpers (e.g., Qwen Code) can already generate configuration files and run sanity checks, but they still require human oversight and are in early stages of adoption [6].  \n\n**What to do**  \n\n1. **Map routine tasks** that a tool can take over: package management, log aggregation, auto‑scaling scripts, and routine patching.  \n2. **Experiment with AI‑assisted automation**—try GitHub Copilot, Ansible‑powered playbooks, or Qwen Code for repetitive commands, and measure time saved.  \n3. **Earn cloud‑automation credentials** (AWS Certified SysOps Admin"
+  },
+  {
+   "t_s": 33.06,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 43.19,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG:** \"The World Economic Forum projects that about **22% of jobs worldwide will be disrupted by 2030**\" -> \"92 million jobs displaced by **2026** (not 2030), with a net gain of **78 million** by **2026**\" [8].\n- **WRONG:** \"The same study forecasts a **net gain of 78 million jobs**...\" -> The WEF report in [1] states **78 million net gain** but does not specify **2030** (source [1] lacks this timeframe; [8] states **2026**). Contradictory.\n- **UNSUPPORTED:** \"AI **can handle a significant portion of repetitive duties but not the whole job**\" — no source quantifies this split for sysadmin/IT ops roles specifically.\n- **MISSING:** *Comparative growth in sysadmin vs. automation-specialist roles* (e.g., data scientist demand vs. sysadmin demand).\n- **MISSING:** *Regulatory/enterprise adoption hurdles* (e.g., compliance, security constraints on AI in production sysadmin workflows).\n- **STRUCTURE:** The BLS AI Exposure Categories and Microsoft’s 200K Copilot conversations ([2]) are buried; **lead with sysadmin-specific exposure score** (moderate/low/high) instead of generic disruption metrics."
+  }
+ ],
+ "sources": [
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "Will AI Take My Job? Free AI Job Risk Checker (2026 Data ...",
+   "u": "https://promptslove.com/free-tools/will-ai-take-my-job/",
+   "d": "2026"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "Dev Ops & SysAdmin, QA Archives - Remote Work Hub",
+   "u": "https://remoteworkhub.com/job-category/dev-ops-sysadminqa/",
+   "d": ""
+  },
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2025-05"
+  },
+  {
+   "t": "I Ditched Claude Code and Now Using Open Source Qwen AI for Real...",
+   "u": "https://itsfoss.com/qwen-code-sysadmin-tasks/",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Estimating displacement risk using data-driven approaches: Flood...",
+   "u": "https://story.internal-displacement.org/estimating-displacement-risk-using-data-driven-approaches-flood-and-drought-displacement-risk-in-the-horn-of-africa/",
+   "d": ""
+  },
+  {
+   "t": "Will AI Take My Job in 2026? What the Data Actually Says",
+   "u": "https://www.nucamp.co/blog/will-ai-take-my-job-in-2026-what-the-data-actually-says",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   43.19,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   43.19,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 182.3,
+  "tok": 531,
+  "s": 2.9
+ },
+ "answer_raw": "AI won’t wholesale replace a sysadmin in the next five years; it will automate many routine chores but the role will keep its core responsibilities.\n\n**Displacement risk**\n- The World Economic Forum estimates that about **22 % of jobs worldwide will be disrupted by 2030**, and the same study projects a **net gain of 78 million jobs** when new roles are added [1].\n- A separate 2026 projection shows **92 million jobs displaced**, though the same source still projects a **net gain of 78 million jobs** when accounting for new roles created. [8].\n- The 2026 BLS AI Exposure Categories and related tools classify sysadmin-type occupations as having **moderate AI exposure**, meaning AI tools can handle significant parts of repetitive tasks without replacing the entire role. [2].\n- AI‑powered CLI helpers such as Qwen Code already generate configuration files and run sanity checks, yet they still need human oversight and are in early stages of production use [6].\n\n**What to do**\n\n1. **Identify routine tasks** that a tool can hand off—package management, log aggregation, auto‑scaling scripts, routine patching.\n2. **Test AI‑assisted automation**: try GitHub Copilot for scripting, Ansible playbooks for configuration, or Qwen Code for command generation, and measure time saved.\n3. **Earn cloud‑automation credentials** (e.g., AWS Certified SysOps Administrator, Azure Administrator, GCP Professional Cloud Network Engineer) to stay competitive as automation grows.\n4. **Build a portfolio** of scripts and workflows that demonstrate you’re a *system‑automation specialist*, not just a traditional sysadmin.\n5. **Re‑check the job‑risk calculator** every 12–18 months to see if your exposure category shifts and adjust your learning path accordingly.\n\nBecause the evidence doesn’t detail regulatory or enterprise‑adoption hurdles, stay alert to compliance and security requirements that might slow AI deployment in production environments. By treating AI as a productivity enhancer rather than a replacement, you’ll keep your role valuable and open doors to higher‑level strategy positions that still need human judgment.",
+ "answer": "AI won’t wholesale replace a sysadmin in the next five years; it will automate many routine chores but the role will keep its core responsibilities.\n\n**Displacement risk**\n- The World Economic Forum estimates that about **22 % of jobs worldwide will be disrupted by 2030**, and the same study projects a **net gain of 78 million jobs** when new roles are added [1].\n- A separate 2026 projection shows **92 million jobs displaced**, though the same source still projects a **net gain of 78 million jobs** when accounting for new roles created. [8].\n- The 2026 BLS AI Exposure Categories and related tools classify sysadmin-type occupations as having **moderate AI exposure**, meaning AI tools can handle significant parts of repetitive tasks without replacing the entire role. [2].\n- AI‑powered CLI helpers such as Qwen Code already generate configuration files and run sanity checks, yet they still need human oversight and are in early stages of production use [6].\n\n**What to do**\n\n1. **Identify routine tasks** that a tool can hand off—package management, log aggregation, auto‑scaling scripts, routine patching.\n2. **Test AI‑assisted automation**: try GitHub Copilot for scripting, Ansible playbooks for configuration, or Qwen Code for command generation, and measure time saved.\n3. **Earn cloud‑automation credentials** (e.g., AWS Certified SysOps Administrator, Azure Administrator, GCP Professional Cloud Network Engineer) to stay competitive as automation grows.\n4. **Build a portfolio** of scripts and workflows that demonstrate you’re a *system‑automation specialist*, not just a traditional sysadmin.\n5. **Re‑check the job‑risk calculator** every 12–18 months to see if your exposure category shifts and adjust your learning path accordingly.\n\nBecause the evidence doesn’t detail regulatory or enterprise‑adoption hurdles, stay alert to compliance and security requirements that might slow AI deployment in production environments. By treating AI as a productivity enhancer rather than a replacement, you’ll keep your role valuable and open doors to higher‑level strategy positions that still need human judgment.",
+ "chars": 2124,
+ "raw_bytes": 9956,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.55,
+ "rate_gen_tok_s": 30.55,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2-server-think",
+ "asked_at": "2026-10-24T23:26:08",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

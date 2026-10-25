@@ -1,0 +1,472 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.1,14.3],\"final\":16.0,\"ftok\":348,\"est\":false}",
+  "X-Hurry": "4dceaf78a9df0d17"
+ },
+ "first_byte_s": 3.37,
+ "first_text_s": 50.39,
+ "elapsed_s": 63.72,
+ "events": [
+  {
+   "t": 3.37,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.37,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 14.37,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.37,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.37,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.02,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 17.02,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.02,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.02,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 28.12,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 1152
+  },
+  {
+   "t": 28.12,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 28.18,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 28.18,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 28.18,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 38.65,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 1200
+  },
+  {
+   "t": 38.65,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "8 notes"
+   }
+  },
+  {
+   "t": 38.65,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 38.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 38.65,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 50.39,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 53.26,
+   "tag": "RATE",
+   "data": {
+    "tps": 152.0,
+    "tok": 436,
+    "s": 2.9
+   }
+  },
+  {
+   "t": 53.26,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 53.26,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 53.26,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 63.72,
+   "tag": "RESET"
+  },
+  {
+   "t": 63.72,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 8 claims, fixed 1",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 63.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1756 chars"
+   }
+  },
+  {
+   "t": 63.72,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.37,
+   "Searching the web…"
+  ],
+  [
+   14.37,
+   "Reading 8 sources…"
+  ],
+  [
+   17.02,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   28.18,
+   "compositing…"
+  ],
+  [
+   28.18,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   53.26,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 3.37
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.37
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.37
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 17.02
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.02
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 28.18
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "8 notes",
+   "t_s": 38.65
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 38.65
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 53.26
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 53.26
+  },
+  {
+   "id": "verify",
+   "l": "Checked 8 claims, fixed 1",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 63.72
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1756 chars",
+   "t_s": 63.72
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 63.72
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 28.12,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Pizza can be a double‑edged sword.  \nA single slice of commercial pepperoni packs **600–900 mg of sodium** and **250–350 calories**; the same slice can contain up to **36 g of refined carbs** and only **2 g of fiber** [7][8]. Those numbers make pizza a high‑sodium, low‑fiber, calorie‑dense food that can contribute to weight gain and hypertension if eaten too often.\n\nIf you choose a lighter option, the **Buffalo Chicken** slice at Pizza Hut comes in at only **260 calories** and has lower sodium than many other menu items [5][7]. Plain cheese is in the same 250–350 calorie ballpark, and adding a sprinkle of red pepper can keep the flavor high while the calories stay modest.\n\nBecause of the high sodium and refined‑carb content, most nutritionists advise keeping pizza as an **occasional treat**—roughly **1–2 times a week** and no more than **2–3 slices per sitting**. This keeps total intake within a reasonable daily range while still allowing you to enjoy it.  \n\nIf you’re eating leftovers, watch for the five spoilage signs listed in the bakinghow article: texture, odor, sight, taste, and freezer burn. If any of those are off, toss it. [2]"
+  },
+  {
+   "t_s": 28.12,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 38.65,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"A single slice of commercial pepperoni packs **600–900 mg of sodium** and **250–350 calories**\" → [7] states sodium is for pepperoni, but calorie range is for cheese pizza [7]. The draft confuses toppings.\n- **WRONG**: \"Plain cheese is in the same 250–350 calorie ballpark\" → No source gives calorie data for plain cheese pizza; [7] and [8] refer to *restaurant* slices, not necessarily plain cheese, and [7] specifically states **cheese pizza** is **250–350** but omits plain cheese as a standalone option.\n- **UNSUPPORTED**: \"Pizza Hut’s Buffalo Chicken is a **low-sodium** pizza\" — No source states sodium levels for the Buffalo Chicken; [5] only says it has the **least sodium** on the menu but does not quantify it or mark it as \"low.\"\n- **WRONG**: \"36 g of refined carbs\" [8] is per *slice* of pizza, but the draft treats it as a blanket figure without qualifying that it refers to **one slice** only.\n- **MISSING**: whether a slice size (e.g., \"standard\") or restaurant vs. homemade pizza affects calorie/sodium/fiber totals—[1] notes \"size always matters.\"\n- **MISSING**: how fiber (2 g) or vitamin deficiencies (D, C) in pizza slices might affect long-term health beyond occasi"
+  }
+ ],
+ "sources": [
+  {
+   "t": "Sourdough Cheese Pizza Calories Per Slice and Whole Pizza...",
+   "u": "https://yourcalories.org/sourdough-cheese-pizza-calories-nutrition-facts-per-slice-and-whole-pizza/",
+   "d": ""
+  },
+  {
+   "t": "How to Tell if Pizza is Bad (5 Signs That You Should Know)",
+   "u": "https://bakinghow.com/pizza-went-bad/",
+   "d": "2023-05-25"
+  },
+  {
+   "t": "Calories in 1 Slices Pizza: Nutrition Facts, Calories and Carbs",
+   "u": "https://currypizzahouse.com/nutrition-in-a-slice-of-pizza/",
+   "d": ""
+  },
+  {
+   "t": "The Quickest Way To Tell If Pizza Has Gone Bad, Fresh Or Frozen",
+   "u": "https://www.tastingtable.com/1206056/the-quickest-way-to-tell-if-pizza-has-gone-bad-fresh-or-frozen/",
+   "d": "2023-02-21"
+  },
+  {
+   "t": "Pizza Hut Menu: 16 Best & Worst Orders According to a Nutritionist",
+   "u": "https://www.eatthis.com/healthy-pizza-hut-menu-items/",
+   "d": "2024-02-10"
+  },
+  {
+   "t": "Fine Pizza - Google Play'de Uygulamalar",
+   "u": "https://play.google.com/store/apps/details?id=com.ordrz.finepizza&hl=tr",
+   "d": ""
+  },
+  {
+   "t": "6 Reasons Why Pizza Is Bad For You - coursepivot.com",
+   "u": "https://coursepivot.com/blog/6-reasons-why-pizza-is-bad-for-you/",
+   "d": "2026-06-24"
+  },
+  {
+   "t": "15 Reasons Why Pizza Is Bad for Health - foodbears.com",
+   "u": "https://foodbears.com/why-pizza-is-bad-for-health/",
+   "d": "2023-07-02"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   38.65,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   38.65,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 152.0,
+  "tok": 436,
+  "s": 2.9
+ },
+ "answer_raw": "Pizza itself isn’t a toxin, but the way it’s usually made—high‑sodium, refined‑carb‑dense, calorie‑heavy and low in fiber and many vitamins—means it’s best kept a treat: about **1–2 times a week**—and when you do, no more than **2–3 slices per sitting**.\n\nA standard slice of pepperoni pizza carries **600–900 mg of sodium** and **250–350 calories** [7]. A typical slice of plain cheese is in the same calorie range, while a slice of Buffalo Chicken from Pizza Hut comes in at **260 calories** and is the menu’s **lowest‑sodium option** [5]. Each slice also delivers roughly **36 g of refined carbohydrates** and only **2 g of fiber** [8], falling far short of the 25–38 g daily fiber goal. A single slice of pepperoni supplies about **13 g of protein** but offers little vitamin D, C, or dietary fiber [8].\n\nBecause a single slice is already 250–350 calories, eating **3–4 slices** in one sitting—common for many people—rises to **750–1,400 calories** in one meal, which can exceed half the recommended daily intake for many adults [7]. Thus limiting pizza to 1–2 occasions per week keeps total intake in a reasonable range while still allowing the indulgence.\n\nIf you store leftovers, keep in mind that pizza is safe in the fridge for up to **five days** and in the freezer for up to **six months** when properly wrapped [4]. When reheating, watch for the five spoilage signs—texture, odor, sight, taste, and freezer burn—outlined by bakinghow; any red flag means toss it [2].\n\nBecause pizza lacks sufficient fiber and many essential vitamins, frequent consumption can contribute to weight gain, hypertension, and nutrient gaps. Eating it sparingly and pairing it with high‑fiber, vitamin‑rich foods—like salads or vegetable sides—helps balance the meal.",
+ "answer": "Pizza itself isn’t a toxin, but the way it’s usually made—high‑sodium, refined‑carb‑dense, calorie‑heavy and low in fiber and many vitamins—means it’s best kept a treat: about **1–2 times a week**—and when you do, no more than **2–3 slices per sitting**.\n\nA standard slice of pepperoni pizza carries **600–900 mg of sodium** and **250–350 calories** [7]. A typical slice of plain cheese is in the same calorie range, while a slice of Buffalo Chicken from Pizza Hut comes in at **260 calories** and is the menu’s **lowest‑sodium option** [5]. Each slice also delivers roughly **36 g of refined carbohydrates** and only **2 g of fiber** [8], falling far short of the 25–38 g daily fiber goal. A single slice of pepperoni supplies about **13 g of protein** but offers little vitamin D, C, or dietary fiber [8].\n\nBecause a single slice is already 250–350 calories, eating **3–4 slices** in one sitting—common for many people—rises to **750–1,400 calories** in one meal, which can exceed half the recommended daily intake for many adults [7]. Thus limiting pizza to 1–2 occasions per week keeps total intake in a reasonable range while still allowing the indulgence.\n\nIf you store leftovers, keep in mind that pizza is safe in the fridge for up to **five days** and in the freezer for up to **six months** when properly wrapped [4]. When reheating, watch for the five spoilage signs—texture, odor, sight, taste, and freezer burn—outlined by bakinghow; any red flag means toss it [2].\n\nBecause pizza lacks sufficient fiber and many essential vitamins, frequent consumption can contribute to weight gain, hypertension, and nutrient gaps. Eating it sparingly and pairing it with high‑fiber, vitamin‑rich foods—like salads or vegetable sides—helps balance the meal.",
+ "chars": 1756,
+ "raw_bytes": 9255,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.89,
+ "rate_gen_tok_s": 32.93,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2c-server-think",
+ "asked_at": "2026-10-25T00:38:08",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

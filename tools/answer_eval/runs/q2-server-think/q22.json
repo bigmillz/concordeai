@@ -1,0 +1,425 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[14.8,13.6],\"final\":15.3,\"ftok\":290,\"est\":false}",
+  "X-Hurry": "322fe4dddd6e2778"
+ },
+ "first_byte_s": 0.01,
+ "first_text_s": 53.94,
+ "elapsed_s": 54.63,
+ "events": [
+  {
+   "t": 0.01,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.01,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.01,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "0 pages · 8 passages"
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.01,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 36.2,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 492
+  },
+  {
+   "t": 36.2,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 36.2,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 36.2,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 36.2,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 44.09,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 726
+  },
+  {
+   "t": 44.09,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "7 notes · 1 dropped"
+   }
+  },
+  {
+   "t": 44.09,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 44.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 44.09,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 53.94,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 54.63,
+   "tag": "RATE",
+   "data": {
+    "tps": 185.3,
+    "tok": 128,
+    "s": 0.7
+   }
+  },
+  {
+   "t": 54.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 54.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "514 chars"
+   }
+  },
+  {
+   "t": 54.63,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.01,
+   "Searching the web…"
+  ],
+  [
+   11.01,
+   "Reading 8 sources…"
+  ],
+  [
+   18.01,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   36.2,
+   "compositing…"
+  ],
+  [
+   36.2,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.01
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.01
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.01
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "0 pages · 8 passages",
+   "t_s": 18.01
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.01
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 36.2
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "7 notes · 1 dropped",
+   "t_s": 44.09
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 44.09
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 54.63
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "514 chars",
+   "t_s": 54.63
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 54.63
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 36.2,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "Elevator installer – **$106,580 median** with a **4‑year paid apprenticeship** [1].  \n\nThe other four roles that frequently appear in “high‑pay, no‑degree” lists are:  \n• Electrician  \n• Real‑estate broker  \n• HVAC technician  \n• Commercial pilot  \n\nThe web evidence you provided does not include pay ranges or training‑length details for those positions, so you’ll need to check state licensing boards, industry salary surveys, or the employers’ own training programs for up‑to‑date numbers."
+  },
+  {
+   "t_s": 36.2,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 44.09,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- WRONG: **\"The other four roles that frequently appear in “high-pay, no-degree” lists\"** -> The draft invents these roles; the only role with *current* pay and training details in the evidence is **Elevator Installer** [1].\n- MISSING: **top five realistic jobs** – the draft supplies only one from the evidence.\n- UNSUPPORTED: **\"4-year paid apprenticeship\"** for any role *other than Elevator Installer* [1].\n- UNSUPPORTED: **\"Electrician\"** – no pay or training details in evidence.\n- UNSUPPORTED: **\"Real-estate broker\"** – no pay or training details in evidence.\n- UNSUPPORTED: **\"HVAC technician\"** – no pay or training details in evidence.\n- UNSUPPORTED: **\"Commercial pilot\"** – no pay or training details in evidence."
+  }
+ ],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume GeniusBest Jobs Without",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-05-26"
+  },
+  {
+   "t": "Movies with Long Takes That Amaze | The Reel - films.io",
+   "u": "https://films.io/list/2026/04/27/best-long-takes-movies/",
+   "d": "2026-04-27"
+  },
+  {
+   "t": "Abg Viral Terbaru Top Viral Terbaru 2026 Kamu... - Tempikviral2026",
+   "u": "https://tempikviral2026.store/abg-viral-terbaru-top-viral-terbaru-2026-kamu-adalah-alasan-aku-merasa-begitu-damai-di-tengah-badai-kehidupan-learn-fast-sma-2025/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest Paying Jobs without Degree #viral #shorts #trending #top...",
+   "u": "https://www.purshology.com/2023/06/highest-paying-jobs-without-degree-viral-shorts-trending-top-job-jobs-without-degree/",
+   "d": "2023-06"
+  },
+  {
+   "t": "Top 15 Low-Stress Jobs That Pay Well Without a Degree in 2026 ...",
+   "u": "https://blog.theinterviewguys.com/low-stress-jobs-that-pay-well-without-a-degree-in-2026/",
+   "d": "2026-05-01"
+  },
+  {
+   "t": "Best Long Takes in Cinema History (September 2026)",
+   "u": "https://www.requiemforadream.com/best-long-takes-in-cinema-history/",
+   "d": "2026-05-10"
+  },
+  {
+   "t": "Bachelor Point Season 5 (2025) | Rtally",
+   "u": "https://rtally.lol/post/bachelor-point-season-5",
+   "d": "2026-09-17"
+  },
+  {
+   "t": "investopedia.com/personal-finance/top-highest-paying-jobs",
+   "u": "https://www.investopedia.com/personal-finance/top-highest-paying-jobs/",
+   "d": "2021"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   44.09,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   44.09,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 185.3,
+  "tok": 128,
+  "s": 0.7
+ },
+ "answer_raw": "Elevator installer – **$106,580 median** salary, requires a **4‑year paid apprenticeship** [1].\n\nOther high‑pay, no‑degree roles that frequently show up on “best jobs without a degree” lists are:\n\n- Electrician  \n- Real‑estate broker  \n- HVAC technician  \n- Commercial pilot  \n\nThe evidence you provided does not give pay ranges or training timelines for those four positions. For accurate, up‑to‑date figures, check the relevant state licensing board, industry salary surveys, or the employers’ training programs.",
+ "answer": "Elevator installer – **$106,580 median** salary, requires a **4‑year paid apprenticeship** [1].\n\nOther high‑pay, no‑degree roles that frequently show up on “best jobs without a degree” lists are:\n\n- Electrician  \n- Real‑estate broker  \n- HVAC technician  \n- Commercial pilot  \n\nThe evidence you provided does not give pay ranges or training timelines for those four positions. For accurate, up‑to‑date figures, check the relevant state licensing board, industry salary surveys, or the employers’ training programs.",
+ "chars": 514,
+ "raw_bytes": 4919,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.35,
+ "rate_gen_tok_s": 186.23,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "q2-server-think",
+ "asked_at": "2026-10-24T23:24:56",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

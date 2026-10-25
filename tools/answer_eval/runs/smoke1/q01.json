@@ -1,0 +1,503 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Ollama1 %C2%B7 gpt-oss:20b, Ollama1 %C2%B7 ministral-3:14b, Ollama1 %C2%B7 gemma4:12b",
+  "X-Eta": "{\"search\":14.0,\"models\":[24.7,54.8],\"final\":56.6,\"ftok\":124,\"est\":false}",
+  "X-Hurry": "8ea067ff1697e3c0"
+ },
+ "first_byte_s": 5.94,
+ "first_text_s": 106.79,
+ "elapsed_s": 127.73,
+ "events": [
+  {
+   "t": 5.94,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 5.94,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 13.94,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.94,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 13.94,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.31,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 17.31,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.31,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.31,
+   "tag": "STATUS",
+   "text": "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  },
+  {
+   "t": 32.46,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gpt-oss:20b",
+   "chars": 740
+  },
+  {
+   "t": 32.46,
+   "tag": "DRAFT",
+   "m": "Ollama1 · gemma4:12b",
+   "chars": 65
+  },
+  {
+   "t": 32.46,
+   "tag": "STATUS",
+   "text": "compositing…"
+  },
+  {
+   "t": 32.46,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 32.46,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewing the draft",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 48.86,
+   "tag": "DRAFT",
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "chars": 903
+  },
+  {
+   "t": 48.86,
+   "tag": "STEP",
+   "step": {
+    "id": "review",
+    "l": "Reviewed the draft",
+    "s": "done",
+    "d": "6 notes · 1 correction · 2 dropped"
+   }
+  },
+  {
+   "t": 48.86,
+   "tag": "RUN",
+   "run": {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 48.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "run",
+    "l": "Writing the answer",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 48.86,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 70.99,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 91.01,
+   "tag": "STATUS",
+   "text": "Ollama1 · ministral-3:14b is reviewing the draft"
+  },
+  {
+   "t": 106.79,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 108.91,
+   "tag": "RATE",
+   "data": {
+    "tps": 162.8,
+    "tok": 344,
+    "s": 2.1
+   }
+  },
+  {
+   "t": 108.91,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "s": "done",
+    "l": "Answer written",
+    "d": "Ollama1 · gpt-oss:20b"
+   }
+  },
+  {
+   "t": 108.91,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checking the facts",
+    "s": "run",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 108.91,
+   "tag": "STATUS",
+   "text": "checking the facts with Ollama1 · ministral-3:14b"
+  },
+  {
+   "t": 127.73,
+   "tag": "STEP",
+   "step": {
+    "id": "verify",
+    "l": "Checked 4 claims, all held",
+    "s": "done",
+    "d": "Ollama1 · ministral-3:14b"
+   }
+  },
+  {
+   "t": 127.73,
+   "tag": "STEP",
+   "step": {
+    "id": "fix",
+    "l": "Applied the review’s corrections",
+    "s": "done",
+    "d": "1 of 1"
+   }
+  },
+  {
+   "t": 127.73,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1379 chars"
+   }
+  },
+  {
+   "t": 127.73,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   5.94,
+   "Searching the web…"
+  ],
+  [
+   13.94,
+   "Reading 8 sources…"
+  ],
+  [
+   17.31,
+   "asking Ollama1 · gpt-oss:20b · 1 of 1"
+  ],
+  [
+   32.46,
+   "compositing…"
+  ],
+  [
+   32.46,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   70.99,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   91.01,
+   "Ollama1 · ministral-3:14b is reviewing the draft"
+  ],
+  [
+   108.91,
+   "checking the facts with Ollama1 · ministral-3:14b"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 5.94
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.94
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 13.94
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 17.31
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.31
+  },
+  {
+   "id": "review",
+   "l": "Reviewing the draft",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 32.46
+  },
+  {
+   "id": "review",
+   "l": "Reviewed the draft",
+   "s": "done",
+   "d": "6 notes · 1 correction · 2 dropped",
+   "t_s": 48.86
+  },
+  {
+   "id": "draft",
+   "s": "run",
+   "l": "Writing the answer",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 48.86
+  },
+  {
+   "id": "draft",
+   "s": "done",
+   "l": "Answer written",
+   "d": "Ollama1 · gpt-oss:20b",
+   "t_s": 108.91
+  },
+  {
+   "id": "verify",
+   "l": "Checking the facts",
+   "s": "run",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 108.91
+  },
+  {
+   "id": "verify",
+   "l": "Checked 4 claims, all held",
+   "s": "done",
+   "d": "Ollama1 · ministral-3:14b",
+   "t_s": 127.73
+  },
+  {
+   "id": "fix",
+   "l": "Applied the review’s corrections",
+   "s": "done",
+   "d": "1 of 1",
+   "t_s": 127.73
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1379 chars",
+   "t_s": 127.73
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 127.73
+  }
+ ],
+ "drafts": [
+  {
+   "t_s": 32.46,
+   "m": "Ollama1 · gpt-oss:20b",
+   "text": "The **NVIDIA RTX 5090** (Blackwell) is the top‑performing consumer GPU for AI today, offering up to **3,352 TOPS** of INT8 compute with sparsity thanks to its first‑ever FP4 precision support【2】.  \n\nIn data‑center rigs, the **NVIDIA H200, B200, and GB200 NVL72** (all Blackwell‑based with HBM3e memory) dominate large‑scale LLM training and high‑density inference【4】.  \n\n**Claude** runs its flagship **Haiku 5.5** model on the Claude Platform, which is available natively and through **AWS, Google Cloud, and Microsoft Foundry**【1】.  \n\nOther AI‑working teams typically spin up the same GPU lineup: RTX 5090 for on‑premise or local inference, and H200/B200/GB200 for cloud‑scale workloads. No TPU‑based claim appears in the current evidence."
+  },
+  {
+   "t_s": 32.46,
+   "m": "Ollama1 · gemma4:12b",
+   "text": "(no answer — not asked: Thinking seats one writer and one critic)"
+  },
+  {
+   "t_s": 48.86,
+   "m": "Ollama1 · ministral-3:14b (review)",
+   "text": "- **WRONG**: \"the **NVIDIA RTX 5090** (Blackwell)\" -> RTX 5090 is **Ada** architecture (not Blackwell) [2][7]. Blackwell GPUs in the evidence are **B200/GB200/H200** [4].\n- **MISSING**: *current TPU deployments or usage* (evidence [5] mentions a $30B Anthropic TPU deal but no technical details or latest TPU models in use).\n- **MISSING**: *specific hardware behind Claude’s Haiku 5.5* (only mentions cloud availability, not underlying accelerators).\n- **CONTRADICTS**: \"the same GPU lineup\" — no source states other AI teams use identical setups to Claude or NVIDIA; no comparative benchmarks exist.\n- **STRUCTURE**: Leads with a **consumer GPU** (RTX 5090) instead of **data-center class** (H200/B200/GB200) for \"most powerful,\" which the question prioritizes.\n- **MISSING**: *if \"most powerful GPU\" refers to raw performance (H200/B200) or a specific category (e.g., consumer, TPU)*—no clarification."
+  }
+ ],
+ "sources": [
+  {
+   "t": "Claude Haiku \\ Anthropic",
+   "u": "https://www.anthropic.com/claude/haiku",
+   "d": "2026-10-07"
+  },
+  {
+   "t": "Best GPU for AI & LLM Inference 2026 — RTX 5090 to Budget ...",
+   "u": "https://www.compute-market.com/blog/best-gpu-for-ai-2026",
+   "d": "2026-02-20"
+  },
+  {
+   "t": "How Claude is uplifting biomolecular modeling \\ Anthropic",
+   "u": "https://www.anthropic.com/research/claude-uplifts-biomolecular-modeling",
+   "d": "2026-09-17"
+  },
+  {
+   "t": "Top 12 NVIDIA GPUs for AI Training & Inference in 2026",
+   "u": "https://www.atlantic.net/gpu-server-hosting/top-nvidia-gpus-for-ai-training-and-inference/",
+   "d": "2026-03-05"
+  },
+  {
+   "t": "Unveiling the Epic Anthropic TPU Deal Driving $30B",
+   "u": "https://dailytechintel.com/anthropic-tpu-deal-30b-run-rate/",
+   "d": "2026"
+  },
+  {
+   "t": "Accelerating open-source biomolecular models with Claude",
+   "u": "https://www-cdn.anthropic.com/d8ca26d0d205708d26c7337cf4cfe7cb52e9b671.pdf",
+   "d": ""
+  },
+  {
+   "t": "Best GPU for AI 2026: Local LLM & Image Gen Picks - Ai Miracle",
+   "u": "https://www.aimiracle.ai/ai-collections/best-gpu-for-ai/",
+   "d": "2026-10-13"
+  },
+  {
+   "t": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware",
+   "u": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   48.86,
+   {
+    "c": "Ollama1 · gpt-oss:20b"
+   }
+  ],
+  [
+   48.86,
+   {
+    "r": [
+     "Ollama1 · gpt-oss:20b"
+    ],
+    "w": "mix",
+    "m": "Ollama1 · gpt-oss:20b"
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+ "searched": true,
+ "rate_writer": {
+  "tps": 162.8,
+  "tok": 344,
+  "s": 2.1
+ },
+ "answer_raw": "The most powerful GPU currently is **NVIDIA H200**, along with its siblings **B200** and **GB200 NVL72**—all Blackwell‑based with HBM3e memory, designed for large‑scale LLM training and high‑density inference. [4] These cards are the standard for large‑scale AI clusters and can handle massive batch sizes with high throughput.  \n\nThe top consumer GPU for AI is **NVIDIA RTX 5090**, an Ada‑architecture card that supports FP4 precision and delivers up to 3,352 TOPS of INT8 compute with sparsity. [2][7] It is the best option for users looking to run LLMs and image models locally without a data‑center rig.  \n\nNo publicly documented TPU model is identified; **Anthropic's $30B deal** is the only TPU‑related information, and it does not specify a particular TPU generation. [5] This suggests that Anthropic may be using a custom or proprietary TPU solution.  \n\n**Claude** runs its flagship **Haiku 5.5** model on the Claude Platform, available natively and through AWS, Google Cloud, and Microsoft Foundry; **Haiku 5.5** is the fastest and most efficient model in the Claude 5.5 family, built for high‑volume, cost‑sensitive work. [1] Developers can access it via the Claude API or directly on the platform for agent and coding tasks.  \n\nThe hardware used by other AI teams is not specified. This means we don't have publicly available data on their specific GPU or TPU choices.",
+ "answer": "The most powerful GPU currently is **NVIDIA H200**, along with its siblings **B200** and **GB200 NVL72**—all Blackwell‑based with HBM3e memory, designed for large‑scale LLM training and high‑density inference. [4] These cards are the standard for large‑scale AI clusters and can handle massive batch sizes with high throughput.  \n\nThe top consumer GPU for AI is **NVIDIA RTX 5090**, an Ada‑architecture card that supports FP4 precision and delivers up to 3,352 TOPS of INT8 compute with sparsity. [2][7] It is the best option for users looking to run LLMs and image models locally without a data‑center rig.  \n\nNo publicly documented TPU model is identified; **Anthropic's $30B deal** is the only TPU‑related information, and it does not specify a particular TPU generation. [5] This suggests that Anthropic may be using a custom or proprietary TPU solution.  \n\n**Claude** runs its flagship **Haiku 5.5** model on the Claude Platform, available natively and through AWS, Google Cloud, and Microsoft Foundry; **Haiku 5.5** is the fastest and most efficient model in the Claude 5.5 family, built for high‑volume, cost‑sensitive work. [1] Developers can access it via the Claude API or directly on the platform for agent and coding tasks.  \n\nThe hardware used by other AI teams is not specified. This means we don't have publicly available data on their specific GPU or TPU choices.",
+ "chars": 1379,
+ "raw_bytes": 6471,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.7,
+ "rate_gen_tok_s": 16.46,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "srv:5b346919:think",
+ "config": "server-think",
+ "run": "smoke1",
+ "asked_at": "2026-10-24T22:42:17",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "srv:5b346919:think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

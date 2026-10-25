@@ -1,0 +1,113 @@
+{
+ "name": "smoke1",
+ "config": "server-think",
+ "where": "server",
+ "started": "2026-10-24T22:38:35",
+ "repo": ".",
+ "head": [
+  "c52dc6c",
+  "quality-2"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 127.73,
+   "chars": 1379,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 175.38,
+   "chars": 1372,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 76.11,
+   "chars": 617,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 86.76,
+   "chars": 1088,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 76.29,
+   "chars": 406,
+   "error": ""
+  },
+  {
+   "file": "q27.json",
+   "elapsed_s": 46.33,
+   "chars": 363,
+   "error": ""
+  }
+ ],
+ "server": {
+  "id": "5b346919",
+  "name": "Ollama1",
+  "paired": true,
+  "reachable": true,
+  "auth": true,
+  "err": "",
+  "kind": "",
+  "latency_ms": 427,
+  "gpu": {
+   "vendor": "nvidia",
+   "name": "GeForce RTX 5070 Ti",
+   "vram_bytes": null
+  },
+  "only": {
+   "ok": true,
+   "server": "Ollama1",
+   "model": "gpt-oss:20b",
+   "label": "Ollama1 · gpt-oss:20b",
+   "how": "fits",
+   "why": "",
+   "note": "The strongest model on Ollama1 that fits its card, answering alone. Nothing runs on this computer or in the cloud.",
+   "placement": "gpu",
+   "asleep": false
+  },
+  "models": [
+   "deepseek-r1:8b",
+   "devstral-small-2:24b",
+   "gemma4:12b",
+   "gemma4:e2b",
+   "gpt-oss:20b",
+   "hermes3:8b",
+   "llama3.2:1b",
+   "ministral-3:14b",
+   "qwen3-coder:30b",
+   "qwen3.5:9b"
+  ]
+ },
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "tier": "srv:5b346919:think",
+ "warmup": {
+  "elapsed_s": 89.8,
+  "x_models": "Ollama1 · gpt-oss:20b, Ollama1 · ministral-3:14b, Ollama1 · gemma4:12b",
+  "drafts": [
+   "Ollama1 · gpt-oss:20b: **Heat sinks** absorb excess heat from electronic components and dissipate it in",
+   "Ollama1 · gemma4:12b: (no answer — not asked: Thinking seats one writer and one critic)",
+   "Ollama1 · ministral-3:14b (review): ---\n**No problems found.** *[If evidence had supplied an alternate baseline, thi"
+  ],
+  "answer": "**Heat sinks** absorb excess heat from electronic components and dissipate it into the ambient air through conduction and convection, often aided by extended fins or integrated vapor chambers. Recent "
+ },
+ "finished": "2026-10-24T22:50:10"
+}
