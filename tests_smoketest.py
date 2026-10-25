@@ -36470,6 +36470,9 @@ _g14_lines = (_MILLENAI_SRC.count("\n", 0, _g14_lo) + 1, _MILLENAI_SRC.count("\n
 for _n14 in _ctree.body:
     if _g14_lines[0] <= _n14.lineno < _g14_lines[1]:
         exec(_ast.get_source_segment(_MILLENAI_SRC, _n14), _g14)
+# (6b520) the official data, the vendor feeds and the news search never touch the network here
+_g14["_official_get"] = lambda url, timeout=6.0, data=None: (_ for _ in ()).throw(OSError("no network in the gauntlet"))
+_g14["_ddg_news"] = lambda q, limit=8, timelimit="m": []
 _Y14 = time.strftime("%Y")
 _GPUQ14 = ("What is the most powerful GPU in the world right now, or TPU, or anything "
            "being used for AI? What is Claude using, and what are others using?")
@@ -36678,7 +36681,7 @@ check("with nothing found the turn says so, dates the model's memory and never i
 _calls14, _pages14 = [], []
 
 
-def _ddg14(q, limit=8):
+def _ddg14(q, limit=8, timelimit=None):
     _calls14.append(q)
     time.sleep(0.05)
     slug = re.sub(r"\W+", "-", q.lower())
@@ -36739,7 +36742,7 @@ check("a planner slower than its budget is not waited for: the rules' queries st
       "%r %.1fs" % (_gr14c.queries, _el14))
 
 
-def _dead14(q, limit=8):
+def _dead14(q, limit=8, timelimit=None):
     raise RuntimeError("offline")
 
 
@@ -37324,7 +37327,7 @@ def _web18(q, limit=8):
 
 
 _calls18 = []
-_g18["_ddg_text"] = lambda q, limit=8: (_calls18.append(q), _web18(q))[1]
+_g18["_ddg_text"] = lambda q, limit=8, timelimit=None: (_calls18.append(q), _web18(q))[1]
 _g18["_ddg_more"] = lambda q, limit=8: []
 _g18["_page_read"] = lambda url, want_photo=False, timeout=6.0: None
 _g18["_ground_cache"].clear()
@@ -37413,6 +37416,306 @@ check("the final writer's reasoning level goes only to gpt-oss, and a server tha
       and 'synth[0]["_think"] = final_think_level()' in _MILLENAI_SRC
       and 'm.get("_think") for m in messages' in _ss18, "")
 # ==== quality-2 (6b518): end ====
+# ==== fresh-1 (6b520) fresh facts, free fixes only: begin ====
+# Fresh facts scored 3.0 of 10 and travel 2.8 on the answer bench; the owner chose free fixes only (no paid
+# search API, never his cloud keys). Four fixes (NOTES 6b520): the engines' own date filter and a news search
+# on a question about now; free official data with no key (the BLS API, the Fed's feed and statement, the New
+# York Fed, Frankfurter, the Treasury) and the vendor's own news feed, seated first as dated sources; a source
+# whose page refused the read is marked snippet-only; every current figure is dated from its own source, and
+# a pack with nothing from the last 12 months says so. These run the grounded-search section out of the
+# source with the network stubbed; every rule has a mutant below that must break a check.
+print("== fresh-1: date filter, official data, vendor feeds, snippet-only, dating (6b520) ==")
+_T520 = time.strptime("2026-10-25 12:00", "%Y-%m-%d %H:%M")
+_BLS520 = json.dumps({"status": "REQUEST_SUCCEEDED", "Results": {"series": [
+    {"seriesID": "APU0000708111", "data": [
+        {"year": "2026", "period": "M09", "value": "2.272"}, {"year": "2026", "period": "M08", "value": "2.272"},
+        {"year": "2026", "period": "M07", "value": "2.189"}, {"year": "2026", "period": "M06", "value": "2.141"},
+        {"year": "2025", "period": "M10", "value": "-"}, {"year": "2025", "period": "M09", "value": "3.488"}]},
+    {"seriesID": "CUUR0000SA0", "data": [{"year": "2026", "period": "M09", "value": "336.940"},
+                                         {"year": "2025", "period": "M09", "value": "324.800"}]}]}})
+_FEDRSS520 = ('<rss><channel><item><title>Minutes of the Federal Open Market Committee, September 15-16, 2026</title>'
+              '<link><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm]]></link>'
+              '<pubDate><![CDATA[Wed, 7 Oct 2026 18:00:00 GMT]]></pubDate></item>'
+              '<item><title>Federal Reserve issues FOMC statement</title>'
+              '<link><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm]]></link>'
+              '<pubDate><![CDATA[Wed, 16 Sep 2026 18:00:00 GMT]]></pubDate></item></channel></rss>')
+_FEDST520 = ("<html><body><script>var x=1;</script><p>The Federal Open Market Committee approved the following "
+             "statement for release by a 12 &ndash; 0 vote:</p><p>Recent indicators suggest that economic activity "
+             "has been expanding at a solid pace. The Committee decided to raise the target range for the federal "
+             "funds rate by 1/4 percentage point to 3-3/4 to 4 percent, in support of its dual mandate.</p></body></html>")
+_FEDCAL520 = ("<h4>2026 FOMC Meetings</h4><div>January 27-28</div><div>Statement: PDF | HTML</div>"
+              "<div>Minutes (Released February 18, 2026)</div><div>September 15-16*</div><div>Statement: HTML</div>"
+              "<div>Minutes (Released October 07, 2026)</div><div>October 27-28</div><div>December 8-9*</div>"
+              "<h4>2025 FOMC Meetings</h4><div>January 28-29</div><div>Statement</div>")
+_NYF520 = json.dumps({"refRates": [{"effectiveDate": "2026-10-22", "type": "EFFR", "percentRate": 3.88,
+                                    "targetRateFrom": 3.75, "targetRateTo": 4.0}]})
+_FX520 = json.dumps({"amount": 1.0, "base": "USD", "date": "2026-10-23", "rates": {"BRL": 5.0465}})
+_TSY520 = ('<feed><entry><m:properties><d:NEW_DATE m:type="Edm.DateTime">2026-10-23T00:00:00</d:NEW_DATE>'
+           '<d:BC_3MONTH m:type="Edm.Double">3.95</d:BC_3MONTH><d:BC_2YEAR m:type="Edm.Double">3.80</d:BC_2YEAR>'
+           '<d:BC_10YEAR m:type="Edm.Double">4.31</d:BC_10YEAR></m:properties></entry></feed>')
+_OAI520 = ("<rss><channel>"
+           "<item><title><![CDATA[How we built ChatGPT's ad stack]]></title><link>https://openai.com/index/ads</link>"
+           "<pubDate>Wed, 21 Oct 2026 10:00:00 GMT</pubDate><description>Ads in ChatGPT.</description></item>"
+           "<item><title><![CDATA[GPT-6 and Intelligent UI for everyone]]></title><link>https://openai.com/index/g6</link>"
+           "<pubDate>Wed, 07 Oct 2026 00:00:00 GMT</pubDate></item>"
+           "<item><title><![CDATA[Introducing GPT-6.1 Sol]]></title><link>https://openai.com/index/g61</link>"
+           "<pubDate>Tue, 29 Sep 2026 17:00:00 GMT</pubDate></item>"
+           "<item><title><![CDATA[Introducing GPT-4o]]></title><link>https://openai.com/index/g4o</link>"
+           "<pubDate>Mon, 13 May 2024 17:00:00 GMT</pubDate></item></channel></rss>")
+_APL520 = ('<feed><entry><title><![CDATA[iPhone Duo arrives at Apple Store locations]]></title>'
+           '<updated>2026-10-23T06:10:35.677Z</updated><link href="https://www.apple.com/newsroom/duo"/></entry></feed>')
+_ANT520 = ('<div>Latest news</div><div>October 25, 2026</div><a href="/news/claude-opus-5-5"><h2>Introducing Claude '
+           'Opus 5.5</h2></a><p>Claude Opus 5.5 leads in agentic coding and knowledge work, and costs less to run.</p>'
+           '<span>Announcements</span><span>Oct 7, 2026</span><a href="/news/claude-haiku-5-5"><h3>Introducing Claude '
+           'Haiku 5.5</h3></a><p>Claude Haiku 5.5 is our fastest, most capable small model for high-volume work.</p>')
+_WEB520 = {"api.bls.gov": _BLS520, "press_monetary.xml": _FEDRSS520, "monetary20260916a": _FEDST520,
+           "fomccalendars": _FEDCAL520, "newyorkfed.org": _NYF520, "frankfurter": _FX520,
+           "home.treasury.gov": _TSY520, "openai.com/news/rss": _OAI520, "apple.com/newsroom/rss": _APL520,
+           "anthropic.com/news": _ANT520}
+
+
+def _ns520(src):
+    """The grounded-search section of `src`, executed with the network stubbed."""
+    ns = {"re": re, "time": time, "json": json, "html": _html14, "copy": _copy14, "threading": _th14,
+          "urllib": urllib, "socket": socket, "sys": sys, "os": os, "unicodedata": _ud14,
+          "calendar": __import__("calendar"), "DEV_HOME": "", "HAS_SEARCH": True}
+    _exec_names(ns, {"_NOPAD", "strftime_np", "strip_greeting", "_PREAMBLE_RX", "_FRESH_PATTERNS",
+                     "_ASKY_RX", "_BOOKING_RX", "_PLACE_NOUNS", "strip_think", "strip_special",
+                     "END_TOKENS", "NUL", "_THINK_RE", "_JUNK_HOSTS", "_GOOD_HOSTS",
+                     "_link_shape_ok", "_ip_public", "_LOCAL_HOST_RX", "_SC_SPLIT_RX", "_SC_NUM_RX",
+                     "_SC_ASK_RX", "_SC_WORLD_RX", "_SC_Q_START_RX", "_sc_entities", "reasoning_parts",
+                     "self_contained_reasoning"})
+    tree = _ast.parse(src)
+    lo = src.index("# ------------------------------------------------ grounded web search (6b514)")
+    hi = src.index("# ------------------------------------------------------------------ usage", lo)
+    lines = (src.count("\n", 0, lo) + 1, src.count("\n", 0, hi) + 1)
+    for n in tree.body:
+        if lines[0] <= n.lineno < lines[1]:
+            exec(_ast.get_source_segment(src, n), ns)
+    ns["calls"] = []
+
+    def _get(url, timeout=6.0, data=None):
+        ns["calls"].append(url)
+        for k, v in _WEB520.items():
+            if k in url:
+                return v
+        raise OSError("refused")
+    ns["_official_get"] = _get
+    ns["text_calls"], ns["news_calls"] = [], []
+
+    def _text(q, limit=8, timelimit=None):
+        ns["text_calls"].append((q, timelimit))
+        return [{"title": "Fed rate news %s" % q, "href": "https://www.reuters.com/" + re.sub(r"\W+", "-", q),
+                 "body": "federal funds rate Fed 2026 " + q}]
+    ns["_ddg_text"] = _text
+    ns["_ddg_more"] = lambda q, limit=8: []
+
+    def _news(q, limit=8, timelimit="m"):
+        ns["news_calls"].append(q)
+        return [{"title": "Fed holds rate news", "href": "https://apnews.com/article/fed-x", "body": "the Fed rate",
+                 "date": "2026-10-22", "news": True}]
+    ns["_ddg_news_real"] = ns["_ddg_news"]
+    ns["_ddg_news"] = _news
+    ns["_page_read"] = lambda url, want_photo=False, timeout=6.0: None
+    return ns
+
+
+def _c520_all(src):
+    out = {}
+    try:
+        g = _ns520(src)
+    except Exception as e_:
+        return {"the section runs: %r" % (e_,): False}
+    k = g["official_kinds"]
+    names = lambda q: [x[0] if x[0] != "bls" else x[1] for x in k(q)]
+    out["which official data a question wants: the price series, CPI, the Fed, a currency, the yield curve"] = (
+        names("How much is a dozen eggs in the US right now compared to a year ago?") == ["APU0000708111"]
+        and names("What's the current federal funds rate and what did the Fed do?") == ["fed"]
+        and names("what does it run per month, in reais and dollars?") == ["fx"]
+        and k("in reais and dollars")[0][1] == ["BRL"]
+        and names("What's the 10-year Treasury yield today?") == ["tsy"]
+        and names("What's US inflation running at?") == ["cpi"]
+        and names("write a short poem about the sea") == [])
+    out["no US average for a price abroad, nor for a non-price question about the item"] = (
+        names("How much is a dozen eggs in Brazil?") == []
+        and names("How much protein is in a chicken breast?") == []
+        and names("Is gas cheaper in Lisbon than Madrid?") == [])
+    d = g["_bls_series_all"]()
+    g["_bls_series_all"]()
+    b = g["bls_price_block"]("APU0000708111", "Eggs, grade A, large", "dozen", d) or {}
+    bt = " ".join(b.get("paras") or [])
+    out["the BLS block: the latest month, a year earlier with the change, dated by the month"] = (
+        "$2.27 per dozen in September 2026" in bt and "A year earlier, September 2025: $3.49" in bt
+        and "−35% year on year" in bt and b.get("date") == "2026-09" and b.get("host") == "bls.gov"
+        and "October 2025" not in bt)
+    c = g["bls_cpi_block"](d) or {}
+    out["the CPI block: the 12-month change to the latest month"] = (
+        "up 3.7% over the 12 months to September 2026" in " ".join(c.get("paras") or []))
+    out["one BLS request serves every series (the keyless API allows 25 a day)"] = (
+        sum(1 for u in g["calls"] if "api.bls.gov" in u) == 1)
+    f = g["fed_blocks"]()
+    ft = " ".join(" ".join(x.get("paras") or []) for x in f)
+    out["the Fed: the latest statement's decision and vote, the next meeting, the effective rate, each dated"] = (
+        len(f) == 2 and f[0]["date"] == "2026-09-16" and f[0]["url"].endswith("monetary20260916a.htm")
+        and "raise the target range for the federal funds rate by 1/4 percentage point to 3-3/4 to 4 percent" in ft
+        and "(vote 12–0)" in ft and "Next scheduled FOMC meeting: October 27-28, 2026" in ft
+        and "3.88% on 2026-10-22" in ft and f[1]["date"] == "2026-10-22")
+    x = g["fx_block"](["BRL"]) or {}
+    out["the exchange rate: the ECB's reference rate both ways, dated"] = (
+        "1 US dollar = 5.0465 BRL; 1 BRL = $0.1982 (ECB reference rate, 2026-10-23)" in " ".join(x.get("paras") or [])
+        and x.get("date") == "2026-10-23")
+    t = g["treasury_block"](_T520) or {}
+    out["the Treasury's latest par yields, dated"] = (
+        "Treasury par yields on 2026-10-23: 3-month 3.95%, 2-year 3.80%, 10-year 4.31%." in (t.get("paras") or [""])[0])
+    ri = g["_rss_items"](_OAI520) + g["_rss_items"](_APL520)
+    out["a feed's items keep their dates, RSS and Atom (an ISO stamp with its time)"] = (
+        ("2026-09-29", "Introducing GPT-6.1 Sol") in [(a_, b_) for a_, b_, _c, _d in ri]
+        and ("2026-10-23", "iPhone Duo arrives at Apple Store locations") in [(a_, b_) for a_, b_, _c, _d in ri])
+    ph = g["_page_headlines"](_ANT520)
+    out["a news page's headlines and dates; its own header date dates nothing"] = (
+        [(a_, b_) for a_, b_, _c, _d in ph] == [("", "Introducing Claude Opus 5.5"), ("2026-10-07", "Introducing Claude Haiku 5.5")]
+        and ph[1][2] == "https://www.anthropic.com/news/claude-haiku-5-5")
+    vq = ("What's the latest Claude model from Anthropic and how does it stack up against the latest ChatGPT model? "
+          "Which one would you use for coding?")
+    feeds = g["vendor_feeds_for"](vq)
+    oai = [f_ for f_ in feeds if f_[0] == "OpenAI"][0]
+    vb = g["vendor_news_block"](*oai, terms=["latest", "Claude", "model", "Anthropic", "ChatGPT", "coding"],
+                                question=vq, today=_T520) or {}
+    vp = vb.get("paras") or []
+    out["the vendor's feed: on a question about the latest, its launches lead, an old post is out"] = (
+        [f_[0] for f_ in feeds] == ["OpenAI", "Anthropic"] and vb.get("feed") and vb.get("date") == "2026-10-21"
+        and any("Introducing GPT-6.1 Sol" in p for p in vp) and any("GPT-6 and Intelligent UI" in p for p in vp)
+        and not any("GPT-4o" in p for p in vp)
+        and [p_.split(":")[0] for p_ in vp] == sorted([p_.split(":")[0] for p_ in vp], reverse=True))
+    ant = [f_ for f_ in g["vendor_feeds_for"]("What is the most powerful GPU right now? What is Claude using?")
+           if f_[0] == "Anthropic"][0]
+    out["a vendor's feed that says nothing on the question is left out (Claude's models, for chips)"] = (
+        g["vendor_news_block"](*ant, terms=["most", "powerful", "GPU", "Claude"],
+                               question="What is the most powerful GPU right now? What is Claude using?",
+                               today=_T520) is None)
+    # the Grounding thread with the network stubbed
+    g["_ground_cache"].clear()
+    gr = g["ground_start"]("What's the current federal funds rate right now?")
+    gr.wait(None, 15.0)
+    srcs, pack, _nr, _np = gr.snapshot()
+    out["a question about now: the first engine's queries carry the past-year filter, one news search runs"] = (
+        g["text_calls"] and all(tl_ == "y" for _q, tl_ in g["text_calls"])
+        and len(g["news_calls"]) == 1 and not g["news_calls"][0].startswith("news:")
+        and not re.search(r"\b20\d\d\b", g["news_calls"][0]))
+    out["the official data is seated first and marked; an unread page is marked snippet-only"] = (
+        bool(srcs) and srcs[0].get("host") == "federalreserve.gov" and srcs[0].get("official")
+        and pack.split("\n")[1].startswith("[1] Federal Reserve: FOMC statement")
+        and "(OFFICIAL DATA: the agency's own figures)" in pack
+        and "(SNIPPET ONLY: the page refused a full read" in pack
+        and any(s_.get("snippet_only") for s_ in srcs) and not srcs[0].get("snippet_only"))
+    out["a news row's own date dates the source"] = (
+        any(s_.get("host") == "apnews.com" and s_.get("date") == "2026-10-22" for s_ in srcs))
+    g["text_calls"][:] = []
+    g["news_calls"][:] = []
+    g["_ground_cache"].clear()
+    gr2 = g["ground_start"]("How does a heat pump work in winter?")
+    gr2.wait(None, 15.0)
+    out["a timeless question: no date filter, no news search, no official data"] = (
+        g["text_calls"] and all(tl_ is None for _q, tl_ in g["text_calls"]) and g["news_calls"] == []
+        and not any(s_.get("official") for s_ in gr2.snapshot()[0]))
+    # the writer's rules
+    old = ("WEB EVIDENCE gathered 2026-10-25, 1 source:\n[1] iPhone 14 review — x.com — 2023-01\n"
+           "    https://x.com/a\n    The iPhone 14 starts at $799 in 2023.")
+    new = old.replace("2023-01", "2026-09")
+    gt_old = g["grounded_turn"]("What is the newest iPhone right now?", old, _T520)
+    gt_new = g["grounded_turn"]("What is the newest iPhone right now?", new, _T520)
+    gt_tl = g["grounded_turn"]("How does a heat pump work?", old, _T520)
+    out["every current figure is dated from its own source; newer beats older; official beats an article"] = (
+        "DATE EVERY CURRENT FIGURE" in gt_new and "taken from ITS OWN source's date" in gt_new
+        and "give the one with the later date" in gt_new and "OFFICIAL DATA or THE VENDOR'S OWN FEED" in gt_new
+        and "SNIPPET ONLY" in gt_new
+        and gt_new.index("DATE EVERY CURRENT FIGURE") < gt_new.index("PROMPT: What is the newest iPhone"))
+    out["nothing from the last 12 months on a question about now: the answer is told to say so"] = (
+        "NOTHING RECENT" in gt_old and "the newest is 2023-01" in gt_old
+        and "NOTHING RECENT" not in gt_new and "NOTHING RECENT" not in gt_tl)
+    out["the key figures carry their source's date"] = (
+        "- [1] The iPhone 14 starts at $799 in 2023. (source dated 2026-09)" in gt_new)
+    # the engine calls themselves, with a stand-in DDGS
+    _kw = []
+
+    class _FakeDDGS:
+        def __init__(self, proxy=None):
+            pass
+
+        def text(self, q, **kw):
+            _kw.append(("text", kw))
+            return [{"title": "t", "href": "https://a.com/x", "body": "b"}]
+
+        def news(self, q, **kw):
+            _kw.append(("news", kw))
+            return [{"date": "2026-10-14T21:51:35+00:00", "title": "Fed", "url": "https://apnews.com/a", "body": "b"}]
+    e = {"DDGS": _FakeDDGS, "IS_WIN": False, "_search_proxy": lambda: None, "_SEARCH_BACKENDS": ("bing",)}
+    for n in _ast.parse(src).body:
+        if getattr(n, "name", "") == "_ddg_text":
+            exec(_ast.get_source_segment(src, n), e)
+    e["_ddg_text"]("fed rate", 8, timelimit="y")
+    g["DDGS"] = _FakeDDGS
+    nw = g["_ddg_news_real"]("fed rate")
+    out["the date filter reaches the engine, and a news row comes back with its own date"] = (
+        ("text", {"max_results": 8, "backend": "bing", "timelimit": "y"}) in _kw
+        and ("news", {"max_results": 8, "timelimit": "m"}) in _kw
+        and nw and nw[0]["date"] == "2026-10-14" and nw[0]["href"] == "https://apnews.com/a")
+    out["the shipped app never runs without the fixes (the knob is a dev copy's only)"] = (
+        g["fresh_ablate"]() == set() and '"MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF"' in src
+        and "    if not DEV_HOME:\n        return set()\n" in src)
+    return out
+
+
+for _n520, _o520 in _c520_all(_MILLENAI_SRC).items():
+    check("6b520 fresh facts — " + _n520, _o520, "")
+_C520_MUT = [
+    ("the date filter never reaches the engine",
+     "query, max_results=limit, backend=backend, timelimit=timelimit)", "query, max_results=limit, backend=backend)"),
+    ("no date filter on a question about now",
+     '            tl = FRESH_TIMELIMIT if nowish and "tl" not in ab else None', "            tl = None"),
+    ("the date filter on every question", '            tl = FRESH_TIMELIMIT if nowish and "tl" not in ab else None',
+     '            tl = FRESH_TIMELIMIT'),
+    ("no news search", '            if nowish and rules and "news" not in ab:', "            if False:"),
+    ("official data not seated", "            final = offs + final\n", "            final = final\n"),
+    ("official data not fetched", '                    if "official" not in ab:\n', '                    if False:\n'),
+    ("snippet-only not marked", '                    s["snippet_only"] = not s.get("paras")', '                    s["snippet_only"] = False'),
+    ("the pack hides official data's mark",
+     "        if s.get(\"official\"):\n            # the agency's", "        if False:\n            # the agency's"),
+    ("no dating rules", "        rules += GROUND_DATING\n", "        pass\n"),
+    ("never says nothing recent",
+     "            if not any(0 <= _src_months_ago(d, today) <= FRESH_STALE_MONTHS for d in ds):",
+     "            if False:"),
+    ("the key figures undated", '(" (source dated %s)" % dates[n]) if dates.get(n) else ""', '""'),
+    ("a US average for a price abroad", "    us_ok = bool(_OF_US_RX.search(q)) or not _OF_ABROAD_RX.search(q)",
+     "    us_ok = True"),
+    ("any 'how much' is a price", 'r"how much (?:is|are|was|were|does|do|did|for|a|an|would)|paying for)', 'r"how much|paying for)'),
+    ("no year-ago figure", '    ago = next((r for r in rows if r[0] == str(int(y) - 1) and r[1] == p), None)\n    if ago:\n        ch',
+     '    ago = None\n    if ago:\n        ch'),
+    ("a minutes date read as a meeting", '                seg = re.sub(r"\\(\\s*Released [^)]*\\)", " ", seg)\n', ""),
+    ("the vote dropped", '(" (vote %s)" % re.sub(r"\\s+", "", vote.group(1))) if vote else ""', '""'),
+    ("the currency ignored", '    codes = [c for c in dict.fromkeys(codes) if c != "USD"][:4]', "    codes = []"),
+    ("a feed's off-topic block kept", "    if not scored or not topical:", "    if not scored:"),
+    ("an old feed post kept", "            if ago < 0 or ago > VENDOR_MONTHS or date[:7] > now_ym:\n                continue          # undated",
+     "            if ago < 0 or date[:7] > now_ym:\n                continue          # undated"),
+    ("a page's header date dates its featured post",
+     '                out.append(("" if header else _src_date_text(c), t, link, summ))',
+     '                out.append((_src_date_text(c), t, link, summ))'),
+    ("a news row's date ignored", '    if re.fullmatch(r"20[12]\\d-\\d{2}(?:-\\d{2})?", d):\n        return d\n', ""),
+    ("an ISO stamp's date lost", 're.compile(r"\\b(20[12]\\d)-(\\d{2})-(\\d{2})(?!\\d)"),', 're.compile(r"\\b(20[12]\\d)-(\\d{2})-(\\d{2})\\b"),'),
+    ("the BLS asked per series", '    return _official_cached("bls", fetch) or {}', '    _official_cache.pop("bls", None)\n    return _official_cached("bls", fetch) or {}'),
+    ("the knob honoured in the shipped app", "    if not DEV_HOME:\n        return set()\n", ""),
+]
+_c520_caught = []
+for _mn, _ma, _mb in _C520_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c520_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c520_all(_ms).values()):
+        _c520_caught.append((_mn, "not caught"))
+check("6b520's rules each break a check when broken (%d mutants)" % len(_C520_MUT), not _c520_caught,
+      "%r" % _c520_caught)
+# ==== fresh-1 (6b520): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

@@ -506,7 +506,9 @@ def _real_app_dir() -> str:
 _KNOWN_ENV = frozenset((
     "MILLENAI_DEV", "MILLENAI_HOME", "MILLENAI_NOWINDOW", "MILLENAI_TEST_HOOKS",
     "MILLENAI_SYNC_URL", "MILLENAI_PORT", "MILLENAI_TESTBUILD",
-    "MILLENAI_NO_PACKAGE"))
+    "MILLENAI_NO_PACKAGE",
+    # a dev copy's measuring knobs (6b518, 6b520): honoured only when DEV_HOME is set
+    "MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF"))
 
 
 def _dev_home(env, real):
@@ -17742,14 +17744,15 @@ def _search_proxy():
     return _SEARCH_PROXY["url"]
 
 
-def _ddg_text(query: str, limit: int = 5) -> list:
+def _ddg_text(query: str, limit: int = 5, timelimit=None) -> list:
     """Raw engine hits, trying several backends until one answers.
-    Never raises — an empty list means every engine struck out."""
+    Never raises — an empty list means every engine struck out.
+    `timelimit` ('d', 'w', 'm', 'y'): the engine's own date filter (6b520)."""
     proxy = _search_proxy() if IS_WIN else None
     for backend in _SEARCH_BACKENDS:
         try:
             rows = (DDGS(proxy=proxy) if proxy else DDGS()).text(
-                query, max_results=limit, backend=backend)
+                query, max_results=limit, backend=backend, timelimit=timelimit)
             if rows:
                 return rows
         except Exception:
@@ -19759,6 +19762,51 @@ def _ddg_more(query: str, limit: int = GROUND_PER_QUERY) -> list:
         return []
 
 
+# DATE-RESTRICTED SEARCH (6b520, per Patrick). On a question about now the
+# engines returned old posts as readily as new ones (round 2: an Ampere
+# launch and the TPU v5e for "most powerful GPU"). ddgs passes a time filter
+# to bing ("filters=ex1:ez5_<from>_<to>" for the past year), measured from
+# here: "Fed interest rate decision" returned tradingeconomics and polymarket
+# unfiltered and CNBC's "Fed rate decision September 2026" and the Fed's
+# calendar with it. The first engine's query of a question about now carries
+# the past-year filter (the second engine stays unfiltered, so a long-lived
+# reference page still comes back), and one news search of the past month
+# runs beside them: news rows carry their own date.
+FRESH_TIMELIMIT = "y"
+FRESH_NEWS_LIMIT = "m"
+FRESH_STALE_MONTHS = 12     # no source newer than this: the answer says so
+
+
+def fresh_ablate() -> set:
+    """The 6b520 fixes a DEV copy runs without (MILLENAI_FRESH_OFF, comma-
+    separated: tl, news, official, vendor, dating, snippet), so the bench
+    can measure each; the shipped app always runs them all."""
+    if not DEV_HOME:
+        return set()
+    return {w.strip().lower() for w in os.environ.get("MILLENAI_FRESH_OFF", "").split(",") if w.strip()}
+
+
+def _ddg_news(query: str, limit: int = GROUND_PER_QUERY, timelimit=FRESH_NEWS_LIMIT) -> list:
+    """The news engine's dated hits for a query (6b520), as text-search
+    rows with a 'date'. Never raises."""
+    if not HAS_SEARCH:
+        return []
+    proxy = _search_proxy() if IS_WIN else None
+    try:
+        rows = (DDGS(proxy=proxy) if proxy else DDGS()).news(
+            query, max_results=limit, timelimit=timelimit) or []
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        out.append({"title": r.get("title") or "", "href": r.get("url") or r.get("href") or "",
+                    "body": r.get("body") or "", "date": _src_date_text(str(r.get("date") or ""))[:10],
+                    "news": True})
+    return out
+
+
 def _gq_tokens(text: str) -> list:
     # letters of any script (6b518: "Florianópolis" was searched as
     # "Florian polis", "Medellín" as "Medell")
@@ -20134,6 +20182,558 @@ def ground_hints(question: str, today=None, lead: str = "") -> list:
     return out[:GROUND_HINT_QUERIES]
 
 
+# FREE OFFICIAL DATA WITH NO KEY (6b520, per Patrick: fresh facts scored 3.0
+# of 10 and the owner chose free fixes only: no paid search API, never his
+# cloud keys). Round 2's `site:` hints reached the statistics agencies, but
+# their pages refuse a script's read from this network (bls.gov 403, FRED
+# times out), so q06 had the BLS series in its sources and not its figure.
+# Their DATA endpoints answer, measured from this Mac with the reader's
+# browser User-Agent on 2026-10-25: the BLS public API v1 (no key; 25
+# queries a day per address, so every series is asked at once and kept for
+# 12 hours), the Fed's monetary-policy RSS and its statement pages, the New
+# York Fed's rates API, Frankfurter (the ECB's reference rates) and the
+# Treasury's daily yield curve. FRED's fredgraph.csv timed out three times
+# out of three and is not used. A matching question gets a short, dated
+# fact block from the source itself, seated first in the evidence pack
+# ("OFFICIAL DATA"), so the writer has the figure and its date in hand.
+OFFICIAL_S = 7.0                # the official fetches' budget, beside the search
+OFFICIAL_CACHE_S = 12 * 3600.0  # monthly series and daily rates: half a day is fresh
+OFFICIAL_MAX = 3                # official sources in one pack
+_official_cache = profile_cache("_official_cache", {})   # key -> (at, value)
+_official_lock = threading.Lock()
+# (item pattern, BLS average-price series, label, unit): U.S. city average
+_BLS_ITEMS = (
+    (r"eggs?", "APU0000708111", "Eggs, grade A, large", "dozen"),
+    (r"milk", "APU0000709112", "Milk, fresh, whole, fortified", "gallon"),
+    (r"bread", "APU0000702111", "Bread, white, pan", "lb"),
+    (r"(?:ground )?beef|hamburger", "APU0000703112", "Ground beef, 100% beef", "lb"),
+    (r"chicken", "APU0000706111", "Chicken, fresh, whole", "lb"),
+    (r"coffee", "APU0000717311", "Coffee, 100%, ground roast", "lb"),
+    (r"bananas?", "APU0000711211", "Bananas", "lb"),
+    (r"butter", "APU0000FS1101", "Butter, salted, grade AA, stick", "lb"),
+    (r"sugar", "APU0000715211", "Sugar, white, all sizes", "lb"),
+    (r"rice", "APU0000701312", "Rice, white, long grain, uncooked", "lb"),
+    (r"natural gas", "APU000072620", "Utility (piped) gas", "therm"),
+    (r"gas(?:oline)?|petrol|fuel", "APU000074714", "Gasoline, unleaded regular", "gallon"),
+    (r"diesel", "APU000074717", "Automotive diesel fuel", "gallon"),
+    (r"electricity|electric bill|power bill", "APU000072610", "Electricity", "kWh"),
+)
+_BLS_CPI = (("CUUR0000SA0", "CPI-U, all items"),
+            ("CUUR0000SA0L1E", "CPI-U, all items less food and energy"))
+_OF_PRICE_RX = re.compile(r"\b(?:price|prices|priced|cost|costs|costing|cheaper|expensive|"
+                          r"how much (?:is|are|was|were|does|do|did|for|a|an|would)|paying for)\b", re.I)
+_OF_CPI_RX = re.compile(r"\b(?:inflation|cpi|consumer price index|consumer prices)\b", re.I)
+_OF_FED_RX = re.compile(r"\b(?:fed(?:eral)? funds|fomc|federal reserve|the fed\b|fed (?:rate|meeting|"
+                        r"decision|hike|cut)|interest rates? (?:hike|cut|decision))", re.I)
+_OF_TSY_RX = re.compile(r"\btreasur(?:y|ies)\b.{0,40}\b(?:yields?|rates?|bonds?|notes?|bills?)\b|"
+                        r"\b(?:\d{1,2})-year (?:yield|treasury|note|bond)|\byield curve\b|\bbond yields?\b",
+                        re.I)
+# (ISO code, the words that name it): the ECB's reference currencies
+_OF_FX = (
+    ("BRL", r"\breais\b|\bR\$|\bbrl\b|\bbrazilian reals?\b"),
+    ("EUR", r"\beuros?\b|\beur\b|€"),
+    ("GBP", r"\bpounds? sterling\b|\bgbp\b|£|\bbritish pounds?\b"),
+    ("MXN", r"\bmexican pesos?\b|\bmxn\b"),
+    ("JPY", r"\byen\b|\bjpy\b"),
+    ("CAD", r"\bcanadian dollars?\b|\bcad\b"),
+    ("AUD", r"\baustralian dollars?\b|\baud\b"),
+    ("CHF", r"\bswiss francs?\b|\bchf\b"),
+    ("CNY", r"\byuan\b|\brenminbi\b|\bcny\b"),
+    ("INR", r"\brupees?\b|\binr\b"),
+    ("THB", r"\bbaht\b|\bthb\b"),
+    ("KRW", r"\bwon\b(?=.{0,30}\b(?:korea|dollar|usd|exchange))|\bkrw\b"),
+)
+# a place outside the US: a US average is the wrong answer there
+_OF_ABROAD_RX = re.compile(
+    r"\b(?:brazil|mexico|canada|uk|britain|england|europe|eu|germany|france|spain|portugal|italy|"
+    r"japan|china|india|australia|colombia|argentina|chile|peru|ecuador|thailand|vietnam|korea|"
+    r"lisbon|medell\w+|florian\w+|bogot\w+|london|paris|tokyo|toronto|nigeria|philippines)\b", re.I)
+_OF_US_RX = re.compile(r"\b(?:us|u\.s\.?|usa|united states|america|american|nationally|national)\b", re.I)
+
+
+def _official_get(url: str, timeout: float = 6.0, data: bytes = None) -> str:
+    """One official endpoint's body (raises on any failure). The reader's
+    browser User-Agent: a bare one is refused at many edges (CLAUDE.md)."""
+    hdr = {"User-Agent": _PAGE_UA, "Accept": "*/*", "Accept-Language": "en-US,en;q=0.9"}
+    if data is not None:
+        hdr["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=hdr)
+    with _page_open(req, timeout) as r:
+        return r.read(GROUND_PAGE_BYTES).decode("utf-8", "replace")
+
+
+def _official_cached(key: str, fetch, ttl: float = OFFICIAL_CACHE_S):
+    """fetch()'s value, kept `ttl` seconds; a failure is kept 10 minutes
+    (as None) so a refusing endpoint isn't asked on every question."""
+    now = time.time()
+    with _official_lock:
+        hit = _official_cache.get(key)
+    if hit and now - hit[0] < (ttl if hit[1] is not None else 600.0):
+        return hit[1]
+    try:
+        val = fetch()
+    except Exception:
+        val = None
+    with _official_lock:
+        if len(_official_cache) > 64:
+            _official_cache.clear()
+        _official_cache[key] = (now, val)
+    return val
+
+
+def _of_money(v: float, unit: str) -> str:
+    return ("$%.3f" % v) if unit == "kWh" else ("$%.2f" % v)
+
+
+def _of_month(year: str, period: str) -> str:
+    try:
+        return "%s %s" % (calendar.month_name[int(period[1:])], year)
+    except (ValueError, IndexError):
+        return "%s %s" % (period, year)
+
+
+def _bls_series_all() -> dict:
+    """{series id: [(year, 'M09', value), ...] newest first} for every
+    series above, in ONE request (the v1 API allows 25 a day)."""
+    ids = [s for _r, s, _l, _u in _BLS_ITEMS] + [s for s, _l in _BLS_CPI]
+
+    def fetch():
+        raw = _official_get("https://api.bls.gov/publicAPI/v1/timeseries/data/", 8.0,
+                            json.dumps({"seriesid": ids}).encode("utf-8"))
+        d = json.loads(raw)
+        if d.get("status") != "REQUEST_SUCCEEDED":
+            raise ValueError(str(d.get("message"))[:200])
+        out = {}
+        for s in (d.get("Results") or {}).get("series") or []:
+            rows = []
+            for x in s.get("data") or []:
+                try:
+                    rows.append((str(x["year"]), str(x["period"]), float(x["value"])))
+                except (KeyError, TypeError, ValueError):
+                    continue      # "-": a month the agency didn't publish
+            out[s.get("seriesID")] = rows
+        if not out:
+            raise ValueError("no series")
+        return out
+    return _official_cached("bls", fetch) or {}
+
+
+def bls_price_block(series: str, label: str, unit: str, data: dict) -> dict:
+    """The dated fact block for one average-price series, or None."""
+    rows = [r for r in (data.get(series) or []) if r[1].startswith("M") and r[1] != "M13"]
+    if not rows:
+        return None
+    y, p, v = rows[0]
+    lines = ["%s, U.S. city average: %s per %s in %s (BLS average price, series %s; "
+             "published monthly, about a month behind)." % (label, _of_money(v, unit), unit,
+                                                           _of_month(y, p), series)]
+    ago = next((r for r in rows if r[0] == str(int(y) - 1) and r[1] == p), None)
+    if ago:
+        ch = (v - ago[2]) / ago[2] * 100 if ago[2] else 0
+        lines.append("A year earlier, %s: %s per %s (%s%.0f%% year on year)." % (
+            _of_month(ago[0], ago[1]), _of_money(ago[2], unit), unit, "+" if ch >= 0 else "−", abs(ch)))
+    recent = rows[1:5]
+    if recent:
+        lines.append("Months before: " + "; ".join("%s %s" % (_of_month(a, b), _of_money(c, unit))
+                                                   for a, b, c in recent) + ".")
+    last12 = rows[:12]
+    hi, lo = max(last12, key=lambda r: r[2]), min(last12, key=lambda r: r[2])
+    if hi is not lo:
+        lines.append("Past 12 published months: high %s (%s), low %s (%s)." % (
+            _of_money(hi[2], unit), _of_month(hi[0], hi[1]), _of_money(lo[2], unit), _of_month(lo[0], lo[1])))
+    return {"title": "BLS average price: %s (U.S. city average)" % label,
+            "url": "https://data.bls.gov/timeseries/%s" % series, "host": "bls.gov",
+            "date": "%s-%s" % (y, p[1:]), "paras": lines}
+
+
+def bls_cpi_block(data: dict) -> dict:
+    """12-month CPI-U change, headline and core, or None."""
+    lines, date = [], ""
+    for series, label in _BLS_CPI:
+        rows = [r for r in (data.get(series) or []) if r[1].startswith("M") and r[1] != "M13"]
+        if not rows:
+            continue
+        y, p, v = rows[0]
+        ago = next((r for r in rows if r[0] == str(int(y) - 1) and r[1] == p), None)
+        if not ago:
+            continue
+        date = date or "%s-%s" % (y, p[1:])
+        lines.append("%s: up %.1f%% over the 12 months to %s (index %.3f against %.3f a year "
+                     "earlier, not seasonally adjusted; BLS series %s)." % (
+                         label, (v - ago[2]) / ago[2] * 100, _of_month(y, p), v, ago[2], series))
+    if not lines:
+        return None
+    return {"title": "BLS Consumer Price Index (CPI-U), latest release", "host": "bls.gov",
+            "url": "https://data.bls.gov/timeseries/CUUR0000SA0", "date": date, "paras": lines}
+
+
+def _rss_items(raw: str) -> list:
+    """[(date 'YYYY-MM-DD' or '', title, link, summary)] of an RSS or Atom
+    feed, in feed order. re only: a feed is small and its shape is fixed."""
+    out = []
+    for it in re.findall(r"(?is)<(?:item|entry)\b.*?</(?:item|entry)>", raw or ""):
+        def tag(name):
+            m = re.search(r"(?is)<%s\b[^>]*>(.*?)</%s>" % (name, name), it)
+            if not m:
+                return ""
+            v = re.sub(r"(?s)<!\[CDATA\[(.*?)\]\]>", r"\1", m.group(1))
+            return html.unescape(re.sub(r"(?s)<[^>]+>", " ", v)).strip()
+        title = re.sub(r"\s+", " ", tag("title"))
+        link = tag("link")
+        if not link:
+            m = re.search(r'(?is)<link\b[^>]*href="([^"]+)"', it)
+            link = m.group(1) if m else ""
+        when = tag("pubDate") or tag("published") or tag("updated") or tag("dc:date")
+        date = _src_date_text(when)
+        m = re.match(r"\w{3}, (\d{1,2}) (\w{3}) (\d{2,4})", when)
+        if m:
+            yy = m.group(3) if len(m.group(3)) == 4 else "20" + m.group(3)
+            mo = _SRC_MONTHS.index(m.group(2)[:3].lower()) + 1 if m.group(2)[:3].lower() in _SRC_MONTHS else 0
+            if mo:
+                date = "%s-%02d-%02d" % (yy, mo, int(m.group(1)))
+        summ = re.sub(r"\s+", " ", tag("description") or tag("summary"))[:300]
+        if title:
+            out.append((date, title, link.strip(), summ))
+    return out
+
+
+def fed_blocks() -> list:
+    """The latest FOMC statement's decision (the Fed's RSS, then the
+    statement page), the next meeting (the Fed's calendar) and the New
+    York Fed's effective rate: up to two dated sources."""
+    def fetch():
+        out = []
+        items = _rss_items(_official_get("https://www.federalreserve.gov/feeds/press_monetary.xml"))
+        st = next((i for i in items if re.search(r"(?i)\bFOMC statement\b", i[1])), None)
+        if st:
+            raw = _official_get(st[2])
+            txt = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", _PAGE_DROP_RX.sub(" ", raw))))
+            dec = re.search(r"[^.]{0,200}\bdecided to [^.]*target range for the federal funds rate[^.]*\.", txt)
+            vote = re.search(r"by an? (\d{1,2}\s*[–-]\s*\d{1,2}) vote", txt)
+            lines = []
+            if dec:
+                s = dec.group(0).strip()
+                s = re.sub(r"^.*?(?=The Committee decided)", "", s)
+                lines.append("FOMC statement of %s: %s%s" % (
+                    st[0], s, (" (vote %s)" % re.sub(r"\s+", "", vote.group(1))) if vote else ""))
+            try:
+                cal = _official_get("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm")
+                yr = st[0][:4]
+                i = cal.find("%s FOMC Meetings" % yr)
+                seg = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", cal[i:i + 30000]))) if i >= 0 else ""
+                seg = seg.split("%d FOMC Meetings" % (int(yr) - 1))[0]
+                # "(Released February 18, 2026)" is a minutes date, not a meeting
+                seg = re.sub(r"\(\s*Released [^)]*\)", " ", seg)
+                mrx = r"(January|February|March|April|May|June|July|August|September|October|November|December)" \
+                      r"(?:/\w+)?\s+(\d{1,2}(?:-\d{1,2})?)\*?"
+                meets = [(m.group(1), m.group(2), m.end()) for m in re.finditer(mrx, seg)]
+                for k, (mo, dd, end) in enumerate(meets):
+                    nxt = meets[k + 1][2] if k + 1 < len(meets) else len(seg)
+                    if "Statement" not in seg[end:nxt]:
+                        lines.append("Next scheduled FOMC meeting: %s %s, %s (the Fed's meeting calendar)."
+                                     % (mo, dd, yr))
+                        break
+            except Exception:
+                pass
+            if lines:
+                out.append({"title": "Federal Reserve: FOMC statement, %s" % st[0], "url": st[2],
+                            "host": "federalreserve.gov", "date": st[0], "paras": lines})
+        try:
+            d = json.loads(_official_get("https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1.json"))
+            r = (d.get("refRates") or [])[0]
+            lines = ["Effective federal funds rate: %.2f%% on %s (New York Fed%s)." % (
+                float(r["percentRate"]), r["effectiveDate"],
+                (", target range %s-%s%%" % (r["targetRateFrom"], r["targetRateTo"]))
+                if r.get("targetRateFrom") is not None and r.get("targetRateTo") is not None else "")]
+            out.append({"title": "New York Fed: effective federal funds rate (EFFR)",
+                        "url": "https://www.newyorkfed.org/markets/reference-rates/effr",
+                        "host": "newyorkfed.org", "date": r["effectiveDate"], "paras": lines})
+        except Exception:
+            pass
+        if not out:
+            raise ValueError("no Fed data")
+        return out
+    return _official_cached("fed", fetch, 3 * 3600.0) or []
+
+
+def fx_block(codes: list) -> dict:
+    """The ECB's reference rates against the US dollar (Frankfurter), dated."""
+    codes = [c for c in dict.fromkeys(codes) if c != "USD"][:4]
+    if not codes:
+        return None
+
+    def fetch():
+        d = json.loads(_official_get("https://api.frankfurter.app/latest?from=USD&to=" + ",".join(codes)))
+        if not d.get("rates"):
+            raise ValueError("no rates")
+        return d
+    d = _official_cached("fx:" + ",".join(codes), fetch, 6 * 3600.0)
+    if not d:
+        return None
+    lines = []
+    for c in codes:
+        v = (d.get("rates") or {}).get(c)
+        if v:
+            lines.append("1 US dollar = %s %s; 1 %s = $%s (ECB reference rate, %s)." % (
+                ("%.4f" % v).rstrip("0").rstrip("."), c, c, ("%.4f" % (1.0 / v)).rstrip("0").rstrip("."),
+                d.get("date") or ""))
+    if not lines:
+        return None
+    return {"title": "Exchange rates: ECB reference rates (via Frankfurter)", "host": "frankfurter.app",
+            "url": "https://www.frankfurter.app/", "date": d.get("date") or "", "paras": lines}
+
+
+def treasury_block(today=None) -> dict:
+    """The Treasury's latest daily par yield curve, dated."""
+    today = today or time.localtime()
+
+    def fetch():
+        for back in (0, 1):
+            y, m = today.tm_year, today.tm_mon - back
+            if m < 1:
+                y, m = y - 1, 12
+            raw = _official_get("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
+                                "pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value_month=%04d%02d"
+                                % (y, m), 8.0)
+            ents = re.findall(r"(?is)<m:properties>(.*?)</m:properties>", raw)
+            if ents:
+                return ents[-1]
+        raise ValueError("no curve")
+    ent = _official_cached("tsy", fetch, 6 * 3600.0)
+    if not ent:
+        return None
+
+    def val(tag):
+        m = re.search(r"(?is)<d:%s\b[^>]*>([\d.]+)</d:%s>" % (tag, tag), ent)
+        return m.group(1) if m else ""
+    m = re.search(r"(?is)<d:NEW_DATE\b[^>]*>(\d{4}-\d{2}-\d{2})", ent)
+    date = m.group(1) if m else ""
+    parts = [(lbl, val(t)) for lbl, t in (("3-month", "BC_3MONTH"), ("2-year", "BC_2YEAR"),
+                                         ("5-year", "BC_5YEAR"), ("10-year", "BC_10YEAR"),
+                                         ("30-year", "BC_30YEAR"))]
+    parts = [(a, b) for a, b in parts if b]
+    if not parts:
+        return None
+    return {"title": "U.S. Treasury: daily par yield curve rates", "host": "treasury.gov",
+            "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates",
+            "date": date, "paras": ["Treasury par yields on %s: %s." % (
+                date, ", ".join("%s %s%%" % (a, b) for a, b in parts))]}
+
+
+def official_kinds(question: str) -> list:
+    """Which official blocks a question wants: [('bls', series...), ('cpi',),
+    ('fed',), ('fx', codes), ('tsy',)]. Rules only; [] for most questions."""
+    q = str(question or "")
+    out = []
+    us_ok = bool(_OF_US_RX.search(q)) or not _OF_ABROAD_RX.search(q)
+    if _OF_PRICE_RX.search(q) and us_ok:
+        seen = set()
+        for rx, series, label, unit in _BLS_ITEMS:
+            if re.search(r"\b(?:%s)\b" % rx, q, re.I) and series not in seen:
+                if series == "APU000074714" and re.search(r"\bnatural gas\b", q, re.I):
+                    continue
+                if series == "APU000074714" and re.search(r"\bgas (?:stove|station|mileage)s?\b|\bmpg\b", q, re.I) \
+                        and not re.search(r"\bgas (?:price|prices|cost)|price of gas", q, re.I):
+                    continue
+                seen.add(series)
+                out.append(("bls", series, label, unit))
+                if len(seen) >= 2:
+                    break
+    if _OF_CPI_RX.search(q) and us_ok:
+        out.append(("cpi",))
+    if _OF_FED_RX.search(q):
+        out.append(("fed",))
+    codes = [c for c, rx in _OF_FX if re.search(rx, q, re.I)]
+    if codes:
+        out.append(("fx", codes))
+    if _OF_TSY_RX.search(q):
+        out.append(("tsy",))
+    return out
+
+
+def official_sources(question: str, today=None) -> list:
+    """The dated official fact blocks this question wants, as evidence
+    sources (seated first, marked official); [] when none applies or every
+    endpoint failed. Never raises."""
+    out = []
+    try:
+        kinds = official_kinds(question)
+    except Exception:
+        kinds = []
+    for k in kinds:
+        try:
+            if k[0] == "bls":
+                b = bls_price_block(k[1], k[2], k[3], _bls_series_all())
+                bl = [b] if b else []
+            elif k[0] == "cpi":
+                b = bls_cpi_block(_bls_series_all())
+                bl = [b] if b else []
+            elif k[0] == "fed":
+                bl = [dict(x) for x in fed_blocks()]
+            elif k[0] == "fx":
+                b = fx_block(k[1])
+                bl = [b] if b else []
+            elif k[0] == "tsy":
+                b = treasury_block(today)
+                bl = [b] if b else []
+            else:
+                bl = []
+        except Exception:
+            bl = []
+        for b in bl:
+            b = dict(b)
+            b.update({"official": True, "body": " ".join(b.get("paras") or [])[:400],
+                      "score": 100, "seat": True, "qs": []})
+            out.append(b)
+    return out[:OFFICIAL_MAX]
+
+
+# THE VENDOR'S OWN NEWS FEED (6b520): a launch, a price or a "latest model"
+# lives on the maker's newsroom, and several of those pages refuse a
+# script's read (openai.com 403s every article) while their feed answers:
+# OpenAI's, Apple's, NVIDIA's, Google's, AMD's, AWS's and Microsoft's RSS,
+# and Anthropic's news page, all read from this Mac with the browser
+# User-Agent on 2026-10-25. For a question about now that names the
+# vendor or its product, the feed's items on the question (titles and
+# their dates) become one dated source: what the vendor announced, when.
+VENDOR_FEEDS = (
+    # (question pattern, name, feed URL, human URL, kind, the vendor's product names)
+    (r"\b(?:openai|chatgpt|gpt-?\d[\w.]*|codex|sora)\b", "OpenAI", "https://openai.com/news/rss.xml",
+     "https://openai.com/news/", "rss", r"\bGPT-?\d[\w.]*|\bo\d\b|\bChatGPT\b|\bCodex\b|\bSora\b"),
+    (r"\b(?:anthropic|claude)\b", "Anthropic", "https://www.anthropic.com/news",
+     "https://www.anthropic.com/news", "page", r"\bClaude\b"),
+    (r"\b(?:apple|iphones?|ipads?|macbooks?|airpods|apple watch|vision pro)\b", "Apple",
+     "https://www.apple.com/newsroom/rss-feed.rss", "https://www.apple.com/newsroom/", "rss",
+     r"\biPhone\b|\biPad\b|\bMacBook\b|\bMac\b|\bAirPods\b|\bApple Watch\b|\bVision Pro\b"),
+    (r"\b(?:nvidia|gpus?|blackwell|rubin|geforce|rtx \d+)\b", "NVIDIA",
+     "https://nvidianews.nvidia.com/releases.xml", "https://nvidianews.nvidia.com/", "rss",
+     r"\bBlackwell\b|\bRubin\b|\bGB\d00\b|\bB\d00\b|\bDGX\b|\bHGX\b|\bGrace\b|\bGPUs?\b"),
+    (r"\b(?:tpus?|ironwood|google cloud)\b", "Google Cloud", "https://cloudblog.withgoogle.com/rss/",
+     "https://cloud.google.com/blog/", "rss", r"\bTPUs?\b|\bIronwood\b|\bTPU ?\w*\b"),
+    (r"\b(?:gemini|pixel \d+|android \d+)\b", "Google", "https://blog.google/rss/", "https://blog.google/",
+     "rss", r"\bGemini\b|\bPixel\b"),
+    (r"\b(?:amd|instinct|mi\d{3}x?|radeon|ryzen)\b", "AMD", "https://ir.amd.com/news-events/press-releases/rss",
+     "https://ir.amd.com/news-events/press-releases", "rss",
+     r"\bInstinct\b|\bMI\d{3}X?\b|\bHelios\b|\bRyzen\b|\bRadeon\b|\bEPYC\b"),
+    (r"\b(?:aws|trainium\d?|inferentia|amazon bedrock)\b", "AWS",
+     "https://aws.amazon.com/about-aws/whats-new/recent/feed/", "https://aws.amazon.com/new/", "rss",
+     r"\bTrainium\d?\b|\bInferentia\d?\b|\bBedrock\b"),
+    (r"\b(?:microsoft|copilot|azure)\b", "Microsoft", "https://blogs.microsoft.com/feed/",
+     "https://blogs.microsoft.com/", "rss", r"\bCopilot\b|\bAzure\b|\bMaia\b"),
+)
+VENDOR_MAX = 2              # vendor feeds per question
+VENDOR_ITEMS = 6            # headlines kept from one feed
+VENDOR_MONTHS = 13          # an item older than this is history, not news
+_VN_LAUNCH_RX = re.compile(r"(?i)\b(?:introduc\w*|launch\w*|unveil\w*|announc\w*|now available|"
+                           r"available|releas\w*|debut\w*|arriv\w*|meet|new)\b")
+_VN_GENERIC = frozenset("ai new latest newest best most powerful right now current using use used "
+                        "others other what which model models".split())
+# what a product the question names means in the vendor's titles
+_VN_ALIAS = {"chatgpt": r"\bChatGPT\b|\bGPT-?\d", "mac": r"\bMac(?:Book)?\b"}
+_VN_LATEST_RX = re.compile(r"(?i)\b(?:latest|newest|new|most recent|just (?:released|announced|launched)|"
+                           r"current(?:ly)?|announced|released|launched)\b")
+_VN_DATE_CELL_RX = re.compile(r"[A-Z][a-z]{2,8}\.? \d{1,2}, 20\d\d")
+_VN_LABELS = frozenset("announcements product policy research features read more news events "
+                       "featured company".split())
+
+
+def _page_headlines(raw: str, base: str = "https://www.anthropic.com") -> list:
+    """[(date, title, link, summary)] of a news index page that prints a
+    date beside each headline (Anthropic's /news): the page's text cut
+    into cells, a date cell, then the next cell that reads as a title.
+    The page's own header date ("Latest news | October 25, 2026") dates
+    nothing: the featured post after it is listed undated."""
+    body = _PAGE_DROP_RX.sub(" ", raw or "")
+    links = []
+    for m in re.finditer(r"(?is)<a\b[^>]*href=\"(/news/[a-z0-9-]+)\"[^>]*>(.*?)</a>", body):
+        t = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", m.group(2)))).strip()
+        if t:
+            links.append((t, m.group(1)))
+    cells = [c for c in (re.sub(r"\s+", " ", html.unescape(x)).strip()
+                         for x in re.split(r"(?s)<[^>]+>", body)) if c]
+    out, seen = [], set()
+    for i, c in enumerate(cells):
+        if not _VN_DATE_CELL_RX.fullmatch(c):
+            continue
+        header = any(re.fullmatch(r"(?i)latest news|today|newsroom", x) for x in cells[max(0, i - 2):i])
+        for k in range(i + 1, min(len(cells), i + 4)):
+            t = cells[k]
+            if _VN_DATE_CELL_RX.fullmatch(t) or t.lower() in _VN_LABELS or not 2 <= len(t.split()) <= 16:
+                continue
+            if t not in seen:
+                seen.add(t)
+                summ = cells[k + 1][:300] if k + 1 < len(cells) and len(cells[k + 1].split()) > 8 else ""
+                link = next((base + h for lt, h in links if t[:40] in lt), "")
+                out.append(("" if header else _src_date_text(c), t, link, summ))
+            break
+    return out
+
+
+def vendor_feeds_for(question: str) -> list:
+    """The feeds a question's vendors and products name, at most VENDOR_MAX."""
+    q = str(question or "")
+    out = []
+    for rx, name, url, human, kind, prod in VENDOR_FEEDS:
+        if re.search(rx, q, re.I) and name not in [o[0] for o in out]:
+            out.append((name, url, human, kind, prod))
+    return out[:VENDOR_MAX]
+
+
+def vendor_news_block(name: str, url: str, human: str, kind: str, prod: str, terms: list,
+                      question: str = "", today=None) -> dict:
+    """One vendor feed's items on the question, the best and newest first,
+    dated; None when the feed fails or nothing in it speaks to the
+    question. An item counts when it names one of the vendor's products
+    or two of the question's own words; a product the question names
+    ("iPhone"; never a generic GPU or TPU) must be in it ("ChatGPT"
+    model means a GPT one); on a question about what is latest a launch
+    post leads. At least one item must carry a word of the question
+    beyond the vendor and its product, or be a launch the question asks
+    about: "What is Claude using" for chips doesn't list Claude's models."""
+    today = today or time.localtime()
+    raw = _official_cached("feed:" + url, lambda: _official_get(url, 6.0), 3 * 3600.0)
+    if not raw:
+        return None
+    items = _page_headlines(raw) if kind == "page" else _rss_items(raw)
+    q = str(question or "")
+    vend = {w.lower() for w in re.findall(r"[A-Za-z]+", name)}
+    asked = {p.lower() for p in re.findall(prod, q, re.I)
+             if p.lower().rstrip("s") not in ("gpu", "tpu")}
+    asked_rx = [_VN_ALIAS.get(p, re.escape(p)) for p in asked]
+    others = [t for t in terms if t.lower() not in _VN_GENERIC and len(t) >= 2
+              and t.lower() not in vend and t.lower() not in asked]
+    latest = bool(_VN_LATEST_RX.search(q))
+    now_ym = time.strftime("%Y-%m", today)
+    scored, topical = [], False
+    for k, (date, title, link, summ) in enumerate(items[:400]):
+        ago = _src_months_ago(date, today)
+        if date or kind != "page" or k:
+            if ago < 0 or ago > VENDOR_MONTHS or date[:7] > now_ym:
+                continue          # undated only as a page's featured post
+        if asked_rx and not any(re.search(r, title, re.I) for r in asked_rx):
+            continue
+        pm = bool(re.search(prod, title)) or bool(asked_rx)
+        th = _term_hits(others, title) * 2 + _term_hits(others, summ)
+        if not pm and th < 2:
+            continue
+        launch = bool(_VN_LAUNCH_RX.search(title))
+        if th or (latest and launch and pm):
+            topical = True
+        scored.append((th + (3 if pm else 0) + ((3 if latest else 1) if launch else 0),
+                       date, title, link, summ))
+    if not scored or not topical:
+        return None
+    top = sorted(scored, key=lambda x: (x[0], x[1]), reverse=True)[:VENDOR_ITEMS]
+    top.sort(key=lambda x: x[1] or "9", reverse=True)
+    lines = ["%s: %s%s" % (d or "undated (the newsroom's featured post)", t,
+                           (" \u2014 " + s[:200]) if s and s.lower()[:40] != t.lower()[:40] else "")
+             for _h, d, t, _l, s in top]
+    return {"title": "%s newsroom: its latest posts on this (the vendor's own feed)" % name,
+            "url": human, "host": _src_host(human), "date": max(x[1] for x in top), "paras": lines,
+            "official": True, "feed": True, "body": " ".join(lines)[:400],
+            "score": 90, "seat": True, "qs": []}
+
+
 GROUND_PLAN = (
     "Today is {today}. Write the web search queries that would find the facts "
     "needed to answer the question below, aimed at the PRIMARY source where "
@@ -20234,7 +20834,7 @@ _SRC_DOCS_RX = re.compile(
 _SRC_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep",
                "oct", "nov", "dec")
 _SRC_DATE_RXS = (
-    re.compile(r"\b(20[12]\d)-(\d{2})-(\d{2})\b"),
+    re.compile(r"\b(20[12]\d)-(\d{2})-(\d{2})(?!\d)"),   # an ISO stamp's "T06:10" may follow (6b520)
     re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?"
                r"\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20[12]\d)\b", re.I),
     re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|"
@@ -20300,7 +20900,11 @@ def _src_date_text(text: str) -> str:
 
 
 def _src_date(row: dict) -> str:
-    """When a hit was written, as far as its URL and snippet say."""
+    """When a hit was written, as far as its URL and snippet say (a news
+    row's own date first, 6b520)."""
+    d = str(row.get("date") or "")
+    if re.fullmatch(r"20[12]\d-\d{2}(?:-\d{2})?", d):
+        return d
     m = _SRC_URL_DATE_RX.search(str(row.get("url") or row.get("href") or ""))
     if m and 1 <= int(m.group(2)) <= 12:
         return "%s-%02d" % (m.group(1), int(m.group(2))) + (
@@ -20442,7 +21046,7 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         if topical >= 2 and any(host == h or host.endswith("." + h) for h in primary or ()):
             in_host = max(in_host, 3)          # the primary source itself, on the question (6b518)
         qual = _src_quality(host, path)
-        date = _src_date({"url": url, "body": body, "title": title})
+        date = _src_date({"url": url, "body": body, "title": title, "date": r.get("date")})
         if date and date[:7] > time.strftime("%Y-%m", today):
             date = ""       # a date after today is a misread
         rec = 0
@@ -20644,6 +21248,21 @@ def evidence_pack(sources: list, terms: list, today=None,
             s.get("host") or "", when))
         lines.append("    %s" % (s.get("url") or "")[:160])
         snippet = re.sub(r"\s+", " ", s.get("body") or "")[:share]
+        if s.get("official"):
+            # the agency's or the maker's own record (6b520): every line, in order
+            lines.append("    (%s)" % ("THE VENDOR'S OWN FEED: what it announced, with each post's date"
+                                       if s.get("feed") else "OFFICIAL DATA: the agency's own figures"))
+            used = 0
+            for p in s.get("paras") or []:
+                if used + len(p) > max(share, 900) and used:
+                    break
+                lines.append("    %s" % p)
+                used += len(p)
+                n_pass += 1
+            lines.append("")
+            continue
+        if s.get("snippet_only"):
+            lines.append("    (SNIPPET ONLY: the page refused a full read; this is the search engine's summary)")
         if s.get("paras") and _para_hits(s["paras"], terms):
             ps = _pick_passages(s["paras"], terms, cap=share)
         elif s.get("paras") and snippet:
@@ -20700,6 +21319,42 @@ GROUND_NONE = (
     "any fact that may have changed with the month it was last true for you "
     "(never present it as 'right now'), and say in one clause what to check "
     "and where.\n")
+# DATING EVERY FIGURE (6b520, per Patrick): round 2's judges marked fresh
+# answers down for current figures with no date ("$2.27 a dozen", "3.75%")
+# and for stale ones stated as now. The writer dates each current figure
+# from its own source's date line; the newer of two disagreeing sources
+# wins; official data beats an article; a snippet-only source is hedged;
+# and when no source is from the last FRESH_STALE_MONTHS the answer says so.
+GROUND_DATING = (
+    "- DATE EVERY CURRENT FIGURE: a price, rate, spec, ranking or version "
+    "gets 'as of <month year>' (the day, for a rate) taken from ITS OWN "
+    "source's date in the list above, never today's date; from a source "
+    "marked 'date unknown' it is 'undated'.\n"
+    "- When two sources disagree on a current figure, give the one with the "
+    "later date and say it is the newer.\n"
+    "- A source marked OFFICIAL DATA or THE VENDOR'S OWN FEED is the "
+    "agency's or the maker's own record: its figure and date beat any "
+    "article's.\n"
+    "- A source marked SNIPPET ONLY is a search engine's two-line summary of "
+    "a page that refused a full read: a figure from it is 'reportedly' or "
+    "'per <site>', never stated as checked.\n")
+GROUND_STALE = (
+    "- NOTHING RECENT: none of these sources is dated within the last {months} "
+    "months (the newest is {newest}). Say so plainly in one clause, give "
+    "what you found with its date, and never present it as today's.\n")
+
+
+def pack_dates(pack: str) -> dict:
+    """{source number: 'YYYY[-MM[-DD]]' or ''} from a pack's header lines."""
+    out = {}
+    for ln in str(pack or "").split("\n"):
+        m = re.match(r"\[(\d+)\] .* \u2014 ([^\u2014]*)$", ln)
+        if m:
+            d = m.group(2).strip()
+            out[int(m.group(1))] = d if re.match(r"20\d\d", d) else ""
+    return out
+
+
 # the shared system prompt's one grounding line (the merge keeps the system
 # prompt, so the compositor reads this too): the [n] marks survive the merge
 GROUND_SYSTEM = (
@@ -20725,6 +21380,7 @@ def evidence_figures(pack: str, query: str, limit: int = 10, each: int = 220) ->
     `limit`, in source order. Self-contained (re only)."""
     words = {w for w in re.findall(r"[^\W\d_]{3,}", str(query or "").lower())
              if w not in _FIG_STOP}
+    dates = pack_dates(pack)
     out, n, seen = [], 0, set()
     for ln in str(pack or "").split("\n"):
         m = re.match(r"\[(\d+)\] ", ln)
@@ -20745,7 +21401,8 @@ def evidence_figures(pack: str, query: str, limit: int = 10, each: int = 220) ->
             if key in seen:
                 continue
             seen.add(key)
-            out.append("[%d] %s" % (n, sent[:each].rstrip() + ("\u2026" if len(sent) > each else "")))
+            out.append("[%d] %s%s" % (n, sent[:each].rstrip() + ("\u2026" if len(sent) > each else ""),
+                                      (" (source dated %s)" % dates[n]) if dates.get(n) else ""))
             if len(out) >= limit:
                 return out
     return out
@@ -20763,6 +21420,14 @@ def grounded_turn(query: str, pack: str, today=None, note: str = "") -> str:
     if not pack:
         return (GROUND_NONE.format(query=query, today=day) + tail
                 + "PROMPT: %s" % query)
+    rules = GROUND_RULES.format(today=day)
+    if "dating" not in fresh_ablate():
+        rules += GROUND_DATING
+        if _gq_stamp(str(query or ""), today):
+            ds = [d for d in pack_dates(pack).values() if d]
+            if not any(0 <= _src_months_ago(d, today) <= FRESH_STALE_MONTHS for d in ds):
+                rules += GROUND_STALE.format(months=FRESH_STALE_MONTHS,
+                                             newest=max(ds) if ds else "undated")
     figs = evidence_figures(pack, query)
     fig_block = ("\n\nKEY FIGURES IN THAT EVIDENCE (use the ones that answer "
                  "the question, each with its source number):\n"
@@ -20770,7 +21435,7 @@ def grounded_turn(query: str, pack: str, today=None, note: str = "") -> str:
     return ("What you just found on the web about '%s' \u2014 the reader can "
             "NEVER see this block, so restate anything you use, and cite it:\n"
             "%s%s\n\n%s%sPROMPT: %s"
-            % (query, pack, fig_block, GROUND_RULES.format(today=day), tail, query))
+            % (query, pack, fig_block, rules, tail, query))
 
 
 def ground_clip(block: str, cap: int) -> str:
@@ -20810,6 +21475,7 @@ class Grounding:
         self.today = today or time.localtime()
         self.queries, self.model_queries, self.terms = [], [], []
         self.hint_queries, self.primary = [], []
+        self.official = []         # the official data and vendor feeds it seated (6b520)
         self.prior = prior         # a follow-up's earlier grounded turn (6b518)
         self.search = bool(search) or prior is None   # False: that evidence alone
         self.turn_key = turn_key
@@ -20915,6 +21581,31 @@ class Grounding:
                 hints = []
             self.hint_queries = [h for h, _host in hints]
             self.primary = [host for _h, host in hints if host]
+            # FREE OFFICIAL DATA AND THE VENDOR'S FEED (6b520), beside the search
+            ab = fresh_ablate()
+            off_box = []
+
+            def _official():
+                try:
+                    if "official" not in ab:
+                        off_box.extend(official_sources(q, self.today))
+                    if nowish and "vendor" not in ab:
+                        vt = []
+                        for s_ in rules:
+                            for w in _gq_tokens(s_):
+                                w = w.strip(".'\u2019")
+                                if w and not re.fullmatch(r"20\d\d", w) and w.lower() not in _GQ_FILLER \
+                                        and w.lower() not in [x.lower() for x in vt]:
+                                    vt.append(w)
+                        for name, url_, human, kind, prod in vendor_feeds_for(q):
+                            b_ = vendor_news_block(name, url_, human, kind, prod, vt, q, self.today)
+                            if b_:
+                                off_box.append(b_)
+                except Exception:
+                    pass
+            off_t = ctx_thread(target=_official, daemon=True)
+            off_t.start()
+            self.official = off_box
             ents = []
             for part in _GQ_SPLIT_RX.split(q):
                 for e in _gq_terms(part or "")[1]:
@@ -20928,9 +21619,19 @@ class Grounding:
             ex = ctx_executor(2 * GROUND_QUERIES)
             per_q = self.t.setdefault("queries", {})
 
-            def _timed(s, more=False):
+            # the first engine's queries of a question about now: the past year (6b520)
+            tl = FRESH_TIMELIMIT if nowish and "tl" not in ab else None
+
+            def _timed(s, more=False, news=False):
                 _ts = time.time()
-                got = (_ddg_more if more else _ddg_text)(s, GROUND_PER_QUERY)
+                if news:
+                    got = _ddg_news(re.sub(r"^news: ", "", s), GROUND_PER_QUERY)
+                elif more:
+                    got = _ddg_more(s, GROUND_PER_QUERY)
+                elif tl:
+                    got = _ddg_text(s, GROUND_PER_QUERY, timelimit=tl)
+                else:
+                    got = _ddg_text(s, GROUND_PER_QUERY)
                 n, t_ = per_q.get(s, (0, 0.0))
                 per_q[s] = (n + len(got), max(t_, round(time.time() - _ts, 1)))
                 for r in got:
@@ -20951,6 +21652,10 @@ class Grounding:
             for i, s in enumerate(rules):
                 # the compact whole-question query repeats the parts: one engine
                 _submit(s, both=i < 3)
+            # one news search of the past month on the lead query (6b520): dated rows
+            if nowish and rules and "news" not in ab:
+                _nq = "news: " + re.sub(r"\s*\b20\d\d\b", "", rules[0]).strip()
+                futs[ex.submit(_timed, _nq, False, True)] = _nq
             self.queries += [s for s in self.hint_queries
                              if not any(_gq_same(s, x) for x in rules)]
             plan_box = []
@@ -21006,7 +21711,8 @@ class Grounding:
             cands = rank_sources(rows, terms, ents, nowish, self.today,
                                  limit=GROUND_SOURCES + 4, primary=self.primary)
             self.dropped = len(rows) - len(cands)
-            self._publish(cands[:GROUND_SOURCES], terms)
+            off_t.join(timeout=max(0.0, t0 + OFFICIAL_S - time.time()))
+            self._publish((list(off_box) + cands)[:GROUND_SOURCES], terms)
             self._set_phase("read")
             t1 = time.time()
             ex2 = ctx_executor(GROUND_READ)
@@ -21047,8 +21753,14 @@ class Grounding:
             for s in cands:
                 if s.get("paras"):
                     s["score"] += 2 if _para_hits(s["paras"], terms) else -1
+            offs = list(off_box)[:OFFICIAL_MAX]
             final = sorted((s for s in cands if not s.get("junk")),
-                           key=lambda s: (0 if s.get("seat") else 1, -s["score"]))[:GROUND_SOURCES]
+                           key=lambda s: (0 if s.get("seat") else 1, -s["score"]))[:GROUND_SOURCES - len(offs)]
+            if "snippet" not in ab:
+                for s in final:
+                    # never read, or the page refused: the engine's summary is all there is (6b520)
+                    s["snippet_only"] = not s.get("paras")
+            final = offs + final
             if self.prior is not None:
                 final = merge_prior(self.prior.sources, final)
                 terms = list(dict.fromkeys(list(self.prior.terms or []) + terms))
@@ -21059,9 +21771,10 @@ class Grounding:
             if DEV_HOME:
                 # a dev copy's log tells what was searched and read (the
                 # eval bench and the NOTES measurements read it)
-                print("ground: %s | queries=%r model=%r | hits=%d kept=%d read=%d "
+                print("ground: %s | queries=%r model=%r | official=%r | hits=%d kept=%d read=%d "
                       "passages=%d pack=%d | %s" % (
                           _ground_key(q)[:60], self.queries, self.model_queries,
+                          [o.get("host") for o in offs],
                           self.hits, len(final), self.n_read, self.n_passages,
                           len(self.pack),
                           " ".join("%s=%s" % (k, v) for k, v in self.t.items()
