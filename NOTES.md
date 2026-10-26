@@ -17222,3 +17222,6 @@ refused that knob, so it could never have been set. `run_bench.py --env` passes 
   - the knob a dev copy's only
 - Stale fixtures follow the code. 6b514's and 6b518's `_ddg_text` stubs take `timelimit`. 6b514's namespace
   stubs `_official_get` and `_ddg_news`, so no check touches the network or the BLS quota.
+- The gauntlet on `fresh-1`: run 1 (349015d) stopped at 1174 passed on a NameError: the 6b516 check execs a slice
+  (`GROUND_RULES` .. `_ground_key`) whose grounded turn now calls `fresh_ablate`, `_gq_stamp` and `_src_months_ago`;
+  the slice gets them. Run 2 (2412ebc): **1221/1221**, exit 0.
