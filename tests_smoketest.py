@@ -37150,7 +37150,10 @@ check("6b515's rules each break a check when broken (%d mutants)" % len(_C515_MU
 # craft (6b515) and Fast's second pass cut the question block with a plain [:8000] / [:5000], which kept
 # the pages and dropped the rules and the question itself. ground_clip keeps the end whole.
 print("== quality-1: the grounded turn survives every cut (6b516) ==")
-_q16 = {"re": re, "time": time, "strftime_np": lambda f, t: time.strftime(f.replace("%-d", "%d"), t)}
+_q16 = {"re": re, "time": time, "strftime_np": lambda f, t: time.strftime(f.replace("%-d", "%d"), t),
+        # (6b520) the grounded turn's dating rules read these; a question with no stamp skips the stale note
+        "fresh_ablate": lambda: set(), "_gq_stamp": lambda q, t: "", "_src_months_ago": lambda d, t: -1,
+        "FRESH_STALE_MONTHS": 12}
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("GROUND_RULES = ("):_MILLENAI_SRC.index("def _ground_key(")], _q16)
 _pack16 = "WEB EVIDENCE gathered today, 8 sources:\n" + "\n".join("[%d] page %d\n    %s" % (i, i, "x" * 1000) for i in range(1, 9))
 _turn16 = _q16["grounded_turn"]("most powerful GPU now", _pack16)
