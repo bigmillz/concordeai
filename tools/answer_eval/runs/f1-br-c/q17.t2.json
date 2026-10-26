@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.0,\"ftok\":137,\"est\":false}",
+  "X-Hurry": "a7595fe5e50e35e6"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 17.74,
+ "elapsed_s": 24.4,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 8.44,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.44,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.44,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 22 passages"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.55,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.74,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.4,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.1,
+    "tok": 373,
+    "s": 6.7
+   }
+  },
+  {
+   "t": 24.4,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1495 chars"
+   }
+  },
+  {
+   "t": 24.4,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.44,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.44
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.44
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 22 passages",
+   "t_s": 10.55
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.55
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.55
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.55
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1495 chars",
+   "t_s": 24.4
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.4
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Is Florianópolis Safe? 2026 Beaches & Tourist Tips",
+   "u": "https://brazilsafetravel.com/blog/is-florianopolis-safe",
+   "d": "2026"
+  },
+  {
+   "t": "Best beaches in Florianópolis: a complete 2026... - Career Gappers",
+   "u": "https://careergappers.com/florianopolis-beaches/",
+   "d": "2026"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Oct 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-10"
+  },
+  {
+   "t": "Cost of Living Estimator for Florianopolis, Brazil - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/city-estimator/in/Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Coliving in Florianopolis — Furnished Rooms & Shared Housing for...",
+   "u": "https://coliving.love/coliving-florianopolis/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.55,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 56.1,
+  "tok": 373,
+  "s": 6.7
+ },
+ "answer_raw": "Pick **Canasvieiras** for your six-month stay. It offers the best balance of your requirements, as it provides a furnished one-bedroom setup within a 6-minute walk of the beach [4].\n\nWhile the provided data does not list an exact monthly price for a furnished one-bedroom in Canasvieiras, I can provide the conversion math and the context needed to estimate your budget.\n\n## Financial Breakdown\n\nUsing the exchange rate from October 23, 2026, where 1 USD = 5.0465 BRL [5], you can calculate the cost once you secure a specific listing.\n\n**Estimated Budgeting**\nIf you find a furnished one-bedroom in a prime coastal area like Canasvieiras, it will likely command a premium over the city's average rent. For context, a single person's monthly costs excluding rent are approximately R$3,290.2 ($652.08) as of October 2026 [6].\n\n| Currency | Conversion Factor (per Oct 23, 2026) |\n| :--- | :--- |\n| **1 BRL** | $0.1982 USD [5] |\n| **1 USD** | R$5.0465 BRL [5] |\n\n## Why Canasvieiras fits\n\n**Proximity and Convenience**\nIn Canasvieiras, you can find furnished apartments that are a 6-minute walk from the beach [4]. This satisfies your desire for a walkable, beach-adjacent lifestyle.\n\n**Connectivity**\nThe area supports the fiber optic infrastructure found in much of the city, where 300 to 500 Mbps connections typically run between R$100 and R$150 per month [1]. You can also find high-end options, such as those offering 1Gb optical internet, to ensure your remote work requirements are met [4].",
+ "answer": "Pick **Canasvieiras** for your six-month stay. It offers the best balance of your requirements, as it provides a furnished one-bedroom setup within a 6-minute walk of the beach [4].\n\nWhile the provided data does not list an exact monthly price for a furnished one-bedroom in Canasvieiras, I can provide the conversion math and the context needed to estimate your budget.\n\n## Financial Breakdown\n\nUsing the exchange rate from October 23, 2026, where 1 USD = 5.0465 BRL [5], you can calculate the cost once you secure a specific listing.\n\n**Estimated Budgeting**\nIf you find a furnished one-bedroom in a prime coastal area like Canasvieiras, it will likely command a premium over the city's average rent. For context, a single person's monthly costs excluding rent are approximately R$3,290.2 ($652.08) as of October 2026 [6].\n\n| Currency | Conversion Factor (per Oct 23, 2026) |\n| :--- | :--- |\n| **1 BRL** | $0.1982 USD [5] |\n| **1 USD** | R$5.0465 BRL [5] |\n\n## Why Canasvieiras fits\n\n**Proximity and Convenience**\nIn Canasvieiras, you can find furnished apartments that are a 6-minute walk from the beach [4]. This satisfies your desire for a walkable, beach-adjacent lifestyle.\n\n**Connectivity**\nThe area supports the fiber optic infrastructure found in much of the city, where 300 to 500 Mbps connections typically run between R$100 and R$150 per month [1]. You can also find high-end options, such as those offering 1Gb optical internet, to ensure your remote work requirements are met [4].",
+ "chars": 1495,
+ "raw_bytes": 3587,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.32,
+ "rate_gen_tok_s": 56.12,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-c",
+ "asked_at": "2026-10-25T19:59:36",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay that balances safety, beach access, and connectivity, **Ingleses Norte** and the **gastronomic district** are your strongest contenders, though the \"best\" depends on whether you prioritize a coastal resort feel or an urban, walkable vibe.\n\n## Neighborhood Options\n\n**Ingleses Norte**\nThis area offers a direct beach lifestyle, with some rentals located just a two-minute walk from Ingleses Beach [4]. It is a practical choice for a medium-term stay, as it provides proximity to local amenities like the Floripa Mall (roughly 15 miles away) [4].\n\n**The Gastronomic District**\nIf you prefer being closer to the city center while maintaining a distinct local vibe, look at the area adjacent to the UDESC campus. This district is roughly 4 miles from the city center and offers modern rental options, including units with 1Gb optical internet [4].\n\n## Planning Considerations\n\n**Internet and Connectivity**\nYou won't have trouble with bandwidth. In most neighborhoods, fiber optic connections ranging from 300 to 500 Mbps are available for R$100 to R$150 per month (as of November 2025) [1]. If your work requires higher throughput, look specifically for listings advertising 1Gb optical internet [4].\n\n**Safety and Logistics**\nFlorianópolis is the safest state capital in Brazil, with a 2024 homicide rate of 7.9 per 100,000 residents, significantly lower than the national average [2]. Because the city does not have one central hub with a radiating quality corridor, you should evaluate each neighborhood based on your individual \"friction\" levels—such as your morning call schedule versus local walking distances [1][6].\n\n**Rental Market Trends**\nBe prepared for rising costs; asking rents increased by 9.13% in the 12 months leading up to September 2026 [5]. While a long-term lease is often more cost-effective than short-term rentals, the market is competitive, and one-bedroom units are particularly popular [5]."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

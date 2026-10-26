@@ -1,0 +1,114 @@
+{
+ "name": "f1-base-a",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T18:59:28",
+ "repo": "/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad/fresh1/base",
+ "head": [
+  "",
+  ""
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 28.11,
+   "chars": 2508,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 15.7,
+   "chars": 2392,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 23.14,
+   "chars": 2003,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 25.91,
+   "chars": 1816,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 22.2,
+   "chars": 385,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 19.64,
+   "chars": 1691,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 22.16,
+   "chars": 366,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 21.35,
+   "chars": 1791,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 18.96,
+   "chars": 1519,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 36.06,
+   "chars": 2123,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 24.94,
+   "chars": 1923,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 28.76,
+   "chars": 2356,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 29.56,
+   "chars": 2096,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 15.0,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink acts as a thermal bridge that pulls heat away from a sensitive component to dissipate it into the surrounding air. It uses an increased surface area—typically through metal fins—to maximiz"
+ },
+ "finished": "2026-10-25T19:05:26"
+}

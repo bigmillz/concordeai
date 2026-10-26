@@ -1,0 +1,115 @@
+{
+ "name": "f1-br-c",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T19:55:24",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 29.88,
+   "chars": 2484,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 16.7,
+   "chars": 2315,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 24.66,
+   "chars": 1674,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 24.81,
+   "chars": 1815,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 24.92,
+   "chars": 275,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 24.98,
+   "chars": 1786,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 25.65,
+   "chars": 391,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 23.64,
+   "chars": 1937,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 24.4,
+   "chars": 1495,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 38.91,
+   "chars": 1985,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 28.5,
+   "chars": 2420,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 24.07,
+   "chars": 2187,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 32.25,
+   "chars": 2202,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 15.32,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink increases the available surface area to facilitate the transfer of thermal energy from a high-temperature component to a cooler medium. It uses conductive materials and geometries like fin"
+ },
+ "finished": "2026-10-25T20:01:49"
+}

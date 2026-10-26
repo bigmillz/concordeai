@@ -1,0 +1,117 @@
+{
+ "name": "f1-ab-search",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T20:01:50",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 33.1,
+   "chars": 2071,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 15.21,
+   "chars": 2605,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 23.42,
+   "chars": 1727,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 23.9,
+   "chars": 1449,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 23.47,
+   "chars": 441,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 26.43,
+   "chars": 1490,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 23.23,
+   "chars": 220,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 24.8,
+   "chars": 1670,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 22.72,
+   "chars": 1533,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 46.54,
+   "chars": 1848,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 28.32,
+   "chars": 1856,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 29.62,
+   "chars": 2336,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 29.87,
+   "chars": 2361,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {
+  "MILLENAI_FRESH_OFF": "tl,news"
+ },
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.68,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink conducts heat away from a sensitive component to increase its effective surface area. It then dissipates that thermal energy into the surrounding medium, such as air or liquid, to prevent "
+ },
+ "finished": "2026-10-25T20:08:22"
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.7,\"ftok\":166,\"est\":false}",
+  "X-Hurry": "4b2dbbe12c521b4b"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 17.31,
+ "elapsed_s": 23.42,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 10.52,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.52,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.52,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.4,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 33 passages"
+   }
+  },
+  {
+   "t": 13.4,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.4,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.4,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.4,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.31,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.42,
+   "tag": "RATE",
+   "data": {
+    "tps": 70.7,
+    "tok": 431,
+    "s": 6.1
+   }
+  },
+  {
+   "t": 23.42,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1727 chars"
+   }
+  },
+  {
+   "t": 23.42,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.52,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.52
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.52
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 33 passages",
+   "t_s": 13.4
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.4
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.4
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1727 chars",
+   "t_s": 23.42
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.42
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Identify your iPhone model - Apple Support",
+   "u": "https://support.apple.com/en-us/108044",
+   "d": "2026"
+  },
+  {
+   "t": "iPhone 14 Pro makes the notch come alive, finally - ZDNET",
+   "u": "https://www.zdnet.com/article/iphone-14-pro-makes-the-notch-come-alive-finally/",
+   "d": "2022-09-09"
+  },
+  {
+   "t": "Apple Service and Repair for iPhone - Apple Support",
+   "u": "https://support.apple.com/iphone/repair?services=service",
+   "d": ""
+  },
+  {
+   "t": "iPhone eSIM Compatible Models: The Complete 2026 Guide",
+   "u": "https://destinationsim.com/blog/iphone-esim-compatible-models/",
+   "d": "2026"
+  },
+  {
+   "t": "iPhone 14 Pro Max 2 Weeks Later Review - Mark Ellis Reviews",
+   "u": "https://markellisreviews.com/reviews/iphone-14-pro-max-2-weeks-later-review/",
+   "d": "2022-09-29"
+  },
+  {
+   "t": "Apple iPhone 14 review: Everything you need to know | Tom's Guide",
+   "u": "https://www.tomsguide.com/reviews/iphone-14",
+   "d": "2022-10-20"
+  },
+  {
+   "t": "What 2026 iPhone Model & Color Are You... | MacRumors Forums",
+   "u": "https://forums.macrumors.com/threads/what-2026-iphone-model-color-are-you-getting.2488743/page-2",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.4,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 70.7,
+  "tok": 431,
+  "s": 6.1
+ },
+ "answer_raw": "The newest iPhone lineup is the **iPhone Duo** [1].\n\nThe provided sources do not list the specific pricing for the iPhone Duo [1]. You would need to check the Apple Store directly for current retail pricing.\n\nWhether it is worth upgrading from an iPhone 14 depends on your tolerance for first-generation hardware and your specific feature needs.\n\n## The Case for Upgrading\nIf you are coming from a base iPhone 14, moving to the latest lineup offers significant hardware shifts.\n\n*   **New Form Factor**: The iPhone Duo is a new product line that arrived in stores in September s/2026 [1].\n*   **Camera Capabilities**: If you are interested in professional mobile videography, the iPhone 18 Pro supports variable aperture in Final Cut Camera [1].\n*   **Display/Design**: If you have an iPhone 14, you are likely moving from a design that lacks the \"Dynamic Island\" (unless you have a 14 Pro) and is transitioning to the newest hardware iteration [2][3].\n\n## The Case for Waiting\nThere are significant reasons to hold off on an upgrade if you currently own an iPhone 14.\n\n*   **First-Gen Risks**: The iPhone Duo is considered a first-gen product with an unproven timeframe regarding the crease during daily usage [8].\n*   **Incremental vs. Generational**: Some users are opting for the iPhone 18 Pro Max instead of the Duo to ensure they have the latest processor and camera technology while avoiding the experimental form factor of the Duo [8].\n*   **Current Hardware Longevity**: Your iPhone 14 remains a modern device; depending on whether you have the base model or the Pro, the jump in features like the Dynamic Island or the move to an entirely different form factor represents a massive shift in user experience [2][3][5].",
+ "answer": "The newest iPhone lineup is the **iPhone Duo** [1].\n\nThe provided sources do not list the specific pricing for the iPhone Duo [1]. You would need to check the Apple Store directly for current retail pricing.\n\nWhether it is worth upgrading from an iPhone 14 depends on your tolerance for first-generation hardware and your specific feature needs.\n\n## The Case for Upgrading\nIf you are coming from a base iPhone 14, moving to the latest lineup offers significant hardware shifts.\n\n*   **New Form Factor**: The iPhone Duo is a new product line that arrived in stores in September s/2026 [1].\n*   **Camera Capabilities**: If you are interested in professional mobile videography, the iPhone 18 Pro supports variable aperture in Final Cut Camera [1].\n*   **Display/Design**: If you have an iPhone 14, you are likely moving from a design that lacks the \"Dynamic Island\" (unless you have a 14 Pro) and is transitioning to the newest hardware iteration [2][3].\n\n## The Case for Waiting\nThere are significant reasons to hold off on an upgrade if you currently own an iPhone 14.\n\n*   **First-Gen Risks**: The iPhone Duo is considered a first-gen product with an unproven timeframe regarding the crease during daily usage [8].\n*   **Incremental vs. Generational**: Some users are opting for the iPhone 18 Pro Max instead of the Duo to ensure they have the latest processor and camera technology while avoiding the experimental form factor of the Duo [8].\n*   **Current Hardware Longevity**: Your iPhone 14 remains a modern device; depending on whether you have the base model or the Pro, the jump in features like the Dynamic Island or the move to an entirely different form factor represents a massive shift in user experience [2][3][5].",
+ "chars": 1727,
+ "raw_bytes": 3707,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.44,
+ "rate_gen_tok_s": 70.66,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-search",
+ "asked_at": "2026-10-25T20:03:21",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

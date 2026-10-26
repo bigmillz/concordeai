@@ -1,0 +1,117 @@
+{
+ "name": "f1-ab-vendor",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T20:14:30",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 29.23,
+   "chars": 2206,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 18.39,
+   "chars": 2888,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 26.17,
+   "chars": 1823,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 24.87,
+   "chars": 1443,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 23.64,
+   "chars": 404,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 21.37,
+   "chars": 1147,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 25.6,
+   "chars": 267,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 24.82,
+   "chars": 1942,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 25.89,
+   "chars": 1197,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 35.4,
+   "chars": 1993,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 27.59,
+   "chars": 2324,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 25.13,
+   "chars": 1688,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 31.82,
+   "chars": 2213,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {
+  "MILLENAI_FRESH_OFF": "vendor"
+ },
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.25,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink increases the surface area available for thermal transfer to pull heat away from a concentrated source like a CPU. It then dissipates that heat into the surrounding environment through con"
+ },
+ "finished": "2026-10-25T20:20:50"
+}

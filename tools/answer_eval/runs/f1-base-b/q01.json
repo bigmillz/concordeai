@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.3,\"ftok\":32,\"est\":false}",
+  "X-Hurry": "5f2d3cbcf2b9c8cd"
+ },
+ "first_byte_s": 0.95,
+ "first_text_s": 16.83,
+ "elapsed_s": 24.59,
+ "events": [
+  {
+   "t": 0.95,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.95,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 8.83,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.83,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.83,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.6,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 10.6,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.6,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.6,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.6,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.83,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.59,
+   "tag": "RATE",
+   "data": {
+    "tps": 71.7,
+    "tok": 556,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 24.59,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2224 chars"
+   }
+  },
+  {
+   "t": 24.59,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.95,
+   "Searching the web…"
+  ],
+  [
+   8.83,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 0.95
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.83
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.83
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 10.6
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.6
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.6
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2224 chars",
+   "t_s": 24.59
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.59
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "AI Hypercomputer inference updates for Google Cloud TPU and GPU",
+   "u": "https://cloud.google.com/blog/products/compute/ai-hypercomputer-inference-updates-for-google-cloud-tpu-and-gpu",
+   "d": "2025-05-09"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "Claude Opus 4.5 System Card - anthropic.com",
+   "u": "https://www.anthropic.com/claude-opus-4-5-system-card",
+   "d": "2025-11-24"
+  },
+  {
+   "t": "NVIDIA Vera Rubin Opens Agentic AI Frontier",
+   "u": "https://nvidianews.nvidia.com/news/nvidia-vera-rubin-platform",
+   "d": "2026-03-16"
+  },
+  {
+   "t": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware",
+   "u": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html",
+   "d": "2026"
+  },
+  {
+   "t": "Nebius AI GPU Cloud Platform - Competitive NVIDIA GPU Pricing",
+   "u": "https://www.bing.com/aclick?ld=e8m7Df8SGuLYp3xJ4qQw2gFjVUCUz_GOF4F6rCam2ctNlKShCnOG5VbUJuCdOwBcnOFpRrcVOMp4nJBKuv3m88PylMvl-YfKkGJFwTV2_52Z7Cz-nVQ_RbptCgW_OJQYQwzPRQf-brClNgVGe5mL1ghLRQV6trXt4sJ1NPmyf3o41wC6R5M8wNl-LcVc5s4jHMlJI3yFAVSDzyXuptqeeu9AipGXk&u=aHR0cHMlM2ElMmYlMmZuZWJpdXMuY29tJTJmY29tcHV0ZSUzZnV0bV90ZXJtJTNkbnZpZGlhJTI1MjBncHUlMjZ1dG1fY2FtcGFpZ24lM2RGWTI2X0RNX05CX1BTRV9QVVJfQklfTkFfbnZpZGlhLWdwdXMlMjZ1dG1fc291cmNlJTNkYmluZyUyNnV0bV9tZWRpdW0lM2RjcGMlMjZ1dG1fY29udGVudCUzZDgyOTQ0ODM4ODIyNTM1JTI2dXRtX2FkZ3JvdXAlM2QxMzI3MTEzNDIxNTYxOTY1JTI2dXRtX2lkJTNkNTI0MjI4NzM5JTI2bXNjbGtpZCUzZDQwNmUzN2ZmM2U0MDE2YmFlYzgyNWQyMTQzMjY2MmQzJTI2aHNhX2NhbSUzZDUyNDIyODczOSUyNmhzYV9ncnAlM2QxMzI3MTEzNDIxNTYxOTY1JTI2aHNhX2FkJTNkODI5NDQ4Mzg4MjI1MzUlMjZoc2Ffc3JjJTNkbyUyNmhzYV90Z3QlM2Rrd2QtODI5NDYyNzM1MDYwMDIlM2Fsb2MtMjAlMjZoc2Ffa3clM2RudmlkaWElMjUyMGdwdSUyNmhzYV9tdCUzZHAlMjZoc2FfbmV0JTNkYmluZyUyNmhzYV92ZXIlM2Qz&rlid=406e37ff3e4016baec825d21432662d3",
+   "d": ""
+  },
+  {
+   "t": "GPU Comparison 2026: Graphics Card Benchmarks & Specs",
+   "u": "https://www.gpu-monkey.com/en/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.6,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 71.7,
+  "tok": 556,
+  "s": 7.8
+ },
+ "answer_raw": "The most powerful hardware for AI currently depends on whether you are looking at discrete GPUs or custom scale-out architectures.\n\nFor massive, pod-scale supercomputing, the **NVIDIA Vera Rubin** platform is the leading edge, integrating the Rubin GPU, Vera CPU, and specialized networking like the NVLink 6 Switch and ConnectX-9 SuperNIC to create massive, coherent AI-driven systems [5]. For rack-scale, liquid-cooled clusters, the **NVIDIA GB300 NVL72** (featuring 72 Blackwell Ultra GPUs) is purpose-built for frontier model training and agentic AI [7]. \n\nOn the specialized accelerator side, Google's **Ironwood** is the newest TPU designed specifically for inference [2].\n\n## Hardware usage and strategies\n\nThe landscape is split between those chasing the highest raw GPU throughput and those building custom, vertically integrated silicon stacks.\n\n**Anthropic**\nClaude's infrastructure is heavily centered on Google's silicon. Anthropic uses **Google Cloud** as its primary hosting partner, utilizing TPU workloads to avoid the complexity of managing Nvidia'\ndrivers and CUDA stacks [1]. In April 2026, Anthropic secured a partnership with Google and Broadcom for approximately **3.5GW of next-generation TPU capacity** starting in 2027, effectively making them Google's largest external TPU customer to ensure priority access to compute [1].\n\n**Other Major Players**\n*   **NVIDIA-centric users**: Companies like Microsoft (OpenAI) have historically received the first allocations of Nvidia's most advanced GPUs [1]. High-scale users utilize systems like the **NVIDIA GB300 NVL72** for massive training tasks [7].\n*   **Google**: Beyond serving Anthropic, Google uses its own hardware for own models, such as the **Gemma 3** family, which is optimized for single-GPU performance and dedicated AI hardware [3].\n*   **Edge/Developer users**: Developers looking for high performance on limited hardware use models like **Gemma 3**, which Google claims is the world's best single-accelerator model [3].\n\nWhile the specific hardware used for training the latest Claude models (like Opus 4.5) is not explicitly detailed, its reliance on Google's TPU-centric infrastructure is the primary driver of its availability [1][4].",
+ "answer": "The most powerful hardware for AI currently depends on whether you are looking at discrete GPUs or custom scale-out architectures.\n\nFor massive, pod-scale supercomputing, the **NVIDIA Vera Rubin** platform is the leading edge, integrating the Rubin GPU, Vera CPU, and specialized networking like the NVLink 6 Switch and ConnectX-9 SuperNIC to create massive, coherent AI-driven systems [5]. For rack-scale, liquid-cooled clusters, the **NVIDIA GB300 NVL72** (featuring 72 Blackwell Ultra GPUs) is purpose-built for frontier model training and agentic AI [7]. \n\nOn the specialized accelerator side, Google's **Ironwood** is the newest TPU designed specifically for inference [2].\n\n## Hardware usage and strategies\n\nThe landscape is split between those chasing the highest raw GPU throughput and those building custom, vertically integrated silicon stacks.\n\n**Anthropic**\nClaude's infrastructure is heavily centered on Google's silicon. Anthropic uses **Google Cloud** as its primary hosting partner, utilizing TPU workloads to avoid the complexity of managing Nvidia'\ndrivers and CUDA stacks [1]. In April 2026, Anthropic secured a partnership with Google and Broadcom for approximately **3.5GW of next-generation TPU capacity** starting in 2027, effectively making them Google's largest external TPU customer to ensure priority access to compute [1].\n\n**Other Major Players**\n*   **NVIDIA-centric users**: Companies like Microsoft (OpenAI) have historically received the first allocations of Nvidia's most advanced GPUs [1]. High-scale users utilize systems like the **NVIDIA GB300 NVL72** for massive training tasks [7].\n*   **Google**: Beyond serving Anthropic, Google uses its own hardware for own models, such as the **Gemma 3** family, which is optimized for single-GPU performance and dedicated AI hardware [3].\n*   **Edge/Developer users**: Developers looking for high performance on limited hardware use models like **Gemma 3**, which Google claims is the world's best single-accelerator model [3].\n\nWhile the specific hardware used for training the latest Claude models (like Opus 4.5) is not explicitly detailed, its reliance on Google's TPU-centric infrastructure is the primary driver of its availability [1][4].",
+ "chars": 2224,
+ "raw_bytes": 5142,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 22.61,
+ "rate_gen_tok_s": 71.65,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-b",
+ "asked_at": "2026-10-25T19:06:53",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

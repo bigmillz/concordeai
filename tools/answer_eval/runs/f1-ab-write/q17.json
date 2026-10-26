@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.7,\"ftok\":132,\"est\":false}",
+  "X-Hurry": "c0f44e9424eaa31e"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.66,
+ "elapsed_s": 25.87,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.91,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 25 passages"
+   }
+  },
+  {
+   "t": 11.91,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.91,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.91,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.91,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.66,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.87,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.6,
+    "tok": 487,
+    "s": 7.2
+   }
+  },
+  {
+   "t": 25.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1949 chars"
+   }
+  },
+  {
+   "t": 25.87,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 25 passages",
+   "t_s": 11.91
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.91
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.91
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1949 chars",
+   "t_s": 25.87
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.87
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is Florianópolis Safe? 2026 Beaches & Tourist Tips",
+   "u": "https://brazilsafetravel.com/blog/is-florianopolis-safe",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Buy Property in Florianópolis, Brazil: Foreigner Guide",
+   "u": "https://www.elisainvestimentos.com.br/en/buy-property-florianopolis/",
+   "d": "2026-02-16"
+  },
+  {
+   "t": "Safest Neighborhoods in Florianópolis: SSP-SC Data Guide",
+   "u": "https://scbimoveis.com/en/articles/florianopolis-safest-neighborhoods-data-russians-2026",
+   "d": "2026-09-09"
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis neighborhoods for those coming from São Paulo...",
+   "u": "https://en.guiafloripa.com.br/Blog/Florianopolis-neighborhoods-for-those-coming-from-SP-profile-access-and-prospective-rent",
+   "d": "2025-08-25"
+  },
+  {
+   "t": "Picky mom wants beach, safe walkable town, no cars... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g1-i9658-k11989472-o10-Picky_mom_wants_beach_safe_walkable_town_no_cars_food-Family_Travel.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.91,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 67.6,
+  "tok": 487,
+  "s": 7.2
+ },
+ "answer_raw": "Since Florianópolis doesn't have a single central hub, your best bet depends on whether you prioritize a \"glamorous\" lifestyle or a \"local\" vibe, but you can count on reliable fiber optic (300 to 500 Mbps) in most neighborhoods to support remote work [2].\n\n## Top Neighborhood Recommendations\n\n**Jurerê Internacional** — If you want the most upscale, \"glamorous\" experience with beach clubs and high-end amenities, this is the primary choice [3]. It is a distinct, high-end area that offers a specific type of luxury coastal lifestyle [3].\n\n**Barra da Lagoa** — For a more laid-back, \"fishing village\" vibe, this area is highly desirable [7]. It offers a calmer routine and proximity to trails and beaches, though demand is very high during the summer months [7].\n\n**Centro** — If you want to be in the heart of the city with the best mobility, the downtown area is an option, but keep in mind it has a much higher \"floating population\" of workers and tourists compared to residents [4]. While it offers central access, it is not a traditional \"beach town\" atmosphere [4].\n\n## Planning Considerations\n\n**Transportation vs. Walkability** — Because the city isn't built around a single corridor, moving around without a car can be time-consuming unless you are near one of the six integration terminals [2]. In the Island residential areas, you'll find a mix of green neighborhoods and beach access, whereas the Continent offers better mobility and more stable rent prices [7].\n\n**Budget and Rental Trends** — Rent prices are rising faster than property prices, with asking rents increasing 9.13% in the siding year leading up to September 2026 [6]. Since you are looking for a six-month stay, be aware that one-bedroom units are a common and effective rental choice [6].\n\n**Safety** — You are looking at one of the safest state capitals in Brazil; the 2024 homicide rate was 9.7 per 100,000 residents, which is well below the national average [1][4].",
+ "answer": "Since Florianópolis doesn't have a single central hub, your best bet depends on whether you prioritize a \"glamorous\" lifestyle or a \"local\" vibe, but you can count on reliable fiber optic (300 to 500 Mbps) in most neighborhoods to support remote work [2].\n\n## Top Neighborhood Recommendations\n\n**Jurerê Internacional** — If you want the most upscale, \"glamorous\" experience with beach clubs and high-end amenities, this is the primary choice [3]. It is a distinct, high-end area that offers a specific type of luxury coastal lifestyle [3].\n\n**Barra da Lagoa** — For a more laid-back, \"fishing village\" vibe, this area is highly desirable [7]. It offers a calmer routine and proximity to trails and beaches, though demand is very high during the summer months [7].\n\n**Centro** — If you want to be in the heart of the city with the best mobility, the downtown area is an option, but keep in mind it has a much higher \"floating population\" of workers and tourists compared to residents [4]. While it offers central access, it is not a traditional \"beach town\" atmosphere [4].\n\n## Planning Considerations\n\n**Transportation vs. Walkability** — Because the city isn't built around a single corridor, moving around without a car can be time-consuming unless you are near one of the six integration terminals [2]. In the Island residential areas, you'll find a mix of green neighborhoods and beach access, whereas the Continent offers better mobility and more stable rent prices [7].\n\n**Budget and Rental Trends** — Rent prices are rising faster than property prices, with asking rents increasing 9.13% in the siding year leading up to September 2026 [6]. Since you are looking for a six-month stay, be aware that one-bedroom units are a common and effective rental choice [6].\n\n**Safety** — You are looking at one of the safest state capitals in Brazil; the 2024 homicide rate was 9.7 per 100,000 residents, which is well below the national average [1][4].",
+ "chars": 1949,
+ "raw_bytes": 4243,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.83,
+ "rate_gen_tok_s": 67.58,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-write",
+ "asked_at": "2026-10-25T20:24:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.2,\"ftok\":34,\"est\":false}",
+  "X-Hurry": "7b0fddcc661da57e"
+ },
+ "first_byte_s": 1.07,
+ "first_text_s": 23.59,
+ "elapsed_s": 32.25,
+ "events": [
+  {
+   "t": 1.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 1.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 11.86,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.86,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.86,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.85,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 22 passages"
+   }
+  },
+  {
+   "t": 16.85,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.85,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.86,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.59,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 32.25,
+   "tag": "RATE",
+   "data": {
+    "tps": 68.2,
+    "tok": 590,
+    "s": 8.7
+   }
+  },
+  {
+   "t": 32.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2363 chars"
+   }
+  },
+  {
+   "t": 32.25,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   1.07,
+   "Searching the web…"
+  ],
+  [
+   11.86,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 1.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.86
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.86
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 22 passages",
+   "t_s": 16.85
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.85
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.86
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2363 chars",
+   "t_s": 32.25
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 32.25
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Google TPU vs NVIDIA GPU: Compared 2026 - CloudMinister",
+   "u": "https://cloudminister.com/blog/google-tpu-vs-nvidia-gpu-2026/",
+   "d": "2026-09-02"
+  },
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "AI Inference Hardware Battle 2026: Google TPU vs Nvidia GPU ...",
+   "u": "https://www.evoart.ai/blog/the-great-ai-inference-race-google-tpu-vs-nvidia-gpu-in-2026",
+   "d": "2026-05-02"
+  },
+  {
+   "t": "NVIDIA’s New Ampere Data Center GPU in Full... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/news/nvidias-new-ampere-data-center-gpu-in-full-production",
+   "d": ""
+  },
+  {
+   "t": "How Cloud TPU v5e accelerates large-scale AI... | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/how-cloud-tpu-v5e-accelerates-large-scale-ai-inference",
+   "d": "2023-08-31"
+  },
+  {
+   "t": "Why NVIDIA's most powerful GPU is so rarely sold to consumers",
+   "u": "https://www.msn.com/en-us/news/other/why-nvidias-most-powerful-gpu-is-so-rarely-sold-to-consumers/ar-AA2d1Wr0?ocid=BingNewsVerp",
+   "d": "2026-09-26"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "Google's $40B Anthropic Investment: TPU Deal Inside [2026]",
+   "u": "https://tech-insider.org/google-40-billion-anthropic-investment-tpu-compute-2026/",
+   "d": "2026-04-25"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.86,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 68.2,
+  "tok": 590,
+  "s": 8.7
+ },
+ "answer_raw": "The answer depends on whether you are measuring raw single-chip power or the massive scale of distributed infrastructure used by the world's largest AI labs.\n\n## The Hardware Landscape\n\nFor desktop-class workstation power, the **NVIDIA RTX PRO 6000 Blackwell Workstation Edition** is described as the most powerful desktop GPU ever created, per an undated report [6]. \n\nIn the data center and cloud-scale realm, the battle is between **NVIDIA GPUs** and **Google TPUs**. Historically, NVIDIA was the default for almost everyone due to its CUDA ecosystem and architectural dominance [3]. However, the landscape has shifted as Google's **Ironwood TPU** has significantly closed the performance gap [1]. While NVIDIA's high-end chips (like the A100) were once the gold standard for unifying training and inference [4], Google's newer TPUs are now achieving unprecedented performance levels for inference workloads [3].\n\n## Who is using what?\n\nThe distribution of hardware is largely dictated by priority queues and strategic partnerships.\n\n**Anthropic (Claude)** — Anthropic uses **Google Cloud** as its primary hosting partner and has moved toward a TPU-centric infrastructure [2]. This strategic shift was driven by the fact that Anthropic was third in the NVIDIA allocation queue, which was a competitive disadvantage [2]. As part of a massive deal in April 2026, Anthropic secured approximately 3.5GW of next-generation TPU capacity starting in 2027, with a total of 5GW of dedicated compute capacity locked in on Google’s TPU infrastructure [2][8].\n\n**Other Major Players** — Historically, NVIDIA's most advanced GPUs were allocated first to **Microsoft (OpenAI)**, followed by **Google** [2]. \n\n| User/Entity | Primary Hardware Focus | Strategic Context |\n| :--- | :--- | :--- |\n| **Anthropic** | **Google TPUs** [2] | Uses Google Cloud; secured 3.5GW of TPU capacity starting in 2027 [2][8]. |\n| **Microsoft** | **NVIDIA GPUs** [2] | Historically held the top priority in NVIDIA's allocation queue [2]. |\n| **Google** | **TPUs / NVIDIA** [2] | Uses internal TPUs and was historically top of the NVIDIA queue [2]. |\n\nThe current state of \"the most powerful\" is a split: NVIDIA dominates the transferable, high-end GPU market, while Google's TPU infrastructure provides the massive, specialized scale needed for the next generation of models like Claude [1][2].",
+ "answer": "The answer depends on whether you are measuring raw single-chip power or the massive scale of distributed infrastructure used by the world's largest AI labs.\n\n## The Hardware Landscape\n\nFor desktop-class workstation power, the **NVIDIA RTX PRO 6000 Blackwell Workstation Edition** is described as the most powerful desktop GPU ever created, per an undated report [6]. \n\nIn the data center and cloud-scale realm, the battle is between **NVIDIA GPUs** and **Google TPUs**. Historically, NVIDIA was the default for almost everyone due to its CUDA ecosystem and architectural dominance [3]. However, the landscape has shifted as Google's **Ironwood TPU** has significantly closed the performance gap [1]. While NVIDIA's high-end chips (like the A100) were once the gold standard for unifying training and inference [4], Google's newer TPUs are now achieving unprecedented performance levels for inference workloads [3].\n\n## Who is using what?\n\nThe distribution of hardware is largely dictated by priority queues and strategic partnerships.\n\n**Anthropic (Claude)** — Anthropic uses **Google Cloud** as its primary hosting partner and has moved toward a TPU-centric infrastructure [2]. This strategic shift was driven by the fact that Anthropic was third in the NVIDIA allocation queue, which was a competitive disadvantage [2]. As part of a massive deal in April 2026, Anthropic secured approximately 3.5GW of next-generation TPU capacity starting in 2027, with a total of 5GW of dedicated compute capacity locked in on Google’s TPU infrastructure [2][8].\n\n**Other Major Players** — Historically, NVIDIA's most advanced GPUs were allocated first to **Microsoft (OpenAI)**, followed by **Google** [2]. \n\n| User/Entity | Primary Hardware Focus | Strategic Context |\n| :--- | :--- | :--- |\n| **Anthropic** | **Google TPUs** [2] | Uses Google Cloud; secured 3.5GW of TPU capacity starting in 2027 [2][8]. |\n| **Microsoft** | **NVIDIA GPUs** [2] | Historically held the top priority in NVIDIA's allocation queue [2]. |\n| **Google** | **TPUs / NVIDIA** [2] | Uses internal TPUs and was historically top of the NVIDIA queue [2]. |\n\nThe current state of \"the most powerful\" is a split: NVIDIA dominates the transferable, high-end GPU market, while Google's TPU infrastructure provides the massive, specialized scale needed for the next generation of models like Claude [1][2].",
+ "chars": 2363,
+ "raw_bytes": 4634,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.32,
+ "rate_gen_tok_s": 68.22,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-b",
+ "asked_at": "2026-10-25T19:43:47",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

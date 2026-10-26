@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.5,\"ftok\":34,\"est\":false}",
+  "X-Hurry": "10b8cbe502ca9731"
+ },
+ "first_byte_s": 1.14,
+ "first_text_s": 20.55,
+ "elapsed_s": 29.88,
+ "events": [
+  {
+   "t": 1.14,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 1.14,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 12.12,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.12,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.12,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.71,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.55,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.88,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.6,
+    "tok": 621,
+    "s": 9.3
+   }
+  },
+  {
+   "t": 29.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2484 chars"
+   }
+  },
+  {
+   "t": 29.88,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   1.14,
+   "Searching the web…"
+  ],
+  [
+   12.12,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 1.14
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.12
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.12
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 13.71
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.71
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.71
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2484 chars",
+   "t_s": 29.88
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 29.88
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "AI Inference Hardware Battle 2026: Google TPU vs Nvidia GPU ...",
+   "u": "https://www.evoart.ai/blog/the-great-ai-inference-race-google-tpu-vs-nvidia-gpu-in-2026",
+   "d": "2026-05-02"
+  },
+  {
+   "t": "Best GPU for AI in 2026: Local Hardware and Cloud Options",
+   "u": "https://www.thundercompute.com/blog/best-gpu-for-ai-guide",
+   "d": "2026-10-09"
+  },
+  {
+   "t": "Why NVIDIA's most powerful GPU is so rarely sold to consumers",
+   "u": "https://www.msn.com/en-us/news/other/why-nvidias-most-powerful-gpu-is-so-rarely-sold-to-consumers/ar-AA2d1Wr0?ocid=BingNewsVerp",
+   "d": "2026-09-26"
+  },
+  {
+   "t": "Google TPU Shortage, Thanks to Anthropic | UniverseBlend |",
+   "u": "https://universeblend.blog/google-tpus-anthropic/",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Designing more efficient quantum circuits with Claude \\ Anthropic",
+   "u": "https://www.anthropic.com/research/designing-efficient-quantum-circuits",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "Claude Haiku \\ Anthropic",
+   "u": "https://www.anthropic.com/claude/haiku",
+   "d": "2026-10-07"
+  },
+  {
+   "t": "Anthropic Google TPU deal : 7 Things to Know",
+   "u": "https://decodethefuture.org/en/anthropic-google-tpu-deal/",
+   "d": "2026-06-03"
+  },
+  {
+   "t": "Nebius AI GPU Cloud Platform - Competitive NVIDIA GPU Pricing",
+   "u": "https://www.bing.com/aclick?ld=e8P5wehxpZfq0NPOXW8AV-YzVUCUyOcalpsKGz143-mRdDiU7HJeOR74JjZ56QGAu2UWFhneN3mvYkbil9jQYWO-NnswkIcoHyhVn4muqDmERornJK6w7zaelseIfHzCCwmjGUSGnrA7wZBZAinuraEo-gZZ-GdOPWVP0_bnOBL3d2MEn0gSWu-DGj9LIYOQUgWKr7cWNG45DUzzMvxhLLWhjMB08&u=aHR0cHMlM2ElMmYlMmZuZWJpdXMuY29tJTJmY29tcHV0ZSUzZnV0bV90ZXJtJTNkbnZpZGlhJTI1MjBkYXRhJTI1MjBjZW50ZXIlMjUyMGdwdSUyNnV0bV9jYW1wYWlnbiUzZEZZMjZfRE1fTkJfUFNFX1BVUl9CSV9OQV9udmlkaWEtZ3B1cyUyNnV0bV9zb3VyY2UlM2RiaW5nJTI2dXRtX21lZGl1bSUzZGNwYyUyNnV0bV9jb250ZW50JTNkODI5NDQ4Mzg4MjI1MzUlMjZ1dG1fYWRncm91cCUzZDEzMjcxMTM0MjE1NjE5NjUlMjZ1dG1faWQlM2Q1MjQyMjg3MzklMjZtc2Nsa2lkJTNkNWE0NGQzMDc5NTlhMWIwOWZkNzViOWQ5MWQ2YTU3YTYlMjZoc2FfY2FtJTNkNTI0MjI4NzM5JTI2aHNhX2dycCUzZDEzMjcxMTM0MjE1NjE5NjUlMjZoc2FfYWQlM2Q4Mjk0NDgzODgyMjUzNSUyNmhzYV9zcmMlM2RvJTI2aHNhX3RndCUzZGt3ZC04Mjk0NjI3MzUwNjAwNiUzYWxvYy0yMCUyNmhzYV9rdyUzZG52aWRpYSUyNTIwZGF0YSUyNTIwY2VudGVyJTI1MjBncHUlMjZoc2FfbXQlM2RwJTI2aHNhX25ldCUzZGJpbmclMjZoc2FfdmVyJTNkMw&rlid=5a44d307959a1b09fd75b9d91d6a57a6",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.71,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.6,
+  "tok": 621,
+  "s": 9.3
+ },
+ "answer_raw": "The title for \"most powerful\" depends entirely on whether you are looking at a single workstation or a massive data center cluster.\n\nFor a single desktop workstation, the **NVIDIA RTX PRO 6000 Blackwell** is described as the most powerful desktop GPU ever created, as of September 2026 [3]. Consumer-grade GPUs typically top out at 32GB of VRAM, so for models larger than 30B at FP16, you need this Blackwell workstation model or data center-class hardware [2, as of October 2026].\n\nFor massive-scale AI, the landscape is split between NVIDIA's GPU dominance and Google's specialized hardware.\n\n## Scale and Architecture\n\n**NVIDIA Blackwell Systems**\nThe **NVIDIA GB300 NVL72** is a liquid-cooled, rack-scale system featuring 72 NVIDIA Blackwell Ultra GPUs and 36 NVIDIA Grace CPUs, built specifically for the highest scale of frontier model training and agentic AI, as of October 2026 [8]. These data center GPUs use **HBM (High Bandwidth Memory)** rather than GDDR, which provides 2-4x the bandwidth of consumer cards and is critical because most AI workloads are memory-bound [2, as of October 2026].\n\n**Google TPUs**\nGoogle's **Tensor Processing Units (TPUs)** have reached unprecedented performance levels for inference workloads, prompting enterprises to reconsider their infrastructure investments, as of May 2026 [1]. While NVIDIA has historically been the default due to the CUDA ecosystem, Google's new TPUs designed specifically for inference represent a significant shift in the hardware landscape [1, as of May 2026].\n\n## Who is using what?\n\nThe most complex hardware strategies involve \"multi-vendor\" approaches to hedge against risk and match specific workloads to the best chips.\n\n**Anthropic (Claude)**\nAnthropic uses a diversified hardware stack to ensure they can scale and deploy their models. Their strategy includes:\n*   **Google Cloud TPUs:** Through a partnership that includes TPU capacity, Anthropic uses these to train, scale, and deploy AI systems [4, as of July 2026].\n*   **AWS Trainium:** They use Amazon's custom silicon for specific workloads [7, as of June 2026].\n*   **NVIDIA GPUs:** They maintain access to NVIDIA hardware to match workloads to the chips best suited for them [7, as of June 2026].\n\n**Other Players**\nLarge-scale providers like **Nebius** build entire compute clouds around NVIDIA reference architectures, offering everything from single-node instances to thousand-GPU clusters using NVIDIA Quantum-2 InfiniBand fabric [8, undated].",
+ "answer": "The title for \"most powerful\" depends entirely on whether you are looking at a single workstation or a massive data center cluster.\n\nFor a single desktop workstation, the **NVIDIA RTX PRO 6000 Blackwell** is described as the most powerful desktop GPU ever created, as of September 2026 [3]. Consumer-grade GPUs typically top out at 32GB of VRAM, so for models larger than 30B at FP16, you need this Blackwell workstation model or data center-class hardware [2, as of October 2026].\n\nFor massive-scale AI, the landscape is split between NVIDIA's GPU dominance and Google's specialized hardware.\n\n## Scale and Architecture\n\n**NVIDIA Blackwell Systems**\nThe **NVIDIA GB300 NVL72** is a liquid-cooled, rack-scale system featuring 72 NVIDIA Blackwell Ultra GPUs and 36 NVIDIA Grace CPUs, built specifically for the highest scale of frontier model training and agentic AI, as of October 2026 [8]. These data center GPUs use **HBM (High Bandwidth Memory)** rather than GDDR, which provides 2-4x the bandwidth of consumer cards and is critical because most AI workloads are memory-bound [2, as of October 2026].\n\n**Google TPUs**\nGoogle's **Tensor Processing Units (TPUs)** have reached unprecedented performance levels for inference workloads, prompting enterprises to reconsider their infrastructure investments, as of May 2026 [1]. While NVIDIA has historically been the default due to the CUDA ecosystem, Google's new TPUs designed specifically for inference represent a significant shift in the hardware landscape [1, as of May 2026].\n\n## Who is using what?\n\nThe most complex hardware strategies involve \"multi-vendor\" approaches to hedge against risk and match specific workloads to the best chips.\n\n**Anthropic (Claude)**\nAnthropic uses a diversified hardware stack to ensure they can scale and deploy their models. Their strategy includes:\n*   **Google Cloud TPUs:** Through a partnership that includes TPU capacity, Anthropic uses these to train, scale, and deploy AI systems [4, as of July 2026].\n*   **AWS Trainium:** They use Amazon's custom silicon for specific workloads [7, as of June 2026].\n*   **NVIDIA GPUs:** They maintain access to NVIDIA hardware to match workloads to the chips best suited for them [7, as of June 2026].\n\n**Other Players**\nLarge-scale providers like **Nebius** build entire compute clouds around NVIDIA reference architectures, offering everything from single-node instances to thousand-GPU clusters using NVIDIA Quantum-2 InfiniBand fabric [8, undated].",
+ "chars": 2484,
+ "raw_bytes": 5465,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.78,
+ "rate_gen_tok_s": 66.56,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-c",
+ "asked_at": "2026-10-25T19:56:10",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

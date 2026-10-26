@@ -23,6 +23,9 @@ Files:
 - `score.py` — aggregates `judgments/<run>/` into a table by category.
 - `stats.py` — timings, first-visible-text, councils, compositors and skipped
   seats per run, with no judging needed.
+- `blind_batches.py` — (6b520) blind batches by turn: every run's answer to one turn in front of one judge,
+  run names replaced by codes; `split` writes the judgments back per run. `paired.py` — the paired table.
+- `run_bench.py --env MILLENAI_FRESH_OFF=tl,news` — a dev copy's measuring knob (one fix left out).
 - `runs/<run>/` — one JSON record per turn, `summary.json`, `answers.md`,
   `devcopy.log`, `scores.md`.
 

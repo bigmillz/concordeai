@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":147,\"est\":false}",
+  "X-Hurry": "ea923b36325e7a1e"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 20.79,
+ "elapsed_s": 29.75,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 11.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.09,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.09,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.47,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "3 pages · 21 passages"
+   }
+  },
+  {
+   "t": 17.47,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.47,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.47,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.47,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.79,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.75,
+   "tag": "RATE",
+   "data": {
+    "tps": 68.5,
+    "tok": 613,
+    "s": 9.0
+   }
+  },
+  {
+   "t": 29.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2454 chars"
+   }
+  },
+  {
+   "t": 29.75,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   11.09,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.09
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.09
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "3 pages · 21 passages",
+   "t_s": 17.47
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.47
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.47
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2454 chars",
+   "t_s": 29.75
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 29.75
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "South American Airline Carry-On Rules (2026) — CarrySizer",
+   "u": "https://carrysizer.com/guides/carry-on-rules-south-america/",
+   "d": "2026-06-19"
+  },
+  {
+   "t": "New carry-on baggage rules 2026 | gol, latam and...",
+   "u": "https://clipzag.com/watch?v=ab-7VmZbaxk",
+   "d": "2025"
+  },
+  {
+   "t": "Packing Light for South America: Weight Compliance Tips – Titantrek",
+   "u": "https://titantrekstore.com/blogs/travel-guides/packing-light-for-south-america-weight-compliance-tips",
+   "d": "2025-03-25"
+  },
+  {
+   "t": "South America Itinerary: 5 Ways to Spend 2 or 3 Weeks",
+   "u": "https://latinlands.com/guides/south-america-itinerary/",
+   "d": "2026-10-01"
+  },
+  {
+   "t": "Gol vs. Latam vs. Azul Recommendation for Heavy Carry On?",
+   "u": "https://www.tripadvisor.com/ShowTopic-g303631-i2161-k14569763-Gol_vs_Latam_vs_Azul_Recommendation_for_Heavy_Carry_On-Sao_Paulo_State_of_Sao_Paulo.html",
+   "d": ""
+  },
+  {
+   "t": "Brazil Aviation Superpower: Merging LATAM, Gol, Azul Would Upend...",
+   "u": "https://viewfromthewing.com/brazil-engineering-aviation-superpower-latam-gol-azul-merger-would-upend-delta-american-united-skies/",
+   "d": "2024-03-30"
+  },
+  {
+   "t": "3 Weeks In South America | The 5 Best Itineraries To Do It",
+   "u": "https://threeweektraveller.com/3-weeks-south-america-itinerary/",
+   "d": ""
+  },
+  {
+   "t": "ITA Airways vs. Ryanair Carry-On Rules: Size, Weight, Priority and...",
+   "u": "https://www.nationaltraveller.com/ita-airways-vs-ryanair-carry-on-rules-size-weight-priority-and-cost-44a30563dd5f/",
+   "d": "2026-10-07"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.47,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 68.5,
+  "tok": 613,
+  "s": 9.0
+ },
+ "answer_raw": "For a three-week trip with carry-on only, you need to plan for a weight limit of roughly **8–10 kg (17–22 lbs)** [3]. While specific dimensions vary, the weight limit is the primary constraint for these carriers.\n\n## Airline Limits\n\nThe following limits apply to LATAM, GOL, and Azul:\n\n*   **Weight** — Most South American airlines maintain strict limits between **8–10 kg (17–22 lbs)** [3]. On some domestic flights, the limit is set at **10 kg** [5].\n*   **Size** — While size requirements are specific, some travelers note that domestic carriers often focus more on the physical dimensions (the \"fit\") of the bag rather than weighing it [5]. \n\nIf you are flying specific routes, check your specific reservation, as limits can vary based on your fare class or if you are flying a budget vs. full-service version of these airlines [8].\n\n## Packing Strategy\n\nSince you'll be managing a strict weight ceiling, you cannot afford \"just in case\" items. A three-week itinerary in South America often involves variable climates—from tropical heat to Andean chill—so your packing must be modular.\n\n**The Core Wardrobe**\n*   **Versatile layers:** Pack items that can be layered. A lightweight merino wool base layer, a mid-weight fleece or sweater, and a packable waterproof shell.\n*   **The \"Rule of Three\":** Three bottom pieces (e.g., one pair of technical trousers, one casual pant, one short), three tops, and three pairs of socks/underwear. You will wash these as you go.\n*   **Footwear:** Wear your heaviest shoes (walking boots or sneakers) on the plane to save weight in your bag. Pack one pair of lightweight sandals or flip-flops.\n\n**Technical Gear & Organization**\n*   **Compression Packing Cubes:** Use cubes to manage volume and keep your bag's shape consistent, which helps with size compliance [3].\n*   **Electronic management:** Since you'll likely have chargers, a high-capacity power bank, and perhaps a camera, consolidate your cables into a single tech organizer.\n*   **Toiletries:** Use solid versions of liquids (shampoo bars, solid cologne/perfume) to save weight and avoid liquid-limit issues at security.\n\n**Logistics for a 3-week trip**\nBecause your itinerary might span two different countries or climates [4], you should prioritize high-performance fabrics (synthetic blends or merino) that dry quickly and don't hold odors. If you find yourself in a much colder region, you can often rent heavy gear locally rather than carrying it.",
+ "answer": "For a three-week trip with carry-on only, you need to plan for a weight limit of roughly **8–10 kg (17–22 lbs)** [3]. While specific dimensions vary, the weight limit is the primary constraint for these carriers.\n\n## Airline Limits\n\nThe following limits apply to LATAM, GOL, and Azul:\n\n*   **Weight** — Most South American airlines maintain strict limits between **8–10 kg (17–22 lbs)** [3]. On some domestic flights, the limit is set at **10 kg** [5].\n*   **Size** — While size requirements are specific, some travelers note that domestic carriers often focus more on the physical dimensions (the \"fit\") of the bag rather than weighing it [5]. \n\nIf you are flying specific routes, check your specific reservation, as limits can vary based on your fare class or if you are flying a budget vs. full-service version of these airlines [8].\n\n## Packing Strategy\n\nSince you'll be managing a strict weight ceiling, you cannot afford \"just in case\" items. A three-week itinerary in South America often involves variable climates—from tropical heat to Andean chill—so your packing must be modular.\n\n**The Core Wardrobe**\n*   **Versatile layers:** Pack items that can be layered. A lightweight merino wool base layer, a mid-weight fleece or sweater, and a packable waterproof shell.\n*   **The \"Rule of Three\":** Three bottom pieces (e.g., one pair of technical trousers, one casual pant, one short), three tops, and three pairs of socks/underwear. You will wash these as you go.\n*   **Footwear:** Wear your heaviest shoes (walking boots or sneakers) on the plane to save weight in your bag. Pack one pair of lightweight sandals or flip-flops.\n\n**Technical Gear & Organization**\n*   **Compression Packing Cubes:** Use cubes to manage volume and keep your bag's shape consistent, which helps with size compliance [3].\n*   **Electronic management:** Since you'll likely have chargers, a high-capacity power bank, and perhaps a camera, consolidate your cables into a single tech organizer.\n*   **Toiletries:** Use solid versions of liquids (shampoo bars, solid cologne/perfume) to save weight and avoid liquid-limit issues at security.\n\n**Logistics for a 3-week trip**\nBecause your itinerary might span two different countries or climates [4], you should prioritize high-performance fabrics (synthetic blends or merino) that dry quickly and don't hold odors. If you find yourself in a much colder region, you can often rent heavy gear locally rather than carrying it.",
+ "chars": 2454,
+ "raw_bytes": 4718,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.62,
+ "rate_gen_tok_s": 68.47,
+ "id": "q21",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Carry-on travel in South America",
+ "question": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-b",
+ "asked_at": "2026-10-25T19:12:04",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

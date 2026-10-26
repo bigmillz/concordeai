@@ -1,0 +1,117 @@
+{
+ "name": "f1-ab-write",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T20:20:51",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 29.7,
+   "chars": 2617,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 17.5,
+   "chars": 3508,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 22.57,
+   "chars": 1582,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 25.01,
+   "chars": 1898,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 22.81,
+   "chars": 441,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 23.75,
+   "chars": 1150,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 23.06,
+   "chars": 305,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 25.87,
+   "chars": 1949,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 24.3,
+   "chars": 1770,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 27.28,
+   "chars": 1206,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 25.58,
+   "chars": 2033,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 26.19,
+   "chars": 2648,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 30.56,
+   "chars": 1994,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {
+  "MILLENAI_FRESH_OFF": "dating,snippet"
+ },
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.09,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink draws heat away from a component through **conduction** to increase the surface area available for cooling. It then dissipates that thermal energy into the surrounding air through **convec"
+ },
+ "finished": "2026-10-25T20:26:56"
+}

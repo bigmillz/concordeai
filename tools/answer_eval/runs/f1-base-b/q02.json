@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.4,\"ftok\":151,\"est\":false}",
+  "X-Hurry": "9b5263774cb1d5bf"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 16.0,
+ "elapsed_s": 23.06,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 7.16,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.16,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.16,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.43,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 34 passages"
+   }
+  },
+  {
+   "t": 9.43,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.43,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.43,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.0,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.05,
+   "tag": "RATE",
+   "data": {
+    "tps": 62.1,
+    "tok": 437,
+    "s": 7.1
+   }
+  },
+  {
+   "t": 23.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1751 chars"
+   }
+  },
+  {
+   "t": 23.06,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   7.16,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.16
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.16
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 34 passages",
+   "t_s": 9.43
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.43
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.43
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1751 chars",
+   "t_s": 23.06
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.06
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026 - uptradeit.com",
+   "u": "https://uptradeit.com/blog/is-iphone-14-worth-buying",
+   "d": "2026-05-06"
+  },
+  {
+   "t": "How Much Is It to Upgrade Your iPhone? A 2026 Cost Guide",
+   "u": "https://electronics.alibaba.com/buyingguides/how-much-to-upgrade-your-iphone-in-2026",
+   "d": "2026-08-05"
+  },
+  {
+   "t": "iPhone 14 Pro makes the notch come alive, finally - ZDNET",
+   "u": "https://www.zdnet.com/article/iphone-14-pro-makes-the-notch-come-alive-finally/",
+   "d": "2022-09-09"
+  },
+  {
+   "t": "iPhone 14 - Tech Specs - Apple Support",
+   "u": "https://support.apple.com/en-us/111850",
+   "d": ""
+  },
+  {
+   "t": "iPhone 18: Rumors and Release Date",
+   "u": "https://www.macrumors.com/roundup/iphone-18/",
+   "d": "2026-10-09"
+  },
+  {
+   "t": "Should I upgrade iPhone 14 Plus to iOS 26… - Apple Community",
+   "u": "https://discussions.apple.com/thread/256227019",
+   "d": ""
+  },
+  {
+   "t": "How long does Apple support iPhones with updates? | Macworld",
+   "u": "https://www.macworld.com/article/675021/how-long-does-apple-support-iphones.html",
+   "d": "2026-09-14"
+  },
+  {
+   "t": "iPhone Price List 2026: Every Model and What to Pay",
+   "u": "https://geekblog.net/mobile/iphone-price-list-2026/",
+   "d": "2026-07-08"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.43,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 62.1,
+  "tok": 437,
+  "s": 7.1
+ },
+ "answer_raw": "The newest available iPhone models are the **iPhone 17** lineup, with the **iPhone 17 Pro Max** serving as the top-tier flagship.\n\n## Pricing and Models\nAs of late 2026, the current pricing for the iPhone 17 series is:\n* **iPhone 17e** — ~$599 (the cheapest new model) [8]\n* **iPhone 7** — ~$799 (considered the value sweet spot) [8]\n* **iPhone 17 Pro Max** — ~$1,199 (the flagship) [8]\n\n## Upgrading from an iPhone 14\nWhether it is worth moving from your iPhone 14 depends on whether you prioritize cutting-edge hardware or value.\n\n**The Case for Upgrading**\nYou will see a significant jump in hardware. The iPhone 14 was noted for being a conservative update over the iPhone 13 [1]. Moving to the 17 series provides much newer processors, likely better camera systems, and potentially different display sizes, as the iPhone 17 line utilizes 6.1-inch and 6.3-inch screens [5]. Additionally, since the iPhone 14 uses eSIM technology and lacks physical SIM support [4], moving to a newer model might resolve any connectivity constraints you face with physical cards.\n\n**The Case for Staying**\nThe iPhone 14 remains a strong value pick in 2026, particularly in the refurbished market [1]. If your current device is functioning well and you don't need professional-grade camera/zoom capabilities, the iPhone 14 still offers a solid price-to-performance ratio [1]. \n\n**The Verdict**\nIf you need the best possible specs, go for the **iPhone 17 Pro Max**. If you want the most logical leap in value, the **iPhone 17** is the logical successor to your current setup [8]. Since the iPhone 14 is still receiving security updates and running modern iOS versions, you aren't \"forced\" to upgrade unless your hardware is failing or you've outgrown the performance.",
+ "answer": "The newest available iPhone models are the **iPhone 17** lineup, with the **iPhone 17 Pro Max** serving as the top-tier flagship.\n\n## Pricing and Models\nAs of late 2026, the current pricing for the iPhone 17 series is:\n* **iPhone 17e** — ~$599 (the cheapest new model) [8]\n* **iPhone 7** — ~$799 (considered the value sweet spot) [8]\n* **iPhone 17 Pro Max** — ~$1,199 (the flagship) [8]\n\n## Upgrading from an iPhone 14\nWhether it is worth moving from your iPhone 14 depends on whether you prioritize cutting-edge hardware or value.\n\n**The Case for Upgrading**\nYou will see a significant jump in hardware. The iPhone 14 was noted for being a conservative update over the iPhone 13 [1]. Moving to the 17 series provides much newer processors, likely better camera systems, and potentially different display sizes, as the iPhone 17 line utilizes 6.1-inch and 6.3-inch screens [5]. Additionally, since the iPhone 14 uses eSIM technology and lacks physical SIM support [4], moving to a newer model might resolve any connectivity constraints you face with physical cards.\n\n**The Case for Staying**\nThe iPhone 14 remains a strong value pick in 2026, particularly in the refurbished market [1]. If your current device is functioning well and you don't need professional-grade camera/zoom capabilities, the iPhone 14 still offers a solid price-to-performance ratio [1]. \n\n**The Verdict**\nIf you need the best possible specs, go for the **iPhone 17 Pro Max**. If you want the most logical leap in value, the **iPhone 17** is the logical successor to your current setup [8]. Since the iPhone 14 is still receiving security updates and running modern iOS versions, you aren't \"forced\" to upgrade unless your hardware is failing or you've outgrown the performance.",
+ "chars": 1751,
+ "raw_bytes": 3696,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.98,
+ "rate_gen_tok_s": 62.0,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-b",
+ "asked_at": "2026-10-25T19:07:33",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

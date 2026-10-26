@@ -1,0 +1,114 @@
+{
+ "name": "f1-base-b",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T19:06:13",
+ "repo": "/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad/fresh1/base",
+ "head": [
+  "",
+  ""
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 24.59,
+   "chars": 2224,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 13.56,
+   "chars": 2613,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 23.06,
+   "chars": 1751,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 19.36,
+   "chars": 1730,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 23.5,
+   "chars": 522,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 25.31,
+   "chars": 1618,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 22.98,
+   "chars": 326,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 25.49,
+   "chars": 2169,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 18.82,
+   "chars": 1011,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 35.9,
+   "chars": 2191,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 25.49,
+   "chars": 1921,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 24.29,
+   "chars": 2035,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 29.75,
+   "chars": 2454,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.76,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink increases the **surface area** available for thermal transfer to draw heat away from a concentrated source like a CPU. It then dissipates that heat into the surrounding medium, typically t"
+ },
+ "finished": "2026-10-25T19:12:06"
+}

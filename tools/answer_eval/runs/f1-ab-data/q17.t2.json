@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.3,\"ftok\":135,\"est\":false}",
+  "X-Hurry": "7d9632c29a06b85b"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 19.77,
+ "elapsed_s": 25.35,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 10.38,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.39,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.39,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 27 passages"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.18,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.77,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.35,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.3,
+    "tok": 314,
+    "s": 5.6
+   }
+  },
+  {
+   "t": 25.35,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1258 chars"
+   }
+  },
+  {
+   "t": 25.35,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.39,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.38
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.39
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 27 passages",
+   "t_s": 12.18
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.18
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.18
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1258 chars",
+   "t_s": 25.35
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.35
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Safety in Florianópolis: The Honest Neighborhood Guide for ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-safety-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Florianópolis Neighborhoods for Digital Nomads (2026)",
+   "u": "https://floripaguru.com/blog/best-neighborhoods-floripa-digital-nomads",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Best Cities to Live in Brazil for Foreigners (2026)",
+   "u": "https://welcome-to-brazil.vercel.app/en/blog/best-cities-brazil-foreigners",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis, Brazil Furnished Monthly Rentals and Extended ...",
+   "u": "https://www.airbnb.com/florianopolis-brazil/stays/monthly",
+   "d": "2026-10-25"
+  },
+  {
+   "t": "Furnished Rentals Florianópolis — Monthly Apartments & Homes ...",
+   "u": "https://rentihome.com/florianopolis/furnished-apartments-florianopolis.html",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Sep 2026. Prices in Florianopolis",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-09"
+  },
+  {
+   "t": "Cost of Living Comparison Between Lisbon, Portugal And...",
+   "u": "https://www.numbeo.com/cost-of-living/compare_cities.jsp?country1=Portugal&city1=Lisbon&country2=Brazil&city2=Florianopolis",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.18,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 56.3,
+  "tok": 314,
+  "s": 5.6
+ },
+ "answer_raw": "Pick **Lagoa da Conceição** for your six-month stay. \n\nIt hits the best balance of your requirements: it is the primary international hub for foreigners [7], offers high walkability with cafes and coworking spaces nearby [7], and provides the social environment you'll want for a longer stay [7].\n\n## Monthly Rental Estimates\n\nSince you are looking for a furnished one-bedroom, prices vary based on the specific \"micro-neighborhood\" and how much of the \"beach lifestyle\" you want to pay for.\n\n**Lagoa Core** — For a newer apartment with reliable fiber internet and walkability to lagoon cafes, expect to pay around **$800/month** (as of July s2026) [6].\n\n**Alternative: Barra da Lagoa or Centro** — If you want to prioritize a lower budget while still having access to the village or city center, a one-bedroom can run around **$550/month** (as of July 2026) [6].\n\n| Location | Price (USD) | Price (BRL) | Profile |\n| :--- | :--- | :--- | :--- |\n| **Lagoa Core** | **$800** [6] | ~R$4,400* | The \"sweet spot\" for social nomads [6]. |\n| **Barra/Centro** | **$550** [6] | ~R$3,000* | Budget-friendly village/city base [6]. |\n\n*\\*Note: BRL conversions are estimates based on typical exchange rates; use the exact USD amount provided in the source for accuracy.*",
+ "answer": "Pick **Lagoa da Conceição** for your six-month stay. \n\nIt hits the best balance of your requirements: it is the primary international hub for foreigners [7], offers high walkability with cafes and coworking spaces nearby [7], and provides the social environment you'll want for a longer stay [7].\n\n## Monthly Rental Estimates\n\nSince you are looking for a furnished one-bedroom, prices vary based on the specific \"micro-neighborhood\" and how much of the \"beach lifestyle\" you want to pay for.\n\n**Lagoa Core** — For a newer apartment with reliable fiber internet and walkability to lagoon cafes, expect to pay around **$800/month** (as of July s2026) [6].\n\n**Alternative: Barra da Lagoa or Centro** — If you want to prioritize a lower budget while still having access to the village or city center, a one-bedroom can run around **$550/month** (as of July 2026) [6].\n\n| Location | Price (USD) | Price (BRL) | Profile |\n| :--- | :--- | :--- | :--- |\n| **Lagoa Core** | **$800** [6] | ~R$4,400* | The \"sweet spot\" for social nomads [6]. |\n| **Barra/Centro** | **$550** [6] | ~R$3,000* | Budget-friendly village/city base [6]. |\n\n*\\*Note: BRL conversions are estimates based on typical exchange rates; use the exact USD amount provided in the source for accuracy.*",
+ "chars": 1258,
+ "raw_bytes": 3557,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.41,
+ "rate_gen_tok_s": 56.36,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-data",
+ "asked_at": "2026-10-25T20:12:28",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay that balances safety, walkability, and beach access, your best options depend on whether you want a social expat hub or a high-end, secure enclave.\n\n## Top Neighborhood Recommendations\n\n**Lagoa da Conceição** — This is the primary choice for international living [7]. It serves as the epicenter of international life, allowing you to live for months without needing Portuguese [7]. It is highly walkable, with supermarkets, bars, and coworking spaces all within walking distance [7].\n\n**Jurerê Internacional** — This is the best option if you have a higher budget and prioritize maximum safety [7]. It features patrolled streets, open lawns, and gorgeous parks [7]. It has a safety score of 78/100 and reported zero robberies in 2025, though a one-bedroom here can cost around €1,200/month as of May 2026 [1].\n\n**Centro** — If walkability is your absolute priority, the city center is the exception in a city that isn't naturally pedestrian-friendly [3]. You can spend days here without needing a car [3]. While not a beach neighborhood, it offers excellent central infrastructure [3].\n\n## Comparison of Key Factors\n\n| Neighborhood | Primary Vibe | Safety/Walkability Profile |\n| :--- | :--- | :--- |\n| **Lagoa da Conceição** | International/Social | Everything is within walking distance [7]. |\n| **Jurerê Internacional** | High-end/Secure | Maximum safety; zero reported robberies in 2025 [1][7]. |\n| **Centro** | Urban/Functional | The best walkability in the city [3]. |\n\n## Infrastructure and Logistics\n\n**Internet** — You will not struggle with connectivity in the central neighborhoods. Fiber optic service providing 300 to 500 Mbps typically runs R$100 to R$150/month [2]. While internet is reliable in central areas, the real differentiator for remote work is often the pace of daily life rather than raw bandwidth [2].\n\n**Transportation** — Be aware that Florianópolis is not a pedestrian-centric city by design [3]. If you choose a neighborhood that isn't a central hub, you may face a 40-minute commute to find good coffee or specific amenities [3]. Choosing a neighborhood that doesn't match your lifestyle could lead to isolation or connectivity issues [3].\n\n**Cost-Saving Tip** — If you are looking to lower your rental costs, Canasvieiras sees rental prices drop to a minimum during the off-season (April to November) [7]. In this area, it is recommended to secure a yearly contract rather than a short 3-month lease [7]."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

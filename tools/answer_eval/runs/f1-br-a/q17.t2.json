@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.1,\"ftok\":141,\"est\":false}",
+  "X-Hurry": "0f3fea7ea60ddf3e"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 19.41,
+ "elapsed_s": 24.29,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 10.57,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.57,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.57,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.75,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 19 passages"
+   }
+  },
+  {
+   "t": 12.75,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.75,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.75,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.75,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.41,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.29,
+   "tag": "RATE",
+   "data": {
+    "tps": 50.1,
+    "tok": 244,
+    "s": 4.9
+   }
+  },
+  {
+   "t": 24.29,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "976 chars"
+   }
+  },
+  {
+   "t": 24.29,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.57,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.57
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.57
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 19 passages",
+   "t_s": 12.75
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.75
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.75
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.75
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "976 chars",
+   "t_s": 24.29
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.29
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Cities to Live in Brazil for Foreigners (2026)",
+   "u": "https://welcome-to-brazil.vercel.app/en/blog/best-cities-brazil-foreigners",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighbourhoods... | Rocks Investments",
+   "u": "https://rocksinvestments.com/insights/florianopolis-neighbourhoods-guide",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis neighborhoods · Yodl",
+   "u": "https://yodl.me/brazil/florianopolis-neighborhoods/",
+   "d": "2026-07-23"
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Sep 2026. Prices in Florianopolis",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-09"
+  },
+  {
+   "t": "Cost of Living Comparison Between Lisbon, Portugal And...",
+   "u": "https://www.numbeo.com/cost-of-living/compare_cities.jsp?country1=Portugal&city1=Lisbon&country2=Brazil&city2=Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Coliving in Florianopolis — Furnished Rooms & Shared Housing for...",
+   "u": "https://coliving.love/coliving-florianopolis/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.75,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 50.1,
+  "tok": 244,
+  "s": 4.9
+ },
+ "answer_raw": "Pick **Lagoa da Conceição**; it is the best intersection of beach access, walkability, and the social infrastructure needed for a six-month stay [4].\n\nThe provided sources do not list specific rental prices for a furnished one-bedroom apartment in Lagoa da Conceição. The available data only provides a general cost of living of $900–$1,500/month [2] and a base rental rate of R$59.00/m² (as of November 2025) [1].\n\nTo estimate your monthly cost for a furnished one-bedroom in Lagoa, you would need to check local listings on sites like QuintoAndar or OLX for current availability.\n\nBased on the provided exchange rate (1 USD = 5.0465 BRL, as of October 23, 2026), here is how the available cost of living baseline translates:\n\n| Description | Price in BRL | Price in USD |\n| :--- | :--- | :--- |\n| Monthly cost of living (baseline) | R$4,541.85–R$7,569.75 [2] | $900–$1,500 [2] |\n\n*Note: The BRL conversion is based on the rate of 1 BRL = $0.1982 as of October 23, 2026 [5].*",
+ "answer": "Pick **Lagoa da Conceição**; it is the best intersection of beach access, walkability, and the social infrastructure needed for a six-month stay [4].\n\nThe provided sources do not list specific rental prices for a furnished one-bedroom apartment in Lagoa da Conceição. The available data only provides a general cost of living of $900–$1,500/month [2] and a base rental rate of R$59.00/m² (as of November 2025) [1].\n\nTo estimate your monthly cost for a furnished one-bedroom in Lagoa, you would need to check local listings on sites like QuintoAndar or OLX for current availability.\n\nBased on the provided exchange rate (1 USD = 5.0465 BRL, as of October 23, 2026), here is how the available cost of living baseline translates:\n\n| Description | Price in BRL | Price in USD |\n| :--- | :--- | :--- |\n| Monthly cost of living (baseline) | R$4,541.85–R$7,569.75 [2] | $900–$1,500 [2] |\n\n*Note: The BRL conversion is based on the rate of 1 BRL = $0.1982 as of October 23, 2026 [5].*",
+ "chars": 976,
+ "raw_bytes": 3156,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.05,
+ "rate_gen_tok_s": 50.0,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-a",
+ "asked_at": "2026-10-25T19:40:45",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay, **Lagoa da Conceição** is your best bet, though the \"best\" depends on whether you prioritize social density or beach access.\n\nBecause Florianópolis lacks a single central hub, you shouldn't look for one specific area to cover everything; instead, you'll be choosing between different lifestyles scattered across the island [1]. Internet is generally reliable across the city, with fiber optic (300 to 500 Mbps) costing roughly R$100 to R$150/month in most neighborhoods [1].\n\n## Top Neighborhood Options\n\n**Lagoa da Conceição** — The primary choice for remote workers.\nThis is a lakeside village wrapped around a lagoon, situated about five minutes from Joaquina and Mole beaches [4]. It is thick with cafés, coworking spots, and other remote workers, making it the island's long-standing digital nomad hub [4].\n\n**Campeche** — The beach-centric alternative.\nIf you prefer being directly on the coast over a lakeside vibe, Campeche is a top contender [7]. It offers a different pace than the central areas, though transit times to the city center will be longer than from the Lagoa area [4].\n\n**Centro** — The infrastructure baseline.\nThe city center, or Centro, provides the most stable access to services and is a common starting point for residents [4][7]. While not a beach neighborhood itself, it is about a 15-minute trip to Lagoa da Conceição [4].\n\n## Planning Considerations\n\n**Seasonality and Pricing**\nThe \"two calendars\" of Floripa dictate your budget and experience. From December through February, the beaches and restaurants reflect peak season [4]. Outside of that window, neighborhoods slow down and become noticeably easier to live in [4]. \n\n**Rental Trends**\nIf you are looking at long-term rental costs, be aware that asking rents rose 9.13% in the 12 months leading to September 2026 [6]. \n\n**The \"Best\" Verdict**\nIf you want the intersection of \"near a beach,\" \"walkable,\" and \"remote worker community,\" **Lagoa da Conceição** is the most logical choice for a six-month stint [4]. It provides the social infrastructure you'll need to avoid isolation while remaining close to the water."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

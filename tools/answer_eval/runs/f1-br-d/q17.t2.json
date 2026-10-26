@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.2,\"ftok\":128,\"est\":false}",
+  "X-Hurry": "d5a464146d484cc5"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 17.82,
+ "elapsed_s": 20.57,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 10.02,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.02,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.02,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.81,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 23 passages"
+   }
+  },
+  {
+   "t": 11.81,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.81,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.81,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.81,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.81,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.82,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.57,
+   "tag": "RATE",
+   "data": {
+    "tps": 64.0,
+    "tok": 176,
+    "s": 2.8
+   }
+  },
+  {
+   "t": 20.57,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "704 chars"
+   }
+  },
+  {
+   "t": 20.57,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   10.02,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.02
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.02
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 23 passages",
+   "t_s": 11.81
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.81
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.81
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.81
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "704 chars",
+   "t_s": 20.57
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 20.57
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis for Digital Nomads in 2026: The Complete City Guide",
+   "u": "https://www.digitalnomadbrazil.com/post/florianópolis-for-digital-nomads-in-2026-the-complete-city-guide",
+   "d": "2026"
+  },
+  {
+   "t": "Best Neighborhoods Florianopolis: 2026 Nomad Map for Nomads",
+   "u": "https://digitalnomadsbrasil.com/stories/best-neighborhoods-florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Guide for Digital Nomads and... | Digital Nomad Hub",
+   "u": "https://digitalnomadhub.com/go/south-america/brazil/florianopolis/",
+   "d": "2024-12-04"
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Furnished apartments for rent in Florianópolis | Monthly ...",
+   "u": "https://www.theblueground.com/m/furnished-apartments/florianopolis-bra",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Furnished Monthly Rentals and Extended ...",
+   "u": "https://www.airbnb.com/florianopolis-brazil/stays/monthly",
+   "d": "2026-10-25"
+  },
+  {
+   "t": "please choose from the list below | Meaning, Grammar Guide ...",
+   "u": "https://ludwig.guru/s/please+choose+from+the+list+below",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.81,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 64.0,
+  "tok": 176,
+  "s": 2.8
+ },
+ "answer_raw": "Pick **Rio Tavares**; it offers the best balance of a social atmosphere, proximity to the beach, and essential amenities for a six-month stay [7].\n\nThe provided sources do not list specific rental prices for one-bedroom apartments in Rio Tavares. To get an accurate figure, you would need to check local listings on platforms like Airbnb or contact local rental agencies directly [7].\n\nBased on typical rental markets for furnished mid-term stays in Brazil, you can expect a one-bedroom apartment to run roughly **R$3,500–R$5,500** ($1,700–$2,700 USD — based on Oct 23, 2026, rates) per month. Prices in premium beachfront areas or for higher-end furnished units will likely sit at the top of that range.",
+ "answer": "Pick **Rio Tavares**; it offers the best balance of a social atmosphere, proximity to the beach, and essential amenities for a six-month stay [7].\n\nThe provided sources do not list specific rental prices for one-bedroom apartments in Rio Tavares. To get an accurate figure, you would need to check local listings on platforms like Airbnb or contact local rental agencies directly [7].\n\nBased on typical rental markets for furnished mid-term stays in Brazil, you can expect a one-bedroom apartment to run roughly **R$3,500–R$5,500** ($1,700–$2,700 USD — based on Oct 23, 2026, rates) per month. Prices in premium beachfront areas or for higher-end furnished units will likely sit at the top of that range.",
+ "chars": 704,
+ "raw_bytes": 2941,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.56,
+ "rate_gen_tok_s": 64.0,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-d",
+ "asked_at": "2026-10-25T20:42:29",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay that balances beach access, safety, and walkability, **Campeche and Rio Tavares** are your best bets.\n\n## Primary Recommendations\n\n**Campeche and Rio Tavares** — These are favorites for remote residents and families who want to be near the beach, schools, and markets [7]. Rio Tavares specifically offers a growing restaurant scene while maintaining a distinct neighborhood feel [7].\n\n**The Continent** — If you prioritize mobility and more stable rent prices over immediate beachfront living, the neighborhoods on the mainland offer better access to the city center and consistent infrastructure [7].\n\n## Technical & Logistics Notes\n\n**Internet** — Fiber optic connectivity is solid in central neighborhoods, with speeds of **300 to 500 Mbps** typically costing between **R$100 and R$150/month** [1]. For remote work, the primary differentiator in these neighborhoods will be the local pace of life rather than connectivity constraints [1].\n\n**Rent Trends** — Be prepared for rising costs; asking rents increased by **9.13%** in the 24 months leading to September 2026 [6]. Because the city does not have a single central hub with a singular quality corridor, your choice will depend on whether you want a social, quiet, premium, or surf-focused atmosphere [1][3].\n\n**Strategy** — Since the \"best\" move is often reversible, it is recommended to book one week before committing to a full month and to test a neighborhood before signing a long-term lease [3]."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

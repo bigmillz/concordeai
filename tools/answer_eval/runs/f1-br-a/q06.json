@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":147,\"est\":false}",
+  "X-Hurry": "75259484a422dec6"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 24.08,
+ "elapsed_s": 26.76,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.23,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 17 passages"
+   }
+  },
+  {
+   "t": 17.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.23,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.23,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.08,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.76,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.8,
+    "tok": 160,
+    "s": 2.7
+   }
+  },
+  {
+   "t": 26.76,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "641 chars"
+   }
+  },
+  {
+   "t": 26.76,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   11.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 17 passages",
+   "t_s": 17.23
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.23
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.23
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "641 chars",
+   "t_s": 26.76
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.76
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "BLS average price: Eggs, grade A, large (U.S. city average)",
+   "u": "https://data.bls.gov/timeseries/APU0000708111",
+   "d": "2026-09"
+  },
+  {
+   "t": "Average Price: Eggs, Grade A, Large (Cost per Dozen)... | St. Louis Fed",
+   "u": "https://fred.stlouisfed.org/series/APU0000708111",
+   "d": ""
+  },
+  {
+   "t": "Egg prices have soared 60% in a year. Here's why. - CBS News",
+   "u": "https://www.cbsnews.com/news/eggs-prices-2022-chicken-bird-flu-inflation-cpi/",
+   "d": "2023-01-17"
+  },
+  {
+   "t": "Cal-Maine Foods Loss as Egg Prices Plunge 60%",
+   "u": "https://thenerdyhumourist.com/cal-maine-foods-earnings-loss-egg-prices/",
+   "d": "2026-10-01"
+  },
+  {
+   "t": "CPI: Average Price Data - U.S. Bureau of Labor StatisticsCPI Home : U.S. Bureau ",
+   "u": "https://www.bls.gov/cpi/factsheets/average-prices.htm",
+   "d": "2023-12"
+  },
+  {
+   "t": "Food Inflation and the Outlook for Beef Prices - farmdoc daily",
+   "u": "https://farmdocdaily.illinois.edu/2026/10/food-inflation-and-the-outlook-for-beef-prices.html",
+   "d": "2026-10"
+  },
+  {
+   "t": "US egg prices increase to record high, dashing hopes of... | AP News",
+   "u": "https://apnews.com/article/egg-prices-bird-flu-cpi-b0ded420e9f7c0a707277c9c63396a76",
+   "d": ""
+  },
+  {
+   "t": "Are Egg Prices Lower Now Than Six Years Ago?",
+   "u": "https://factually.co/fact-checks/finance/are-egg-prices-lower-now-than-6-years-ago-1dff17",
+   "d": "2025"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.23,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 59.8,
+  "tok": 160,
+  "s": 2.7
+ },
+ "answer_raw": "A dozen eggs in the U.S. currently costs roughly **$2.27** on average, which is a significant drop from the **$3.49** per dozen seen a year ago in September 2025 [1].\n\nThe price has dropped by **35%** year-over-year [1]. This price implosion is attributed to an \"abundantly supplied egg market\" following the industry's layer flock repopulation during fiscal 2026, alongside historically softer seasonal pricing [4].\n\nThe shift in pricing has had a massive impact on producers; for instance, Cal-Maine Foods reported that its average selling price per dozen conventional shell eggs fell **59.3%** year-over-year as of September 30, 2026 [4].",
+ "answer": "A dozen eggs in the U.S. currently costs roughly **$2.27** on average, which is a significant drop from the **$3.49** per dozen seen a year ago in September 2025 [1].\n\nThe price has dropped by **35%** year-over-year [1]. This price implosion is attributed to an \"abundantly supplied egg market\" following the industry's layer flock repopulation during fiscal 2026, alongside historically softer seasonal pricing [4].\n\nThe shift in pricing has had a massive impact on producers; for instance, Cal-Maine Foods reported that its average selling price per dozen conventional shell eggs fell **59.3%** year-over-year as of September 30, 2026 [4].",
+ "chars": 641,
+ "raw_bytes": 2728,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.99,
+ "rate_gen_tok_s": 59.79,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-a",
+ "asked_at": "2026-10-25T19:39:50",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

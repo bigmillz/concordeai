@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":141,\"est\":false}",
+  "X-Hurry": "8fe82c8765af5556"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 20.14,
+ "elapsed_s": 29.62,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 28 passages"
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.08,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.14,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.62,
+   "tag": "RATE",
+   "data": {
+    "tps": 61.6,
+    "tok": 584,
+    "s": 9.5
+   }
+  },
+  {
+   "t": 29.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2336 chars"
+   }
+  },
+  {
+   "t": 29.62,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 28 passages",
+   "t_s": 13.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.08
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.08
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2336 chars",
+   "t_s": 29.62
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 29.62
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Global Liveability Index 2026 - Economist Intelligence Unit",
+   "u": "https://www.eiu.com/n/global-themes/report/global-liveability-index-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Tokyo in the Global Liveability Index Top 10: What... | Housing Japan",
+   "u": "https://housingjapan.com/blog/tokyo-global-liveability-index-top-10/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "Tehran Enters Bottom 10 Least Liveable Cities in EIU 2026 Global Index",
+   "u": "https://iranwire.com/en/news/157457-tehran-enters-bottom-10-least-liveable-cities-in-eiu-2026-global-index/",
+   "d": "2026"
+  },
+  {
+   "t": "EIU Global Liveability Index 2026",
+   "u": "https://www.eiu.com/n/wp-content/uploads/2026/07/EIU_Liveability-Index-2026.pdf",
+   "d": "2026-07"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life, Ranked ...",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026",
+   "d": "2026-10-17"
+  },
+  {
+   "t": "Top City Rankings 2026: Quality of Life & Livability | City ...",
+   "u": "https://cityandlocal.com/best-in-city/quality-of-life-livability-top-city-rankings-2026",
+   "d": "2026-06-26"
+  },
+  {
+   "t": "Quality of Life survey 2026: The 20 most liveable cities in ...",
+   "u": "https://monocle.com/affairs/urbanism/qol/quality-of-life-2026-most-liveable-cities/",
+   "d": "2026-07"
+  },
+  {
+   "t": "Ranked: The World’s Best Cities for Quality of Life in 2026",
+   "u": "https://www.visualcapitalist.com/ranked-the-worlds-best-cities-for-quality-of-life-in-2026/",
+   "d": "2026-10-08"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.08,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 61.6,
+  "tok": 584,
+  "s": 9.5
+ },
+ "answer_raw": "There isn't one single \"top\" city because different ranking bodies use different metrics to define quality of life. Depending on whether you value stability and infrastructure or economic power and human capital, your answer changes.\n\n## The Major 2026 Rankings\n\n**The Economist Intelligence Unit (EIU) — Global Liveability Index**\nThis index evaluates 173 cities based on five categories: stability, healthcare, culture and environment, education, and infrastructure [1][4]. It measures how \"comfortable\" a city is to live in [2].\n*   **Top Performers:** As of July 2026, **Osaka** ranked 7th and **Tokyo** ranked 10th; they were the only Asian cities in the top ten [2].\n*   **The Bottom:** **Tehran** entered the bottom 10, ranking 164th with a score of 45.3 as of July 2026 due to regional instability [3].\n\n**Oxford Economics — Global Cities Index**\nThis ranking evaluates 1,000 cities across economics, human capital, environment, and quality of life [5]. While it focuses heavily on economic strength, it includes a specific \"quality of life\" category (accounting for 25% of the score) that measures things like income equality, crime, and access to recreation [5][8].\n*   **Top Performers:** **New York** took the No. 1 spot in the overall index as of October 2026, though only one US city made the specific \"quality of life\" cut [5].\n*   **Standout Balance:** **Canberra** ranks highly for quality of life but only 45th overall, showing how a city can excel in livability without being an economic powerhouse [8].\n\n**Monocle — Quality of Life Rankings**\nMonocle’s survey uses correspondents' judgments on safety, connectivity, governance, and green space [7]. \n*   **Top Performers:** **Paris** led the rankings in 2026, following Munich (2025) and Vienna (2024) [6]. \n*   **Regional Trends:** North American cities have struggled in this ranking due to crime and housing costs, whereas **Perth** has become a more attractive option [7].\n\n## Comparison of Methodologies\n\n| Ranking Body | Primary Focus | Key Metric Ambition |\n| :--- | :--- | :--- |\n| **EIU** | Urban livability & resilience | Comfort and stability for the individual [1][2] |\n| **Oxford Economics** | Economic & human capital | Global city strength + quality of life [5] |\n| **Monocle** | Connectivity & governance | Subjective/correspondent-led urbanism [7] |",
+ "answer": "There isn't one single \"top\" city because different ranking bodies use different metrics to define quality of life. Depending on whether you value stability and infrastructure or economic power and human capital, your answer changes.\n\n## The Major 2026 Rankings\n\n**The Economist Intelligence Unit (EIU) — Global Liveability Index**\nThis index evaluates 173 cities based on five categories: stability, healthcare, culture and environment, education, and infrastructure [1][4]. It measures how \"comfortable\" a city is to live in [2].\n*   **Top Performers:** As of July 2026, **Osaka** ranked 7th and **Tokyo** ranked 10th; they were the only Asian cities in the top ten [2].\n*   **The Bottom:** **Tehran** entered the bottom 10, ranking 164th with a score of 45.3 as of July 2026 due to regional instability [3].\n\n**Oxford Economics — Global Cities Index**\nThis ranking evaluates 1,000 cities across economics, human capital, environment, and quality of life [5]. While it focuses heavily on economic strength, it includes a specific \"quality of life\" category (accounting for 25% of the score) that measures things like income equality, crime, and access to recreation [5][8].\n*   **Top Performers:** **New York** took the No. 1 spot in the overall index as of October 2026, though only one US city made the specific \"quality of life\" cut [5].\n*   **Standout Balance:** **Canberra** ranks highly for quality of life but only 45th overall, showing how a city can excel in livability without being an economic powerhouse [8].\n\n**Monocle — Quality of Life Rankings**\nMonocle’s survey uses correspondents' judgments on safety, connectivity, governance, and green space [7]. \n*   **Top Performers:** **Paris** led the rankings in 2026, following Munich (2025) and Vienna (2024) [6]. \n*   **Regional Trends:** North American cities have struggled in this ranking due to crime and housing costs, whereas **Perth** has become a more attractive option [7].\n\n## Comparison of Methodologies\n\n| Ranking Body | Primary Focus | Key Metric Ambition |\n| :--- | :--- | :--- |\n| **EIU** | Urban livability & resilience | Comfort and stability for the individual [1][2] |\n| **Oxford Economics** | Economic & human capital | Global city strength + quality of life [5] |\n| **Monocle** | Connectivity & governance | Subjective/correspondent-led urbanism [7] |",
+ "chars": 2336,
+ "raw_bytes": 4554,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.72,
+ "rate_gen_tok_s": 61.6,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-search",
+ "asked_at": "2026-10-25T20:07:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

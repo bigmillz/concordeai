@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.2,\"ftok\":123,\"est\":false}",
+  "X-Hurry": "e621e9c279525b38"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 17.02,
+ "elapsed_s": 24.4,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.32,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 36 passages"
+   }
+  },
+  {
+   "t": 12.32,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.32,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.32,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.32,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.02,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.39,
+   "tag": "RATE",
+   "data": {
+    "tps": 54.5,
+    "tok": 401,
+    "s": 7.4
+   }
+  },
+  {
+   "t": 24.4,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1607 chars"
+   }
+  },
+  {
+   "t": 24.4,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   11.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 36 passages",
+   "t_s": 12.32
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.32
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.32
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1607 chars",
+   "t_s": 24.4
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.4
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iPhone buying guide 2026: Which iPhone should you buy? - MacworldiPhone 14 New P",
+   "u": "https://www.macworld.com/article/670458/iphone-buying-guide.html",
+   "d": "2026-08-05"
+  },
+  {
+   "t": "Apple iPhone 14 Prices, October 2026 - SwappaIs iPhone 14 Worth Buying in 2026 -",
+   "u": "https://swappa.com/prices/apple-iphone-14",
+   "d": "2026-05-06"
+  },
+  {
+   "t": "iPhone 16 vs iPhone 14 Pro Max | Specs, Prices Comparison",
+   "u": "https://swappie.com/en/compare/iphone-14-pro-max-vs-iphone-16/?reverseVisualOrder=true",
+   "d": ""
+  },
+  {
+   "t": "iPhone Launch Prices (2026): MSRP From SE to Pro Max",
+   "u": "https://iphonescompare.com/iphone-price-comparison",
+   "d": "2026-09-13"
+  },
+  {
+   "t": "iPhone 14 Pro makes the notch come alive, finally - ZDNET",
+   "u": "https://www.zdnet.com/article/iphone-14-pro-makes-the-notch-come-alive-finally/",
+   "d": "2022-09-09"
+  },
+  {
+   "t": "Apple iPhones Prices in USA October 2026 | USD Rates",
+   "u": "https://www.mobile57.com/us/phones/apple/",
+   "d": "2026-10"
+  },
+  {
+   "t": "Apple iPhone 6s vs Samsung Galaxy S6 [Full Comparison]",
+   "u": "https://www.redmondpie.com/apple-iphone-6s-vs-samsung-galaxy-s6-full-comparison/",
+   "d": "2015-11-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.32,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 54.5,
+  "tok": 401,
+  "s": 7.4
+ },
+ "answer_raw": "The newest iPhone lineup is the **iPhone Duo** [1].\n\n## Pricing and Specs\nThe current flagship pricing for the new lineup is as follows:\n\n| Model | Price (MSRP) |\n| :--- | :--- |\n| **iPhone Duo** (256GB) | **$1,999** (as of 2026-09-13) [5] |\n| **iPhone 18 Pro** | **$1,199** (as of 2026-09-13) [5] |\n| **iPhone 18 Pro Max** | **$1,299** (as of 2026-09-13) [5] |\n\nThe **iPhone 18 Pro** features a **48MP Fusion Main camera** with **variable aperture** ($f/1.48, f/1.8, f/2.8, f/4.0$), which is a significant hardware shift for mobile photography [2].\n\n## Is it worth upgrading from an iPhone 14?\nWhether the upgrade is worth it depends on whether you prioritize cutting-edge photography or general usability.\n\n**The case for upgrading**\nIf you want a massive leap in camera capabilities, the jump is substantial. The **iPhone 18 Pro** series introduces manual-style control over depth of field via variable aperture, a feature not present on the iPhone 14 [2]. You would also gain access to the latest features like the **iPhone Duo**'s specific ecosystem or the improvements seen in the **iPhone 17** series, such as better Ultra Wide sensors and ProMotion/Always-On displays which were previously Pro-only [2].\n\n**The case against upgrading**\nThe iPhone 14 remains a \"reliable, well-rounded\" device in 2026 [3]. It offers a strong price-to-performance ratio for those who don't need flagship-level hardware to complete daily tasks [3]. Unless you are specifically looking for the variable aperture lens or the unique form factor of the Duo, the iPhone 14's performance remains capable for standard use [3].",
+ "answer": "The newest iPhone lineup is the **iPhone Duo** [1].\n\n## Pricing and Specs\nThe current flagship pricing for the new lineup is as follows:\n\n| Model | Price (MSRP) |\n| :--- | :--- |\n| **iPhone Duo** (256GB) | **$1,999** (as of 2026-09-13) [5] |\n| **iPhone 18 Pro** | **$1,199** (as of 2026-09-13) [5] |\n| **iPhone 18 Pro Max** | **$1,299** (as of 2026-09-13) [5] |\n\nThe **iPhone 18 Pro** features a **48MP Fusion Main camera** with **variable aperture** ($f/1.48, f/1.8, f/2.8, f/4.0$), which is a significant hardware shift for mobile photography [2].\n\n## Is it worth upgrading from an iPhone 14?\nWhether the upgrade is worth it depends on whether you prioritize cutting-edge photography or general usability.\n\n**The case for upgrading**\nIf you want a massive leap in camera capabilities, the jump is substantial. The **iPhone 18 Pro** series introduces manual-style control over depth of field via variable aperture, a feature not present on the iPhone 14 [2]. You would also gain access to the latest features like the **iPhone Duo**'s specific ecosystem or the improvements seen in the **iPhone 17** series, such as better Ultra Wide sensors and ProMotion/Always-On displays which were previously Pro-only [2].\n\n**The case against upgrading**\nThe iPhone 14 remains a \"reliable, well-rounded\" device in 2026 [3]. It offers a strong price-to-performance ratio for those who don't need flagship-level hardware to complete daily tasks [3]. Unless you are specifically looking for the variable aperture lens or the unique form factor of the Duo, the iPhone 14's performance remains capable for standard use [3].",
+ "chars": 1607,
+ "raw_bytes": 3637,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 16.47,
+ "rate_gen_tok_s": 54.44,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-d",
+ "asked_at": "2026-10-25T20:39:53",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

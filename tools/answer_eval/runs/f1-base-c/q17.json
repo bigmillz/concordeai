@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.4,\"ftok\":115,\"est\":false}",
+  "X-Hurry": "3d05e9f21b6873dc"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 13.43,
+ "elapsed_s": 24.23,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.8,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 22 passages"
+   }
+  },
+  {
+   "t": 9.8,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.8,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.8,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.8,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.43,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.23,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.7,
+    "tok": 687,
+    "s": 10.8
+   }
+  },
+  {
+   "t": 24.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2750 chars"
+   }
+  },
+  {
+   "t": 24.23,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 22 passages",
+   "t_s": 9.8
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.8
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.8
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2750 chars",
+   "t_s": 24.23
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.23
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis 2026: Where Expats ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-neighborhoods-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis — Where to Stay (2026)",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Where is the Best Place to Live in Florianópolis? | FloripaGuru Blog",
+   "u": "https://floripaguru.com/blog/best-areas-to-live-florianopolis",
+   "d": "2026-08-20"
+  },
+  {
+   "t": "Buy Property in Florianópolis, Brazil: Foreigner Guide",
+   "u": "https://www.elisainvestimentos.com.br/en/buy-property-florianopolis/",
+   "d": "2026-02-16"
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Florianópolis Expat Guide 2026 | Modern Expat Magazine",
+   "u": "https://modernexpatmagazine.com/guides/florianopolis",
+   "d": "2026-08-15"
+  },
+  {
+   "t": "Lavaca Neighborhood - safety, walkability? - Tripadvisor",
+   "u": "https://www.tripadvisor.com.sg/ShowTopic-g60956-i76-k14148740-Lavaca_Neighborhood_safety_walkability-San_Antonio_Texas.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.8,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 63.7,
+  "tok": 687,
+  "s": 10.8
+ },
+ "answer_raw": "For a six-month stay that balances safety, walkability, and beach access, **Lagoa da Conceição** is the most logical choice, though your specific lifestyle needs might shift you toward **Jurerê Internacional** or **Campeche**. \n\nWhile fiber optic internet with 300 to 500 Mbps is widely available for roughly R$100 to R$150/month [1], the \"best\" neighborhood depends on whether you prioritize a social hub or a quiet, upscale retreat.\n\n## Top Neighborhood Recommendations\n\n**Lagoa da Conceição** — The best all-rounder for your criteria. \nThis is the primary epicenter for international life and digital nomads [4]. It is highly walkable, with supermarkets, bars, and coworking spaces all within walking distance [4]. You can live here for months without needing to speak Portuguese [4].\n\n**Jurerê Internacional** — The high-budget, high-safety option. \nIf your priority is maximum safety, patrolled streets, and a more manicured environment, this is it [4]. The local beach has no strong waves, making it very easy to access for walks or relaxation [4]. It is known for its glamorous beach clubs [5].\n\n**Campeche** — The local expat-favorite. \nWhile many expats distribute themselves across the island, a significant portion live within 5km of Praia do Campeche [2]. It offers a different vibe than the more tourist-heavy centers, often serving as a primary base for those looking for a specific beach lifestyle [2].\n\n## Comparison of Resident Profiles\n\n| Neighborhood | Best For... | Vibe |\n| :--- | :--- | :--- |\n| **Lagoa da Conceição** | Digital nomads & socialites | High walkability; everything is local [4] |\n| **Jurerê Internacional** | Families & luxury seekers | High safety; manicured; upscale [4][5] |\n| **Campeche** | Beach-centric living | Part of the 90% expat concentration [2] |\n\n## Critical Logistics for a Six-Month Stay\n\n*   **Internet vs. Lifestyle:** Internet speeds are reliable across most neighborhoods, so your choice should be driven by the \"pace of daily life\" rather than bandwidth [1]. \n*   **The Seasonal Price Shift:** If you are looking at areas like Canasvieiras, prices drop significantly during the off-season (April to November), but ensure you are negotiating a proper mid-term contract rather than a short-term tourist rate [4].\n*   **The \"Centric\" Trap:** Avoid the Centro if you want a beach lifestyle; it is often considered a place for the \"brave\" and lacks the immediate coastal access you're looking for [2].\n*   **Rental Strategy:** For a six-month stay, be wary of \"shoebox\" apartments in central areas where you might pay high rents (e.g., €800/month) for very little space or poor insulation [2]. Always test the ordinary routine and your specific housing setup before committing to a long lease [7].",
+ "answer": "For a six-month stay that balances safety, walkability, and beach access, **Lagoa da Conceição** is the most logical choice, though your specific lifestyle needs might shift you toward **Jurerê Internacional** or **Campeche**. \n\nWhile fiber optic internet with 300 to 500 Mbps is widely available for roughly R$100 to R$150/month [1], the \"best\" neighborhood depends on whether you prioritize a social hub or a quiet, upscale retreat.\n\n## Top Neighborhood Recommendations\n\n**Lagoa da Conceição** — The best all-rounder for your criteria. \nThis is the primary epicenter for international life and digital nomads [4]. It is highly walkable, with supermarkets, bars, and coworking spaces all within walking distance [4]. You can live here for months without needing to speak Portuguese [4].\n\n**Jurerê Internacional** — The high-budget, high-safety option. \nIf your priority is maximum safety, patrolled streets, and a more manicured environment, this is it [4]. The local beach has no strong waves, making it very easy to access for walks or relaxation [4]. It is known for its glamorous beach clubs [5].\n\n**Campeche** — The local expat-favorite. \nWhile many expats distribute themselves across the island, a significant portion live within 5km of Praia do Campeche [2]. It offers a different vibe than the more tourist-heavy centers, often serving as a primary base for those looking for a specific beach lifestyle [2].\n\n## Comparison of Resident Profiles\n\n| Neighborhood | Best For... | Vibe |\n| :--- | :--- | :--- |\n| **Lagoa da Conceição** | Digital nomads & socialites | High walkability; everything is local [4] |\n| **Jurerê Internacional** | Families & luxury seekers | High safety; manicured; upscale [4][5] |\n| **Campeche** | Beach-centric living | Part of the 90% expat concentration [2] |\n\n## Critical Logistics for a Six-Month Stay\n\n*   **Internet vs. Lifestyle:** Internet speeds are reliable across most neighborhoods, so your choice should be driven by the \"pace of daily life\" rather than bandwidth [1]. \n*   **The Seasonal Price Shift:** If you are looking at areas like Canasvieiras, prices drop significantly during the off-season (April to November), but ensure you are negotiating a proper mid-term contract rather than a short-term tourist rate [4].\n*   **The \"Centric\" Trap:** Avoid the Centro if you want a beach lifestyle; it is often considered a place for the \"brave\" and lacks the immediate coastal access you're looking for [2].\n*   **Rental Strategy:** For a six-month stay, be wary of \"shoebox\" apartments in central areas where you might pay high rents (e.g., €800/month) for very little space or poor insulation [2]. Always test the ordinary routine and your specific housing setup before committing to a long lease [7].",
+ "chars": 2750,
+ "raw_bytes": 4934,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 28.37,
+ "rate_gen_tok_s": 63.66,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-c",
+ "asked_at": "2026-10-25T19:52:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

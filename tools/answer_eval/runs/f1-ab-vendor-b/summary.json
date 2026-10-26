@@ -1,0 +1,117 @@
+{
+ "name": "f1-ab-vendor-b",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T20:32:18",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 25.92,
+   "chars": 1698,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 13.72,
+   "chars": 1731,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 25.43,
+   "chars": 1789,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 24.93,
+   "chars": 1590,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 25.86,
+   "chars": 390,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 20.76,
+   "chars": 1087,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 25.39,
+   "chars": 230,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 21.9,
+   "chars": 1996,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 22.23,
+   "chars": 1173,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 34.97,
+   "chars": 1390,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 27.36,
+   "chars": 2170,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 29.91,
+   "chars": 2492,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 29.21,
+   "chars": 2195,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {
+  "MILLENAI_FRESH_OFF": "vendor"
+ },
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.23,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink increases the available **surface area** to draw thermal energy away from a component and dissipate it into the surrounding medium, such as air. By utilizing materials with high **thermal "
+ },
+ "finished": "2026-10-25T20:38:26"
+}

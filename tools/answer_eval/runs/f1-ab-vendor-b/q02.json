@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.2,\"ftok\":120,\"est\":false}",
+  "X-Hurry": "c11a32f8b84aa4b3"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 17.57,
+ "elapsed_s": 25.43,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.82,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 39 passages"
+   }
+  },
+  {
+   "t": 12.82,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.82,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.82,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.57,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.43,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.9,
+    "tok": 447,
+    "s": 7.9
+   }
+  },
+  {
+   "t": 25.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1789 chars"
+   }
+  },
+  {
+   "t": 25.43,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.67,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.67
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.67
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 39 passages",
+   "t_s": 12.82
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.82
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.82
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1789 chars",
+   "t_s": 25.43
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.43
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "iPhone 14 vs iPhone 13: o que mudou?",
+   "u": "https://blogdoiphone.com/comparativos/iphone-14-vs-13/",
+   "d": "2026"
+  },
+  {
+   "t": "iPhone Launch Prices (2026): MSRP From SE to Pro Max",
+   "u": "https://iphonescompare.com/iphone-price-comparison",
+   "d": "2026-09-13"
+  },
+  {
+   "t": "iPhone 16 vs iPhone 14 Pro Max | Specs, Prices Comparison",
+   "u": "https://swappie.com/en/compare/iphone-14-pro-max-vs-iphone-16/?reverseVisualOrder=true",
+   "d": ""
+  },
+  {
+   "t": "I put the iPhone 18 Pro vs. iPhone 16 Pro through a 7-round face-off: Is the upg",
+   "u": "https://tech.yahoo.com/phones/articles/put-iphone-18-pro-vs-043000058.html",
+   "d": "2026-10-05"
+  },
+  {
+   "t": "iPhone 14 Pro makes the notch come alive, finally - ZDNET",
+   "u": "https://www.zdnet.com/article/iphone-14-pro-makes-the-notch-come-alive-finally/",
+   "d": "2022-09-09"
+  },
+  {
+   "t": "Apple iPhones Prices in USA October 2026 | USD Rates",
+   "u": "https://www.mobile57.com/us/phones/apple/",
+   "d": "2026-10"
+  },
+  {
+   "t": "iPhone 18 Pro vs iPhone 15 Pro: Should you upgrade?",
+   "u": "https://www.trustedreviews.com/versus/iphone-18-pro-vs-iphone-15-pro",
+   "d": "2026-09-28"
+  },
+  {
+   "t": "Apple debuts iPhone 18 Pro and iPhone 18 Pro Max - Apple",
+   "u": "https://www.apple.com/newsroom/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/",
+   "d": "2026-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.82,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 56.9,
+  "tok": 447,
+  "s": 7.9
+ },
+ "answer_raw": "The newest flagship models are the **iPhone 18 Pro** and **iPhone 18 Pro Max** [2].\n\n| Model | Launch Price (MSRP) |\n| :--- | :--- |\n| **iPhone 18 Pro** | **$1,199** [2] |\n| **iPhone 8 Pro Max** | **$1,299** [2] |\n| **iPhone Duo** | **$1,999** (256GB) [2] |\n\nUpgrading from an iPhone 14 to the iPhone 18 Pro series is a significant generational leap that is likely worth it if you want the latest AI capabilities and hardware improvements.\n\n## Why it's a substantial upgrade\nThe iPhone 14 was a much more modest transition from the 13, whereas the 18 Pro introduces several architectural shifts that your 14 lacks:\n\n*   **Storage and Value**: While the 18 Pro is more expensive due to rising DRAM and manufacturing costs [4][7], the base storage was raised to **256GB** in 2025, meaning you're getting double the starting capacity compared to older base models [4].\n*   **AI and Software**: The iPhone 18 series features \"Siri AI,\" which uses personal context understanding and onscreen awareness to perform tasks across your apps [8].\n*   **Connectivity**: The 18 Pro models include advanced satellite features for staying connected outside of cellular/Wi-Fi coverage [8].\n*   **Camera and Video**: You'll gain access to features like 4K 120 fps slow-mo and \"Audio Mix\" which were not present on the 14 [4].\n\n## The Verdict\nIf you are coming from an iPhone 14, you are jumping four generations. Your current phone lacks the Dynamic Island (introduced with the 14 Pro/Max) and the significant processing power required for the new AI-driven features [5][8]. \n\nIf you trade in your iPhone 14, you can get up to **$1,200** in credits through select carriers [8]. Given that the cost of the 18 Pro starts at **$1,199** [2], a high-value trade-in could make this a very efficient upgrade path.",
+ "answer": "The newest flagship models are the **iPhone 18 Pro** and **iPhone 18 Pro Max** [2].\n\n| Model | Launch Price (MSRP) |\n| :--- | :--- |\n| **iPhone 18 Pro** | **$1,199** [2] |\n| **iPhone 8 Pro Max** | **$1,299** [2] |\n| **iPhone Duo** | **$1,999** (256GB) [2] |\n\nUpgrading from an iPhone 14 to the iPhone 18 Pro series is a significant generational leap that is likely worth it if you want the latest AI capabilities and hardware improvements.\n\n## Why it's a substantial upgrade\nThe iPhone 14 was a much more modest transition from the 13, whereas the 18 Pro introduces several architectural shifts that your 14 lacks:\n\n*   **Storage and Value**: While the 18 Pro is more expensive due to rising DRAM and manufacturing costs [4][7], the base storage was raised to **256GB** in 2025, meaning you're getting double the starting capacity compared to older base models [4].\n*   **AI and Software**: The iPhone 18 series features \"Siri AI,\" which uses personal context understanding and onscreen awareness to perform tasks across your apps [8].\n*   **Connectivity**: The 18 Pro models include advanced satellite features for staying connected outside of cellular/Wi-Fi coverage [8].\n*   **Camera and Video**: You'll gain access to features like 4K 120 fps slow-mo and \"Audio Mix\" which were not present on the 14 [4].\n\n## The Verdict\nIf you are coming from an iPhone 14, you are jumping four generations. Your current phone lacks the Dynamic Island (introduced with the 14 Pro/Max) and the significant processing power required for the new AI-driven features [5][8]. \n\nIf you trade in your iPhone 14, you can get up to **$1,200** in credits through select carriers [8]. Given that the cost of the 18 Pro starts at **$1,199** [2], a high-value trade-in could make this a very efficient upgrade path.",
+ "chars": 1789,
+ "raw_bytes": 3823,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.59,
+ "rate_gen_tok_s": 56.9,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-vendor-b",
+ "asked_at": "2026-10-25T20:33:42",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

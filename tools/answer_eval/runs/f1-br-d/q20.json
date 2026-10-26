@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":133,\"est\":false}",
+  "X-Hurry": "4fb4974b1cc83839"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 17.45,
+ "elapsed_s": 26.55,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.82,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.82,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.82,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.89,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 24 passages"
+   }
+  },
+  {
+   "t": 12.89,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.89,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.89,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.45,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.55,
+   "tag": "RATE",
+   "data": {
+    "tps": 58.8,
+    "tok": 534,
+    "s": 9.1
+   }
+  },
+  {
+   "t": 26.55,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2139 chars"
+   }
+  },
+  {
+   "t": 26.55,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   10.82,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.82
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.82
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 24 passages",
+   "t_s": 12.89
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.89
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.89
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2139 chars",
+   "t_s": 26.55
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.55
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Tokyo in the Global Liveability Index Top 10: What... | Housing Japan",
+   "u": "https://housingjapan.com/blog/tokyo-global-liveability-index-top-10/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "EIU Global Liveability Index 2026",
+   "u": "https://www.eiu.com/n/wp-content/uploads/2026/07/EIU_Liveability-Index-2026.pdf",
+   "d": "2026-07"
+  },
+  {
+   "t": "Tehran Enters Bottom 10 Least Liveable Cities in EIU 2026 Global Index",
+   "u": "https://iranwire.com/en/news/157457-tehran-enters-bottom-10-least-liveable-cities-in-eiu-2026-global-index/",
+   "d": "2026"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life, Ranked ...",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026",
+   "d": "2026-10-17"
+  },
+  {
+   "t": "Quality of Life survey 2026: The 20 most liveable cities in... - Monocle",
+   "u": "https://monocle.com/affairs/urbanism/qol/quality-of-life-2026-most-liveable-cities/",
+   "d": "2026"
+  },
+  {
+   "t": "Ranked: The World’s Best Cities for Quality of Life in 2026",
+   "u": "https://www.yahoo.com/lifestyle/articles/ranked-world-best-cities-quality-144105234.html",
+   "d": "2026-10-11"
+  },
+  {
+   "t": "Thinking About Moving? These 10 U.S. Cities Rank Highest for Quality of Life",
+   "u": "https://www.yahoo.com/lifestyle/articles/thinking-moving-10-u-cities-153000658.html",
+   "d": "2026-10-04"
+  },
+  {
+   "t": "Top City Rankings 2026: Quality of Life & Livability | City ...",
+   "u": "https://cityandlocal.com/best-in-city/quality-of-life-livability-top-city-rankings-2026",
+   "d": "2026-06-26"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.89,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 58.8,
+  "tok": 534,
+  "s": 9.1
+ },
+ "answer_raw": "There isn't one single \"best\" city because different ranking organizations use different metrics, so the top spot depends entirely on whether you are measuring livability, economic power, or specific quality-of-life indicators.\n\n## The Primary Rankings for 2026\n\n**The EIU Global Liveability Index**\nPublished in July 2026, the Economist Intelligence Unit (EIU) assesses 173 cities across five categories: stability, healthcare, education, culture/environment, and infrastructure [1][2]. This index focuses on how \"comfortable\" a city is to inhabit.\n*   **Top Asian Cities:** **Osaka** ranked 7th and **Tokyo** ranked out of 173 at 10th as of July 2026 [1].\n*   **Performance:** Both cities achieved perfect scores of 100 in stability, healthcare, and education [1].\n\n**The Oxford Economics Global Cities Index**\nThis index evaluates 1,000 cities across economics, human capital, environment, and quality of life [4]. It is a broader look at global city dominance rather than just resident comfort.\n*   **Top Quality of Life:** **Canberra** earned a perfect score of 100 for the \"Quality of Life\" category as of October 2026 [6].\n*   **US Performance:** While **New York** took the No. 1 spot for the overall index as of October 2026, only one US city made the top 20 for the specific quality of life category [4].\n\n**The Monocle Survey**\nThis ranking uses a qualitative approach, relying on correspondents to judge factors like connectivity, governance, and green space [5].\n*   **Top City:** **Paris** took the top spot for quality of life as of June 2026, continuing a trend of European dominance [8].\n\n## Comparison of Key Metrics\n\n| Ranking Agency | Primary Focus | Top City / Leader | Key Context |\n| :--- | :--- | :--- | :--- |\n| **EIU** (July 2026) | Resident comfort/livability | **Osaka** (7th) / **Tokyo** (10th) | Only Asian cities in the top 10 [1]. |\n| **Oxford Economics** (Oct 2026) | Economic & human capital | **New York** (Overall) / **Canberra** (QoL) | Canberra led the specific QoL category [4][6]. |\n| **Monocle** (June 2026) | Urbanism & connectivity | **Paris** | European cities have dominated recent years [8]. |",
+ "answer": "There isn't one single \"best\" city because different ranking organizations use different metrics, so the top spot depends entirely on whether you are measuring livability, economic power, or specific quality-of-life indicators.\n\n## The Primary Rankings for 2026\n\n**The EIU Global Liveability Index**\nPublished in July 2026, the Economist Intelligence Unit (EIU) assesses 173 cities across five categories: stability, healthcare, education, culture/environment, and infrastructure [1][2]. This index focuses on how \"comfortable\" a city is to inhabit.\n*   **Top Asian Cities:** **Osaka** ranked 7th and **Tokyo** ranked out of 173 at 10th as of July 2026 [1].\n*   **Performance:** Both cities achieved perfect scores of 100 in stability, healthcare, and education [1].\n\n**The Oxford Economics Global Cities Index**\nThis index evaluates 1,000 cities across economics, human capital, environment, and quality of life [4]. It is a broader look at global city dominance rather than just resident comfort.\n*   **Top Quality of Life:** **Canberra** earned a perfect score of 100 for the \"Quality of Life\" category as of October 2026 [6].\n*   **US Performance:** While **New York** took the No. 1 spot for the overall index as of October 2026, only one US city made the top 20 for the specific quality of life category [4].\n\n**The Monocle Survey**\nThis ranking uses a qualitative approach, relying on correspondents to judge factors like connectivity, governance, and green space [5].\n*   **Top City:** **Paris** took the top spot for quality of life as of June 2026, continuing a trend of European dominance [8].\n\n## Comparison of Key Metrics\n\n| Ranking Agency | Primary Focus | Top City / Leader | Key Context |\n| :--- | :--- | :--- | :--- |\n| **EIU** (July 2026) | Resident comfort/livability | **Osaka** (7th) / **Tokyo** (10th) | Only Asian cities in the top 10 [1]. |\n| **Oxford Economics** (Oct 2026) | Economic & human capital | **New York** (Overall) / **Canberra** (QoL) | Canberra led the specific QoL category [4][6]. |\n| **Monocle** (June 2026) | Urbanism & connectivity | **Paris** | European cities have dominated recent years [8]. |",
+ "chars": 2139,
+ "raw_bytes": 4381,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.14,
+ "rate_gen_tok_s": 58.76,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-d",
+ "asked_at": "2026-10-25T20:44:05",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

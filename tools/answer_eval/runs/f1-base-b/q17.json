@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.6,\"ftok\":129,\"est\":false}",
+  "X-Hurry": "9014b1d08e2097bd"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 17.9,
+ "elapsed_s": 25.49,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.87,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 22 passages"
+   }
+  },
+  {
+   "t": 11.87,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.87,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.87,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.9,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.49,
+   "tag": "RATE",
+   "data": {
+    "tps": 71.4,
+    "tok": 542,
+    "s": 7.6
+   }
+  },
+  {
+   "t": 25.49,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2169 chars"
+   }
+  },
+  {
+   "t": 25.49,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 22 passages",
+   "t_s": 11.87
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.87
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.87
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2169 chars",
+   "t_s": 25.49
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.49
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Cities to Live in Brazil for Foreigners (2026)",
+   "u": "https://welcome-to-brazil.vercel.app/en/blog/best-cities-brazil-foreigners",
+   "d": "2026"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Short Term and Weekly Rentals | cozycozy",
+   "u": "https://www.cozycozy.com/gb/florianopolis-short-term-rentals",
+   "d": ""
+  },
+  {
+   "t": "Furnished apartments for rent Florianópolis | Long & short-term rentals",
+   "u": "https://www.theblueground.com/m/furnished-apartments/florianopolis-bra",
+   "d": ""
+  },
+  {
+   "t": "Lavaca Neighborhood - safety, walkability? - Tripadvisor",
+   "u": "https://www.tripadvisor.com.sg/ShowTopic-g60956-i76-k14148740-Lavaca_Neighborhood_safety_walkability-San_Antonio_Texas.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.87,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 71.4,
+  "tok": 542,
+  "s": 7.6
+ },
+ "answer_raw": "Since Florianópolis lacks a single central hub, your choice depends on whether you prioritize a tech-driven lifestyle or a coastal vibe, but **Lagoa da Conceição** and **Ingleses Norte** are your strongest candidates for meeting all your criteria.\n\n## Top Neighborhood Options\n\n**Ingleses Norte** — This area is highly convenient for those wanting to be close to the water, with some rentals located just a two-minute walk from Ingleses Beach [3]. It offers residential amenities like proximity to malls and is a common choice for those seeking beach access [3].\n\n**Lagoa da Conceição** — This neighborhood is a strong contender for a six-month stay due to its proximity to north island beaches like Campeche and ease of access to various coastal areas [6]. It is well-positioned for those wanting a mix of local flavor and natural beauty [6].\n\n**The Gastronomic District / University Vicinity** — Areas near the UDESC campus provide a different lifestyle, often featuring modern flats with high-speed connectivity (up to 1Gbps optical internet) and proximity to city centers [3]. These areas are useful if you want to be near academic or culinary hubs [3].\n\n## Infrastructure and Logistics\n\n**Internet** — You will likely have no trouble with connectivity. Fiber optic service providing 300 to 500 Mbps is available in most neighborhoods and typically costs between R$100 and R$150 per month [1]. For high-bandwidth needs, some rentals specifically offer 1Gb optical internet [3].\n\n**The Digital Nomad Scene** — The city has become an unofficial capital for digital nomads due to its 42 beaches and thriving tech scene [2]. While internet speed is generally high across the city, the \"best\" neighborhood for remote work often comes down to the daily pace of life rather than the bandwidth [1][2].\n\n**Rental Trends** — If you are looking at long-term leases versus short-term stays, be aware that asking rents rose by 9.13% in the 12 months leading to September 2026 [5]. In some markets, like São Paulo, short-term Airbnb stays can sometimes gross less than the citywide average for a long-term lease, so compare your six-month budget against local lease averages [5].",
+ "answer": "Since Florianópolis lacks a single central hub, your choice depends on whether you prioritize a tech-driven lifestyle or a coastal vibe, but **Lagoa da Conceição** and **Ingleses Norte** are your strongest candidates for meeting all your criteria.\n\n## Top Neighborhood Options\n\n**Ingleses Norte** — This area is highly convenient for those wanting to be close to the water, with some rentals located just a two-minute walk from Ingleses Beach [3]. It offers residential amenities like proximity to malls and is a common choice for those seeking beach access [3].\n\n**Lagoa da Conceição** — This neighborhood is a strong contender for a six-month stay due to its proximity to north island beaches like Campeche and ease of access to various coastal areas [6]. It is well-positioned for those wanting a mix of local flavor and natural beauty [6].\n\n**The Gastronomic District / University Vicinity** — Areas near the UDESC campus provide a different lifestyle, often featuring modern flats with high-speed connectivity (up to 1Gbps optical internet) and proximity to city centers [3]. These areas are useful if you want to be near academic or culinary hubs [3].\n\n## Infrastructure and Logistics\n\n**Internet** — You will likely have no trouble with connectivity. Fiber optic service providing 300 to 500 Mbps is available in most neighborhoods and typically costs between R$100 and R$150 per month [1]. For high-bandwidth needs, some rentals specifically offer 1Gb optical internet [3].\n\n**The Digital Nomad Scene** — The city has become an unofficial capital for digital nomads due to its 42 beaches and thriving tech scene [2]. While internet speed is generally high across the city, the \"best\" neighborhood for remote work often comes down to the daily pace of life rather than the bandwidth [1][2].\n\n**Rental Trends** — If you are looking at long-term leases versus short-term stays, be aware that asking rents rose by 9.13% in the 12 months leading to September 2026 [5]. In some markets, like São Paulo, short-term Airbnb stays can sometimes gross less than the citywide average for a long-term lease, so compare your six-month budget against local lease averages [5].",
+ "chars": 2169,
+ "raw_bytes": 4323,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 21.27,
+ "rate_gen_tok_s": 71.44,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-b",
+ "asked_at": "2026-10-25T19:09:40",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

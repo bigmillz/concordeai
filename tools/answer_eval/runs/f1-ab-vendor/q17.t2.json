@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.8,\"ftok\":133,\"est\":false}",
+  "X-Hurry": "79933e70e860ed8c"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 19.9,
+ "elapsed_s": 25.89,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 10.52,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.52,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.52,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 28 passages"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.63,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.9,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.88,
+   "tag": "RATE",
+   "data": {
+    "tps": 50.0,
+    "tok": 299,
+    "s": 6.0
+   }
+  },
+  {
+   "t": 25.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1197 chars"
+   }
+  },
+  {
+   "t": 25.88,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   10.52,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.52
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.52
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 28 passages",
+   "t_s": 12.63
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.63
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.63
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.63
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1197 chars",
+   "t_s": 25.88
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.88
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Safety in Florianópolis: The Honest Neighborhood Guide for ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-safety-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Best Florianópolis Neighborhoods for Digital Nomads (2026)",
+   "u": "https://floripaguru.com/blog/best-neighborhoods-floripa-digital-nomads",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Nomads.com - Best Places to Live for Digital Nomads (formerly Nomad...",
+   "u": "https://nomads.com/",
+   "d": ""
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Florianópolis, Brazil Furnished Monthly Rentals and Extended ...",
+   "u": "https://www.airbnb.com/florianopolis-brazil/stays/monthly",
+   "d": "2026-10-25"
+  },
+  {
+   "t": "Furnished Rentals Florianópolis — Monthly Apartments & Homes ...",
+   "u": "https://rentihome.com/florianopolis/furnished-apartments-florianopolis.html",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Sep 2026. Prices in Florianopolis",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.63,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 50.0,
+  "tok": 299,
+  "s": 6.0
+ },
+ "answer_raw": "Pick **Lagoa**; it is the best balance of community, reliable internet, and proximity to the water for a six-month stay [2].\n\nThe cost for a furnished one-bedroom in the Lagoa core runs about **$800/month** (roughly **R$4,037/month** based on the October 23, 2026, exchange rate) [7][5].\n\n**Why this is the best pick**\nWhile Jurerê Internacional offers higher safety scores, you would be paying a significant premium of approximately €1,200/month (roughly $1,300/month) [1]. Lagoa provides a more integrated social scene and easier access to the lagoon, making it the \"sweet spot\" for someone living there long-term [7]. \n\nThe internet infrastructure in these central neighborhoods is solid, with fiber optic options typically running between R$100 and R$150 per month [3]. \n\n| Neighborhood | Monthly Rent (USD) | Monthly Rent (BRL) | Profile |\n| :--- | :--- | :--- | :--- |\n| **Lagoa** | **$800** [7] | **R$4,037** [5] | Socially active, reliable fiber, walkable to cafes [7] |\n| **Jurerê Internacional** | **~$1,300** [1] | **~R$6,567** [5] | High safety (78/100), premium pricing [1] |\n\n*Note: The BRL conversion is based on the ECB reference rate of 1 BRL = $0.1982 from October 23, 2026 [5].*",
+ "answer": "Pick **Lagoa**; it is the best balance of community, reliable internet, and proximity to the water for a six-month stay [2].\n\nThe cost for a furnished one-bedroom in the Lagoa core runs about **$800/month** (roughly **R$4,037/month** based on the October 23, 2026, exchange rate) [7][5].\n\n**Why this is the best pick**\nWhile Jurerê Internacional offers higher safety scores, you would be paying a significant premium of approximately €1,200/month (roughly $1,300/month) [1]. Lagoa provides a more integrated social scene and easier access to the lagoon, making it the \"sweet spot\" for someone living there long-term [7]. \n\nThe internet infrastructure in these central neighborhoods is solid, with fiber optic options typically running between R$100 and R$150 per month [3]. \n\n| Neighborhood | Monthly Rent (USD) | Monthly Rent (BRL) | Profile |\n| :--- | :--- | :--- | :--- |\n| **Lagoa** | **$800** [7] | **R$4,037** [5] | Socially active, reliable fiber, walkable to cafes [7] |\n| **Jurerê Internacional** | **~$1,300** [1] | **~R$6,567** [5] | High safety (78/100), premium pricing [1] |\n\n*Note: The BRL conversion is based on the ECB reference rate of 1 BRL = $0.1982 from October 23, 2026 [5].*",
+ "chars": 1197,
+ "raw_bytes": 3365,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.56,
+ "rate_gen_tok_s": 49.96,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-vendor",
+ "asked_at": "2026-10-25T20:18:40",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay that balances community, infrastructure, and ease of living, your best bet depends on whether you prefer a social hub or a premium, secure environment.\n\n## Top Recommendations\n\n**Lagoa** — This is the most frequent recommendation for digital nomads, appearing in 90% of nomad-focused discussions [2]. It offers a strong community, reliable internet, and various coworking options, though you will have to deal with \"summer chaos\" as a trade-off [2].\n\n**Jurerê Internacional** — If your priority is high safety and a premium lifestyle, this is the choice. It has a safety score of le 78/100 with zero reported robberies in 2025, but expect to pay significantly more, with one-bedroom rentals reaching €1,200/month as of May 2024 [1].\n\n## Infrastructure and Logistics\n\n**Internet** — Reliable fiber optic service is widely available in central neighborhoods, typically offering speeds between 300 to 500 Mbps for R$100 to R$150/month [3]. In certain rental listings, you can find high-end 1Gb optical internet availability [6].\n\n**Safety and Layout** — Florianópolis does not have a single central hub; instead, each *bairro* (neighborhood) has its own unique microclimate, cost profile, and internet reliability [2][3]. While the city has a relatively low overall safety score of 50/100, security is often concentrated in specific areas, leaving others with more patchy coverage [1].\n\n| Neighborhood | Profile | Key Trade-off |\n| :--- | :--- | :--- |\n| **Lagoa** | High community density, best for first-timers [2] | Summer crowds and chaos [2] |\n| **Jurerê Internacional** | High safety (78/100), premium feel [1] | High cost (€1,200/month for 1-bed) [1] |\n\nBecause the city's layout is granular, you should verify specific street-level walkability and exact fiber availability before committing to a six-month lease, as the \"best\" neighborhood can change based on whether you want a quiet retreat or a social hub [2][5]."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

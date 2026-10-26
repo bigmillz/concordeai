@@ -1,0 +1,115 @@
+{
+ "name": "f1-br-d",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T20:38:27",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 29.73,
+   "chars": 1946,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 13.4,
+   "chars": 1895,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 24.4,
+   "chars": 1607,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 24.81,
+   "chars": 1896,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 25.3,
+   "chars": 411,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 27.17,
+   "chars": 2331,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 24.97,
+   "chars": 336,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 20.85,
+   "chars": 1479,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 20.57,
+   "chars": 704,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 38.2,
+   "chars": 1790,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 25.19,
+   "chars": 2043,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 26.55,
+   "chars": 2139,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 32.88,
+   "chars": 2474,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.3,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink pulls heat away from a component through **conduction** to increase the surface area available for cooling. It then uses that larger surface area to dissipate the heat into the surrounding"
+ },
+ "finished": "2026-10-25T20:44:42"
+}

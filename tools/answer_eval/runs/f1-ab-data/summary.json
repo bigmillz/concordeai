@@ -1,0 +1,117 @@
+{
+ "name": "f1-ab-data",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T20:08:22",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 26.09,
+   "chars": 1951,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 13.91,
+   "chars": 2133,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 25.33,
+   "chars": 1923,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 24.25,
+   "chars": 1480,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 27.34,
+   "chars": 800,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 23.05,
+   "chars": 1567,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 26.13,
+   "chars": 463,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 23.84,
+   "chars": 2458,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 25.35,
+   "chars": 1258,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 33.33,
+   "chars": 1930,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 25.31,
+   "chars": 1825,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 23.52,
+   "chars": 1995,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 28.85,
+   "chars": 2079,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {
+  "MILLENAI_FRESH_OFF": "official,vendor"
+ },
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.42,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink pulls heat away from a sensitive component through **conduction** and spreads it across a much larger surface area. It then uses that increased surface area to dissipate the heat into the "
+ },
+ "finished": "2026-10-25T20:14:29"
+}

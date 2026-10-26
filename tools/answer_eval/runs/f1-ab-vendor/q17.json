@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":128,\"est\":false}",
+  "X-Hurry": "bcf137d6a23a9759"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 17.12,
+ "elapsed_s": 24.82,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.65,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 30 passages"
+   }
+  },
+  {
+   "t": 12.66,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.66,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.66,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.66,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.12,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.82,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.1,
+    "tok": 485,
+    "s": 7.7
+   }
+  },
+  {
+   "t": 24.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1942 chars"
+   }
+  },
+  {
+   "t": 24.82,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 30 passages",
+   "t_s": 12.65
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.66
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.66
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1942 chars",
+   "t_s": 24.82
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.82
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Safety in Florianópolis: The Honest Neighborhood Guide for ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-safety-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Best Florianópolis Neighborhoods for Digital Nomads (2026)",
+   "u": "https://floripaguru.com/blog/best-neighborhoods-floripa-digital-nomads",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Nomads.com - Best Places to Live for Digital Nomads (formerly Nomad...",
+   "u": "https://nomads.com/",
+   "d": ""
+  },
+  {
+   "t": "Best Neighborhoods Florianopolis: 2026 Nomad Map for Nomads",
+   "u": "https://digitalnomadsbrasil.com/stories/best-neighborhoods-florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.66,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 63.1,
+  "tok": 485,
+  "s": 7.7
+ },
+ "answer_raw": "For a six-month stay that balances community, infrastructure, and ease of living, your best bet depends on whether you prefer a social hub or a premium, secure environment.\n\n## Top Recommendations\n\n**Lagoa** — This is the most frequent recommendation for digital nomads, appearing in 90% of nomad-focused discussions [2]. It offers a strong community, reliable internet, and various coworking options, though you will have to deal with \"summer chaos\" as a trade-off [2].\n\n**Jurerê Internacional** — If your priority is high safety and a premium lifestyle, this is the choice. It has a safety score of le 78/100 with zero reported robberies in 2025, but expect to pay significantly more, with one-bedroom rentals reaching €1,200/month as of May 2024 [1].\n\n## Infrastructure and Logistics\n\n**Internet** — Reliable fiber optic service is widely available in central neighborhoods, typically offering speeds between 300 to 500 Mbps for R$100 to R$150/month [3]. In certain rental listings, you can find high-end 1Gb optical internet availability [6].\n\n**Safety and Layout** — Florianópolis does not have a single central hub; instead, each *bairro* (neighborhood) has its own unique microclimate, cost profile, and internet reliability [2][3]. While the city has a relatively low overall safety score of 50/100, security is often concentrated in specific areas, leaving others with more patchy coverage [1].\n\n| Neighborhood | Profile | Key Trade-off |\n| :--- | :--- | :--- |\n| **Lagoa** | High community density, best for first-timers [2] | Summer crowds and chaos [2] |\n| **Jurerê Internacional** | High safety (78/100), premium feel [1] | High cost (€1,200/month for 1-bed) [1] |\n\nBecause the city's layout is granular, you should verify specific street-level walkability and exact fiber availability before committing to a six-month lease, as the \"best\" neighborhood can change based on whether you want a quiet retreat or a social hub [2][5].",
+ "answer": "For a six-month stay that balances community, infrastructure, and ease of living, your best bet depends on whether you prefer a social hub or a premium, secure environment.\n\n## Top Recommendations\n\n**Lagoa** — This is the most frequent recommendation for digital nomads, appearing in 90% of nomad-focused discussions [2]. It offers a strong community, reliable internet, and various coworking options, though you will have to deal with \"summer chaos\" as a trade-off [2].\n\n**Jurerê Internacional** — If your priority is high safety and a premium lifestyle, this is the choice. It has a safety score of le 78/100 with zero reported robberies in 2025, but expect to pay significantly more, with one-bedroom rentals reaching €1,200/month as of May 2024 [1].\n\n## Infrastructure and Logistics\n\n**Internet** — Reliable fiber optic service is widely available in central neighborhoods, typically offering speeds between 300 to 500 Mbps for R$100 to R$150/month [3]. In certain rental listings, you can find high-end 1Gb optical internet availability [6].\n\n**Safety and Layout** — Florianópolis does not have a single central hub; instead, each *bairro* (neighborhood) has its own unique microclimate, cost profile, and internet reliability [2][3]. While the city has a relatively low overall safety score of 50/100, security is often concentrated in specific areas, leaving others with more patchy coverage [1].\n\n| Neighborhood | Profile | Key Trade-off |\n| :--- | :--- | :--- |\n| **Lagoa** | High community density, best for first-timers [2] | Summer crowds and chaos [2] |\n| **Jurerê Internacional** | High safety (78/100), premium feel [1] | High cost (€1,200/month for 1-bed) [1] |\n\nBecause the city's layout is granular, you should verify specific street-level walkability and exact fiber availability before committing to a six-month lease, as the \"best\" neighborhood can change based on whether you want a quiet retreat or a social hub [2][5].",
+ "chars": 1942,
+ "raw_bytes": 4023,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.56,
+ "rate_gen_tok_s": 63.05,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-vendor",
+ "asked_at": "2026-10-25T20:18:13",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

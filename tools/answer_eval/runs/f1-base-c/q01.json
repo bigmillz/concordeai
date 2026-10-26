@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.2,\"ftok\":31,\"est\":false}",
+  "X-Hurry": "7793ec43fdf66c7c"
+ },
+ "first_byte_s": 1.54,
+ "first_text_s": 23.3,
+ "elapsed_s": 28.63,
+ "events": [
+  {
+   "t": 1.54,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 1.54,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 12.52,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.52,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.52,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.45,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 22 passages"
+   }
+  },
+  {
+   "t": 17.45,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.45,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.45,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.45,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.3,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 28.63,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.7,
+    "tok": 360,
+    "s": 5.3
+   }
+  },
+  {
+   "t": 28.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1443 chars"
+   }
+  },
+  {
+   "t": 28.63,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   1.54,
+   "Searching the web…"
+  ],
+  [
+   12.52,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 1.54
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.52
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.52
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 22 passages",
+   "t_s": 17.45
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.45
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.45
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1443 chars",
+   "t_s": 28.63
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 28.63
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "NVIDIA’s New Ampere Data Center GPU in Full... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/news/nvidias-new-ampere-data-center-gpu-in-full-production",
+   "d": ""
+  },
+  {
+   "t": "Trillium TPU is GA | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/trillium-tpu-is-ga",
+   "d": "2024-12-11"
+  },
+  {
+   "t": "How Cloud TPU v5e accelerates large-scale AI... | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/how-cloud-tpu-v5e-accelerates-large-scale-ai-inference",
+   "d": ""
+  },
+  {
+   "t": "Google TPU Shortage, Thanks to Anthropic | UniverseBlend |",
+   "u": "https://universeblend.blog/google-tpus-anthropic/",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "Anthropic Google TPU deal : 7 Things to Know",
+   "u": "https://decodethefuture.org/en/anthropic-google-tpu-deal/",
+   "d": "2026-06-03"
+  },
+  {
+   "t": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware",
+   "u": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html",
+   "d": "2026"
+  },
+  {
+   "t": "What is TPU? How Tensor Processing Units Power AI Models",
+   "u": "https://blog.temok.com/what-is-tpu/",
+   "d": "2026-10-06"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.45,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 67.7,
+  "tok": 360,
+  "s": 5.3
+ },
+ "answer_raw": "The landscape of AI hardware is split between specialized Google custom silicon and NVIDIA's dominant GPU architecture.\n\n## The Most Powerful Hardware\n\nIn terms of specialized AI training, the **Trillium TPU** is Google's sixth-generation and most performant TPU to date [2]. It was powerful enough to be used to train the Gemini 2.0 model [2]. \n\nFor general-purpose AI acceleration, the **NVIDIA A100** remains a significant benchmark, offering up to 20x performance boosts over its predecessors via the Ampere architecture [1]. While newer architectures exist, the A1s's ability to unify data analytics, training, and inference through multi-instance GPU capabilities makes it a staple in top cloud providers and server makers [1].\n\n## What Claude and Others Are Using\n\nAnthropic (the maker of Claude) uses a multi-vendor strategy to hedge against single-vendor risk. This means **Claude** runs across a mix of **AWS Trainium**, **Google TPUs**, and **NVIDIA GPUs** [6]. This allows them to match specific workloads to the chips best suited for them [6].\n\nOther major players use the following:\n\n*   **Google** uses its own **Trillium TPUs** to train its most capable models, such as Gemini 2.0 [2].\n*   **Developers** looking for single-accelerator performance use models like **Gemma 3**, which is optimized for running on a single GPU or dedicated AI hardware [5].\n*   **Enterprises** use **TPU v5e** specifically for inference tasks [4].",
+ "answer": "The landscape of AI hardware is split between specialized Google custom silicon and NVIDIA's dominant GPU architecture.\n\n## The Most Powerful Hardware\n\nIn terms of specialized AI training, the **Trillium TPU** is Google's sixth-generation and most performant TPU to date [2]. It was powerful enough to be used to train the Gemini 2.0 model [2]. \n\nFor general-purpose AI acceleration, the **NVIDIA A100** remains a significant benchmark, offering up to 20x performance boosts over its predecessors via the Ampere architecture [1]. While newer architectures exist, the A1s's ability to unify data analytics, training, and inference through multi-instance GPU capabilities makes it a staple in top cloud providers and server makers [1].\n\n## What Claude and Others Are Using\n\nAnthropic (the maker of Claude) uses a multi-vendor strategy to hedge against single-vendor risk. This means **Claude** runs across a mix of **AWS Trainium**, **Google TPUs**, and **NVIDIA GPUs** [6]. This allows them to match specific workloads to the chips best suited for them [6].\n\nOther major players use the following:\n\n*   **Google** uses its own **Trillium TPUs** to train its most capable models, such as Gemini 2.0 [2].\n*   **Developers** looking for single-accelerator performance use models like **Gemma 3**, which is optimized for running on a single GPU or dedicated AI hardware [5].\n*   **Enterprises** use **TPU v5e** specifically for inference tasks [4].",
+ "chars": 1443,
+ "raw_bytes": 3497,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.6,
+ "rate_gen_tok_s": 67.68,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-c",
+ "asked_at": "2026-10-25T19:49:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
