@@ -37719,8 +37719,8 @@ def _r519_helpers(src):
     l1, _s1 = ns["rubin_lanes"](None, mac_label="Gemma 4 26B")
     ns["cloud_allowed"] = lambda: True
     l2, _s2 = ns["rubin_lanes"](None, mac_label="Gemma 4 26B")
-    got["the cloud works on it only while the person's cloud switch is on"] = (
-        [l.kind for l in l1] == ["mac"] and [l.kind for l in l2] == ["mac", "cloud"] and l2[1].name == "Claude")
+    got["never the cloud, even with cloud power on (6b521)"] = (
+        [l.kind for l in l1] == ["mac"] and [l.kind for l in l2] == ["mac"])
     act, pk, outs = [0], [0], []
     lk = _t519.Lock()
 
@@ -37909,7 +37909,8 @@ _R519_MUT = [
     ("two jobs at once on a machine", "        while not self.lock.acquire(timeout=0.5):\n",
      "        self.lock = threading.Lock()\n        while not self.lock.acquire(timeout=0.5):\n"),
     ("a model too big for the card", "            if _srv_fits(m, vram, bool(probe)):", "            if True:"),
-    ("the cloud regardless of the switch", "    if cloud_allowed() if cloud_ok is None else cloud_ok:", "    if True:"),
+    ("a cloud writer added", "    return lanes, servers\n",
+     "    lanes.append(RubinLane(\"cloud\", \"Claude\", [{\"name\": \"Claude\"}]))\n    return lanes, servers\n"),
     ("the frame not lifted from the saved turn", '              "|RUBIN")', '              "")'),
     ("the yardstick dropped", "    return round(max(1.0, min(10.0, anchor_score + frac * (10.0 - anchor_score))), 2)",
      "    return round(cand_now, 2)"),

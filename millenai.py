@@ -33474,7 +33474,7 @@ def funnel_images(goal: str, labels: list, budget: float = _FIMG_BUDGET,
 # both machines' load while they do. His rules: it runs until Stop, or until
 # RUBIN_STALL_ROUNDS rounds in a row bring no improvement (a ceiling of
 # RUBIN_CEILING_S is the safety net); the best answer so far is always the one
-# on screen; cloud models only when his "Use cloud power" switch is on.
+# on screen; never a cloud model, even with "Use cloud power" on (6b521).
 #
 # THE LOOP (run_rubin):
 #   round 0  the question is planned (its parts and the evidence each needs) on
@@ -33625,11 +33625,11 @@ class RubinIO:
 
 
 class RubinLane:
-    """One machine's worker (this Mac, one paired server, or the cloud): its
+    """One machine's worker (this Mac or one paired server): its
     models run one at a time, because a server's card holds one job at a time
     (the gateway's rule) and this Mac one MLX engine. `models`: labels, the
-    strongest first (a cloud lane's are its confs). The panel reads busy,
-    model, tps and the live pace of the call under way."""
+    strongest first. The panel reads busy, model, tps and the live pace of
+    the call under way."""
 
     def __init__(self, kind, name, models, run=None, sid=""):
         self.kind, self.name, self.sid = kind, name, sid
@@ -33724,14 +33724,8 @@ class RubinLane:
 
 
 def _rubin_run(lane, model, messages, collect):
-    """A lane's model call: a cloud conf through its provider, a server's
-    model through the gateway (a model load gets RUBIN_SRV_FIRST_S), this
-    Mac's through its engine."""
-    if lane.kind == "cloud":
-        t = cloud_text(dict(model), messages, timeout=180, max_tokens=4000, quiet=True)
-        if t:
-            collect(t)
-        return
+    """A lane's model call: a server's model through the gateway (a model
+    load gets RUBIN_SRV_FIRST_S), this Mac's through its engine."""
     if lane.kind == "server":
         with server_first_deadline(RUBIN_SRV_FIRST_S):
             run_model(model, messages, collect)
@@ -34436,9 +34430,10 @@ def rubin_mac_model():
     return r[0] if r else ""
 
 
-def rubin_lanes(ctx, mac_label=None, cloud_ok=None, probe=True):
-    """Every machine that works on the question: this Mac, the servers, and
-    the cloud's strongest writer only while the person's cloud switch is on."""
+def rubin_lanes(ctx, mac_label=None, probe=True):
+    """Every machine that works on the question: this Mac and the servers.
+    Never the cloud (6b521, per Patrick: local only, even with cloud power
+    on, so it can run for hours and cost nothing)."""
     lanes, servers = [], {}
     mac_label = rubin_mac_model() if mac_label is None else mac_label
     if mac_label:
@@ -34446,13 +34441,6 @@ def rubin_lanes(ctx, mac_label=None, cloud_ok=None, probe=True):
     for lane, e in rubin_server_lanes(ctx, probe):
         lanes.append(lane)
         servers[lane.sid] = e
-    if cloud_allowed() if cloud_ok is None else cloud_ok:
-        try:
-            lad = compositor_ladder()
-        except Exception:
-            lad = []
-        if lad:
-            lanes.append(RubinLane("cloud", str(lad[0].get("name") or "Cloud"), [lad[0]]))
     return lanes, servers
 
 
@@ -34462,18 +34450,16 @@ def rubin_tier_row(ctx) -> dict:
         lanes, _s = rubin_lanes(ctx, probe=False)
     except Exception:
         lanes = []
-    models = [l.label_of(m) for l in lanes if l.kind != "cloud" for m in l.models]
-    cloud = [l.name for l in lanes if l.kind == "cloud"]
-    n = len(models) + len(cloud)
-    return {"desc": TIERS[RUBIN_TIER]["desc"], "models": models, "cloud": cloud, "skipped": [],
+    models = [l.label_of(m) for l in lanes for m in l.models]
+    n = len(models)
+    return {"desc": TIERS[RUBIN_TIER]["desc"], "models": models, "cloud": [], "skipped": [],
             "available": bool(n), "count": n,
             "why": "" if n else ("Nothing can run it: download a model under Settings › Models "
                                  "or pair a server."),
             "note": ("It stops when you press Stop, or when %d rounds in a row bring nothing "
                      "better, and keeps this Mac%s busy the whole time." % (RUBIN_STALL_ROUNDS, " and your server" if any(
                          l.kind == "server" for l in lanes) else ""))
-            + (" Cloud power is on, so %s writes a revision each round while its revisions keep "
-               "winning." % cloud[0] if cloud else " Nothing is sent to the cloud.")}
+            + " Nothing is sent to the cloud."}
 
 
 # ---- one round
@@ -34694,22 +34680,16 @@ def rubin_round(st, lanes, stop, io, search=None):
     best_now = (res.get(0) or {}).get("score", 0.0)
     win = max(range(1, len(cands) + 1), key=lambda i: (res.get(i) or {}).get("score", 0.0))
     w_score = (res.get(win) or {}).get("score", 0.0)
-    for lane in {c[0] for c in cands}:
-        # a cloud writer earns its seat (the paid-API rule): it stays while its
-        # revisions win at least once in three rounds
-        lane.rounds = getattr(lane, "rounds", 0) + 1
     if not rubin_accept(best_now, w_score, [p for p in picks if p != a_i]):
         # the score shown stays the one the answer won with: a judging of an
         # unchanged answer moves by noise alone, and the line would wander
         st.weak = (res.get(0) or {}).get("weak") or st.weak
-        _rubin_cloud_due(st, lanes)
         return stalled("Round %d: no revision beat the answer (the strongest scored %.1f, the "
                        "answer %.1f in the same judging)." % (n, w_score, best_now),
                        new=new_n, drafts=len(cands), score=st.best["score"])
     w_lane, w_lbl, w_text = cands[win - 1]
     w_lane.wins = getattr(w_lane, "wins", 0) + 1
     w_lane.last_win = n
-    _rubin_cloud_due(st, lanes)
     # 5. the new best, fact-checked against the evidence it cites
     if not stop.is_set():
         phase("fact-checking the new answer", "fact-checking")
@@ -34740,16 +34720,6 @@ def rubin_round(st, lanes, stop, io, search=None):
                             "first_now": round(a_now, 2) if a_now is not None else None})
     io.answer(w_text + rubin_footer(st))
     return True
-
-
-def _rubin_cloud_due(st, lanes):
-    """The paid-API rule for a cloud writer: three rounds of its revisions
-    without a win and it sits the rest of the run out, said in the console."""
-    for l in lanes:
-        if l.kind == "cloud" and not l.down and getattr(l, "rounds", 0) >= 3 \
-                and st.round - getattr(l, "last_win", 0) >= 3:
-            l.down = True
-            st.changed += " %s stopped writing: none of its last three revisions won." % l.name
 
 
 def rubin_first(st, lanes, messages, stop, io, council=None):

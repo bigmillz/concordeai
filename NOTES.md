@@ -17219,3 +17219,12 @@ holding 9902 by the killed baseline run; run 2 (def7dc1) **1242/1244**: two muta
 `/v1/usage` read and Max's `"available": n > 0`) were no longer unique because Vera Rubin's code repeated them;
 run 3 (04c6286): **1244/1244**, exit 0. After the Mac-only run's two fixes, run 4 (999b02f): **1245/1245**,
 exit 0.
+
+## 6b521 — Vera Rubin never uses the cloud (per Patrick)
+
+Asked whether Vera Rubin may add a cloud writer each round while "Use cloud power" is on, Patrick chose
+local only. `rubin_lanes()` now returns this Mac and the paired servers and nothing else, whatever the
+switch says, so a run can go for hours and cost nothing. The cloud lane's call, its paid-API seat rule
+(`_rubin_cloud_due`) and the tier row's "Cloud power is on…" line are gone; the row's `cloud` is always
+`[]` and its note always ends "Nothing is sent to the cloud." The gauntlet's lane check now asserts no
+cloud lane with the switch on, and the mutant "a cloud writer added" puts one back to prove it fails.
