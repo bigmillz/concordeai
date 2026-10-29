@@ -727,6 +727,7 @@ ln -sfn "$LIBDIR/bin/ollama1-fan" /usr/local/bin/ollama1-fan
 ln -sfn "$LIBDIR/bin/ollama1-leds" /usr/local/bin/ollama1-leds
 ln -sfn "$LIBDIR/bin/ollama1-watchdog" /usr/local/bin/ollama1-watchdog
 ln -sfn "$LIBDIR/bin/ollama1-rdp-tidy" /usr/local/sbin/ollama1-rdp-tidy
+ln -sfn "$LIBDIR/bin/ollama1-logguard" /usr/local/sbin/ollama1-logguard
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
@@ -759,6 +760,10 @@ install -d -m 0755 /etc/systemd/system/systemd-networkd-wait-online.service.d
 install -m 0644 "$KIT/config/10-ollama1-wait-online.conf" /etc/systemd/system/systemd-networkd-wait-online.service.d/10-ollama1.conf
 systemctl daemon-reload
 install -d -m 0755 /etc/ollama1 /var/lib/ollama1 /opt/ollama
+# the log guard (6b517): every minute a log in /var/log over logguard_max_bytes (2 GiB) keeps its last 64 MiB, in
+# place, and with under logguard_min_free_bytes (8 GiB) free on / the biggest logs are trimmed. On here, early, so a
+# run that stops later still leaves it on; tools/install-logguard.sh installs it alone, without the rest of setup.
+run systemctl enable --now ollama1-logguard.timer
 sed -e "s/@UID_OLLAMA@/$(id -u ollama)/g" -e "s/@UID_O1GW@/$(id -u o1gw)/g" \
     -e "s/@UID_O1ADMIN@/$(id -u o1admin)/g" -e "s/@UID_CLOUDFLARED@/$(id -u cloudflared)/g" \
     "$KIT/config/ollama1.nft.in" | ssh_door_lines "$SSH_DOOR" >/etc/ollama1/ollama1.nft   # the door's guard: 6b507

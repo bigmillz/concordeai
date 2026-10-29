@@ -2346,6 +2346,84 @@ Commands:
 Its state (when each session was first seen without a client, cleared at a
 reboot) is `/var/lib/ollama1/rdp-tidy.json`, mode 0600.
 
+## Log guard
+
+No log may fill the root disk. Once, a failed suspend left the graphics
+driver logging the same two lines hundreds of millions of times: rsyslog
+wrote about 237 GB to `/var/log/syslog` and `/var/log/kern.log` in five
+hours, the root disk filled and the server hung until someone pressed its
+power button. Daily logrotate can't keep up with a log growing about 47 GB
+an hour, so `ollama1-logguard.timer` runs `ollama1-logguard` (root) every
+minute:
+
+- **A log over `logguard_max_bytes`** (2 GiB) keeps its last 64 MiB,
+  starting at a whole line. This covers `syslog`, `kern.log`, `auth.log`
+  and `ufw.log` always, any `/var/log/*.log`, and whatever
+  `logguard_files` adds.
+- **With under `logguard_min_free_bytes` free on `/`** (8 GiB), every log
+  anywhere in `/var/log` over 256 MiB is trimmed the same way, biggest
+  first, until there is that much free again. If the logs weren't enough,
+  the journal is vacuumed to 500M (`journalctl --vacuum-size=500M`).
+- **In place.** The file stays the same file (the same inode), so rsyslog's
+  open handle keeps appending to it and nothing has to be restarted. The
+  kept tail is read into memory, the file is cut to nothing and the tail
+  written back; what rsyslog writes meanwhile lands in the file too (only
+  the lines of the instant between the last read and the cut can be lost).
+  No disk space is needed for a copy, so a full disk can still be trimmed.
+- **Never** outside `/var/log`: no path is followed through a symlink, and
+  a file with another hard link, one on another filesystem, a FIFO or a
+  device is left alone. Nor the journal's own files, compressed logs or the
+  login records (`wtmp`, `btmp`, `lastlog`, `faillog`). **Nothing is ever
+  deleted.** One pass runs at a time (a lock on `/var/log` itself, which
+  needs no disk space either); a pass with nothing to do looks at a few
+  files and stops.
+- Its unit can write only `/var/log`, the journal and its own state file,
+  has no network, and depends on no other kit service, so it runs while the
+  rest is down. It starts without a private `/tmp`, which systemd couldn't
+  make on a full disk.
+
+Settings, in `/etc/ollama1/config.json` (each is optional):
+
+- `"logguard_max_bytes": 2147483648`: the limit, 256 MiB to 20 GiB.
+- `"logguard_min_free_bytes": 8589934592`: the free space it keeps on `/`,
+  1 to 64 GiB.
+- `"logguard_files": ["apt/term.log"]`: more logs in `/var/log` to hold to
+  the limit, added to the four above (they can't be taken off).
+
+A setting it can't use falls back to its default, and `status` says so. A
+broken or missing `config.json` never stops the guard: it runs on its
+defaults.
+
+Commands:
+
+- `sudo ollama1-logguard status`: the settings, the guarded logs and their
+  sizes, the free space and the last trim.
+- `sudo ollama1-logguard --dry-run`: what it would trim now. It trims
+  nothing.
+- `journalctl -u ollama1-logguard`: one line per trim (the file, its size
+  before and after, and why), never a word of what is in the log.
+- `systemctl list-timers ollama1-logguard.timer`: its next run.
+
+The last trims are kept in `/var/lib/ollama1/logguard.json` (mode 0600).
+
+### Installing it on its own
+
+`setup.sh` installs and enables the log guard like everything else. To put
+it (or a newer version of it) on a running server without a full setup run,
+which restarts the firewall, SSH and the tunnel:
+
+```bash
+cd ~/concordeai/ollama1 && git pull && sudo bash tools/install-logguard.sh
+```
+
+`tools/install-logguard.sh` copies only `bin/ollama1-logguard`,
+`lib/o1logguard.py` (it uses no other kit library, so nothing else that
+runs changes), the two units and the `/usr/local/sbin/ollama1-logguard`
+link, runs `systemctl daemon-reload`, enables and starts the timer, runs
+one pass and prints the timer's next run. It touches no network, firewall,
+SSH or tunnel setting and restarts nothing else. Running it again puts the
+same files back.
+
 ## Troubleshooting
 
 | | |

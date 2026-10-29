@@ -1,0 +1,44 @@
+# The log guard (6b517): a log in /var/log over logguard_max_bytes (2 GiB)
+# keeps its last 64 MiB, in place (rsyslog's open file stays the file), and
+# with under logguard_min_free_bytes (8 GiB) free on / the biggest logs are
+# trimmed, then the journal is vacuumed to 500M. Root, because the logs
+# belong to syslog and the journal to root; it can write only /var/log and
+# its own state file, can't reach the network and runs no other program
+# than journalctl. No PrivateTmp: on a full disk systemd couldn't make the
+# private /tmp, and the guard would never start when it is needed most.
+# No dependency on any other kit unit, so it runs while the rest is down.
+[Unit]
+Description=ollama1: keep any log from filling the root disk
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-logguard run
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=300
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/log -/var/lib/ollama1 -/run/log/journal
+ProtectHome=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+MemoryMax=256M
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
