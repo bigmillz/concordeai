@@ -43521,16 +43521,18 @@ __HZ_FONTS__
 .hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:808px;margin:0 auto;width:100%}
 .hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,4,10,.5) 70%);padding:0 24px 22px}
 .hz .novideo #composer-wrap{background:none}
-/* the glass (NORTHSTAR 12): lit from below, its glow a separate breathing layer */
+/* the glass (NORTHSTAR 12): lit from below, its glow a separate breathing layer.
+   No dark drop shadow: the limb's light is behind the glass, and a shadow cast
+   onto it read as a dark plate under the composer (seen in WKWebView) */
 .hz #composer{max-width:none;margin:0;border-radius:var(--hz-r-composer);padding:20px 18px 14px 24px;gap:14px;
   background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.045));
   border:1px solid rgba(255,255,255,.13);border-bottom-color:var(--hz-glass-lit);
   -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.35),0 30px 80px rgba(0,0,0,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.35);
   transition:border-color var(--hz-t-mid) ease,box-shadow var(--hz-t-mid) ease}
 .hz #composer:focus-within{border-color:rgba(255,255,255,.2);border-bottom-color:rgba(200,222,255,.6);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.22),0 0 0 4px rgba(159,192,255,.08)}
-.hz .gen #composer{border-color:rgba(159,192,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.5),0 30px 80px rgba(0,0,0,.22)}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 0 0 4px rgba(159,192,255,.08)}
+.hz .gen #composer{border-color:rgba(159,192,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.5)}
 .hz #hz-cglow{position:fixed;left:0;top:0;z-index:0;pointer-events:none;border-radius:28px;
   box-shadow:0 24px 70px rgba(80,130,255,.22),0 2px 30px rgba(159,192,255,.12);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
 .hz #hz-cglow[hidden]{display:none}
