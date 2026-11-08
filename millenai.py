@@ -32452,6 +32452,102 @@ def sky_is_night() -> bool:
     except Exception:
         h = time.localtime().tm_hour
         return h >= 19 or h < 6
+
+
+# ------------------------------------------------- the Horizon look (6b526)
+# The page's new home (per Patrick: "the most beautiful AI chat home screen
+# anyone has shipped") draws the REAL sky over the person. The server names
+# the place, with no network and no location permission: the town typed in
+# Settings when its coordinates are already in the geocode cache, else the
+# time zone's reference city from the OS zone table (_zone_latlon). None
+# when neither is known, and the page then says nothing about the place.
+MODE_ALIASES = {"Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro",
+                "Odyssey": "Vera Rubin"}
+_HZ_PLACE_CACHE = {}
+
+
+def hz_place():
+    """{"lat", "lon", "city", "src"} for the Horizon sky, or None."""
+    home = ""
+    try:
+        home = home_area()
+    except Exception:
+        pass
+    key = home.lower()
+    if key in _HZ_PLACE_CACHE:
+        return _HZ_PLACE_CACHE[key]
+    out = None
+    if home:
+        g = _geo_cache.get(home.lower())
+        if g and isinstance(g.get("lat"), (int, float)):
+            out = {"lat": g["lat"], "lon": g["lon"],
+                   "city": home.split(",")[0].strip()[:40], "src": "home"}
+    if out is None:
+        tz = _host_tz()
+        ll = _zone_latlon(tz)
+        if ll and "/" in tz:
+            out = {"lat": ll[0], "lon": ll[1],
+                   "city": tz.rsplit("/", 1)[1].replace("_", " ")[:40],
+                   "src": "zone", "tz": tz}
+    _HZ_PLACE_CACHE[key] = out
+    return out
+
+
+# THE DEBUG STATE OF A DEV COPY'S PAGE (6b526): /?hz=<spec> freezes the
+# intro at a moment or stages a state, so every state can be screenshot
+# deterministically. Only a dev copy has it: anywhere else "/?hz=..." is
+# not the page, exactly as "/?anything" has been refused since 6b321.
+_HZ_DEBUG_RX = re.compile(r"/\?hz=([A-Za-z0-9_.,:=@%+-]{1,300})")
+
+
+def hz_debug_spec(path: str, dev: bool):
+    """The spec string of a dev copy's debug page, else None."""
+    if not dev:
+        return None
+    m = _HZ_DEBUG_RX.fullmatch(path or "")
+    return urllib.parse.unquote(m.group(1)) if m else None
+
+
+# THE BUNDLED FACE (6b526, per Patrick: "the font and word mark that we
+# had originally"): Michroma, the lockup's face, ships in fonts/ for the
+# titlebar and is served under /static/fonts/ too, so the wordmark renders
+# with no network. Space Grotesk and IBM Plex Mono load as the app always
+# has (the Google stylesheet in the head); bundling them is a follow-up.
+# Any OFL file placed in fonts/ and named here is served the same way.
+HZ_FONT_FILES = (("Michroma", "Michroma-Regular.ttf", "normal"),)
+_HZ_FONT_RX = re.compile(r"/static/fonts/([A-Za-z0-9_-]+\.(?:ttf|otf|woff2?))")
+
+
+def hz_font_css() -> str:
+    """@font-face for each bundled face whose file is present."""
+    out = []
+    for fam, fn, style in HZ_FONT_FILES:
+        if os.path.exists(resource("fonts", fn)):
+            out.append('@font-face{font-family:"%s";src:local("%s"),'
+                       'url(/static/fonts/%s) format("truetype");font-weight:400;'
+                       'font-style:%s;font-display:swap}' % (fam, fam, fn, style))
+    return "\n".join(out)
+
+
+def home_facts(ctx) -> dict:
+    """/api/home (6b526): what the home's status line says, from the
+    ledger: the calls that went to the cloud since local midnight (a
+    local or server call never leaves the person's machines)."""
+    try:
+        lt = time.localtime()
+        midnight = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday,
+                                0, 0, 0, 0, 0, -1))
+        n = toks = 0
+        for r in usage_read(ctx):
+            # a call names where it ran; an answer rollup (no "w") is not a call
+            if (r.get("t") or 0) >= midnight and r.get("w") \
+                    and r.get("w") not in ("local", "server"):
+                n += int(_usage_num(r.get("n")) or 1)
+                toks += int(_usage_num(r.get("i")) or 0) \
+                    + int(_usage_num(r.get("o")) or 0)
+        return {"cloud_today": n, "cloud_tokens_today": toks}
+    except Exception:
+        return {}
 _sky_jobs = {}          # idx -> {"status": ..., "pct": int}
 
 # APPLE'S ROOT, FOR THE BACKDROPS ON WINDOWS (6b317, found in a Windows
@@ -33799,6 +33895,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return self._deny()
         if self.command == "GET" and _COOKIE_ONLY.fullmatch(self.path):
             return True
+        if self.command == "GET" and (
+                hz_debug_spec(self.path, bool(DEV_HOME)) is not None
+                or _HZ_FONT_RX.fullmatch(self.path)):
+            # the Horizon's bundled fonts (6b526), fetched by @font-face with
+            # no way to add a header; and a dev copy's frozen page
+            return True
         if ACCOUNTS and self.command == "GET" and self.path in ACCOUNT_STATIC:
             # the account window's page and its two static files: nothing
             # personal, and a <script src> can't send a header
@@ -33987,12 +34089,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "prompt": _suggest_state.get("prompt", ""),
                              "running": bool(_suggest_state.get("running"))})
             return
-        if self.path == "/":
+        _hz_spec = hz_debug_spec(self.path, bool(DEV_HOME))
+        if self.path == "/" or _hz_spec is not None:
             # exactly "/" (6b321): "/?anything" is no longer the page, so
             # "/?key=" gets the gate's 403 even with the cookie. The page
             # carries nothing personal: the name and town for the hero
-            # come from /api/prefs, behind the token.
+            # come from /api/prefs, behind the token. A dev copy also
+            # serves "/?hz=<spec>", the same page in a frozen state (6b526).
+            _hz_spec = _hz_spec or _hook_arg("hz") or None
             html = (HTML_CONTENT
+                    .replace("__HZ_DEBUG__", json.dumps(_hz_spec))
+                    .replace("__HZ_PLACE__", json.dumps(hz_place()))
+                    .replace("__HZ_FONTS__", hz_font_css())
+                    .replace("__SKY_ORBIT__", json.dumps(
+                        [i for i, u in enumerate(SKY_SOURCES) if "GMT" in u]))
                     .replace("__AGENT_ROWS__", build_agent_rows())
                     .replace("__CODE_ROWS__", build_code_rows())
                     .replace("__TIER_META__", json.dumps(
@@ -34038,7 +34148,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # is never "unchanged", or a reload after a switch would get
             # a 304 and the old __PROFILE__, and reload again
             etag = '"b%d-%d-%s"' % (APP_BUILD, _SRC_MTIME, self.ctx.tag)
-            if self.headers.get("If-None-Match") == etag:
+            if _hz_spec is None and self.headers.get("If-None-Match") == etag:
                 self.send_response(304)
                 self.send_header("ETag", etag)
                 self.send_header("Cache-Control", "no-cache")
@@ -34138,6 +34248,30 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # under /static/ (6b321): a <video src> can't carry the token,
             # and these are Apple's public clips, streamed by Range
             self._send_sky()
+        elif _HZ_FONT_RX.fullmatch(self.path):
+            # the Horizon's bundled faces (6b526): fixed public bytes from
+            # fonts/, by name, nothing else from that folder
+            _fn = _HZ_FONT_RX.fullmatch(self.path).group(1)
+            _fp = resource("fonts", _fn)
+            if not os.path.isfile(_fp):
+                self.send_error(404)
+                return
+            with open(_fp, "rb") as f:
+                _fb = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", {
+                "ttf": "font/ttf", "otf": "font/otf", "woff": "font/woff",
+                "woff2": "font/woff2"}[_fn.rsplit(".", 1)[1]])
+            self.send_header("Content-Length", str(len(_fb)))
+            self.send_header("Cache-Control", "max-age=86400")
+            self.end_headers()
+            try:
+                self.wfile.write(_fb)
+            except Exception:
+                pass
+        elif self.path == "/api/home":
+            # the Horizon home's status line (6b526): the day's cloud calls
+            self._send_json(home_facts(self.ctx))
         elif self.path.startswith("/api/remote/classify"):
             # read-only introspection of the safety classifier (6b249):
             # the UI uses it to preview a command's risk, and the gauntlet
@@ -36155,6 +36289,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             tier = "Fast"   # Best retired (5.3) — it was Fast in a crown
         if tier == "Power":
             tier = "Pro"    # Pro absorbed Power (5.3)
+        # THE MODES' BRAND NAMES (6b526, per Patrick): the page says Flare,
+        # Zenith, Meridian (and Odyssey where its tier exists); the tiers
+        # keep their keys, and a client that sends the name is understood
+        if isinstance(tier, str) and tier in MODE_ALIASES \
+                and MODE_ALIASES[tier] in TIERS:
+            tier = MODE_ALIASES[tier]
         # Cloud Only, or one of its modes or picks (6b440): "cloud:fast",
         # ":think", ":pro", "cloud:m:<provider>"
         _cl_mode, _cl_pid = cloud_tier_parse(tier)
@@ -39861,11 +40001,30 @@ HTML_CONTENT = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>
+/* THE LOOK (6b526, per Patrick): Horizon unless Settings > About says
+   Classic, decided before the first paint so neither look flashes. The
+   intro runs once per launch (sessionStorage), never with Visual effects
+   off or reduced motion. */
+var hzLook="horizon";
+try{hzLook=localStorage.getItem("millen.look")==="classic"?"classic":"horizon";}catch(e){}
+if(hzLook==="horizon"){
+  document.documentElement.classList.add("hz");
+  var hzFxOff=false,hzIntroDone=false,hzReduced=false;
+  try{hzFxOff=localStorage.getItem("millen.video")==="0"
+    ||(localStorage.getItem("millen.video")===null&&localStorage.getItem("millen.perf")==="1");}catch(e){}
+  try{hzIntroDone=sessionStorage.getItem("millen.hz.intro")==="1";}catch(e){}
+  try{hzReduced=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);}catch(e){}
+  if(!hzFxOff&&!hzIntroDone&&!hzReduced)document.documentElement.classList.add("hz-intro");
+  // DEAD-MAN'S SWITCH: should the main script die, the finished home shows anyway
+  // (a dev copy's deliberately frozen intro says it is alive, and keeps its moment)
+  setTimeout(function(){if(!window.hzFrozen)document.documentElement.classList.remove("hz-intro","hz-run","hz-freeze");},5000);
+}
 /* Window-wipe boot (native Mac app only): the NSWindow starts transparent
    and the whole page is clipped to nothing, so tagging the root BEFORE the
    first paint is what stops a flash of the normal UI. Performance mode
-   opts out here too — rainbowWipe() would skip its half later anyway. */
-if("__WIN_WIPE__"==="1"){
+   opts out here too — rainbowWipe() would skip its half later anyway.
+   Classic only (6b526): Horizon opens on its own intro. */
+if("__WIN_WIPE__"==="1"&&hzLook==="classic"){
   try{
     document.documentElement.classList.add("winwipe");
   }catch(e){}
@@ -43123,8 +43282,444 @@ body.gen #chip-model{color:var(--accent)}
   #tierpop{left:12px!important;right:12px;max-width:none}
   #hero{padding:0 12px}
   #hero .greet{font-size:24px;margin-top:14px}
+  /* Horizon on a narrow window (6b526): the column fills it, the Moon's
+     block and the slider's words step aside, the sidebar is the drawer */
+  .hz #hz-top{padding:0 12px;gap:10px}
+  .hz #hz-lanes{gap:16px}
+  .hz #hz-machines .hz-seg:not(:first-child){display:none}
+  .hz #main:has(#hero) #chat-inner{padding-top:120px}
+  .hz .hz-sl-desc,.hz .hz-sl-l2{display:none}
+  .hz .hz-sl{width:150px}
+  .hz #main:has(#hero) #composer-wrap{padding:0 12px 24px}
+  .hz #composer{padding:16px 12px 12px 18px}
+  .hz #main:not(:has(#hero)) #composer{margin-left:auto}
 }
 
+
+/* ============================================================ HORIZON (6b526) */
+/* THE HORIZON LOOK (6b526, per Patrick). Everything below applies only under
+   html.hz (Settings > About > Look); Classic keeps every rule above this line
+   exactly as it was. The design system is design/TOKENS.md with the art
+   director's design/NORTHSTAR.md on top: one palette, glass lit from below,
+   the composer sitting ON the limb of the Earth, an aurora of ice rays under
+   masks, static stars, serif display type. Motion is transform and opacity
+   only; the blurred layers are static and rasterised once. */
+/* HORIZON TOKENS (6b526) */
+:root{
+  --hz-night:#04050a; --hz-deep:#070a16; --hz-dusk:#10204a;
+  --hz-ink:#f1f3fa;            /* primary text on the sky */
+  --hz-ink-2:#c9d0e2;          /* secondary text, AA on glass */
+  --hz-ink-3:#9aa6c6;          /* tertiary, labels; AA at 13px+ on --hz-deep */
+  --hz-accent:#9fc0ff;         /* the ONE accent: ice blue. Use with restraint */
+  --hz-good:#6ff0c0; --hz-warn:#f2b33d; --hz-bad:#ff8a7a;
+  --hz-glass:rgba(255,255,255,.06); --hz-glass-2:rgba(255,255,255,.09);
+  --hz-glass-line:rgba(255,255,255,.12); --hz-glass-line-2:rgba(170,200,255,.22);
+  --hz-blur:blur(28px) saturate(150%);
+  --hz-r-sm:8px; --hz-r-md:12px; --hz-r-lg:20px; --hz-r-xl:28px; --hz-r-pill:999px;
+  --hz-s1:4px; --hz-s2:8px; --hz-s3:12px; --hz-s4:16px; --hz-s5:24px; --hz-s6:32px; --hz-s7:48px;
+  --hz-ease-out:cubic-bezier(.16,1,.3,1);      /* arrivals */
+  --hz-ease-in-out:cubic-bezier(.65,0,.35,1);  /* moves */
+  --hz-ease-spring:cubic-bezier(.34,1.56,.64,1);/* small pops only */
+  --hz-t-fast:140ms; --hz-t-mid:260ms; --hz-t-slow:520ms;
+  --hz-shadow:0 30px 80px rgba(0,0,0,.45);
+  --hz-font-ui:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-display:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-read:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --hz-ink-read:#e6e9f4; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:150,236,212;
+  --hz-hair:rgba(255,255,255,.09); --hz-hair-2:rgba(255,255,255,.14); --hz-glass-lit:rgba(200,222,255,.42);
+  --hz-r-composer:26px; --hz-t-drift:28s; --hz-t-drift-busy:16s; --hz-t-breathe:8s;
+}
+/* the conversation's columns (NORTHSTAR 20): the reading column, the gutter,
+   the marginalia; the reply bar takes the reading column's width and edge */
+:root{--hz-read-w:640px;--hz-gutter:56px;--hz-marg-w:236px;--hz-hairline:1px}
+__HZ_FONTS__
+/* ---- the ground: the page is the night */
+.hz body{background:#03040a;font-family:var(--hz-font-ui);-webkit-font-smoothing:antialiased}
+.hz #skyline,.hz #skyload,.hz #suggest,.hz #celebrate{display:none!important}
+/* ---- the sky: fixed under everything, centred on the main panel */
+#hz-sky{display:none}
+.hz #hz-sky{display:block;position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+  --hz-sbw:0px;--hz-limb-y:70vh;--hz-aur-op:.46;--hz-rate:0;--hz-srv:0;--hz-day:0;
+  background:linear-gradient(180deg,#03040a 0%,#04060e 40%,#060b1c 100%)}
+.hz #hz-starsw{position:absolute;inset:0}
+.hz #hz-stars{position:absolute;left:0;top:0}
+/* the aurora: ice rays drawn once to a canvas at a third of their size (the
+   upscale is the softness, so no filter runs), under an elliptical mask, in
+   a wrapper that leans three degrees. Two layers sway on different clocks;
+   while an answer runs they sway faster and brighter (NORTHSTAR 13, 16). */
+.hz #hz-aurw{position:absolute;left:calc(50% + var(--hz-sbw)/2);top:128px;width:1640px;height:440px;margin-left:-820px;
+  transform:rotate(-3deg);transform-origin:50% 60%;
+  -webkit-mask-image:radial-gradient(ellipse 52% 46% at 50% 52%,#000 18%,rgba(0,0,0,0) 100%);
+          mask-image:radial-gradient(ellipse 52% 46% at 50% 52%,#000 18%,rgba(0,0,0,0) 100%);
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  opacity:var(--hz-aur-op);transition:opacity 1.6s var(--hz-ease-in-out),transform 1.2s var(--hz-ease-in-out)}
+.hz #main:not(:has(#hero)) #hz-aurw{transform:translateY(calc(46vh - 128px)) rotate(-3deg)}
+.hz .hz-aur{position:absolute;inset:-40px 0;will-change:transform}
+.hz .hz-aur canvas{display:block;width:100%;height:100%}
+.hz #hz-aur1{animation:hzSway var(--hz-t-drift) ease-in-out infinite alternate}
+.hz #hz-aur2{animation:hzSway2 calc(var(--hz-t-drift) * 1.32) ease-in-out infinite alternate;inset:-20px 0 30px}
+.hz .gen #hz-aur1,.hz .gen #hz-aur2{animation-duration:var(--hz-t-drift-busy)}
+.hz .gen #hz-aur2{animation-duration:calc(var(--hz-t-drift-busy) * 1.37)}
+.hz #hz-aur2.hz-pulse{animation:hzSway2 calc(var(--hz-t-drift-busy) * 1.37) ease-in-out infinite alternate,hzPulse .7s var(--hz-ease-out)}
+/* the second aurora, from the far horizon, only while a paired server works */
+.hz #hz-aursrv{position:absolute;left:calc(50% + var(--hz-sbw)/2);width:1200px;height:220px;margin-left:-600px;
+  top:calc(var(--hz-limb-y) - 230px);transform-origin:50% 100%;
+  -webkit-mask-image:radial-gradient(ellipse 50% 70% at 50% 100%,#000 20%,rgba(0,0,0,0) 100%);
+          mask-image:radial-gradient(ellipse 50% 70% at 50% 100%,#000 20%,rgba(0,0,0,0) 100%);
+  opacity:calc(var(--hz-srv) * .55);transform:scaleY(calc(.4 + .6 * var(--hz-srv)));
+  transition:opacity 1.4s var(--hz-ease-in-out),transform 1.6s var(--hz-ease-out)}
+.hz #hz-aursrv canvas{display:block;width:100%;height:100%}
+@keyframes hzSway{from{transform:translateX(-64px) skewX(-13deg)}to{transform:translateX(64px) skewX(-17deg)}}
+@keyframes hzSway2{from{transform:translateX(52px) skewX(-19deg)}to{transform:translateX(-60px) skewX(-11deg)}}
+@keyframes hzPulse{0%{opacity:1}30%{opacity:1.35}100%{opacity:1}}
+@keyframes hzBreathe{0%,100%{opacity:.5}50%{opacity:1}}
+/* the Earth: a 3200px circle whose top edge is the horizon, moved as one
+   with its sky band by a single transform; the composer's centre is where
+   the limb's peak sits (hzLimbFit), hidden behind the glass */
+.hz #hz-earth{position:absolute;left:0;right:0;top:0;height:0;transform:translateY(var(--hz-limb-y));
+  transition:transform 1.1s var(--hz-ease-in-out);will-change:transform}
+.hz #hz-band{position:absolute;left:0;right:0;top:-150px;height:150px;
+  background:linear-gradient(180deg,rgba(16,34,79,0) 0%,#0b1736 60%,#10224f 100%);opacity:.9;transition:opacity 2s ease}
+.hz #hz-limb{position:absolute;left:calc(50% + var(--hz-sbw)/2);top:0;width:3200px;height:3200px;margin-left:-1600px;border-radius:50%;
+  background:radial-gradient(circle at 50% 0%,#0b142c 0%,#060a16 10%,#030509 26%,#020307 60%);
+  box-shadow:0 -1px 0 var(--hz-limb),0 -3px 1px rgba(170,205,255,.55),0 -14px 30px rgba(120,170,255,.36),
+    0 -56px 120px rgba(50,100,220,.24),0 -170px 300px rgba(30,70,180,.14)}
+/* THE EARTH WINDOW (per Patrick: the Apple backdrops, incorporated): below
+   the limb the planet is real orbital footage (the ISS clips of the app's own
+   backdrop list, night ones at night), clipped to the limb's circle and graded
+   to the palette by filters on the video alone; the rim's light is drawn by the
+   sibling layers above it, so the horizon line stays crisp */
+.hz #hz-limb{overflow:hidden}
+.hz #hz-earth-vid{position:absolute;left:50%;top:0;width:2400px;height:720px;margin-left:-1200px;object-fit:cover;object-position:50% 40%;
+  opacity:0;transition:opacity 2.6s ease;filter:saturate(.42) brightness(.56) contrast(1.1) sepia(.24) hue-rotate(176deg)}
+.hz #hz-earth-vid.on{opacity:.55}
+/* THE TRACE LINES: the edges of a city aerial, thin ice lines flowing on a
+   canvas behind the stars, strongest mid-sky and gone behind the headline */
+.hz #hz-trace-vid{position:absolute;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none}
+.hz #hz-trace{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 2s ease;
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,0) 10%,rgba(0,0,0,.3) 26%,#000 46%,#000 62%,rgba(0,0,0,0) 92%);
+          mask-image:linear-gradient(180deg,rgba(0,0,0,0) 10%,rgba(0,0,0,.3) 26%,#000 46%,#000 62%,rgba(0,0,0,0) 92%)}
+.hz #hz-trace.on{opacity:.26}
+.hz .novideo #hz-trace,.hz.hz-pause #hz-trace{opacity:0}
+@media (prefers-reduced-motion:reduce){.hz #hz-trace{opacity:0!important}}
+/* the limb's own light breathes: a second shadow layer, opacity only */
+.hz #hz-limb-glow{position:absolute;left:calc(50% + var(--hz-sbw)/2);top:0;width:3200px;height:3200px;margin-left:-1600px;border-radius:50%;
+  box-shadow:0 -3px 2px rgba(190,215,255,.35),0 -24px 50px rgba(120,170,255,.22);
+  animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
+/* the day's first answer, and the landing: a warmer limb for a moment */
+.hz #hz-limb-warm{position:absolute;left:calc(50% + var(--hz-sbw)/2);top:0;width:3200px;height:3200px;margin-left:-1600px;border-radius:50%;
+  box-shadow:0 -1px 0 rgba(255,181,138,.95),0 -4px 2px rgba(255,200,150,.45),0 -30px 70px rgba(255,170,110,.22),0 -120px 240px rgba(255,150,90,.1);
+  opacity:0}
+.hz.hz-land #hz-limb-warm{animation:hzDawn 3s var(--hz-ease-in-out) both}
+.hz.hz-land-first #hz-limb-warm{animation:hzDawn 4.6s var(--hz-ease-in-out) both}
+@keyframes hzDawn{0%{opacity:0}30%{opacity:.9}100%{opacity:0}}
+/* the colour wash (per Patrick: "a wash of color and then neutrality, but
+   blend in what you already did"): indigo, rose, amber and teal blooms drawn
+   once to a small canvas (its upscale is the softness: no filter at any
+   frame), screened over the scene. It flowers on first open and on arriving
+   home, settles to a residual, lifts a little while an answer runs. The
+   wrapper drifts; reduced motion and effects off keep the residual only. */
+.hz #hz-washw{position:absolute;inset:-12%;pointer-events:none;will-change:transform,opacity;
+  animation:hzDrift 22s ease-in-out infinite alternate,hzSwell 14s ease-in-out infinite alternate}
+.hz #hz-wash{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:screen;opacity:.14;transform-origin:50% 55%;
+  transition:opacity 1.8s var(--hz-ease-in-out)}
+.hz .gen #hz-wash{opacity:.4}
+.hz #hz-wash.bloom{animation:hzWash 4.6s var(--hz-ease-out) both}
+.hz.hz-intro #hz-wash{opacity:0}
+.hz.hz-intro.hz-run #hz-wash{animation:hzWash 5.2s var(--hz-ease-out) calc(1.1s + var(--hz-t,0s)) both}
+@keyframes hzWash{0%{opacity:0;transform:scale(1.12) rotate(-4deg)}28%{opacity:.85;transform:scale(1.04) rotate(-1.5deg)}100%{opacity:.14;transform:scale(1) rotate(0)}}
+@keyframes hzDrift{from{transform:translate(-3%,-1%)}to{transform:translate(3%,1.5%)}}
+@keyframes hzSwell{from{opacity:.75}to{opacity:1}}
+.hz .novideo #hz-wash,.hz .novideo #hz-wash.bloom{animation:none!important;opacity:.14}
+@media (prefers-reduced-motion:reduce){.hz #hz-wash,.hz #hz-wash.bloom{animation:none!important;opacity:.14}}
+/* a scrim for the conversation: the sky steps back, the words own the contrast */
+.hz #hz-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,4,10,.12),rgba(3,4,10,.38) 55%,rgba(3,4,10,.5));
+  opacity:0;transition:opacity 1s ease}
+.hz #main:not(:has(#hero)) #hz-scrim{opacity:1}
+/* one rare moment: a meteor (seeded, ~every 40-90 minutes), a 120x1 streak */
+.hz .hz-meteor{position:absolute;left:0;top:0;width:120px;height:1px;border-radius:1px;transform-origin:100% 50%;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.95));box-shadow:0 0 6px rgba(255,255,255,.35);opacity:0}
+/* the send: two ice rings from the button, a contrail along the limb */
+.hz-ring{position:fixed;left:0;top:0;width:44px;height:44px;border-radius:50%;pointer-events:none;z-index:4;
+  border:1px solid rgba(214,226,255,.75);box-shadow:0 0 12px rgba(159,192,255,.45);opacity:0}
+.hz-ring.frozen{opacity:.5}
+.hz .hz-contrail{position:absolute;left:0;top:0;width:260px;height:1px;border-radius:1px;transform-origin:0 50%;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(214,226,255,.85) 70%,rgba(255,255,255,0));box-shadow:0 0 8px rgba(159,192,255,.5);opacity:0}
+/* ---- the header (NORTHSTAR 19/20): 72px on the home, 56px in a conversation */
+#hz-top{display:none}
+.hz #hz-top{display:flex;align-items:center;gap:20px;position:absolute;left:0;right:0;top:0;z-index:5;height:72px;padding:0 28px;pointer-events:none}
+.hz #main:not(:has(#hero)) #hz-top{height:56px;padding:0 32px;gap:16px}
+.hz #hz-top>*{pointer-events:auto}
+.hz .hz-ib{width:40px;height:40px;border-radius:12px;border:0;background:transparent;color:var(--hz-ink-2);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;padding:0;transition:background var(--hz-t-fast) ease,transform var(--hz-t-fast) ease}
+.hz .hz-ib svg{width:18px;height:18px;display:block}
+.hz .hz-ib:hover{background:rgba(255,255,255,.08)}
+.hz .hz-ib:active{transform:scale(.98)}
+.hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz #hz-machines:focus-visible,.hz #look-sel:focus-visible{
+  outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz #hz-brand{display:flex;align-items:center;gap:10px;min-width:0}
+/* the wordmark is the app's own lockup (.vghost: the wing and CONCORDE AI in
+   Michroma), unchanged, per Patrick; the header's copy of the wing has its
+   own ids so the gradient resolves while the sidebar's copy is hidden */
+.hz #hz-mark{margin-right:0}
+.hz #hz-vmark,.hz #hz-vmark2{width:12.4px;height:10.4px;margin-right:4px;vertical-align:-.8px}
+/* the sidebar carries its own wordmark: with it open, the header's steps aside */
+.hz.hz-sbopen #main:has(#hero) #hz-mark,.hz:not(.sbhide) #main:not(:has(#hero)) #hz-mark{display:none}
+.hz #hz-title{font-size:15px;color:var(--hz-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:none}
+.hz #main:not(:has(#hero)) #hz-title{display:block}
+.hz .hz-sp{flex:1}
+.hz #hz-lanes{display:flex;gap:26px}
+.hz #main:not(:has(#hero)) #hz-lanes{display:none}
+.hz #hz-lanes button{height:40px;padding:0 2px;border:0;background:transparent;font:inherit;font-size:14px;color:var(--hz-ink-3);cursor:pointer;
+  border-radius:4px;transition:color var(--hz-t-fast) ease,box-shadow var(--hz-t-mid) ease}
+.hz #hz-lanes button:hover{color:var(--hz-ink-2)}
+.hz #hz-lanes button[aria-selected=true]{color:var(--hz-ink);font-weight:500;box-shadow:inset 0 -1px 0 var(--hz-accent)}
+.hz #hz-right{display:flex;align-items:center;gap:18px}
+.hz #hz-machines{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--hz-ink-2);border:0;background:transparent;font-family:inherit;
+  cursor:pointer;height:40px;padding:0 6px;border-radius:12px;transition:background var(--hz-t-fast) ease}
+.hz #hz-machines:hover{background:rgba(255,255,255,.06)}
+.hz #hz-machines:empty{display:none}
+.hz .hz-seg{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.hz .hz-dot{width:6px;height:6px;border-radius:50%;background:rgba(214,226,255,.45);flex:none}
+.hz .hz-dot.good{background:var(--hz-good);box-shadow:0 0 8px rgba(111,240,192,.7)}
+.hz .hz-dot.warn{background:var(--hz-warn);box-shadow:0 0 8px rgba(242,179,61,.55)}
+.hz .hz-dot.off{background:transparent;box-shadow:inset 0 0 0 1px rgba(214,226,255,.55)}
+.hz .hz-dot.cloud{background:var(--hz-accent);box-shadow:0 0 8px rgba(159,192,255,.6)}
+.hz .hz-dot.live{animation:hzBreathe 2.2s ease-in-out infinite}
+/* the conversation header's compact slider slot (NORTHSTAR 30) */
+.hz #hz-effort-slot{display:none;align-items:center}
+.hz #main:not(:has(#hero)) #hz-effort-slot{display:flex}
+/* ---- the sidebar on the home: closed unless opened; in a conversation open
+   unless closed (the header's first button flips the one that applies) */
+.hz body:has(#main #hero):not(.sbopen) #sidebar{display:none}
+.hz.hz-sbopen body:has(#main #hero):not(.sbopen) #sidebar{display:flex}
+.hz.sbhide body:not(:has(#main #hero)) #sidebar{display:none}
+.hz #mburger{display:none!important}
+/* ---- the home column (NORTHSTAR 19): 760px, left-aligned, the greeting
+   108px under the header, the composer on the limb, history rows under it */
+.hz #main:has(#hero) #chat-scroll{flex:1 1 auto;overflow:visible;min-height:0;display:flex}
+.hz #main:has(#hero) #chat-inner{max-width:none;width:100%;padding:72px 24px 0;margin:0;display:flex;align-items:center;justify-content:center}
+.hz #main:has(#hero) #hero{min-height:0;padding:0;align-items:center;text-align:center;gap:14px;justify-content:center;width:100%}
+/* the headline (per Patrick: "much more centered... very dominant"): centred
+   in the room above the composer, large, with a faint ice glow; it rises in once */
+.hz #hero .greet{font-family:var(--hz-font-display);font-weight:400;
+  font-size:clamp(54px,8vw,104px);line-height:1;letter-spacing:-.04em;color:#f6f7fc;margin:0;text-wrap:balance;
+  text-shadow:0 0 60px rgba(159,192,255,.18);max-width:12ch}
+.hz #hero .greet.rise{--hz-dy:18px;animation:hzFadeUp 1.4s var(--hz-ease-out) both}
+/* the home shows only the headline (per Patrick: "I just like the opening
+   headline"); the status element stays in the markup, empty and unseen */
+.hz-status{display:none}
+/* the Moon as light: its glow's strength is the real illuminated fraction
+   tonight (0.08 + 0.62 x lit), at the upper right while it waxes and the
+   upper left while it wanes; no disc, no words */
+.hz #hz-moonglow{position:absolute;top:-6%;right:-4%;width:min(760px,70vw);height:min(760px,70vw);border-radius:50%;
+  background:radial-gradient(circle,rgba(246,241,228,.5) 0%,rgba(222,230,255,.2) 16%,rgba(159,192,255,.07) 42%,rgba(159,192,255,0) 68%);
+  mix-blend-mode:screen;opacity:.3;transition:opacity 2s var(--hz-ease-in-out)}
+.hz #hz-moonglow.left{right:auto;left:-4%}
+/* the composer-wrap on the home: in flow at the foot of the column */
+.hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:808px;margin:0 auto;width:100%}
+.hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,4,10,.5) 70%);padding:0 24px 22px}
+.hz .novideo #composer-wrap{background:none}
+/* the glass (NORTHSTAR 12): lit from below, its glow a separate breathing layer */
+.hz #composer{max-width:none;margin:0;border-radius:var(--hz-r-composer);padding:20px 18px 14px 24px;gap:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.045));
+  border:1px solid rgba(255,255,255,.13);border-bottom-color:var(--hz-glass-lit);
+  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.35),0 30px 80px rgba(0,0,0,.22);
+  transition:border-color var(--hz-t-mid) ease,box-shadow var(--hz-t-mid) ease}
+.hz #composer:focus-within{border-color:rgba(255,255,255,.2);border-bottom-color:rgba(200,222,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.22),0 0 0 4px rgba(159,192,255,.08)}
+.hz .gen #composer{border-color:rgba(159,192,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.5),0 30px 80px rgba(0,0,0,.22)}
+.hz #hz-cglow{position:fixed;left:0;top:0;z-index:0;pointer-events:none;border-radius:28px;
+  box-shadow:0 24px 70px rgba(80,130,255,.22),0 2px 30px rgba(159,192,255,.12);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
+.hz #hz-cglow[hidden]{display:none}
+.hz #input{font:17px/1.5 var(--hz-font-ui);color:var(--hz-ink);padding:0 2px 4px;min-height:52px}
+.hz #input::placeholder{color:var(--hz-ink-2);opacity:1}
+.hz #input:focus,.hz #input:focus-visible{outline:0;box-shadow:none}
+.hz #main:not(:has(#hero)) #input{min-height:40px;font-size:16px;padding:9px 6px}
+/* the row: attach, the effort slider, the quiet More-modes button, the spacer, mic, send */
+.hz #crow{display:flex;align-items:center;gap:8px;margin-top:0;justify-content:flex-start;flex-wrap:wrap}
+.hz #cbtns{display:contents}
+.hz #attach{order:1}.hz #hz-effort{order:2}.hz #model-chip{order:3}.hz #mic{order:6;margin-left:auto}.hz #voicebtn{order:7}.hz #send{order:8}
+.hz #accel-chip,.hz #srv-chips,.hz #cloud-chip{display:none!important}
+.hz .cbtn{width:40px;height:40px;border-radius:999px;color:var(--hz-ink-2);transition:background var(--hz-t-fast) ease,transform var(--hz-t-fast) ease,color var(--hz-t-fast) ease}
+.hz .cbtn:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
+.hz .cbtn:active{transform:scale(.98)}
+.hz .cbtn:focus-visible{outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz #attach{border:1px solid rgba(255,255,255,.16)}
+.hz #voicebtn.parked{display:none}
+.hz #send{background:#eef2fc;color:#071026;font-weight:600;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 26px rgba(159,192,255,.38)}
+.hz #send:hover{background:#fff;color:#071026;transform:none;box-shadow:0 0 0 1px rgba(255,255,255,.2),0 0 30px rgba(159,192,255,.5)}
+.hz #send:disabled{background:rgba(255,255,255,.1);color:var(--hz-ink-3);box-shadow:none}
+.hz #send.stop{background:#eef2fc;color:#071026;font-size:12px}
+/* the More-modes button: Max, Cloud only, your servers, Advanced live in the
+   engine menu; its label never names a model here (per Patrick) */
+.hz #model-chip{height:40px;width:40px;padding:0;border-radius:999px;border:0;background:transparent;color:var(--hz-ink-2);font-size:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background var(--hz-t-fast) ease}
+.hz #model-chip:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
+.hz #model-chip b{display:none}
+.hz #model-chip::before{content:"";width:18px;height:18px;display:block;
+  background:currentColor;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat;
+          mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat}
+.hz .gen #chip-model{color:inherit}
+/* ---- the effort slider (NORTHSTAR 24-30): a real range input over a drawn track */
+#hz-effort{display:none}
+.hz #hz-effort{display:flex;align-items:center;gap:14px;min-width:0}
+.hz #hz-effort[hidden]{display:none}
+.hz .hz-sl{position:relative;width:196px;height:40px;flex:none;margin-left:6px;border-radius:999px;--hz-eff-u:.5}
+.hz .hz-sl:focus-within{box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz .hz-sl-glow{position:absolute;left:9px;right:9px;top:16px;height:8px;border-radius:4px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(159,192,255,0) 0%,rgba(159,192,255,.22) 45%,rgba(159,192,255,.62) 100%);filter:blur(7px)}
+.hz .hz-sl-track{position:absolute;left:9px;right:9px;top:19px;height:2px;border-radius:1px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(255,255,255,.18) 0%,rgba(159,192,255,.34) 55%,rgba(176,204,255,.75) 100%)}
+.hz .hz-sl-fill{position:absolute;left:9px;top:19px;height:2px;width:calc(100% - 18px);border-radius:1px;pointer-events:none;
+  background:#cfe0ff;box-shadow:0 0 8px rgba(159,192,255,.7);transform-origin:0 50%;transform:scaleX(var(--hz-eff-u));
+  transition:transform var(--hz-t-mid) var(--hz-ease-spring)}
+.hz .hz-sl-dot{position:absolute;top:17px;width:6px;height:6px;margin-left:-3px;border-radius:50%;pointer-events:none;
+  background:rgba(214,226,255,.45);left:calc(9px + (100% - 18px) * var(--hz-u))}
+.hz .hz-sl-dot.passed{background:#cfe0ff}
+.hz .hz-sl-dot.last{background:rgba(176,204,255,.85);box-shadow:0 0 8px rgba(159,192,255,.7)}
+.hz .hz-sl-halo{position:absolute;top:6px;left:9px;width:28px;height:28px;margin-left:-14px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(159,192,255,.55) 0%,rgba(159,192,255,0) 70%);
+  transform:translateX(var(--hz-eff-px,0px));transition:transform var(--hz-t-mid) var(--hz-ease-spring);
+  animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
+.hz .hz-sl-thumbw{position:absolute;left:9px;right:9px;top:11px;height:18px;pointer-events:none}
+.hz .hz-sl-thumb{position:absolute;top:0;left:0;width:18px;height:18px;margin-left:-9px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#ffffff 0%,#dde7ff 70%,#bfd0ff 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.35),0 0 14px rgba(159,192,255,.9),0 2px 4px rgba(0,0,0,.45);
+  transform:translateX(var(--hz-eff-px,0px));
+  transition:transform var(--hz-t-mid) var(--hz-ease-spring)}
+.hz .hz-sl.dragging .hz-sl-thumb,.hz .hz-sl.dragging .hz-sl-fill,.hz .hz-sl.dragging .hz-sl-halo{transition:none}
+.hz .hz-sl.dragging .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) scale(1.08)}
+.hz .hz-sl.dragging .hz-sl-thumb{box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 18px rgba(159,192,255,1),0 3px 6px rgba(0,0,0,.45)}
+.hz .hz-sl.off .hz-sl-thumb{background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0) 0 55%,#dde7ff 58%)}
+.hz .hz-sl input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.hz .hz-sl input[type=range]:focus{outline:0}
+.hz .hz-sl-label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.hz .hz-sl-l1{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+.hz .hz-sl-name{font-size:14px;font-weight:500;color:var(--hz-ink)}
+.hz .hz-sl-desc{font-size:13px;color:var(--hz-ink-2)}
+.hz .hz-sl-l2{display:flex;align-items:baseline;gap:14px;white-space:nowrap;font-size:12px;color:var(--hz-ink-2)}
+.hz .hz-sl-l2:empty{display:none}
+.hz .hz-sl-l2 .mono{font-family:var(--hz-font-mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+/* the deepest modes (per Patrick: "feel special, like the shimmering ultra
+   text in Claude Code"): at Odyssey the name shimmers and a 1.5px conic light
+   travels the composer's edge; at Meridian both are subtler; Flare and Zenith
+   have neither. Transform, opacity and background-position only; a static
+   gradient name and no ring under reduced motion or effects off. The ring
+   needs @property and mask-composite: without them (hz-ring-static) a still
+   gradient border stands in. */
+@property --hz-ang{syntax:'<angle>';initial-value:0deg;inherits:false}
+.hz .hz-sl-name.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzShim 3.2s linear infinite}
+.hz .hz-sl-name.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
+@keyframes hzShim{to{background-position:300% 0}}
+.hz #composer{position:relative}
+.hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
+  transition:opacity .8s var(--hz-ease-in-out);
+  background:conic-gradient(from var(--hz-ang),rgba(159,168,255,0) 0deg,#9fa8ff 40deg,#ff8fc4 90deg,#ffc58a 140deg,rgba(127,240,214,0) 200deg,rgba(159,168,255,0) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+          mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:hzRing 4s linear infinite}
+.hz #main:not(:has(#hero)) #composer::before{border-radius:22px}
+.hz.hz-ody #composer::before{opacity:.9}
+.hz.hz-ody .gen #composer::before{opacity:1;animation-duration:2.4s}
+.hz.hz-mer #composer::before{opacity:.35;animation-duration:7s}
+@keyframes hzRing{to{--hz-ang:360deg}}
+.hz.hz-ring-static #composer::before{animation:none;background:linear-gradient(135deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6)}
+.hz .novideo .hz-sl-name.shim,.hz.hz-pause .hz-sl-name.shim{animation:none}
+.hz .novideo #composer::before{animation:none;opacity:0!important}
+@media (prefers-reduced-motion:reduce){.hz .hz-sl-name.shim{animation:none}.hz #composer::before{animation:none;opacity:0!important}}
+/* the compact variant in the conversation header: 120x28, name only */
+.hz #hz-effort.compact{gap:10px}
+.hz #hz-effort.compact .hz-sl{width:120px;height:28px;margin:0}
+.hz #hz-effort.compact .hz-sl-glow{top:11px;height:6px}
+.hz #hz-effort.compact .hz-sl-track{top:13px}
+.hz #hz-effort.compact .hz-sl-fill{top:13px}
+.hz #hz-effort.compact .hz-sl-dot{top:11.5px;width:5px;height:5px;margin-left:-2.5px}
+.hz #hz-effort.compact .hz-sl-halo{top:3px;width:22px;height:22px;margin-left:-11px}
+.hz #hz-effort.compact .hz-sl-thumbw{top:7px;height:14px}
+.hz #hz-effort.compact .hz-sl-thumb{width:14px;height:14px;margin-left:-7px}
+.hz #hz-effort.compact .hz-sl-desc,.hz #hz-effort.compact .hz-sl-l2{display:none}
+.hz #hz-effort.compact .hz-sl-name{font-size:13px;color:var(--hz-ink-2)}
+/* ---- history: hairline rows under the composer (title, when, tokens when real) */
+#hz-history{display:none}
+.hz #main:has(#hero) #hz-history:not([hidden]){display:flex;flex-direction:column;margin-top:34px;pointer-events:auto}
+.hz .hz-vh{position:absolute;left:-9999px}
+.hz #hz-history[hidden]{display:none}
+.hz .hz-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:24px;padding:13px 8px;
+  border:0;border-top:1px solid var(--hz-hair);border-radius:6px;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;
+  transition:background var(--hz-t-fast) ease}
+.hz .hz-row:last-child{border-bottom:1px solid var(--hz-hair)}
+.hz .hz-row:hover{background:rgba(255,255,255,.04)}
+.hz .hz-row .t{font-size:15px;color:var(--hz-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hz .hz-row .w{font-size:13px;color:var(--hz-ink-3)}
+.hz .hz-row .k{font-family:var(--hz-font-mono);font-size:12px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+.hz .hz-row .k:empty{min-width:0}
+/* ---- the conversation (NORTHSTAR 20): the reply bar at the foot, the reading
+   column's width and edge; the sky calmer behind the words */
+.hz #main:not(:has(#hero)) #chat-inner{padding-top:72px}
+.hz #main:not(:has(#hero)) #composer{max-width:var(--hz-read-w);margin:0 auto 0 calc(50% - (var(--hz-read-w) + var(--hz-gutter) + var(--hz-marg-w))/2);
+  border-radius:22px;padding:8px 8px 8px 10px;flex-direction:row;align-items:flex-end;gap:6px}
+.hz #main:not(:has(#hero)) #crow{display:contents}
+.hz #main:not(:has(#hero)) #attach{order:-1}.hz #main:not(:has(#hero)) #input{order:0;flex:1 1 auto;min-width:0}
+.hz #main:not(:has(#hero)) #model-chip{order:2}.hz #main:not(:has(#hero)) #mic{order:3;margin-left:0}.hz #main:not(:has(#hero)) #send{order:4}
+.hz #main:not(:has(#hero)) #hz-effort:not(.compact){display:none}
+@media (max-width:1100px){.hz #main:not(:has(#hero)) #composer{margin-left:auto}}
+/* ---- the intro (once per launch): black; the stars; the limb rising with
+   a flare on its hairline; the aurora; the wordmark, then its flight to the
+   header; the greeting and the composer rising into place. Each keyframe is
+   delayed from --hz-t so a dev copy can freeze any moment. */
+#hz-intro-mark{display:none}
+.hz.hz-intro #hz-intro-mark{display:flex;flex-direction:column;align-items:center;gap:14px;position:fixed;left:calc(50% + var(--hz-sbw,0px)/2);top:46%;z-index:9;
+  transform:translate(-50%,-50%);pointer-events:none;opacity:0;white-space:nowrap}
+/* the intro's wordmark is the same lockup, scaled up by transform (the wing
+   and the type together), its tracking settling from .42em to .15em */
+.hz.hz-intro #hz-intro-mark .vghost{transform:scale(3.4);transform-origin:50% 50%;opacity:1;overflow:visible;margin:0;letter-spacing:.15em}
+.hz.hz-intro #hz-intro-mark .hz-tag{font-family:var(--hz-font-ui);font-size:15px;color:var(--hz-ink-2);opacity:0;margin-top:38px}
+.hz.hz-intro #hz-intro-mark.flying .hz-tag{display:none}
+.hz.hz-intro #hz-starsw,.hz.hz-intro #hz-aurw,.hz.hz-intro #hz-aursrv,.hz.hz-intro #hz-earth,.hz.hz-intro #hz-band,
+.hz.hz-intro #sidebar,.hz.hz-intro #hz-top,.hz.hz-intro #hero>*,.hz.hz-intro #composer,.hz.hz-intro #hz-cglow,.hz.hz-intro #hz-history{opacity:0}
+.hz.hz-intro #hz-moonglow{opacity:0!important}
+.hz.hz-intro.hz-run #hz-moonglow{animation:hzMoonIn 1.4s var(--hz-ease-out) calc(.5s + var(--hz-t,0s)) both}
+@keyframes hzMoonIn{from{opacity:0}to{opacity:var(--hz-moon,.3)}}
+.hz.hz-intro #hz-sky{background:#000}
+.hz.hz-intro.hz-run #hz-sky{animation:hzSkyIn 1.8s var(--hz-ease-out) calc(.1s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-starsw{animation:hzStarsIn 1.3s var(--hz-ease-out) calc(.25s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-earth{animation:hzRise 1.5s var(--hz-ease-out) calc(.6s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-band{animation:hzFadeIn 1.2s var(--hz-ease-out) calc(1.1s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-limb-warm{animation:hzFlare 1.9s var(--hz-ease-in-out) calc(.95s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-aurw{animation:hzBloom 1.6s var(--hz-ease-out) calc(1.35s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-intro-mark{animation:hzMarkIn .9s var(--hz-ease-out) calc(1.65s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-intro-mark .vghost{animation:hzTrack 1.1s var(--hz-ease-out) calc(1.65s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-intro-mark .hz-tag{animation:hzFadeIn .6s var(--hz-ease-out) calc(2s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hero>*{--hz-dy:22px;animation:hzFadeUp .8s var(--hz-ease-out) calc(3.05s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #composer{--hz-dy:30px;animation:hzFadeUp .85s var(--hz-ease-out) calc(3.1s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-cglow{animation:hzFadeIn .9s var(--hz-ease-out) calc(3.3s + var(--hz-t,0s)) both,hzBreathe var(--hz-t-breathe) ease-in-out calc(4.2s + var(--hz-t,0s)) infinite}
+.hz.hz-intro.hz-run #hz-history{--hz-dy:18px;animation:hzFadeUp .8s var(--hz-ease-out) calc(3.3s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #hz-top{animation:hzFadeIn .8s var(--hz-ease-out) calc(3.3s + var(--hz-t,0s)) both}
+.hz.hz-intro.hz-run #sidebar{animation:hzFadeIn .8s var(--hz-ease-out) calc(3.35s + var(--hz-t,0s)) both}
+.hz.hz-freeze *,.hz.hz-freeze #hz-sky *{animation-play-state:paused!important}
+@keyframes hzSkyIn{from{background:#000}to{background:#060b1c}}
+@keyframes hzFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes hzFadeUp{from{opacity:0;transform:translateY(var(--hz-dy,24px))}to{opacity:1;transform:none}}
+@keyframes hzStarsIn{from{opacity:0;transform:scale(1.03)}to{opacity:1;transform:none}}
+@keyframes hzRise{from{opacity:0;transform:translateY(calc(var(--hz-limb-y) + 180px))}to{opacity:1;transform:translateY(var(--hz-limb-y))}}
+@keyframes hzFlare{0%{opacity:0}35%{opacity:1}100%{opacity:0}}
+@keyframes hzBloom{from{opacity:0;transform:translateY(50px) rotate(-3deg) scaleY(.7)}to{opacity:var(--hz-aur-op);transform:rotate(-3deg)}}
+@keyframes hzMarkIn{from{opacity:0;transform:translate(-50%,-50%) scale(1.06)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes hzTrack{from{letter-spacing:.42em}to{letter-spacing:.15em}}
+/* ---- stillness: effects off, reduced motion, hidden or long unfocused */
+.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-dot.live{animation:none!important}
+.hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo{animation-play-state:paused!important}
+@media (prefers-reduced-motion:reduce){
+  .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-dot.live,.hz #hz-intro-mark{animation:none!important}
+  .hz #hz-earth,.hz #hz-aurw,.hz .hz-sl-thumb,.hz .hz-sl-fill{transition:none!important}
+}
+/* ---- the Look row in Settings > About, in the pane's own row style */
+#look-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+/* ============================================================ HORIZON end */
 
 </style>
 </head>
@@ -43275,6 +43870,60 @@ __CODE_ROWS__
 </aside>
 
 <main id="main">
+  <!-- THE HORIZON SKY (6b526, per Patrick): fixed under everything, drawn by
+       the HORIZON block at the end of the script. Layers, bottom to top: the
+       stars (a canvas, the real sky), the aurora (ice rays on canvases under
+       a masked, leaning wrapper), the server's aurora, the Earth (its band,
+       the limb, its breathing light, its warm moment), the scrim. -->
+  <div id="hz-sky" aria-hidden="true">
+    <!-- the Apple aerials (per Patrick: "incorporate them, like trace lines in
+         the background"): a city clip's edges, drawn by WebGL as thin ice lines -->
+    <video id="hz-trace-vid" muted loop playsinline crossorigin="anonymous"></video>
+    <canvas id="hz-trace"></canvas>
+    <div id="hz-starsw"><canvas id="hz-stars"></canvas></div>
+    <!-- the Moon as light (per Patrick: "use the VFX to express that"): a soft
+         glow whose strength is tonight's real illuminated fraction, at the
+         upper right while the Moon waxes, the upper left while it wanes -->
+    <div id="hz-moonglow"></div>
+    <div id="hz-aurw">
+      <div class="hz-aur" id="hz-aur1"><canvas></canvas><canvas id="hz-aur1f" style="position:absolute;inset:0"></canvas></div>
+      <div class="hz-aur" id="hz-aur2"><canvas></canvas></div>
+    </div>
+    <div id="hz-aursrv"><canvas></canvas></div>
+    <div id="hz-earth"><div id="hz-band"></div><div id="hz-limb"><video id="hz-earth-vid" muted loop playsinline></video></div><div id="hz-limb-glow"></div><div id="hz-limb-warm"></div></div>
+    <!-- the wash (per Patrick: "a wash of color and then neutrality"): four
+         soft blooms that flower on arrival and settle to a residual -->
+    <div id="hz-washw"><canvas id="hz-wash"></canvas></div>
+    <div id="hz-scrim"></div>
+  </div>
+  <!-- THE HEADER (6b526): the chats button and the wordmark; the chat's title
+       in a conversation; the lanes as text on the home; the machines (each
+       server by its own name, never an assumed one) and Settings -->
+  <header id="hz-top" aria-label="Window">
+    <div id="hz-brand">
+      <button id="hz-sb" type="button" class="hz-ib" aria-label="Show the chats" aria-pressed="false">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+      <span id="hz-mark" class="vghost" title="MillenAI"><svg id="hz-vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
+      <span id="hz-title"></span>
+    </div>
+    <span class="hz-sp"></span>
+    <nav id="hz-lanes" role="tablist" aria-label="Lane">
+      <button type="button" role="tab" data-m="ai" aria-selected="true">Chat</button>
+      <button type="button" role="tab" data-m="code" aria-selected="false" tabindex="-1">Code</button>
+      <button type="button" role="tab" data-m="funnel" aria-selected="false" tabindex="-1">Funnels</button>
+    </nav>
+    <span class="hz-sp"></span>
+    <div id="hz-right">
+      <div id="hz-effort-slot"></div>
+      <button id="hz-machines" type="button" title="Your machines"></button>
+      <button id="hz-settings" type="button" class="hz-ib" aria-label="Settings">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+      </button>
+    </div>
+  </header>
+  <!-- the intro's wordmark and its one line (6b526), shown once per launch -->
+  <div id="hz-intro-mark" aria-hidden="true" hidden><span class="vghost"><svg id="hz-vmark2" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg2)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span><span class="hz-tag">Your own AI. On your own machines.</span></div>
   <div id="skyline" hidden>
     <video id="sky-color" muted loop playsinline></video>
   </div>
@@ -43298,6 +43947,9 @@ __CODE_ROWS__
 <!-- 6.0b2, per Patrick: no in-app hero branding — the greeting IS the
      hero, Claude-style; the only wordmark lives in the sidebar header -->
       <p class="greet">What's going on today?</p>
+      <!-- Horizon's status line (6b526): the machines awake, and whether
+           anything left them today; empty (and so hidden) until known -->
+      <p class="hz-status"></p>
     </div>
   </div></div>
   <div id="findbar" role="search" hidden>
@@ -43323,13 +43975,19 @@ __CODE_ROWS__
     <div id="imgchips" hidden></div>
     <!-- a benchmark is running: said here, the composer kept (6b331) -->
     <div id="bm-busy" hidden></div>
+    <!-- Horizon (6b526): the glow under the glass, placed by hzGlowFit -->
+    <div id="hz-cglow" hidden></div>
     <div id="composer">
 
       <input type="file" id="fpick" multiple hidden
         accept="image/*,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
       <textarea id="input" rows="1" placeholder="How can I help you today?"></textarea>
       <div id="crow">
-      <div id="model-chip" title="Change engine — opens the picker">engine <b id="chip-model">Gemma 4 E2B</b></div>
+      <!-- Horizon's effort slider (6b526): Flare, Zenith, Meridian; the real
+           range input is inside; the engine menu beside it keeps Max, Cloud
+           only, the servers and Advanced -->
+      <div id="hz-effort" hidden></div>
+      <div id="model-chip" title="More modes: Max, Cloud only, your servers, Advanced">engine <b id="chip-model">Gemma 4 E2B</b></div>
       <div id="accel-chip" hidden><i></i><b></b></div>
       <!-- your servers' cards (6b334): one chip per paired server whose
            card the server names, in the MLX chip's style -->
@@ -43367,6 +44025,8 @@ __CODE_ROWS__
       </div>
       </div>
     </div>
+    <!-- Horizon (6b526): recent chats as hairline rows under the composer -->
+    <nav id="hz-history" aria-label="Recent chats" hidden></nav>
   </div>
 </main>
 
@@ -43511,6 +44171,11 @@ __CODE_ROWS__
       <div class="toggle-row" id="fx-toggle"
            title="The moving backdrop behind the chat. Everything else stays as it is.">
         <div class="switch"></div><span>Enable visual effects</span></div>
+      <!-- THE LOOK (6b526, per Patrick): Horizon is the new home, sky and
+           intro; Classic is the look before it, exactly as it was -->
+      <label id="look-row"><span>Look</span>
+        <select id="look-sel"><option value="horizon">Horizon</option>
+          <option value="classic">Classic</option></select></label>
       <!-- 6b345, per Patrick ("it takes about a, two seconds each time for
            it to switch on"): the microphone stays open for 15 s after a
            dictation, so the next hold starts at once. Open, not listening. -->
@@ -43928,6 +44593,16 @@ __CODE_ROWS__
 <script>
 "use strict";
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+// THE MODES' BRAND NAMES (6b526, per Patrick): Flare, Zenith, Meridian, and
+// Odyssey where its tier exists. Declared first: tierShown() reads modeName
+// during boot, and a const further down would be a temporal-dead-zone throw
+// that kills the whole page (seen live, this build).
+/* MODE NAMES (6b526) */
+const MODE_NAMES={"Fast":"Flare","Thinking":"Zenith","Pro":"Meridian","Vera Rubin":"Odyssey"};
+const modeName=t=>MODE_NAMES[t]||t;
+const HZ_MODE_DESC={"Fast":"A quick answer","Thinking":"Thinks it through and checks itself",
+  "Pro":"Goes deep, every model weighs in","Vera Rubin":"Keeps going until you stop it",
+  "Max":"Every model you have, everywhere"};
 /* THE API TOKEN (6b321, 0a 5.4). The cookie alone opens only this page;
    every /api call also carries X-Api-Token, which the window hands over
    through pywebview's js_api once the page has loaded (pywebviewready).
@@ -44091,7 +44766,9 @@ const PREF_OF={"millen.tier":"tier","millen.agent":"agent",
 const PREF_TOO={"millen.model":"model","millen.council":"council"};
 const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
   "millen.voice","millen.speeds","millen.sky","millen.skyhist",
-  "millen.skynext","millen.sbw"];
+  "millen.skynext","millen.sbw",
+  // the Horizon look's own (6b526): the look, the sidebar, the intro's day, its seed
+  "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt"];
 let P={};                        // the person's settings, as prefs.json holds them
 const prefMine=new Set();        // set here before prefs.json answered
 let prefQ=Promise.resolve();
@@ -44283,6 +44960,7 @@ function paintModels(){
   });
   $("#chip-model").textContent=tierLabel();
   paintCloudChip();
+  if(hzReady)hzModesPaint();       // Horizon's slider follows the tier (6b526)
 }
 function selectModel(name){
   if(!name)return;  // rows without a model (Power Mode) don't select
@@ -44306,6 +44984,7 @@ function setVideo(on){
   noVideo=!on; document.body.classList.toggle("novideo",noVideo);
   const t=$("#fx-toggle");if(t)t.classList.toggle("on",on);
   localStorage.setItem("millen.video",on?"1":"0");
+  if(hzReady){hzPauseSync();if(on)hzMediaBoot();}   // Horizon's sky follows the switch (6b526)
   const v=$("#sky-color");
   if(!on){if(v&&!v.paused)v.pause();}
   else if(typeof bootSkyline==="function"){
@@ -44937,7 +45616,7 @@ function detRefresh(){
 // Advanced. No line under any row: who writes the answer is in the pop-out.
 function engMainRows(){
   return ["Fast","Thinking","Pro","Max"].filter(n=>TIER_META[n]).map(n=>
-    modeRow(n,TIER_META[n].icon,n,MODE_LABEL[n]||"",!!tierOff[n],"","",tier===n))
+    modeRow(n,TIER_META[n].icon,modeName(n),MODE_LABEL[n]||"",!!tierOff[n],"","",tier===n))
     .join("")
     +cloudMenuRow()
     // one row per paired server: its modes open in a sub-menu beside it (6b337)
@@ -45043,6 +45722,7 @@ function cloudChipOn(cs,t){
 function paintCloudChip(){
   const c=document.getElementById("cloud-chip");if(!c)return;
   c.hidden=!cloudChipOn(cloudSt,tier);
+  if(hzReady)hzMachinesPaint();    // Horizon's header (6b526)
 }
 function cloudChipSet(cs){cloudSt=cs||null;paintCloudChip();}
 async function cloudChipLoad(){
@@ -45117,6 +45797,7 @@ function modeShow(which){
   setTimeout(renderChats,0);
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
+  if(hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes and rows (6b526)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
@@ -47114,6 +47795,7 @@ async function send(){
   const turn={chat_id:myChat,lane:(chats.find(x=>x.id===myChat)||{}).lane||uiMode,
     after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};
   generating=true; document.body.classList.add("gen"); genChat=myChat;
+  if(hzReady)hzOnSend();           // Horizon: the shockwave, the live aurora (6b526)
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
   const aiDiv=addMsg("assistant",""); const body=aiDiv.querySelector(".body");
   aiDiv.classList.add("live");     // soft mask on the newest line
@@ -47284,11 +47966,13 @@ async function send(){
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
+                  if(hzReady)hzTele("run",d);
                 }catch(e){}},
-        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);},
+        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);if(hzReady)hzTele("status",t);},
         RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}},   // the writer's pace (6b515)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
+                     if(hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
                      if(!drafts.some(x=>x.m===d.m))drafts.push(d);
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
@@ -47302,7 +47986,7 @@ async function send(){
         CTX:j=>{try{locCtx=(JSON.parse(j).loc)||"";}catch(e){}},
         PLACEHINT:j=>{try{placeHint=JSON.parse(j);}catch(e){}},
         PLACES2:j=>{try{places=JSON.parse(j);}catch(e){}},
-        STEP:j=>{try{const sd=JSON.parse(j);addStep(sd);
+        STEP:j=>{try{const sd=JSON.parse(j);addStep(sd);if(hzReady)hzTele("step",sd);
                  // the server answered the wake: its bars are read now (6b461)
                  if(sd&&sd.id==="wake"&&sd.s==="done"&&/^Woke /.test(sd.l||""))
                    srvUseKick();}catch(e){}},
@@ -47332,6 +48016,7 @@ async function send(){
       const gsecs=genT0?(lastChunkT-genT0)/1000:0;
       lastRate=gsecs>0.3?tokEst/gsecs:0;
       setToks(lastRate,"streaming");
+      if(hzReady)hzTele("rate",lastRate);
       // a RESET replays the replacement ONCE, when it arrives (6b463, per
       // Patrick: "started streaming all over again while flickering").
       // raw keeps the marker for the rest of the stream, so testing
@@ -47472,6 +48157,7 @@ async function send(){
   }
   setToks(0,"idle");
   generating=false;abortCtl=null;genChat=null;document.body.classList.remove("gen");
+  if(hzReady)hzOnLand(wasAborted);  // Horizon: the sky settles (6b526)
   srvBoost=false;     // the bars go back to their normal rate (6b461)
   sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
   if(curChat===myChat)autoScroll();
@@ -47660,12 +48346,19 @@ function greeting(){
   // still take the name the old way
   return t.indexOf("{")>=0?greetFill(t):persGreet(t);
 }
+// Horizon's greeting (6b526) is by the time of day, in its own words
+const _greetBank=greeting;
+greeting=function(){
+  if(hzReady&&document.documentElement.classList.contains("hz"))return hzGreeting();
+  return _greetBank();
+};
 (function(){const g=$(".greet");if(g)g.textContent=greeting();})();
 api("/api/prefs").then(r=>r.json()).then(p=>{
   // "Peter Smith" -> "Peter"; "Brooklyn, NY" -> "Brooklyn"
   NICK=(String(p.user_name||"").trim().split(" ")[0]||"").slice(0,24);
   CITY=String(p.home_area||"").split(",")[0].trim().slice(0,32);
   const g=$("#hero .greet");
+  if(hzReady)hzHomePaint();        // Horizon: the name reaches the greeting (6b526)
   if(!g||!(NICK||CITY))return;
   g.textContent=greeting();
   // mid-wipe the fly-in is already raising it; otherwise rise in again
@@ -48332,8 +49025,9 @@ function syncSuggest(){
 }
 
 function resetHero(){
-  inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
+  inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p><p class="hz-status"></p></div>';
   paintSuggest();
+  if(hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -48491,6 +49185,7 @@ function chatOpenHit(id){
   if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);
 }
 function renderChats(){
+  if(hzReady)setTimeout(hzHistoryPaint,0);   // Horizon's rows (6b526)
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
   // code chats, Agents lists specialist chats, Chat lists the rest
@@ -49128,6 +49823,7 @@ async function pollStats(){
   // a PC with no GPU readings (no NVIDIA card) shows no bar rather
   // than a made-up one (6b317, from the Windows sweep)
   if($("#gpu-meter"))$("#gpu-meter").hidden=(IS_PC&&gpu==null);
+  if(hzReady)hzStats(gpu,memPct);  // Horizon: only the real reading, never the ambient one (6b526)
   if(gpu==null){
     // ambient fallback — clearly approximate
     simGpu=Math.max(2,Math.min(97,simGpu+(Math.random()-0.5)*8+(generating?22:-16)));
@@ -49297,6 +49993,7 @@ const skySeen=i=>api("/api/sky/seen",{method:"POST",
   headers:{"Content-Type":"application/json"},body:JSON.stringify({i})}).catch(()=>{});
 async function bootSkyline(){
   if(noVideo||!skyline||skyBooted)return;
+  if(document.documentElement.classList.contains("hz"))return;   // Horizon has its own sky (6b526)
   skyBooted=true;
   // NO STOCKPILE, per Patrick: pick fresh every launch and let the bar
   // play its moment — the loading bar IS part of the show. The server
@@ -49734,7 +50431,7 @@ if(matchMedia("(pointer:fine)").matches){
     requestAnimationFrame(paraStep);
   }
   document.addEventListener("mousemove",e=>{
-    if(noVideo)return;
+    if(noVideo||document.documentElement.classList.contains("hz"))return;
     pxT=(e.clientX/innerWidth-.5);pyT=(e.clientY/innerHeight-.5);
     if(!paraOn){paraOn=true;requestAnimationFrame(paraStep);}
   },{passive:true});
@@ -51577,6 +52274,7 @@ function paintSrvChips(){
   const box=document.getElementById("srv-chips");
   if(box)box.innerHTML=srvChipsHtml(srvList);
   srvMetersRefresh();
+  if(hzReady)hzHomePaint();        // Horizon: the machines and the status line (6b526)
 }
 // "<server> Only" (6b337, per Patrick: "Under the cloud models only, can we
 // add a Olama one only or whatever the server name is in a user's case?"):
@@ -51596,8 +52294,8 @@ function srvPickable(s){return !!(s&&s.paired&&s.only&&(s.only.ok||s.only.asleep
 // here and nowhere else: {id, mode}, mode "" for "<name> Only"; a tier that
 // isn't one of these has no id, so its server is "gone". A function, not a
 // const: a boot path that reads it before this line would throw (the TDZ)
-function srvSubModes(){return [["fast","Fast","\u26a1\ufe0f"],["think","Thinking","\ud83e\udde0"],
-  ["pro","Pro","\u2728"],["max","Max","\ud83d\ude80"]];}   // Max: every model on it (6b442)
+function srvSubModes(){return [["fast",modeName("Fast"),"\u26a1\ufe0f"],["think",modeName("Thinking"),"\ud83e\udde0"],
+  ["pro",modeName("Pro"),"\u2728"],["max","Max","\ud83d\ude80"]];}   // Max: every model on it (6b442)
 function srvTierParse(t){
   const m=isSrvMode(t)?/^srv:([^:]+)(?::(fast|think|pro|max))?$/.exec(t):null;
   const k=m&&m[2]?srvSubModes().find(x=>x[0]===m[2]):null;
@@ -51708,12 +52406,13 @@ function tierShown(t){
     const sv=((tierInfo[t]||{}).models||[]).filter(m=>m.indexOf(SRV_SEP)>=0);
     // Fast with cloud power on asks the cloud first (the server seat is the
     // fallback), so the chip doesn't claim the server answers (final review)
-    if(!sv.length||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return t;
+    // the modes carry their brand names (6b526): Flare, Zenith, Meridian
+    if(!sv.length||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return modeName(t);
     const nm=[...new Set(sv.map(m=>m.slice(0,m.indexOf(SRV_SEP))))].join(" + ");
-    return t==="Fast"?t+" \u00b7 "+sv[0].replace(SRV_SEP," "):t+" \u00b7 "+nm+(sv.length>1?" \u00d7"+sv.length:"");
+    return t==="Fast"?modeName(t)+" \u00b7 "+sv[0].replace(SRV_SEP," "):modeName(t)+" \u00b7 "+nm+(sv.length>1?" \u00d7"+sv.length:"");
   }
   const s=srvModeOf(t),mode=srvTierParse(t).mode;
-  if(s&&mode)return mode+" \u00b7 "+s.name+" only";   // "Thinking · <name> only" (6b426)
+  if(s&&mode)return modeName(mode)+" \u00b7 "+s.name+" only";   // "Zenith · <name> only" (6b426, 6b526)
   return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
 }
 function tierLabel(){return tierShown(tier)||model;}
@@ -52289,6 +52988,11 @@ function winWipeRun(){
 }
 function kickWipe(){
   if(wipeKicked)return;wipeKicked=true;
+  // Horizon (6b526) opens on its own intro; the wipe and the band are Classic's
+  if(document.documentElement.classList.contains("hz")){
+    if(hzReady)hzIntroKick();
+    return;
+  }
   // native Mac boot: the window wipes in from the right first, and the
   // rainbow answers from the left inside winWipeFinish
   if(document.documentElement.classList.contains("winwipe"))winWipeRun();
@@ -54294,6 +54998,931 @@ document.addEventListener("visibilitychange",()=>{
 })();
 
 input.focus();
+/* ========================================================= HORIZON (6b526) */
+// THE HORIZON LOOK (6b526, per Patrick: "the most beautiful AI chat home
+// screen anyone has shipped", then "drop dead gorgeous, sharp, and clean").
+// Design: design/TOKENS.md and the art director's design/NORTHSTAR.md.
+// The home is a night sky that is the REAL sky over the person: the brightest
+// stars (a compact Yale Bright Star subset below) placed from the clock and the
+// place the server names (the town in Settings when its coordinates are known,
+// else the time zone's city from the OS zone table; no network, no location
+// permission), the Moon with its true phase, an aurora of ice rays whose shape
+// is seeded by the day, and the limb of the Earth whose peak sits behind the
+// composer. An intro runs once per launch. While an answer runs the aurora
+// sways faster and brighter, pulses on each stage the stream reports, and a
+// second aurora rises from the far horizon only while a paired server works.
+// Cost: every animation is transform or opacity; the stars and the aurora are
+// drawn to canvases once and again every few minutes; everything pauses while
+// the window is hidden, long unfocused, or Visual effects are off. The Classic
+// look (Settings > About > Look) is untouched: without html.hz nothing runs.
+// No model names on these surfaces (per Patrick): it is always the mode.
+// `hzReady` and `hzS` are vars: the hooks earlier in this file test hzReady,
+// and a let/const here would be a temporal-dead-zone throw during boot.
+var hzReady=false;
+var hzS=null;
+// ---- the sky's arithmetic (standard low-precision formulas, J2000)
+function hzD(t){return t/86400000+2440587.5-2451545.0;}
+function hzGmst(t){const g=(18.697374558+24.06570982441908*hzD(t))%24;return g<0?g+24:g;}
+function hzAltAz(raH,dec,lat,lon,t){
+  const R=Math.PI/180,ha=((hzGmst(t)+lon/15-raH)*15)*R,de=dec*R,la=lat*R;
+  const sa=Math.sin(la)*Math.sin(de)+Math.cos(la)*Math.cos(de)*Math.cos(ha);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sa)));
+  const az=Math.atan2(-Math.cos(de)*Math.sin(ha),
+    Math.sin(de)*Math.cos(la)-Math.cos(de)*Math.sin(la)*Math.cos(ha));
+  return {alt:alt/R,az:((az/R)+360)%360};
+}
+function hzSun(t){
+  const d=hzD(t),R=Math.PI/180;
+  const g=((357.529+0.98560028*d)%360)*R,q=(280.459+0.98564736*d)%360;
+  const L=(((q+1.915*Math.sin(g)+0.020*Math.sin(2*g))%360)+360)%360,e=(23.439-0.00000036*d)*R;
+  const ra=Math.atan2(Math.cos(e)*Math.sin(L*R),Math.cos(L*R)),dec=Math.asin(Math.sin(e)*Math.sin(L*R));
+  return {ra:((ra/R)/15+24)%24,dec:dec/R,lon:L};
+}
+// Schlyter's Moon: RA (hours), Dec, the lit fraction, whether it waxes, and
+// the elongation from the Sun (0 new, 180 full)
+function hzMoon(t){
+  const R=Math.PI/180,d=hzD(t)+1.5,n=x=>((x%360)+360)%360,s=x=>Math.sin(x*R);
+  const N=n(125.1228-0.0529538083*d),i=5.1454*R,w=n(318.0634+0.1643573223*d);
+  const a=60.2666,e=0.054900,M=n(115.3654+13.0649929509*d);
+  let E=M*R+e*Math.sin(M*R)*(1+e*Math.cos(M*R));
+  for(let k=0;k<5;k++)E=E-(E-e*Math.sin(E)-M*R)/(1-e*Math.cos(E));
+  const xv=a*(Math.cos(E)-e),yv=a*Math.sqrt(1-e*e)*Math.sin(E);
+  const v=Math.atan2(yv,xv),r=Math.sqrt(xv*xv+yv*yv),NN=N*R,vw=v+w*R;
+  const xh=r*(Math.cos(NN)*Math.cos(vw)-Math.sin(NN)*Math.sin(vw)*Math.cos(i));
+  const yh=r*(Math.sin(NN)*Math.cos(vw)+Math.cos(NN)*Math.sin(vw)*Math.cos(i));
+  const zh=r*Math.sin(vw)*Math.sin(i);
+  let lon=Math.atan2(yh,xh)/R,lat=Math.atan2(zh,Math.sqrt(xh*xh+yh*yh))/R;
+  const ws=n(282.9404+4.70935e-5*d),Ms=n(356.0470+0.9856002585*d),Ls=n(ws+Ms);
+  const Lm=n(N+w+M),D=n(Lm-Ls),F=n(Lm-N);
+  lon+=-1.274*s(M-2*D)+0.658*s(2*D)-0.186*s(Ms)-0.059*s(2*M-2*D)-0.057*s(M-2*D+Ms)
+      +0.053*s(M+2*D)+0.046*s(2*D-Ms)+0.041*s(M-Ms)-0.035*s(D)-0.031*s(M+Ms)
+      -0.015*s(2*F-2*D)+0.011*s(M-4*D);
+  lat+=-0.173*s(F-2*D)-0.055*s(M-F-2*D)-0.046*s(M+F-2*D)+0.033*s(F+2*D)+0.017*s(2*M+F);
+  const ecl=(23.4393-3.563e-7*d)*R,lo=lon*R,la=lat*R;
+  const xe=Math.cos(lo)*Math.cos(la),ye=Math.sin(lo)*Math.cos(la),ze=Math.sin(la);
+  const yq=ye*Math.cos(ecl)-ze*Math.sin(ecl),zq=ye*Math.sin(ecl)+ze*Math.cos(ecl);
+  const ra=((Math.atan2(yq,xe)/R)/15+24)%24,dec=Math.atan2(zq,Math.sqrt(xe*xe+yq*yq))/R;
+  const el=n(lon-hzSun(t).lon);
+  return {ra:ra,dec:dec,lit:(1-Math.cos(el*R))/2,waxing:el<180,elong:el};
+}
+// the brightest stars (Yale Bright Star Catalog, public domain): J2000 RA in
+// hours, Dec in degrees, V magnitude, B-V colour. ~160 stars to V 3.0, plus a
+// few fainter ones that complete a well-known shape (the Dipper, the W, Corvus)
+const HZ_STARS=[[6.752,-16.716,-1.46,0],[6.399,-52.696,-0.74,.15],[14.66,-60.835,-0.27,.71],[14.261,19.182,-0.05,1.23],
+[18.616,38.784,.03,0],[5.278,45.998,.08,.8],[5.242,-8.202,.13,-.03],[7.655,5.225,.34,.42],[1.629,-57.237,.46,-.16],
+[5.92,7.407,.5,1.85],[14.064,-60.373,.61,-.23],[19.846,8.868,.76,.22],[12.443,-63.099,.76,-.24],[4.599,16.509,.86,1.54],
+[16.49,-26.432,.96,1.83],[13.42,-11.161,.97,-.23],[7.755,28.026,1.14,1],[22.961,-29.622,1.16,.09],[20.69,45.28,1.25,.09],
+[12.795,-59.689,1.25,-.23],[10.14,11.967,1.35,-.11],[6.977,-28.972,1.5,-.21],[7.577,31.888,1.58,.03],[12.519,-57.113,1.63,1.59],
+[17.56,-37.104,1.62,-.22],[5.419,6.35,1.64,-.22],[5.438,28.608,1.65,-.13],[9.22,-69.717,1.68,0],[5.604,-1.202,1.69,-.19],
+[22.137,-46.961,1.74,-.13],[5.679,-1.943,1.77,-.21],[12.9,55.96,1.77,-.02],[11.062,61.751,1.79,1.07],[3.405,49.861,1.8,.48],
+[7.14,-26.393,1.84,.68],[17.622,-42.998,1.87,.4],[18.403,-34.385,1.85,-.03],[8.375,-59.51,1.86,1.28],[13.792,49.313,1.86,-.19],
+[5.992,44.948,1.9,.03],[16.811,-69.028,1.92,1.44],[6.629,16.399,1.93,0],[20.428,-56.735,1.94,-.2],[8.745,-54.709,1.96,.04],
+[6.378,-17.956,1.98,-.24],[9.46,-8.659,1.98,1.44],[2.53,89.264,1.98,.6],[2.12,23.463,2,1.15],[10.333,19.842,2.08,1.13],
+[.727,-17.987,2.04,1.02],[13.399,54.925,2.04,.02],[18.921,-26.297,2.05,-.13],[14.111,-36.37,2.06,1.01],[1.162,35.621,2.05,1.58],
+[.14,29.091,2.06,-.11],[17.582,12.56,2.08,.16],[14.845,74.156,2.08,1.47],[5.796,-9.67,2.09,-.17],[11.818,14.572,2.14,.09],
+[3.136,40.956,2.12,-.05],[22.711,-46.885,2.11,1.62],[12.692,-48.96,2.17,-.01],[9.285,-59.275,2.21,.19],[9.133,-43.433,2.21,1.66],
+[15.578,26.715,2.23,-.02],[5.533,-.299,2.23,-.22],[20.371,40.257,2.23,.68],[17.943,51.489,2.23,1.52],[.675,56.537,2.24,1.17],
+[8.06,-40.003,2.25,-.26],[2.065,42.33,2.26,1.37],[.153,59.15,2.27,.34],[14.75,27.074,2.37,.97],[16.006,-22.622,2.32,-.12],
+[16.836,-34.293,2.29,1.15],[11.031,56.382,2.37,-.02],[.438,-42.306,2.38,1.08],[17.708,-39.03,2.39,-.17],[21.736,9.875,2.39,1.53],
+[23.063,28.083,2.42,1.67],[17.173,-15.725,2.43,.06],[11.897,53.695,2.44,.04],[7.402,-29.303,2.45,-.08],[9.369,-55.011,2.5,-.14],
+[.945,60.717,2.47,-.15],[23.079,15.205,2.49,-.04],[20.77,33.97,2.48,1.03],[16.091,-19.805,2.62,-.07],[14.848,-16.042,2.75,.15],
+[15.283,-9.383,2.61,-.07],[15.738,6.426,2.65,1.17],[1.911,20.808,2.64,.13],[21.31,62.586,2.44,.22],[12.263,-17.542,2.59,-.11],
+[12.573,-23.397,2.65,.89],[19.044,-29.88,2.6,.08],[18.35,-29.828,2.7,1.38],[18.466,-25.422,2.81,1.04],[19.771,10.613,2.72,1.52],
+[16.239,-3.694,2.73,1.58],[17.725,4.567,2.76,1.16],[8.159,-47.337,1.83,-.22],[14.699,-47.388,2.3,-.2],[14.976,-43.134,2.68,-.22],
+[13.665,-53.466,2.3,-.22],[14.592,-42.158,2.31,-.19],[13.926,-47.288,2.55,-.22],[12.139,-50.722,2.58,-.12],[13.343,-36.712,2.73,.07],
+[15.919,-63.431,2.83,.29],[12.252,-58.749,2.79,-.26],[10.716,-64.394,2.74,-.22],[12.257,57.033,3.31,.08],[1.907,63.67,3.37,-.15],
+[6.383,22.514,2.88,1.64],[4.95,33.166,2.69,1.53],[5.995,37.213,2.65,-.08],[3.791,24.105,2.87,-.09],[11.235,20.524,2.56,.12],
+[12.694,-1.449,2.74,.36],[13.036,10.959,2.83,.94],[13.912,18.398,2.68,.58],[17.513,-37.296,2.69,-.18],[16.598,-28.216,2.82,-.25],
+[18.097,-30.424,2.98,.98],[19.75,45.131,2.87,-.03],[19.512,27.96,3.05,1.09],[.221,15.183,2.83,-.19],[3.038,4.09,2.53,1.64],
+[5.131,-5.086,2.79,.16],[2.971,-40.305,2.88,.13],[8.126,-24.304,2.81,.43],[7.286,-37.097,2.7,1.62],[10.78,-49.42,2.69,.9],
+[16.619,-10.567,2.56,.02],[16.504,21.49,2.77,.94],[16.688,31.603,2.81,.65],[17.507,52.301,2.79,.98],[15.346,71.834,3.05,.06],
+[15.315,-68.68,2.87,0],[17.421,-55.53,2.84,1.46],[17.531,-49.876,2.84,-.17],[.429,-77.254,2.82,.62],[1.979,-61.57,2.86,.29],
+[5.661,-34.074,2.65,-.12],[5.546,-17.822,2.58,.21],[5.471,-20.759,2.84,.82],[7.453,8.289,2.89,-.1],[1.43,60.235,2.68,.13],
+[21.784,-16.127,2.87,.29],[12.498,-16.516,2.95,-.05],[12.169,-22.62,3,-.02]];
+// where a time zone is, for a machine with no zone table (Windows): lat, lon.
+// The Mac's server reads the OS's own table; this is the fallback
+const HZ_ZONES={"America/New_York":[40.71,-74.01],"America/Chicago":[41.88,-87.63],"America/Denver":[39.74,-104.99],
+"America/Los_Angeles":[34.05,-118.24],"America/Phoenix":[33.45,-112.07],"America/Anchorage":[61.22,-149.9],
+"Pacific/Honolulu":[21.31,-157.86],"America/Toronto":[43.65,-79.38],"America/Vancouver":[49.28,-123.12],
+"America/Edmonton":[53.55,-113.49],"America/Winnipeg":[49.9,-97.14],"America/Halifax":[44.65,-63.58],
+"America/St_Johns":[47.56,-52.71],"America/Mexico_City":[19.43,-99.13],"America/Bogota":[4.71,-74.07],
+"America/Lima":[-12.05,-77.04],"America/Santiago":[-33.45,-70.67],"America/Argentina/Buenos_Aires":[-34.6,-58.38],
+"America/Sao_Paulo":[-23.55,-46.63],"America/Montevideo":[-34.9,-56.16],"America/Caracas":[10.48,-66.9],
+"America/Havana":[23.13,-82.38],"America/Puerto_Rico":[18.47,-66.11],"America/Detroit":[42.33,-83.05],
+"America/Indiana/Indianapolis":[39.77,-86.16],"America/Boise":[43.62,-116.2],"America/Regina":[50.45,-104.62],
+"America/Guatemala":[14.63,-90.51],"America/Costa_Rica":[9.93,-84.08],"America/Panama":[8.98,-79.52],
+"America/La_Paz":[-16.5,-68.15],"America/Asuncion":[-25.26,-57.58],"America/Guayaquil":[-2.17,-79.92],
+"Europe/London":[51.51,-.13],"Europe/Dublin":[53.35,-6.26],"Europe/Lisbon":[38.72,-9.14],"Europe/Madrid":[40.42,-3.7],
+"Europe/Paris":[48.86,2.35],"Europe/Brussels":[50.85,4.35],"Europe/Amsterdam":[52.37,4.9],"Europe/Berlin":[52.52,13.41],
+"Europe/Zurich":[47.37,8.54],"Europe/Rome":[41.9,12.5],"Europe/Vienna":[48.21,16.37],"Europe/Prague":[50.08,14.44],
+"Europe/Warsaw":[52.23,21.01],"Europe/Stockholm":[59.33,18.07],"Europe/Oslo":[59.91,10.75],"Europe/Copenhagen":[55.68,12.57],
+"Europe/Helsinki":[60.17,24.94],"Europe/Athens":[37.98,23.73],"Europe/Istanbul":[41.01,28.98],"Europe/Kyiv":[50.45,30.52],
+"Europe/Moscow":[55.76,37.62],"Europe/Bucharest":[44.43,26.1],"Europe/Budapest":[47.5,19.04],"Europe/Belgrade":[44.79,20.47],
+"Europe/Zagreb":[45.81,15.98],"Europe/Riga":[56.95,24.11],"Europe/Vilnius":[54.69,25.28],"Europe/Tallinn":[59.44,24.75],
+"Europe/Minsk":[53.9,27.57],"Europe/Sofia":[42.7,23.32],"Atlantic/Reykjavik":[64.15,-21.94],"Africa/Cairo":[30.04,31.24],
+"Africa/Johannesburg":[-26.2,28.05],"Africa/Lagos":[6.52,3.38],"Africa/Nairobi":[-1.29,36.82],"Africa/Casablanca":[33.57,-7.59],
+"Asia/Dubai":[25.2,55.27],"Asia/Jerusalem":[31.77,35.21],"Asia/Riyadh":[24.69,46.72],"Asia/Tehran":[35.69,51.39],
+"Asia/Baghdad":[33.31,44.37],"Asia/Karachi":[24.86,67.01],"Asia/Kolkata":[22.57,88.36],"Asia/Dhaka":[23.81,90.41],
+"Asia/Kathmandu":[27.72,85.32],"Asia/Colombo":[6.93,79.86],"Asia/Bangkok":[13.76,100.5],"Asia/Jakarta":[-6.21,106.85],
+"Asia/Singapore":[1.35,103.82],"Asia/Kuala_Lumpur":[3.14,101.69],"Asia/Manila":[14.6,120.98],"Asia/Hong_Kong":[22.32,114.17],
+"Asia/Shanghai":[31.23,121.47],"Asia/Taipei":[25.03,121.57],"Asia/Seoul":[37.57,126.98],"Asia/Tokyo":[35.68,139.69],
+"Asia/Ho_Chi_Minh":[10.82,106.63],"Asia/Yangon":[16.87,96.2],"Asia/Kabul":[34.53,69.17],"Asia/Almaty":[43.24,76.95],
+"Asia/Tashkent":[41.3,69.24],"Asia/Baku":[40.41,49.87],"Asia/Tbilisi":[41.72,44.83],"Asia/Yerevan":[40.18,44.51],
+"Australia/Perth":[-31.95,115.86],"Australia/Adelaide":[-34.93,138.6],"Australia/Brisbane":[-27.47,153.03],
+"Australia/Sydney":[-33.87,151.21],"Australia/Melbourne":[-37.81,144.96],"Australia/Hobart":[-42.88,147.33],
+"Pacific/Auckland":[-36.85,174.76]};
+const HZ_PLACE=__HZ_PLACE__,HZ_DEBUG=__HZ_DEBUG__;
+function hzFindPlace(){
+  const p=HZ_PLACE;
+  if(p&&typeof p.lat==="number"&&typeof p.lon==="number")return p;
+  let tz="";try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";}catch(e){}
+  const z=HZ_ZONES[tz];
+  if(z)return {lat:z[0],lon:z[1],city:tz.split("/").pop().replace(/_/g," "),src:"zone"};
+  return null;
+}
+// a small deterministic generator (mulberry32), seeded by the day
+function hzRng(seed){let a=(seed>>>0)||1;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+function hzHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function hzNow(){return hzS&&hzS.fixedNow?hzS.fixedNow:Date.now();}
+function hzDayness(sunAlt){return Math.max(0,Math.min(1,(sunAlt+6)/12));}
+// ---- geometry: the sky's horizon for the stars is the foot of the window
+// (where the limb rests in a conversation); on the home the Earth stands
+// higher and simply covers the lower stars. Isotropic: one scale for both axes
+function hzGeom(){
+  const W=innerWidth,H=innerHeight,sb=hzS.sb;
+  const foot=H-56,ppd=Math.max(4,(foot-16)/90);
+  return {W:W,H:H,cx:W/2+sb/2,R:1600,foot:foot,ppd:ppd,azC:(hzS.place&&hzS.place.lat<0)?0:180};
+}
+function hzRimY(g,x){const dx=x-g.cx;return g.foot+g.R-Math.sqrt(Math.max(0,g.R*g.R-dx*dx));}
+function hzProject(g,alt,az){
+  let da=az-g.azC;da=((da+540)%360)-180;
+  const x=g.cx+da*g.ppd;
+  return {x:x,y:hzRimY(g,x)-alt*g.ppd};
+}
+function hzStarColor(bv){
+  if(bv<0)return "rgba(205,222,255,A)";if(bv<0.5)return "rgba(255,255,255,A)";
+  if(bv<1)return "rgba(255,244,228,A)";return "rgba(255,230,200,A)";
+}
+// the stars, drawn once and again every few minutes: static, 1 to 1.8 px,
+// their alpha by magnitude, the giants warm. No twinkle: no air up here
+function hzDrawStars(){
+  const cv=$("#hz-stars");if(!cv)return;
+  const g=hzGeom(),dpr=Math.min(devicePixelRatio||1,2),t=hzNow(),p=hzS.place||{lat:40,lon:0};
+  cv.width=Math.round(g.W*dpr);cv.height=Math.round(g.H*dpr);cv.style.width=g.W+"px";cv.style.height=g.H+"px";
+  const x=cv.getContext("2d");x.scale(dpr,dpr);
+  const day=hzDayness(hzS.sun?hzS.sun.alt:-30);
+  let n=0;
+  for(const s of HZ_STARS){
+    const aa=hzAltAz(s[0],s[1],p.lat,p.lon,t);
+    if(aa.alt<1)continue;
+    const pt=hzProject(g,aa.alt,aa.az);
+    if(pt.x<-4||pt.x>g.W+4||pt.y<-4)continue;
+    const m=s[2],r=Math.max(0.5,Math.min(0.9,0.86-0.1*m));
+    let a=Math.max(0.3,Math.min(0.95,0.98-0.17*m))*(1-day*0.9);
+    if(a<0.03)continue;
+    const col=hzStarColor(s[3]);
+    if(m<0.6){const gr=x.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,4);
+      gr.addColorStop(0,col.replace("A",(a*.22).toFixed(3)));gr.addColorStop(1,col.replace("A","0"));
+      x.fillStyle=gr;x.beginPath();x.arc(pt.x,pt.y,4,0,7);x.fill();}
+    x.fillStyle=col.replace("A",a.toFixed(3));x.beginPath();x.arc(pt.x,pt.y,r,0,7);x.fill();
+    n++;
+  }
+  hzS.starsShown=n;
+}
+// the Moon block at the right of the column: the ephemeris in words, the
+// place beneath, the disc with its true phase (lit side true to the hemisphere)
+function hzMoonWords(m){
+  const syn=29.530588,toFull=(((180-m.elong)%360)+360)%360/360*syn,sinceFull=(((m.elong-180)%360)+360)%360/360*syn;
+  const toNew=((360-m.elong)%360)/360*syn,sinceNew=m.elong/360*syn;
+  const nights=d=>{const n=Math.round(d);return n===1?"One night":n===2?"Two nights":n===3?"Three nights":n===4?"Four nights":n===5?"Five nights":n+" nights";};
+  if(toFull<0.5||sinceFull<0.5)return "Full Moon tonight";
+  if(toNew<0.5||sinceNew<0.5)return "New Moon tonight";
+  if(toFull<=5.5)return nights(toFull)+" from full";
+  if(sinceFull<=4.5)return nights(sinceFull)+" past full";
+  if(Math.abs(m.elong-90)<6)return "First quarter tonight";
+  if(Math.abs(m.elong-270)<6)return "Last quarter tonight";
+  if(toNew<=4.5)return nights(toNew)+" from new";
+  if(sinceNew<=4.5)return nights(sinceNew)+" past new";
+  return m.waxing?"A waxing Moon":"A waning Moon";
+}
+function hzDrawMoon(){
+  const g=$("#hz-moonglow");if(!g)return;
+  const t=hzNow(),p=hzS.place,m=hzMoon(t);
+  hzS.moon=Object.assign(m,p?hzAltAz(m.ra,m.dec,p.lat,p.lon,t):{});
+  const op=0.08+0.62*m.lit;
+  g.style.opacity=op.toFixed(3);
+  const sky=$("#hz-sky");if(sky)sky.style.setProperty("--hz-moon",op.toFixed(3));
+  g.classList.toggle("left",!m.waxing);
+}
+// the Sun: never drawn (the palette never changes); it sets the day, and in
+// civil twilight warms the limb's hairline and lifts the sky band one step
+function hzPlaceSun(){
+  const sky=$("#hz-sky");if(!sky)return;
+  const t=hzNow(),p=hzS.place||{lat:40,lon:0},s=hzSun(t),aa=hzAltAz(s.ra,s.dec,p.lat,p.lon,t);
+  hzS.sun=aa;
+  const day=hzDayness(aa.alt),twi=aa.alt>-6&&aa.alt<0;
+  sky.style.setProperty("--hz-day",day.toFixed(3));
+  sky.style.setProperty("--hz-limb",twi?"rgba(255,181,138,.95)":"rgba(255,214,160,.92)");
+  const band=$("#hz-band");if(band)band.style.opacity=twi?"1":"";
+  const sw=$("#hz-starsw");if(sw)sw.style.opacity=(1-day*0.92).toFixed(3);
+}
+// the aurora (NORTHSTAR 13): ice rays of three periods under a vertical mask,
+// a broad glow beneath, a mint fringe over the bottom quarter; drawn at a third
+// of its size, the upscale being the softness, so no filter runs at any frame.
+// The seed (the day and this install) picks the periods, the lean and the gain
+function hzRayTile(period,stops,hgt){
+  const t=document.createElement("canvas");t.width=Math.max(2,Math.round(period));t.height=hgt;
+  const x=t.getContext("2d"),g=x.createLinearGradient(0,0,t.width,0);
+  for(const st of stops)g.addColorStop(Math.min(1,st[0]/period),st[1]);
+  x.fillStyle=g;x.fillRect(0,0,t.width,hgt);return t;
+}
+function hzDrawAuroraLayer(cv,o){
+  const w=o.w,h=o.h,sc=1/4,W=Math.max(48,Math.round(w*sc)),H=Math.max(24,Math.round(h*sc));
+  cv.width=W;cv.height=H;cv.style.width=w+"px";cv.style.height=h+"px";
+  const x=cv.getContext("2d");x.clearRect(0,0,W,H);
+  const col=o.rgb,c=a=>"rgba("+col+","+a.toFixed(3)+")";
+  const gain=o.gain||1,k=o.k||1;
+  // the rays: periods 43 / 150 / 97 px (scaled), stretched a little by the seed
+  const p1=43*k*sc,p2=150*k*sc,p3=97*k*sc;
+  const tiles=[
+    hzRayTile(p1,[[0,c(0)],[7*k*sc,c(.55*gain)],[15*k*sc,c(0)],[28*k*sc,c(0)],[34*k*sc,c(.32*gain)],[p1,c(0)]],H),
+    hzRayTile(p2,[[0,c(0)],[60*k*sc,c(.26*gain)],[p2,c(0)]],H),
+    hzRayTile(p3,[[0,c(0)],[40*k*sc,c(.14*gain)],[p3,c(0)]],H)];
+  if(o.glow){const g=x.createLinearGradient(0,0,W,0);
+    g.addColorStop(0,c(0));g.addColorStop(.28,c(.2*gain));g.addColorStop(.55,c(.26*gain));g.addColorStop(1,c(0));
+    x.fillStyle=g;x.fillRect(0,0,W,H);}
+  if(o.rays!==false)for(const t of tiles){x.fillStyle=x.createPattern(t,"repeat-x");x.fillRect(0,0,W,H);}
+  // along the curtain: a slow envelope (two sines from the seed) so the rays
+  // gather and thin instead of reading as even bars
+  x.globalCompositeOperation="destination-in";
+  const ph=o.phase||0,env=x.createLinearGradient(0,0,W,0);
+  for(let i=0;i<=24;i++){const u=i/24,a=0.45+0.55*(0.5+0.5*Math.sin(u*6.283*1.6+ph)*Math.cos(u*6.283*0.7+ph*0.6));
+    env.addColorStop(u,"rgba(0,0,0,"+a.toFixed(3)+")");}
+  x.fillStyle=env;x.fillRect(0,0,W,H);
+  // the vertical mask: nothing at the top, bright at 84%, nothing at the bottom
+  const m=x.createLinearGradient(0,0,0,H);
+  for(const st of o.mask)m.addColorStop(st[0],"rgba(0,0,0,"+st[1]+")");
+  x.fillStyle=m;x.fillRect(0,0,W,H);
+  x.globalCompositeOperation="source-over";
+}
+function hzDrawAuroras(){
+  const r=hzS.rnd,k=0.9+r()*0.25,gain=0.85+r()*0.3,fr=0.8+r()*0.4,ph=r()*6.283,ph2=r()*6.283;
+  const w1=$("#hz-aur1 canvas"),w2=$("#hz-aur2 canvas"),f1=$("#hz-aur1f"),sv=$("#hz-aursrv canvas");
+  if(w1)hzDrawAuroraLayer(w1,{w:1640,h:520,rgb:"168,198,255",k:k,gain:gain,glow:true,phase:ph,mask:[[0,0],[.42,.3],[.84,1],[1,0]]});
+  if(f1)hzDrawAuroraLayer(f1,{w:1640,h:520,rgb:"150,236,212",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});
+  if(w2)hzDrawAuroraLayer(w2,{w:1640,h:490,rgb:"186,208,255",k:k*0.45,gain:gain*0.55,phase:ph2,mask:[[0,0],[.1,0],[.6,.5],[.9,1],[1,0]]});
+  if(sv)hzDrawAuroraLayer(sv,{w:1200,h:220,rgb:"168,198,255",k:k*0.7,gain:gain,glow:true,phase:ph2,mask:[[0,0],[.5,.5],[.92,1],[1,0]]});
+}
+// the wash's four blooms, at a sixth of the size: the reference's radial
+// gradients (indigo upper left, rose upper right, amber by the horizon,
+// teal lower right), drawn once per paint
+function hzDrawWash(){
+  const cv=$("#hz-wash");if(!cv)return;
+  const w=cv.clientWidth||innerWidth*1.24,h=cv.clientHeight||innerHeight*1.24;
+  const W=Math.max(60,Math.round(w/6)),H=Math.max(40,Math.round(h/6));
+  cv.width=W;cv.height=H;const x=cv.getContext("2d");x.clearRect(0,0,W,H);
+  const bloom=(cx,cy,rx,ry,col,a)=>{x.save();x.translate(cx*W,cy*H);x.scale(rx*W,ry*H);
+    const g=x.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,"rgba("+col+","+a+")");g.addColorStop(.72,"rgba("+col+",0)");g.addColorStop(1,"rgba("+col+",0)");
+    x.fillStyle=g;x.beginPath();x.arc(0,0,1,0,7);x.fill();x.restore();};
+  bloom(.24,.40,.42,.36,"98,96,255",.6);
+  bloom(.72,.30,.38,.32,"255,118,178",.4);
+  bloom(.50,.64,.40,.30,"255,182,108",.44);
+  bloom(.88,.58,.34,.30,"58,214,198",.34);
+}
+// the wash flowers on arriving home (the intro has its own, synced to the limb)
+function hzWashBloom(){
+  const w=$("#hz-wash");if(!w||!hzMotionOK()||document.documentElement.classList.contains("hz-intro"))return;
+  w.classList.remove("bloom");void w.offsetWidth;w.classList.add("bloom");
+  clearTimeout(hzS.washT);hzS.washT=setTimeout(()=>w.classList.remove("bloom"),4700);
+}
+function hzSkyPaint(){
+  if(!hzS)return;
+  const day=Math.floor((hzNow()-new Date().getTimezoneOffset()*60000)/86400000);
+  if(hzS.dayKey!==day){hzS.dayKey=day;hzS.seed=hzHash(day+":"+hzS.salt);hzS.rnd=hzRng(hzS.seed);hzSeedDay();}
+  hzS.sb=hzSidebarWidth();
+  const sky=$("#hz-sky");if(sky)sky.style.setProperty("--hz-sbw",hzS.sb+"px");
+  hzPlaceSun();hzDrawStars();hzDrawMoon();hzDrawAuroras();hzDrawWash();hzLimbFit();
+  hzS.skyAt=performance.now();
+  hzAuroraLevel();
+}
+// the day's own drift: the sway's period and lean, within tight bounds
+function hzSeedDay(){
+  const sky=$("#hz-sky");if(!sky)return;const r=hzS.rnd;
+  sky.style.setProperty("--hz-t-drift",(26+r()*6).toFixed(1)+"s");
+  const a1=$("#hz-aur1"),a2=$("#hz-aur2");
+  if(a1)a1.style.animationDelay=(-r()*40).toFixed(1)+"s";
+  if(a2)a2.style.animationDelay=(-r()*50).toFixed(1)+"s";
+  // the rare moment: a meteor at seeded times, roughly every 40 to 90 minutes
+  hzS.meteorGaps=[];for(let i=0;i<48;i++)hzS.meteorGaps.push((40+r()*50)*60000);
+}
+// the aurora's intensity follows real GPU activity: idle .35-.5, answering .62
+function hzAuroraLevel(){
+  const sky=$("#hz-sky");if(!sky)return;
+  let op;
+  if(hzS.gen)op=0.62;
+  else op=0.35+0.15*(hzS.gpu==null?0.45:Math.max(0,Math.min(1,hzS.gpu/100)));
+  sky.style.setProperty("--hz-aur-op",op.toFixed(3));
+}
+function hzSidebarWidth(){
+  const sb=$("#sidebar");if(!sb||innerWidth<=760)return 0;
+  if(getComputedStyle(sb).display==="none"||getComputedStyle(sb).position==="fixed")return 0;
+  return sb.getBoundingClientRect().width;
+}
+// the limb's peak sits at the composer's vertical centre (NORTHSTAR 11)
+function hzLimbFit(){
+  const sky=$("#hz-sky"),c=$("#composer");if(!sky||!c)return;
+  const r=c.getBoundingClientRect();
+  if(r.height>0)sky.style.setProperty("--hz-limb-y",(r.top+r.height/2).toFixed(0)+"px");
+  hzGlowFit();
+}
+// ---- the Apple aerials (per Patrick: "we're missing out from the original
+// design with the Apple backgrounds... incorporate them, like trace lines in
+// the background"). The app's own backdrop list, its day/night rule (6b318)
+// and its local cache, served same-origin from /static/sky/ so WebGL may read
+// the frames. The planet below the limb is an orbital (GMT) clip; the sky
+// carries the edges of a city clip as thin ice lines. Decode is the
+// hardware's; the edge pass is a small shader at half the window's size,
+// 30 frames a second, 15 while a model answers; paused when hidden, long
+// unfocused or with effects off; a still frame and no lines under reduced
+// motion; no WebGL means no lines and the Earth window stays.
+const HZ_SKY_ORBIT=__SKY_ORBIT__,HZ_SKY_DARK=new Set(JSON.parse('__SKY_DARK__'));
+function hzClipPool(orbital){
+  const night=!hzS.sun||hzS.sun.alt<-6,all=[];
+  for(let i=0;i<SKY_N;i++)all.push(i);
+  let pool=all.filter(i=>HZ_SKY_ORBIT.includes(i)===orbital&&HZ_SKY_DARK.has(i)===night);
+  if(!pool.length)pool=all.filter(i=>HZ_SKY_ORBIT.includes(i)===orbital);
+  // the day's pick first, so the two clips vary with the day like the aurora
+  const r=hzRng(hzS.seed+(orbital?7:3)),k=Math.floor(r()*pool.length);
+  return pool.slice(k).concat(pool.slice(0,k));
+}
+async function hzClipReady(pool,tag){
+  if(typeof api!=="function")return -1;
+  for(const i of pool){try{const st=await(await api("/api/sky/status?i="+i)).json();if(st.status==="ready")return i;}catch(e){return -1;}}
+  const i=pool[0];if(i==null)return -1;
+  // nothing cached: the first candidate downloads in the background (the app's
+  // own one-at-a-time rule); the planet stays its painted self meanwhile
+  for(let k=0;k<480&&hzS.mediaGen===tag;k++){
+    try{const st=await(await api("/api/sky/status?i="+i+"&warm=1")).json();
+      if(st.status==="ready")return i;if(st.status==="error")return -1;}catch(e){return -1;}
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  return -1;
+}
+function hzMediaOK(){return document.documentElement.classList.contains("hz")&&!(typeof noVideo!=="undefined"&&noVideo);}
+async function hzEarthBoot(){
+  const v=$("#hz-earth-vid");if(!v||!hzMediaOK()||v.dataset.i)return;
+  const tag=hzS.mediaGen;
+  const i=await hzClipReady(hzClipPool(true),tag);
+  if(i<0||tag!==hzS.mediaGen)return;
+  v.dataset.i=String(i);v.src="/static/sky/"+i+".mov";
+  v.addEventListener("loadeddata",()=>{v.classList.add("on");hzMediaSync();},{once:true});
+  v.load();
+}
+async function hzTraceBoot(){
+  const cv=$("#hz-trace"),v=$("#hz-trace-vid");if(!cv||!v||!hzMediaOK()||hzS.trace!==undefined)return;
+  hzS.trace=null;
+  if(hzS.reduced)return;                                   // no lines under reduced motion
+  let gl=null;try{gl=cv.getContext("webgl",{alpha:true,premultipliedAlpha:true,antialias:false,preserveDrawingBuffer:true,depth:false,stencil:false});}catch(e){}
+  if(!gl)return;                                           // no WebGL: the Earth window stays, the lines don't
+  const sh=(t,src)=>{const h=gl.createShader(t);gl.shaderSource(h,src);gl.compileShader(h);
+    if(!gl.getShaderParameter(h,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(h));return h;};
+  let prog;
+  try{
+    prog=gl.createProgram();
+    gl.attachShader(prog,sh(gl.VERTEX_SHADER,"attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}"));
+    // Scharr edges of the frame's luminance; premultiplied ice-to-white lines
+    gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,"precision mediump float;varying vec2 uv;uniform sampler2D t;uniform vec2 px;"
+      +"float L(vec2 q){vec3 c=texture2D(t,q).rgb;return dot(c,vec3(.299,.587,.114));}"
+      +"void main(){float tl=L(uv+px*vec2(-1.,-1.)),tc=L(uv+px*vec2(0.,-1.)),tr=L(uv+px*vec2(1.,-1.));"
+      +"float l=L(uv+px*vec2(-1.,0.)),r=L(uv+px*vec2(1.,0.));"
+      +"float bl=L(uv+px*vec2(-1.,1.)),bc=L(uv+px*vec2(0.,1.)),br=L(uv+px*vec2(1.,1.));"
+      +"float gx=3.*tr+10.*r+3.*br-3.*tl-10.*l-3.*bl;float gy=3.*bl+10.*bc+3.*br-3.*tl-10.*tc-3.*tr;"
+      +"float g=sqrt(gx*gx+gy*gy)/16.;float s=smoothstep(.07,.55,g);"
+      +"vec3 col=mix(vec3(.624,.753,1.),vec3(1.),smoothstep(.45,1.,s));gl_FragColor=vec4(col*s,s);}"));
+    gl.linkProgram(prog);
+    if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(prog));
+  }catch(e){return;}
+  gl.useProgram(prog);
+  const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const ap=gl.getAttribLocation(prog,"p");gl.enableVertexAttribArray(ap);gl.vertexAttribPointer(ap,2,gl.FLOAT,false,0,0);
+  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  // temporal smoothing in place: each frame blends over the last (k new, 1-k old),
+  // so the lines flow instead of flicker and vanished edges fade out
+  gl.enable(gl.BLEND);gl.blendColor(0,0,0,.34);gl.blendFunc(gl.CONSTANT_ALPHA,gl.ONE_MINUS_CONSTANT_ALPHA);
+  gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+  hzS.trace={gl:gl,px:gl.getUniformLocation(prog,"px"),w:0,h:0,last:0,frames:0};
+  const tag=hzS.mediaGen;
+  const i=await hzClipReady(hzClipPool(false),tag);
+  if(i<0||tag!==hzS.mediaGen)return;
+  v.dataset.i=String(i);v.src="/static/sky/"+i+".mov";
+  v.addEventListener("loadeddata",()=>{hzMediaSync();},{once:true});
+  v.load();
+}
+function hzTraceFit(){
+  const t=hzS.trace,cv=$("#hz-trace");if(!t||!cv)return;
+  const w=Math.max(160,Math.round(innerWidth/2)),h=Math.max(90,Math.round(innerHeight/2));
+  if(w!==t.w||h!==t.h){t.w=w;t.h=h;cv.width=w;cv.height=h;t.gl.viewport(0,0,w,h);t.gl.uniform2f(t.px,1/w,1/h);t.gl.clear(t.gl.COLOR_BUFFER_BIT);}
+}
+function hzTraceTick(now){
+  hzS.traceT=0;const t=hzS.trace,v=$("#hz-trace-vid"),cv=$("#hz-trace");
+  if(!t||!v||!cv||!hzS.mediaOn)return;
+  const gap=hzS.gen?1000/15:1000/30;              // 30 fps, 15 while a model answers
+  if(now-t.last>=gap-1){
+    t.last=now;
+    if(v.readyState>=2&&!v.paused){
+      hzTraceFit();const gl=t.gl;
+      try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,v);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);t.frames++;
+        if(t.frames===3)cv.classList.add("on");}
+      catch(e){hzS.trace=null;cv.classList.remove("on");return;}   // a tainted or lost context: no lines
+    }
+  }
+  hzS.traceT=requestAnimationFrame(hzTraceTick);
+}
+// play or pause both clips with the rest of the sky: hidden, long unfocused
+// and effects off pause them; reduced motion holds the Earth on one frame
+function hzMediaSync(){
+  const e=$("#hz-earth-vid"),v=$("#hz-trace-vid");
+  const on=hzMediaOK()&&!document.hidden&&!hzS.blurred;
+  hzS.mediaOn=on;
+  const playOrPause=(m,play)=>{if(!m||!m.src)return;if(play){const p=m.play();if(p&&p.catch)p.catch(()=>{});}else if(!m.paused)m.pause();};
+  playOrPause(e,on&&!hzS.reduced);
+  playOrPause(v,on&&!hzS.reduced&&!!hzS.trace);
+  if(on&&hzS.trace&&!hzS.traceT)hzS.traceT=requestAnimationFrame(hzTraceTick);
+  if(!on&&hzS.traceT){cancelAnimationFrame(hzS.traceT);hzS.traceT=0;}
+}
+function hzMediaBoot(){
+  hzS.mediaGen=(hzS.mediaGen||0)+1;
+  if(!hzMediaOK())return;
+  if(hzS.debug&&hzS.debug.media==="0")return;             // a dev screenshot without the footage
+  hzEarthBoot();hzTraceBoot();
+}
+// ---- words from data (NORTHSTAR 34)
+function hzGreeting(){
+  const d=new Date(hzNow()),h=d.getHours(),nm=(typeof NICK==="string"&&NICK)?NICK:"";
+  if(h<5)return nm?"Up late, "+nm+".":"Up late.";
+  if(h<12)return "Good morning"+(nm?", "+nm:"")+".";
+  if(h<18)return "Good afternoon"+(nm?", "+nm:"")+".";
+  return "Good evening"+(nm?", "+nm:"")+".";
+}
+// the status line under the greeting: the machines awake, and whether anything
+// left them today (the ledger's cloud calls since midnight, from /api/home)
+function hzStatusLine(){
+  const srvs=typeof srvList!=="undefined"?srvList.filter(s=>s.paired):[];
+  const awake=srvs.filter(s=>s.only&&s.only.ok),asleep=srvs.filter(s=>!(s.only&&s.only.ok));
+  if(typeof srvLoaded!=="undefined"&&!srvLoaded&&!srvs.length)return "";
+  let a;
+  if(!srvs.length)a="This Mac is awake.";
+  else if(!asleep.length)a=(srvs.length===1?"Both":srvs.length===2?"All three of":"All")+" your machines are awake.";
+  else if(awake.length)a="This Mac and "+awake.map(s=>s.name).join(", ")+" are awake; "+asleep.map(s=>s.name).join(", ")+(asleep.length>1?" are":" is")+" asleep.";
+  else a="This Mac is awake; "+asleep.map(s=>s.name).join(", ")+(asleep.length>1?" are":" is")+" asleep.";
+  const f=hzS.facts;let b="";
+  if(f&&typeof f.cloud_today==="number")b=f.cloud_today===0?(srvs.length?" Nothing has left them today.":" Nothing has left it today.")
+    :(" "+f.cloud_today+(f.cloud_today===1?" call went":" calls went")+" to the cloud today.");
+  return a+b;
+}
+function hzHomePaint(){
+  if(!hzReady)return;
+  const g=$("#hero .greet");
+  if(g){g.textContent=hzGreeting();
+    // a fresh headline rises in once (not during the intro, which raises it itself)
+    if(!g.dataset.hz&&!document.documentElement.classList.contains("hz-intro")&&hzMotionOK())g.classList.add("rise");
+    g.dataset.hz="1";}
+  hzHistoryPaint();hzMachinesPaint();hzLanePaint();hzModesPaint();hzTitlePaint();
+  requestAnimationFrame(hzLimbFit);setTimeout(hzLimbFit,60);
+}
+function hzWhen(ts){
+  if(!(ts>0))return "";
+  const d=new Date(ts),now=new Date(hzNow()),day=x=>Math.floor((x.getTime()-x.getTimezoneOffset()*60000)/86400000);
+  const dd=day(now)-day(d);
+  if(dd<=0)return "Today";if(dd===1)return "Yesterday";
+  if(dd<7)return d.toLocaleDateString(undefined,{weekday:"long"});
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+function hzK(n){return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e4?Math.round(n/1e3)+"K":n>=1e3?(n/1e3).toFixed(1)+"K":String(n);}
+// recent chats as hairline rows under the composer: title, when, and a token
+// count only where the chat carries a real one (never estimated here)
+function hzHistoryPaint(){
+  const box=$("#hz-history");if(!box)return;
+  if(!$("#hero")){box.hidden=true;return;}
+  const esc_=typeof esc==="function"?esc:(s=>String(s));
+  const laneOK=c=>(uiMode==="code"||uiMode==="funnel")?(c.lane||"ai")===uiMode:((c.lane||"ai")!=="code"&&(c.lane||"ai")!=="funnel");
+  const mine=(typeof chats!=="undefined"?chats:[]).filter(c=>c.id!==curChat&&laneOK(c)&&(c.title||"").trim()&&c.ts>0)
+    .sort((a,b)=>(+b.ts||0)-(+a.ts||0)).slice(0,3);
+  box.hidden=!mine.length;
+  box.innerHTML=mine.map(c=>'<button type="button" class="hz-row" data-id="'+esc_(c.id)+'"><span class="t">'+esc_(c.title)+'</span>'
+    +'<span class="w">'+esc_(hzWhen(c.ts))+'</span><span class="k">'+(typeof c.tokens==="number"&&c.tokens>0?hzK(c.tokens):"")+'</span></button>').join("");
+}
+// the machines in the header: this Mac, then each paired server by ITS name
+// (never an assumed one), then the cloud when it is on. Dots say the state.
+function hzMachinesPaint(){
+  const el=$("#hz-machines");if(!el)return;
+  const esc_=typeof esc==="function"?esc:(s=>String(s));
+  const seg=(dot,name,title)=>'<span class="hz-seg" title="'+esc_(title||"")+'"><i class="hz-dot '+dot+'"></i>'+esc_(name)+'</span>';
+  let h=seg(hzS.gen?"good live":hzS.gpu==null?"good":hzS.gpu<70?"good":"warn","This Mac",hzS.gpu==null?"This Mac":"This Mac, GPU "+Math.round(hzS.gpu)+"%");
+  const srvs=typeof srvList!=="undefined"?srvList.filter(s=>s.paired):[];
+  srvs.slice(0,2).forEach(s=>{const ok=!!(s.only&&s.only.ok),asleep=typeof srvAsleep==="function"&&srvAsleep(s);
+    h+=seg(ok?(hzS.srv?"good live":"good"):asleep?"warn":"off",s.name,ok?s.name+" is ready":asleep?s.name+" is asleep":s.name+" is offline");});
+  if(srvs.length>2)h+=seg("","+"+(srvs.length-2)+" more","Your other servers");
+  if(typeof cloudSt!=="undefined"&&cloudSt&&cloudSt.configured&&cloudSt.turbo)h+=seg("cloud","Cloud","Cloud models are on");
+  el.innerHTML=h;
+}
+function hzStats(gpu,mem){if(!hzReady)return;hzS.gpu=(typeof gpu==="number")?gpu:null;hzS.mem=mem;hzMachinesPaint();hzAuroraLevel();}
+function hzLanePaint(){
+  $$("#hz-lanes [role=tab]").forEach(b=>{const on=b.dataset.m===uiMode;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
+}
+function hzTitlePaint(){
+  const t=$("#hz-title");if(!t)return;
+  const c=(typeof chats!=="undefined"&&typeof curChat!=="undefined")?chats.find(x=>x.id===curChat):null;
+  t.textContent=c&&c.title?c.title:"";
+}
+// ---- the effort slider (NORTHSTAR 24-30): Flare, Zenith, Meridian (and
+// Odyssey where its tier exists) over a real range input; Max, Cloud only,
+// the servers and Advanced stay in the engine menu beside it and park the
+// thumb hollow at their depth. Its words never name a model.
+function hzModes(){return ["Fast","Thinking","Pro","Vera Rubin"].filter(n=>TIER_META[n]);}
+function hzModeIndex(t){
+  const ms=hzModes(),i=ms.indexOf(t);if(i>=0)return i;
+  const s=String(t||"").toLowerCase();
+  if(t==="Max"||/pro|max/.test(s))return ms.length-1;
+  if(/think/.test(s))return Math.min(1,ms.length-1);
+  if(/fast/.test(s))return 0;
+  return 1;
+}
+function hzOffLabel(t){
+  if(t==="Max")return "Max";
+  if(typeof isCloudMode==="function"&&isCloudMode(t))return "Cloud only";
+  if(typeof isSrvMode==="function"&&isSrvMode(t)){const s=typeof srvModeOf==="function"?srvModeOf(t):null;return s?s.name+" only":"Your server";}
+  if(typeof advOn!=="undefined"&&advOn)return "Your own council";
+  return "Your pick";
+}
+function hzHint(name){
+  let sp={};try{sp=JSON.parse(localStorage.getItem("millen.speeds")||"{}");}catch(e){}
+  const s=+sp[name];if(!(s>0))return "";
+  if(s<60)return "Usually about "+Math.max(5,Math.round(s/5)*5)+" s for you";
+  const m=Math.round(s/60);return "Usually about "+m+(m===1?" minute for you":" minutes for you");
+}
+function hzModesPaint(){
+  const host=$("#hz-effort");if(!host)return;
+  const ms=hzModes();if(ms.length<2){host.hidden=true;return;}
+  host.hidden=false;
+  let sl=host.querySelector(".hz-sl");
+  if(!sl||+sl.dataset.n!==ms.length){
+    host.innerHTML='<div class="hz-sl" data-n="'+ms.length+'"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
+      +ms.map((m,i)=>'<i class="hz-sl-dot'+(i===ms.length-1&&m==="Vera Rubin"?" last":"")+'" style="--hz-u:'+(i/(ms.length-1)).toFixed(4)+'"></i>').join("")
+      +'<i class="hz-sl-halo"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
+      +'<label><span class="hz-vh">How hard it thinks</span><input type="range" min="0" max="'+(ms.length-1)+'" step="0.01" value="1"></label></div>'
+      +'<div class="hz-sl-label"><span class="hz-sl-l1"><span class="hz-sl-name"></span><span class="hz-sl-desc"></span></span><span class="hz-sl-l2"></span></div>';
+    sl=host.querySelector(".hz-sl");hzSliderWire(host);
+  }
+  const t=typeof tier==="string"?tier:"",on=ms.indexOf(t)>=0,i=hzModeIndex(t);
+  sl.classList.toggle("off",!on);
+  hzSliderShow(host,i,on?ms[i]:"",true);
+  // the deepest modes shimmer: Odyssey in full, Meridian softly
+  const root=document.documentElement,nm=host.querySelector(".hz-sl-name");
+  root.classList.toggle("hz-ody",t==="Vera Rubin");root.classList.toggle("hz-mer",t==="Pro");
+  nm.classList.toggle("shim",t==="Vera Rubin"||t==="Pro");nm.classList.toggle("soft",t==="Pro");
+  if(!on){host.querySelector(".hz-sl-name").textContent=hzOffLabel(t);host.querySelector(".hz-sl-desc").textContent=t==="Max"?HZ_MODE_DESC.Max:"";
+    host.querySelector(".hz-sl-l2").textContent="";}
+}
+function hzSliderShow(host,i,name,settle){
+  const ms=hzModes(),sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input"),n=ms.length;
+  const u=Math.max(0,Math.min(1,i/Math.max(1,n-1)));
+  const pad=9,width=sl.getBoundingClientRect().width||(host.classList.contains("compact")?120:196);
+  sl.style.setProperty("--hz-eff-u",u.toFixed(4));
+  sl.style.setProperty("--hz-eff-px",(u*(width-pad*2)).toFixed(1)+"px");
+  sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k/(n-1)<=u+0.001));
+  if(settle){inp.value=String(Math.round(i));inp.setAttribute("aria-valuenow",String(Math.round(i)));}
+  const m=name||ms[Math.round(i)];
+  if(m){inp.setAttribute("aria-valuetext",modeName(m)+". "+(HZ_MODE_DESC[m]||""));
+    host.querySelector(".hz-sl-name").textContent=modeName(m);
+    host.querySelector(".hz-sl-desc").textContent=HZ_MODE_DESC[m]||"";
+    const hint=hzHint(m),l2=host.querySelector(".hz-sl-l2");
+    l2.innerHTML=hint?'<span>'+hint+'</span>':"";}
+}
+function hzSliderWire(host){
+  const sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input");
+  const pick=i=>{const ms=hzModes(),m=ms[Math.max(0,Math.min(ms.length-1,i))];
+    if(m&&m!==tier&&typeof setTier==="function"&&!(typeof tierOff!=="undefined"&&tierOff[m]))setTier(m);else hzModesPaint();};
+  // a smooth drag (the input steps by hundredths), then the snap to the detent
+  inp.addEventListener("pointerdown",()=>{sl.classList.add("dragging");sl.classList.remove("off");});
+  inp.addEventListener("input",()=>{if(!sl.classList.contains("dragging"))return;const v=+inp.value;hzSliderShow(host,v,hzModes()[Math.round(v)],false);});
+  const settle=()=>{if(!sl.classList.contains("dragging"))return;sl.classList.remove("dragging");
+    const i=Math.round(+inp.value);hzSliderShow(host,i,hzModes()[i],true);pick(i);};
+  inp.addEventListener("pointerup",settle);inp.addEventListener("pointercancel",settle);
+  inp.addEventListener("change",()=>{if(!sl.classList.contains("dragging")){const i=Math.round(+inp.value);hzSliderShow(host,i,hzModes()[i],true);pick(i);}});
+  inp.addEventListener("keydown",e=>{
+    const n=hzModes().length,cur=Math.round(+inp.value);let i=null;
+    if(e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="PageUp")i=cur+1;
+    else if(e.key==="ArrowLeft"||e.key==="ArrowDown"||e.key==="PageDown")i=cur-1;
+    else if(e.key==="Home")i=0;else if(e.key==="End")i=n-1;
+    if(i===null)return;e.preventDefault();pick(Math.max(0,Math.min(n-1,i)));
+  });
+}
+// the slider lives in the composer on the home and, compact, in the
+// conversation header (NORTHSTAR 30)
+function hzPlaceEffort(){
+  const eff=$("#hz-effort"),slot=$("#hz-effort-slot"),crow=$("#crow");if(!eff||!slot||!crow)return;
+  const home=!!$("#hero");
+  if(home&&eff.parentElement!==crow){crow.insertBefore(eff,$("#model-chip"));eff.classList.remove("compact");hzModesPaint();}
+  else if(!home&&eff.parentElement!==slot){slot.appendChild(eff);eff.classList.add("compact");hzModesPaint();}
+}
+// ---- the header's first button: on the home it opens the chats; in a
+// conversation it hides or shows the sidebar; under 760px it is the drawer
+function hzSidebarToggle(){
+  const root=document.documentElement;
+  if(innerWidth<=760){document.body.classList.toggle("sbopen");return;}
+  if($("#hero")){root.classList.toggle("hz-sbopen");}
+  else{const hide=!root.classList.contains("sbhide");root.classList.toggle("sbhide",hide);
+    try{localStorage.setItem("millen.sbhide",hide?"1":"0");}catch(e){}}
+  hzSidebarLabel();hzSkyPaint();
+}
+function hzSidebarLabel(){
+  const b=$("#hz-sb");if(!b)return;
+  const open=hzSidebarWidth()>0||document.body.classList.contains("sbopen");
+  b.setAttribute("aria-pressed",open?"true":"false");b.setAttribute("aria-label",open?"Hide the chats":"Show the chats");
+}
+// the glow under the composer: a layer behind the glass whose opacity breathes
+function hzGlowFit(){
+  const g=$("#hz-cglow"),c=$("#composer");if(!g||!c)return;
+  const r=c.getBoundingClientRect();if(!(r.height>0)){g.hidden=true;return;}
+  g.hidden=false;
+  g.style.transform="translate("+(r.left+24).toFixed(0)+"px,"+(r.top+10).toFixed(0)+"px)";
+  g.style.width=(r.width-48).toFixed(0)+"px";g.style.height=(r.height-4).toFixed(0)+"px";
+}
+// ---- the send: two ice rings from the button, a contrail along the limb
+function hzOnSend(){
+  if(!hzReady||!document.documentElement.classList.contains("hz"))return;
+  hzS.gen=true;hzS.rate=0;hzS.rateT=0;hzS.srv=0;hzS.stage="";hzS.genT0=performance.now();
+  const sky=$("#hz-sky");if(sky){sky.style.setProperty("--hz-rate","0");sky.style.setProperty("--hz-srv","0");}
+  hzAuroraLevel();hzMachinesPaint();
+  if(hzMotionOK()){hzBoom();hzContrail();}
+  if(!hzS.teleT)hzS.teleT=requestAnimationFrame(hzTeleApply);
+}
+function hzBoom(){
+  const b=$("#send");if(!b)return;const r=b.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  for(let i=0;i<2;i++){
+    const el=document.createElement("i");el.className="hz-ring";el.style.left=cx+"px";el.style.top=cy+"px";
+    document.body.appendChild(el);
+    const a=el.animate([{transform:"translate(-50%,-50%) scale(.25)",opacity:.9},{transform:"translate(-50%,-50%) scale("+(i?14:8)+")",opacity:0}],
+      {duration:i?980:640,delay:i*90,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+    a.onfinish=()=>el.remove();
+  }
+  b.animate([{transform:"scale(.92)"},{transform:"scale(1)"}],{duration:420,easing:"cubic-bezier(.34,1.56,.64,1)"});
+}
+function hzContrail(){
+  const sky=$("#hz-sky");if(!sky)return;
+  const g=hzGeom(),limbY=parseFloat(getComputedStyle(sky).getPropertyValue("--hz-limb-y"))||g.foot;
+  const rim=x=>{const dx=x-g.cx;return limbY+g.R-Math.sqrt(Math.max(0,g.R*g.R-dx*dx));};
+  const el=document.createElement("i");el.className="hz-contrail";sky.appendChild(el);
+  const half=(g.W-g.sb)*0.46,x0=g.cx-half,x1=g.cx+half,kf=[];
+  for(let k=0;k<=8;k++){const x=x0+(x1-x0)*k/8,y=rim(x)-2,dy=(rim(x+1)-rim(x-1))/2;
+    kf.push({transform:"translate("+x.toFixed(1)+"px,"+y.toFixed(1)+"px) rotate("+(Math.atan2(dy,1)*180/Math.PI).toFixed(2)+"deg)",
+      opacity:k===0||k===8?0:(k<2?.6:.95),offset:k/8});}
+  const a=el.animate(kf,{duration:1500,easing:"cubic-bezier(.3,.6,.2,1)",fill:"forwards"});a.onfinish=()=>el.remove();
+}
+// ---- the stream's frames feed the aurora (RUN, STATUS, STEP, DRAFT, and the
+// writer's rate the page measures); applied at most thirty times a second
+function hzTele(kind,v){
+  if(!hzReady||!hzS.gen)return;
+  if(kind==="rate"){hzS.rateT=Math.max(0,Math.min(1,(+v||0)/60));}
+  else if(kind==="run"&&v){if(v.w==="server"||v.w==="mix")hzS.srv=1;hzPulse();}
+  else if(kind==="status"){if(v!==hzS.stage){hzS.stage=v;hzPulse();}}
+  else if(kind==="step"||kind==="draft"){hzPulse();}
+}
+function hzPulse(){
+  const a=$("#hz-aur2");if(!a||!hzMotionOK())return;
+  a.classList.remove("hz-pulse");void a.offsetWidth;a.classList.add("hz-pulse");
+  clearTimeout(hzS.pulseT);hzS.pulseT=setTimeout(()=>a.classList.remove("hz-pulse"),800);
+}
+function hzTeleApply(){
+  hzS.teleT=0;if(!hzS.gen)return;
+  const now=performance.now();
+  if(now-(hzS.lastApply||0)>=33){
+    hzS.lastApply=now;
+    hzS.rate+=((hzS.rateT||0)-hzS.rate)*0.12;
+    const sky=$("#hz-sky");
+    if(sky){sky.style.setProperty("--hz-rate",hzS.rate.toFixed(3));
+      sky.style.setProperty("--hz-aur-op",(0.62+0.08*hzS.rate).toFixed(3));
+      sky.style.setProperty("--hz-srv",String(hzS.srv||0));}
+    if(hzS.srv&&!hzS.srvShown){hzS.srvShown=true;hzMachinesPaint();}
+  }
+  hzS.teleT=requestAnimationFrame(hzTeleApply);
+}
+// the answer landed: the sky settles; the limb warms for a moment, the day's
+// first answer longer and softer (NORTHSTAR 33)
+function hzOnLand(aborted){
+  if(!hzReady)return;
+  hzS.gen=false;hzS.srv=0;hzS.srvShown=false;
+  const sky=$("#hz-sky");if(sky){sky.style.setProperty("--hz-rate","0");sky.style.setProperty("--hz-srv","0");}
+  hzAuroraLevel();hzMachinesPaint();
+  if(aborted||!document.documentElement.classList.contains("hz")||!hzMotionOK())return;
+  const day=String(Math.floor(hzNow()/86400000));let first=false;
+  try{first=localStorage.getItem("millen.hz.lastday")!==day;localStorage.setItem("millen.hz.lastday",day);}catch(e){}
+  const root=document.documentElement;
+  root.classList.remove("hz-land","hz-land-first");void document.body.offsetWidth;
+  root.classList.add(first?"hz-land-first":"hz-land");
+  clearTimeout(hzS.landT);hzS.landT=setTimeout(()=>root.classList.remove("hz-land","hz-land-first"),first?4800:3200);
+}
+// ---- stillness: effects off, reduced motion, hidden, or a minute unfocused
+function hzMotionOK(){
+  return !(typeof noVideo!=="undefined"&&noVideo)&&!hzS.reduced&&!document.hidden&&!hzS.blurred;
+}
+function hzPauseSync(){
+  const root=document.documentElement;
+  const pause=document.hidden||hzS.blurred||(typeof noVideo!=="undefined"&&noVideo);
+  root.classList.toggle("hz-pause",pause);
+  hzMediaSync();
+  if(!pause&&hzS&&performance.now()-(hzS.skyAt||0)>120000)hzSkyPaint();
+}
+function hzMeteorPlan(){
+  clearTimeout(hzS.meteorT);
+  const gaps=hzS.meteorGaps||[];const gap=gaps[(hzS.meteorN||0)%Math.max(1,gaps.length)]||3600000;
+  hzS.meteorT=setTimeout(()=>{hzS.meteorN=(hzS.meteorN||0)+1;
+    if(hzMotionOK()&&document.documentElement.classList.contains("hz"))hzMeteor();hzMeteorPlan();},gap);
+}
+function hzMeteor(){
+  const sky=$("#hz-sky");if(!sky)return;
+  const g=hzGeom(),r=hzS.rnd,x=g.W*(0.3+r()*0.55),y=g.H*(0.06+r()*0.22);
+  const el=document.createElement("i");el.className="hz-meteor";sky.appendChild(el);
+  const a=el.animate([{transform:"translate("+x+"px,"+y+"px) rotate(151deg)",opacity:0},{opacity:.95,offset:.3},
+    {transform:"translate("+(x-230)+"px,"+(y+126)+"px) rotate(151deg)",opacity:0}],
+    {duration:1500,easing:"linear",fill:"forwards"});
+  a.onfinish=()=>el.remove();
+}
+// ---- the intro, once per launch: black; the real stars; the limb rising with
+// a warm flare on its hairline; the aurora; the wordmark and one line, then its
+// flight into the header; the greeting and the composer rising into place. Any
+// key, click or wheel skips it and the key lands in the composer, which has
+// focus from the first frame. Choreographed in CSS from --hz-t (so a dev copy
+// can freeze any moment); the wordmark's flight in JS.
+function hzIntroKick(){
+  const root=document.documentElement;
+  if(!root.classList.contains("hz-intro")){hzIntroEnd(false);return;}
+  if(hzS.intro)return;                                   // already running (the app kicks twice)
+  hzS.intro=true;hzS.introT0=performance.now();
+  try{sessionStorage.setItem("millen.hz.intro","1");}catch(e){}
+  const dbg=hzS.debug||{},frozen=dbg.intro!=null;
+  const mark=$("#hz-intro-mark");if(mark)mark.hidden=false;
+  if(frozen){root.style.setProperty("--hz-t",(-dbg.intro).toFixed(2)+"s");root.classList.add("hz-freeze");window.hzFrozen=true;}
+  requestAnimationFrame(()=>root.classList.add("hz-run"));
+  setTimeout(()=>root.classList.add("hz-run"),40);     // a hidden document has no frames
+  const skip=e=>{if(e&&e.type==="keydown"&&(e.metaKey||e.ctrlKey||e.altKey))return;hzIntroEnd(true);};
+  hzS.introSkip=skip;
+  ["keydown","pointerdown","wheel","touchstart"].forEach(k=>addEventListener(k,skip,{capture:true,passive:true}));
+  const at=(ms,fn)=>hzS.introTimers.push(setTimeout(fn,ms));
+  if(!frozen){at(2350,()=>hzIntroFly());at(4150,()=>hzIntroEnd(false));}
+  else hzIntroFly(dbg.intro*1000);
+}
+function hzIntroFly(frozenAt){
+  const mark=$("#hz-intro-mark");if(!mark)return;
+  const to=$("#hz-mark"),from=mark.querySelector(".vghost").getBoundingClientRect();
+  const dst=to&&getComputedStyle(to).display!=="none"?to.getBoundingClientRect():null;
+  let kf;
+  if(dst&&dst.width>4&&from.width>4){
+    const s=dst.height/from.height,fx=from.left+from.width/2,fy=from.top+from.height/2;
+    const dx=(dst.left+dst.width/2)-fx,dy=(dst.top+dst.height/2)-fy;
+    kf=[{transform:"translate(-50%,-50%)",opacity:1},
+        {transform:"translate(calc(-50% + "+dx.toFixed(1)+"px),calc(-50% + "+dy.toFixed(1)+"px)) scale("+s.toFixed(3)+")",opacity:1,offset:.86},
+        {transform:"translate(calc(-50% + "+dx.toFixed(1)+"px),calc(-50% + "+dy.toFixed(1)+"px)) scale("+s.toFixed(3)+")",opacity:0}];
+  }else kf=[{opacity:1},{opacity:0}];
+  mark.classList.add("flying");
+  const a=mark.animate(kf,{duration:950,easing:"cubic-bezier(.65,0,.35,1)",fill:"forwards"});
+  hzS.flipAnim=a;
+  if(frozenAt!=null){const t=frozenAt-2350;if(t<0){a.cancel();mark.classList.remove("flying");}else{a.pause();a.currentTime=Math.min(950,t);}}
+}
+function hzIntroEnd(skipped){
+  const root=document.documentElement;
+  if(hzS&&hzS.introTimers){hzS.introTimers.forEach(clearTimeout);hzS.introTimers=[];}
+  if(hzS&&hzS.introSkip){["keydown","pointerdown","wheel","touchstart"].forEach(k=>removeEventListener(k,hzS.introSkip,{capture:true}));hzS.introSkip=null;}
+  if(hzS&&hzS.flipAnim){try{hzS.flipAnim.cancel();}catch(e){}hzS.flipAnim=null;}
+  const mark=$("#hz-intro-mark");if(mark){mark.classList.remove("flying");mark.hidden=true;}
+  root.classList.remove("hz-intro","hz-run","hz-freeze");root.style.removeProperty("--hz-t");
+  root.classList.add("hz-ready");
+  if(hzS)hzS.intro=false;
+  if(skipped){const i=$("#input");if(i&&document.activeElement!==i)i.focus();}
+}
+// ---- the Look setting: Horizon (the default) or Classic, exactly as it was
+function setLook(v,quiet){
+  v=v==="classic"?"classic":"horizon";
+  try{localStorage.setItem("millen.look",v);}catch(e){}
+  const sel=$("#look-sel");if(sel&&sel.value!==v)sel.value=v;
+  const root=document.documentElement,was=root.classList.contains("hz");
+  if(v==="horizon"&&!was){root.classList.add("hz");hzStart();
+    const sk=$("#skyline");if(sk){sk.hidden=true;const vid=$("#sky-color");if(vid&&!vid.paused)vid.pause();}
+    const i=$("#input");if(i)i.placeholder="Ask anything, or drop a file here";}
+  if(v==="classic"&&was){hzStop();root.classList.remove("hz","hz-ready","hz-pause","sbhide","hz-sbopen");
+    const i=$("#input");if(i)i.placeholder="How can I help you today?";
+    if(!quiet&&typeof bootSkyline==="function"){skyBooted=false;bootSkyline();}
+    const g=$("#hero .greet");if(g&&typeof greeting==="function")g.textContent=greeting();}
+}
+function hzStart(){
+  hzS.place=hzFindPlace();
+  hzSkyPaint();hzHomePaint();hzPlaceEffort();hzMeteorPlan();hzPauseSync();hzSidebarLabel();hzMediaBoot();
+  clearInterval(hzS.skyTimer);hzS.skyTimer=setInterval(()=>{if(!document.hidden)hzSkyPaint();},180000);
+}
+function hzStop(){
+  clearInterval(hzS.skyTimer);clearTimeout(hzS.meteorT);hzS.skyTimer=0;hzS.meteorT=0;
+  hzS.mediaGen=(hzS.mediaGen||0)+1;hzS.mediaOn=false;
+  if(hzS.traceT){cancelAnimationFrame(hzS.traceT);hzS.traceT=0;}
+  ["#hz-earth-vid","#hz-trace-vid"].forEach(q=>{const m=$(q);if(m&&!m.paused)m.pause();});
+  const eff=$("#hz-effort"),crow=$("#crow");if(eff&&crow&&eff.parentElement!==crow){crow.insertBefore(eff,$("#model-chip"));eff.classList.remove("compact");}
+  hzIntroEnd(false);
+}
+// ---- the dev copy's frozen states (?hz=..., refused outside a dev copy)
+function hzDebugParse(spec){
+  const o={};if(!spec)return o;
+  String(spec).split(",").forEach(kv=>{
+    const m=/^intro@([\d.]+)$/.exec(kv);if(m){o.intro=+m[1];return;}
+    const i=kv.indexOf("=");if(i>0)o[kv.slice(0,i)]=kv.slice(i+1);else if(kv)o[kv]="1";
+  });
+  return o;
+}
+function hzDebugApply(){
+  const d=hzS.debug;if(!d)return;
+  const root=document.documentElement;
+  if(d.time){const t=Date.parse(d.time);if(t)hzS.fixedNow=t;}
+  if(d.place){const p=d.place.split(":");if(p.length>=2)hzS.place={lat:+p[0],lon:+p[1],city:p[2]||"",src:"debug"};}
+  if(d.sidebar==="1")root.classList.add("hz-sbopen");
+  if(d.fx==="0")document.body.classList.add("novideo");
+  if(d.time||d.place||d.sidebar)hzSkyPaint();
+  if(d.state==="typing"){const i=$("#input");if(i){i.value=d.text||"Which of my two job offers makes more sense if I want to move abroad next year?";i.dispatchEvent(new Event("input"));}}
+  if(d.state==="thinking"||d.state==="boom"||d.state==="landed"){
+    // a conversation in flight, for a screenshot: the question, the status line
+    const hero=$("#hero");if(hero)hero.remove();
+    if(typeof addMsg==="function"){addMsg("user",d.text||"Which of my two job offers makes more sense if I want to move abroad next year?");
+      const ai=addMsg("assistant","");const b=ai.querySelector(".body");if(b)b.innerHTML='<span class="statusline"><i class="cspin"></i> Reading both offers</span>';}
+    hzPlaceEffort();hzTitlePaint();
+    if(d.state!=="landed"){document.body.classList.add("gen");hzS.gen=true;
+      const sky=$("#hz-sky");if(sky){sky.style.setProperty("--hz-rate",d.rate||"0.6");sky.style.setProperty("--hz-aur-op","0.66");
+        sky.style.setProperty("--hz-srv",d.server==="1"?"1":"0");}
+      if(d.server==="1")hzS.srv=1;
+      $("#send").classList.add("stop");$("#send").textContent="■";hzMachinesPaint();}
+    if(d.state==="boom"){
+      const b=$("#send"),r=b.getBoundingClientRect();
+      for(let i=0;i<2;i++){const el=document.createElement("i");el.className="hz-ring frozen";el.style.left=(r.left+r.width/2)+"px";el.style.top=(r.top+r.height/2)+"px";
+        el.style.transform="translate(-50%,-50%) scale("+(i?6:3.5)+")";el.style.opacity=i?".3":".55";document.body.appendChild(el);}}
+    if(d.state==="landed"){root.classList.add("hz-land","hz-freeze");root.style.setProperty("--hz-t","-1.1s");}
+  }
+  requestAnimationFrame(hzLimbFit);setTimeout(hzLimbFit,80);
+}
+// ---- boot
+function hzInit(){
+  const root=document.documentElement;
+  let salt="";try{salt=localStorage.getItem("millen.hz.salt")||"";if(!salt){salt=String(Math.random()).slice(2,10);localStorage.setItem("millen.hz.salt",salt);}}catch(e){}
+  hzS={rate:0,rateT:0,srv:0,gen:false,intro:false,blurred:false,introTimers:[],salt:salt,
+    reduced:!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches),
+    debug:hzDebugParse(HZ_DEBUG),gpu:null,mem:null,sb:0,seed:1,rnd:hzRng(1),dayKey:-1,skyAt:0,facts:null};
+  if(hzS.debug&&hzS.debug.intro!=null&&root.classList.contains("hz"))root.classList.add("hz-intro");
+  hzReady=true;
+  const sbtn=$("#hz-sb");if(sbtn)sbtn.addEventListener("click",hzSidebarToggle);
+  try{if(localStorage.getItem("millen.sbhide")==="1")root.classList.add("sbhide");}catch(e){}
+  $$("#hz-lanes [role=tab]").forEach(b=>b.addEventListener("click",()=>{if(typeof switchLane==="function")switchLane(b.dataset.m);}));
+  const lanes=$("#hz-lanes");if(lanes)lanes.addEventListener("keydown",e=>{
+    const tabs=[...lanes.querySelectorAll("[role=tab]")],i=tabs.indexOf(document.activeElement);if(i<0)return;
+    const j=e.key==="ArrowRight"?(i+1)%tabs.length:e.key==="ArrowLeft"?(i+tabs.length-1)%tabs.length:-1;
+    if(j<0)return;e.preventDefault();tabs[j].focus();tabs[j].click();});
+  const mach=$("#hz-machines");if(mach)mach.addEventListener("click",()=>{if(typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
+  const gear=$("#hz-settings");if(gear)gear.addEventListener("click",()=>$("#settings-btn").click());
+  const hist=$("#hz-history");if(hist)hist.addEventListener("click",e=>{
+    const row=e.target.closest(".hz-row");if(row&&row.dataset.id&&typeof loadChat==="function")loadChat(row.dataset.id);});
+  const sel=$("#look-sel");
+  if(sel){try{sel.value=localStorage.getItem("millen.look")==="classic"?"classic":"horizon";}catch(e){}
+    sel.addEventListener("change",()=>setLook(sel.value));}
+  const inp=$("#input");if(inp&&root.classList.contains("hz"))inp.placeholder="Ask anything, or drop a file here";
+  addEventListener("visibilitychange",hzPauseSync);
+  addEventListener("blur",()=>{clearTimeout(hzS.blurT);hzS.blurT=setTimeout(()=>{hzS.blurred=true;hzPauseSync();},60000);});
+  addEventListener("focus",()=>{clearTimeout(hzS.blurT);if(hzS.blurred){hzS.blurred=false;hzPauseSync();}});
+  let rz=0;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(root.classList.contains("hz")){hzSkyPaint();hzModesPaint();}},150);});
+  // the limb follows the composer: its growth as the person types, and the
+  // home turning into a conversation (the hero leaving, or coming back)
+  if(window.ResizeObserver&&$("#composer"))new ResizeObserver(()=>{if(root.classList.contains("hz"))hzLimbFit();}).observe($("#composer"));
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(root.classList.contains("hz"))hzLimbFit();});
+  const inner=$("#chat-inner");
+  if(inner&&window.MutationObserver)new MutationObserver(()=>{if(!root.classList.contains("hz"))return;
+    hzPlaceEffort();hzHistoryPaint();hzTitlePaint();hzSidebarLabel();hzS.sb=hzSidebarWidth();
+    const sky=$("#hz-sky");if(sky)sky.style.setProperty("--hz-sbw",hzS.sb+"px");
+    requestAnimationFrame(hzLimbFit);setTimeout(hzLimbFit,80);setTimeout(hzLimbFit,400);
+    const home=!!$("#hero");if(home&&!hzS.home)hzWashBloom();hzS.home=home;
+    }).observe(inner,{childList:true});
+  hzS.home=!!$("#hero");
+  // the light ring needs @property and mask-composite; without them it stands still
+  try{if(!("registerProperty" in CSS)||!(CSS.supports("mask-composite","exclude")||CSS.supports("-webkit-mask-composite","xor")))root.classList.add("hz-ring-static");}catch(e){root.classList.add("hz-ring-static");}
+  if(root.classList.contains("hz")){
+    hzStart();
+    if(hzS.debug)hzDebugApply();
+    if(hzS.debug&&hzS.debug.intro!=null)hzIntroKick();
+    // arriving home without the intro (a second window, a look switch): the wash flowers once
+    else if(!root.classList.contains("hz-intro")&&hzS.home)hzWashBloom();
+  }
+}
+hzInit();
+/* ===================================================== HORIZON end (6b526) */
+
 </script>
 </body>
 </html>
