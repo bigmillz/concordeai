@@ -43310,6 +43310,8 @@ body.gen #chip-model{color:var(--accent)}
     background:rgba(10,12,17,.92);
   }
   #chat-inner{padding:24px 14px 150px}
+  /* the first line starts under the burger (6b528): the conversation's column reads these */
+  #chat-inner{--hz-col-top:68px;--hz-col-side:16px}
   body.sbopen #sidebar{transform:none}
   #mburger{
     display:flex;align-items:center;justify-content:center;
@@ -43352,8 +43354,9 @@ body.gen #chip-model{color:var(--accent)}
 @keyframes hzBreathe{0%,100%{opacity:.5}50%{opacity:1}}
 @keyframes hzBlink{0%,45%{opacity:1}50%,95%{opacity:0}100%{opacity:1}}
 /* ---- the column: 640 of reading, a 56 gutter, 236 of marginalia */
-#chat-inner{max-width:1012px;padding:36px 40px 150px}
+#chat-inner{max-width:1012px;padding:var(--hz-col-top,36px) var(--hz-col-side,40px) 150px}
 .msg{margin-bottom:0;animation:hzRise var(--hz-t-slow) var(--hz-ease-out) both}
+.msg.settled{animation:none}
 /* ---- the person's words: the sans, plain on the sky, 560 wide; files as chips */
 .msg.user{display:block;max-width:640px;margin:0 0 28px}
 .msg.user .who{display:none}
@@ -43693,6 +43696,9 @@ input.crename:focus{box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-acce
   padding:12px 10px 0;-webkit-backdrop-filter:none;backdrop-filter:none;font-family:var(--hz-font-mono)}
 #telemetry .t-head{font-family:var(--hz-font-ui);font-size:12.5px;letter-spacing:0;color:var(--hz-ink-3)}
 #telemetry .t-head .live{font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-2)}
+/* the memory label reads in sentence case like the rest of the column; the chip's name stays its own */
+#telemetry .meter-label span{display:inline-block;text-transform:lowercase;letter-spacing:0;font-family:var(--hz-font-ui);font-size:12.5px}
+#telemetry .meter-label span::first-letter{text-transform:uppercase}
 #sb-foot{margin-top:0;padding:14px 10px 0;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:10px;
   font:12.5px var(--hz-font-ui);color:var(--hz-ink-3)}
 #sb-foot[hidden]{display:none}
@@ -47653,7 +47659,9 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra){
   const sl=$("#skyload"); if(sl)sl.hidden=true;
   const m=extra||{};
   const div=document.createElement("div");
-  div.className="msg "+(role==="user"?"user":"ai");
+  // a saved message (the record itself rides in as `extra`) is drawn settled:
+  // a reopened chat of two hundred messages plays no two hundred entrances
+  div.className="msg "+(role==="user"?"user":"ai")+(m.role?" settled":"");
   // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): "Concorde Zenith", a
   // breathing dot while it works and one plain word for what it is doing; the
   // real models stay behind the answer, in the marginalia, and only when asked
@@ -48358,7 +48366,7 @@ async function send(){
     // the context the final writer ran in, for the header's meter (horizon's)
     const ctxNow=contextOf(usage);
     window.hzContext=ctxNow?{used:ctxNow.used,window:ctxNow.window,tps:tps}:null;
-    try{document.dispatchEvent(new CustomEvent("hz-context",{detail:window.hzContext}));}catch(e){}
+    try{document.dispatchEvent(new Event("hz-context"));}catch(e){}   // the header reads window.hzContext
     const rec={role:"assistant",content:full};
     if(drafts.length)rec.drafts=drafts;
     if(sources&&sources.length)rec.sources=sources;
