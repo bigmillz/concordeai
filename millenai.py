@@ -43687,6 +43687,7 @@ body.resizing #sidebar{transition:none}
 .chat-item .csnip mark{background:rgba(159,192,255,.3);color:var(--hz-ink)}
 .chat-item .csnip .clane{font-family:var(--hz-font-mono);font-size:9.5px;letter-spacing:.06em;color:var(--hz-ink-3)}
 .chidden{font-family:var(--hz-font-ui);font-size:12px;color:var(--hz-ink-3);padding:8px 10px}
+.chidden .rall{margin-left:10px}
 .cempty{font-family:var(--hz-font-ui);font-style:normal;color:var(--hz-ink-3);font-size:12.5px;padding:10px}
 .cfoot{font-family:var(--hz-font-mono);font-size:10.5px;color:var(--hz-ink-3);opacity:.75;padding:10px 10px 2px}
 input.crename{font:14px var(--hz-font-ui);background:rgba(0,0,0,.35);border:1px solid var(--hz-glass-line-2);border-radius:7px;
@@ -43915,8 +43916,8 @@ __CODE_ROWS__
   </div>
   <div id="model-list">
   <div id="chat-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="chat-q" type="search"
-    placeholder="Search your chats" autocomplete="off"
-    spellcheck="false" aria-label="Search your chats"></div>
+    placeholder="Search chats" autocomplete="off"
+    spellcheck="false" aria-label="Search chats"></div>
   <div class="group-label chats">Chats</div>
   <div id="chat-list"></div>
 
@@ -43940,7 +43941,7 @@ __CODE_ROWS__
     <div id="sb-where"></div>
     <button id="settings-btn" title="Settings — preferences &amp; about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg><span>Settings</span></button>
     <!-- the rail (6b528): the sidebar folds to a strip of icons and back -->
-    <button id="rail-btn" type="button" title="Collapse the sidebar" aria-label="Collapse the sidebar" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button id="rail-btn" type="button" title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
   </div>
 </aside>
 
@@ -47342,7 +47343,7 @@ function msgActions(div,role,text){
   bar.innerHTML=mk("copy","Copy",ICO.copy)
     +(role==="assistant"
       ?mk("speak","Read aloud",ICO.speak)+mk("redo","Try again",ICO.redo)
-        +mk("good","Good answer",ICO.good)+mk("bad","Not good",ICO.bad)
+        +mk("good","Good",ICO.good)+mk("bad","Not good",ICO.bad)
       :mk("edit","Edit and resend",ICO.edit));
   foot.appendChild(bar);
 }
@@ -47486,7 +47487,7 @@ function signatureHTML(mode,st){
 // would use and never a model's name; the status line's gist when no step exists
 const THINK_WORDS={wake:"waking your server",search:"searching the web",read:"reading the pages",
   geo:"finding it on the map",council:"writing a first draft",review:"reviewing the draft",draft:"writing",
-  polish:"writing",verify:"checking the facts",places:"pinning the places",fix:"applying the review"};
+  polish:"writing",verify:"checking the facts",places:"pinning the places",fix:"applying corrections"};
 function thinkPhrase(steps,status,nDrafts){
   const run=(steps||[]).filter(s=>s&&s.s!=="done");
   const s=run.length?run[run.length-1]:null;
@@ -47522,6 +47523,8 @@ function spineRows(o){
   const take=pred=>{const k=u.findIndex((x,j)=>!used.has(j)&&pred(x));if(k<0)return null;used.add(k);return u[k];};
   const numsOf=c=>{const a=[];if(!c)return a;const t=c.x?"~":"";
     if(c.i)a.push(t+fmtTok(c.i)+" in");if(c.o)a.push(t+fmtTok(c.o)+" out");if(c.d>0)a.push(fmtSecs(c.d/1000));return a;};
+  // a detail the server joined with middle dots is separate facts here, 14px apart
+  const facts=d=>d?String(d).split(/\s*\u00b7\s*/).filter(Boolean):[];
   const li=(cls,what,c,nums,extra,text,whoOverride)=>{
     const w=whoOverride!==undefined?whoOverride:(c?machineOf(c):"");
     const mn=c?modelOf(c):"";
@@ -47550,32 +47553,32 @@ function spineRows(o){
   };
   st.forEach(s=>{
     const run=live&&s.s!=="done",cls=run?"live":"done";
-    if(s.id==="wake"){out.push(li(cls,esc(s.l||"Waking your server"),null,s.d?[s.d]:[],
+    if(s.id==="wake"){out.push(li(cls,esc(s.l||"Waking your server"),null,facts(s.d),
       run&&o.skip?'<button class="wtskip"'+(o.skipping?' disabled>Skipping…':'>Skip')+'</button>':"","",""));return;}
     if(s.id==="search"){const c=take(x=>x.r==="search");
-      out.push(li(cls,esc(run?"Searching the web":"Searched the web"),c,(s.d?[s.d]:[]).concat(numsOf(c))));return;}
-    if(s.id==="read"||s.id==="geo"||s.id==="fix"){out.push(li(cls,esc(s.l||s.id),null,s.d?[s.d]:[],"","",""));return;}
+      out.push(li(cls,esc(run?"Searching the web":"Searched the web"),c,facts(s.d).concat(numsOf(c))));return;}
+    if(s.id==="read"||s.id==="geo"||s.id==="fix"){out.push(li(cls,esc(s.l||s.id),null,facts(s.d),"","",""));return;}
     if(s.id==="places"){const c=take(x=>x.r==="places");
-      out.push(li(cls,esc(s.l||"Found the places"),c,(s.d?[s.d]:[]).concat(numsOf(c))));return;}
+      out.push(li(cls,esc(s.l||"Found the places"),c,facts(s.d).concat(numsOf(c))));return;}
     if(s.id==="council"){drafts();return;}
     if(s.id==="review"){drafts();const c=take(x=>x.r==="review");
       // the detail is the critic's model while it runs and the notes count once done
-      out.push(li(cls,esc(run?"Reviewing the draft":"Reviewed the draft"),c,(!run&&s.d?[s.d]:[]).concat(numsOf(c)),"",note?note.t:""));return;}
+      out.push(li(cls,esc(run?"Reviewing the draft":"Reviewed the draft"),c,(run?[]:facts(s.d)).concat(numsOf(c)),"",note?note.t:""));return;}
     if(s.id==="draft"||s.id==="polish"){drafts();if(finalOut)return;finalOut=true;
       const c=take(x=>x.r==="final"||!x.r),nums=numsOf(c);
       if(run&&o.rate>0)nums.push("~"+(o.rate>=100?Math.round(o.rate):o.rate.toFixed(1))+" tok/s");
       else if(!run&&c&&c.o&&!c.x&&o.rateS>0){const t=c.o/o.rateS;nums.push((t>=100?Math.round(t):t.toFixed(1))+" tok/s");}
-      const what=out.length?(run?"Final answer, writing":"Final answer"):(run?"Writing the answer":"The answer");
+      const what=out.length?(run?"Final answer, writing":"Final answer"):(run?"Writing the answer":"Answer");
       out.push(li(cls,what,c,nums,run?'<span class="prog" aria-hidden="true"><i></i></span>':""));return;}
     if(s.id==="verify"){const c=take(x=>x.r==="verify");let what=s.l||"";
       const m=/(\d+) claim/.exec(String(s.d||""));
       if(run&&m)what="Checking "+m[1]+" claim"+(m[1]==="1"?"":"s");
       out.push(li(cls,esc(what),c,numsOf(c),run?'<span class="prog" aria-hidden="true"><i></i></span>':""));return;}
-    out.push(li(cls,esc(s.l||s.id),null,s.d?[s.d]:[],"","",""));
+    out.push(li(cls,esc(s.l||s.id),null,facts(s.d),"","",""));
   });
   drafts();
   u.forEach((c,k)=>{if(used.has(k))return;
-    out.push(li("done",esc(c.r==="final"||!c.r?(out.length?"Final answer":"The answer"):(ROLE_WORDS[c.r]||c.r)),c,numsOf(c)));});
+    out.push(li("done",esc(c.r==="final"||!c.r?(out.length?"Final answer":"Answer"):(ROLE_WORDS[c.r]||c.r)),c,numsOf(c)));});
   return out;
 }
 // THE MACHINES (6b528): who took part in this answer, from the USAGE frames: this
@@ -48332,8 +48335,7 @@ async function send(){
   // inside the disclosure, so a settled answer is prose (6b242)
   body.innerHTML=treeKeep
     +annIn(myChat,()=>renderMD(full||(wasAborted?"*(stopped)*":
-    "That answer didn\u2019t come through \u2014 the model was still "
-    +"warming up. Try again and it usually lands.")))
+    "No answer came through. Try again.")))
     +(full&&!wasAborted?srcRow(sources)+photoRow(photos)
       +(places&&places.length?placesModule(places,locCtx,mapd):mapCard(mapd)):"");
   const secs=((performance.now()-t0)/1000);
@@ -49509,7 +49511,7 @@ function renderChats(flip){
     +'<span class="ct" title="'+esc(c.title||"chat")+'">'
     +markTitle(c.title||"chat",window.chatQ)+'</span>'
     +(tk.n?'<span class="ctok"'+(tk.est?' title="estimated from length"':'')+'>'+(tk.est?"~":"")+fmtTok(tk.n)+'</span>':'')
-    +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin to top")+'">'
+    +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin")+'">'
     +PIN_SVG+'</span>'
     +'<span class="cx" title="Delete chat">×</span>'
     +(sn?'<span class="csnip"></span>':'')+'</div>';};
@@ -49521,7 +49523,7 @@ function renderChats(flip){
       +'<span class="rbtn" title="Recents options">'+OPTS_SVG+'</span></div>';
     html+=dayRows(rest,row,Date.now());
     if(sp.hidden&&rv.open)html+='<div class="chidden">'+sp.hidden+' older chat'
-      +(sp.hidden===1?"":"s")+' hidden · <span class="rall">Show all</span></div>';
+      +(sp.hidden===1?"":"s")+' hidden <span class="rall">Show all</span></div>';
   }
   if(chatsErr)html='<div class="cempty">'+esc(chatsErr)+'</div>';
   else if(!html)html='<div class="cempty">'
@@ -53366,7 +53368,7 @@ function setRail(on){
   document.documentElement.style.setProperty("--sbw",(on?60:(parseInt(sidebarEl.style.width,10)||240))+"px");
   const b=$("#rail-btn");
   if(b){b.setAttribute("aria-expanded",on?"false":"true");
-    b.title=on?"Expand the sidebar":"Collapse the sidebar";b.setAttribute("aria-label",b.title);}
+    b.title=on?"Expand sidebar":"Collapse sidebar";b.setAttribute("aria-label",b.title);}
   chatRoom();
 }
 $("#rail-btn").addEventListener("click",()=>setRail(!document.body.classList.contains("rail")));
@@ -53416,7 +53418,7 @@ async function sbFootPaint(){
     a.innerHTML='<span>Today</span><span class="mono">'+(d.estimated?"~":"")+fmtTok(n)+' tokens</span>';
     const rows=d.models||[];
     const cloud=rows.some(r=>r.where&&r.where!=="local"&&r.where!=="server");
-    b.textContent=rows.length?(cloud?"Some of it through the cloud":"All on your machines"):"";
+    b.textContent=rows.length?(cloud?"Some through the cloud":"All on your machines"):"";
   }catch(e){}
 }
 sbFootPaint();
