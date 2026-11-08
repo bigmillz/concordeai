@@ -18036,3 +18036,81 @@ and five are new, each with mutants: the 89-clip table (one entry each, the sixt
 trail-free); the chooser run in node (fits the hour, never one of the last three while a fresh one fits, plays from
 the cache and fetches the wanted one); the effort rules' truth tables with their call sites; the mode menu; the opening's timings; asking
 from the home. The scorecard is in the commit message.
+
+## 6b535 — integ-1: the November masterclass branches merged onto Horizon, before main (integration)
+
+One branch to test the design push together once: `integ-1`, cut from origin/main (3acf24c, with Vera
+Rubin and the ZITO removal), merging in order `horizon` (3442e69; 6b526, 6b534), `know-you` (9aa1123;
+6b530), `speed-1` (dc3a698; 6b531), `hz-chat` (2d9647d; 6b528) and `import-chats` (988222b; 6b529), each
+as its own merge commit. `hz-settings` (6b527) had no commits yet and is still to come in, last. Not in
+this branch: rust-shell, docattach, quality-3, fresh-1, kit-watchdogs, muse. Horizon is the base design;
+where two layouts truly met, its structure won and the other side's feature was ported onto it.
+
+**NOTES.md** conflicted on every merge (append against append); every entry from every side is kept, in id
+order (6b525's gauntlet paragraph, then 6b526, 6b528, 6b529, 6b530, 6b531, 6b534).
+
+**hz-chat onto horizon (ten hunks in millenai.py, one in the gauntlet).** Both grew from 7119239.
+- The frame tags: `RATE|USAGE|DONE|RUBIN` on the page and in the server's `_TURN_TAGS` (RUBIN last, so
+  6b519's `"|RUBIN")` pin holds). The handler takes horizon's effort switches (6b534) and then hz-chat's
+  run clock and usage tap. `KEEP_LS` keeps both sides' keys, horizon's last (its pin ends the list).
+- The sources row is hz-chat's numbered pills with no favicon fetch, and know-you's personal pills sit
+  inside them with the same number (`knowCtx.n`, since the gauntlet pins the call as `knowChip(s)`); the
+  marginalia's source list shows a personal source by its title and name, through the same delegated handler.
+- The RUN frame feeds hz-chat's spine (running nodes, the compositor's step, the merge ripple) and horizon's
+  sky (`hzTele`); main's `setWho("Compositor: <model>")` is gone, since a model's name never reaches the
+  byline. STATUS, RATE, RUBIN, USAGE, DONE and DRAFT all have their handlers; a DRAFT is a comet and a pulse.
+- The landing: hz-chat moved the pace line to the spine and removed the `.meta` under the prose; Vera Rubin's
+  record line (6b519) is its own and stays, the one `.meta` an answer may draw; `whereBadge` is still called
+  on that line (the 6b334 badge pin). hz-chat's `contextOf` and `hz-context` event stay.
+- `renderChats(flip)` is hz-chat's (Today / Yesterday / This week / Earlier) with horizon's `hzHistoryPaint`
+  repaint at its top; 6b534's MutationObserver keeps the live row through either.
+- What the auto-merge let through: TWO top-level `const MODE_NAMES` / `const modeName` (horizon's Greek
+  block at the top of the script, hz-chat's Flare block further down), a SyntaxError that would have killed
+  the page: hz-chat's went, `SIGN_BRAND` stays. Two composer rings on the same `#composer::before` sharing
+  the keyframe name `hzRing` with different properties (`--hzang` against `--hz-ang`), so hz-chat's finish
+  ring could never turn: it now rides horizon's effort ring (`.hz #composer.finish::before`, one light once
+  round, then back to the effort's state; `hz-ring-static` and the still rules still outrank it). One
+  `hzBreathe` and one `hzShim` keyframe (the horizon copies were identical and went). The comets' local
+  chip lookup finds horizon's `.rig[data-id="local"]` first (`.rig.mlx` missed a PC; 6b534's open seam).
+
+**import-chats onto horizon (eight hunks, one in the gauntlet).** `addMsg(role,…,loc,extra,by,model)`:
+the saved record (6b528) and then who answered in the other app and on which model (6b529); the byline is
+the other app's name and model for an imported chat, else the one brain's signature; the body is hz-chat's
+(chips, numbered sources, the marginalia lifted out) plus the imported question's pictures; both reopen call
+sites hand over record, by and model; the home paints Horizon's rows and then the bring-your-chats card
+(shown with five chats or fewer); the two script blocks are appended, Horizon's first. `PERSONAL_NAMES`
+holds know-you's `know`, `know.json` and the import's `imports`. Four copies of the `HORIZON TOKENS` `:root`
+block (one per branch) became one, horizon's: the others were subsets, differing only in `--hz-t-drift`
+(46s against horizon's 28s, 6b526's own value). The import sheet drew a limb (a 3200px circle under its
+stars, `.imp-limb`); OVERRIDE 2 says none anywhere, so it went.
+
+**Gauntlet pins moved to the merged truth** (none weakened, none removed):
+- `FRAME_TAGS` (6b515's check, main's and hz-chat's versions, and 6b519's): `…|RATE|USAGE|DONE|RUBIN`.
+- the byline in node (6b528): Concorde Zenith → Gamma, Odyssey → Omega, Meridian → Sigma (OVERRIDE 4).
+- the `/* MODE NAMES (6b526) */` block (6b528's pin): the Greek names.
+- the finish ring (6b528): `.hz #composer.finish::before{opacity:1;animation:hzRing 1.5s …}` and
+  `@keyframes hzRing{to{--hz-ang:360deg}}`.
+- `addMsg`'s signature (6b529): `…,loc,extra,by,model){`.
+- `PERSONAL_NAMES` (6b334's servers check and its mutant): `"account.key", "servers.json", "imports"))`;
+  the mutant drops servers.json as before.
+- two hz-chat pins that no longer matched hz-chat's own source (06e1a5b moved the byline's word into the live
+  line): `setWho(thinkPhrase(steps,status,draftsGot));` → `const w=thinkPhrase(steps,status,nd);`; the
+  reduced-motion rule → its full current selector list.
+
+**Left for the owner.** 6b257's "caret retired" check (`.caret{` not in page, per Patrick) and hz-chat's
+streaming caret (`.caret{display:inline-block…` in page) contradict; both are left, one will be red.
+hz-chat's conversation rules are not scoped under `html.hz`, so the Classic look gets the new conversation
+too. Two ways to fold the sidebar coexist (horizon's hide, hz-chat's rail). hz-chat's byline shimmer follows
+the mode (Omega, Sigma) while OVERRIDE 4 moved the composer's ring and shimmer to the effort. In a
+conversation the first question sits under horizon's 56px header (hz-chat's list has no room for it).
+Settings' Look and Effects rows are unstyled until hz-settings lands. `hz-answer-done` and `hz-context` are
+dispatched by hz-chat with no listener in horizon (its `hzOnLand` is called directly), harmless.
+
+**Checked** (no gauntlet: the ports were in use): both files parse; a windowless dev copy on 9893 served
+the page with no unreplaced token; both inline scripts pass `node --check`; every literal pin in the
+gauntlet checked against the served page and the source (1,835; the one red is the caret above, plus an
+`or` the checker can't read); Playwright's headless Chromium loaded the page with the js_api stubbed: no
+page errors, no API response over 400, only SwiftShader's GL warnings; the home, the mode menu with its
+lineups, Effort at Ultra, a seeded conversation with its marginalia and numbered sources, an imported
+ChatGPT fixture (byline "ChatGPT · gpt-4o-mini" as two spans), Settings, the import sheet and the home card
+were captured at 1440 and 390 px (no horizontal scroll). No question was sent.

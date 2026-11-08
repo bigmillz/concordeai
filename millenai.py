@@ -10319,9 +10319,9 @@ PERSONAL_NAMES = frozenset((
     CHATS_FILE, MEMORY_FILE, LEGACY_CHATS, LEGACY_MEMORY, PERSONAL_FILE,
     LOCAL_FILE, QUALITY_FILE, "usage.jsonl", "cloud.json", "remote.json",
     "remote_known_hosts", "bench_targets.jsonl", "suggest.json", "images", "videos",
-    "exports", "sync", "account.key",
+    "exports", "sync",
     "know", "know.json",       # (6b530) the index of your stuff, and its settings
-    "servers.json", "imports"))      # (6b529) the brought-in chats' ledger and pictures
+    "account.key", "servers.json", "imports"))      # imports (6b529): the brought-in chats' ledger and pictures
 # absent means "not written yet" for these only until their first write
 # (0b 5.2, L1); after it a missing file is a read error, never empty
 _FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json", PERSONAL_FILE,
@@ -49717,10 +49717,7 @@ __HZ_FONTS__
     radial-gradient(1px 1px at 83% 4%,rgba(255,226,190,.7),transparent),
     radial-gradient(1.2px 1.2px at 90% 14%,rgba(255,255,255,.55),transparent),
     radial-gradient(1px 1px at 52% 3%,rgba(220,230,255,.4),transparent)}
-#imp-sheet .imp-limb{position:absolute;left:50%;bottom:-3194px;width:3200px;height:3200px;margin-left:-1600px;
-  border-radius:50%;background:radial-gradient(circle at 50% 0%,#0b142c 0%,#060a16 10%,#030509 26%,#020307 60%);
-  box-shadow:0 -1px 0 var(--hz-limb),0 -3px 1px rgba(170,205,255,.55),0 -14px 30px rgba(120,170,255,.36),
-    0 -56px 120px rgba(50,100,220,.24),0 -170px 300px rgba(30,70,180,.14)}
+/* no limb under the stars (NORTHSTAR OVERRIDE 2: none anywhere; the sheet's went at integration) */
 #imp-sheet>*:not(.imp-sky){position:relative;z-index:1}
 .imp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:30px 36px 0}
 .imp-headtext{display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -50105,7 +50102,7 @@ __CODE_ROWS__
 <div id="imp-veil" hidden>
   <div class="imp-glow" aria-hidden="true"></div>
   <div id="imp-sheet" role="dialog" aria-modal="true" aria-labelledby="imp-title" tabindex="-1">
-    <div class="imp-sky" aria-hidden="true"><i class="imp-limb"></i></div>
+    <div class="imp-sky" aria-hidden="true"></div>
     <header class="imp-head">
       <div class="imp-headtext">
         <h2 id="imp-title" class="imp-title">Bring your chats</h2>
@@ -55012,7 +55009,7 @@ async function send(){
     // Vera Rubin's line is its record, not the first writer's pace (6b519); the
     // pace line itself moved to the spine (6b528), so only Rubin draws a .meta
     const rbS=rubinLive&&rubinLive.div===aiDiv?rubinLive.st:null;
-    const where=rbS?whereBadge(lastModels,srvWho):"";
+    const where=whereBadge(lastModels,srvWho);
     const meta=rbS?document.createElement("div"):null;if(meta)meta.className="meta";
     if(rbS)meta.innerHTML='<span class="wbadge">'+esc(where)+'</span><b>Vera Rubin</b> · '
       +(rbS.spark||[]).length+" round"+((rbS.spark||[]).length===1?"":"s")+" · "+(rbS.read||0)+" sources read · "

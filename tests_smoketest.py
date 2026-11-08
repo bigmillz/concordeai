@@ -20946,7 +20946,7 @@ def _svc_pins(src):
         < ch.index("            elif len(council) > 1:") < ch.index("_fl = gate_ladder(_fl, req_cloud)")
         and ch.index("            elif cloud_only:") < ch.index("            elif _srv_lbl:"),
         "hold": "        if not server_only_request(req_json, self.ctx):\n            if not bench_hold():" in ch,
-        "personal": '"account.key", "servers.json"))' in src,
+        "personal": '"account.key", "servers.json", "imports"))' in src,   # imports: 6b529
         "routes": 'self._send_json(servers_view(\n                self.ctx, (_sq.get("refresh") or [""])[0] == "1"))' in src
         and 'if self.path.startswith("/api/servers/"):' in src,
         "cloud only bench": "            council = [lbl for lbl, _c in cloud_bench()]" in ch,
@@ -21420,7 +21420,7 @@ _SV_MUT = [
     ("a failure passed to the catch-all", "    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except Exception as exc:",
      "    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except ZeroDivisionError as exc:"),
     ("server_answer swallows a gone server", "    except ServerError as se:\n        emit(AppText(", "    except ServerError as se:\n        (lambda *a: None)(AppText("),
-    ("servers.json the machine's", '"account.key", "servers.json"))', '"account.key"))'),
+    ("servers.json the machine's", '"account.key", "servers.json", "imports"))', '"account.key", "imports"))'),
     ("the branch after the cloud ladder", "            elif _srv_lbl:\n                server_answer(_srv_lbl,", "            elif False:\n                server_answer(_srv_lbl,"),
     ("run_model not routing a server label", "    if server_label(label):\n        # a model on the person's own server (6b334), never a fallback\n        return server_stream(label, messages, emit)\n",
      ""),
@@ -38896,13 +38896,13 @@ check("the answer's actions, the code cards' line numbers, the spine's steps and
       and "DONE:j=>{try{runInfo=JSON.parse(j);}catch(e){}}," in page
       and "usage.length=0;runInfo=null;\n      full=streamText(raw,{" in page
       and "if(usage.length)rec.usage=usage.slice();" in page and "if(runInfo)rec.run=runInfo;" in page
-      and 'setWho(thinkPhrase(steps,status,draftsGot));' in page
+      and 'const w=thinkPhrase(steps,status,nd);' in page   # the live line's last word (06e1a5b)
       and 'addMsg("assistant","",null,null,null,null,null,null,{live:true,mode:tier});' in page
       and ".msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite}" in page
       and ".msg.ai.live .who b.shim{animation:hzShim 3.2s linear infinite}" in page
       and ".msg.ai.live .who b.shim.soft{animation-duration:5s}" in page
       and "@keyframes hzShim{to{background-position:300% 0}}" in page
-      and ".behind .spine li.live .node,.msg.ai.live .who b.shim{animation:none!important}" in page
+      and ".msg,.chat-item,#undobar,.caret,.msg.ai.live .who .dot,.behind .spine li.live .node,.msg.ai.live .who b.shim,\n  .msg.ai.live .liveline .die,.msg.ai.live .liveline em,#composer.finish::before{animation:none!important}" in page
       and "if(txt)caretIn(body);" in page and ".caret{display:inline-block;width:2px;height:1.05em;" in page
       and '/* MODE NAMES (6b526) */\nconst MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};\nconst modeName=t=>MODE_NAMES[t]||t;' in page
       and "/* HORIZON TOKENS (6b526) */" in page and "--hz-ink-read:#e6e9f4;" in page
