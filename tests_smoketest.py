@@ -6299,7 +6299,7 @@ def _s5_page(src):
             and src.count("setCardsHtml(") == 6
             and '<div id="plan-row"><div id="plan-limits">' in pg
             and pg.index('id="plan-limits"') < pg.index('id="nolimits"') < pg.index('id="giants"')
-            and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<div id="zito">')]
+            and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<script>', pg.index('<div id="setup-veil"'))]
             and "No limits: also let Everything hold any models" in pg
             and not re.search(r'"(Basic|Minimum|Full|Max)"', src[src.index("const SET_KEYS="):
                                                                 src.index("function renderSetup(")])
@@ -21150,7 +21150,9 @@ def _svc_review(src):
                      and 'self.send_header("X-Models", header_text(xm))' in src
                      and src.count('send_header("X-Models"') == 1
                      and 'lastModels=hdrText(resp.headers.get("X-Models"));' in src
-                     and 'const line=hdrText(resp.headers.get("X-Models"));' in src
+                     # the ZITO board's reader went with the board (6b525):
+                     # the page's one reader is the one above, decoded
+                     and src.count('resp.headers.get("X-Models")') == 1
                      and "function hdrText(v){try{return decodeURIComponent(v||\"\");}" in src
                      and 'resp.headers.get("X-Models")||' not in src)
     # the kept state: a removal takes servers.json's secrets, keeps the rest
@@ -27105,7 +27107,9 @@ def _dk_pins(src):
                   and 'addEventListener("blur",dictAway);' in src
                   and "if(document.hidden)dictAway();" in src)
     _p["modal"] = ("""[...document.querySelectorAll('[id$="-veil"]')].some(v=>!v.hidden)""" in src
-                   and '(z&&z.classList.contains("on"))' in src and "(p&&!p.hidden)" in src)
+                   and "(p&&!p.hidden)" in src
+                   # 6b525: the ZITO board is gone, so dictation no longer asks after it
+                   and '(z&&z.classList.contains("on"))' not in src)
     _p["tip"] = ('micBtn.title="Dictate \\u2014 speak your message. Hold "+DICT_KEY\n'
                  '  +" to talk and let go to finish, or tap it to keep listening";' in src
                  and 'const DICT_KEY=IS_PC?"Ctrl+D":"\\u2318D";' in src)
@@ -37934,6 +37938,13 @@ check("6b519's rules each break a check when broken (%d mutants)" % len(_R519_MU
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
+# ZITO REMOVED (6b525, per Patrick): holding Z+I+T+O opened a hidden board
+# that deleted the last letters typed; a missed keyup left keys "held", so
+# ordinary typing (any word with z, i, t and o) could trigger it
+check("6b525 the ZITO easter egg is gone: no board, no key combo, no letter-eating",
+      'id="zito"' not in _MILLENAI_SRC and "zEngage" not in _MILLENAI_SRC
+      and 'NEED=["z","i","t","o"]' not in _MILLENAI_SRC and "zitoEsc" not in _MILLENAI_SRC)
+
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
