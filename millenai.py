@@ -35323,6 +35323,14 @@ def run_council(labels: list, messages: list, emit, status,
         report["stuck"] = corrections_stuck(_final, _corr) if _corr else []
         report["stuck_after_writer"] = len(report["stuck"])
         _trim = trim_recap(_final) if report.get("craft") else _final
+        # THE POST-PASS ON EVERY FINAL (6b523): the council's answer gets the
+        # same deterministic check as the single writer's (the sums and
+        # conversions re-computed, the leaks reworded); a change rides the
+        # fact-check's RESET
+        try:
+            _trim, report["polish"] = answer_polish(_trim, report.get("question") or "")
+        except Exception:
+            report["polish"] = []
         try:
             report["verify"] = verify_pass(
                 _trim, report, messages, _emit0, status, _step_frame,

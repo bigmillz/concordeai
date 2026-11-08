@@ -12118,7 +12118,12 @@ _CRAFT_NAMES = {"ANSWER_BRIEF", "_BRIEF_MARK", "_brief_today", "answer_brief", "
                 "_NOTE_LABEL_RX", "_NOTE_QUOTE_RX", "_NOTE_NUM_RX", "_NOTE_WORD_STOP", "_num_key",
                 "_note_corpus", "_note_new_specifics", "critic_filter", "_evidence_has", "critic_corrections",
                 "_correction_backed", "corrections_block", "_squash", "corrections_stuck", "_RECAP_RX", "trim_recap",
-                "FINAL_THINK", "final_think_level"}
+                "FINAL_THINK", "final_think_level",
+                # quality-3 (6b523): the post-pass the council's final goes through
+                "_ANS_CUR", "_ANS_NUM", "_ANS_OP", "_ANS_OPS", "_ANS_SP", "_ANS_EXPR", "_ANS_EQ_RX", "_ANS_YEAR_RX",
+                "_ans_num", "_ans_fmt", "_ans_calc", "_ans_eval", "answer_arith_fixes", "_ANS_RATE_RXS",
+                "answer_fx_rate", "_ANS_PLAIN", "_ANS_FX_RXS", "answer_fx_fixes", "_ANS_LEAK_RXS", "answer_scrub",
+                "answer_polish", "shown_answer", "quality_ablate"}
 _rc26["DEV_HOME"] = ""
 _exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
                     "PEER_INSTRUCTION", "_srv_think", "server_think"} | _CRAFT_NAMES)
@@ -41729,6 +41734,11 @@ def _c523_all(src):
         and 'memit(Ctl(NUL + "RESET" + NUL))\n                            memit(_new)' in hs
         and 'step("polish", "Sharpened", "done",' in hs
         and hs.index("_stream_guarded(lbl, full_messages,\n                                    memit, status, None,") < hs.rindex("_single_polish()"))
+    rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
+    out["the council's final answer goes through the post-pass too, before the fact-check's re-send"] = (
+        '_trim, report["polish"] = answer_polish(_trim, report.get("question") or "")' in rc
+        and rc.index('report["polish"] = answer_polish') < rc.index('report["verify"] = verify_pass(')
+        and 'changed=_trim != _final)' in rc)
     out["a follow-up with nothing new to look up tells the writer what a follow-up is for"] = (
         '_fu_note = (GROUND_FOLLOWUP if (_g_reuse and not _oai_note\n' in src
         and '"followup" not in quality_ablate()) else "")' in src
@@ -41771,6 +41781,8 @@ _C523_MUT = [
     ("a far-off query still seats its best", '    floor = (max(s["score"] for s in out) * 0.5) if (out and "vendor" not in quality_ablate()) else 0', "    floor = 0"),
     ("the post-pass not run after the one-pass stream", '                                    "kept the part before it wandered")\n                    _single_polish()\n        except (BrokenPipeError',
      '                                    "kept the part before it wandered")\n        except (BrokenPipeError'),
+    ("the council's final not post-passed", '            _trim, report["polish"] = answer_polish(_trim, report.get("question") or "")',
+     '            report["polish"] = []'),
     ("the follow-up note never passed", "            _gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)", "            _gturn = grounded_turn(query, _gpack, note=_oai_note)"),
 ]
 _c523_caught = []
