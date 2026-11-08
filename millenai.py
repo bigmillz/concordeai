@@ -10319,8 +10319,9 @@ PERSONAL_NAMES = frozenset((
     CHATS_FILE, MEMORY_FILE, LEGACY_CHATS, LEGACY_MEMORY, PERSONAL_FILE,
     LOCAL_FILE, QUALITY_FILE, "usage.jsonl", "cloud.json", "remote.json",
     "remote_known_hosts", "bench_targets.jsonl", "suggest.json", "images", "videos",
-    "exports", "sync", "account.key", "servers.json",
-    "know", "know.json"))      # (6b530) the index of your stuff, and its settings
+    "exports", "sync", "account.key",
+    "know", "know.json",       # (6b530) the index of your stuff, and its settings
+    "servers.json", "imports"))      # (6b529) the brought-in chats' ledger and pictures
 # absent means "not written yet" for these only until their first write
 # (0b 5.2, L1); after it a missing file is a read error, never empty
 _FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json", PERSONAL_FILE,
@@ -14513,7 +14514,11 @@ def _write_chats(items, base, evict=True):
     have = set(gone)
     gone += [x for x in fin if x not in have]
     items = sorted(items, key=_chat_ts, reverse=True)
-    exempt = [isinstance(c, dict) and bool(c.get("pin") or c.get("project"))
+    # and every chat brought from another app (6b529, per Patrick): an
+    # import is older than everything here by its dates, so the 1,000
+    # rule would evict the imported history first, and silently
+    exempt = [isinstance(c, dict) and bool(c.get("pin") or c.get("project")
+                                           or c.get("src"))
               for c in items]
     rest = [i for i, e in enumerate(exempt) if not e]
     # evict=False: a put-back (M9) brings chats back whole, whatever the cap
@@ -14953,6 +14958,1992 @@ def chat_append_late(cid, n, h, rec, base):
             store_chats(chats, base)
         m = _chat_msgs(c)
         return cid, len(m), chat_prefix_hash(m, len(m))
+# ==== bring your chats (6b529): begin ====
+# BRING YOUR CHATS (6b529, per Patrick: "if somebody wanted to switch
+# platforms, then they can quickly connect another AI app and pull all
+# their chats in detail, like beautifully, perfectly"). No vendor offers
+# an API or OAuth that lets another app read a consumer's chat history
+# (checked 2026-11-08; see NOTES), so "connect" is a guided export-and-
+# import that feels like one step: the app opens the vendor's own export
+# page, the person drops the zip (or, opt-in, the app watches ~/Downloads
+# for it), and the parsers STREAM it into the real chat store. Nothing
+# here logs in anywhere or reads a cookie.
+#
+# Imported text is DATA. It lands in chats as history and is sent to a
+# model only the way any saved chat is: as earlier turns, never as
+# instructions. Custom instructions found in an export are shown and
+# added to memory only when the person asks (import_remember).
+import zipfile
+import codecs
+import datetime as _dt
+import html.parser as _htmlparser
+from collections import Counter
+
+IMPORT_APPS = {
+    # url: the page the "Open …" button opens. Claude's is the official
+    # deep link (support.claude.com 9450526); ChatGPT documents no deep
+    # link, so its home opens and the words say where to go (help.openai
+    # .com 7260999); Takeout's custom URL scheme is Google's own
+    # (support.google.com 3024190) and preselects My Activity.
+    "chatgpt": {"name": "ChatGPT", "url": "https://chatgpt.com/"},
+    "claude": {"name": "Claude",
+               "url": "https://claude.ai/settings/data-privacy-controls"},
+    "gemini": {"name": "Gemini",
+               "url": "https://takeout.google.com/settings/takeout/custom/my_activity"},
+    "file": {"name": "a file", "url": ""},
+}
+IMPORT_DIR = "imports"                 # a profile's: ledger, incoming files, extras
+IMPORT_LEDGER = "imports/ledger.json"
+IMPORT_BATCH = 100                     # chats written per take of the lock
+IMPORT_IMG_MAX = 25 * 1024 * 1024      # one picture, at most
+IMPORT_GAP_MS = 30 * 60 * 1000         # Gemini: prompts this close are one chat
+IMPORT_BIG = 300 * 1024 * 1024         # the page calls an export this big "big"
+IMPORT_TEXT_EXT = (".md", ".markdown", ".txt", ".json", ".html", ".htm")
+IMPORT_IMG_EXT = {".png": "png", ".jpg": "jpg", ".jpeg": "jpg", ".webp": "webp"}
+_IMPORT_RUNS = profile_cache("_IMPORT_RUNS", {})     # run id -> job
+_IMPORT_WATCH = profile_cache("_IMPORT_WATCH", {})   # the Downloads watcher
+_import_lock = threading.Lock()
+
+
+class ImportError_(Exception):
+    """A plain line for the person; `detail` is what was found."""
+    def __init__(self, msg, detail=None):
+        super().__init__(msg)
+        self.detail = detail
+
+
+# ---------------------------------------------------------------- reading
+def _imp_json_items(fp, chunk=1 << 20, on_bytes=None):
+    """The elements of a top-level JSON array, one at a time, from a
+    binary stream, never holding more than the element in hand plus a
+    chunk (an export's conversations.json can be gigabytes). The C
+    decoder does the work: raw_decode on a growing text buffer, the
+    consumed prefix dropped after each element; a failed decode with
+    more bytes to come just reads more. on_bytes(n) counts what was
+    read, for progress."""
+    dec = json.JSONDecoder()
+    udec = codecs.getincrementaldecoder("utf-8")("replace")
+    buf, pos, eof, opened, n_read = "", 0, False, False, 0
+
+    def more(grow=False):
+        nonlocal buf, pos, eof, chunk
+        # the chunk grows only when an element outran it (a retry), never
+        # on a plain read: growing on every read made the buffer itself
+        # a hundred MB on a big file
+        if grow and chunk < (16 << 20):
+            chunk *= 2
+        raw = fp.read(chunk)
+        if not raw:
+            eof = True
+            buf = buf[pos:] + udec.decode(b"", True)
+        else:
+            buf = buf[pos:] + udec.decode(raw)
+            if on_bytes:
+                on_bytes(len(raw))
+        pos = 0
+        return not eof or buf[pos:].strip() != ""
+
+    more()
+    while True:
+        # the array itself
+        m = re.compile(r"\s*").match(buf, pos)
+        pos = m.end()
+        if pos >= len(buf):
+            if eof:
+                raise ImportError_("The file is empty.")
+            more()
+            continue
+        if not opened:
+            if buf[pos] == "﻿":
+                pos += 1
+                continue
+            if buf[pos] != "[":
+                # one object, not a list: hand it over whole
+                try:
+                    while True:
+                        try:
+                            obj, end = dec.raw_decode(buf, pos)
+                            break
+                        except json.JSONDecodeError:
+                            if eof:
+                                raise
+                            more(True)
+                except json.JSONDecodeError:
+                    raise ImportError_("This isn't JSON we can read.",
+                                       {"starts": buf[pos:pos + 60]})
+                yield obj
+                return
+            opened = True
+            pos += 1
+            continue
+        c = buf[pos]
+        if c == ",":
+            pos += 1
+            continue
+        if c == "]":
+            return
+        try:
+            obj, end = dec.raw_decode(buf, pos)
+        except json.JSONDecodeError as exc:
+            if eof:
+                raise ImportError_("The file ends in the middle of a chat; "
+                                   "the export may be incomplete.",
+                                   {"at": exc.pos}) from exc
+            more(True)
+            continue
+        pos = end
+        yield obj
+        if len(buf) - pos < 4096 and not eof:
+            more()
+
+
+class _CountingFile:
+    """A binary stream that reports what was read (progress)."""
+    def __init__(self, fp, on_bytes):
+        self.fp, self.on = fp, on_bytes
+
+    def read(self, n=-1):
+        b = self.fp.read(n)
+        if b and self.on:
+            self.on(len(b))
+        return b
+
+    def close(self):
+        try:
+            self.fp.close()
+        except Exception:
+            pass
+
+
+def _imp_ms(t):
+    """A vendor timestamp as milliseconds: Unix seconds (float, int or a
+    digit string), ISO 8601 ("2026-11-08T10:12:03.123Z"), or None."""
+    if t is None or isinstance(t, bool):
+        return None
+    if isinstance(t, (int, float)):
+        if t <= 0:
+            return None
+        return int(t * 1000) if t < 1e11 else int(t)
+    if isinstance(t, str):
+        s = t.strip()
+        if not s:
+            return None
+        if re.fullmatch(r"\d+(\.\d+)?", s):
+            return _imp_ms(float(s))
+        try:
+            d = _dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+            if d.tzinfo is None:
+                d = d.replace(tzinfo=_dt.timezone.utc)
+            return int(d.timestamp() * 1000)
+        except ValueError:
+            return None
+    return None
+
+
+def _imp_title(text, fallback="Untitled chat", n=72):
+    t = " ".join(str(text or "").split())
+    t = re.sub(r"^[#>*\-\s]+", "", t)
+    if not t:
+        return fallback
+    if len(t) > n:
+        cut = t[:n]
+        sp = cut.rfind(" ")
+        t = (cut[:sp] if sp > n - 24 else cut).rstrip(" ,.;:") + "…"
+    return t
+
+
+def _imp_key(app, vid):
+    return "%s:%s" % (app, vid)
+
+
+def _imp_sha(*parts):
+    h = hashlib.sha1()
+    for p in parts:
+        h.update(str(p).encode("utf-8", "replace") + b"\x00")
+    return h.hexdigest()
+
+
+class _ImpHtmlText(_htmlparser.HTMLParser):
+    """HTML to plain, lightly marked text: paragraphs and <br> become
+    lines, lists get dashes, <b>/<strong> **, <code> backticks, <pre>
+    a fenced block, <a> its text with the link. Scripts and styles are
+    dropped. Used for Gemini's HTML answers and .html transcripts."""
+    BLOCK = {"p", "div", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5",
+             "h6", "tr", "table", "blockquote", "section", "article", "br",
+             "hr", "pre"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.out, self.skip, self.pre, self.href = [], 0, False, None
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "noscript"):
+            self.skip += 1
+            return
+        if self.skip:
+            return
+        if tag == "br":
+            self.out.append("\n")
+        elif tag == "pre":
+            self.pre = True
+            self.out.append("\n```\n")
+        elif tag == "li":
+            self.out.append("\n- ")
+        elif tag in ("b", "strong"):
+            self.out.append("**")
+        elif tag in ("i", "em"):
+            self.out.append("*")
+        elif tag == "code" and not self.pre:
+            self.out.append("`")
+        elif tag == "a":
+            self.href = dict(attrs).get("href")
+        elif tag in self.BLOCK:
+            self.out.append("\n")
+        if tag in ("h1", "h2", "h3"):
+            self.out.append("#" * int(tag[1]) + " ")
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript"):
+            self.skip = max(0, self.skip - 1)
+            return
+        if self.skip:
+            return
+        if tag == "pre":
+            self.pre = False
+            self.out.append("\n```\n")
+        elif tag in ("b", "strong"):
+            self.out.append("**")
+        elif tag in ("i", "em"):
+            self.out.append("*")
+        elif tag == "code" and not self.pre:
+            self.out.append("`")
+        elif tag == "a":
+            if self.href and self.href.startswith(("http://", "https://")):
+                self.out.append(" (%s)" % self.href)
+            self.href = None
+        elif tag in self.BLOCK:
+            self.out.append("\n")
+
+    def handle_data(self, data):
+        if self.skip:
+            return
+        self.out.append(data if self.pre else re.sub(r"[ \t\r\f\v]+", " ", data))
+
+    def text(self):
+        t = "".join(self.out)
+        t = re.sub(r"[ \t]+\n", "\n", t)
+        t = re.sub(r"\n{3,}", "\n\n", t)
+        return t.strip()
+
+
+def _imp_html_text(s):
+    p = _ImpHtmlText()
+    try:
+        p.feed(s if isinstance(s, str) else str(s))
+        p.close()
+    except Exception:
+        return re.sub(r"<[^>]+>", "", str(s)).strip()
+    return p.text()
+
+
+# ----------------------------------------------------- what the file is
+_IMP_CONV_RX = re.compile(r"(?:^|/)conversations(?:-\d+)?\.json$", re.I)
+_IMP_GEMINI_RX = re.compile(r"(?:^|/)(?:My ?Activity|Meine Aktivitäten|Mon activité|"
+                            r"Mi actividad)[^/]*\.(json|html)$", re.I)
+_IMP_PARTIAL = (".crdownload", ".download", ".part", ".tmp", ".partial")
+
+
+def _imp_sniff_json(src, n=1 << 16):
+    """The shape of a JSON file from its first bytes (a stream, bytes or
+    text): chatgpt, claude, gemini, generic (something with role and
+    content) or None."""
+    head = src.read(n) if hasattr(src, "read") else src[:n]
+    if isinstance(head, bytes):
+        head = head.decode("utf-8", "replace")
+    if '"mapping"' in head and ('"current_node"' in head or '"message"' in head):
+        return "chatgpt"
+    if '"chat_messages"' in head or ('"sender"' in head and '"uuid"' in head):
+        return "claude"
+    if '"header"' in head and ('Gemini' in head or '"products"' in head
+                               or '"safeHtmlItem"' in head or '"userInteractions"' in head):
+        return "gemini"
+    if '"role"' in head and '"content"' in head:
+        return "generic"
+    return None
+
+
+def import_inspect(path):
+    """What the file at path is: {"kind", "size", "files", "note"} with
+    kind one of chatgpt, claude, gemini, file (transcripts), or an
+    ImportError_ with a plain line (damaged zip, nothing readable)."""
+    try:
+        size = os.path.getsize(path)
+    except OSError as exc:
+        raise ImportError_("Couldn't open that file.") from exc
+    low = path.lower()
+    out = {"size": size, "files": [], "members": 0, "kind": "unknown", "note": ""}
+    if low.endswith((".tgz", ".tar.gz", ".tar")):
+        raise ImportError_("This is a .tgz archive, which we can't open here. In Takeout, "
+                           "choose .zip as the file type and export again.",
+                           {"name": os.path.basename(path), "size": size})
+    if low.endswith(".zip") and not zipfile.is_zipfile(path):
+        raise ImportError_("This zip is damaged or still downloading. Wait for it to "
+                           "finish, then try again.", {"size": size})
+    if zipfile.is_zipfile(path):
+        try:
+            with zipfile.ZipFile(path) as zf:
+                infos = [i for i in zf.infolist() if not i.is_dir()]
+                names = [i.filename for i in infos]
+                out["members"] = len(names)
+                out["files"] = sorted(names, key=len)[:8]
+                convs = [n for n in names if _IMP_CONV_RX.search(n)]
+                gem = [n for n in names if _IMP_GEMINI_RX.search(n)
+                       and re.search(r"gemini", n, re.I)]
+                if convs:
+                    base_names = {os.path.basename(n).lower() for n in names}
+                    dirs = {os.path.dirname(n).lower() for n in names}
+                    if base_names & {"users.json", "projects.json", "memories.json"}:
+                        out["kind"] = "claude"
+                    elif (base_names & {"user.json", "chat.html", "message_feedback.json",
+                                        "export_manifest.json", "shared_conversations.json",
+                                        "model_comparisons.json"}
+                          or any(d.endswith("personal/conversations") for d in dirs)):
+                        out["kind"] = "chatgpt"
+                    else:
+                        with zf.open(convs[0]) as f:
+                            k = _imp_sniff_json(f)
+                        out["kind"] = k if k in ("chatgpt", "claude") else "file"
+                    out["files"] = convs[:8]
+                    out["bytes"] = sum(i.file_size for i in infos
+                                       if _IMP_CONV_RX.search(i.filename))
+                elif gem:
+                    out["kind"] = "gemini"
+                    out["files"] = gem[:8]
+                    out["bytes"] = sum(i.file_size for i in infos if i.filename in gem)
+                else:
+                    texts = [n for n in names if n.lower().endswith(IMPORT_TEXT_EXT)
+                             and not os.path.basename(n).startswith(".")
+                             and "__MACOSX/" not in n]
+                    if any(n.lower().endswith("archive_browser.html") for n in names):
+                        # Google Takeout, but Gemini Apps wasn't ticked
+                        out["kind"] = "unknown"
+                        out["note"] = "takeout-without-gemini"
+                    elif texts:
+                        out["kind"] = "file"
+                        out["files"] = texts[:8]
+                        out["bytes"] = sum(i.file_size for i in infos if i.filename in texts)
+                    else:
+                        out["kind"] = "unknown"
+        except zipfile.BadZipFile as exc:
+            raise ImportError_("This zip is damaged or still downloading. Wait for it "
+                               "to finish, then try again.", {"size": size}) from exc
+        return out
+    if low.endswith(_IMP_PARTIAL):
+        raise ImportError_("That file is still downloading.", {"size": size})
+    if low.endswith(".json"):
+        with open(path, "rb") as f:
+            k = _imp_sniff_json(f)
+        out["kind"] = k if k in ("chatgpt", "claude", "gemini") else "file"
+        out["files"] = [os.path.basename(path)]
+        out["bytes"] = size
+        return out
+    if low.endswith(IMPORT_TEXT_EXT):
+        out["kind"] = "file"
+        out["files"] = [os.path.basename(path)]
+        out["bytes"] = size
+        return out
+    if size and size < 1 << 20:
+        # a text file under another extension (a transcript saved as .log)
+        with open(path, "rb") as f:
+            head = f.read(4096)
+        if head and b"\x00" not in head:
+            out["kind"] = "file"
+            out["files"] = [os.path.basename(path)]
+            out["bytes"] = size
+            return out
+    raise ImportError_("This isn't a file we can read as chats. We read a ChatGPT, "
+                       "Claude or Google Takeout zip, or a .md, .txt, .json or .html "
+                       "transcript.", {"name": os.path.basename(path), "size": size})
+
+
+# ------------------------------------------------------------ the parsers
+# Each parser is a generator of events over one export:
+#   ("chat", chat_dict, vendor_key)   a chat ready to store (no id yet)
+#   ("skip", reason)                  something left out, counted by reason
+#   ("extra", kind, value)            custom instructions, projects, memory
+# chat_dict: title, ts (ms), created (ms), messages [{role, content, ts,
+# model?}], src {app, name, id, model?, left?}. put_image(raw, ext) stores
+# a picture and returns its /api/image/ path, or None.
+
+def _imp_fence(lang, text):
+    lang = re.sub(r"[^\w+#.-]", "", str(lang or ""))[:20]
+    t = str(text or "").rstrip("\n")
+    fence = "```"
+    while fence in t:
+        fence += "`"
+    return "%s%s\n%s\n%s" % (fence, lang, t, fence)
+
+
+class _ImpImages:
+    """The pictures in a ChatGPT zip, by the id their asset pointers
+    carry: file-<id>-<name>.png, file_<hex>-<name>.png, dalle-generations/
+    file-<id>-<uuid>.webp, <conversation>/image/<id>.png, file_<hex>.dat
+    (sniffed). Copied into images/ content-addressed, so the same
+    picture in two exports is one file, and a re-import writes nothing."""
+    _ID_RX = re.compile(r"^(file[-_][A-Za-z0-9]+)")
+
+    def __init__(self, zf, put_image, counts):
+        self.zf, self.put, self.counts = zf, put_image, counts
+        self.index, self.done = {}, {}
+        if zf is not None:
+            for i in zf.infolist():
+                if i.is_dir():
+                    continue
+                bn = os.path.basename(i.filename)
+                m = self._ID_RX.match(bn)
+                if m:
+                    self.index.setdefault(m.group(1).lower(), i.filename)
+                    stem = bn.rsplit(".", 1)[0].lower()
+                    self.index.setdefault(stem, i.filename)
+
+    def resolve(self, pointer, alt=""):
+        """A markdown image for an asset pointer, or None (and a count
+        of why): "file-service://file-X", "sediment://file_X", a bare id."""
+        if not isinstance(pointer, str) or not pointer:
+            return None
+        pid = pointer.rsplit("://", 1)[-1].rsplit("/", 1)[-1].lower()
+        if pid in self.done:
+            return self.done[pid]
+        name = self.index.get(pid)
+        if not name:
+            m = self._ID_RX.match(pid)
+            name = self.index.get(m.group(1)) if m else None
+        md = None
+        if name and self.zf is not None:
+            md = self._copy(name, alt)
+        if md is None:
+            self.counts["images_missing"] = self.counts.get("images_missing", 0) + 1
+        self.done[pid] = md
+        return md
+
+    def _copy(self, name, alt):
+        try:
+            info = self.zf.getinfo(name)
+        except KeyError:
+            return None
+        if info.file_size > IMPORT_IMG_MAX:
+            self.counts["images_too_big"] = self.counts.get("images_too_big", 0) + 1
+            return None
+        with self.zf.open(info) as f:
+            raw = f.read()
+        ext = _imp_image_ext(raw, name)
+        if not ext:
+            self.counts["files_other"] = self.counts.get("files_other", 0) + 1
+            return None
+        p = self.put(raw, ext)
+        if not p:
+            return None
+        # copied, not "brought": the run counts a picture only when the
+        # chat showing it is new (a re-import copies nothing it already has)
+        self.counts["images_copied"] = self.counts.get("images_copied", 0) + 1
+        a = " ".join(str(alt or "image").split())[:120].replace("]", ")")
+        return "![%s](%s)" % (a, p)
+
+
+def _imp_image_ext(raw, name=""):
+    """png, jpg or webp from the bytes (a .dat is one of these or
+    nothing); gif and the rest aren't served, so they are left out."""
+    if raw[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if raw[:3] == b"\xff\xd8\xff":
+        return "jpg"
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
+def _imp_chatgpt_text(content, imgs, counts, role):
+    """One ChatGPT message's content as markdown, or "" when nothing
+    of it is shown (reasoning, browsing scaffolding, context blocks)."""
+    if not isinstance(content, dict):
+        return ""
+    ct = content.get("content_type") or "text"
+    parts = content.get("parts")
+    if ct in ("text", "multimodal_text"):
+        out = []
+        for p in parts if isinstance(parts, list) else []:
+            if isinstance(p, str):
+                if p.strip():
+                    out.append(p)
+            elif isinstance(p, dict):
+                pt = p.get("content_type") or ""
+                if pt == "image_asset_pointer" or p.get("asset_pointer"):
+                    alt = ""
+                    md = p.get("metadata") if isinstance(p.get("metadata"), dict) else {}
+                    d = md.get("dalle") if isinstance(md.get("dalle"), dict) else {}
+                    if d.get("prompt"):
+                        alt = str(d["prompt"])[:120]
+                    im = imgs.resolve(p.get("asset_pointer"), alt or "image")
+                    if im:
+                        out.append(im)
+                elif pt.startswith("audio") or pt.startswith("real_time"):
+                    counts["audio"] = counts.get("audio", 0) + 1
+                    t = p.get("text") or (p.get("transcription") if isinstance(
+                        p.get("transcription"), str) else "")
+                    if t:
+                        out.append(str(t))
+                else:
+                    counts["parts_other"] = counts.get("parts_other", 0) + 1
+        return "\n\n".join(out)
+    if ct == "code":
+        t = content.get("text") or ""
+        return _imp_fence(content.get("language") or "", t) if t.strip() else ""
+    if ct == "execution_output":
+        t = content.get("text") or ""
+        return _imp_fence("", t) if str(t).strip() else ""
+    if ct == "tether_quote":
+        t = str(content.get("text") or "").strip()
+        title = str(content.get("title") or content.get("domain") or "").strip()
+        url = str(content.get("url") or "")
+        head = ("[%s](%s)" % (title, url) if title and url.startswith("http")
+                else title)
+        q = "\n".join("> " + ln for ln in t.splitlines()[:40]) if t else ""
+        return "\n".join(x for x in (head, q) if x)
+    if ct in ("thoughts", "reasoning_recap"):
+        counts["reasoning"] = counts.get("reasoning", 0) + 1
+        return ""
+    if ct in ("user_editable_context", "model_editable_context"):
+        return ""                      # harvested by the caller
+    if ct in ("tether_browsing_display", "tether_browsing_code", "sonic_webpage",
+              "system_error", "computer_output", "system_message"):
+        counts["scaffolding"] = counts.get("scaffolding", 0) + 1
+        return ""
+    # an unknown type: its text if it has any, counted either way
+    counts["parts_other"] = counts.get("parts_other", 0) + 1
+    t = content.get("text")
+    return str(t) if isinstance(t, str) and t.strip() else ""
+
+
+def _imp_chatgpt_thread(mapping, current):
+    """The node ids of the shown thread, root first: current_node up
+    through parents. Without a usable current_node, the newest leaf."""
+    if not isinstance(mapping, dict) or not mapping:
+        return []
+    if current not in mapping:
+        leaves = [k for k, v in mapping.items()
+                  if isinstance(v, dict) and not v.get("children")]
+
+        def _t(k):
+            m = (mapping[k] or {}).get("message") if isinstance(mapping[k], dict) else None
+            return (m or {}).get("create_time") or 0 if isinstance(m, dict) else 0
+        current = max(leaves, key=_t) if leaves else next(iter(mapping))
+    path, seen = [], set()
+    k = current
+    while k in mapping and k not in seen:
+        seen.add(k)
+        path.append(k)
+        node = mapping[k]
+        k = node.get("parent") if isinstance(node, dict) else None
+    path.reverse()
+    return path
+
+
+def _imp_chatgpt_conv(conv, imgs, counts):
+    """One conversation -> (chat, vendor key), or None when it has no
+    shown turns. Branches (edits, regenerations) are counted and left;
+    system and hidden messages are dropped; custom-instruction blocks
+    are returned on the chat's src for the caller to harvest."""
+    mapping = conv.get("mapping")
+    if not isinstance(mapping, dict):
+        raise ImportError_("unsupported", {"keys": sorted(conv.keys())[:20]})
+    path = _imp_chatgpt_thread(mapping, conv.get("current_node"))
+    branches = sum(1 for v in mapping.values()
+                   if isinstance(v, dict) and len(v.get("children") or []) > 1)
+    msgs, models, instr = [], Counter(), []
+    for k in path:
+        node = mapping.get(k)
+        m = node.get("message") if isinstance(node, dict) else None
+        if not isinstance(m, dict):
+            continue
+        author = m.get("author") if isinstance(m.get("author"), dict) else {}
+        role = author.get("role") or ""
+        meta = m.get("metadata") if isinstance(m.get("metadata"), dict) else {}
+        content = m.get("content") if isinstance(m.get("content"), dict) else {}
+        ct = content.get("content_type") or "text"
+        if ct in ("user_editable_context", "model_editable_context"):
+            for f in ("user_profile", "user_instructions", "model_set_context"):
+                v = content.get(f)
+                if isinstance(v, str) and v.strip():
+                    instr.append(v.strip())
+            continue
+        ucd = meta.get("user_context_message_data")
+        if isinstance(ucd, dict):
+            for f in ("about_user_message", "about_model_message"):
+                v = ucd.get(f)
+                if isinstance(v, str) and v.strip():
+                    instr.append(v.strip())
+        if role == "system" or meta.get("is_user_system_message"):
+            counts["system"] = counts.get("system", 0) + 1
+            continue
+        if meta.get("is_visually_hidden_from_conversation"):
+            counts["hidden"] = counts.get("hidden", 0) + 1
+            continue
+        if role not in ("user", "assistant", "tool"):
+            counts["hidden"] = counts.get("hidden", 0) + 1
+            continue
+        text = _imp_chatgpt_text(content, imgs, counts, role)
+        if role == "user":
+            att = meta.get("attachments")
+            if isinstance(att, list):
+                names = []
+                for a in att:
+                    if not isinstance(a, dict):
+                        continue
+                    nm = str(a.get("name") or "").strip()
+                    im = imgs.resolve(a.get("id"), nm or "image") if a.get("id") else None
+                    if im:
+                        if im not in text:
+                            text = (text + "\n\n" + im).strip()
+                    elif nm:
+                        names.append(nm)
+                if names:
+                    counts["attachments"] = counts.get("attachments", 0) + len(names)
+                    text = (text + "\n\n" + "\n".join(
+                        "📎 %s (not in the export)" % n for n in names)).strip()
+        if not text.strip():
+            continue
+        out_role = "user" if role == "user" else "assistant"
+        ts = _imp_ms(m.get("create_time"))
+        slug = meta.get("model_slug") if out_role == "assistant" else None
+        if slug:
+            models[str(slug)] += 1
+        # ChatGPT splits one answer over several nodes (code, its output,
+        # the prose): consecutive answer parts read as one message
+        if msgs and msgs[-1]["role"] == out_role == "assistant":
+            msgs[-1]["content"] += "\n\n" + text
+            if slug and not msgs[-1].get("model"):
+                msgs[-1]["model"] = str(slug)
+            continue
+        rec = {"role": out_role, "content": text}
+        if ts:
+            rec["ts"] = ts
+        if slug:
+            rec["model"] = str(slug)
+        msgs.append(rec)
+    if not msgs:
+        counts["empty"] = counts.get("empty", 0) + 1
+        return None
+    vid = str(conv.get("conversation_id") or conv.get("id") or "")
+    if not vid:
+        vid = _imp_sha(conv.get("title"), conv.get("create_time"), msgs[0]["content"][:200])
+    created = _imp_ms(conv.get("create_time")) or (msgs[0].get("ts"))
+    updated = _imp_ms(conv.get("update_time")) or (msgs[-1].get("ts")) or created
+    model = str(conv.get("default_model_slug") or (models.most_common(1)[0][0]
+                                                    if models else "") or "")
+    src = {"app": "chatgpt", "name": "ChatGPT", "id": vid}
+    if model:
+        src["model"] = model
+    left = {}
+    if branches:
+        left["branches"] = branches
+        counts["branches"] = counts.get("branches", 0) + branches
+    if left:
+        src["left"] = left
+    chat = {"title": _imp_title(conv.get("title"), _imp_title(msgs[0]["content"])),
+            "ts": updated or int(time.time() * 1000), "messages": msgs, "src": src}
+    if created:
+        chat["created"] = created
+    if instr:
+        chat["_instr"] = instr
+    return chat, _imp_key("chatgpt", vid)
+
+
+def _imp_chatgpt(job, zf, members, put_image, counts, on_bytes):
+    """Every conversation in a ChatGPT export: conversations.json, or the
+    split conversations-NNN.json files, streamed one conversation at a
+    time; pictures resolved against the zip."""
+    imgs = _ImpImages(zf, put_image, counts)
+    seen_instr = set()
+    for name in members:
+        fp = zf.open(name) if zf is not None else open(name, "rb")
+        try:
+            for conv in _imp_json_items(fp, on_bytes=on_bytes):
+                if job.get("cancel"):
+                    return
+                if not isinstance(conv, dict):
+                    counts["unknown"] = counts.get("unknown", 0) + 1
+                    continue
+                try:
+                    got = _imp_chatgpt_conv(conv, imgs, counts)
+                except ImportError_ as exc:
+                    if exc.args and exc.args[0] == "unsupported":
+                        raise ImportError_(
+                            "This looks like a ChatGPT export, but its chats are in a "
+                            "shape we haven't seen. The first chat's fields: %s."
+                            % ", ".join((exc.detail or {}).get("keys", [])[:12]),
+                            exc.detail) from exc
+                    raise
+                if got is None:
+                    continue
+                chat, key = got
+                for s in chat.pop("_instr", []):
+                    if s not in seen_instr:
+                        seen_instr.add(s)
+                        yield ("extra", "instructions", s)
+                yield ("chat", chat, key)
+        finally:
+            fp.close()
+
+
+def _imp_claude_msg(m, counts):
+    """One Claude message's text: its content blocks (text kept; thinking,
+    tool use and tool results counted and left), else its `text`; then
+    each attachment's extracted text and each file's name."""
+    if not isinstance(m, dict):
+        return None
+    sender = m.get("sender")
+    role = "user" if sender == "human" else "assistant" if sender == "assistant" else None
+    if role is None:
+        counts["hidden"] = counts.get("hidden", 0) + 1
+        return None
+    parts = []
+    blocks = m.get("content")
+    if isinstance(blocks, list) and blocks:
+        for b in blocks:
+            if not isinstance(b, dict):
+                continue
+            bt = b.get("type")
+            if bt == "text":
+                t = b.get("text")
+                if isinstance(t, str) and t.strip():
+                    parts.append(t)
+            elif bt == "thinking":
+                counts["reasoning"] = counts.get("reasoning", 0) + 1
+            elif bt in ("tool_use", "tool_result"):
+                counts["tools"] = counts.get("tools", 0) + 1
+            elif bt in ("token_budget", "voice_note"):
+                counts["scaffolding"] = counts.get("scaffolding", 0) + 1
+            else:
+                counts["parts_other"] = counts.get("parts_other", 0) + 1
+    if not parts:
+        t = m.get("text")
+        if isinstance(t, str) and t.strip():
+            parts.append(t)
+    text = "\n\n".join(parts)
+    att = m.get("attachments")
+    if isinstance(att, list):
+        for a in att:
+            if not isinstance(a, dict):
+                continue
+            nm = str(a.get("file_name") or "attachment").strip()
+            ex = a.get("extracted_content")
+            counts["attachments"] = counts.get("attachments", 0) + 1
+            if isinstance(ex, str) and ex.strip():
+                body = ex.strip()
+                note = ""
+                if len(body) > 20000:
+                    body = body[:20000].rstrip()
+                    note = "\n(the first 20,000 characters)"
+                text = (text + "\n\n📎 %s%s\n%s" % (nm, note, _imp_fence("", body))).strip()
+            else:
+                text = (text + "\n\n📎 %s" % nm).strip()
+    files = m.get("files")
+    if isinstance(files, list):
+        for f in files:
+            nm = (f.get("file_name") if isinstance(f, dict) else f)
+            if isinstance(nm, str) and nm.strip():
+                counts["attachments"] = counts.get("attachments", 0) + 1
+                text = (text + "\n\n📎 %s (not in the export)" % nm.strip()).strip()
+    if not text.strip():
+        return None
+    rec = {"role": role, "content": text}
+    ts = _imp_ms(m.get("created_at"))
+    if ts:
+        rec["ts"] = ts
+    return rec
+
+
+def _imp_claude_conv(conv, counts):
+    if "chat_messages" not in conv:
+        raise ImportError_("unsupported", {"keys": sorted(conv.keys())[:20]})
+    raw = conv.get("chat_messages")
+    raw = [m for m in raw if isinstance(m, dict)] if isinstance(raw, list) else []
+    raw.sort(key=lambda m: _imp_ms(m.get("created_at")) or 0)
+    msgs = []
+    for m in raw:
+        rec = _imp_claude_msg(m, counts)
+        if rec is None:
+            continue
+        if msgs and msgs[-1]["role"] == rec["role"] == "assistant":
+            msgs[-1]["content"] += "\n\n" + rec["content"]
+            continue
+        msgs.append(rec)
+    if not msgs:
+        counts["empty"] = counts.get("empty", 0) + 1
+        return None
+    vid = str(conv.get("uuid") or "") or _imp_sha(conv.get("name"), conv.get("created_at"),
+                                                  msgs[0]["content"][:200])
+    created = _imp_ms(conv.get("created_at")) or msgs[0].get("ts")
+    updated = _imp_ms(conv.get("updated_at")) or msgs[-1].get("ts") or created
+    src = {"app": "claude", "name": "Claude", "id": vid}
+    if isinstance(conv.get("model"), str) and conv["model"]:
+        src["model"] = conv["model"]
+    chat = {"title": _imp_title(conv.get("name"), _imp_title(msgs[0]["content"])),
+            "ts": updated or int(time.time() * 1000), "messages": msgs, "src": src}
+    if created:
+        chat["created"] = created
+    return chat, _imp_key("claude", vid)
+
+
+def _imp_claude(job, zf, members, put_image, counts, on_bytes):
+    """A Claude export: conversations.json streamed; projects.json and
+    memories.json handed over as extras (users.json is never read)."""
+    for name in members:
+        fp = zf.open(name) if zf is not None else open(name, "rb")
+        try:
+            for conv in _imp_json_items(fp, on_bytes=on_bytes):
+                if job.get("cancel"):
+                    return
+                if not isinstance(conv, dict):
+                    counts["unknown"] = counts.get("unknown", 0) + 1
+                    continue
+                try:
+                    got = _imp_claude_conv(conv, counts)
+                except ImportError_ as exc:
+                    if exc.args and exc.args[0] == "unsupported":
+                        raise ImportError_(
+                            "This looks like a Claude export, but its chats are in a "
+                            "shape we haven't seen. The first chat's fields: %s."
+                            % ", ".join((exc.detail or {}).get("keys", [])[:12]),
+                            exc.detail) from exc
+                    raise
+                if got is not None:
+                    yield ("chat",) + got
+        finally:
+            fp.close()
+    if zf is None:
+        return
+    names = {os.path.basename(i.filename).lower(): i.filename for i in zf.infolist()
+             if not i.is_dir()}
+    if "projects.json" in names:
+        try:
+            with zf.open(names["projects.json"]) as f:
+                projs = json.loads(f.read(50 << 20).decode("utf-8", "replace"))
+        except (ValueError, OSError):
+            projs = None
+        kept = []
+        for p in projs if isinstance(projs, list) else []:
+            if not isinstance(p, dict):
+                continue
+            docs = []
+            for d in p.get("docs") if isinstance(p.get("docs"), list) else []:
+                if isinstance(d, dict):
+                    docs.append({"filename": str(d.get("filename") or ""),
+                                 "content": str(d.get("content") or "")[:200000]})
+            kept.append({"uuid": str(p.get("uuid") or ""), "name": str(p.get("name") or ""),
+                         "description": str(p.get("description") or ""),
+                         "prompt_template": str(p.get("prompt_template") or ""),
+                         "created_at": p.get("created_at"), "docs": docs})
+        if kept:
+            yield ("extra", "projects", kept)
+    if "memories.json" in names:
+        try:
+            with zf.open(names["memories.json"]) as f:
+                mem = json.loads(f.read(5 << 20).decode("utf-8", "replace"))
+        except (ValueError, OSError):
+            mem = None
+        for item in mem if isinstance(mem, list) else [mem] if isinstance(mem, dict) else []:
+            if not isinstance(item, dict):
+                continue
+            t = item.get("conversations_memory")
+            if isinstance(t, str) and t.strip():
+                yield ("extra", "instructions", t.strip())
+            pm = item.get("project_memories")
+            if isinstance(pm, dict):
+                for v in pm.values():
+                    if isinstance(v, str) and v.strip():
+                        yield ("extra", "instructions", v.strip())
+
+
+_IMP_GEM_PREFIX = re.compile(
+    r"^(?:Prompted|Eingegebener Prompt|Demande|Solicitud|Prompt)\s*[:：]\s*", re.I)
+_IMP_GEM_CONV = re.compile(r"/app/(?:c/)?([A-Za-z0-9_-]{6,})")
+
+
+def _imp_gemini_entry(e, counts):
+    """One Takeout activity entry -> {"ts", "prompt", "answer", "conv"} or
+    None. Three attested shapes: title "Prompted: …" with the answer as
+    HTML in safeHtmlItem[]; details[] named Request/Response;
+    userInteractions[].userInteraction{request, response}."""
+    if not isinstance(e, dict):
+        return None
+    header = str(e.get("header") or "")
+    prods = e.get("products") if isinstance(e.get("products"), list) else []
+    if not (re.search(r"gemini|bard", header, re.I)
+            or any(re.search(r"gemini|bard", str(p), re.I) for p in prods)):
+        counts["other_products"] = counts.get("other_products", 0) + 1
+        return None
+    ts = _imp_ms(e.get("time"))
+    prompt, answer = "", ""
+    det = e.get("details")
+    if isinstance(det, list):
+        for d in det:
+            if not isinstance(d, dict):
+                continue
+            nm = str(d.get("name") or "").lower()
+            v = d.get("value")
+            if not isinstance(v, str):
+                continue
+            if nm in ("request", "prompt", "anfrage") and not prompt:
+                prompt = v
+            elif nm in ("response", "answer", "antwort") and not answer:
+                answer = v
+    ui = e.get("userInteractions")
+    if isinstance(ui, list) and not (prompt and answer):
+        for u in ui:
+            u = u.get("userInteraction") if isinstance(u, dict) else None
+            if not isinstance(u, dict):
+                continue
+            rq, rs = u.get("request"), u.get("response")
+            for cand, is_req in ((rq, True), (rs, False)):
+                if isinstance(cand, str) and cand[:1] in "{[":
+                    try:
+                        cand = json.loads(cand)
+                    except ValueError:
+                        pass
+                if isinstance(cand, dict):
+                    cand = cand.get("text") or cand.get("content") or cand.get("prompt") or ""
+                if isinstance(cand, list):
+                    cand = "\n".join(str(x) for x in cand if isinstance(x, str))
+                if isinstance(cand, str) and cand.strip():
+                    if is_req and not prompt:
+                        prompt = cand
+                    elif not is_req and not answer:
+                        answer = cand
+    title = str(e.get("title") or "")
+    if not prompt:
+        if _IMP_GEM_PREFIX.match(title):
+            prompt = _IMP_GEM_PREFIX.sub("", title, count=1)
+        elif title and not re.match(r"^(Used|Viewed|Searched|Visited)\b", title):
+            prompt = title
+    if not answer:
+        shi = e.get("safeHtmlItem")
+        if isinstance(shi, list):
+            answer = "\n\n".join(_imp_html_text(x.get("html")) for x in shi
+                                 if isinstance(x, dict) and isinstance(x.get("html"), str))
+        elif isinstance(shi, dict) and isinstance(shi.get("html"), str):
+            answer = _imp_html_text(shi["html"])
+    if not answer:
+        subs = e.get("subtitles")
+        if isinstance(subs, list):
+            answer = "\n".join(str(s.get("name")) for s in subs
+                               if isinstance(s, dict) and isinstance(s.get("name"), str))
+    if e.get("imageFile") or e.get("audioFiles"):
+        counts["attachments"] = counts.get("attachments", 0) + 1
+    conv = None
+    m = _IMP_GEM_CONV.search(str(e.get("titleUrl") or ""))
+    if m:
+        conv = m.group(1)
+    prompt, answer = prompt.strip(), answer.strip()
+    if not prompt and not answer:
+        counts["empty"] = counts.get("empty", 0) + 1
+        return None
+    return {"ts": ts, "prompt": prompt, "answer": answer, "conv": conv}
+
+
+def _imp_gemini_group(entries, counts):
+    """Entries into chats: by Gemini's conversation id when the export
+    carries one, else by time (a prompt within IMPORT_GAP_MS of the last
+    one continues the chat). Yields ("chat", chat, key)."""
+    entries = [e for e in entries if e]
+    entries.sort(key=lambda e: e["ts"] or 0)
+    groups, by_conv, last = [], {}, None
+    for e in entries:
+        if e["conv"]:
+            g = by_conv.get(e["conv"])
+            if g is None:
+                g = by_conv[e["conv"]] = {"conv": e["conv"], "items": []}
+                groups.append(g)
+            g["items"].append(e)
+            continue
+        if (last is not None and last["conv"] is None and e["ts"] and last["items"][-1]["ts"]
+                and e["ts"] - last["items"][-1]["ts"] <= IMPORT_GAP_MS):
+            last["items"].append(e)
+        else:
+            last = {"conv": None, "items": [e]}
+            groups.append(last)
+    counts["grouped_by_time"] = sum(1 for g in groups if g["conv"] is None)
+    counts["grouped_by_id"] = sum(1 for g in groups if g["conv"] is not None)
+    for g in groups:
+        msgs = []
+        for e in g["items"]:
+            if e["prompt"]:
+                rec = {"role": "user", "content": e["prompt"]}
+                if e["ts"]:
+                    rec["ts"] = e["ts"]
+                msgs.append(rec)
+            if e["answer"]:
+                rec = {"role": "assistant", "content": e["answer"]}
+                if e["ts"]:
+                    rec["ts"] = e["ts"]
+                msgs.append(rec)
+        if not msgs:
+            continue
+        first = g["items"][0]
+        vid = g["conv"] or _imp_sha(first["ts"], first["prompt"][:200], first["answer"][:100])
+        created = first["ts"]
+        updated = g["items"][-1]["ts"] or created
+        title = _imp_title(next((e["prompt"] for e in g["items"] if e["prompt"]), ""),
+                           _imp_title(msgs[0]["content"]))
+        chat = {"title": title, "ts": updated or int(time.time() * 1000),
+                "messages": msgs, "src": {"app": "gemini", "name": "Gemini", "id": vid}}
+        if created:
+            chat["created"] = created
+        yield ("chat", chat, _imp_key("gemini", vid))
+
+
+class _ImpGeminiHtml(_htmlparser.HTMLParser):
+    """Takeout's MyActivity.html for Gemini Apps: each outer-cell holds a
+    header cell (the product), then a content cell with the prompt, a
+    <br>, the time, and the answer after it. Best effort; what doesn't
+    parse is counted."""
+    _DATE = re.compile(r"^\s*[A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2}:\d{2}\s*(AM|PM)?\s*[A-Z]{2,5}\s*$")
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.entries, self.cur, self.depth = [], None, 0
+        # the cell being read: its kind, the tag that opened it (a div
+        # or a p), how deep inside same-tag nesting we are, its segments
+        self.cell, self.cell_tag, self.cell_depth = None, None, 0
+        self.segs, self.seg = [], []
+
+    def _close_cell(self):
+        self.segs.append("".join(self.seg))
+        if self.cell == "header":
+            self.cur["header"] = " ".join("".join(self.segs).split())
+        else:
+            self.cur["cells"].append(list(self.segs))
+        self.cell, self.cell_tag, self.segs, self.seg = None, None, [], []
+
+    def handle_starttag(self, tag, attrs):
+        cls = dict(attrs).get("class") or ""
+        if tag == "div" and "outer-cell" in cls:
+            if self.cur is not None:
+                if self.cell is not None:
+                    self._close_cell()
+                self.entries.append(self.cur)
+            self.cur = {"header": "", "cells": []}
+            self.depth = 1
+            return
+        if self.cur is None:
+            return
+        if tag == "div":
+            self.depth += 1
+        if self.cell is not None:
+            if tag == self.cell_tag:
+                self.cell_depth += 1
+            if tag == "br":
+                self.segs.append("".join(self.seg))
+                self.seg = []
+            elif tag in ("p", "li"):
+                self.seg.append("\n")
+            return
+        if "header-cell" in cls:
+            self.cell, self.cell_tag, self.cell_depth = "header", tag, 1
+            self.segs, self.seg = [], []
+        elif "content-cell" in cls:
+            self.cell, self.cell_tag, self.cell_depth = "content", tag, 1
+            self.segs, self.seg = [], []
+
+    def handle_endtag(self, tag):
+        if self.cur is None:
+            return
+        if self.cell is not None and tag == self.cell_tag:
+            self.cell_depth -= 1
+            if self.cell_depth <= 0:
+                self._close_cell()
+        if tag == "div":
+            self.depth -= 1
+            if self.depth <= 0:
+                if self.cell is not None:
+                    self._close_cell()
+                self.entries.append(self.cur)
+                self.cur = None
+
+    def close(self):
+        super().close()
+        if self.cur is not None:
+            if self.cell is not None:
+                self._close_cell()
+            self.entries.append(self.cur)
+            self.cur = None
+
+    def handle_data(self, data):
+        if self.cur is not None and self.cell is not None:
+            self.seg.append(data)
+
+    def results(self, counts):
+        out = []
+        for e in self.entries:
+            if not re.search(r"gemini|bard", e["header"], re.I):
+                counts["other_products"] = counts.get("other_products", 0) + 1
+                continue
+            cells = e["cells"]
+            if not cells:
+                counts["unreadable"] = counts.get("unreadable", 0) + 1
+                continue
+            segs = [s.strip() for s in cells[0]]
+            ts, prompt, answer = None, "", []
+            seen_date = False
+            for s in segs:
+                if not s:
+                    continue
+                if not seen_date and self._DATE.match(s):
+                    seen_date = True
+                    ts = _imp_html_date(s)
+                    continue
+                if not seen_date:
+                    prompt = (prompt + "\n" + s).strip() if prompt else s
+                else:
+                    answer.append(s)
+            prompt = _IMP_GEM_PREFIX.sub("", prompt, count=1).strip()
+            if prompt.lower().startswith("prompted "):
+                prompt = prompt[9:].strip()
+            ans = "\n".join(answer).strip()
+            if not prompt and not ans:
+                counts["unreadable"] = counts.get("unreadable", 0) + 1
+                continue
+            out.append({"ts": ts, "prompt": prompt, "answer": ans, "conv": None})
+        return out
+
+
+def _imp_html_date(s):
+    """"Nov 8, 2026, 10:12:03 AM UTC" -> ms, or None (another locale)."""
+    t = re.sub(r"\s+[A-Z]{2,5}\s*$", "", s.strip())
+    for fmt in ("%b %d, %Y, %I:%M:%S %p", "%b %d, %Y, %H:%M:%S"):
+        try:
+            d = _dt.datetime.strptime(t, fmt).replace(tzinfo=_dt.timezone.utc)
+            return int(d.timestamp() * 1000)
+        except ValueError:
+            continue
+    return None
+
+
+def _imp_gemini(job, zf, members, put_image, counts, on_bytes):
+    """Google Takeout's Gemini Apps activity, JSON or HTML. Every entry
+    is read first (they are small, one prompt and answer each), then
+    grouped into chats."""
+    entries = []
+    for name in members:
+        if name.lower().endswith(".html") or name.lower().endswith(".htm"):
+            fp = zf.open(name) if zf is not None else open(name, "rb")
+            p = _ImpGeminiHtml()
+            try:
+                while True:
+                    raw = fp.read(1 << 20)
+                    if not raw:
+                        break
+                    if on_bytes:
+                        on_bytes(len(raw))
+                    p.feed(raw.decode("utf-8", "replace"))
+                p.close()
+            finally:
+                fp.close()
+            entries.extend(p.results(counts))
+            continue
+        fp = zf.open(name) if zf is not None else open(name, "rb")
+        try:
+            for e in _imp_json_items(fp, on_bytes=on_bytes):
+                if job.get("cancel"):
+                    return
+                r = _imp_gemini_entry(e, counts)
+                if r:
+                    entries.append(r)
+        finally:
+            fp.close()
+    yield from _imp_gemini_group(entries, counts)
+
+
+_IMP_SPEAKER = re.compile(
+    r"^\s{0,3}(?:(?P<mark>#{1,6}\s+|\*\*|__|>\s*))?"
+    r"(?P<who>user|you|me|human|prompt|question|q|assistant|ai|chatgpt|gpt(?:-?\d\w*)?|"
+    r"claude|gemini|bard|bot|model|answer|response|a|copilot|llama|mistral|concordeai)"
+    r"(?:\*\*|__)?\s*(?P<colon>[:：])?\s*(?P<rest>.*)$", re.I)
+_IMP_USER_WORDS = {"user", "you", "me", "human", "prompt", "question", "q"}
+
+
+def _imp_transcript(text, name, counts):
+    """A .md or .txt transcript as chats: speaker lines ("User:", "## Me",
+    "**You**", "Assistant:", "## Claude", …) start turns; a file with no
+    speaker lines is one chat holding the text as one message. "# " headings
+    between turns split the file into several chats."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    stem = os.path.splitext(os.path.basename(name))[0] or "Imported chat"
+    chats, cur, turn = [], None, None
+
+    def flush_turn():
+        nonlocal turn
+        if turn and turn["content"].strip():
+            body = turn["content"].strip()
+            if cur["messages"] and cur["messages"][-1]["role"] == turn["role"]:
+                cur["messages"][-1]["content"] += "\n\n" + body
+            else:
+                cur["messages"].append({"role": turn["role"], "content": body})
+        turn = None
+
+    def new_chat(title):
+        nonlocal cur
+        if cur is not None:
+            flush_turn()
+            if cur["messages"]:
+                chats.append(cur)
+        cur = {"title": title, "messages": []}
+
+    speakers = 0
+    in_fence = False
+    for ln in lines:
+        if ln.strip().startswith("```"):
+            in_fence = not in_fence
+        if in_fence:
+            if turn is None:
+                if cur is None:
+                    new_chat(stem)
+                turn = {"role": "assistant", "content": ""}
+            turn["content"] += ln + "\n"
+            continue
+        m = _IMP_SPEAKER.match(ln)
+        if m and (m.group("mark") or m.group("colon")) and len(ln) < 400:
+            who = m.group("who").lower()
+            role = "user" if who in _IMP_USER_WORDS else "assistant"
+            if cur is None:
+                new_chat(stem)
+            flush_turn()
+            speakers += 1
+            turn = {"role": role, "content": m.group("rest") + "\n"}
+            continue
+        if re.match(r"^#\s+\S", ln) and speakers and turn is not None:
+            new_chat(_imp_title(ln[2:]))
+            continue
+        if cur is None:
+            new_chat(stem)
+        # a heading before any turn names the chat, it isn't a message
+        if (re.match(r"^#\s+\S", ln) and turn is None and not cur["messages"]
+                and cur["title"] == stem):
+            cur["title"] = _imp_title(ln[2:])
+            continue
+        if turn is None:
+            if ln.strip():
+                turn = {"role": "assistant", "content": ln + "\n"}
+            continue
+        turn["content"] += ln + "\n"
+    if cur is not None:
+        flush_turn()
+        if cur["messages"]:
+            chats.append(cur)
+    if not speakers:
+        counts["unstructured"] = counts.get("unstructured", 0) + 1
+    for i, c in enumerate(chats):
+        first = c["messages"][0]["content"]
+        if c["title"] == stem:
+            h = re.search(r"^#\s+(.+)$", text, re.M)
+            c["title"] = _imp_title(h.group(1)) if h and not speakers else _imp_title(
+                first if speakers and c["messages"][0]["role"] == "user" else stem)
+        yield c, _imp_sha(name, i, first[:200])
+
+
+def _imp_generic_json(obj, name, counts):
+    """JSON that isn't a vendor's: {"messages": [{role, content}]}, a list
+    of such, or a bare list of {role, content}."""
+    items = obj if isinstance(obj, list) else [obj]
+    if items and all(isinstance(x, dict) and "role" in x for x in items):
+        items = [{"messages": items}]
+    n = 0
+    for i, it in enumerate(items):
+        if not isinstance(it, dict):
+            continue
+        raw = it.get("messages") if isinstance(it.get("messages"), list) else None
+        if raw is None:
+            counts["unknown"] = counts.get("unknown", 0) + 1
+            continue
+        msgs = []
+        for m in raw:
+            if not isinstance(m, dict):
+                continue
+            role = str(m.get("role") or "").lower()
+            c = m.get("content")
+            if isinstance(c, list):
+                c = "\n\n".join(str(x.get("text") if isinstance(x, dict) else x) for x in c)
+            if not isinstance(c, str) or not c.strip():
+                continue
+            if role in ("system", "developer"):
+                counts["system"] = counts.get("system", 0) + 1
+                continue
+            rec = {"role": "user" if role in ("user", "human") else "assistant",
+                   "content": c.strip()}
+            ts = _imp_ms(m.get("ts") or m.get("time") or m.get("created_at"))
+            if ts:
+                rec["ts"] = ts
+            msgs.append(rec)
+        if not msgs:
+            continue
+        n += 1
+        title = _imp_title(it.get("title") or it.get("name") or msgs[0]["content"])
+        chat = {"title": title, "messages": msgs,
+                "ts": _imp_ms(it.get("updated_at") or it.get("update_time") or it.get("ts"))
+                or msgs[-1].get("ts") or int(time.time() * 1000)}
+        created = _imp_ms(it.get("created_at") or it.get("create_time")) or msgs[0].get("ts")
+        if created:
+            chat["created"] = created
+        yield chat, _imp_sha(name, str(it.get("id") or i), msgs[0]["content"][:200])
+
+
+def _imp_file(job, zf, members, put_image, counts, on_bytes):
+    """Transcripts: .md/.txt (speaker lines), .html (as text), .json (a
+    vendor's shape when it is one, else role/content). Each becomes a
+    chat or several, sourced "a file"."""
+    for name in members:
+        low = name.lower()
+        if zf is not None:
+            info = zf.getinfo(name)
+            size = info.file_size
+            with zf.open(info) as f:
+                raw = f.read(200 << 20)
+        else:
+            size = os.path.getsize(name)
+            with open(name, "rb") as f:
+                raw = f.read(200 << 20)
+        if on_bytes:
+            on_bytes(min(size, len(raw)))
+        if job.get("cancel"):
+            return
+        if size > len(raw):
+            counts["truncated"] = counts.get("truncated", 0) + 1
+        bn = os.path.basename(name)
+        if low.endswith(".json"):
+            kind = _imp_sniff_json(raw[:1 << 16])
+            try:
+                obj = json.loads(raw.decode("utf-8", "replace"))
+            except ValueError:
+                counts["unreadable"] = counts.get("unreadable", 0) + 1
+                continue
+            if kind == "chatgpt" and isinstance(obj, list):
+                imgs = _ImpImages(None, put_image, counts)
+                for conv in obj:
+                    if isinstance(conv, dict) and isinstance(conv.get("mapping"), dict):
+                        got = _imp_chatgpt_conv(conv, imgs, counts)
+                        if got:
+                            got[0].pop("_instr", None)
+                            yield ("chat",) + got
+                continue
+            if kind == "claude" and isinstance(obj, list):
+                for conv in obj:
+                    if isinstance(conv, dict) and "chat_messages" in conv:
+                        got = _imp_claude_conv(conv, counts)
+                        if got:
+                            yield ("chat",) + got
+                continue
+            if kind == "gemini" and isinstance(obj, list):
+                ents = [_imp_gemini_entry(e, counts) for e in obj]
+                yield from _imp_gemini_group(ents, counts)
+                continue
+            for chat, vid in _imp_generic_json(obj, bn, counts):
+                chat["src"] = {"app": "file", "name": bn, "id": vid}
+                yield ("chat", chat, _imp_key("file", vid))
+            continue
+        text = raw.decode("utf-8", "replace")
+        if low.endswith((".html", ".htm")):
+            text = _imp_html_text(text)
+        for chat, vid in _imp_transcript(text, bn, counts):
+            chat["src"] = {"app": "file", "name": bn, "id": vid}
+            chat["ts"] = int(time.time() * 1000)
+            yield ("chat", chat, _imp_key("file", vid))
+
+
+_IMP_PARSERS = {"chatgpt": _imp_chatgpt, "claude": _imp_claude,
+                "gemini": _imp_gemini, "file": _imp_file}
+
+
+def _imp_members(zf, kind, path):
+    """Which members a parser reads, in order."""
+    if zf is None:
+        return [path]
+    names = [i.filename for i in zf.infolist() if not i.is_dir()]
+    if kind in ("chatgpt", "claude"):
+        return sorted(n for n in names if _IMP_CONV_RX.search(n))
+    if kind == "gemini":
+        got = sorted(n for n in names if _IMP_GEMINI_RX.search(n)
+                     and re.search(r"gemini", n, re.I))
+        js = [n for n in got if n.lower().endswith(".json")]
+        return js or got
+    return sorted(n for n in names if n.lower().endswith(IMPORT_TEXT_EXT)
+                  and not os.path.basename(n).startswith(".") and "__MACOSX/" not in n)
+
+
+# ------------------------------------------------------------- the ledger
+def _imp_ledger(base):
+    d = _read_json(IMPORT_LEDGER, base, dict) or {}
+    keys = d.get("keys") if isinstance(d.get("keys"), dict) else {}
+    files = d.get("files") if isinstance(d.get("files"), dict) else {}
+    runs = d.get("runs") if isinstance(d.get("runs"), list) else []
+    return {"v": 1, "keys": keys, "files": files, "runs": runs[-50:]}
+
+
+def _imp_ledger_save(d, base):
+    _write_json(IMPORT_LEDGER, d, base)
+
+
+def _imp_image_put(base, run_files):
+    """put_image for a run: content-addressed into images/, remembered
+    on the run for the undo."""
+    def put(raw, ext):
+        name = "imp-%s.%s" % (hashlib.sha1(raw).hexdigest()[:24], ext)
+        rel = "images/" + name
+        p = _pfile(rel, base)
+        if not os.path.exists(p):
+            _write_raw(rel, raw, base)
+        if rel not in run_files:
+            run_files.append(rel)
+        return "/api/image/" + name
+    return put
+
+
+# ---------------------------------------------------------------- the job
+def _imp_job(base, run):
+    j = _IMPORT_RUNS.get(run)
+    if not j or j.get("bk") != _bk(base):
+        return None
+    return j
+
+
+def import_begin(base, app, name="", size=0, path=None):
+    """Start a run: {"run", "state"}. With path, the file is already on
+    this disk (the Downloads watcher found it, or the person named it);
+    without, the page uploads it next (import_upload)."""
+    if app not in IMPORT_APPS:
+        raise ImportError_("Pick ChatGPT, Claude, Gemini or a file.")
+    run = secrets.token_hex(6)
+    job = {"run": run, "app": app, "picked": app, "bk": _bk(base), "state": "receiving",
+           "name": str(name or "")[:120], "size": int(size or 0), "path": None,
+           "uploaded": False, "counts": {}, "recent": [], "n_recent": 0,
+           "bytes_done": 0, "bytes_total": 0, "started": 0, "ended": 0,
+           "err": "", "detail": None, "kind": "", "mismatch": False, "cancel": False,
+           "first_id": "", "last_id": "", "extras": {"instructions": [], "projects": []},
+           "already": 0, "ids": [], "at": time.time()}
+    if path:
+        if not (isinstance(path, str) and os.path.isfile(path)):
+            raise ImportError_("That file isn't there any more.")
+        job["path"], job["name"] = path, os.path.basename(path)
+        job["size"] = os.path.getsize(path)
+        job["state"] = "received"
+    else:
+        safe = re.sub(r"[^\w.-]+", "_", os.path.basename(str(name or "export")))[:80] or "export"
+        rel = "%s/incoming/%s-%s" % (IMPORT_DIR, run, safe)
+        job["path"] = _pfile(rel, base)
+        job["uploaded"] = True
+    with _import_lock:
+        # the ten newest runs stay for the page to ask about; older ones go
+        for k in sorted(_IMPORT_RUNS, key=lambda k: _IMPORT_RUNS[k].get("at", 0))[:-10]:
+            if _IMPORT_RUNS[k].get("state") in ("done", "error", "received", "inspected"):
+                _IMPORT_RUNS.pop(k, None)
+        _IMPORT_RUNS[run] = job
+    if job["state"] == "received":
+        _imp_inspect_job(job)
+    return {"run": run, "state": job["state"], "kind": job["kind"],
+            "mismatch": job["mismatch"], "size": job["size"], "name": job["name"],
+            "err": job["err"], "detail": job["detail"], "big": job["size"] >= IMPORT_BIG}
+
+
+def import_upload(base, run, rfile, n):
+    """The upload's body, streamed to the run's file in 1 MiB pieces;
+    then the file is inspected."""
+    job = _imp_job(base, run)
+    if job is None:
+        raise ImportError_("That import is gone. Start again.")
+    if not job.get("uploaded") or job["state"] != "receiving":
+        raise ImportError_("This import already has its file.")
+    p = job["path"]
+    _ensure_parent(p, base)
+    got = 0
+    try:
+        with open(p, "wb") as f:
+            while got < n:
+                chunk = rfile.read(min(1 << 20, n - got))
+                if not chunk:
+                    break
+                f.write(chunk)
+                got += len(chunk)
+    except OSError as exc:
+        job["state"], job["err"] = "error", "Couldn't save the file here: %s" % exc
+        raise ImportError_(job["err"]) from exc
+    if got < n:
+        job["state"], job["err"] = "error", "The copy stopped short; try again."
+        raise ImportError_(job["err"])
+    job["size"], job["state"] = got, "received"
+    _imp_inspect_job(job)
+    return {"run": run, "state": job["state"], "kind": job["kind"],
+            "mismatch": job["mismatch"], "size": got, "err": job["err"],
+            "detail": job["detail"], "big": got >= IMPORT_BIG}
+
+
+def _imp_inspect_job(job):
+    try:
+        info = import_inspect(job["path"])
+    except ImportError_ as exc:
+        job["state"], job["err"], job["detail"] = "error", str(exc), exc.detail
+        return
+    job["kind"] = info["kind"]
+    job["detail"] = {"files": info["files"], "members": info["members"],
+                     "note": info.get("note", "")}
+    job["bytes_total"] = int(info.get("bytes") or job["size"] or 0)
+    job["state"] = "inspected"
+    if info["kind"] == "unknown":
+        job["state"] = "error"
+        job["err"] = ("This zip holds no chats we recognise: no ChatGPT or Claude "
+                      "conversations.json, no Gemini activity, no transcripts. It has %d "
+                      "files, such as %s." % (info["members"], ", ".join(info["files"][:3])
+                                             or "nothing"))
+        if info.get("note") == "takeout-without-gemini":
+            job["err"] = ("This is a Google Takeout zip, but Gemini Apps isn't in it. In "
+                          "Takeout, under My Activity, tick Gemini Apps and export again.")
+        return
+    # the picked app against what the file is: a vendor's export under
+    # another app's name is offered as that vendor; "a file" takes any
+    picked = job["picked"]
+    if picked == "file" and info["kind"] in ("chatgpt", "claude", "gemini"):
+        job["app"] = info["kind"]
+    elif picked != "file" and info["kind"] != picked:
+        job["mismatch"] = True
+
+
+def import_start(base, run, app=None):
+    """Run the import on its own thread. app, when given, is the person's
+    answer to a mismatch ("import it as Gemini instead")."""
+    job = _imp_job(base, run)
+    if job is None:
+        raise ImportError_("That import is gone. Start again.")
+    if job["state"] == "running":
+        return {"run": run, "state": "running"}
+    if job["state"] not in ("inspected",):
+        raise ImportError_(job.get("err") or "This import isn't ready.")
+    if app in IMPORT_APPS:
+        job["app"] = app
+    if job["kind"] in ("chatgpt", "claude", "gemini") and job["app"] != job["kind"]:
+        job["app"] = job["kind"]
+    if job["kind"] == "file":
+        job["app"] = "file"
+    job["mismatch"] = False
+    job["state"], job["started"] = "running", time.time()
+    ctx_thread(target=_import_run, args=(job, base), daemon=True, ctx=base).start()
+    return {"run": run, "state": "running", "app": job["app"]}
+
+
+def _imp_flush(base, batch, ledger, job, run_files):
+    """A batch of chats into the store, under the lock, one write; the
+    ledger written beside it."""
+    if not batch:
+        return
+    now = int(time.time() * 1000)
+    with _chats_lock:
+        _chat_live(base)
+        _chat_settle()
+        chats = load_chats(base)
+        have = {c.get("id") for c in chats if isinstance(c, dict)}
+        for chat, key in batch:
+            cid = _new_chat_id()
+            while cid in have or _chat_dead(cid, chats):
+                cid = _new_chat_id()
+            have.add(cid)
+            chat["id"] = cid
+            chat["lane"] = "ai"
+            chat["named"] = True
+            chat["src"]["run"] = job["run"]
+            chat["src"]["at"] = now
+            chats.append(chat)
+            ledger["keys"][key] = cid
+            job["ids"].append(cid)
+            if not job["first_id"]:
+                job["first_id"] = cid
+            job["last_id"] = cid
+        store_chats(chats, base)
+    files = ledger["files"].setdefault(job["app"], [])
+    for rel in run_files:
+        if rel not in files:
+            files.append(rel)
+    _imp_ledger_save(ledger, base)
+    batch.clear()
+
+
+def _import_run(job, base):
+    counts = job["counts"]
+    run_files = []
+    path = job["path"]
+    zf = None
+    try:
+        ledger = _imp_ledger(base)
+        known = set(ledger["keys"])
+        with _chats_lock:
+            for c in load_chats(base):
+                s = c.get("src") if isinstance(c, dict) else None
+                if isinstance(s, dict) and s.get("app") and s.get("id"):
+                    known.add(_imp_key(s["app"], s["id"]))
+        if zipfile.is_zipfile(path):
+            zf = zipfile.ZipFile(path)
+        members = _imp_members(zf, job["app"], path)
+        if not members:
+            raise ImportError_("The export opened fine but holds no chats.")
+
+        def on_bytes(n):
+            job["bytes_done"] += n
+
+        put = _imp_image_put(base, run_files)
+        parser = _IMP_PARSERS[job["app"]]
+        batch = []
+        seen_keys = set()
+        for ev in parser(job, zf, members, put, counts, on_bytes):
+            if job.get("cancel"):
+                break
+            if ev[0] == "chat":
+                chat, key = ev[1], ev[2]
+                if key in known or key in seen_keys:
+                    job["already"] += 1
+                    continue
+                seen_keys.add(key)
+                msgs = chat.get("messages") or []
+                chat["title"] = str(chat.get("title") or "Untitled chat")[:80]
+                chat["src"]["name"] = IMPORT_APPS.get(job["app"], {}).get("name") \
+                    if job["app"] != "file" else chat["src"].get("name") or "a file"
+                counts["chats"] = counts.get("chats", 0) + 1
+                counts["messages"] = counts.get("messages", 0) + len(msgs)
+                # the pictures this new chat shows (a re-import of a chat
+                # already here counts none, whatever the zip held)
+                pics = set()
+                for m in msgs:
+                    if isinstance(m.get("content"), str):
+                        pics.update(_MEDIA_IMG_RX.findall(m["content"]))
+                if pics:
+                    counts["images"] = counts.get("images", 0) + len(pics)
+                job["recent"].append({"t": chat["title"], "ts": chat.get("ts"),
+                                      "n": len(msgs)})
+                if len(job["recent"]) > 400:
+                    del job["recent"][:200]
+                job["n_recent"] += 1
+                batch.append((chat, key))
+                if len(batch) >= IMPORT_BATCH:
+                    _imp_flush(base, batch, ledger, job, run_files)
+            elif ev[0] == "extra":
+                kind, val = ev[1], ev[2]
+                if kind == "instructions":
+                    if val not in job["extras"]["instructions"]:
+                        job["extras"]["instructions"].append(val)
+                elif kind == "projects":
+                    job["extras"]["projects"] = val
+            elif ev[0] == "skip":
+                counts[ev[1]] = counts.get(ev[1], 0) + 1
+        _imp_flush(base, batch, ledger, job, run_files)
+        if job["extras"]["projects"] or job["extras"]["instructions"]:
+            _write_json("%s/%s-extras.json" % (IMPORT_DIR, job["app"]), {
+                "run": job["run"], "at": int(time.time() * 1000),
+                "projects": job["extras"]["projects"],
+                "instructions": job["extras"]["instructions"]}, base, indent=1)
+        ledger["runs"].append({"run": job["run"], "app": job["app"], "at": int(time.time() * 1000),
+                               "file": job["name"], "chats": counts.get("chats", 0),
+                               "messages": counts.get("messages", 0),
+                               "images": counts.get("images", 0),
+                               "already": job["already"], "cancelled": bool(job.get("cancel"))})
+        ledger["runs"] = ledger["runs"][-50:]
+        _imp_ledger_save(ledger, base)
+        if not counts.get("chats") and not job["already"] and not job.get("cancel"):
+            job["err"] = ("The export opened fine but holds no chats. %s"
+                          % _imp_left_line(counts)).strip()
+            job["state"] = "error"
+        else:
+            job["state"] = "stopped" if job.get("cancel") else "done"
+    except ImportError_ as exc:
+        job["state"], job["err"], job["detail"] = "error", str(exc), exc.detail
+    except (StoreReadError, StaleProfile) as exc:
+        job["state"], job["err"] = "error", ("Couldn't read your chats, so nothing was "
+                                             "added. Try again in a moment.")
+    except Exception as exc:
+        job["state"], job["err"] = "error", "Something broke while reading the export: %s" % (
+            str(exc)[:200] or type(exc).__name__)
+    finally:
+        job["ended"] = time.time()
+        try:
+            if zf is not None:
+                zf.close()
+        except Exception:
+            pass
+        if job.get("uploaded"):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+
+def _imp_left_line(counts):
+    bits = []
+    if counts.get("system"):
+        bits.append("%d system messages" % counts["system"])
+    if counts.get("reasoning"):
+        bits.append("%d reasoning notes" % counts["reasoning"])
+    if counts.get("empty"):
+        bits.append("%d empty chats" % counts["empty"])
+    return ("Left out: " + ", ".join(bits) + ".") if bits else ""
+
+
+def import_status(base, run, since=0):
+    job = _imp_job(base, run)
+    if job is None:
+        raise ImportError_("That import is gone. Start again.")
+    try:
+        since = max(0, int(since or 0))
+    except (TypeError, ValueError):
+        since = 0
+    # recent titles after the cursor: n_recent counts every title ever
+    # appended; the list keeps the newest 200-400
+    n = job["n_recent"]
+    rec = job["recent"]
+    start = max(0, len(rec) - (n - since)) if n > since else len(rec)
+    out = {k: job[k] for k in ("run", "app", "picked", "state", "kind", "mismatch",
+                               "name", "size", "bytes_done", "bytes_total", "err",
+                               "detail", "first_id", "last_id", "already")}
+    out["counts"] = dict(job["counts"])
+    out["recent"] = rec[start:]
+    out["cursor"] = n
+    out["extras"] = {"instructions": len(job["extras"]["instructions"]),
+                     "projects": len(job["extras"]["projects"])}
+    out["big"] = job["size"] >= IMPORT_BIG
+    el = (job["ended"] or time.time()) - job["started"] if job["started"] else 0
+    out["elapsed"] = round(el, 1)
+    # the estimate, from how fast it is going: marked as one by the page
+    if job["state"] == "running" and job["bytes_total"] and job["bytes_done"] and el > 2:
+        rate = job["bytes_done"] / el
+        out["eta"] = round(max(0.0, (job["bytes_total"] - job["bytes_done"]) / rate), 0)
+    return out
+
+
+def import_cancel(base, run):
+    job = _imp_job(base, run)
+    if job is None:
+        return {"ok": False}
+    job["cancel"] = True
+    return {"ok": True}
+
+
+def import_sources(base):
+    """What has been brought in, per app: from the chats themselves (the
+    truth) and the ledger's runs."""
+    out = {}
+    with _chats_lock:
+        chats = load_chats(base)
+    for c in chats:
+        s = c.get("src") if isinstance(c, dict) else None
+        if not isinstance(s, dict) or not s.get("app"):
+            continue
+        a = out.setdefault(s["app"], {"app": s["app"], "name": s.get("name") or s["app"],
+                                      "chats": 0, "messages": 0, "newest": 0, "oldest": 0,
+                                      "last_import": 0})
+        a["chats"] += 1
+        a["messages"] += len(c.get("messages") or [])
+        ts = c.get("ts") or 0
+        a["newest"] = max(a["newest"], ts)
+        a["oldest"] = ts if not a["oldest"] else min(a["oldest"], ts)
+        a["last_import"] = max(a["last_import"], s.get("at") or 0)
+    if "file" in out:
+        out["file"]["name"] = "files"
+    ledger = _imp_ledger(base)
+    return {"apps": sorted(out.values(), key=lambda a: -a["last_import"]),
+            "runs": ledger["runs"][-10:]}
+
+
+def import_remove(base, app):
+    """The undo: every chat brought from app leaves the store for good
+    (its id joins `gone`), its pictures go unless another chat shows
+    them, and the ledger forgets its keys, so a later import can bring
+    them back."""
+    if app not in IMPORT_APPS:
+        raise ImportError_("Pick ChatGPT, Claude, Gemini or files.")
+    bk = _bk(base)
+    with _chats_lock:
+        _chat_live(base)
+        _chat_settle()
+        chats = load_chats(base)
+        keep, gone_ids = _ChatList(), []
+        keep.doc, keep.gone = chats.doc, chats.gone
+        for c in chats:
+            s = c.get("src") if isinstance(c, dict) else None
+            if isinstance(s, dict) and s.get("app") == app:
+                gone_ids.append(c.get("id"))
+            else:
+                keep.append(c)
+        if gone_ids:
+            _chat_finals.setdefault(bk, []).extend(x for x in gone_ids if isinstance(x, str))
+            for x in gone_ids:
+                _chat_gone.add(x)
+            store_chats(keep, base)
+        still = set()
+        for c in keep:
+            still.update(_chat_media(c))
+    ledger = _imp_ledger(base)
+    files = ledger["files"].pop(app, [])
+    removed_files = 0
+    for rel in files:
+        if rel in still or not _media_ok(rel):
+            continue
+        try:
+            os.remove(_pfile(rel, base))
+            removed_files += 1
+        except OSError:
+            pass
+    ledger["keys"] = {k: v for k, v in ledger["keys"].items() if not k.startswith(app + ":")}
+    ledger["runs"] = [r for r in ledger["runs"] if r.get("app") != app]
+    _imp_ledger_save(ledger, base)
+    try:
+        os.remove(_pfile("%s/%s-extras.json" % (IMPORT_DIR, app), base))
+    except OSError:
+        pass
+    return {"ok": True, "chats": len(gone_ids), "images": removed_files}
+
+
+def import_remember(base, run):
+    """The person asked: the export's custom instructions or memory go
+    into what the app remembers, as facts, each one line."""
+    job = _imp_job(base, run)
+    if job is None:
+        raise ImportError_("That import is gone. Start again.")
+    facts = []
+    for s in job["extras"]["instructions"]:
+        for ln in re.split(r"\n+", s):
+            ln = " ".join(ln.strip().lstrip("-•* ").split())
+            if len(ln) >= 8:
+                facts.append(ln[:300])
+    facts = facts[:40]
+    if not facts:
+        return {"ok": True, "added": 0}
+    with _memory_lock:
+        mem = _load_memory(base)
+        have = {m.get("fact") for m in mem if isinstance(m, dict)}
+        now = int(time.time() * 1000)
+        added = [{"fact": f, "ts": now, "from": IMPORT_APPS.get(job["app"], {}).get("name", job["app"])}
+                 for f in facts if f not in have]
+        if added:
+            _save_memory(list(mem) + added, base)
+    job["extras"]["instructions"] = []
+    return {"ok": True, "added": len(added)}
+
+
+def import_open(app):
+    """The vendor's export page, in the person's browser; only the
+    allow-listed URLs above ever open."""
+    url = IMPORT_APPS.get(app, {}).get("url") or ""
+    if not url.startswith("https://"):
+        return {"ok": False, "url": ""}
+    try:
+        webbrowser.open(url)
+        ok = True
+    except Exception:
+        ok = False
+    return {"ok": ok, "url": url}
+
+
+# ------------------------------------------------------ watching Downloads
+def _imp_downloads_dir():
+    """~/Downloads, or the folder a dev copy's test hook names
+    (MILLENAI_TEST_HOOKS=downloads=<dir>; the gauntlet's own folder)."""
+    return _hook_arg("downloads") or os.path.join(os.path.expanduser("~"), "Downloads")
+
+
+def import_watch(base, on, app="file"):
+    """Start or stop watching Downloads for an export (opt-in, only while
+    the import screen is open: the page renews it every few seconds and
+    it lapses on its own). A file that appears after the watch began,
+    finished downloading and of the right kind is reported once."""
+    w = _IMPORT_WATCH
+    now = time.time()
+    if not on:
+        w.clear()
+        return {"on": False}
+    if w.get("on") and w.get("bk") == _bk(base):
+        w["until"] = now + 20
+        if app in IMPORT_APPS:
+            w["app"] = app
+        return _imp_watch_status(w)
+    w.clear()
+    w.update(on=True, bk=_bk(base), app=app if app in IMPORT_APPS else "file",
+             since=now - 90, until=now + 20, found=None, access=None, seen={},
+             dir=_imp_downloads_dir(), err="")
+    try:
+        os.listdir(w["dir"])
+        w["access"] = True
+    except PermissionError:
+        w["access"] = False
+        w["on"] = False
+        w["err"] = "no-access"
+        return _imp_watch_status(w)
+    except OSError:
+        w["access"] = False
+        w["on"] = False
+        w["err"] = "no-folder"
+        return _imp_watch_status(w)
+    ctx_thread(target=_imp_watch_loop, args=(w,), daemon=True, ctx=base).start()
+    return _imp_watch_status(w)
+
+
+def _imp_watch_status(w):
+    return {"on": bool(w.get("on")), "access": w.get("access"), "found": w.get("found"),
+            "err": w.get("err", ""), "dir": w.get("dir", "")}
+
+
+def _imp_watch_loop(w):
+    while w.get("on") and time.time() < w.get("until", 0):
+        try:
+            cands = []
+            with os.scandir(w["dir"]) as it:
+                for e in it:
+                    try:
+                        if not e.is_file():
+                            continue
+                        st = e.stat()
+                    except OSError:
+                        continue
+                    low = e.name.lower()
+                    if low.startswith(".") or low.endswith(_IMP_PARTIAL):
+                        continue
+                    if not low.endswith((".zip",) + IMPORT_TEXT_EXT):
+                        continue
+                    if st.st_mtime < w["since"]:
+                        continue
+                    cands.append((e.path, st.st_size, st.st_mtime))
+            for path, size, mtime in sorted(cands, key=lambda c: -c[2]):
+                prev = w["seen"].get(path)
+                w["seen"][path] = size
+                if prev is None or prev != size:
+                    continue              # still growing, or first sight
+                try:
+                    info = import_inspect(path)
+                except ImportError_:
+                    w["seen"][path] = -1  # not ours; don't look again
+                    continue
+                kind = info["kind"]
+                want = w.get("app", "file")
+                if want == "file" or kind == want:
+                    w["found"] = {"path": path, "name": os.path.basename(path),
+                                  "size": size, "kind": kind}
+                    w["on"] = False
+                    return
+                else:
+                    w["seen"][path] = -1
+        except PermissionError:
+            w["access"], w["on"], w["err"] = False, False, "no-access"
+            return
+        except OSError:
+            pass
+        time.sleep(2)
+    w["on"] = False
+# ==== bring your chats (6b529): end ====
+
+
 _memory_lock = threading.Lock()
 
 MEMORY_PROMPT = (
@@ -37195,6 +39186,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
                     .replace("__SKY_NIGHT__", json.dumps(sky_is_night()))
                     .replace("__PROFILE__", self.ctx.tag)
+                    # a dev copy's imp-demo=<path> hook (6b529): the import
+                    # sheet opens on load and brings that export in; "" otherwise
+                    .replace("__IMP_DEMO__", json.dumps(_hook_arg("imp-demo")))
                     .replace("__JUST_UPDATED__", json.dumps(_JUST_UPDATED[0]))
                     .replace("__APP_VER_SPEC__", spec_version())
                     .replace("__APP_VER__", short_version()
@@ -37627,6 +39621,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # the starter chips from the person's chats (6b390): what is
             # kept, at once; a pass that is due runs behind it
             self._send_json(suggest_view(self.ctx))
+        elif self.path.startswith("/api/import/"):
+            self._import_get()               # bring your chats (6b529)
         elif self.path == "/api/chats":
             # an unreadable store answers 503, never an empty list (0b L1)
             with _chats_lock:
@@ -37783,6 +39779,58 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Security-Policy", ACCOUNT_CSP)
         self.end_headers()
         self.wfile.write(body)
+
+    # ==== bring your chats (6b529): routes begin ====
+    # Every route sits behind _gate (the cookie and the API token) like
+    # the rest of /api/. Errors the person can act on come back as 400
+    # with a plain line; an unreadable store is _run's 503.
+    def _import_get(self):
+        u = urllib.parse.urlparse(self.path)
+        q = urllib.parse.parse_qs(u.query)
+        one = lambda k, d="": (q.get(k, [d])[0] or d)
+        try:
+            if u.path == "/api/import/status":
+                self._send_json(import_status(self.ctx, one("run"), one("since", "0")))
+            elif u.path == "/api/import/sources":
+                self._send_json(import_sources(self.ctx))
+            elif u.path == "/api/import/apps":
+                self._send_json({"apps": IMPORT_APPS,
+                                 "watch": _imp_watch_status(_IMPORT_WATCH)})
+            else:
+                self.send_error(404)
+        except ImportError_ as exc:
+            self._send_json({"err": str(exc), "detail": exc.detail}, code=400)
+
+    def _import_post(self):
+        u = urllib.parse.urlparse(self.path)
+        try:
+            if u.path == "/api/import/upload":
+                q = urllib.parse.parse_qs(u.query)
+                n = int(self.headers.get("Content-Length", 0) or 0)
+                self._send_json(import_upload(self.ctx, q.get("run", [""])[0],
+                                              self.rfile, n))
+                return
+            d = self._json_body()
+            if u.path == "/api/import/begin":
+                self._send_json(import_begin(self.ctx, d.get("app"), d.get("name"),
+                                             d.get("size"), d.get("path")))
+            elif u.path == "/api/import/start":
+                self._send_json(import_start(self.ctx, d.get("run"), d.get("app")))
+            elif u.path == "/api/import/cancel":
+                self._send_json(import_cancel(self.ctx, d.get("run")))
+            elif u.path == "/api/import/remove":
+                self._send_json(import_remove(self.ctx, d.get("app")))
+            elif u.path == "/api/import/remember":
+                self._send_json(import_remember(self.ctx, d.get("run")))
+            elif u.path == "/api/import/open":
+                self._send_json(import_open(d.get("app")))
+            elif u.path == "/api/import/watch":
+                self._send_json(import_watch(self.ctx, bool(d.get("on")), d.get("app")))
+            else:
+                self.send_error(404)
+        except ImportError_ as exc:
+            self._send_json({"err": str(exc), "detail": exc.detail}, code=400)
+    # ==== bring your chats (6b529): routes end ====
 
     def _json_body(self) -> dict:
         """The request's JSON object; {} for anything else."""
@@ -39357,6 +41405,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     409 if got in BENCH_BUSY_REASONS + (BENCH_ANSWERING,
                                                          BENCH_DOWNLOADING)
                     else 400))
+            return
+        if self.path.startswith("/api/import/"):
+            self._import_post()              # bring your chats (6b529)
             return
         if self.path != "/api/chat":
             self.send_error(404)
@@ -43404,31 +45455,6 @@ select option{background:#16171b;color:#ececec}
   --helv:'Helvetica Neue',Helvetica,Arial,sans-serif;
   --disp:'Michroma','Space Grotesk',system-ui,sans-serif;  /* the wide techno face (6.1) */
 }
-/* HORIZON TOKENS (6b526) */
-:root{
-  --hz-night:#04050a; --hz-deep:#070a16; --hz-dusk:#10204a;
-  --hz-ink:#f1f3fa;            /* primary text on the sky */
-  --hz-ink-2:#c9d0e2;          /* secondary text, AA on glass */
-  --hz-ink-3:#9aa6c6;          /* tertiary, labels; AA at 13px+ on --hz-deep */
-  --hz-accent:#9fc0ff;         /* the ONE accent: ice blue. Use with restraint */
-  --hz-good:#6ff0c0; --hz-warn:#f2b33d; --hz-bad:#ff8a7a;
-  --hz-glass:rgba(255,255,255,.06); --hz-glass-2:rgba(255,255,255,.09);
-  --hz-glass-line:rgba(255,255,255,.12); --hz-glass-line-2:rgba(170,200,255,.22);
-  --hz-blur:blur(28px) saturate(150%);
-  --hz-r-sm:8px; --hz-r-md:12px; --hz-r-lg:20px; --hz-r-xl:28px; --hz-r-pill:999px;
-  --hz-s1:4px; --hz-s2:8px; --hz-s3:12px; --hz-s4:16px; --hz-s5:24px; --hz-s6:32px; --hz-s7:48px;
-  --hz-ease-out:cubic-bezier(.16,1,.3,1);      /* arrivals */
-  --hz-ease-in-out:cubic-bezier(.65,0,.35,1);  /* moves */
-  --hz-ease-spring:cubic-bezier(.34,1.56,.64,1);/* small pops only */
-  --hz-t-fast:140ms; --hz-t-mid:260ms; --hz-t-slow:520ms;
-  --hz-shadow:0 30px 80px rgba(0,0,0,.45);
-  --hz-font-ui:'Space Grotesk',system-ui,sans-serif;
-  --hz-font-display:'Space Grotesk',system-ui,sans-serif; --hz-font-read:'Space Grotesk',system-ui,sans-serif;
-  --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
-  --hz-ink-read:#e6e9f4; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:150,236,212;
-  --hz-hair:rgba(255,255,255,.09); --hz-hair-2:rgba(255,255,255,.14); --hz-glass-lit:rgba(200,222,255,.42);
-  --hz-r-composer:26px; --hz-t-drift:46s; --hz-t-drift-busy:16s; --hz-t-breathe:8s;
-}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
@@ -44975,30 +47001,6 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 }
 .srcchip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .srcchip img{width:16px;height:16px;border-radius:4px;flex:none}
-/* HORIZON TOKENS (6b526) */
-:root{
-  --hz-night:#04050a; --hz-deep:#070a16; --hz-dusk:#10204a;
-  --hz-ink:#f1f3fa;            /* primary text on the sky */
-  --hz-ink-2:#c9d0e2;          /* secondary text, AA on glass */
-  --hz-ink-3:#9aa6c6;          /* tertiary, labels; AA at 13px+ on --hz-deep */
-  --hz-accent:#9fc0ff;         /* the ONE accent: ice blue. Use with restraint */
-  --hz-good:#6ff0c0; --hz-warn:#f2b33d; --hz-bad:#ff8a7a;
-  --hz-glass:rgba(255,255,255,.06); --hz-glass-2:rgba(255,255,255,.09);
-  --hz-glass-line:rgba(255,255,255,.12); --hz-glass-line-2:rgba(170,200,255,.22);
-  --hz-blur:blur(28px) saturate(150%);
-  --hz-r-sm:8px; --hz-r-md:12px; --hz-r-lg:20px; --hz-r-xl:28px; --hz-r-pill:999px;
-  --hz-s1:4px; --hz-s2:8px; --hz-s3:12px; --hz-s4:16px; --hz-s5:24px; --hz-s6:32px; --hz-s7:48px;
-  --hz-ease-out:cubic-bezier(.16,1,.3,1);      /* arrivals */
-  --hz-ease-in-out:cubic-bezier(.65,0,.35,1);  /* moves */
-  --hz-ease-spring:cubic-bezier(.34,1.56,.64,1);/* small pops only */
-  --hz-t-fast:140ms; --hz-t-mid:260ms; --hz-t-slow:520ms;
-  --hz-shadow:0 30px 80px rgba(0,0,0,.45);
-  --hz-font-ui:'Space Grotesk',system-ui,sans-serif;              /* the owner's override (NORTHSTAR): the app's own faces */
-  --hz-font-display:'Space Grotesk',system-ui,sans-serif; --hz-font-read:'Space Grotesk',system-ui,sans-serif;
-  --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
-}
-/* NORTH STAR additions (6b530; design/NORTHSTAR.md) */
-:root{--hz-ink-read:#e6e9f4; --hz-hair:rgba(255,255,255,.09); --hz-hair-2:rgba(255,255,255,.14)}
 /* YOUR STUFF (6b530): the personal source pills in answers and the Settings
    pane. Horizon tokens; North star rules: hairline rows, ice only, sentence
    case, mono for digits only, separate facts as separate spans. The Settings
@@ -47680,6 +49682,205 @@ __HZ_FONTS__
 }
 /* ============================================================ HORIZON end */
 
+/* ==== bring your chats (6b529): styles begin ==== */
+/* the --hz-* tokens: one block, in the HORIZON css (6b526); the copy that stood here went at integration */
+/* THE SHEET. A glass card lit from below over a dimmed app: the veil
+   stays translucent so the sidebar can be seen filling up behind it
+   while the chats arrive. The limb at the card's foot is the horizon
+   every Horizon surface sits on. */
+#imp-veil{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(3,4,10,.44);
+  -webkit-backdrop-filter:blur(5px) saturate(120%);backdrop-filter:blur(5px) saturate(120%);
+  font-family:var(--hz-font-ui);color:var(--hz-ink);font-size:14px;
+  -webkit-font-smoothing:antialiased;line-height:1.45}
+#imp-veil[hidden]{display:none}
+#imp-veil *{box-sizing:border-box}
+#imp-veil button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0;margin:0;text-align:left}
+#imp-veil button:focus-visible,#imp-veil [tabindex]:focus-visible,#imp-veil input:focus-visible{outline:0;
+  box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+#imp-veil .imp-glow{position:absolute;width:min(760px,80vw);height:220px;left:50%;bottom:calc(50% - 320px);
+  transform:translateX(-50%);border-radius:50%;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 100%,rgba(159,192,255,.38),rgba(159,192,255,0) 62%);
+  filter:blur(34px);animation:impBreathe var(--hz-t-breathe) ease-in-out infinite}
+#imp-sheet{position:relative;width:min(980px,100%);height:min(92vh,720px);display:flex;flex-direction:column;
+  border-radius:22px;border:1px solid rgba(255,255,255,.13);border-bottom-color:var(--hz-glass-lit);
+  background:linear-gradient(180deg,rgba(6,8,18,.90),rgba(8,14,34,.88));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.35),var(--hz-shadow);
+  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);overflow:hidden;outline:0}
+/* a few static stars (no twinkle), kept to the header band: through a
+   glass card a star beside a number read as a stray dot */
+#imp-sheet .imp-sky{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit;
+  background:radial-gradient(1px 1px at 46% 7%,rgba(255,255,255,.7),transparent),
+    radial-gradient(1px 1px at 58% 13%,rgba(220,230,255,.5),transparent),
+    radial-gradient(1.4px 1.4px at 66% 5%,rgba(255,255,255,.85),transparent),
+    radial-gradient(1px 1px at 74% 11%,rgba(255,255,255,.45),transparent),
+    radial-gradient(1px 1px at 83% 4%,rgba(255,226,190,.7),transparent),
+    radial-gradient(1.2px 1.2px at 90% 14%,rgba(255,255,255,.55),transparent),
+    radial-gradient(1px 1px at 52% 3%,rgba(220,230,255,.4),transparent)}
+#imp-sheet .imp-limb{position:absolute;left:50%;bottom:-3194px;width:3200px;height:3200px;margin-left:-1600px;
+  border-radius:50%;background:radial-gradient(circle at 50% 0%,#0b142c 0%,#060a16 10%,#030509 26%,#020307 60%);
+  box-shadow:0 -1px 0 var(--hz-limb),0 -3px 1px rgba(170,205,255,.55),0 -14px 30px rgba(120,170,255,.36),
+    0 -56px 120px rgba(50,100,220,.24),0 -170px 300px rgba(30,70,180,.14)}
+#imp-sheet>*:not(.imp-sky){position:relative;z-index:1}
+.imp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:30px 36px 0}
+.imp-headtext{display:flex;flex-direction:column;gap:6px;min-width:0}
+.imp-title{margin:0;font-family:var(--hz-font-display);font-weight:500;
+  font-size:32px;line-height:1.08;letter-spacing:-.02em;color:#f6f7fc}
+.imp-sub{margin:0;font-size:15px;line-height:1.5;color:var(--hz-ink-2)}
+#imp-veil .imp-x{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  color:var(--hz-ink-2);border:1px solid var(--hz-hair)!important;background:rgba(255,255,255,.03)!important;
+  transition:background var(--hz-t-fast),color var(--hz-t-fast)}
+#imp-veil .imp-x:hover{background:rgba(255,255,255,.08)!important;color:var(--hz-ink)}
+/* the rail: four steps as 2px bars, like the Pair flow, no numbers */
+.imp-steps{list-style:none;margin:22px 36px 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.imp-steps li{display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--hz-ink-3)}
+.imp-steps li i{display:block;height:2px;border-radius:1px;background:var(--hz-hair-2)}
+.imp-steps li.done{color:var(--hz-ink-2)}
+.imp-steps li.done i{background:var(--hz-accent);opacity:.55}
+.imp-steps li.now{color:var(--hz-ink);font-weight:600}
+.imp-steps li.now i{background:var(--hz-ink)}
+.imp-body{flex:1;min-height:0;display:flex;gap:20px;padding:22px 36px 30px}
+.imp-stage{flex:1 1 560px;min-width:0;display:flex;flex-direction:column;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:4px}
+.imp-stage>.imp-done,.imp-stage>.imp-err{padding-bottom:10px}
+.imp-side{flex:0 0 272px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto}
+@media (max-width:860px){.imp-side{display:none}.imp-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #imp-sheet{height:min(94vh,820px)}.imp-head,.imp-steps,.imp-body{padding-left:20px;padding-right:20px;margin-left:0;margin-right:0}
+  .imp-steps{margin:16px 20px 0}}
+/* the aside: hairline rows, label and value */
+.imp-card{border:1px solid var(--hz-hair);border-radius:16px;background:rgba(255,255,255,.035);padding:16px 18px;display:flex;flex-direction:column;gap:0}
+.imp-card h3{margin:0 0 6px;font-size:14px;font-weight:600;color:var(--hz-ink)}
+.imp-card p{margin:0;font-size:13px;line-height:1.55;color:var(--hz-ink-2)}
+.imp-card p+p{margin-top:8px}
+.imp-kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 0;border-top:1px solid var(--hz-hair);font-size:13px}
+.imp-kv:first-of-type{border-top:0}
+.imp-kv span:first-child{color:var(--hz-ink-3);flex:0 0 auto}
+.imp-kv span:last-child{color:var(--hz-ink);text-align:right;min-width:0;overflow-wrap:anywhere}
+.imp-kv .n{font-family:var(--hz-font-mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--hz-ink-2)}
+.imp-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--hz-good);box-shadow:0 0 8px rgba(111,240,192,.7);margin-right:8px;vertical-align:1px}
+.imp-dot.live{animation:impBreathe 2.2s ease-in-out infinite}
+.imp-dot.warn{background:var(--hz-warn);box-shadow:0 0 8px rgba(242,179,61,.6)}
+/* step 1: the four tiles */
+.imp-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:4px}
+.imp-tile{display:flex;flex-direction:column;gap:10px;min-height:128px;padding:18px 18px 16px;border-radius:18px;
+  border:1px solid var(--hz-hair)!important;background:rgba(255,255,255,.035)!important;color:var(--hz-ink);
+  transition:background var(--hz-t-fast),border-color var(--hz-t-fast),transform var(--hz-t-fast)}
+.imp-tile:hover{background:rgba(255,255,255,.075)!important;border-color:var(--hz-glass-line-2)!important}
+.imp-tile:active{transform:scale(.985)}
+.imp-tile svg{width:22px;height:22px;color:var(--hz-accent)}
+.imp-tile b{font-size:17px;font-weight:500;line-height:1.2}
+.imp-tile span{font-size:13px;line-height:1.45;color:var(--hz-ink-3)}
+.imp-lede{margin:0 0 16px;font-size:15px;line-height:1.55;color:var(--hz-ink-2);max-width:560px}
+/* step 2: the vendor's steps as hairline rows */
+.imp-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.imp-rows li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:24px;padding:13px 8px;
+  border-top:1px solid var(--hz-hair);font-size:15px;line-height:1.45;color:var(--hz-ink)}
+.imp-rows li:last-child{border-bottom:1px solid var(--hz-hair)}
+.imp-rows li .w{font-size:13px;color:var(--hz-ink-3);white-space:nowrap}
+.imp-rows li .n{font-family:var(--hz-font-mono);font-size:12px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
+.imp-rows.steps li{grid-template-columns:28px minmax(0,1fr)}
+.imp-rows.steps li em{font-style:normal;font-family:var(--hz-font-mono);font-size:12px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
+.imp-wait{margin:14px 0 0;font-size:13.5px;line-height:1.55;color:var(--hz-ink-2);max-width:560px}
+.imp-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:20px}
+.imp-btn{height:40px;padding:0 20px;border-radius:999px;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:8px;
+  border:1px solid rgba(255,255,255,.16)!important;background:rgba(255,255,255,.04)!important;color:var(--hz-ink);
+  transition:background var(--hz-t-fast),transform var(--hz-t-fast)}
+.imp-btn:hover{background:rgba(255,255,255,.08)!important}
+.imp-btn:active{transform:scale(.98)}
+/* colours on buttons carry the veil's id: the reset above (#imp-veil
+   button{color:inherit}) would outrank a class alone */
+#imp-veil .imp-btn.primary{background:var(--hz-accent)!important;border-color:transparent!important;color:#071026;font-weight:600}
+#imp-veil .imp-btn.primary:hover{background:#b4ceff!important}
+.imp-btn[disabled]{opacity:.5;cursor:default}
+#imp-veil .imp-link{font-size:13.5px;color:var(--hz-ink-3);text-decoration:underline;text-underline-offset:3px;padding:6px 2px!important;border-radius:6px}
+#imp-veil .imp-link:hover{color:var(--hz-ink)}
+#imp-veil .imp-link.danger:hover{color:var(--hz-bad)}
+/* the watch row: a 46×28 switch with On/Off beneath, as in Settings */
+.imp-watch{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:18px;margin-top:22px;padding-top:16px;border-top:1px solid var(--hz-hair)}
+.imp-watch b{display:block;font-size:14px;font-weight:500;color:var(--hz-ink)}
+.imp-watch span{display:block;margin-top:4px;font-size:13px;line-height:1.5;color:var(--hz-ink-3)}
+.imp-sw{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--hz-ink-3)}
+.imp-sw button{position:relative;width:46px;height:28px;border-radius:999px;background:rgba(255,255,255,.12)!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);transition:background var(--hz-t-mid)}
+.imp-sw button::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#f1f3fa;
+  box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform var(--hz-t-mid) var(--hz-ease-out)}
+.imp-sw button[aria-checked="true"]{background:var(--hz-accent)!important}
+.imp-sw button[aria-checked="true"]::after{transform:translateX(18px)}
+/* step 3: the drop zone */
+.imp-drop{flex:1;min-height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;
+  padding:28px;border-radius:20px;border:1px dashed rgba(255,255,255,.2);background:rgba(255,255,255,.025);
+  transition:border-color var(--hz-t-fast),background var(--hz-t-fast)}
+.imp-drop.over{border-color:var(--hz-accent);background:rgba(159,192,255,.07)}
+.imp-drop svg{width:34px;height:34px;color:var(--hz-accent);margin-bottom:6px}
+.imp-drop b{font-family:var(--hz-font-display);font-weight:500;font-size:24px;letter-spacing:-.02em;color:#f6f7fc}
+.imp-drop span{font-size:13.5px;line-height:1.5;color:var(--hz-ink-3);max-width:420px}
+.imp-found{display:flex;flex-direction:column;gap:6px;padding:18px 20px;border-radius:16px;border:1px solid var(--hz-glass-line-2);background:rgba(159,192,255,.06)}
+.imp-found b{font-size:15px;font-weight:500}
+.imp-found .f{display:flex;gap:14px;font-size:13px;color:var(--hz-ink-3)}
+.imp-found .f .n{font-family:var(--hz-font-mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--hz-ink-2)}
+/* step 4: the arrival. The big count in the serif, facts as separate
+   spans, a hairline progress, then the titles cascading in: each row is
+   placed by transform, so a new one slides the rest down without a jump. */
+.imp-hero{display:flex;align-items:baseline;gap:14px;margin:2px 0 4px}
+.imp-big{font-family:var(--hz-font-display);font-weight:500;font-size:64px;line-height:1;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;color:#f6f7fc;min-width:1.2ch}
+.imp-biglabel{font-size:17px;color:var(--hz-ink-2)}
+.imp-facts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;color:var(--hz-ink-2)}
+.imp-facts .n{font-family:var(--hz-font-mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--hz-ink-2)}
+.imp-facts .est{color:var(--hz-ink-3)}
+.imp-bar{position:relative;height:2px;margin:18px 0 6px;border-radius:1px;background:var(--hz-hair)}
+.imp-bar i{position:absolute;inset:0;border-radius:1px;background:linear-gradient(90deg,rgba(159,192,255,.6),#cfe0ff);
+  transform-origin:left center;transform:scaleX(0);transition:transform .4s linear;box-shadow:0 0 8px rgba(159,192,255,.6)}
+.imp-bar.pulse i{transform:scaleX(1);opacity:.35;animation:impBreathe 2.2s ease-in-out infinite}
+.imp-foot{display:flex;justify-content:space-between;gap:14px;font-size:12px;color:var(--hz-ink-3)}
+.imp-foot .n{font-family:var(--hz-font-mono);font-variant-numeric:tabular-nums}
+.imp-cascade{position:relative;flex:1;min-height:120px;margin:12px 0 0;padding:0;list-style:none;overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,#000 70%,transparent 100%)}
+.imp-row{position:absolute;left:0;right:0;top:0;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:24px;
+  height:44px;padding:0 8px;border-top:1px solid var(--hz-hair);font-size:15px;color:var(--hz-ink);
+  transition:transform var(--hz-t-slow) var(--hz-ease-out),opacity var(--hz-t-slow) var(--hz-ease-out);will-change:transform,opacity}
+.imp-row .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:44px}
+.imp-row .w{font-size:13px;color:var(--hz-ink-3);white-space:nowrap}
+.imp-row .n{font-family:var(--hz-font-mono);font-size:12px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
+.imp-note{margin:14px 0 0;font-size:13px;line-height:1.55;color:var(--hz-ink-3);max-width:600px}
+/* done, and errors */
+.imp-done h3,.imp-err h3{margin:0 0 8px;font-family:var(--hz-font-display);font-weight:500;font-size:28px;line-height:1.1;letter-spacing:-.02em;color:#f6f7fc}
+.imp-done p,.imp-err p{margin:0;font-size:15px;line-height:1.55;color:var(--hz-ink-2);max-width:600px}
+.imp-done .imp-facts{margin:14px 0 18px;font-size:15px}
+.imp-done .imp-facts .n{font-size:13.5px}
+.imp-done .imp-rows{margin-top:4px}
+.imp-extra{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:18px;padding:14px 16px;border-radius:14px;border:1px solid var(--hz-hair);background:rgba(255,255,255,.03)}
+.imp-extra p{font-size:13.5px;max-width:none}
+.imp-extra .imp-actions{margin:0}
+.imp-err{padding:4px 0}
+.imp-err .d{margin-top:10px;font-family:var(--hz-font-mono);font-size:12px;color:var(--hz-ink-3);word-break:break-word}
+.imp-sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+/* Settings row and the home card (the hooks into the two surfaces) */
+#imp-settings-note{margin-top:10px}
+.imp-srcrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--dim)}
+#imp-settings-note .imp-link{font:inherit;font-size:12px;color:var(--faint);background:none;border:0;padding:4px 2px;cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;border-radius:6px}
+#imp-settings-note .imp-link:hover{color:var(--red)}
+#imp-settings-note .imp-btn{font:inherit;font-size:12px;color:var(--text);background:none;border:1px solid var(--red);border-radius:999px;padding:5px 12px;cursor:pointer}
+.imp-srcrow .n{font-family:var(--hz-font-mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.imp-homecard{display:inline-flex;align-items:center;gap:12px;margin-top:26px;height:44px;padding:0 18px 0 16px;border-radius:999px;
+  border:1px solid var(--hz-hair);background:rgba(255,255,255,.04);color:var(--hz-ink-2);font:500 14px var(--hz-font-ui);cursor:pointer;
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);transition:background var(--hz-t-fast),color var(--hz-t-fast)}
+.imp-homecard:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
+.imp-homecard svg{width:18px;height:18px;color:var(--hz-accent)}
+.imp-homecard:focus-visible{outline:0;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+/* who answered in a chat brought from another app, and which model */
+.msg .who .who-model{margin-left:14px;font-size:11.5px;font-weight:400;color:var(--faint);letter-spacing:0;text-transform:none}
+/* the app hides its own answer labels (6b264); an answer brought from
+   another app names where it came from, in sentence case, no tracking */
+.msg.ai .who.imp{display:flex;align-items:baseline;font-family:var(--sans);font-size:12px;letter-spacing:0;
+  text-transform:none;color:var(--faint);margin-bottom:6px}
+@keyframes impBreathe{0%,100%{opacity:.5}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  #imp-veil .imp-glow,.imp-dot.live,.imp-bar.pulse i{animation:none}
+  .imp-row,.imp-bar i,.imp-tile,.imp-btn,.imp-sw button,.imp-sw button::after{transition:none}}
+body.novideo #imp-veil .imp-glow,body.novideo .imp-dot.live,body.novideo .imp-bar.pulse i{animation:none}
+body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
+/* ==== bring your chats (6b529): styles end ==== */
 </style>
 </head>
 <body>
@@ -47900,6 +50101,28 @@ __CODE_ROWS__
       <span>\u21a9 open</span><span>esc close</span></div>
   </div>
 </div>
+<!-- ==== bring your chats (6b529): the sheet begin ==== -->
+<div id="imp-veil" hidden>
+  <div class="imp-glow" aria-hidden="true"></div>
+  <div id="imp-sheet" role="dialog" aria-modal="true" aria-labelledby="imp-title" tabindex="-1">
+    <div class="imp-sky" aria-hidden="true"><i class="imp-limb"></i></div>
+    <header class="imp-head">
+      <div class="imp-headtext">
+        <h2 id="imp-title" class="imp-title">Bring your chats</h2>
+        <p id="imp-sub" class="imp-sub">From ChatGPT, Claude, Gemini or a file. Everything stays on this Mac.</p>
+      </div>
+      <button type="button" class="imp-x" id="imp-close" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <ol class="imp-steps" id="imp-steps" aria-label="Steps"></ol>
+    <div class="imp-body">
+      <section class="imp-stage" id="imp-stage"></section>
+      <aside class="imp-side" id="imp-side"></aside>
+    </div>
+    <input type="file" id="imp-file" accept=".zip,.json,.md,.markdown,.txt,.html,.htm" multiple hidden>
+    <span id="imp-live" class="imp-sr" aria-live="polite"></span>
+  </div>
+</div>
+<!-- ==== bring your chats (6b529): the sheet end ==== -->
 <div id="undobar" hidden><span class="ut"></span><button id="undobtn">Undo</button></div>
   <canvas id="stars"></canvas>
   <!-- the comets (6b528): a draft flies in from the machine that wrote it; a ripple on arrival -->
@@ -48163,6 +50386,13 @@ __CODE_ROWS__
         <span id="acct-sub"></span></div>
       </div>
       <p id="acct-crypto" hidden></p>
+      <!-- ==== bring your chats (6b529): Settings hook begin. One row; the
+           sheet itself is #imp-veil, among the overlays. ==== -->
+      <div id="imp-settings-row">
+        <button class="about-btn" id="imp-settings-open" type="button">Bring your chats from another app</button>
+        <div id="imp-settings-note" class="tdesc"></div>
+      </div>
+      <!-- ==== bring your chats (6b529): Settings hook end ==== -->
       <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
       <div id="forget-steps" hidden>
         <div id="forget-what">
@@ -51871,7 +54101,7 @@ function answerLanded(){
   cb.classList.remove("finish");void cb.offsetWidth;cb.classList.add("finish");
   setTimeout(()=>cb.classList.remove("finish"),1700);
 }
-function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra){
+function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   const hero=$("#hero"); if(hero)hero.remove();
   const sg=$("#suggest"); if(sg)sg.hidden=true;   // hero's gone, so are these
   const sl=$("#skyload"); if(sl)sl.hidden=true;
@@ -51880,12 +54110,23 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra){
   // a saved message (the record itself rides in as `extra`) is drawn settled:
   // a reopened chat of two hundred messages plays no two hundred entrances
   div.className="msg "+(role==="user"?"user":"ai")+(m.role?" settled":"");
-  // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): "Concorde Zenith", a
+  // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): "Concorde Gamma", a
   // breathing dot while it works and one plain word for what it is doing; the
-  // real models stay behind the answer, in the marginalia, and only when asked
-  const who=role==="user"?"you":signatureHTML(m.run?m.run.mode:(m.mode!=null?m.mode:""),m.live?"thinking":"");
-  div.innerHTML='<div class="who">'+who+'</div><div class="body"></div>';
+  // real models stay behind the answer, in the marginalia, and only when asked.
+  // A chat brought from another app (6b529) says who answered there, and
+  // which model when the export knew: two spans, no middle dot.
+  const who=role==="user"?"you"
+    :by?esc(by)+(model?'<span class="who-model">'+esc(model)+'</span>':'')
+    :signatureHTML(m.run?m.run.mode:(m.mode!=null?m.mode:""),m.live?"thinking":"");
+  div.innerHTML='<div class="who'+(by&&role!=="user"?' imp':'')+'">'+who+'</div><div class="body"></div>';
   const body=div.querySelector(".body");
+  // an imported question's pictures show as sent pictures do (6b529):
+  // the user side is plain text, so the markdown is lifted out first
+  let impImgs=null;
+  if(role==="user"&&by&&typeof text==="string"&&text.indexOf("](/api/image/")>=0){
+    impImgs=[];
+    text=text.replace(/!\[[^\]\n]*\]\((\/api\/image\/[\w.-]+)\)\n*/g,(_,u)=>{impImgs.push(u);return "";}).trim();
+  }
   // a [[FORM]] trailer becomes a clickable question card (6b250) and is
   // stripped from the prose — the reader sees the question, not the JSON
   let form=null;
@@ -51903,6 +54144,11 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra){
     // the marginalia is the message's second column, not part of the prose (6b528)
     const aside=body.querySelector(":scope>aside.behind");if(aside)div.appendChild(aside);}
   howCtx.m=null;
+  if(impImgs&&impImgs.length){
+    const row=document.createElement("div");row.className="sentimgs";
+    impImgs.forEach(u=>{const im=new Image();im.dataset.apiSrc=u;im.alt="";row.appendChild(im);mediaShow(im);});
+    body.appendChild(row);
+  }
   annCtx.pos=null;
   // the live line of a saved answer: done, with the run's clock and counts (6b528)
   if(role!=="user"&&m.role&&(m.run||(m.usage&&m.usage.length)))
@@ -53171,8 +55417,9 @@ const sameMsgs=(a,b)=>(a||[]).length===(b||[]).length
 function redrawOpen(){
   inner.innerHTML="";
   if(!messages.length){resetHero();return;}
+  const sc=chats.find(x=>x.id===curChat),by=sc&&sc.src&&sc.src.name;   // 6b529
   messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
-    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m));
+    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,by,m.model));
 }
 async function loadChatsFromDisk(){
   try{
@@ -53677,6 +55924,7 @@ function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
   if(globalThis.hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
+  impHomeMount();                 // bring your chats (6b529): the home card
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -54086,7 +56334,8 @@ function loadChat(id){
   curChat=id;
   messages=c.messages.slice();
   inner.innerHTML="";
-  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m));
+  const by=c.src&&c.src.name;     // a chat brought from another app (6b529)
+  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,by,m.model));
   renderChats();
   markSeen();
 }
@@ -54492,6 +56741,7 @@ document.addEventListener("keydown",e=>{
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
     if(srvSheetAt){srvSheetClose();e.preventDefault();return;}
+    if(impEsc()){e.preventDefault();return;}     // bring your chats (6b529)
     for(const sel of ["#bmc-veil","#bmv-veil","#new-veil","#update-veil",
                       "#about-veil","#setup-veil"]){
       const el=$(sel);
@@ -61049,6 +63299,483 @@ function hzInit(){
 hzInit();
 /* ===================================================== HORIZON end (6b526) */
 
+/* ==== bring your chats (6b529): script begin ==== */
+// BRING YOUR CHATS (6b529, per Patrick: "quickly connect another AI app and
+// pull all their chats in detail, like beautifully, perfectly"). No vendor
+// offers an API for this, so the sheet walks four steps: pick the old app,
+// get its export (the app opens the vendor's own export page; opt-in, it
+// watches Downloads for the zip), drop the file, and watch the chats
+// arrive. The server does the reading (/api/import/*, see the Python
+// block of the same name); this is the stage. The look is the north star
+// (design/NORTHSTAR.md, with the owner's override): Space Grotesk for the
+// words and the big count, IBM Plex Mono for numbers, ice as the one
+// accent, hairline rows, glass lit from below, transform/opacity motion
+// that stops under reduced motion and effects-off.
+const IMP_APPS={
+  chatgpt:{name:"ChatGPT",where:"Settings › Data controls › Export data",
+    steps:["Open ChatGPT and sign in.",
+      "Click your profile picture, then Settings, then Data controls.",
+      "Click Export data, then Export, then Confirm export."],
+    wait:"OpenAI emails you a download link, usually within the hour, sometimes up to a few days. The link works for 24 hours.",
+    open:"Open ChatGPT",arrives:"A zip with conversations.json inside, plus the pictures you sent or made."},
+  claude:{name:"Claude",where:"Settings › Privacy › Export data",
+    steps:["Open Claude's privacy settings. The button below goes straight there.",
+      "Click Export data, then Export.",
+      "Open the email from Anthropic and download the zip."],
+    wait:"Anthropic emails you when it's ready, usually within minutes. The link works for 24 hours and may work only once. A long history arrives as more than one zip: drop them all in together.",
+    open:"Open Claude's privacy settings",arrives:"A zip with conversations.json, your projects and Claude's memory of you. Uploaded files aren't in it; their extracted text is."},
+  gemini:{name:"Gemini",where:"Google Takeout › My Activity › Gemini Apps",
+    steps:["Google Takeout opens with My Activity ticked.",
+      "Click All activity data included, then Deselect all, tick Gemini Apps, click OK.",
+      "Click Next step, keep .zip, then Create export."],
+    wait:"Google emails you a link, usually the same day. It works for 7 days.",
+    open:"Open Google Takeout",arrives:"A Takeout zip with your prompts and Gemini's answers. Gemini keeps no conversations, so prompts close in time become one chat here."},
+  file:{name:"A file",where:".md, .txt, .json or .html",steps:[],wait:"",open:"",
+    arrives:"A transcript with speaker lines like You: and Assistant:, a chat as JSON, an .html page, or a zip of them."}};
+const impV=$("#imp-veil"),impSheet=$("#imp-sheet"),impStageEl=$("#imp-stage"),impSideEl=$("#imp-side"),impStepsEl=$("#imp-steps");
+const imp={step:0,app:"",run:null,cursor:0,poll:0,watch:false,watchT:0,opener:null,status:null,
+  lastReload:0,rows:[],queue:[],totals:null,liveAt:0,xhr:null,open:false,phase:"",dripQ:[],drip:0,ended:null};
+const IMP_STEPS=["Pick your app","Get your export","Drop the file","Bringing them in"];
+const IMP_ROW=44;
+function impN(n){return Math.round(+n||0).toLocaleString("en-US");}
+function impBytes(b){b=+b||0;if(b<1024*1024)return Math.max(1,Math.round(b/1024))+" KB";
+  if(b<1024*1024*1024){const m=b/1048576;return (m<10?m.toFixed(1):Math.round(m))+" MB";}
+  return (b/1073741824).toFixed(b<10*1073741824?2:1)+" GB";}
+function impDur(s){s=Math.max(0,Math.round(+s||0));if(s<10)return "under 10 s";if(s<60)return "about "+Math.round(s/5)*5+" s";
+  if(s<3600)return "about "+Math.round(s/60)+" min";return "about "+(s/3600).toFixed(1)+" h";}
+function impWhen(ts){if(!ts)return "";const d=new Date(ts),now=new Date();
+  const day=86400000,sd=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),t=d.getTime();
+  if(t>=sd)return "Today";if(t>=sd-day)return "Yesterday";
+  if(t>=sd-6*day)return d.toLocaleDateString("en-US",{weekday:"long"});
+  if(d.getFullYear()===now.getFullYear())return d.toLocaleDateString("en-US",{day:"numeric",month:"short"});
+  return d.toLocaleDateString("en-US",{month:"short",year:"numeric"});}
+function impPlural(n,one,many){return impN(n)+" "+(n===1?one:(many||one+"s"));}
+const IMP_ICON={
+  chatgpt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H9l-4 3v-3.2A2.5 2.5 0 0 1 4 14.5z"/><path d="M8 9h8M8 12.5h5"/></svg>',
+  claude:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>',
+  gemini:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c.6 4.9 4.1 8.4 9 9-4.9.6-8.4 4.1-9 9-.6-4.9-4.1-8.4-9-9 4.9-.6 8.4-4.1 9-9z"/></svg>',
+  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h5M10 17h5"/></svg>',
+  drop:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5M7.5 9.5 12 5l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>',
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>'};
+async function impApi(path,body){
+  const o=body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)};
+  const r=await api(path,o);const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw Object.assign(new Error(d.err||("the app answered "+r.status)),{detail:d.detail,status:r.status});
+  return d;}
+function impSetSteps(){
+  impStepsEl.innerHTML=IMP_STEPS.map((t,i)=>{const n=i+1;
+    const cls=n<imp.step?"done":n===imp.step?"now":"";
+    return '<li class="'+cls+'"'+(n===imp.step?' aria-current="step"':'')+'><i></i>'+esc(t)+'</li>';}).join("");}
+function impSide(title,rows,paras){
+  let h="";
+  if(rows&&rows.length){h+='<div class="imp-card"><h3>'+esc(title)+'</h3>'
+    +rows.filter(r=>r&&r[1]!==""&&r[1]!==undefined&&r[1]!==null).map(r=>'<div class="imp-kv"><span>'+esc(r[0])+'</span><span'
+    +(r[2]?' class="n"':'')+'>'+(r[3]?r[1]:esc(String(r[1])))+'</span></div>').join("")+'</div>';}
+  (paras||[]).forEach(p=>{if(!p)return;h+='<div class="imp-card"><h3>'+esc(p[0])+'</h3>'+p.slice(1).map(x=>'<p>'+x+'</p>').join("")+'</div>';});
+  impSideEl.innerHTML=h;}
+function impStage(html){impStageEl.innerHTML=html;}
+function impLive(t){const now=Date.now();if(now-imp.liveAt<2000)return;imp.liveAt=now;const el=$("#imp-live");if(el)el.textContent=t;}
+/* ----------------------------------------------------------- open, close */
+function impOpen(opener){
+  if(imp.open)return;
+  imp.open=true;imp.opener=opener||document.activeElement;
+  impV.hidden=false;
+  if(imp.run&&imp.status&&imp.status.state==="running"){imp.step=4;impSetSteps();impShowProgress();impPollStart();}
+  else impShowPick();
+  setTimeout(()=>{const f=impSheet.querySelector(".imp-tile,.imp-btn,button:not(.imp-x)");(f||impSheet).focus();},0);}
+function impClose(){
+  if(!imp.open)return;
+  imp.open=false;impV.hidden=true;
+  impPollStop();impWatchStop(false);impDripReset();
+  if(imp.xhr){try{imp.xhr.abort();}catch(e){}imp.xhr=null;}
+  const o=imp.opener;imp.opener=null;
+  if(o&&o.isConnected&&typeof o.focus==="function")setTimeout(()=>o.focus(),0);}
+function impEsc(){if(impV.hidden)return false;impClose();return true;}
+$("#imp-close").addEventListener("click",impClose);
+impV.addEventListener("click",e=>{if(e.target===impV)impClose();});
+// the focus stays inside the sheet (a modal dialog)
+impSheet.addEventListener("keydown",e=>{
+  if(e.key!=="Tab")return;
+  const f=[...impSheet.querySelectorAll('button:not([disabled]),[href],input:not([hidden]),[tabindex]:not([tabindex="-1"])')]
+    .filter(el=>el.offsetParent!==null);
+  if(!f.length){e.preventDefault();return;}
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&(document.activeElement===first||document.activeElement===impSheet)){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}});
+// one delegated handler for every button on the stage
+impStageEl.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(b&&impStageEl.contains(b))impAct(b.dataset.act,b);});
+impSideEl.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(b)impAct(b.dataset.act,b);});
+function impAct(act,el){
+  const a=el.dataset.app||"";
+  if(act==="pick"){imp.app=a;imp.queue=[];imp.totals=null;if(a==="file")impShowDrop();else impShowExport();}
+  else if(act==="back")impShowPick();
+  else if(act==="open")impOpenVendor();
+  else if(act==="have")impShowDrop();
+  else if(act==="choose")$("#imp-file").click();
+  else if(act==="watch")impWatchToggle();
+  else if(act==="bring-found")impBegin({path:el.dataset.path,name:el.dataset.name,size:+el.dataset.size});
+  else if(act==="start-as")impStart(a);
+  else if(act==="again")impShowDrop();
+  else if(act==="cancel")impCancel();
+  else if(act==="finish")impFinish();
+  else if(act==="another"){imp.run=null;imp.status=null;imp.totals=null;impShowPick();}
+  else if(act==="remove-ask")impRemoveAsk(a,el);
+  else if(act==="remove-go")impRemove(a,el);
+  else if(act==="remember")impRemember(el);
+  else if(act==="dismiss-extra"){const x=el.closest(".imp-extra");if(x)x.remove();}}
+/* ------------------------------------------------------------ the steps */
+function impShowPick(){
+  imp.step=1;impSetSteps();impPollStop();impWatchStop(false);impDripReset();
+  $("#imp-sub").textContent="From ChatGPT, Claude, Gemini or a file. Everything stays on this Mac.";
+  impStage('<p class="imp-lede">Where are your chats now?</p><div class="imp-tiles">'
+    +Object.keys(IMP_APPS).map(k=>'<button type="button" class="imp-tile" data-act="pick" data-app="'+k+'">'+IMP_ICON[k]
+      +'<b>'+esc(IMP_APPS[k].name)+'</b><span>'+esc(IMP_APPS[k].where)+'</span></button>').join("")+'</div>');
+  impSide("",[],[["How it works","You export your chats from your old app. It emails you a zip.",
+    "Drop the zip here. MillenAI reads it on this Mac and nothing is uploaded anywhere.",
+    "Your chats appear in the sidebar with their titles and dates, searchable, ready to continue."],
+    ["Already brought some in?","Importing the same export again adds only what's new, and you can remove everything from an app in one step."]]);
+  impSourcesSide();}
+async function impSourcesSide(){
+  try{const d=await impApi("/api/import/sources");
+    if(imp.step!==1||!d.apps||!d.apps.length)return;
+    const card=document.createElement("div");card.className="imp-card";
+    card.innerHTML='<h3>Already here</h3>'+d.apps.map(a=>'<div class="imp-kv"><span>'+esc(a.name)+'</span><span><span class="n">'
+      +impN(a.chats)+'</span> '+(a.chats===1?"chat":"chats")+'</span></div>').join("");
+    impSideEl.appendChild(card);}catch(e){}}
+function impShowExport(){
+  imp.step=2;impSetSteps();
+  const A=IMP_APPS[imp.app];
+  $("#imp-sub").textContent="Get your export from "+A.name+". It usually takes a few minutes to arrive.";
+  impStage('<p class="imp-lede">'+esc(A.name)+' gives you your chats as a download. Here is where it is.</p>'
+    +'<ol class="imp-rows steps">'+A.steps.map((s,i)=>'<li><em>'+(i+1)+'</em><span>'+esc(s)+'</span></li>').join("")+'</ol>'
+    +'<p class="imp-wait">'+esc(A.wait)+'</p>'
+    +'<div class="imp-actions"><button type="button" class="imp-btn primary" data-act="open">'+esc(A.open)+'</button>'
+    +'<button type="button" class="imp-btn" data-act="have">I have the file</button>'
+    +'<button type="button" class="imp-link" data-act="back">Pick another app</button></div>'
+    +'<div class="imp-watch"><div><b>Watch my Downloads for it</b><span>Only while this screen is open, and only for export files. When the zip lands, it comes straight in.</span></div>'
+    +'<div class="imp-sw"><button type="button" role="switch" aria-checked="'+(imp.watch?"true":"false")+'" aria-label="Watch my Downloads" data-act="watch"></button><span id="imp-sw-label">'+(imp.watch?"On":"Off")+'</span></div></div>'
+    +'<div id="imp-watch-note" class="imp-note"></div>');
+  impExportSide();}
+function impExportSide(){
+  const A=IMP_APPS[imp.app];
+  const w=imp.watch?'<span class="imp-dot live"></span>Watching':"";
+  impSide("What arrives",[["From",A.name],["Where",A.where],["Downloads",w,false,true]],
+    [["What's in it",esc(A.arrives)],
+     imp.app==="gemini"?["Worth knowing","Gemini's export has no conversations, only prompts and answers. Prompts within 30 minutes of each other become one chat here; where Google kept a conversation id, that's used instead."]:null]);}
+async function impOpenVendor(){
+  try{const d=await impApi("/api/import/open",{app:imp.app});
+    const n=$("#imp-watch-note");
+    if(n)n.textContent=d.ok?"Opened in your browser. Come back here when the email arrives.":"Couldn't open your browser. The page is "+(d.url||"");
+  }catch(e){const n=$("#imp-watch-note");if(n)n.textContent="Couldn't open your browser: "+e.message;}}
+function impShowDrop(found){
+  imp.step=3;impSetSteps();
+  const A=IMP_APPS[imp.app];
+  $("#imp-sub").textContent=imp.app==="file"?"Drop a transcript, a chat as JSON, or a zip of them.":"Drop the zip "+A.name+" sent you.";
+  let h="";
+  if(found)h+='<div class="imp-found"><b>Found in Downloads</b><div class="f"><span>'+esc(found.name)+'</span><span class="n">'+impBytes(found.size)+'</span></div>'
+    +'<div class="imp-actions" style="margin-top:8px"><button type="button" class="imp-btn primary" data-act="bring-found" data-path="'+esc(found.path)+'" data-name="'+esc(found.name)+'" data-size="'+found.size+'">Bring it in</button>'
+    +'<button type="button" class="imp-link" data-act="choose">Choose a different file</button></div></div>';
+  h+='<div class="imp-drop" id="imp-drop">'+IMP_ICON.drop+'<b>'+(found?"Or drop another file here":"Drop your export here")+'</b>'
+    +'<span>'+esc(imp.app==="file"?"A .md, .txt, .json or .html transcript, or a zip of them.":"The zip "+A.name+" emailed you. A long history can come as more than one zip: drop them together.")+'</span>'
+    +'<div class="imp-actions" style="margin-top:12px"><button type="button" class="imp-btn" data-act="choose">Choose the file</button>'
+    +(imp.app!=="file"?'<button type="button" class="imp-link" data-act="back">Pick another app</button>':'<button type="button" class="imp-link" data-act="back">Pick another app</button>')+'</div></div>';
+  impStage(h);
+  impSide("What arrives",[["From",A.name]],[["What's in it",esc(A.arrives)],["Nothing leaves this Mac","The file is read here. Pictures are copied into your data folder; the zip itself isn't kept."]]);}
+/* --------------------------------------------------------- the import */
+async function impBegin(file){
+  // a File from the drop zone or the picker, or {path} from Downloads
+  imp.step=4;impSetSteps();imp.cursor=0;imp.rows=[];imp.status=null;imp.phase="copy";impDripReset();
+  if(!imp.totals)imp.totals={chats:0,messages:0,images:0,already:0,runs:0,counts:{},extras:{instructions:0,projects:0},first:"",apps:{}};
+  impShowProgress();
+  const name=file.name||"export",size=file.size||0;
+  impSide("What we can see",[["File",name],["Size",impBytes(size),true]]);
+  impPhaseText(file.path?"Opening the file":"Copying the file",name);
+  try{
+    let d;
+    if(file.path){d=await impApi("/api/import/begin",{app:imp.app,path:file.path});}
+    else{
+      d=await impApi("/api/import/begin",{app:imp.app,name:name,size:size});
+      imp.run=d.run;
+      d=await impUpload(file,d.run);}
+    imp.run=d.run;
+    if(d.state==="error"){impShowError("Couldn't read that file.",d.err,d.detail,[["again","Choose another file"],["back","Pick another app"]]);return;}
+    impInspected(d,name,d.size||size);
+    if(d.mismatch){
+      const K=IMP_APPS[d.kind]||{name:d.kind};
+      const looks=d.kind==="file"?"a plain transcript":"a "+(d.kind==="gemini"?"Google Takeout":K.name)+" export";
+      impStage('<div class="imp-err"><h3>This isn’t a '+esc(IMP_APPS[imp.app].name)+' export.</h3><p>It looks like '+esc(looks)
+        +'. Want to bring it in as '+esc(d.kind==="file"?"a file":K.name)+' instead?</p>'
+        +'<div class="imp-actions"><button type="button" class="imp-btn primary" data-act="start-as" data-app="'+esc(d.kind)+'">Import it as '+esc(d.kind==="file"?"a file":K.name)+'</button>'
+        +'<button type="button" class="imp-btn" data-act="again">Choose another file</button></div></div>');
+      return;}
+    await impStart();
+  }catch(e){impShowError("Couldn't read that file.",e.message,e.detail,[["again","Choose another file"],["back","Pick another app"]]);}}
+function impUpload(file,run){
+  return new Promise((res,rej)=>{apiTok().then(tok=>{
+    const x=new XMLHttpRequest();imp.xhr=x;
+    x.open("POST","/api/import/upload?run="+encodeURIComponent(run));
+    x.setRequestHeader("X-Api-Token",tok);x.setRequestHeader("X-Profile",PROFILE);
+    // never a form content type (the cross-site wall refuses those; a
+    // .md would arrive as text/plain)
+    x.setRequestHeader("Content-Type","application/octet-stream");
+    x.upload.onprogress=e=>{if(e.lengthComputable)impBar(e.loaded/e.total,impBytes(e.loaded)+" of "+impBytes(e.total));};
+    x.onload=()=>{imp.xhr=null;let d={};try{d=JSON.parse(x.responseText);}catch(err){}
+      if(x.status>=200&&x.status<300)res(d);else rej(Object.assign(new Error(d.err||("the app answered "+x.status)),{detail:d.detail}));};
+    x.onerror=()=>{imp.xhr=null;rej(new Error("The copy stopped. Is the app still running?"));};
+    x.onabort=()=>{imp.xhr=null;rej(new Error("Stopped."));};
+    x.send(file);}).catch(rej);});}
+function impInspected(d,name,size){
+  const K=IMP_APPS[d.kind]||{name:d.kind};
+  const rows=[["File",name],["Size",impBytes(size),true],["Looks like",d.kind==="file"?"a transcript":K.name+" export"]];
+  if(d.detail&&d.detail.files&&d.detail.files.length)rows.push(["Reads",d.detail.files.length===1?d.detail.files[0].split("/").pop():impN(d.detail.files.length)+" files"]);
+  impSide("What we can see",rows,d.big?[["A big one","This may take a while. You can close this sheet and keep using the app: it keeps going, and the sidebar fills as it does."]]:[]);}
+async function impStart(app){
+  try{const d=await impApi("/api/import/start",{run:imp.run,app:app||undefined});
+    if(app){imp.app=app;}
+    imp.phase="read";impPhaseText("Reading your chats","");impBar(0,"");
+    impPollStart();
+  }catch(e){impShowError("Couldn't start.",e.message,e.detail,[["again","Choose another file"],["back","Pick another app"]]);}}
+function impShowProgress(){
+  const A=IMP_APPS[imp.app]||IMP_APPS.file;
+  $("#imp-sub").textContent="Bringing your "+(imp.app==="file"?"chats":A.name+" history")+" home.";
+  impStage('<div class="imp-hero"><span class="imp-big" id="imp-big">0</span><span class="imp-biglabel" id="imp-biglabel">chats</span></div>'
+    +'<div class="imp-facts" id="imp-facts"><span id="imp-f-msgs"></span><span id="imp-f-imgs"></span><span id="imp-f-already"></span><span class="est" id="imp-f-eta"></span></div>'
+    +'<div class="imp-bar pulse" id="imp-bar"><i></i></div><div class="imp-foot"><span id="imp-phase"></span><span class="n" id="imp-bytes"></span></div>'
+    +'<ol class="imp-cascade" id="imp-cascade" aria-hidden="true"></ol>'
+    +'<div class="imp-actions" style="margin-top:8px"><button type="button" class="imp-link" data-act="cancel">Stop here</button></div>');}
+function impPhaseText(t,sub){const p=$("#imp-phase");if(p)p.textContent=t+(sub?"  "+sub:"");}
+function impBar(frac,bytesText){
+  const b=$("#imp-bar");if(!b)return;
+  const i=b.querySelector("i");
+  if(frac===null){b.classList.add("pulse");}else{b.classList.remove("pulse");i.style.transform="scaleX("+Math.max(0,Math.min(1,frac))+")";}
+  const t=$("#imp-bytes");if(t&&bytesText!==undefined)t.textContent=bytesText;}
+let impTweens={};
+function impTween(id,to){
+  const el=$("#"+id);if(!el)return;to=+to||0;
+  const from=+((el.dataset.v)||0);el.dataset.v=to;
+  clearInterval(impTweens[id]);
+  if(document.body.classList.contains("novideo")||matchMedia("(prefers-reduced-motion:reduce)").matches||Math.abs(to-from)<3){el.textContent=impN(to);return;}
+  const t0=Date.now(),dur=360;
+  impTweens[id]=setInterval(()=>{const k=Math.min(1,(Date.now()-t0)/dur),e=1-Math.pow(1-k,3);
+    el.textContent=impN(from+(to-from)*e);if(k>=1){clearInterval(impTweens[id]);el.textContent=impN(to);}},30);}
+function impCascadeAdd(rec){
+  const list=$("#imp-cascade");if(!list)return;
+  const li=document.createElement("li");li.className="imp-row";
+  li.innerHTML='<span class="t">'+esc(rec.t||"Untitled chat")+'</span><span class="w">'+esc(impWhen(rec.ts))+'</span><span class="n">'+impN(rec.n||0)+'</span>';
+  li.style.transform="translateY(-"+IMP_ROW+"px)";li.style.opacity="0";
+  list.prepend(li);imp.rows.unshift(li);
+  const lay=()=>{imp.rows.forEach((el,i)=>{el.style.transform="translateY("+(i*IMP_ROW)+"px)";el.style.opacity=i>7?"0":String(1-i*.09);});};
+  // rAF never fires in a hidden document: a timeout does the same work
+  requestAnimationFrame(lay);setTimeout(lay,30);
+  while(imp.rows.length>10){const old=imp.rows.pop();setTimeout(()=>old.remove(),600);}}
+function impPollStart(){impPollStop();imp.poll=setInterval(impPoll,340);impPoll();}
+function impPollStop(){if(imp.poll){clearInterval(imp.poll);imp.poll=0;}}
+async function impPoll(){
+  if(!imp.run)return;
+  let st;
+  try{st=await impApi("/api/import/status?run="+encodeURIComponent(imp.run)+"&since="+imp.cursor);}
+  catch(e){if(e.status===400){impPollStop();impShowError("Lost track of this import.",e.message,null,[["again","Choose the file again"]]);}return;}
+  imp.status=st;imp.cursor=st.cursor||imp.cursor;
+  const c=st.counts||{};
+  impTween("imp-big",c.chats||0);
+  const lb=$("#imp-biglabel");if(lb)lb.textContent=(c.chats||0)===1?"chat":"chats";
+  const f=(id,t)=>{const el=$("#"+id);if(el)el.textContent=t;};
+  f("imp-f-msgs",c.messages?impPlural(c.messages,"message"):"");
+  f("imp-f-imgs",c.images?impPlural(c.images,"image"):"");
+  f("imp-f-already",st.already?impN(st.already)+" already here":"");
+  f("imp-f-eta",st.state==="running"&&st.eta>=0&&st.eta!==undefined?impDur(st.eta)+" left*":"");
+  if(st.state==="running"){
+    const tot=st.bytes_total||0,done=st.bytes_done||0;
+    if(tot)impBar(done/tot,impBytes(done)+" of "+impBytes(tot));else impBar(null,impBytes(done));
+    impPhaseText("Reading your chats",st.eta!==undefined?"*estimated from how fast it's going":"");}
+  impDripPush(st.recent||[]);
+  if(c.chats)impLive(impN(c.chats)+" chats, "+impN(c.messages||0)+" messages so far");
+  // the sidebar fills behind the glass as the chats land
+  if(c.chats&&Date.now()-imp.lastReload>1500&&chatsLoaded){imp.lastReload=Date.now();loadChatsFromDisk();}
+  if(st.state==="done"||st.state==="stopped"||st.state==="error"){impPollStop();imp.ended=st;impDripFinish();}}
+// THE TITLES ARRIVE AT A READABLE PACE. The server is faster than the
+// eye (a small export lands between two polls), so the titles it reports
+// queue here and enter one every 60 ms; the counts above are always the
+// real ones. A long backlog keeps only its newest rows, and the done
+// screen waits for the last row to land.
+function impDripPush(recs){
+  recs.forEach(r=>imp.dripQ.push(r));
+  if(imp.dripQ.length>80)imp.dripQ.splice(0,imp.dripQ.length-80);
+  if(!imp.drip&&imp.dripQ.length)imp.drip=setInterval(impDripTick,60);}
+function impDripTick(){
+  const r=imp.dripQ.shift();
+  if(r)impCascadeAdd(r);
+  if(!imp.dripQ.length){clearInterval(imp.drip);imp.drip=0;
+    if(imp.ended){const st=imp.ended;imp.ended=null;setTimeout(()=>impRunEnded(st),450);}}}
+function impDripFinish(){
+  if(imp.dripQ.length>30)imp.dripQ.splice(0,imp.dripQ.length-30);
+  if(!imp.drip&&imp.ended){const st=imp.ended;imp.ended=null;impRunEnded(st);}}
+function impDripReset(){clearInterval(imp.drip);imp.drip=0;imp.dripQ=[];imp.ended=null;}
+async function impRunEnded(st){
+  const c=st.counts||{},T=imp.totals;
+  if(T){T.runs++;T.chats+=c.chats||0;T.messages+=c.messages||0;T.images+=c.images||0;T.already+=st.already||0;
+    Object.keys(c).forEach(k=>{T.counts[k]=(T.counts[k]||0)+c[k];});
+    T.extras.instructions+=(st.extras||{}).instructions||0;T.extras.projects+=(st.extras||{}).projects||0;
+    if(!T.first&&st.first_id)T.first=st.first_id;T.apps[st.app]=1;T.lastRun=st.run;T.recent=(T.recent||[]).concat(st.recent||[]);}
+  if(st.state==="error"&&!(c.chats)){impShowError("That didn't work.",st.err,st.detail,[["again","Choose another file"],["back","Pick another app"]]);return;}
+  if(imp.queue.length){const nxt=imp.queue.shift();impPhaseText("Next file","");impBegin(nxt);return;}
+  try{await loadChatsFromDisk();}catch(e){}
+  impHomeMount();impSourcesNote();
+  impShowDone(st);}
+function impLeftLine(c,app){
+  const bits=[];
+  if(c.branches)bits.push(impN(c.branches)+" earlier "+(c.branches===1?"version":"versions")+" of edited or regenerated answers (only the final one came)");
+  if(c.reasoning)bits.push(impPlural(c.reasoning,"reasoning note"));
+  if(c.system)bits.push(impPlural(c.system,"system message"));
+  if(c.hidden)bits.push(impPlural(c.hidden,"hidden message"));
+  if(c.tools)bits.push(impPlural(c.tools,"tool call"));
+  if(c.scaffolding)bits.push(impN(c.scaffolding)+" bits of browsing scaffolding");
+  if(c.images_missing)bits.push(impN(c.images_missing)+" "+(c.images_missing===1?"picture that wasn't":"pictures that weren't")+" in the export");
+  if(c.images_too_big||c.files_other)bits.push(impN((c.images_too_big||0)+(c.files_other||0))+" files in formats we don't show");
+  if(c.audio)bits.push(impPlural(c.audio,"voice note")+" (text kept where there was a transcript)");
+  if(c.empty)bits.push(impPlural(c.empty,"empty chat"));
+  if(c.unreadable)bits.push(impN(c.unreadable)+" entries we couldn't read");
+  return bits.length?"Left out: "+bits.join(", ")+".":"";}
+function impShowDone(st){
+  const T=imp.totals||{chats:0,messages:0,images:0,already:0,counts:{},extras:{},apps:{}};
+  const c=T.counts||{},A=IMP_APPS[imp.app]||IMP_APPS.file;
+  const stopped=st.state==="stopped";
+  let title=stopped?"Stopped. What came in is yours to keep.":T.chats?(imp.app==="file"?"Your chats are in.":"Your "+A.name+" history is home."):"Nothing new to bring in.";
+  let line=T.chats?"They're in the sidebar now, with their titles and dates, searchable, and each one can be continued."
+    :T.already?"All "+impN(T.already)+" of these chats were already here.":"";
+  let facts='<div class="imp-facts">'+(T.chats?'<span><span class="n">'+impN(T.chats)+'</span> '+(T.chats===1?"chat":"chats")+'</span>':'')
+    +(T.messages?'<span><span class="n">'+impN(T.messages)+'</span> '+(T.messages===1?"message":"messages")+'</span>':'')
+    +(T.images?'<span><span class="n">'+impN(T.images)+'</span> '+(T.images===1?"image":"images")+'</span>':'')
+    +(T.already?'<span><span class="n">'+impN(T.already)+'</span> already here</span>':'')+'</div>';
+  const rec=(T.recent||[]).slice(-4).reverse();
+  const rows=rec.length?'<ol class="imp-rows">'+rec.map(r=>'<li><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.t||"Untitled chat")+'</span><span class="w">'+esc(impWhen(r.ts))+'</span><span class="n">'+impN(r.n||0)+'</span></li>').join("")+'</ol>':"";
+  const left=impLeftLine(c,imp.app);
+  let notes="";
+  if(imp.app==="gemini"&&(c.grouped_by_time||c.grouped_by_id)){
+    notes+='<p class="imp-note">Gemini keeps no conversations, only prompts and answers. '
+      +(c.grouped_by_time?impN(c.grouped_by_time)+(c.grouped_by_time===1?" chat was":" chats were")+" grouped by time: prompts within 30 minutes of each other became one chat.":"")
+      +(c.grouped_by_id?" "+impN(c.grouped_by_id)+(c.grouped_by_id===1?" chat follows":" chats follow")+" Google's own conversation ids.":"")+'</p>';}
+  if(left&&T.chats)notes+='<p class="imp-note">'+esc(left)+'</p>';
+  if(T.extras&&T.extras.projects)notes+='<p class="imp-note">'+impN(T.extras.projects)+(T.extras.projects===1?" project":" projects")+' (instructions and documents) saved in your data folder, for when Projects arrive here.</p>';
+  let extra="";
+  if(T.extras&&T.extras.instructions&&T.lastRun)extra='<div class="imp-extra"><p>'+esc(A.name)+' kept notes about you: '+impPlural(T.extras.instructions,"custom instruction or memory","custom instructions and memories")+'. Remember them here too?</p>'
+    +'<div class="imp-actions"><button type="button" class="imp-btn primary" data-act="remember" data-run="'+esc(T.lastRun)+'">Remember them</button><button type="button" class="imp-link" data-act="dismiss-extra">Not now</button></div></div>';
+  const appsIn=Object.keys(T.apps||{}).filter(a=>a!=="file");
+  // the actions sit right under the facts, above the fold; the rows,
+  // the notes and the memory offer follow, and the stage scrolls
+  const actions='<div class="imp-actions" style="margin:4px 0 22px">'+(T.chats?'<button type="button" class="imp-btn primary" data-act="finish">Open your chats</button>':'')
+    +'<button type="button" class="imp-btn" data-act="another">Bring another app</button>'
+    +(appsIn.length===1?'<button type="button" class="imp-link danger" data-act="remove-ask" data-app="'+esc(appsIn[0])+'">Remove everything from '+esc(IMP_APPS[appsIn[0]].name)+'</button>':'')+'</div>';
+  impStage('<div class="imp-done"><h3>'+esc(title)+'</h3>'+(line?'<p>'+esc(line)+'</p>':'')+facts+actions+rows+notes+extra+'</div>');
+  impSide("What we can see",[["From",A.name],["Chats",impN(T.chats),true],["Messages",impN(T.messages),true],["Images",T.images?impN(T.images):"",true],
+    ["Already here",T.already?impN(T.already):"",true],["Took",st.elapsed!==undefined?impDur(st.elapsed):"",false]]);}
+function impShowError(title,line,detail,actions){
+  impPollStop();
+  let d="";
+  if(detail&&typeof detail==="object"){const keys=detail.keys||detail.files||detail.starts;if(keys)d='<div class="d">'+esc(Array.isArray(keys)?keys.join(", "):String(keys))+'</div>';}
+  impStage('<div class="imp-err"><h3>'+esc(title)+'</h3><p>'+esc(line||"")+'</p>'+d
+    +'<div class="imp-actions">'+(actions||[]).map((a,i)=>'<button type="button" class="'+(i?"imp-btn":"imp-btn primary")+'" data-act="'+a[0]+'">'+esc(a[1])+'</button>').join("")+'</div></div>');}
+async function impCancel(){if(!imp.run)return;try{await impApi("/api/import/cancel",{run:imp.run});}catch(e){}}
+async function impFinish(){
+  const first=imp.totals&&imp.totals.first;
+  impClose();
+  try{await loadChatsFromDisk();}catch(e){}
+  if(first&&chats.some(c=>c.id===first))loadChat(first);}
+function impRemoveAsk(app,el){
+  const A=IMP_APPS[app];if(!A)return;
+  const wrap=el.parentElement;
+  const n=document.createElement("span");n.className="imp-actions";n.style.margin="0";
+  n.innerHTML='<span style="font-size:13.5px;color:var(--hz-ink-2)">Remove every chat brought from '+esc(A.name)+'? This can’t be undone.</span>'
+    +'<button type="button" class="imp-btn" data-act="remove-go" data-app="'+esc(app)+'" style="border-color:rgba(255,138,122,.5)!important">Yes, remove them</button>'
+    +'<button type="button" class="imp-link" data-act="dismiss-extra">Keep them</button>';
+  el.replaceWith(n);}
+async function impRemove(app,el){
+  const A=IMP_APPS[app];if(!A)return;
+  el.disabled=true;el.textContent="Removing";
+  try{const d=await impApi("/api/import/remove",{app:app});
+    try{await loadChatsFromDisk();}catch(e){}
+    if(curChat&&!chats.some(c=>c.id===curChat)){curChat=null;messages=[];resetHero();}
+    impHomeMount();impSourcesNote();
+    const host=el.closest(".imp-actions")||el.parentElement;
+    if(host)host.innerHTML='<span style="font-size:13.5px;color:var(--hz-ink-2)">Removed '+impPlural(d.chats||0,"chat")+(d.images?" and "+impPlural(d.images,"picture"):"")+' from '+esc(A.name)+'.</span>';
+    if(imp.totals)imp.totals=null;
+  }catch(e){el.disabled=false;el.textContent="Couldn’t remove: "+e.message;}}
+async function impRemember(el){
+  el.disabled=true;
+  try{const d=await impApi("/api/import/remember",{run:el.dataset.run});
+    const x=el.closest(".imp-extra");if(x)x.innerHTML='<p>Remembered '+impPlural(d.added||0,"thing")+'. You can see and clear them in Settings.</p>';
+  }catch(e){el.disabled=false;el.textContent="Couldn’t: "+e.message;}}
+/* ---------------------------------------------------- watching Downloads */
+async function impWatchToggle(){
+  const want=!imp.watch;
+  try{const d=await impApi("/api/import/watch",{on:want,app:imp.app});
+    imp.watch=!!d.on;
+    const b=impStageEl.querySelector('[data-act="watch"]'),l=$("#imp-sw-label"),n=$("#imp-watch-note");
+    if(b)b.setAttribute("aria-checked",imp.watch?"true":"false");if(l)l.textContent=imp.watch?"On":"Off";
+    if(n){if(d.err==="no-access")n.textContent="macOS didn’t let MillenAI see your Downloads. Drop the file here instead, or allow it in System Settings, Privacy & Security, Files and Folders.";
+      else if(d.err==="no-folder")n.textContent="Couldn’t find a Downloads folder here. Drop the file in instead.";
+      else n.textContent=imp.watch?"Watching "+(d.dir||"Downloads")+" for a "+IMP_APPS[imp.app].name+" export. Leave this open; it starts by itself.":"";}
+    impExportSide();
+    if(imp.watch){clearInterval(imp.watchT);imp.watchT=setInterval(impWatchTick,3000);}else impWatchStop(false);
+  }catch(e){const n=$("#imp-watch-note");if(n)n.textContent="Couldn’t start watching: "+e.message;}}
+async function impWatchTick(){
+  if(!imp.watch||!imp.open){impWatchStop(false);return;}
+  try{const d=await impApi("/api/import/watch",{on:true,app:imp.app});
+    if(d.found){impWatchStop(true);impShowDrop(d.found);return;}
+    if(!d.on){impWatchStop(false);}
+  }catch(e){}}
+function impWatchStop(found){
+  clearInterval(imp.watchT);imp.watchT=0;
+  if(imp.watch){imp.watch=false;impApi("/api/import/watch",{on:false}).catch(()=>{});}
+  if(found){const l=$("#imp-sw-label");if(l)l.textContent="Off";}}
+/* ------------------------------------------------- drop, pick, the hooks */
+impV.addEventListener("dragover",e=>{if(!hasFiles(e))return;e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect="copy";
+  const z=$("#imp-drop");if(z)z.classList.add("over");});
+impV.addEventListener("dragleave",e=>{const z=$("#imp-drop");if(z&&!impSheet.contains(e.relatedTarget))z.classList.remove("over");});
+impV.addEventListener("drop",e=>{if(!hasFiles(e))return;e.preventDefault();e.stopPropagation();
+  const z=$("#imp-drop");if(z)z.classList.remove("over");
+  if(imp.step===4&&imp.status&&imp.status.state==="running")return;
+  impTakeFiles([...(e.dataTransfer.files||[])]);});
+$("#imp-file").addEventListener("change",()=>{impTakeFiles([...$("#imp-file").files]);$("#imp-file").value="";});
+function impTakeFiles(files){
+  if(!files.length)return;
+  if(!imp.app)imp.app="file";
+  imp.totals=null;imp.queue=files.slice(1);
+  impBegin(files[0]);}
+// Settings: the row and what's already here
+async function impSourcesNote(){
+  const n=$("#imp-settings-note");if(!n)return;
+  try{const d=await impApi("/api/import/sources");
+    if(!d.apps||!d.apps.length){n.innerHTML="";return;}
+    n.innerHTML=d.apps.map(a=>'<div class="imp-srcrow"><span><span class="n">'+impN(a.chats)+'</span> '+(a.chats===1?"chat":"chats")+' from '+esc(a.name)+'</span>'
+      +'<button type="button" class="imp-link danger" data-act="remove-ask" data-app="'+esc(a.app)+'">Remove</button></div>').join("");
+  }catch(e){}}
+$("#imp-settings-open").addEventListener("click",e=>{aboutVeil.hidden=true;impOpen(e.currentTarget);});
+$("#imp-settings-note").addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(b)impAct(b.dataset.act,b);});
+$("#settings-btn").addEventListener("click",impSourcesNote);
+// the empty home: one quiet pill under the greeting while the history is
+// short (five chats or fewer); Settings always has the row
+function impHomeMount(){
+  const hero=$("#hero");if(!hero)return;
+  const old=hero.querySelector(".imp-homecard");
+  const show=chatsLoaded&&chats.length<=5;
+  if(!show){if(old)old.remove();return;}
+  if(old)return;
+  const b=document.createElement("button");b.type="button";b.className="imp-homecard";
+  b.innerHTML=IMP_ICON.home+'<span>Bring your chats from ChatGPT, Claude or Gemini</span>';
+  b.addEventListener("click",()=>impOpen(b));
+  hero.appendChild(b);}
+(function(){let n=0;const t=setInterval(()=>{if(chatsLoaded||++n>100){clearInterval(t);impHomeMount();}},300);})();
+// a dev copy's imp-demo=<path> hook (6b529): the sheet opens on load and
+// brings that export in by itself, so a windowed copy can be captured
+// without a click; "" in the app, where nothing here runs
+const IMP_DEMO=__IMP_DEMO__;
+if(IMP_DEMO){(function(){let n=0;const t=setInterval(()=>{if(!chatsLoaded&&++n<100)return;clearInterval(t);
+  impOpen(document.getElementById("settings-btn"));
+  if(IMP_DEMO==="open")return;                 // just the first step, for a look
+  impAct("pick",{dataset:{app:"chatgpt"}});impAct("have",{dataset:{}});
+  setTimeout(()=>impBegin({path:IMP_DEMO,name:IMP_DEMO.split("/").pop(),size:0}),2500);},300);})();}
+/* ==== bring your chats (6b529): script end ==== */
 </script>
 </body>
 </html>

@@ -1,0 +1,672 @@
+[
+ {
+  "title": "Trip to Lisbon in March",
+  "create_time": 1766000000.0,
+  "update_time": 1766005000.0,
+  "conversation_id": "conv-a1a1a1a1-0000-4000-8000-000000000001",
+  "id": "conv-a1a1a1a1-0000-4000-8000-000000000001",
+  "current_node": "a-t2",
+  "default_model_slug": "gpt-4o",
+  "is_archived": false,
+  "is_starred": null,
+  "gizmo_id": null,
+  "mapping": {
+   "a-root": {
+    "id": "a-root",
+    "message": null,
+    "parent": null,
+    "children": [
+     "a-sys"
+    ]
+   },
+   "a-sys": {
+    "id": "a-sys",
+    "message": {
+     "id": "a-sys",
+     "author": {
+      "role": "system",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000000.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "You are a helpful assistant. The user is planning a trip."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "is_visually_hidden_from_conversation": true
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-root",
+    "children": [
+     "a-u1"
+    ]
+   },
+   "a-u1": {
+    "id": "a-u1",
+    "message": {
+     "id": "a-u1",
+     "author": {
+      "role": "user",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000010.0,
+     "update_time": null,
+     "content": {
+      "content_type": "multimodal_text",
+      "parts": [
+       {
+        "content_type": "image_asset_pointer",
+        "asset_pointer": "file-service://file-AbC123xyz",
+        "size_bytes": 4000,
+        "width": 48,
+        "height": 32,
+        "fovea": null,
+        "metadata": null
+       },
+       "Here's where we're staying. Three days in Lisbon in March: what should we not miss?"
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "attachments": [
+       {
+        "id": "file-AbC123xyz",
+        "name": "flat.png",
+        "size": 4000,
+        "width": 48,
+        "height": 32
+       }
+      ]
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-sys",
+    "children": [
+     "a-a1"
+    ]
+   },
+   "a-a1": {
+    "id": "a-a1",
+    "message": {
+     "id": "a-a1",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000040.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Three days is a good fit. Day one: Alfama on foot, the viewpoint at Santa Luzia, then tram 28 back.\n\nDay two: Belém in the morning (the monastery opens at 10), pastéis at the counter, the river walk.\n\nDay three: LX Factory and a late lunch in Cais do Sodré."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "gpt-4o"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-u1",
+    "children": [
+     "a-h1"
+    ]
+   },
+   "a-h1": {
+    "id": "a-h1",
+    "message": {
+     "id": "a-h1",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000041.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Model set context updated (hidden note)."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "is_visually_hidden_from_conversation": true,
+      "model_slug": "gpt-4o"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-a1",
+    "children": [
+     "a-u2"
+    ]
+   },
+   "a-u2": {
+    "id": "a-u2",
+    "message": {
+     "id": "a-u2",
+     "author": {
+      "role": "user",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000900.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Can you work out the tram fares for two people, in Python?"
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {},
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-h1",
+    "children": [
+     "a-r1",
+     "a-t0"
+    ]
+   },
+   "a-r1": {
+    "id": "a-r1",
+    "message": {
+     "id": "a-r1",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000920.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Sure, roughly 3 euros each way."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "gpt-4o"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-u2",
+    "children": []
+   },
+   "a-t0": {
+    "id": "a-t0",
+    "message": {
+     "id": "a-t0",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000930.0,
+     "update_time": null,
+     "content": {
+      "content_type": "thoughts",
+      "thoughts": [
+       {
+        "summary": "Working out fares",
+        "content": "Each ride is 3.20…"
+       }
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "o3"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-u2",
+    "children": [
+     "a-c1"
+    ]
+   },
+   "a-c1": {
+    "id": "a-c1",
+    "message": {
+     "id": "a-c1",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000940.0,
+     "update_time": null,
+     "content": {
+      "content_type": "code",
+      "language": "python",
+      "text": "fare = 3.20\nprint(fare * 2 * 2)"
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "o3"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-t0",
+    "children": [
+     "a-o1"
+    ]
+   },
+   "a-o1": {
+    "id": "a-o1",
+    "message": {
+     "id": "a-o1",
+     "author": {
+      "role": "tool",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000950.0,
+     "update_time": null,
+     "content": {
+      "content_type": "execution_output",
+      "text": "12.8"
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {},
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-c1",
+    "children": [
+     "a-t1"
+    ]
+   },
+   "a-t1": {
+    "id": "a-t1",
+    "message": {
+     "id": "a-t1",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766000960.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Two return trips for two people come to 12.80 euros at the onboard fare. A day pass is cheaper if you ride more than twice."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "o3"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-o1",
+    "children": [
+     "a-u3"
+    ]
+   },
+   "a-u3": {
+    "id": "a-u3",
+    "message": {
+     "id": "a-u3",
+     "author": {
+      "role": "user",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766004000.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Draw me a postcard of the tram at sunset."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {},
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-t1",
+    "children": [
+     "a-d1"
+    ]
+   },
+   "a-d1": {
+    "id": "a-d1",
+    "message": {
+     "id": "a-d1",
+     "author": {
+      "role": "tool",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766004900.0,
+     "update_time": null,
+     "content": {
+      "content_type": "multimodal_text",
+      "parts": [
+       {
+        "content_type": "image_asset_pointer",
+        "asset_pointer": "file-service://file-DaLLe777",
+        "size_bytes": 34,
+        "width": 1,
+        "height": 1,
+        "metadata": {
+         "dalle": {
+          "gen_id": "g1",
+          "prompt": "A yellow tram at sunset",
+          "seed": 1
+         }
+        }
+       }
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {},
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-u3",
+    "children": [
+     "a-t2"
+    ]
+   },
+   "a-t2": {
+    "id": "a-t2",
+    "message": {
+     "id": "a-t2",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766005000.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Here's your postcard."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "gpt-4o"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "a-d1",
+    "children": []
+   }
+  }
+ },
+ {
+  "title": "Sourdough timing",
+  "create_time": 1766086400.0,
+  "update_time": 1766086700.0,
+  "conversation_id": "conv-b2b2b2b2-0000-4000-8000-000000000002",
+  "current_node": "b-a2",
+  "default_model_slug": "gpt-4o-mini",
+  "mapping": {
+   "b-root": {
+    "id": "b-root",
+    "message": null,
+    "parent": null,
+    "children": [
+     "b-ctx"
+    ]
+   },
+   "b-ctx": {
+    "id": "b-ctx",
+    "message": {
+     "id": "b-ctx",
+     "author": {
+      "role": "system",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766086400.0,
+     "update_time": null,
+     "content": {
+      "content_type": "user_editable_context",
+      "user_profile": "I bake at home on weekends.",
+      "user_instructions": "Keep answers short."
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "is_user_system_message": true,
+      "user_context_message_data": {
+       "about_user_message": "I bake at home on weekends.",
+       "about_model_message": "Keep answers short."
+      }
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "b-root",
+    "children": [
+     "b-u1"
+    ]
+   },
+   "b-u1": {
+    "id": "b-u1",
+    "message": {
+     "id": "b-u1",
+     "author": {
+      "role": "user",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766086405.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "My starter doubles in 5 hours. Bulk ferment how long?"
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "attachments": [
+       {
+        "id": "file-NotInZip99",
+        "name": "notes.txt",
+        "size": 300
+       }
+      ]
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "b-ctx",
+    "children": [
+     "b-a1"
+    ]
+   },
+   "b-a1": {
+    "id": "b-a1",
+    "message": {
+     "id": "b-a1",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766086460.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "About 4 to 5 hours at 24 °C, until it has grown by half and the top is domed."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "gpt-4o-mini"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "b-u1",
+    "children": [
+     "b-q1"
+    ]
+   },
+   "b-q1": {
+    "id": "b-q1",
+    "message": {
+     "id": "b-q1",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766086461.0,
+     "update_time": null,
+     "content": {
+      "content_type": "tether_quote",
+      "title": "Bulk fermentation guide",
+      "url": "https://example.org/bulk",
+      "domain": "example.org",
+      "text": "Judge bulk by volume and feel, not the clock."
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {},
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "b-a1",
+    "children": [
+     "b-a2"
+    ]
+   },
+   "b-a2": {
+    "id": "b-a2",
+    "message": {
+     "id": "b-a2",
+     "author": {
+      "role": "assistant",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766086700.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Judge it by the dough, not the clock."
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "model_slug": "gpt-4o-mini"
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "b-q1",
+    "children": []
+   }
+  }
+ },
+ {
+  "title": "New chat",
+  "create_time": 1766172800.0,
+  "update_time": 1766172800.0,
+  "conversation_id": "conv-c3c3c3c3-0000-4000-8000-000000000003",
+  "current_node": "c-sys",
+  "mapping": {
+   "c-root": {
+    "id": "c-root",
+    "message": null,
+    "parent": null,
+    "children": [
+     "c-sys"
+    ]
+   },
+   "c-sys": {
+    "id": "c-sys",
+    "message": {
+     "id": "c-sys",
+     "author": {
+      "role": "system",
+      "name": null,
+      "metadata": {}
+     },
+     "create_time": 1766172800.0,
+     "update_time": null,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       ""
+      ]
+     },
+     "status": "finished_successfully",
+     "end_turn": true,
+     "weight": 1.0,
+     "metadata": {
+      "is_visually_hidden_from_conversation": true
+     },
+     "recipient": "all",
+     "channel": null
+    },
+    "parent": "c-root",
+    "children": []
+   }
+  }
+ }
+]

@@ -1,0 +1,17 @@
+{
+ "title": "Bike fit",
+ "messages": [
+  {
+   "role": "system",
+   "content": "You are terse."
+  },
+  {
+   "role": "user",
+   "content": "Saddle height for a 32 inch inseam?"
+  },
+  {
+   "role": "assistant",
+   "content": "Start around 71 cm from the bottom bracket centre and adjust by feel."
+  }
+ ]
+}
