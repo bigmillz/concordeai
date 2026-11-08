@@ -5199,7 +5199,7 @@ check("the marginalia lives outside the prose and survives streaming (6b528; rep
       and 'box=document.createElement("aside");box.className="behind worktree";' in page
       and "root.appendChild(box);" in page
       and "const keepTree=" not in page and "insertAdjacentHTML(\"beforeend\",restHTML)" not in page
-      and 'const aside=body.querySelector(":scope>aside.behind");if(aside)div.appendChild(aside);' in page
+      and 'const aside=body.querySelector(":scope>aside.behind");if(aside&&isHz())div.appendChild(aside);' in page
       and ".msg.ai>aside.behind{grid-column:2;grid-row:1/span 5" in page
       and "if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}" in page)
 # 6b257: the bar the user SEES is a tween chasing the honest math —
@@ -38754,7 +38754,7 @@ check("the chat handler taps every call of the answer and sends the run's clock"
       and _ch528.index("usage_tap(lambda d: _tap_sink[0](d))") < _ch528.index("def _ground_planner(ask_text")
       and '_write((NUL + "USAGE:" + json.dumps(d, separators=(",", ":"))' in _ch528
       and '_write((NUL + "DONE:" + json.dumps({' in _ch528
-      and '"t": round(_now - _t_req, 2), "mode": tier or ""}' in _ch528
+      and '"t": round(_now - _t_req, 2), "mode": tier or "",\n                        "effort": _effort or ""}' in _ch528
       and "            usage_tap(None)\n            usage_role(\"\")\n" in _ch528
       and _ch528.index("            usage_tap(None)\n            usage_role(\"\")\n") < _ch528.index("            hb_stop.set()\n            # the quality ledger")
       and 'if not _t_first[0] and str(chunk).strip():\n                    _t_first[0] = time.time()' in _ch528
@@ -38800,7 +38800,7 @@ def _spine_js(pg):
               "const THINK_WORDS=", "const ORDINAL=", "const ROLE_WORDS="):
         js += _jsconst(pg, h)
     for h in ("function fmtTok(n){", "function fmtSecs(s){", "function usageTotals(u){", "function usageFinal(u){",
-              "function whereName(w){", "function machineOf(c){", "function isCloud(c){", "function signatureHTML(mode,st){",
+              "function whereName(w){", "function machineOf(c){", "function isCloud(c){", "function signatureHTML(mode,st,eff){",
               "function thinkPhrase(steps,status,nDrafts){", "function spineRows(o){", "function machinesHTML(u,ctx){",
               "function contextOf(u){", "function spineHTML(o){", "function srcList(srcs){", "function chatTokens(c){",
               "function markTitle(t,q){", "function dayLabel(ts,now){"):
@@ -38843,7 +38843,7 @@ const out={
  think:[thinkPhrase([{id:"verify",s:"run",d:"12 claims · x"}],"",0),thinkPhrase([],"asking Gemma 4 26B · 1 of 1",0),
    thinkPhrase([{id:"council",s:"run",d:"2 of 3"}],"",1),thinkPhrase([],"",0),thinkPhrase([{id:"read",s:"run",d:"4 pages"}],"",0)],
  sign:signatureHTML("Thinking","writing"),signPlain:signatureHTML("",""),
- signOd:signatureHTML("Vera Rubin","writing"),signMer:signatureHTML("Pro","")
+ signOd:signatureHTML("Vera Rubin","writing","ultra"),signMer:signatureHTML("Pro","","max"),signModeOnly:signatureHTML("Vera Rubin","writing")
    ,tok:[chatTokens({messages:[{role:"user",content:"x".repeat(40)},{role:"assistant",content:"y",usage:[{i:100,o:20}]}]}),
    chatTokens({messages:[{role:"user",content:"x".repeat(40)},{role:"assistant",content:"y".repeat(80)}]})],
  day:(()=>{const n=new Date(2026,10,8,15,0).getTime();return [dayLabel(n-3600000,n),dayLabel(n-86400000,n),dayLabel(n-3*86400000,n),dayLabel(n-9*86400000,n)];})(),
@@ -38874,6 +38874,7 @@ check("the spine's pure pieces: figures, totals, the final call, a row per step 
       and _so.get("signPlain") == '<i class="dot" aria-hidden="true"></i><b>Concorde</b><span class="st"></span>'
       and _so.get("signOd") == '<i class="dot" aria-hidden="true"></i><b class="shim">Concorde Omega</b><span class="st">writing</span>'
       and _so.get("signMer") == '<i class="dot" aria-hidden="true"></i><b class="shim soft">Concorde Sigma</b><span class="st"></span>'
+      and _so.get("signModeOnly") == '<i class="dot" aria-hidden="true"></i><b>Concorde Omega</b><span class="st">writing</span>'   # the mode alone never shimmers (OVERRIDE 4)
       and _so.get("tok") == [{"n": 120, "est": False}, {"n": 30, "est": True}]
       and _so.get("day") == ["Today", "Yesterday", "This week", "Earlier"]
       and _so.get("mark") == "Best <mark>GPU</mark> for home", "%r" % (_so,))
@@ -38885,7 +38886,7 @@ check("mutants: a model name outside .mdl, a hardcoded server name, and an unmar
       and _som3.get("tilde") is False, "%r %r %r" % (_som1.get("modelOutside"), _som2.get("hard"), _som3.get("tilde")))
 # the handlers are delegated (the footer and the spine are rebuilt), the frames are read, the byline breathes
 _ma528 = _jsfn(page, "function msgActions(div,role,text){")
-check("the answer's actions, the code cards' line numbers, the spine's steps and Show models are all delegated from the chat; the new frames are read; the byline and caret are drawn",
+check("the answer's actions, the code cards' line numbers, the spine's steps and Show models are all delegated from the chat; the new frames are read; the byline is drawn and the caret stays retired (6b257)",
       "addEventListener" not in _ma528 and 'data-act="' in _ma528
       and 'const b=e.target.closest&&e.target.closest(".mab[data-act]");' in page
       and 'if(act==="speak"){' in page and 'if(act==="good"||act==="bad"){' in page and '"/api/feedback"' in page
@@ -38897,21 +38898,23 @@ check("the answer's actions, the code cards' line numbers, the spine's steps and
       and "usage.length=0;runInfo=null;\n      full=streamText(raw,{" in page
       and "if(usage.length)rec.usage=usage.slice();" in page and "if(runInfo)rec.run=runInfo;" in page
       and 'const w=thinkPhrase(steps,status,nd);' in page   # the live line's last word (06e1a5b)
-      and 'addMsg("assistant","",null,null,null,null,null,null,{live:true,mode:tier});' in page
+      and 'addMsg("assistant","",null,null,null,null,null,null,{live:true,mode:tier,effort:typeof hzEffortWire==="function"?hzEffortWire():""});' in page
       and ".msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite}" in page
       and ".msg.ai.live .who b.shim{animation:hzShim 3.2s linear infinite}" in page
       and ".msg.ai.live .who b.shim.soft{animation-duration:5s}" in page
       and "@keyframes hzShim{to{background-position:300% 0}}" in page
-      and ".msg,.chat-item,#undobar,.caret,.msg.ai.live .who .dot,.behind .spine li.live .node,.msg.ai.live .who b.shim,\n  .msg.ai.live .liveline .die,.msg.ai.live .liveline em,#composer.finish::before{animation:none!important}" in page
-      and "if(txt)caretIn(body);" in page and ".caret{display:inline-block;width:2px;height:1.05em;" in page
+      and "  .hz .msg,.hz .chat-item,.hz #undobar,.hz .msg.ai.live .who .dot,.hz .behind .spine li.live .node,.hz .msg.ai.live .who b.shim,\n  .hz .msg.ai.live .liveline .die,.hz .msg.ai.live .liveline em,.hz #composer.finish::before{animation:none!important}" in page   # scoped under html.hz (integration)
+      and "caretIn(" not in page and ".caret{" not in page   # the caret stays retired (6b257, per Patrick; integration)
       and '/* MODE NAMES (6b526) */\nconst MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};\nconst modeName=t=>MODE_NAMES[t]||t;' in page
       and "/* HORIZON TOKENS (6b526) */" in page and "--hz-ink-read:#e6e9f4;" in page
       and ".msg.ai{display:grid;grid-template-columns:minmax(0,640px) 236px;column-gap:56px;" in page
       and ".msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;" in page
       and "--hz-font-read:'Space Grotesk',system-ui,sans-serif;" in page
-      and "@media (max-width:860px){\n  .msg.ai{grid-template-columns:minmax(0,1fr)}" in page
+      and "@media (max-width:860px){\n  .hz .msg.ai{grid-template-columns:minmax(0,1fr)}" in page
       and "millen.codeLines" in page and "millen.rail" in page and "millen.showModels" in page
-      and 'id="rail-btn"' in page and "body.rail #sidebar{width:60px!important" in page
+      and 'id="rail-btn"' in page and "body.rail" not in page   # one fold (integration): the button drives horizon's state
+      and '$("#rail-btn").addEventListener("click",()=>{if(typeof hzSidebarToggle==="function")hzSidebarToggle();});' in page
+      and 'localStorage.getItem("millen.rail")==="1"' in page   # the old key migrates once
       and 'id="sb-foot"' in page and '"/api/usage?range=1d"' in page
       and "function dayRows(rows,row,now){" in page and 'class="cday"' in page
       and "function hzStill(){" in page and ".chat-item.leaving{opacity:0;" in page)

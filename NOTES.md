@@ -18114,3 +18114,49 @@ page errors, no API response over 400, only SwiftShader's GL warnings; the home,
 lineups, Effort at Ultra, a seeded conversation with its marginalia and numbered sources, an imported
 ChatGPT fixture (byline "ChatGPT · gpt-4o-mini" as two spans), Settings, the import sheet and the home card
 were captured at 1440 and 390 px (no horizontal scroll). No question was sent.
+
+**Fix round (the coordinator's six items, same day; commits on top of d5c6ad0).**
+1. *The caret.* 6b257 retired it per Patrick and no north-star frame has one, so hz-chat's streaming caret went
+   whole: `.caret{…}`, `hzBlink`, `caretIn()` and its call; 6b257's "caret retired" check is green again and
+   hz-chat's own check now pins the caret absent.
+2. *Classic.* Every rule in hz-chat's `HORIZON CONVERSATION (6b528)` block is scoped under `html.hz` (a scoper
+   over the block, checked with horizon's own `_hz_scoped` over both blocks, mutant included); the layout-only
+   JS asks `isHz()` first (the marginalia's lift out of the prose, the live line, the comets and ripples, the
+   finish ring). What Classic cannot get back is hz-chat's markup (the sidebar foot, the comets canvas, the
+   live line, the aside, the token facts), so Classic gets defaults for it: `html:not(.hz)` hides the comets
+   canvas (it sat in Classic's flow at 1440x900 and pushed the chat down), the live line, the aside, the foot's
+   facts and the fold button, and sizes the search icon, the day labels and the foot's Settings button. Horizon's
+   own Classic leak went too: `hzHomePaint` built the greeting's three trace copies in Classic (hzReady is set
+   in both looks); it now returns unless `html.hz`. The import sheet's CSS styles only its own `#imp-*` ids and
+   is left alone. Classic is recognisably Classic again (bubble question, the old sidebar, the engine chip), not
+   pixel-exact: hz-chat's DOM is in both looks.
+3. *One fold.* Horizon's (6b526): the header button and the sidebar's `#rail-btn` both call `hzSidebarToggle`
+   (`sbhide` in a conversation, `hz-sbopen` on the home, the drawer under 760px) and both say "Hide chats" /
+   "Show chats" (`hzSidebarLabel` sets the sidebar button too). NORTHSTAR has a sidebar toggle in the header and
+   no rail in any override. The rail (`body.rail`, `setRail`, the 60px strip) is gone; `millen.rail` = 1
+   migrates once to `millen.sbhide` = 1 and the key is dropped; `millen.rail` left `KEEP_LS`.
+4. *The byline's shimmer follows the effort* (OVERRIDE 4): `signatureHTML(mode,st,eff)` shimmers in full at
+   `ultra`, softly at `max`, never from the mode; the live byline reads the slider (`hzEffortWire()`), a saved
+   answer its run: the DONE frame now carries `"effort"`, which `turn_record` keeps with the run. Still under
+   reduced motion and effects off, as before (the `.hz .msg.ai.live .who b.shim` still rules).
+5. *The header seam.* `#chat-inner` keeps its 72px top (the first message starts at 72, under a 56px header, at
+   1440 and 390); what scrolls up fades under the header through a mask on `#chat-scroll` (transparent to 34px,
+   solid from 104px). Found while measuring at 390 in a conversation: 440px of sideways scroll, from horizon's
+   header right group (the compact effort slider) and the composer's reading-column offset; at 600px and under
+   the slider's track is 84px, the title gives way, and the composer centres once the marginalia has stacked.
+6. *The machines as the header shows them* (OVERRIDE 2): `hzChipLabel(c)` reads horizon's `hzMachines()` for a
+   call's machine and gives its die (the chip's own `--ac`) and the chip's word ("MLX" for this Mac, a maker's
+   name or the server's own name), with the machine's name in the title; `spineRows` and `machinesHTML` use
+   it when the page has chips and keep the pure words ("this Mac") where there are none, so the gauntlet's node
+   run is unchanged.
+
+Pins moved in this round: hz-chat's delegated-handlers check (caret absent; the reduced-motion rule's scoped
+selector list; `@media (max-width:860px){\n  .hz .msg.ai{…}`; the live `addMsg` call with `effort`); the
+rail pins (no `body.rail`, the button wired to `hzSidebarToggle`, the migration line); `signatureHTML(mode,st,eff)`
+and the node calls (`"ultra"`, `"max"`, plus a mode-only call that must not shimmer); the DONE frame's `"effort"`;
+the marginalia lift gated on `isHz()`. Checked as before: parse, no unreplaced token, both scripts `node --check`,
+1,837 literal pins (the one red is the `or` the checker can't read), Playwright: no page errors, no API response
+over 400, in Horizon and in Classic; 390px wide: no sideways scroll on the home or in a conversation.
+Pre-existing and left: the old `page.count("body.novideo ") == 3` check (hz-chat's and import-chats' still
+rules took the count to 33 before this branch).
+
