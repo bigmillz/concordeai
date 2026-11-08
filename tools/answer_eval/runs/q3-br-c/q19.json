@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.2,\"ftok\":113,\"est\":false}",
+  "X-Hurry": "be543528799c4f0a"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 16.9,
+ "elapsed_s": 23.36,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 7.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.78,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.87,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.9,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.36,
+   "tag": "RATE",
+   "data": {
+    "tps": 37.3,
+    "tok": 241,
+    "s": 6.5
+   }
+  },
+  {
+   "t": 23.36,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "964 chars"
+   }
+  },
+  {
+   "t": 23.36,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   7.78,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.78
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.78
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 9.87
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.87
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.87
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "964 chars",
+   "t_s": 23.36
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.36
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Cost of Living Comparison",
+   "u": "https://www.numbeo.com/cost-of-living/comparison.jsp",
+   "d": ""
+  },
+  {
+   "t": "FlyBnB: Flights & Airbnb Costs in One Smart Search",
+   "u": "https://flybnb.io/",
+   "d": ""
+  },
+  {
+   "t": "New York City vs Athens: Travel Cost Comparison (2026) | TripVS",
+   "u": "https://www.tripvs.ai/compare/new-york-city-vs-athens",
+   "d": "2026"
+  },
+  {
+   "t": "London vs Paris Cost Comparison 2026: Which Is Cheaper?",
+   "u": "https://costoftrip.com/compare/london-vs-paris",
+   "d": "2026"
+  },
+  {
+   "t": "13 Cozy (and Convenient) Winter Weekend Getaways From NYC",
+   "u": "https://www.cntraveler.com/gallery/best-winter-weekend-getaways-from-nyc",
+   "d": "2020-12-11"
+  },
+  {
+   "t": "How to have a weekend for two in NYC for... - Good Morning America",
+   "u": "https://www.goodmorningamerica.com/travel/story/weekend-nyc-500-54755673",
+   "d": "2018-04-27"
+  },
+  {
+   "t": "Cost of Living in United States. Prices in United States. Updated Oct...",
+   "u": "https://www.numbeo.com/cost-of-living/country_result.jsp?country=United+States",
+   "d": ""
+  },
+  {
+   "t": "Kiwi.com | Find Cheap Flights & Discover New Destinations",
+   "u": "https://www.kiwi.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.87,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 37.3,
+  "tok": 241,
+  "s": 6.5
+ },
+ "answer_raw": "**Athens** is your best bet for a low-cost two-week trip, as it is approximately 33% more affordable than New York City for a 7-day trip [3].\n\nFor a 7-day mid-range trip, Athens costs about $1000 including flights, accommodation, food, and transport, whereas New York City costs about $1500 [3]. Budget travelers can cut those numbers by 30-40% [3]. \n\nIf you look toward Europe, **Paris** is a cheaper alternative to London, with a mid-range 7-day stay costing approximately $1505 excluding airfare compared to $1645 in London [4]. In Paris, you can expect to spend an average of $215 per day on hotel, meals, and local transit [4].\n\nSince flight-specific prices for a two-week duration aren't provided, you'll need to check current seasonal fares on sites like Kiwi.com or FlyBnB to get the final total [2][8]. Typically, a round-trip flight from NYC to Europe in winter ranges from $500–$800, though you should check live comparisons for your specific dates [3].",
+ "answer": "**Athens** is your best bet for a low-cost two-week trip, as it is approximately 33% more affordable than New York City for a 7-day trip [3].\n\nFor a 7-day mid-range trip, Athens costs about $1000 including flights, accommodation, food, and transport, whereas New York City costs about $1500 [3]. Budget travelers can cut those numbers by 30-40% [3]. \n\nIf you look toward Europe, **Paris** is a cheaper alternative to London, with a mid-range 7-day stay costing approximately $1505 excluding airfare compared to $1645 in London [4]. In Paris, you can expect to spend an average of $215 per day on hotel, meals, and local transit [4].\n\nSince flight-specific prices for a two-week duration aren't provided, you'll need to check current seasonal fares on sites like Kiwi.com or FlyBnB to get the final total [2][8]. Typically, a round-trip flight from NYC to Europe in winter ranges from $500–$800, though you should check live comparisons for your specific dates [3].",
+ "chars": 964,
+ "raw_bytes": 2845,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.32,
+ "rate_gen_tok_s": 37.31,
+ "id": "q19",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Cheapest places to travel",
+ "question": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:12:50",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

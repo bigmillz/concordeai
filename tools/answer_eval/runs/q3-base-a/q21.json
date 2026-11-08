@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.1,\"ftok\":284,\"est\":false}",
+  "X-Hurry": "4039108a3e4f862f"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 22.99,
+ "elapsed_s": 31.59,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.49,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 26 passages"
+   }
+  },
+  {
+   "t": 15.49,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.49,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.49,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.49,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 22.99,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 31.59,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.2,
+    "tok": 509,
+    "s": 8.6
+   }
+  },
+  {
+   "t": 31.59,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2037 chars"
+   }
+  },
+  {
+   "t": 31.59,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 26 passages",
+   "t_s": 15.49
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.49
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.49
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2037 chars",
+   "t_s": 31.59
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 31.59
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Complete South America Packing List (Expert 2026 Guide)Americans Overpack fo",
+   "u": "https://worldlyadventurer.com/south-america-packing-list/",
+   "d": "2026-07-17"
+  },
+  {
+   "t": "South American Airline Carry-On Rules (2026) — CarrySizer",
+   "u": "https://carrysizer.com/guides/carry-on-rules-south-america/",
+   "d": "2026-06-19"
+  },
+  {
+   "t": "Carry-on Only For 3 Weeks In South America Is It Realistic Or ...",
+   "u": "https://gradeonetools.com/more/carry-on-only-for-3-weeks-in-south-america-is-it-realistic-or-just-influencer-fantasy",
+   "d": "2026-08-10"
+  },
+  {
+   "t": "Carry-On for São Paulo: LATAM, Azul, GOL and GRU vs CGH",
+   "u": "https://carrysizer.com/guides/carry-on-for-sao-paulo-trip/",
+   "d": "2026-09-30"
+  },
+  {
+   "t": "A condição da Azul, Latam e Gol para não subirem os preços",
+   "u": "https://www.metropoles.com/colunas/andreza-matais/a-condicao-da-azul-latam-e-gol-para-nao-subirem-os-precos",
+   "d": "2025-08-20"
+  },
+  {
+   "t": "Azul, GOL e LATAM ampliam voos para os EUA durante a Copa do...",
+   "u": "https://epocanegocios.globo.com/empresas/noticia/2026/05/azul-gol-e-latam-ampliam-voos-para-os-eua-durante-a-copa-do-mundo.ghtml",
+   "d": "2026-05"
+  },
+  {
+   "t": "3 Weeks in South America- Our Itinerary's Hits and Misses",
+   "u": "https://www.travelyesplease.com/travel-blog-3-weeks-in-south-america-itinerary/",
+   "d": "2026-02-08"
+  },
+  {
+   "t": "Baggage - GOL Linhas Aéreas",
+   "u": "https://www.voegol.com.br/en-US/nh/fazendo-as-malas",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.49,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 59.2,
+  "tok": 509,
+  "s": 8.6
+ },
+ "answer_raw": "To pull off three weeks with just a carry-on, you need to respect the strict size limits of South American carriers and pack for high-frequency laundry cycles.\n\n## Airline Limits\n\nThe size limits for LATAM and GOL are identical, while Azul's personal item constraints are more specific.\n\n| Airline | Carry-on Size Limit | Personal Item Size Limit |\n| :--- | :--- | :--- |\n| **LATAM** | 55 x 35 x 25 cm (including protrusions) [4] | Typically one personal item [3] |\n| **GOL** | 55 x 35 x 25 cm (including protrusions) [8] | One handbag/backpack up to 10kg [8] |\n| **Azul** | 55 x 35 x 25 cm (up to 10 kg) [2][4] | 45 x 35 x 20 cm [2][4] |\n\n**A note on enforcement:** For LATAM, the 35 cm width is a frequent point of failure for travelers; ensure your bag's dimensions are strictly within these bounds to avoid being sent to the hold [4]. For GOL, weight and size allowances are generally honored only if the flights were issued on the same ticket [8].\n\n## Packing Strategy\n\nFor a three-week itinerary, a 38-liter backpack is a common choice for minimalist travelers [3]. Because laundry-access is inexpensive and ubiquitous across South America, you should pack for roughly a week of clothing and cycle through laundry every few days [1].\n\n**The Essentials**\n*   **Versatile Clothing:** Focus on wrinkle-resistant fabrics and layers to handle everything from Amazonian humidity to high-altitude winds [3][4].\n*   re-packable **Toiletries:** Keep liquids minimal to stay under weight limits; many travelers use small, reusable containers.\n*   **Tech and Essentials:** A single laptop or tablet and essential electronics should fit within your personal item to ensure they stay with you [3].\n\n**The Logistics**\n*   **Laundry is key:** Do not overpack; the goal is to keep your bag light enough to maneuver through various transit hubs [1]. \n*   **Weight Management:** Since most carriers limit carry-ons to roughly 10 kg (22 lbs), avoid heavy-duty hard-shell suitcases in favor of lightweight, durable backpacks or soft-sided bags [3][8].",
+ "answer": "To pull off three weeks with just a carry-on, you need to respect the strict size limits of South American carriers and pack for high-frequency laundry cycles.\n\n## Airline Limits\n\nThe size limits for LATAM and GOL are identical, while Azul's personal item constraints are more specific.\n\n| Airline | Carry-on Size Limit | Personal Item Size Limit |\n| :--- | :--- | :--- |\n| **LATAM** | 55 x 35 x 25 cm (including protrusions) [4] | Typically one personal item [3] |\n| **GOL** | 55 x 35 x 25 cm (including protrusions) [8] | One handbag/backpack up to 10kg [8] |\n| **Azul** | 55 x 35 x 25 cm (up to 10 kg) [2][4] | 45 x 35 x 20 cm [2][4] |\n\n**A note on enforcement:** For LATAM, the 35 cm width is a frequent point of failure for travelers; ensure your bag's dimensions are strictly within these bounds to avoid being sent to the hold [4]. For GOL, weight and size allowances are generally honored only if the flights were issued on the same ticket [8].\n\n## Packing Strategy\n\nFor a three-week itinerary, a 38-liter backpack is a common choice for minimalist travelers [3]. Because laundry-access is inexpensive and ubiquitous across South America, you should pack for roughly a week of clothing and cycle through laundry every few days [1].\n\n**The Essentials**\n*   **Versatile Clothing:** Focus on wrinkle-resistant fabrics and layers to handle everything from Amazonian humidity to high-altitude winds [3][4].\n*   re-packable **Toiletries:** Keep liquids minimal to stay under weight limits; many travelers use small, reusable containers.\n*   **Tech and Essentials:** A single laptop or tablet and essential electronics should fit within your personal item to ensure they stay with you [3].\n\n**The Logistics**\n*   **Laundry is key:** Do not overpack; the goal is to keep your bag light enough to maneuver through various transit hubs [1]. \n*   **Weight Management:** Since most carriers limit carry-ons to roughly 10 kg (22 lbs), avoid heavy-duty hard-shell suitcases in favor of lightweight, durable backpacks or soft-sided bags [3][8].",
+ "chars": 2037,
+ "raw_bytes": 4251,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 16.12,
+ "rate_gen_tok_s": 59.22,
+ "id": "q21",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Carry-on travel in South America",
+ "question": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:19:00",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

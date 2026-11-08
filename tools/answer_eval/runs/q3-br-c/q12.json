@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":111,\"est\":false}",
+  "X-Hurry": "4f6b84de35db0889"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 13.69,
+ "elapsed_s": 19.34,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 6.31,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.31,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.31,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.1,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 31 passages"
+   }
+  },
+  {
+   "t": 9.1,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.1,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.1,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.1,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.69,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 19.33,
+   "tag": "RATE",
+   "data": {
+    "tps": 61.9,
+    "tok": 349,
+    "s": 5.6
+   }
+  },
+  {
+   "t": 19.33,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1397 chars"
+   }
+  },
+  {
+   "t": 19.33,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.31,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.31
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.31
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 31 passages",
+   "t_s": 9.1
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.1
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.1
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1397 chars",
+   "t_s": 19.33
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 19.33
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Body Odor: Causes, Changes, Underlying Diseases & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17865-body-odor",
+   "d": "2023-08-30"
+  },
+  {
+   "t": "What's that smell? Get rid of body odor - Harvard HealthBad Smelling Sweat? 5 Ef",
+   "u": "https://www.health.harvard.edu/staying-healthy/whats-that-smell-common-and-less-common-causes-of-body-odor",
+   "d": "2025-09-11"
+  },
+  {
+   "t": "Body Odor Changes: Treatments Overview | Acibadem Health Point...",
+   "u": "https://www.acibademhealthpoint.com/body-odor-changes-treatments-overview/",
+   "d": "2025-08-03"
+  },
+  {
+   "t": "What Causes Body Odor? 7 Causes of Bad Sweat Smell",
+   "u": "https://www.ejisinc.com/blogs/news/what-causes-body-odor",
+   "d": "2020-01-15"
+  },
+  {
+   "t": "How to Not Smell Like Sweat: Causes and Real Fixes",
+   "u": "https://scienceinsights.org/how-to-not-smell-like-sweat-causes-and-real-fixes/",
+   "d": "2026-03-20"
+  },
+  {
+   "t": "Sudden Change in Body Odor: Causes, Symptoms, and Treatment",
+   "u": "https://www.healthline.com/health/sudden-change-in-body-odor",
+   "d": "2019-05-13"
+  },
+  {
+   "t": "Vaginal Odor: Types, Causes, Diagnosis & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17905-vaginal-odor",
+   "d": "2023-08-24"
+  },
+  {
+   "t": "Here's Why Stress Sweat Smells Worse Than Normal Sweat",
+   "u": "https://thompsontee.com/blogs/news/stress-sweat-smells",
+   "d": "2021-10-04"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.1,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 61.9,
+  "tok": 349,
+  "s": 5.6
+ },
+ "answer_raw": "Your sweat doesn't actually smell; the odor is caused when bacteria on your skin break down the compounds in your sweat into pungent acids or sulfur molecules [1][5].\n\nIf your scent has changed, it is likely due to one of several physiological or lifestyle shifts:\n\n*   **Hormonal changes:** Puberty, menstruation, and pregnancy can alter hormone levels, which in turn changes how much you sweat and how it smells [3][6].\n*   **Stress:** Sweat produced during stress can smell more pungent than regular sweat [8].\n*   **Dietary triggers:** Consuming spicy foods, garlic, or caffeine can make your sweat smell worse [3].\n*   **Bacterial activity:** Bacteria in the genus *Corynebacterium* break down proteins in thicker secretions (from apocrine glands in the armpits and groin) into sour or onion-like smells [5].\n\nTo fix it, focus on managing the bacterial interaction and dietary inputs:\n\n*   **Hygiene:** Regular washing helps remove the bacteria and the sweat-born compounds they feed on [2].\n*   **Dietary adjustment:** Reducing intake of garlic, spicy foods, and caffeine can mitigate odor [3]. Increasing intake of fruits and vegetables has been linked to better-smelling sweat [6].\n*   **Medical check:** If the change is sudden, accompanied by unusual discharge, or involves much more sweating than usual, consult a healthcare provider to rule out underlying medical conditions [2][3][7].",
+ "answer": "Your sweat doesn't actually smell; the odor is caused when bacteria on your skin break down the compounds in your sweat into pungent acids or sulfur molecules [1][5].\n\nIf your scent has changed, it is likely due to one of several physiological or lifestyle shifts:\n\n*   **Hormonal changes:** Puberty, menstruation, and pregnancy can alter hormone levels, which in turn changes how much you sweat and how it smells [3][6].\n*   **Stress:** Sweat produced during stress can smell more pungent than regular sweat [8].\n*   **Dietary triggers:** Consuming spicy foods, garlic, or caffeine can make your sweat smell worse [3].\n*   **Bacterial activity:** Bacteria in the genus *Corynebacterium* break down proteins in thicker secretions (from apocrine glands in the armpits and groin) into sour or onion-like smells [5].\n\nTo fix it, focus on managing the bacterial interaction and dietary inputs:\n\n*   **Hygiene:** Regular washing helps remove the bacteria and the sweat-born compounds they feed on [2].\n*   **Dietary adjustment:** Reducing intake of garlic, spicy foods, and caffeine can mitigate odor [3]. Increasing intake of fruits and vegetables has been linked to better-smelling sweat [6].\n*   **Medical check:** If the change is sudden, accompanied by unusual discharge, or involves much more sweating than usual, consult a healthcare provider to rule out underlying medical conditions [2][3][7].",
+ "chars": 1397,
+ "raw_bytes": 3494,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.06,
+ "rate_gen_tok_s": 61.81,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:09:16",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

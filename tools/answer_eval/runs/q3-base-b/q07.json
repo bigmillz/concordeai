@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.3,\"ftok\":123,\"est\":false}",
+  "X-Hurry": "6056580bcb350328"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 18.91,
+ "elapsed_s": 27.03,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 4.95,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 4.95,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 4.95,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.99,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 30 passages"
+   }
+  },
+  {
+   "t": 11.99,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.99,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.99,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.99,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.91,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.03,
+   "tag": "RATE",
+   "data": {
+    "tps": 51.3,
+    "tok": 416,
+    "s": 8.1
+   }
+  },
+  {
+   "t": 27.03,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1667 chars"
+   }
+  },
+  {
+   "t": 27.03,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   4.95,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 4.95
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 4.95
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 30 passages",
+   "t_s": 11.99
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.99
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.99
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1667 chars",
+   "t_s": 27.03
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 27.03
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "$109+ Cheap Flights from Miami to Brooklyn | Cheapflights",
+   "u": "https://www.cheapflights.com/flights-to-brooklyn/miami/",
+   "d": "2026"
+  },
+  {
+   "t": "Driving vs. Flying Calculator: Compare Cost & Time",
+   "u": "https://smartonlinecalculator.com/driving-vs-flying-calculator.html",
+   "d": ""
+  },
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": ""
+  },
+  {
+   "t": "Driving Cost between Brooklyn Center, Minnesota and Minneapolis...",
+   "u": "https://www.meetways.com/info/travel-cost/Brooklyn+Center,+Minnesota/Minneapolis,+Minnesota",
+   "d": ""
+  },
+  {
+   "t": "Cheap Flights, Airline Tickets & Airfare Deals | KAYAK",
+   "u": "https://www.kayak.com/flights",
+   "d": ""
+  },
+  {
+   "t": "Flights from Hamburg to Milan Bergamo in November 2026 | Eurowings",
+   "u": "https://www.eurowings.com/en/booking/offers/flights-from/DE/HAM/to/IT/BGY/2026-11.html",
+   "d": "2026-11"
+  },
+  {
+   "t": "Driving Vs Flying Calculator: Your 2026 Travel Guide",
+   "u": "https://economadtravel.com/driving-vs-flying-calculator/",
+   "d": "2026-04-10"
+  },
+  {
+   "t": "Moving to Miami? 2026 Living Costs & Relocation Tips - MoverDB.com",
+   "u": "https://moverdb.com/moving-to-miami/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.99,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 51.3,
+  "tok": 416,
+  "s": 8.1
+ },
+ "answer_raw": "Flying is the cheaper option for two people, likely saving you roughly **$200–$300** compared to driving. \n\nBecause the distance between Brooklyn and Miami is roughly 1,300 miles, driving becomes significantly more expensive due to fuel and vehicle wear-and-tear, whereas flying scales more efficiently for two travelers.\n\n## Cost Comparison\n\n| Expense Category | Flying (Two People) | Driving (Two People) |\n| :--- | :--- | :--- |\n| **Travel Cost** | **$272+** [5] | **$1,742** [2] |\n| **Notes** | Based on ~$136 round-trip per person [5] | Based on ~$0.67/mile [2] |\n\n### Flying Breakdown\nBased on current flight data, a round-trip ticket from Miami to New York (the closest major hub to Brooklyn) is listed at **$136+** [5]. For two people, this brings your total airfare to approximately **$272** [5]. Taking an evening flight could potentially save you up to **49%** on those fares [1].\n\n### Driving Breakdown\nDriving for a trip of this distance is much more costly when factoring in vehicle overhead. Using a standard rate of **$0.67 per mile** [2] for a trip of this scale, the cost for the vehicle alone is significantly higher than a flight. For a 600-mile leg, the cost is **$402** [2]; scaling that to the ~1,300-mile trip to Miami would result in a much higher total.\n\nWhile driving is often competitive for trips under 300–500 miles [2], for a long-distance haul to Miami, flying's time savings and lower price-per-person make it the clear winner for a one-week trip.\n\nThe specific total for driving would depend on your vehicle's actual fuel economy and whether you factor in tolls and lodging during the transit, which the provided data does not cover.",
+ "answer": "Flying is the cheaper option for two people, likely saving you roughly **$200–$300** compared to driving. \n\nBecause the distance between Brooklyn and Miami is roughly 1,300 miles, driving becomes significantly more expensive due to fuel and vehicle wear-and-tear, whereas flying scales more efficiently for two travelers.\n\n## Cost Comparison\n\n| Expense Category | Flying (Two People) | Driving (Two People) |\n| :--- | :--- | :--- |\n| **Travel Cost** | **$272+** [5] | **$1,742** [2] |\n| **Notes** | Based on ~$136 round-trip per person [5] | Based on ~$0.67/mile [2] |\n\n### Flying Breakdown\nBased on current flight data, a round-trip ticket from Miami to New York (the closest major hub to Brooklyn) is listed at **$136+** [5]. For two people, this brings your total airfare to approximately **$272** [5]. Taking an evening flight could potentially save you up to **49%** on those fares [1].\n\n### Driving Breakdown\nDriving for a trip of this distance is much more costly when factoring in vehicle overhead. Using a standard rate of **$0.67 per mile** [2] for a trip of this scale, the cost for the vehicle alone is significantly higher than a flight. For a 600-mile leg, the cost is **$402** [2]; scaling that to the ~1,300-mile trip to Miami would result in a much higher total.\n\nWhile driving is often competitive for trips under 300–500 miles [2], for a long-distance haul to Miami, flying's time savings and lower price-per-person make it the clear winner for a one-week trip.\n\nThe specific total for driving would depend on your vehicle's actual fuel economy and whether you factor in tolls and lodging during the transit, which the provided data does not cover.",
+ "chars": 1667,
+ "raw_bytes": 3633,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.42,
+ "rate_gen_tok_s": 51.32,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:43:37",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.6,\"ftok\":256,\"est\":false}",
+  "X-Hurry": "7f3e91128c2a5b90"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 24.86,
+ "elapsed_s": 29.81,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "0 pages · 8 passages"
+   }
+  },
+  {
+   "t": 18.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.07,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.09,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 18.1,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.86,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.81,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.9,
+    "tok": 331,
+    "s": 5.0
+   }
+  },
+  {
+   "t": 29.81,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1326 chars"
+   }
+  },
+  {
+   "t": 29.81,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "0 pages · 8 passages",
+   "t_s": 18.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.06
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 18.1
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1326 chars",
+   "t_s": 29.81
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 29.81
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Retire in Brazil: visa, tax & cost of living guide for Americans",
+   "u": "https://www.taxesforexpats.com/country-guides/brazil/retire-in-brazil.html",
+   "d": "2026"
+  },
+  {
+   "t": "The Role of Brazil’s inheritance system in wealth inequality",
+   "u": "https://repositorio.ipea.gov.br/entities/publication/244f91b3-d398-48bb-a873-e8787d260568",
+   "d": ""
+  },
+  {
+   "t": "Brazil Inheritance Law: Guide for Brazilians Living in the U.S.",
+   "u": "https://accordinglaw.com/brazil-inheritance-law-guide-for-brazilians-living-in-the-u-s/",
+   "d": "2026-08-07"
+  },
+  {
+   "t": "Brazil Retirement Visa for Foreigners | Oliveira Lawyers",
+   "u": "https://oliveiralawyers.com/services/immigration/retirement-visa/",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "Some nonresidents with U.S. assets must file estate tax returns",
+   "u": "https://www.irs.gov/individuals/international-taxpayers/some-nonresidents-with-us-assets-must-file-estate-tax-returns",
+   "d": ""
+  },
+  {
+   "t": "How US Citizens Can Move to Brazil in 2026",
+   "u": "https://visabrazilservices.com/en/how-us-citizens-can-move-to-brazil-in-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Brazil Probate: How Foreign Heirs Claim Inheritance 2026",
+   "u": "https://www.ribeirocavalcante.com.br/brazil-probate-foreign-heirs-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Retirement Visa Brazil: US$2,000 Income Rule and Steps 2026",
+   "u": "https://www.ribeirocavalcante.com.br/brazil-immigration/retirement-visa/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   18.09,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.9,
+  "tok": 331,
+  "s": 5.0
+ },
+ "answer_raw": "Your Brazilian apartment will be subject to Brazilian inheritance laws, while your US accounts will likely remain under US jurisdiction.\n\nFor the **Brazilian apartment**, assets located within Brazilian territory are always subject to Brazilian inheritance rules, regardless of whether the deceased or the heirs reside in the US [3]. To transfer the property or release frozen bank accounts in Brazil, foreign heirs must undergo a Brazilian probate process known as *inventário* [7]. Foreign wills and foreign court orders cannot be used to directly transfer Brazilian real estate [7].\n\nFor your **US accounts**, the situation is different. While you are subject to Brazilian rules for local assets, the US and Brazil have different views on \"situated\" assets. Estate tax treaties often provide favorable treatment for nonresidents by limiting which assets are considered subject to US estate taxation [5]. For the specific tax implications of your US-based wealth being viewed by Brazilian authorities, you should consult a cross-border tax specialist.\n\nRegarding the **retirement visa**, you must meet a minimum monthly income of roughly **US$2,000** (approximately R$ 10,500–11,000, depending on current rates) [1][4][8] from sources dated 2026 and undated. This income must be verifiable and transferable to Brazil [4][8].",
+ "answer": "Your Brazilian apartment will be subject to Brazilian inheritance laws, while your US accounts will likely remain under US jurisdiction.\n\nFor the **Brazilian apartment**, assets located within Brazilian territory are always subject to Brazilian inheritance rules, regardless of whether the deceased or the heirs reside in the US [3]. To transfer the property or release frozen bank accounts in Brazil, foreign heirs must undergo a Brazilian probate process known as *inventário* [7]. Foreign wills and foreign court orders cannot be used to directly transfer Brazilian real estate [7].\n\nFor your **US accounts**, the situation is different. While you are subject to Brazilian rules for local assets, the US and Brazil have different views on \"situated\" assets. Estate tax treaties often provide favorable treatment for nonresidents by limiting which assets are considered subject to US estate taxation [5]. For the specific tax implications of your US-based wealth being viewed by Brazilian authorities, you should consult a cross-border tax specialist.\n\nRegarding the **retirement visa**, you must meet a minimum monthly income of roughly **US$2,000** (approximately R$ 10,500–11,000, depending on current rates) [1][4][8] from sources dated 2026 and undated. This income must be verifiable and transferable to Brazil [4][8].",
+ "chars": 1326,
+ "raw_bytes": 3479,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.12,
+ "rate_gen_tok_s": 66.97,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:13:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.2,\"ftok\":150,\"est\":false}",
+  "X-Hurry": "98172bd9b5849cda"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 21.55,
+ "elapsed_s": 26.03,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.93,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.93,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.93,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.25,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 28 passages"
+   }
+  },
+  {
+   "t": 16.25,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.25,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.25,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.25,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.55,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.03,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.9,
+    "tok": 299,
+    "s": 4.5
+   }
+  },
+  {
+   "t": 26.03,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1196 chars"
+   }
+  },
+  {
+   "t": 26.03,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.93,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.93
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.93
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 28 passages",
+   "t_s": 16.25
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.25
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.25
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.25
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1196 chars",
+   "t_s": 26.03
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.03
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Effects of Magnesium Supplementation on Subjective Anxiety...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5452159/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium Forms: Evidence, Doses and Safety",
+   "u": "https://purecityresearch.org/magnesium/",
+   "d": "2026-07-02"
+  },
+  {
+   "t": "Best Magnesium for Anxiety: Forms, Dosage & Protocols That Work",
+   "u": "https://mitohealth.com/guide/best-magnesium-form-for-anxiety",
+   "d": "2026-01-28"
+  },
+  {
+   "t": "Examining the Effects of Supplemental Magnesium on Self-Reported...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11136869/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium Glycinate vs Citrate: Which Form Is Better?",
+   "u": "https://naturstack.com/minerals/magnesium/magnesium-glycinate-vs-citrate-which-is-better/",
+   "d": "2026-03-31"
+  },
+  {
+   "t": "Magnesium Glycinate vs. Citrate for Sleep, Anxiety, Constipa",
+   "u": "https://www.modernmetabolic.org/articles/magnesium-glycinate-citrate-sleep-anxiety-constipation-208",
+   "d": "2026-05-29"
+  },
+  {
+   "t": "Magnesium Glycinate vs Citrate: Key Differences (2026) | Mito ...",
+   "u": "https://mitohealth.com/blog/magnesium-glycinate-vs-citrate",
+   "d": "2025-12-16"
+  },
+  {
+   "t": "Magnesium basics - PMC",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4455825/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.25,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.9,
+  "tok": 299,
+  "s": 4.5
+ },
+ "answer_raw": "The provided evidence does not contain information regarding interactions between magnesium and sertraline or the effects of combining magnesium with alcohol. You should consult a medical professional or a pharmacist to check for drug-to-supplement interactions and alcohol-related risks.\n\n## Glycinate vs. Citrate\n\nWhether glycinate is \"better\" depends on your physical goals, such as managing digestive issues versus managing sleep.\n\n**Magnesium Glycinate**\nThis form is often preferred for anxiety, sleep, and daily use because it is typically gentler on the GI tract and doess not add the side effects associated with other forms [7]. It is a common choice for those seeking relaxation or dealing with nighttime muscle tension [7].\n\n**Magnesium Citrate**\nThis form is frequently chosen for its osmotic laxative effect, as it draws water into the intestines to help with constipation [6]. While it offers good absorption and is often more cost-effective than chelated forms, it may cause more GI side effects than glycinate [5][6].\n\nThe choice is not purely marketing; it is a trade-off between the calming, gentle properties of glycinate and the bowel-regulating properties of citrate [6][7].",
+ "answer": "The provided evidence does not contain information regarding interactions between magnesium and sertraline or the effects of combining magnesium with alcohol. You should consult a medical professional or a pharmacist to check for drug-to-supplement interactions and alcohol-related risks.\n\n## Glycinate vs. Citrate\n\nWhether glycinate is \"better\" depends on your physical goals, such as managing digestive issues versus managing sleep.\n\n**Magnesium Glycinate**\nThis form is often preferred for anxiety, sleep, and daily use because it is typically gentler on the GI tract and doess not add the side effects associated with other forms [7]. It is a common choice for those seeking relaxation or dealing with nighttime muscle tension [7].\n\n**Magnesium Citrate**\nThis form is frequently chosen for its osmotic laxative effect, as it draws water into the intestines to help with constipation [6]. While it offers good absorption and is often more cost-effective than chelated forms, it may cause more GI side effects than glycinate [5][6].\n\nThe choice is not purely marketing; it is a trade-off between the calming, gentle properties of glycinate and the bowel-regulating properties of citrate [6][7].",
+ "chars": 1196,
+ "raw_bytes": 3258,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.49,
+ "rate_gen_tok_s": 66.74,
+ "id": "q11",
+ "turn": 2,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "Any problem taking it with sertraline or with a few drinks? And is glycinate really better than citrate or is that marketing?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:13:10",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   },
+   {
+    "role": "assistant",
+    "content": "The evidence for magnesium as an anxiety treatment is promising but remains limited by inconsistent data and varying study designs. While it is considered \"likely useful\" for mild anxiety and insomnia—especially in those with low magnesium levels—the scientific community has not yet established a universal \"best\" form or a single definitive dose [2][8].\n\n## Evidence Quality and Findings\n\nThe strength of the evidence depends on whether you are looking at general health or specific psychiatric symptoms. For those with low magnesium status, a 2024 systematic review found supplementation to be likely useful for treating mild anxiety and insomnia [8].\n\nHowever, broad conclusions are difficult to reach because studies often suffer from:\n*   **Heterogeneity**: Researchers use different dosages, formulations, and study durations, making it hard to compare results [4].\n*   **Small sample sizes**: Many trials involve few participants, which limits the ability to draw firm conclusions [4].\n*   **Mixed results**: While some studies show benefits, findings for anxiety, depression, and sleep are often described as uncertain or mixed [2].\n\n## Dosage and Form\n\nBecause there is no single gold standard, dosing and form selection often depend on individual needs and the specific goal of the supplementation.\n\n**Dosage**\nTrials targeting anxiety and stress typically utilize approximately **300 mg of elemental magnesium daily** [3]. This amount is sometimes split into morning and evening doses to manage symptoms throughout the day [3]. It is important to note that the NIH upper limit for supplemental magnesium is **350 mg per day**; doses exceeding this should only be taken under medical supervision due to risks like diarrhea or low blood pressure [3].\n\n**Form**\nThe molecule magnesium is bound to determines how well it is absorbed and how it behaves in the body. Organic forms are significantly more bioavailable than inorganic forms [8].\n\n*   **Magnesium L-threonate**: This form is clinically noted for its ability to cross the blood-brain barrier to increase brain magnesium concentrations, making it a candidate for cognitive support [8].\n*   **Magnesium Taurate**: This is often used for anxiety related to heart-health concerns [3].\n*   **Citrate vs. Oxide**: In small studies, citrate shows better absorption than oxide [2].\n\nIf you are experiencing significant deficiency, a clinician might direct higher doses, but these must be monitored with follow-up labs to ensure safety [3]."
+   },
+   {
+    "role": "user",
+    "content": "Any problem taking it with sertraline or with a few drinks? And is glycinate really better than citrate or is that marketing?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

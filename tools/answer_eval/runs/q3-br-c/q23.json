@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.2,\"ftok\":255,\"est\":false}",
+  "X-Hurry": "9fb2587db2465daf"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.93,
+ "elapsed_s": 26.44,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 6.93,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.93,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.93,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 24 passages"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.97,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.93,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.44,
+   "tag": "RATE",
+   "data": {
+    "tps": 71.1,
+    "tok": 534,
+    "s": 7.5
+   }
+  },
+  {
+   "t": 26.44,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2136 chars"
+   }
+  },
+  {
+   "t": 26.44,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   6.93,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.93
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.93
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 24 passages",
+   "t_s": 11.97
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.97
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.97
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2136 chars",
+   "t_s": 26.44
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.44
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2025-05"
+  },
+  {
+   "t": "Chief AI officer: What it takes to land the C-suite’s hottest new job",
+   "u": "https://www.cio.com/article/657977/chief-ai-officer-what-it-takes-to-land-the-c-suites-hottest-new-job.html",
+   "d": "2026-11-04"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist! : The Indicator from Planet Money",
+   "u": "https://www.npr.org/2026/10/18/nx-s1-6006805/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-10-18"
+  },
+  {
+   "t": "Remote Dev Ops & SysAdmin Jobs - Work... - Remote Work Hub",
+   "u": "https://remoteworkhub.com/job-category/dev-ops-sysadmin/",
+   "d": ""
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "Applicants say AI makes the job market hell. OpenAI wants... | Mashable",
+   "u": "https://mashable.com/article/ai-job-market-openai-jobs-platform",
+   "d": "2026"
+  },
+  {
+   "t": "I Ditched Claude Code and Now Using Open Source Qwen AI for Real...",
+   "u": "https://itsfoss.com/qwen-code-sysadmin-tasks/",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "China issues guidelines to boost AI-driven job creation... - Global Times",
+   "u": "https://www.globaltimes.cn/page/202610/1372863.shtml",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.97,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 71.1,
+  "tok": 534,
+  "s": 7.5
+ },
+ "answer_raw": "The displacement risk for sysadmins over the next five years is not total replacement, but a fundamental shift toward managing AI-driven automation and higher-level strategy.\n\nFor your specific role, the risk is concentrated in **repetitive, manual tasks**—such as fetching binaries, wiring paths, generating config files, and running sanity checks—which AI-powered CLI tools are already beginning to handle [7]. While these tools can automate the \"boring\" parts of setting up web servers or managing packages, they still struggle with intelligent error correction, such as fixing environment variables [7]. You won't be replaced by a bot, but you might be replaced by a peer who knows how to direct these tools to handle the heavy lifting [7].\n\nThe macro-economic outlook is mixed. Some industry leaders argue AI will reshape roles and create more jobs than it destroys [3], and government-level policies are already being designed to mitigate displacement through workforce training and job creation [8]. However, the job market is currently facing headwinds, with reports of \"near-zero job growth\" in certain sectors and a cycle where AI-generated applications meet AI-driven HR screening, complicating the hiring landscape [6].\n\nTo protect your career, you should focus on these three moves:\n\n**Move from execution to orchestration** — Master AI-powered CLI tools and automation frameworks to handle the low-level tasks, moving your value toward overseeing complex system architectures and \"sanity checking\" the AI's output [7].\n\n**Pivot toward strategic leadership** — As organizations appoint Chief AI Officers to set strategy, there is a growing need for senior IT executives who can balance AI benefits with technical risks [2]. Learning to bridge the gap between business goals and AI implementation places you in a higher-value bracket than a traditional sysadmin [2].\n\n**Develop specialized technical depth** — While AI handles the repetitive, lean towards roles that require high-level troubleshooting or specialized data science-adjacent tasks, where the median annual wage for data scientists was $120,230 in May 2025 [1].",
+ "answer": "The displacement risk for sysadmins over the next five years is not total replacement, but a fundamental shift toward managing AI-driven automation and higher-level strategy.\n\nFor your specific role, the risk is concentrated in **repetitive, manual tasks**—such as fetching binaries, wiring paths, generating config files, and running sanity checks—which AI-powered CLI tools are already beginning to handle [7]. While these tools can automate the \"boring\" parts of setting up web servers or managing packages, they still struggle with intelligent error correction, such as fixing environment variables [7]. You won't be replaced by a bot, but you might be replaced by a peer who knows how to direct these tools to handle the heavy lifting [7].\n\nThe macro-economic outlook is mixed. Some industry leaders argue AI will reshape roles and create more jobs than it destroys [3], and government-level policies are already being designed to mitigate displacement through workforce training and job creation [8]. However, the job market is currently facing headwinds, with reports of \"near-zero job growth\" in certain sectors and a cycle where AI-generated applications meet AI-driven HR screening, complicating the hiring landscape [6].\n\nTo protect your career, you should focus on these three moves:\n\n**Move from execution to orchestration** — Master AI-powered CLI tools and automation frameworks to handle the low-level tasks, moving your value toward overseeing complex system architectures and \"sanity checking\" the AI's output [7].\n\n**Pivot toward strategic leadership** — As organizations appoint Chief AI Officers to set strategy, there is a growing need for senior IT executives who can balance AI benefits with technical risks [2]. Learning to bridge the gap between business goals and AI implementation places you in a higher-value bracket than a traditional sysadmin [2].\n\n**Develop specialized technical depth** — While AI handles the repetitive, lean towards roles that require high-level troubleshooting or specialized data science-adjacent tasks, where the median annual wage for data scientists was $120,230 in May 2025 [1].",
+ "chars": 2136,
+ "raw_bytes": 4236,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.2,
+ "rate_gen_tok_s": 71.11,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:14:37",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

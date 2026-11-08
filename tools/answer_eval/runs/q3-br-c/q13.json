@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":111,\"est\":false}",
+  "X-Hurry": "5abcce08cb378379"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 15.5,
+ "elapsed_s": 21.28,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 6.73,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.73,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.73,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 23 passages"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.05,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.5,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.28,
+   "tag": "RATE",
+   "data": {
+    "tps": 70.0,
+    "tok": 404,
+    "s": 5.8
+   }
+  },
+  {
+   "t": 21.28,
+   "tag": "RESET"
+  },
+  {
+   "t": 21.28,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 21.28,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1590 chars"
+   }
+  },
+  {
+   "t": 21.28,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   6.73,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.73
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.73
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 23 passages",
+   "t_s": 8.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.05
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 21.28
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1590 chars",
+   "t_s": 21.28
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 21.28
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is Pizza Healthy? Nutrition Tips for Pizza LoversIs Pizza Good for You? Health B",
+   "u": "https://www.healthline.com/nutrition/is-pizza-healthy",
+   "d": "2023-06-29"
+  },
+  {
+   "t": "Is Pizza the Healthiest Food? A Deep Dive into Nutritional ...",
+   "u": "https://mycookingheaven.com/is-pizza-the-healthiest-food/",
+   "d": "2026-06-25"
+  },
+  {
+   "t": "Healthy Pizza? Yes, Of Course! - Granite Fitness Blog",
+   "u": "https://blog.granitefitness.com.au/healthy-pizza-yes-of-course/",
+   "d": ""
+  },
+  {
+   "t": "10 Unhealthiest Pizza Slices in America—Ranked by Nutritionbad.pizzaDoes Pizza G",
+   "u": "https://www.eatthis.com/unhealthiest-pizza/",
+   "d": "2023-03-03"
+  },
+  {
+   "t": "Scientist Creates Pizza Healthy Enough to Eat 3 Times a Day, Every...",
+   "u": "https://gizmodo.com/scientist-creates-pizza-healthy-enough-to-eat-3-times-a-5923097",
+   "d": ""
+  },
+  {
+   "t": "Can Eating Pizza Really be the Key to Building Muscle? - ClassX",
+   "u": "https://classx.org/can-eating-pizza-really-be-the-key-to-building-muscle/",
+   "d": "2024-09-21"
+  },
+  {
+   "t": "Is There Anything Healthy in Pizza? Uncovering the ...",
+   "u": "https://tastesfood.com/is-there-anything-healthy-in-pizza/",
+   "d": "2026-07-29"
+  },
+  {
+   "t": "Is Pizza Considered a Healthy Food? Uncovering the ...",
+   "u": "https://eatsmartcooking.com/is-pizza-considered-a-healthy-food/",
+   "d": "2026-08-18"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.05,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 70.0,
+  "tok": 404,
+  "s": 5.8
+ },
+ "answer_raw": "Pizza is not inherently bad for you, but its health impact depends entirely on the ingredients used and the frequency of consumption.\n\nThe nutritional profile shifts significantly based on whether you choose freshly made pizza or processed varieties. Freshly made pizzas often contain healthier ingredients than those sold in convenience stores or fast-food restaurants [1]. Conversely, fast-food pizzas typically contain more processed ingredients, such as **monosodium glutamate (MSG)**, artificial colorings, and high-fructose corn syrup, which can negatively impact your health [1].\n\n**The nutritional breakdown by component:**\n*   **Crust** — Typically made from refined wheat flour, providing carbohydrates but often lacking significant fiber [2].\n*   **Toppings** — These offer the greatest opportunity to influence nutritional value. Vegetables like bell peppers, onions, mushrooms, and broccoli add vitamins and minerals [7], while grilled chicken is an excellent protein choice [6].\n*   **Processed Meats** — Ingredients like pepperoni and sausage are high in saturated fat, sodium, and preservatives [2][7].\n\nRegarding frequency, enjoying a slice of frozen or fast-food pizza occasionally likely won't impact your weight, but eating these items regularly can lead to weight gain and increase the risk of chronic health conditions [1]. Using the right ingredients can transform pizza into a nutritious meal or even a muscle-building food [6]. \n\nI didn't find a strict \"how often\" schedule for a healthy diet, so you should consult a nutritionist for a personalized frequency plan.",
+ "answer": "Pizza is not inherently bad for you, but its health impact depends entirely on the ingredients used and the frequency of consumption.\n\nThe nutritional profile shifts significantly based on whether you choose freshly made pizza or processed varieties. Freshly made pizzas often contain healthier ingredients than those sold in convenience stores or fast-food restaurants [1]. Conversely, fast-food pizzas typically contain more processed ingredients, such as **monosodium glutamate (MSG)**, artificial colorings, and high-fructose corn syrup, which can negatively impact your health [1].\n\n**The nutritional breakdown by component:**\n*   **Crust** — Typically made from refined wheat flour, providing carbohydrates but often lacking significant fiber [2].\n*   **Toppings** — These offer the greatest opportunity to influence nutritional value. Vegetables like bell peppers, onions, mushrooms, and broccoli add vitamins and minerals [7], while grilled chicken is an excellent protein choice [6].\n*   **Processed Meats** — Ingredients like pepperoni and sausage are high in saturated fat, sodium, and preservatives [2][7].\n\nRegarding frequency, enjoying a slice of frozen or fast-food pizza occasionally likely won't impact your weight, but eating these items regularly can lead to weight gain and increase the risk of chronic health conditions [1]. Using the right ingredients can transform pizza into a nutritious meal or even a muscle-building food [6]. \n\nI didn't find a strict \"how often\" schedule for a healthy diet, so you should consult a nutritionist for a personalized frequency plan.",
+ "chars": 1590,
+ "raw_bytes": 5373,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.68,
+ "rate_gen_tok_s": 68.77,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:09:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

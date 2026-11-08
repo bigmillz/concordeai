@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":92,\"est\":false}",
+  "X-Hurry": "3f570cc7f5dc7b03"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 18.36,
+ "elapsed_s": 24.89,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 6.41,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.41,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.41,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.47,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 24 passages"
+   }
+  },
+  {
+   "t": 13.47,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.47,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.47,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.47,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.36,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.89,
+   "tag": "RATE",
+   "data": {
+    "tps": 51.6,
+    "tok": 337,
+    "s": 6.5
+   }
+  },
+  {
+   "t": 24.89,
+   "tag": "RESET"
+  },
+  {
+   "t": 24.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 24.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1328 chars"
+   }
+  },
+  {
+   "t": 24.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.41,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.41
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.41
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 24 passages",
+   "t_s": 13.47
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.47
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.47
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 24.89
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1328 chars",
+   "t_s": 24.89
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.89
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Driving Vs Flying Calculator: Your 2026 Travel Guide",
+   "u": "https://economadtravel.com/driving-vs-flying-calculator/",
+   "d": "2026-04-10"
+  },
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": ""
+  },
+  {
+   "t": "Atlanta to Miami Drive Cost & Gas Cost | DriveCostCheck",
+   "u": "https://www.drivecostcheck.com/routes/atlanta-ga-to-miami-fl",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Driving vs. Flying Calculator: Compare Cost & Time",
+   "u": "https://smartonlinecalculator.com/driving-vs-flying-calculator.html",
+   "d": ""
+  },
+  {
+   "t": "Flying vs. Driving?? - Manuel Antonio Forum - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g309274-i2022-k774962-Flying_vs_Driving-Manuel_Antonio_Quepos_Province_of_Puntarenas.html",
+   "d": ""
+  },
+  {
+   "t": "Flying vs Driving - Family Cruises - Cruise Critic Community",
+   "u": "https://boards.cruisecritic.com/topic/1834271-flying-vs-driving",
+   "d": ""
+  },
+  {
+   "t": "Driving in Mostar 2026 — Parking, Fuel, Rental Tips",
+   "u": "https://exploremostar.com/driving-in-mostar/",
+   "d": "2026"
+  },
+  {
+   "t": "New York to Miami Road Trip: The Scenic Route with... - Southern Afro",
+   "u": "https://www.southernafro.com/scenic/new-york-to-miami-drive/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.47,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 51.6,
+  "tok": 337,
+  "s": 6.5
+ },
+ "answer_raw": "**Driving is cheaper** for two people, likely saving you roughly **$500–$700** all-in compared to flying, depending on your vehicle and flight timing.\n\nThe total cost of driving from Brooklyn to Miami involves fuel, tolls, and parking, but it avoids the per-person ticket costs that scale linearly with travelers. For a two-person trip, the fixed costs of the vehicle (like gas and tolls) are split, whereas flight prices are individual hits to your wallet.\n\n**The cost breakdown**\n*   **Driving** — If you use a fuel-efficient vehicle, gas for a one-way trip of roughly 1,300 miles could cost around **$180–$220** (based on a $0.67/mile rate for a 600-mile trip scaled up, undated) or roughly **$140** for a 663-mile leg in a highly efficient car [3]. You must also budget for tolls and potentially expensive parking at your Miami hotel [8].\n*   **Flying** — Two round-trip tickets typically cost between **$600–$1,200** total (typically $300–$600 per person, as of 2025). While flying wins on time for distances over 400–500 miles [4], the cost per person makes it the more expensive option for a pair.\n\nBecause I didn't find specific Brooklyn-to-Miami flight prices or real-time gas prices for the full distance, you should check current airline fares and a fuel calculator for your specific car's MPG to get the final delta.",
+ "answer": "**Driving is cheaper** for two people, likely saving you roughly **$500–$700** all-in compared to flying, depending on your vehicle and flight timing.\n\nThe total cost of driving from Brooklyn to Miami involves fuel, tolls, and parking, but it avoids the per-person ticket costs that scale linearly with travelers. For a two-person trip, the fixed costs of the vehicle (like gas and tolls) are split, whereas flight prices are individual hits to your wallet.\n\n**The cost breakdown**\n*   **Driving** — If you use a fuel-efficient vehicle, gas for a one-way trip of roughly 1,300 miles could cost around **$180–$220** (based on a $0.67/mile rate for a 600-mile trip scaled up, undated) or roughly **$140** for a 663-mile leg in a highly efficient car [3]. You must also budget for tolls and potentially expensive parking at your Miami hotel [8].\n*   **Flying** — Two round-trip tickets typically cost between **$600–$1,200** total (typically $300–$600 per person, as of 2025). While flying wins on time for distances over 400–500 miles [4], the cost per person makes it the more expensive option for a pair.\n\nBecause I didn't find specific Brooklyn-to-Miami flight prices or real-time gas prices for the full distance, you should check current airline fares and a fuel calculator for your specific car's MPG to get the final delta.",
+ "chars": 1328,
+ "raw_bytes": 4799,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.34,
+ "rate_gen_tok_s": 50.84,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:06:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

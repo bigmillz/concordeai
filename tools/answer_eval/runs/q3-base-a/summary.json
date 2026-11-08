@@ -1,0 +1,235 @@
+{
+ "name": "q3-base-a",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-11-08T01:06:24",
+ "repo": "/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad/q3/base686",
+ "head": [
+  "",
+  ""
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 33.25,
+   "chars": 1822,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 18.15,
+   "chars": 2496,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 30.24,
+   "chars": 1793,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 29.91,
+   "chars": 2197,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 20.62,
+   "chars": 369,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 28.3,
+   "chars": 1725,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 22.57,
+   "chars": 325,
+   "error": ""
+  },
+  {
+   "file": "q07.json",
+   "elapsed_s": 28.67,
+   "chars": 2130,
+   "error": ""
+  },
+  {
+   "file": "q08.json",
+   "elapsed_s": 26.51,
+   "chars": 1600,
+   "error": ""
+  },
+  {
+   "file": "q09.json",
+   "elapsed_s": 32.16,
+   "chars": 1697,
+   "error": ""
+  },
+  {
+   "file": "q10.json",
+   "elapsed_s": 32.97,
+   "chars": 1947,
+   "error": ""
+  },
+  {
+   "file": "q11.json",
+   "elapsed_s": 34.02,
+   "chars": 2499,
+   "error": ""
+  },
+  {
+   "file": "q11.t2.json",
+   "elapsed_s": 26.03,
+   "chars": 1196,
+   "error": ""
+  },
+  {
+   "file": "q12.json",
+   "elapsed_s": 34.05,
+   "chars": 2782,
+   "error": ""
+  },
+  {
+   "file": "q13.json",
+   "elapsed_s": 23.54,
+   "chars": 1195,
+   "error": ""
+  },
+  {
+   "file": "q14.json",
+   "elapsed_s": 28.71,
+   "chars": 1802,
+   "error": ""
+  },
+  {
+   "file": "q15.json",
+   "elapsed_s": 29.48,
+   "chars": 2373,
+   "error": ""
+  },
+  {
+   "file": "q16.json",
+   "elapsed_s": 35.88,
+   "chars": 2332,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 34.03,
+   "chars": 2492,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 22.0,
+   "chars": 384,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 32.56,
+   "chars": 1146,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 29.3,
+   "chars": 1733,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 27.55,
+   "chars": 2305,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 31.59,
+   "chars": 2037,
+   "error": ""
+  },
+  {
+   "file": "q22.json",
+   "elapsed_s": 46.94,
+   "chars": 2053,
+   "error": ""
+  },
+  {
+   "file": "q23.json",
+   "elapsed_s": 23.89,
+   "chars": 2472,
+   "error": ""
+  },
+  {
+   "file": "q24.json",
+   "elapsed_s": 27.84,
+   "chars": 1976,
+   "error": ""
+  },
+  {
+   "file": "q25.json",
+   "elapsed_s": 27.45,
+   "chars": 2428,
+   "error": ""
+  },
+  {
+   "file": "q26.json",
+   "elapsed_s": 22.62,
+   "chars": 959,
+   "error": ""
+  },
+  {
+   "file": "q27.json",
+   "elapsed_s": 19.82,
+   "chars": 527,
+   "error": ""
+  },
+  {
+   "file": "q28.json",
+   "elapsed_s": 33.94,
+   "chars": 400,
+   "error": ""
+  },
+  {
+   "file": "q29.json",
+   "elapsed_s": 26.83,
+   "chars": 1913,
+   "error": ""
+  },
+  {
+   "file": "q30.json",
+   "elapsed_s": 26.77,
+   "chars": 2712,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 17.54,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink acts as a thermal bridge that draws heat away from a sensitive component and spreads it across a larger surface area. Through convection or liquid cooling, that heat is then dissipated int"
+ },
+ "finished": "2026-11-08T01:23:37"
+}

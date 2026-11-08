@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.6,\"ftok\":106,\"est\":false}",
+  "X-Hurry": "e316147acdc18e27"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 23.06,
+ "elapsed_s": 27.68,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.4,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 22 passages"
+   }
+  },
+  {
+   "t": 15.4,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.4,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.4,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.4,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.06,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.68,
+   "tag": "RATE",
+   "data": {
+    "tps": 50.2,
+    "tok": 231,
+    "s": 4.6
+   }
+  },
+  {
+   "t": 27.68,
+   "tag": "RESET"
+  },
+  {
+   "t": 27.68,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 27.68,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "906 chars"
+   }
+  },
+  {
+   "t": 27.68,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 22 passages",
+   "t_s": 15.4
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.4
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.4
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 27.68
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "906 chars",
+   "t_s": 27.68
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 27.68
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Morning people are happier than night owls, study suggestsEarly risers versus ni",
+   "u": "https://www.today.com/health/morning-people-are-happier-night-owls-study-suggests-1C9381787",
+   "d": "2012-06-11"
+  },
+  {
+   "t": "Morning people really do report being happier than night owls...",
+   "u": "https://siliconcanals.com/t-morning-people-happier-night-owls-social-jet-lag/",
+   "d": "2026-08-15"
+  },
+  {
+   "t": "Morning People Are Actually Happier Than Night Owls | Live Science",
+   "u": "https://www.livescience.com/20880-morning-people-happier.html",
+   "d": "2012-06-11"
+  },
+  {
+   "t": "Morning People Happier Than Night Owls, Study... | HuffPost Life",
+   "u": "https://www.huffpost.com/entry/morning-people-happier-night-owls-sleep_n_1589982",
+   "d": "2012-06-14"
+  },
+  {
+   "t": "16-Port eNVR and APEX Expansion Switch – Night Owl SP, LLC",
+   "u": "https://nightowlsp.com/products/16-port-envr-expansion-switch",
+   "d": ""
+  },
+  {
+   "t": "Are morning people happier than night people?",
+   "u": "https://www.thehealthyjournal.com/q-and-a/are-morning-people-happier-than-night-people/",
+   "d": ""
+  },
+  {
+   "t": "Study finds morning people are happier than night owls - TODAY",
+   "u": "https://www.today.com/health/study-finds-morning-people-are-happier-night-owls-t147647",
+   "d": "2019-01-30"
+  },
+  {
+   "t": "Morning People vs Night Owls: Is One Better Than the Other?",
+   "u": "https://bedthreads.com/blogs/journal/morning-people-vs-night-people?redirected=true",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.4,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 50.2,
+  "tok": 231,
+  "s": 4.6
+ },
+ "answer_raw": "Morning-type individuals tend to report higher levels of happiness and life satisfaction than night owls [1][4]. \n\nResearch suggests that morning-type people often experience more **activated feelings**, such as being cheerful, lively, and alert [2]. They also tend to report feeling healthier [6]. This may be because their preferred waking time aligns with the start of the day, whereas a night owl's schedule might conflict with their circadian system, leading to own struggles with sleep or a \"scowl\" upon waking [2][1].\n\nRegarding switching, the evidence suggests that the tendency toward being a night owl often **fades with age** [1]. This natural shift toward a morning-focused schedule in older adults could be one reason why older generations report higher levels of happiness than younger ones [1]. I didn't find specific behavioral protocols for a night owl to manually switch their chronotype.",
+ "answer": "Morning-type individuals tend to report higher levels of happiness and life satisfaction than night owls [1][4]. \n\nResearch suggests that morning-type people often experience more **activated feelings**, such as being cheerful, lively, and alert [2]. They also tend to report feeling healthier [6]. This may be because their preferred waking time aligns with the start of the day, whereas a night owl's schedule might conflict with their circadian system, leading to own struggles with sleep or a \"scowl\" upon waking [2][1].\n\nRegarding switching, the evidence suggests that the tendency toward being a night owl often **fades with age** [1]. This natural shift toward a morning-focused schedule in older adults could be one reason why older generations report higher levels of happiness than younger ones [1]. I didn't find specific behavioral protocols for a night owl to manually switch their chronotype.",
+ "chars": 906,
+ "raw_bytes": 4091,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.18,
+ "rate_gen_tok_s": 49.03,
+ "id": "q14",
+ "turn": 1,
+ "category": "health",
+ "topic": "Morning people and happiness",
+ "question": "Are morning people really happier, or is that a myth? Can a night owl actually switch?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:07:40",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Are morning people really happier, or is that a myth? Can a night owl actually switch?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

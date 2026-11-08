@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.0,\"ftok\":285,\"est\":false}",
+  "X-Hurry": "663d09b89e939bcc"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 30.28,
+ "elapsed_s": 46.94,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 25 passages"
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.82,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 30.28,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 46.94,
+   "tag": "RATE",
+   "data": {
+    "tps": 30.8,
+    "tok": 513,
+    "s": 16.7
+   }
+  },
+  {
+   "t": 46.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2053 chars"
+   }
+  },
+  {
+   "t": 46.94,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 25 passages",
+   "t_s": 13.82
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.82
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.82
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2053 chars",
+   "t_s": 46.94
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 46.94
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius50 Top High-Payin",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-03-15"
+  },
+  {
+   "t": "Best High-Paying Jobs In USA Without A Degree (2026) – Top...",
+   "u": "https://postingtak.com/best-high-paying-jobs-in-usa-without-a-degree-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "50 Top High-Paying Jobs Without a Degree in 2026",
+   "u": "https://www.apollotechnical.com/top-high-paying-jobs-without-a-degree/",
+   "d": "2026-03-15"
+  },
+  {
+   "t": "Top 10 Jobs That Pay Well Without a Degree in 2026: Skip ...",
+   "u": "https://blog.theinterviewguys.com/jobs-that-pay-well-without-a-degree/",
+   "d": "2026-05-04"
+  },
+  {
+   "t": "Top 10 Highest Paying Jobs in 2026 Without a Degree",
+   "u": "https://articleify.com/highest-paying-jobs-no-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest Paying Occupations : Occupational Outlook Handbook...",
+   "u": "https://www.bls.gov/ooh/highest-paying.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Highest Paying Jobs Without A Degree - photos and vectors",
+   "u": "https://dishcuss.com/explore/highest-paying-jobs-without-a-degree",
+   "d": ""
+  },
+  {
+   "t": "Information Security Analysts : Occupational Outlook Handbook...",
+   "u": "https://www.bls.gov/ooh/computer-and-information-technology/information-security-analysts.htm",
+   "d": "2025-05"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.82,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 30.8,
+  "tok": 513,
+  "s": 16.7
+ },
+ "answer_raw": "Focusing on roles with strong growth projections and clear entry paths, here are five realistic, high-paying careers that don't require a college degree.\n\n| Job Title | Typical Pay | Time to Entry |\n| :--- | :--- | :--- |\n| **Aircraft Mechanic** | Ranked #1 for high-paying non-degree jobs in 2026 [3] | Variable; requires vocational training or apprenticeship [1] |\n| **Commercial Pilot** | High-end salary with travel benefits [2] | Requires obtaining an FAA commercial pilot license [2] |\ns| **Locomotive Engineer** | ~$75,680 median [3] | On-the-job training and FRA certification [3] |\n| **Building Inspector** | ~$72,120 median [3] | High school diploma plus certifications or experience [3] |\n| **Elevator Installer** | Impressive salaries through apprenticeships [2] | Completion of an apprenticeship [2] |\n\n## Core pathways to entry\n\n**Vocational and Certification-based roles**\nThe most efficient way to enter these fields is through specialized training rather than four-year degrees. Many of these roles require vocational certificates or short-term technical training that can launch a career in months [4]. For roles like **Building Inspector**, a high school diploma paired with relevant certifications or construction experience is often enough to meet entry requirements [3].\n\n**Apprenticeships and On-the-job training**\nFor technical trades like **Elevator Installation** or **Locomotive Engineering**, the path is often built through hands-on experience. **Elevator installers** use apprenticeships to gain the necessary technical skills [2], while **Locomotive Engineers** rely on on-the-job training and Federal Railroad Administration (FRA) certification to drive freight or passenger trains [3].\n\n**Aviation-specific paths**\nAviation offers high-pay potential but requires specific licensing. **Commercial Pilots** must obtain an FAA commercial pilot license to access airline or private company roles [2]. **Aircraft Mechanics** were ranked as the top overall job for salary, stability, growth, and work-life balance in 2026 [3].",
+ "answer": "Focusing on roles with strong growth projections and clear entry paths, here are five realistic, high-paying careers that don't require a college degree.\n\n| Job Title | Typical Pay | Time to Entry |\n| :--- | :--- | :--- |\n| **Aircraft Mechanic** | Ranked #1 for high-paying non-degree jobs in 2026 [3] | Variable; requires vocational training or apprenticeship [1] |\n| **Commercial Pilot** | High-end salary with travel benefits [2] | Requires obtaining an FAA commercial pilot license [2] |\ns| **Locomotive Engineer** | ~$75,680 median [3] | On-the-job training and FRA certification [3] |\n| **Building Inspector** | ~$72,120 median [3] | High school diploma plus certifications or experience [3] |\n| **Elevator Installer** | Impressive salaries through apprenticeships [2] | Completion of an apprenticeship [2] |\n\n## Core pathways to entry\n\n**Vocational and Certification-based roles**\nThe most efficient way to enter these fields is through specialized training rather than four-year degrees. Many of these roles require vocational certificates or short-term technical training that can launch a career in months [4]. For roles like **Building Inspector**, a high school diploma paired with relevant certifications or construction experience is often enough to meet entry requirements [3].\n\n**Apprenticeships and On-the-job training**\nFor technical trades like **Elevator Installation** or **Locomotive Engineering**, the path is often built through hands-on experience. **Elevator installers** use apprenticeships to gain the necessary technical skills [2], while **Locomotive Engineers** rely on on-the-job training and Federal Railroad Administration (FRA) certification to drive freight or passenger trains [3].\n\n**Aviation-specific paths**\nAviation offers high-pay potential but requires specific licensing. **Commercial Pilots** must obtain an FAA commercial pilot license to access airline or private company roles [2]. **Aircraft Mechanics** were ranked as the top overall job for salary, stability, growth, and work-life balance in 2026 [3].",
+ "chars": 2053,
+ "raw_bytes": 4136,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.93,
+ "rate_gen_tok_s": 30.81,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:19:49",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

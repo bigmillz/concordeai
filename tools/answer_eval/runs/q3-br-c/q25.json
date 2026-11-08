@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.2,\"ftok\":262,\"est\":false}",
+  "X-Hurry": "7109db6ad18a57b4"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 15.88,
+ "elapsed_s": 21.58,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 6.29,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.29,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.29,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 7.95,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 27 passages"
+   }
+  },
+  {
+   "t": 7.95,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.95,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 7.95,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 7.95,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.88,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.58,
+   "tag": "RATE",
+   "data": {
+    "tps": 57.2,
+    "tok": 326,
+    "s": 5.7
+   }
+  },
+  {
+   "t": 21.58,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1306 chars"
+   }
+  },
+  {
+   "t": 21.58,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   6.29,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.29
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.29
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 27 passages",
+   "t_s": 7.95
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.95
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 7.95
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1306 chars",
+   "t_s": 21.58
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 21.58
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Rent vs. Buy: The Real 5-Year Financial Analysis (2026)",
+   "u": "https://decisionscalc.com/articles/rent-vs-buy-decision-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Rent vs Buy a Home in 2026: The Complete Financial Analysis",
+   "u": "https://homecostlab.com/guides/rent-vs-buy-2026/",
+   "d": "2026-05-10"
+  },
+  {
+   "t": "Menifee Real Estate Market Trends 2026 | Christian Rios Properties",
+   "u": "https://christianriosproperties.com/menifee-real-estate-market-trends/",
+   "d": "2026"
+  },
+  {
+   "t": "IMF cuts Latin America, Caribbean growth forecasts on energy shock, little AI bo",
+   "u": "https://www.reuters.com/world/asia-pacific/imf-cuts-latin-america-caribbean-growth-forecasts-energy-shock-little-ai-boost-2026-10-13/",
+   "d": "2026-10-13"
+  },
+  {
+   "t": "Escondido real estate market trends (February 2026)",
+   "u": "https://grokipedia.com/page/Escondido_real_estate_market_trends_February_2026",
+   "d": "2026-02"
+  },
+  {
+   "t": "Latin America bought so many motorcycles last year",
+   "u": "https://www.msn.com/en-ie/cars/motorcycles/latin-america-bought-so-many-motorcycles-last-year/ar-AA2e8UhL?ocid=BingNewsVerp",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "Retirees eye lower cost of living in Latin America",
+   "u": "https://www.usatoday.com/story/money/personalfinance/2014/06/10/retirees-relocation-latin-america/8414799/",
+   "d": "2014-06-10"
+  },
+  {
+   "t": "Rent vs. Buy in 2026: A Data-Driven Analysis | RealEstatean",
+   "u": "https://realestatean.com/guides/rent-vs-buy-analysis",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   7.95,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 57.2,
+  "tok": 326,
+  "s": 5.7
+ },
+ "answer_raw": "You should **rent** until you relocate.\n\nBuying a home is a long-term financial commitment that rarely makes sense for a two-year horizon, especially given the high costs of entry and the friction of selling. In many markets, buying at the median price costs more than **$1,200/month** more than renting a comparable space [2, as of May 2026]. \n\nWhen you buy, you aren't just paying a mortgage; you are responsible for interest, property taxes, insurance, and maintenance—which typically costs roughly **1% of the home's value per year** [1, as of Nov 2026]. If you buy a $500,000 home with $80,000 down at a 7.24% interest rate (as of Nov 2026), the \"hidden\" costs of ownership like taxes and maintenance can significantly erode your liquidity [1, as of Nov 206].\n\nThe financial math for a short stay is often dictated by the **price-to-rent ratio** [8, as of 2026]. If you buy now and need to sell in two years, you face transaction costs (commissions, closing costs, moving expenses) that could wipe out any equity gained from a 3% annual appreciation [1, as of Nov 2026]. \n\nRenting provides the mobility you need for a planned relocation. It keeps your capital liquid for your move to Latin America and avoids the risk of being stuck with an asset you have to sell in a shifting market [3, as of 2026].",
+ "answer": "You should **rent** until you relocate.\n\nBuying a home is a long-term financial commitment that rarely makes sense for a two-year horizon, especially given the high costs of entry and the friction of selling. In many markets, buying at the median price costs more than **$1,200/month** more than renting a comparable space [2, as of May 2026]. \n\nWhen you buy, you aren't just paying a mortgage; you are responsible for interest, property taxes, insurance, and maintenance—which typically costs roughly **1% of the home's value per year** [1, as of Nov 2026]. If you buy a $500,000 home with $80,000 down at a 7.24% interest rate (as of Nov 2026), the \"hidden\" costs of ownership like taxes and maintenance can significantly erode your liquidity [1, as of Nov 206].\n\nThe financial math for a short stay is often dictated by the **price-to-rent ratio** [8, as of 2026]. If you buy now and need to sell in two years, you face transaction costs (commissions, closing costs, moving expenses) that could wipe out any equity gained from a 3% annual appreciation [1, as of Nov 2026]. \n\nRenting provides the mobility you need for a planned relocation. It keeps your capital liquid for your move to Latin America and avoids the risk of being stuck with an asset you have to sell in a shifting market [3, as of 2026].",
+ "chars": 1306,
+ "raw_bytes": 3503,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.13,
+ "rate_gen_tok_s": 57.28,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:15:27",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

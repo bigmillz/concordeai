@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.6,\"ftok\":148,\"est\":false}",
+  "X-Hurry": "d37e297caa1fce38"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 21.61,
+ "elapsed_s": 31.01,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 9.45,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.45,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.45,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 31 passages"
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.17,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.61,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 31.01,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.3,
+    "tok": 632,
+    "s": 9.4
+   }
+  },
+  {
+   "t": 31.01,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2531 chars"
+   }
+  },
+  {
+   "t": 31.01,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   9.45,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.45
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.45
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 31 passages",
+   "t_s": 15.17
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.17
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.17
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2531 chars",
+   "t_s": 31.01
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 31.01
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Body Odor: Causes, Changes, Underlying Diseases & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17865-body-odor",
+   "d": "2023-08-30"
+  },
+  {
+   "t": "What's that smell? Get rid of body odor - Harvard HealthBad Smelling Sweat? 5 Ef",
+   "u": "https://www.health.harvard.edu/staying-healthy/whats-that-smell-common-and-less-common-causes-of-body-odor",
+   "d": "2025-09-11"
+  },
+  {
+   "t": "Sweating and body odor - Symptoms and causes - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/sweating-and-body-odor/symptoms-causes/syc-20353895",
+   "d": "2025-05-03"
+  },
+  {
+   "t": "Body Odor Changes: Medical Reasons Routine - Acibadem Health...",
+   "u": "https://www.acibademhealthpoint.com/body-odor-changes-medical-reasons-routine/",
+   "d": "2025-08-03"
+  },
+  {
+   "t": "Smelly Scalp: Causes, Shampoos & At-Home Treatments",
+   "u": "https://my.clevelandclinic.org/health/symptoms/24751-smelly-scalp",
+   "d": "2023-02-20"
+  },
+  {
+   "t": "What Causes Body Odor? 7 Causes of Bad Sweat Smell",
+   "u": "https://www.ejisinc.com/blogs/news/what-causes-body-odor",
+   "d": "2020-01-15"
+  },
+  {
+   "t": "How to Not Smell Like Sweat: Causes and Real Fixes",
+   "u": "https://scienceinsights.org/how-to-not-smell-like-sweat-causes-and-real-fixes/",
+   "d": "2026-03-20"
+  },
+  {
+   "t": "Sudden Change in Body Odor: Causes, Symptoms, and Treatment",
+   "u": "https://www.healthline.com/health/sudden-change-in-body-odor",
+   "d": "2019-05-13"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.17,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 67.3,
+  "tok": 632,
+  "s": 9.4
+ },
+ "answer_raw": "Sweat itself is nearly odorless; the smell happens when bacteria on your skin break down the compounds within your sweat [1][7]. If your odor has changed, it is likely due to a shift in your body's chemistry, your microbiome, or your lifestyle.\n\n## Why the smell changed\nThere are several biological and lifestyle reasons why your scent might suddenly become more pungent:\n\n*   **Bacterial activity:** Bacteria (specifically from the genus *Corynebacterium*) break down sweat into volatile acids (sour smells) and sulfur compounds (onion-like smells) [7]. A shift in the bacterial population on your skin can change your scent profile [1].\n*   **Hormonal shifts:** Changes in hormones, such as those occurring during puberty or other life stages, can make sweat glands more active or change the composition of the sweat being produced [8].\n*   **Gland types:** Your body uses two types of glands: **eccrine** glands produce thin, watery sweat for cooling, while **apocrine** glands (found in armpits and groin) produce a thicker secretion loaded with proteins and fats. The latter are much more prone to odor when they meet skin bacteria [2][7].\n*   **Diet and lifestyle:** Dietary choices can influence odor; for instance, a diet high in fruits and vegetables has been linked to better-smelling sweat in some research [8].\n*   **Medical conditions:** While often related to lifestyle or natural development, sudden changes in body odor can sometimes indicate an underlying medical condition [2][4].\n\n## How to fix it\nBecause the smell is a result of the interaction between sweat and bacteria, \"fixing\" it usually involves managing moisture or the microbial environment.\n\n**Hygiene and lifestyle adjustments**\nThe most immediate fix is regular washing to remove the buildup of sweat, sebum (body oils), and dead skin cells that bacteria feed on [5]. Since sweat evaporates to cool you, managing the \"wetness\" factor is key to preventing the chemical breakdown that causes odor [2].\n\n**Medical consultation**\nIf the smell changed suddenly without a clear reason or if it persists despite hygiene efforts, you should consult a healthcare provider [4]. They can determine if the change is due to a medical condition or suggest tailored treatments [4].\n\nIf you are experiencing other symptoms or if the odor is accompanied by physical changes you can't explain, you'll need to see a doctor to rule out more serious issues. Checking with a professional is the best way to address any sudden, unexplained shifts in your body's baseline.",
+ "answer": "Sweat itself is nearly odorless; the smell happens when bacteria on your skin break down the compounds within your sweat [1][7]. If your odor has changed, it is likely due to a shift in your body's chemistry, your microbiome, or your lifestyle.\n\n## Why the smell changed\nThere are several biological and lifestyle reasons why your scent might suddenly become more pungent:\n\n*   **Bacterial activity:** Bacteria (specifically from the genus *Corynebacterium*) break down sweat into volatile acids (sour smells) and sulfur compounds (onion-like smells) [7]. A shift in the bacterial population on your skin can change your scent profile [1].\n*   **Hormonal shifts:** Changes in hormones, such as those occurring during puberty or other life stages, can make sweat glands more active or change the composition of the sweat being produced [8].\n*   **Gland types:** Your body uses two types of glands: **eccrine** glands produce thin, watery sweat for cooling, while **apocrine** glands (found in armpits and groin) produce a thicker secretion loaded with proteins and fats. The latter are much more prone to odor when they meet skin bacteria [2][7].\n*   **Diet and lifestyle:** Dietary choices can influence odor; for instance, a diet high in fruits and vegetables has been linked to better-smelling sweat in some research [8].\n*   **Medical conditions:** While often related to lifestyle or natural development, sudden changes in body odor can sometimes indicate an underlying medical condition [2][4].\n\n## How to fix it\nBecause the smell is a result of the interaction between sweat and bacteria, \"fixing\" it usually involves managing moisture or the microbial environment.\n\n**Hygiene and lifestyle adjustments**\nThe most immediate fix is regular washing to remove the buildup of sweat, sebum (body oils), and dead skin cells that bacteria feed on [5]. Since sweat evaporates to cool you, managing the \"wetness\" factor is key to preventing the chemical breakdown that causes odor [2].\n\n**Medical consultation**\nIf the smell changed suddenly without a clear reason or if it persists despite hygiene efforts, you should consult a healthcare provider [4]. They can determine if the change is due to a medical condition or suggest tailored treatments [4].\n\nIf you are experiencing other symptoms or if the odor is accompanied by physical changes you can't explain, you'll need to see a doctor to rule out more serious issues. Checking with a professional is the best way to address any sudden, unexplained shifts in your body's baseline.",
+ "chars": 2531,
+ "raw_bytes": 4679,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.4,
+ "rate_gen_tok_s": 67.31,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:46:52",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

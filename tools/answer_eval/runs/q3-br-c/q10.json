@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":108,\"est\":false}",
+  "X-Hurry": "fec32e770a7a2ab7"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 14.78,
+ "elapsed_s": 20.36,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 6.83,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.83,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.83,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.69,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 36 passages"
+   }
+  },
+  {
+   "t": 8.69,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.69,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.69,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.69,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 14.78,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.36,
+   "tag": "RATE",
+   "data": {
+    "tps": 53.6,
+    "tok": 299,
+    "s": 5.6
+   }
+  },
+  {
+   "t": 20.36,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1197 chars"
+   }
+  },
+  {
+   "t": 20.36,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.83,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.83
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.83
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 36 passages",
+   "t_s": 8.69
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.69
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.69
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1197 chars",
+   "t_s": 20.36
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 20.36
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Ollama vs MLX: Which Local Model Stack for Claude Code? (M4 Mac...)",
+   "u": "https://macstripe.com/en/blog/articles/mlx-vs-ollama-apple-silicon-ai/mlx-vs-ollama-apple-silicon-ai.html",
+   "d": "2026-06-02"
+  },
+  {
+   "t": "2026 Mac mini M4 Local LLM Guide: MLX vs Ollama... | neokvm",
+   "u": "https://neokvm.com/en/blog/articles/2026-mac-mini-m4-local-llm-guide-mlx-vs-ollama-remote-ai-dev.html",
+   "d": "2026-06-23"
+  },
+  {
+   "t": "MacBook Pro M4 Pro 48GB (48 GB) — What AI Models Can It Run ...",
+   "u": "https://canitrun.net/hardware/macs/macbook-pro-m4-pro-48gb",
+   "d": ""
+  },
+  {
+   "t": "Local coding agent on a Mac mini M4 Pro (48 GB): Ollama ...",
+   "u": "https://github.com/He-Wolf/mac-mini-ollama-copilot",
+   "d": ""
+  },
+  {
+   "t": "How to Run LLMs on a Mac (M1 to M4): Ollama, LM Studio, MLX",
+   "u": "https://llmhardware.io/guides/how-to-run-llms-on-mac",
+   "d": ""
+  },
+  {
+   "t": "2026 Mac Inference Framework Selection: vllm-mlx vs. Ollama vs....",
+   "u": "https://macgpu.com/en/blog/2026-mac-inference-framework-vllm-mlx-ollama-llamacpp-benchmark.html",
+   "d": "2026"
+  },
+  {
+   "t": "M4 Pro vs M4 Max LLM 2026: Which Mac Runs 70B? | CraftRigs",
+   "u": "https://craftrigs.com/comparisons/mac-mini-m4-pro-vs-mac-studio-m4-max-local-llm/",
+   "d": "2026-03"
+  },
+  {
+   "t": "M4 Pro (48 GB) Local LLM Benchmarks, Speed, and Fit",
+   "u": "https://siliconscore.com/chips/m4-pro-48-gb/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.69,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 53.6,
+  "tok": 299,
+  "s": 5.6
+ },
+ "answer_raw": "For your specific hardware, **MLX is faster for benchmarks**, but **Ollama is the better choice for agentic workflows** [1].\n\nThe comparison isn't symmetric because they serve different purposes: **MLX** is optimized for peak throughput and overnight benchmarks, while **Ollama** is designed for developer experience and serving agents [1]. If you are running autonomous coding agents, use **Ollama**; if you are running pure performance stress tests, use **MLX** [1].\n\nRegarding your capacity, you can realistically run **30B models at full precision** or **70B models with Q4 quantization** [3].\n\n| Model Tier | Quantization / Precision | Feasibility on 48GB M4 Pro |\n| :--- | :--- | :--- |\n| **30B** | Full Precision | Smooth operation [3] |\n| **70B** | Q4 Quantization | Loadable/Usable [3] |\n| **70B** | Q6_K | Requires 64GB+ (M4 Max) for daily use [7] |\n\nWith 48GB of unified memory, your primary constraint is the split between model weights and the KV cache (context window). A **70B Q4_K_M** model is the practical ceiling for your machine [7]. While you can load larger models, they will likely exceed your available memory once the context window starts to occupy significant space [4].",
+ "answer": "For your specific hardware, **MLX is faster for benchmarks**, but **Ollama is the better choice for agentic workflows** [1].\n\nThe comparison isn't symmetric because they serve different purposes: **MLX** is optimized for peak throughput and overnight benchmarks, while **Ollama** is designed for developer experience and serving agents [1]. If you are running autonomous coding agents, use **Ollama**; if you are running pure performance stress tests, use **MLX** [1].\n\nRegarding your capacity, you can realistically run **30B models at full precision** or **70B models with Q4 quantization** [3].\n\n| Model Tier | Quantization / Precision | Feasibility on 48GB M4 Pro |\n| :--- | :--- | :--- |\n| **30B** | Full Precision | Smooth operation [3] |\n| **70B** | Q4 Quantization | Loadable/Usable [3] |\n| **70B** | Q6_K | Requires 64GB+ (M4 Max) for daily use [7] |\n\nWith 48GB of unified memory, your primary constraint is the split between model weights and the KV cache (context window). A **70B Q4_K_M** model is the practical ceiling for your machine [7]. While you can load larger models, they will likely exceed your available memory once the context window starts to occupy significant space [4].",
+ "chars": 1197,
+ "raw_bytes": 3296,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.7,
+ "rate_gen_tok_s": 53.63,
+ "id": "q10",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Ollama vs MLX on an M4 Pro",
+ "question": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:08:08",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

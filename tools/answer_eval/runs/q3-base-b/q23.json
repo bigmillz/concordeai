@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.7,\"ftok\":155,\"est\":false}",
+  "X-Hurry": "28df2ec8c1193aea"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 20.99,
+ "elapsed_s": 31.06,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.57,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 19 passages"
+   }
+  },
+  {
+   "t": 14.57,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.57,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.58,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.58,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.99,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 31.06,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.3,
+    "tok": 658,
+    "s": 10.1
+   }
+  },
+  {
+   "t": 31.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2632 chars"
+   }
+  },
+  {
+   "t": 31.06,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 19 passages",
+   "t_s": 14.57
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.57
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.58
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2632 chars",
+   "t_s": 31.06
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 31.06
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "50+ AI Job Displacement Statistics: Trends & Hiring Impact (2026)",
+   "u": "https://recruitingconnection.org/blog/ai-job-displacement-statistics-trends/",
+   "d": "2026-06-05"
+  },
+  {
+   "t": "AI Job Displacement Statistics (2026 Update) — Letaido Blog",
+   "u": "https://blog.letaido.com/ai-job-displacement-statistics",
+   "d": "2026-06-26"
+  },
+  {
+   "t": "AI Automation Jobs in 2026: Roles, Skills, and What ... - Upwork",
+   "u": "https://www.upwork.com/resources/ai-automation-jobs-in-2026",
+   "d": "2026-03-13"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist! : The Indicator from Planet Money",
+   "u": "https://www.npr.org/2026/10/18/nx-s1-6006805/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-10-18"
+  },
+  {
+   "t": "How AI in IT Operations Is Redefining IT Roles in 2026",
+   "u": "https://aitechtrend.com/ai-in-it-operations-roles/",
+   "d": "2026-04-17"
+  },
+  {
+   "t": "Remote Dev Ops & SysAdmin Jobs - Work... - Remote Work Hub",
+   "u": "https://remoteworkhub.com/job-category/dev-ops-sysadmin/",
+   "d": ""
+  },
+  {
+   "t": "Sysadmin Job Description: Tasks, Skills & Role Overview",
+   "u": "https://www.diontraining.com/blogs/news/sysadmin-job-description",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "Applicants say AI makes the job market hell. OpenAI wants... | Mashable",
+   "u": "https://mashable.com/article/ai-job-market-openai-jobs-platform",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.58,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 65.3,
+  "tok": 658,
+  "s": 10.1
+ },
+ "answer_raw": "Your job won't likely disappear, but the nature of your daily tasks is shifting from manual execution to high-level oversight.\n\nThe displacement risk for sysadmins is less about being replaced by a single \"AI bot\" and more about your role being absorbed into broader, automated workflows. In IT operations, the shift is moving from hands-on operators to strategic orchestrators [5]. While routine workflows are increasingly absorbed by automation, human oversight remains an essential component of the organizational structure [1].\n\n## The Displacement Profile\n\nThe risk is not distributed evenly across all IT functions. Based on the current landscape:\n\n*   **High-exposure roles:** Roles that are highly exposed to AI—often those involving heavy administrative or customer-facing tasks—report much higher anxiety regarding displacement [2].\n*   **Operational tier shifts:** Automation is fundamentally reshaping how teams are structured and how candidates are evaluated [1]. If your role is purely about executing repetitive, scripted tasks, you are at higher risk of being \"automated out\" of a headcount.\n*   **The \"Hiring Hell\" factor:** Current market headwinds show that even as roles change, the job market can feel impenetrable because AI is being used to write applications while HR uses AI to filter them, creating a friction-filled environment for applicants [8].\n\n## Your Five-Year Strategy\n\nTo mitigate risk, you need to move from the \"operator\" tier to the \"orchestrator\" tier.\n\n**1. Move toward Orchestration**\nSince the trend is shifting roles toward strategic orchestration [5], focus on managing the systems that manage the infrastructure. Instead of being the person who configures a single server, become the person who designs the automated pipeline that configures a thousand.\n\n**2. Bridge the Skills Gap**\nAs technology absorbs routine workflows, a new skills gap is emerging [1]. You should focus on the specific technical requirements of \"AI-automation jobs,\" which involve understanding how to integrate AI into existing operational frameworks [3].\n\n**3. Focus on Oversight and Strategy**\nSince human oversight remains essential [1], your value lies in being the \"human in the loop\" who can troubleshoot when the automation fails or when the logic of an automated system produces an edge-case error. This requires moving deeper into architecture and higher into business logic.\n\nIf you are currently focused on manual, ticket-driven work without a path toward automation or architecture, your risk is higher. If you are building the systems that handle those tickets, you are moving in the right direction.",
+ "answer": "Your job won't likely disappear, but the nature of your daily tasks is shifting from manual execution to high-level oversight.\n\nThe displacement risk for sysadmins is less about being replaced by a single \"AI bot\" and more about your role being absorbed into broader, automated workflows. In IT operations, the shift is moving from hands-on operators to strategic orchestrators [5]. While routine workflows are increasingly absorbed by automation, human oversight remains an essential component of the organizational structure [1].\n\n## The Displacement Profile\n\nThe risk is not distributed evenly across all IT functions. Based on the current landscape:\n\n*   **High-exposure roles:** Roles that are highly exposed to AI—often those involving heavy administrative or customer-facing tasks—report much higher anxiety regarding displacement [2].\n*   **Operational tier shifts:** Automation is fundamentally reshaping how teams are structured and how candidates are evaluated [1]. If your role is purely about executing repetitive, scripted tasks, you are at higher risk of being \"automated out\" of a headcount.\n*   **The \"Hiring Hell\" factor:** Current market headwinds show that even as roles change, the job market can feel impenetrable because AI is being used to write applications while HR uses AI to filter them, creating a friction-filled environment for applicants [8].\n\n## Your Five-Year Strategy\n\nTo mitigate risk, you need to move from the \"operator\" tier to the \"orchestrator\" tier.\n\n**1. Move toward Orchestration**\nSince the trend is shifting roles toward strategic orchestration [5], focus on managing the systems that manage the infrastructure. Instead of being the person who configures a single server, become the person who designs the automated pipeline that configures a thousand.\n\n**2. Bridge the Skills Gap**\nAs technology absorbs routine workflows, a new skills gap is emerging [1]. You should focus on the specific technical requirements of \"AI-automation jobs,\" which involve understanding how to integrate AI into existing operational frameworks [3].\n\n**3. Focus on Oversight and Strategy**\nSince human oversight remains essential [1], your value lies in being the \"human in the loop\" who can troubleshoot when the automation fails or when the logic of an automated system produces an edge-case error. This requires moving deeper into architecture and higher into business logic.\n\nIf you are currently focused on manual, ticket-driven work without a path toward automation or architecture, your risk is higher. If you are building the systems that handle those tickets, you are moving in the right direction.",
+ "chars": 2632,
+ "raw_bytes": 4703,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 21.18,
+ "rate_gen_tok_s": 65.34,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:54:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

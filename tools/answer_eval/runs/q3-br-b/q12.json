@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":120,\"est\":false}",
+  "X-Hurry": "9752286ef5cb7228"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.55,
+ "elapsed_s": 24.47,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 8.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.01,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.01,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.14,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 27 passages"
+   }
+  },
+  {
+   "t": 13.14,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.14,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.14,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.14,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.55,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.46,
+   "tag": "RATE",
+   "data": {
+    "tps": 62.6,
+    "tok": 432,
+    "s": 6.9
+   }
+  },
+  {
+   "t": 24.46,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1730 chars"
+   }
+  },
+  {
+   "t": 24.46,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.01,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.01
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.01
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 27 passages",
+   "t_s": 13.14
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.14
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.14
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1730 chars",
+   "t_s": 24.46
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.46
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "What's that smell? Get rid of body odor - Harvard HealthBad Smelling Sweat? 5 Ef",
+   "u": "https://www.health.harvard.edu/staying-healthy/whats-that-smell-common-and-less-common-causes-of-body-odor",
+   "d": "2025-09-11"
+  },
+  {
+   "t": "Body Odor: Causes, Changes, Underlying Diseases & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17865-body-odor",
+   "d": "2023-08-30"
+  },
+  {
+   "t": "Sweating and body odor - Symptoms and causes - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/sweating-and-body-odor/symptoms-causes/syc-20353895",
+   "d": "2025-05-03"
+  },
+  {
+   "t": "What Causes Body Odor? 7 Causes of Bad Sweat Smell",
+   "u": "https://www.ejisinc.com/blogs/news/what-causes-body-odor",
+   "d": "2020-01-15"
+  },
+  {
+   "t": "How to Not Smell Like Sweat: Causes and Real Fixes",
+   "u": "https://scienceinsights.org/how-to-not-smell-like-sweat-causes-and-real-fixes/",
+   "d": "2026-03-20"
+  },
+  {
+   "t": "Sudden Change in Body Odor: Causes, Symptoms, and Treatment",
+   "u": "https://www.healthline.com/health/sudden-change-in-body-odor",
+   "d": "2019-05-13"
+  },
+  {
+   "t": "Smelly Scalp: Causes, Shampoos & At-Home Treatments",
+   "u": "https://my.clevelandclinic.org/health/symptoms/24751-smelly-scalp",
+   "d": "2023-02-20"
+  },
+  {
+   "t": "Body Odor Changes: Treatments Overview | Acibadem Health Point...",
+   "u": "https://www.acibademhealthpoint.com/body-odor-changes-treatments-overview/",
+   "d": "2025-08-03"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.14,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 62.6,
+  "tok": 432,
+  "s": 6.9
+ },
+ "answer_raw": "A sudden change in smell is often caused by **hormonal shifts**, **dietary changes**, or the **breakdown of sweat by bacteria** on your skin [2][6][8].\n\nSweat itself is nearly odorless; the scent occurs when bacteria on your skin break down the compounds in your perspiration into pungent acids or sulfur molecules [5]. Your body uses two types of glands: **eccrine glands** produce thin, watery sweat for cooling, while **apocrine glands** (located in the armpits, groin, and feet) produce a thicker secretion loaded with proteins and fats that bacteria love to consume [1][5].\n\nThe most common reasons for a change in scent include:\n\n*   **Hormones**: Fluctuations due to puberty, pregnancy, or menstruation can make sweat smell stronger [6][8].\n*   **Diet**: Consuming garlic, spicy foods, or caffeine can change your scent, while a diet high in fruits and vegetables may lead to better-smelling sweat [6][8].\n*   **Bacteria**: Microbes in the genus *Corynebacterium* break down sweat proteins into volatile acids (sour smells) or sulfur compounds (onion-like smells) [5].\n*   **Medical/Lifestyle**: Changes can also stem from medications, infections, diabetes, or underlying medical conditions [2].\n\nTo fix it, focus on managing the bacteria and your biological triggers:\n\n*   **Hygiene**: Regular washing removes the bacteria and buildup of skin cells or sebum that fuel the odor [2][7].\n*   **Dietary adjustments**: Reducing intake of sulfur-heavy or pungent foods can help mitigate scent changes [8].\n*   **Medical intervention**: If the change is sudden or accompanied by excessive sweating, consult a provider, as they may suggest **prescription-strength antiperspirants** or medications to address underlying causes [2].",
+ "answer": "A sudden change in smell is often caused by **hormonal shifts**, **dietary changes**, or the **breakdown of sweat by bacteria** on your skin [2][6][8].\n\nSweat itself is nearly odorless; the scent occurs when bacteria on your skin break down the compounds in your perspiration into pungent acids or sulfur molecules [5]. Your body uses two types of glands: **eccrine glands** produce thin, watery sweat for cooling, while **apocrine glands** (located in the armpits, groin, and feet) produce a thicker secretion loaded with proteins and fats that bacteria love to consume [1][5].\n\nThe most common reasons for a change in scent include:\n\n*   **Hormones**: Fluctuations due to puberty, pregnancy, or menstruation can make sweat smell stronger [6][8].\n*   **Diet**: Consuming garlic, spicy foods, or caffeine can change your scent, while a diet high in fruits and vegetables may lead to better-smelling sweat [6][8].\n*   **Bacteria**: Microbes in the genus *Corynebacterium* break down sweat proteins into volatile acids (sour smells) or sulfur compounds (onion-like smells) [5].\n*   **Medical/Lifestyle**: Changes can also stem from medications, infections, diabetes, or underlying medical conditions [2].\n\nTo fix it, focus on managing the bacteria and your biological triggers:\n\n*   **Hygiene**: Regular washing removes the bacteria and buildup of skin cells or sebum that fuel the odor [2][7].\n*   **Dietary adjustments**: Reducing intake of sulfur-heavy or pungent foods can help mitigate scent changes [8].\n*   **Medical intervention**: If the change is sudden or accompanied by excessive sweating, consult a provider, as they may suggest **prescription-strength antiperspirants** or medications to address underlying causes [2].",
+ "chars": 1730,
+ "raw_bytes": 3876,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.67,
+ "rate_gen_tok_s": 62.5,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:42:12",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

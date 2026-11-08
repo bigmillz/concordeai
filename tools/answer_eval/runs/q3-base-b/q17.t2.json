@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.4,\"ftok\":150,\"est\":false}",
+  "X-Hurry": "9b261d7fe4e4237d"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 31.91,
+ "elapsed_s": 37.35,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.22,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 29 passages"
+   }
+  },
+  {
+   "t": 16.22,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.22,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.22,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.22,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.22,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 31.91,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 37.35,
+   "tag": "RATE",
+   "data": {
+    "tps": 25.7,
+    "tok": 139,
+    "s": 5.4
+   }
+  },
+  {
+   "t": 37.35,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "559 chars"
+   }
+  },
+  {
+   "t": 37.35,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 29 passages",
+   "t_s": 16.22
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.22
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.22
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.22
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "559 chars",
+   "t_s": 37.35
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 37.35
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Where to Stay in Florianópolis (2026) — Best Neighborhoods Ranked",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighborhood Guide | Where to Live",
+   "u": "https://scbimoveis.com/en/articles/florianopolis-neighborhood-guide-where-to-live-by-lifestyle",
+   "d": "2026-06-07"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-11-06"
+  },
+  {
+   "t": "Furnished apartments for rent Florianópolis | Long & short-term...",
+   "u": "https://www.theblueground.com/m/furnished-apartments/florianopolis-bra",
+   "d": ""
+  },
+  {
+   "t": "Furnished Rentals Florianópolis — Monthly Apartments & Homes ...",
+   "u": "https://rentihome.com/florianopolis/furnished-apartments-florianopolis.html",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis, Brazil Furnished Monthly Rentals and Extended ...",
+   "u": "https://www.airbnb.com/florianopolis-brazil/stays/monthly",
+   "d": "2026-11-08"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.22,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 25.7,
+  "tok": 139,
+  "s": 5.4
+ },
+ "answer_raw": "Pick **Lagoa da Conceição**; it is the best balance of infrastructure and the active lifestyle you're looking for.\n\nA furnished one-bedroom in the Lagoa core runs approximately **$800/month** (roughly **R$ 4,400/month** based on the Nov 2026 exchange rate) [7].\n\nThis price represents the \"sweet spot\" for the area, offering newer stock and reliable fiber internet [7]. While you can find lower prices in areas like Barra da Lagoa or Centro for around $550/month (roughly R$ 3,025/month), Lagoa is more central to the island's social scene and activities [7].",
+ "answer": "Pick **Lagoa da Conceição**; it is the best balance of infrastructure and the active lifestyle you're looking for.\n\nA furnished one-bedroom in the Lagoa core runs approximately **$800/month** (roughly **R$ 4,400/month** based on the Nov 2026 exchange rate) [7].\n\nThis price represents the \"sweet spot\" for the area, offering newer stock and reliable fiber internet [7]. While you can find lower prices in areas like Barra da Lagoa or Centro for around $550/month (roughly R$ 3,025/month), Lagoa is more central to the island's social scene and activities [7].",
+ "chars": 559,
+ "raw_bytes": 2685,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 3.74,
+ "rate_gen_tok_s": 25.69,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:50:57",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay that balances beach access, walkability, and infrastructure, **Lagoa da Conceição** is your best bet.\n\n## Top Neighborhood Recommendations\n\n**Lagoa da Conceição** — This is the heart of the island for an active lifestyle [3]. It is highly coveted because it offers full infrastructure, including supermarkets and services, while providing easy access to the lagoon for activities like windsurfing or stand-up paddle [3]. It features a lively nightlife and is central to the island's energy [3].\n\n**Centro / Beira-Mar Norte** — This is where most foreign residents land [4]. It offers the most robust infrastructure, but you would need to drive or transit to reach the beaches [1]. \n\n**Campeche or Inglesa** — These areas offer different price points for residential living [3]. For example, rents in areas like Inglesa or Campeche run around R$ 4,500/m² as of June 2026 [3].\n\n## Rental Strategy\n\nIf you are moving for a six-month window, do not sign a long-term lease immediately.\n\n*   **Initial landing:** Book 5–7 nights via platforms like Booking.com or Hotels.com to get your bearings [4].\n*   **Mid-term:** After your first week, look for 1–2 month furnished rentals before committing to a longer contract [4].\n*   **Legal note:** Foreigners can buy and rent urban apartments in their own name using just a CPF; no residency is required [6].\n\nThe provided sources do not specifically list WiFi speeds for these neighborhoods, so you should verify connection stability with individual landlords before signing."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.1,\"ftok\":252,\"est\":false}",
+  "X-Hurry": "56862e3b3ba1f953"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 13.75,
+ "elapsed_s": 19.26,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 6.48,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.48,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.48,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 23 passages"
+   }
+  },
+  {
+   "t": 8.79,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.79,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.79,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.75,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 19.26,
+   "tag": "RATE",
+   "data": {
+    "tps": 62.4,
+    "tok": 343,
+    "s": 5.5
+   }
+  },
+  {
+   "t": 19.26,
+   "tag": "RESET"
+  },
+  {
+   "t": 19.26,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 19.26,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1353 chars"
+   }
+  },
+  {
+   "t": 19.26,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   6.48,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.48
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.48
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 23 passages",
+   "t_s": 8.78
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.79
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.79
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 19.26
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1353 chars",
+   "t_s": 19.26
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 19.26
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best High-Paying Jobs In USA Without A Degree (2026) – Top...",
+   "u": "https://postingtak.com/best-high-paying-jobs-in-usa-without-a-degree-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "Top 10 Highest Paying Jobs in 2026 Without a Degree",
+   "u": "https://articleify.com/highest-paying-jobs-no-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest Paying Jobs in UK Without a Degree 2026",
+   "u": "https://workercv.com/highest-paying-jobs-in-uk-without-a-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "highest paying construction jobs without a degree",
+   "u": "https://soboly.com/highest-paying-construction-jobs-without-a-degree",
+   "d": "2026-06-05"
+  },
+  {
+   "t": "3 Jobs Where Gen Z Can Earn $80K Without a 4-Year Degree",
+   "u": "https://finance.yahoo.com/small-business/articles/3-jobs-where-gen-z-170029383.html",
+   "d": "2026-11-01"
+  },
+  {
+   "t": "Highest Paying Occupations : Occupational Outlook Handbook...",
+   "u": "https://www.bls.gov/ooh/highest-paying.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Highest-Paying Jobs in 2026: Realistic Salaries and Paths",
+   "u": "https://bestjobsearchapps.com/articles/en/highest-paying-jobs-in-2026-realistic-top-careers-from-ceos-to-surgeons-us-data",
+   "d": "2026-09-17"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.79,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 62.4,
+  "tok": 343,
+  "s": 5.5
+ },
+ "answer_raw": "You can reach high-earning roles through specialized certifications, apprenticeships, or technical licenses rather than a four-year degree.\n\n**Airline Captain** — medians above **$226,600** as of September 2026 [8]. The path requires earning flight hours and FAA certifications, often taking several years of flight time and seniority to reach top-tier pay [8].\n\n**Restoration Project Manager** — median starting pay of **$92,500** as of November 2026 [6]. This role focuses on project management within the restoration industry and can be entered by building practical skills and portfolios [6].\n\n**Commercial Pilot** — excellent pay and travel benefits as of 2026 [1]. You must obtain an **FAA commercial pilot license** rather than a degree [1].\n\n**Elevator Installer** — impressive salaries through apprenticeships as of 2026 [1]. Entry requires technical skill development and often involves an apprenticeship period [1].\n\n**Construction Site Manager** — high-paying roles per June 2026 [5]. These roles focus on health, safety, and site problem-solving, typically requiring specialized training or experience rather than a degree [5].\n\nI didn't find the exact number of months or years for every apprenticeship or certification path, so you would need to check specific trade schools or union requirements to determine the exact timeline for each.",
+ "answer": "You can reach high-earning roles through specialized certifications, apprenticeships, or technical licenses rather than a four-year degree.\n\n**Airline Captain** — medians above **$226,600** as of September 2026 [8]. The path requires earning flight hours and FAA certifications, often taking several years of flight time and seniority to reach top-tier pay [8].\n\n**Restoration Project Manager** — median starting pay of **$92,500** as of November 2026 [6]. This role focuses on project management within the restoration industry and can be entered by building practical skills and portfolios [6].\n\n**Commercial Pilot** — excellent pay and travel benefits as of 2026 [1]. You must obtain an **FAA commercial pilot license** rather than a degree [1].\n\n**Elevator Installer** — impressive salaries through apprenticeships as of 2026 [1]. Entry requires technical skill development and often involves an apprenticeship period [1].\n\n**Construction Site Manager** — high-paying roles per June 2026 [5]. These roles focus on health, safety, and site problem-solving, typically requiring specialized training or experience rather than a degree [5].\n\nI didn't find the exact number of months or years for every apprenticeship or certification path, so you would need to check specific trade schools or union requirements to determine the exact timeline for each.",
+ "chars": 1353,
+ "raw_bytes": 4901,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.56,
+ "rate_gen_tok_s": 61.39,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:14:09",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

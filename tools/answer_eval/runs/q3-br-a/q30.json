@@ -1,0 +1,199 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":8.8,\"ftok\":259,\"est\":false}",
+  "X-Hurry": "acfbe49345a184f9"
+ },
+ "first_byte_s": 0.03,
+ "first_text_s": 19.22,
+ "elapsed_s": 28.88,
+ "events": [
+  {
+   "t": 0.03,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.03,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.03,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is thinking it through"
+  },
+  {
+   "t": 13.58,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2525 chars"
+   }
+  },
+  {
+   "t": 13.58,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpening it",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 13.58,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is sharpening the answer"
+  },
+  {
+   "t": 19.22,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 28.88,
+   "tag": "RATE",
+   "data": {
+    "tps": 57.6,
+    "tok": 556,
+    "s": 9.7
+   }
+  },
+  {
+   "t": 28.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2227 chars"
+   }
+  },
+  {
+   "t": 28.88,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.03,
+   "Gemma 4 26B is thinking it through"
+  ],
+  [
+   13.58,
+   "Gemma 4 26B is sharpening the answer"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.03
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2525 chars",
+   "t_s": 13.58
+  },
+  {
+   "id": "polish",
+   "l": "Sharpening it",
+   "s": "run",
+   "d": "",
+   "t_s": 13.58
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2227 chars",
+   "t_s": 28.88
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 28.88
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.03,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "rate_writer": {
+  "tps": 57.6,
+  "tok": 556,
+  "s": 9.7
+ },
+ "answer_raw": "4-bit quantization maps high-precision weights (typically **FP16** or **BF16**) to a 4-bit integer space to reduce the VRAM footprint by roughly **4x** and increase inference throughput.\n\nIn a 16-bit model, each parameter takes 2 bytes of VRAM. Moving to 4-bit reduces that to **0.5 bytes** per parameter (plus a small overhead for metadata), allowing a 70B parameter model to fit into roughly **40GB of VRAM** rather than requiring the **140GB** needed for full precision.\n\n## The Mechanism: Mapping and Scaling\nBecause a s-bit range only allows for 16 discrete values, you cannot simply round a floating-point number without losing massive amounts of information. Modern techniques like **GPTQ** or **AWQ** use \"group-wise\" scaling to mitigate this.\n\nThe process involves:\n- **Scaling Factors**: Dividing weights by a constant to fit the distribution into the 4-bit range.\n- **Group sizes**: Applying different scales to specific blocks of weights (e.g., every 64 or 128 weights) so that the rounding error is localized and doesn't destroy the model's overall distribution.\n\n## When It Matters\nThe trade-off is between **VRAM capacity** and **perplexity** (the mathematical measure of how much the model's accuracy degrades).\n\n**It matters when:**\n- **Hardware is the bottleneck**: If you need to run a model that is 40GB on a 24GB GPU, 4-bit quantization is the only way to fit the weights into memory.\n- **Inference throughput is the goal**: Smaller weights require less bandwidth to move from VRAM to the compute cores, which can significantly increase **tokens-per-second**.\n\n**It matters less when:**\n- **You have massive headroom**: If you are running a small model on an 80GB A100, there is no benefit to quantizing; you should run the highest precision available to preserve intelligence.\n- **The model is small**: Models with very low parameter counts (under 7B) tend to degrade significantly when pushed to 4-bit because they lack the \"parameter redundancy\" larger models use to absorb quantization errors.\n\nThe \"sweet spot\" is currently **4-bit to 6-bit**. Going below 4-bit (to 2-bit or 3-bit) typically causes an \"intelligence collapse\" where the model loses the ability to reason or follow complex instructions.",
+ "answer": "4-bit quantization maps high-precision weights (typically **FP16** or **BF16**) to a 4-bit integer space to reduce the VRAM footprint by roughly **4x** and increase inference throughput.\n\nIn a 16-bit model, each parameter takes 2 bytes of VRAM. Moving to 4-bit reduces that to **0.5 bytes** per parameter (plus a small overhead for metadata), allowing a 70B parameter model to fit into roughly **40GB of VRAM** rather than requiring the **140GB** needed for full precision.\n\n## The Mechanism: Mapping and Scaling\nBecause a s-bit range only allows for 16 discrete values, you cannot simply round a floating-point number without losing massive amounts of information. Modern techniques like **GPTQ** or **AWQ** use \"group-wise\" scaling to mitigate this.\n\nThe process involves:\n- **Scaling Factors**: Dividing weights by a constant to fit the distribution into the 4-bit range.\n- **Group sizes**: Applying different scales to specific blocks of weights (e.g., every 64 or 128 weights) so that the rounding error is localized and doesn't destroy the model's overall distribution.\n\n## When It Matters\nThe trade-off is between **VRAM capacity** and **perplexity** (the mathematical measure of how much the model's accuracy degrades).\n\n**It matters when:**\n- **Hardware is the bottleneck**: If you need to run a model that is 40GB on a 24GB GPU, 4-bit quantization is the only way to fit the weights into memory.\n- **Inference throughput is the goal**: Smaller weights require less bandwidth to move from VRAM to the compute cores, which can significantly increase **tokens-per-second**.\n\n**It matters less when:**\n- **You have massive headroom**: If you are running a small model on an 80GB A100, there is no benefit to quantizing; you should run the highest precision available to preserve intelligence.\n- **The model is small**: Models with very low parameter counts (under 7B) tend to degrade significantly when pushed to 4-bit because they lack the \"parameter redundancy\" larger models use to absorb quantization errors.\n\nThe \"sweet spot\" is currently **4-bit to 6-bit**. Going below 4-bit (to 2-bit or 3-bit) typically causes an \"intelligence collapse\" where the model loses the ability to reason or follow complex instructions.",
+ "chars": 2227,
+ "raw_bytes": 2754,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.28,
+ "rate_gen_tok_s": 57.63,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:15:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

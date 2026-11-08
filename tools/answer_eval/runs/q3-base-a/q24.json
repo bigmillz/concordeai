@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.6,\"ftok\":291,\"est\":false}",
+  "X-Hurry": "8d032707eb61e475"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 20.27,
+ "elapsed_s": 27.84,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.99,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.99,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.99,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.38,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 31 passages"
+   }
+  },
+  {
+   "t": 12.38,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.38,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.38,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.38,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.27,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.83,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.3,
+    "tok": 494,
+    "s": 7.6
+   }
+  },
+  {
+   "t": 27.83,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1976 chars"
+   }
+  },
+  {
+   "t": 27.83,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   9.99,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.99
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.99
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 31 passages",
+   "t_s": 12.38
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.38
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.38
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1976 chars",
+   "t_s": 27.83
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 27.83
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Will in Brazil | Brazilian Will | Inheritance Tax Laws",
+   "u": "https://www.globalpropertyguide.com/latin-america/brazil/inheritance",
+   "d": "2021-08-01"
+  },
+  {
+   "t": "Brazilian Inheritance Law: Forced Heirship Rules | ZS Advogados",
+   "u": "https://zsassociados.com/guides/inheritance-law-brazil-guide/",
+   "d": "2026-04-05"
+  },
+  {
+   "t": "Brazilian Inheritance Law: Wills and Estate Planning",
+   "u": "https://www.jarniascyril.com/expatriation/guide-moving-to-brazil-expat/droit-succession-bresil-heritage-testament/",
+   "d": "2026-03-03"
+  },
+  {
+   "t": "Retire in Brazil: visa, tax & cost of living guide for Americans",
+   "u": "https://www.taxesforexpats.com/country-guides/brazil/retire-in-brazil.html",
+   "d": "2026"
+  },
+  {
+   "t": "US Bank Accounts While Living in Brazil: 2026 American Guide",
+   "u": "https://getbrazilvisa.com/us-bank-accounts-while-living-in-brazil",
+   "d": "2026-09-09"
+  },
+  {
+   "t": "Brazil Probate: How Foreign Heirs Claim Inheritance 2026",
+   "u": "https://www.ribeirocavalcante.com.br/brazil-probate-foreign-heirs-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "How US Citizens Can Move to Brazil in 2026",
+   "u": "https://visabrazilservices.com/en/how-us-citizens-can-move-to-brazil-in-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Brazil Retirement Visa for Foreigners | Oliveira Lawyers",
+   "u": "https://oliveiralawyers.com/services/immigration/retirement-visa/",
+   "d": "2026-10-12"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.38,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 65.3,
+  "tok": 494,
+  "s": 7.6
+ },
+ "answer_raw": "Your US-based accounts and your Brazilian assets will be handled under two different legal frameworks, and your heirs will likely be subject to Brazilian forced heirship rules regarding assets located in Brazil.\n\n## Brazilian Assets and Forced Heirship\nIf you own an apartment in Brazil, your heirs will face Brazilian inheritance laws to transfer that title. According to Brazilian law, you do not have total testamentary freedom; you must adhere to \"forced heirship\" rules (the *legitima*), which require that at least 50% of your estate be reserved for compulsory heirs—typically children or a spouse [2][3]. \n\nBecause Brazilian courts often apply the laws of the country where the deceased lived, or may favor Brazilian law to protect local spouses/children, your ability to dictate exactly who gets your Brazilian property via a will may be restricted [1]. To transfer Brazilian real estate or release frozen Brazilian bank accounts, heirs must typically go through a Brazilian probate process (*inventário*); foreign wills or foreign court orders cannot unilaterally transfer Brazilian property [6].\n\nInheritance tax in Brazil (the *Imposto sobre Heranças e Doações*) is a state-level tax with maximum rates of roughly 8% [1][3].\n\n## US Accounts\nThe provided evidence does not specify the exact legal mechanics for US-based bank accounts when a resident of Brazil passes away, as these would likely fall under US law and international treaty-driven processes. You would need to consult a US estate attorney to determine how US-based assets are handled when the owner is a resident of Brazil.\n\n## Summary of Key Differences\n\n| Asset Type | Primary Legal Venue | Key Rule/Constraint |\n| :--- | :--- | :--- |\n| **Brazilian Apartment** | Brazil | Must respect the 50% *legitima* (forced heirship) [2][3]. |\n| **US Bank Accounts** | USA | Likely governed by US law; evidence does not specify [6]. |\n| **Taxation** | Brazil | State-levied tax, maximum rate around 8% [1][3]. |",
+ "answer": "Your US-based accounts and your Brazilian assets will be handled under two different legal frameworks, and your heirs will likely be subject to Brazilian forced heirship rules regarding assets located in Brazil.\n\n## Brazilian Assets and Forced Heirship\nIf you own an apartment in Brazil, your heirs will face Brazilian inheritance laws to transfer that title. According to Brazilian law, you do not have total testamentary freedom; you must adhere to \"forced heirship\" rules (the *legitima*), which require that at least 50% of your estate be reserved for compulsory heirs—typically children or a spouse [2][3]. \n\nBecause Brazilian courts often apply the laws of the country where the deceased lived, or may favor Brazilian law to protect local spouses/children, your ability to dictate exactly who gets your Brazilian property via a will may be restricted [1]. To transfer Brazilian real estate or release frozen Brazilian bank accounts, heirs must typically go through a Brazilian probate process (*inventário*); foreign wills or foreign court orders cannot unilaterally transfer Brazilian property [6].\n\nInheritance tax in Brazil (the *Imposto sobre Heranças e Doações*) is a state-level tax with maximum rates of roughly 8% [1][3].\n\n## US Accounts\nThe provided evidence does not specify the exact legal mechanics for US-based bank accounts when a resident of Brazil passes away, as these would likely fall under US law and international treaty-driven processes. You would need to consult a US estate attorney to determine how US-based assets are handled when the owner is a resident of Brazil.\n\n## Summary of Key Differences\n\n| Asset Type | Primary Legal Venue | Key Rule/Constraint |\n| :--- | :--- | :--- |\n| **Brazilian Apartment** | Brazil | Must respect the 50% *legitima* (forced heirship) [2][3]. |\n| **US Bank Accounts** | USA | Likely governed by US law; evidence does not specify [6]. |\n| **Taxation** | Brazil | State-levied tax, maximum rate around 8% [1][3]. |",
+ "chars": 1976,
+ "raw_bytes": 4081,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.74,
+ "rate_gen_tok_s": 65.26,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:20:45",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.3,\"ftok\":149,\"est\":false}",
+  "X-Hurry": "2e785491767cd457"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 18.37,
+ "elapsed_s": 23.54,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.51,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.51,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.51,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.09,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 29 passages"
+   }
+  },
+  {
+   "t": 14.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.09,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.09,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.37,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.54,
+   "tag": "RATE",
+   "data": {
+    "tps": 57.8,
+    "tok": 298,
+    "s": 5.2
+   }
+  },
+  {
+   "t": 23.54,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1195 chars"
+   }
+  },
+  {
+   "t": 23.54,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.51,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.51
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.51
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 29 passages",
+   "t_s": 14.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.09
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.09
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1195 chars",
+   "t_s": 23.54
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.54
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How Often Should You Eat Pizza? - Food Blog Alliance",
+   "u": "https://foodblogalliance.com/how-often-should-you-eat-pizza/",
+   "d": "2026-06-20"
+  },
+  {
+   "t": "How to Tell if Pizza is Bad (5 Signs That You Should Know)",
+   "u": "https://bakinghow.com/pizza-went-bad/",
+   "d": "2023-05-25"
+  },
+  {
+   "t": "Pizza Consumption: 2026 Verified Stats & Trends",
+   "u": "https://gitnux.org/pizza-consumption-statistics/",
+   "d": "2026"
+  },
+  {
+   "t": "Pizza bomber",
+   "u": "https://en.wikipedia.org/wiki/Pizza_bomber",
+   "d": "2018"
+  },
+  {
+   "t": "Daily Value on the Nutrition and Supplement Facts Labels | FDA",
+   "u": "https://www.fda.gov/food/nutrition-facts-label/daily-value-nutrition-and-supplement-facts-labels",
+   "d": "2024-03-05"
+  },
+  {
+   "t": "Prenota - Fine Pizza",
+   "u": "https://finepizza.it/prenota/",
+   "d": "2026-01-02"
+  },
+  {
+   "t": "NIH 3D",
+   "u": "https://3d.nih.gov/entries/3DPX-003774",
+   "d": ""
+  },
+  {
+   "t": "Bad Breath (Halitosis) - Cleveland Clinic",
+   "u": "https://my.clevelandclinic.org/health/diseases/17771-bad-breath-halitosis",
+   "d": "2023-09-08"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.09,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 57.8,
+  "tok": 298,
+  "s": 5.2
+ },
+ "answer_raw": "Whether pizza is \"bad\" depends on your specific dietary needs and how the pizza is constructed, but aiming for a frequency of **once or twice a week** is generally considered an optimal way to enjoy it while maintaining a balanced diet [1].\n\n## Nutritional Profile and Frequency\nA typical slice can be high in sodium, saturated fat, and carbohydrates, especially when topped with extra cheese or processed meats [1]. However, pizza can also serve as a source of essential nutrients depending on the toppings and crust [1].\n\nWhile individual health factors dictate the exact limit, the following statistics show how common pizza consumption is:\n*   **8.5% of US adults** reported eating pizza at least once per week in 2022 [3].\n*   In **Washington**, per capita pizza consumption averaged **16.9 kg/year** in 2022 [3].\n*   In **Germany**, per capita pizza consumption averaged **9.8 kg/year** in 2022 [3].\n*   In **Italy**, per capita pizza consumption averaged **6.2 kg/year** in 2022 [3].\n\n## Food Safety\nIf you are eating leftovers, watch for signs that the pizza has spoiled. You should not eat it if you notice a **hard and dry texture**, an **odd or rancid odor**, or visible **mold** [2].",
+ "answer": "Whether pizza is \"bad\" depends on your specific dietary needs and how the pizza is constructed, but aiming for a frequency of **once or twice a week** is generally considered an optimal way to enjoy it while maintaining a balanced diet [1].\n\n## Nutritional Profile and Frequency\nA typical slice can be high in sodium, saturated fat, and carbohydrates, especially when topped with extra cheese or processed meats [1]. However, pizza can also serve as a source of essential nutrients depending on the toppings and crust [1].\n\nWhile individual health factors dictate the exact limit, the following statistics show how common pizza consumption is:\n*   **8.5% of US adults** reported eating pizza at least once per week in 2022 [3].\n*   In **Washington**, per capita pizza consumption averaged **16.9 kg/year** in 2022 [3].\n*   In **Germany**, per capita pizza consumption averaged **9.8 kg/year** in 2022 [3].\n*   In **Italy**, per capita pizza consumption averaged **6.2 kg/year** in 2022 [3].\n\n## Food Safety\nIf you are eating leftovers, watch for signs that the pizza has spoiled. You should not eat it if you notice a **hard and dry texture**, an **odd or rancid odor**, or visible **mold** [2].",
+ "chars": 1195,
+ "raw_bytes": 2969,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.69,
+ "rate_gen_tok_s": 57.79,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:14:11",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

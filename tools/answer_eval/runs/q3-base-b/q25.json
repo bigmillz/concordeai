@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.1,\"ftok\":166,\"est\":false}",
+  "X-Hurry": "0b0a331dff8e663f"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.98,
+ "elapsed_s": 35.15,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.92,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 31 passages"
+   }
+  },
+  {
+   "t": 11.92,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.92,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.92,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.92,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.98,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 35.15,
+   "tag": "RATE",
+   "data": {
+    "tps": 31.4,
+    "tok": 539,
+    "s": 17.2
+   }
+  },
+  {
+   "t": 35.15,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2157 chars"
+   }
+  },
+  {
+   "t": 35.15,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 31 passages",
+   "t_s": 11.92
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.92
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.92
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2157 chars",
+   "t_s": 35.15
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 35.15
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Latin America Real Estate Investment Report 2026: 11 Markets",
+   "u": "https://www.internationalre.org/reports/2026-global-investment-report.html",
+   "d": "2026-11-04"
+  },
+  {
+   "t": "Latin America Real Estate Market 2026: Where to Invest ...",
+   "u": "https://blog.latam.finance/en/articles/marche-immobilier-amerique-latine-2026",
+   "d": "2026"
+  },
+  {
+   "t": "How to Move to Latin America from the USA: Step-by-Step",
+   "u": "https://mylatinlife.com/how-to-move-to-latin-america-from-usa/",
+   "d": "2026-06-22"
+  },
+  {
+   "t": "Moving to Latin America from the US in 2026 | VISAPrep",
+   "u": "https://visaprep.net/move-to-latin-america-from-us/",
+   "d": "2026"
+  },
+  {
+   "t": "Retirees eye lower cost of living in Latin America",
+   "u": "https://www.usatoday.com/story/money/personalfinance/2014/06/10/retirees-relocation-latin-america/8414799/",
+   "d": "2014-06-10"
+  },
+  {
+   "t": "FlyRight to Relocate King Air C90A Sim to Brazil",
+   "u": "https://finance.yahoo.com/technology/articles/flyright-relocate-king-air-c90a-120000617.html",
+   "d": "2026-10-18"
+  },
+  {
+   "t": "From the Freedom Tower to the White House: 16 years after the Trail Of Dreams",
+   "u": "https://www.yahoo.com/news/us/articles/freedom-tower-white-house-16-083000378.html",
+   "d": "2026-10-18"
+  },
+  {
+   "t": "MAMA Awards 2026 Voting: How to Vote & Full Nominees List",
+   "u": "https://bestkpopband.com/mama-awards-2026",
+   "d": "2026-10-12"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.92,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 31.4,
+  "tok": 539,
+  "s": 17.2
+ },
+ "answer_raw": "The decision to buy versus rent depends entirely on your current equity and your intended liquidity when you move, but since the evidence doesn't cover your current domestic real estate market, you'll need to run the numbers on your local cost of living first.\n\nIf you are looking at a transition in 1–2 years, the following factors should weigh on your decision:\n\n**Liquidity and mobility**\nBuying property usually entails higher transaction costs (commissions, closing costs, taxes) and a longer timeline to liquidate. If you buy now, you may find yourself stuck in a house you can't sell quickly enough to fund your move, or facing a capital loss if the market dips right when you need to leave. Renting provides the flexibility to pivot your location or timing without the friction of a real estate sale.\n\n**The cost of relocation**\nMoving to Latin America involves specific logistical costs that can eat into your capital. For example, most expats starting fresh in the region take only 2–4 checked bags and ship nothing because furniture is cheap locally while shipping is expensive [3]. If you buy a home now, you are effectively investing in a lifestyle that you've already decided to leave. \n\n**Financial considerations**\n*   **Tax obligations:** Regardless of whether you rent or buy, if you remain a US citizen, you must continue to file Form 1040 every year and report foreign bank accounts over $10,000 (FBAR) [4]. \n*   **The \"Frontier\" factor:** The Latin American market is viewed as a high-potential region for returns with a growing middle class [2], but it is a different financial landscape than the US. If you sell a home to fund an international move, ensure you aren't liquidating a stable asset to move into a market where you'll be starting from scratch.\n\n**Summary of the trade-off**\nIf your current home is a primary residence you intend to sell to fund your relocation, buying a new one now might be a mistake due to the \"double\" transaction costs. If your goal is to build equity to use as a nest egg in Latin America, renting is often the cleaner path for a two-year horizon to avoid being \"house poor\" when you try to relocate.",
+ "answer": "The decision to buy versus rent depends entirely on your current equity and your intended liquidity when you move, but since the evidence doesn't cover your current domestic real estate market, you'll need to run the numbers on your local cost of living first.\n\nIf you are looking at a transition in 1–2 years, the following factors should weigh on your decision:\n\n**Liquidity and mobility**\nBuying property usually entails higher transaction costs (commissions, closing costs, taxes) and a longer timeline to liquidate. If you buy now, you may find yourself stuck in a house you can't sell quickly enough to fund your move, or facing a capital loss if the market dips right when you need to leave. Renting provides the flexibility to pivot your location or timing without the friction of a real estate sale.\n\n**The cost of relocation**\nMoving to Latin America involves specific logistical costs that can eat into your capital. For example, most expats starting fresh in the region take only 2–4 checked bags and ship nothing because furniture is cheap locally while shipping is expensive [3]. If you buy a home now, you are effectively investing in a lifestyle that you've already decided to leave. \n\n**Financial considerations**\n*   **Tax obligations:** Regardless of whether you rent or buy, if you remain a US citizen, you must continue to file Form 1040 every year and report foreign bank accounts over $10,000 (FBAR) [4]. \n*   **The \"Frontier\" factor:** The Latin American market is viewed as a high-potential region for returns with a growing middle class [2], but it is a different financial landscape than the US. If you sell a home to fund an international move, ensure you aren't liquidating a stable asset to move into a market where you'll be starting from scratch.\n\n**Summary of the trade-off**\nIf your current home is a primary residence you intend to sell to fund your relocation, buying a new one now might be a mistake due to the \"double\" transaction costs. If your goal is to build equity to use as a nest egg in Latin America, renting is often the cleaner path for a two-year horizon to avoid being \"house poor\" when you try to relocate.",
+ "chars": 2157,
+ "raw_bytes": 4269,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.34,
+ "rate_gen_tok_s": 31.41,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:56:23",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

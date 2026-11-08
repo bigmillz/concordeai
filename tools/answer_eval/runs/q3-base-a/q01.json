@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.2,\"ftok\":33,\"est\":false}",
+  "X-Hurry": "8172bd5018f21f76"
+ },
+ "first_byte_s": 4.49,
+ "first_text_s": 25.53,
+ "elapsed_s": 33.25,
+ "events": [
+  {
+   "t": 4.49,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.49,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 15.3,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.3,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 15.3,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.33,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 22 passages"
+   }
+  },
+  {
+   "t": 18.33,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.33,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.33,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 18.33,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 25.53,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 33.25,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.0,
+    "tok": 455,
+    "s": 7.7
+   }
+  },
+  {
+   "t": 33.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1822 chars"
+   }
+  },
+  {
+   "t": 33.25,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.49,
+   "Searching the web…"
+  ],
+  [
+   15.3,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 4.49
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.3
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 15.3
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 22 passages",
+   "t_s": 18.33
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.33
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 18.33
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1822 chars",
+   "t_s": 33.25
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 33.25
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "[2026 Latest] Google's Proprietary 'TPU' Chip is Transforming the AI Semiconduct",
+   "u": "https://note.com/dote_taro/n/n2f85bdbb304a?hl=en",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "NVIDIA’s New Ampere Data Center GPU in Full... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/news/nvidias-new-ampere-data-center-gpu-in-full-production",
+   "d": ""
+  },
+  {
+   "t": "Trillium TPU is GA | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/trillium-tpu-is-ga",
+   "d": "2024-12-11"
+  },
+  {
+   "t": "Google TPU Arrives on Oracle Cloud: New Split Architecture Transforms Enterprise",
+   "u": "https://www.msn.com/en-us/news/other/google-tpu-arrives-on-oracle-cloud-new-split-architecture-transforms-enterprise-ai-compute/ar-AA2gdpAx",
+   "d": "2026-10-28"
+  },
+  {
+   "t": "Anthropic Custom Hardware for Claude AI in 2026: What ...",
+   "u": "https://sedulousweb.in/news/anthropic-custom-hardware-claude-2026",
+   "d": "2026-08-07"
+  },
+  {
+   "t": "Anthropic will design its own hardware to power Claude",
+   "u": "https://arstechnica.com/ai/2026/08/anthropic-confirms-plans-to-build-an-in-house-silicon-team/",
+   "d": "2026-08"
+  },
+  {
+   "t": "Best GPU for AI in 2026: 7 Picks From $310 to $4,900",
+   "u": "https://bestgpuforai.com/articles/best-gpu-for-ai/",
+   "d": "2026-09-13"
+  },
+  {
+   "t": "Anthropic Partners with Google to Train Claude AI Using... - Laffert",
+   "u": "https://laffert.in/2025/10/tech/anthropic-partners-with-google-to-train-claude-ai-using-tens-of-billions-in-tpu-chips/",
+   "d": "2025-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   18.33,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 59.0,
+  "tok": 455,
+  "s": 7.7
+ },
+ "answer_raw": "The answer depends on whether you are looking at consumer hardware or the massive scale of data center infrastructure.\n\n## The Hardware Landscape\n\nFor consumer-grade hardware, the **NVIDIA RTX 5090** (32GB VRAM, ~$4,900 as of 2026-09-13) is the most powerful AI GPU available [7].\n\nIn the data center and enterprise space, the landscape is split between NVIDIA's GPUs and Google's proprietary TPUs:\n\n*   **Google TPU** — Google's sixth-generation **Trillium** TPU is currently their most performant, used to train the Gemini 2.0 models [3]. Looking toward 2027, Oracle Cloud is set to offer eighth-generation TPUs (8t and 8i) [4].\n*   **NVIDIA GPU** — While the A100 was a massive leap in its time [2], modern workloads are shifting toward the specialized scale of TPUs and newer architectures to handle massive parameter counts.\n\n## What the Big Players Are Using\n\nThe \"most powerful\" hardware often depends on the specific partnership and scale of the model being trained.\n\n**Claude (Anthropic)**\nAnthropic is currently in a transition phase regarding its compute stack. They have a massive partnership with Google, securing access to **one million TPU chips** to power the next generation of Claude [8]. However, they are also moving toward vertical integration; in August 2026, Anthropic confirmed they are building an **in-house silicon team** to design custom hardware specifically tailored to Claude's computational needs [5][6].\n\n**Others**\n*   **Google** uses its own **Trillium TPUs** for its most capable models, such as Gemini 2.0 [3].\n*   **Major AI Labs (OpenAI, Meta, Anthropic)** — While historically these companies relied on NVIDIA, there is a visible shift toward adopting Google's **TPU infrastructure**, which is being provided through third-party data center operators like Oracle and Fluidstack [1].",
+ "answer": "The answer depends on whether you are looking at consumer hardware or the massive scale of data center infrastructure.\n\n## The Hardware Landscape\n\nFor consumer-grade hardware, the **NVIDIA RTX 5090** (32GB VRAM, ~$4,900 as of 2026-09-13) is the most powerful AI GPU available [7].\n\nIn the data center and enterprise space, the landscape is split between NVIDIA's GPUs and Google's proprietary TPUs:\n\n*   **Google TPU** — Google's sixth-generation **Trillium** TPU is currently their most performant, used to train the Gemini 2.0 models [3]. Looking toward 2027, Oracle Cloud is set to offer eighth-generation TPUs (8t and 8i) [4].\n*   **NVIDIA GPU** — While the A100 was a massive leap in its time [2], modern workloads are shifting toward the specialized scale of TPUs and newer architectures to handle massive parameter counts.\n\n## What the Big Players Are Using\n\nThe \"most powerful\" hardware often depends on the specific partnership and scale of the model being trained.\n\n**Claude (Anthropic)**\nAnthropic is currently in a transition phase regarding its compute stack. They have a massive partnership with Google, securing access to **one million TPU chips** to power the next generation of Claude [8]. However, they are also moving toward vertical integration; in August 2026, Anthropic confirmed they are building an **in-house silicon team** to design custom hardware specifically tailored to Claude's computational needs [5][6].\n\n**Others**\n*   **Google** uses its own **Trillium TPUs** for its most capable models, such as Gemini 2.0 [3].\n*   **Major AI Labs (OpenAI, Meta, Anthropic)** — While historically these companies relied on NVIDIA, there is a visible shift toward adopting Google's **TPU infrastructure**, which is being provided through third-party data center operators like Oracle and Fluidstack [1].",
+ "chars": 1822,
+ "raw_bytes": 4052,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.7,
+ "rate_gen_tok_s": 59.0,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:07:15",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

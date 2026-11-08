@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.2,\"ftok\":167,\"est\":false}",
+  "X-Hurry": "fa726450eff069a5"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 25.36,
+ "elapsed_s": 35.44,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 21 passages"
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.05,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 25.36,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 35.42,
+   "tag": "RATE",
+   "data": {
+    "tps": 40.0,
+    "tok": 402,
+    "s": 10.1
+   }
+  },
+  {
+   "t": 35.42,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1610 chars"
+   }
+  },
+  {
+   "t": 35.42,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 21 passages",
+   "t_s": 18.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.05
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 18.05
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1610 chars",
+   "t_s": 35.42
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 35.42
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Without the Amazon’s ‘flying rivers’ South America would be ...",
+   "u": "https://www.cnn.com/climate/amazon-flying-rivers-south-america-would-be-at-risk-c2e-spc",
+   "d": "2026-08-24"
+  },
+  {
+   "t": "AWS announces Local Zones in Latin America - aws.amazon.com",
+   "u": "https://aws.amazon.com/blogs/publicsector/aws-announces-local-zones-latin-america/",
+   "d": "2022-03-23"
+  },
+  {
+   "t": "Latin America - Amazon Sustainability",
+   "u": "https://sustainability.aboutamazon.com/global-action/latin-america",
+   "d": ""
+  },
+  {
+   "t": "Amazon in Other Countries 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/amazon-in-other-countries",
+   "d": "2026"
+  },
+  {
+   "t": "Amazons In South America - ArcGIS StoryMaps",
+   "u": "https://storymaps.arcgis.com/stories/623229ba725843cd87048998a1592f89",
+   "d": "2023-10-18"
+  },
+  {
+   "t": "Latin America Becomes the Center of Amazon’s Largest Last ...",
+   "u": "https://www.ciocoverage.com/latin-america-becomes-the-center-of-amazons-largest-last-mile-delivery/",
+   "d": ""
+  },
+  {
+   "t": "AmazonGlobal Export Countries and Regions - Amazon Customer ...",
+   "u": "https://www.amazon.com/gp/help/customer/display.html?nodeId=TrpVfN7DgpcGPK9Opa",
+   "d": ""
+  },
+  {
+   "t": "Amazon International shopping and shipping made easy",
+   "u": "https://www.amazon.com/International-Shipping-Direct/b?node=230659011",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   18.05,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 40.0,
+  "tok": 402,
+  "s": 10.1
+ },
+ "answer_raw": "Amazon does not have a dedicated marketplace in South America, but it does facilitate commerce there through international shipping and specific localized operations in certain regions.\n\n## Delivery and Market Presence\nWhile there is no continent-wide Amazon infrastructure, the level of service depends on whether you are looking for a local storefront or international shipping.\n\n**Localized Storefronts** — Amazon has established dedicated marketplaces in specific large economies, which includes **Brazil** [4]. While Brazil has a localized presence, much of the rest of South America relies on international shipping models.\n\n**International Shipping** — A large number of countries in South America can access Amazon through international shipping despite lacking their own localized marketplaces [4]. These customers use Amazon's international shipping services to receive products from established hubs like the US or Europe [7].\n\n**Regional Hubs** — Amazon’s presence in Latin America is heavily concentrated in the north. For example, Amazon established a massive 30,000-square-meter last-mile delivery center in **Mexico City** to serve the surrounding population of 22 million people (as of Oct 2023) [6].\n\n## Alternatives and Local Competition\nThe provided evidence does not specify which local competitors people use in South America instead of Amazon, as the sources focus on Amazon's own operational footprint [4][6]. To find the specific market leaders in countries like Argentina, Colombia, or Chile, you would need to look at local e-commerce market share reports for those specific nations.",
+ "answer": "Amazon does not have a dedicated marketplace in South America, but it does facilitate commerce there through international shipping and specific localized operations in certain regions.\n\n## Delivery and Market Presence\nWhile there is no continent-wide Amazon infrastructure, the level of service depends on whether you are looking for a local storefront or international shipping.\n\n**Localized Storefronts** — Amazon has established dedicated marketplaces in specific large economies, which includes **Brazil** [4]. While Brazil has a localized presence, much of the rest of South America relies on international shipping models.\n\n**International Shipping** — A large number of countries in South America can access Amazon through international shipping despite lacking their own localized marketplaces [4]. These customers use Amazon's international shipping services to receive products from established hubs like the US or Europe [7].\n\n**Regional Hubs** — Amazon’s presence in Latin America is heavily concentrated in the north. For example, Amazon established a massive 30,000-square-meter last-mile delivery center in **Mexico City** to serve the surrounding population of 22 million people (as of Oct 2023) [6].\n\n## Alternatives and Local Competition\nThe provided evidence does not specify which local competitors people use in South America instead of Amazon, as the sources focus on Amazon's own operational footprint [4][6]. To find the specific market leaders in countries like Argentina, Colombia, or Chile, you would need to look at local e-commerce market share reports for those specific nations.",
+ "chars": 1610,
+ "raw_bytes": 3728,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.36,
+ "rate_gen_tok_s": 39.93,
+ "id": "q26",
+ "turn": 1,
+ "category": "money",
+ "topic": "Amazon in South America",
+ "question": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:57:00",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

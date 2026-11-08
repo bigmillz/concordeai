@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.7,\"ftok\":115,\"est\":false}",
+  "X-Hurry": "e104805b808934fd"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 18.17,
+ "elapsed_s": 23.97,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 8.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 31 passages"
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.18,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.17,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.96,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.7,
+    "tok": 345,
+    "s": 5.8
+   }
+  },
+  {
+   "t": 23.97,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1383 chars"
+   }
+  },
+  {
+   "t": 23.97,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 31 passages",
+   "t_s": 10.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.18
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.18
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1383 chars",
+   "t_s": 23.97
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.97
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "16 Cheap Places You Can Fly from NYC in 2026 - Global Viewpoint5 Best Sunny Dest",
+   "u": "https://www.myglobalviewpoint.com/cheapest-places-to-fly-from-nyc/",
+   "d": "2024-02-01"
+  },
+  {
+   "t": "Cheapest Places to Fly From NYC This Winter - Thrillist",
+   "u": "https://www.thrillist.com/travel/new-york/cheapest-places-to-fly-from-nyc",
+   "d": "2018-02-07"
+  },
+  {
+   "t": "The 7 Cheapest Winter Sun Destinations For American Travelers ...",
+   "u": "https://www.traveloffpath.com/the-7-cheapest-winter-sun-destinations-for-american-travelers-revealed/",
+   "d": "2025-10-20"
+  },
+  {
+   "t": "Trip Cost Calculator 2026 | Vacation & Travel Budget ...",
+   "u": "https://tripmemo.app/trip-cost-calculator",
+   "d": "2026-05-06"
+  },
+  {
+   "t": "9 Cheap Winter Vacations From NYC (That Don’t Suck)",
+   "u": "https://www.overherenewyork.com/cheap-winter-vacations-from-nyc/",
+   "d": "2025-12-25"
+  },
+  {
+   "t": "Cost of Living Comparison",
+   "u": "https://www.numbeo.com/cost-of-living/comparison.jsp",
+   "d": ""
+  },
+  {
+   "t": "Travel Budget Calculator 2026 | Estimate Your Trip Costs",
+   "u": "https://travelcostcalculator.org/calculator",
+   "d": "2026"
+  },
+  {
+   "t": "Cheapest time to visit new york | Mycausewaycafe.com",
+   "u": "https://mycausewaycafe.com/atraccion/cheapest-time-to-visit-new-york",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.18,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 59.7,
+  "tok": 345,
+  "s": 5.8
+ },
+ "answer_raw": "The cheapest options for a two-week winter trip from NYC involve balancing flight costs with local living expenses, with **Cartagena** and **Prague** emerging as top value picks depending on whether you want sun or city culture.\n\n**Cartagena, Colombia** — ranked as the number one cheapest winter sun destination for Americans as of October 2025 [3]. It offers a high-value mix of a historic, walled city and easy access to affordable islands [3].\n\n**Prague, Czech Republic** — offers extremely low ground costs, with beer costing a little over $1 as of February 2018 [2]. Flights from NYC to Prague were reportedly $488 as of February 2018 [2].\n\n**Vienna, Austria** — provides a budget-friendly European winter with flights reported at $585 as of February 2018 [2].\n\n**Panama** — serves as an affordable gateway to beautiful islands with the added convenience of using the U.S. dollar, making it an incredible value for adventurous travelers as of October 2025 [3].\n\n**Boca, Florida** — is a practical, short-flight option for those prioritizing ease and reliable warmth, with frequent flights available from JFK, LGA, and EWR as of December 2025 [5].\n\nTo calculate your total two-week budget, you would need to combine these flight rates with typical local accommodation and food costs, which would require checking current rental listings and meal indices for your specific dates.",
+ "answer": "The cheapest options for a two-week winter trip from NYC involve balancing flight costs with local living expenses, with **Cartagena** and **Prague** emerging as top value picks depending on whether you want sun or city culture.\n\n**Cartagena, Colombia** — ranked as the number one cheapest winter sun destination for Americans as of October 2025 [3]. It offers a high-value mix of a historic, walled city and easy access to affordable islands [3].\n\n**Prague, Czech Republic** — offers extremely low ground costs, with beer costing a little over $1 as of February 2018 [2]. Flights from NYC to Prague were reportedly $488 as of February 2018 [2].\n\n**Vienna, Austria** — provides a budget-friendly European winter with flights reported at $585 as of February 2018 [2].\n\n**Panama** — serves as an affordable gateway to beautiful islands with the added convenience of using the U.S. dollar, making it an incredible value for adventurous travelers as of October 2025 [3].\n\n**Boca, Florida** — is a practical, short-flight option for those prioritizing ease and reliable warmth, with frequent flights available from JFK, LGA, and EWR as of December 2025 [5].\n\nTo calculate your total two-week budget, you would need to combine these flight rates with typical local accommodation and food costs, which would require checking current rental listings and meal indices for your specific dates.",
+ "chars": 1383,
+ "raw_bytes": 3395,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.42,
+ "rate_gen_tok_s": 59.61,
+ "id": "q19",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Cheapest places to travel",
+ "question": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:45:36",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.3,\"ftok\":145,\"est\":false}",
+  "X-Hurry": "5500912f99ddb50a"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 23.52,
+ "elapsed_s": 34.05,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.66,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.66,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.66,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.72,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 25 passages"
+   }
+  },
+  {
+   "t": 16.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.72,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.72,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.52,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 34.05,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.0,
+    "tok": 695,
+    "s": 10.5
+   }
+  },
+  {
+   "t": 34.05,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2782 chars"
+   }
+  },
+  {
+   "t": 34.05,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.66,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.66
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.66
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 25 passages",
+   "t_s": 16.72
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.72
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.72
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2782 chars",
+   "t_s": 34.05
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 34.05
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "10 Reasons Your Sweat Smells Like Vinegar - HealthlineSweating and body odor - S",
+   "u": "https://www.healthline.com/health/sweat-smells-like-vinegar",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "What's that smell? Get rid of body odor - Harvard HealthBad Smelling Sweat? 5 Ef",
+   "u": "https://www.health.harvard.edu/staying-healthy/whats-that-smell-common-and-less-common-causes-of-body-odor",
+   "d": "2025-09-11"
+  },
+  {
+   "t": "Body odor: Causes, prevention, and treatments",
+   "u": "https://www.medicalnewstoday.com/articles/173478",
+   "d": "2017-11-29"
+  },
+  {
+   "t": "Body Odor: Causes, Changes, Underlying Diseases & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17865-body-odor",
+   "d": "2023-08-30"
+  },
+  {
+   "t": "Sweating and body odor - Symptoms and causes - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/sweating-and-body-odor/symptoms-causes/syc-20353895",
+   "d": "2025-05-03"
+  },
+  {
+   "t": "How to Not Smell Like Sweat: Causes and Real Fixes",
+   "u": "https://scienceinsights.org/how-to-not-smell-like-sweat-causes-and-real-fixes/",
+   "d": "2026-03-20"
+  },
+  {
+   "t": "Why Does My Sweat Smell Worse Than Usual? | Stop Sudden Odor",
+   "u": "https://wellfizz.com/why-does-my-sweat-smell-worse-than-usual/",
+   "d": "2026-02-05"
+  },
+  {
+   "t": "Vaginal Odor: Types, Causes, Diagnosis & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17905-vaginal-odor",
+   "d": "2023-08-24"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.72,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.0,
+  "tok": 695,
+  "s": 10.5
+ },
+ "answer_raw": "Sweat itself is almost entirely odorless; the smell you experience is the result of bacteria on your skin breaking down the compounds in your perspiration into acids and sulfur molecules [3][6].\n\nIf your scent has changed recently, it is likely due to a shift in the chemical composition of your sweat or the specific type of bacteria interacting with it.\n\n## The Biological Mechanics\nYour body uses two different types of sweat glands, and they produce different \"raw materials\" for bacteria to work with:\n\n*   **Eccrine glands**: These cover most of your body and produce a thin, watery sweat used for cooling [6].\n*   **Apocrine glands**: Concentrated in the armpits and groin, these release a thicker secretion loaded with proteins and fats [4][6].\n\nWhen bacteria—specifically those in the genus *Corynebacterium*—break down the proteins in apocrine sweat, they produce two distinct types of odor: **volatile acids** (which smell sour or vinegary) and **sulfur compounds** (which produce a pungent, onion-like smell) [6].\n\n## Why the Change?\nIf the smell is a new development, consider these factors:\n\n**Hormonal and biological shifts**\nHormones can increase sweat production or change its composition, a common factor during puberty [3]. Changes in weight or obesity can also make individuals more susceptible to body odor [3].\n\n**Diet and lifestyle**\nThe foods you eat, your hygiene practices, and your genetics all play a role in how your sweat smells once it hits your skin [4].\n\n**Medical indicators**\nA sudden change in odor or the amount you sweat can be a sign of an underlying medical condition. For example, a vinegar-like scent can sometimes be a sign of kidney disease or diabetes [1]. Other conditions like liver disease can also contribute to changes in body odor [7]. Certain medicines, such as antidepressants, can increase sweating or change the odor [7].\n\n## How to Address It\nBecause the smell is caused by the interaction between sweat and bacteria, \"fixing\" it involves managing those two variables.\n\n**Target the bacteria**\nSince the smell is caused by microbes breaking down sweat, maintaining consistent hygiene to manage bacterial populations is the primary defense [2].\n\n**Manage the sweat source**\nIf the odor is coming from apocrine glands (the thicker, protein-rich sweat), it is often more pungent than eccrine sweat. Managing the moisture levels in areas like the armpits and groin can help prevent the \"raw material\" from sitting on the skin too long [6].\n\n**Consult a professional if**\nIf the change in smell is sudden, much stronger than usual, or accompanied by other symptoms, you should contact a doctor [2][3]. If you notice a fishy smell combined with unusual discharge or itching, consult a healthcare provider to rule out infections [8].",
+ "answer": "Sweat itself is almost entirely odorless; the smell you experience is the result of bacteria on your skin breaking down the compounds in your perspiration into acids and sulfur molecules [3][6].\n\nIf your scent has changed recently, it is likely due to a shift in the chemical composition of your sweat or the specific type of bacteria interacting with it.\n\n## The Biological Mechanics\nYour body uses two different types of sweat glands, and they produce different \"raw materials\" for bacteria to work with:\n\n*   **Eccrine glands**: These cover most of your body and produce a thin, watery sweat used for cooling [6].\n*   **Apocrine glands**: Concentrated in the armpits and groin, these release a thicker secretion loaded with proteins and fats [4][6].\n\nWhen bacteria—specifically those in the genus *Corynebacterium*—break down the proteins in apocrine sweat, they produce two distinct types of odor: **volatile acids** (which smell sour or vinegary) and **sulfur compounds** (which produce a pungent, onion-like smell) [6].\n\n## Why the Change?\nIf the smell is a new development, consider these factors:\n\n**Hormonal and biological shifts**\nHormones can increase sweat production or change its composition, a common factor during puberty [3]. Changes in weight or obesity can also make individuals more susceptible to body odor [3].\n\n**Diet and lifestyle**\nThe foods you eat, your hygiene practices, and your genetics all play a role in how your sweat smells once it hits your skin [4].\n\n**Medical indicators**\nA sudden change in odor or the amount you sweat can be a sign of an underlying medical condition. For example, a vinegar-like scent can sometimes be a sign of kidney disease or diabetes [1]. Other conditions like liver disease can also contribute to changes in body odor [7]. Certain medicines, such as antidepressants, can increase sweating or change the odor [7].\n\n## How to Address It\nBecause the smell is caused by the interaction between sweat and bacteria, \"fixing\" it involves managing those two variables.\n\n**Target the bacteria**\nSince the smell is caused by microbes breaking down sweat, maintaining consistent hygiene to manage bacterial populations is the primary defense [2].\n\n**Manage the sweat source**\nIf the odor is coming from apocrine glands (the thicker, protein-rich sweat), it is often more pungent than eccrine sweat. Managing the moisture levels in areas like the armpits and groin can help prevent the \"raw material\" from sitting on the skin too long [6].\n\n**Consult a professional if**\nIf the change in smell is sudden, much stronger than usual, or accompanied by other symptoms, you should contact a doctor [2][3]. If you notice a fishy smell combined with unusual discharge or itching, consult a healthcare provider to rule out infections [8].",
+ "chars": 2782,
+ "raw_bytes": 4922,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.43,
+ "rate_gen_tok_s": 66.05,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:13:46",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

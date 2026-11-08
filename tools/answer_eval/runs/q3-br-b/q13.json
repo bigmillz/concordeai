@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":121,\"est\":false}",
+  "X-Hurry": "a33ef924b6c573c1"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 18.65,
+ "elapsed_s": 24.56,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 6.85,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.85,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.85,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.0,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 29 passages"
+   }
+  },
+  {
+   "t": 11.0,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.0,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.0,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.0,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.65,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.55,
+   "tag": "RATE",
+   "data": {
+    "tps": 60.2,
+    "tok": 355,
+    "s": 5.9
+   }
+  },
+  {
+   "t": 24.55,
+   "tag": "RESET"
+  },
+  {
+   "t": 24.55,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 24.55,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1417 chars"
+   }
+  },
+  {
+   "t": 24.55,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.85,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.85
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.85
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 29 passages",
+   "t_s": 11.0
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.0
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.0
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 24.55
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1417 chars",
+   "t_s": 24.55
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.55
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Development of a nutritionally balanced pizza as a functional meal...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10282456/",
+   "d": ""
+  },
+  {
+   "t": "The Nutritional Value of Custom Pizza - Giovanni's Frozen Pizza",
+   "u": "https://giovannisfrozenpizza.com/2017/09/the-nutritional-value-of-custom-pizza/",
+   "d": "2017-09"
+  },
+  {
+   "t": "Pizza Causes: Health Effects of Eating Pizza Regularly",
+   "u": "https://doctipluss.com/pizza-causes-health-effects/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Pizza vs. Burrito — Health Impact and Nutrition Comparison",
+   "u": "https://foodstruct.com/nutrition-comparison-text/pizza-vs-burrito",
+   "d": "2021-04-06"
+  },
+  {
+   "t": "Can You Get Food Poisoning from Pizza? - Acibadem Health Point...",
+   "u": "https://www.acibademhealthpoint.com/can-you-get-food-poisoning-from-pizza/",
+   "d": "2024-05-29"
+  },
+  {
+   "t": "Pizza Consumption by Country 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/pizza-consumption-by-country",
+   "d": "2026"
+  },
+  {
+   "t": "A Healthy Showdown: Who Wins - Pizza or Pasta? • Edel Alon",
+   "u": "https://www.edelalon.com/blog/a-healthy-showdown-who-wins-pizza-or-pasta/",
+   "d": "2022-12-30"
+  },
+  {
+   "t": "Plasma Lycopene Is Associated with Pizza and Pasta Consumption in...",
+   "u": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0161918",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.0,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 60.2,
+  "tok": 355,
+  "s": 5.9
+ },
+ "answer_raw": "Pizza is not inherently unhealthy, but its nutritional impact depends entirely on the ingredients and how frequently you eat it.\n\nRegular consumption of standard pizza can lead to health issues because the refined white flour base can spike blood sugar, while cheese and processed meats like pepperoni or sausage contribute high levels of sodium and saturated fat [3]. For example, a standard slice contains roughly **285 calories** [3], and eating processed meats can raise LDL (bad) cholesterol over time [3].\n\nHow \"bad\" a pizza is depends on the composition:\n*   **Vegetable toppings** are a better choice for managing fat intake compared to meat toppings like sausage or pepperoni [2].\n*   **Customization** allows for a more nutritionally balanced meal, whereas mass-market pizzas are often nutritionally undesirable [1].\n*   **Comparison** shows that 100g of pizza provides roughly **20% of the daily value** for saturated fat and **0.24g of trans fats** (about 12% of the daily requirement) [4].\n\nRegarding frequency, there is no single medical consensus in what I found for a \"safe\" number of slices per week, but the impact shifts when a casual habit becomes a routine, such as eating it four times a week [3]. To minimize health risks, focus on using vegetables to offset fats and monitor your total daily saturated fat intake, which the Mayo Clinic suggests keeping under **13 grams** for heart health [3].",
+ "answer": "Pizza is not inherently unhealthy, but its nutritional impact depends entirely on the ingredients and how frequently you eat it.\n\nRegular consumption of standard pizza can lead to health issues because the refined white flour base can spike blood sugar, while cheese and processed meats like pepperoni or sausage contribute high levels of sodium and saturated fat [3]. For example, a standard slice contains roughly **285 calories** [3], and eating processed meats can raise LDL (bad) cholesterol over time [3].\n\nHow \"bad\" a pizza is depends on the composition:\n*   **Vegetable toppings** are a better choice for managing fat intake compared to meat toppings like sausage or pepperoni [2].\n*   **Customization** allows for a more nutritionally balanced meal, whereas mass-market pizzas are often nutritionally undesirable [1].\n*   **Comparison** shows that 100g of pizza provides roughly **20% of the daily value** for saturated fat and **0.24g of trans fats** (about 12% of the daily requirement) [4].\n\nRegarding frequency, there is no single medical consensus in what I found for a \"safe\" number of slices per week, but the impact shifts when a casual habit becomes a routine, such as eating it four times a week [3]. To minimize health risks, focus on using vegetables to offset fats and monitor your total daily saturated fat intake, which the Mayo Clinic suggests keeping under **13 grams** for heart health [3].",
+ "chars": 1417,
+ "raw_bytes": 5018,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.42,
+ "rate_gen_tok_s": 59.94,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:42:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

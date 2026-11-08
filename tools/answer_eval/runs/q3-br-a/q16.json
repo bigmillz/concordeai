@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.7,\"ftok\":107,\"est\":false}",
+  "X-Hurry": "b1eeb5e5ebdf4767"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 23.02,
+ "elapsed_s": 31.92,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.59,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 23 passages"
+   }
+  },
+  {
+   "t": 15.59,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.59,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.59,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.59,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.02,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 31.92,
+   "tag": "RATE",
+   "data": {
+    "tps": 46.2,
+    "tok": 411,
+    "s": 8.9
+   }
+  },
+  {
+   "t": 31.92,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1647 chars"
+   }
+  },
+  {
+   "t": 31.92,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 23 passages",
+   "t_s": 15.59
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.59
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.59
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1647 chars",
+   "t_s": 31.92
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 31.92
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "The relationship between nicotine cessation and mental disorders in...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/23890363/",
+   "d": ""
+  },
+  {
+   "t": "Quitlines and Other Cessation Support Resources",
+   "u": "https://www.cdc.gov/tobacco/hcp/patient-care/quitlines-and-other-resources.html",
+   "d": "2025-01-31"
+  },
+  {
+   "t": "1 Month After Smoking Cessation: What To Expect",
+   "u": "https://www.webmd.com/smoking-cessation/first-month-not-smoking",
+   "d": ""
+  },
+  {
+   "t": "How to set family boundaries (and why they’re so...) — Calm Blog",
+   "u": "https://www.calm.com/blog/family-boundaries",
+   "d": "2024-09-25"
+  },
+  {
+   "t": "How to Set Boundaries With Family - Psychology Today",
+   "u": "https://www.psychologytoday.com/us/blog/pain-explained/201912/how-to-set-boundaries-with-family",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "Effects of a family-assisted smoking cessation intervention based on...",
+   "u": "https://www.ribasmedicina.com/wp-content/uploads/2018/02/2015-Huang-et-al.-Effects-of-a-family-assisted-smoking-cessation-in-China.pdf",
+   "d": "2018-02"
+  },
+  {
+   "t": "Guide to Help A Friend or Family Quit Smoking | Way to Quit",
+   "u": "https://waytoquit.org/help-someone-quit-a-guide-for-friends-and-family/",
+   "d": "2025-08-14"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.59,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 46.2,
+  "tok": 411,
+  "s": 8.9
+ },
+ "answer_raw": "The most effective way to get support is to **lead with your own needs** by telling them exactly how you want to be helped, rather than letting them guess. \n\nEffective support is often about following your lead: ask them how they can help, then instruct them to listen without lecturing or nagging [1]. You might need them to simply keep the home smoke-free or to understand that irritability is a common part of the withdrawal process during the first two to four weeks [1].\n\nIf you want to stop the \"checking up\" behavior, you should **set clear boundaries** [5]. Setting boundaries is a way to maintain healthy relationships and your own wellbeing, and it doesn't mean you love your family any less [5]. You can frame these boundaries as \"if/then\" agreements: for example, tell them that if they nag or interrogate you about your progress, you will step away from the conversation to protect your own mental space [5][6].\n\nSince withdrawal symptoms typically peak within the first 3 days and last for about 2 weeks [4], you might suggest they use specific tactics to help you through those windows:\n*   **Distraction**: Instead of talking about quitting, have them call or text you to talk about completely different topics—like sports or weekend plans—just to help the craving pass [4].\n*   **Information vs. Failure**: If you have a slip, ask them to treat it as a data point/information rather than a failure or a reason to lecture you [1].\ns\nIf you find yourself needing more structured help, you can look into **quitlines** or smartphone apps like **quitSTART** to provide a layer of support that is separate from your family dynamics [3].",
+ "answer": "The most effective way to get support is to **lead with your own needs** by telling them exactly how you want to be helped, rather than letting them guess. \n\nEffective support is often about following your lead: ask them how they can help, then instruct them to listen without lecturing or nagging [1]. You might need them to simply keep the home smoke-free or to understand that irritability is a common part of the withdrawal process during the first two to four weeks [1].\n\nIf you want to stop the \"checking up\" behavior, you should **set clear boundaries** [5]. Setting boundaries is a way to maintain healthy relationships and your own wellbeing, and it doesn't mean you love your family any less [5]. You can frame these boundaries as \"if/then\" agreements: for example, tell them that if they nag or interrogate you about your progress, you will step away from the conversation to protect your own mental space [5][6].\n\nSince withdrawal symptoms typically peak within the first 3 days and last for about 2 weeks [4], you might suggest they use specific tactics to help you through those windows:\n*   **Distraction**: Instead of talking about quitting, have them call or text you to talk about completely different topics—like sports or weekend plans—just to help the craving pass [4].\n*   **Information vs. Failure**: If you have a slip, ask them to treat it as a data point/information rather than a failure or a reason to lecture you [1].\ns\nIf you find yourself needing more structured help, you can look into **quitlines** or smartphone apps like **quitSTART** to provide a layer of support that is separate from your family dynamics [3].",
+ "chars": 1647,
+ "raw_bytes": 3826,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.9,
+ "rate_gen_tok_s": 46.26,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:08:47",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

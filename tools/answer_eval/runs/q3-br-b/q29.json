@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":124,\"est\":false}",
+  "X-Hurry": "581d153e404fa3fc"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 13.31,
+ "elapsed_s": 20.47,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 7.12,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.12,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.12,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.8,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 24 passages"
+   }
+  },
+  {
+   "t": 8.8,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.8,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.8,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.8,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.31,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.47,
+   "tag": "RATE",
+   "data": {
+    "tps": 52.2,
+    "tok": 373,
+    "s": 7.2
+   }
+  },
+  {
+   "t": 20.47,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1494 chars"
+   }
+  },
+  {
+   "t": 20.47,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   7.12,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.12
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.12
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 24 passages",
+   "t_s": 8.8
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.8
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.8
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1494 chars",
+   "t_s": 20.47
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 20.47
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Airbnb em Jurerê, Florianópolis 2026 | ROI",
+   "u": "https://tulugar.com/pt/airbnb/brasil/florianopolis/jurere-12622672",
+   "d": "2026"
+  },
+  {
+   "t": "Cobertura vista mar, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/cobertura-vista-mar-florianopolis7.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "OS 10 MELHORES hotéis com piscina: Florianópolis 2026...",
+   "u": "https://www.tripadvisor.com.br/Hotels-g303576-zfa3-Florianopolis_State_of_Santa_Catarina-Hotels.html",
+   "d": "2026"
+  },
+  {
+   "t": "Spring Ball Florianópolis 2026",
+   "u": "https://www.escoladual.com.br/blog/spring-ball-florianopolis-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Best Airbnb Management Companies in the US (2026)",
+   "u": "https://www.airdna.co/blog/the-best-airbnb-property-management-services",
+   "d": "2026"
+  },
+  {
+   "t": "floripaguru.com/blog/housing-guide-florianopolis-2026.md",
+   "u": "https://floripaguru.com/blog/housing-guide-florianopolis-2026.md",
+   "d": "2026"
+  },
+  {
+   "t": "16 Best Hotels in Florianopolis. Hotels from $15/night - KAYAK",
+   "u": "https://www.kayak.com/Florianopolis-Hotels.29399.hotel.ksp",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.8,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 52.2,
+  "tok": 373,
+  "s": 7.2
+ },
+ "answer_raw": "Trust the **4.6-star rating** because it is statistically more reliable.\n\nThe 4.6 with 212 reviews represents a much larger, more stable sample size that has survived various guest types and seasonal shifts. In contrast, a 4.9 with only 18 reviews is susceptible to \"small sample bias,\" where a few perfect stays can artificially inflate the score; for context, once a host scales to 20-49 listings, only about one in five maintains a lyra-level 4.9 [6].\n\nFor 30+ night stays in Florianópolis, your pricing strategy depends heavily on the specific neighborhood, so you should check local listings for your exact area to calibrate your base rate.\n\n**Pricing Strategy**\n\n*   **Establish a baseline:** If you are in a premium area like Jurerê, the median price is **$117/night** as of 2026, which is 43% above the city average [2].\n*   **Apply the long-stay discount:** For 30+ night stays, you typically offer a discount of **20% to 40%** off the nightly rate to account for lower turnover costs and guaranteed occupancy.\n*   **Calculate your target:** Using the Jurerê median as a benchmark, a 30-night stay would roughly cost between **$70 and $94 per night** after applying a typical 20-40% discount ($117 - 20% = $93.60; $117 - 40% = $70.20) [2].\n*   **Account for seasonality:** Be aware that December is the most expensive month in Florianópolis at **$252/night**, while July is the cheapest at **$61/night** as of 2026 [8]. Adjust your base rate upward for summer bookings to maximize ROI.",
+ "answer": "Trust the **4.6-star rating** because it is statistically more reliable.\n\nThe 4.6 with 212 reviews represents a much larger, more stable sample size that has survived various guest types and seasonal shifts. In contrast, a 4.9 with only 18 reviews is susceptible to \"small sample bias,\" where a few perfect stays can artificially inflate the score; for context, once a host scales to 20-49 listings, only about one in five maintains a lyra-level 4.9 [6].\n\nFor 30+ night stays in Florianópolis, your pricing strategy depends heavily on the specific neighborhood, so you should check local listings for your exact area to calibrate your base rate.\n\n**Pricing Strategy**\n\n*   **Establish a baseline:** If you are in a premium area like Jurerê, the median price is **$117/night** as of 2026, which is 43% above the city average [2].\n*   **Apply the long-stay discount:** For 30+ night stays, you typically offer a discount of **20% to 40%** off the nightly rate to account for lower turnover costs and guaranteed occupancy.\n*   **Calculate your target:** Using the Jurerê median as a benchmark, a 30-night stay would roughly cost between **$70 and $94 per night** after applying a typical 20-40% discount ($117 - 20% = $93.60; $117 - 40% = $70.20) [2].\n*   **Account for seasonality:** Be aware that December is the most expensive month in Florianópolis at **$252/night**, while July is the cheapest at **$61/night** as of 2026 [8]. Adjust your base rate upward for summer bookings to maximize ROI.",
+ "chars": 1494,
+ "raw_bytes": 3558,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.25,
+ "rate_gen_tok_s": 52.16,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:49:18",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

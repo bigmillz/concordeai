@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":34,\"est\":false}",
+  "X-Hurry": "8930026dc55e84b8"
+ },
+ "first_byte_s": 2.18,
+ "first_text_s": 21.83,
+ "elapsed_s": 30.17,
+ "events": [
+  {
+   "t": 2.18,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 2.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 12.5,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.5,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.5,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.79,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 13.79,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.79,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.79,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.83,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 30.17,
+   "tag": "RATE",
+   "data": {
+    "tps": 50.4,
+    "tok": 420,
+    "s": 8.3
+   }
+  },
+  {
+   "t": 30.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1682 chars"
+   }
+  },
+  {
+   "t": 30.17,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   2.18,
+   "Searching the web…"
+  ],
+  [
+   12.5,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 2.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.5
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.5
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 13.79
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.79
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.79
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1682 chars",
+   "t_s": 30.17
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 30.17
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "NVIDIA’s New Ampere Data Center GPU in Full... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/news/nvidias-new-ampere-data-center-gpu-in-full-production",
+   "d": ""
+  },
+  {
+   "t": "Anthropic-Google TPU deal - AI Wiki",
+   "u": "https://aiwiki.ai/wiki/anthropic_google_tpu_deal",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "TPU 8t and TPU 8i technical deep dive | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/tpu-8t-and-tpu-8i-technical-deep-dive",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "Trillium TPU is GA | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/trillium-tpu-is-ga",
+   "d": ""
+  },
+  {
+   "t": "Broadcom TPU shipments doubled to 2M H100-equivalents | Epoch AI",
+   "u": "https://epoch.ai/data-insights/tpu-production-doubling",
+   "d": "2026"
+  },
+  {
+   "t": "Claude by Anthropic | The AI for problem solvers",
+   "u": "https://claude.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.79,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 50.4,
+  "tok": 420,
+  "s": 8.3
+ },
+ "answer_raw": "The most powerful hardware for AI is currently a split between specialized **Nvidia GPUs** for general purpose scaling and **Google TPUs** for massive-scale model training and inference.\n\nFor massive, dedicated workloads, the **8th-generation TPUs** (specifically the **TPU 8t** and **TPU 8i** models) represent the leading edge of custom-built AI infrastructure as of April s 2026 [4]. These systems are designed to handle the divergent requirements of pre-training, post-training, and real-time serving for massive Mixture-of-Experts (MoEs) and agentic AI [4]. In terms of raw volume, Broadcom-produced TPU shipments reached the equivalent of nearly **2 million Nvidia H100 GPUs** in the second half of 2026 [7].\n\n**Claude** runs on **Google Cloud's infrastructure** using Google's **TPUs** [1]. Anthropic established a partnership with Google and Broadcom in April 2026 to secure approximately **3.5GW of next-generation TPU capacity** starting in 2027, which builds upon the ~1GW of compute already committed for 2026 [1]. This move allows Anthropic to bypass the complexity of managing Nvidia-specific stacks and places them at the top of the priority queue as Google's largest external TPU customer [1].\n\nOther major players use a mix of the following:\n\n**Microsoft/OpenAI** — Historically allocated the first share of **Nvidia's** most advanced GPUs [1].\n\n**Google** — Uses their own proprietary **TPU** architecture across their AI Hypercomputer (including the **Trillium TPU**) and for models like **Gemma 3** [5][6].\n\n**DeepSeek and Llama** — Represent the competitive landscape for high-performance models often compared against Google's single-accelerator offerings [5].",
+ "answer": "The most powerful hardware for AI is currently a split between specialized **Nvidia GPUs** for general purpose scaling and **Google TPUs** for massive-scale model training and inference.\n\nFor massive, dedicated workloads, the **8th-generation TPUs** (specifically the **TPU 8t** and **TPU 8i** models) represent the leading edge of custom-built AI infrastructure as of April s 2026 [4]. These systems are designed to handle the divergent requirements of pre-training, post-training, and real-time serving for massive Mixture-of-Experts (MoEs) and agentic AI [4]. In terms of raw volume, Broadcom-produced TPU shipments reached the equivalent of nearly **2 million Nvidia H100 GPUs** in the second half of 2026 [7].\n\n**Claude** runs on **Google Cloud's infrastructure** using Google's **TPUs** [1]. Anthropic established a partnership with Google and Broadcom in April 2026 to secure approximately **3.5GW of next-generation TPU capacity** starting in 2027, which builds upon the ~1GW of compute already committed for 2026 [1]. This move allows Anthropic to bypass the complexity of managing Nvidia-specific stacks and places them at the top of the priority queue as Google's largest external TPU customer [1].\n\nOther major players use a mix of the following:\n\n**Microsoft/OpenAI** — Historically allocated the first share of **Nvidia's** most advanced GPUs [1].\n\n**Google** — Uses their own proprietary **TPU** architecture across their AI Hypercomputer (including the **Trillium TPU**) and for models like **Gemma 3** [5][6].\n\n**DeepSeek and Llama** — Represent the competitive landscape for high-performance models often compared against Google's single-accelerator offerings [5].",
+ "chars": 1682,
+ "raw_bytes": 3678,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.94,
+ "rate_gen_tok_s": 50.42,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:36:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

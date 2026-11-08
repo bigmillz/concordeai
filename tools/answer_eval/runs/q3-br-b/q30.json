@@ -1,0 +1,199 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":4.7,\"ftok\":127,\"est\":false}",
+  "X-Hurry": "268dc27ab55bfbf3"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 17.4,
+ "elapsed_s": 25.48,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is thinking it through"
+  },
+  {
+   "t": 11.77,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2044 chars"
+   }
+  },
+  {
+   "t": 11.77,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpening it",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 11.77,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is sharpening the answer"
+  },
+  {
+   "t": 17.4,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.47,
+   "tag": "RATE",
+   "data": {
+    "tps": 58.3,
+    "tok": 471,
+    "s": 8.1
+   }
+  },
+  {
+   "t": 25.47,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1884 chars"
+   }
+  },
+  {
+   "t": 25.47,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Gemma 4 26B is thinking it through"
+  ],
+  [
+   11.77,
+   "Gemma 4 26B is sharpening the answer"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.06
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2044 chars",
+   "t_s": 11.77
+  },
+  {
+   "id": "polish",
+   "l": "Sharpening it",
+   "s": "run",
+   "d": "",
+   "t_s": 11.77
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1884 chars",
+   "t_s": 25.47
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.47
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.06,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "rate_writer": {
+  "tps": 58.3,
+  "tok": 471,
+  "s": 8.1
+ },
+ "answer_raw": "4-bit quantization maps high-precision weights (typically **FP16** or **BF16**) to a discrete set of 16 possible values to compress the model's memory footprint.\n\nBecause 4 bits cannot represent the nuance of much larger floating-point ranges, this process introduces **quantization error** (noise). To mitigate this, modern techniques like **GPTQ** (Post-Training Quantization) or **AWQ** (Activation-aware Weight Quantization) use calibration datasets to identify and protect the most critical weights, minimizing the impact on the model's **perplexity** (the measure of how well the model predicts the next token).\n\n## When it matters\n\nThe decision to use 4-bit quantization is driven by the trade-off between hardware constraints and the scale of the model architecture.\n\n**Memory-constrained environments** — This is the primary driver. A **70B** parameter model in FP16 requires ~140GB of VRAM, which exceeds most single-GPU setups. In 4-bit, that same model fits into **~40GB**, allowing it to run on a single **RTX 6000 Ada** or dual **RTX 4090s** (~48GB total). If you need to fit a large model on consumer-grade hardware, 4-bit is the standard.\n\n**Model scale vs. intelligence loss** — The impact of quantization is inversely proportional to model size. If you quantize a tiny model (e.g., **3B** parameters) to 4-bit, the intelligence loss is often massive because the model lacks the capacity to absorb the noise. If you quantize a massive model (e.g., **405B**), the degradation is often negligible because the sheer parameter redundancy allows the model to remain highly capable despite the loss of precision.\n\n**The Verdict**\nUse 4-bit when you need to trade a small percentage of accuracy for a massive reduction in VRAM footprint. If you have the headroom to run the model in **8-bit** or **FP16**, do so, as the perplexity will always be better at higher bit depths.",
+ "answer": "4-bit quantization maps high-precision weights (typically **FP16** or **BF16**) to a discrete set of 16 possible values to compress the model's memory footprint.\n\nBecause 4 bits cannot represent the nuance of much larger floating-point ranges, this process introduces **quantization error** (noise). To mitigate this, modern techniques like **GPTQ** (Post-Training Quantization) or **AWQ** (Activation-aware Weight Quantization) use calibration datasets to identify and protect the most critical weights, minimizing the impact on the model's **perplexity** (the measure of how well the model predicts the next token).\n\n## When it matters\n\nThe decision to use 4-bit quantization is driven by the trade-off between hardware constraints and the scale of the model architecture.\n\n**Memory-constrained environments** — This is the primary driver. A **70B** parameter model in FP16 requires ~140GB of VRAM, which exceeds most single-GPU setups. In 4-bit, that same model fits into **~40GB**, allowing it to run on a single **RTX 6000 Ada** or dual **RTX 4090s** (~48GB total). If you need to fit a large model on consumer-grade hardware, 4-bit is the standard.\n\n**Model scale vs. intelligence loss** — The impact of quantization is inversely proportional to model size. If you quantize a tiny model (e.g., **3B** parameters) to 4-bit, the intelligence loss is often massive because the model lacks the capacity to absorb the noise. If you quantize a massive model (e.g., **405B**), the degradation is often negligible because the sheer parameter redundancy allows the model to remain highly capable despite the loss of precision.\n\n**The Verdict**\nUse 4-bit when you need to trade a small percentage of accuracy for a massive reduction in VRAM footprint. If you have the headroom to run the model in **8-bit** or **FP16**, do so, as the perplexity will always be better at higher bit depths.",
+ "chars": 1884,
+ "raw_bytes": 2415,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.49,
+ "rate_gen_tok_s": 58.29,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:49:46",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

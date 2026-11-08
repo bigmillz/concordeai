@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":111,\"est\":false}",
+  "X-Hurry": "ceb6e311ea9e9e62"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 14.72,
+ "elapsed_s": 24.79,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 7.47,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.47,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.47,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 20 passages"
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.67,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 14.72,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.79,
+   "tag": "RATE",
+   "data": {
+    "tps": 42.7,
+    "tok": 430,
+    "s": 10.1
+   }
+  },
+  {
+   "t": 24.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1721 chars"
+   }
+  },
+  {
+   "t": 24.79,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   7.47,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.47
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.47
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 20 passages",
+   "t_s": 10.67
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.67
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.67
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1721 chars",
+   "t_s": 24.79
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.79
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Setting Healthy Boundaries During Addiction Recovery",
+   "u": "https://www.pacificshoresrecovery.com/blog/setting-healthy-boundaries-with-loved-ones-during-early-recovery/",
+   "d": "2026-07-23"
+  },
+  {
+   "t": "How to Set Healthy Family Boundaries in Addiction Recovery",
+   "u": "https://avedisrecovery.com/blog/addiction-recovery/setting-healthy-family-boundaries-in-addiction-recovery/",
+   "d": ""
+  },
+  {
+   "t": "Nicotine Addiction - PMC",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2928221/",
+   "d": ""
+  },
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Quitting smoking: 10 ways to resist tobacco cravings - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/nicotine-dependence/in-depth/nicotine-craving/art-20045454",
+   "d": ""
+  },
+  {
+   "t": "NIH Clinical Center: Search the Studies",
+   "u": "https://clinicalstudies.info.nih.gov/protocoldetails.aspx?id=13-DA-N485&query=",
+   "d": ""
+  },
+  {
+   "t": "How Do You Set Boundaries With Someone in Addiction Recovery?",
+   "u": "https://www.hollywoodhillsrecovery.com/addiction-guidance/how-do-you-set-boundaries-with-someone-in-addiction-recovery",
+   "d": "2026-01-08"
+  },
+  {
+   "t": "Setting Boundaries With Family - Soulful Recovery",
+   "u": "https://www.soulful-recovery.com/setting-boundaries-with-family/",
+   "d": "2026-04-16"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.67,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 42.7,
+  "tok": 430,
+  "s": 10.1
+ },
+ "answer_raw": "The best way to stop the nagging is to **set clear, proactive boundaries** that define how you want to be supported and what behaviors you will no longer accept.\n\nYou should lead the conversation by telling them exactly how you want help—or how you don't—rather than waiting for them to guess. The most effective support involves **following your lead**; they should listen without lecturing and treat any slips as pieces of information rather than failures [4]. Because the first two to four weeks of withdrawal often involve high irritability, you should establish rules for how they handle your moods during this window [4].\n\nSetting these boundaries is about protecting your own space and avoiding unnecessary triggers while you focus on your goals [1]. You can frame these boundaries as **rules for them** to follow to ensure they aren't unintentionally enabling old habits or creating new stress [2][7].\n\nEffective boundaries might look like this:\n*   **Define the communication style**: Tell them if you want to talk about your cravings or if you need silence and space to process them [4].\n*   **Set \"check-in\" rules**: Instead of them checking up on you constantly, agree on a specific time or method for updates so they don't nag throughout the day [1].\n*   **Establish failure protocols**: Agree beforehand that if you have a slip, the response will be a specific, non-judgmental action rather than a lecture [4].\n\nIf they struggle to adjust, you may need to remind them that their role is to **sit with you in pain** rather than act as a coach [4]. Since family dynamics can often create unintentional pressure, these boundaries are essential to prevent codependency and maintain your own mental space [7][8].",
+ "answer": "The best way to stop the nagging is to **set clear, proactive boundaries** that define how you want to be supported and what behaviors you will no longer accept.\n\nYou should lead the conversation by telling them exactly how you want help—or how you don't—rather than waiting for them to guess. The most effective support involves **following your lead**; they should listen without lecturing and treat any slips as pieces of information rather than failures [4]. Because the first two to four weeks of withdrawal often involve high irritability, you should establish rules for how they handle your moods during this window [4].\n\nSetting these boundaries is about protecting your own space and avoiding unnecessary triggers while you focus on your goals [1]. You can frame these boundaries as **rules for them** to follow to ensure they aren't unintentionally enabling old habits or creating new stress [2][7].\n\nEffective boundaries might look like this:\n*   **Define the communication style**: Tell them if you want to talk about your cravings or if you need silence and space to process them [4].\n*   **Set \"check-in\" rules**: Instead of them checking up on you constantly, agree on a specific time or method for updates so they don't nag throughout the day [1].\n*   **Establish failure protocols**: Agree beforehand that if you have a slip, the response will be a specific, non-judgmental action rather than a lecture [4].\n\nIf they struggle to adjust, you may need to remind them that their role is to **sit with you in pain** rather than act as a coach [4]. Since family dynamics can often create unintentional pressure, these boundaries are essential to prevent codependency and maintain your own mental space [7][8].",
+ "chars": 1721,
+ "raw_bytes": 3916,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.36,
+ "rate_gen_tok_s": 42.73,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:10:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

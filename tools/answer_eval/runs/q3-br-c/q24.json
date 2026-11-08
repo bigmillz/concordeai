@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.3,\"ftok\":258,\"est\":false}",
+  "X-Hurry": "da425265c4cc7983"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 16.72,
+ "elapsed_s": 23.98,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 7.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.23,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.23,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.98,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 27 passages"
+   }
+  },
+  {
+   "t": 8.98,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.98,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.98,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.98,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.72,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.97,
+   "tag": "RATE",
+   "data": {
+    "tps": 74.4,
+    "tok": 539,
+    "s": 7.3
+   }
+  },
+  {
+   "t": 23.98,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2159 chars"
+   }
+  },
+  {
+   "t": 23.98,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   7.23,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.23
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.23
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 27 passages",
+   "t_s": 8.98
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.98
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.98
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2159 chars",
+   "t_s": 23.98
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.98
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Brazilian Inheritance Law: Forced Heirship Rules | ZS Advogados",
+   "u": "https://zsassociados.com/guides/inheritance-law-brazil-guide/",
+   "d": "2026-04-05"
+  },
+  {
+   "t": "Brazil Probate: How Foreign Heirs Claim Inheritance 2026",
+   "u": "https://www.ribeirocavalcante.com.br/brazil-probate-foreign-heirs-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Inheritance in Brazil for Foreign Heirs: the 2026 Rules",
+   "u": "https://carvalhobarros.adv.br/en/blog/inheritance-in-brazil-foreign-heir",
+   "d": "2026-08-25"
+  },
+  {
+   "t": "Foreign Heirs Guide for Inheritance Tax in Brazil - Oliveira Lawyers",
+   "u": "https://oliveiralawyers.com/services/family-law/what-inheritance-taxes-and-fees-will-subject-brazil/",
+   "d": "2026-10-30"
+  },
+  {
+   "t": "How US Citizens Can Move to Brazil in 2026",
+   "u": "https://visabrazilservices.com/en/how-us-citizens-can-move-to-brazil-in-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Retire in Brazil: visa, tax & cost of living guide for Americans",
+   "u": "https://www.taxesforexpats.com/country-guides/brazil/retire-in-brazil.html",
+   "d": "2026"
+  },
+  {
+   "t": "Retirement Visa vs. Investor Visa in Brazil | ZS Advogados",
+   "u": "https://zsassociados.com/guides/compare/retirement-vs-investor-visa-brazil/",
+   "d": "2026-04-05"
+  },
+  {
+   "t": "Brazil Retirement Visa for Foreigners | Oliveira Lawyers",
+   "u": "https://oliveiralawyers.com/services/immigration/retirement-visa/",
+   "d": "2026-10-12"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.98,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 74.4,
+  "tok": 539,
+  "s": 7.3
+ },
+ "answer_raw": "Your US accounts will generally remain under US jurisdiction, but your Brazilian apartment will be subject to Brazilian law and local probate procedures.\n\nBrazilian authorities have **exclusive jurisdiction** over assets located within Brazil, regardless of whether the deceased was a foreigner or a resident [2]. To transfer the title of a Brazilian apartment or release frozen Brazilian bank accounts, heirs must go through a formal Brazilian probate process called an **inventário** [2][3]. Because the assets are physically in Brazil, foreign wills and foreign court orders cannot bypass this local process to transfer real estate [2].\n\nYour heirs will likely be hit with Brazilian inheritance rules regarding the apartment. Under Brazilian law, there is a concept called **forced heirship** (legitima), which dictates that at least **50% of the estate** must be distributed to compulsory heirs (such as children or spouses) [1]. This rule is a cornerstone of Brazilian succession law and can conflict with US will provisions [1].\n\nRegarding the financial impact, the transfer of assets is subject to **ITCMD** (inheritance tax). Under Complementary Law 227/2026, these rules include **progressive rates** and taxation based on market value [4]. Because your heirs are in the US, they will need to navigate the Brazilian legal system to claim the property, though there are specific legal routes that allow heirs living abroad to manage the process without physically being in Brazil [2].\n\nThe following table summarizes the jurisdictional split:\n\n| Asset Type | Governing Law/Process | Key Constraint |\n| :--- | :--- | :--- |\n| **US Bank Accounts** | US Law / US Probate | Generally handled via US legal channels. |\n| **Brazilian Apartment** | Brazilian Law / **Inventário** | Must be settled in Brazil; foreign orders cannot transfer title [2]. |\n| **Brazilian Bank Accounts** | Brazilian Law / **Inventário** | Must be settled in Brazil [2]. |\n\nFor the specific tax implications of moving US-based wealth into Brazil versus keeping it in the US, you should consult a tax professional regarding the interaction between US estate tax and Brazilian ITCMD.",
+ "answer": "Your US accounts will generally remain under US jurisdiction, but your Brazilian apartment will be subject to Brazilian law and local probate procedures.\n\nBrazilian authorities have **exclusive jurisdiction** over assets located within Brazil, regardless of whether the deceased was a foreigner or a resident [2]. To transfer the title of a Brazilian apartment or release frozen Brazilian bank accounts, heirs must go through a formal Brazilian probate process called an **inventário** [2][3]. Because the assets are physically in Brazil, foreign wills and foreign court orders cannot bypass this local process to transfer real estate [2].\n\nYour heirs will likely be hit with Brazilian inheritance rules regarding the apartment. Under Brazilian law, there is a concept called **forced heirship** (legitima), which dictates that at least **50% of the estate** must be distributed to compulsory heirs (such as children or spouses) [1]. This rule is a cornerstone of Brazilian succession law and can conflict with US will provisions [1].\n\nRegarding the financial impact, the transfer of assets is subject to **ITCMD** (inheritance tax). Under Complementary Law 227/2026, these rules include **progressive rates** and taxation based on market value [4]. Because your heirs are in the US, they will need to navigate the Brazilian legal system to claim the property, though there are specific legal routes that allow heirs living abroad to manage the process without physically being in Brazil [2].\n\nThe following table summarizes the jurisdictional split:\n\n| Asset Type | Governing Law/Process | Key Constraint |\n| :--- | :--- | :--- |\n| **US Bank Accounts** | US Law / US Probate | Generally handled via US legal channels. |\n| **Brazilian Apartment** | Brazilian Law / **Inventário** | Must be settled in Brazil; foreign orders cannot transfer title [2]. |\n| **Brazilian Bank Accounts** | Brazilian Law / **Inventário** | Must be settled in Brazil [2]. |\n\nFor the specific tax implications of moving US-based wealth into Brazil versus keeping it in the US, you should consult a tax professional regarding the interaction between US estate tax and Brazilian ITCMD.",
+ "chars": 2159,
+ "raw_bytes": 4276,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 22.51,
+ "rate_gen_tok_s": 74.35,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:15:03",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

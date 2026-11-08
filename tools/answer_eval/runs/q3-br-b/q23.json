@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":123,\"est\":false}",
+  "X-Hurry": "624bed2e065ab8c1"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 13.79,
+ "elapsed_s": 23.22,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 6.77,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.77,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.77,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.4,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 34 passages"
+   }
+  },
+  {
+   "t": 8.4,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.4,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.4,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.4,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.79,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.22,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.6,
+    "tok": 561,
+    "s": 9.4
+   }
+  },
+  {
+   "t": 23.22,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2245 chars"
+   }
+  },
+  {
+   "t": 23.22,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.77,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.77
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.77
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 34 passages",
+   "t_s": 8.4
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.4
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.4
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2245 chars",
+   "t_s": 23.22
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.22
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "AI Job Impact Statistics 2026: Global Labor Market ...",
+   "u": "https://toolfountain.com/ai-job-impact-statistics",
+   "d": "2026-04-25"
+  },
+  {
+   "t": "AI Job Market Statistics 2026: Postings, Pay & Skills Data",
+   "u": "https://axis-intelligence.com/ai-job-market-statistics/",
+   "d": "2026"
+  },
+  {
+   "t": "For those worried that 'AI might take my job.' It wasn't your job that was taken",
+   "u": "https://note.com/hal_kiryu/n/n4d8f4f41104a?hl=en",
+   "d": "2026-10-19"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist!",
+   "u": "https://www.npr.org/2026/11/04/nx-s1-6028029/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "Applicants say AI makes the job market hell. OpenAI wants... | Mashable",
+   "u": "https://mashable.com/article/ai-job-market-openai-jobs-platform",
+   "d": "2026"
+  },
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2025-05"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "AI Job Market Statistics 2026: Losses, Wages & Shifts",
+   "u": "https://www.gradually.ai/en/ai-job-market-statistics/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.4,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 59.6,
+  "tok": 561,
+  "s": 9.4
+ },
+ "answer_raw": "Your displacement risk is not a total loss of employment, but a structural shift where entry-level roles contract while experienced workers face task-based automation rather than job replacement.\n\nThe real risk over the next five years is a **contraction in entry-level opportunities** and clerical functions, even as high-level projections suggest a net positive shift of 78 million jobs by 2030 [1]. For someone in IT ops, the immediate reality of 2026 is that the \"bottom\" of the career ladder is being squeezed [1]. A significant percentage of companies using or planning AI expect job cuts within five years (27.1% as of June 2025) [8]. \n\nFor your specific role, the risk manifests as a shift in what you actually do:\n*   **Task vs. Job Displacement:** It is often not the entire job being taken, but specific tasks that used to take hours being finished in seconds [3]. \n*   re-skilling or \"human work\" is the defense; if you can delegate tasks to AI, you must use the freed-up time to focus on high-level work where you can take **responsibility for the results** [3]. \n*   **The Experience Gap:** While novice and low-skilled support agents saw a 34.0% productivity improvement using AI, experienced workers saw 0.0% impact as of April 2025 [1]. This suggests that seniority and specialized knowledge act as a shield against automation.\n\nTo protect your career, you should focus on these three moves:\n*   **Move up the complexity ladder:** Since 53.3% of companies using AI expect lower pay for workers without a university degree and under five years of experience (as of June 2026), you must ensure your role moves beyond \"junior\" or \"clerical\" tasks [8].\n*   **Own the verification:** AI can provide materials, but it cannot take responsibility for results [3]. Positioning yourself as the person who **verifies and signs off** on AI-generated outputs turns the tool into your junior staff rather than your replacement.\n*   **Leverage your degree/experience for wage growth:** For workers with a university degree, 26% of companies expected a positive wage effect as of June 2026 [8]. If you have a degree or deep technical expertise, focus on roles where AI-driven productivity can be harnessed to increase your own output and value.",
+ "answer": "Your displacement risk is not a total loss of employment, but a structural shift where entry-level roles contract while experienced workers face task-based automation rather than job replacement.\n\nThe real risk over the next five years is a **contraction in entry-level opportunities** and clerical functions, even as high-level projections suggest a net positive shift of 78 million jobs by 2030 [1]. For someone in IT ops, the immediate reality of 2026 is that the \"bottom\" of the career ladder is being squeezed [1]. A significant percentage of companies using or planning AI expect job cuts within five years (27.1% as of June 2025) [8]. \n\nFor your specific role, the risk manifests as a shift in what you actually do:\n*   **Task vs. Job Displacement:** It is often not the entire job being taken, but specific tasks that used to take hours being finished in seconds [3]. \n*   re-skilling or \"human work\" is the defense; if you can delegate tasks to AI, you must use the freed-up time to focus on high-level work where you can take **responsibility for the results** [3]. \n*   **The Experience Gap:** While novice and low-skilled support agents saw a 34.0% productivity improvement using AI, experienced workers saw 0.0% impact as of April 2025 [1]. This suggests that seniority and specialized knowledge act as a shield against automation.\n\nTo protect your career, you should focus on these three moves:\n*   **Move up the complexity ladder:** Since 53.3% of companies using AI expect lower pay for workers without a university degree and under five years of experience (as of June 2026), you must ensure your role moves beyond \"junior\" or \"clerical\" tasks [8].\n*   **Own the verification:** AI can provide materials, but it cannot take responsibility for results [3]. Positioning yourself as the person who **verifies and signs off** on AI-generated outputs turns the tool into your junior staff rather than your replacement.\n*   **Leverage your degree/experience for wage growth:** For workers with a university degree, 26% of companies expected a positive wage effect as of June 2026 [8]. If you have a degree or deep technical expertise, focus on roles where AI-driven productivity can be harnessed to increase your own output and value.",
+ "chars": 2245,
+ "raw_bytes": 4227,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 24.17,
+ "rate_gen_tok_s": 59.52,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:47:19",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
