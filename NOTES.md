@@ -17238,6 +17238,21 @@ step's server detail ("3 notes · 1 correction") → separate facts 14px apart; 
 come through — the model was still warming up. Try again and it usually lands." → "No answer came through. Try
 again."
 
+**The asking flow (the owner's third override, signed off).** Under the byline, one live line says what is really
+happening, with the die of the machine doing it and tokens, pace and seconds ticking beside it in mono: "Searching
+the web", "Reading 6 sources", "<model> drafting on <machine>" (the owner's own wording: the live line names the model
+and the machine; the spine behind the answer keeps model names for "Show models"), "Merging 3 drafts", "Reviewing the
+draft", "Checking the answer", "Done in 8.6 s" with the real counts. Every state comes from a frame in hand (STEP, RUN,
+STATUS, DRAFT, USAGE, DONE), never a timer: `livePhrase()` is pure and tested in node. Each real DRAFT frame is a comet
+in its machine's colour flying from that machine's chip (the header's `.rig` when the sky branch lands it, the sidebar's
+telemetry row until then; a cloud draft falls from the top of the sky) to the live line, rippling on arrival; the RUN
+compositor frame is one white ripple on a council of two or more. The prose glows while it writes and settles to white
+on the `.live` class of the message, not on the words, so the stream's innerHTML repaints cannot restart it (the 6b242
+trap again). When the answer lands, one light runs once round the composer (`#composer.finish::before`, a conic ring
+through `@property --hzang`) and `hz-answer-done` is dispatched for the sky to settle. The compact mode pill, the effort
+slider and the header's machine chips belong to the home builder. All of it is still under reduced motion and with the
+effects off, and the comets never draw in a hidden window.
+
 **The gauntlet.** Changed for real, each explained in its comment: the brand guard allows exactly the byline's
 `SIGN_BRAND="Concorde"` constant (and a mutant proves a second bare Concorde still trips it); the 6b462
 pinwheel check became the marginalia check (the aside outside the prose, surviving repaints); the smooth-bar
