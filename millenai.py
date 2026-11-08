@@ -43541,8 +43541,12 @@ body.showmodels .behind .spine .mdl,.behind .spine li.full .mdl{display:inline}
 .behind .machines{border-top:1px solid var(--hz-hair);padding-top:16px;display:flex;flex-direction:column;gap:10px}
 .behind .mrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px;color:var(--hz-ink-2);line-height:1.3}
 .behind .mrow>span:first-child{display:flex;align-items:center;gap:8px;min-width:0}
-.behind .mrow .dot{width:6px;height:6px;border-radius:50%;background:var(--hz-good);box-shadow:0 0 8px rgba(111,240,192,.7);flex:none}
-.behind .mrow .dot.cloud{background:var(--hz-warn);box-shadow:0 0 8px rgba(242,179,61,.6)}
+/* one tiny die per machine, in its maker's colour where the maker is known (NORTHSTAR OVERRIDE 2);
+   ice for a server whose maker the frames don't carry, hollow ice for the cloud */
+.behind .mrow .die{width:8px;height:8px;border-radius:2px;flex:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 60%),var(--ac,#9fc0ff);
+  box-shadow:0 0 8px rgba(159,192,255,.35)}
+.behind .mrow .die.hollow{background:transparent;box-shadow:inset 0 0 0 1.2px var(--ac,#9fc0ff),0 0 8px rgba(159,192,255,.45)}
 .behind .mrow .mono{font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;
   display:flex;gap:14px;flex:none}
 .behind .ctx{display:block;height:2px;border-radius:1px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:-4px}
@@ -47582,15 +47586,15 @@ function machinesHTML(u,ctx){
   if(!u.length)return "";
   const rows=[],seen={},cloud=[];
   u.forEach(c=>{
-    let key,name,cl="";
-    if(isCloud(c)){name=whereName(c.w);key="c:"+name;cl=" cloud";if(cloud.indexOf(name)<0)cloud.push(name);}
-    else if(c.w==="server"){name=machineOf(c);key="s:"+name;}
-    else{name=IS_PC?"This PC":"This Mac";key="l";}
-    let r=seen[key];if(!r){r=seen[key]={name:name,cl:cl,o:0,ms:0,est:false};rows.push(r);}
+    let key,name,die;
+    if(isCloud(c)){name=whereName(c.w);key="c:"+name;die=' class="die hollow"';if(cloud.indexOf(name)<0)cloud.push(name);}
+    else if(c.w==="server"){name=machineOf(c);key="s:"+name;die=' class="die"';}
+    else{name=IS_PC?"This PC":"This Mac";key="l";die=IS_PC?' class="die"':' class="die" style="--ac:#c9ccd2"';}
+    let r=seen[key];if(!r){r=seen[key]={name:name,die:die,o:0,ms:0,est:false};rows.push(r);}
     r.o+=+c.o||0;r.ms+=+c.d||0;if(c.x)r.est=true;
   });
   const line=cloud.length?"Some of this went through "+cloud.join(" and ")+".":"Nothing has left your machines.";
-  let h='<div class="machines">'+rows.map(r=>'<div class="mrow"><span><i class="dot'+r.cl+'" aria-hidden="true"></i>'+esc(r.name)+'</span>'
+  let h='<div class="machines">'+rows.map(r=>'<div class="mrow"><span><i'+r.die+' aria-hidden="true"></i>'+esc(r.name)+'</span>'
     +'<span class="mono">'+(r.o?'<span>'+(r.est?"~":"")+fmtTok(r.o)+' out</span>':"")
     +(r.ms>0?'<span>'+fmtSecs(r.ms/1000)+'</span>':"")+'</span></div>').join("");
   if(ctx&&ctx.used>0&&ctx.window>0){
