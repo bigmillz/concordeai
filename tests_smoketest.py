@@ -2321,11 +2321,16 @@ check("first-run wizard present, gated on wizard_done",
       'id="wiz-veil"' in page and page.count('class="wstep"') == 4
       and "wizard_done" in page and "openWizard" in page
       and "platform.moonshot.ai" in page and "aistudio.google.com" in page)
+# (6b534) the Horizon look closes the sidebar on its home by its own scoped rules, each with
+# its open state beside it; the drawer rule holds for everything outside that block
+_page_nohz = (page[:page.index("/* ============================================================ HORIZON (6b526) */")]
+              + page[page.index("/* ============================================================ HORIZON end */"):])
 check("mobile drawer present and openable",
       'id="mburger"' in page and "body.sbopen #sidebar" in page
       and page.count("max-width:760px") == 1
       and "max-width:700px" not in page
-      and "#sidebar{display:none}" not in page)
+      and "#sidebar{display:none}" not in _page_nohz
+      and ".hz.hz-sbopen body:has(#main #hero):not(.sbopen) #sidebar{display:flex}" in page)
 # 6b242: ONE mode picker. The sidebar's copy of the tier list is gone —
 # the composer's engine pill is the only place modes are chosen, so guard
 # both halves: the picker is there, and the duplicate has not crept back.
@@ -2712,6 +2717,10 @@ _PAGE_HOST |= {"ClipboardItem", "FileReader", "ResizeObserver"}
 _PAGE_HOST |= {"ClipboardItem", "FileReader", "NodeFilter", "Number", "ResizeObserver"}   # browser globals the new features use
 _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
                "__DICT_TRACE__"}
+# the Horizon look (6b526, 6b534): its placeholders, and three host globals it uses
+# (Intl for the time zone, removeEventListener, globalThis for the hooks; all three on
+# window in WKWebView, WebView2 and Qt)
+_PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -23425,7 +23434,7 @@ def _p2c_pins(src):
         "fallback call": "                    _seat_res[0] = server_first_answer(\n                        lbl, _seat_fb[lbl], full_messages, memit, emit,\n"
                          "                        status, step,\n                        first_s=30.0 if tier == \"Fast\" else 60.0,\n"
                          "                        polish=_revise if _pol else None)\n                    hb_stop.set()\n                    return" in ch
-        and "                    _pol = (user_prefs(user_base).get(\"polish\", True)\n                            and not images and (not query or bookish)\n"
+        and "                    _pol = (effort_polish(user_prefs(user_base).get(\"polish\", True), _effort)\n                            and not images and (not query or bookish)\n"
             "                            and not _links\n"            # pasted pages write once (6b423)
             "                            and _is_substantive(prompt))" in ch
         and "REVISE_INSTRUCTION + \"QUESTION: \" + _sq" in ch,
@@ -37572,13 +37581,13 @@ check("horizon: the real-sky math lands (GMST at J2000, Polaris at the latitude,
       and not _hz_sky_math(_hz_astro.replace("hzGmst(t)+lon/15-raH", "hzGmst(t)-lon/15-raH"))
       and not _hz_sky_math(_hz_astro.replace(",d=hzD(t)+1.5,", ",d=hzD(t)+2.5,")), "")
 _hz_alias = {}
-exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODE_ALIASES = {"):_MILLENAI_SRC.index("_HZ_PLACE_CACHE = {}")], _hz_alias)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODE_ALIASES = {"):_MILLENAI_SRC.index("_HZ_PLACE_CACHE = profile_cache(")], _hz_alias)
 _hz_post = _MILLENAI_SRC[_MILLENAI_SRC.index('        if tier == "Power":'):_MILLENAI_SRC.index("_cl_mode, _cl_pid = cloud_tier_parse(tier)")]
 check("horizon: Alpha, Gamma, Sigma and Omega (and 6b526's Flare, Zenith, Meridian, Odyssey) are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and the home itself names no model",
       _hz_alias["MODE_ALIASES"] == {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro", "Omega": "Vera Rubin",
                                     "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro", "Odyssey": "Vera Rubin"}
       and "tier = MODE_ALIASES[tier]" in _hz_post and "MODE_ALIASES[tier] in TIERS" in _hz_post
-      and "function tierLabel(){return hzModeWords(tierShown(tier))||model;}" in _MILLENAI_SRC
+      and 'function tierLabel(){return (typeof hzModeWords==="function"?hzModeWords(tierShown(tier)):tierShown(tier))||model;}' in _MILLENAI_SRC
       and "hzMenuBrand(engMenu);" in _MILLENAI_SRC and "hzMenuBrand(engSub);" in _MILLENAI_SRC
       and 'root.querySelectorAll(".engrow.mode .enm").forEach(e=>{e.textContent=modeName(e.textContent);});' in _MILLENAI_SRC
       and 'return s?s.name+" only":"Your server";' in _hz_js and 'return "Your pick";' in _hz_js
@@ -37642,16 +37651,16 @@ process.stdout.write(JSON.stringify(o));
         o = json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=60).stdout)
     except Exception:
         return False
-    return (o["fit"] and o["fresh"] and o["cached"]["play"]["i"] == 4 and o["cached"]["fetch"] is None
-            and o["fetchFor"]["play"]["i"] == 2 and o["fetchFor"]["fetch"]["i"] == 1
-            and o["none"]["play"] is None and o["none"]["fetch"]["i"] == 6)
+    return (o["fit"] and o["fresh"] and o["cached"]["play"]["i"] == 4 and o["cached"]["later"] is None
+            and o["fetchFor"]["play"]["i"] == 2 and o["fetchFor"]["later"]["i"] == 1
+            and o["none"]["play"] is None and o["none"]["later"]["i"] == 6)
 
 
 check("horizon: the backdrop fits the hour, is never one of the last three while a fresh one fits, plays from the cache and fetches the one it wanted for a later open; the mutants are caught",
       _hz_choose(_hz_js)
       and not _hz_choose(_hz_js.replace("const fresh=fit.filter(c=>recent.indexOf(c.i)<0);", "const fresh=fit;"))
-      and not _hz_choose(_hz_js.replace("if(has.has(want.i))return {play:want,fetch:null};", "return {play:want,fetch:null};"))
-      and 'if(ch.fetch)api("/api/sky/status?i="+ch.fetch.i+"&warm=1").catch(()=>{});   // for a later open, never waited on' in _hz_js
+      and not _hz_choose(_hz_js.replace("if(has.has(want.i))return {play:want,later:null};", "return {play:want,later:null};"))
+      and 'if(ch.later)api("/api/sky/status?i="+ch.later.i+"&warm=1").catch(()=>{});   // for a later open, never waited on' in _hz_js
       and 'api("/api/sky/seen",{method:"POST"' in _hz_js and "hzMoonNow();hzDrawStars();hzDrawAuroras();hzClipCheck();" in _hz_js, "")
 
 # EFFORT (6b534): a separate control from the mode; the page sends it, the server takes only the
@@ -37679,12 +37688,12 @@ check("horizon: Effort (Low, Medium, High, Max, Ultra) is sent with each questio
       _hze["EFFORT_LEVELS"] == ("low", "medium", "high", "max", "ultra") and _hz_effort_ok(_hze)
       and not _hz_effort_ok(_hze_m1) and not _hz_effort_ok(_hze_m2)
       and "_effort = _effort if _effort in EFFORT_LEVELS else None\n        _srv_think.level = effort_think(_effort)" in _MILLENAI_SRC
-      and "        _tl_search.__dict__.clear()\n        _srv_think.level = _srv_think.effort = None" in _MILLENAI_SRC
+      and "            _srv_think.level = _srv_think.effort = None\n            # the hurry registry entry dies" in _MILLENAI_SRC
       and "        _srv_think.effort = _effort    # run_council reads it for its reviews" in _MILLENAI_SRC
       and _MILLENAI_SRC.count('effort_polish(user_prefs(user_base).get("polish", True), _effort)') == 3
       and 'user_prefs(user_base).get("polish", True)\n' not in _MILLENAI_SRC
       and '_eff = getattr(globals().get("_srv_think"), "effort", None)\n    if _eff and not max_mode:\n        reflect, peer = effort_reflect(reflect, _eff), effort_peer(peer, _eff)\n' in _MILLENAI_SRC
-      and '{effort:hzEffortWire()}' in _MILLENAI_SRC
+      and 'if(globalThis.hzReady&&document.documentElement.classList.contains("hz"))annExtra.effort=hzEffortWire();' in _MILLENAI_SRC
       and 'const HZ_EFFORT=["Low","Medium","High","Max","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in _hz_js
       and '<input type="range" min="0" max="\'+HZ_EMAX+\'" step="1" value="1">' in _hz_js
       and 'inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);' in _hz_js
@@ -37726,7 +37735,7 @@ check("horizon: the opening is the wordmark alone, traced, then a 2.8 s streak, 
 # ASKING FROM THE HOME (OVERRIDE 3): the composer's place is taken before the hero goes; the
 # question arcs into its row (or the chats button), the row keeps a live die from the RUN frames
 # and renames itself; the list's repaints keep it (observed, not patched into renderChats)
-_hz_send = _MILLENAI_SRC[_MILLENAI_SRC.index("  if(hzReady)hzBeforeSend(text);"):_MILLENAI_SRC.index("  if(hzReady)hzOnSend();")]
+_hz_send = _MILLENAI_SRC[_MILLENAI_SRC.index("  if(globalThis.hzReady)hzBeforeSend(text);"):_MILLENAI_SRC.index("  if(globalThis.hzReady)hzOnSend();")]
 check("horizon: a question sent from the home glides the composer to the foot and arcs into its chat's row, which keeps a live die in the working machine's colour until the answer lands and renames itself",
       "messages.push({role:\"user\",content:shown});\n  const uDiv=addMsg(\"user\",shown);" in _hz_send
       and "if(from&&from.home)hzArc(from,hzS.liveChat);" in _hz_js and "if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}" in _hz_js

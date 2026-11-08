@@ -32677,7 +32677,7 @@ MODE_ALIASES = {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro",
                 # the names of 6b526, which older pages still send
                 "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro",
                 "Odyssey": "Vera Rubin"}
-_HZ_PLACE_CACHE = {}
+_HZ_PLACE_CACHE = profile_cache("_HZ_PLACE_CACHE", {})   # follows the person's home area
 
 
 def hz_place():
@@ -34006,7 +34006,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     # write after a switch is refused (409 when nothing was sent yet).
     def _run(self, fn):
         _tl_search.__dict__.clear()
-        _srv_think.level = _srv_think.effort = None   # no effort carried over (6b534)
         _answered.pop(threading.get_ident(), None)
         self._turn = None
         self._head_sent = False
@@ -38851,6 +38850,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                      "didn't answer either. Ask again — it usually "
                      "comes straight back.")
         finally:
+            # the effort ends with the answer (6b534): a title or a memory
+            # pass after it on this thread reasons at the model's default
+            _srv_think.level = _srv_think.effort = None
             # the hurry registry entry dies with the request — a set()
             # arriving after this harmlessly answers ok:false (6b257)
             with _hurry_lock:
@@ -45189,7 +45191,7 @@ function paintModels(){
     el.classList.toggle("active",manual&&el.dataset.model===council[0]);
     const old=el.querySelector(".rank"); if(old)old.remove();
   });
-  if(hzReady)hzModesPaint();       // Horizon's slider follows the tier (6b526)
+  if(globalThis.hzReady)hzModesPaint();       // Horizon's slider follows the tier (6b526)
   $("#chip-model").textContent=tierLabel();
   paintCloudChip();
 }
@@ -45215,7 +45217,7 @@ function setVideo(on){
   noVideo=!on; document.body.classList.toggle("novideo",noVideo);
   const t=$("#fx-toggle");if(t)t.classList.toggle("on",on);
   localStorage.setItem("millen.video",on?"1":"0");
-  if(hzReady){hzPauseSync();if(on)hzMediaBoot();}   // Horizon's sky follows the switch (6b526)
+  if(globalThis.hzReady){hzPauseSync();if(on)hzMediaBoot();}   // Horizon's sky follows the switch (6b526)
   const v=$("#sky-color");
   if(!on){if(v&&!v.paused)v.pause();}
   else if(typeof bootSkyline==="function"){
@@ -45955,7 +45957,7 @@ function cloudChipOn(cs,t){
 function paintCloudChip(){
   const c=document.getElementById("cloud-chip");if(!c)return;
   c.hidden=!cloudChipOn(cloudSt,tier);
-  if(hzReady)hzMachinesPaint();    // Horizon's header (6b526)
+  if(globalThis.hzReady)hzMachinesPaint();    // Horizon's header (6b526)
 }
 function cloudChipSet(cs){cloudSt=cs||null;paintCloudChip();}
 async function cloudChipLoad(){
@@ -46030,7 +46032,7 @@ function modeShow(which){
   setTimeout(renderChats,0);
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
-  if(hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes and rows (6b526)
+  if(globalThis.hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes and rows (6b526)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
@@ -47999,7 +48001,7 @@ async function send(){
     ||(sentDocs.length?"📄 (file)":""))
     +(sentDocs.length&&text?"":"")
     +(sentDocs.length?"\n📄 "+sentDocs.map(d=>d.name).join(", "):"");
-  if(hzReady)hzBeforeSend(text);   // Horizon: where the composer and the words were (6b534)
+  if(globalThis.hzReady)hzBeforeSend(text);   // Horizon: where the composer and the words were (6b534)
   messages.push({role:"user",content:shown});
   const uDiv=addMsg("user",shown);
   if(sentImages.length){
@@ -48029,7 +48031,7 @@ async function send(){
   const turn={chat_id:myChat,lane:(chats.find(x=>x.id===myChat)||{}).lane||uiMode,
     after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};
   generating=true; document.body.classList.add("gen"); genChat=myChat;
-  if(hzReady)hzOnSend();           // Horizon: the shockwave, the live aurora (6b526)
+  if(globalThis.hzReady)hzOnSend();           // Horizon: the shockwave, the live aurora (6b526)
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
   const aiDiv=addMsg("assistant",""); const body=aiDiv.querySelector(".body");
   aiDiv.classList.add("live");     // soft mask on the newest line
@@ -48070,6 +48072,8 @@ async function send(){
       if(b)annExtra={prev_image:b.img,prev_grid:b.grid||undefined};
     }
   }
+  // the Horizon composer's Effort (6b534): Low, Medium, High, Max or Ultra
+  if(globalThis.hzReady&&document.documentElement.classList.contains("hz"))annExtra.effort=hzEffortWire();
   if(advGhostOnly){
     const g=adv.local[0],gs=srvList.find(x=>g.indexOf(x.name+SRV_SEP)===0);
     body.insertAdjacentHTML("beforebegin",'<div class="ghostnote" style="font-size:11px;'
@@ -48095,9 +48099,7 @@ async function send(){
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           mode_comp:advGhostOnly?"":modeComp(),    // the mode's own compositor, "" for its default (6b442)
           // the Remote agent (6b249) carries the autonomy throttle
-          autonomy:agent==="Remote"?autonomy:undefined},turn,
-        // the Horizon composer's Effort (6b534): Low, Medium, High or Max
-        hzReady&&document.documentElement.classList.contains("hz")?{effort:hzEffortWire()}:{})),
+          autonomy:agent==="Remote"?autonomy:undefined},turn)),
     });
     // refused before anything was saved (a store it can't read answers
     // 503): the line is shown as the error it is, and the question leaves
@@ -48202,13 +48204,13 @@ async function send(){
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
-                  if(hzReady)hzTele("run",d);
+                  if(globalThis.hzReady)hzTele("run",d);
                 }catch(e){}},
-        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);if(hzReady)hzTele("status",t);},
+        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);if(globalThis.hzReady)hzTele("status",t);},
         RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}},   // the writer's pace (6b515)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
-                     if(hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
+                     if(globalThis.hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
                      if(!drafts.some(x=>x.m===d.m))drafts.push(d);
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
@@ -48222,7 +48224,7 @@ async function send(){
         CTX:j=>{try{locCtx=(JSON.parse(j).loc)||"";}catch(e){}},
         PLACEHINT:j=>{try{placeHint=JSON.parse(j);}catch(e){}},
         PLACES2:j=>{try{places=JSON.parse(j);}catch(e){}},
-        STEP:j=>{try{const sd=JSON.parse(j);addStep(sd);if(hzReady)hzTele("step",sd);
+        STEP:j=>{try{const sd=JSON.parse(j);addStep(sd);if(globalThis.hzReady)hzTele("step",sd);
                  // the server answered the wake: its bars are read now (6b461)
                  if(sd&&sd.id==="wake"&&sd.s==="done"&&/^Woke /.test(sd.l||""))
                    srvUseKick();}catch(e){}},
@@ -48252,7 +48254,7 @@ async function send(){
       const gsecs=genT0?(lastChunkT-genT0)/1000:0;
       lastRate=gsecs>0.3?tokEst/gsecs:0;
       setToks(lastRate,"streaming");
-      if(hzReady)hzTele("rate",lastRate);
+      if(globalThis.hzReady)hzTele("rate",lastRate);
       // a RESET replays the replacement ONCE, when it arrives (6b463, per
       // Patrick: "started streaming all over again while flickering").
       // raw keeps the marker for the rest of the stream, so testing
@@ -48393,7 +48395,7 @@ async function send(){
   }
   setToks(0,"idle");
   generating=false;abortCtl=null;genChat=null;document.body.classList.remove("gen");
-  if(hzReady)hzOnLand(wasAborted);  // Horizon: the sky settles (6b526)
+  if(globalThis.hzReady)hzOnLand(wasAborted);  // Horizon: the sky settles (6b526)
   srvBoost=false;     // the bars go back to their normal rate (6b461)
   sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
   if(curChat===myChat)autoScroll();
@@ -48585,7 +48587,7 @@ function greeting(){
 // Horizon's greeting (6b526) is by the time of day, in its own words
 const _greetBank=greeting;
 greeting=function(){
-  if(hzReady&&document.documentElement.classList.contains("hz"))return hzGreeting();
+  if(globalThis.hzReady&&document.documentElement.classList.contains("hz"))return hzGreeting();
   return _greetBank();
 };
 (function(){const g=$(".greet");if(g)g.textContent=greeting();})();
@@ -48594,7 +48596,7 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
   NICK=(String(p.user_name||"").trim().split(" ")[0]||"").slice(0,24);
   CITY=String(p.home_area||"").split(",")[0].trim().slice(0,32);
   const g=$("#hero .greet");
-  if(hzReady)hzHomePaint();        // Horizon: the name reaches the greeting (6b526)
+  if(globalThis.hzReady)hzHomePaint();        // Horizon: the name reaches the greeting (6b526)
   if(!g||!(NICK||CITY))return;
   g.textContent=greeting();
   // mid-wipe the fly-in is already raising it; otherwise rise in again
@@ -49263,7 +49265,7 @@ function syncSuggest(){
 function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
-  if(hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
+  if(globalThis.hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -49421,7 +49423,7 @@ function chatOpenHit(id){
   if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);
 }
 function renderChats(){
-  if(hzReady)setTimeout(hzHistoryPaint,0);   // Horizon's rows (6b526)
+  if(globalThis.hzReady)setTimeout(hzHistoryPaint,0);   // Horizon's rows (6b526)
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
   // code chats, Agents lists specialist chats, Chat lists the rest
@@ -50059,7 +50061,7 @@ async function pollStats(){
   // a PC with no GPU readings (no NVIDIA card) shows no bar rather
   // than a made-up one (6b317, from the Windows sweep)
   if($("#gpu-meter"))$("#gpu-meter").hidden=(IS_PC&&gpu==null);
-  if(hzReady)hzStats(gpu,memPct);  // Horizon: only the real reading, never the ambient one (6b526)
+  if(globalThis.hzReady)hzStats(gpu,memPct);  // Horizon: only the real reading, never the ambient one (6b526)
   if(gpu==null){
     // ambient fallback — clearly approximate
     simGpu=Math.max(2,Math.min(97,simGpu+(Math.random()-0.5)*8+(generating?22:-16)));
@@ -52508,9 +52510,9 @@ function srvChipsHtml(list){
 }
 function paintSrvChips(){
   const box=document.getElementById("srv-chips");
+  if(globalThis.hzReady)hzMachinesPaint();   // Horizon's header follows the servers (6b526)
   if(box)box.innerHTML=srvChipsHtml(srvList);
   srvMetersRefresh();
-  if(hzReady)hzHomePaint();        // Horizon: the machines and the status line (6b526)
 }
 // "<server> Only" (6b337, per Patrick: "Under the cloud models only, can we
 // add a Olama one only or whatever the server name is in a user's case?"):
@@ -52651,7 +52653,7 @@ function tierShown(t){
   return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
 }
 // the chip's words carry the modes' brand names (6b526): "Zenith · <server> only"
-function tierLabel(){return hzModeWords(tierShown(tier))||model;}
+function tierLabel(){return (typeof hzModeWords==="function"?hzModeWords(tierShown(tier)):tierShown(tier))||model;}
 // the modes that can't answer are the ones tierOff holds (setTier, the
 // menu's click and paintTierAvail read it)
 function srvSyncOff(){
@@ -53226,7 +53228,7 @@ function kickWipe(){
   if(wipeKicked)return;wipeKicked=true;
   // Horizon (6b526) opens on its own intro; the wipe and the band are Classic's
   if(document.documentElement.classList.contains("hz")){
-    if(hzReady)hzIntroKick();
+    if(globalThis.hzReady)hzIntroKick();
     return;
   }
   // native Mac boot: the window wipes in from the right first, and the
@@ -55632,11 +55634,11 @@ function hzClipChoose(clips,bucket,cached,hist,rnd){
   const fresh=fit.filter(c=>recent.indexOf(c.i)<0);
   const one=a=>a.length?a[Math.min(a.length-1,Math.floor(rnd()*a.length))]:null;
   const want=one(fresh)||one(fit);
-  if(!want)return {play:null,fetch:null};
-  if(has.has(want.i))return {play:want,fetch:null};
+  if(!want)return {play:null,later:null};
+  if(has.has(want.i))return {play:want,later:null};
   const age=c=>{const k=hist.indexOf(c.i);return k<0?1e9:k;};
   const now=one(fresh.filter(c=>has.has(c.i)))||fit.filter(c=>has.has(c.i)).sort((a,b)=>age(b)-age(a))[0]||null;
-  return {play:now,fetch:want};
+  return {play:now,later:want};
 }
 async function hzClipPick(){
   let cached=[],hist=[];
@@ -55649,11 +55651,11 @@ async function hzVideoBoot(){
   if(hzS.debug&&hzS.debug.media==="0")return;
   const tag=hzS.mediaGen;
   let ch=null;
-  if(hzS.debug&&hzS.debug.clip!=null){const c=HZ_CLIPS.find(x=>x.i===+hzS.debug.clip);if(c)ch={play:c,fetch:null};}   // a dev copy may name one
+  if(hzS.debug&&hzS.debug.clip!=null){const c=HZ_CLIPS.find(x=>x.i===+hzS.debug.clip);if(c)ch={play:c,later:null};}   // a dev copy may name one
   if(!ch)ch=await hzClipPick();
   if(tag!==hzS.mediaGen)return;
   hzS.clipBucket=hzBucket(hzHourNow());
-  if(ch.fetch)api("/api/sky/status?i="+ch.fetch.i+"&warm=1").catch(()=>{});   // for a later open, never waited on
+  if(ch.later)api("/api/sky/status?i="+ch.later.i+"&warm=1").catch(()=>{});   // for a later open, never waited on
   if(ch.play)hzClipLoad(ch.play);
 }
 function hzClipLoad(c){
@@ -55674,7 +55676,7 @@ function hzClipCheck(){
   if(hzS.clip.when.split(" ").indexOf(b)>=0)return;
   const tag=hzS.mediaGen;
   hzClipPick().then(ch=>{if(tag!==hzS.mediaGen||!ch.play||ch.play.i===hzS.clip.i)return;
-    if(ch.fetch)api("/api/sky/status?i="+ch.fetch.i+"&warm=1").catch(()=>{});
+    if(ch.later)api("/api/sky/status?i="+ch.later.i+"&warm=1").catch(()=>{});
     if(hzS.sky)hzS.sky.footTo=0;
     setTimeout(()=>{if(tag===hzS.mediaGen)hzClipLoad(ch.play);},700);});
 }
@@ -55914,7 +55916,8 @@ function hzSrvV(name){const s=typeof srvList!=="undefined"?srvList.find(x=>x.nam
 function hzMachines(){
   const esc_=typeof esc==="function"?esc:(s=>String(s));
   const out=[];
-  out.push({id:"local",v:hzLocalV(),name:hzLocalName(),hw:typeof CHIP_NAME==="string"?CHIP_NAME:"",st:hzS.gen&&hzS.genLocal?"Thinking":"Ready",working:!!(hzS.gen&&hzS.genLocal),asleep:false});
+  const chip=$("#spec-chip");
+  out.push({id:"local",v:hzLocalV(),name:hzLocalName(),hw:chip?chip.textContent.trim():"",st:hzS.gen&&hzS.genLocal?"Thinking":"Ready",working:!!(hzS.gen&&hzS.genLocal),asleep:false});
   const srvs=typeof srvList!=="undefined"?srvList.filter(s=>s.paired):[];
   srvs.forEach(s=>{const g=s.gpu||{},ok=!!(s.only&&s.only.ok),asleep=typeof srvAsleep==="function"&&srvAsleep(s);
     out.push({id:s.id,v:hzVendor(g.vendor)||"srv",name:s.name,hw:[g.name||"",g.vram_bytes?Math.round(g.vram_bytes/1073741824)+" GB":""].filter(Boolean).join(", "),
@@ -55968,7 +55971,7 @@ function hzModeIndex(t){
   return 1;
 }
 function hzOffLabel(t){
-  if(t==="Max")return "Max";
+  if(t==="Max")return t;
   if(typeof isCloudMode==="function"&&isCloudMode(t))return "Cloud only";
   if(typeof isSrvMode==="function"&&isSrvMode(t)){const s=typeof srvModeOf==="function"?srvModeOf(t):null;return s?s.name+" only":"Your server";}
   if(typeof advOn!=="undefined"&&advOn)return "Your own council";
@@ -56027,7 +56030,6 @@ function hzLineupOf(mode){
   (info.models||[]).forEach(m=>{
     const k=m.indexOf(sep);
     if(k>=0){const nm=m.slice(0,k),s=srvs.find(x=>x.name===nm);rows.push({n:m.slice(k+sep.length),m:nm,v:hzVendor(s&&s.gpu&&s.gpu.vendor)||"srv",id:s?s.id:nm});}
-    else if(typeof isCloudModel==="function"&&isCloudModel(m))rows.push({n:m,m:"Cloud",v:"cloud",id:"cloud"});
     else rows.push({n:m,m:hzLocalName(),v:hzLocalV(),id:"local"});
   });
   return rows;
