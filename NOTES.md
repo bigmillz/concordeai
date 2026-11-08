@@ -9,6 +9,95 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b532 — the move to Rust begins: a Tauri shell replaces pywebview as the window (per Patrick)
+
+Patrick: "I want to do the fastest language we can run that will be cross-platform." He
+chose Rust and approved the toolchain (rustup's rustc/cargo 1.99.1 under
+`/opt/homebrew/opt/rustup/bin`, not on PATH; tauri-cli 2.12.4 under `~/.cargo`). The
+strategy is a strangler, not a rewrite: `RUST_PLAN.md` at the repo root is the plan
+(contract, inventory, porting order, crates, engines, packaging, updater, tests, timeline,
+risks), grounded in measurements taken first.
+
+**The baseline, Python today** (windowless dev copy on 9884, no servers, no keys): launch
+to `run/instance.json` 0.35 s, to `/` answering 0.38–0.40 s; idle RSS 208 MB (server
+only); the page 742,353 bytes in one response (523 KB inline JS, 173 KB CSS), rendered
+server-side in 17–35 ms, parsed by Blink in 19 ms (responseEnd → domInteractive);
+`/api/chat` received → first model call **2.3–3.1 ms** warm (9.1 ms the first time, it
+probes `/models`), against a recording provider stub, Cloud Only, search off. So the
+server's own overhead is not the problem; the move buys launch, memory, a real binary, the
+end of the pywebview crash classes (6b508) and, in step 3, in-process engines.
+
+**Step 1, done on macOS: `shell/`**, a Tauri 2 app (Rust, tauri 2.12.5, plugins
+single-instance and opener; one bin, `ConcordeAI`). It starts `millenai.py` as a sidecar
+with `MILLENAI_SHELL=tauri`, waits for `run/instance.json` and `run/boot.json` (both with
+the child's pid), loads `/?boot=<code>` once and deletes the boot note. The page gets its
+token the way it always has, through `window.pywebview.api.api_token()`: an
+initialization script (main frame only) defines that one frozen object as a shim over one
+IPC command, `api_token`, which answers only while the webview's URL is
+`http://127.0.0.1:<the sidecar's port>` (the `_WindowBridge` rule), under a capability
+that grants exactly `allow-api-token` to `http://127.0.0.1:*`. Quit (Cmd+Q, close, a
+second launch) SIGTERMs the sidecar and waits 8 s before SIGKILL; the sidecar also watches
+its parent pid and runs `_signal_exit` when the shell is gone, so a crashed shell leaves
+no orphan (proven with SIGKILL: gone in ~1 s, note dropped, port free). Menus: ConcordeAI,
+Edit, View (Reload), Window. Window: 1320×860, min 940×620, transparent title bar with the
+title hidden, dark appearance, window and webview background `#03040a` before any paint
+(first frame captured: pure night). Downloads land in `~/Downloads`; other origins open in
+the browser; the main frame shows only the app's origin, `about:blank`, or the shell's own
+error page (a `data:` document: the server's exit code meaning and the log's tail).
+
+**The lesson that cost an hour**: the webview must start on `about:blank`. Starting on
+Tauri's own `tauri://localhost` page and navigating to `/?boot=` made WebKit treat the
+navigation as cross-site, the 302's `SameSite=Strict` cookie was withheld on `/`, and the
+window sat on the 403 ("open the app from its own window"). pywebview never saw this
+because its first load has no initiator document.
+
+**The Python side, `MILLENAI_SHELL=tauri`** (small and marked): the setting is known and
+takes only `tauri` (anything else exits 2; `_dev_home`); `SHELL`/`SHELL_PARENT` beside
+`NOWINDOW`; the window blocker and the Cocoa patches are skipped; `_write_boot_note()`
+runs after the instance note; `__WIN_WIPE__` is `0` (the wipe needs pywebview's transparent
+NSWindow); the serve loop polls `os.getppid()` once a second. `_gate` is untouched; the
+token is still never in the HTML, a URL or a cookie. Allowed for the real app, not only
+dev copies: it must run the real folder to be the app, and it weakens nothing (the boot
+note is 0600 beside the note that already holds the key and token).
+
+**Measured, pywebview vs the release shell** (dev copies, fresh folders, memory 20 s after
+launch, three rounds; `scratchpad/rs_ab*.out`): window on screen pywebview 0.94–1.12 s;
+shell **0.22–0.23 s** warm (3.0 s the first launch after copying a new ad-hoc-signed
+binary, macOS's one-time assessment). Memory, everything: pywebview 1.16–1.30 GB (Python
+576–580 MB, WebKit GPU 78–104, WebContent 85–92, Networking 417–533 MB); shell 0.70–1.24
+GB (ConcordeAI 102–115 MB, Python sidecar 482–486 MB, GPU 32–78, WebContent 67–90,
+Networking 20–476 MB). The Networking process is the backdrop clips being fetched and
+swings in both; without it pywebview is 767–790 MB and the shell 684–763 MB. The sidecar's
+~485 MB is the Python server with the page using it (208 MB bare); step 1 is a window win,
+the memory win is step 2's. Bundle: 6.7 MB `.app` (the Python one is 3.0 MB;
+both lean on the venv). Cross-platform: `cargo check --target x86_64-pc-windows-msvc`
+needs Homebrew LLVM's `llvm-rc` on PATH (tauri-winres compiles the icon resource); Linux
+needs the gtk/webkit dev packages, so `.github/workflows/shell-build.yml` (not pushed)
+builds macOS arm64/x64, Windows x64 and Linux x64 as artifacts.
+
+**Not yet**: microphone permission in the shell's WKWebView (pywebview needed a delegate
+and a private preference; wry grants the delegate call, the preference is unverified),
+`target=_blank` windowed check, the updater's swap for the new bundle layout
+(`Contents/MacOS/ConcordeAI`, `Resources/millenai.py`), `release.sh` building the shell,
+signing/notarisation, Windows and Linux runs. `RUST_PLAN.md` §12 lists the decisions.
+
+**Gauntlet**: six new checks under `== the native shell's sidecar mode ==`: the setting and
+its mutants through `_dev_home`; the source rules (blocker skipped, boot note, no wipe,
+parent watch); a live shell-mode copy on 9903 (boot note 0600 with its pid, page without
+token/key/code, one trade → HttpOnly Strict cookie, replay 403, cookie alone on /api 403,
+token alone 403, other Host 403, proxy header 403, wrong token 403); the orphan rule (a
+stand-in `sh` parent SIGKILLed → the sidecar stops within seconds and drops its note); no
+boot note outside shell mode; and the Rust source's own rules (one command, the
+scheme/host/port check, `about:blank`, the night colour, one permission, no secret in the
+shim, SIGTERM on exit). Full run: see the scorecard line below.
+
+Run: `cd shell/src-tauri && MILLENAI_DEV=1 MILLENAI_HOME=… MILLENAI_PORT=9895 cargo tauri dev`
+(or `cargo run`); the release bundle `cargo tauri build --bundles app`. Overrides
+`CONCORDE_PYTHON`, `CONCORDE_SERVER`; debug builds honour `CONCORDE_SHELL_QUIT_AFTER`.
+
+Full gauntlet: queued behind other sessions' locks at the time of this commit; the
+scorecard follows in the next commit's line here.
+
 ## 6b459 — the time-left line counts down instead of climbing (per Patrick)
 
 Patrick: "when running a query … make the estimated time remaining a little

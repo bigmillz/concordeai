@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ConcordeAI</title>
+<style>
+  /* The shell's first frame: the Horizon night (#03040a), nothing else, so
+     there is no flash before the app's own page replaces this one. */
+  html, body { margin: 0; height: 100%; background: #03040a; color: #c9d0e2;
+    font: 14px/1.5 -apple-system, "Instrument Sans", system-ui, sans-serif; }
+  #err { display: none; max-width: 640px; margin: 18vh auto 0; padding: 0 24px;
+    white-space: pre-wrap; }
+  #err h1 { font-weight: 500; font-size: 19px; color: #f1f3fa; margin: 0 0 12px; }
+  #err pre { font: 12px/1.5 "Geist Mono", ui-monospace, Menlo, monospace; color: #9aa6c6;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09);
+    border-radius: 12px; padding: 14px; overflow: auto; max-height: 40vh; }
+</style>
+</head>
+<body>
+<div id="err"><h1></h1><p></p><pre></pre></div>
+<script>
+// the shell calls this when the server can't start (its exit code's meaning
+// and the tail of its log); nothing else ever draws here
+function showErr(title, why, log) {
+  var e = document.getElementById("err");
+  e.querySelector("h1").textContent = title;
+  e.querySelector("p").textContent = why;
+  e.querySelector("pre").textContent = log || "";
+  e.style.display = "block";
+}
+</script>
+</body>
+</html>
