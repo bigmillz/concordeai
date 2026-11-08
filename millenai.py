@@ -43392,7 +43392,11 @@ __HZ_FONTS__
    sibling layers above it, so the horizon line stays crisp */
 .hz #hz-limb{overflow:hidden}
 .hz #hz-earth-vid{position:absolute;left:50%;top:0;width:2400px;height:720px;margin-left:-1200px;object-fit:cover;object-position:50% 40%;
-  opacity:0;transition:opacity 2.6s ease;filter:saturate(.42) brightness(.56) contrast(1.1) sepia(.24) hue-rotate(176deg)}
+  opacity:0;transition:opacity 2.6s ease;filter:saturate(.42) brightness(.66) contrast(1.08) sepia(.24) hue-rotate(176deg);
+  /* the footage comes in below the rim, so the painted cap keeps its glow and
+     the planet doesn't read as a black plate under the composer (measured) */
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.22) 0,rgba(0,0,0,.6) 90px,#000 220px);
+          mask-image:linear-gradient(180deg,rgba(0,0,0,.22) 0,rgba(0,0,0,.6) 90px,#000 220px)}
 .hz #hz-earth-vid.on{opacity:.55}
 /* THE TRACE LINES: the edges of a city aerial, thin ice lines flowing on a
    canvas behind the stars, strongest mid-sky and gone behind the headline */
