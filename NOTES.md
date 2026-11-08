@@ -17135,3 +17135,80 @@ typing of a word with those letters could open the board and eat the end of the 
 trouble with the letter Z. Removed whole: its CSS, the #zito markup, the script, its seat in the
 Escape chain and in dictation's modal check. The 6302 setup-dialog check now ends its slice at the
 page's <script> instead of at the board, and a new check keeps the board, the combo and zitoEsc out.
+
+## 6b531 — Faster first words: the hour in the system prompt; a llama.cpp bridge for the server (per Patrick)
+
+"Faster feels smarter." Branch speed-1, measured on this Mac (M4 Pro, 48 GB) under the shared
+engines.lock, with about ten helper sessions sharing the machine (load 5-8, 86% memory free, no other
+engine resident); the dev copy on 9885 on its own data folder, no cloud keys, no servers. Every number
+below is measured unless it says estimated. The timing harness (an HTTP client that reads the chat
+stream as the page does: first byte, first visible text with the frames stripped, total) and the
+prompts live in the session's scratchpad (speed1/e2e.py, prompts.json, spec_bench.py, cache_probe.py).
+
+**What the baseline said (Fast, Gemma 4 26B, before any change; first text / total):**
+cold engine q1 26.9 s / 37.3 s; warm q1 14.7 / 20.6 and 19.3 / 27.8; q2 9.0 / 14.5 and 10.5 / 18.0;
+q3 15.2 / 26.8 and 21.3 / 32.0; a second turn with history 9.6 / 14.6 and 8.5 / 13.9; Thinking q2
+(Gemma 4 12B writes, Ministral 3 14B reviews, Gemma 4 26B composes and checks) 65.0 / 84.7. Output
+205-300 chars/s. Qwen 3.8 27B and Qwen 3.6 35B were "needs more memory" on the shared machine, so the
+tiers ran on the Gemmas and Ministral.
+
+Three things make the first word late, in order of size:
+
+1. **The two-pass draft.** Fast drafts in silence, then streams the rewrite ("TWO PASS: draft in
+   silence, then stream the rewrite", the `polish` pref, default on). The first visible text is the
+   whole first draft's time: 9-21 s warm. The page already understands RESET, so the draft could
+   stream and the sharpened answer replace it. Not changed here: it trades the answer visibly
+   changing under the reader for a first word in 1-2 s, and that is Patrick's call (see the handback).
+2. **The engine's prompt cache was thrown away every minute.** mlx_lm's server keeps an LRU prompt
+   cache (10 sequences, on by default) and reuses a prompt only from its first token. The system
+   prompt carried "RIGHT NOW for the user it is Saturday, November 8, 2026, 4:05AM", BEFORE the whole
+   history, so a chat's second turn in a different minute re-read everything. Probed on the resident
+   Gemma 4 26B with a 5,562-token chat: fresh 8.55 s to the first token (0 cached); identical 0.17 s
+   (5,561 cached); a new user turn 2.32 s (4,096 cached); the same prompt with the clock one minute
+   later 8.32 s (0 cached). In the app, through the dev copy, the engine log's "Prompt processing"
+   count for the second turn across a minute boundary: **3,521 tokens before, 364 after**; first text
+   13.2 s before, 6.8 s after (part of that is draft length). Fix: the system prompt names the hour
+   ("around 4AM"), which keeps its rule (never a different weekday, date or hour) and changes once an
+   hour; the exact minute still rides the question for searched answers (6b264's clock line), where
+   it was shown to matter. Gauntlet: the hour format is pinned, the minute format is kept out of that
+   region, the clock line stays, and a mutant with the minute back is caught.
+3. **The cold engine.** The janitor stops every MLX engine after 5 idle minutes; the next question
+   then pays the load: 26.9 s to the first word against 14.7 s warm for the same question (12 s,
+   Gemma 4 26B, 15 GB). A longer idle window (30 min, or until memory is wanted) is a memory
+   decision for Patrick, not changed here. Also seen: killing the dev copy with SIGTERM left its
+   engine running as an orphan on 8910 (killed by port); the app's clean exit path stops them, a
+   signal does not.
+
+**Speculative decoding on MLX: not possible for the models the tiers use, with this mlx-lm (0.32.2).**
+The server takes `--draft-model` and the vocabularies match (Qwen3.5-0.8B-4bit, 652 MB, downloaded
+for the test, and the cached Qwen3.5-2B share Qwen 3.8/3.6's 248,044-token tokenizer; Gemma 4 E2B
+shares the Gemmas' 262,144). But mlx_lm's speculative step needs a trimmable KV cache, and: Qwen 3.8
+27B and Qwen 3.6 35B (qwen3_5 / qwen3_5_moe) keep an ArraysCache for their linear-attention layers,
+which raises "Speculative decoding requires a trimmable prompt cache (got {'ArraysCache'})" on the
+first draft; Gemma 4 12B and 26B use a RotatingKVCache with a 1,024-token window, trimmable only
+while the prompt is shorter than the window, and the app's system prompt alone is 1,581 tokens. The
+same rule is why the Gemmas cannot reuse a longer cached prompt with a changed clock (0 cached above).
+Qwen 3.8 27B measured 12.0-13.7 tok/s without a draft (0.9-1.1 s to the first token on a short
+prompt), the figure a draft would have had to beat. Nothing shipped; the draft wiring was not written.
+Worth a retry when mlx-lm's generator learns to speculate over hybrid caches, or if the catalog gains a
+dense standard-KV model in a tier.
+
+**The server (prepared, not installed: it is down and Patrick is abroad).** BEAT_FABLE measured
+llama.cpp's CUDA build 15-25% faster than Ollama on 3 of 4 models and 59% slower on gemma4, so the kit
+gains an optional bridge: `ollama1-llamacpp` (lib/o1llamacpp.py, bin, unit, config/llamacpp.json,
+tests/test_llamacpp.py with a stub llama-server, tools/install-llamacpp.sh). It speaks Ollama's dialect
+to the gateway on a UNIX socket (/run/ollama1/llamacpp/bridge.sock, ollama:o1gw 2770: no port, no
+port-guard change), passes everything to Ollama except the models named in /etc/ollama1/llamacpp.json,
+which it serves on llama-server (-fa on, --jinja, -ctk/-ctv, --spec-type ngram-mod --spec-draft-n-max N
+as measured on b11849; the old --draft-max is gone; a same-tokenizer draft GGUF through -md) and
+translates chat, generate, the empty-prompt load, keep_alive 0 and /api/ps. The gateway's fit check
+still reads Ollama's /api/show; its 100%-in-VRAM check reads the merged /api/ps, where the bridge
+reports the child's VRAM from nvidia-smi and 0 when it cannot (fails closed). One runtime on the card:
+a child start unloads Ollama's models, an Ollama model stops the child. The gateway reads one new
+config key, `llamacpp_bridge`; removing it is the rollback (o1ollama.connect learned `unix:` bases; the
+OpenAI door uses it too). README: the plan (check, install only when quiet, verify, rollback: no
+reboot, no network or driver change; the CUDA build is copied from where the measurements ran, not
+downloaded). Kit tests: 2,248 run, all pass (one quickburn test failed once in the full run and passes
+alone and is untouched; a README json block had to be labelled jsonc because test_power validates
+every ```json block as a tariff). Not covered on purpose: 8470 (llama-server's loopback port) is not
+in the nft guard; that firewall line waits for a visit.
