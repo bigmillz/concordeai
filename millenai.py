@@ -44600,6 +44600,16 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 /* MODE NAMES (6b526) */
 const MODE_NAMES={"Fast":"Flare","Thinking":"Zenith","Pro":"Meridian","Vera Rubin":"Odyssey"};
 const modeName=t=>MODE_NAMES[t]||t;
+// a chip line that starts with a mode ("Fast", "Thinking · <server> only") takes the brand name
+const hzModeWords=s=>String(s||"").replace(/^(Fast|Thinking|Pro|Vera Rubin)(?=$| \u00b7 )/,m=>modeName(m));
+// the engine menu's rows are built with the tiers' keys (the gauntlet pins their
+// builders); once a menu is on screen its mode names become the brand names
+function hzMenuBrand(root){
+  if(!root)return;
+  root.querySelectorAll(".engrow.mode .enm").forEach(e=>{e.textContent=modeName(e.textContent);});
+  root.querySelectorAll(".engrow.mode .einfo").forEach(e=>{
+    e.setAttribute("aria-label",String(e.getAttribute("aria-label")||"").replace(/^What (Fast|Thinking|Pro|Vera Rubin) uses$/,(m,k)=>"What "+modeName(k)+" uses"));});
+}
 const HZ_MODE_DESC={"Fast":"A quick answer","Thinking":"Thinks it through and checks itself",
   "Pro":"Goes deep, every model weighs in","Vera Rubin":"Keeps going until you stop it",
   "Max":"Every model you have, everywhere"};
@@ -44958,9 +44968,9 @@ function paintModels(){
     el.classList.toggle("active",manual&&el.dataset.model===council[0]);
     const old=el.querySelector(".rank"); if(old)old.remove();
   });
+  if(hzReady)hzModesPaint();       // Horizon's slider follows the tier (6b526)
   $("#chip-model").textContent=tierLabel();
   paintCloudChip();
-  if(hzReady)hzModesPaint();       // Horizon's slider follows the tier (6b526)
 }
 function selectModel(name){
   if(!name)return;  // rows without a model (Power Mode) don't select
@@ -45532,6 +45542,7 @@ function openEngSub(id,keepScroll,byHover){
   if(keep<0&&detEl&&engMenu.contains(detEl))hideTierPop();
   engSubId=id;engSubByHover=!!byHover;
   engSub.innerHTML=s?srvSubRows(s):cloudSubRows();
+  hzMenuBrand(engSub);             // the server's modes too (6b526)
   engMenu.querySelectorAll(".engrow.srvmenu").forEach(e=>e.classList.toggle("open",e===row));
   engSub.hidden=false;
   placeEngSub();
@@ -45616,7 +45627,7 @@ function detRefresh(){
 // Advanced. No line under any row: who writes the answer is in the pop-out.
 function engMainRows(){
   return ["Fast","Thinking","Pro","Max"].filter(n=>TIER_META[n]).map(n=>
-    modeRow(n,TIER_META[n].icon,modeName(n),MODE_LABEL[n]||"",!!tierOff[n],"","",tier===n))
+    modeRow(n,TIER_META[n].icon,n,MODE_LABEL[n]||"",!!tierOff[n],"","",tier===n))
     .join("")
     +cloudMenuRow()
     // one row per paired server: its modes open in a sub-menu beside it (6b337)
@@ -45632,6 +45643,7 @@ function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
   srvSyncOff();
   engMenu.innerHTML=engMainRows();
+  hzMenuBrand(engMenu);            // Flare, Zenith, Meridian (6b526)
   engMenu.hidden=false;
   // fit the window (6b336): open on the side with room; when neither
   // side holds the whole list, take the roomier one and scroll
@@ -52294,8 +52306,8 @@ function srvPickable(s){return !!(s&&s.paired&&s.only&&(s.only.ok||s.only.asleep
 // here and nowhere else: {id, mode}, mode "" for "<name> Only"; a tier that
 // isn't one of these has no id, so its server is "gone". A function, not a
 // const: a boot path that reads it before this line would throw (the TDZ)
-function srvSubModes(){return [["fast",modeName("Fast"),"\u26a1\ufe0f"],["think",modeName("Thinking"),"\ud83e\udde0"],
-  ["pro",modeName("Pro"),"\u2728"],["max","Max","\ud83d\ude80"]];}   // Max: every model on it (6b442)
+function srvSubModes(){return [["fast","Fast","\u26a1\ufe0f"],["think","Thinking","\ud83e\udde0"],
+  ["pro","Pro","\u2728"],["max","Max","\ud83d\ude80"]];}   // Max: every model on it (6b442)
 function srvTierParse(t){
   const m=isSrvMode(t)?/^srv:([^:]+)(?::(fast|think|pro|max))?$/.exec(t):null;
   const k=m&&m[2]?srvSubModes().find(x=>x[0]===m[2]):null;
@@ -52406,16 +52418,16 @@ function tierShown(t){
     const sv=((tierInfo[t]||{}).models||[]).filter(m=>m.indexOf(SRV_SEP)>=0);
     // Fast with cloud power on asks the cloud first (the server seat is the
     // fallback), so the chip doesn't claim the server answers (final review)
-    // the modes carry their brand names (6b526): Flare, Zenith, Meridian
-    if(!sv.length||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return modeName(t);
+    if(!sv.length||(t==="Fast"&&(tierInfo[t]||{}).fastcloud))return t;
     const nm=[...new Set(sv.map(m=>m.slice(0,m.indexOf(SRV_SEP))))].join(" + ");
-    return t==="Fast"?modeName(t)+" \u00b7 "+sv[0].replace(SRV_SEP," "):modeName(t)+" \u00b7 "+nm+(sv.length>1?" \u00d7"+sv.length:"");
+    return t==="Fast"?t+" \u00b7 "+sv[0].replace(SRV_SEP," "):t+" \u00b7 "+nm+(sv.length>1?" \u00d7"+sv.length:"");
   }
   const s=srvModeOf(t),mode=srvTierParse(t).mode;
-  if(s&&mode)return modeName(mode)+" \u00b7 "+s.name+" only";   // "Zenith · <name> only" (6b426, 6b526)
+  if(s&&mode)return mode+" \u00b7 "+s.name+" only";   // "Thinking · <name> only" (6b426)
   return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
 }
-function tierLabel(){return tierShown(tier)||model;}
+// the chip's words carry the modes' brand names (6b526): "Zenith · <server> only"
+function tierLabel(){return hzModeWords(tierShown(tier))||model;}
 // the modes that can't answer are the ones tierOff holds (setTier, the
 // menu's click and paintTierAvail read it)
 function srvSyncOff(){

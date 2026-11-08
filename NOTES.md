@@ -17210,9 +17210,12 @@ about 20 s for you" from the page's own `millen.speeds`; compact in the conversa
 name shimmers softly and a conic light ring travels the composer's edge (`@property --hz-ang`, masked to the
 border; a still gradient border where @property or mask-composite is missing); at Odyssey in full; Flare
 and Zenith have neither. **The modes' names** (`/* MODE NAMES (6b526) */`, declared at the top of the script:
-`tierShown()` reads `modeName` during boot and a const further down was a TDZ throw that killed the page,
-seen live): `/api/chat` also accepts Flare/Zenith/Meridian/Odyssey beside Smart/Best/Power; tiers, prefs and
-`/api/tiers` keys are unchanged.
+`tierLabel()` reads `modeName` during boot and a const further down was a TDZ throw that killed the page,
+seen live): the chip's line goes through `hzModeWords` ("Zenith · <server> only"), the engine menu's rows
+through `hzMenuBrand` after they land (the gauntlet pins `tierShown`, `modeRow`, `engMainRows` and the
+menu's `innerHTML` lines, so the names are applied one layer out and those pins hold); `/api/chat` also
+accepts Flare/Zenith/Meridian/Odyssey beside Smart/Best/Power; tiers, prefs and `/api/tiers` keys are
+unchanged.
 
 **The intro**, once per launch (sessionStorage), never with effects off or reduced motion: black, the stars,
 the limb rising under a warm flare with the wash blooming, the aurora, the lockup scaled up with its tracking

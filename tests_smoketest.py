@@ -37576,7 +37576,10 @@ _hz_post = _MILLENAI_SRC[_MILLENAI_SRC.index('        if tier == "Power":'):_MIL
 check("horizon: Flare, Zenith, Meridian and Odyssey are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and no model is named on the slider",
       _hz_alias["MODE_ALIASES"] == {"Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro", "Odyssey": "Vera Rubin"}
       and "tier = MODE_ALIASES[tier]" in _hz_post and "MODE_ALIASES[tier] in TIERS" in _hz_post
-      and "return modeName(t);" in _MILLENAI_SRC and "modeRow(n,TIER_META[n].icon,modeName(n)," in _MILLENAI_SRC
+      and "function tierLabel(){return hzModeWords(tierShown(tier))||model;}" in _MILLENAI_SRC
+      and "hzMenuBrand(engMenu);" in _MILLENAI_SRC and "hzMenuBrand(engSub);" in _MILLENAI_SRC
+      and 'root.querySelectorAll(".engrow.mode .enm").forEach(e=>{e.textContent=modeName(e.textContent);});' in _MILLENAI_SRC
+      and "const hzModeWords=s=>String(s||\"\").replace(/^(Fast|Thinking|Pro|Vera Rubin)(?=$| \\u00b7 )/,m=>modeName(m));" in _MILLENAI_SRC
       and 'return s?s.name+" only":"Your server";' in _hz_js and 'return "Your pick";' in _hz_js
       and "tierLabel()" not in _hz_js[_hz_js.index("function hzModesPaint"):_hz_js.index("function hzSliderShow")], "")
 
