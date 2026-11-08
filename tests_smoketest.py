@@ -37414,25 +37414,28 @@ check("the final writer's reasoning level goes only to gpt-oss, and a server tha
       and 'm.get("_think") for m in messages' in _ss18, "")
 # ==== quality-2 (6b518): end ====
 
-# ==== HORIZON (6b526, per Patrick): the home, the real sky, the intro, the effort slider, the Look ====
+# ==== HORIZON (6b526, per Patrick): the home, the GPU night, the opening, the effort slider, the Look ====
 # The served page carries the Horizon layer; every rule of it is scoped under html.hz so
-# Classic is untouched; the intro is skippable and never runs with effects off or reduced
-# motion; every animation pauses while hidden; the dev-only ?hz= flag is refused outside a
-# dev copy; the sky's arithmetic lands on known stars; the modes carry their brand names.
-# Each rule has a mutant the same predicate must catch.
+# Classic is untouched; the opening is skippable, plays in full on the first launch only and
+# never with effects off or reduced motion; everything pauses while hidden; the dev-only ?hz=
+# flag is refused outside a dev copy; the sky's arithmetic lands on known stars; the modes
+# carry their brand names; there is no limb. Each rule has a mutant the same predicate must catch.
 _hz_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ============================================================ HORIZON (6b526) */"):
                         _MILLENAI_SRC.index("/* ============================================================ HORIZON end */")]
 _hz_js = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ========================================================= HORIZON (6b526) */"):
                        _MILLENAI_SRC.index("/* ===================================================== HORIZON end (6b526) */")]
 _hz_head = _MILLENAI_SRC[_MILLENAI_SRC.index('var hzLook="horizon";'):_MILLENAI_SRC.index('<title>MillenAI __APP_VER__</title>')]
-check("horizon: the served page carries the sky, the header, the slider, the Look row, the tokens and no unfilled template",
-      'id="hz-sky"' in page and 'id="hz-top"' in page and 'id="hz-effort"' in page and 'id="look-sel"' in page
+check("horizon: the served page carries the night canvas, the header, the slider, the lineup, the Look and Effects rows, the tokens, and no unfilled template",
+      'id="hz-sky"' in page and '<canvas id="hz-gl"></canvas>' in page and 'id="hz-top"' in page and 'id="hz-effort"' in page
+      and 'id="hz-lineup"' in page and 'id="look-sel"' in page and 'id="fx-level"' in page and 'id="hz-machines"' in page
       and "/* HORIZON TOKENS (6b526) */" in page and "/* MODE NAMES (6b526) */" in page
       and 'const MODE_NAMES={"Fast":"Flare","Thinking":"Zenith","Pro":"Meridian","Vera Rubin":"Odyssey"};' in page
       and "const modeName=t=>MODE_NAMES[t]||t;" in page
-      and "const HZ_PLACE=" in page and "const HZ_SKY_ORBIT=[" in page
-      and not any(t in page for t in ("__HZ_PLACE__", "__HZ_DEBUG__", "__HZ_FONTS__", "__SKY_ORBIT__")), "")
-# the bundled face is served on the cookie alone (an @font-face can carry no header), nothing else from fonts/
+      and "const HZ_PLACE=" in page and "const HZ_SKY_ORBIT=[" in page and "var hzSeen=" in page
+      and not any(tk in page for tk in ("__HZ_PLACE__", "__HZ_DEBUG__", "__HZ_FONTS__", "__SKY_ORBIT__", "__HZ_SEEN__")), "")
+check("horizon: no limb, no Earth circle, no semicircle (OVERRIDE 2); the composer floats",
+      'id="hz-limb"' not in page and "#hz-limb" not in page and "hz-earth" not in page and "--hz-limb-y" not in page and "hzLimbFit" not in page
+      and "3200px" not in _hz_css, "")
 _hzf = req("/static/fonts/Michroma-Regular.ttf", token=False)
 check("horizon: Michroma is served from fonts/ for the lockup, by name only",
       _hzf[0] == 200 and _hzf[1].get("Content-Type") == "font/ttf" and len(_hzf[2]) > 50000
@@ -37442,8 +37445,6 @@ check("horizon: Michroma is served from fonts/ for the lockup, by name only",
 
 
 def _hz_no_external(css, js):
-    """The Horizon blocks fetch nothing from the internet: the only URL in them is the
-    SVG namespace of an inline icon."""
     import re as _re
     urls = _re.findall(r"https?://[^\s'\")]+", css + js)
     return all(u.startswith("http://www.w3.org/2000/svg") for u in urls)
@@ -37456,43 +37457,48 @@ check("horizon: the Horizon blocks reference no external URL (the app's pre-exis
 
 def _hz_skippable(js):
     return ('["keydown","pointerdown","wheel","touchstart"].forEach(k=>addEventListener(k,skip,{capture:true,passive:true}));' in js
-            and "hzIntroEnd(true)" in js
+            and "hzIntroEnd(true)" in js and "if(skipped)hzTraceKill();" in js
             and 'if(skipped){const i=$("#input");if(i&&document.activeElement!==i)i.focus();}' in js)
 
 
-check("horizon: the intro is skipped by any key, click, wheel or touch, and the key lands in the composer; the mutant is caught",
+check("horizon: the opening is skipped by any key, click, wheel or touch (its tracers killed) and the key lands in the composer; the mutant is caught",
       _hz_skippable(_hz_js) and not _hz_skippable(_hz_js.replace('"keydown",', "")), "")
 
 
-def _hz_intro_gated(head, css):
-    return ('if(!hzFxOff&&!hzIntroDone&&!hzReduced)document.documentElement.classList.add("hz-intro");' in head
+def _hz_intro_gated(head, css, js):
+    return ('if(!hzFxOff&&!hzIntroDone&&!hzReduced&&!hzSeen)document.documentElement.classList.add("hz-intro");' in head
             and 'matchMedia("(prefers-reduced-motion: reduce)").matches' in head
             and 'localStorage.getItem("millen.video")==="0"' in head
             and "@media (prefers-reduced-motion:reduce){" in css
-            and ".hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-dot.live,.hz #hz-intro-mark{animation:none!important}" in css
-            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-dot.live{animation:none!important}" in css)
+            and ".hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint{animation:none!important}" in css
+            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-sl-name.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen{animation:none!important}" in css
+            and "if(!hzMotionOK()||hzS.reduced)return;" in js)
 
 
-check("horizon: effects off and reduced motion disable the intro and every sky animation; the mutants are caught",
-      _hz_intro_gated(_hz_head, _hz_css)
-      and not _hz_intro_gated(_hz_head.replace("!hzFxOff&&", ""), _hz_css)
-      and not _hz_intro_gated(_hz_head.replace("&&!hzReduced", ""), _hz_css)
-      and not _hz_intro_gated(_hz_head, _hz_css.replace("@media (prefers-reduced-motion:reduce){", "@media (x){")), "")
+check("horizon: effects off and reduced motion disable the opening, the tracer and every sky animation; the mutants are caught",
+      _hz_intro_gated(_hz_head, _hz_css, _hz_js)
+      and not _hz_intro_gated(_hz_head.replace("!hzFxOff&&", ""), _hz_css, _hz_js)
+      and not _hz_intro_gated(_hz_head.replace("&&!hzReduced", ""), _hz_css, _hz_js)
+      and not _hz_intro_gated(_hz_head, _hz_css.replace("@media (prefers-reduced-motion:reduce){", "@media (x){"), _hz_js), "")
+# the full opening plays on the first launch only: the page posts seen_opening (a machine pref), the server hands it back
+check("horizon: the full opening is a first-launch moment: seen_opening posted after it, read into the page by the server, a quick trace afterwards",
+      'prefSet({seen_opening:true})' in _hz_js and '.replace("__HZ_SEEN__", json.dumps(hz_seen(self.ctx)))' in _MILLENAI_SRC
+      and 'prefs_view(ctx, strict=False).get("seen_opening") is True' in _MILLENAI_SRC
+      and "HZ_SEEN?{margin:48,speed:980,spread:.5}:{margin:56,speed:620,spread:.9}" in _hz_js
+      and "MACHINE_PREFIXES = (\"studio_\", \"last_\", \"seen_\"" in _MILLENAI_SRC, "")
 
 
 def _hz_scoped(css):
-    """Every selector of the Horizon stylesheet is scoped under html.hz or names a Horizon
-    element, so no rule reaches Classic (the tokens' :root blocks and the keyframes aside)."""
     import re as _re
     body = _re.sub(r"/\*.*?\*/", "", css, flags=_re.S)
     body = _re.sub(r"@(?:keyframes|property)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", "", body)
     body = _re.sub(r"@media[^{]*\{", "", body)
     for sel in _re.findall(r"([^{}]+)\{", body):
-        for s in sel.split(","):
-            s = s.strip()
-            if not s or s.startswith(":root") or s.startswith("__HZ_FONTS__"):
+        for s_ in sel.split(","):
+            s_ = s_.strip()
+            if not s_ or s_.startswith(":root") or s_.startswith("__HZ_FONTS__"):
                 continue
-            if not (".hz" in s or s.startswith("#hz-") or s.startswith("#look-row") or s.startswith(".hz-ring")):
+            if not (".hz" in s_ or s_.startswith("#hz-") or s_.startswith("#look-row") or s_.startswith("#fx-level") or s_.startswith(".hz-ring")):
                 return False
     return True
 
@@ -37511,14 +37517,13 @@ def _hz_pauses(js, css):
     return ('addEventListener("visibilitychange",hzPauseSync);' in js
             and 'const pause=document.hidden||hzS.blurred||(typeof noVideo!=="undefined"&&noVideo);' in js
             and 'root.classList.toggle("hz-pause",pause);' in js
-            and ".hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo{animation-play-state:paused!important}" in css
-            and "const on=hzMediaOK()&&!document.hidden&&!hzS.blurred;" in js)
+            and ".hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}" in css
+            and "const on=hzMediaOK()&&!document.hidden&&!hzS.blurred;" in js
+            and "if(document.hidden)return;" in js)
 
 
-check("horizon: every animation and both aerial clips pause while the window is hidden or long unfocused; the mutant is caught",
+check("horizon: every animation, the footage and the GPU frame loop pause while the window is hidden or long unfocused; the mutant is caught",
       _hz_pauses(_hz_js, _hz_css) and not _hz_pauses(_hz_js.replace("const pause=document.hidden||", "const pause="), _hz_css), "")
-
-# the dev-only debug flag: a pure function, run out of the source, and the gate's two calls
 _hzd_src = _MILLENAI_SRC[_MILLENAI_SRC.index("_HZ_DEBUG_RX = re.compile("):_MILLENAI_SRC.index("# THE BUNDLED FACE (6b526")]
 _hzd = {"re": re, "urllib": urllib}
 exec(_hzd_src, _hzd)
@@ -37534,10 +37539,6 @@ check("horizon: ?hz= freezes a dev copy's page and is refused outside one; the g
       and _MILLENAI_SRC.count("hz_debug_spec(self.path, bool(DEV_HOME))") == 2
       and _hz_live[0] == 200 and 'HZ_DEBUG="intro@1.0"' in _hz_live[2].decode("utf-8", "replace")
       and req("/?key=x", token=False)[0] == 403, str(_hz_live[0]))
-
-# the sky's arithmetic, run in node on the page's own functions: GMST at J2000, Polaris'
-# altitude against the latitude, Sirius culminating from Cape Town at 90-|lat-dec|, the local
-# sidereal time equal to its RA at that moment, and the Moon at a known new and full moon
 _hz_astro = _hz_js[_hz_js.index("function hzD(t)"):_hz_js.index("// the brightest stars")]
 
 
@@ -37568,34 +37569,33 @@ check("horizon: the real-sky math lands (GMST at J2000, Polaris at the latitude,
       _hz_sky_math(_hz_astro)
       and not _hz_sky_math(_hz_astro.replace("hzGmst(t)+lon/15-raH", "hzGmst(t)-lon/15-raH"))
       and not _hz_sky_math(_hz_astro.replace(",d=hzD(t)+1.5,", ",d=hzD(t)+2.5,")), "")
-
-# the modes' brand names: the server understands them, the page shows them, and no model is named on the home
 _hz_alias = {}
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODE_ALIASES = {"):_MILLENAI_SRC.index("_HZ_PLACE_CACHE = {}")], _hz_alias)
 _hz_post = _MILLENAI_SRC[_MILLENAI_SRC.index('        if tier == "Power":'):_MILLENAI_SRC.index("_cl_mode, _cl_pid = cloud_tier_parse(tier)")]
-check("horizon: Flare, Zenith, Meridian and Odyssey are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and no model is named on the slider",
+check("horizon: Flare, Zenith, Meridian and Odyssey are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and the home itself names no model",
       _hz_alias["MODE_ALIASES"] == {"Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro", "Odyssey": "Vera Rubin"}
       and "tier = MODE_ALIASES[tier]" in _hz_post and "MODE_ALIASES[tier] in TIERS" in _hz_post
       and "function tierLabel(){return hzModeWords(tierShown(tier))||model;}" in _MILLENAI_SRC
       and "hzMenuBrand(engMenu);" in _MILLENAI_SRC and "hzMenuBrand(engSub);" in _MILLENAI_SRC
       and 'root.querySelectorAll(".engrow.mode .enm").forEach(e=>{e.textContent=modeName(e.textContent);});' in _MILLENAI_SRC
-      and "const hzModeWords=s=>String(s||\"\").replace(/^(Fast|Thinking|Pro|Vera Rubin)(?=$| \\u00b7 )/,m=>modeName(m));" in _MILLENAI_SRC
       and 'return s?s.name+" only":"Your server";' in _hz_js and 'return "Your pick";' in _hz_js
-      and "tierLabel()" not in _hz_js[_hz_js.index("function hzModesPaint"):_hz_js.index("function hzSliderShow")], "")
-
-# the aerials: the planet's footage is clipped inside the limb; the trace pass is capped and paused;
-# the clips are the app's own list, served same-origin; reduced motion draws no lines
-check("horizon: the Earth window is the app's own orbital clips inside the limb and the trace lines are a capped, pausable WebGL pass over a city clip",
-      ".hz #hz-limb{overflow:hidden}" in _hz_css and '<div id="hz-limb"><video id="hz-earth-vid" muted loop playsinline></video></div>' in page
-      and '<video id="hz-trace-vid" muted loop playsinline crossorigin="anonymous"></video>' in page
-      and 'const gap=hzS.gen?1000/15:1000/30;' in _hz_js and 'v.src="/static/sky/"+i+".mov";' in _hz_js
-      and "if(hzS.reduced)return;                                   // no lines under reduced motion" in _hz_js
-      and "if(!gl)return;" in _hz_js and 'HZ_SKY_ORBIT.includes(i)===orbital&&HZ_SKY_DARK.has(i)===night' in _hz_js
-      and "filter:saturate(.42) brightness(.56) contrast(1.1) sepia(.24) hue-rotate(176deg)" in _hz_css, "")
-check("horizon: the Look is Horizon by default, Classic by choice, kept in browser storage with the sidebar and the day's seed",
-      '"millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt"' in page
+      and "tierLabel()" not in _hz_js[_hz_js.index("function hzModesPaint"):_hz_js.index("function hzSliderShow")]
+      and "function hzLineupOf(mode)" in _hz_js and "hzLineupShow(true)" in _hz_js, "")
+# the GPU night: the app's own orbital clip under one WebGL canvas, same-origin; capped, pausable; a plain fallback
+check("horizon: the night is one GPU canvas over the app's own orbital clip (same-origin, 0.7x), with trails, bloom, the neon aurora following the slider and the work, capped while a local model answers, plain footage without WebGL",
+      '<video id="hz-vid" muted loop playsinline preload="auto" crossorigin="anonymous"></video>' in page
+      and 'v.src="/static/sky/"+i+".mov";' in _hz_js and "const pref=[3,25,8,75]" in _hz_js and "v.playbackRate=.7;" in _hz_js
+      and 'powerPreference:"high-performance"' in _hz_js and "gap=hzS.gen&&hzS.genLocal?1000/15:(full?0:32);" in _hz_js
+      and 'document.documentElement.classList.add("hz-novfx")' in _hz_js and ".hz.hz-novfx #hz-vid{opacity:1;" in _hz_css
+      and "S.effort=function(i){S.lvl=[.2,.28,.5,.78][Math.max(0,Math.min(3,i))]||.25;S.setNeon();};" in _hz_js
+      and "S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};" in _hz_js
+      and "uniform1f(pS.U.moon,.08+.62*lit)" in _hz_js and 'localStorage.getItem("millen.fxlevel")==="full"' in _hz_js
+      and ".hz .hz-rig.mlx,.hz .hz-mdl[data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz .hz-mdl[data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}" in _hz_css, "")
+check("horizon: the Look is Horizon by default, Classic by choice, with Effects Full or Balanced, kept in browser storage with the sidebar and the day's seed",
+      '"millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel"' in page
       and "function setLook(v,quiet){" in _hz_js and 'sel.addEventListener("change",()=>setLook(sel.value));' in _hz_js
-      and '<label id="look-row"><span>Look</span>' in page, "")
+      and "function setFxLevel(v){" in _hz_js and '<label id="look-row"><span>Look</span>' in page
+      and '<label id="fx-level-row"><span>Effects</span>' in page, "")
 # ==== HORIZON end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks

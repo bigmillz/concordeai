@@ -17239,6 +17239,40 @@ demo's 2400 s rotation: they are the real sky. The status sentence and the Moon 
 removed on the owner's word; `/api/home` (the day's cloud calls) stays as a small real fact for the other
 builders. Bundling Space Grotesk and IBM Plex Mono (OFL) is a follow-up that needs a download.
 
+**OVERRIDE 2 (the same day, per Patrick: "get rid of the semicircle", "maximum GPU with the night effect",
+"80% moon effect, 20% Apple", "neon colors, rainbows... being classy", "a trace for that opening title").**
+The limb, the Earth circle, the Earth window video and the separate trace-line layer are removed (not hidden), and
+with them `hzLimbFit`, the contrail and the limb's warming on landing. The background is now ONE full-screen WebGL
+canvas (`#hz-gl`, the art director's reference `nightmock/index.html` ported as the app's layer): the footage is the
+app's own orbital night clip (KOREA_JAPAN_NIGHT first, then the other dark GMT clips, from the cache; same-origin so
+the GPU may read it; 0.7× speed) as a texture; a feedback pass keeps the brightest lights for a moment (a live long
+exposure) and the traced edges with a short afterglow; a blur pyramid at half and quarter size makes the bloom and a
+soft lens streak; a half-size neon aurora pass (mint at its lower edge, the shimmer colours higher, curtains that
+fold) whose strength follows the effort slider (Flare .2, Zenith .28, Meridian .5, Odyssey .78) and the work (+.28,
+longer trails); the composite grades the sky and the footage by the local hour, draws the REAL stars from a texture
+the page paints from the catalogue (every three minutes; they move at the real sky's rate, a deliberate deviation from
+the reference's 40-minute turn, kept to a faint dust under them), the moonglow as bright as tonight's real Moon on the
+side it really is, the footage as about a fifth of the picture rising from the foot, a prism fringe and fine grain.
+The CSS ice rays stay at .42 (.85 while an answer runs), the wash stays. Effects (Settings > About): Full (1.5× pixel
+ratio, 60 fps, long trails: for when a server does the thinking) or Balanced (0.75×, 30 fps, short trails; the
+default); 15 fps while a local model answers; hidden, long unfocused and effects off rest it; reduced motion holds one
+frame; no WebGL shows the plain footage. The machines are dies in their makers' colours (MLX, NVIDIA, AMD, Intel; a
+sleeping one hollow; the one working pulses and its label shimmers; a hover card with the machine, its hardware and
+state), each paired server by its own name, never an assumed one. The effort slider slides the mode's real lineup
+(`tierInfo[mode].models` from `/api/tiers`, each seat on its machine with the maker's die) out under the composer while
+you hover or drag; leavers tuck back; the machines in use light up; gone 2.6 s after the last change.
+**The opening** is now the reference's: the lockup appears with its wing drawn line by line, its word traced in
+light (sparks in the shimmer colours run round every glyph from the top of each shape, cool to ice, light floods the
+letters, the text crossfades in), one line beneath, the wash blooms, the lockup lifts away, the home fades in and the
+greeting is traced; the machines light up one by one. **It plays in full on the first launch only** (per Patrick):
+the page posts `seen_opening` (a machine pref by the `seen_` prefix, prefs.json) when it ends, the server hands it
+back as `__HZ_SEEN__`, and every later open goes straight home with a quick title trace (speed 980, spread .5, about
+1.5 s). Reduced motion or effects off: no trace, the text alone. **Copy** (per Patrick: direct, Apple-like):
+"Ask anything, or drop a file here" → "Ask anything"; "More modes: Max, Cloud only, your servers, Advanced" → "More
+modes"; "Usually about 20 s for you" → "About 20 seconds" (and "About a minute"); "Every model you have, everywhere" →
+"Every model, everywhere"; the slider's label "How hard it thinks" → "Effort"; "Show the chats"/"Hide the chats" →
+"Show chats"/"Hide chats"; the Effects row's note is one line ("Full is best when a server does the thinking.").
+
 **Gauntlet.** Twelve checks with mutants: the page carries the layer; Michroma served by name only; no
 external URL in the Horizon blocks; the intro skippable; effects off and reduced motion gate it; every rule
 scoped and Classic intact; everything pauses hidden; `?hz=` refused outside dev; the sky math; the mode
