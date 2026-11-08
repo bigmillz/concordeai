@@ -13165,11 +13165,12 @@ MACHINE_IO = frozenset((
 # records, framed as data (never instructions, like the web evidence),
 # and sets the request's know_private flag, under which cloud_allowed()
 # answers False for the rest of the request: no cloud seat, ladder,
-# polish or title pass sees it. A question that would be answered by the
-# cloud (Cloud Only), a server pick or a council with a server seat gets
-# NO private context unless the person turned on "Let cloud and server
-# models read my stuff too" (off by default), and then each such answer
-# says so in its status line.
+# polish or title pass sees it. A question bound for the cloud (Cloud
+# Only, Max with cloud seats) gets
+# NO private context unless the person turned on "Let cloud models read my
+# stuff too" (off by default), and then each such answer says so. The
+# person's own paired servers count as private, like this Mac ("my servers
+# are mine", per Patrick): a server pick or seat gets the records.
 KNOW_FILE = "know.json"              # the settings: {"chats", "folders", "share"}
 KNOW_DIR = "know"                    # the index folder in the profile
 KNOW_DB = "know/index.db"
@@ -39419,12 +39420,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # notes and chats, found on this computer (know_search: words and
         # meaning, fused, recency-aware). The records ride under the
         # question as numbered private data (know_turn), cited [n] like web
-        # evidence, and their chips join the sources row. Local models only
-        # unless the person allowed sharing: a Cloud Only question, a server
-        # pick, Max with cloud seats or a council with a server seat gets no
-        # private context, and with the records in, cloud_allowed() is shut
-        # for the rest of the request. Pictures, agents and the Code lane
-        # are left alone.
+        # evidence, and their chips join the sources row. This Mac and the
+        # person's own servers only ("my servers are mine", per Patrick):
+        # a server pick or a council with server seats gets the records; a
+        # question bound for the cloud (Cloud Only, Max with cloud seats)
+        # gets none unless the person allowed sharing, and with the records
+        # in, cloud_allowed() is shut for the rest of the request, so no
+        # cloud seat, ladder, polish, title or memory pass sees them.
+        # Pictures, agents and the Code lane are left alone.
         _kn_hits = []
         try:
             _kn_want = 0
@@ -39434,12 +39437,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _kn_want = know_wants(prompt)
             if _kn_want:
                 _kn_cfg = know_settings(user_base)
-                _kn_away = bool(cloud_only or _srv_lbl or _srv_only or _max_bench
-                                or any(server_label(l) for l in council))
+                _kn_away = bool(cloud_only or _max_bench)     # bound for the cloud
                 if _kn_away and not _kn_cfg["share"]:
                     if _kn_want == 2:
                         step("know", "Didn\u2019t look through your stuff", "done",
-                             "it stays on this Mac; this answer uses the cloud or a server")
+                             "it never goes to the cloud; this answer uses the cloud")
                 else:
                     _kn_hits = know_search(
                         user_base, prompt,
@@ -39459,7 +39461,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 elif _kn_away or cloud_allowed():
                     # the per-answer note (6b530): sharing was allowed, and
                     # this answer may go to the cloud or a server with them
-                    step("know-share", "Your notes may reach the cloud or your server",
+                    step("know-share", "Your notes may reach the cloud",
                          "done", "you allowed this under Settings > Your stuff")
                 _kn_n = len(_kn_hits)
                 status("Found %d match%s in your notes and chats"
@@ -45047,9 +45049,9 @@ __CODE_ROWS__
         files in the folders you add. Nothing outside them is read.</div>
       <div class="kn-note" id="know-note"></div>
       <label class="kn-row"><input type="checkbox" id="know-share">
-        <span>Let cloud and server models read my stuff too</span></label>
+        <span>Let cloud models read my stuff too</span></label>
       <div class="kn-hint">Off: an answer that uses your stuff comes from this Mac
-        alone. On: it may go to a cloud model or your server, and each such
+        or your own servers. On: it may go to a cloud model too, and each such
         answer says so.</div>
       <div class="ctlrow"><button class="about-btn slim" id="know-reindex"
         type="button">Read everything again</button>

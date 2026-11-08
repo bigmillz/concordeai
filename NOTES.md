@@ -17202,13 +17202,14 @@ the personal rows appended (`know:chat:<id>` / `know:file:<path>` with a date an
 reach the sources row and the saved chat alike; `[n]` chips map onto them in order, as before. A pill opens
 its chat (`loadChat`) or shows its file in the Finder (`/api/know/open`, only a path the index holds).
 
-**Privacy, and how it is tested.** Default: local models only for an answer that used personal context. The
-handler gives no records to an answer leaving this Mac (Cloud Only, a server pick, Max with cloud seats, any
-council with a server seat) unless the person turned on "Let cloud and server models read my stuff too" (off
-by default), and with records in, `_tl_search.know_private` is set and **`cloud_allowed()` answers False for
-the rest of the request**: no seat, ladder, polish, title or memory pass reaches a provider (the memory pass
-reads the question alone anyway). With sharing on, each such answer carries the step "Your notes may reach the
-cloud or your server". The gauntlet (`# ==== know (6b530)`, 22 checks): the readers for every type (PDF text
+**Privacy, and how it is tested.** "My servers are mine" (per Patrick, on the first report): this Mac and the
+person's own paired servers count as private, so a server pick or a council with server seats gets the
+records like a local model does. The cloud never does by default: the handler gives no records to a
+cloud-bound answer (Cloud Only, Max with cloud seats) unless the person turned on "Let cloud models read my
+stuff too" (off by default), and with records in, `_tl_search.know_private` is set and **`cloud_allowed()`
+answers False for the rest of the request**: no cloud seat, ladder, polish, title or memory pass reaches a
+provider (the memory pass reads the question alone anyway); server seats are unaffected by the gate. With
+sharing on, each such answer carries the step "Your notes may reach the cloud". The gauntlet (`# ==== know (6b530)`, 22 checks): the readers for every type (PDF text
 layer with the stdlib's zlib: Tj/TJ operators, a scanned or custom-encoded PDF gives nothing and Settings
 counts it), the size cap, the chunk heading paths, a real pass on a temp profile (six files and two chats,
 nothing outside or hidden, every chunk embedded), the second pass re-reading nothing, a changed file re-read
@@ -17219,14 +17220,14 @@ folder (documents and setting gone, files untouched), chats off, the gate shut u
 open without, the handler's wiring, the pause and the dev-copy gate, the model and its update rule, the
 page's privacy line, pane, pills and the one Horizon token block; live on the copy: a folder and a new chat
 indexed within seconds and found over the wire, "/" and a missing folder refused, an unindexed path never
-opened, Forget over the wire, the key and the token required. **Twelve mutants** each turn a check red: the
-gate left open, records given to a leaving answer, the private flag never set, the injection rule dropped,
+opened, Forget over the wire, the key and the token required. **Thirteen mutants** each turn a check red: the
+gate left open, records given to a cloud-bound answer, a server seat refused the records, the private flag never set, the injection rule dropped,
 the question before the records, the cosine floor gone, the fusion threshold gone, forget leaving documents,
 hidden folders read, an unchanged file re-read, the heading path lost, a dev copy loading the model unasked.
 
 **UI.** Minimal, for the Settings builder to fold in: a "Your stuff" pane (the privacy line, the status in
 plain words, "Include my chats", the folders as hairline rows with "Forget this folder", a path field and
-"Add folder", the sharing switch with its two-line meaning, "Read everything again"), and the personal pills
+"Add folder", the cloud-sharing switch with its two-line meaning, "Read everything again"), and the personal pills
 in the sources row (a chat or file glyph, the name, the date in mono). The Horizon token block is added
 verbatim once, the fonts per the owner's override (Space Grotesk, IBM Plex Mono), the North star rules kept:
 hairlines, ice only, sentence case, mono for digits only, no middle-dot strings.
