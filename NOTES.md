@@ -17135,3 +17135,186 @@ typing of a word with those letters could open the board and eat the end of the 
 trouble with the letter Z. Removed whole: its CSS, the #zito markup, the script, its seat in the
 Escape chain and in dictation's modal check. The 6302 setup-dialog check now ends its slice at the
 page's <script> instead of at the board, and a new check keeps the board, the combo and zitoEsc out.
+
+## 6b529 — Bring your chats: a ChatGPT, Claude or Gemini history comes home in one guided step (per Patrick)
+
+Patrick: "make it a feature where if somebody wanted to switch platforms, then they can quickly
+connect another AI app and pull all their chats in detail, like beautifully, perfectly." And the
+north star for the look: "Claude is so clean, but ChatGPT right now just looks like eye-opening
+magic. And I know you and I can top that."
+
+**The honest constraint, which shapes the whole design.** No vendor offers an API or OAuth that lets
+another app read a consumer's chat history (checked 2026-11-08: OpenAI has export and its Privacy
+Portal only, and a community request for a read-only API has no staff reply,
+community.openai.com/t/.../1399113; Anthropic says exported data can't be imported into another
+personal account, claude.com/docs/third-party/claude-desktop/import.md; Google's Data Portability
+API has 67 scopes and none for Gemini, developers.google.com/data-portability/user-guide/scopes).
+So "connect" is a guided export-and-import that feels like one step. Nothing here logs in anywhere,
+reads a cookie or scrapes a private endpoint.
+
+**The flow (a sheet, `#imp-veil`, opened from Settings › Account "Bring your chats from another
+app" and from a pill under the greeting on the empty home while the history is five chats or
+fewer):** pick your app (ChatGPT, Claude, Gemini, a file) → get your export (the vendor's own steps
+as hairline rows, an "Open …" button that opens the vendor's page in the browser, and an opt-in
+"Watch my Downloads for it") → drop the file (or choose it; several zips together are queued) → the
+arrival: the real count in the display face, "N messages" "N images" as separate spans, a hairline
+progress with "x of y MB", and the titles cascading in at 60 ms a row, placed by transform so a new
+row slides the rest down with no jump, dated and counted like Home's history rows → done: "Your
+ChatGPT history is home.", the last four rows, what was left out in one quiet line, "Open your
+chats", "Bring another app", "Remove everything from ChatGPT", and, when the export carried custom
+instructions or Claude's memory, "Remember them here too?". The veil is translucent on purpose: the
+sidebar can be seen filling behind the glass while the titles arrive.
+
+**The vendors' current export steps (all checked 2026-11-08; the words in the sheet are these):**
+- ChatGPT: profile picture › Settings › Data controls › Export data › Export › Confirm export.
+  Emailed link, "can take up to 7 days", expires 24 hours after it arrives; Free/Go/Plus/Pro, Edu
+  only when an admin enables it. help.openai.com/en/articles/7260999 and 7730893. OpenAI documents
+  no deep link, so the button opens chatgpt.com and the words say where to go. Zip layouts seen in
+  the wild: `conversations.json` at the root (with chat.html, user.json, message_feedback.json…);
+  `personal/conversations/conversations.json`; split `conversations-000.json`… with an
+  `export_manifest.json` (chat-stats.epoch.ai; difegam.github.io/chatgpt-to-markdown;
+  community.openai.com/t/.../1161967). All three read.
+- Claude: Settings › Privacy › Export data › Export; the official deep link
+  claude.ai/settings/data-privacy-controls opens that page. Emailed "Your data is ready for
+  download", link expires 24 hours after it's created and may work once; big histories arrive as
+  more than one zip. support.claude.com/en/articles/9450526. The zip holds conversations.json,
+  projects.json, users.json, memories.json; uploaded files are not in it, their extracted text is.
+- Gemini: takeout.google.com › Deselect all › My Activity › "All activity data included" › Deselect
+  all › tick Gemini Apps › OK › Next step › .zip › Create export. The button opens Google's own
+  documented custom URL takeout.google.com/settings/takeout/custom/my_activity, which preselects My
+  Activity. Emailed link, 7 days, 5 downloads. support.google.com/gemini/answer/16920332 and
+  13594961, support.google.com/accounts/answer/3024190. Gemini has no in-app full-history export.
+  The file is `Takeout/My Activity/Gemini Apps/MyActivity.json` (or .html; the folder name is
+  localised, and the German export calls it `Gemini-Apps`).
+
+**What each parser keeps and drops.**
+- ChatGPT (`_imp_chatgpt`): the shown thread, `current_node` up through its parents (the newest
+  leaf when it is missing); edits and regenerations are counted as "earlier versions" and left, the
+  store has no branches (said on the done screen); system and `is_visually_hidden` messages dropped
+  and counted; `text`/`multimodal_text` parts joined; `code` as a fenced block with its language,
+  `execution_output` as a fenced block after it, consecutive answer parts (code, output, prose) read
+  as ONE message; `tether_quote` as a markdown link plus a blockquote; `thoughts`/`reasoning_recap`
+  dropped and counted as reasoning notes; browsing scaffolding, system errors and computer output
+  dropped and counted; pictures (`file-service://file-X`, `sediment://file_X`, DALL·E's) found in
+  the zip by their id prefix, sniffed for png/jpg/webp (a `.dat` is one of those or nothing; gif
+  isn't served and is counted), copied content-addressed into images/ as
+  `imp-<sha1>.png`, so the same picture in two exports is one file; a user attachment that isn't in
+  the zip is named "(not in the export)"; `model_slug` kept per answer and the conversation's
+  `default_model_slug` on the chat; custom instructions (`user_editable_context`,
+  `user_context_message_data`) harvested as extras, never as messages.
+- Claude (`_imp_claude`): content blocks: text kept; thinking, tool_use, tool_result counted and
+  left; `text` when there are no blocks; attachments' `extracted_content` kept as a fenced block
+  under "📎 name" (the first 20,000 characters); `files[]` named "(not in the export)"; ISO dates;
+  projects.json (name, description, prompt_template, docs) and memories.json handed over as extras:
+  the projects to `imports/claude-extras.json` for when Projects arrive here, the memory to the
+  "Remember them" offer; users.json is never read.
+- Gemini (`_imp_gemini`): the three attested JSON shapes (title "Prompted: …" with the answer as
+  HTML in `safeHtmlItem[]`; `details[]` Request/Response; `userInteractions[].userInteraction`),
+  and the HTML export (outer-cell / header-cell / content-cell, the time line between prompt and
+  answer). Google keeps prompts and answers, not conversations: where `titleUrl` carries
+  `/app/c/<id>` that groups the chat, otherwise prompts within 30 minutes of each other become one
+  chat, and the done screen says so with the real counts. Other products in the same file are
+  ignored.
+- A file (`_imp_file`): .md/.txt with speaker lines ("User:", "## Me", "**You**", "Assistant:",
+  "## Claude", …; a line needs a heading/bold mark or a colon, under 400 characters) become turns;
+  a leading "# heading" names the chat; a file with no speaker lines is one chat holding the text as
+  one message; .json that is a vendor's shape reads as that vendor, else role/content (system
+  lines dropped); .html as text; a zip of any of these; `__MACOSX` skipped.
+
+**Storage.** Imported chats go into the real store (chats.v2.json) through the same lock and
+`store_chats`, written in batches of 100, as `{id, lane:"ai", ts (the vendor's update time),
+created, title, named:true, messages:[{role, content, ts, model?}], src:{app, name, id, model?,
+left?, run, at}}`. The 1,000 rule now spares every chat with a `src` (as it spares pins and
+projects): an import is older than everything here by its dates, so the rule would have evicted
+the imported history first, silently. `imports/ledger.json` keeps the vendor keys (`app:id` →
+chat id), the pictures per app and the last 50 runs. Idempotent: a key already in the ledger or
+on a chat's `src` is "already here", counted and skipped, and its pictures are not counted or
+copied. The undo, "Remove everything from X", takes the app's chats out for good (their ids join
+`gone`), deletes its pictures unless another chat still shows them, forgets the ledger keys and
+runs, so a later import can bring them back. Uploaded zips land in `imports/incoming/` and are
+deleted when the run ends; a file the watcher found is read in place and never moved. imports/ is
+in PERSONAL_NAMES.
+
+**The page shows where an imported answer came from:** the app hides its own answer labels (6b264),
+an imported answer shows "ChatGPT" and the model as two spans in sentence case (`.who.imp`); an
+imported question's pictures show as sent pictures do. Continuing an imported chat sends the
+history as history, nothing else changed.
+
+**Routes**, all behind `_gate` (cookie and token) and the cross-site wall: `POST /api/import/begin`
+(an app and a name/size, or a path), `POST /api/import/upload?run=` (the raw body, streamed to disk
+in 1 MiB pieces; the page sends it as application/octet-stream, since the wall refuses the form
+types and a .md would arrive as text/plain), `POST /api/import/start` (with the app to use when the
+file was offered as another), `GET /api/import/status?run=&since=` (counts, bytes, the titles since
+the cursor, an eta from the measured rate that the page marks with * and a footnote),
+`POST /api/import/cancel`, `GET /api/import/sources`, `POST /api/import/remove`,
+`POST /api/import/remember`, `POST /api/import/open` (only the three https URLs above ever open),
+`POST /api/import/watch`, `GET /api/import/apps`.
+
+**Reading without loading.** `_imp_json_items` streams a top-level JSON array one element at a
+time: the C decoder's raw_decode on a growing text buffer, the consumed prefix dropped after each
+element, more read only when an element outran the buffer (the chunk doubles only then; doubling
+on every read made the buffer itself a hundred MB). A 200 MB conversations.json (30,613 chats)
+parses in 1.4 s with a 154 MB peak RSS in a process of its own (json.load would need the whole
+file and more). Live: 2,450 chats from one 16 MB file in 0.8 s, all kept.
+
+**The watcher.** Opt-in, only while the sheet is open (the page renews it every 3 s and it lapses
+on its own after 20 s): every 2 s it lists ~/Downloads (a dev copy's `downloads=<dir>` hook names
+another folder) for .zip/.json/.md/.txt/.html files newer than the watch minus 90 s, not partial
+(.crdownload/.download/.part), unchanged in size between two looks; the first that inspects as the
+wanted kind is reported once and the watch stops. A PermissionError (macOS asking for Downloads
+access and the person declining) answers access:false and the page says to drop the file instead.
+
+**Errors, each a plain line:** a damaged or still-downloading zip; a zip of nothing (how many files,
+such as which); Takeout without Gemini Apps ticked; a .tgz; a file that isn't text; the wrong
+app's export, offered as the right one ("This isn't a ChatGPT export. It looks like a Google Takeout
+export. Want to bring it in as Gemini instead?"); an export in a shape we haven't seen, with its
+field names; an empty export; a file over 300 MB is called a big one and the sheet can be closed
+while it keeps going.
+
+**The look** follows design/NORTHSTAR.md with the owner's override: Space Grotesk for the words and
+the big count, IBM Plex Mono for numbers (tabular), the one ice accent, hairline rows, glass lit
+from below with the limb at the sheet's foot, a few static stars kept to the header band (through a
+glass card a star beside a number read as a stray dot), transform/opacity motion only, all of it
+still under prefers-reduced-motion and effects-off. The HORIZON TOKENS block (6b526) is in the
+page once. Accessibility: role=dialog aria-modal, a focus trap, Escape closes it first in the
+chain, focus returns to the opener, a polite live region for the counts, 40 px targets, AA inks.
+
+**Untrusted data.** Imported text is DATA: it lands in chats as history and is sent to a model
+only the way any saved chat is, as earlier turns. An imported assistant turn that holds
+instruction-shaped text has the same standing as any model's earlier answer in a saved chat, no
+more. Custom instructions and Claude's memory reach memory only through "Remember them", as
+facts the person can see and clear in Settings. Pictures are copied bytes, sniffed by magic
+number, served by the existing image route under its id rule.
+
+**Not verified against a real export (the parsers are built from the vendors' help pages and the
+open-source parsers cited above, and from fictional fixtures that mirror them):** the ChatGPT zip's
+file name and the `user_context_message_data` metadata; the Claude zip name and `files[]` field
+names; the English "Prompted" prefix in Gemini's HTML and where attached images land. Each parser
+counts and names what it couldn't read rather than guessing.
+
+**Gauntlet (6b529 block, runs last and removes what it brought in):** the fixtures reproduce
+byte-for-byte from tests/fixtures/imports/make_fixtures.py (fictional, deterministic); each
+parser's counts, the shown-thread order, branches, hidden and system messages, pictures mapped,
+attachments, extras, the split layout and a bare conversations.json; the inspector's lines; 11
+mutants of the parsers' rules each caught by its check; 1,205 chats kept past the 1,000 rule and
+the mutant without the exemption keeping 1,000; the 200 MB stream under a 200 MB peak; live on A:
+upload, inspect, start, the chats in the store, the picture served, re-import adding nothing, the
+wrong-app offer, a path import, the memory opt-in once, the error lines, the gate, the Downloads
+watcher on a folder of the run's own, Remove and the return, 2,450 chats from one file; the page's
+dialog, hooks, upload content type, motion rules and the app's own faces; the page's words for
+sizes, times and what was left out, run in node.
+
+**Scorecard:** the 6b529 block's 25 checks pass 25/25 in a rehearsal against a dev copy on 9888 (the same block, exec'd from tests_smoketest.py, with the real store slice); the full gauntlet run on this worktree was queued behind another builder's gauntlet.lock at the time of this commit (the waiter runs it and logs to the scratchpad's gauntlet-import.log); its scorecard goes into the next entry.
+
+**Checked by hand:** every step, the cascade, the done screen, an imported chat open in the
+conversation view with its pictures and "ChatGPT · model" labels, the Settings row with Remove, and
+each error, in the Browser pane (Blink) on a windowless dev copy; the home, the first step, the
+cascade mid-flight and the done screen on a windowed copy (WKWebView) captured with screencapture
+(the sheet opens by itself under the dev-only `imp-demo=<path>` hook; the app never has it).
+
+**Worth knowing (open risks):** the chat store is one JSON file read whole by `GET /api/chats` and
+rewritten on every write; a 5,000-chat import works (every write is one file) but the page then
+holds every message in memory and each save rewrites tens of MB. The next step, if it bites, is a
+light list without message bodies and `syncChat` on open, which the page already has half of.
+Branches are counted, not kept. Gemini's time grouping is a guess by design, and says so. The
+Downloads watcher needs macOS to allow the app into ~/Downloads the first time.

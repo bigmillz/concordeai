@@ -272,8 +272,13 @@ if not _py_has_nacl(_SMOKE_PY):
 # no window to spend a boot code, so the hook writes one to run/boot.json
 # (6b324) and webstore-fake: the web view's clean-up records what it was
 # asked in run/webstore.json instead of needing a window
+# and downloads=<dir> (6b529): the Downloads folder the import screen may
+# watch is a folder of this run's own, never the real ~/Downloads
+_DL_DIR = os.path.join(_SMOKE_TMP, "downloads")
+os.makedirs(_DL_DIR, exist_ok=True)
 INST = Instance(9901, "A", seed=_seed_a,
-                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake,photoedit-stub"}).start()
+                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake,photoedit-stub,downloads="
+                     + _DL_DIR}).start()
 BASE = INST.base
 KEY = INST.key
 PORT_ = INST.port
@@ -2697,7 +2702,7 @@ localStorage location matchMedia navigator parseFloat parseInt performance
 requestAnimationFrame setInterval setTimeout window
 DOMException Headers IntersectionObserver MutationObserver
 TextEncoder Uint8Array Int32Array crypto RegExp sessionStorage
-Number""".split())
+Number XMLHttpRequest""".split())
 # 6b355, drawing on a picture: Copy puts a PNG on the clipboard
 # (ClipboardItem), Save reads the flattened PNG as a data URL (FileReader)
 # and the overlay follows the picture's box (ResizeObserver); all three
@@ -37422,6 +37427,488 @@ check("the final writer's reasoning level goes only to gpt-oss, and a server tha
 check("6b525 the ZITO easter egg is gone: no board, no key combo, no letter-eating",
       'id="zito"' not in _MILLENAI_SRC and "zEngage" not in _MILLENAI_SRC
       and 'NEED=["z","i","t","o"]' not in _MILLENAI_SRC and "zitoEsc" not in _MILLENAI_SRC)
+
+# ==== bring your chats (6b529): begin ====
+# BRING YOUR CHATS (6b529, per Patrick). The parsers run over the fixtures
+# in tests/fixtures/imports (fictional exports in the vendors' real shapes:
+# ChatGPT's mapping tree with a branch, hidden and system nodes, code and
+# its output, pictures; Claude's content blocks, attachments and extras;
+# Takeout's three Gemini shapes and its HTML; transcripts); then the live
+# flow on A (upload, inspect, start, status, the chats in the store, a
+# picture served), a re-import that adds nothing, a wrong-app offer, a
+# path import, the memory opt-in, the error lines, the gate, the Downloads
+# watcher on a folder of this run's own, the undo, 1,200 chats kept past
+# the 1,000 rule, a 200 MB conversations.json streamed under a memory cap,
+# the page's hooks, and a mutant of each rule. Runs last: what it brings
+# in it removes again.
+import zipfile as _zf529
+import hashlib as _hl529
+import secrets as _sec529
+import threading as _th529
+_IMPF = os.path.join("tests", "fixtures", "imports")
+_IMP_SEG = _MILLENAI_SRC[_MILLENAI_SRC.index("# ==== bring your chats (6b529): begin ===="):
+                         _MILLENAI_SRC.index("# ==== bring your chats (6b529): end ====")]
+
+
+def _imp_ns(seg=None):
+    ns = {"profile_cache": lambda n, o: o, "TEST_HOOKS": frozenset(), "json": json, "os": os,
+          "re": re, "time": time, "hashlib": _hl529, "secrets": _sec529, "threading": _th529,
+          "webbrowser": None,
+          "_MEDIA_IMG_RX": re.compile(r"/api/image/([\w-]+\.(?:png|jpg|webp))")}
+    exec(seg or _IMP_SEG, ns)
+    return ns
+
+
+def _imp_parse(ns, path, app=None):
+    """(chats, keys, counts, extras) from a fixture, through the parser alone."""
+    info = ns["import_inspect"](path)
+    kind = info["kind"]
+    use = app or (kind if kind in ("chatgpt", "claude", "gemini") else "file")
+    zf = _zf529.ZipFile(path) if _zf529.is_zipfile(path) else None
+    members = ns["_imp_members"](zf, use, path)
+    counts, chats, keys, extras = {}, [], [], []
+    put = lambda raw, ext: "/api/image/imp-%s.%s" % (_hl529.sha1(raw).hexdigest()[:24], ext)
+    try:
+        for ev in ns["_IMP_PARSERS"][use]({"cancel": False}, zf, members, put, counts, None):
+            if ev[0] == "chat":
+                chats.append(ev[1])
+                keys.append(ev[2])
+            elif ev[0] == "extra":
+                extras.append((ev[1], ev[2]))
+    finally:
+        if zf:
+            zf.close()
+    return chats, keys, counts, extras
+
+
+# the fixtures are what the generator writes: no drift, and nothing real
+with tempfile.TemporaryDirectory() as _fxd:
+    shutil.copy(os.path.join(_IMPF, "make_fixtures.py"), _fxd)
+    subprocess.run([sys.executable, "-I", os.path.join(_fxd, "make_fixtures.py")],
+                   check=True, capture_output=True, timeout=120)
+    _fx_names = [n for n in os.listdir(_IMPF) if n != "make_fixtures.py" and not n.startswith(".")
+                 and os.path.isfile(os.path.join(_IMPF, n))]
+    _fx_same = all(os.path.exists(os.path.join(_fxd, n))
+                   and open(os.path.join(_fxd, n), "rb").read() == open(os.path.join(_IMPF, n), "rb").read()
+                   for n in _fx_names)
+check("6b529 the import fixtures are exactly what make_fixtures.py writes (%d files, no drift)" % len(_fx_names),
+      _fx_same and len(_fx_names) >= 12 and "FICTIONAL" in open(os.path.join(_IMPF, "make_fixtures.py")).read(),
+      sorted(_fx_names))
+
+_ins = _imp_ns()
+_gz_path = os.path.join(_IMPF, "chatgpt-export.zip")
+_gc, _gk, _gcnt, _gx = _imp_parse(_ins, _gz_path)
+_lis = _gc[0]
+_lm = _lis["messages"]
+_gall = json.dumps(_gc)
+check("6b529 ChatGPT: two chats, the shown thread's 6 and 2 messages with roles alternating, title, dates, model and vendor id kept",
+      len(_gc) == 2 and [len(c["messages"]) for c in _gc] == [6, 2]
+      and [m["role"] for m in _lm] == ["user", "assistant"] * 3
+      and _lis["title"] == "Trip to Lisbon in March" and _lis["ts"] == 1766005000000
+      and _lis["created"] == 1766000000000
+      and _lis["src"] == {"app": "chatgpt", "name": "ChatGPT",
+                          "id": "conv-a1a1a1a1-0000-4000-8000-000000000001",
+                          "model": "gpt-4o", "left": {"branches": 1}}
+      and _lm[1]["model"] == "gpt-4o" and _lm[3]["model"] == "o3" and _lm[1]["ts"] == 1766000040000
+      and _gk == ["chatgpt:conv-a1a1a1a1-0000-4000-8000-000000000001",
+                  "chatgpt:conv-b2b2b2b2-0000-4000-8000-000000000002"],
+      "%r" % [[(m["role"], m["content"][:30]) for m in c["messages"]] for c in _gc])
+check("6b529 ChatGPT: the abandoned branch, the hidden note, the system text and the reasoning never become a message, and each is counted",
+      "Sure, roughly 3 euros" not in _gall and "hidden note" not in _gall
+      and "helpful assistant" not in _gall and "Each ride is 3.20" not in _gall
+      and "Working out fares" not in _gall
+      and _gcnt.get("branches") == 1 and _gcnt.get("hidden") == 1 and _gcnt.get("system") == 2
+      and _gcnt.get("reasoning") == 1 and _gcnt.get("empty") == 1, "%r" % _gcnt)
+check("6b529 ChatGPT: code, its output and the prose read as one answer; a web quote keeps its link; the sent picture and the DALL·E picture map to the zip's files; a file not in the zip is named; custom instructions come out as extras",
+      _lm[3]["content"].startswith("```python\nfare = 3.20\nprint(fare * 2 * 2)\n```\n\n```\n12.8\n```\n\nTwo return trips")
+      and _lm[0]["content"].startswith("![image](/api/image/imp-") and ".png)" in _lm[0]["content"]
+      and "![A yellow tram at sunset](/api/image/imp-" in _lm[5]["content"] and ".webp)" in _lm[5]["content"]
+      and "[Bulk fermentation guide](https://example.org/bulk)" in _gc[1]["messages"][1]["content"]
+      and "> Judge bulk by volume" in _gc[1]["messages"][1]["content"]
+      and "📎 notes.txt (not in the export)" in _gc[1]["messages"][0]["content"]
+      and _gcnt.get("images_copied") == 2 and _gcnt.get("images_missing") == 1
+      and _gcnt.get("attachments") == 1
+      and [x for x in _gx if x[0] == "instructions"] == [("instructions", "I bake at home on weekends."),
+                                                        ("instructions", "Keep answers short.")],
+      "%r" % [_lm[3]["content"][:80], _lm[0]["content"][:60], _gx])
+_sc, _sk, _scnt, _ = _imp_parse(_ins, os.path.join(_IMPF, "chatgpt-export-split.zip"))
+_jc, _jk, _jcnt, _ = _imp_parse(_ins, os.path.join(_IMPF, "chatgpt-conversations.json"))
+check("6b529 ChatGPT: the newer split layout (personal/conversations/conversations-NNN.json) and a bare conversations.json read the same chats",
+      _sk == _gk and _jk == _gk and [c["title"] for c in _sc] == [c["title"] for c in _gc]
+      and _ins["import_inspect"](os.path.join(_IMPF, "chatgpt-export-split.zip"))["kind"] == "chatgpt"
+      and _ins["import_inspect"](os.path.join(_IMPF, "chatgpt-conversations.json"))["kind"] == "chatgpt"
+      and _jcnt.get("images_missing") == 3 and _scnt.get("images_copied") == 2,
+      "%r %r" % (_sk, _jcnt))
+_cc, _ck, _ccnt, _cx = _imp_parse(_ins, os.path.join(_IMPF, "claude-export.zip"))
+_c0 = _cc[0]["messages"]
+check("6b529 Claude: two chats; thinking, tool use and tool results left out and counted; an attachment's extracted text kept, a file named; dates from ISO 8601; projects and memory handed over as extras",
+      len(_cc) == 2 and [len(c["messages"]) for c in _cc] == [4, 2]
+      and _cc[0]["src"]["id"] == "11111111-aaaa-4bbb-8ccc-000000000001"
+      and _cc[0]["ts"] == 1770111600000 and _cc[0]["created"] == 1770109920000
+      and _c0[1]["content"] == "The Nib. Shedquarters. Eight by Ten."
+      and "Short, warm" not in json.dumps(_cc) and "web_search" not in json.dumps(_cc)
+      and "📎 shed-plan.txt" in _c0[2]["content"] and "Door on the south wall" in _c0[2]["content"]
+      and "shed-photo.jpg (not in the export)" in _c0[2]["content"]
+      and _cc[1]["title"] == "What's a good Tuesday soup?"
+      and _ccnt.get("reasoning") == 1 and _ccnt.get("tools") == 2 and _ccnt.get("attachments") == 2
+      and [k for k, v in _cx] == ["projects", "instructions", "instructions"]
+      and _cx[0][1][0]["name"] == "Shed room" and _cx[0][1][0]["docs"][0]["filename"] == "measurements.md"
+      and _cx[1][1] == "Sam is converting a garden shed into a writing room.",
+      "%r" % [[(m["role"], m["content"][:40]) for m in c["messages"]] for c in _cc])
+_mc, _mk, _mcnt, _ = _imp_parse(_ins, os.path.join(_IMPF, "gemini-takeout.zip"))
+_hc, _hk, _hcnt, _ = _imp_parse(_ins, os.path.join(_IMPF, "gemini-takeout-html.zip"))
+check("6b529 Gemini: prompts within 30 minutes are one chat, two hours on is another, Google's conversation id wins where there is one, the other product is ignored, the HTML export reads too",
+      [c["title"] for c in _mc] == ["What rhymes with orange?", "How long do I boil an egg for jammy?",
+                                     "Plan a 20-minute stretch routine"]
+      and [len(c["messages"]) for c in _mc] == [6, 2, 4] and _mc[2]["src"]["id"] == "9f8e7d6c5b4a"
+      and _mc[0]["messages"][1]["content"] == "Nothing exactly. **Door hinge** comes close, and so does *Blorenge*, a hill in Wales."
+      and _mc[2]["messages"][3]["content"] == "Neck, hips, back: three minutes each, one to breathe."
+      and _mcnt.get("grouped_by_time") == 2 and _mcnt.get("grouped_by_id") == 1 and _mcnt.get("other_products") == 1
+      and _mc[0]["created"] == 1775116800000 and _mc[0]["ts"] == 1775118000000
+      and len(_hc) == 1 and len(_hc[0]["messages"]) == 4 and _hc[0]["title"] == "Name three quiet board games"
+      and _hc[0]["messages"][1]["content"] == "Azul, Patchwork and Hive. All under an hour."
+      and _hc[0]["created"] == 1775423702000,
+      "%r %r" % ([(c["title"], len(c["messages"])) for c in _mc], [(c["title"], len(c["messages"])) for c in _hc]))
+_tc, _tk, _tcnt, _ = _imp_parse(_ins, os.path.join(_IMPF, "transcripts.zip"))
+check("6b529 a file: speaker lines become turns and a heading names the chat; a plain .md is one chat; a role/content JSON drops its system line; __MACOSX is skipped",
+      [c["title"] for c in _tc] == ["Planning the allotment", "Bike fit", "Notes from the talk"]
+      and [m["role"] for m in _tc[0]["messages"]] == ["user", "assistant", "user", "assistant"]
+      and _tc[0]["messages"][0]["content"] == "Which beds get the brassicas this year?"
+      and "beds = ['north-1', 'north-2']" in _tc[0]["messages"][3]["content"]
+      and len(_tc[1]["messages"]) == 2 and _tcnt.get("system") == 1
+      and len(_tc[2]["messages"]) == 1 and _tc[2]["messages"][0]["role"] == "assistant"
+      and _tcnt.get("unstructured") == 1 and all(c["src"]["app"] == "file" for c in _tc)
+      and len(set(_tk)) == 3,
+      "%r" % [(c["title"], [(m["role"], m["content"][:30]) for m in c["messages"]]) for c in _tc])
+
+
+def _imp_err(path):
+    try:
+        return "kind:" + _ins["import_inspect"](path)["kind"]
+    except _ins["ImportError_"] as exc:
+        return str(exc)
+
+
+_tgz = os.path.join(_SMOKE_TMP, "takeout-x.tgz")
+open(_tgz, "wb").write(b"\x1f\x8b" + b"\x00" * 40)
+_dmg = os.path.join(_SMOKE_TMP, "something.dmg")
+open(_dmg, "wb").write(b"\x00\x01\x02\x03" * 300)
+check("6b529 the inspector: a damaged zip, a zip of nothing, Takeout without Gemini, a .tgz and a file that isn't text each get their own plain line",
+      "damaged or still downloading" in _imp_err(os.path.join(_IMPF, "corrupt.zip"))
+      and _imp_err(os.path.join(_IMPF, "not-an-export.zip")) == "kind:unknown"
+      and _ins["import_inspect"](os.path.join(_IMPF, "takeout-no-gemini.zip"))["note"] == "takeout-without-gemini"
+      and ".tgz" in _imp_err(_tgz) and "isn't a file we can read as chats" in _imp_err(_dmg)
+      and _imp_err(os.path.join(_IMPF, "transcript.md")) == "kind:file"
+      and _imp_err(os.path.join(_IMPF, "generic-chat.json")) == "kind:file"
+      and _imp_err(os.path.join(_IMPF, "claude-export.zip")) == "kind:claude"
+      and _imp_err(os.path.join(_IMPF, "gemini-takeout-html.zip")) == "kind:gemini")
+
+# ---- the mutants: each rule above, broken one way, must fail its check
+_cl_path = os.path.join(_IMPF, "claude-export.zip")
+_gm_path = os.path.join(_IMPF, "gemini-takeout.zip")
+_IMP_MUT = [
+    ("the shown thread ignores current_node (every node, the abandoned branch too)",
+     "    path.reverse()\n    return path", "    path.reverse()\n    return list(mapping)",
+     lambda ns: "Sure, roughly 3 euros" not in json.dumps(_imp_parse(ns, _gz_path)[0])),
+    ("a hidden message shows",
+     'if meta.get("is_visually_hidden_from_conversation"):', "if False:",
+     lambda ns: "hidden note" not in json.dumps(_imp_parse(ns, _gz_path)[0])),
+    ("a system message isn't counted as one",
+     'if role == "system" or meta.get("is_user_system_message"):', 'if False:',
+     lambda ns: _imp_parse(ns, _gz_path)[2].get("system") == 2),
+    ("the custom-instructions block isn't recognised (it falls through as a system message)",
+     'if ct in ("user_editable_context", "model_editable_context"):\n'
+     '            for f in ("user_profile", "user_instructions", "model_set_context"):',
+     'if False:\n            for f in ("user_profile", "user_instructions", "model_set_context"):',
+     lambda ns: _imp_parse(ns, _gz_path)[2].get("system") == 2
+     and [x for x in _imp_parse(ns, _gz_path)[3] if x[0] == "instructions"]
+     == [("instructions", "I bake at home on weekends."), ("instructions", "Keep answers short.")]),
+    ("the vendor's id isn't the key (a re-import would add everything again)",
+     'vid = str(conv.get("conversation_id") or conv.get("id") or "")', 'vid = secrets.token_hex(4)',
+     lambda ns: _imp_parse(ns, _gz_path)[1] == _imp_parse(ns, _gz_path)[1] == _gk),
+    ("the streaming reader loses the comma between elements",
+     '        if c == ",":\n            pos += 1\n            continue\n', '',
+     lambda ns: len(_imp_parse(ns, _gz_path)[0]) == 2),
+    ("an attachment's extracted text is dropped",
+     "if isinstance(ex, str) and ex.strip():", "if False:",
+     lambda ns: "Door on the south wall" in json.dumps(_imp_parse(ns, _cl_path)[0])),
+    ("Claude's thinking isn't counted (showing it takes two mistakes: the type and the field)",
+     'elif bt == "thinking":\n                counts["reasoning"] = counts.get("reasoning", 0) + 1',
+     'elif bt == "thinking":\n                pass',
+     lambda ns: _imp_parse(ns, _cl_path)[2].get("reasoning") == 1),
+    ("Gemini's time gap is a thousand times too wide",
+     "<= IMPORT_GAP_MS):", "<= IMPORT_GAP_MS * 1000):",
+     lambda ns: len(_imp_parse(ns, _gm_path)[0]) == 3),
+    ("Gemini's conversation id is ignored",
+     "    if m:\n        conv = m.group(1)", "    if False:\n        conv = m.group(1)",
+     lambda ns: _imp_parse(ns, _gm_path)[0][2]["src"]["id"] == "9f8e7d6c5b4a"),
+    ("a transcript's speaker lines aren't turns",
+     'if m and (m.group("mark") or m.group("colon")) and len(ln) < 400:', "if False:",
+     lambda ns: len(_imp_parse(ns, os.path.join(_IMPF, "transcripts.zip"))[0][0]["messages"]) == 4),
+]
+_imp_caught = []
+for _nm, _a, _b, _ok in _IMP_MUT:
+    assert _IMP_SEG.count(_a) >= 1, _nm
+    _seg_m = _IMP_SEG.replace(_a, _b, 1)
+    try:
+        _got = _ok(_imp_ns(_seg_m))
+    except Exception:
+        _got = False
+    _imp_caught.append((_nm, not _got))
+check("6b529 the parsers: %d mutants of their rules, each caught by the check that guards it" % len(_IMP_MUT),
+      all(c for _, c in _imp_caught), [n for n, c in _imp_caught if not c])
+
+# ---- the store: imported chats are never evicted, and the mutant that would
+with tempfile.TemporaryDirectory() as _evd:
+    _many = ([{"id": "c%d" % i, "ts": 9000 - i, "src": {"app": "chatgpt", "id": str(i)}} for i in range(1200)]
+             + [{"id": "n%d" % i, "ts": 10000 + i} for i in range(5)])
+    _scn["store_chats"](_many, _evd)
+    _ev_kept = [c["id"] for c in _scn["load_chats"](_evd)]
+_wc_src = _ast.get_source_segment(_MILLENAI_SRC, next(
+    n for n in _ctree.body if getattr(n, "name", None) == "_write_chats"))
+assert 'or c.get("src"))' in _wc_src
+_scn_m = dict(_scn)
+exec(_wc_src.replace('or c.get("src"))', ')'), _scn_m)
+with tempfile.TemporaryDirectory() as _evd2:
+    _ev_mut = len(_scn_m["_write_chats"](list(_many), _evd2)[0])
+check("6b529 chats brought from another app are never evicted: 1,200 imported and 5 of our own all kept; without the exemption only the newest 1,000 would stay",
+      len(_ev_kept) == 1205 and _ev_mut == 1000, "%r" % [len(_ev_kept), _ev_mut])
+
+# ---- a 200 MB conversations.json, streamed in a process of its own
+_big = os.path.join(_SMOKE_TMP, "big-conversations.json")
+_bn = int(subprocess.run([sys.executable, "-I", os.path.join(_IMPF, "make_fixtures.py"), "--big", _big, "200"],
+                         capture_output=True, text=True, check=True, timeout=300).stdout.split()[-2])
+_seg_file = os.path.join(_SMOKE_TMP, "imp_seg.py")
+open(_seg_file, "w", encoding="utf-8").write(_IMP_SEG)
+_runner = os.path.join(_SMOKE_TMP, "imp_big.py")
+open(_runner, "w").write(r'''
+import json, os, re, sys, time, hashlib, secrets, threading, resource
+ns = {"profile_cache": lambda n, o: o, "TEST_HOOKS": frozenset(), "json": json, "os": os, "re": re,
+      "time": time, "hashlib": hashlib, "secrets": secrets, "threading": threading, "webbrowser": None,
+      "_MEDIA_IMG_RX": re.compile(r"/api/image/([\w-]+\.(?:png|jpg|webp))")}
+exec(open(sys.argv[1], encoding="utf-8").read(), ns)
+counts, n, t0 = {}, 0, time.time()
+imgs = ns["_ImpImages"](None, lambda raw, ext: "", counts)
+with open(sys.argv[2], "rb") as fp:
+    for conv in ns["_imp_json_items"](fp):
+        if ns["_imp_chatgpt_conv"](conv, imgs, counts):
+            n += 1
+rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+if sys.platform != "darwin":
+    rss *= 1024
+print(json.dumps({"chats": n, "secs": round(time.time() - t0, 1), "rss_mb": round(rss / 1048576)}))
+''')
+_bo = json.loads(subprocess.run([sys.executable, "-I", _runner, _seg_file, _big],
+                                capture_output=True, text=True, timeout=900).stdout)
+_big_mb = os.path.getsize(_big) // 1048576
+check("6b529 a %d MB conversations.json streams one chat at a time: %d chats in %s s, peak %d MB (json.load would need the whole file and more)"
+      % (_big_mb, _bo["chats"], _bo["secs"], _bo["rss_mb"]),
+      _bo["chats"] == _bn and _bo["rss_mb"] < 200 and _big_mb >= 190, "%r" % _bo)
+os.remove(_big)
+
+
+# ---- the live flow on A
+def _imp_wait(run, timeout=180):
+    end = time.time() + timeout
+    st = {}
+    while time.time() < end:
+        st = json.loads(req("/api/import/status?run=%s" % run)[2])
+        if st.get("state") in ("done", "error", "stopped"):
+            return st
+        time.sleep(0.2)
+    return st
+
+
+def _imp_go(app, path=None, upload=None, name="export.zip", start_app=None):
+    """begin (by path or by upload), start, wait; or the step that refused."""
+    if path:
+        _, _, b = req("/api/import/begin", "POST", {"app": app, "path": path})
+    else:
+        _, _, b = req("/api/import/begin", "POST", {"app": app, "name": name, "size": len(upload)})
+    d = json.loads(b)
+    if upload is not None and d.get("state") == "receiving":
+        _, _, b = req("/api/import/upload?run=%s" % d["run"], "POST", data=upload,
+                      headers={"Content-Type": "application/octet-stream"}, timeout=120)
+        d = json.loads(b)
+    if d.get("state") != "inspected":
+        return d
+    _, _, b = req("/api/import/start", "POST", {"run": d["run"], "app": start_app})
+    d2 = json.loads(b)
+    if d2.get("state") != "running":
+        return d2
+    return _imp_wait(d["run"])
+
+
+def _imp_chats(app):
+    return [c for c in json.loads(req("/api/chats")[2])["chats"]
+            if isinstance(c.get("src"), dict) and c["src"].get("app") == app]
+
+
+_gz = open(_gz_path, "rb").read()
+_r1 = _imp_go("chatgpt", upload=_gz, name="chatgpt-export.zip")
+_ch1 = _imp_chats("chatgpt")
+_lis1 = next((c for c in _ch1 if c.get("title") == "Trip to Lisbon in March"), None) or {}
+_img_m = re.search(r"/api/image/[\w.-]+\.png", json.dumps(_ch1))
+_img = _img_m.group(0) if _img_m else "/api/image/none.png"
+_is, _ih, _ib = req(_img)
+check("6b529 live: an uploaded ChatGPT zip is inspected, imported and stored with its source, dates, lane and names; the status carries the titles; the picture is served from images/",
+      _r1.get("state") == "done" and _r1.get("counts", {}).get("chats") == 2
+      and _r1["counts"].get("messages") == 8 and _r1["counts"].get("images") == 2 and _r1.get("already") == 0
+      and _r1.get("kind") == "chatgpt" and [r["t"] for r in _r1.get("recent", [])] == ["Trip to Lisbon in March", "Sourdough timing"]
+      and len(_ch1) == 2 and _lis1.get("lane") == "ai" and _lis1.get("named") is True
+      and _lis1.get("ts") == 1766005000000 and _lis1.get("created") == 1766000000000
+      and _lis1.get("src", {}).get("run") == _r1.get("run") and re.fullmatch(r"c[0-9a-v]{26}", _lis1.get("id", ""))
+      and _r1.get("first_id") in [c["id"] for c in _ch1]
+      and _is == 200 and _ih.get("Content-Type") == "image/png" and _ib[:8] == b"\x89PNG\r\n\x1a\n"
+      and os.path.exists(os.path.join(INST.home, "images", _img.rsplit("/", 1)[1])),
+      "%r" % {"r1": {k: _r1.get(k) for k in ("state", "counts", "already", "err", "kind")}, "n": len(_ch1), "img": (_is, _img)})
+_r2 = _imp_go("chatgpt", upload=_gz, name="chatgpt-export.zip")
+_ch2 = _imp_chats("chatgpt")
+_r3 = _imp_go("chatgpt", upload=open(os.path.join(_IMPF, "chatgpt-export-split.zip"), "rb").read(),
+              name="chatgpt-export-split.zip")
+check("6b529 live: the same export again adds nothing and says what was already here, copies no picture; the split layout of the same chats reads as the same two",
+      _r2.get("state") == "done" and not _r2.get("counts", {}).get("chats") and _r2.get("already") == 2
+      and not _r2["counts"].get("images") and sorted(c["id"] for c in _ch2) == sorted(c["id"] for c in _ch1)
+      and _r3.get("kind") == "chatgpt" and _r3.get("already") == 2 and len(_r3.get("detail", {}).get("files", [])) == 2
+      and len(_imp_chats("chatgpt")) == 2,
+      "%r" % [{k: _r2.get(k) for k in ("state", "counts", "already")}, {k: _r3.get(k) for k in ("state", "kind", "already", "detail")}])
+_gm = open(_gm_path, "rb").read()
+_, _, _b = req("/api/import/begin", "POST", {"app": "chatgpt", "name": "takeout-20260408T101010Z-001.zip", "size": len(_gm)})
+_d = json.loads(_b)
+_, _, _b = req("/api/import/upload?run=%s" % _d["run"], "POST", data=_gm,
+               headers={"Content-Type": "application/octet-stream"})
+_d = json.loads(_b)
+_mis = _d.get("mismatch") is True and _d.get("kind") == "gemini" and _d.get("state") == "inspected"
+_, _, _b = req("/api/import/start", "POST", {"run": _d["run"], "app": "gemini"})
+_r4 = _imp_wait(_d["run"])
+check("6b529 live: a Takeout zip begun as ChatGPT is held with the offer to import it as Gemini, and does when told to",
+      _mis and _r4.get("state") == "done" and _r4.get("app") == "gemini" and _r4.get("counts", {}).get("chats") == 3
+      and len(_imp_chats("gemini")) == 3,
+      "%r" % [_d.get("mismatch"), _d.get("kind"), {k: _r4.get(k) for k in ("state", "app", "counts")}])
+_r5 = _imp_go("claude", path=os.path.abspath(_cl_path))
+_mem0 = json.loads(req("/api/memory")[2])["facts"]
+_, _, _b = req("/api/import/remember", "POST", {"run": _r5.get("run")})
+_rem = json.loads(_b)
+_mem1 = json.loads(req("/api/memory")[2])["facts"]
+_, _, _b = req("/api/import/remember", "POST", {"run": _r5.get("run")})
+_rem2 = json.loads(_b)
+check("6b529 live: a file already on disk imports by its path (the Downloads watcher's way); Claude's memory and instructions join memory only when asked, and only once",
+      _r5.get("state") == "done" and _r5.get("counts", {}).get("chats") == 2 and _r5.get("extras") == {"instructions": 2, "projects": 1}
+      and _rem.get("added") == 2 and len(_mem1) == len(_mem0) + 2
+      and any(f.get("from") == "Claude" and "garden shed" in f.get("fact", "") for f in _mem1)
+      and _rem2.get("added") == 0
+      and os.path.exists(os.path.join(INST.home, "imports", "claude-extras.json"))
+      and len(_imp_chats("claude")) == 2,
+      "%r" % [{k: _r5.get(k) for k in ("state", "counts", "extras", "err")}, _rem, _rem2])
+_e1 = _imp_go("claude", path=os.path.abspath(os.path.join(_IMPF, "corrupt.zip")))
+_e2 = _imp_go("chatgpt", path=os.path.abspath(os.path.join(_IMPF, "not-an-export.zip")))
+_e3 = _imp_go("gemini", path=os.path.abspath(os.path.join(_IMPF, "takeout-no-gemini.zip")))
+with _zf529.ZipFile(os.path.join(_SMOKE_TMP, "odd-shape.zip"), "w") as _oz:
+    _oz.writestr("conversations.json", json.dumps([{"title": "x", "messages": [{"role": "user", "content": "hi"}]}]))
+    _oz.writestr("user.json", "{}")
+with _zf529.ZipFile(os.path.join(_SMOKE_TMP, "empty-export.zip"), "w") as _oz:
+    _oz.writestr("conversations.json", "[]")
+    _oz.writestr("user.json", "{}")
+_e4 = _imp_go("chatgpt", path=os.path.join(_SMOKE_TMP, "odd-shape.zip"))
+_e5 = _imp_go("chatgpt", path=os.path.join(_SMOKE_TMP, "empty-export.zip"))
+check("6b529 live: a damaged zip, a zip of nothing, Takeout without Gemini, an unseen shape (its fields named) and an empty export each answer with a plain line and nothing is added",
+      _e1.get("state") == "error" and "damaged or still downloading" in _e1.get("err", "")
+      and _e2.get("state") == "error" and "no chats we recognise" in _e2.get("err", "")
+      and _e3.get("state") == "error" and "Gemini Apps isn't in it" in _e3.get("err", "")
+      and _e4.get("state") == "error" and "shape we haven't seen" in _e4.get("err", "") and "messages, title" in _e4.get("err", "")
+      and _e5.get("state") == "error" and "holds no chats" in _e5.get("err", "")
+      and len(_imp_chats("chatgpt")) == 2,
+      "%r" % [e.get("err") for e in (_e1, _e2, _e3, _e4, _e5)])
+check("6b529 the import routes sit behind the gate: no cookie 403, no token 403, and a form-typed upload is refused by the cross-site wall",
+      req("/api/import/sources", cookie=False)[0] == 403 and req("/api/import/sources", token=False)[0] == 403
+      and req("/api/import/begin", "POST", {"app": "chatgpt"}, token=False)[0] == 403
+      and req("/api/import/upload?run=x", "POST", data=b"x",
+              headers={"Content-Type": "multipart/form-data"})[0] == 403
+      and req("/api/import/sources")[0] == 200)
+_, _, _b = req("/api/import/watch", "POST", {"on": True, "app": "gemini"})
+_w0 = json.loads(_b)
+shutil.copy(_gm_path, os.path.join(_DL_DIR, "takeout-20260408T101010Z-001.zip"))
+_found, _w = None, {}
+for _ in range(50):
+    _w = json.loads(req("/api/import/apps")[2])["watch"]
+    if _w.get("found"):
+        _found = _w["found"]
+        break
+    time.sleep(0.5)
+req("/api/import/watch", "POST", {"on": False})
+check("6b529 live: watching Downloads (a folder of this run's own, never the real one) finds the Takeout zip once it has stopped growing, says what it is, and stops watching",
+      _w0.get("on") is True and _w0.get("access") is True and _w0.get("dir") == _DL_DIR
+      and _found and _found.get("kind") == "gemini" and _found.get("name") == "takeout-20260408T101010Z-001.zip"
+      and _found.get("size") == len(_gm) and _w.get("on") is False,
+      "%r %r" % (_w0, _w))
+_src = json.loads(req("/api/import/sources")[2])
+_, _, _b = req("/api/import/remove", "POST", {"app": "chatgpt"})
+_rm = json.loads(_b)
+_img_after = req(_img)[0]
+_led = json.load(open(os.path.join(INST.home, "imports", "ledger.json")))
+_r6 = _imp_go("chatgpt", upload=_gz, name="chatgpt-export.zip")
+check("6b529 live: Remove everything from ChatGPT takes its chats out for good and its pictures with them, the ledger forgets them, and a later import brings them back",
+      any(a["app"] == "chatgpt" and a["chats"] == 2 and a["messages"] == 8 for a in _src.get("apps", []))
+      and _rm == {"ok": True, "chats": 2, "images": 2} and _img_after == 404
+      and not any(k.startswith("chatgpt:") for k in _led["keys"]) and "chatgpt" not in _led["files"]
+      and not any(r.get("app") == "chatgpt" for r in _led["runs"])
+      and _r6.get("state") == "done" and _r6.get("counts", {}).get("chats") == 2 and _r6.get("already") == 0
+      and len(_imp_chats("chatgpt")) == 2,
+      "%r" % [_rm, _img_after, _src.get("apps"), {k: _r6.get(k) for k in ("state", "counts", "already")}])
+_mid = os.path.join(_SMOKE_TMP, "mid-conversations.json")
+_mn = int(subprocess.run([sys.executable, "-I", os.path.join(_IMPF, "make_fixtures.py"), "--big", _mid, "16"],
+                         capture_output=True, text=True, check=True, timeout=120).stdout.split()[-2])
+_t0 = time.time()
+_r7 = _imp_go("chatgpt", path=_mid)
+_dt7 = time.time() - _t0
+_n7 = len(_imp_chats("chatgpt"))
+check("6b529 live: %d chats from one file in %.1f s, every one of them kept beside the two already there (the 1,000 rule spares imports)" % (_mn, _dt7),
+      _r7.get("state") == "done" and _r7.get("counts", {}).get("chats") == _mn and _mn > 1000
+      and _n7 == _mn + 2 and _r7.get("bytes_done") == _r7.get("bytes_total") == os.path.getsize(_mid),
+      "%r" % [{k: _r7.get(k) for k in ("state", "counts", "already", "err", "bytes_done", "bytes_total")}, _n7])
+os.remove(_mid)
+# what this block brought in leaves again, so A's store is as it was
+for _a in ("chatgpt", "gemini", "claude", "file"):
+    req("/api/import/remove", "POST", {"app": _a})
+check("6b529 live: after Remove for every app, nothing imported is left in the store",
+      not any(isinstance(c.get("src"), dict) for c in json.loads(req("/api/chats")[2])["chats"]))
+
+# ---- the page
+_pg_imp = page[page.index("/* ==== bring your chats (6b529): script begin ==== */"):
+               page.index("/* ==== bring your chats (6b529): script end ==== */")]
+_rh = page.index("function resetHero(){")
+check("6b529 the page: the sheet is a modal dialog with a focus trap that Escape closes first; its hooks sit in Settings and on the empty home; the upload never carries a form content type; motion stops under reduced motion and effects-off; the app's own faces",
+      'id="imp-veil" hidden' in page and 'role="dialog" aria-modal="true" aria-labelledby="imp-title"' in page
+      and "#imp-veil[hidden]{display:none}" in page and page.count("/* HORIZON TOKENS (6b526) */") == 1
+      and 'if(impEsc()){e.preventDefault();return;}' in page and 'id="imp-settings-open"' in page
+      and "impHomeMount();" in page[_rh:_rh + 300]
+      and 'x.setRequestHeader("Content-Type","application/octet-stream")' in _pg_imp
+      and 'if(e.key!=="Tab")return;' in _pg_imp
+      and "function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,by,model){" in page
+      and "@media (prefers-reduced-motion:reduce){\n  #imp-veil .imp-glow" in page
+      and "body.novideo #imp-veil .imp-glow" in page and ".msg.ai .who.imp{display:flex" in page
+      and "--hz-font-ui:'Space Grotesk'" in page and "Instrument Sans" not in page
+      and "Newsreader" not in page and "Geist Mono" not in page)
+_pj = (_pg_imp[_pg_imp.index("function impN("):_pg_imp.index("const IMP_ICON=")]
+       + _pg_imp[_pg_imp.index("function impLeftLine("):_pg_imp.index("function impShowDone(")])
+_pf = os.path.join(_SMOKE_TMP, "imp529.js")
+open(_pf, "w").write(
+    "const esc=s=>String(s);\n" + _pj
+    + "\nprocess.stdout.write(JSON.stringify([impBytes(900*1024),impBytes(5*1048576),impBytes(2.5*1073741824),"
+      "impDur(3),impDur(47),impDur(130),impDur(7200),impN(1284),"
+      "impLeftLine({branches:1,reasoning:2,images_missing:1}),impWhen(Date.now()),impWhen(Date.now()-86400000)]));")
+_pr = json.loads(subprocess.run(["node", _pf], capture_output=True, text=True, timeout=30).stdout)
+check("6b529 the page's words for sizes, times, counts, dates and what was left out",
+      _pr == ["900 KB", "5.0 MB", "2.50 GB", "under 10 s", "about 45 s", "about 2 min", "about 2.0 h", "1,284",
+              "Left out: 1 earlier version of edited or regenerated answers (only the final one came), "
+              "2 reasoning notes, 1 picture that wasn't in the export.", "Today", "Yesterday"], _pr)
+check("6b529 the server: imports/ is a profile's own folder, the ledger lives there, both routes go through the handler's gate, and only the allow-listed https pages ever open",
+      '"servers.json", "imports"))' in _MILLENAI_SRC and 'IMPORT_LEDGER = "imports/ledger.json"' in _MILLENAI_SRC
+      and "self._import_get()" in _MILLENAI_SRC and "self._import_post()" in _MILLENAI_SRC
+      and 'if not url.startswith("https://"):' in _IMP_SEG and "webbrowser.open(url)" in _IMP_SEG
+      and '"https://claude.ai/settings/data-privacy-controls"' in _IMP_SEG
+      and "Imported text is DATA" in _IMP_SEG)
+# ==== bring your chats (6b529): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
