@@ -5186,7 +5186,7 @@ check("the marginalia lives outside the prose and survives streaming (6b528; rep
       and "root.appendChild(box);" in page
       and "const keepTree=" not in page and "insertAdjacentHTML(\"beforeend\",restHTML)" not in page
       and 'const aside=body.querySelector(":scope>aside.behind");if(aside)div.appendChild(aside);' in page
-      and ".msg.ai>aside.behind{grid-column:2;grid-row:1/span 4" in page
+      and ".msg.ai>aside.behind{grid-column:2;grid-row:1/span 5" in page
       and "if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}" in page)
 # 6b257: the bar the user SEES is a tween chasing the honest math —
 # the in-place fast path moves .wtbar i without an innerHTML rewrite
@@ -37654,6 +37654,62 @@ check("the answer's actions, the code cards' line numbers, the spine's steps and
       and 'id="sb-foot"' in page and '"/api/usage?range=1d"' in page
       and "function dayRows(rows,row,now){" in page and 'class="cday"' in page
       and "function hzStill(){" in page and ".chat-item.leaving{opacity:0;" in page)
+# THE ASKING FLOW (6b528, NORTHSTAR OVERRIDE 3): the live line's words come from the frames in hand, never a
+# timer; the comets, the ripple, the glow and the composer light hang off the same frames
+def _live528(pg):
+    js = "const IS_PC=false;const SRV_SEP=\" \\u00b7 \";const esc=s=>String(s);let engineState={\"Gemma 4 26B\":{up:true},\"Gemma 4 E2B\":{up:true}},lastModels=\"\";\n"
+    js += "const document={body:{classList:{contains:()=>false}},querySelector:()=>null,querySelectorAll:()=>[]};\n"
+    for h in ("const STEP_ORDER=", "const THINK_WORDS=", "const MACH="):
+        js += _jsconst(pg, h)
+    for h in ("function fmtTok(n){", "function fmtSecs(s){", "function thinkPhrase(steps,status,nDrafts){", "function machineKind(label){",
+              "function machineName(label){", "function livePhrase(steps,running,status,drafts,comp,done){"):
+        js += _jsfn(pg, h)
+    js += r"""
+const D=[{m:"Gemma 4 26B",t:"draft one"},{m:"Sam’s box · gpt-oss:20b",t:"draft two"}];
+const o={
+ search:livePhrase([{id:"search",s:"run"}],[],"",[],"",null).text,
+ read:livePhrase([{id:"search",s:"done",d:"6 sources"},{id:"read",s:"run",d:"4 pages"}],[],"",[],"",null).text,
+ drafting:livePhrase([{id:"council",s:"run",d:"1 of 2"}],["Sam’s box · gpt-oss:20b"],"",[],"",null),
+ status:livePhrase([],[],"asking Gemma 4 26B · 1 of 1",[],"",null).text,
+ two:livePhrase([],["Gemma 4 26B","Gemma 4 E2B"],"",[],"",null).text,
+ merging:livePhrase([{id:"polish",s:"run",d:"x"}],[],"",D,"Gemma 4 26B",null),
+ writing:livePhrase([{id:"polish",s:"run",d:"x"}],[],"",[D[0]],"Gemma 4 26B",null).text,
+ review:livePhrase([{id:"review",s:"run",d:"Gemma 4 26B"}],[],"",D,"",null),
+ verify:livePhrase([{id:"verify",s:"run",d:"12 claims · Sam’s box · gpt-oss:20b"}],[],"",D,"",null),
+ done:livePhrase([],[],"",D,"",{t:8.62}).text,
+ idle:livePhrase([],[],"",[],"",null).text,
+ kinds:[machineKind("Gemma 4 26B"),machineKind("Sam’s box · gpt-oss:20b"),machineKind("Claude")],
+ names:[machineName("Gemma 4 26B"),machineName("Sam’s box · gpt-oss:20b"),machineName("Claude")]};
+process.stdout.write(JSON.stringify(o));
+"""
+    try:
+        return _node_json(js, "live528.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+_lv = _live528(page)
+check("the live line says what the frames say: searching, reading N sources, <model> drafting on <machine>, merging N drafts, writing, reviewing, checking, done in N s; machines by kind and by their own names",
+      _lv.get("search") == "Searching the web" and _lv.get("read") == "Reading 6 sources"
+      and _lv.get("drafting", {}).get("text") == "Sam’s box · gpt-oss:20b drafting on Sam’s box"
+      and _lv.get("drafting", {}).get("who") == ["Sam’s box · gpt-oss:20b"]
+      and _lv.get("status") == "Gemma 4 26B drafting on this Mac" and _lv.get("two") == "2 models drafting"
+      and _lv.get("merging", {}).get("text") == "Merging 2 drafts" and len(_lv.get("merging", {}).get("who") or []) == 2
+      and _lv.get("writing") == "Writing the answer" and _lv.get("review", {}).get("text") == "Reviewing the draft"
+      and _lv.get("verify", {}).get("text") == "Checking the answer" and _lv.get("verify", {}).get("who") == ["Sam’s box · gpt-oss:20b"]
+      and _lv.get("done") == "Done in 8.6 s" and _lv.get("idle") == "Thinking"
+      and _lv.get("kinds") == ["local", "server", "cloud"] and _lv.get("names") == ["this Mac", "Sam’s box", "the cloud"], "%r" % (_lv,))
+check("the asking flow hangs off real frames: a comet per real DRAFT, the white ripple on the RUN compositor frame, the live line painted from the stream loop and a 200 ms clock, the glow on the live body's container, the light round the composer at the end",
+      'if(!/^\\(no answer/.test(d.t||"")&&!/\\((review|rewrite)\\)$/.test(d.m||""))cometFor(d.m,aiDiv);}' in page
+      and 'if(!stepComp&&drafts.filter(x=>!/^\\(no answer/.test(x.t||"")).length>=2)rippleAt(aiDiv,"#ffffff");' in page
+      and "liveLinePaint(aiDiv);              // the live line follows the frames (6b528)" in page
+      and "const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);" in page
+      and "liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});" in page
+      and "if(full&&!wasAborted)answerLanded();" in page and 'document.dispatchEvent(new Event("hz-answer-done"))' in page
+      and '<canvas id="comets" aria-hidden="true"></canvas>' in page and "function cometsDraw(){" in page
+      and ".msg.ai.live .body{color:#fff;text-shadow:0 0 10px rgba(159,192,255,.38)" in page
+      and ".msg.ai .body{transition:color .9s ease,text-shadow .9s ease}" in page
+      and "#composer.finish::before{" in page and "@keyframes hzRing{to{--hzang:360deg}}" in page
+      and ".msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}" in page
+      and "function cometsDraw(){" in _jsfn(page, "function cometsDraw(){") and "setTimeout(" not in _jsfn(page, "function livePhrase(steps,running,status,drafts,comp,done){"))
 # a fenced block with a blank line in it is ONE card (6b528): the paragraph splitter used to cut it in two
 # and wrap each half in <p>, and the inline rules dressed backticks and asterisks inside it
 def _fence528(src):

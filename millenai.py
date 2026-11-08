@@ -43394,7 +43394,38 @@ body.gen #chip-model{color:var(--accent)}
 .msg.ai .who .st:empty{display:none}
 .msg.ai>.body{grid-column:1;min-width:0}
 .msg.ai>.ans-foot,.msg.ai>.retrybtn,.msg.ai>.ghostnote{grid-column:1}
-.msg.ai>aside.behind{grid-column:2;grid-row:1/span 4;padding-top:22px;align-self:start}
+.msg.ai>aside.behind{grid-column:2;grid-row:1/span 5;padding-top:22px;align-self:start}
+/* THE LIVE LINE (OVERRIDE 3): the die of the machine at work, the words, the figures ticking in mono */
+.msg.ai>.liveline{grid-column:1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-height:24px;margin:-6px 0 14px}
+.liveline .lstep{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--hz-ink-2)}
+.liveline .die{width:8px;height:8px;border-radius:2px;flex:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 60%),var(--ac,#9fc0ff);box-shadow:0 0 8px rgba(159,192,255,.35)}
+.liveline .die.hollow{background:transparent;box-shadow:inset 0 0 0 1.2px var(--ac,#9fc0ff),0 0 8px rgba(159,192,255,.45)}
+.msg.ai.live .liveline .die{animation:hzBreathe 1.2s ease-in-out infinite}
+.liveline em{font-style:normal}
+.msg.ai.live .liveline em{background:linear-gradient(90deg,var(--hz-ink-2) 30%,#fff 50%,var(--hz-ink-2) 70%);background-size:250% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzLbl 2s linear infinite}
+.liveline.done .lstep{color:var(--hz-ink-3)}
+.liveline .lstats{margin-left:auto;display:flex;gap:14px;font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-3);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+@keyframes hzLbl{from{background-position:100% 0}to{background-position:-150% 0}}
+/* the comets ride over the chat, never over a dialog */
+#comets{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:7}
+/* the prose glows in while it writes and settles to white when the answer lands; set on the container,
+   since the stream replaces the body's HTML every frame (the 6b242 trap) */
+.msg.ai .body{transition:color .9s ease,text-shadow .9s ease}
+.msg.ai.live .body{color:#fff;text-shadow:0 0 10px rgba(159,192,255,.38),0 0 1px rgba(255,255,255,.5)}
+.msg.ai.live .body>*:last-child{text-shadow:0 0 14px rgba(159,192,255,.6),0 0 2px rgba(255,255,255,.7)}
+.msg.ai.live .body .srcrow,.msg.ai.live .body .codecard,.msg.ai.live .body table{text-shadow:none}
+/* one light runs once round the composer when the answer lands */
+@property --hzang{syntax:'<angle>';initial-value:0deg;inherits:false}
+#composer.finish{position:relative}
+#composer.finish::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1.5px;pointer-events:none;z-index:3;
+  background:conic-gradient(from var(--hzang),rgba(159,168,255,0) 0deg,#9fa8ff 40deg,#ff8fc4 90deg,#ffc58a 140deg,rgba(127,240,214,0) 200deg,rgba(159,168,255,0) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:hzRing 1.5s cubic-bezier(.45,0,.25,1) 1}
+@keyframes hzRing{to{--hzang:360deg}}
 .msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;letter-spacing:.002em;
   color:var(--hz-ink-read);padding:0;font-kerning:normal;text-rendering:optimizeLegibility;
   font-variant-numeric:normal}
@@ -43770,18 +43801,25 @@ body.rail #sb-foot #settings-btn{width:36px;height:36px;margin:0;padding:0;justi
 /* ---- the marginalia stacks under the answer when the window is narrow */
 @media (max-width:860px){
   .msg.ai{grid-template-columns:minmax(0,1fr)}
+  .msg.ai>.liveline .lstats{margin-left:0}
   .msg.ai>aside.behind{grid-column:1;grid-row:auto;padding-top:0;margin-top:22px}
   .behind .spine li{padding-bottom:14px}
   .msg.ai>.ans-foot{order:5}
 }
 /* ---- still, when asked: reduced motion, and the app's visual effects off */
 @media (prefers-reduced-motion:reduce){
-  .msg,.chat-item,#undobar,.caret,.msg.ai.live .who .dot,.behind .spine li.live .node,.msg.ai.live .who b.shim{animation:none!important}
+  .msg,.chat-item,#undobar,.caret,.msg.ai.live .who .dot,.behind .spine li.live .node,.msg.ai.live .who b.shim,
+  .msg.ai.live .liveline .die,.msg.ai.live .liveline em,#composer.finish::before{animation:none!important}
+  .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}
+  .msg.ai.live .body,.msg.ai.live .body>*:last-child{text-shadow:none}
   .msg,.chat-item,.mact,.mab,.fopt,#sidebar,#rail-btn svg,.behind .spine .prog i{transition:none!important}
   .caret{opacity:1}
 }
 body.novideo .msg,body.novideo .chat-item,body.novideo #undobar,body.novideo .caret,body.novideo .msg.ai.live .who .dot,
-body.novideo .behind .spine li.live .node,body.novideo .msg.ai.live .who b.shim{animation:none}
+body.novideo .behind .spine li.live .node,body.novideo .msg.ai.live .who b.shim,body.novideo .msg.ai.live .liveline .die,
+body.novideo .msg.ai.live .liveline em,body.novideo #composer.finish::before{animation:none}
+body.novideo .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}
+body.novideo .msg.ai.live .body,body.novideo .msg.ai.live .body>*:last-child{text-shadow:none}
 body.novideo #sidebar{transition:none}
 body.novideo .codecard,body.novideo .fopt,body.novideo .apcard,body.novideo #undobar,body.novideo .mapcard>a,
 body.novideo #recents-menu{-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -43964,6 +44002,8 @@ __CODE_ROWS__
 </div>
 <div id="undobar" hidden><span class="ut"></span><button id="undobtn">Undo</button></div>
   <canvas id="stars"></canvas>
+  <!-- the comets (6b528): a draft flies in from the machine that wrote it; a ripple on arrival -->
+  <canvas id="comets" aria-hidden="true"></canvas>
   <div id="chat-scroll"><div id="chat-inner">
     <div id="hero">
 <!-- 6.0b2, per Patrick: no in-app hero branding — the greeting IS the
@@ -46992,7 +47032,7 @@ async function mountPin(id,la,lo,nm){
 let steps=[],stepHost=null;
 // what the spine beside the live answer reads (6b528): the run's USAGE frames,
 // its DRAFT frames, who is running now (RUN), the page's live pace and status
-let stepUsage=[],stepDrafts=[],stepRunning=[],stepRate=0,stepStatus="";
+let stepUsage=[],stepDrafts=[],stepRunning=[],stepRate=0,stepStatus="",stepComp="";
 // what THIS run is expected to do (set at stream start) + live signals
 let stepPlan=[],answerChars=0,streamDone=false;
 // 6b257, per Patrick: the bar the user SEES is a tween chasing the
@@ -47660,6 +47700,157 @@ function caretIn(body){
   const last=ps.length?ps[ps.length-1]:null;
   if(last&&!last.querySelector(".caret"))last.insertAdjacentHTML("beforeend",'<span class="caret" aria-hidden="true"></span>');
 }
+// THE ASKING FLOW (NORTHSTAR OVERRIDE 3, per Patrick: "exciting but clean"). One live line
+// says what is really happening, with the die of the machine doing it, and tokens, pace and
+// seconds ticking beside it in mono; each draft is a comet in its machine's colour flying from
+// that machine's chip to the line (a cloud draft falls from the top of the sky), rippling on
+// arrival; the merge is one white ripple; the prose glows in and settles to white; when the
+// answer lands one light runs once round the composer. Every state comes from a real frame
+// (STEP, RUN, STATUS, DRAFT, USAGE, DONE), never a timer.
+const MACH={mlx:{ac:"#c9ccd2",ag:"#e4e7ee"},nvidia:{ac:"#76b900",ag:"#93dc1a"},amd:{ac:"#ed1c24",ag:"#ff4d55"},
+  intel:{ac:"#0071c5",ag:"#3a95e6"},server:{ac:"#9fc0ff",ag:"#cfe0ff"},cloud:{ac:"#9fc0ff",ag:"#cfe0ff"}};
+// where a model label runs, and the chip in the header or the sidebar that stands for that machine
+function machineKind(label){
+  const l=String(label||"");
+  if(l.indexOf(SRV_SEP)>0)return "server";
+  if(engineState&&engineState[l])return "local";
+  return (lastModels||"").indexOf(l)>=0&&!/cloud/.test(l)?"local":"cloud";
+}
+function machineName(label){
+  const k=machineKind(label);
+  return k==="server"?String(label).slice(0,String(label).indexOf(SRV_SEP)):(k==="local"?(IS_PC?"this PC":"this Mac"):"the cloud");
+}
+function machineChip(label){
+  const k=machineKind(label),name=machineName(label);
+  if(k==="server")return document.querySelector('.rig[data-machine="'+name.replace(/"/g,'\\"')+'"]')
+    ||[...document.querySelectorAll("#telemetry .srv-mrow .t-head")].find(x=>x.textContent.indexOf(name)>=0)||null;
+  if(k==="local")return document.querySelector(".rig.mlx")||document.querySelector("#telemetry .t-head")||null;
+  return null;
+}
+function machineColours(label){
+  const k=machineKind(label);
+  const rig=k!=="cloud"?machineChip(label):null;
+  if(rig&&rig.classList){const st=getComputedStyle(rig);const ac=st.getPropertyValue("--ac").trim(),ag=st.getPropertyValue("--ag").trim();
+    if(ac)return {ac:ac,ag:ag||ac,hollow:false};}
+  if(k==="local")return Object.assign({hollow:false},IS_PC?MACH.server:MACH.mlx);
+  if(k==="server")return Object.assign({hollow:false},MACH.server);
+  return Object.assign({hollow:true},MACH.cloud);
+}
+function dieHTML(label){
+  const c=machineColours(label);
+  return '<i class="die'+(c.hollow?" hollow":"")+'" style="--ac:'+c.ac+';--ag:'+c.ag+'" aria-hidden="true"></i>';
+}
+// WHAT IS REALLY HAPPENING (pure): the newest state from the frames in hand, in a person's words.
+// steps: the STEP rows; running: the RUN frame's list; status: the STATUS line; drafts: the real
+// DRAFT frames so far; comp: the compositor the RUN frame named; done: {t} when the run ended.
+function livePhrase(steps,running,status,drafts,comp,done){
+  const nd=(drafts||[]).filter(d=>d&&!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||"")).length;
+  if(done&&done.t>0)return {text:"Done in "+fmtSecs(done.t),who:[]};
+  const run=(steps||[]).filter(x=>x&&x.s!=="done"),s=run.length?run[run.length-1]:null;
+  const byId=id=>(steps||[]).find(x=>x&&x.id===id);
+  if(s&&s.id==="wake")return {text:/^Waking /.test(s.l||"")?s.l:"Waking your server",who:[]};
+  if(s&&s.id==="verify"){const d=String(s.d||""),k=d.indexOf("·");return {text:"Checking the answer",who:k>0?[d.slice(k+1).trim()]:[]};}
+  if(s&&s.id==="review")return {text:"Reviewing the draft",who:s.d&&/[A-Za-z]/.test(s.d)&&!/note|problem/.test(s.d)?[s.d]:[]};
+  if(s&&(s.id==="polish"||s.id==="draft")&&comp)return nd>=2?{text:"Merging "+nd+" drafts",who:(drafts||[]).filter(d=>d&&!/^\(no answer/.test(d.t||"")).map(d=>d.m)}
+    :{text:"Writing the answer",who:[comp]};
+  if(s&&s.id==="places")return {text:"Pinning the places",who:[]};
+  if(s&&s.id==="fix")return {text:"Applying corrections",who:[]};
+  if(running&&running.length)return {text:running.length===1?running[0]+" drafting on "+machineName(running[0])
+      :running.length+" models drafting",who:running.slice()};
+  const m=/^asking (.+?) ·/.exec(String(status||""));
+  if(m)return {text:m[1]+" drafting on "+machineName(m[1]),who:[m[1]]};
+  if(s&&s.id==="read"){const n=/(\d+)/.exec(String(s.d||""));const sr=byId("search");const ns=sr&&/(\d+) source/.exec(String(sr.d||""));
+    return {text:ns?"Reading "+ns[1]+" sources":(n?"Reading "+n[1]+" pages":"Reading the pages"),who:[]};}
+  if(s&&s.id==="search")return {text:"Searching the web",who:[]};
+  if(s&&(s.id==="polish"||s.id==="draft"))return {text:"Writing the answer",who:s.d&&!/GB|minutes/.test(s.d)?[String(s.d)]:[]};
+  if(s&&s.id==="council"){const mm=/(\d+)\s*of\s*(\d+)/.exec(String(s.d||""));return {text:mm&&+mm[2]>1?"Drafting, "+mm[1]+" of "+mm[2]:"Writing a first draft",who:[]};}
+  const w=thinkPhrase(steps,status,nd);
+  return {text:w.charAt(0).toUpperCase()+w.slice(1),who:[]};
+}
+// the live line's HTML: the dies of the machines at work, the words, the figures
+function liveLineHTML(ph,stats,done){
+  const dies=[...new Set((ph.who||[]).map(w=>machineName(w)+"|"+machineKind(w)))].map(k=>dieHTML((ph.who||[]).find(w=>machineName(w)+"|"+machineKind(w)===k))).join("");
+  return '<div class="liveline'+(done?" done":"")+'"><span class="lstep">'+dies+'<em>'+esc(ph.text)+'</em></span>'
+    +'<span class="lstats">'+(stats||[]).map(x=>'<span>'+esc(x)+'</span>').join("")+'</span></div>';
+}
+// the figures beside the line: live, the page's own estimate (marked ~) and the clock; done, the real counts
+function liveStats(live){
+  if(live){const a=[];const tk=Math.round(answerChars/4);if(tk>0)a.push("~"+fmtTok(tk)+" tokens");
+    if(stepRate>0)a.push("~"+(stepRate>=100?Math.round(stepRate):stepRate.toFixed(1))+" tok/s");
+    a.push(fmtSecs((performance.now()-runT0)/1000));return a;}
+  return [];
+}
+function liveLinePaint(div){
+  if(!div||!div.isConnected)return;
+  let el=div.querySelector(":scope>.liveline");
+  const ph=livePhrase(steps,stepRunning,stepStatus,stepDrafts,stepComp,null);
+  const html=liveLineHTML(ph,liveStats(true),false);
+  if(!el){const who=div.querySelector(":scope>.who");(who||div).insertAdjacentHTML("afterend",html);return;}
+  // in place: the words only when they changed (the label shimmer must not restart), the figures every tick
+  const em=el.querySelector("em");if(em&&em.textContent!==ph.text){el.outerHTML=html;return;}
+  const st=el.querySelector(".lstats");if(st)st.innerHTML=liveStats(true).map(x=>'<span>'+esc(x)+'</span>').join("");
+}
+function liveLineDone(div,info){
+  if(!div)return;
+  const el=div.querySelector(":scope>.liveline");
+  const t=(info.run&&info.run.t>0)?info.run.t:info.secs;
+  const tot=usageTotals(info.usage),fin=usageFinal(info.usage),st=[];
+  if(tot.n&&tot.i)st.push((tot.est?"~":"")+fmtTok(tot.i)+" in");
+  if(tot.n&&tot.o)st.push((tot.est?"~":"")+fmtTok(tot.o)+" out");
+  if(fin&&fin.o&&!fin.x&&info.rate&&info.rate.s>0){const v=fin.o/info.rate.s;st.push((v>=100?Math.round(v):v.toFixed(1))+" tok/s");}
+  else if(info.rate&&info.rate.tps>0)st.push("~"+(info.rate.tps>=100?Math.round(info.rate.tps):info.rate.tps.toFixed(1))+" tok/s");
+  const who=[...new Set((info.usage||[]).filter(Boolean).map(c=>c.m))];
+  const html=liveLineHTML({text:t>0?"Done in "+fmtSecs(t):"Done",who:who},st,true);
+  if(el)el.outerHTML=html;else{const w=div.querySelector(":scope>.who");(w||div).insertAdjacentHTML("afterend",html);}
+}
+// THE COMETS: a draft leaves its machine's chip and lands on the live line
+const cometsEl=$("#comets");let comets=[],rings=[],cometRaf=0;
+function cometsSize(){if(!cometsEl)return;const d=Math.min(devicePixelRatio||1,2);
+  cometsEl.width=innerWidth*d;cometsEl.height=innerHeight*d;const c=cometsEl.getContext("2d");c.setTransform(d,0,0,d,0,0);}
+if(cometsEl){cometsSize();addEventListener("resize",cometsSize);}
+function rgbaOf(hex,a){const h=String(hex||"#9fc0ff").replace("#","");const n=parseInt(h.length===3?h.split("").map(x=>x+x).join(""):h,16);
+  return "rgba("+(n>>16)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
+function cometsDraw(){
+  if(!cometsEl)return;const c=cometsEl.getContext("2d");
+  c.clearRect(0,0,innerWidth,innerHeight);c.globalCompositeOperation="lighter";const now=performance.now();
+  comets=comets.filter(k=>{const u=Math.min(1,(now-k.t0)/k.dur),e=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+    const P=t=>[(1-t)*(1-t)*k.a[0]+2*(1-t)*t*k.c[0]+t*t*k.b[0],(1-t)*(1-t)*k.a[1]+2*(1-t)*t*k.c[1]+t*t*k.b[1]];
+    for(let i=0;i<22;i++){const t=Math.max(0,e-i*.012),q=P(t),a=(1-i/22)*.8;c.fillStyle=rgbaOf(k.col,a*.5);c.beginPath();c.arc(q[0],q[1],2.2*(1-i/26),0,7);c.fill();}
+    const h=P(e),g=c.createRadialGradient(h[0],h[1],0,h[0],h[1],16);g.addColorStop(0,"rgba(255,255,255,.95)");g.addColorStop(.25,rgbaOf(k.glow,.7));g.addColorStop(1,rgbaOf(k.glow,0));
+    c.fillStyle=g;c.beginPath();c.arc(h[0],h[1],16,0,7);c.fill();
+    if(u>=1){rings.push({x:k.b[0],y:k.b[1],t0:now,col:k.glow,big:false});return false;}return true;});
+  rings=rings.filter(r=>{const u=(now-r.t0)/(r.big?1100:700);if(u>=1)return false;const R=(r.big?90:34)*(1-Math.pow(1-u,3));
+    c.strokeStyle=rgbaOf(r.col,(1-u)*.8);c.lineWidth=r.big?2:1.4;c.beginPath();c.arc(r.x,r.y,R,0,7);c.stroke();return true;});
+  if(comets.length||rings.length)cometRaf=requestAnimationFrame(cometsDraw);else{c.clearRect(0,0,innerWidth,innerHeight);cometRaf=0;}
+}
+function liveTarget(div){
+  const el=div&&div.querySelector(":scope>.liveline .lstep");
+  if(!el)return null;const r=el.getBoundingClientRect();if(!r.width)return null;return [r.left+8,r.top+r.height/2];
+}
+function cometFor(label,div){
+  if(!cometsEl||hzStill()||document.hidden)return;
+  const to=liveTarget(div);if(!to)return;
+  const col=machineColours(label),chip=machineChip(label);
+  let from;
+  if(chip){const r=chip.getBoundingClientRect();from=[r.left+r.width/2,r.top+r.height/2];}
+  else from=[innerWidth*(.25+Math.random()*.5),-24];          // a cloud draft falls from the top of the sky
+  const mid=[(from[0]+to[0])/2+(Math.random()-.5)*260,Math.min(from[1],to[1])-40+Math.random()*120];
+  comets.push({a:from,b:to,c:mid,col:col.ac,glow:col.ag,dur:1200+Math.random()*500,t0:performance.now()});
+  if(!cometRaf)cometRaf=requestAnimationFrame(cometsDraw);
+}
+function rippleAt(div,col){
+  if(!cometsEl||hzStill()||document.hidden)return;
+  const to=liveTarget(div);if(!to)return;
+  rings.push({x:to[0],y:to[1],t0:performance.now(),col:col||"#ffffff",big:true});
+  if(!cometRaf)cometRaf=requestAnimationFrame(cometsDraw);
+}
+// when the answer lands, one light runs once round the composer and the sky is told
+function answerLanded(){
+  try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}
+  const cb=$("#composer");if(!cb||hzStill())return;
+  cb.classList.remove("finish");void cb.offsetWidth;cb.classList.add("finish");
+  setTimeout(()=>cb.classList.remove("finish"),1700);
+}
 function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra){
   const hero=$("#hero"); if(hero)hero.remove();
   const sg=$("#suggest"); if(sg)sg.hidden=true;   // hero's gone, so are these
@@ -47693,6 +47884,14 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra){
     const aside=body.querySelector(":scope>aside.behind");if(aside)div.appendChild(aside);}
   howCtx.m=null;
   annCtx.pos=null;
+  // the live line of a saved answer: done, with the run's clock and counts (6b528)
+  if(role!=="user"&&m.role&&(m.run||(m.usage&&m.usage.length)))
+    div.querySelector(":scope>.who").insertAdjacentHTML("afterend",
+      liveLineHTML({text:m.run&&m.run.t>0?"Done in "+fmtSecs(m.run.t):"Done",who:[...new Set((m.usage||[]).filter(Boolean).map(c=>c.m))]},
+        (()=>{const tot=usageTotals(m.usage),fin=usageFinal(m.usage),st=[];
+          if(tot.n&&tot.i)st.push((tot.est?"~":"")+fmtTok(tot.i)+" in");if(tot.n&&tot.o)st.push((tot.est?"~":"")+fmtTok(tot.o)+" out");
+          if(fin&&fin.o&&!fin.x&&m.rate&&m.rate.s>0){const v=fin.o/m.rate.s;st.push((v>=100?Math.round(v):v.toFixed(1))+" tok/s");}
+          return st;})(),true));
   if(form)body.appendChild(formCard(form));
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
@@ -48044,7 +48243,10 @@ async function send(){
   // the run's own numbers (6b528): every model call's tokens (USAGE) and the
   // server's clock (DONE); the spine beside the answer reads them live
   let usage=[],runInfo=null;
-  stepUsage=usage;stepDrafts=drafts;stepRunning=[];stepRate=0;stepStatus="";
+  stepUsage=usage;stepDrafts=drafts;stepRunning=[];stepRate=0;stepStatus="";stepComp="";
+  // the live line ticks on its own clock, from the first second (6b528)
+  liveLinePaint(aiDiv);
+  const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);
   // the writer's pace (6b515): the server's RATE frame when it sent one, else
   // the page's own clock from the first character shown after the last RESET
   let rateInfo=null,genT0=0,genCut=-1,lastChunkT=0;
@@ -48206,6 +48408,9 @@ async function send(){
                   // who is running now feeds the spine (6b528): the models
                   // drafting as live nodes, the compositor as the final step
                   if(d.c!==undefined){stepRunning=[];
+                    // the merge: one white ripple on the live line (6b528)
+                    if(!stepComp&&drafts.filter(x=>!/^\(no answer/.test(x.t||"")).length>=2)rippleAt(aiDiv,"#ffffff");
+                    stepComp=String(d.c);
                     const cs=steps.find(x=>x.id==="council");
                     if(cs&&cs.s!=="done")addStep(Object.assign({},cs,{s:"done"}));
                     if(!steps.some(x=>x.id==="draft"||x.id==="polish"))
@@ -48218,7 +48423,9 @@ async function send(){
         DONE:j=>{try{runInfo=JSON.parse(j);}catch(e){}},       // the run's clock and mode (6b528)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
-                     if(!drafts.some(x=>x.m===d.m))drafts.push(d);
+                     if(!drafts.some(x=>x.m===d.m)){drafts.push(d);
+                       // a real draft is a comet from its machine (6b528)
+                       if(!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||""))cometFor(d.m,aiDiv);}
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
                        x=>!/^\(no answer/.test(x.t||"")).length;
@@ -48270,7 +48477,7 @@ async function send(){
       if(!answerChars&&full.length)etaMark=performance.now();  // text began (6b459)
       answerChars=full.length;  // drafting progress is real text
       if(steps.length)paintSteps();
-      setWho(thinkPhrase(steps,status,draftsGot));   // the byline's word (6b528)
+      liveLinePaint(aiDiv);              // the live line follows the frames (6b528)
       kickDrip();
     }
     streamEnded=true;streamDone=true;
@@ -48296,6 +48503,7 @@ async function send(){
   }
 
   aiDiv.classList.remove("live");
+  clearInterval(liveT);
   const secs0=(performance.now()-t0)/1000;
   // the spine settles (6b528): every node done, the run's numbers, the sources
   collapseSteps(searched?sources:null,{drafts:drafts,usage:usage,run:runInfo,secs:secs0,
@@ -48303,6 +48511,9 @@ async function send(){
   // at rest the byline is the brain alone, in the mode the server ran (6b528)
   {const w=aiDiv.querySelector(".who");
    if(w)w.innerHTML=signatureHTML(runInfo&&runInfo.mode!=null?runInfo.mode:tier,"");}
+  // the live line settles on "Done in N s" with the real counts; one light round the composer
+  liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});
+  if(full&&!wasAborted)answerLanded();
   paintDrafts(aiDiv,drafts,false);   // merge done: collapse (or clear bar)
   // the stream died but good drafts exist — the best one IS the answer;
   // never show "engine returned nothing" over a usable draft
