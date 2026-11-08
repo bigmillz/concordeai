@@ -17139,3 +17139,87 @@ page's <script> instead of at the board, and a new check keeps the board, the co
 The gauntlet came back 1199/1200: the servers review check (6b334) still pinned the board's own
 X-Models reader, which went with the board. It now pins the page's one remaining reader and counts
 it, so a second, undecoded reader still fails. That check alone was rerun against the source, green.
+
+## 6b533 — Muse Glimmer 30B on trial: its channels split, its strength sent, and a fair retest (per Patrick)
+
+On `muse` from `main`. A first look (report only) found Meta's Muse Glimmer 30B (dense, 27.9B text + 1.9B
+vision, 131,072 context, Apache 2.0, released 2026-08-10; cached on this Mac since 2026-10-07) best of three
+on a blind spot check, but slow, with no thinking-off switch, and impossible to show in the app: mlx-lm
+0.32.2 has no response format for `muse_glimmer` (only `muse_spark` sets `TOKENIZER_DEFAULTS`), so its server
+streams `to=self<|message|>…reasoning…<|eom|><|start|>assistant to=user<|message|>answer` as plain content.
+Patrick chose: do the app work, then retest fairly before deciding.
+
+**1. The channels** (`MuseChannels`, before `stream_ollama`). A streaming splitter: the `to=self` channel goes
+inside `<think>…</think>` (the collapsible block the page already draws for R1 and Gemma's reasoning, and
+which `strip_think` drops before a merge), the `to=user` (or `commentary`) channel is the answer, a tool
+channel (`to=functions.x`) is dropped, every control token goes, a marker cut between two chunks is held
+back until it is whole, a stream that never had a header passes through untouched, and a reasoning cut
+off by the token cap still closes its block. On the MLX route every content chunk of a `MUSE_ROWS` row goes
+through it (`stream_openai_compat`, also the non-streamed fallback). On Ollama (`stream_ollama`): Ollama's
+own `glimmer` renderer and parser (Ollama 0.32.8+, the tag's config says so) hand the reasoning over as
+`message.thinking`, which goes into the block; content still passes the splitter, for an older Ollama or a
+raw route.
+
+**2. The strength** (`muse_level`): Muse has no off, only low to xhigh. It is asked for `"high"` where the
+app asks a model to think and `"low"` otherwise: MLX gets `chat_template_kwargs.reasoning_strength` (mlx-lm's
+server passes the kwargs to the template), Ollama gets `think` as the level. A council's drafts ask for high
+(`run_council`'s draft call: `or _lbl.startswith("Muse")`, a label test like the Qwen one beside it, so no
+council harness needs a new name); Fast, a lone pick and the passes that review or rewrite (critic, peer,
+merge, polish) ask for low; `run_model` hands `thinking` to Ollama now too. Other rows are unchanged.
+
+**3. The row, on trial.** `("Muse Glimmer 30B", "🎇", "30B", "big", "mlx-community/Muse-Glimmer-30B-4bit",
+"muse-glimmer:30b", 8954, 18.5, 19.4, False)`: the MLX repo is 19,443,248,945 bytes (sha 3e7677d7), mem is
+the measured 17.0 GB peak at a 32K prompt plus 1.5 GB; `OLLAMA_BYTES` 18,157,010,026 (the registry manifest,
+2026-11-08), `OLLAMA_REQUIRES` (0, 32, 8), `MLX_MODEL_TYPES` `muse_glimmer`, `MLX_REQUIRES` (0, 32, 2) (the
+module is checked in the pin; 0.32.0-0.32.1 unknown, so below the pin the row runs on Ollama), and an
+Advanced blurb. **`TRIAL_ROWS`**: a row in the catalog (downloads by hand, routes, answers when picked in
+Advanced or by name) that no mode seats (`_tier_ready`'s blend skips it, Pro and Thinking included) and no
+model set holds (`model_sets`, a Mac's and a server's), so no update card, first run or server allow-list
+brings it in ("models follow app updates" would otherwise have offered 19 GB to every Everything machine).
+Taking it out of `TRIAL_ROWS` and naming it in a mode's picks is the whole promotion.
+
+**4. The fair retest** (the same 9 prompts as the first look: q27 q28 q29 q30 q11 q12 q16 q25 and a
+20,042-token synthetic log; the same plain system prompt with the persona; in-process mlx-lm 0.32.2 on the
+M4 Pro 48 GB). Every model reasons: Gemma 4 26B and Qwen 3.6 35B MoE with `enable_thinking=True`, Muse at
+low and at high. Each maker's sampling: Gemma 1.0/0.95/64 and Qwen 1.0/0.95/20 (their
+`generation_config.json`), Muse 1.0/0.95/64 (Meta's card; Ollama's params blob agrees); seed 533; 8,192
+tokens at most (the app's cap); every answer finished on its own. Blind Opus judges per RUBRIC.md, **two per
+question** with their own shuffles (two packet sets; 1 of 9 orders the same), the key kept apart.
+
+| overall, mean of 2 judges | Muse low | Muse high | Gemma 4 26B (thinking) | Qwen 3.6 35B (thinking) |
+|---|---|---|---|---|
+| total / 90 | 52.5 | **56.0** | 42.5 | 45.5 |
+| per question | 5.83 | **6.22** | 4.72 | 5.06 |
+| hallucination flags (high) | 20.5 (3.0) | 16.5 (2.0) | **13.0** (2.5) | 36.5 (10.0) |
+| answer starts, median of 8 short | 14.4 s | 53.1 s | 14.6 s | **13.2 s** |
+| whole answer, median of 8 short | 37.6 s | 71.3 s | 20.0 s | **19.4 s** |
+| 20K log: answer starts / done | 247 / 433 s | 431 / 557 s | 133 / 159 s | **67 / 79 s** |
+
+The judges agree (mean |difference| 0.42 a question, never more than 1; set A alone 52/56/43/47, set B
+53/56/42/44). Per question, Muse high beats Qwen on 6 of 9 (+1.2, t 1.7) and Gemma on 8 of 9 (+1.5, t 2.0);
+low against high +0.4, t 0.9: suggestive on 9 questions, not proof. Where Muse lost: q30 (quantization; both
+levels 3-4 against 5.5-6.5) and the long summary (it lists the routine rows again; Qwen 6.0). Gemma with
+thinking on still wrote $95 × 1.12 = $106.60 on q27 (3.5). Thinking costs the incumbents little time (they
+decode at 64 and 87 tok/s against Muse's 15.6); Muse low starts answering as soon as they do but takes about
+twice as long to finish; high takes 3.5x; on a 20K prompt its ~180 s prefill dominates.
+
+**Leak check.** The splitter over the 17 fresh Muse outputs at six chunkings each: no control token, no
+header word, no reasoning outside the block, the answer identical to a whole-text parse. Through the app (a
+windowless dev copy of this branch on 9894, its own MILLENAI_HOME): Muse picked alone (q27, a one-liner) and
+Advanced's council of Muse + Gemma 4 E2B (q27): no `<|…|>`, no `to=self`/`to=user`, the reasoning only in
+its `<think>` block, the council's final with none; the dev copy's engines stopped with it. The Ollama route
+is checked on stand-in engines only (pulling the 18 GB tag was not asked for).
+
+Gauntlet: 12 checks (`# ==== muse (6b533)`): the splitter at every cut 1-40, strip_think, clean streams,
+the tool channel, a cut-off reasoning, a half header and a stray token; the strength; both routes on
+stand-in engines (the payload's strength or `think`, the split, another row untouched); `run_model` and the
+council's wiring; the row and its routes on and below the pin; on trial (no mode, no set, Mac or server;
+downloaded, still in no mode); 14 mutants, each caught. The stream and set harnesses gain the new names;
+stale pins follow the code: `> BIG_MODEL_BYTES)` (the call carries the depth), `MLX_REQUIRES` (Muse asks for
+the pin), "intel, no 3.8" (Muse's 0.32.8 is the next newest; a case without either keeps 0.30.9), and the
+sets' and server sets' mutant anchors (`l not in TRIAL_ROWS`). Run 1 (e902cfc, before the rebase onto
+6b525's main): 1207/1211, those four. Run 2 (a6b0a3b, rebased onto 6b525's main): **1212/1212**, exit 0.
+
+**Verdict.** On this bench Muse is the better Thinking brain, at both strengths, with the incumbents
+reasoning too; it costs time, about 2x a whole answer at low and 3.5x at high, and 3-7x on a long prompt.
+It stays on trial until Patrick decides; what promoting it would take is in the report.
