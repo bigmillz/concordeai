@@ -3248,7 +3248,8 @@ check("a giant on Ollama: fixed context, stays loaded, an hour to load",
       and _so_seen[2][0]["options"] == {"temperature": 0.75}
       and _so_seen[2][1] == 600
       and "giant=model_is_giant(label),\n" in _MILLENAI_SRC
-      and "> BIG_MODEL_BYTES)" in _MILLENAI_SRC
+      # 6b533: the call carries the depth too (a Muse row's strength)
+      and "> BIG_MODEL_BYTES, thinking=thinking)" in _MILLENAI_SRC
       and "except (TimeoutError, socket.timeout):" in _MILLENAI_SRC,
       "%r" % _so_seen)
 # 6b314: a 404 GB pull. Progress is bytes across every layer (the old
@@ -4066,11 +4067,15 @@ for _k in ("apple", "windows", "intel"):
     _need[_k] = _nz["_ollama_needed"]()
 _nz["SUPPORTED"] = dict(_plat["intel"]["SUPPORTED"], **{"Qwen 3.8 27B": False})
 _need["intel, no 3.8"] = _nz["_ollama_needed"]()
+# 6b533: a row on trial still runs when picked, so its tag counts (0.32.8)
+_nz["SUPPORTED"] = dict(_plat["intel"]["SUPPORTED"], **{"Qwen 3.8 27B": False, "Muse Glimmer 30B": False})
+_need["intel, no 3.8 or Muse"] = _nz["_ollama_needed"]()
 check("the engine download is checked against the release, and sized to this computer",
       _dl_ok and _dl_bad == ("the engine download doesn't match the release's checksum", [])
       and _need["apple"] == (0, 17, 1)          # only its MLX-less Vision row
       and _need["windows"] == (0, 32, 12) and _need["intel"] == (0, 32, 12)
-      and _need["intel, no 3.8"] == (0, 30, 9),
+      and _need["intel, no 3.8"] == (0, 32, 8)
+      and _need["intel, no 3.8 or Muse"] == (0, 30, 9),
       "%r" % [_dl_ok, _dl_bad, _need])
 _stream_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def stream_ollama("):
                             _MILLENAI_SRC.index("def stream_openai_compat(")]
@@ -6337,8 +6342,8 @@ import types as _types
 for _i5, _n5, _o5, _d5 in _s5_run(_MILLENAI_SRC):
     check(_n5, _o5, "%r" % (_d5,))
 _S5_MUT = [
-    ("Light sized with No limits", "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n                    and fits_by_memory(l))",
-     "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n                    and model_fits_machine(l))", [0]),
+    ("Light sized with No limits", "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n                    and fits_by_memory(l) and l not in TRIAL_ROWS)",
+     "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n                    and model_fits_machine(l) and l not in TRIAL_ROWS)", [0]),
     ("a giant in Recommended", "            return (bool(SUPPORTED.get(l)) and not model_is_giant(l)\n",
      "            return (bool(SUPPORTED.get(l))\n", [0]),
     ("the everyday not a Gemma first", 'next((l for l in small if l.startswith("Gemma 4") and l not in QUICK_PAIR), None)', 'None', [0]),
@@ -6347,8 +6352,8 @@ _S5_MUT = [
     ("no code model", "    add(first(CODE_LADDER))\n", "", [0]),
     ("no vision model", "    add(VISION_MODEL)\n", "", [0]),
     ("one per row, not per download", "        if l and fits(l) and key(l) not in keys:\n", "        if l and fits(l) and l not in out:\n", [0]),
-    ("Everything without No limits' extras", "        pool = [l for l in MODEL_INFO\n                if SUPPORTED.get(l) and model_fits_machine(l)]",
-     "        pool = [l for l in MODEL_INFO\n                if SUPPORTED.get(l) and fits_by_memory(l)]", [0]),
+    ("Everything without No limits' extras", "        pool = [l for l in MODEL_INFO\n                if SUPPORTED.get(l) and model_fits_machine(l) and l not in TRIAL_ROWS]",
+     "        pool = [l for l in MODEL_INFO\n                if SUPPORTED.get(l) and fits_by_memory(l) and l not in TRIAL_ROWS]", [0]),
     ("nothing over memory flagged", '            "over": ([l for l in out if not fits_by_memory(l)]', '            "over": ([l for l in out if False]', [0]),
     ("the pick believed while incomplete", "    mine = chosen if chosen in full else next(\n        (k for k in reversed(MODEL_SETS) if k in full and not out[k][\"same\"]),",
      "    mine = chosen or next(\n        (k for k in reversed(MODEL_SETS) if k in full and not out[k][\"same\"]),", [1]),
@@ -32314,8 +32319,8 @@ def _s7_run(src, which=None):
 for _i7, _n7, _o7, _d7 in _s7_run(_MILLENAI_SRC):
     check(_n7, _o7, "%r" % (_d7,))
 _S7_MUT = [
-    ("a model that spills fitted", '            return bool(tag) and _srv_fits(\n                {"placement": "gpu", "size": _set_tag_bytes(tag)}, vram, True)',
-     '            return bool(tag)', [0]),
+    ("a model that spills fitted", '            return l not in TRIAL_ROWS and bool(tag) and _srv_fits(\n                {"placement": "gpu", "size": _set_tag_bytes(tag)}, vram, True)',
+     '            return l not in TRIAL_ROWS and bool(tag)', [0]),
     ("the seen hash unsorted", '    return hashlib.sha256("\\n".join(sorted(str(n) for n in names))', '    return hashlib.sha256("\\n".join(str(n) for n in names)', [1]),
     ("a set's own model removed", "              if _srv_tag_key(n) not in keys[k] and SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]",
      "              if SRV_TAG_RX.fullmatch(n)][:SRV_SETS_MAX]", [1]),
