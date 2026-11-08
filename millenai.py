@@ -16559,6 +16559,12 @@ def _imp_flush(base, batch, ledger, job, run_files):
             chat["named"] = True
             chat["src"]["run"] = job["run"]
             chat["src"]["at"] = now
+            # the messages brought in are marked (integration): they keep the
+            # other app's byline; an answer written here later in the same
+            # chat signs as Concorde like any other
+            for _m in chat.get("messages") or []:
+                if isinstance(_m, dict):
+                    _m["imp"] = 1
             chats.append(chat)
             ledger["keys"][key] = cid
             job["ids"].append(cid)
@@ -49596,8 +49602,8 @@ __HZ_FONTS__
 .hz .hz-row .k:empty{min-width:0}
 /* ---- the conversation: the reply bar at the foot, the reading column's width and edge */
 .hz #main:not(:has(#hero)) #chat-inner{padding-top:72px}
-/* what scrolls up fades under the 56px header instead of meeting it (integration) */
-.hz #main:not(:has(#hero)) #chat-scroll{-webkit-mask-image:linear-gradient(180deg,transparent 34px,#000 104px);mask-image:linear-gradient(180deg,transparent 34px,#000 104px)}
+/* what scrolls up fades under the 56px header instead of meeting it; at rest nothing is dimmed (integration) */
+.hz #main:not(:has(#hero)) #chat-scroll.scrolled{-webkit-mask-image:linear-gradient(180deg,transparent 34px,#000 104px);mask-image:linear-gradient(180deg,transparent 34px,#000 104px)}
 .hz #main:not(:has(#hero)) #composer{max-width:var(--hz-read-w);margin:0 auto 0 calc(50% - (var(--hz-read-w) + var(--hz-gutter) + var(--hz-marg-w))/2);
   border-radius:22px;padding:8px 8px 8px 10px;flex-direction:row;align-items:flex-end;gap:6px}
 @media (max-width:860px){.hz #main:not(:has(#hero)) #composer{margin:0 auto;max-width:none}}   /* the marginalia has stacked: centre it (integration) */
@@ -53010,6 +53016,8 @@ function renderMD(raw){
 
 /* ----------------------------------------------------------- chat ui */
 const inner=$("#chat-inner"), scroller=$("#chat-scroll");
+// scrolled or not (integration): Horizon fades what passes under the header only once something has
+scroller.addEventListener("scroll",()=>{const on=scroller.scrollTop>4;if(scroller.classList.contains("scrolled")!==on)scroller.classList.toggle("scrolled",on);},{passive:true});
 /* While a blend is RUNNING: a clean progress bar \u2014 model answers stay
    hidden ("random junk", Patrick) until the merge writes the real answer.
    Once merged: the familiar collapsed "N of M contributed" details, with
@@ -54795,8 +54803,9 @@ async function send(){
     // animator reveals it at a rate that eases toward the backlog, so
     // text flows like typing instead of teleporting. The caret is
     // gone — the pinwheel rides the text's tail instead.
-    let dripShown=0,dripOn=false,streamEnded=false,dripCut=-1;
+    let dripShown=0,dripOn=false,dripOff=false,streamEnded=false,dripCut=-1;   // dripOff: the answer has landed (integration)
     const paintStream=txt=>{
+      if(dripOff)return;             // a landed answer is never repainted from the drip (integration)
       // the tree owns the narration; the bare status line is only for
       // the moment before any step exists
       // the step card is KEPT, not re-parsed from its outerHTML (6b462):
@@ -54814,6 +54823,7 @@ async function send(){
       if(curChat===myChat)autoScroll();
     };
     const dripTick=()=>{
+      if(dripOff)return;
       if(dripShown>=full.length){dripOn=false;
         if(streamEnded)paintStream(full);
         return;}
@@ -54991,6 +55001,7 @@ async function send(){
     if(uniq.length)places=uniq;
   }
   const treeKeep=(body.querySelector(".worktree")||{}).outerHTML||"";
+  dripOff=true;                    // from here the prose is the landing's; a late drip frame paints nothing
   // no loose srcRow here any more — collapseSteps() folded the chips
   // inside the disclosure, so a settled answer is prose (6b242)
   body.innerHTML=treeKeep
@@ -55443,7 +55454,7 @@ function redrawOpen(){
   if(!messages.length){resetHero();return;}
   const sc=chats.find(x=>x.id===curChat),by=sc&&sc.src&&sc.src.name;   // 6b529
   messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
-    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,by,m.model));
+    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));
 }
 async function loadChatsFromDisk(){
   try{
@@ -56359,7 +56370,8 @@ function loadChat(id){
   messages=c.messages.slice();
   inner.innerHTML="";
   const by=c.src&&c.src.name;     // a chat brought from another app (6b529)
-  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,by,m.model));
+  // only the messages brought in carry the other app's byline (integration); an answer written here signs as Concorde
+  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));
   renderChats();
   markSeen();
 }

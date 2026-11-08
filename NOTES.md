@@ -18160,3 +18160,41 @@ over 400, in Horizon and in Classic; 390px wide: no sideways scroll on the home 
 Pre-existing and left: the old `page.count("body.novideo ") == 3` check (hz-chat's and import-chats' still
 rules took the count to 33 before this branch).
 
+**Second fix round (the reviewer's items, same day; commits on top of 39f071c).**
+1. *A pin the merge broke.* Horizon's home-send check pinned `messages.push(...)\n  const uDiv=addMsg("user",shown);`
+   inside its `_hz_send` slice; hz-chat's call carries the attached files' chips, so the pin is now that call. The
+   checker (`pincheck.py`) had skipped every pin against a slice it didn't know; it now follows the gauntlet's
+   `_named` slices of the page and the source and reports a pin absent from both. That found two more hz-chat
+   pins stale against hz-chat's own source: the answer's copy (`copyText(text)`, not `copyText(t)`) and the
+   fact-check's claim count, pinned with a backslash-u where the source has the character. Both re-pinned.
+2. *The effects switch (6b292).* `page.count("body.novideo ") == 3` was the old truth; since Horizon the switch
+   stills motion too. The check now reads `_nv_ok(page)`: Classic's own `body.novideo` rules are still exactly
+   three, counted outside the Horizon blocks (hz-chat's, horizon's, the import sheet's); every other
+   `body.novideo` rule may declare only what stills or hides decoration (animation, transition, opacity, text and
+   box shadows, backgrounds, glass, `display:none`); a mutant that slips `margin:0` into one scoped still rule is
+   caught.
+3. *The fade dimmed the first message at rest.* The mask now sits on `#chat-scroll.scrolled`, toggled by a scroll
+   listener (scrollTop > 4). Measured at 390 and 1440 with the scroller at the top: no mask, no class, the first
+   question at y = 72 with the same colour and opacity as a later question (ink-2 / 1), answers alike
+   (ink-read / 1); scrolled, the class and the 34 to 104 px ramp.
+4. *Bottom clearance.* Measured, not changed: scrolled to the end at 390 the last message's bottom is at 654
+   against the composer's top at 762 (108 px clear, pills and action row included); at 1440, 710 against 818
+   (108 px), with Ultra's ring at .9. The room is `#chat-scroll #chat-inner`'s padding-bottom from `--cwh`
+   (6b425), which still measures the composer under Horizon. The earlier 390 shot was taken at scroll top of a
+   taller-than-the-window chat, mid-scroll under a floating composer.
+5. *An imported chat continued here.* The import marks every message it brings in (`imp: 1`, set in
+   `import_start` before the store); on reopen only those carry the other app's byline (`m.imp?by:""` at both
+   call sites), and an answer written here signs as Concorde live (the live call never passed `by`) and on reopen.
+   Pinned with a mutant (every message handed the app's name) and in the live import flow (the stored messages
+   carry the mark).
+6. *The drip.* A drip frame could land after the final paint: `dripTick` repaints a slice while `dripShown <
+   full.length`, and `paintStream(full)` once the stream has ended, either of them after the landing's
+   `body.innerHTML` (which carries the photos, the places and the map cards the drip's paint does not). `dripOff`
+   is set at the landing; `paintStream` and `dripTick` return on it. Pinned.
+
+Pins moved or added in this round: the home-send pin; the 6b292 effects check (`_nv_ok`, its mutant); the 6b529
+live check (the `imp` mark) and a new imported-chat-continued check with its mutant; the drip and the scrolled-only
+fade in hz-chat's delegated-handlers check; `copyText(text)`; the claims string's dot. Checks as before: parse, no
+unreplaced token, both scripts `node --check`, 2,135 literal pins (the one red is the `or` the checker can't read),
+Playwright at 390 and 1440: no page errors, no API response over 400.
+

@@ -1868,11 +1868,41 @@ check("draw on a picture: the served page wires the grid, the card, Save and Cop
 # About and touches ONLY the backdrop; the cog sits left of the pen;
 # automatic update checks are a switch (launch + daily) with the button
 # as the manual path
+def _nv_ok(pg):
+    """Since Horizon (6b526, 6b528; integration) the effects switch stills motion as well as
+    hiding the backdrop. Classic's OWN body.novideo rules stay exactly three, counted outside
+    the Horizon blocks; every other body.novideo rule (the .hz-scoped ones, the import sheet's)
+    may only still or hide decoration: animation, transition, opacity, text and box shadows,
+    glass and backgrounds, display:none. Nothing that moves layout or content.
+    Returns (Classic's count, the offending declarations)."""
+    import re as _re
+    css = pg[pg.index("<style>"):pg.index("</style>")]
+    a = css.index("HORIZON CONVERSATION (6b528")
+    b = css.index("/* ==== bring your chats (6b529): styles end ==== */")
+    classic = css[:a].count("body.novideo ") + css[b:].count("body.novideo ")
+    ok = ("animation", "animation-play-state", "animation-duration", "transition", "opacity", "text-shadow",
+          "box-shadow", "background", "background-image", "color", "backdrop-filter", "-webkit-backdrop-filter", "filter")
+    bad = []
+    for sel, body in _re.findall(r"([^{}]*body\.novideo[^{}]*)\{([^{}]*)\}", css[a:b]):
+        for d in body.split(";"):
+            d = d.strip()
+            if not d:
+                continue
+            prop, _, val = d.partition(":")
+            prop = prop.strip().lower()
+            if prop == "display" and val.strip() == "none":
+                continue
+            if prop not in ok:
+                bad.append(" ".join(sel.split())[:70] + " -> " + d)
+    return classic, bad
+_nv_mut = page.replace(".hz body.novideo #sidebar{transition:none}", ".hz body.novideo #sidebar{transition:none;margin:0}", 1)
+assert _nv_mut != page
 check("visual effects switch: backdrop only, in About; cog left of pen",
       'id="fx-toggle"' in page and 'id="perf-toggle"' not in page
       and "body.perf" not in page and "body:not(.perf)" not in page
       and "body.novideo #skyline{display:none}" in page
-      and page.count("body.novideo ") == 3
+      and _nv_ok(page) == (3, [])          # Classic's three; every Horizon-era rule decorative only (integration)
+      and _nv_ok(_nv_mut)[1] != []            # the mutant: a margin slipped into a still rule is caught
       and 0 < page.index('id="settings-btn"') < page.index('id="newchat"')
       and 'id="settings">' not in page
       and "Toggle visual effects" in page)
@@ -5200,6 +5230,9 @@ check("the marginalia lives outside the prose and survives streaming (6b528; rep
       and "root.appendChild(box);" in page
       and "const keepTree=" not in page and "insertAdjacentHTML(\"beforeend\",restHTML)" not in page
       and 'const aside=body.querySelector(":scope>aside.behind");if(aside&&isHz())div.appendChild(aside);' in page
+      and "const dripTick=()=>{\n      if(dripOff)return;" in page and "  if(dripOff)return;" in page   # a late drip frame never repaints the landed prose (integration, from review)
+      and "dripOff=true;                    // from here the prose is the landing's; a late drip frame paints nothing\n  // no loose srcRow here any more" in page
+      and ".hz #main:not(:has(#hero)) #chat-scroll.scrolled{-webkit-mask-image:" in page and 'scroller.classList.toggle("scrolled",on)' in page   # the header fade only once scrolled (integration)
       and ".msg.ai>aside.behind{grid-column:2;grid-row:1/span 5" in page
       and "if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}" in page)
 # 6b257: the bar the user SEES is a tween chasing the honest math —
@@ -34994,7 +35027,7 @@ check("copy buttons (6b464): delegated .ccopy handler, textarea+execCommand fall
       and _cp.index('document.execCommand("copy")') < _cp.index("navigator.clipboard.writeText(t).then(()=>true,()=>false)")
       and 'set(ok?"Copied":"Couldn\'t copy")' in _cp
       and 'code.querySelector("pre code")' in _cp and "pre.textContent" in _cp
-      and "copyText(t).then(ok=>{" in _cp and "navigator.clipboard.writeText(pre" not in _cp)
+      and "copyText(text).then(ok=>{" in _cp and "navigator.clipboard.writeText(pre" not in _cp)   # the answer's copy goes through copyText too (6b528)
 # ==== 6b461 the Code lane: server first, a wake with ten seconds and a Skip, bars that follow: begin ====
 print("== the Code lane follows the server first; the wake has 10 s and a Skip; the bars follow (6b461) ==")
 def _w461(src):
@@ -38281,7 +38314,7 @@ check("horizon: the opening is the wordmark alone, traced, then a 2.8 s streak, 
 # and renames itself; the list's repaints keep it (observed, not patched into renderChats)
 _hz_send = _MILLENAI_SRC[_MILLENAI_SRC.index("  if(globalThis.hzReady)hzBeforeSend(text);"):_MILLENAI_SRC.index("  if(globalThis.hzReady)hzOnSend();")]
 check("horizon: a question sent from the home glides the composer to the foot and arcs into its chat's row, which keeps a live die in the working machine's colour until the answer lands and renames itself",
-      "messages.push({role:\"user\",content:shown});\n  const uDiv=addMsg(\"user\",shown);" in _hz_send
+      "messages.push({role:\"user\",content:shown});\n  // the attached files ride as chips with their size in tokens (6b528)\n  const uDiv=addMsg(\"user\",shown,null,null,null,null,null,null," in _hz_send
       and "if(from&&from.home)hzArc(from,hzS.liveChat);" in _hz_js and "if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}" in _hz_js
       and 'if(v.w==="server"){hzS.srvWorking=String(v.s||"");hzS.genLocal=false;hzS.liveV=hzSrvV(hzS.srvWorking);}' in _hz_js
       and 'new MutationObserver(()=>{if(root.classList.contains("hz")){hzSideLive();hzRenameCheck();}}).observe(clist,{childList:true});' in _hz_js
@@ -38764,7 +38797,7 @@ check("the chat handler taps every call of the answer and sends the run's clock"
       and 'usage_role("search")' in _ch528 and 'usage_role("places")' in _ch528
       and "window=_ctx or SRV_CTX_DEFAULT)" in _ch528
       and "window=GIANT_CTX if (giant or big) else None)" in _ch528
-      and '"%d claim%s \\u00b7 %s" % (n_cl, "" if n_cl == 1 else "s", name))' in _ch528)
+      and '"%d claim%s \u00b7 %s" % (n_cl, "" if n_cl == 1 else "s", name))' in _ch528)   # the source spells the dot as the character
 # the saved record carries the run's numbers; turn_text strips the new frames
 _tr528 = _cs["turn_record"]("\x00USAGE:" + json.dumps({"r": "final", "m": "A", "w": "local", "i": 10, "o": 4, "d": 900}) + "\x00"
                             "\x00STEP:" + json.dumps({"id": "draft", "l": "Writing the answer", "s": "run", "d": "A"}) + "\x00"
@@ -39362,6 +39395,7 @@ check("6b529 live: an uploaded ChatGPT zip is inspected, imported and stored wit
       and len(_ch1) == 2 and _lis1.get("lane") == "ai" and _lis1.get("named") is True
       and _lis1.get("ts") == 1766005000000 and _lis1.get("created") == 1766000000000
       and _lis1.get("src", {}).get("run") == _r1.get("run") and re.fullmatch(r"c[0-9a-v]{26}", _lis1.get("id", ""))
+      and all(m.get("imp") == 1 for m in _lis1.get("messages", [])) and len(_lis1.get("messages", [])) > 0   # marked as brought in (integration)
       and _r1.get("first_id") in [c["id"] for c in _ch1]
       and _is == 200 and _ih.get("Content-Type") == "image/png" and _ib[:8] == b"\x89PNG\r\n\x1a\n"
       and os.path.exists(os.path.join(INST.home, "images", _img.rsplit("/", 1)[1])),
@@ -39512,6 +39546,16 @@ check("6b529 the server: imports/ is a profile's own folder, the ledger lives th
       and 'if not url.startswith("https://"):' in _IMP_SEG and "webbrowser.open(url)" in _IMP_SEG
       and '"https://claude.ai/settings/data-privacy-controls"' in _IMP_SEG
       and "Imported text is DATA" in _IMP_SEG)
+# AN IMPORTED CHAT CONTINUED HERE (integration, from review): `by` is the chat's, so every
+# answer in an imported chat used to carry the other app's name. The import marks the messages
+# it brings in (imp: 1); only those keep that byline, and an answer written here signs as the
+# one brain, live (the live addMsg call never passed `by`) and when reopened (both call sites).
+def _byimp(pg):
+    return (pg.count(',m.loc,m,m.imp?by:"",m.model));') == 2 and ',m.loc,m,by,m.model' not in pg
+            and 'div.innerHTML=\'<div class="who\'+(by&&role!=="user"?\' imp\':\'\')+\'">\'+who+\'</div>' in pg)
+check("6b529 an imported chat continued here: the messages brought in keep the other app's byline, an answer written here signs as Concorde on reopen; the import marks what it brings; the mutant that hands every message the app's name is caught",
+      _byimp(page) and not _byimp(page.replace(',m.loc,m,m.imp?by:"",m.model));', ',m.loc,m,by,m.model));'))
+      and '_m["imp"] = 1' in _IMP_SEG and 'for _m in chat.get("messages") or []:' in _IMP_SEG, "")
 # ==== bring your chats (6b529): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
