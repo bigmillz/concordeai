@@ -27105,7 +27105,9 @@ def _dk_pins(src):
                   and 'addEventListener("blur",dictAway);' in src
                   and "if(document.hidden)dictAway();" in src)
     _p["modal"] = ("""[...document.querySelectorAll('[id$="-veil"]')].some(v=>!v.hidden)""" in src
-                   and '(z&&z.classList.contains("on"))' in src and "(p&&!p.hidden)" in src)
+                   and "(p&&!p.hidden)" in src
+                   # 6b525: the ZITO board is gone, so dictation no longer asks after it
+                   and '(z&&z.classList.contains("on"))' not in src)
     _p["tip"] = ('micBtn.title="Dictate \\u2014 speak your message. Hold "+DICT_KEY\n'
                  '  +" to talk and let go to finish, or tap it to keep listening";' in src
                  and 'const DICT_KEY=IS_PC?"Ctrl+D":"\\u2318D";' in src)
