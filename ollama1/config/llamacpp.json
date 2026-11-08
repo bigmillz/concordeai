@@ -1,0 +1,7 @@
+{
+  "_comment": "ollama1 llama.cpp bridge (6b531). Models listed here are served by llama-server; every other model stays on Ollama. Ships with none: choose them from what was measured faster on this card (BEAT_FABLE: gpt-oss:20b, qwen3.5:9b, hermes3:8b; never gemma4). Per model: ctx (context tokens), kv (f16 | q8_0 | q4_0), spec (none | ngram-mod | ngram-simple | ngram-map-k | ngram-map-k4v), spec_n_max (draft tokens per step), draft (an absolute path to a same-tokenizer draft .gguf, or empty), args (extra plain flags). Edit at the server: sudo nano /etc/ollama1/llamacpp.json, then: sudo systemctl restart ollama1-llamacpp.service",
+  "enabled": false,
+  "bin": "/opt/llamacpp/current/llama-server",
+  "port": 8470,
+  "models": {}
+}

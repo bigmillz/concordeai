@@ -40502,7 +40502,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     "image": ""}.get(_xk[0], "")))
         if ag_system:
             dated_system["content"] = ag_system
-        _now_local = _venue_stamp("%A, %B %-d, %Y, %-I:%M%p")
+        # THE HOUR, NOT THE MINUTE (6b531, per Patrick: "faster feels
+        # smarter"). The engine's prompt cache reuses a prompt only from
+        # its first token: measured on Gemma 4 26B, a 5.5K-token chat whose
+        # system prompt differed by one minute re-read everything (8.3 s to
+        # the first token, 0 cached) where the same system prompt re-read
+        # only the new turn (2.3 s, 4,096 cached). A minute stamp here made
+        # every turn after the first a cold read. The hour keeps the rule
+        # below (weekday, date, hour) and changes the prompt once an hour;
+        # the exact minute still rides the question for searched answers
+        # (6b264's clock line), the one place no model ignores.
+        _now_local = _venue_stamp("%A, %B %-d, %Y, around %-I%p")
         dated_system["content"] += (
             "\n\nRIGHT NOW for the user it is " + _now_local +
             " (their local time). Every 'today', 'tonight' and 'right "

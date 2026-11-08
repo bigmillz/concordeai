@@ -1,0 +1,20 @@
+#!/usr/bin/python3
+"""ollama1-llamacpp: the llama.cpp bridge (6b531). Chosen models served by
+llama-server, the rest passed to Ollama, all in Ollama's dialect on a UNIX
+socket the gateway reads when config.json names it (llamacpp_bridge).
+
+    ollama1-llamacpp            serve (the unit)
+    ollama1-llamacpp check      the config's problems and each model's command line; exit 1 if any
+    ollama1-llamacpp status     what the running bridge holds
+
+The whole of it is lib/o1llamacpp.py; this file only finds the library."""
+import os
+import sys
+
+sys.path.insert(0, os.environ.get("OLLAMA1_LIB") or os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), "lib"))
+
+import o1llamacpp  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(o1llamacpp.main())

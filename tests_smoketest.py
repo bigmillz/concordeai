@@ -38679,6 +38679,28 @@ check("6b525 the ZITO easter egg is gone: no board, no key combo, no letter-eati
       'id="zito"' not in _MILLENAI_SRC and "zEngage" not in _MILLENAI_SRC
       and 'NEED=["z","i","t","o"]' not in _MILLENAI_SRC and "zitoEsc" not in _MILLENAI_SRC)
 
+# THE SYSTEM PROMPT'S CLOCK IS THE HOUR (6b531, per Patrick: "faster feels
+# smarter"): a minute stamp before the history made every turn after the
+# first a cold read for the engine's prompt cache (measured: 8.3 s vs 2.3 s
+# to the first token on a 5.5K-token chat). The minute still rides the
+# question for searched answers (6b264), unchanged.
+_ck31 = _MILLENAI_SRC[_MILLENAI_SRC.index("def do_POST(self)"):]
+_i_clk31 = _ck31.index('_now_local = _venue_stamp("%A, %B %-d, %Y, around %-I%p")')
+check("6b531 the system prompt's clock names the hour, not the minute, and still binds weekday, date and hour",
+      _i_clk31 > 0
+      and '"\\n\\nRIGHT NOW for the user it is " + _now_local' in _ck31
+      and "different weekday, date or hour" in _ck31[_i_clk31:_i_clk31 + 900]
+      and '_venue_stamp("%A, %B %-d, %Y, %-I:%M%p")' not in _MILLENAI_SRC
+      and "%-I:%M" not in _ck31[_i_clk31 - 1200:_i_clk31 + 900], "")
+check("6b531 the minute still rides the question for searched answers, after the hour went into the system prompt",
+      _ck31.index('_venue_stamp("%A %-I:%M%p")') > _i_clk31
+      and "messages[-1][\"content\"] = _clock_line + str(messages[-1][\"content\"])" in _ck31, "")
+# the mutant: the minute back in the system prompt must fail the first check
+_mut31 = _ck31.replace('around %-I%p")', '%-I:%M%p")', 1)
+check("6b531 mutant: a minute stamp back in the system prompt is caught",
+      '"%A, %B %-d, %Y, around %-I%p"' not in _mut31
+      and "%-I:%M" in _mut31[_i_clk31 - 1200:_i_clk31 + 900], "")
+
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
