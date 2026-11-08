@@ -10367,6 +10367,14 @@ _profile_lock = threading.RLock()   # the innermost lock: taken last
 _PROFILE = {"ctx": None, "stale": 0, "aside": None}
 _written = {}           # folder -> the _FIRST_WRITE names it has written
 _tl_ctx = threading.local()         # the ctx this thread works for
+# THE PAGE SEES EVERY MODEL CALL (6b528, per Patrick: "shows number of
+# tokens and everything"): a chat request installs a tap on its thread,
+# every thread the run starts (ctx_thread) carries it, and each
+# usage_note() of the run — a draft here, a cloud seat's, the critic's,
+# the final writer's, the fact-check's — also goes to the page as a USAGE
+# frame. `role` names the stage the thread is in. The handler clears the
+# tap as the stream ends, so a memory pass after it reports nowhere.
+_tl_usage = threading.local()
 
 
 class _MachineRoot:
@@ -10783,13 +10791,21 @@ def bind_ctx(ctx):
 
 
 def _ctx_wrap(fn, ctx):
+    # the starter's usage tap and stage ride along (6b528): a cloud seat's
+    # thread, a server group's, the fact-check's all report into the page
+    # that asked, as the request's own thread does
+    tap = getattr(_tl_usage, "tap", None)
+    role = getattr(_tl_usage, "role", "")
+
     @functools.wraps(fn)
     def run(*a, **k):
         prev = bind_ctx(ctx)
+        _tl_usage.tap, _tl_usage.role = tap, role
         try:
             return fn(*a, **k)
         finally:
             bind_ctx(prev)
+            _tl_usage.tap, _tl_usage.role = None, ""
     return run
 
 
@@ -22583,9 +22599,50 @@ def usage_counts(u):
     return None
 
 
-def usage_note(model, where, messages, chars, reported=None, t0=None):
+def usage_tap(fn):
+    """Install fn (None removes it) as this thread's usage tap (6b528): each
+    usage_note() on this thread, and on the threads it starts, hands fn the
+    page's copy of the record. Returns the previous tap."""
+    old = getattr(_tl_usage, "tap", None)
+    _tl_usage.tap = fn
+    return old
+
+
+def usage_role(role: str) -> str:
+    """Name the stage this thread's model calls belong to ("draft",
+    "review", "final", "verify", "search", "places"; "" for a plain
+    answer). Returns the previous name."""
+    old = getattr(_tl_usage, "role", "") or ""
+    _tl_usage.role = str(role or "")
+    return old
+
+
+def usage_frame(rec: dict, window=None) -> dict:
+    """The page's copy of one ledger record (6b528): r the stage, m the
+    model, w where it ran ("local", "server", or the provider), i and o
+    the tokens in and out, x when either is an estimate, d milliseconds,
+    c the cached input, n the context window when the caller knows it.
+    Nothing the page shows is invented: an estimate is marked as one."""
+    d = {"r": getattr(_tl_usage, "role", "") or "", "m": str(rec.get("m") or ""),
+         "w": str(rec.get("w") or ""), "i": int(rec.get("i") or 0),
+         "o": int(rec.get("o") or 0)}
+    if rec.get("x"):
+        d["x"] = 1
+    if rec.get("d") is not None:
+        d["d"] = int(rec["d"])
+    if rec.get("c"):
+        d["c"] = int(rec["c"])
+    if window:
+        d["n"] = int(window)
+    return d
+
+
+def usage_note(model, where, messages, chars, reported=None, t0=None,
+               window=None):
     """Queue one model call. chars: the text it sent back. Never raises
-    and never touches the disk on the caller's thread."""
+    and never touches the disk on the caller's thread. window: the
+    context the call ran in, when the caller knows it (6b528), for the
+    page's context meter."""
     try:
         got = usage_counts(reported)
         if got is None and not chars:
@@ -22614,6 +22671,14 @@ def usage_note(model, where, messages, chars, reported=None, t0=None):
             rec["d"] = int(max(0.0, time.time() - t0) * 1000)
         if est:
             rec["x"] = 1
+        # the page that asked sees the call too (6b528); a tap that fails
+        # never costs the ledger its line
+        tap = getattr(_tl_usage, "tap", None)
+        if tap is not None:
+            try:
+                tap(usage_frame(rec, window))
+            except Exception:
+                pass
         usage_put(rec)
     except Exception:
         pass
@@ -23984,7 +24049,10 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
         finally:
             conn.close()
     finally:
-        usage_note(label, "server", messages, sent[0], last, t0)
+        # the context the call ran in (6b528): what was asked for, else the
+        # gateway's own; the page's context meter reads it
+        usage_note(label, "server", messages, sent[0], last, t0,
+                   window=_ctx or SRV_CTX_DEFAULT)
 
 
 def _srv_reads_pictures(e, model: str) -> bool:
@@ -26969,7 +27037,10 @@ def stream_ollama(tag: str, messages: list, emit,
                     break
     finally:
         try:
-            usage_note(label or tag, "local", messages, sent[0], last, t0)
+            # a big model's context is the one fixed above (6b528); the
+            # rest run in Ollama's own, which the app doesn't know
+            usage_note(label or tag, "local", messages, sent[0], last, t0,
+                       window=GIANT_CTX if (giant or big) else None)
         except Exception:
             pass
 
@@ -30364,6 +30435,7 @@ def run_council(labels: list, messages: list, emit, status,
             # "Running\u2026" label forever and missing from the ledger. A
             # cloud voice must be able to fail in every way there is
             # without taking anything else down with it.
+            usage_role("draft")           # the page's ledger row (6b528)
             try:
                 try:
                     status(f"asking {lbl} \u00b7 cloud")
@@ -30486,6 +30558,7 @@ def run_council(labels: list, messages: list, emit, status,
             _p.append(chunk)
 
         def _draft_local(_lbl=label, _c=_collect, _e=_err):
+            usage_role("draft")           # the page's ledger row (6b528)
             try:
                 # a mode's server seat gives up on a first word early
                 with server_first_deadline(srv_first_s if server_label(_lbl)
@@ -30697,6 +30770,7 @@ def run_council(labels: list, messages: list, emit, status,
     # merges the rewrites. Twice the engine passes — the mode that says
     # "take as long as you need, give me your best".
     if peer and len(good) >= 2 and not _hurried():
+        usage_role("peer")                # the page's ledger row (6b528)
         question0 = messages[-1]["content"] if messages else ""
         block = "\n\n".join(f"[draft {n}]\n{t[:1200]}"
                              for n, (_l, t) in enumerate(good[:5], 1))
@@ -30818,6 +30892,7 @@ def run_council(labels: list, messages: list, emit, status,
               else rank.get(d[0], 99))
     good = good[:5]
 
+    usage_role("final")                   # the page's ledger row (6b528)
     status("compositing\u2026" if _pen_kind or not pen else
            "%s can\u2019t write the answer right now, so the usual compositor does" % pen_name(pen))
     question = messages[-1]["content"] if messages else ""
@@ -30860,6 +30935,7 @@ def run_council(labels: list, messages: list, emit, status,
         _critic = critic_lbl or merger
         status(f"{_critic} is reviewing the draft")
         _step_frame("review", "Reviewing the draft", "run", _critic)
+        usage_role("review")              # the page's ledger row (6b528)
         _persona = ""
         try:
             _pm = re.search(r'standing instructions for how you should respond, in '
@@ -30904,6 +30980,7 @@ def run_council(labels: list, messages: list, emit, status,
         report["notes"] = notes
     elif reflect and len(good) > 1 and not _hurried():
         status(f"{merger} is double-checking the drafts")
+        usage_role("review")              # the page's ledger row (6b528)
         try:
             parts = []
             _capped(merger, lambda: run_model(merger, [
@@ -31909,11 +31986,15 @@ def verify_pass(text: str, report: dict, messages: list, emit, status,
         _resend_if_changed()
         return out
     out.update(ran=True, who=name)
-    step("verify", "Checking the facts", "run", name)
+    # the claims counted ride the detail (6b528): the page's line reads
+    # "Checking 12 claims" while the check runs
+    step("verify", "Checking the facts", "run",
+         "%d claim%s · %s" % (n_cl, "" if n_cl == 1 else "s", name))
     try:
         status("checking the facts with %s" % name)
     except Exception:
         pass
+    usage_role("verify")                  # the page's ledger row (6b528)
     question = str(report.get("question") or (messages[-1]["content"] if messages else ""))
     material = list(report.get("material") or [])
     if kind == "cloud":
@@ -32011,12 +32092,15 @@ def _plan_queries(label: str, question: str, status) -> list:
     """Ask the model what to search for. Falls back to the raw question."""
     status("planning the research")
     parts = []
+    _was = usage_role("search")           # the page's ledger row (6b528)
     try:
         run_model(label, [{"role": "user",
                            "content": RESEARCH_PLAN + question}],
                   parts.append)
     except Exception:
         return [question]
+    finally:
+        usage_role(_was)
     out = strip_think(strip_special("".join(parts)))
     lines = [re.sub(r'^[\s\d\.\)\-\*"]+', "", ln).strip(' "\'*')
              for ln in out.splitlines()]
@@ -36513,6 +36597,7 @@ def run_rubin(question, messages, emit, status, step, stop, ctx=None, ground=Non
 # looking at is kept, and a stopped one keeps what was shown.
 _TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
               "|STEP|APPROVE|RATE"      # RATE: the writer's pace (6b515), the page's twin
+              "|USAGE|DONE"             # a model call's tokens; the run's clock (6b528)
               "|RUBIN")                 # Vera Rubin's console (6b519)
 # the page's rules, character for character: JS "." stops at a line
 # break, and JS "$" (unlike Python's) only at the very end
@@ -36571,6 +36656,18 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
             got[tag] = d
         elif tag == "CTX" and isinstance(d, dict):
             got["CTX"] = d.get("loc") or ""
+        # the run's own numbers (6b528): every model call's tokens, the
+        # clock, and each step's last state, so a reopened chat shows the
+        # same token line and "How it got there" the live answer did
+        elif tag == "USAGE" and isinstance(d, dict):
+            got.setdefault("USAGE", []).append(d)
+        elif tag == "DONE" and isinstance(d, dict):
+            got["DONE"] = d
+        elif tag == "RATE" and isinstance(d, dict):
+            got["RATE"] = d
+        elif tag == "STEP" and isinstance(d, dict) and d.get("id"):
+            st = got.setdefault("STEP", {})
+            st[d["id"]] = {k: d[k] for k in ("id", "l", "s", "d") if k in d}
     full = turn_text(raw)
     if not full and not aborted:
         good = [x for x in drafts if not str(x.get("t", "")).startswith(
@@ -36614,6 +36711,14 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
     if places:
         rec["places"] = places
         rec["loc"] = got.get("CTX", "")
+    if got.get("USAGE"):
+        rec["usage"] = got["USAGE"][:40]
+    if got.get("DONE"):
+        rec["run"] = got["DONE"]
+    if got.get("RATE"):
+        rec["rate"] = got["RATE"]
+    if got.get("STEP"):
+        rec["steps"] = list(got["STEP"].values())[:24]
     return rec
 
 
@@ -38820,6 +38925,36 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 sky_seen(i)
             self._send_json({"ok": ok})
             return
+        if self.path == "/api/feedback":
+            # GOOD / BAD ON AN ANSWER (6b528): one line in the quality
+            # ledger ("make it better" has numbers instead of vibes), keyed
+            # by the chat and the answer's place in it. 1 good, -1 bad, 0
+            # takes it back. Nothing else is read or changed.
+            _fb = self._json_body()
+            try:
+                vote = int(_fb.get("vote", 0))
+            except (TypeError, ValueError):
+                vote = 0
+            cid = str(_fb.get("chat_id") or "")[:40]
+            try:
+                n = int(_fb.get("n", -1))
+            except (TypeError, ValueError):
+                n = -1
+            if vote not in (-1, 0, 1) or not _CHAT_ID.fullmatch(cid) or n < 0:
+                self._send_json({"ok": False, "err": "not a vote"}, code=400)
+                return
+            try:
+                self.ctx.append(QUALITY_FILE, (json.dumps({
+                    "ts": int(time.time()), "fb": vote, "chat": cid, "n": n})
+                    + "\n").encode("utf-8"), mode=0o644)
+            except StaleProfile:
+                raise
+            except Exception:
+                self._send_json({"ok": False, "err": "couldn’t save it"},
+                                code=500)
+                return
+            self._send_json({"ok": True})
+            return
         if self.path == "/api/chat/hurry":
             # ANSWER NOW (6b257): flips the per-request Event minted in
             # /api/chat. The unguessable id is the whole authorization,
@@ -39331,6 +39466,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _effort = _effort if _effort in EFFORT_LEVELS else None
         _srv_think.level = effort_think(_effort)
         _srv_think.effort = _effort    # run_council reads it for its reviews
+        _t_req = time.time()          # the run's clock starts here (6b528)
+        _t_first = [0.0]              # when the first word reached the page
+        # the usage tap goes in NOW (6b528), before the search and pre-warm
+        # threads start, so the query plan's call is counted with the rest;
+        # its frames wait in a list until the headers are out
+        _tap_q = []
+        _tap_sink = [_tap_q.append]
+        usage_tap(lambda d: _tap_sink[0](d))
+        usage_role("")
         _answered.pop(threading.get_ident(), None)
         # a new question voids the last one's "who answered": the title
         # of a chat answered on this Mac must never go to the cloud. Per
@@ -40092,6 +40236,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         computer's engine when it is already up and idle;
                         '' when none answers in time."""
                         ask = [{"role": "user", "content": ask_text}]
+                        usage_role("search")     # the page's ledger row (6b528)
                         if not _co:
                             # THE PLAN NEVER LANDED (6b518): 28 of 28 bench
                             # plans had model=[]. Not the deadline: the
@@ -40768,8 +40913,28 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     shown_n[0] = 0
             else:
                 shown_n[0] += len(chunk)
+                if not _t_first[0] and str(chunk).strip():
+                    _t_first[0] = time.time()    # the first word (6b528)
             answer_buf.append(chunk)
             _write(chunk.encode("utf-8"))
+
+        # THE PAGE SEES EVERY MODEL CALL (6b528): a USAGE frame per
+        # usage_note() of this answer, from this thread and the threads the
+        # run starts; switched off with the stream, so the memory pass that
+        # follows reports to the ledger alone
+        _tap_on = [True]
+
+        def _usage_tap(d):
+            if _tap_on[0]:
+                _write((NUL + "USAGE:" + json.dumps(d, separators=(",", ":"))
+                        + NUL).encode("utf-8"))
+        _tap_sink[0] = _usage_tap
+        for _d in list(_tap_q):          # the query plan's, from before the headers
+            try:
+                _usage_tap(_d)
+            except Exception:
+                pass
+        del _tap_q[:]
 
         # SETTINGS › USAGE (6b325): the model paths get memit, which notes
         # that a model's own text reached the page; the app's own lines
@@ -41867,6 +42032,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                      and server_label_down(
                                          user_base, route_label or model_name))):
                         step("places", "Finding the places", "run", "")
+                        usage_role("places")     # the page's ledger row (6b528)
                         ans = "".join(answer_buf)[-2400:]
                         _pin_ask = [
                             {"role": "user", "content":
@@ -41942,6 +42108,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 except Exception as _exc:
                     emit("\n\nI wrote the answer but couldn\u2019t package "
                          "it: %s." % str(_exc)[:200])
+            # THE RUN'S CLOCK (6b528): first word and total from the request's
+            # arrival, and the mode that answered, so the page's token line and
+            # signature say the same on a reopened chat as they did live.
+            # Then the tap goes quiet: the memory pass reports nowhere.
+            _tap_on[0] = False
+            usage_tap(None)
+            usage_role("")
+            if not _gone and _model_said[0]:
+                try:
+                    _now = time.time()
+                    _write((NUL + "DONE:" + json.dumps({
+                        "f": round(_t_first[0] - _t_req, 2) if _t_first[0] else None,
+                        "t": round(_now - _t_req, 2), "mode": tier or ""},
+                        separators=(",", ":")) + NUL).encode("utf-8"))
+                except Exception:
+                    pass
             hb_stop.set()
             # the quality ledger: one line per answer, so "make it
             # better" has numbers instead of vibes (grep-able JSONL)
@@ -43221,6 +43403,31 @@ select option{background:#16171b;color:#ececec}
   --sans:'Space Grotesk',system-ui,sans-serif;
   --helv:'Helvetica Neue',Helvetica,Arial,sans-serif;
   --disp:'Michroma','Space Grotesk',system-ui,sans-serif;  /* the wide techno face (6.1) */
+}
+/* HORIZON TOKENS (6b526) */
+:root{
+  --hz-night:#04050a; --hz-deep:#070a16; --hz-dusk:#10204a;
+  --hz-ink:#f1f3fa;            /* primary text on the sky */
+  --hz-ink-2:#c9d0e2;          /* secondary text, AA on glass */
+  --hz-ink-3:#9aa6c6;          /* tertiary, labels; AA at 13px+ on --hz-deep */
+  --hz-accent:#9fc0ff;         /* the ONE accent: ice blue. Use with restraint */
+  --hz-good:#6ff0c0; --hz-warn:#f2b33d; --hz-bad:#ff8a7a;
+  --hz-glass:rgba(255,255,255,.06); --hz-glass-2:rgba(255,255,255,.09);
+  --hz-glass-line:rgba(255,255,255,.12); --hz-glass-line-2:rgba(170,200,255,.22);
+  --hz-blur:blur(28px) saturate(150%);
+  --hz-r-sm:8px; --hz-r-md:12px; --hz-r-lg:20px; --hz-r-xl:28px; --hz-r-pill:999px;
+  --hz-s1:4px; --hz-s2:8px; --hz-s3:12px; --hz-s4:16px; --hz-s5:24px; --hz-s6:32px; --hz-s7:48px;
+  --hz-ease-out:cubic-bezier(.16,1,.3,1);      /* arrivals */
+  --hz-ease-in-out:cubic-bezier(.65,0,.35,1);  /* moves */
+  --hz-ease-spring:cubic-bezier(.34,1.56,.64,1);/* small pops only */
+  --hz-t-fast:140ms; --hz-t-mid:260ms; --hz-t-slow:520ms;
+  --hz-shadow:0 30px 80px rgba(0,0,0,.45);
+  --hz-font-ui:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-display:'Space Grotesk',system-ui,sans-serif; --hz-font-read:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --hz-ink-read:#e6e9f4; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:150,236,212;
+  --hz-hair:rgba(255,255,255,.09); --hz-hair-2:rgba(255,255,255,.14); --hz-glass-lit:rgba(200,222,255,.42);
+  --hz-r-composer:26px; --hz-t-drift:46s; --hz-t-drift-busy:16s; --hz-t-breathe:8s;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -46538,6 +46745,8 @@ body.gen #chip-model{color:var(--accent)}
     background:rgba(10,12,17,.92);
   }
   #chat-inner{padding:24px 14px 150px}
+  /* the first line starts under the burger (6b528): the conversation's column reads these */
+  #chat-inner{--hz-col-top:68px;--hz-col-side:16px}
   body.sbopen #sidebar{transform:none}
   #mburger{
     display:flex;align-items:center;justify-content:center;
@@ -46571,6 +46780,491 @@ body.gen #chip-model{color:var(--accent)}
   .hz #main:not(:has(#hero)) #composer{margin-left:auto}
 }
 
+/* ================================================================================
+   HORIZON CONVERSATION (6b528, per Patrick: "beat out the UI of ChatGPT in every
+   possible way ... a very tight look, similar to Claude, that shows number of
+   tokens and everything"). The conversation surface and the sidebar to the art
+   director's north star (design/NORTHSTAR.md, StarAnswer.dc.html): the answer's
+   prose sits on the sky with no surface, in the reading face at 17.5/1.7 on a
+   640px measure; the person's words stay in the sans; one brain signs each answer
+   with a breathing dot and an ice caret; a 236px marginalia column, "Behind this
+   answer", carries the steps as a lit spine with what, who and the numbers, then
+   the machines; the sidebar is a 240px glass column of hairline rows with token
+   totals in mono. Every number is measured; an estimate carries a ~.
+   These rules come AFTER the older ones on purpose, at the same or higher
+   specificity, so each pinned old rule stays where the gauntlet expects it and
+   the new look wins by order. The old rules are dead weight to sweep once the
+   three Horizon branches have merged.
+   ================================================================================ */
+@keyframes hzRise{from{opacity:0;transform:translateY(10px)}}
+@keyframes hzBreathe{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes hzBlink{0%,45%{opacity:1}50%,95%{opacity:0}100%{opacity:1}}
+/* ---- the column: 640 of reading, a 56 gutter, 236 of marginalia */
+#chat-inner{max-width:1012px;padding:var(--hz-col-top,36px) var(--hz-col-side,40px) 150px}
+.msg{margin-bottom:0;animation:hzRise var(--hz-t-slow) var(--hz-ease-out) both}
+.msg.settled{animation:none}
+/* ---- the person's words: the sans, plain on the sky, 560 wide; files as chips */
+.msg.user{display:block;max-width:640px;margin:0 0 28px}
+.msg.user .who{display:none}
+.msg.user .body{font-family:var(--hz-font-ui);font-size:15.5px;line-height:1.55;color:var(--hz-ink-2);
+  letter-spacing:0;background:none;border:0;border-radius:0;padding:0;max-width:560px;box-shadow:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none;white-space:pre-wrap}
+.docrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.docchip2{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px 0 8px;border-radius:8px;
+  background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+  font:12.5px var(--hz-font-ui);color:var(--hz-ink-2);max-width:260px}
+.docchip2>span:first-of-type{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.docchip2 svg{width:13px;height:13px;flex:none}
+.docchip2 .mono{font-family:var(--hz-font-mono);font-size:11px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;flex:none}
+.msg.user .sentimgs{margin-top:12px}
+.msg.user .sentimgs img{border-radius:var(--hz-r-md);border:1px solid var(--hz-hair-2)}
+.msg.user .ans-foot{margin-top:6px;min-height:28px}
+/* ---- the answer: a hairline, the byline, the prose, with the marginalia beside */
+.msg.ai{display:grid;grid-template-columns:minmax(0,640px) 236px;column-gap:56px;align-items:start;margin:0 0 40px}
+.msg.ai .who{grid-column:1;display:flex;align-items:center;gap:10px;border-top:1px solid var(--hz-hair);
+  padding-top:22px;margin:0 0 16px;font-family:var(--hz-font-ui);font-size:13.5px;font-weight:500;color:#e2e7f5;
+  letter-spacing:0;text-transform:none;line-height:1.3}
+.msg.ai .who .dot{width:7px;height:7px;border-radius:50%;background:var(--hz-accent);flex:none;opacity:.55;
+  box-shadow:0 0 10px rgba(159,192,255,.9)}
+.msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite}
+.msg.ai .who b{font-weight:500;color:#e2e7f5}
+.msg.ai .who .st{font-size:13px;font-weight:400;color:var(--hz-ink-3)}
+/* the deepest modes shimmer (per Patrick): Odyssey in full colour while it writes, Meridian a subtle
+   ice-to-violet; both settle to the gradient, still, when the answer lands */
+.msg.ai .who b.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.msg.ai .who b.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff)}
+.msg.ai.live .who b.shim{animation:hzShim 3.2s linear infinite}
+.msg.ai.live .who b.shim.soft{animation-duration:5s}
+@keyframes hzShim{to{background-position:300% 0}}
+.msg.ai .who .st:empty{display:none}
+.msg.ai>.body{grid-column:1;min-width:0}
+.msg.ai>.ans-foot,.msg.ai>.retrybtn,.msg.ai>.ghostnote{grid-column:1}
+.msg.ai>aside.behind{grid-column:2;grid-row:1/span 5;padding-top:22px;align-self:start}
+/* THE LIVE LINE (OVERRIDE 3): the die of the machine at work, the words, the figures ticking in mono */
+.msg.ai>.liveline{grid-column:1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-height:24px;margin:-6px 0 14px}
+.liveline .lstep{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--hz-ink-2)}
+.liveline .die{width:8px;height:8px;border-radius:2px;flex:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 60%),var(--ac,#9fc0ff);box-shadow:0 0 8px rgba(159,192,255,.35)}
+.liveline .die.hollow{background:transparent;box-shadow:inset 0 0 0 1.2px var(--ac,#9fc0ff),0 0 8px rgba(159,192,255,.45)}
+.msg.ai.live .liveline .die{animation:hzBreathe 1.2s ease-in-out infinite}
+.liveline em{font-style:normal}
+.msg.ai.live .liveline em{background:linear-gradient(90deg,var(--hz-ink-2) 30%,#fff 50%,var(--hz-ink-2) 70%);background-size:250% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzLbl 2s linear infinite}
+.liveline.done .lstep{color:var(--hz-ink-3)}
+.liveline .lstats{margin-left:auto;display:flex;gap:14px;font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-3);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+@keyframes hzLbl{from{background-position:100% 0}to{background-position:-150% 0}}
+/* the comets ride over the chat, never over a dialog */
+#comets{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:7}
+/* the prose glows in while it writes and settles to white when the answer lands; set on the container,
+   since the stream replaces the body's HTML every frame (the 6b242 trap) */
+.msg.ai .body{transition:color .9s ease,text-shadow .9s ease}
+.msg.ai.live .body{color:#fff;text-shadow:0 0 10px rgba(159,192,255,.38),0 0 1px rgba(255,255,255,.5)}
+.msg.ai.live .body>*:last-child{text-shadow:0 0 14px rgba(159,192,255,.6),0 0 2px rgba(255,255,255,.7)}
+.msg.ai.live .body .srcrow,.msg.ai.live .body .codecard,.msg.ai.live .body table{text-shadow:none}
+/* one light runs once round the composer when the answer lands: #composer.finish rides the
+   Horizon effort ring (.hz #composer::before, --hz-ang, hzRing in the HORIZON block; integration) */
+.msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;letter-spacing:.002em;
+  color:var(--hz-ink-read);padding:0;font-kerning:normal;text-rendering:optimizeLegibility;
+  font-variant-numeric:normal}
+.msg.ai .body p{margin:0 0 16px}
+.msg.ai .body>p:last-child{margin-bottom:0}
+.msg.ai .body h1,.msg.ai .body h2,.msg.ai .body h3{font-family:var(--hz-font-ui);font-weight:600;color:var(--hz-ink);
+  letter-spacing:-.012em;line-height:1.3;margin:1.4em 0 .5em}
+.msg.ai .body h1{font-size:22px}
+.msg.ai .body h2{font-size:18.5px}
+.msg.ai .body h3{font-size:16px;color:var(--hz-ink-2)}
+.msg.ai .body>h1:first-child,.msg.ai .body>h2:first-child,.msg.ai .body>h3:first-child{margin-top:0}
+.msg.ai .body strong{color:var(--hz-ink);font-weight:600}
+.msg.ai .body em{color:var(--hz-ink-2)}
+.msg.ai .body ul,.msg.ai .body ol{margin:0 0 16px;padding-left:1.3em}
+.msg.ai .body li{margin-bottom:6px;padding-left:.1em}
+.msg.ai .body li::marker{color:var(--hz-ink-3)}
+.msg.ai .body ol li::marker{font-family:var(--hz-font-mono);font-size:.8em;font-variant-numeric:tabular-nums}
+.msg.ai .body blockquote{margin:0 0 16px;padding:.1em 0 .1em 1.05em;color:var(--hz-ink-2);
+  border-left:1px solid var(--hz-glass-line-2);font-style:normal}
+.msg.ai .body hr{border:0;border-top:1px solid var(--hz-hair);margin:24px 0}
+.msg.ai .body a{color:var(--hz-accent);text-decoration:none;border-bottom:1px solid rgba(159,192,255,.3)}
+.msg.ai .body a:hover{border-bottom-color:var(--hz-accent)}
+.caret{display:inline-block;width:2px;height:1.05em;vertical-align:-.18em;margin-left:3px;background:var(--hz-accent);
+  border-radius:1px;animation:hzBlink 1.1s steps(1) infinite}
+/* tables: hairlines, never boxes; the sans for cells, tabular digits */
+.msg.ai .body table{font-family:var(--hz-font-ui);font-size:13.5px;line-height:1.45;margin:6px 0 20px;
+  border-top:1px solid var(--hz-hair-2);border-bottom:1px solid var(--hz-hair-2);font-variant-numeric:tabular-nums}
+.msg.ai .body th{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3);
+  font-weight:500;padding:9px 12px 8px;border-bottom:1px solid var(--hz-hair);white-space:normal}
+.msg.ai .body td{padding:8px 12px;border-bottom:1px solid var(--hz-hair);color:var(--hz-ink-2)}
+.msg.ai .body th:first-child,.msg.ai .body td:first-child{padding-left:2px}
+.msg.ai .body th:last-child,.msg.ai .body td:last-child{padding-right:2px}
+.msg.ai .body td:first-child{color:var(--hz-ink)}
+.msg.ai .body tbody tr:last-child td{border-bottom:none}
+/* code: inline in mono on a whisper of glass; cards with a header bar, line numbers on request */
+.msg.ai .body code{font-family:var(--hz-font-mono);font-size:.8em;color:#e9eef9;background:rgba(255,255,255,.07);
+  border:1px solid var(--hz-glass-line);padding:1px 6px;border-radius:6px}
+.codecard{margin:6px 0 20px;border-radius:var(--hz-r-md);overflow:hidden;border:1px solid var(--hz-glass-line);
+  background:rgba(4,6,14,.5);-webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.codecard .codebar{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3);
+  padding:5px 8px 5px 14px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--hz-hair);
+  display:flex;align-items:center;gap:2px;min-height:34px}
+.codecard .codebar>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-family:var(--hz-font-mono);font-size:11.5px}
+.codecard .cbtn,.codecard .ccopy{font:12px var(--hz-font-ui);letter-spacing:0;text-transform:none;background:none;border:0;
+  padding:0 9px;height:26px;border-radius:7px;color:var(--hz-ink-3);cursor:pointer;
+  transition:color var(--hz-t-fast),background var(--hz-t-fast)}
+.codecard .cbtn:hover,.codecard .ccopy:hover{color:var(--hz-ink);background:rgba(255,255,255,.08)}
+.codecard .cbtn:focus-visible,.codecard .ccopy:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.codecard .ccopy.did{color:var(--hz-good)}
+.codecard .ccopy.fail{color:var(--hz-bad)}
+body.codelines .codecard .cbtn.lines{color:var(--hz-ink)}
+.codecard pre{background:none;border:0;border-radius:0;margin:0;padding:12px 14px;display:flex;gap:14px;
+  -webkit-backdrop-filter:none;backdrop-filter:none}
+.codecard pre code{display:block;flex:1;min-width:0;overflow-x:auto;font-size:12.5px;line-height:1.6;color:#dde3f2;
+  background:none;border:0;padding:0;border-radius:0}
+.codecard .gut{display:none;flex:none;font-family:var(--hz-font-mono);font-size:12.5px;line-height:1.6;color:var(--hz-ink-3);
+  opacity:.55;text-align:right;white-space:pre;user-select:none;font-variant-numeric:tabular-nums}
+body.codelines .codecard .gut{display:block}
+.hkw{color:#a9c4ff;font-weight:500}
+.hstr{color:#9fe6c1}
+.hnum{color:#f2cf8f}
+.hcom{color:#8591ae}
+/* citations: small pills on the accent, a hover to the title */
+.msg.ai .body sup.cite{font:500 10px/1 var(--hz-font-mono);color:var(--hz-accent);background:rgba(159,192,255,.1);
+  border:1px solid rgba(159,192,255,.3);border-radius:999px;padding:2px 5px 1px;margin:0 1px 0 3px;vertical-align:.45em;
+  cursor:pointer;transition:background var(--hz-t-fast),border-color var(--hz-t-fast)}
+.msg.ai .body sup.cite:hover{background:rgba(159,192,255,.22);border-color:var(--hz-accent)}
+/* the sources row: numbered pills, the domain, nothing fetched from outside */
+.srcrow{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0}
+.srcchip{font-family:var(--hz-font-ui);font-size:12px;color:var(--hz-ink-2);background:rgba(255,255,255,.05);
+  border:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);border-radius:999px;padding:0 10px 0 4px;gap:7px;height:26px;
+  max-width:240px;transition:background var(--hz-t-fast),color var(--hz-t-fast)}
+.srcchip:hover{background:rgba(255,255,255,.09);color:var(--hz-ink)}
+.srcchip:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.srcchip .sn{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+  font:500 9.5px/1 var(--hz-font-mono);color:var(--hz-ink);background:rgba(255,255,255,.1);flex:none;font-variant-numeric:tabular-nums}
+/* photos, maps and places: the same hairlines and radii */
+.photorow{gap:8px;margin:16px 0 0}
+.photorow img{height:120px;border-radius:var(--hz-r-md);border:1px solid var(--hz-glass-line);box-shadow:0 18px 40px -20px rgba(0,0,0,.7)}
+.mapcard,.placesmod{margin:16px 0 0;border-radius:var(--hz-r-lg);border:1px solid var(--hz-glass-line);box-shadow:0 24px 60px -28px rgba(0,0,0,.8)}
+.mapcard>a{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;border-radius:999px;background:rgba(8,10,20,.72);
+  border:1px solid var(--hz-glass-line);color:var(--hz-ink);padding:6px 12px;-webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur)}
+.prail{background:var(--hz-hair-2)}
+.pcard{background:rgba(8,10,20,.82);padding:12px 14px;gap:4px}
+.pcard b{font-family:var(--hz-font-ui);font-size:13.5px;font-weight:600;color:var(--hz-ink);letter-spacing:0}
+.pcard .pd{font-family:var(--hz-font-ui);font-size:12.5px;color:var(--hz-ink-2)}
+.pcard .ph{font-family:var(--hz-font-mono);font-size:11px;color:var(--hz-good)}
+/* the first-second line before any step exists is the byline's word now */
+.msg.ai .statusline{display:none}
+/* ---- the marginalia: "Behind this answer", the steps as a lit spine, then the machines */
+.worktree{margin:0;padding:0;background:none;border:0;border-radius:0;-webkit-backdrop-filter:none;backdrop-filter:none;
+  font-family:var(--hz-font-ui)}
+.worktree.folded{padding:0;background:none}
+aside.behind{display:flex;flex-direction:column;gap:18px;min-width:0}
+.behind .bh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;font-weight:500;
+  color:var(--hz-ink-2);line-height:1.3}
+.behind .bt{font-family:var(--hz-font-mono);font-size:11.5px;font-weight:400;color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
+.behind .bt:empty{display:none}
+.behind .bfacts{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:-8px;font-family:var(--hz-font-mono);font-size:11.5px;
+  color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
+.behind .spine{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.behind .spine li{position:relative;padding:0 0 18px 22px;margin:0}
+.behind .spine li:last-child{padding-bottom:0}
+.behind .spine li .node{position:absolute;left:3px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--hz-ink-3)}
+.behind .spine li::after{content:"";position:absolute;left:6px;top:17px;bottom:-2px;width:1px;background:var(--hz-hair-2)}
+.behind .spine li:last-child::after{display:none}
+.behind .spine li.live .node{left:2px;top:5px;width:9px;height:9px;background:var(--hz-accent);
+  box-shadow:0 0 10px rgba(159,192,255,.9);animation:hzBreathe 2.2s ease-in-out infinite}
+.behind .spine .what{display:block;font-size:13px;line-height:1.4;color:var(--hz-ink-2)}
+.behind .spine li.live .what{font-weight:500;color:var(--hz-ink)}
+.behind .spine .who2{display:block;font-size:12px;line-height:1.4;color:var(--hz-ink-3)}
+.behind .spine .nums{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:3px;font-family:var(--hz-font-mono);font-size:11.5px;
+  color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
+.behind .spine li.live .nums{color:var(--hz-ink-2)}
+.behind .spine .prog{display:block;margin-top:10px;height:1px;background:rgba(255,255,255,.12);overflow:hidden}
+.behind .spine .prog i{display:block;width:100%;height:1px;background:var(--hz-accent);transform-origin:left center;
+  transform:scaleX(0);transition:transform .6s var(--hz-ease-out)}
+.behind .spine .dtext{display:none;margin-top:8px;font-size:12.5px;line-height:1.5;color:var(--hz-ink-3);white-space:pre-wrap;
+  max-height:260px;overflow:auto;overflow-wrap:anywhere}
+/* the model behind a step shows when the step is opened, or for every step with "Show models" */
+.behind .spine .mdl{display:none}
+body.showmodels .behind .spine .mdl,.behind .spine li.full .mdl{display:inline}
+.behind .showm{align-self:flex-start;font:12.5px var(--hz-font-ui);color:var(--hz-ink-3);background:none;border:0;padding:0 2px;
+  height:28px;border-radius:6px;cursor:pointer;margin-top:-6px;transition:color var(--hz-t-fast)}
+.behind .showm:hover{color:var(--hz-ink-2)}
+.behind .showm:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.behind .bt .wteta{margin-left:14px;color:var(--hz-ink-3)}
+.behind .spine li.has-text{cursor:pointer}
+.behind .spine li.has-text .what::after{content:" \203a";color:var(--hz-ink-3);display:inline-block;opacity:0;
+  transition:opacity var(--hz-t-fast),transform var(--hz-t-fast)}
+.behind .spine li.has-text:hover .what::after,.behind .spine li.has-text:focus-visible .what::after,
+.behind .spine li.has-text.full .what::after{opacity:.7}
+.behind .spine li.has-text.full .what::after{transform:rotate(90deg)}
+.behind .spine li.has-text:hover .what{color:var(--hz-ink)}
+.behind .spine li.has-text:focus-visible{outline:none;border-radius:6px;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.behind .spine li.full .dtext{display:block}
+.behind .wtsub{margin:0;justify-content:flex-start}
+.behind .wtnow,.behind .wtskip{font:500 12.5px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--hz-ink);
+  border:1px solid var(--hz-glass-line-2);background:rgba(255,255,255,.05);border-radius:999px;padding:0 12px;height:30px;margin:0}
+.behind .wtnow:hover,.behind .wtskip:hover{background:rgba(255,255,255,.09);border-color:var(--hz-accent)}
+.behind .wtnow[disabled],.behind .wtskip[disabled]{color:var(--hz-ink-3);border-color:var(--hz-glass-line)}
+.behind .spine .wtskip{display:inline-flex;align-items:center;margin-top:8px;height:26px;font-size:12px}
+.behind .machines{border-top:1px solid var(--hz-hair);padding-top:16px;display:flex;flex-direction:column;gap:10px}
+.behind .mrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px;color:var(--hz-ink-2);line-height:1.3}
+.behind .mrow>span:first-child{display:flex;align-items:center;gap:8px;min-width:0}
+/* one tiny die per machine, in its maker's colour where the maker is known (NORTHSTAR OVERRIDE 2);
+   ice for a server whose maker the frames don't carry, hollow ice for the cloud */
+.behind .mrow .die{width:8px;height:8px;border-radius:2px;flex:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 60%),var(--ac,#9fc0ff);
+  box-shadow:0 0 8px rgba(159,192,255,.35)}
+.behind .mrow .die.hollow{background:transparent;box-shadow:inset 0 0 0 1.2px var(--ac,#9fc0ff),0 0 8px rgba(159,192,255,.45)}
+.behind .mrow .mono{font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;
+  display:flex;gap:14px;flex:none}
+.behind .ctx{display:block;height:2px;border-radius:1px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:-4px}
+.behind .ctx i{display:block;height:2px;background:var(--hz-accent)}
+.behind .mnote{font-size:12.5px;line-height:1.5;color:var(--hz-ink-3);margin-top:4px}
+.behind .bsrc{border-top:1px solid var(--hz-hair);padding-top:14px}
+.behind .bsrc .howsec{font-size:13px;font-weight:500;color:var(--hz-ink-2);margin:0 0 8px}
+.howsrc{display:flex;flex-direction:column;gap:2px}
+.howsrc a{display:flex;align-items:center;gap:9px;padding:5px 6px;margin:0 -6px;border-radius:8px;color:var(--hz-ink-2);
+  text-decoration:none;font-size:12.5px;min-height:30px;transition:background var(--hz-t-fast)}
+.howsrc a:hover{background:rgba(255,255,255,.06);color:var(--hz-ink)}
+.howsrc .sn{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:none;border-radius:50%;
+  font:500 9.5px/1 var(--hz-font-mono);color:var(--hz-ink);background:rgba(255,255,255,.1)}
+.howsrc .st{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.howsrc .sd{font-family:var(--hz-font-mono);font-size:11px;color:var(--hz-ink-3);flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis}
+/* ---- the footer under an answer: the actions, on hover or focus */
+.ans-foot{display:flex;align-items:center;gap:12px;margin-top:12px;min-height:30px}
+.mact{margin:0;gap:2px;opacity:0;transition:opacity var(--hz-t-fast)}
+.msg:hover .mact,.mact:focus-within,.msg:focus-within .mact{opacity:1}
+@media (hover:none){.mact{opacity:1}}
+.mab{width:30px;height:30px;border-radius:8px;color:var(--hz-ink-3);
+  transition:background var(--hz-t-fast),color var(--hz-t-fast),transform var(--hz-t-fast)}
+.mab svg{width:15px;height:15px}
+.mab:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
+.mab:active{transform:scale(.94)}
+.mab:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.mab.on{color:var(--hz-accent)}
+.mab.done{color:var(--hz-good)}
+.retrybtn{font:500 13px var(--hz-font-ui);border-radius:999px;background:rgba(255,255,255,.05);
+  border:1px solid var(--hz-glass-line-2);color:var(--hz-ink);padding:0 16px;height:36px;margin-top:12px}
+.retrybtn:hover{background:rgba(255,255,255,.09)}
+/* ---- the Code lane's cards */
+.apcard{border-radius:var(--hz-r-md);border:1px solid var(--hz-glass-line);background:rgba(4,6,14,.5);
+  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);margin:0 0 16px}
+.apcard .aptop{font-family:var(--hz-font-ui);font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3);
+  padding:8px 14px;border-bottom:1px solid var(--hz-hair)}
+.apcard .aprisk{font-family:var(--hz-font-mono);font-size:10.5px;letter-spacing:.02em;font-weight:500}
+.apcard .aprisk.read{color:var(--hz-accent);background:rgba(159,192,255,.12)}
+.apcard .aprisk.write{color:var(--hz-warn);background:rgba(242,179,61,.14)}
+.apcard .aprisk.danger{color:var(--hz-bad);background:rgba(255,138,122,.16)}
+.apcard pre{font:12.5px/1.55 var(--hz-font-mono);color:#dde3f2;padding:12px 14px}
+.apcard .apfoot{gap:8px;padding:0 14px 12px}
+.apbtn{font:500 12.5px var(--hz-font-ui);border-radius:999px;padding:0 14px;height:36px}
+.apbtn.ok{background:var(--hz-accent);color:#071026}
+.apbtn.ok:hover{background:#bcd3ff}
+.apbtn.no{background:rgba(255,255,255,.05);color:var(--hz-ink-2);border:1px solid var(--hz-glass-line)}
+.apbtn.no:hover{background:rgba(255,255,255,.09);color:var(--hz-ink)}
+.apbtn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.apcard .apverdict{font-family:var(--hz-font-ui);font-size:12.5px;padding:8px 14px 12px}
+.apcard.ok .apverdict{color:var(--hz-good)}
+/* ---- the Funnels lane: the question in the reading face, options as glass cards */
+.fstage{margin:0 0 16px}
+.fstage .fpath,.body .fpath{font-family:var(--hz-font-mono);font-size:11.5px;letter-spacing:0;color:var(--hz-ink-3);
+  margin-bottom:8px;font-variant-numeric:tabular-nums}
+.fstage .fsq{font-family:var(--hz-font-ui);font-size:18px;font-weight:600;line-height:1.4;color:var(--hz-ink);
+  margin-bottom:14px;letter-spacing:-.01em}
+.fopts{gap:10px}
+.fopt{background:rgba(255,255,255,.05);border:1px solid var(--hz-glass-line);border-radius:var(--hz-r-md);padding:13px 15px;
+  color:var(--hz-ink);-webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
+  transition:background var(--hz-t-fast),border-color var(--hz-t-fast),transform var(--hz-t-fast)}
+.fopt:hover{background:rgba(255,255,255,.09);border-color:var(--hz-glass-line-2)}
+.fopt:active{transform:scale(.985)}
+.fopt:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.fopt b{font-family:var(--hz-font-ui);font-size:14px;font-weight:600;color:var(--hz-ink);margin-bottom:4px}
+.fopt span{font-family:var(--hz-font-ui);font-size:12.5px;line-height:1.45;color:var(--hz-ink-3)}
+.fimg{border-radius:var(--hz-r-sm)}
+/* ---- the sidebar: a 240px glass column, hairline rows, numbers in mono */
+#sidebar{width:240px;min-width:240px;padding:16px 12px 18px;gap:6px;background:rgba(3,4,10,.42);
+  border-right:1px solid rgba(255,255,255,.08);box-shadow:none;
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  transition:width var(--hz-t-mid) var(--hz-ease-in-out),min-width var(--hz-t-mid) var(--hz-ease-in-out),
+  padding var(--hz-t-mid) var(--hz-ease-in-out)}
+body.resizing #sidebar{transition:none}
+#brand-wrap{padding:0}
+#brand-row{gap:4px;padding:2px 2px 8px 4px}
+#newchat{width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--hz-ink-2);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex:none;margin:0;
+  transition:background var(--hz-t-fast),color var(--hz-t-fast)}
+#newchat svg{width:17px;height:17px}
+#newchat:hover{background:rgba(255,255,255,.08);border-color:transparent;color:var(--hz-ink)}
+#newchat:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+#mode-tabs{background:none;border:0;padding:0;margin:2px 0 4px;gap:2px;border-bottom:1px solid var(--hz-hair);border-radius:0}
+#tab-glide{display:none}
+#mode-tabs .ltab{font:13px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--hz-ink-3);padding:9px 0 8px;
+  border-radius:0;border-bottom:1px solid transparent;margin-bottom:-1px;gap:7px;min-height:36px;
+  transition:color var(--hz-t-fast),border-color var(--hz-t-fast)}
+#mode-tabs .ltab svg{width:13px;height:13px}
+#mode-tabs .ltab:hover{color:var(--hz-ink-2)}
+#mode-tabs .ltab.on{color:var(--hz-ink);font-weight:500;background:none;border-bottom-color:var(--hz-accent)}
+#mode-tabs .ltab:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent);border-radius:6px}
+.group-label.chats{display:none}
+#chat-search{margin:4px 0 2px;position:relative}
+#chat-search svg{position:absolute;left:11px;top:50%;width:14px;height:14px;margin-top:-7px;color:var(--hz-ink-3);pointer-events:none}
+#chat-search input{height:34px;padding:0 12px 0 32px;background:rgba(255,255,255,.04);border:0;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);border-radius:10px;font:13.5px var(--hz-font-ui);color:var(--hz-ink);
+  transition:box-shadow var(--hz-t-fast)}
+#chat-search input::placeholder{color:var(--hz-ink-3)}
+#chat-search input:focus{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 0 0 2px var(--hz-night),0 0 0 4px rgba(159,192,255,.55)}
+#model-list{margin:0 -4px;padding:0 4px}
+#chat-list{padding:0 0 4px;scrollbar-width:thin}
+.cgroup{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3);opacity:1;
+  padding:12px 10px 4px;line-height:1.3}
+.cgroup .fold{font:inherit;letter-spacing:0;text-transform:none;min-height:24px}
+.cgroup .fold .fchev{border-width:.3em 0 .3em .5em}
+.cgroup .fldn{opacity:.7}
+.cgroup .rbtn{width:24px;height:24px;border-radius:6px}
+.cgroup .rbtn:hover{background:rgba(255,255,255,.06)}
+.cday{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--hz-font-ui);font-size:12px;
+  color:var(--hz-ink-3);padding:14px 10px 4px;user-select:none;line-height:1.3}
+.cday:first-child,.cgroup+.cday{padding-top:8px}
+.cday .ctot{font-family:var(--hz-font-mono);font-size:11px;font-variant-numeric:tabular-nums}
+.chat-item{padding:0 10px;gap:10px;min-height:34px;border-radius:10px;font-family:var(--hz-font-ui);font-size:14px;
+  color:var(--hz-ink-2);margin-bottom:1px;align-items:center;
+  transition:background var(--hz-t-fast),color var(--hz-t-fast),opacity var(--hz-t-mid) var(--hz-ease-in-out),
+  transform var(--hz-t-mid) var(--hz-ease-in-out),max-height var(--hz-t-mid) var(--hz-ease-in-out),
+  padding var(--hz-t-mid) var(--hz-ease-in-out),margin var(--hz-t-mid) var(--hz-ease-in-out)}
+.chat-item.has-snip{padding-top:7px;padding-bottom:7px}
+.chat-item:hover{background:rgba(255,255,255,.05);color:var(--hz-ink)}
+.chat-item:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.chat-item.active{background:rgba(255,255,255,.08);color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.chat-item .ct mark{background:rgba(159,192,255,.3);color:var(--hz-ink);border-radius:2px;padding:0}
+.chat-item .ctok{flex:none;font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
+.chat-item:hover .ctok,.chat-item:focus-within .ctok{display:none}
+.chat-item .cpin,.chat-item .cx{display:none;visibility:visible;width:24px;height:24px;flex:none;align-items:center;
+  justify-content:center;border-radius:6px;color:var(--hz-ink-3);padding:0;margin:0 -4px 0 0;
+  transition:background var(--hz-t-fast),color var(--hz-t-fast)}
+.chat-item .cpin svg{width:13px;height:13px}
+.chat-item .cx{font-size:16px;line-height:1}
+.chat-item:hover .cpin,.chat-item:hover .cx,.chat-item:focus-within .cpin,.chat-item:focus-within .cx{display:flex}
+.chat-item .cpin:hover{background:rgba(255,255,255,.09);color:var(--hz-ink)}
+.chat-item .cx:hover{background:rgba(255,138,122,.16);color:var(--hz-bad)}
+.chat-item.pinned .cpin{display:flex;color:var(--hz-ink-3);opacity:.85}
+.chat-item.pinned:hover .cpin{color:var(--hz-ink)}
+.chat-item .cdot{left:3px}
+.chat-item.leaving{opacity:0;transform:translateX(-10px);max-height:0;min-height:0;padding-top:0;padding-bottom:0;margin:0;
+  overflow:hidden;pointer-events:none}
+.chat-item .csnip{font-family:var(--hz-font-ui);font-size:12px;color:var(--hz-ink-3)}
+.chat-item .csnip mark{background:rgba(159,192,255,.3);color:var(--hz-ink)}
+.chat-item .csnip .clane{font-family:var(--hz-font-mono);font-size:9.5px;letter-spacing:.06em;color:var(--hz-ink-3)}
+.chidden{font-family:var(--hz-font-ui);font-size:12px;color:var(--hz-ink-3);padding:8px 10px}
+.chidden .rall{margin-left:10px}
+.cempty{font-family:var(--hz-font-ui);font-style:normal;color:var(--hz-ink-3);font-size:12.5px;padding:10px}
+.cfoot{font-family:var(--hz-font-mono);font-size:10.5px;color:var(--hz-ink-3);opacity:.75;padding:10px 10px 2px}
+input.crename{font:14px var(--hz-font-ui);background:rgba(0,0,0,.35);border:1px solid var(--hz-glass-line-2);border-radius:7px;
+  color:var(--hz-ink);padding:4px 8px;height:28px}
+input.crename:focus{box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+#recents-menu{background:rgba(6,8,18,.9);border:1px solid var(--hz-glass-line-2);border-radius:var(--hz-r-md);
+  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);font-family:var(--hz-font-ui);font-size:13px}
+#recents-menu .rm-h{font-family:var(--hz-font-ui);font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3)}
+#recents-menu .rm-i{min-height:30px;border-radius:7px}
+#telemetry{margin-top:6px;background:none;border:0;border-top:1px solid rgba(255,255,255,.08);border-radius:0;box-shadow:none;
+  padding:12px 10px 0;-webkit-backdrop-filter:none;backdrop-filter:none;font-family:var(--hz-font-mono)}
+#telemetry .t-head{font-family:var(--hz-font-ui);font-size:12.5px;letter-spacing:0;color:var(--hz-ink-3)}
+#telemetry .t-head .live{font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-2)}
+/* the memory label reads in sentence case like the rest of the column; the chip's name stays its own */
+#telemetry .meter-label span{display:inline-block;text-transform:lowercase;letter-spacing:0;font-family:var(--hz-font-ui);font-size:12.5px}
+#telemetry .meter-label span::first-letter{text-transform:uppercase}
+#sb-foot{margin-top:0;padding:14px 10px 0;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:10px;
+  font:12.5px var(--hz-font-ui);color:var(--hz-ink-3)}
+#sb-foot[hidden]{display:none}
+#sb-today{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+#sb-today .mono{font-family:var(--hz-font-mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+#sb-today:empty,#sb-where:empty{display:none}
+#sb-foot{position:relative}
+#sb-foot #rail-btn{position:absolute;right:0;bottom:0;width:36px;height:36px;border-radius:10px;border:0;background:transparent;
+  color:var(--hz-ink-3);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  transition:background var(--hz-t-fast),color var(--hz-t-fast)}
+#sb-foot #rail-btn svg{width:16px;height:16px;transition:transform var(--hz-t-mid) var(--hz-ease-in-out)}
+#sb-foot #rail-btn:hover{background:rgba(255,255,255,.06);color:var(--hz-ink)}
+#sb-foot #rail-btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+body.rail #sb-foot #rail-btn{position:static}
+body.rail #sb-foot #rail-btn svg{transform:rotate(180deg)}
+#sb-foot #settings-btn{display:flex;align-items:center;gap:9px;width:auto;height:36px;margin:4px 26px 0 -10px;padding:0 10px;
+  border:0;border-radius:10px;background:transparent;font:13.5px var(--hz-font-ui);color:var(--hz-ink-2);cursor:pointer;
+  transition:background var(--hz-t-fast),color var(--hz-t-fast)}
+#sb-foot #settings-btn svg{width:16px;height:16px;flex:none}
+#sb-foot #settings-btn:hover{background:rgba(255,255,255,.05);border-color:transparent;color:var(--hz-ink)}
+#sb-foot #settings-btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+#undobar{background:rgba(6,8,18,.78);border:1px solid var(--hz-glass-line-2);border-radius:999px;padding:8px 8px 8px 16px;
+  font:13px var(--hz-font-ui);color:var(--hz-ink);-webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);gap:10px;
+  animation:hzRise var(--hz-t-mid) var(--hz-ease-out) both}
+#undobar button{font:500 12.5px var(--hz-font-ui);color:var(--hz-ink);background:rgba(255,255,255,.09);
+  border:1px solid var(--hz-glass-line);border-radius:999px;padding:0 12px;height:28px}
+#undobar button:hover{text-decoration:none;background:rgba(255,255,255,.14)}
+/* the Code lane's sidebar: the agent rows, the folder, the connection */
+#code-wrap .agent{font-family:var(--hz-font-ui);font-size:13.5px;color:var(--hz-ink-2);border-radius:10px;min-height:34px;
+  padding:0 10px;border:1px solid transparent}
+#code-wrap .agent:hover{background:rgba(255,255,255,.05);color:var(--hz-ink)}
+#code-wrap .agent.on{background:rgba(255,255,255,.08);border-color:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);color:var(--hz-ink)}
+#code-wrap .set-h{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3);opacity:1;margin-bottom:8px}
+#ws-bar,#remote-bar{border-radius:var(--hz-r-md);background:rgba(255,255,255,.04);border:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+#ws-path,#remote-bar input{background:rgba(0,0,0,.28);border:1px solid var(--hz-glass-line);border-radius:var(--hz-r-sm);
+  font:12px var(--hz-font-mono);color:var(--hz-ink)}
+#ws-path:focus,#remote-bar input:focus{border-color:var(--hz-glass-line-2);outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+#ws-note,#rm-note{font-family:var(--hz-font-ui);color:var(--hz-ink-3)}
+.autoseg{border-radius:var(--hz-r-sm);background:rgba(255,255,255,.04);border:1px solid var(--hz-glass-line);color:var(--hz-ink-2)}
+.autoseg b{font-family:var(--hz-font-ui);color:var(--hz-ink)}
+.autoseg .ad{font-family:var(--hz-font-ui);color:var(--hz-ink-3)}
+/* the Funnels lane's sidebar form */
+#funnel-wrap .fq{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3)}
+#funnel-wrap textarea,#funnel-wrap select,#funnel-wrap input{background:rgba(255,255,255,.04);border:1px solid var(--hz-glass-line);
+  border-radius:var(--hz-r-sm);font:13.5px var(--hz-font-ui);color:var(--hz-ink)}
+#funnel-wrap textarea:focus,#funnel-wrap select:focus,#funnel-wrap input:focus{border-color:var(--hz-glass-line-2);
+  box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.fseg{background:rgba(255,255,255,.04);border:1px solid var(--hz-glass-line);border-radius:var(--hz-r-sm)}
+.fseg span{font:13px var(--hz-font-ui);color:var(--hz-ink-3);padding:0;min-height:28px;line-height:28px}
+#funnel-wrap .fchk{font-family:var(--hz-font-ui);color:var(--hz-ink-2)}
+/* ---- the rail: the sidebar folds to a 60px strip of icons (6b528) */
+body.rail #sidebar{width:60px!important;min-width:60px!important;padding:16px 10px 18px;align-items:center}
+body.rail #sb-resize,body.rail #chat-search,body.rail #chat-list,body.rail .group-label,body.rail #telemetry,
+body.rail #funnel-wrap,body.rail #code-wrap,body.rail #dlstrip,body.rail #models-flag,body.rail #update-flag,
+body.rail .vghost,body.rail #sb-today,body.rail #sb-where,body.rail #sb-foot #settings-btn span{display:none}
+body.rail #brand-row{flex-direction:column;gap:6px;align-items:center;padding:0 0 8px}
+body.rail #mode-tabs{flex-direction:column;gap:4px;margin:4px 0 0;width:100%;border-bottom:0}
+body.rail #mode-tabs .ltab{font-size:0;padding:0;height:36px;border:0;border-radius:10px;color:var(--hz-ink-3);margin:0}
+body.rail #mode-tabs .ltab svg{width:16px;height:16px}
+body.rail #mode-tabs .ltab:hover{background:rgba(255,255,255,.05);color:var(--hz-ink-2)}
+body.rail #mode-tabs .ltab.on{color:var(--hz-ink);background:rgba(255,255,255,.08)}
+body.rail #sb-foot{padding:10px 0 0;align-items:center;width:100%;gap:4px}
+body.rail #sb-foot #settings-btn{width:36px;height:36px;margin:0;padding:0;justify-content:center}
+/* ---- the marginalia stacks under the answer when the window is narrow */
+@media (max-width:860px){
+  .msg.ai{grid-template-columns:minmax(0,1fr)}
+  .msg.ai>.liveline .lstats{margin-left:0}
+  .msg.ai>aside.behind{grid-column:1;grid-row:auto;padding-top:0;margin-top:22px}
+  .behind .spine li{padding-bottom:14px}
+  .msg.ai>.ans-foot{order:5}
+}
+/* ---- still, when asked: reduced motion, and the app's visual effects off */
+@media (prefers-reduced-motion:reduce){
+  .msg,.chat-item,#undobar,.caret,.msg.ai.live .who .dot,.behind .spine li.live .node,.msg.ai.live .who b.shim,
+  .msg.ai.live .liveline .die,.msg.ai.live .liveline em,#composer.finish::before{animation:none!important}
+  .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}
+  .msg.ai.live .body,.msg.ai.live .body>*:last-child{text-shadow:none}
+  .msg,.chat-item,.mact,.mab,.fopt,#sidebar,#rail-btn svg,.behind .spine .prog i{transition:none!important}
+  .caret{opacity:1}
+}
+body.novideo .msg,body.novideo .chat-item,body.novideo #undobar,body.novideo .caret,body.novideo .msg.ai.live .who .dot,
+body.novideo .behind .spine li.live .node,body.novideo .msg.ai.live .who b.shim,body.novideo .msg.ai.live .liveline .die,
+body.novideo .msg.ai.live .liveline em,body.novideo #composer.finish::before{animation:none}
+body.novideo .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}
+body.novideo .msg.ai.live .body,body.novideo .msg.ai.live .body>*:last-child{text-shadow:none}
+body.novideo #sidebar{transition:none}
+body.novideo .codecard,body.novideo .fopt,body.novideo .apcard,body.novideo #undobar,body.novideo .mapcard>a,
+body.novideo #recents-menu{-webkit-backdrop-filter:none;backdrop-filter:none}
+body.novideo .codecard,body.novideo .apcard{background:rgba(12,14,22,.94)}
+body.novideo .fopt{background:rgba(18,20,30,.94)}
+body.novideo #undobar,body.novideo #recents-menu{background:rgba(14,18,30,.96)}
 
 /* ============================================================ HORIZON (6b526) */
 /* THE HORIZON LOOK (6b526, per Patrick). Everything below applies only under
@@ -46648,7 +47342,6 @@ __HZ_FONTS__
 @keyframes hzSway{from{transform:translateX(-64px) skewX(-12deg)}to{transform:translateX(64px) skewX(-18deg)}}
 @keyframes hzSway2{from{transform:translateX(52px) skewX(-19deg)}to{transform:translateX(-58px) skewX(-10deg)}}
 @keyframes hzPulse{0%{opacity:1}30%{opacity:1.35}100%{opacity:1}}
-@keyframes hzBreathe{0%,100%{opacity:.5}50%{opacity:1}}
 .hz #hz-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,4,10,.1),rgba(3,4,10,.34) 55%,rgba(3,4,10,.5));opacity:0;transition:opacity 1s ease}
 .hz #main:not(:has(#hero)) #hz-scrim{opacity:1}
 .hz-ring{position:fixed;left:0;top:0;width:44px;height:44px;border-radius:50%;pointer-events:none;z-index:4;
@@ -46853,7 +47546,6 @@ __HZ_FONTS__
 .hz .hz-elevel.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzShim 3.2s linear infinite}
 .hz .hz-elevel.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
-@keyframes hzShim{to{background-position:300% 0}}
 .hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
   transition:opacity .8s var(--hz-ease-in-out);
   background:conic-gradient(from var(--hz-ang),rgba(159,168,255,0) 0deg,#9fa8ff 40deg,#ff8fc4 90deg,#ffc58a 140deg,rgba(127,240,214,0) 200deg,rgba(159,168,255,0) 360deg);
@@ -46864,6 +47556,8 @@ __HZ_FONTS__
 .hz.hz-ultra #composer::before{opacity:.9}
 .hz.hz-ultra .gen #composer::before{opacity:1;animation-duration:2.4s}
 .hz.hz-maxe #composer::before{opacity:.35;animation-duration:7s}
+/* the answer landed (6b528): the light runs once round, then the ring returns to its effort's state */
+.hz #composer.finish::before{opacity:1;animation:hzRing 1.5s cubic-bezier(.45,0,.25,1) 1}
 @keyframes hzRing{to{--hz-ang:360deg}}
 .hz.hz-ring-static #composer::before{animation:none;background:linear-gradient(135deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6)}
 /* a model a mode runs: a pill with its machine's die (the machine in the tooltip) */
@@ -46997,7 +47691,6 @@ __HZ_FONTS__
   <div id="brand-wrap">
     <div id="brand-row">
     <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
-<button id="settings-btn" title="Settings — preferences &amp; about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>
 <button id="newchat" title="New chat">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round">
@@ -47005,7 +47698,7 @@ __HZ_FONTS__
         <path d="M18.4 2.6a1.7 1.7 0 0 1 2.4 2.4L12.8 13l-3.2.8.8-3.2z"/>
       </svg>
     </button>
-    
+
     <div id="update-flag" hidden title="Install the update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></div>
     </div>
     <!-- 6b308, per Patrick: the chips sit on their OWN line under the
@@ -47113,9 +47806,9 @@ __CODE_ROWS__
     </div>
   </div>
   <div id="model-list">
-  <div id="chat-search"><input id="chat-q" type="search"
-    placeholder="Search chats&hellip;" autocomplete="off"
-    spellcheck="false"></div>
+  <div id="chat-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="chat-q" type="search"
+    placeholder="Search chats" autocomplete="off"
+    spellcheck="false" aria-label="Search chats"></div>
   <div class="group-label chats">Chats</div>
   <div id="chat-list"></div>
 
@@ -47131,6 +47824,15 @@ __CODE_ROWS__
       <div class="meter-label"><span>__MEM_LABEL__</span></div>
       <div class="meter" id="mem-meter"></div>
     </div>
+  </div>
+  <!-- the foot (6b528): what today cost, where it ran, and the way into Settings;
+       the two lines come from the usage ledger and are hidden until it answers -->
+  <div id="sb-foot">
+    <div id="sb-today"></div>
+    <div id="sb-where"></div>
+    <button id="settings-btn" title="Settings — preferences &amp; about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg><span>Settings</span></button>
+    <!-- the rail (6b528): the sidebar folds to a strip of icons and back -->
+    <button id="rail-btn" type="button" title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
   </div>
 </aside>
 
@@ -47200,6 +47902,8 @@ __CODE_ROWS__
 </div>
 <div id="undobar" hidden><span class="ut"></span><button id="undobtn">Undo</button></div>
   <canvas id="stars"></canvas>
+  <!-- the comets (6b528): a draft flies in from the machine that wrote it; a ripple on arrival -->
+  <canvas id="comets" aria-hidden="true"></canvas>
   <div id="chat-scroll"><div id="chat-inner">
     <div id="hero">
 <!-- 6.0b2, per Patrick: no in-app hero branding — the greeting IS the
@@ -48045,6 +48749,10 @@ async function apiDownload(p,nm){
 }
 // a Windows PC (6b317): its commands, settings and words differ
 const IS_PC=__IS_PC__;
+// the answer's signature (6b528): one brain signs each answer, "Concorde Gamma";
+// the mode's name comes from MODE_NAMES at the top of the script (6b534).
+// This constant is the one bare brand word the gauntlet's brand guard allows.
+const SIGN_BRAND="Concorde";
 // the dictation timing line (6b345): only a dev copy with the dict-trace hook
 const DICT_TRACE=__DICT_TRACE__;
 // the sun is down where you are (6b318): the backdrop goes dark
@@ -48070,6 +48778,9 @@ const PREF_TOO={"millen.model":"model","millen.council":"council"};
 const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
   "millen.voice","millen.speeds","millen.sky","millen.skyhist",
   "millen.skynext","millen.sbw",
+  // the conversation's own conveniences (6b528): line numbers in code, the rail,
+  // the model names behind an answer
+  "millen.codeLines","millen.rail","millen.showModels",
   // the Horizon look's own (6b526): the look, the sidebar, the intro's day, its seed
   "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort"];
 let P={};                        // the person's settings, as prefs.json holds them
@@ -49915,6 +50626,12 @@ function renderMD(raw){
   // text is escaped, so bold/italic/inline-code rules can never touch the
   // filename or the JSON, and restored next to the THINK restores below
   const dls=[],ans=[];
+  // CODE CARDS ARE STASHED WHOLE (6b528): a fenced block with a blank line in it
+  // was cut in two by the paragraph splitter below, and a backtick or an
+  // asterisk inside it was dressed by the inline rules; the card's HTML waits as
+  // a placeholder on its own line and comes back after every other rule has run
+  const ccs=[];
+  const stash=h=>"\n\n\u0000CC"+(ccs.push(h)-1)+"\u0000\n\n";
   s=s.replace(/\[\[dl:(\{.*?\})\]\]/g,(_,j)=>{
     try{dls.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&#39;/g,"'")
                              .replace(/&amp;/g,"&")));}
@@ -49936,7 +50653,7 @@ function renderMD(raw){
   // renderMD re-runs on every chunk, so the flip needs no state at all.
   s=s.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g,(_,lang,code,close)=>{
     code=code.replace(/\n$/,"");
-    if(lang.toLowerCase()==="flow")return flowDiagram(code);
+    if(lang.toLowerCase()==="flow")return stash(flowDiagram(code));
     if(lang.toLowerCase()==="annotate"){
       // stashed like the download box: no inline rule may reach the attribute
       const ah=annSlot(code,close);
@@ -49952,13 +50669,18 @@ function renderMD(raw){
     }
     // every card carries the bar now — the copy button needs a home
     // even when the model named no language
-    return '<div class="codecard">'
+    // the gutter (6b528): line numbers as a sibling of the code, shown by the
+    // "lines" switch on the bar; the copy button still reads pre code alone
+    const nl=code.split("\n").length;
+    return stash('<div class="codecard">'
       +'<div class="codebar"><span>'+esc(lang||"code")+'</span>'
+      +'<button class="cbtn lines" type="button" title="Line numbers">lines</button>'
       +(close
         ?'<button class="ccopy" title="Copy this block">copy</button>'
         :'<button class="ccopy wait" disabled title="Still generating…">copy</button>')
       +'</div>'
-      +"<pre><code>"+hilite(code,lang)+"</code></pre></div>";
+      +'<pre><span class="gut" aria-hidden="true">'+Array.from({length:nl},(_,i)=>i+1).join("\n")+'</span>'
+      +"<code>"+hilite(code,lang)+"</code></pre></div>");
   });
   // inline code, bold, italics, headings
   s=s.replace(/`([^`\n]+)`/g,"<code>$1</code>");
@@ -50026,10 +50748,11 @@ function renderMD(raw){
   // paragraphs
   s=s.split(/\n{2,}/).map(p=>{
     if(!p.trim())return "";   // a table's own blank lines make no empty <p>
-    if(/^<(pre|ul|ol|h\d|details|table|blockquote|hr|p>)/.test(p.trim()))return p;
+    if(/^<(pre|ul|ol|h\d|details|table|blockquote|hr|p>)|^\u0000CC\d+\u0000$/.test(p.trim()))return p;
     return "<p>"+p.replace(/\n/g,"<br>")+"</p>";
   }).join("");
-  // restore think blocks
+  // the code cards come back whole (6b528), then the think blocks
+  s=s.replace(/\u0000CC(\d+)\u0000/g,(_,i)=>ccs[+i]||"");
   s=s.replace(/\u0000DL(\d+)\u0000/g,(_,i)=>dlBox(dls[+i]));
   s=s.replace(/\u0000AN(\d+)\u0000/g,(_,i)=>ans[+i]||"");
   s=s.replace(/\u0000VD(\d+)\u0000/g,(_,i)=>{
@@ -50056,34 +50779,14 @@ const inner=$("#chat-inner"), scroller=$("#chat-scroll");
    Once merged: the familiar collapsed "N of M contributed" details, with
    the drafts inside for whoever wants to peek. */
 function paintDrafts(div,drafts,live,statusText){
+  // THE DRAFTS MOVED (6b528): each draft is a node on the spine beside the answer
+  // ("Behind this answer"), opened with a click; the old "N of M models
+  // contributed" fold and the blend bar are gone. Called from the paths that used
+  // to paint them, this only clears anything an older page left behind.
   if(!div)return;
-  let d=div.querySelector(".contrib"),p=div.querySelector(".blendprog");
-  // ONE BAR (6b224, per Patrick): the council's own progress bar is
-  // retired — the worktree card carries the single bar with the step
-  // rows beneath it, Claude-style. Council progress now arrives there
-  // as a "Consulting models · i of n" row.
-  if(p){if(p._tick)clearInterval(p._tick);p.remove();p=null;}
-  if(live){
-    if(d)d.remove();
-    return;
-  }
+  const d=div.querySelector(".contrib"),p=div.querySelector(".blendprog");
   if(p){if(p._tick)clearInterval(p._tick);p.remove();}
-  if(!drafts||!drafts.length)return;
-  if(!d){
-    d=document.createElement("details");
-    d.className="contrib";
-    div.insertBefore(d,div.querySelector(".body"));
-  }
-  const answered=drafts.filter(x=>!/^\(no answer/.test(x.t)).length;
-  d.innerHTML='<summary><span class="caretmark">\u203a</span>'
-    +answered+" of "+drafts.length+" models contributed"
-    +'</summary>'
-    +drafts.map(x=>{
-       const none=/^\(no answer/.test(x.t);
-       return '<div class="draft'+(none?" empty":"")+'">'
-         +'<div class="dm">'+esc(x.m)+'</div>'
-         +'<div class="dt">'+esc(x.t)+'</div></div>';}).join("");
-  return d;
+  if(d)d.remove();
 }
 
 // a wall of model names above every blend read as noise — count them
@@ -50096,46 +50799,64 @@ function whoLabel(s){
 // the "searched the web" badge plus clickable source chips — the answer
 // shows WHERE it looked, Google-style, not just that it looked
 function srcRow(srcs){
-  // no label (6b225, per Patrick): the tree row above already reports
-  // "Searched the web · N sources" — these chips only say WHERE, and
-  // saying it twice was the redundancy.
-  let h="";
-  if(srcs&&srcs.length){
-    h+='<div class="srcrow">'+srcs.map(s=>{
-      if(/^know:/.test(s.u||""))return knowChip(s);   // your stuff (6b530)
-      let d="";try{d=new URL(s.u).hostname.replace(/^www\./,"");}catch(e){return "";}
-      return '<a class="srcchip" href="'+esc(s.u)+'" target="_blank" rel="noopener" title="'+esc(s.t||d)+'">'
-        +'<img src="https://www.google.com/s2/favicons?domain='+encodeURIComponent(d)+'&sz=32" alt="" loading="lazy">'
-        +'<span>'+esc(d)+'</span></a>';
-    }).join("")+'</div>';
-  }
-  return h;
+  // THE SOURCES ROW (6b528): numbered pills, the domain in words, under the prose.
+  // Nothing is fetched from outside to draw them: the favicon service a chip used
+  // to load sent every domain the answer read to a third party as it rendered.
+  // The number is the one the [n] citations in the prose point at.
+  if(!srcs||!srcs.length)return "";
+  const chips=srcs.map((s,i)=>{
+    knowCtx.n=i+1;                                    // the pill's number (6b528)
+    if(/^know:/.test(s.u||""))return knowChip(s);   // your stuff (6b530)
+    let d="";try{d=new URL(s.u).hostname.replace(/^www\./,"");}catch(e){return "";}
+    return '<a class="srcchip" href="'+esc(s.u)+'" target="_blank" rel="noopener" title="'+esc(s.t||d)+'">'
+      +'<span class="sn">'+(i+1)+'</span><span>'+esc(d)+'</span></a>';
+  }).join("");
+  return chips?'<div class="srcrow">'+chips+'</div>':"";
 }
 // YOUR STUFF PILLS (6b530): a personal source is a chat (its title) or a
 // file (its name) with its date beside it in mono; the glyph says which.
 // It opens the chat, or shows the file in the Finder, through the
 // delegated handler beside the citation chips. No favicon, nothing fetched.
+// It carries the citation's number like the web pills (6b528); srcRow sets
+// knowCtx.n before each call, since the gauntlet pins the call as knowChip(s).
+const knowCtx={n:0};
 const KN_CHAT_SVG='<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7H7.5l-3 2.5v-2.5h-2z"/></svg>';
 const KN_FILE_SVG='<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h5.5l3 3v10H4z"/><path d="M9.5 1.5v3h3"/></svg>';
 function knowChip(s){
   const chat=/^know:chat:/.test(s.u||"");
   const name=chat?(s.p||"chat"):(((s.p||"").split(/[\\/]/).pop())||"file");
   return '<a class="srcchip know" href="#" data-know="'+esc(s.u)+'" title="'+esc(s.t||name)+'">'
+    +(knowCtx.n?'<span class="sn">'+knowCtx.n+'</span>':'')
     +(chat?KN_CHAT_SVG:KN_FILE_SVG)+'<span>'+esc(name)+'</span>'
     +(s.d?'<span class="kn-when">'+esc(s.d)+'</span>':'')+'</a>';
 }
-// 6b257, per Patrick ("once the query is done... it's redundant"): a
-// finished answer shows sources ONLY inside the disclosure. Live
-// answers fold them in with the steps (collapseSteps, 6b242); this is
-// the same folded box for RELOADED answers, where the steps are gone
-// (telemetry isn't persisted) but the chips survive on m.sources. The
-// delegated wtsum handler on the chat works here unchanged.
+// the fuller list in the marginalia: number, title, domain (a personal source:
+// its title, then its chat or file name and date, opening through the same handler)
+function srcList(srcs){
+  return '<div class="howsrc">'+(srcs||[]).map((s,i)=>{
+    if(/^know:/.test(s.u||"")){
+      const chat=/^know:chat:/.test(s.u),name=chat?(s.p||"chat"):(((s.p||"").split(/[\\/]/).pop())||"file");
+      return '<a href="#" class="srcchip know" data-know="'+esc(s.u)+'"><span class="sn">'+(i+1)+'</span>'
+        +'<span class="st">'+esc(s.t||name)+'</span><span class="sd">'+esc(s.d||name)+'</span></a>';}
+    let d="";try{d=new URL(s.u).hostname.replace(/^www\./,"");}catch(e){return "";}
+    return '<a href="'+esc(s.u)+'" target="_blank" rel="noopener"><span class="sn">'+(i+1)+'</span>'
+      +'<span class="st">'+esc(s.t||d)+'</span><span class="sd">'+esc(d)+'</span></a>';}).join("")+'</div>';
+}
+// THE MARGINALIA OF A REOPENED ANSWER (6b528): what the server saved with the
+// message (its steps, its calls, its drafts, the run's clock) drawn as the same
+// "Behind this answer" the live answer had; addMsg lifts the <aside> out of the
+// prose into the message's second column. howCtx carries the message in, since
+// the call site is pinned by the gauntlet as srcBox(srcs). Sources alone (an
+// answer from before the ledger reached the page) still earn the column.
+const howCtx={m:null};
 function srcBox(srcs){
-  const ns=(srcs&&srcs.length)||0;
-  if(!ns)return "";
-  return '<div class="worktree folded"><button class="wtsum">'
-    +'<span class="wtchev">›</span>'+ns+' source'+(ns===1?"":"s")
-    +'</button><div class="wtlist" hidden>'+srcRow(srcs)+'</div></div>';
+  const m=howCtx.m||{};
+  const has=(srcs&&srcs.length)||(m.steps&&m.steps.length)||(m.usage&&m.usage.length)||(m.drafts&&m.drafts.length);
+  if(!has)return "";
+  return '<aside class="behind worktree folded" aria-label="Behind this answer">'
+    +spineHTML({steps:m.steps||[],usage:m.usage||[],drafts:m.drafts||[],run:m.run||null,running:[],live:false,
+      secs:0,rateS:(m.rate&&m.rate.s)||0,srcs:srcs||[]})
+    +'</aside>';
 }
 // THE CLAUDE TREATMENT, per Patrick: a place answer renders as a dark
 // multi-pin map with a card rail — the model hands over structured
@@ -50315,6 +51036,9 @@ async function mountPin(id,la,lo,nm){
 // THE WORKING TREE: what it's actually doing, live — a step list with
 // a progress bar, instead of one vague spinner line.
 let steps=[],stepHost=null;
+// what the spine beside the live answer reads (6b528): the run's USAGE frames,
+// its DRAFT frames, who is running now (RUN), the page's live pace and status
+let stepUsage=[],stepDrafts=[],stepRunning=[],stepRate=0,stepStatus="",stepComp="";
 // what THIS run is expected to do (set at stream start) + live signals
 let stepPlan=[],answerChars=0,streamDone=false;
 // 6b257, per Patrick: the bar the user SEES is a tween chasing the
@@ -50399,15 +51123,20 @@ function addStep(s){
 }
 function paintSteps(){
   if(!stepHost)return;
-  let box=stepHost.querySelector(".worktree");
+  // THE MARGINALIA (6b528): the card is an <aside> beside the answer, the second
+  // column of the message's grid, never a box inside the prose. Found from the
+  // message root, so a repaint of the prose can't touch it.
+  const root=(stepHost.closest&&stepHost.closest(".msg"))||stepHost;
+  let box=root.querySelector(":scope>.worktree");
   if(!box){
-    box=document.createElement("div");box.className="worktree";
+    box=document.createElement("aside");box.className="behind worktree";
+    box.setAttribute("aria-label","Behind this answer");
     // SPINNER-FIRST (6b257, per Patrick): a quick answer never shows
     // machinery. The card exists from the first step but stays hidden
     // for the run's first 5s; the clock below lifts .warm and the
     // opacity transition fades it in.
     if(performance.now()-runT0<5000)box.classList.add("warm");
-    stepHost.insertBefore(box,stepHost.firstChild);
+    root.appendChild(box);
   }
   // the card has height from here on: a pinned view follows it, so it
   // never opens behind the composer (6b425); smooth until text streams
@@ -50487,51 +51216,16 @@ function paintSteps(){
     ?(hurriedNow
       ?'<button class="wtnow" disabled>Hurrying it along…</button>'
       :'<button class="wtnow">Answer now</button>'):"";
-  const ordered=steps.slice().sort((a,b)=>
-    STEP_ORDER.indexOf(a.id)-STEP_ORDER.indexOf(b.id));
-  const headTail=(etaTxt||nowBtn)
-    ?'<div class="wtsub"><i class="wteta">'+etaTxt+'</i>'+nowBtn+'</div>'
-    :"";
-  // CHEAP PATH: same rows, same tail shape — move the bar IN PLACE so
-  // the CSS width transition actually animates (a full innerHTML
-  // rewrite recreates the <i> and kills the transition every 600ms,
-  // which is why the old bar always jumped)
-  const sig=ordered.map(s=>s.id+s.s+(s.d||"")).join("|")
-    +(etaTxt?"|e":"")+(nowBtn?(hurriedNow?"|h":"|n"):"")+(wakeSkipNow?"|w":"");
-  if(box._sig===sig&&box.firstChild){
-    const bi=box.querySelector(".wtbar i");
-    if(bi)bi.style.width=shown+"%";
-    const et=box.querySelector(".wteta");
-    if(et)et.textContent=etaTxt;
-    return;
-  }
+  // THE SPINE (6b528): rebuilt when a step, a call, a draft or the running list
+  // changed; between changes only the clock and the live step's hairline move,
+  // in place, so nothing flickers at the 200 ms tick
+  const o={steps:steps,usage:stepUsage,drafts:stepDrafts,run:null,running:stepRunning,live:true,
+    rate:stepRate,secs:el2,eta:etaTxt,nowBtn:nowBtn,skip:!!curHid,skipping:wakeSkipNow};
+  const sig=spineSig(o)+(nowBtn?(hurriedNow?"|h":"|n"):"")+(wakeSkipNow?"|w":"");
+  if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}
   box._sig=sig;
-  // the head (pinwheel + bar) is built ONCE and kept (6b462): a new step
-  // or status line rewrites only what is below it, so the pinwheel is the
-  // same element with the same running animation for the whole run
-  let kept=box.firstChild&&box.firstChild.classList
-    &&box.firstChild.classList.contains("wthead")?box.firstChild:null;
-  if(kept){
-    while(kept.nextSibling)box.removeChild(kept.nextSibling);
-    const bi2=kept.querySelector(".wtbar i");
-    if(bi2)bi2.style.width=shown+"%";
-  }
-  const headHTML=kept?"":'<div class="wthead"><i class="cspin"></i>'
-    +'<div class="wtbar"><i style="width:'+shown+'%"></i></div></div>';
-  const restHTML=
-    headTail
-    +'<div class="wtlist">'+ordered.map(s=>
-      '<div class="wtrow '+(s.s==="done"?"ok":"run")+'">'
-      +'<span class="wtdot"></span>'
-      +'<span class="wtl">'+esc(s.l||"")+'</span>'
-      +(s.d?'<span class="wtd">'+esc(s.d)+'</span>':"")
-      // SKIP WAKING (6b461): the server's wake gives up by itself after 10 s
-      +(s.id==="wake"&&s.s==="run"&&curHid
-        ?(wakeSkipNow?'<button class="wtskip" disabled>Skipping…</button>'
-                     :'<button class="wtskip">Skip</button>'):"")
-      +'</div>').join("")+'</div>';
-  if(kept)box.insertAdjacentHTML("beforeend",restHTML);
-  else box.innerHTML=headHTML+restHTML;
+  box.innerHTML=spineHTML(o);
+  spineTick(box,shown,el2,etaTxt);
   if(!box.classList.contains("warm"))follow();
 }
 // repaint on a 200ms clock — the tween needs frames even when the
@@ -50569,30 +51263,21 @@ inner.addEventListener("click",e=>{
 // Patrick): visible while the answer works, folded away with the steps
 // once it lands, so a finished answer is prose \u2014 not prose sitting under
 // a pile of chips.
-function collapseSteps(srcs){
+function collapseSteps(srcs,info){
   if(!stepHost)return;
-  const box=stepHost.querySelector(".worktree");
+  const root=(stepHost.closest&&stepHost.closest(".msg"))||stepHost;
+  const box=root.querySelector(":scope>.worktree");
   if(!box)return;
-  box.classList.remove("warm");   // a sub-5s answer still gets its fold
-  if(!steps.length){box.remove();stepHost=null;return;}
-  const n=steps.length;
-  const ns=(srcs&&srcs.length)||0;
+  box.classList.remove("warm");   // a sub-5s answer still gets its marginalia
+  info=info||{};
+  if(!steps.length&&!(info.usage&&info.usage.length)){box.remove();stepHost=null;return;}
+  // SETTLED (6b528): the same spine, every node lit as done, the run's clock,
+  // the machines and the sources under it: what the saved message shows again
+  // when the chat is reopened (srcBox draws it from the record)
   box.classList.add("folded");
-  box.innerHTML='<button class="wtsum">'
-    +'<span class="wtchev">\u203a</span>'+n+' step'+(n===1?"":"s")
-    +(ns?' \u00b7 '+ns+' source'+(ns===1?"":"s"):' \u00b7 done')
-    +'</button><div class="wtlist" hidden>'
-    +steps.slice().sort((a,b)=>STEP_ORDER.indexOf(a.id)-STEP_ORDER.indexOf(b.id))
-      .map(s=>'<div class="wtrow ok"><span class="wtdot"></span>'
-      +'<span class="wtl">'+esc(s.l||"")+'</span>'
-      +(s.d?'<span class="wtd">'+esc(s.d)+'</span>':"")+'</div>').join("")
-    +(ns?srcRow(srcs):"")
-    +'</div>';
-  // NO per-element listener here (6b242): send() re-inserts this card
-  // from its outerHTML STRING when the answer settles, which parses
-  // fresh nodes and drops every handler — the chevron has been dead on
-  // finished answers. One delegated listener on the chat survives any
-  // number of innerHTML swaps. See the wtsum handler near addMsg.
+  box.innerHTML=spineHTML({steps:steps,usage:info.usage||[],drafts:info.drafts||[],run:info.run||null,running:[],
+    live:false,secs:info.secs||0,first:info.first||0,rateS:info.rateS||0,srcs:srcs||[]});
+  box._sig="";
   stepHost=null;
 }
 // ONE delegated handler for every worktree chevron, now and forever:
@@ -50695,32 +51380,62 @@ inner.addEventListener("click",e=>{
 const ICO={
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>',
-  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'};
-// every answer is a thing you can act on — copy it, run it again, or
-// rewrite the question. Their absence is what makes a chat feel like a
-// printout instead of a workspace.
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  speak:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>',
+  good:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v10"/><path d="M7 10l4-7a2 2 0 0 1 3 2l-1 4h6a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7"/></svg>',
+  bad:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V4"/><path d="M17 14l-4 7a2 2 0 0 1-3-2l1-4H5a2 2 0 0 1-2-2l2-7a2 2 0 0 1 2-2h10"/></svg>',
+  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>'};
+// every answer is a thing you can act on — copy it, hear it, run it again, say
+// whether it was good — or rewrite the question. Their absence is what makes a
+// chat feel like a printout instead of a workspace.
+// ONE DELEGATED HANDLER (6b528): the footer is rebuilt when a chat is reopened or
+// an answer re-rendered, so a listener on the button itself would die with it
+// (the 6b242 lesson); the message keeps its text on the element for the handler.
 function msgActions(div,role,text){
+  let foot=div.querySelector(":scope>.ans-foot");
+  if(!foot){foot=document.createElement("div");foot.className="ans-foot";div.appendChild(foot);}
   const bar=document.createElement("div");
-  bar.className="mact";
-  const mk=(name,title,svg,fn)=>{
-    const b=document.createElement("button");
-    b.className="mab";b.title=title;b.innerHTML=svg;
-    b.addEventListener("click",ev=>{ev.stopPropagation();fn(b);});
-    bar.appendChild(b);
-  };
-  mk("copy","Copy",ICO.copy,b=>{
-    const t=(typeof text==="string"?text:"");
-    copyText(t).then(ok=>{
+  bar.className="mact";bar.setAttribute("role","toolbar");
+  bar.setAttribute("aria-label",role==="assistant"?"Answer actions":"Message actions");
+  div._txt=typeof text==="string"?text:"";
+  const mk=(act,title,svg)=>'<button class="mab" type="button" data-act="'+act+'" title="'+title+'" aria-label="'+title+'">'+svg+'</button>';
+  bar.innerHTML=mk("copy","Copy",ICO.copy)
+    +(role==="assistant"
+      ?mk("speak","Read aloud",ICO.speak)+mk("redo","Try again",ICO.redo)
+        +mk("good","Good",ICO.good)+mk("bad","Not good",ICO.bad)
+      :mk("edit","Edit and resend",ICO.edit));
+  foot.appendChild(bar);
+}
+inner.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest(".mab[data-act]");
+  if(!b)return;
+  e.stopPropagation();
+  const msg=b.closest(".msg"),text=(msg&&msg._txt)||"",act=b.dataset.act;
+  if(act==="copy"){
+    copyText(text).then(ok=>{
       if(ok){b.classList.add("done");setTimeout(()=>b.classList.remove("done"),1200);}
       else copyFlash(b,false,ICO.copy,true);
     });
-  });
-  if(role==="assistant")
-    mk("redo","Try again",ICO.redo,()=>regenerate());
-  else
-    mk("edit","Edit & resend",ICO.edit,()=>editResend(text));
-  div.appendChild(bar);
-}
+  }else if(act==="redo")regenerate();
+  else if(act==="edit")editResend(text);
+  else if(act==="speak"){
+    // the app's own voice reads the answer; pressed again, it stops
+    const on=b.classList.contains("on");
+    inner.querySelectorAll(".mab[data-act=speak].on").forEach(x=>x.classList.remove("on"));
+    api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(on?{stop:true}:{text:stripTokens(text)})}).catch(()=>{});
+    if(!on)b.classList.add("on");
+  }else if(act==="good"||act==="bad"){
+    // one line in the quality ledger (6b528); pressed again, taken back
+    const was=b.classList.contains("on");
+    msg.querySelectorAll(".mab[data-act=good],.mab[data-act=bad]").forEach(x=>x.classList.remove("on"));
+    if(!was)b.classList.add("on");
+    const n=[...inner.querySelectorAll(".msg")].indexOf(msg);
+    if(curChat&&n>=0)api("/api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({chat_id:curChat,n:n,vote:was?0:(act==="good"?1:-1)})}).catch(()=>{});
+  }
+});
 // TRY AGAIN: drop the last answer and re-ask the same question
 // TRY AGAIN (6b322): the last question is asked again, whether it was
 // answered or its answer failed (the server keeps a question whose
@@ -50765,7 +51480,7 @@ function editResend(text){
   messages.splice(i,messages.length-i);
   inner.innerHTML="";
   messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
-    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
+    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m));
   input.value=String(text).replace(/\n?\ud83d\udcc4 .*$/,"").trim();
   input.dispatchEvent(new Event("input"));
   input.focus();
@@ -50773,15 +51488,402 @@ function editResend(text){
   // the saved chat rewinds when the edited question is sent, not now
   if(curChat)chatTrunc={id:curChat,to:i,hash:chatHash(messages,i)};
 }
-function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
+/* ===================== HORIZON CONVERSATION (6b528, per Patrick) ===================== */
+// Numbers read as engineered figures, never guesses dressed as counts: an
+// estimated figure (the ledger's x flag) carries a ~ wherever it is shown.
+function fmtTok(n){
+  n=+n;if(!isFinite(n)||n<0)return "";
+  if(n<10000)return Math.round(n).toLocaleString("en-US");
+  if(n<1e6)return (n/1000).toFixed(n<100000?1:0)+"K";
+  return (n/1e6).toFixed(1)+"M";
+}
+function fmtSecs(s){
+  s=+s;if(!isFinite(s)||s<0)return "";
+  if(s<10)return s.toFixed(1)+" s";
+  if(s<90)return Math.round(s)+" s";
+  const m=Math.floor(s/60),r=Math.round(s-m*60);
+  return m+" min"+(r?" "+r+" s":"");
+}
+// the run's tokens: every call's in and out, summed; est when any count was estimated
+function usageTotals(u){
+  let i=0,o=0,est=false,n=0;
+  (u||[]).forEach(c=>{if(!c)return;i+=+c.i||0;o+=+c.o||0;if(c.x)est=true;n++;});
+  return {i:i,o:o,est:est,n:n};
+}
+// the call that wrote the answer: the final writer's, else a lone call's
+function usageFinal(u){
+  const l=(u||[]).filter(Boolean);
+  const f=l.filter(c=>c.r==="final");
+  if(f.length)return f[f.length-1];
+  const bare=l.filter(c=>!c.r);
+  return bare.length?bare[bare.length-1]:null;
+}
+// where a call ran, in words: this computer, a server by ITS OWN name (the label
+// is "Name · model"; nothing here assumes any particular server), or a provider
+const PROVIDER_WORDS={anthropic:"Claude",groq:"Groq",gemini:"Gemini",google:"Gemini",moonshot:"Kimi",openai:"OpenAI",cloud:"the cloud"};
+function whereName(w){
+  if(!w||w==="local")return IS_PC?"this PC":"this Mac";
+  if(w==="server")return "your server";
+  return PROVIDER_WORDS[w]||w;
+}
+function machineOf(c){
+  if(!c)return "";
+  const m=String(c.m||""),i=m.indexOf(SRV_SEP);
+  if(c.w==="server"&&i>0)return m.slice(0,i);
+  return whereName(c.w);
+}
+function modelOf(c){const m=String((c&&c.m)||""),i=m.indexOf(SRV_SEP);return i>0?m.slice(i+SRV_SEP.length):m;}
+function isCloud(c){const w=(c&&c.w)||"local";return w!=="local"&&w!=="server";}
+// ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick: "make it sound like, okay,
+// you have it on Zenith right now"): the byline is the brain, a breathing dot
+// while it works, and one plain word for what it is doing
+function signatureHTML(mode,st){
+  const mn=mode?modeName(mode):"";
+  // the deepest modes shimmer (per Patrick): Odyssey in full colour, Meridian softly
+  const shim=mode==="Vera Rubin"?' class="shim"':(mode==="Pro"?' class="shim soft"':"");
+  return '<i class="dot" aria-hidden="true"></i><b'+shim+'>'+SIGN_BRAND+(mn?" "+esc(mn):"")+'</b><span class="st">'+esc(st||"")+'</span>';
+}
+// ONE PLAIN WORD WHILE IT WORKS (6b528): the newest running step, in words a person
+// would use and never a model's name; the status line's gist when no step exists
+const THINK_WORDS={wake:"waking your server",search:"searching the web",read:"reading the pages",
+  geo:"finding it on the map",council:"writing a first draft",review:"reviewing the draft",draft:"writing",
+  polish:"writing",verify:"checking the facts",places:"pinning the places",fix:"applying corrections"};
+function thinkPhrase(steps,status,nDrafts){
+  const run=(steps||[]).filter(s=>s&&s.s!=="done");
+  const s=run.length?run[run.length-1]:null;
+  if(s){
+    let w=THINK_WORDS[s.id]||"working";
+    const d=String(s.d||"");
+    if(s.id==="council"){const m=/(\d+)\s*of\s*(\d+)/.exec(d);
+      if(m&&+m[2]>1)w="drafting, "+m[1]+" of "+m[2];else if((nDrafts||0)>0)w="writing another draft";}
+    if(s.id==="verify"){const m=/(\d+) claim/.exec(d);if(m)w="checking "+m[1]+" claim"+(m[1]==="1"?"":"s");}
+    if(s.id==="read"){const m=/(\d+)/.exec(d);if(m&&/page/.test(d))w="reading "+m[1]+" page"+(m[1]==="1"?"":"s");}
+    if(s.id==="wake"&&/^Waking /.test(s.l||""))w=s.l.charAt(0).toLowerCase()+s.l.slice(1);
+    return w;
+  }
+  const t=String(status||"").trim();
+  if(/^asking /i.test(t))return "writing a first draft";
+  if(/^compositing/i.test(t))return "writing";
+  if(/reviewing the draft/i.test(t))return "reviewing the draft";
+  if(/double-checking/i.test(t))return "reviewing the drafts";
+  if(/checking the facts/i.test(t))return "checking the facts";
+  if(/planning the research/i.test(t))return "planning the search";
+  if(/^(woke|waking) /i.test(t))return t.charAt(0).toLowerCase()+t.slice(1).replace(/\.$/,"");
+  return "thinking";
+}
+// BEHIND THIS ANSWER (6b528): each step as a node on the spine with what happened,
+// where it ran (the machine; the model only when the step is opened or "Show
+// models" is on) and the numbers that were measured. Pure: steps, USAGE frames,
+// DRAFT frames, the RUN frames' running list and the live clock in; <li>s out.
+const ORDINAL=["First","Second","Third","Fourth","Fifth","Sixth"];
+const ROLE_WORDS={search:"Planned the search",draft:"Draft",review:"Review",peer:"Rewrite",final:"Final answer",
+  verify:"Fact-check",places:"Found the places","":"Answer"};
+function spineRows(o){
+  const steps=o.steps||[],u=(o.usage||[]).filter(Boolean),used=new Set(),live=!!o.live;
+  const take=pred=>{const k=u.findIndex((x,j)=>!used.has(j)&&pred(x));if(k<0)return null;used.add(k);return u[k];};
+  const numsOf=c=>{const a=[];if(!c)return a;const t=c.x?"~":"";
+    if(c.i)a.push(t+fmtTok(c.i)+" in");if(c.o)a.push(t+fmtTok(c.o)+" out");if(c.d>0)a.push(fmtSecs(c.d/1000));return a;};
+  // a detail the server joined with middle dots is separate facts here, 14px apart
+  const facts=d=>d?String(d).split(/\s*\u00b7\s*/).filter(Boolean):[];
+  const li=(cls,what,c,nums,extra,text,whoOverride)=>{
+    const w=whoOverride!==undefined?whoOverride:(c?machineOf(c):"");
+    const mn=c?modelOf(c):"";
+    const has=!!(text||mn);
+    return '<li class="'+cls+(has?" has-text":"")+'"'+(has?' tabindex="0" role="button" aria-expanded="false"':"")
+      +'><i class="node" aria-hidden="true"></i><span class="what">'+what+'</span>'
+      +(w||mn?'<span class="who2">'+esc(w)+(mn?'<span class="mdl">'+(w?" · ":"")+esc(mn)+'</span>':"")+'</span>':"")
+      +(nums&&nums.length?'<span class="nums">'+nums.map(n=>'<span>'+esc(n)+'</span>').join("")+'</span>':"")
+      +(extra||"")
+      +(text?'<span class="dtext">'+esc(String(text).slice(0,1500))+'</span>':"")
+      +'</li>';
+  };
+  const st=steps.slice().sort((a,b)=>STEP_ORDER.indexOf(a.id)-STEP_ORDER.indexOf(b.id));
+  const real=(o.drafts||[]).filter(d=>d&&!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||""));
+  const note=(o.drafts||[]).find(d=>d&&/\(review\)$/.test(d.m||""));
+  const guess=m=>({m:m,w:String(m).indexOf(SRV_SEP)>0?"server":"local"});
+  const out=[];
+  let draftsOut=false,finalOut=false;
+  const drafts=()=>{
+    if(draftsOut)return;draftsOut=true;
+    real.forEach((d,i)=>{const c=take(x=>x.r==="draft"&&x.m===d.m)||guess(d.m);
+      out.push(li("done",(ORDINAL[i]?ORDINAL[i]+" draft":"Draft "+(i+1)),c,numsOf(c),"",d.t));});
+    if(live)(o.running||[]).forEach((m,k)=>{if(real.some(d=>d.m===m))return;
+      const i=real.length+k;
+      out.push(li("live",(ORDINAL[i]?ORDINAL[i]+" draft, writing":"Draft, writing"),guess(m),[]));});
+  };
+  st.forEach(s=>{
+    const run=live&&s.s!=="done",cls=run?"live":"done";
+    if(s.id==="wake"){out.push(li(cls,esc(s.l||"Waking your server"),null,facts(s.d),
+      run&&o.skip?'<button class="wtskip"'+(o.skipping?' disabled>Skipping…':'>Skip')+'</button>':"","",""));return;}
+    if(s.id==="search"){const c=take(x=>x.r==="search");
+      out.push(li(cls,esc(run?"Searching the web":"Searched the web"),c,facts(s.d).concat(numsOf(c))));return;}
+    if(s.id==="read"||s.id==="geo"||s.id==="fix"){out.push(li(cls,esc(s.l||s.id),null,facts(s.d),"","",""));return;}
+    if(s.id==="places"){const c=take(x=>x.r==="places");
+      out.push(li(cls,esc(s.l||"Found the places"),c,facts(s.d).concat(numsOf(c))));return;}
+    if(s.id==="council"){drafts();return;}
+    if(s.id==="review"){drafts();const c=take(x=>x.r==="review");
+      // the detail is the critic's model while it runs and the notes count once done
+      out.push(li(cls,esc(run?"Reviewing the draft":"Reviewed the draft"),c,(run?[]:facts(s.d)).concat(numsOf(c)),"",note?note.t:""));return;}
+    if(s.id==="draft"||s.id==="polish"){drafts();if(finalOut)return;finalOut=true;
+      const c=take(x=>x.r==="final"||!x.r),nums=numsOf(c);
+      if(run&&o.rate>0)nums.push("~"+(o.rate>=100?Math.round(o.rate):o.rate.toFixed(1))+" tok/s");
+      else if(!run&&c&&c.o&&!c.x&&o.rateS>0){const t=c.o/o.rateS;nums.push((t>=100?Math.round(t):t.toFixed(1))+" tok/s");}
+      const what=out.length?(run?"Final answer, writing":"Final answer"):(run?"Writing the answer":"Answer");
+      out.push(li(cls,what,c,nums,run?'<span class="prog" aria-hidden="true"><i></i></span>':""));return;}
+    if(s.id==="verify"){const c=take(x=>x.r==="verify");let what=s.l||"";
+      const m=/(\d+) claim/.exec(String(s.d||""));
+      if(run&&m)what="Checking "+m[1]+" claim"+(m[1]==="1"?"":"s");
+      out.push(li(cls,esc(what),c,numsOf(c),run?'<span class="prog" aria-hidden="true"><i></i></span>':""));return;}
+    out.push(li(cls,esc(s.l||s.id),null,facts(s.d),"","",""));
+  });
+  drafts();
+  u.forEach((c,k)=>{if(used.has(k))return;
+    out.push(li("done",esc(c.r==="final"||!c.r?(out.length?"Final answer":"Answer"):(ROLE_WORDS[c.r]||c.r)),c,numsOf(c)));});
+  return out;
+}
+// THE MACHINES (6b528): who took part in this answer, from the USAGE frames: this
+// computer, each server by its own name, the cloud by provider; what each wrote
+// and how long it took. The last line says where the words went, from the data.
+function machinesHTML(u,ctx){
+  u=(u||[]).filter(Boolean);
+  if(!u.length)return "";
+  const rows=[],seen={},cloud=[];
+  u.forEach(c=>{
+    let key,name,die;
+    if(isCloud(c)){name=whereName(c.w);key="c:"+name;die=' class="die hollow"';if(cloud.indexOf(name)<0)cloud.push(name);}
+    else if(c.w==="server"){name=machineOf(c);key="s:"+name;die=' class="die"';}
+    else{name=IS_PC?"This PC":"This Mac";key="l";die=IS_PC?' class="die"':' class="die" style="--ac:#c9ccd2"';}
+    let r=seen[key];if(!r){r=seen[key]={name:name,die:die,o:0,ms:0,est:false};rows.push(r);}
+    r.o+=+c.o||0;r.ms+=+c.d||0;if(c.x)r.est=true;
+  });
+  const line=cloud.length?"Some of this went through "+cloud.join(" and ")+".":"Nothing has left your machines.";
+  let h='<div class="machines">'+rows.map(r=>'<div class="mrow"><span><i'+r.die+' aria-hidden="true"></i>'+esc(r.name)+'</span>'
+    +'<span class="mono">'+(r.o?'<span>'+(r.est?"~":"")+fmtTok(r.o)+' out</span>':"")
+    +(r.ms>0?'<span>'+fmtSecs(r.ms/1000)+'</span>':"")+'</span></div>').join("");
+  if(ctx&&ctx.used>0&&ctx.window>0){
+    const pct=Math.min(100,Math.round(ctx.used/ctx.window*100));
+    h+='<div class="mrow"><span>Context</span><span class="mono"><span>'+fmtTok(ctx.used)+' of '+fmtTok(ctx.window)+'</span></span></div>'
+      +'<span class="ctx" aria-hidden="true"><i style="width:'+pct+'%"></i></span>';
+  }
+  return h+'<span class="mnote">'+esc(line)+'</span></div>';
+}
+// the context the final writer ran in, when its window was reported
+function contextOf(u){const f=usageFinal(u);return (f&&f.n>0&&f.i>0&&!f.x)?{used:f.i,window:f.n}:null;}
+function spineHTML(o){
+  const rows=spineRows(o);
+  const t=o.run&&o.run.t>0?o.run.t:(o.secs>0?o.secs:0);
+  const tot=usageTotals(o.usage),facts=[];
+  if(tot.n&&tot.i)facts.push((tot.est?"~":"")+fmtTok(tot.i)+" in");
+  if(tot.n&&tot.o)facts.push((tot.est?"~":"")+fmtTok(tot.o)+" out");
+  const f=o.run&&o.run.f>0?o.run.f:(o.first>0?o.first:0);
+  if(f)facts.push("first word "+fmtSecs(f));
+  const srcs=o.srcs||[];
+  return '<div class="bh"><span>Behind this answer</span><span class="bt">'+(t>0?fmtSecs(t):"")
+      +(o.live&&o.eta?' <span class="wteta">'+esc(o.eta)+'</span>':"")+'</span></div>'
+    +(facts.length?'<div class="bfacts">'+facts.map(x=>'<span>'+esc(x)+'</span>').join("")+'</div>':"")
+    +(o.nowBtn?'<div class="wtsub">'+o.nowBtn+'</div>':"")
+    +(rows.length?'<ol class="spine">'+rows.join("")+'</ol>':"")
+    +machinesHTML(o.usage,contextOf(o.usage))
+    +(srcs.length?'<div class="bsrc"><div class="howsec">'+srcs.length+' source'+(srcs.length===1?"":"s")+'</div>'+srcList(srcs)+'</div>':"")
+    +(rows.some(r=>r.indexOf('class="mdl"')>=0)?'<button type="button" class="showm">'
+      +(document.body.classList.contains("showmodels")?"Hide models":"Show models")+'</button>':"");
+}
+// between rebuilds only the clock and the live step's hairline move
+function spineTick(box,shown,secs,eta){
+  const bt=box.querySelector(".bt");
+  if(bt){const t=(secs>0?fmtSecs(secs):"")+(eta?' <span class="wteta">'+esc(eta)+'</span>':"");if(bt.innerHTML!==t)bt.innerHTML=t;}
+  const p=box.querySelector(".spine li.live .prog i");
+  if(p)p.style.transform="scaleX("+(Math.max(0,Math.min(100,shown))/100)+")";
+}
+function spineSig(o){
+  return (o.steps||[]).map(s=>s.id+s.s+(s.d||"")).join("|")+"#"+(o.usage||[]).length+"#"+(o.drafts||[]).length
+    +"#"+(o.running||[]).join(",")+"#"+(document.body.classList.contains("showmodels")?"m":"");
+}
+// the person's words: the sans, plain on the sky; attached files as chips with
+// their token counts (estimated from length, so marked ~; a reopened chat keeps
+// the names and shows no number)
+function userBody(body,text,docs){
+  text=String(text==null?"":text);
+  const m=/\n?📄 (.+)$/.exec(text);
+  body.textContent=m?text.slice(0,m.index):text;
+  if(!m)return;
+  const row=document.createElement("div");row.className="docrow";
+  row.innerHTML=m[1].split(", ").map(n=>{
+    const d=(docs||[]).find(x=>x.name===n);
+    return '<span class="docchip2" title="'+esc(n)+'">'+ICO.file+'<span>'+esc(n)+'</span>'
+      +(d&&d.tok?'<span class="mono">~'+fmtTok(d.tok)+'</span>':"")+'</span>';}).join("");
+  body.appendChild(row);
+}
+// the ice caret rides the end of the newest line while the answer streams
+function caretIn(body){
+  const ps=body.querySelectorAll("p,li,h1,h2,h3,td,blockquote");
+  const last=ps.length?ps[ps.length-1]:null;
+  if(last&&!last.querySelector(".caret"))last.insertAdjacentHTML("beforeend",'<span class="caret" aria-hidden="true"></span>');
+}
+// THE ASKING FLOW (NORTHSTAR OVERRIDE 3, per Patrick: "exciting but clean"). One live line
+// says what is really happening, with the die of the machine doing it, and tokens, pace and
+// seconds ticking beside it in mono; each draft is a comet in its machine's colour flying from
+// that machine's chip to the line (a cloud draft falls from the top of the sky), rippling on
+// arrival; the merge is one white ripple; the prose glows in and settles to white; when the
+// answer lands one light runs once round the composer. Every state comes from a real frame
+// (STEP, RUN, STATUS, DRAFT, USAGE, DONE), never a timer.
+const MACH={mlx:{ac:"#c9ccd2",ag:"#e4e7ee"},nvidia:{ac:"#76b900",ag:"#93dc1a"},amd:{ac:"#ed1c24",ag:"#ff4d55"},
+  intel:{ac:"#0071c5",ag:"#3a95e6"},server:{ac:"#9fc0ff",ag:"#cfe0ff"},cloud:{ac:"#9fc0ff",ag:"#cfe0ff"}};
+// where a model label runs, and the chip in the header or the sidebar that stands for that machine
+function machineKind(label){
+  const l=String(label||"");
+  if(l.indexOf(SRV_SEP)>0)return "server";
+  if(engineState&&engineState[l])return "local";
+  return (lastModels||"").indexOf(l)>=0&&!/cloud/.test(l)?"local":"cloud";
+}
+function machineName(label){
+  const k=machineKind(label);
+  return k==="server"?String(label).slice(0,String(label).indexOf(SRV_SEP)):(k==="local"?(IS_PC?"this PC":"this Mac"):"the cloud");
+}
+function machineChip(label){
+  const k=machineKind(label),name=machineName(label);
+  if(k==="server")return document.querySelector('.rig[data-machine="'+name.replace(/"/g,'\\"')+'"]')
+    ||[...document.querySelectorAll("#telemetry .srv-mrow .t-head")].find(x=>x.textContent.indexOf(name)>=0)||null;
+  if(k==="local")return document.querySelector('.rig[data-id="local"]')||document.querySelector(".rig.mlx")||document.querySelector("#telemetry .t-head")||null;
+  return null;
+}
+function machineColours(label){
+  const k=machineKind(label);
+  const rig=k!=="cloud"?machineChip(label):null;
+  if(rig&&rig.classList){const st=getComputedStyle(rig);const ac=st.getPropertyValue("--ac").trim(),ag=st.getPropertyValue("--ag").trim();
+    if(ac)return {ac:ac,ag:ag||ac,hollow:false};}
+  if(k==="local")return Object.assign({hollow:false},IS_PC?MACH.server:MACH.mlx);
+  if(k==="server")return Object.assign({hollow:false},MACH.server);
+  return Object.assign({hollow:true},MACH.cloud);
+}
+function dieHTML(label){
+  const c=machineColours(label);
+  return '<i class="die'+(c.hollow?" hollow":"")+'" style="--ac:'+c.ac+';--ag:'+c.ag+'" aria-hidden="true"></i>';
+}
+// WHAT IS REALLY HAPPENING (pure): the newest state from the frames in hand, in a person's words.
+// steps: the STEP rows; running: the RUN frame's list; status: the STATUS line; drafts: the real
+// DRAFT frames so far; comp: the compositor the RUN frame named; done: {t} when the run ended.
+function livePhrase(steps,running,status,drafts,comp,done){
+  const nd=(drafts||[]).filter(d=>d&&!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||"")).length;
+  if(done&&done.t>0)return {text:"Done in "+fmtSecs(done.t),who:[]};
+  const run=(steps||[]).filter(x=>x&&x.s!=="done"),s=run.length?run[run.length-1]:null;
+  const byId=id=>(steps||[]).find(x=>x&&x.id===id);
+  if(s&&s.id==="wake")return {text:/^Waking /.test(s.l||"")?s.l:"Waking your server",who:[]};
+  if(s&&s.id==="verify"){const d=String(s.d||""),k=d.indexOf("·");return {text:"Checking the answer",who:k>0?[d.slice(k+1).trim()]:[]};}
+  if(s&&s.id==="review")return {text:"Reviewing the draft",who:s.d&&/[A-Za-z]/.test(s.d)&&!/note|problem/.test(s.d)?[s.d]:[]};
+  if(s&&(s.id==="polish"||s.id==="draft")&&comp)return nd>=2?{text:"Merging "+nd+" drafts",who:(drafts||[]).filter(d=>d&&!/^\(no answer/.test(d.t||"")).map(d=>d.m)}
+    :{text:"Writing the answer",who:[comp]};
+  if(s&&s.id==="places")return {text:"Pinning the places",who:[]};
+  if(s&&s.id==="fix")return {text:"Applying corrections",who:[]};
+  if(running&&running.length)return {text:running.length===1?running[0]+" drafting on "+machineName(running[0])
+      :running.length+" models drafting",who:running.slice()};
+  const m=/^asking (.+?) ·/.exec(String(status||""));
+  if(m)return {text:m[1]+" drafting on "+machineName(m[1]),who:[m[1]]};
+  if(s&&s.id==="read"){const n=/(\d+)/.exec(String(s.d||""));const sr=byId("search");const ns=sr&&/(\d+) source/.exec(String(sr.d||""));
+    return {text:ns?"Reading "+ns[1]+" sources":(n?"Reading "+n[1]+" pages":"Reading the pages"),who:[]};}
+  if(s&&s.id==="search")return {text:"Searching the web",who:[]};
+  if(s&&(s.id==="polish"||s.id==="draft"))return {text:"Writing the answer",who:s.d&&!/GB|minutes/.test(s.d)?[String(s.d)]:[]};
+  if(s&&s.id==="council"){const mm=/(\d+)\s*of\s*(\d+)/.exec(String(s.d||""));return {text:mm&&+mm[2]>1?"Drafting, "+mm[1]+" of "+mm[2]:"Writing a first draft",who:[]};}
+  const w=thinkPhrase(steps,status,nd);
+  return {text:w.charAt(0).toUpperCase()+w.slice(1),who:[]};
+}
+// the live line's HTML: the dies of the machines at work, the words, the figures
+function liveLineHTML(ph,stats,done){
+  const dies=[...new Set((ph.who||[]).map(w=>machineName(w)+"|"+machineKind(w)))].map(k=>dieHTML((ph.who||[]).find(w=>machineName(w)+"|"+machineKind(w)===k))).join("");
+  return '<div class="liveline'+(done?" done":"")+'"><span class="lstep">'+dies+'<em>'+esc(ph.text)+'</em></span>'
+    +'<span class="lstats">'+(stats||[]).map(x=>'<span>'+esc(x)+'</span>').join("")+'</span></div>';
+}
+// the figures beside the line: live, the page's own estimate (marked ~) and the clock; done, the real counts
+function liveStats(live){
+  if(live){const a=[];const tk=Math.round(answerChars/4);if(tk>0)a.push("~"+fmtTok(tk)+" tokens");
+    if(stepRate>0)a.push("~"+(stepRate>=100?Math.round(stepRate):stepRate.toFixed(1))+" tok/s");
+    a.push(fmtSecs((performance.now()-runT0)/1000));return a;}
+  return [];
+}
+function liveLinePaint(div){
+  if(!div||!div.isConnected)return;
+  let el=div.querySelector(":scope>.liveline");
+  const ph=livePhrase(steps,stepRunning,stepStatus,stepDrafts,stepComp,null);
+  const html=liveLineHTML(ph,liveStats(true),false);
+  if(!el){const who=div.querySelector(":scope>.who");(who||div).insertAdjacentHTML("afterend",html);return;}
+  // in place: the words only when they changed (the label shimmer must not restart), the figures every tick
+  const em=el.querySelector("em");if(em&&em.textContent!==ph.text){el.outerHTML=html;return;}
+  const st=el.querySelector(".lstats");if(st)st.innerHTML=liveStats(true).map(x=>'<span>'+esc(x)+'</span>').join("");
+}
+function liveLineDone(div,info){
+  if(!div)return;
+  const el=div.querySelector(":scope>.liveline");
+  const t=(info.run&&info.run.t>0)?info.run.t:info.secs;
+  const tot=usageTotals(info.usage),fin=usageFinal(info.usage),st=[];
+  if(tot.n&&tot.i)st.push((tot.est?"~":"")+fmtTok(tot.i)+" in");
+  if(tot.n&&tot.o)st.push((tot.est?"~":"")+fmtTok(tot.o)+" out");
+  if(fin&&fin.o&&!fin.x&&info.rate&&info.rate.s>0){const v=fin.o/info.rate.s;st.push((v>=100?Math.round(v):v.toFixed(1))+" tok/s");}
+  else if(info.rate&&info.rate.tps>0)st.push("~"+(info.rate.tps>=100?Math.round(info.rate.tps):info.rate.tps.toFixed(1))+" tok/s");
+  const who=[...new Set((info.usage||[]).filter(Boolean).map(c=>c.m))];
+  const html=liveLineHTML({text:t>0?"Done in "+fmtSecs(t):"Done",who:who},st,true);
+  if(el)el.outerHTML=html;else{const w=div.querySelector(":scope>.who");(w||div).insertAdjacentHTML("afterend",html);}
+}
+// THE COMETS: a draft leaves its machine's chip and lands on the live line
+const cometsEl=$("#comets");let comets=[],rings=[],cometRaf=0;
+function cometsSize(){if(!cometsEl)return;const d=Math.min(devicePixelRatio||1,2);
+  cometsEl.width=innerWidth*d;cometsEl.height=innerHeight*d;const c=cometsEl.getContext("2d");c.setTransform(d,0,0,d,0,0);}
+if(cometsEl){cometsSize();addEventListener("resize",cometsSize);}
+function rgbaOf(hex,a){const h=String(hex||"#9fc0ff").replace("#","");const n=parseInt(h.length===3?h.split("").map(x=>x+x).join(""):h,16);
+  return "rgba("+(n>>16)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
+function cometsDraw(){
+  if(!cometsEl)return;const c=cometsEl.getContext("2d");
+  c.clearRect(0,0,innerWidth,innerHeight);c.globalCompositeOperation="lighter";const now=performance.now();
+  comets=comets.filter(k=>{const u=Math.min(1,(now-k.t0)/k.dur),e=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+    const P=t=>[(1-t)*(1-t)*k.a[0]+2*(1-t)*t*k.c[0]+t*t*k.b[0],(1-t)*(1-t)*k.a[1]+2*(1-t)*t*k.c[1]+t*t*k.b[1]];
+    for(let i=0;i<22;i++){const t=Math.max(0,e-i*.012),q=P(t),a=(1-i/22)*.8;c.fillStyle=rgbaOf(k.col,a*.5);c.beginPath();c.arc(q[0],q[1],2.2*(1-i/26),0,7);c.fill();}
+    const h=P(e),g=c.createRadialGradient(h[0],h[1],0,h[0],h[1],16);g.addColorStop(0,"rgba(255,255,255,.95)");g.addColorStop(.25,rgbaOf(k.glow,.7));g.addColorStop(1,rgbaOf(k.glow,0));
+    c.fillStyle=g;c.beginPath();c.arc(h[0],h[1],16,0,7);c.fill();
+    if(u>=1){rings.push({x:k.b[0],y:k.b[1],t0:now,col:k.glow,big:false});return false;}return true;});
+  rings=rings.filter(r=>{const u=(now-r.t0)/(r.big?1100:700);if(u>=1)return false;const R=(r.big?90:34)*(1-Math.pow(1-u,3));
+    c.strokeStyle=rgbaOf(r.col,(1-u)*.8);c.lineWidth=r.big?2:1.4;c.beginPath();c.arc(r.x,r.y,R,0,7);c.stroke();return true;});
+  if(comets.length||rings.length)cometRaf=requestAnimationFrame(cometsDraw);else{c.clearRect(0,0,innerWidth,innerHeight);cometRaf=0;}
+}
+function liveTarget(div){
+  const el=div&&div.querySelector(":scope>.liveline .lstep");
+  if(!el)return null;const r=el.getBoundingClientRect();if(!r.width)return null;return [r.left+8,r.top+r.height/2];
+}
+function cometFor(label,div){
+  if(!cometsEl||hzStill()||document.hidden)return;
+  const to=liveTarget(div);if(!to)return;
+  const col=machineColours(label),chip=machineChip(label);
+  let from;
+  if(chip){const r=chip.getBoundingClientRect();from=[r.left+r.width/2,r.top+r.height/2];}
+  else from=[innerWidth*(.25+Math.random()*.5),-24];          // a cloud draft falls from the top of the sky
+  const mid=[(from[0]+to[0])/2+(Math.random()-.5)*260,Math.min(from[1],to[1])-40+Math.random()*120];
+  comets.push({a:from,b:to,c:mid,col:col.ac,glow:col.ag,dur:1200+Math.random()*500,t0:performance.now()});
+  if(!cometRaf)cometRaf=requestAnimationFrame(cometsDraw);
+}
+function rippleAt(div,col){
+  if(!cometsEl||hzStill()||document.hidden)return;
+  const to=liveTarget(div);if(!to)return;
+  rings.push({x:to[0],y:to[1],t0:performance.now(),col:col||"#ffffff",big:true});
+  if(!cometRaf)cometRaf=requestAnimationFrame(cometsDraw);
+}
+// when the answer lands, one light runs once round the composer and the sky is told
+function answerLanded(){
+  try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}
+  const cb=$("#composer");if(!cb||hzStill())return;
+  cb.classList.remove("finish");void cb.offsetWidth;cb.classList.add("finish");
+  setTimeout(()=>cb.classList.remove("finish"),1700);
+}
+function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra){
   const hero=$("#hero"); if(hero)hero.remove();
   const sg=$("#suggest"); if(sg)sg.hidden=true;   // hero's gone, so are these
   const sl=$("#skyload"); if(sl)sl.hidden=true;
+  const m=extra||{};
   const div=document.createElement("div");
-  div.className="msg "+(role==="user"?"user":"ai");
-  // the brand, not the machinery (6b264, per Patrick): which model
-  // composited is a power-user detail
-  const who=role==="user"?"you":"MillenAI";
+  // a saved message (the record itself rides in as `extra`) is drawn settled:
+  // a reopened chat of two hundred messages plays no two hundred entrances
+  div.className="msg "+(role==="user"?"user":"ai")+(m.role?" settled":"");
+  // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): "Concorde Zenith", a
+  // breathing dot while it works and one plain word for what it is doing; the
+  // real models stay behind the answer, in the marginalia, and only when asked
+  const who=role==="user"?"you":signatureHTML(m.run?m.run.mode:(m.mode!=null?m.mode:""),m.live?"thinking":"");
   div.innerHTML='<div class="who">'+who+'</div><div class="body"></div>';
   const body=div.querySelector(".body");
   // a [[FORM]] trailer becomes a clickable question card (6b250) and is
@@ -50796,8 +51898,20 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
     }
   }
   annCtx.pos=inner.children.length;      // which picture this answer follows
-  if(role==="user")body.textContent=text; else{body.innerHTML=srcBox(srcs)+renderMD(text)+photoRow(ph)+(places&&places.length?placesModule(places,loc,mapd):mapCard(mapd));requestAnimationFrame(()=>wireFlow(body));}
+  howCtx.m={steps:m.steps,usage:m.usage,run:m.run,rate:m.rate,drafts:drafts};
+  if(role==="user")userBody(body,text,m.docs); else{body.innerHTML=srcBox(srcs)+renderMD(text)+srcRow(srcs)+photoRow(ph)+(places&&places.length?placesModule(places,loc,mapd):mapCard(mapd));requestAnimationFrame(()=>wireFlow(body));
+    // the marginalia is the message's second column, not part of the prose (6b528)
+    const aside=body.querySelector(":scope>aside.behind");if(aside)div.appendChild(aside);}
+  howCtx.m=null;
   annCtx.pos=null;
+  // the live line of a saved answer: done, with the run's clock and counts (6b528)
+  if(role!=="user"&&m.role&&(m.run||(m.usage&&m.usage.length)))
+    div.querySelector(":scope>.who").insertAdjacentHTML("afterend",
+      liveLineHTML({text:m.run&&m.run.t>0?"Done in "+fmtSecs(m.run.t):"Done",who:[...new Set((m.usage||[]).filter(Boolean).map(c=>c.m))]},
+        (()=>{const tot=usageTotals(m.usage),fin=usageFinal(m.usage),st=[];
+          if(tot.n&&tot.i)st.push((tot.est?"~":"")+fmtTok(tot.i)+" in");if(tot.n&&tot.o)st.push((tot.est?"~":"")+fmtTok(tot.o)+" out");
+          if(fin&&fin.o&&!fin.x&&m.rate&&m.rate.s>0){const v=fin.o/m.rate.s;st.push((v>=100?Math.round(v):v.toFixed(1))+" tok/s");}
+          return st;})(),true));
   if(form)body.appendChild(formCard(form));
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
@@ -51249,7 +52363,9 @@ async function send(){
     +(sentDocs.length?"\n📄 "+sentDocs.map(d=>d.name).join(", "):"");
   if(globalThis.hzReady)hzBeforeSend(text);   // Horizon: where the composer and the words were (6b534)
   messages.push({role:"user",content:shown});
-  const uDiv=addMsg("user",shown);
+  // the attached files ride as chips with their size in tokens (6b528)
+  const uDiv=addMsg("user",shown,null,null,null,null,null,null,
+    {docs:sentDocs.map(d=>({name:d.name,tok:Math.ceil(String(d.text||"").length/4)}))});
   if(sentImages.length){
     const row=document.createElement("div");row.className="sentimgs";
     sentImages.forEach(d=>{const im=new Image();im.src=d;row.appendChild(im);});
@@ -51279,7 +52395,7 @@ async function send(){
   generating=true; document.body.classList.add("gen"); genChat=myChat;
   if(globalThis.hzReady)hzOnSend();           // Horizon: the shockwave, the live aurora (6b526)
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
-  const aiDiv=addMsg("assistant",""); const body=aiDiv.querySelector(".body");
+  const aiDiv=addMsg("assistant","",null,null,null,null,null,null,{live:true,mode:tier}); const body=aiDiv.querySelector(".body");
   aiDiv.classList.add("live");     // soft mask on the newest line
   // the pulsing caret is RETIRED (6b257, per Patrick): the first 5s
   // are a quiet pinwheel; machinery only fades in if the run earns it
@@ -51291,6 +52407,13 @@ async function send(){
   let full="",t0=performance.now(),tokEst=0,lastRate=0,wasAborted=false,searched=false,status=null,drafts=[],sources=null,photos=null,mapd=null,locCtx="",places=null,placeHint=null;
   // Vera Rubin's frames (6b519): the last of each kind, and what was last drawn
   const rbFr={};let rbSeen="";rubinLive=null;
+  // the run's own numbers (6b528): every model call's tokens (USAGE) and the
+  // server's clock (DONE); the spine beside the answer reads them live
+  let usage=[],runInfo=null;
+  stepUsage=usage;stepDrafts=drafts;stepRunning=[];stepRate=0;stepStatus="";stepComp="";
+  // the live line ticks on its own clock, from the first second (6b528)
+  liveLinePaint(aiDiv);
+  const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);
   // the writer's pace (6b515): the server's RATE frame when it sent one, else
   // the page's own clock from the first character shown after the last RESET
   let rateInfo=null,genT0=0,genCut=-1,lastChunkT=0;
@@ -51393,7 +52516,8 @@ async function send(){
     // the label speaks plainly (6b223, per Patrick): "Running… a, b"
     // with every simultaneously active model, then "Compositor: name" —
     // driven by dedicated RUN markers, not status-sniffing
-    const setWho=t=>{const w=aiDiv.querySelector(".who");if(w)w.textContent=t;};
+    // the byline's one word (6b528): what the brain is doing, never a model's name
+    const setWho=t=>{const w=aiDiv.querySelector(".who .st");if(w&&w.textContent!==t)w.textContent=t;};
     if(searched)body.innerHTML="";
     // THE DRIP (6b223, per Patrick: "unfold slowly… not chunks
     // magically appearing"): network chunks land in `full`; a paced
@@ -51408,16 +52532,14 @@ async function send(){
       // a fresh node every drip frame restarted the pinwheel at 0deg each
       // time, which read as a jitter. Lifted out, put back: same node,
       // same running animation, and its _sig survives for the cheap path.
-      const keepTree=body.querySelector(".worktree");
-      const hasBar=!!keepTree;
-      if(keepTree)keepTree.remove();
-      body.innerHTML=(status&&!txt&&!hasBar
-          ?'<span class="statusline"><i class="cspin"></i> '
-           +esc(status)+'…</span>':"")
-        +(searched&&sources&&sources.length?srcRow(sources):"")
-        +annIn(myChat,()=>renderMD(txt.replace(/\n?\[\[PLACES\]\][\s\S]*$/,"")))
-        ;
-      if(keepTree)body.insertBefore(keepTree,body.firstChild);
+      // THE PROSE ALONE IS REPAINTED (6b528): the marginalia is the message's
+      // other column, outside this body, so a repaint here can't touch it or
+      // restart anything in it (the 6b462 lift-out is no longer needed); the
+      // byline's word carries the status until the first text lands
+      body.innerHTML=annIn(myChat,()=>renderMD(txt.replace(/\n?\[\[PLACES\]\][\s\S]*$/,"")))
+        // the sources sit under the words they back, from the first line on (6b528)
+        +(searched&&sources&&sources.length?srcRow(sources):"");
+      if(txt)caretIn(body);           // the ice caret on the newest line (6b528)
       requestAnimationFrame(()=>wireFlow(body));
       if(curChat===myChat)autoScroll();
     };
@@ -51441,6 +52563,9 @@ async function send(){
       raw+=dec.decode(value,{stream:true});
       // pull progress markers out so they never land in the answer;
       // streamText() also keeps only what follows the last RESET
+      // the frames are re-read whole on every chunk: the per-call list is
+      // rebuilt each time rather than deduplicated (6b528)
+      usage.length=0;runInfo=null;
       full=streamText(raw,{
         RUN:j=>{
                 try{const d=JSON.parse(j);
@@ -51449,18 +52574,30 @@ async function send(){
                   if(d.w==="server"){srvWho=String(d.s||"");
                     if(!srvBoost){srvBoost=true;srvUseKick();}}
                   else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}
-                  if(d.c!==undefined)setWho("Compositor: "+d.c);
-                  else if(d.r)setWho(d.r.length
-                    ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
-                  if(globalThis.hzReady)hzTele("run",d);
+                  // who is running now feeds the spine (6b528): the models
+                  // drafting as live nodes, the compositor as the final step
+                  if(d.c!==undefined){stepRunning=[];
+                    // the merge: one white ripple on the live line (6b528)
+                    if(!stepComp&&drafts.filter(x=>!/^\(no answer/.test(x.t||"")).length>=2)rippleAt(aiDiv,"#ffffff");
+                    stepComp=String(d.c);
+                    const cs=steps.find(x=>x.id==="council");
+                    if(cs&&cs.s!=="done")addStep(Object.assign({},cs,{s:"done"}));
+                    if(!steps.some(x=>x.id==="draft"||x.id==="polish"))
+                      addStep({id:"polish",l:"Writing the answer",s:"run",d:String(d.c)});}
+                  else if(d.r)stepRunning=d.r.slice();
+                  if(globalThis.hzReady)hzTele("run",d);   // the sky answers the frame (6b526)
                 }catch(e){}},
-        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);if(globalThis.hzReady)hzTele("status",t);},
+        STATUS:t=>{status=t;stepStatus=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);if(globalThis.hzReady)hzTele("status",t);},
         RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}},   // the writer's pace (6b515)
         RUBIN:j=>{const k=/^\{"k":"(\w+)"/.exec(j);if(k)rbFr[k[1]]=j;},   // Vera Rubin (6b519)
+        USAGE:j=>{try{usage.push(JSON.parse(j));}catch(e){}},  // a model call's tokens (6b528)
+        DONE:j=>{try{runInfo=JSON.parse(j);}catch(e){}},       // the run's clock and mode (6b528)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
                      if(globalThis.hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
-                     if(!drafts.some(x=>x.m===d.m))drafts.push(d);
+                     if(!drafts.some(x=>x.m===d.m)){drafts.push(d);
+                       // a real draft is a comet from its machine (6b528)
+                       if(!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||""))cometFor(d.m,aiDiv);}
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
                        x=>!/^\(no answer/.test(x.t||"")).length;
@@ -51509,6 +52646,7 @@ async function send(){
       lastRate=gsecs>0.3?tokEst/gsecs:0;
       setToks(lastRate,"streaming");
       if(globalThis.hzReady)hzTele("rate",lastRate);
+      stepRate=lastRate;               // the live step's pace on the spine (6b528)
       // a RESET replays the replacement ONCE, when it arrives (6b463, per
       // Patrick: "started streaming all over again while flickering").
       // raw keeps the marker for the rest of the stream, so testing
@@ -51517,6 +52655,7 @@ async function send(){
       if(!answerChars&&full.length)etaMark=performance.now();  // text began (6b459)
       answerChars=full.length;  // drafting progress is real text
       if(steps.length)paintSteps();
+      liveLinePaint(aiDiv);              // the live line follows the frames (6b528)
       kickDrip();
     }
     streamEnded=true;streamDone=true;
@@ -51543,13 +52682,17 @@ async function send(){
 
   if(rubinLive&&rubinLive.div===aiDiv)rubinEnd();      // its clock stops (6b519)
   aiDiv.classList.remove("live");
-  collapseSteps(searched?sources:null);   // sources fold in with the steps
-  // at rest the label credits the LINEUP, not the last runner: single
-  // model keeps its name, councils settle to the tier (6b216)
-  // 6b242, per Patrick: name the ROLE, then who filled it — "Compositor"
-  // in bold, the model that actually wrote the final answer after it
+  clearInterval(liveT);
+  const secs0=(performance.now()-t0)/1000;
+  // the spine settles (6b528): every node done, the run's numbers, the sources
+  collapseSteps(searched?sources:null,{drafts:drafts,usage:usage,run:runInfo,secs:secs0,
+    first:genT0?(genT0-t0)/1000:0,rateS:(rateInfo&&rateInfo.s)||0});
+  // at rest the byline is the brain alone, in the mode the server ran (6b528)
   {const w=aiDiv.querySelector(".who");
-   if(w)w.textContent="MillenAI";}   // brand() renders the real name
+   if(w)w.innerHTML=signatureHTML(runInfo&&runInfo.mode!=null?runInfo.mode:tier,"");}
+  // the live line settles on "Done in N s" with the real counts; one light round the composer
+  liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});
+  if(full&&!wasAborted)answerLanded();
   paintDrafts(aiDiv,drafts,false);   // merge done: collapse (or clear bar)
   // the stream died but good drafts exist — the best one IS the answer;
   // never show "engine returned nothing" over a usable draft
@@ -51582,9 +52725,8 @@ async function send(){
   // inside the disclosure, so a settled answer is prose (6b242)
   body.innerHTML=treeKeep
     +annIn(myChat,()=>renderMD(full||(wasAborted?"*(stopped)*":
-    "That answer didn\u2019t come through \u2014 the model was still "
-    +"warming up. Try again and it usually lands.")))
-    +(full&&!wasAborted?photoRow(photos)
+    "No answer came through. Try again.")))
+    +(full&&!wasAborted?srcRow(sources)+photoRow(photos)
       +(places&&places.length?placesModule(places,locCtx,mapd):mapCard(mapd)):"");
   const secs=((performance.now()-t0)/1000);
   // remember this tier's pace for the next run's time-left line — an
@@ -51611,38 +52753,46 @@ async function send(){
     aiDiv.appendChild(rb);
   }
   if(full&&!isErr){
-    const meta=document.createElement("div");meta.className="meta";
-    // a server model's name is its own, not a provider's (6b334):
-    // "<server name> · gpt-oss:20b" never reads as the cloud
-    const where=whereBadge(lastModels,srvWho);
-    // the writer's own pace when the server measured it (RATE), else the
-    // page's measure from the first character shown; the run's total beside it
+    // THE NUMBERS LIVE BESIDE THE ANSWER NOW (6b528): the spine's final step
+    // carries the writer's pace (its real output tokens over the RATE clock),
+    // its head the run's in, out, first word and total; nothing under the prose
+    // but the actions. The pace the page measured itself stands in until the
+    // server's figures land, and never pretends to be more than it is.
     const tps=(rateInfo&&rateInfo.tps>0)?rateInfo.tps:lastRate;
-    const wrote=(rateInfo&&rateInfo.s>0)?rateInfo.s
-      :(genT0?Math.max(0.1,(lastChunkT-genT0)/1000):secs);
-    meta.innerHTML='<span class="wbadge">'+esc(where)+'</span>'
-      +"<b>"+tps.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
-      +" tokens · wrote in "+wrote.toFixed(1)+"s · "+secs.toFixed(1)+"s total";
-    // Vera Rubin's line is its record, not the first writer's pace (6b519)
+    // the context the final writer ran in, for the header's meter (horizon's)
+    const ctxNow=contextOf(usage);
+    window.hzContext=ctxNow?{used:ctxNow.used,window:ctxNow.window,tps:tps}:null;
+    try{document.dispatchEvent(new Event("hz-context"));}catch(e){}   // the header reads window.hzContext
+    // Vera Rubin's line is its record, not the first writer's pace (6b519); the
+    // pace line itself moved to the spine (6b528), so only Rubin draws a .meta
     const rbS=rubinLive&&rubinLive.div===aiDiv?rubinLive.st:null;
+    const where=rbS?whereBadge(lastModels,srvWho):"";
+    const meta=rbS?document.createElement("div"):null;if(meta)meta.className="meta";
     if(rbS)meta.innerHTML='<span class="wbadge">'+esc(where)+'</span><b>Vera Rubin</b> · '
       +(rbS.spark||[]).length+" round"+((rbS.spark||[]).length===1?"":"s")+" · "+(rbS.read||0)+" sources read · "
       +(rbS.drafts||0)+" drafts · "+rbClock(rbS.el||secs)+" total";
-    aiDiv.appendChild(meta);
+    if(meta)aiDiv.appendChild(meta);
     const rec={role:"assistant",content:full};
     if(drafts.length)rec.drafts=drafts;
     if(sources&&sources.length)rec.sources=sources;
     if(photos&&photos.length)rec.photos=photos;
     if(mapd)rec.map=mapd;
     if(places&&places.length){rec.places=places;rec.loc=locCtx;}
+    // the run's own numbers ride the page's copy too (6b528): the server
+    // saves the same from the wire, so a reopened chat shows the same spine
+    if(usage.length)rec.usage=usage.slice();
+    if(runInfo)rec.run=runInfo;
+    if(rateInfo)rec.rate=rateInfo;
+    if(steps.length)rec.steps=steps.map(s=>({id:s.id,l:s.l,s:"done",d:s.d}));
     myMessages.push(rec);
+    sbFootPaint();                   // today's tokens in the sidebar's foot
     // viewing the owning chat but the live bubble was detached by a
     // switch-away-and-back? paint the finished answer in
     if(curChat===myChat&&!inner.contains(aiDiv)){
       messages=myMessages;
       inner.innerHTML="";
       myMessages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
-        m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
+        m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m));
     }
   }else{
     // error or empty: the question stays, for Try again (0b Q12)
@@ -51987,7 +53137,8 @@ function chatHash(msgs,n){
 // handler in `on`), then only what follows the last RESET: what the
 // page shows, and what the server saves (turn_text() is its twin; 0b
 // L5, R-2-22, one corpus checks both)
-const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|RUBIN";   // RUBIN: Vera Rubin's console (6b519)
+// USAGE: a model call's tokens; DONE: the run's clock and its mode (6b528); RUBIN: Vera Rubin's console (6b519)
+const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN";
 const FRAME_RX=new RegExp("\u0000("+FRAME_TAGS+"):(.*?)\u0000","g");
 const FRAME_PART=new RegExp("\u0000(?:"+FRAME_TAGS+"):[^\u0000]*$");
 function streamText(raw,on){
@@ -52021,7 +53172,7 @@ function redrawOpen(){
   inner.innerHTML="";
   if(!messages.length){resetHero();return;}
   messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
-    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
+    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m));
 }
 async function loadChatsFromDisk(){
   try{
@@ -52682,8 +53833,56 @@ function chatOpenHit(id){
   loadChat(id);
   if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);
 }
-function renderChats(){
-  if(globalThis.hzReady)setTimeout(hzHistoryPaint,0);   // Horizon's rows (6b526)
+// A CHAT'S TOKENS (6b528): the sum of every answer's measured calls; an answer
+// that carries none (a chat from before the ledger reached the page) is estimated
+// from its text at four characters a token, the ledger's own rule, and marked ~
+function chatTokens(c){
+  let n=0,est=false;
+  const ms=(c&&c.messages)||[];
+  const anyReal=ms.some(m=>m&&m.role==="assistant"&&m.usage&&m.usage.length);
+  ms.forEach(m=>{
+    if(!m)return;
+    if(m.role==="assistant"&&m.usage&&m.usage.length){
+      const t=usageTotals(m.usage);n+=t.i+t.o;if(t.est)est=true;return;}
+    if(m.role!=="assistant"&&anyReal)return;   // a question's words are inside its answer's input
+    const len=String(m.content||"").length;
+    if(len){n+=Math.ceil(len/4);est=true;}
+  });
+  return {n:n,est:est};
+}
+// the search's match lit inside the title
+function markTitle(t,q){
+  t=String(t||"");q=String(q||"").trim();
+  if(!q)return esc(t);
+  const i=t.toLowerCase().indexOf(q.toLowerCase());
+  if(i<0)return esc(t);
+  return esc(t.slice(0,i))+"<mark>"+esc(t.slice(i,i+q.length))+"</mark>"+esc(t.slice(i+q.length));
+}
+// Today, Yesterday, This week, Earlier: by the local calendar (6b528)
+function dayLabel(ts,now){
+  const d=new Date(ts||0),n=new Date(now);
+  const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((day(n)-day(d))/86400000);
+  if(diff<=0)return "Today";
+  if(diff===1)return "Yesterday";
+  if(diff<7)return "This week";
+  return "Earlier";
+}
+// the rows of Recents under their day, each day with its token total
+function dayRows(rows,row,now){
+  const groups=[];let cur=null;
+  rows.forEach(c=>{
+    const l=dayLabel(c.ts,now);
+    if(!cur||cur.l!==l){cur={l:l,rows:[],n:0,est:false};groups.push(cur);}
+    cur.rows.push(c);
+    const tk=chatTokens(c);cur.n+=tk.n;if(tk.est&&tk.n)cur.est=true;
+  });
+  return groups.map(g=>'<div class="cday"><span>'+g.l+'</span>'
+    +(g.n?'<span class="ctot"'+(g.est?' title="estimated from length"':'')+'>'+(g.est?"~":"")+fmtTok(g.n)+'</span>':"")
+    +'</div>'+g.rows.map(row).join("")).join("");
+}
+function renderChats(flip){
+  if(globalThis.hzReady)setTimeout(hzHistoryPaint,0);   // Horizon's home rows (6b526)
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
   // code chats, Agents lists specialist chats, Chat lists the rest
@@ -52703,19 +53902,27 @@ function renderChats(){
   const pins=pv.rows,rest=rv.rows;
   const head=(which,name,v)=>'<button type="button" class="fold" data-fold="'+which
     +'" aria-expanded="'+(v.open?"true":"false")+'"><span class="fchev"></span>'
-    +name+(v.open?'':'<span class="fldn"> \u00b7 '+v.count+'</span>')+'</button>';
+    +name+(v.open?'':'<span class="fldn"> · '+v.count+'</span>')+'</button>';
   const views=new Map();
+  let anyEst=false;
+  // MOTION (6b528): the rows that move when one is pinned glide to their new place
+  // (measure before, measure after, play the difference); nothing moves under
+  // reduced motion or with the effects off
+  const before={};
+  if(flip&&!hzStill())el.querySelectorAll(".chat-item").forEach(it=>{before[it.dataset.id]=it.getBoundingClientRect().top;});
   const row=c=>{
     const v=q?chatHitView(window.chatQHits,c.id,window.chatQ,c.lane,uiMode):null;
     const sn=!!(v&&(v.snip||v.lane));if(sn)views.set(c.id,v);
+    const tk=chatTokens(c);if(tk.est&&tk.n)anyEst=true;
     return '<div class="chat-item'+(c.id===curChat?" active":"")
-    +(c.pin?" pinned":"")+(c.unread&&c.id!==curChat?" unread":"")+(sn?" has-snip":"")+'" data-id="'+esc(c.id)+'">'
+    +(c.pin?" pinned":"")+(c.unread&&c.id!==curChat?" unread":"")+(sn?" has-snip":"")+'" data-id="'+esc(c.id)+'" tabindex="0">'
     +(c.unread&&c.id!==curChat?'<span class="cdot" role="img" aria-label="unread"></span>':'')
     +'<span class="ct" title="'+esc(c.title||"chat")+'">'
-    +esc(c.title||"chat")+'</span>'
-    +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin to top")+'">'
+    +markTitle(c.title||"chat",window.chatQ)+'</span>'
+    +(tk.n?'<span class="ctok"'+(tk.est?' title="estimated from length"':'')+'>'+(tk.est?"~":"")+fmtTok(tk.n)+'</span>':'')
+    +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin")+'">'
     +PIN_SVG+'</span>'
-    +'<span class="cx" title="Delete chat">\u00d7</span>'
+    +'<span class="cx" title="Delete chat">×</span>'
     +(sn?'<span class="csnip"></span>':'')+'</div>';};
   let html="";
   if(sp.pins.length)
@@ -52723,16 +53930,26 @@ function renderChats(){
   if(sp.shown.length||sp.hidden){
     html+='<div class="cgroup recents">'+head("recents","Recents",rv)
       +'<span class="rbtn" title="Recents options">'+OPTS_SVG+'</span></div>';
-    html+=rest.map(row).join("");
+    html+=dayRows(rest,row,Date.now());
     if(sp.hidden&&rv.open)html+='<div class="chidden">'+sp.hidden+' older chat'
-      +(sp.hidden===1?"":"s")+' hidden \u00b7 <span class="rall">Show all</span></div>';
+      +(sp.hidden===1?"":"s")+' hidden <span class="rall">Show all</span></div>';
   }
   if(chatsErr)html='<div class="cempty">'+esc(chatsErr)+'</div>';
   else if(!html)html='<div class="cempty">'
-    +(q?"Nothing matches \u201c"+esc(window.chatQ)+"\u201d"
+    +(q?"Nothing matches “"+esc(window.chatQ)+"”"
       :uiMode==="code"?"No code chats yet"
       :uiMode==="funnel"?"No funnels yet":"No chats yet")+'</div>';
+  else if(anyEst)html+='<div class="cfoot">~ estimated from length</div>';
   el.innerHTML=html;
+  if(flip&&!hzStill()){
+    el.querySelectorAll(".chat-item").forEach(it=>{
+      const was=before[it.dataset.id];if(was==null)return;
+      const dy=was-it.getBoundingClientRect().top;if(!dy)return;
+      it.style.transition="none";it.style.transform="translateY("+dy+"px)";
+      requestAnimationFrame(()=>{it.style.transition="";it.style.transform="";});
+      setTimeout(()=>{it.style.transition="";it.style.transform="";},40);   // hidden documents never run rAF
+    });
+  }
   if(!el._foldWired){el._foldWired=true;
     el.addEventListener("click",ev=>{
       const f=ev.target.closest&&ev.target.closest(".fold");
@@ -52752,8 +53969,8 @@ function renderChats(){
       ev.stopPropagation();
       const c=chats.find(x=>x.id===id);if(!c)return;
       const was=!!c.pin,wasAt=c.pin_at||0,at=was?wasAt:Date.now();
-      c.pin=!was;c.pin_at=at;renderChats();
-      const undo=()=>{c.pin=was;c.pin_at=wasAt;renderChats();};
+      c.pin=!was;c.pin_at=at;renderChats(true);
+      const undo=()=>{c.pin=was;c.pin_at=wasAt;renderChats(true);};
       chatOps([{op:"set",id,field:"pin",old:was,new:!was},
                {op:"set",id,field:"pin_at",old:wasAt,new:at}])
         .then(r=>{if(!(r[0]&&r[0].ok))undo();})
@@ -52762,8 +53979,17 @@ function renderChats(){
     it.addEventListener("dblclick",ev=>{
       ev.stopPropagation();startRename(it,id);
     });
+    it.addEventListener("keydown",ev=>{
+      if(ev.target!==it)return;
+      if(ev.key==="Enter"){ev.preventDefault();chatOpenHit(id);}
+      if(ev.key==="Delete"||ev.key==="Backspace"){ev.preventDefault();deleteChat(id);}
+    });
     it.addEventListener("click",()=>chatOpenHit(id));
   });
+}
+// still, when asked: reduced motion, or the app's visual effects off
+function hzStill(){
+  try{return noVideo||matchMedia("(prefers-reduced-motion: reduce)").matches;}catch(e){return false;}
 }
 // RENAME in place — dblclick the title, type, Enter (Esc cancels)
 function startRename(it,id){
@@ -52800,17 +54026,31 @@ let undoTimer=null,undoStash=null;
 function deleteChat(id){
   const idx=chats.findIndex(c=>c.id===id);
   if(idx<0)return;
-  undoStash={chat:chats[idx],idx:idx,wasCur:curChat===id};
-  chats.splice(idx,1);
-  if(curChat===id){curChat=null;messages=[];fnState=null;fnAnswer=null;resetHero();}
-  renderChats();
-  chatOps([{op:"delete",id}]).catch(()=>loadChatsFromDisk());
-  const t=$("#undobar");
-  t.querySelector(".ut").textContent='Deleted "'
-    +(undoStash.chat.title||"chat").slice(0,40)+'"';
-  t.hidden=false;
-  clearTimeout(undoTimer);
-  undoTimer=setTimeout(()=>{t.hidden=true;undoStash=null;},6000);
+  // the row slides out before the list redraws (6b528); the undo toast then
+  // offers the way back, as it always did
+  const it=document.querySelector('#chat-list .chat-item[data-id="'+id+'"]');
+  let gone=false;
+  const go=()=>{
+    if(gone)return;gone=true;
+    undoStash={chat:chats[idx],idx:idx,wasCur:curChat===id};
+    chats.splice(idx,1);
+    if(curChat===id){curChat=null;messages=[];fnState=null;fnAnswer=null;resetHero();}
+    renderChats();
+    chatOps([{op:"delete",id}]).catch(()=>loadChatsFromDisk());
+    const t=$("#undobar");
+    t.querySelector(".ut").textContent='Deleted "'
+      +(undoStash.chat.title||"chat").slice(0,40)+'"';
+    t.hidden=false;
+    clearTimeout(undoTimer);
+    undoTimer=setTimeout(()=>{t.hidden=true;undoStash=null;},6000);
+  };
+  if(it&&!hzStill()){
+    it.style.maxHeight=it.offsetHeight+"px";
+    requestAnimationFrame(()=>it.classList.add("leaving"));
+    setTimeout(()=>it.classList.add("leaving"),20);     // hidden documents never run rAF
+    it.addEventListener("transitionend",go,{once:true});
+    setTimeout(go,340);
+  }else go();
 }
 async function undoDelete(){
   if(!undoStash)return;
@@ -52846,7 +54086,7 @@ function loadChat(id){
   curChat=id;
   messages=c.messages.slice();
   inner.innerHTML="";
-  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
+  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m));
   renderChats();
   markSeen();
 }
@@ -56549,6 +57789,70 @@ function setSidebar(w){
 }
 const savedW=parseInt(localStorage.getItem("millen.sbw")||"0",10);
 if(savedW)setSidebar(savedW);
+else document.documentElement.style.setProperty("--sbw","240px");   // the column's own width (6b528)
+// THE RAIL (6b528): the sidebar folds to a 60px strip of icons and back,
+// remembered per machine; anything centred on the main panel reads --sbw
+function setRail(on){
+  document.body.classList.toggle("rail",on);
+  try{localStorage.setItem("millen.rail",on?"1":"0");}catch(e){}
+  document.documentElement.style.setProperty("--sbw",(on?60:(parseInt(sidebarEl.style.width,10)||240))+"px");
+  const b=$("#rail-btn");
+  if(b){b.setAttribute("aria-expanded",on?"false":"true");
+    b.title=on?"Expand sidebar":"Collapse sidebar";b.setAttribute("aria-label",b.title);}
+  chatRoom();
+}
+$("#rail-btn").addEventListener("click",()=>setRail(!document.body.classList.contains("rail")));
+try{if(localStorage.getItem("millen.rail")==="1")setRail(true);}catch(e){}
+// LINE NUMBERS IN CODE (6b528): one switch for every card, on the bar of any of
+// them, remembered per machine; delegated like the copy button beside it
+inner.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest(".cbtn.lines");
+  if(!b)return;
+  const on=!document.body.classList.contains("codelines");
+  document.body.classList.toggle("codelines",on);
+  try{localStorage.setItem("millen.codeLines",on?"1":"0");}catch(err){}
+});
+try{document.body.classList.toggle("codelines",localStorage.getItem("millen.codeLines")==="1");}catch(e){}
+// BEHIND THIS ANSWER (6b528): a step opens to its text and names its model;
+// "Show models" names them all, per machine. Delegated, since the spine is
+// rebuilt as the run moves and again when a chat is reopened.
+inner.addEventListener("click",e=>{
+  const sm=e.target.closest&&e.target.closest(".showm");
+  if(sm){
+    const on=!document.body.classList.contains("showmodels");
+    document.body.classList.toggle("showmodels",on);
+    try{localStorage.setItem("millen.showModels",on?"1":"0");}catch(err){}
+    inner.querySelectorAll(".showm").forEach(x=>{x.textContent=on?"Hide models":"Show models";});
+    return;
+  }
+  const li=e.target.closest&&e.target.closest(".spine li.has-text");
+  if(!li||e.target.closest("a,button"))return;
+  const open=!li.classList.contains("full");
+  li.classList.toggle("full",open);li.setAttribute("aria-expanded",open?"true":"false");
+});
+inner.addEventListener("keydown",e=>{
+  if(e.key!=="Enter"&&e.key!==" ")return;
+  const li=e.target.closest&&e.target.closest(".spine li.has-text");
+  if(!li||e.target!==li)return;
+  e.preventDefault();li.click();
+});
+try{document.body.classList.toggle("showmodels",localStorage.getItem("millen.showModels")==="1");}catch(e){}
+// THE FOOT (6b528): what today cost and where it ran, from the usage ledger;
+// hidden until the ledger answers, and never a made-up figure
+async function sbFootPaint(){
+  const a=$("#sb-today"),b=$("#sb-where");if(!a||!b)return;
+  try{
+    const d=await(await api("/api/usage?range=1d")).json();
+    const t=(d&&d.totals)||{},n=(+t.input||0)+(+t.output||0);
+    if(!n){a.textContent="";b.textContent="";return;}
+    a.innerHTML='<span>Today</span><span class="mono">'+(d.estimated?"~":"")+fmtTok(n)+' tokens</span>';
+    const rows=d.models||[];
+    const cloud=rows.some(r=>r.where&&r.where!=="local"&&r.where!=="server");
+    b.textContent=rows.length?(cloud?"Some through the cloud":"All on your machines"):"";
+  }catch(e){}
+}
+sbFootPaint();
+setInterval(()=>{if(!document.hidden)sbFootPaint();},60000);
 $("#sb-resize").addEventListener("mousedown",e=>{
   e.preventDefault();document.body.classList.add("resizing");
   const move=ev=>setSidebar(ev.clientX-sidebarEl.getBoundingClientRect().left);

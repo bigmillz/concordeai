@@ -2392,9 +2392,16 @@ check("veteran pantry overrides first-run dark set",
 # place it stands alone is a lockup, where a nested <b> splits the AI
 # off ("Concorde<b>AI"); lowercase tokens (concorde-resume,
 # concorde-job) are internals and don't trip the case-sensitive regex.
-check("ConcordeAI brand, no stray MillenAI or bare Concorde",
+# 6b528, per Patrick (the mode names): the byline signs every answer "Concorde Zenith",
+# one brain, so the page carries ONE bare "Concorde": the SIGN_BRAND constant the byline
+# is built from. The guard allows exactly that constant, so a stray leftover still trips.
+_BRAND_RX = r'(?<!SIGN_BRAND=")Concorde(?!(?:<b>)?AI)'
+check("ConcordeAI brand, no stray MillenAI or bare Concorde (the byline's SIGN_BRAND excepted, 6b528)",
       "ConcordeAI" in page and "MillenAI" not in page
-      and not re.search(r"Concorde(?!(?:<b>)?AI)", page))
+      and 'const SIGN_BRAND="Concorde";' in page
+      and not re.search(_BRAND_RX, page))
+check("the brand guard still catches a second bare Concorde (mutant)",
+      bool(re.search(_BRAND_RX, page + "<p>Concorde rocks</p>")))
 # 6b257: every lockup sets the AI in BOLD inside the quiet 400-weight
 # mark — a nested <b> (a span would trip the ">AI</span>" tab guard
 # above), bolded by one shared rule across all three lockups
@@ -5141,9 +5148,14 @@ check("funnel accepts typed answers",
 # answers fold chips in with the steps (collapseSteps, 6b242);
 # reloaded answers now fold them into the same box (srcBox) instead
 # of the loose row addMsg used to prepend.
-check("sources fold into the disclosure on every path",
+# 6b528: the sources are a numbered row of pills UNDER the prose (the numbers the [n]
+# citations point at) and a fuller list in the marginalia; nothing loose above the answer,
+# and nothing fetched from outside to draw them (the favicon service is gone)
+check("sources: a numbered row under the prose, the full list beside it, nothing above it, no outside image (6b528)",
       "function srcBox(" in page and "srcBox(srcs)+renderMD" in page
-      and 'srcRow(srcs):"")+renderMD' not in page)
+      and 'srcRow(srcs):"")+renderMD' not in page
+      and "+renderMD(text)+srcRow(srcs)+" in page and "function srcList(srcs){" in page
+      and "s2/favicons" not in page and '<span class="sn">' in page)
 # 6b257: the about-name id is RETIRED. It existed THREE times (both
 # veil titles + the rail lockup — the trap NOTES logged three separate
 # times), and the pre-rail platform line wrote into whichever copy came
@@ -5173,23 +5185,27 @@ check("spinner-first stream, caret retired",
 # 6b462: the pinwheel never restarts while text streams -- paintStream
 # lifts the SAME step-card node out and back (no outerHTML re-parse),
 # and the pinwheel sits on its own layer inside a contained header
-check("pinwheel survives streaming (6b462)",
-      "const keepTree=body.querySelector(\".worktree\")" in page
-      and "body.insertBefore(keepTree,body.firstChild)" in page
-      and "const treeHTML=(body.querySelector(\".worktree\")" not in page
-      and ".wthead .cspin{will-change:transform}" in page
-      and "@keyframes cspin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}" in page
-      and ".wthead .cspin{will-change:transform;transform:" not in page
-      and "margin-bottom:10px;\n  contain:layout paint}" in page
-      and "const headHTML=kept?\"\":'<div class=\"wthead\"><i class=\"cspin\">" in page
-      and 'box.insertAdjacentHTML("beforeend",restHTML)' in page)
+# 6b528: the step card is the marginalia now, an <aside> that is the message's second
+# grid column, outside the prose; a repaint of the prose can't touch it, so the 6b462
+# lift-out (keepTree) is gone with the pinwheel head it protected. The live node
+# breathes in CSS; a reopened chat lifts its saved <aside> out of the body the same way.
+check("the marginalia lives outside the prose and survives streaming (6b528; replaces 6b462's lift-out)",
+      'let box=root.querySelector(":scope>.worktree");' in page
+      and 'box=document.createElement("aside");box.className="behind worktree";' in page
+      and "root.appendChild(box);" in page
+      and "const keepTree=" not in page and "insertAdjacentHTML(\"beforeend\",restHTML)" not in page
+      and 'const aside=body.querySelector(":scope>aside.behind");if(aside)div.appendChild(aside);' in page
+      and ".msg.ai>aside.behind{grid-column:2;grid-row:1/span 5" in page
+      and "if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}" in page)
 # 6b257: the bar the user SEES is a tween chasing the honest math —
 # the in-place fast path moves .wtbar i without an innerHTML rewrite
 # (a rewrite recreates the <i> and kills the width transition), and
 # a per-tier EMA (millen.speeds) feeds the italic time-left line
-check("smooth bar + honest time-left",
+# 6b528: the bar is the live step's hairline, moved in place by a transform (the tween
+# and the time-left line are the same as 6b257 and 6b459 left them)
+check("smooth bar + honest time-left (the live step's hairline since 6b528)",
       "millen.speeds" in page and 'class="wteta"' in page
-      and "dispPct" in page and "bi.style.width=shown" in page)
+      and "dispPct" in page and 'p.style.transform="scaleX("' in page)
 # 6b257: Answer now — armed only once a REAL draft exists, delegated
 # like the chevron (the card is re-cloned every drip frame), and the
 # server end: an unguessable X-Hurry id, a non-admin endpoint, and
@@ -37097,11 +37113,14 @@ def _c515_pins(src):
         "Fast's second pass writes under the brief too": src.count("brief_system(full_messages[0])") == 3,
         "the answer's own length on the card": '"%d chars" % (shown_n[0] or sent[0])' in ch,
         "the page reads RATE, measures from the first character after the last RESET, and says both times":
-            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|RUBIN";' in src
+            # 6b528: USAGE and DONE joined the list (RUBIN is 6b519's); the speed line is the
+            # spine's final step, the writer's real output tokens over the RATE clock
+            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN";' in src
             and "RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}}," in src
             and "if(cut!==genCut){genCut=cut;genT0=0;}\n      if(full.length&&!genT0)genT0=lastChunkT;" in src
             and "const tps=(rateInfo&&rateInfo.tps>0)?rateInfo.tps:lastRate;" in src
-            and '" tokens · wrote in "+wrote.toFixed(1)+"s · "+secs.toFixed(1)+"s total"' in src,
+            and 'rateS:(rateInfo&&rateInfo.s)||0' in src
+            and 'const t=c.o/o.rateS;nums.push((t>=100?Math.round(t):t.toFixed(1))+" tok/s")' in src,
         "the page's step card knows the review and the check":
             'const STEP_ORDER=["wake","search","read","geo","council","review","draft","polish","verify","places"];' in src
             and "review:8,draft:30,polish:8,verify:6" in src and 'if(isCouncil)stepPlan.push("verify");' in src,
@@ -37867,7 +37886,7 @@ def _r519_pins(src):
             and ch.index("            elif _rubin and not images:") < ch.index("            elif _max and (_max_bench")
             and '_rubin = bool(TIERS.get(tier, {}).get("rubin")) if isinstance(tier, str) else False' in ch,
         "the saved turn lifts the frame out, as the page does": '"|RUBIN")' in src
-            and 'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|RUBIN";' in src,
+            and 'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN";' in src,
         "the console: drawn from the frames beside the body, its clock on a timer, its Stop delegated":
             "RUBIN:j=>{const k=/^\\{\"k\":\"(\\w+)\"/.exec(j);if(k)rbFr[k[1]]=j;}," in page
             and "if(sig!==rbSeen){rbSeen=sig;searched=true;rubinPaint(aiDiv,rbFr);}" in page
@@ -38669,6 +38688,310 @@ check("know: the unmutated rules all hold, and each of %d mutants breaks a check
       all(v for k, v in _c530_base.items() if k != "why") and not _c530_caught,
       "%r %r" % ({k: v for k, v in _c530_base.items() if not v}, _c530_caught))
 # ==== know (6b530): end ====
+
+# ==== hz-chat (6b528, per Patrick): the conversation redesign: begin ====
+print("== the conversation: every model call's tokens reach the page, one brain signs the answer, the spine (6b528) ==")
+import threading as _th528, functools as _ft528, time as _tm528
+def _u528(src):
+    # usage_note with a tap on the thread, the role, the window, a child thread, and off again
+    ns = {"threading": _th528, "functools": _ft528, "time": _tm528, "json": json}
+    puts, taps = [], []
+    ns["usage_put"] = lambda rec: puts.append(rec)
+    _exec_names(ns, {"_tl_usage", "_tl_ctx", "usage_tap", "usage_role", "usage_frame", "usage_counts",
+                     "_usage_num", "_usage_est", "_usage_est_in", "usage_note", "bind_ctx", "_ctx_wrap",
+                     "ctx_thread"})
+    if src is not _MILLENAI_SRC:          # a mutant: these names from the mutated text
+        for n_ in _ast.parse(src).body:
+            nm_ = getattr(n_, "name", None)
+            if nm_ in ("_ctx_wrap", "usage_frame", "usage_note"):
+                exec(_ast.get_source_segment(src, n_), ns)
+    out = {}
+    ns["usage_tap"](lambda d: taps.append(d))
+    ns["usage_role"]("")
+    ns["usage_note"]("Gemma 4 26B", "local", [{"role": "user", "content": "hi"}], 1500,
+                     {"prompt_tokens": 3104, "completion_tokens": 388}, _tm528.time() - 8.3)
+    out["real"] = taps[-1] if taps else None
+    ns["usage_role"]("draft")
+    ns["usage_note"]("Sam’s box · gpt-oss:20b", "server", [{"role": "user", "content": "x" * 400}], 400,
+                     None, _tm528.time() - 2.0, window=16384)
+    out["est"] = taps[-1] if taps else None
+    got = []
+    def child():
+        got.append((getattr(ns["_tl_usage"], "tap", None) is not None, getattr(ns["_tl_usage"], "role", "")))
+        ns["usage_note"]("Gemma 4 E2B", "local", [], 80, {"prompt_tokens": 20, "completion_tokens": 5}, None)
+    t = ns["ctx_thread"](target=child, daemon=True); t.start(); t.join(5)
+    out["child"] = got[0] if got else None
+    out["child_frame"] = taps[-1] if taps else None
+    ns["usage_tap"](None)
+    n0 = len(taps)
+    ns["usage_note"]("Gemma 4 E2B", "local", [], 80, {"prompt_tokens": 1, "completion_tokens": 1}, None)
+    out["after_off"] = len(taps) - n0
+    out["puts"] = len(puts)
+    return out
+_r528 = _u528(_MILLENAI_SRC)
+check("usage_note hands the page a frame per call: real counts, the role, an estimate marked, the window, on a child thread too, and none once the tap is off",
+      _r528["real"] and _r528["real"]["r"] == "" and _r528["real"]["m"] == "Gemma 4 26B" and _r528["real"]["w"] == "local"
+      and _r528["real"]["i"] == 3104 and _r528["real"]["o"] == 388 and "x" not in _r528["real"] and 8000 <= _r528["real"]["d"] <= 9500
+      and _r528["est"] and _r528["est"]["r"] == "draft" and _r528["est"]["x"] == 1 and _r528["est"]["o"] == 100
+      and _r528["est"]["n"] == 16384 and _r528["est"]["w"] == "server"
+      and _r528["child"] == (True, "draft") and _r528["child_frame"]["m"] == "Gemma 4 E2B"
+      and _r528["after_off"] == 0 and _r528["puts"] == 4, "%r" % _r528)
+_m528a = _u528(_MILLENAI_SRC.replace("        _tl_usage.tap, _tl_usage.role = tap, role\n        try:", "        try:", 1))
+check("mutant: a thread wrapper that drops the tap leaves the child's call off the page",
+      _m528a["child"] == (False, "") and _m528a["child_frame"]["m"] != "Gemma 4 E2B", "%r" % _m528a)
+_m528b = _u528(_MILLENAI_SRC.replace('    if rec.get("x"):\n        d["x"] = 1\n', "", 1))
+check("mutant: a frame that forgets the estimate flag is caught", _m528b["est"] and "x" not in _m528b["est"], "%r" % _m528b.get("est"))
+# the handler: the tap in before the search threads start, flushed after the headers, off before the
+# heartbeat stops; the DONE clock; the roles at every stage; the window from a server call
+_ch528 = _MILLENAI_SRC
+check("the chat handler taps every call of the answer and sends the run's clock",
+      "usage_tap(lambda d: _tap_sink[0](d))" in _ch528 and "_tap_sink[0] = _usage_tap" in _ch528
+      and _ch528.index("usage_tap(lambda d: _tap_sink[0](d))") < _ch528.index("def _ground_planner(ask_text")
+      and '_write((NUL + "USAGE:" + json.dumps(d, separators=(",", ":"))' in _ch528
+      and '_write((NUL + "DONE:" + json.dumps({' in _ch528
+      and '"t": round(_now - _t_req, 2), "mode": tier or ""}' in _ch528
+      and "            usage_tap(None)\n            usage_role(\"\")\n" in _ch528
+      and _ch528.index("            usage_tap(None)\n            usage_role(\"\")\n") < _ch528.index("            hb_stop.set()\n            # the quality ledger")
+      and 'if not _t_first[0] and str(chunk).strip():\n                    _t_first[0] = time.time()' in _ch528
+      and 'usage_role("draft")           # the page\'s ledger row (6b528)\n            try:\n                # a mode\'s server seat' in _ch528
+      and _ch528.count('usage_role("draft")') == 2 and 'usage_role("review")' in _ch528
+      and 'usage_role("final")' in _ch528 and 'usage_role("verify")' in _ch528
+      and 'usage_role("search")' in _ch528 and 'usage_role("places")' in _ch528
+      and "window=_ctx or SRV_CTX_DEFAULT)" in _ch528
+      and "window=GIANT_CTX if (giant or big) else None)" in _ch528
+      and '"%d claim%s \\u00b7 %s" % (n_cl, "" if n_cl == 1 else "s", name))' in _ch528)
+# the saved record carries the run's numbers; turn_text strips the new frames
+_tr528 = _cs["turn_record"]("\x00USAGE:" + json.dumps({"r": "final", "m": "A", "w": "local", "i": 10, "o": 4, "d": 900}) + "\x00"
+                            "\x00STEP:" + json.dumps({"id": "draft", "l": "Writing the answer", "s": "run", "d": "A"}) + "\x00"
+                            "the answer\x00STEP:" + json.dumps({"id": "draft", "l": "Answer written", "s": "done", "d": "A"}) + "\x00"
+                            "\x00RATE:" + json.dumps({"tps": 50.0, "tok": 4, "s": 0.4}) + "\x00"
+                            "\x00DONE:" + json.dumps({"f": 1.2, "t": 3.4, "mode": "Thinking"}) + "\x00")
+check("a saved answer keeps its calls, its steps' last state, the writer's pace and the run's clock; the text keeps none of the frames",
+      _tr528 and _tr528["content"] == "the answer" and _tr528["usage"] == [{"r": "final", "m": "A", "w": "local", "i": 10, "o": 4, "d": 900}]
+      and _tr528["steps"] == [{"id": "draft", "l": "Answer written", "s": "done", "d": "A"}]
+      and _tr528["run"] == {"f": 1.2, "t": 3.4, "mode": "Thinking"} and _tr528["rate"]["s"] == 0.4
+      and "|USAGE|DONE" in _cs["_TURN_TAGS"] and _cs["turn_text"]("a\x00USAGE:{}\x00b\x00DONE:{}\x00c") == "abc", "%r" % (_tr528,))
+# good / bad lands in the quality ledger; a bad vote is refused
+_fb528_bad = req("/api/feedback", "POST", {"chat_id": "c" + "a" * 26, "n": 0, "vote": 7})
+_fb528_ok = req("/api/feedback", "POST", {"chat_id": "c" + "a" * 26, "n": 1, "vote": 1})
+_fb528_lines = []
+try:
+    with open(os.path.join(INST.home, "quality.jsonl"), encoding="utf-8") as _fh:
+        _fb528_lines = [json.loads(l) for l in _fh if l.strip()]
+except OSError:
+    pass
+check("good / bad on an answer: one line in the quality ledger, a bad vote refused",
+      _fb528_bad[0] == 400 and _fb528_ok[0] == 200 and json.loads(_fb528_ok[2])["ok"] is True
+      and any(l.get("fb") == 1 and l.get("n") == 1 and l.get("chat") == "c" + "a" * 26 for l in _fb528_lines),
+      "%r %r %r" % (_fb528_bad[0], _fb528_ok[0], _fb528_lines[-1:] ))
+# the page: the pure pieces of the spine, the token figures and the sidebar's numbers, in node, with mutants
+def _jsconst(src, head):
+    a = src.index(head)
+    return src[a:src.index(";\n", a) + 2]
+def _spine_js(pg):
+    js = "const IS_PC=false;const SRV_SEP=\" \\u00b7 \";const esc=s=>String(s).replace(/&/g,\"&amp;\").replace(/</g,\"&lt;\").replace(/>/g,\"&gt;\").replace(/\"/g,\"&quot;\");\n"
+    js += "const document={body:{classList:{contains:()=>false}}};\n"
+    for h in ("const STEP_ORDER=", "const MODE_NAMES=", "const modeName=", "const SIGN_BRAND=", "const PROVIDER_WORDS=",
+              "const THINK_WORDS=", "const ORDINAL=", "const ROLE_WORDS="):
+        js += _jsconst(pg, h)
+    for h in ("function fmtTok(n){", "function fmtSecs(s){", "function usageTotals(u){", "function usageFinal(u){",
+              "function whereName(w){", "function machineOf(c){", "function isCloud(c){", "function signatureHTML(mode,st){",
+              "function thinkPhrase(steps,status,nDrafts){", "function spineRows(o){", "function machinesHTML(u,ctx){",
+              "function contextOf(u){", "function spineHTML(o){", "function srcList(srcs){", "function chatTokens(c){",
+              "function markTitle(t,q){", "function dayLabel(ts,now){"):
+        js += _jsfn(pg, h)
+    js += "const modelOf=" + pg[pg.index("function modelOf(c){"):pg.index("\n", pg.index("function modelOf(c){"))] + "\n"
+    return js
+_SPINE_RUN = r'''
+const U=[{r:"search",m:"Gemma 4 E2B",w:"local",i:420,o:38,d:900},
+ {r:"draft",m:"Gemma 4 26B",w:"local",i:3104,o:388,d:8300,x:1},
+ {r:"review",m:"Sam’s box · gpt-oss:20b",w:"server",i:3880,o:96,d:2900,n:16384},
+ {r:"final",m:"Gemma 4 26B",w:"local",i:3912,o:412,d:4700},
+ {r:"verify",m:"groq-model",w:"groq",i:2210,o:140,d:2100}];
+const S=[{id:"search",l:"Searched the web",s:"done",d:"6 sources"},{id:"read",l:"Read the pages",s:"done",d:"4 pages"},
+ {id:"council",l:"Consulting models",s:"done",d:"1 of 1"},{id:"review",l:"Reviewed the draft",s:"done",d:"3 notes"},
+ {id:"polish",l:"Writing the answer",s:"done",d:"Gemma 4 26B"},{id:"verify",l:"Checked 12 claims, fixed 2",s:"done",d:"12 claims · groq"}];
+const D=[{m:"Gemma 4 26B",t:"the draft text"},{m:"Sam’s box · gpt-oss:20b (review)",t:"WRONG: x"}];
+const rows=spineRows({steps:S,usage:U,drafts:D,running:[],live:false,rateS:4.0});
+const html=spineHTML({steps:S,usage:U,drafts:D,running:[],live:false,secs:20.2,rateS:4.0,srcs:[{u:"https://www.example.org/a",t:"Example"}]});
+const noMdl=html.replace(/<span class="mdl">[^<]*<\/span>/g,"");
+const live=spineRows({steps:[{id:"search",l:"Searched the web",s:"done",d:"6 sources"},{id:"council",l:"Consulting models",s:"run",d:"1 of 2"},{id:"polish",l:"Writing the answer",s:"run",d:"x"}],
+  usage:[U[0],U[1]],drafts:[D[0]],running:["Qwen 3.6 35B MoE"],live:true,rate:57.6});
+const out={
+ fmt:[fmtTok(842),fmtTok(3912),fmtTok(18400),fmtTok(241000),fmtTok(1200000),fmtSecs(1.4),fmtSecs(22.1),fmtSecs(125)],
+ tot:usageTotals(U),fin:(usageFinal(U)||{}).o,bare:(usageFinal([{r:"",m:"E2B",w:"local",i:1,o:2}])||{}).o,
+ rows:rows.length,
+ what:rows.map(r=>/<span class="what">([^<]*)</.exec(r)[1]),
+ who:rows.map(r=>(/<span class="who2">([^<]*)</.exec(r)||[])[1]||""),
+ mdlInside:(html.match(/<span class="mdl">/g)||[]).length,
+ modelOutside:/Gemma|gpt-oss|groq-model/.test(noMdl.replace(/<span class="dtext">[^<]*<\/span>/g,"")),
+ server:/Sam’s box/.test(noMdl),hard:/Ollama1/.test(html),
+ tps:/<span>103 tok\/s<\/span>/.test(html),tilde:/~3,104 in/.test(html)&&/~388 out/.test(html)&&!/~3,912 in/.test(html),
+ facts:/<div class="bfacts"><span>~13.5K in<\/span><span>~1,074 out<\/span>/.test(html),
+ clock:/<span class="bt">20 s<\/span>/.test(html),
+ machines:(html.match(/<div class="mrow">/g)||[]).length,cloudLine:/Some of this went through Groq\./.test(html),
+ quiet:machinesHTML([U[1]],null).indexOf("Nothing has left your machines.")>0,
+ ctx:JSON.stringify(contextOf([{r:"final",m:"A",w:"server",i:4000,n:16384}])),ctxEst:contextOf([{r:"final",m:"A",w:"server",i:4000,n:16384,x:1}]),
+ srcs:/<div class="howsec">1 source<\/div>/.test(html)&&/<span class="sd">example.org<\/span>/.test(html),
+ showm:/class="showm">Show models</.test(html),
+ liveWhat:live.map(r=>/<span class="what">([^<]*)</.exec(r)[1]),liveProg:/class="prog"/.test(live.join("")),liveRate:/~57.6 tok\/s/.test(live.join("")),
+ think:[thinkPhrase([{id:"verify",s:"run",d:"12 claims · x"}],"",0),thinkPhrase([],"asking Gemma 4 26B · 1 of 1",0),
+   thinkPhrase([{id:"council",s:"run",d:"2 of 3"}],"",1),thinkPhrase([],"",0),thinkPhrase([{id:"read",s:"run",d:"4 pages"}],"",0)],
+ sign:signatureHTML("Thinking","writing"),signPlain:signatureHTML("",""),
+ signOd:signatureHTML("Vera Rubin","writing"),signMer:signatureHTML("Pro","")
+   ,tok:[chatTokens({messages:[{role:"user",content:"x".repeat(40)},{role:"assistant",content:"y",usage:[{i:100,o:20}]}]}),
+   chatTokens({messages:[{role:"user",content:"x".repeat(40)},{role:"assistant",content:"y".repeat(80)}]})],
+ day:(()=>{const n=new Date(2026,10,8,15,0).getTime();return [dayLabel(n-3600000,n),dayLabel(n-86400000,n),dayLabel(n-3*86400000,n),dayLabel(n-9*86400000,n)];})(),
+ mark:markTitle("Best GPU for home","gpu")};
+process.stdout.write(JSON.stringify(out));
+'''
+def _spine_out(pg):
+    try:
+        return _node_json(_spine_js(pg) + _SPINE_RUN, "spine528.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+_so = _spine_out(page)
+check("the spine's pure pieces: figures, totals, the final call, a row per step with what / where / numbers, model names only inside .mdl, the writer's pace from its real tokens, estimates marked, the machines by their own names, the context when known",
+      _so.get("fmt") == ["842", "3,912", "18.4K", "241K", "1.2M", "1.4 s", "22 s", "2 min 5 s"]
+      and _so.get("tot") == {"i": 13526, "o": 1074, "est": True, "n": 5} and _so.get("fin") == 412 and _so.get("bare") == 2
+      and _so.get("rows") == 6
+      and _so.get("what") == ["Searched the web", "Read the pages", "First draft", "Reviewed the draft", "Final answer", "Checked 12 claims, fixed 2"]
+      and _so.get("who") == ["this Mac", "", "this Mac", "Sam’s box", "this Mac", "Groq"]
+      and _so.get("mdlInside") == 5 and _so.get("modelOutside") is False and _so.get("server") is True and _so.get("hard") is False
+      and _so.get("tps") is True and _so.get("tilde") is True and _so.get("facts") is True and _so.get("clock") is True
+      and _so.get("machines") == 3 and _so.get("cloudLine") is True and _so.get("quiet") is True
+      and _so.get("ctx") == '{"used":4000,"window":16384}' and _so.get("ctxEst") is None
+      and _so.get("srcs") is True and _so.get("showm") is True
+      and _so.get("liveWhat") == ["Searched the web", "First draft", "Second draft, writing", "Final answer, writing"]
+      and _so.get("liveProg") is True and _so.get("liveRate") is True
+      and _so.get("think") == ["checking 12 claims", "writing a first draft", "drafting, 2 of 3", "thinking", "reading 4 pages"]
+      and _so.get("sign") == '<i class="dot" aria-hidden="true"></i><b>Concorde Gamma</b><span class="st">writing</span>'
+      and _so.get("signPlain") == '<i class="dot" aria-hidden="true"></i><b>Concorde</b><span class="st"></span>'
+      and _so.get("signOd") == '<i class="dot" aria-hidden="true"></i><b class="shim">Concorde Omega</b><span class="st">writing</span>'
+      and _so.get("signMer") == '<i class="dot" aria-hidden="true"></i><b class="shim soft">Concorde Sigma</b><span class="st"></span>'
+      and _so.get("tok") == [{"n": 120, "est": False}, {"n": 30, "est": True}]
+      and _so.get("day") == ["Today", "Yesterday", "This week", "Earlier"]
+      and _so.get("mark") == "Best <mark>GPU</mark> for home", "%r" % (_so,))
+_som1 = _spine_out(page.replace('\'<span class="mdl">\'+(w?" · ":"")+esc(mn)+\'</span>\'', '(w?" · ":"")+esc(mn)', 1))
+_som2 = _spine_out(page.replace('if(c.w==="server"&&i>0)return m.slice(0,i);', 'if(c.w==="server")return "Ollama1";', 1))
+_som3 = _spine_out(page.replace('const t=c.x?"~":"";', 'const t="";', 1))
+check("mutants: a model name outside .mdl, a hardcoded server name, and an unmarked estimate are each caught",
+      _som1.get("modelOutside") is True and _som2.get("hard") is True and _som2.get("server") is False
+      and _som3.get("tilde") is False, "%r %r %r" % (_som1.get("modelOutside"), _som2.get("hard"), _som3.get("tilde")))
+# the handlers are delegated (the footer and the spine are rebuilt), the frames are read, the byline breathes
+_ma528 = _jsfn(page, "function msgActions(div,role,text){")
+check("the answer's actions, the code cards' line numbers, the spine's steps and Show models are all delegated from the chat; the new frames are read; the byline and caret are drawn",
+      "addEventListener" not in _ma528 and 'data-act="' in _ma528
+      and 'const b=e.target.closest&&e.target.closest(".mab[data-act]");' in page
+      and 'if(act==="speak"){' in page and 'if(act==="good"||act==="bad"){' in page and '"/api/feedback"' in page
+      and 'const b=e.target.closest&&e.target.closest(".cbtn.lines");' in page and 'class="gut" aria-hidden="true"' in page
+      and 'const li=e.target.closest&&e.target.closest(".spine li.has-text");' in page
+      and 'const sm=e.target.closest&&e.target.closest(".showm");' in page
+      and "USAGE:j=>{try{usage.push(JSON.parse(j));}catch(e){}}," in page
+      and "DONE:j=>{try{runInfo=JSON.parse(j);}catch(e){}}," in page
+      and "usage.length=0;runInfo=null;\n      full=streamText(raw,{" in page
+      and "if(usage.length)rec.usage=usage.slice();" in page and "if(runInfo)rec.run=runInfo;" in page
+      and 'setWho(thinkPhrase(steps,status,draftsGot));' in page
+      and 'addMsg("assistant","",null,null,null,null,null,null,{live:true,mode:tier});' in page
+      and ".msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite}" in page
+      and ".msg.ai.live .who b.shim{animation:hzShim 3.2s linear infinite}" in page
+      and ".msg.ai.live .who b.shim.soft{animation-duration:5s}" in page
+      and "@keyframes hzShim{to{background-position:300% 0}}" in page
+      and ".behind .spine li.live .node,.msg.ai.live .who b.shim{animation:none!important}" in page
+      and "if(txt)caretIn(body);" in page and ".caret{display:inline-block;width:2px;height:1.05em;" in page
+      and '/* MODE NAMES (6b526) */\nconst MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};\nconst modeName=t=>MODE_NAMES[t]||t;' in page
+      and "/* HORIZON TOKENS (6b526) */" in page and "--hz-ink-read:#e6e9f4;" in page
+      and ".msg.ai{display:grid;grid-template-columns:minmax(0,640px) 236px;column-gap:56px;" in page
+      and ".msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;" in page
+      and "--hz-font-read:'Space Grotesk',system-ui,sans-serif;" in page
+      and "@media (max-width:860px){\n  .msg.ai{grid-template-columns:minmax(0,1fr)}" in page
+      and "millen.codeLines" in page and "millen.rail" in page and "millen.showModels" in page
+      and 'id="rail-btn"' in page and "body.rail #sidebar{width:60px!important" in page
+      and 'id="sb-foot"' in page and '"/api/usage?range=1d"' in page
+      and "function dayRows(rows,row,now){" in page and 'class="cday"' in page
+      and "function hzStill(){" in page and ".chat-item.leaving{opacity:0;" in page)
+# THE ASKING FLOW (6b528, NORTHSTAR OVERRIDE 3): the live line's words come from the frames in hand, never a
+# timer; the comets, the ripple, the glow and the composer light hang off the same frames
+def _live528(pg):
+    js = "const IS_PC=false;const SRV_SEP=\" \\u00b7 \";const esc=s=>String(s);let engineState={\"Gemma 4 26B\":{up:true},\"Gemma 4 E2B\":{up:true}},lastModels=\"\";\n"
+    js += "const document={body:{classList:{contains:()=>false}},querySelector:()=>null,querySelectorAll:()=>[]};\n"
+    for h in ("const STEP_ORDER=", "const THINK_WORDS=", "const MACH="):
+        js += _jsconst(pg, h)
+    for h in ("function fmtTok(n){", "function fmtSecs(s){", "function thinkPhrase(steps,status,nDrafts){", "function machineKind(label){",
+              "function machineName(label){", "function livePhrase(steps,running,status,drafts,comp,done){"):
+        js += _jsfn(pg, h)
+    js += r"""
+const D=[{m:"Gemma 4 26B",t:"draft one"},{m:"Sam’s box · gpt-oss:20b",t:"draft two"}];
+const o={
+ search:livePhrase([{id:"search",s:"run"}],[],"",[],"",null).text,
+ read:livePhrase([{id:"search",s:"done",d:"6 sources"},{id:"read",s:"run",d:"4 pages"}],[],"",[],"",null).text,
+ drafting:livePhrase([{id:"council",s:"run",d:"1 of 2"}],["Sam’s box · gpt-oss:20b"],"",[],"",null),
+ status:livePhrase([],[],"asking Gemma 4 26B · 1 of 1",[],"",null).text,
+ two:livePhrase([],["Gemma 4 26B","Gemma 4 E2B"],"",[],"",null).text,
+ merging:livePhrase([{id:"polish",s:"run",d:"x"}],[],"",D,"Gemma 4 26B",null),
+ writing:livePhrase([{id:"polish",s:"run",d:"x"}],[],"",[D[0]],"Gemma 4 26B",null).text,
+ review:livePhrase([{id:"review",s:"run",d:"Gemma 4 26B"}],[],"",D,"",null),
+ verify:livePhrase([{id:"verify",s:"run",d:"12 claims · Sam’s box · gpt-oss:20b"}],[],"",D,"",null),
+ done:livePhrase([],[],"",D,"",{t:8.62}).text,
+ idle:livePhrase([],[],"",[],"",null).text,
+ kinds:[machineKind("Gemma 4 26B"),machineKind("Sam’s box · gpt-oss:20b"),machineKind("Claude")],
+ names:[machineName("Gemma 4 26B"),machineName("Sam’s box · gpt-oss:20b"),machineName("Claude")]};
+process.stdout.write(JSON.stringify(o));
+"""
+    try:
+        return _node_json(js, "live528.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+_lv = _live528(page)
+check("the live line says what the frames say: searching, reading N sources, <model> drafting on <machine>, merging N drafts, writing, reviewing, checking, done in N s; machines by kind and by their own names",
+      _lv.get("search") == "Searching the web" and _lv.get("read") == "Reading 6 sources"
+      and _lv.get("drafting", {}).get("text") == "Sam’s box · gpt-oss:20b drafting on Sam’s box"
+      and _lv.get("drafting", {}).get("who") == ["Sam’s box · gpt-oss:20b"]
+      and _lv.get("status") == "Gemma 4 26B drafting on this Mac" and _lv.get("two") == "2 models drafting"
+      and _lv.get("merging", {}).get("text") == "Merging 2 drafts" and len(_lv.get("merging", {}).get("who") or []) == 2
+      and _lv.get("writing") == "Writing the answer" and _lv.get("review", {}).get("text") == "Reviewing the draft"
+      and _lv.get("verify", {}).get("text") == "Checking the answer" and _lv.get("verify", {}).get("who") == ["Sam’s box · gpt-oss:20b"]
+      and _lv.get("done") == "Done in 8.6 s" and _lv.get("idle") == "Thinking"
+      and _lv.get("kinds") == ["local", "server", "cloud"] and _lv.get("names") == ["this Mac", "Sam’s box", "the cloud"], "%r" % (_lv,))
+check("the asking flow hangs off real frames: a comet per real DRAFT, the white ripple on the RUN compositor frame, the live line painted from the stream loop and a 200 ms clock, the glow on the live body's container, the light round the composer at the end",
+      'if(!/^\\(no answer/.test(d.t||"")&&!/\\((review|rewrite)\\)$/.test(d.m||""))cometFor(d.m,aiDiv);}' in page
+      and 'if(!stepComp&&drafts.filter(x=>!/^\\(no answer/.test(x.t||"")).length>=2)rippleAt(aiDiv,"#ffffff");' in page
+      and "liveLinePaint(aiDiv);              // the live line follows the frames (6b528)" in page
+      and "const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);" in page
+      and "liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});" in page
+      and "if(full&&!wasAborted)answerLanded();" in page and 'document.dispatchEvent(new Event("hz-answer-done"))' in page
+      and '<canvas id="comets" aria-hidden="true"></canvas>' in page and "function cometsDraw(){" in page
+      and ".msg.ai.live .body{color:#fff;text-shadow:0 0 10px rgba(159,192,255,.38)" in page
+      and ".msg.ai .body{transition:color .9s ease,text-shadow .9s ease}" in page
+      and ".hz #composer.finish::before{opacity:1;animation:hzRing 1.5s cubic-bezier(.45,0,.25,1) 1}" in page and "@keyframes hzRing{to{--hz-ang:360deg}}" in page
+      and ".msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}" in page
+      and "function cometsDraw(){" in _jsfn(page, "function cometsDraw(){") and "setTimeout(" not in _jsfn(page, "function livePhrase(steps,running,status,drafts,comp,done){"))
+# a fenced block with a blank line in it is ONE card (6b528): the paragraph splitter used to cut it in two
+# and wrap each half in <p>, and the inline rules dressed backticks and asterisks inside it
+def _fence528(src):
+    _f = os.path.join(tempfile.mkdtemp(), "fence528.js")
+    open(_f, "w").write(_ann_js_src(src) + "\n" + r"""
+const h=renderMD("Before\n\n```python\ndef a():\n    return `1` * 2\n\nfor x in y:\n    print(x)  # *em*\n```\n\nAfter `tick` and *em*");
+const f=renderMD("```flow\nA -> B\n\nB -> C\n```");
+const pre=(h.match(/<pre>[\s\S]*?<\/pre>/)||[""])[0];
+process.stdout.write(JSON.stringify({pres:(h.match(/<pre>/g)||[]).length,cards:(h.match(/class="codecard"/g)||[]).length,
+  pInCard:/<div class="codecard">[\s\S]*<p>[\s\S]*<\/pre>/.test(h),ps:(h.match(/<p>/g)||[]).length,
+  rawTicks:/`1`/.test(pre)&&!/<code>1<\/code>/.test(pre),
+  rawStar:/\*em\*/.test(pre)&&!/<em>/.test(pre),after:/<p>After <code>tick<\/code> and <em>em<\/em><\/p>/.test(h),
+  flow:(f.match(/class="flowchart"/g)||[]).length===1&&!/<p>/.test(f)}));
+""")
+    _r = subprocess.run(["node", _f], capture_output=True, text=True, timeout=60)
+    try:
+        return json.loads(_r.stdout)
+    except ValueError:
+        return {"ERR": (_r.stderr or _r.stdout)[:300]}
+_fc = _fence528(page)
+check("a fenced block with a blank line renders as one code card, its backticks and asterisks untouched, the prose around it still styled; a flow diagram too (6b528)",
+      _fc.get("pres") == 1 and _fc.get("cards") == 1 and _fc.get("pInCard") is False and _fc.get("ps") == 2
+      and _fc.get("rawTicks") is True and _fc.get("rawStar") is True and _fc.get("after") is True and _fc.get("flow") is True, "%r" % _fc)
+_fcm = _fence528(page.replace('const stash=h=>"\\n\\n\\u0000CC"+(ccs.push(h)-1)+"\\u0000\\n\\n";', "const stash=h=>h;", 1))
+check("mutant: without the stash the card is cut in two again", _fcm.get("pres") != 1 or _fcm.get("pInCard") is True or _fcm.get("rawTicks") is not True, "%r" % _fcm)
+# ==== hz-chat (6b528): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
