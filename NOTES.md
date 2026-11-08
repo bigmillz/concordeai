@@ -17135,3 +17135,106 @@ typing of a word with those letters could open the board and eat the end of the 
 trouble with the letter Z. Removed whole: its CSS, the #zito markup, the script, its seat in the
 Escape chain and in dictation's modal check. The 6302 setup-dialog check now ends its slice at the
 page's <script> instead of at the board, and a new check keeps the board, the combo and zitoEsc out.
+
+## 6b528 — The conversation and the sidebar, redesigned to the Horizon north star; every model call's tokens reach the page (per Patrick)
+
+Patrick: "let's beat out the UI of ChatGPT in every possible way", "a very tight look, similar to Claude,
+that shows number of tokens and everything", "much more human, simplified, and dynamic", and later "drop
+some of the model names ... make it sound like, okay, you have it on Zenith right now". The art director's
+frame (`design/NORTHSTAR.md`, `StarAnswer.dc.html`) set the layout; Patrick's override kept the app's own
+type (Space Grotesk, IBM Plex Mono for digits) and the Michroma wordmark with the wing. This branch
+(`hz-chat`) owns the message list, every message type, the sidebar and the Code and Funnels content views;
+the composer, the sky and Settings belong to the other two Horizon branches.
+
+**What the page shows now.**
+- The person's words are plain sans on the sky, 15.5/1.55, in a 560px measure; attached files are chips
+  with their size in tokens (estimated from length while the message is live, so marked `~`; a reopened chat
+  shows the names alone).
+- The answer sits directly on the sky, no card: 16.5/1.65 in the sans, a 640px measure, headings on a real
+  scale, lists, hairline tables, quotes, code cards with a header bar (language, `lines`, `copy`), inline
+  citations as small pills, and a numbered row of source pills under the prose. A hairline separates each
+  question from its answer. The sources' favicons are gone: a chip used to load
+  `google.com/s2/favicons?domain=` for every domain the answer read, which told a third party what the
+  answer read as it rendered. The pills carry the number and the domain; the marginalia lists titles.
+- ONE brain signs each answer: a byline "Concorde Zenith" (`MODE_NAMES`, `modeName()`: Fast→Flare,
+  Thinking→Zenith, Pro→Meridian, Vera Rubin→Odyssey; the internal keys and prefs are untouched) with a
+  breathing dot while it works and one plain word for what it is doing ("searching the web", "writing a first
+  draft", "checking 12 claims"), never a model's name. An ice caret rides the newest line while text streams.
+  Odyssey's byline shimmers (a four-colour gradient scrolling every 3.2 s), Meridian's softly (ice to
+  violet, 5 s); both settle to the still gradient when the answer lands, and are still from the start under
+  reduced motion or with the effects off.
+- "Behind this answer": a 236px marginalia column beside the answer (a 56px gutter; it stacks under the
+  answer below 860px). The run's clock, its tokens in and out and the time to the first word at the top;
+  then the steps as nodes on a spine, each with what happened, WHERE it ran (this Mac, or a server by its
+  own name) and the numbers that were measured; the live step lit, with a hairline that fills; then the
+  machines that took part (what each wrote, how long it took), the context the final writer ran in when
+  its window is known, and one line from the data: "Nothing has left your machines." or "Some of this went
+  through Claude." Model names appear only when a step is opened (a click, Enter or Space) or through the
+  "Show models" switch at the foot, remembered per machine (`millen.showModels`). Nothing is hardcoded about
+  any server: its name comes off the model label the server reports ("Name · model").
+- Under the prose, on hover or focus: copy, read aloud, try again, good, not good (and edit-and-resend
+  under a question). Good / not good land in the quality ledger through `/api/feedback` (`{"ts","fb","chat","n"}`;
+  1, -1, or 0 to take it back).
+- The sidebar is a 240px glass column: the lockup, new chat, the lanes as text tabs with a 1px ice
+  underline, search with the match lit in the title and the excerpt, Pinned, then Recents under Today /
+  Yesterday / This week / Earlier with a token total per day and per chat (measured where the chat carries
+  the new records, estimated at four characters a token and marked `~` where it doesn't, with a footnote
+  "~ estimated from length"), pin and delete on hover (a deleted row slides out before the list redraws;
+  rows glide to their new place when one is pinned), rename on a double-click, keyboard: Enter opens,
+  Delete deletes. A foot with today's tokens from the usage ledger and where they ran ("All on your
+  machines"), Settings, and the rail toggle: the sidebar folds to a 60px strip of icons (`millen.rail`).
+- The Code lane's approval cards, autonomy segments, folder and connection fields, and the Funnels' stage
+  question and option cards, take the same glass, hairlines and radii.
+- Reduced motion and the app's effects-off setting still everything: the rise, the breathing dot, the
+  caret's blink, the shimmer, the row motion; the glass loses its blur on a solid ground.
+
+**The numbers are real, or marked.** Nothing on the page is invented:
+- `USAGE` frame (server → page, 6b528): `usage_note()`, which has recorded every model call in the usage
+  ledger since 6b325, now also hands the page a frame per call: `{r, m, w, i, o, d, x?, c?, n?}` (the stage, the
+  model, where it ran, tokens in and out, milliseconds, `x` when a count was estimated from length, cached
+  input, the context window when the caller knows it). The chat handler installs a tap on its thread
+  (`usage_tap`) before the search threads start, so the query plan's call is counted; `_ctx_wrap` carries the
+  tap and the stage name to every thread the run starts (a cloud seat's, a server group's, the fact-check's);
+  the stage is named at each step of `run_council` and the handler (`usage_role`: search, draft, review,
+  peer, final, verify, places; "" for a plain answer); the tap is switched off before the heartbeat stops,
+  so the memory pass that follows reports to the ledger alone. `server_stream` passes the `num_ctx` it asked
+  for (or the gateway's 8,192) as the window; `stream_ollama` passes `GIANT_CTX` for a big model; an MLX call
+  has no window the app knows, so no meter is drawn for it.
+- `DONE` frame: the run's clock from the request's arrival: `{f: seconds to the first word, t: total, mode}`.
+- `RATE` (6b515) is persisted too, so the final step's pace on a reopened chat is the writer's real output
+  tokens over its own writing seconds; live, the page's own estimate from characters is shown with a `~`.
+- `turn_record` keeps `usage`, `run`, `rate` and each step's last state (`steps`) on the saved message, so a
+  reopened chat draws the same marginalia the live answer had. The page's `streamText` reads the frames whole
+  on every chunk, so the per-call list is rebuilt per chunk rather than deduplicated.
+- The fact-check's running step now carries the claim count in its detail ("12 claims · gpt-oss:20b"), so the
+  byline can say "checking 12 claims" while it runs.
+
+**Markdown.** A fenced block with a blank line inside it was cut in two by the paragraph splitter (each half
+wrapped in `<p>`, the browser then closing them around the `<div>`), and a backtick or asterisk inside the code
+was dressed by the inline rules. Code cards and flow diagrams are stashed as `\0CCn\0` placeholders on their
+own line until every other rule has run.
+
+**The client's structure.** `addMsg` takes the saved message as a ninth argument; the marginalia is an
+`<aside class="behind worktree">`, the second column of the message's grid, lifted out of the prose after
+`srcBox(srcs)` draws it (that call site is pinned by the gauntlet), so a repaint of the prose during
+streaming can't touch it: the 6b462 lift-out (`keepTree`) and the pinwheel head are gone with the card
+they protected. The answer's actions, the code cards' `lines` switch, the spine's steps and "Show models" are
+all delegated from the chat, since the footer and the spine are rebuilt as the run moves and when a chat is
+reopened. Old rules for the surfaces this entry restyles stay in the sheet, outranked by order by the block
+marked `HORIZON CONVERSATION (6b528)`; they are dead weight to sweep once the three Horizon branches have
+merged. The `HORIZON TOKENS (6b526)` block carries the north star's additions (`--hz-ink-read`, the hairlines,
+the aurora values) and Patrick's type override.
+
+**The gauntlet.** Changed for real, each explained in its comment: the brand guard allows exactly the byline's
+`SIGN_BRAND="Concorde"` constant (and a mutant proves a second bare Concorde still trips it); the 6b462
+pinwheel check became the marginalia check (the aside outside the prose, surviving repaints); the smooth-bar
+check pins the hairline's transform instead of the bar's width; 6b515's pins take the longer frame list and
+the spine's pace line in place of the retired tokens line under the answer; the sources check says what the
+sources are now (a numbered row under the prose, a list beside it, no outside image). New: `usage_note`'s tap
+(real counts, the role, an estimate marked, the window, a child thread, off again) with two mutants; the
+handler's tap, clock and roles; the saved record's `usage`/`steps`/`run`/`rate`; `/api/feedback` live; the
+spine's pure pieces in node (figures, totals, rows with what/where/numbers, model names only inside `.mdl`, the
+writer's pace, estimates marked, machines by their own names, the context when known, the live rows, the
+byline for each mode, the sidebar's tokens, day labels and title marks) with three mutants (a model name
+outside `.mdl`, a hardcoded server name, an unmarked estimate); the delegated handlers, the frames, the byline,
+the caret, the shimmer, the tokens block, the grid, the rail; and the fence fix with its mutant.
