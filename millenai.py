@@ -28970,6 +28970,13 @@ def run_council(labels: list, messages: list, emit, status,
     server's label or a model of this computer); one that can't write the
     answer now is set aside, said in the status line, and the default writes it.
     """
+    # the effort the person set (6b534, OVERRIDE 4), on this thread: High and
+    # up double-checks the drafts, Max and Ultra add the peer review (never in
+    # the Max mode, where every model already drafts). Looked up softly, so a
+    # namespace without the thread-local runs as before
+    _eff = getattr(globals().get("_srv_think"), "effort", None)
+    if _eff and not max_mode:
+        reflect, peer = effort_reflect(reflect, _eff), effort_peer(peer, _eff)
     # reflection and peer review both run LOCAL passes — off the table
     # when the whole point of the tier is that nothing runs here
     if cloud_only:
@@ -32626,23 +32633,49 @@ def sky_is_night() -> bool:
 # time zone's reference city from the OS zone table (_zone_latlon). None
 # when neither is known, and the page then says nothing about the place.
 # EFFORT (6b534, per Patrick: the mode and the effort are separate controls,
-# like Claude and ChatGPT): the Horizon composer's slider sends Low, Medium,
-# High or Max with each question. For now it decides one real thing, the
-# second pass of a single-model answer (the draft-and-rewrite of Fast and of
-# a server's first answer): Low never, High and Max always (even with Polish
-# off in Settings), Medium and an older client as Settings says.
-EFFORT_LEVELS = ("low", "medium", "high", "max")
+# like Claude and ChatGPT; OVERRIDE 4: five steps, Ultra the highest). The
+# Horizon composer sends low, medium, high, max or ultra with each question,
+# and each step turns switches the pipeline already has, never a show:
+#   low     no second pass on a single-model answer; a server model that
+#           takes a reasoning level (gpt-oss, 6b518) is asked for "low"
+#   medium  as before: the second pass as Settings says, the mode's own reviews
+#   high    the second pass always (the answer reviews itself), and a council's
+#           drafts are double-checked before the merge (reflect; a local Qwen
+#           seat reasons natively with it)
+#   max     high, and the council's peer review: every seat rewrites its draft
+#           from all of them before the merge (peer, twice the engine passes)
+#   ultra   max, and a server model that takes a reasoning level is asked for
+#           "high" (measured on gpt-oss: ~55 s more before the first word)
+# Both ride the answering thread (_srv_think.level and .effort, cleared per
+# request by _run; run_council reads .effort); the cloud's per-role effort
+# (6b307) is left as measured.
+EFFORT_LEVELS = ("low", "medium", "high", "max", "ultra")
 
 
 def effort_polish(pref, effort) -> bool:
     if effort == "low":
         return False
-    if effort in ("high", "max"):
+    if effort in ("high", "max", "ultra"):
         return True
     return bool(pref)
 
 
-MODE_ALIASES = {"Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro",
+def effort_reflect(mode_reflect, effort) -> bool:
+    return bool(mode_reflect) or effort in ("high", "max", "ultra")
+
+
+def effort_peer(mode_peer, effort) -> bool:
+    return bool(mode_peer) or effort in ("max", "ultra")
+
+
+def effort_think(effort):
+    return {"low": "low", "ultra": "high"}.get(effort)
+
+
+MODE_ALIASES = {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro",
+                "Omega": "Vera Rubin",
+                # the names of 6b526, which older pages still send
+                "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro",
                 "Odyssey": "Vera Rubin"}
 _HZ_PLACE_CACHE = {}
 
@@ -33973,6 +34006,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     # write after a switch is refused (409 when nothing was sent yet).
     def _run(self, fn):
         _tl_search.__dict__.clear()
+        _srv_think.level = _srv_think.effort = None   # no effort carried over (6b534)
         _answered.pop(threading.get_ident(), None)
         self._turn = None
         self._head_sent = False
@@ -36457,9 +36491,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # a tier resolves to its own line-up; otherwise honour explicit picks
         tier = req_json.get("tier") or ""
         req_tier = tier               # before a picture resets it (6b308)
-        # the effort the person set (6b534); anything else is no effort at all
+        # the effort the person set (6b534); anything else is no effort at all.
+        # A server model's reasoning level follows it on this thread (_run
+        # clears it for the next request)
         _effort = req_json.get("effort")
         _effort = _effort if _effort in EFFORT_LEVELS else None
+        _srv_think.level = effort_think(_effort)
+        _srv_think.effort = _effort    # run_council reads it for its reviews
         _answered.pop(threading.get_ident(), None)
         # a new question voids the last one's "who answered": the title
         # of a chat answered on this Mac must never go to the cloud. Per
@@ -36484,8 +36522,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             tier = "Fast"   # Best retired (5.3) — it was Fast in a crown
         if tier == "Power":
             tier = "Pro"    # Pro absorbed Power (5.3)
-        # THE MODES' BRAND NAMES (6b526, per Patrick): the page says Flare,
-        # Zenith, Meridian (and Odyssey where its tier exists); the tiers
+        # THE MODES' BRAND NAMES (6b526, 6b534 per Patrick): the page says
+        # Alpha, Gamma, Sigma (and Omega where its tier exists); the tiers
         # keep their keys, and a client that sends the name is understood
         if isinstance(tier, str) and tier in MODE_ALIASES \
                 and MODE_ALIASES[tier] in TIERS:
@@ -43717,7 +43755,7 @@ __HZ_FONTS__
 .hz #hz-effort{display:flex;align-items:center;gap:14px;min-width:0}
 .hz #hz-effort[hidden]{display:none}
 .hz .hz-vh{position:absolute;left:-9999px}
-.hz .hz-sl{position:relative;width:150px;height:40px;flex:none;border-radius:999px;--hz-eff-u:.3333}
+.hz .hz-sl{position:relative;width:170px;height:40px;flex:none;border-radius:999px;--hz-eff-u:.25}
 .hz .hz-sl:focus-within{box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
 .hz .hz-sl-glow{position:absolute;left:9px;right:9px;top:16px;height:8px;border-radius:4px;pointer-events:none;
   background:linear-gradient(90deg,rgba(159,192,255,0) 0%,rgba(159,192,255,.22) 45%,rgba(159,192,255,.62) 100%);filter:blur(7px)}
@@ -43768,11 +43806,11 @@ __HZ_FONTS__
 .hz .hz-opt.open .ms{max-height:140px;margin-top:10px}
 .hz .hz-opt .hz-mdl{height:26px}
 .hz .hz-opt .hz-mdl b{font-size:12.5px}
-/* the deepest modes shimmer and a light runs round the composer (Odyssey in full, Meridian softly) */
+/* the top efforts shimmer and a light runs round the composer (Ultra in full, Max softly; OVERRIDE 4) */
 @property --hz-ang{syntax:'<angle>';initial-value:0deg;inherits:false}
-.hz .hz-pick b.shim,.hz .hz-elevel.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
+.hz .hz-elevel.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzShim 3.2s linear infinite}
-.hz .hz-pick b.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
+.hz .hz-elevel.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
 @keyframes hzShim{to{background-position:300% 0}}
 .hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
   transition:opacity .8s var(--hz-ease-in-out);
@@ -43781,9 +43819,9 @@ __HZ_FONTS__
           mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
   animation:hzRing 4s linear infinite}
 .hz #main:not(:has(#hero)) #composer::before{border-radius:22px}
-.hz.hz-ody #composer::before{opacity:.9}
-.hz.hz-ody .gen #composer::before{opacity:1;animation-duration:2.4s}
-.hz.hz-mer #composer::before{opacity:.35;animation-duration:7s}
+.hz.hz-ultra #composer::before{opacity:.9}
+.hz.hz-ultra .gen #composer::before{opacity:1;animation-duration:2.4s}
+.hz.hz-maxe #composer::before{opacity:.35;animation-duration:7s}
 @keyframes hzRing{to{--hz-ang:360deg}}
 .hz.hz-ring-static #composer::before{animation:none;background:linear-gradient(135deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6)}
 /* a model a mode runs: a pill with its machine's die (the machine in the tooltip) */
@@ -43879,15 +43917,15 @@ __HZ_FONTS__
 @keyframes hzRowPop{0%{transform:scale(.97);box-shadow:0 0 0 0 rgba(159,192,255,0)}35%{transform:scale(1.035);box-shadow:0 0 0 1px rgba(170,200,255,.55),0 0 26px rgba(159,192,255,.4)}100%{transform:none;box-shadow:0 0 0 0 rgba(159,192,255,0)}}
 @keyframes hzFadeIn{from{opacity:0}to{opacity:1}}
 /* ---- stillness: effects off, reduced motion, hidden or long unfocused */
-.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-pick b.shim,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
+.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
 .hz .novideo #hz-wash,.hz .novideo #hz-wash.bloom{animation:none!important;opacity:.1}
 .hz .novideo #composer::before{animation:none;opacity:0!important}
 .hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}
-.hz.hz-pause .hz-pick b.shim,.hz.hz-pause .hz-elevel.shim,.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
+.hz.hz-pause .hz-elevel.shim,.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
   .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}
   .hz #hz-wash,.hz #hz-wash.bloom{animation:none!important;opacity:.1}
-  .hz .hz-pick b.shim,.hz .hz-elevel.shim{animation:none}
+  .hz .hz-elevel.shim{animation:none}
   .hz .hz-mdl,.hz .hz-opt .ms,.hz #hz-menu{transition:none!important}
   .hz #composer::before{animation:none;opacity:0!important}
   .hz #hz-aurw,.hz .hz-sl-thumb,.hz .hz-sl-fill{transition:none!important}
@@ -44775,12 +44813,12 @@ __CODE_ROWS__
 <script>
 "use strict";
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-// THE MODES' BRAND NAMES (6b526, per Patrick): Flare, Zenith, Meridian, and
-// Odyssey where its tier exists. Declared first: tierShown() reads modeName
+// THE MODES' BRAND NAMES (6b526; the Greek ones 6b534, per Patrick): Alpha,
+// Gamma, Sigma, and Omega where its tier exists. Declared first: tierShown() reads modeName
 // during boot, and a const further down would be a temporal-dead-zone throw
 // that kills the whole page (seen live, this build).
 /* MODE NAMES (6b526) */
-const MODE_NAMES={"Fast":"Flare","Thinking":"Zenith","Pro":"Meridian","Vera Rubin":"Odyssey"};
+const MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};
 const modeName=t=>MODE_NAMES[t]||t;
 // a chip line that starts with a mode ("Fast", "Thinking · <server> only") takes the brand name
 const hzModeWords=s=>String(s||"").replace(/^(Fast|Thinking|Pro|Vera Rubin)(?=$| \u00b7 )/,m=>modeName(m));
@@ -45826,7 +45864,7 @@ function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
   srvSyncOff();
   engMenu.innerHTML=engMainRows();
-  hzMenuBrand(engMenu);            // Flare, Zenith, Meridian (6b526)
+  hzMenuBrand(engMenu);            // Alpha, Gamma, Sigma (6b526, 6b534)
   engMenu.hidden=false;
   // fit the window (6b336): open on the side with room; when neither
   // side holds the whole list, take the roomier one and scroll
@@ -55562,8 +55600,8 @@ function hzSkyBoot(){
     const A=S.A;S.A=S.B;S.B=A;
   };
   S.setNeon=function(){S.neonTo=S.lvl+(S.busy?.28:0);};
-  // the neon follows the mode and the effort (the reference's level(m,e)), and the work
-  S.level=function(m,e){S.lvl=[.2,.28,.5,.78][Math.max(0,Math.min(3,m))]+Math.max(0,Math.min(3,e))*.04;S.setNeon();};
+  // the neon follows the mode and the effort, with a lift at Ultra (the reference's level(m,e)), and the work
+  S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};
   S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};
   // a new clip starts with clean trails
   S.reset=function(){[S.A,S.B].forEach(T=>{gl.bindFramebuffer(gl.FRAMEBUFFER,T.f);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);});gl.bindFramebuffer(gl.FRAMEBUFFER,null);};
@@ -55909,15 +55947,15 @@ function hzTitlePaint(){
 // shimmers. The neon aurora follows both. Max, Cloud only, the servers and
 // Advanced stay in the engine menu (the More modes button).
 function hzModes(){return ["Fast","Thinking","Pro","Vera Rubin"].filter(n=>TIER_META[n]);}
-const HZ_EFFORT=["Low","Medium","High","Max"],HZ_EFFORT_KEY=["low","medium","high","max"];
+const HZ_EFFORT=["Low","Medium","High","Max","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;
 function hzEffort(){
   if(hzS&&hzS.effort!=null)return hzS.effort;
-  let v=1;try{const s=localStorage.getItem("millen.effort");if(s!==null&&/^[0-3]$/.test(s))v=+s;}catch(e){}
+  let v=1;try{const s=localStorage.getItem("millen.effort");if(s!==null&&/^[0-4]$/.test(s))v=+s;}catch(e){}
   return v;
 }
 function hzEffortWire(){return HZ_EFFORT_KEY[hzEffort()];}    // what a question carries
 function hzEffortSet(i){
-  i=Math.max(0,Math.min(3,Math.round(+i||0)));hzS.effort=i;
+  i=Math.max(0,Math.min(HZ_EMAX,Math.round(+i||0)));hzS.effort=i;
   try{localStorage.setItem("millen.effort",String(i));}catch(e){}
   hzEffortPaint();
 }
@@ -55944,31 +55982,31 @@ function hzModesPaint(){
     host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
       +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
       +'<div class="hz-sl"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
-      +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot'+(i===3?" last":"")+'" style="--hz-u:'+(i/3).toFixed(4)+'"></i>').join("")
+      +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot'+(i===HZ_EMAX?" last":"")+'" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
       +'<i class="hz-sl-halo"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
-      +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="3" step="1" value="1"></label></div>'
+      +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
       +'<span class="hz-elevel" aria-hidden="true"></span>';
     hzControlsWire(host);
   }
   const t=typeof tier==="string"?tier:"",on=ms.indexOf(t)>=0;
   const nm=host.querySelector(".hz-pick b");
   nm.textContent=on?modeName(t):hzOffLabel(t);
-  nm.classList.toggle("shim",t==="Vera Rubin"||t==="Pro");nm.classList.toggle("soft",t==="Pro");
   host.querySelector(".hz-pick").setAttribute("aria-label","Mode, "+nm.textContent);
-  const root=document.documentElement;root.classList.toggle("hz-ody",t==="Vera Rubin");root.classList.toggle("hz-mer",t==="Pro");
   hzEffortPaint();
   const menu=$("#hz-menu");if(menu&&menu.classList.contains("open"))hzMenuBuild();
 }
 function hzEffortPaint(){
   const host=$("#hz-effort"),sl=host&&host.querySelector(".hz-sl");if(!sl)return;
-  const inp=sl.querySelector("input"),i=hzEffort(),u=i/3,pad=9;
-  const width=sl.getBoundingClientRect().width||(host.classList.contains("compact")?120:150);
+  const inp=sl.querySelector("input"),i=hzEffort(),u=i/HZ_EMAX,pad=9;
+  const width=sl.getBoundingClientRect().width||(host.classList.contains("compact")?120:170);
   sl.style.setProperty("--hz-eff-u",u.toFixed(4));
   sl.style.setProperty("--hz-eff-px",(u*(width-pad*2)).toFixed(1)+"px");
   sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k<=i));
   if(+inp.value!==i)inp.value=String(i);
   inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
-  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("shim",i===3);
+  // Max shimmers softly and the light runs round the composer softly; Ultra in full (OVERRIDE 4)
+  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("shim",i>=3);en.classList.toggle("soft",i===3);
+  const root=document.documentElement;root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
   if(hzS.sky)hzS.sky.level(hzModeIndex(typeof tier==="string"?tier:""),i);
 }
 function hzControlsWire(host){
@@ -56310,7 +56348,7 @@ function hzDebugApply(){
   if(d.fx==="0")document.body.classList.add("novideo");
   if(d.time||d.place)hzSkyPaint();
   if(d.state==="typing"){const i=$("#input");if(i){i.value=d.text||"Which of my two job offers makes more sense if I want to move abroad next year?";i.dispatchEvent(new Event("input"));}}
-  if(d.effort!=null&&/^[0-3]$/.test(d.effort)){hzS.effort=+d.effort;hzEffortPaint();}
+  if(d.effort!=null&&/^[0-4]$/.test(d.effort)){hzS.effort=+d.effort;hzEffortPaint();}
   if(d.state==="menu"){setTimeout(hzMenuOpen,600);}
   if(d.state==="thinking"||d.state==="boom"||d.state==="landed"){
     const hero=$("#hero");if(hero)hero.remove();

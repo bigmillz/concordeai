@@ -37429,7 +37429,7 @@ check("horizon: the served page carries the night canvas, the header, the mode p
       'id="hz-sky"' in page and '<canvas id="hz-gl"></canvas>' in page and 'id="hz-top"' in page and 'id="hz-effort"' in page
       and '<div id="hz-menu" role="menu" aria-label="Mode"></div>' in page and 'id="look-sel"' in page and 'id="fx-level"' in page and 'id="hz-machines"' in page
       and "/* HORIZON TOKENS (6b526) */" in page and "/* MODE NAMES (6b526) */" in page
-      and 'const MODE_NAMES={"Fast":"Flare","Thinking":"Zenith","Pro":"Meridian","Vera Rubin":"Odyssey"};' in page
+      and 'const MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};' in page
       and "const modeName=t=>MODE_NAMES[t]||t;" in page
       and "const HZ_PLACE=" in page and "const HZ_CLIPS=[" in page and "var hzSeen=" in page
       and not any(tk in page for tk in ("__HZ_PLACE__", "__HZ_DEBUG__", "__HZ_FONTS__", "__SKY_ORBIT__", "__HZ_SEEN__", "__SKY_HZ__")), "")
@@ -37471,7 +37471,7 @@ def _hz_intro_gated(head, css, js):
             and 'localStorage.getItem("millen.video")==="0"' in head
             and "@media (prefers-reduced-motion:reduce){" in css
             and ".hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}" in css
-            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-pick b.shim,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}" in css
+            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}" in css
             and "if(!hzMotionOK()||hzS.reduced)return;" in js)
 
 
@@ -37572,8 +37572,9 @@ check("horizon: the real-sky math lands (GMST at J2000, Polaris at the latitude,
 _hz_alias = {}
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODE_ALIASES = {"):_MILLENAI_SRC.index("_HZ_PLACE_CACHE = {}")], _hz_alias)
 _hz_post = _MILLENAI_SRC[_MILLENAI_SRC.index('        if tier == "Power":'):_MILLENAI_SRC.index("_cl_mode, _cl_pid = cloud_tier_parse(tier)")]
-check("horizon: Flare, Zenith, Meridian and Odyssey are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and the home itself names no model",
-      _hz_alias["MODE_ALIASES"] == {"Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro", "Odyssey": "Vera Rubin"}
+check("horizon: Alpha, Gamma, Sigma and Omega (and 6b526's Flare, Zenith, Meridian, Odyssey) are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and the home itself names no model",
+      _hz_alias["MODE_ALIASES"] == {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro", "Omega": "Vera Rubin",
+                                    "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro", "Odyssey": "Vera Rubin"}
       and "tier = MODE_ALIASES[tier]" in _hz_post and "MODE_ALIASES[tier] in TIERS" in _hz_post
       and "function tierLabel(){return hzModeWords(tierShown(tier))||model;}" in _MILLENAI_SRC
       and "hzMenuBrand(engMenu);" in _MILLENAI_SRC and "hzMenuBrand(engSub);" in _MILLENAI_SRC
@@ -37589,7 +37590,7 @@ check("horizon: the night is one GPU canvas over the app's own aerial (same-orig
       and "gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);" in _hz_js
       and 'powerPreference:"high-performance"' in _hz_js and "gap=hzS.gen&&hzS.genLocal?1000/15:(full?0:32);" in _hz_js
       and 'document.documentElement.classList.add("hz-novfx")' in _hz_js and ".hz.hz-novfx #hz-vid{opacity:1;" in _hz_css
-      and "S.level=function(m,e){S.lvl=[.2,.28,.5,.78][Math.max(0,Math.min(3,m))]+Math.max(0,Math.min(3,e))*.04;S.setNeon();};" in _hz_js
+      and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};" in _hz_js
       and "S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};" in _hz_js
       and "uniform1f(pS.U.moon,.08+.62*lit)" in _hz_js and 'localStorage.getItem("millen.fxlevel")==="full"' in _hz_js
       and ".hz .hz-rig.mlx,.hz [data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz [data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}" in _hz_css
@@ -37657,24 +37658,38 @@ _hze = {}
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("EFFORT_LEVELS = ("):_MILLENAI_SRC.index("MODE_ALIASES = {")], _hze)
 
 
-def _hz_effort_ok(f):
-    return (f(True, "low") is False and f(False, "high") is True and f(False, "max") is True
-            and f(True, "medium") is True and f(False, "medium") is False and f(True, None) is True and f(False, None) is False)
+def _hz_effort_ok(ns):
+    f, rf, pr, th = ns["effort_polish"], ns["effort_reflect"], ns["effort_peer"], ns["effort_think"]
+    return (f(True, "low") is False and f(False, "high") is True and f(False, "max") is True and f(False, "ultra") is True
+            and f(True, "medium") is True and f(False, "medium") is False and f(True, None) is True and f(False, None) is False
+            and [rf(False, e) for e in ("low", "medium", "high", "max", "ultra")] == [False, False, True, True, True]
+            and rf(True, "low") is True and pr(True, "low") is True
+            and [pr(False, e) for e in ("low", "medium", "high", "max", "ultra")] == [False, False, False, True, True]
+            and [th(e) for e in ("low", "medium", "high", "max", "ultra", None)] == ["low", None, None, None, "high", None])
 
 
-_hze_mut = {}
-exec(_MILLENAI_SRC[_MILLENAI_SRC.index("EFFORT_LEVELS = ("):_MILLENAI_SRC.index("MODE_ALIASES = {")]
-     .replace('if effort == "low":\n        return False', 'if effort == "low":\n        return bool(pref)'), _hze_mut)
-check("horizon: Effort (Low, Medium, High, Max) is sent with each question and decides the second pass (Low never, High and Max always, Medium as Settings says); the mutant is caught",
-      _hze["EFFORT_LEVELS"] == ("low", "medium", "high", "max") and _hz_effort_ok(_hze["effort_polish"])
-      and not _hz_effort_ok(_hze_mut["effort_polish"])
-      and "_effort = _effort if _effort in EFFORT_LEVELS else None" in _MILLENAI_SRC
+_hze_src = _MILLENAI_SRC[_MILLENAI_SRC.index("EFFORT_LEVELS = ("):_MILLENAI_SRC.index("MODE_ALIASES = {")]
+_hze, _hze_m1, _hze_m2 = {}, {}, {}
+exec(_hze_src, _hze)
+exec(_hze_src.replace('if effort == "low":\n        return False', 'if effort == "low":\n        return bool(pref)'), _hze_m1)
+exec(_hze_src.replace('{"low": "low", "ultra": "high"}', '{"low": "low", "ultra": "low"}'), _hze_m2)
+check("horizon: Effort (Low, Medium, High, Max, Ultra) is sent with each question and turns real switches: the second pass, the council's double-check and peer review, a server model's reasoning level (cleared per request); the mutants are caught",
+      _hze["EFFORT_LEVELS"] == ("low", "medium", "high", "max", "ultra") and _hz_effort_ok(_hze)
+      and not _hz_effort_ok(_hze_m1) and not _hz_effort_ok(_hze_m2)
+      and "_effort = _effort if _effort in EFFORT_LEVELS else None\n        _srv_think.level = effort_think(_effort)" in _MILLENAI_SRC
+      and "        _tl_search.__dict__.clear()\n        _srv_think.level = _srv_think.effort = None" in _MILLENAI_SRC
+      and "        _srv_think.effort = _effort    # run_council reads it for its reviews" in _MILLENAI_SRC
       and _MILLENAI_SRC.count('effort_polish(user_prefs(user_base).get("polish", True), _effort)') == 3
       and 'user_prefs(user_base).get("polish", True)\n' not in _MILLENAI_SRC
-      and '{effort:hzEffortWire()}' in _MILLENAI_SRC and 'const HZ_EFFORT=["Low","Medium","High","Max"],HZ_EFFORT_KEY=["low","medium","high","max"];' in _hz_js
-      and '<label><span class="hz-vh">Effort</span><input type="range" min="0" max="3" step="1" value="1"></label>' in _hz_js
-      and 'inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);' in _hz_js and 'en.classList.toggle("shim",i===3);' in _hz_js
-      and '"millen.fxlevel","millen.effort"]' in page, "")
+      and '_eff = getattr(globals().get("_srv_think"), "effort", None)\n    if _eff and not max_mode:\n        reflect, peer = effort_reflect(reflect, _eff), effort_peer(peer, _eff)\n' in _MILLENAI_SRC
+      and '{effort:hzEffortWire()}' in _MILLENAI_SRC
+      and 'const HZ_EFFORT=["Low","Medium","High","Max","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in _hz_js
+      and '<input type="range" min="0" max="\'+HZ_EMAX+\'" step="1" value="1">' in _hz_js
+      and 'inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);' in _hz_js
+      and 'en.classList.toggle("shim",i>=3);en.classList.toggle("soft",i===3);' in _hz_js
+      and 'root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);' in _hz_js
+      and ".hz.hz-ultra #composer::before{opacity:.9}" in _hz_css and ".hz .hz-sl{position:relative;width:170px;" in _hz_css
+      and "hz-ody" not in page and '"millen.fxlevel","millen.effort"]' in page, "")
 
 # THE MODE PICKER (OVERRIDE 3): the name only; a glass menu of the four modes, what each is for,
 # its machines' dies, its real models sliding out on hover, Escape and arrows; no hint in the composer
