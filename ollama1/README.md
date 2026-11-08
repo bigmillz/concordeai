@@ -1012,6 +1012,108 @@ providers:
         name: gpt-oss 20B (Ollama1)
 ```
 
+## Serving chosen models through llama.cpp (optional, 6b531)
+
+Measured on this card (2026-10-24, `tools/beatfable` on the `beatfable-m0` branch,
+the very GGUF files Ollama serves, llama.cpp CUDA build b11849): llama.cpp's server
+generated 15-25% faster than Ollama on three of four models and 59% **slower** on
+gemma4:12b, which Ollama runs on its own engine.
+
+| model (same file) | Ollama tok/s | llama.cpp tok/s | q8_0 KV cache |
+|---|---|---|---|
+| gpt-oss:20b | 160 | 184 | 179 (-2%) |
+| qwen3.5:9b | 117 | 137 | 135 (-1%) |
+| hermes3:8b | 134 | 167 | 162 (-3%) |
+| gemma4:12b | 152 | 96 | 91 |
+
+Draft-free n-gram speculation (`--spec-type ngram-mod`) was neutral on new text and
+1.3-1.9x when the text repeats (code edits, agent turns). A 1B "same family" draft
+model was refused for a vocabulary mismatch: a draft must share the target's tokenizer.
+
+So the kit can serve **chosen** models through llama-server and leave the rest on
+Ollama, per model, with one key to undo it. The gateway, its rules and the app do not
+change: the gateway speaks Ollama's dialect to one upstream, and that upstream becomes
+the **bridge**, `ollama1-llamacpp`, on a UNIX socket (`/run/ollama1/llamacpp/bridge.sock`,
+`ollama:o1gw 2770`, so no new port and no port-guard line). The bridge passes
+everything to Ollama untouched except the models named in `/etc/ollama1/llamacpp.json`,
+which it serves by running `llama-server` (one at a time, 127.0.0.1 only) and
+translating `/api/chat`, `/api/generate`, the empty-prompt load, `keep_alive: 0` and
+`/api/ps` to and from llama-server's OpenAI-style API. The gateway's fit check still
+reads `/api/show` from Ollama (same weights, same metadata); its 100%-in-VRAM check
+reads the merged `/api/ps`, where the bridge reports the child's VRAM from
+`nvidia-smi` and **0 when it cannot read it**, so an unreadable card refuses the model
+rather than trusting it. One runtime holds the card: starting the child unloads
+Ollama's models first, and a request for an Ollama model stops the child first.
+Embeddings of a bridged model are refused (400); keep embedding models on Ollama.
+
+`/etc/ollama1/llamacpp.json` (root-only; the unit hands the bridge a copy):
+
+```jsonc
+{
+  "enabled": true,
+  "bin": "/opt/llamacpp/current/llama-server",
+  "port": 8470,
+  "models": {
+    "gpt-oss:20b": {"ctx": 32768, "kv": "f16", "spec": "ngram-mod", "spec_n_max": 16},
+    "qwen3.5:9b":  {"ctx": 32768, "kv": "q8_0", "spec": "ngram-mod", "spec_n_max": 16}
+  }
+}
+```
+
+Per model: `ctx` (tokens of context), `kv` (`f16`, `q8_0` or `q4_0`: `-ctk/-ctv`),
+`spec` (`none`, `ngram-mod`, `ngram-simple`, `ngram-map-k`, `ngram-map-k4v`: `--spec-type`),
+`spec_n_max` (`--spec-draft-n-max`; the old `--draft-max` is gone from llama.cpp),
+`draft` (an absolute path to a same-tokenizer draft GGUF, `-md`; for a family that ships
+one, such as an MTP or EAGLE draft for the target: measure it first) and `args` (extra plain
+flags; `--host`, `--port`, `-m`, `-c`, the logging flags and the ones above are the bridge's
+and are refused). The command the bridge runs is
+`llama-server -m <blob> --host 127.0.0.1 --port 8470 -c <ctx> -ngl 999 -fa on --jinja --no-webui`
+plus those; no prompt logging. `sudo /usr/local/lib/ollama1/bin/ollama1-llamacpp check`
+prints every model's exact command and every problem, and exits 1 on any.
+
+Choose only models that measured faster (never a Gemma), and never a model that does not
+fit the card whole: the bridge does not spill to system RAM.
+
+### The plan: install, verify, roll back (from far away)
+
+Rules: no reboot, no network or driver change (the CUDA build already ran on this machine for
+the measurements; it is copied, not downloaded), and nothing while the server is answering
+(the script refuses when a request is in flight or one was answered in the last five
+minutes). Every step is in `tools/install-llamacpp.sh`, skipped when already done.
+
+```bash
+# 0. look, change nothing
+sudo bash ~/ollama1/tools/install-llamacpp.sh --check
+# 1. install: the build folder is the one the measurements used (llama-server and its libraries in it)
+sudo bash ~/ollama1/tools/install-llamacpp.sh --install --from ~/beatfable/llama-cuda/llama-b11849 --name b11849
+#    it: copies the build to /opt/llamacpp/b11849 (-> /opt/llamacpp/current), installs the kit's files,
+#    writes /etc/ollama1/llamacpp.json (disabled, no models) if absent, starts ollama1-llamacpp,
+#    runs its check, sets "llamacpp_bridge" in config.json (a copy stays at config.json.before-llamacpp)
+#    and restarts the gateway once. With no models listed the bridge only passes through: nothing
+#    changes for the app yet, which is the point of the first run.
+# 2. choose the models, then restart the bridge (the gateway needs no restart)
+sudo nano /etc/ollama1/llamacpp.json        # enabled: true, the models from the table
+sudo systemctl restart ollama1-llamacpp.service
+sudo /usr/local/lib/ollama1/bin/ollama1-llamacpp check
+# 3. verify
+sudo bash ~/ollama1/tools/install-llamacpp.sh --verify
+#    then one real question from the app to a listed model, and:
+journalctl -u ollama1-llamacpp -n 30 --no-pager     # start/ready/req lines, model names and counts only
+journalctl -u ollama1-gateway -n 30 --no-pager
+# 4. undo, any time (one key, one gateway restart; Ollama serves everything again)
+sudo bash ~/ollama1/tools/install-llamacpp.sh --rollback
+```
+
+If the gateway does not come back after step 1 or 4, `journalctl -u ollama1-gateway -n 30`
+says why; `cp /etc/ollama1/config.json.before-llamacpp /etc/ollama1/config.json && systemctl
+restart ollama1-gateway` is the hand rollback. The bridge's own failures (a model that will
+not load, a dead child) come back to the app as the gateway's usual 502/507 answers, with
+the model left unloaded.
+
+Not done here, by design: the nft port guard does not cover 8470 (llama-server's loopback
+port), so a local user without sudo could reach that one llama-server directly while it runs.
+Adding the line to `config/ollama1.nft.in` is a firewall change, kept for a visit at the house.
+
 ## Graphics card tuning
 
 **Off unless you ask**: `sudo ./setup.sh --gpu-tune` (or `OLLAMA1_GPU_TUNE=1`)

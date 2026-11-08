@@ -2,6 +2,7 @@
 GPU-fit arithmetic the gateway uses before it lets a model load."""
 import http.client
 import json
+import socket
 import urllib.parse
 
 
@@ -10,7 +11,25 @@ def split_url(base):
     return u.hostname or "127.0.0.1", u.port or 11434
 
 
+class UnixHTTPConnection(http.client.HTTPConnection):
+    """HTTP over a UNIX socket: the llama.cpp bridge's door (6b531), a
+    base written unix:/run/ollama1/llamacpp/bridge.sock. No TCP port, so
+    no port guard to add: the socket's folder says who may connect."""
+
+    def __init__(self, path, timeout=30):
+        super().__init__("localhost", timeout=timeout)
+        self.unix_path = path
+
+    def connect(self):
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(self.timeout)
+        s.connect(self.unix_path)
+        self.sock = s
+
+
 def connect(base, timeout):
+    if str(base).startswith("unix:"):
+        return UnixHTTPConnection(str(base)[5:], timeout=timeout)
     host, port = split_url(base)
     return http.client.HTTPConnection(host, port, timeout=timeout)
 

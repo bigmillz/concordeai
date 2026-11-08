@@ -1,0 +1,55 @@
+# The llama.cpp bridge (6b531): the models named in /etc/ollama1/llamacpp.json
+# served by llama-server, everything else passed to Ollama, in Ollama's own
+# dialect, on a UNIX socket in /run/ollama1/llamacpp (ollama:o1gw 2770): only
+# root and the gateway can open it, so no port and no port-guard line. The
+# gateway uses it when config.json's llamacpp_bridge names the socket.
+# Runs as the ollama user: it reads the same weights, is allowed to reach
+# Ollama's port by the guard, and has the card's groups for llama-server.
+[Unit]
+Description=ollama1 llama.cpp bridge (chosen models on llama-server, the rest on Ollama)
+Requires=ollama1-nft.service ollama.service
+After=ollama.service ollama1-nft.service network-online.target
+RequiresMountsFor=/srv/models
+
+[Service]
+User=ollama
+Group=ollama
+SupplementaryGroups=render video o1gw
+ExecStartPre=+/usr/bin/install -d -m 2770 -o ollama -g o1gw /run/ollama1/llamacpp
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-llamacpp serve
+# config.json (root-only) and llamacpp.json: systemd hands this service copies.
+LoadCredential=config.json:/etc/ollama1/config.json
+LoadCredential=llamacpp.json:/etc/ollama1/llamacpp.json
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/var/lib/ollama
+TimeoutStopSec=40
+KillMode=mixed
+Restart=always
+RestartSec=3
+# Nothing a request carried may reach the disk: no core dumps, no swap.
+LimitCORE=0
+MemorySwapMax=0
+# llama-server dies first under memory pressure, never the gateway
+OOMScoreAdjust=200
+OOMPolicy=continue
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0007
+ReadWritePaths=/run/ollama1/llamacpp
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

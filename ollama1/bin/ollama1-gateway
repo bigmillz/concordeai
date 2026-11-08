@@ -386,7 +386,9 @@ class Gateway:
                                      bool(cfg.get("allow_insecure_certs_url")), clock=clock)
         self.stats = Stats(clock)
         self.slot = Slot(self.stats, int(cfg["queue_max"]))
-        self.base = cfg["ollama_url"]
+        # the llama.cpp bridge (6b531) when config.json names it, else Ollama
+        # itself: one upstream, Ollama's dialect either way
+        self.base = cfg.get("llamacpp_bridge") or cfg["ollama_url"]
         self.pair_lock = threading.Lock()
         self.pair = {"last_try": 0.0}
         self.inflight = threading.BoundedSemaphore(int(cfg.get("max_inflight") or 16))
@@ -1154,8 +1156,7 @@ def make_handler(gw, lan=False):
             raise GatewayError(404, "not_found", "not available through the gateway")
 
         def proxy_openai(self, path, obj, model, t0):
-            u = urllib.parse.urlsplit(gw.base)
-            conn = http.client.HTTPConnection(u.hostname, u.port or 80, timeout=float(cfg.get("openai_timeout_s") or 900))
+            conn = o1ollama.connect(gw.base, timeout=float(cfg.get("openai_timeout_s") or 900))
             try:
                 conn.request("POST", path, body=json.dumps(obj).encode("utf-8"),
                              headers={"Content-Type": "application/json"})

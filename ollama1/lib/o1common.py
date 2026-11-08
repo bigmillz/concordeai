@@ -110,6 +110,10 @@ DEFAULTS = {
     "ttyd_socket": "/run/ollama1/ttyd/ttyd.sock",
     "tunnel_metrics_port": 8439,
     "ollama_url": "http://127.0.0.1:11434",
+    # the llama.cpp bridge (6b531): "unix:/run/ollama1/llamacpp/bridge.sock" sends the gateway's
+    # Ollama-dialect requests through ollama1-llamacpp, which serves the models named in
+    # /etc/ollama1/llamacpp.json with llama-server and passes the rest to Ollama. Empty = Ollama direct.
+    "llamacpp_bridge": "",
     "comfyui_url": "http://127.0.0.1:8188",   # optional image and video generation (tools/install-comfyui.sh); loopback only
     "num_ctx_default": 8192,
     "num_ctx_default_ram": 8192,     # 'ram' models: stepped down to 4096/2048 if needed to fit
