@@ -6299,7 +6299,7 @@ def _s5_page(src):
             and src.count("setCardsHtml(") == 6
             and '<div id="plan-row"><div id="plan-limits">' in pg
             and pg.index('id="plan-limits"') < pg.index('id="nolimits"') < pg.index('id="giants"')
-            and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<div id="zito">')]
+            and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<script>', pg.index('<div id="setup-veil"'))]
             and "No limits: also let Everything hold any models" in pg
             and not re.search(r'"(Basic|Minimum|Full|Max)"', src[src.index("const SET_KEYS="):
                                                                 src.index("function renderSetup(")])
@@ -37416,6 +37416,13 @@ check("the final writer's reasoning level goes only to gpt-oss, and a server tha
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
+# ZITO REMOVED (6b525, per Patrick): holding Z+I+T+O opened a hidden board
+# that deleted the last letters typed; a missed keyup left keys "held", so
+# ordinary typing (any word with z, i, t and o) could trigger it
+check("6b525 the ZITO easter egg is gone: no board, no key combo, no letter-eating",
+      'id="zito"' not in _MILLENAI_SRC and "zEngage" not in _MILLENAI_SRC
+      and 'NEED=["z","i","t","o"]' not in _MILLENAI_SRC and "zitoEsc" not in _MILLENAI_SRC)
+
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:

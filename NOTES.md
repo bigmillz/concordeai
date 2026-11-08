@@ -17124,3 +17124,14 @@ declared in MACHINE_STATE.
 The gauntlet on `quality-2`: run 1 (fd0039a, partly edited mid-run) stopped on a stale 6b516 pin (the verify
 call's text) after failing the new state's MACHINE_STATE lint, two server and two craft mutant anchors and
 three 6b515 pins, all named above and fixed; run 2 (2a97eba): **1199/1199**, exit 0.
+
+## 6b525 — The ZITO easter egg is gone (per Patrick)
+
+Holding Z+I+T+O together opened the hidden "ZITO override" board, and on opening it deleted the last
+four letters typed if they were z, i, t or o ("the combo types four letters into whatever had focus —
+take them back"). The held keys were tracked from keydown/keyup; a keyup the page never sees (focus
+moving, an input method, WKWebView swallowing one during fast typing) left a key "held", so ordinary
+typing of a word with those letters could open the board and eat the end of the message. It was causing
+trouble with the letter Z. Removed whole: its CSS, the #zito markup, the script, its seat in the
+Escape chain and in dictation's modal check. The 6302 setup-dialog check now ends its slice at the
+page's <script> instead of at the board, and a new check keeps the board, the combo and zitoEsc out.
