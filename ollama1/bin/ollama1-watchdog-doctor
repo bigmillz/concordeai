@@ -1,0 +1,50 @@
+#!/usr/bin/python3
+"""ollama1-watchdog-doctor: read-only, run it after a hang on the next boot (6b524). Whether the hardware watchdog
+(6b399) could have reset the box: the driver, its timeout and nowayout, whether the timer is armed and who holds
+/dev/watchdog0, the board's TCO lines in the kernel log, the service; then the previous boot's last journal lines,
+how it ended and what the kernel logged, and a verdict for each way the watchdog can fail to fire.
+
+  sudo ollama1-watchdog-doctor         the report (exit 1 when the watchdog cannot work now)
+  sudo ollama1-watchdog-doctor --json  the same, as JSON
+  sudo ollama1-watchdog-doctor --boot -2   look at an earlier boot (the box was restarted again since)
+
+It changes nothing and never opens /dev/watchdog* (an open would arm the timer). See lib/o1wddoctor.py.
+"""
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1wddoctor as D  # noqa: E402
+
+
+def main():
+    args = sys.argv[1:]
+    if any(a in ("-h", "--help", "help") for a in args):
+        print(__doc__.strip())
+        return 0
+    prev = "-1"
+    if "--boot" in args:
+        i = args.index("--boot")
+        prev = args[i + 1] if i + 1 < len(args) else ""
+        args = args[:i] + args[i + 2:]
+        if not re.fullmatch(r"-[1-9][0-9]?", prev):
+            sys.exit("--boot takes -1, -2, ...")
+    if [a for a in args if a != "--json"]:
+        sys.exit(__doc__)
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        print("note: without sudo the journal and other processes' open files may be hidden\n", file=sys.stderr)
+    r = D.gather(prev=prev)
+    if "--json" in args:
+        r["verdicts"] = D.verdicts(r)
+        print(json.dumps(r, indent=1, sort_keys=True, default=str))
+    else:
+        print(D.render(r))
+    return D.worst(r)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

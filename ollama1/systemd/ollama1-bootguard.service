@@ -1,0 +1,32 @@
+# Panic-reboot and the boot-loop guard (6b524). Early in every boot (after the local filesystems and after
+# systemd-sysctl, so its values are the last word; before sysinit.target, so before most services) it records the
+# boot in /var/lib/ollama1/bootguard.json. With 3 or more boots within 60 minutes it writes the safe values (those
+# from before the install) and logs "bootguard: TRIPPED": the box stays up instead of looping. Otherwise it applies
+# /etc/ollama1/panic-sysctl.conf. It never fails the boot: Wants= only, a oneshot that exits 0, 30 s at most.
+# No PrivateTmp: on a full disk systemd couldn't make it, and the guard must run then too. It writes only
+# /proc/sys/kernel (its six keys) and /var/lib/ollama1. Installed by tools/install-watchdogs.sh.
+[Unit]
+Description=ollama1: boot-loop guard and panic-reboot settings
+DefaultDependencies=no
+After=local-fs.target systemd-sysctl.service systemd-remount-fs.service
+Before=sysinit.target shutdown.target
+Conflicts=shutdown.target
+ConditionPathExists=/usr/local/lib/ollama1/bin/ollama1-bootguard
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-bootguard run
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=30
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=-/var/lib/ollama1
+ProtectHome=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+UMask=0022
+
+[Install]
+WantedBy=sysinit.target

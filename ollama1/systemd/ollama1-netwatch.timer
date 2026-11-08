@@ -1,0 +1,10 @@
+[Unit]
+Description=ollama1: get a server that is up but offline back online (every minute)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

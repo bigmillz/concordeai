@@ -1,0 +1,77 @@
+#!/usr/bin/python3
+"""ollama1-netwatch: a server that is up but offline gets itself back online (6b524). Every minute it asks the
+default gateway, 1.1.1.1 and 8.8.8.8; offline for 3 min it brings the Wi-Fi connection up again, 6 min it switches
+the radio off and on, 10 min (only with "netwatch_driver_reload": true in config.json) it has the card's driver let
+go of it and take it again, 20 min it reboots through ollama1-reboot.service (never within 30 min of boot, never
+twice in 2 h, never after the boot-loop guard tripped). The Cloudflare tunnel down for 10 min with the network up:
+restarted, then at most every 30 min. It never changes a setting. See lib/o1netwatch.py.
+
+  ollama1-netwatch status      the last run: online or not, the probes, Wi-Fi, tunnel, the last actions
+  sudo ollama1-netwatch check  probe now and print; changes nothing (exit 0 online, 1 offline)
+
+Pause every action: sudo touch /etc/ollama1/netwatch.off   (and rm it to resume)
+
+Used by the system and the installer (root):
+  run       ollama1-netwatch.timer, every minute
+  busy      exit 1 (and why) while the gateway serves a request, setup.sh or apt/dpkg runs
+  repair    undo its own half-done steps (a radio it switched off, a card it unbound); the uninstall runs it
+"""
+import json
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1netwatch as N  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal
+
+
+def need_root():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("run it with sudo")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if cmd == "status":
+        st = N.read_json(N.p(N.STATE), None)
+        if st is None and os.path.exists(N.p(N.STATE)):
+            print("Network watch: its status file can't be read (sudo ollama1-netwatch status)")
+            return 1
+        print(N.render_status(st or {}))
+        return 0
+    if cmd == "busy":
+        why = N.busy_reasons()
+        for w in why:
+            print("busy: " + w)
+        return 1 if why else 0
+    if cmd not in ("run", "check", "repair"):
+        sys.exit(__doc__)
+    need_root()
+    sysm = N.System()
+    if cmd == "run":
+        N.run_once(sysm, log=log)
+        return 0
+    if cmd == "repair":
+        return 1 if N.repair(sysm, log=log) else 0
+    o = sysm.observe(N.read_json(N.p(N.STATE), {}) or {})
+    st, acts, held = N.decide(N.read_json(N.p(N.STATE), {}) or {}, o)
+    st["status"] = N.status_of(st, o, held)
+    print(N.render_status(st, time.time()).replace("(checked 0 s ago)", "(now)"))
+    if acts:
+        print("  a run now would: " + ", ".join(a["do"] for a in acts))
+    if "--json" in sys.argv:
+        print(json.dumps(st["status"], sort_keys=True))
+    return 0 if o["online"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

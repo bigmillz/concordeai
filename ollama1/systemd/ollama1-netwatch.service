@@ -1,0 +1,28 @@
+# Wi-Fi recovery (6b524): a server that is up but offline gets itself back online. One look per run (the gateway,
+# 1.1.1.1, 8.8.8.8, the tunnel) and at most one step: reconnect at 3 min offline, the radio off and on at 6, the
+# card's driver rebound at 10 (only with "netwatch_driver_reload": true), a reboot through ollama1-reboot.service at
+# 20 (never within 30 min of boot, never twice in 2 h, never after the boot-loop guard tripped); the tunnel
+# restarted after 10 min down with the network up, then at most every 30 min. It changes no setting: it runs nmcli
+# (connection up, radio), networkctl reconfigure, ip link, systemctl (restart of the tunnel or of netplan's
+# wpa_supplicant unit, the reboot unit) and writes the card's PCI address to its driver's unbind/bind in sysfs.
+# Root, because all of that needs it. No PrivateTmp (a full disk), no ProtectKernelTunables (the driver step
+# writes /sys), no network limit (it is a network check). /etc/ollama1/netwatch.off pauses every action.
+[Unit]
+Description=ollama1: get a server that is up but offline back online
+ConditionPathExists=/usr/local/lib/ollama1/bin/ollama1-netwatch
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-netwatch run
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=4min
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=-/var/lib/ollama1
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+UMask=0027

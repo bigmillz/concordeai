@@ -1,0 +1,72 @@
+#!/usr/bin/python3
+"""ollama1-bootguard: panic-reboot and the boot-loop guard (6b524). Early in each boot it records the boot; with
+3 or more boots within 60 minutes it keeps the panic settings off for this boot (the box stays up instead of
+looping), otherwise it applies them from /etc/ollama1/panic-sysctl.conf (kernel.panic=10, softlockup_panic,
+hardlockup_panic when the NMI watchdog is on, panic_on_oops, hung_task_panic after 600 s). See lib/o1bootguard.py.
+
+  ollama1-bootguard status      what this boot decided, the last boots, the kernel's values now
+
+Used by the system and the installer (root):
+  run          ollama1-bootguard.service (again after editing the config: sudo systemctl restart ollama1-bootguard)
+  plan [FILE]  what the next run would set (from FILE instead of the installed config); changes nothing
+  snapshot     save the values the machine has now (once; the installer, before the first run)
+  restore      put the saved values back and forget them (the uninstall)
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1bootguard as B  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal
+
+
+def need_root():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("run it with sudo")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if cmd == "status":
+        print(B.render_status())
+        return 0
+    if cmd not in ("run", "plan", "snapshot", "restore"):
+        sys.exit(__doc__)
+    need_root()
+    if cmd == "run":
+        return B.run(log=log)
+    if cmd == "plan":
+        rows, notes, tripped = B.plan(sys.argv[2] if len(sys.argv) > 2 else None)
+        for k, now, then in rows:
+            if then is None:
+                print("  %-32s %s (not in this kernel: left alone)" % (k, "-" if now is None else now))
+            elif now == then:
+                print("  %-32s %s (unchanged)" % (k, now))
+            else:
+                print("  %-32s %s -> %s" % (k, "-" if now is None else now, then))
+        for n in notes:
+            print("  note: " + n)
+        if tripped:
+            print("  note: the boot guard tripped in this boot: the safe values")
+        return 0
+    if cmd == "snapshot":
+        made, data = B.snapshot()
+        vals = data.get("values", {})
+        print("%s the values from before: %s" % ("saved" if made else "kept the earlier saved copy of",
+                                                 ", ".join("%s=%s" % (k, vals.get(k)) for k in B.KEYS)))
+        return 0
+    vals, errors = B.restore(log=log)
+    print("restored: " + ", ".join("%s=%s" % (k, v) for k, v in vals.items()))
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
