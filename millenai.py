@@ -28986,6 +28986,13 @@ def run_council(labels: list, messages: list, emit, status,
     server's label or a model of this computer); one that can't write the
     answer now is set aside, said in the status line, and the default writes it.
     """
+    # the effort the person set (6b534, OVERRIDE 4), on this thread: High and
+    # up double-checks the drafts, Max and Ultra add the peer review (never in
+    # the Max mode, where every model already drafts). Looked up softly, so a
+    # namespace without the thread-local runs as before
+    _eff = getattr(globals().get("_srv_think"), "effort", None)
+    if _eff and not max_mode:
+        reflect, peer = effort_reflect(reflect, _eff), effort_peer(peer, _eff)
     # reflection and peer review both run LOCAL passes — off the table
     # when the whole point of the tier is that nothing runs here
     if cloud_only:
@@ -32384,6 +32391,170 @@ SKY_SOURCES = [
 SKY_DARK = [0, 3, 4, 6, 8, 11, 14, 16, 23, 25, 27, 31, 36, 42, 47, 52,
             56, 61, 65, 71, 75, 76, 83]
 
+# THE HORIZON'S BACKDROPS (6b534, per Patrick: "the whole Apple library"):
+# every clip above, with the hours it suits and how it blends into the
+# night. The hours are Apple's own, from its aerial catalog (each asset's
+# type, space / cityscape / landscape / underwater, and timeOfDay, day /
+# twilight / night), keyed by the start of each file's name, which is
+# unique; the gauntlet fails if a clip has no entry or a key matches two.
+# How a kind maps to the hours the page picks by (night, dawn, day, dusk):
+# space by night "night", by day "day dawn"; a city or a landscape at
+# night "night dusk", at twilight "dusk dawn", by day "day"; underwater
+# works by night or by day. The blends follow the art director's
+# reference (nightmock): underwater spreads faintly over the whole sky
+# with no light trails (rise 1.6, hi .97), space, aurora and city lights
+# rise from the foot with trails. Sixteen clips the art director looked at
+# carry his own values (SKY_HZ_PICKED), which win.
+SKY_HZ_TAGS = {
+    "SE_A016": ("sea", "day", "Seals"),
+    "comp_A114_C001": ("space", "day", "Southern California to Baja"),
+    "comp_GL_G002": ("land", "day", "The Greenland coast"),
+    "comp_GMT026": ("space", "night", "Korea and Japan at night"),
+    "PA_A001": ("sea", "night", "Palau jellyfish"),
+    "comp_LA_A008": ("city", "day", "A Los Angeles beach"),
+    "g201_WH_D004": ("sea", "day", "A humpback whale"),
+    "comp_L007": ("city", "day", "London from above"),
+    "comp_GMT312": ("space", "night", "Africa at night"),
+    "comp_CH_C002": ("land", "day", "Rice paddies in China"),
+    "comp_GL_G004": ("land", "twilight", "A Greenland glacier"),
+    "PA_A004": ("sea", "day", "Palau coral"),
+    "comp_LA_A005": ("city", "day", "A Los Angeles overpass"),
+    "comp_A009_C001": ("space", "day", "The Sahara and Italy"),
+    "DL_B002": ("sea", "day", "California dolphins"),
+    "comp_LA_A011": ("city", "night", "Downtown Los Angeles at night"),
+    "KP_A010": ("sea", "night", "Kelp"),
+    "comp_N013": ("city", "night", "New York at night"),
+    "comp_GMT329_113NC_396B_1105_ITALY": ("space", "night", "Italy to Asia"),
+    "g201_TH_803": ("sea", "day", "Tahiti waves"),
+    "comp_L012": ("city", "night", "London in the evening"),
+    "comp_A105_C002": ("space", "day", "The Caribbean"),
+    "comp_A013_C012": ("city", "day", "The Golden Gate Bridge"),
+    "RS_A008": ("sea", "day", "Red Sea coral"),
+    "comp_CH_C007_C004": ("land", "day", "Cliffs in China"),
+    "comp_GMT314": ("space", "night", "Aurora over North America"),
+    "comp_LA_A006_C008": ("city", "day", "LAX"),
+    "BO_A018": ("sea", "day", "Barracudas"),
+    "comp_DB_D011": ("city", "night", "Dubai at night"),
+    "comp_A001_C004": ("space", "day", "West Africa to the Alps"),
+    "comp_A083_C002": ("space", "night", "Iran and Afghanistan"),
+    "PA_A002": ("sea", "day", "Palau jellyfish"),
+    "comp_GMT308": ("space", "day", "The Caribbean by day"),
+    "comp_HK_B005": ("city", "night", "Hong Kong at night"),
+    "comp_GL_G010": ("land", "night", "Greenland in the evening"),
+    "comp_GMT306": ("space", "night", "California to Las Vegas"),
+    "MEX_A006": ("sea", "day", "Cownose rays"),
+    "comp_N008_C009": ("city", "day", "New York from above"),
+    "comp_A015_C018": ("city", "night", "The Bay Bridge at night"),
+    "g201_TH_804": ("sea", "day", "Tahiti waves"),
+    "comp_LA_A006_C004": ("city", "night", "The Hollywood hills"),
+    "comp_H004_C009": ("land", "twilight", "Clouds over Hawaii"),
+    "g201_CA_A016": ("sea", "day", "A California kelp forest"),
+    "comp_A108_C001": ("space", "day", "The Caribbean"),
+    "comp_GMT329_117NC": ("space", "night", "Ireland to Asia"),
+    "comp_DB_D008": ("city", "day", "Dubai from above"),
+    "comp_C003_C003": ("land", "twilight", "China in silhouette"),
+    "g201_AK_A003": ("sea", "night", "Alaskan jellyfish"),
+    "comp_H012_C009": ("land", "night", "The ocean off Hawaii"),
+    "comp_H005_C012": ("land", "day", "A Hawaiian valley"),
+    "comp_GMT329_113NC_396B_1105_CHINA": ("space", "night", "China"),
+    "comp_LA_A009": ("city", "night", "Griffith Park at sunset"),
+    "FK_U009": ("sea", "day", "Grey reef sharks"),
+    "comp_A050_C004": ("space", "day", "The Nile Delta"),
+    "comp_DB_D002": ("city", "twilight", "The Dubai skyline"),
+    "comp_CH_C007_C011": ("land", "day", "Mountains in China"),
+    "BO_A012": ("sea", "day", "Sea stars"),
+    "comp_A105_C003": ("space", "day", "New Zealand"),
+    "comp_LW_L001_C003": ("land", "day", "The Liwa horizon"),
+    "comp_HK_H004_C010": ("city", "day", "Hong Kong's horizon"),
+    "comp_A351_C001": ("space", "day", "South Africa to North Asia"),
+    "CR_A009": ("sea", "day", "Costa Rica dolphins"),
+    "comp_A001_C001": ("space", "night", "The Atlantic to Spain and France"),
+    "comp_A006_C003": ("city", "day", "San Francisco Bay"),
+    "comp_DB_D001_C001": ("city", "day", "Dubai Creek Harbour"),
+    "BO_A014_C023": ("sea", "day", "A school of jacks"),
+    "comp_N008_C003": ("city", "night", "The New York skyline"),
+    "comp_GMT110": ("space", "night", "Aurora over Antarctica"),
+    "comp_L010": ("city", "day", "The London skyline"),
+    "comp_1223LV": ("city", "twilight", "The Embarcadero"),
+    "comp_A103_C002": ("space", "day", "Africa and the Middle East"),
+    "PA_A010": ("sea", "day", "Palau jellyfish"),
+    "comp_N003": ("city", "day", "Midtown Manhattan"),
+    "comp_C001_C005": ("land", "day", "The Great Wall"),
+    "comp_A008_C007": ("city", "twilight", "San Francisco in morning fog"),
+    "comp_GMT307": ("space", "night", "Mexico City to New York"),
+    "BO_A014_C008": ("sea", "day", "Bumphead parrotfish"),
+    "comp_L004": ("city", "night", "The Thames at night"),
+    "comp_H004_C007": ("land", "night", "Clouds over Hawaii at night"),
+    "comp_HK_H004_C013": ("city", "day", "The Hong Kong skyline"),
+    "comp_H007_C003": ("land", "day", "The Hawaiian coast"),
+    "comp_DB_D001_C005": ("city", "day", "Dubai Creek"),
+    "comp_A012_C014": ("city", "twilight", "The San Francisco skyline"),
+    "AK_A004": ("sea", "day", "Alaskan jellyfish"),
+    "comp_HK_H004_C008": ("city", "day", "Hong Kong harbour"),
+    "comp_A007_C017": ("city", "night", "Fisherman's Wharf"),
+    "comp_LW_L001_C006": ("land", "day", "The Liwa dunes"),
+    "comp_GMT060": ("space", "night", "Australia"),
+    "comp_C004_C003": ("land", "day", "The Great Wall"),
+}
+# the art director's sixteen (nightmock/index.html CLIPS), by catalog key:
+# (when, foot, rise, hi, rate, title)
+SKY_HZ_PICKED = {
+    "comp_GMT026": ("night", .3, .56, .36, .7, "Korea and Japan at night"),
+    "comp_GMT314": ("night", .28, .62, .42, .7, "Aurora over North America"),
+    "comp_A015_C018": ("night dusk", .26, .52, .4, .6, "The Bay Bridge at night"),
+    "g201_WH_D004": ("night day", .22, 1.6, .97, .6, "A humpback whale"),
+    "FK_U009": ("night day", .2, 1.6, .97, .6, "Grey reef sharks"),
+    "comp_A050_C004": ("day dawn", .3, .66, .9, .7, "The Mediterranean from orbit"),
+    "comp_GL_G010": ("dusk dawn", .26, .58, .9, .6, "Greenland icebergs at sunset"),
+    "CR_A009": ("day", .2, 1.6, .97, .6, "Dolphins"),
+    "BO_A014_C023": ("night day", .2, 1.6, .97, .6, "A school of jacks"),
+    "PA_A004": ("day", .2, 1.6, .97, .6, "A coral reef"),
+    "comp_A007_C017": ("dawn", .24, .6, .9, .6, "San Francisco in morning fog"),
+    "comp_L007": ("day", .2, .55, .9, .6, "London from above"),
+    "comp_N008_C009": ("day", .2, .55, .9, .6, "Central Park from above"),
+    "g201_CA_A016": ("day dusk", .2, 1.6, .97, .6, "A kelp forest"),
+    "comp_A105_C003": ("dawn day dusk", .28, .66, .9, .7, "Sunrise from orbit"),
+    "comp_GMT110": ("night", .3, .62, .42, .7, "Aurora over Antarctica"),
+}
+# (kind, timeOfDay) -> (when, foot, rise, hi, rate)
+SKY_HZ_BLEND = {
+    ("sea", "day"): ("night day", .2, 1.6, .97, .6),
+    ("sea", "night"): ("night day", .2, 1.6, .97, .6),
+    ("space", "night"): ("night", .3, .56, .36, .7),
+    ("space", "day"): ("day dawn", .3, .66, .9, .7),
+    ("city", "night"): ("night dusk", .26, .52, .4, .6),
+    ("city", "twilight"): ("dusk dawn", .24, .58, .5, .6),
+    ("city", "day"): ("day", .2, .55, .9, .6),
+    ("land", "night"): ("night dusk", .26, .58, .5, .6),
+    ("land", "twilight"): ("dusk dawn", .26, .58, .9, .6),
+    ("land", "day"): ("day", .22, .58, .9, .6),
+}
+SKY_HZ_AURORA = (.28, .62, .42, .7)     # space at night over an aurora
+
+
+def sky_hz_key(url: str):
+    """The catalog key whose name starts this clip's file name, else None."""
+    name = url.rsplit("/", 1)[-1]
+    hits = [k for k in SKY_HZ_TAGS if name.startswith(k)]
+    return max(hits, key=len) if hits else None
+
+
+def sky_hz_clips() -> list:
+    """Every clip as the Horizon page picks and blends it (6b534): {i, when,
+    foot, rise, hi, rate, k (kind), t (title)}, in SKY_SOURCES order."""
+    out = []
+    for i, u in enumerate(SKY_SOURCES):
+        k = sky_hz_key(u)
+        kind, tod, title = SKY_HZ_TAGS.get(k, ("land", "day", ""))
+        when, foot, rise, hi, rate = SKY_HZ_BLEND[(kind, tod)]
+        if kind == "space" and tod == "night" and "AURORA" in u:
+            foot, rise, hi, rate = SKY_HZ_AURORA
+        if k in SKY_HZ_PICKED:
+            when, foot, rise, hi, rate, title = SKY_HZ_PICKED[k]
+        out.append({"i": i, "when": when, "foot": foot, "rise": rise, "hi": hi,
+                    "rate": rate, "k": kind, "t": title})
+    return out
+
 _sky_lock = threading.Lock()
 
 
@@ -32468,6 +32639,154 @@ def sky_is_night() -> bool:
     except Exception:
         h = time.localtime().tm_hour
         return h >= 19 or h < 6
+
+
+# ------------------------------------------------- the Horizon look (6b526)
+# The page's new home (per Patrick: "the most beautiful AI chat home screen
+# anyone has shipped") draws the REAL sky over the person. The server names
+# the place, with no network and no location permission: the town typed in
+# Settings when its coordinates are already in the geocode cache, else the
+# time zone's reference city from the OS zone table (_zone_latlon). None
+# when neither is known, and the page then says nothing about the place.
+# EFFORT (6b534, per Patrick: the mode and the effort are separate controls,
+# like Claude and ChatGPT; OVERRIDE 4: five steps, Ultra the highest). The
+# Horizon composer sends low, medium, high, max or ultra with each question,
+# and each step turns switches the pipeline already has, never a show:
+#   low     no second pass on a single-model answer; a server model that
+#           takes a reasoning level (gpt-oss, 6b518) is asked for "low"
+#   medium  as before: the second pass as Settings says, the mode's own reviews
+#   high    the second pass always (the answer reviews itself), and a council's
+#           drafts are double-checked before the merge (reflect; a local Qwen
+#           seat reasons natively with it)
+#   max     high, and the council's peer review: every seat rewrites its draft
+#           from all of them before the merge (peer, twice the engine passes)
+#   ultra   max, and a server model that takes a reasoning level is asked for
+#           "high" (measured on gpt-oss: ~55 s more before the first word)
+# Both ride the answering thread (_srv_think.level and .effort, cleared per
+# request by _run; run_council reads .effort); the cloud's per-role effort
+# (6b307) is left as measured.
+EFFORT_LEVELS = ("low", "medium", "high", "max", "ultra")
+
+
+def effort_polish(pref, effort) -> bool:
+    if effort == "low":
+        return False
+    if effort in ("high", "max", "ultra"):
+        return True
+    return bool(pref)
+
+
+def effort_reflect(mode_reflect, effort) -> bool:
+    return bool(mode_reflect) or effort in ("high", "max", "ultra")
+
+
+def effort_peer(mode_peer, effort) -> bool:
+    return bool(mode_peer) or effort in ("max", "ultra")
+
+
+def effort_think(effort):
+    return {"low": "low", "ultra": "high"}.get(effort)
+
+
+MODE_ALIASES = {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro",
+                "Omega": "Vera Rubin",
+                # the names of 6b526, which older pages still send
+                "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro",
+                "Odyssey": "Vera Rubin"}
+_HZ_PLACE_CACHE = profile_cache("_HZ_PLACE_CACHE", {})   # follows the person's home area
+
+
+def hz_place():
+    """{"lat", "lon", "city", "src"} for the Horizon sky, or None."""
+    home = ""
+    try:
+        home = home_area()
+    except Exception:
+        pass
+    key = home.lower()
+    if key in _HZ_PLACE_CACHE:
+        return _HZ_PLACE_CACHE[key]
+    out = None
+    if home:
+        g = _geo_cache.get(home.lower())
+        if g and isinstance(g.get("lat"), (int, float)):
+            out = {"lat": g["lat"], "lon": g["lon"],
+                   "city": home.split(",")[0].strip()[:40], "src": "home"}
+    if out is None:
+        tz = _host_tz()
+        ll = _zone_latlon(tz)
+        if ll and "/" in tz:
+            out = {"lat": ll[0], "lon": ll[1],
+                   "city": tz.rsplit("/", 1)[1].replace("_", " ")[:40],
+                   "src": "zone", "tz": tz}
+    _HZ_PLACE_CACHE[key] = out
+    return out
+
+
+# THE DEBUG STATE OF A DEV COPY'S PAGE (6b526): /?hz=<spec> freezes the
+# intro at a moment or stages a state, so every state can be screenshot
+# deterministically. Only a dev copy has it: anywhere else "/?hz=..." is
+# not the page, exactly as "/?anything" has been refused since 6b321.
+_HZ_DEBUG_RX = re.compile(r"/\?hz=([A-Za-z0-9_.,:=@%+-]{1,300})")
+
+
+def hz_debug_spec(path: str, dev: bool):
+    """The spec string of a dev copy's debug page, else None."""
+    if not dev:
+        return None
+    m = _HZ_DEBUG_RX.fullmatch(path or "")
+    return urllib.parse.unquote(m.group(1)) if m else None
+
+
+# THE BUNDLED FACE (6b526, per Patrick: "the font and word mark that we
+# had originally"): Michroma, the lockup's face, ships in fonts/ for the
+# titlebar and is served under /static/fonts/ too, so the wordmark renders
+# with no network. Space Grotesk and IBM Plex Mono load as the app always
+# has (the Google stylesheet in the head); bundling them is a follow-up.
+# Any OFL file placed in fonts/ and named here is served the same way.
+HZ_FONT_FILES = (("Michroma", "Michroma-Regular.ttf", "normal"),)
+_HZ_FONT_RX = re.compile(r"/static/fonts/([A-Za-z0-9_-]+\.(?:ttf|otf|woff2?))")
+
+
+def hz_font_css() -> str:
+    """@font-face for each bundled face whose file is present."""
+    out = []
+    for fam, fn, style in HZ_FONT_FILES:
+        if os.path.exists(resource("fonts", fn)):
+            out.append('@font-face{font-family:"%s";src:local("%s"),'
+                       'url(/static/fonts/%s) format("truetype");font-weight:400;'
+                       'font-style:%s;font-display:swap}' % (fam, fam, fn, style))
+    return "\n".join(out)
+
+
+def hz_seen(ctx) -> bool:
+    """The full opening plays on the first launch only (6b526, per Patrick):
+    True once the page has posted seen_opening (a machine pref, prefs.json)."""
+    try:
+        return prefs_view(ctx, strict=False).get("seen_opening") is True
+    except Exception:
+        return False
+
+
+def home_facts(ctx) -> dict:
+    """/api/home (6b526): what the home's status line says, from the
+    ledger: the calls that went to the cloud since local midnight (a
+    local or server call never leaves the person's machines)."""
+    try:
+        lt = time.localtime()
+        midnight = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday,
+                                0, 0, 0, 0, 0, -1))
+        n = toks = 0
+        for r in usage_read(ctx):
+            # a call names where it ran; an answer rollup (no "w") is not a call
+            if (r.get("t") or 0) >= midnight and r.get("w") \
+                    and r.get("w") not in ("local", "server"):
+                n += int(_usage_num(r.get("n")) or 1)
+                toks += int(_usage_num(r.get("i")) or 0) \
+                    + int(_usage_num(r.get("o")) or 0)
+        return {"cloud_today": n, "cloud_tokens_today": toks}
+    except Exception:
+        return {}
 _sky_jobs = {}          # idx -> {"status": ..., "pct": int}
 
 # APPLE'S ROOT, FOR THE BACKDROPS ON WINDOWS (6b317, found in a Windows
@@ -35287,6 +35606,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return self._deny()
         if self.command == "GET" and _COOKIE_ONLY.fullmatch(self.path):
             return True
+        if self.command == "GET" and (
+                hz_debug_spec(self.path, bool(DEV_HOME)) is not None
+                or _HZ_FONT_RX.fullmatch(self.path)):
+            # the Horizon's bundled fonts (6b526), fetched by @font-face with
+            # no way to add a header; and a dev copy's frozen page
+            return True
         if ACCOUNTS and self.command == "GET" and self.path in ACCOUNT_STATIC:
             # the account window's page and its two static files: nothing
             # personal, and a <script src> can't send a header
@@ -35475,12 +35800,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "prompt": _suggest_state.get("prompt", ""),
                              "running": bool(_suggest_state.get("running"))})
             return
-        if self.path == "/":
+        _hz_spec = hz_debug_spec(self.path, bool(DEV_HOME))
+        if self.path == "/" or _hz_spec is not None:
             # exactly "/" (6b321): "/?anything" is no longer the page, so
             # "/?key=" gets the gate's 403 even with the cookie. The page
             # carries nothing personal: the name and town for the hero
-            # come from /api/prefs, behind the token.
+            # come from /api/prefs, behind the token. A dev copy also
+            # serves "/?hz=<spec>", the same page in a frozen state (6b526).
+            _hz_spec = _hz_spec or _hook_arg("hz") or None
             html = (HTML_CONTENT
+                    .replace("__HZ_DEBUG__", json.dumps(_hz_spec))
+                    .replace("__HZ_PLACE__", json.dumps(hz_place()))
+                    .replace("__HZ_FONTS__", hz_font_css())
+                    .replace("__HZ_SEEN__", json.dumps(hz_seen(self.ctx)))
+                    .replace("__SKY_ORBIT__", json.dumps(
+                        [i for i, u in enumerate(SKY_SOURCES) if "GMT" in u]))
+                    .replace("__SKY_HZ__", json.dumps(sky_hz_clips()))
                     .replace("__AGENT_ROWS__", build_agent_rows())
                     .replace("__CODE_ROWS__", build_code_rows())
                     .replace("__TIER_META__", json.dumps(
@@ -35526,7 +35861,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # is never "unchanged", or a reload after a switch would get
             # a 304 and the old __PROFILE__, and reload again
             etag = '"b%d-%d-%s"' % (APP_BUILD, _SRC_MTIME, self.ctx.tag)
-            if self.headers.get("If-None-Match") == etag:
+            if _hz_spec is None and self.headers.get("If-None-Match") == etag:
                 self.send_response(304)
                 self.send_header("ETag", etag)
                 self.send_header("Cache-Control", "no-cache")
@@ -35626,6 +35961,30 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # under /static/ (6b321): a <video src> can't carry the token,
             # and these are Apple's public clips, streamed by Range
             self._send_sky()
+        elif _HZ_FONT_RX.fullmatch(self.path):
+            # the Horizon's bundled faces (6b526): fixed public bytes from
+            # fonts/, by name, nothing else from that folder
+            _fn = _HZ_FONT_RX.fullmatch(self.path).group(1)
+            _fp = resource("fonts", _fn)
+            if not os.path.isfile(_fp):
+                self.send_error(404)
+                return
+            with open(_fp, "rb") as f:
+                _fb = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", {
+                "ttf": "font/ttf", "otf": "font/otf", "woff": "font/woff",
+                "woff2": "font/woff2"}[_fn.rsplit(".", 1)[1]])
+            self.send_header("Content-Length", str(len(_fb)))
+            self.send_header("Cache-Control", "max-age=86400")
+            self.end_headers()
+            try:
+                self.wfile.write(_fb)
+            except Exception:
+                pass
+        elif self.path == "/api/home":
+            # the Horizon home's status line (6b526): the day's cloud calls
+            self._send_json(home_facts(self.ctx))
         elif self.path.startswith("/api/remote/classify"):
             # read-only introspection of the safety classifier (6b249):
             # the UI uses it to preview a command's risk, and the gauntlet
@@ -37623,6 +37982,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # a tier resolves to its own line-up; otherwise honour explicit picks
         tier = req_json.get("tier") or ""
         req_tier = tier               # before a picture resets it (6b308)
+        # the effort the person set (6b534); anything else is no effort at all.
+        # A server model's reasoning level follows it on this thread (_run
+        # clears it for the next request)
+        _effort = req_json.get("effort")
+        _effort = _effort if _effort in EFFORT_LEVELS else None
+        _srv_think.level = effort_think(_effort)
+        _srv_think.effort = _effort    # run_council reads it for its reviews
         _answered.pop(threading.get_ident(), None)
         # a new question voids the last one's "who answered": the title
         # of a chat answered on this Mac must never go to the cloud. Per
@@ -37647,6 +38013,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             tier = "Fast"   # Best retired (5.3) — it was Fast in a crown
         if tier == "Power":
             tier = "Pro"    # Pro absorbed Power (5.3)
+        # THE MODES' BRAND NAMES (6b526, 6b534 per Patrick): the page says
+        # Alpha, Gamma, Sigma (and Omega where its tier exists); the tiers
+        # keep their keys, and a client that sends the name is understood
+        if isinstance(tier, str) and tier in MODE_ALIASES \
+                and MODE_ALIASES[tier] in TIERS:
+            tier = MODE_ALIASES[tier]
         # Cloud Only, or one of its modes or picks (6b440): "cloud:fast",
         # ":think", ":pro", "cloud:m:<provider>"
         _cl_mode, _cl_pid = cloud_tier_parse(tier)
@@ -39729,7 +40101,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 server_first_answer(
                     _srv_lbl, "", full_messages, memit, emit, status, step,
                     first_s=None,
-                    polish=(_so_revise if (user_prefs(user_base).get("polish", True)
+                    polish=(_so_revise if (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                                            and (not query or bookish)
                                            and _is_substantive(prompt)) else None))
             elif _srv_lbl:
@@ -39840,7 +40212,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # the server. A first word within 30 s (Fast) or 60 s
                     # pasted pages write once (6b423): a reviser shown 5000
                     # characters of eight pages can't check the rest
-                    _pol = (user_prefs(user_base).get("polish", True)
+                    _pol = (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                             and not images and (not query or bookish)
                             and not _links
                             and _is_substantive(prompt))
@@ -39867,7 +40239,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # message so the reviser can check names against data.
                 # a giant on Ollama writes once (6b314): the draft-and-
                 # rewrite pass doubles a few-words-a-second answer
-                polish = (user_prefs(user_base).get("polish", True)
+                polish = (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                           and not images and (not query or bookish)
                           and not _links          # (6b423) see _pol
                           and _is_substantive(prompt)
@@ -39979,6 +40351,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                      "didn't answer either. Ask again — it usually "
                      "comes straight back.")
         finally:
+            # the effort ends with the answer (6b534): a title or a memory
+            # pass after it on this thread reasons at the model's default
+            _srv_think.level = _srv_think.effort = None
             # the hurry registry entry dies with the request — a set()
             # arriving after this harmlessly answers ok:false (6b257)
             with _hurry_lock:
@@ -41362,11 +41737,31 @@ HTML_CONTENT = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>
+/* THE LOOK (6b526, per Patrick): Horizon unless Settings > About says
+   Classic, decided before the first paint so neither look flashes. The
+   intro runs once per launch (sessionStorage), never with Visual effects
+   off or reduced motion. */
+var hzLook="horizon";
+try{hzLook=localStorage.getItem("millen.look")==="classic"?"classic":"horizon";}catch(e){}
+if(hzLook==="horizon"){
+  document.documentElement.classList.add("hz");
+  var hzFxOff=false,hzIntroDone=false,hzReduced=false;
+  try{hzFxOff=localStorage.getItem("millen.video")==="0"
+    ||(localStorage.getItem("millen.video")===null&&localStorage.getItem("millen.perf")==="1");}catch(e){}
+  try{hzIntroDone=sessionStorage.getItem("millen.hz.intro")==="1";}catch(e){}
+  try{hzReduced=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);}catch(e){}
+  var hzSeen=__HZ_SEEN__;   // the full opening plays on the first launch only (the seen_opening pref)
+  if(!hzFxOff&&!hzIntroDone&&!hzReduced&&!hzSeen)document.documentElement.classList.add("hz-intro");
+  // DEAD-MAN'S SWITCH: should the main script die, the finished home shows anyway
+  // (a dev copy's deliberately frozen intro says it is alive, and keeps its moment)
+  setTimeout(function(){if(!window.hzFrozen&&!window.hzReady)document.documentElement.classList.remove("hz-intro","hz-markin","hz-markout");},5000);
+}
 /* Window-wipe boot (native Mac app only): the NSWindow starts transparent
    and the whole page is clipped to nothing, so tagging the root BEFORE the
    first paint is what stops a flash of the normal UI. Performance mode
-   opts out here too — rainbowWipe() would skip its half later anyway. */
-if("__WIN_WIPE__"==="1"){
+   opts out here too — rainbowWipe() would skip its half later anyway.
+   Classic only (6b526): Horizon opens on its own intro. */
+if("__WIN_WIPE__"==="1"&&hzLook==="classic"){
   try{
     document.documentElement.classList.add("winwipe");
   }catch(e){}
@@ -44694,8 +45089,433 @@ body.gen #chip-model{color:var(--accent)}
   #tierpop{left:12px!important;right:12px;max-width:none}
   #hero{padding:0 12px}
   #hero .greet{font-size:24px;margin-top:14px}
+  /* Horizon on a narrow window (6b526): the column fills it, the Moon's
+     block and the slider's words step aside, the sidebar is the drawer */
+  .hz #hz-top{padding:0 12px;gap:10px}
+  .hz #hz-lanes{gap:16px}
+  .hz .hz-rig b{display:none}
+  .hz .hz-rig{padding:0 8px}
+  .hz #main:has(#hero) #chat-inner{padding-top:120px}
+  .hz .hz-sl{width:120px}
+  .hz #main:has(#hero) #composer-wrap{padding:0 12px 24px}
+  .hz #composer{padding:16px 12px 12px 18px}
+  .hz #main:not(:has(#hero)) #composer{margin-left:auto}
 }
 
+
+/* ============================================================ HORIZON (6b526) */
+/* THE HORIZON LOOK (6b526, per Patrick). Everything below applies only under
+   html.hz (Settings > About > Look); Classic keeps every rule above this line
+   exactly as it was. The design system is design/TOKENS.md with the art
+   director's design/NORTHSTAR.md and its overrides on top: no limb, the night
+   drawn on the GPU (one canvas), colour only in light, type white, glass lit
+   from below. Motion is transform and opacity only; the GPU does the rest. */
+/* HORIZON TOKENS (6b526) */
+:root{
+  --hz-night:#04050a; --hz-deep:#070a16; --hz-dusk:#10204a;
+  --hz-ink:#f1f3fa;            /* primary text on the sky */
+  --hz-ink-2:#c9d0e2;          /* secondary text, AA on glass */
+  --hz-ink-3:#9aa6c6;          /* tertiary, labels; AA at 13px+ on --hz-deep */
+  --hz-accent:#9fc0ff;         /* the ONE accent: ice blue. Use with restraint */
+  --hz-good:#6ff0c0; --hz-warn:#f2b33d; --hz-bad:#ff8a7a;
+  --hz-glass:rgba(255,255,255,.06); --hz-glass-2:rgba(255,255,255,.09);
+  --hz-glass-line:rgba(255,255,255,.12); --hz-glass-line-2:rgba(170,200,255,.22);
+  --hz-blur:blur(28px) saturate(150%);
+  --hz-r-sm:8px; --hz-r-md:12px; --hz-r-lg:20px; --hz-r-xl:28px; --hz-r-pill:999px;
+  --hz-s1:4px; --hz-s2:8px; --hz-s3:12px; --hz-s4:16px; --hz-s5:24px; --hz-s6:32px; --hz-s7:48px;
+  --hz-ease-out:cubic-bezier(.16,1,.3,1);      /* arrivals */
+  --hz-ease-in-out:cubic-bezier(.65,0,.35,1);  /* moves */
+  --hz-ease-spring:cubic-bezier(.34,1.56,.64,1);/* small pops only */
+  --hz-t-fast:140ms; --hz-t-mid:260ms; --hz-t-slow:520ms;
+  --hz-shadow:0 30px 80px rgba(0,0,0,.45);
+  --hz-font-ui:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-display:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-read:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --hz-ink-read:#e6e9f4; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:150,236,212;
+  --hz-hair:rgba(255,255,255,.09); --hz-hair-2:rgba(255,255,255,.14); --hz-glass-lit:rgba(200,222,255,.42);
+  --hz-r-composer:26px; --hz-t-drift:28s; --hz-t-drift-busy:16s; --hz-t-breathe:8s;
+}
+:root{--hz-read-w:640px;--hz-gutter:56px;--hz-marg-w:236px}
+__HZ_FONTS__
+.hz body{background:#03040a;font-family:var(--hz-font-ui);-webkit-font-smoothing:antialiased}
+.hz #skyline,.hz #skyload,.hz #suggest,.hz #celebrate{display:none!important}
+/* ---- the night: one GPU canvas under everything; the footage plays beneath it
+   (and shows plain where there is no WebGL) */
+#hz-sky{display:none}
+.hz #hz-sky{display:block;position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;--hz-t-drift:28s;
+  background:radial-gradient(120% 90% at 72% 0%,#0b1636 0%,#050913 55%,#03040a 100%)}
+.hz #hz-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.01;pointer-events:none}
+.hz #hz-gl{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 2.8s var(--hz-ease-out)}
+.hz #hz-gl.on{opacity:1}
+.hz.hz-novfx #hz-vid{opacity:1;filter:brightness(.7) saturate(.85) contrast(1.08);transition:opacity 2.8s var(--hz-ease-out)}
+.hz.hz-novfx #hz-gl{display:none}
+.hz #hz-moonglow{position:absolute;top:-6%;right:-4%;width:min(760px,70vw);height:min(760px,70vw);border-radius:50%;
+  background:radial-gradient(circle,rgba(246,241,228,.5) 0%,rgba(222,230,255,.2) 16%,rgba(159,192,255,.07) 42%,rgba(159,192,255,0) 68%);
+  mix-blend-mode:screen;opacity:.3;transition:opacity 2s var(--hz-ease-in-out)}
+.hz #hz-moonglow.left{right:auto;left:-4%}
+/* the wash: four blooms on a small canvas (its upscale is the softness), screened,
+   flowering on arrival and settling to almost nothing; a little up while an answer runs */
+.hz #hz-washw{position:absolute;inset:-12%;pointer-events:none;will-change:transform,opacity;
+  animation:hzDrift 22s ease-in-out infinite alternate,hzSwell 14s ease-in-out infinite alternate}
+.hz #hz-wash{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:screen;opacity:.1;transform-origin:50% 55%;transition:opacity 2s var(--hz-ease-in-out)}
+.hz.hz-busy #hz-wash{opacity:.3}
+.hz #hz-wash.bloom{animation:hzWash 5.2s var(--hz-ease-out) both}
+@keyframes hzWash{0%{opacity:0;transform:scale(1.14) rotate(-4deg)}30%{opacity:.8;transform:scale(1.04) rotate(-1.5deg)}100%{opacity:.1;transform:none}}
+@keyframes hzDrift{from{transform:translate(-3%,-1%)}to{transform:translate(3%,1.5%)}}
+@keyframes hzSwell{from{opacity:.75}to{opacity:1}}
+/* the ice rays (canvases drawn at a quarter size), over the GPU sky at .42; .85 while an answer runs */
+.hz #hz-aurw{position:absolute;left:50%;top:8vh;width:1800px;height:640px;margin-left:-900px;transform:rotate(-3deg);transform-origin:50% 60%;
+  -webkit-mask-image:radial-gradient(ellipse 54% 44% at 50% 52%,#000 30%,rgba(0,0,0,0) 100%);
+          mask-image:radial-gradient(ellipse 54% 44% at 50% 52%,#000 30%,rgba(0,0,0,0) 100%);
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;opacity:.42;transition:opacity 2.6s var(--hz-ease-out)}
+.hz.hz-busy #hz-aurw{opacity:.85}
+.hz .hz-aur{position:absolute;inset:-40px 0;will-change:transform}
+.hz .hz-aur canvas{display:block;width:100%;height:100%}
+.hz #hz-aur1{animation:hzSway var(--hz-t-drift) ease-in-out infinite alternate}
+.hz #hz-aur2{animation:hzSway2 calc(var(--hz-t-drift) * 1.32) ease-in-out infinite alternate;inset:-20px 0 30px}
+.hz.hz-busy #hz-aur1,.hz.hz-busy #hz-aur2{animation-duration:var(--hz-t-drift-busy)}
+.hz #hz-aur2.hz-pulse{animation:hzSway2 calc(var(--hz-t-drift-busy) * 1.32) ease-in-out infinite alternate,hzPulse .7s var(--hz-ease-out)}
+@keyframes hzSway{from{transform:translateX(-64px) skewX(-12deg)}to{transform:translateX(64px) skewX(-18deg)}}
+@keyframes hzSway2{from{transform:translateX(52px) skewX(-19deg)}to{transform:translateX(-58px) skewX(-10deg)}}
+@keyframes hzPulse{0%{opacity:1}30%{opacity:1.35}100%{opacity:1}}
+@keyframes hzBreathe{0%,100%{opacity:.5}50%{opacity:1}}
+.hz #hz-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,4,10,.1),rgba(3,4,10,.34) 55%,rgba(3,4,10,.5));opacity:0;transition:opacity 1s ease}
+.hz #main:not(:has(#hero)) #hz-scrim{opacity:1}
+.hz-ring{position:fixed;left:0;top:0;width:44px;height:44px;border-radius:50%;pointer-events:none;z-index:4;
+  border:1px solid rgba(214,226,255,.75);box-shadow:0 0 12px rgba(159,192,255,.45);opacity:0}
+.hz-ring.frozen{opacity:.5}
+.hz-tracefx{position:fixed;z-index:8;pointer-events:none;transition:opacity .6s var(--hz-ease-out)}
+/* ---- the header (72px on the home, 56px in a conversation) */
+#hz-top{display:none}
+.hz #hz-top{display:flex;align-items:center;gap:18px;position:absolute;left:0;right:0;top:0;z-index:5;height:72px;padding:0 28px;pointer-events:none}
+.hz #main:not(:has(#hero)) #hz-top{height:56px;padding:0 32px;gap:16px}
+.hz #hz-top>*{pointer-events:auto}
+.hz .hz-ib{width:40px;height:40px;border-radius:12px;border:0;background:transparent;color:var(--hz-ink-2);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;padding:0;transition:background var(--hz-t-fast) ease,transform var(--hz-t-fast) ease}
+.hz .hz-ib svg{width:18px;height:18px;display:block}
+.hz .hz-ib:hover{background:rgba(255,255,255,.08)}
+.hz .hz-ib:active{transform:scale(.98)}
+.hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz .hz-rig:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible{
+  outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz #hz-brand{display:flex;align-items:center;gap:10px;min-width:0}
+/* the wordmark is the app's own lockup, unchanged, with a soft ice glow and a glint every 11 s */
+.hz #hz-mark{margin-right:0;position:relative;overflow:visible;filter:drop-shadow(0 0 8px rgba(159,192,255,.4))}
+.hz #hz-vmark,.hz #hz-vmark2,.hz #hz-vmark3{width:12.4px;height:10.4px;margin-right:4px;vertical-align:-.8px}
+.hz #hz-mark .hz-glint{position:absolute;left:0;top:0;white-space:nowrap;color:#fff;pointer-events:none;
+  -webkit-mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);
+  -webkit-mask-size:300% 100%;mask-size:300% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:100% 0;mask-position:100% 0;
+  filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 9px rgba(255,143,196,.85)) drop-shadow(0 0 16px rgba(159,168,255,.75));animation:hzGlint 11s var(--hz-ease-out) 2s infinite}
+.hz #hz-mark .hz-glint svg g{stroke:#fff}
+@keyframes hzGlint{0%{-webkit-mask-position:100% 0;mask-position:100% 0}16%,100%{-webkit-mask-position:0 0;mask-position:0 0}}
+.hz.hz-sbopen #main:has(#hero) #hz-mark,.hz:not(.sbhide) #main:not(:has(#hero)) #hz-mark{display:none}
+.hz #hz-title{font-size:15px;color:var(--hz-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:none}
+.hz #main:not(:has(#hero)) #hz-title{display:block}
+.hz .hz-sp{flex:1}
+.hz #hz-lanes{display:flex;gap:26px}
+.hz #main:not(:has(#hero)) #hz-lanes{display:none}
+.hz #hz-lanes button{height:40px;padding:0 2px;border:0;background:transparent;font:inherit;font-size:14px;color:var(--hz-ink-3);cursor:pointer;
+  border-radius:4px;transition:color var(--hz-t-fast) ease,box-shadow var(--hz-t-mid) ease}
+.hz #hz-lanes button:hover{color:var(--hz-ink-2)}
+.hz #hz-lanes button[aria-selected=true]{color:var(--hz-ink);font-weight:500;box-shadow:inset 0 -1px 0 var(--hz-accent)}
+.hz #hz-right{display:flex;align-items:center;gap:14px}
+/* the machines: a die per machine in its maker's colour; asleep is hollow; the
+   one at work pulses and its label shimmers; a card on hover */
+.hz #hz-machines{display:flex;align-items:center;gap:2px}
+.hz .hz-rig{position:relative;display:flex;align-items:center;gap:7px;height:32px;padding:0 10px;border-radius:999px;font-family:var(--hz-font-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--hz-ink-3);cursor:default;outline:0;transition:color .5s,background .3s}
+.hz .hz-rig:hover,.hz .hz-rig:focus-visible{background:rgba(255,255,255,.06);color:var(--hz-ink)}
+.hz .hz-rig b{font-weight:500}
+/* a maker's colours, wherever a Horizon die stands for a machine (data-v on the die or its row) */
+.hz .hz-rig.mlx,.hz [data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz [data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}
+.hz .hz-rig.amd,.hz [data-v=amd]{--ac:#ed1c24;--ag:#ff4d55}.hz .hz-rig.intel,.hz [data-v=intel]{--ac:#0071c5;--ag:#3d9df5}
+.hz .hz-rig.srv,.hz [data-v=srv],.hz [data-v=cloud]{--ac:#9fc0ff;--ag:#cfe0ff}
+.hz .hz-rig .die,.hz .hz-mdl .die,.hz .hz-opt .die,.hz .hz-ldie{position:relative;width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 60%),var(--ac,#c9ccd2);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 0 10px -1px var(--ag,#e4e7ee);opacity:0;transform:scale(.4) rotate(-45deg);transition:opacity .5s var(--hz-ease-out),transform .7s var(--hz-ease-spring)}
+.hz .hz-rig.on .die,.hz .hz-mdl .die,.hz .hz-opt .die{opacity:1;transform:none}
+.hz .hz-mdl[data-v=cloud] .die,.hz .hz-opt .die[data-v=cloud],.hz .hz-ldie[data-v=cloud]{background:transparent;box-shadow:inset 0 0 0 1.2px #9fc0ff,0 0 8px rgba(159,192,255,.6)}
+.hz .hz-rig.on{color:var(--hz-ink-2)}
+.hz .hz-rig.asleep .die{background:transparent;box-shadow:inset 0 0 0 1.2px var(--ac)}
+.hz .hz-rig::after{content:"";position:absolute;left:12px;right:12px;bottom:4px;height:1px;background:linear-gradient(90deg,transparent,var(--ag),transparent);transform:scaleX(0);transition:transform .6s var(--hz-ease-out)}
+.hz .hz-rig.working{color:var(--hz-ink)}
+.hz .hz-rig.working::after{transform:scaleX(1)}
+.hz .hz-rig.working .die{animation:hzDie 1.2s ease-in-out infinite}
+.hz .hz-rig.working b{background:linear-gradient(90deg,var(--hz-ink-2) 30%,#fff 50%,var(--hz-ink-2) 70%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:hzLbl 1.8s linear infinite}
+.hz .hz-rig.in-use{color:var(--hz-ink)}
+.hz .hz-rig.in-use .die{box-shadow:inset 0 0 0 1px rgba(255,255,255,.4),0 0 16px 2px var(--ag)}
+@keyframes hzDie{0%,100%{box-shadow:inset 0 0 0 1px rgba(255,255,255,.3),0 0 8px 0 var(--ag)}50%{box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),0 0 18px 3px var(--ag)}}
+@keyframes hzLbl{from{background-position:100% 0}to{background-position:-150% 0}}
+.hz .hz-rig .tip{position:absolute;top:40px;right:0;min-width:188px;padding:12px 14px;border-radius:14px;display:grid;gap:3px;text-transform:none;letter-spacing:0;font-family:var(--hz-font-ui);
+  background:rgba(10,14,28,.72);border:1px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 18px 50px rgba(0,0,0,.5);
+  opacity:0;transform:translateY(-4px);transition:opacity .2s,transform .2s var(--hz-ease-out);pointer-events:none;z-index:6}
+.hz .hz-rig:hover .tip,.hz .hz-rig:focus-visible .tip{opacity:1;transform:none}
+.hz .hz-rig .tip strong{font-size:13.5px;font-weight:500;color:var(--hz-ink)}
+.hz .hz-rig .tip span{font-size:12.5px;color:var(--hz-ink-3)}
+.hz .hz-rig .tip .st{display:flex;align-items:center;gap:7px;margin-top:4px;color:var(--hz-ink-2)}
+.hz .hz-rig .tip .st::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ag);box-shadow:0 0 8px var(--ag)}
+.hz .hz-rig.asleep .tip .st::before{background:transparent;box-shadow:inset 0 0 0 1px var(--ac)}
+.hz #hz-effort-slot{display:none;align-items:center}
+.hz #main:not(:has(#hero)) #hz-effort-slot{display:flex}
+/* ---- the sidebar on the home: closed unless opened; in a conversation open unless hidden */
+.hz body:has(#main #hero):not(.sbopen) #sidebar{display:none}
+.hz.hz-sbopen body:has(#main #hero):not(.sbopen) #sidebar{display:flex}
+.hz.sbhide body:not(:has(#main #hero)) #sidebar{display:none}
+.hz #mburger{display:none!important}
+/* ---- the home: the headline centred in the room above the composer, the
+   composer floating mid-page, recent chats as hairline rows under it */
+.hz #main:has(#hero) #chat-scroll{flex:1 1 auto;overflow:visible;min-height:0;display:flex}
+.hz #main:has(#hero) #chat-inner{max-width:none;width:100%;padding:72px 24px 0;margin:0;display:flex;align-items:center;justify-content:center}
+.hz #main:has(#hero) #hero{min-height:0;padding:0;align-items:center;text-align:center;gap:14px;justify-content:center;width:100%}
+.hz #hero .greet{font-family:var(--hz-font-display);font-weight:600;font-size:clamp(60px,9vw,124px);line-height:.98;letter-spacing:-.055em;color:#f8faff;margin:0;
+  text-wrap:balance;position:relative;display:inline-block;
+  text-shadow:0 0 1px rgba(255,255,255,.6),0 0 16px rgba(205,222,255,.5),0 0 46px rgba(140,175,255,.42),0 12px 90px rgba(60,100,230,.5)}
+.hz #hero .greet .fill{position:relative;opacity:0;transition:opacity .55s var(--hz-ease-out)}
+.hz #hero .greet.shown .fill{opacity:1}
+.hz #hero .greet .bloom{position:absolute;inset:0;color:transparent;text-shadow:none;background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;filter:blur(24px) saturate(1.2);opacity:0;z-index:-1;transition:opacity 1.4s var(--hz-ease-out)}
+.hz #hero .greet.shown .bloom{opacity:.75;animation:hzBreatheB 8s ease-in-out 1.4s infinite,hzShim 16s linear infinite}
+.hz #hero .greet .sheen{position:absolute;inset:0;pointer-events:none;color:transparent;text-shadow:none;opacity:0;
+  background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.95) 48%,rgba(190,212,255,.9) 52%,transparent 65%);background-size:250% 100%;background-position:120% 0;
+  -webkit-background-clip:text;background-clip:text}
+.hz #hero .greet.shown .sheen{opacity:1;animation:hzSheen 9s var(--hz-ease-out) 3s infinite}
+@keyframes hzSheen{0%{background-position:120% 0}30%,100%{background-position:-40% 0}}
+@keyframes hzBreatheB{0%,100%{opacity:.42}50%{opacity:.7}}
+.hz-status{display:none}
+.hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:808px;margin:0 auto;width:100%}
+.hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,4,10,.5) 70%);padding:0 24px 22px}
+.hz .novideo #composer-wrap{background:none}
+/* the glass (NORTHSTAR 12): lit from below; its glow a separate breathing layer */
+.hz #composer{position:relative;max-width:none;margin:0;border-radius:var(--hz-r-composer);padding:18px 16px 12px 22px;gap:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.045));
+  border:1px solid rgba(255,255,255,.13);border-bottom-color:var(--hz-glass-lit);
+  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.35),0 30px 80px rgba(0,0,0,.35);
+  transition:border-color var(--hz-t-mid) ease,box-shadow var(--hz-t-mid) ease}
+.hz #composer:focus-within{border-color:rgba(255,255,255,.2);border-bottom-color:rgba(200,222,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.35),0 0 0 4px rgba(159,192,255,.08)}
+.hz .gen #composer{border-color:rgba(159,192,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.5),0 30px 80px rgba(0,0,0,.35)}
+.hz #hz-cglow{position:fixed;left:0;top:0;z-index:0;pointer-events:none;border-radius:28px;
+  box-shadow:0 24px 70px rgba(80,130,255,.22),0 2px 30px rgba(159,192,255,.12);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
+.hz #hz-cglow[hidden]{display:none}
+.hz #input{font:17px/1.5 var(--hz-font-ui);color:var(--hz-ink);padding:0 2px 4px;min-height:52px}
+.hz #input::placeholder{color:var(--hz-ink-2);opacity:1}
+.hz #input:focus,.hz #input:focus-visible{outline:0;box-shadow:none}
+.hz #main:not(:has(#hero)) #input{min-height:40px;font-size:16px;padding:9px 6px}
+.hz #crow{display:flex;align-items:center;gap:12px;margin-top:0;justify-content:flex-start;flex-wrap:wrap}
+.hz #cbtns{display:contents}
+.hz #attach{order:1}.hz #hz-effort{order:2}.hz #model-chip{order:3}.hz #mic{order:6;margin-left:auto}.hz #voicebtn{order:7}.hz #send{order:8}
+.hz #accel-chip,.hz #srv-chips,.hz #cloud-chip{display:none!important}
+.hz .cbtn{width:40px;height:40px;border-radius:999px;color:var(--hz-ink-2);transition:background var(--hz-t-fast) ease,transform var(--hz-t-fast) ease,color var(--hz-t-fast) ease}
+.hz .cbtn:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
+.hz .cbtn:active{transform:scale(.98)}
+.hz .cbtn:focus-visible{outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz #attach{border:1px solid rgba(255,255,255,.16)}
+.hz #voicebtn.parked{display:none}
+.hz #send{width:42px;height:42px;background:#eef2fc;color:#071026;font-weight:600;box-shadow:0 0 26px rgba(159,192,255,.38)}
+.hz #send:hover{background:#fff;color:#071026;transform:none;box-shadow:0 0 0 1px rgba(255,255,255,.2),0 0 30px rgba(159,192,255,.5)}
+.hz #send:disabled{background:rgba(255,255,255,.1);color:var(--hz-ink-3);box-shadow:none}
+.hz #send.stop{background:#eef2fc;color:#071026;font-size:12px}
+/* the More-modes button (the engine menu: Max, Cloud only, your servers, Advanced); it never names a model */
+.hz #model-chip{height:40px;width:40px;padding:0;border-radius:999px;border:0;background:transparent;color:var(--hz-ink-2);font-size:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background var(--hz-t-fast) ease}
+.hz #model-chip:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
+.hz #model-chip b{display:none}
+.hz #model-chip::before{content:"";width:18px;height:18px;display:block;
+  background:currentColor;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat;
+          mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat}
+.hz .gen #chip-model{color:inherit}
+/* ---- the effort slider (NORTHSTAR 24-30) over a real range input */
+#hz-effort{display:none}
+.hz #hz-effort{display:flex;align-items:center;gap:14px;min-width:0}
+.hz #hz-effort[hidden]{display:none}
+.hz .hz-vh{position:absolute;left:-9999px}
+.hz .hz-sl{position:relative;width:170px;height:40px;flex:none;border-radius:999px;--hz-eff-u:.25}
+.hz .hz-sl:focus-within{box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz .hz-sl-glow{position:absolute;left:9px;right:9px;top:16px;height:8px;border-radius:4px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(159,192,255,0) 0%,rgba(159,192,255,.22) 45%,rgba(159,192,255,.62) 100%);filter:blur(7px)}
+.hz .hz-sl-track{position:absolute;left:9px;right:9px;top:19px;height:2px;border-radius:1px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(255,255,255,.18) 0%,rgba(159,192,255,.34) 55%,rgba(176,204,255,.75) 100%)}
+.hz .hz-sl-fill{position:absolute;left:9px;top:19px;height:2px;width:calc(100% - 18px);border-radius:1px;pointer-events:none;
+  background:#cfe0ff;box-shadow:0 0 8px rgba(159,192,255,.7);transform-origin:0 50%;transform:scaleX(var(--hz-eff-u));transition:transform var(--hz-t-mid) var(--hz-ease-spring)}
+.hz .hz-sl-dot{position:absolute;top:17px;width:6px;height:6px;margin-left:-3px;border-radius:50%;pointer-events:none;background:rgba(214,226,255,.45);left:calc(9px + (100% - 18px) * var(--hz-u))}
+.hz .hz-sl-dot.passed{background:#cfe0ff}
+.hz .hz-sl-dot.last{background:rgba(176,204,255,.85);box-shadow:0 0 8px rgba(159,192,255,.7)}
+.hz .hz-sl-halo{position:absolute;top:6px;left:9px;width:28px;height:28px;margin-left:-14px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(159,192,255,.55) 0%,rgba(159,192,255,0) 70%);transform:translateX(var(--hz-eff-px,0px));
+  transition:transform var(--hz-t-mid) var(--hz-ease-spring);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
+.hz .hz-sl-thumbw{position:absolute;left:9px;right:9px;top:11px;height:18px;pointer-events:none}
+.hz .hz-sl-thumb{position:absolute;top:0;left:0;width:18px;height:18px;margin-left:-9px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#ffffff 0%,#dde7ff 70%,#bfd0ff 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.35),0 0 14px rgba(159,192,255,.9),0 2px 4px rgba(0,0,0,.45);
+  transform:translateX(var(--hz-eff-px,0px));transition:transform var(--hz-t-mid) var(--hz-ease-spring)}
+.hz .hz-sl.dragging .hz-sl-thumb,.hz .hz-sl.dragging .hz-sl-fill,.hz .hz-sl.dragging .hz-sl-halo{transition:none}
+.hz .hz-sl.dragging .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) scale(1.08);box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 18px rgba(159,192,255,1),0 3px 6px rgba(0,0,0,.45)}
+.hz .hz-sl input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.hz .hz-sl input[type=range]:focus{outline:0}
+/* the picker: the mode's name only; a glass menu opens over the sky */
+.hz .hz-pick{display:flex;align-items:center;gap:7px;height:36px;padding:0 11px 0 13px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);
+  cursor:pointer;color:var(--hz-ink);font:inherit;flex:none;transition:background var(--hz-t-fast) ease}
+.hz .hz-pick:hover{background:rgba(255,255,255,.09)}
+.hz .hz-pick:focus-visible{outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz .hz-pick b{font-size:14px;font-weight:500;white-space:nowrap}
+.hz .hz-pick svg{opacity:.7;transform:rotate(180deg);transition:transform .35s var(--hz-ease-out)}
+.hz .hz-pick[aria-expanded=true] svg{transform:none}
+.hz .hz-elevel{font-size:13px;color:var(--hz-ink-2);min-width:60px;white-space:nowrap}
+#hz-menu{display:none}
+.hz #hz-menu{display:block;position:fixed;left:0;top:0;width:min(340px,calc(100vw - 32px));padding:6px;border-radius:18px;z-index:40;
+  background:rgba(12,16,32,.8);border:1px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);
+  box-shadow:0 24px 70px rgba(0,0,0,.55);opacity:0;transform:translateY(8px) scale(.98);transform-origin:bottom left;pointer-events:none;visibility:hidden;
+  transition:opacity .2s,transform .35s var(--hz-ease-out),visibility 0s linear .35s}
+.hz #hz-menu.down{transform-origin:top left;transform:translateY(-8px) scale(.98)}
+.hz #hz-menu.open{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .2s,transform .35s var(--hz-ease-out)}
+.hz .hz-opt{display:grid;grid-template-columns:1fr auto;column-gap:12px;width:100%;padding:10px 12px;border:0;border-radius:12px;background:transparent;text-align:left;cursor:pointer;color:var(--hz-ink);font:inherit}
+.hz .hz-opt:hover,.hz .hz-opt:focus-visible,.hz .hz-opt.open{background:rgba(255,255,255,.07);outline:0}
+.hz .hz-opt.off{opacity:.45;cursor:default}
+.hz .hz-opt>b{font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+.hz .hz-opt[aria-checked=true]>b::after{content:"";width:6px;height:6px;border-radius:50%;background:#cfe0ff;box-shadow:0 0 8px #9fc0ff}
+.hz .hz-opt .d{grid-column:1;font-size:12.5px;color:var(--hz-ink-3);margin-top:2px}
+.hz .hz-opt .dies{grid-row:1/3;grid-column:2;display:flex;gap:4px;align-items:center}
+.hz .hz-opt .dies .die{width:7px;height:7px}
+.hz .hz-opt .ms{grid-column:1/3;display:flex;flex-wrap:wrap;gap:6px;max-height:0;overflow:hidden;transition:max-height .45s var(--hz-ease-out),margin .45s var(--hz-ease-out)}
+.hz .hz-opt.open .ms{max-height:140px;margin-top:10px}
+.hz .hz-opt .hz-mdl{height:26px}
+.hz .hz-opt .hz-mdl b{font-size:12.5px}
+/* the top efforts shimmer and a light runs round the composer (Ultra in full, Max softly; OVERRIDE 4) */
+@property --hz-ang{syntax:'<angle>';initial-value:0deg;inherits:false}
+.hz .hz-elevel.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzShim 3.2s linear infinite}
+.hz .hz-elevel.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
+@keyframes hzShim{to{background-position:300% 0}}
+.hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
+  transition:opacity .8s var(--hz-ease-in-out);
+  background:conic-gradient(from var(--hz-ang),rgba(159,168,255,0) 0deg,#9fa8ff 40deg,#ff8fc4 90deg,#ffc58a 140deg,rgba(127,240,214,0) 200deg,rgba(159,168,255,0) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+          mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:hzRing 4s linear infinite}
+.hz #main:not(:has(#hero)) #composer::before{border-radius:22px}
+.hz.hz-ultra #composer::before{opacity:.9}
+.hz.hz-ultra .gen #composer::before{opacity:1;animation-duration:2.4s}
+.hz.hz-maxe #composer::before{opacity:.35;animation-duration:7s}
+@keyframes hzRing{to{--hz-ang:360deg}}
+.hz.hz-ring-static #composer::before{animation:none;background:linear-gradient(135deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6)}
+/* a model a mode runs: a pill with its machine's die (the machine in the tooltip) */
+.hz .hz-mdl{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 10px;border-radius:999px;white-space:nowrap;overflow:hidden;
+  background:rgba(10,14,30,.55);border:1px solid rgba(255,255,255,.1);
+  max-width:0;padding-inline:0;border-width:0;margin-right:-6px;opacity:0;transform:translateX(-14px) scale(.94);filter:blur(4px);
+  transition:max-width .5s var(--hz-ease-out),padding .5s var(--hz-ease-out),margin .5s var(--hz-ease-out),opacity .35s var(--hz-ease-out),transform .55s var(--hz-ease-spring),filter .4s var(--hz-ease-out)}
+.hz .hz-mdl.in{max-width:260px;padding-inline:10px 12px;border-width:1px;margin-right:0;opacity:1;transform:none;filter:none}
+.hz .hz-mdl b{font-size:13px;font-weight:500;color:var(--hz-ink)}
+.hz #hz-effort.compact{gap:10px}
+.hz #hz-effort.compact .hz-sl{width:120px;height:28px;margin:0}
+.hz #hz-effort.compact .hz-sl-glow{top:11px;height:6px}
+.hz #hz-effort.compact .hz-sl-track,.hz #hz-effort.compact .hz-sl-fill{top:13px}
+.hz #hz-effort.compact .hz-sl-dot{top:11.5px;width:5px;height:5px;margin-left:-2.5px}
+.hz #hz-effort.compact .hz-sl-halo{top:3px;width:22px;height:22px;margin-left:-11px}
+.hz #hz-effort.compact .hz-sl-thumbw{top:7px;height:14px}
+.hz #hz-effort.compact .hz-sl-thumb{width:14px;height:14px;margin-left:-7px}
+.hz #hz-effort.compact .hz-pick{height:30px;padding:0 9px 0 11px}
+.hz #hz-effort.compact .hz-pick b{font-size:13px}
+.hz #hz-effort.compact .hz-elevel{min-width:0;font-size:12.5px}
+/* ---- history rows under the composer */
+#hz-history{display:none}
+.hz #main:has(#hero) #hz-history:not([hidden]){display:flex;flex-direction:column;margin-top:34px;pointer-events:auto}
+.hz .hz-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:24px;padding:13px 8px;
+  border:0;border-top:1px solid var(--hz-hair);border-radius:6px;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;
+  transition:background var(--hz-t-fast) ease}
+.hz .hz-row:last-child{border-bottom:1px solid var(--hz-hair)}
+.hz .hz-row:hover{background:rgba(255,255,255,.04)}
+.hz .hz-row .t{font-size:15px;color:var(--hz-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hz .hz-row .w{font-size:13px;color:var(--hz-ink-3)}
+.hz .hz-row .k{font-family:var(--hz-font-mono);font-size:12px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+.hz .hz-row .k:empty{min-width:0}
+/* ---- the conversation: the reply bar at the foot, the reading column's width and edge */
+.hz #main:not(:has(#hero)) #chat-inner{padding-top:72px}
+.hz #main:not(:has(#hero)) #composer{max-width:var(--hz-read-w);margin:0 auto 0 calc(50% - (var(--hz-read-w) + var(--hz-gutter) + var(--hz-marg-w))/2);
+  border-radius:22px;padding:8px 8px 8px 10px;flex-direction:row;align-items:flex-end;gap:6px}
+.hz #main:not(:has(#hero)) #crow{display:contents}
+.hz #main:not(:has(#hero)) #attach{order:-1}.hz #main:not(:has(#hero)) #input{order:0;flex:1 1 auto;min-width:0}
+.hz #main:not(:has(#hero)) #model-chip{order:2}.hz #main:not(:has(#hero)) #mic{order:3;margin-left:0}.hz #main:not(:has(#hero)) #send{order:4}
+.hz #main:not(:has(#hero)) #hz-effort:not(.compact){display:none}
+@media (max-width:1100px){.hz #main:not(:has(#hero)) #composer{margin-left:auto}}
+/* ---- the opening: the lockup appears (its wing drawn line by line), its word is
+   traced in light with one line beneath; the wash blooms; it lifts away; the
+   home fades in and the greeting is traced; the machines light up */
+#hz-intro-mark{display:none}
+.hz #hz-intro-mark{display:flex;position:fixed;left:0;right:0;top:36vh;flex-direction:column;align-items:center;gap:22px;z-index:9;opacity:0;pointer-events:none}
+.hz #hz-intro-mark[hidden]{display:none}
+.hz #hz-intro-mark .vghost{position:relative;font-size:clamp(26px,3.4vw,44px);opacity:1;overflow:visible;margin:0;display:inline-flex;align-items:center;gap:10px}
+.hz #hz-intro-mark .vghost svg{width:1.5em;height:1.23em;margin:0;filter:drop-shadow(0 0 10px rgba(159,192,255,.75)) drop-shadow(0 0 28px rgba(110,150,255,.45))}
+.hz #hz-intro-mark .hz-word{opacity:0;transition:opacity .6s var(--hz-ease-out);text-shadow:0 0 12px rgba(190,212,255,.75),0 0 40px rgba(159,168,255,.5),0 0 80px rgba(255,143,196,.22)}
+.hz #hz-intro-mark .hz-word.shown{opacity:1}
+.hz #hz-intro-mark line{stroke-dasharray:1 2;stroke-dashoffset:1;opacity:0}
+.hz.hz-markin #hz-intro-mark line{animation:hzDraw 1s var(--hz-ease-out) forwards}
+.hz.hz-markin #hz-intro-mark line:nth-child(2){animation-delay:.08s}.hz.hz-markin #hz-intro-mark line:nth-child(3){animation-delay:.16s}
+.hz.hz-markin #hz-intro-mark line:nth-child(4){animation-delay:.24s}.hz.hz-markin #hz-intro-mark line:nth-child(5){animation-delay:.32s}
+.hz #hz-intro-mark .hz-glint line,.hz.hz-markin #hz-intro-mark .hz-glint line{stroke-dasharray:none;stroke-dashoffset:0;opacity:1;animation:none}
+@keyframes hzDraw{0%{opacity:0;stroke-dashoffset:1}12%{opacity:1}100%{opacity:1;stroke-dashoffset:0}}
+.hz #hz-intro-mark .hz-flare{position:absolute;left:4%;right:4%;top:50%;height:2px;margin-top:-1px;border-radius:2px;opacity:0;transform:scaleX(0);pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(159,168,255,.55) 22%,rgba(220,232,255,.95) 46%,#fff 50%,rgba(255,190,220,.95) 54%,rgba(127,240,214,.5) 78%,transparent);
+  filter:drop-shadow(0 0 6px rgba(159,192,255,.95)) drop-shadow(0 0 22px rgba(255,143,196,.55))}
+.hz.hz-litmark #hz-intro-mark .hz-flare{animation:hzFlare 2.8s cubic-bezier(.22,.8,.25,1) forwards}
+@keyframes hzFlare{0%{opacity:0;transform:scaleX(0)}14%{opacity:1}55%{opacity:.85;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1.12)}}
+.hz #hz-intro-mark .hz-glint{position:absolute;inset:0;display:inline-flex;align-items:center;gap:inherit;pointer-events:none;
+  filter:drop-shadow(0 0 5px #fff) drop-shadow(0 0 14px rgba(255,143,196,.9)) drop-shadow(0 0 26px rgba(159,168,255,.85))}
+.hz #hz-intro-mark .hz-glint .gm{display:inline-flex;align-items:center;gap:inherit;color:#fff;
+  -webkit-mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);
+  -webkit-mask-size:300% 100%;mask-size:300% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:100% 0;mask-position:100% 0}
+.hz #hz-intro-mark .hz-glint svg{filter:none}
+.hz #hz-intro-mark .hz-glint svg g{stroke:#fff}
+.hz.hz-litmark #hz-intro-mark .hz-glint .gm{animation:hzGlint1 2.5s cubic-bezier(.45,0,.25,1) .55s both}
+@keyframes hzGlint1{from{-webkit-mask-position:100% 0;mask-position:100% 0}to{-webkit-mask-position:0 0;mask-position:0 0}}
+.hz.hz-litmark #hz-intro-mark .vghost{animation:hzPrism 9s ease-in-out infinite}
+@keyframes hzPrism{0%,100%{filter:drop-shadow(0 0 14px rgba(159,168,255,.7)) drop-shadow(0 0 42px rgba(255,143,196,.28))}
+  33%{filter:drop-shadow(0 0 14px rgba(127,240,214,.6)) drop-shadow(0 0 42px rgba(159,168,255,.3))}
+  66%{filter:drop-shadow(0 0 14px rgba(255,197,138,.55)) drop-shadow(0 0 42px rgba(127,240,214,.26))}}
+.hz.hz-markin #hz-intro-mark{opacity:1}
+.hz.hz-markout #hz-intro-mark{opacity:0;transform:translateY(-24px);transition:opacity 1.2s var(--hz-ease-out),transform 1.2s var(--hz-ease-out)}
+/* the chrome waits for the home; the night itself is there from the first frame */
+.hz.hz-intro #sidebar,.hz.hz-intro #hz-top,.hz.hz-intro #hero,.hz.hz-intro #composer,.hz.hz-intro #hz-cglow,.hz.hz-intro #hz-history{opacity:0;transition:opacity 1.2s var(--hz-ease-out)}
+.hz.hz-intro #hz-aurw{opacity:0}
+.hz.hz-intro:not(.hz-home) #hz-cglow{animation:none}   /* its breathing would override the hidden glow */
+.hz.hz-intro.hz-markin #hz-aurw{opacity:.42}
+.hz.hz-home #sidebar,.hz.hz-home #hz-top,.hz.hz-home #hero,.hz.hz-home #composer,.hz.hz-home #hz-cglow,.hz.hz-home #hz-history{opacity:1;transition:opacity 1.2s var(--hz-ease-out)}
+/* ---- asking, from the home: the question arcs into the top of the chats; its row keeps a
+   live die (the working machine's colour) until the answer lands, and renames itself */
+.hz-ghost{position:fixed;left:0;top:0;z-index:30;pointer-events:none;font-size:17px;color:#fff;white-space:nowrap;transform-origin:0 50%;
+  text-shadow:0 0 18px rgba(159,192,255,.95),0 0 40px rgba(159,168,255,.5)}
+.hz .chat-item .hz-ldie{margin-left:6px;opacity:1;transform:none;animation:hzDie 1.2s ease-in-out infinite}
+.hz .chat-item.hz-live .ct{background:linear-gradient(90deg,var(--hz-ink) 30%,#fff 50%,var(--hz-ink) 70%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:hzLbl 2s linear infinite}
+.hz .chat-item.hz-landed{animation:hzRowPop .9s var(--hz-ease-out)}
+.hz .chat-item.hz-renamed .ct{animation:hzFadeIn .5s var(--hz-ease-out)}
+.hz #hz-sb.ping{animation:hzRowPop .9s var(--hz-ease-out)}
+@keyframes hzRowPop{0%{transform:scale(.97);box-shadow:0 0 0 0 rgba(159,192,255,0)}35%{transform:scale(1.035);box-shadow:0 0 0 1px rgba(170,200,255,.55),0 0 26px rgba(159,192,255,.4)}100%{transform:none;box-shadow:0 0 0 0 rgba(159,192,255,0)}}
+@keyframes hzFadeIn{from{opacity:0}to{opacity:1}}
+/* ---- stillness: effects off, reduced motion, hidden or long unfocused */
+.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
+.hz .novideo #hz-wash,.hz .novideo #hz-wash.bloom{animation:none!important;opacity:.1}
+.hz .novideo #composer::before{animation:none;opacity:0!important}
+.hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}
+.hz.hz-pause .hz-elevel.shim,.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){
+  .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}
+  .hz #hz-wash,.hz #hz-wash.bloom{animation:none!important;opacity:.1}
+  .hz .hz-elevel.shim{animation:none}
+  .hz .hz-mdl,.hz .hz-opt .ms,.hz #hz-menu{transition:none!important}
+  .hz #composer::before{animation:none;opacity:0!important}
+  .hz #hz-aurw,.hz .hz-sl-thumb,.hz .hz-sl-fill{transition:none!important}
+}
+/* ---- the Look and Effects rows in Settings > About, in the pane's own row style */
+#look-row,#fx-level-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#fx-level-note{font-size:12px;color:#9aa6c6;margin:-4px 0 8px}
+/* ---- a phone-width window (6b534): the lockup steps aside for the lanes; the mode
+   and the effort take their own row in the composer */
+@media (max-width:600px){
+  .hz #hz-mark{display:none}
+  .hz #hz-lanes{gap:14px}
+  .hz #crow{row-gap:10px}
+  .hz #hz-effort:not(.compact){order:9;flex:1 1 100%;gap:10px}
+  .hz #hz-effort:not(.compact) .hz-sl{width:120px}
+}
+/* ============================================================ HORIZON end */
 
 </style>
 </head>
@@ -44846,6 +45666,53 @@ __CODE_ROWS__
 </aside>
 
 <main id="main">
+  <!-- THE HORIZON NIGHT (6b526, per Patrick): one GPU canvas under everything,
+       drawn by the HORIZON block at the end of the script from the footage
+       that plays beneath it (the app's own orbital Apple clip, from its cache,
+       served same-origin). Over it the colour wash, the ice rays, the Moon's
+       light; a scrim for conversations. -->
+  <div id="hz-sky" aria-hidden="true">
+    <video id="hz-vid" muted loop playsinline preload="auto" crossorigin="anonymous"></video>
+    <canvas id="hz-gl"></canvas>
+    <div id="hz-moonglow"></div>
+    <div id="hz-washw"><canvas id="hz-wash"></canvas></div>
+    <div id="hz-aurw">
+      <div class="hz-aur" id="hz-aur1"><canvas></canvas><canvas id="hz-aur1f" style="position:absolute;inset:0"></canvas></div>
+      <div class="hz-aur" id="hz-aur2"><canvas></canvas></div>
+    </div>
+    <div id="hz-scrim"></div>
+  </div>
+  <!-- THE HEADER (6b526): the chats button and the lockup (a glint passes it);
+       the chat's title in a conversation; the lanes as text on the home; the
+       machines as dies in their makers' colours; Settings -->
+  <header id="hz-top" aria-label="Window">
+    <div id="hz-brand">
+      <button id="hz-sb" type="button" class="hz-ib" aria-label="Show chats" aria-pressed="false">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+      <span id="hz-mark" class="vghost" title="MillenAI"><svg id="hz-vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b><span class="hz-glint" aria-hidden="true"><svg id="hz-vmark3" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg3" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg3)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span></span>
+      <span id="hz-title"></span>
+    </div>
+    <span class="hz-sp"></span>
+    <nav id="hz-lanes" role="tablist" aria-label="Lane">
+      <button type="button" role="tab" data-m="ai" aria-selected="true">Chat</button>
+      <button type="button" role="tab" data-m="code" aria-selected="false" tabindex="-1">Code</button>
+      <button type="button" role="tab" data-m="funnel" aria-selected="false" tabindex="-1">Funnels</button>
+    </nav>
+    <span class="hz-sp"></span>
+    <div id="hz-right">
+      <div id="hz-effort-slot"></div>
+      <div id="hz-machines" role="list" aria-label="Your machines"></div>
+      <button id="hz-settings" type="button" class="hz-ib" aria-label="Settings">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+      </button>
+    </div>
+  </header>
+  <!-- the opening's lockup (6b526, 6b534): its wing drawn line by line, its word traced in light;
+       then a light streak, one prism glint and a slow prism glow. No tagline (OVERRIDE 3) -->
+  <div id="hz-intro-mark" aria-hidden="true" hidden><span class="vghost"><svg id="hz-vmark2" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg2)" stroke-width="2.4" stroke-linecap="round"><line pathLength="1" x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line pathLength="1" x1="7.5" y1="17.5" x2="20.4" y2="7"/><line pathLength="1" x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line pathLength="1" x1="16.1" y1="17.5" x2="20.4" y2="14"/><line pathLength="1" x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b class="hz-word">Concorde<b>AI</b></b><span class="hz-glint" aria-hidden="true"><span class="gm"><svg viewBox="2 2.3 19.6 16.4" aria-hidden="true"><g stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span></span></span><span class="hz-flare" aria-hidden="true"></span></div>
+  <!-- the mode menu (6b534): fixed over the sky, placed by the picker -->
+  <div id="hz-menu" role="menu" aria-label="Mode"></div>
   <div id="skyline" hidden>
     <video id="sky-color" muted loop playsinline></video>
   </div>
@@ -44894,13 +45761,20 @@ __CODE_ROWS__
     <div id="imgchips" hidden></div>
     <!-- a benchmark is running: said here, the composer kept (6b331) -->
     <div id="bm-busy" hidden></div>
+    <!-- Horizon (6b526): the glow under the glass, placed by hzGlowFit -->
+    <div id="hz-cglow" hidden></div>
     <div id="composer">
 
       <input type="file" id="fpick" multiple hidden
         accept="image/*,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
       <textarea id="input" rows="1" placeholder="How can I help you today?"></textarea>
       <div id="crow">
-      <div id="model-chip" title="Change engine — opens the picker">engine <b id="chip-model">Gemma 4 E2B</b></div>
+      <!-- Horizon's mode picker and effort slider (6b526, 6b534): the mode's
+           name opens a glass menu (#hz-menu); Effort is a real range input;
+           the engine menu beside them keeps Max, Cloud only, the servers and
+           Advanced -->
+      <div id="hz-effort" hidden></div>
+      <div id="model-chip" title="More modes">engine <b id="chip-model">Gemma 4 E2B</b></div>
       <div id="accel-chip" hidden><i></i><b></b></div>
       <!-- your servers' cards (6b334): one chip per paired server whose
            card the server names, in the MLX chip's style -->
@@ -44938,6 +45812,8 @@ __CODE_ROWS__
       </div>
       </div>
     </div>
+    <!-- Horizon (6b526): recent chats as hairline rows under the composer -->
+    <nav id="hz-history" aria-label="Recent chats" hidden></nav>
   </div>
 </main>
 
@@ -45082,6 +45958,17 @@ __CODE_ROWS__
       <div class="toggle-row" id="fx-toggle"
            title="The moving backdrop behind the chat. Everything else stays as it is.">
         <div class="switch"></div><span>Enable visual effects</span></div>
+      <!-- THE LOOK (6b526, per Patrick): Horizon is the new home, sky and
+           intro; Classic is the look before it, exactly as it was -->
+      <label id="look-row"><span>Look</span>
+        <select id="look-sel"><option value="horizon">Horizon</option>
+          <option value="classic">Classic</option></select></label>
+      <!-- EFFECTS (6b526): Full when a server does the thinking and this
+           Mac's GPU is free; Balanced when this Mac does it too -->
+      <label id="fx-level-row"><span>Effects</span>
+        <select id="fx-level"><option value="balanced">Balanced</option>
+          <option value="full">Full</option></select></label>
+      <div id="fx-level-note">Full is best when a server does the thinking.</div>
       <!-- 6b345, per Patrick ("it takes about a, two seconds each time for
            it to switch on"): the microphone stays open for 15 s after a
            dictation, so the next hold starts at once. Open, not listening. -->
@@ -45499,6 +46386,27 @@ __CODE_ROWS__
 <script>
 "use strict";
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+// THE MODES' BRAND NAMES (6b526; the Greek ones 6b534, per Patrick): Alpha,
+// Gamma, Sigma, and Omega where its tier exists. Declared first: tierShown() reads modeName
+// during boot, and a const further down would be a temporal-dead-zone throw
+// that kills the whole page (seen live, this build).
+/* MODE NAMES (6b526) */
+const MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};
+const modeName=t=>MODE_NAMES[t]||t;
+// a chip line that starts with a mode ("Fast", "Thinking · <server> only") takes the brand name
+const hzModeWords=s=>String(s||"").replace(/^(Fast|Thinking|Pro|Vera Rubin)(?=$| \u00b7 )/,m=>modeName(m));
+// the engine menu's rows are built with the tiers' keys (the gauntlet pins their
+// builders); once a menu is on screen its mode names become the brand names
+function hzMenuBrand(root){
+  if(!root)return;
+  root.querySelectorAll(".engrow.mode .enm").forEach(e=>{e.textContent=modeName(e.textContent);});
+  root.querySelectorAll(".engrow.mode .einfo").forEach(e=>{
+    e.setAttribute("aria-label",String(e.getAttribute("aria-label")||"").replace(/^What (Fast|Thinking|Pro|Vera Rubin) uses$/,(m,k)=>"What "+modeName(k)+" uses"));});
+}
+// what each mode is for, in the mode menu (OVERRIDE 3, 6b534)
+const HZ_MODE_DESC={"Fast":"Fast answers","Thinking":"Thinks it through",
+  "Pro":"Every model weighs in","Vera Rubin":"Keeps going until you stop it",
+  "Max":"Every model, everywhere"};
 /* THE API TOKEN (6b321, 0a 5.4). The cookie alone opens only this page;
    every /api call also carries X-Api-Token, which the window hands over
    through pywebview's js_api once the page has loaded (pywebviewready).
@@ -45662,7 +46570,9 @@ const PREF_OF={"millen.tier":"tier","millen.agent":"agent",
 const PREF_TOO={"millen.model":"model","millen.council":"council"};
 const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
   "millen.voice","millen.speeds","millen.sky","millen.skyhist",
-  "millen.skynext","millen.sbw"];
+  "millen.skynext","millen.sbw",
+  // the Horizon look's own (6b526): the look, the sidebar, the intro's day, its seed
+  "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort"];
 let P={};                        // the person's settings, as prefs.json holds them
 const prefMine=new Set();        // set here before prefs.json answered
 let prefQ=Promise.resolve();
@@ -45852,6 +46762,7 @@ function paintModels(){
     el.classList.toggle("active",manual&&el.dataset.model===council[0]);
     const old=el.querySelector(".rank"); if(old)old.remove();
   });
+  if(globalThis.hzReady)hzModesPaint();       // Horizon's slider follows the tier (6b526)
   $("#chip-model").textContent=tierLabel();
   paintCloudChip();
 }
@@ -45877,6 +46788,7 @@ function setVideo(on){
   noVideo=!on; document.body.classList.toggle("novideo",noVideo);
   const t=$("#fx-toggle");if(t)t.classList.toggle("on",on);
   localStorage.setItem("millen.video",on?"1":"0");
+  if(globalThis.hzReady){hzPauseSync();if(on)hzMediaBoot();}   // Horizon's sky follows the switch (6b526)
   const v=$("#sky-color");
   if(!on){if(v&&!v.paused)v.pause();}
   else if(typeof bootSkyline==="function"){
@@ -46426,6 +47338,7 @@ function openEngSub(id,keepScroll,byHover){
   if(keep<0&&detEl&&engMenu.contains(detEl))hideTierPop();
   engSubId=id;engSubByHover=!!byHover;
   engSub.innerHTML=s?srvSubRows(s):cloudSubRows();
+  hzMenuBrand(engSub);             // the server's modes too (6b526)
   engMenu.querySelectorAll(".engrow.srvmenu").forEach(e=>e.classList.toggle("open",e===row));
   engSub.hidden=false;
   placeEngSub();
@@ -46529,6 +47442,7 @@ function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
   srvSyncOff();
   engMenu.innerHTML=engMainRows();
+  hzMenuBrand(engMenu);            // Alpha, Gamma, Sigma (6b526, 6b534)
   engMenu.hidden=false;
   // fit the window (6b336): open on the side with room; when neither
   // side holds the whole list, take the roomier one and scroll
@@ -46619,6 +47533,7 @@ function cloudChipOn(cs,t){
 function paintCloudChip(){
   const c=document.getElementById("cloud-chip");if(!c)return;
   c.hidden=!cloudChipOn(cloudSt,tier);
+  if(globalThis.hzReady)hzMachinesPaint();    // Horizon's header (6b526)
 }
 function cloudChipSet(cs){cloudSt=cs||null;paintCloudChip();}
 async function cloudChipLoad(){
@@ -46693,6 +47608,7 @@ function modeShow(which){
   setTimeout(renderChats,0);
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
+  if(globalThis.hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes and rows (6b526)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
@@ -48804,6 +49720,7 @@ async function send(){
     ||(sentDocs.length?"📄 (file)":""))
     +(sentDocs.length&&text?"":"")
     +(sentDocs.length?"\n📄 "+sentDocs.map(d=>d.name).join(", "):"");
+  if(globalThis.hzReady)hzBeforeSend(text);   // Horizon: where the composer and the words were (6b534)
   messages.push({role:"user",content:shown});
   const uDiv=addMsg("user",shown);
   if(sentImages.length){
@@ -48833,6 +49750,7 @@ async function send(){
   const turn={chat_id:myChat,lane:(chats.find(x=>x.id===myChat)||{}).lane||uiMode,
     after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};
   generating=true; document.body.classList.add("gen"); genChat=myChat;
+  if(globalThis.hzReady)hzOnSend();           // Horizon: the shockwave, the live aurora (6b526)
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
   const aiDiv=addMsg("assistant",""); const body=aiDiv.querySelector(".body");
   aiDiv.classList.add("live");     // soft mask on the newest line
@@ -48875,6 +49793,8 @@ async function send(){
       if(b)annExtra={prev_image:b.img,prev_grid:b.grid||undefined};
     }
   }
+  // the Horizon composer's Effort (6b534): Low, Medium, High, Max or Ultra
+  if(globalThis.hzReady&&document.documentElement.classList.contains("hz"))annExtra.effort=hzEffortWire();
   if(advGhostOnly){
     const g=adv.local[0],gs=srvList.find(x=>g.indexOf(x.name+SRV_SEP)===0);
     body.insertAdjacentHTML("beforebegin",'<div class="ghostnote" style="font-size:11px;'
@@ -49005,12 +49925,14 @@ async function send(){
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
+                  if(globalThis.hzReady)hzTele("run",d);
                 }catch(e){}},
-        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);},
+        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);if(globalThis.hzReady)hzTele("status",t);},
         RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}},   // the writer's pace (6b515)
         RUBIN:j=>{const k=/^\{"k":"(\w+)"/.exec(j);if(k)rbFr[k[1]]=j;},   // Vera Rubin (6b519)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
+                     if(globalThis.hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
                      if(!drafts.some(x=>x.m===d.m))drafts.push(d);
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
@@ -49024,7 +49946,7 @@ async function send(){
         CTX:j=>{try{locCtx=(JSON.parse(j).loc)||"";}catch(e){}},
         PLACEHINT:j=>{try{placeHint=JSON.parse(j);}catch(e){}},
         PLACES2:j=>{try{places=JSON.parse(j);}catch(e){}},
-        STEP:j=>{try{const sd=JSON.parse(j);addStep(sd);
+        STEP:j=>{try{const sd=JSON.parse(j);addStep(sd);if(globalThis.hzReady)hzTele("step",sd);
                  // the server answered the wake: its bars are read now (6b461)
                  if(sd&&sd.id==="wake"&&sd.s==="done"&&/^Woke /.test(sd.l||""))
                    srvUseKick();}catch(e){}},
@@ -49059,6 +49981,7 @@ async function send(){
       const gsecs=genT0?(lastChunkT-genT0)/1000:0;
       lastRate=gsecs>0.3?tokEst/gsecs:0;
       setToks(lastRate,"streaming");
+      if(globalThis.hzReady)hzTele("rate",lastRate);
       // a RESET replays the replacement ONCE, when it arrives (6b463, per
       // Patrick: "started streaming all over again while flickering").
       // raw keeps the marker for the rest of the stream, so testing
@@ -49205,6 +50128,7 @@ async function send(){
   }
   setToks(0,"idle");
   generating=false;abortCtl=null;genChat=null;document.body.classList.remove("gen");
+  if(globalThis.hzReady)hzOnLand(wasAborted);  // Horizon: the sky settles (6b526)
   srvBoost=false;     // the bars go back to their normal rate (6b461)
   sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
   if(curChat===myChat)autoScroll();
@@ -49393,12 +50317,19 @@ function greeting(){
   // still take the name the old way
   return t.indexOf("{")>=0?greetFill(t):persGreet(t);
 }
+// Horizon's greeting (6b526) is by the time of day, in its own words
+const _greetBank=greeting;
+greeting=function(){
+  if(globalThis.hzReady&&document.documentElement.classList.contains("hz"))return hzGreeting();
+  return _greetBank();
+};
 (function(){const g=$(".greet");if(g)g.textContent=greeting();})();
 api("/api/prefs").then(r=>r.json()).then(p=>{
   // "Peter Smith" -> "Peter"; "Brooklyn, NY" -> "Brooklyn"
   NICK=(String(p.user_name||"").trim().split(" ")[0]||"").slice(0,24);
   CITY=String(p.home_area||"").split(",")[0].trim().slice(0,32);
   const g=$("#hero .greet");
+  if(globalThis.hzReady)hzHomePaint();        // Horizon: the name reaches the greeting (6b526)
   if(!g||!(NICK||CITY))return;
   g.textContent=greeting();
   // mid-wipe the fly-in is already raising it; otherwise rise in again
@@ -50067,6 +50998,7 @@ function syncSuggest(){
 function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
+  if(globalThis.hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -50224,6 +51156,7 @@ function chatOpenHit(id){
   if(v.mi>=0&&curChat===id)findOpenAt(q,v.mi);
 }
 function renderChats(){
+  if(globalThis.hzReady)setTimeout(hzHistoryPaint,0);   // Horizon's rows (6b526)
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
   // code chats, Agents lists specialist chats, Chat lists the rest
@@ -50861,6 +51794,7 @@ async function pollStats(){
   // a PC with no GPU readings (no NVIDIA card) shows no bar rather
   // than a made-up one (6b317, from the Windows sweep)
   if($("#gpu-meter"))$("#gpu-meter").hidden=(IS_PC&&gpu==null);
+  if(globalThis.hzReady)hzStats(gpu,memPct);  // Horizon: only the real reading, never the ambient one (6b526)
   if(gpu==null){
     // ambient fallback — clearly approximate
     simGpu=Math.max(2,Math.min(97,simGpu+(Math.random()-0.5)*8+(generating?22:-16)));
@@ -51030,6 +51964,7 @@ const skySeen=i=>api("/api/sky/seen",{method:"POST",
   headers:{"Content-Type":"application/json"},body:JSON.stringify({i})}).catch(()=>{});
 async function bootSkyline(){
   if(noVideo||!skyline||skyBooted)return;
+  if(document.documentElement.classList.contains("hz"))return;   // Horizon has its own sky (6b526)
   skyBooted=true;
   // NO STOCKPILE, per Patrick: pick fresh every launch and let the bar
   // play its moment — the loading bar IS part of the show. The server
@@ -51467,7 +52402,7 @@ if(matchMedia("(pointer:fine)").matches){
     requestAnimationFrame(paraStep);
   }
   document.addEventListener("mousemove",e=>{
-    if(noVideo)return;
+    if(noVideo||document.documentElement.classList.contains("hz"))return;
     pxT=(e.clientX/innerWidth-.5);pyT=(e.clientY/innerHeight-.5);
     if(!paraOn){paraOn=true;requestAnimationFrame(paraStep);}
   },{passive:true});
@@ -53308,6 +54243,7 @@ function srvChipsHtml(list){
 }
 function paintSrvChips(){
   const box=document.getElementById("srv-chips");
+  if(globalThis.hzReady)hzMachinesPaint();   // Horizon's header follows the servers (6b526)
   if(box)box.innerHTML=srvChipsHtml(srvList);
   srvMetersRefresh();
 }
@@ -53461,7 +54397,8 @@ function tierShown(t){
   if(s&&mode)return mode+" \u00b7 "+s.name+" only";   // "Thinking · <name> only" (6b426)
   return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
 }
-function tierLabel(){return tierShown(tier)||model;}
+// the chip's words carry the modes' brand names (6b526): "Zenith · <server> only"
+function tierLabel(){return (typeof hzModeWords==="function"?hzModeWords(tierShown(tier)):tierShown(tier))||model;}
 // the modes that can't answer are the ones tierOff holds (setTier, the
 // menu's click and paintTierAvail read it)
 function srvSyncOff(){
@@ -54034,6 +54971,11 @@ function winWipeRun(){
 }
 function kickWipe(){
   if(wipeKicked)return;wipeKicked=true;
+  // Horizon (6b526) opens on its own intro; the wipe and the band are Classic's
+  if(document.documentElement.classList.contains("hz")){
+    if(globalThis.hzReady)hzIntroKick();
+    return;
+  }
   // native Mac boot: the window wipes in from the right first, and the
   // rainbow answers from the left inside winWipeFinish
   if(document.documentElement.classList.contains("winwipe"))winWipeRun();
@@ -56039,6 +56981,1190 @@ document.addEventListener("visibilitychange",()=>{
 })();
 
 input.focus();
+/* ========================================================= HORIZON (6b526) */
+// THE HORIZON LOOK (6b526, per Patrick: "the most beautiful AI chat home
+// screen anyone has shipped", then "get rid of the semicircle", "maximum GPU
+// with the night effect", "80% moon effect, 20% Apple", "neon colors,
+// rainbows... being classy", "a trace for that opening title"). Design:
+// design/TOKENS.md, design/NORTHSTAR.md and its OVERRIDE 2.
+// The background is ONE full-screen WebGL canvas: a moonlit sky graded to
+// the local hour, the brightest REAL stars (a compact Yale Bright Star subset
+// below, placed from the clock and the place the server names; no network,
+// no location permission) under a faint turning dust, moonglow as bright as
+// tonight's real Moon on the side it really is, and about a fifth of the
+// picture the app's own orbital Apple night footage rising from the foot of
+// the screen with long-exposure light trails, bloom, a lens streak, traced
+// edges and grain; over it a GPU neon aurora whose strength follows the
+// effort slider and the work. The CSS ice rays and the colour wash stay.
+// On open the wordmark and then the greeting are traced in light. The
+// machines are dies in their makers' colours; the slider slides out what a
+// mode runs. Effects: Full (this Mac's GPU is free) or Balanced. Everything
+// pauses while hidden, long unfocused or with effects off; reduced motion is
+// still; no WebGL means the plain footage. Classic (Settings > About > Look)
+// is untouched: without html.hz nothing here runs. No model names on the
+// home itself: the slider's lineup shows them only while you look.
+// `hzReady` and `hzS` are vars: the hooks earlier in this file test hzReady,
+// and a let/const here would be a temporal-dead-zone throw during boot.
+var hzReady=false;
+var hzS=null;
+const HZ_PLACE=__HZ_PLACE__,HZ_DEBUG=__HZ_DEBUG__,HZ_SEEN=__HZ_SEEN__;
+// every Apple aerial the app knows, with the hours it suits and its blend (sky_hz_clips, 6b534)
+const HZ_CLIPS=__SKY_HZ__;
+// ---- the sky's arithmetic (standard low-precision formulas, J2000)
+function hzD(t){return t/86400000+2440587.5-2451545.0;}
+function hzGmst(t){const g=(18.697374558+24.06570982441908*hzD(t))%24;return g<0?g+24:g;}
+function hzAltAz(raH,dec,lat,lon,t){
+  const R=Math.PI/180,ha=((hzGmst(t)+lon/15-raH)*15)*R,de=dec*R,la=lat*R;
+  const sa=Math.sin(la)*Math.sin(de)+Math.cos(la)*Math.cos(de)*Math.cos(ha);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sa)));
+  const az=Math.atan2(-Math.cos(de)*Math.sin(ha),
+    Math.sin(de)*Math.cos(la)-Math.cos(de)*Math.sin(la)*Math.cos(ha));
+  return {alt:alt/R,az:((az/R)+360)%360};
+}
+function hzSun(t){
+  const d=hzD(t),R=Math.PI/180;
+  const g=((357.529+0.98560028*d)%360)*R,q=(280.459+0.98564736*d)%360;
+  const L=(((q+1.915*Math.sin(g)+0.020*Math.sin(2*g))%360)+360)%360,e=(23.439-0.00000036*d)*R;
+  const ra=Math.atan2(Math.cos(e)*Math.sin(L*R),Math.cos(L*R)),dec=Math.asin(Math.sin(e)*Math.sin(L*R));
+  return {ra:((ra/R)/15+24)%24,dec:dec/R,lon:L};
+}
+// Schlyter's Moon: RA (hours), Dec, the lit fraction, whether it waxes, the elongation
+function hzMoon(t){
+  const R=Math.PI/180,d=hzD(t)+1.5,n=x=>((x%360)+360)%360,s=x=>Math.sin(x*R);
+  const N=n(125.1228-0.0529538083*d),i=5.1454*R,w=n(318.0634+0.1643573223*d);
+  const a=60.2666,e=0.054900,M=n(115.3654+13.0649929509*d);
+  let E=M*R+e*Math.sin(M*R)*(1+e*Math.cos(M*R));
+  for(let k=0;k<5;k++)E=E-(E-e*Math.sin(E)-M*R)/(1-e*Math.cos(E));
+  const xv=a*(Math.cos(E)-e),yv=a*Math.sqrt(1-e*e)*Math.sin(E);
+  const v=Math.atan2(yv,xv),r=Math.sqrt(xv*xv+yv*yv),NN=N*R,vw=v+w*R;
+  const xh=r*(Math.cos(NN)*Math.cos(vw)-Math.sin(NN)*Math.sin(vw)*Math.cos(i));
+  const yh=r*(Math.sin(NN)*Math.cos(vw)+Math.cos(NN)*Math.sin(vw)*Math.cos(i));
+  const zh=r*Math.sin(vw)*Math.sin(i);
+  let lon=Math.atan2(yh,xh)/R,lat=Math.atan2(zh,Math.sqrt(xh*xh+yh*yh))/R;
+  const ws=n(282.9404+4.70935e-5*d),Ms=n(356.0470+0.9856002585*d),Ls=n(ws+Ms);
+  const Lm=n(N+w+M),D=n(Lm-Ls),F=n(Lm-N);
+  lon+=-1.274*s(M-2*D)+0.658*s(2*D)-0.186*s(Ms)-0.059*s(2*M-2*D)-0.057*s(M-2*D+Ms)
+      +0.053*s(M+2*D)+0.046*s(2*D-Ms)+0.041*s(M-Ms)-0.035*s(D)-0.031*s(M+Ms)
+      -0.015*s(2*F-2*D)+0.011*s(M-4*D);
+  lat+=-0.173*s(F-2*D)-0.055*s(M-F-2*D)-0.046*s(M+F-2*D)+0.033*s(F+2*D)+0.017*s(2*M+F);
+  const ecl=(23.4393-3.563e-7*d)*R,lo=lon*R,la=lat*R;
+  const xe=Math.cos(lo)*Math.cos(la),ye=Math.sin(lo)*Math.cos(la),ze=Math.sin(la);
+  const yq=ye*Math.cos(ecl)-ze*Math.sin(ecl),zq=ye*Math.sin(ecl)+ze*Math.cos(ecl);
+  const ra=((Math.atan2(yq,xe)/R)/15+24)%24,dec=Math.atan2(zq,Math.sqrt(xe*xe+yq*yq))/R;
+  const el=n(lon-hzSun(t).lon);
+  return {ra:ra,dec:dec,lit:(1-Math.cos(el*R))/2,waxing:el<180,elong:el};
+}
+// the brightest stars (Yale Bright Star Catalog, public domain): J2000 RA in
+// hours, Dec in degrees, V magnitude, B-V colour. ~160 stars to V 3.0, plus a
+// few fainter ones that complete a well-known shape (the Dipper, the W, Corvus)
+const HZ_STARS=[[6.752,-16.716,-1.46,0],[6.399,-52.696,-0.74,.15],[14.66,-60.835,-0.27,.71],[14.261,19.182,-0.05,1.23],
+[18.616,38.784,.03,0],[5.278,45.998,.08,.8],[5.242,-8.202,.13,-.03],[7.655,5.225,.34,.42],[1.629,-57.237,.46,-.16],
+[5.92,7.407,.5,1.85],[14.064,-60.373,.61,-.23],[19.846,8.868,.76,.22],[12.443,-63.099,.76,-.24],[4.599,16.509,.86,1.54],
+[16.49,-26.432,.96,1.83],[13.42,-11.161,.97,-.23],[7.755,28.026,1.14,1],[22.961,-29.622,1.16,.09],[20.69,45.28,1.25,.09],
+[12.795,-59.689,1.25,-.23],[10.14,11.967,1.35,-.11],[6.977,-28.972,1.5,-.21],[7.577,31.888,1.58,.03],[12.519,-57.113,1.63,1.59],
+[17.56,-37.104,1.62,-.22],[5.419,6.35,1.64,-.22],[5.438,28.608,1.65,-.13],[9.22,-69.717,1.68,0],[5.604,-1.202,1.69,-.19],
+[22.137,-46.961,1.74,-.13],[5.679,-1.943,1.77,-.21],[12.9,55.96,1.77,-.02],[11.062,61.751,1.79,1.07],[3.405,49.861,1.8,.48],
+[7.14,-26.393,1.84,.68],[17.622,-42.998,1.87,.4],[18.403,-34.385,1.85,-.03],[8.375,-59.51,1.86,1.28],[13.792,49.313,1.86,-.19],
+[5.992,44.948,1.9,.03],[16.811,-69.028,1.92,1.44],[6.629,16.399,1.93,0],[20.428,-56.735,1.94,-.2],[8.745,-54.709,1.96,.04],
+[6.378,-17.956,1.98,-.24],[9.46,-8.659,1.98,1.44],[2.53,89.264,1.98,.6],[2.12,23.463,2,1.15],[10.333,19.842,2.08,1.13],
+[.727,-17.987,2.04,1.02],[13.399,54.925,2.04,.02],[18.921,-26.297,2.05,-.13],[14.111,-36.37,2.06,1.01],[1.162,35.621,2.05,1.58],
+[.14,29.091,2.06,-.11],[17.582,12.56,2.08,.16],[14.845,74.156,2.08,1.47],[5.796,-9.67,2.09,-.17],[11.818,14.572,2.14,.09],
+[3.136,40.956,2.12,-.05],[22.711,-46.885,2.11,1.62],[12.692,-48.96,2.17,-.01],[9.285,-59.275,2.21,.19],[9.133,-43.433,2.21,1.66],
+[15.578,26.715,2.23,-.02],[5.533,-.299,2.23,-.22],[20.371,40.257,2.23,.68],[17.943,51.489,2.23,1.52],[.675,56.537,2.24,1.17],
+[8.06,-40.003,2.25,-.26],[2.065,42.33,2.26,1.37],[.153,59.15,2.27,.34],[14.75,27.074,2.37,.97],[16.006,-22.622,2.32,-.12],
+[16.836,-34.293,2.29,1.15],[11.031,56.382,2.37,-.02],[.438,-42.306,2.38,1.08],[17.708,-39.03,2.39,-.17],[21.736,9.875,2.39,1.53],
+[23.063,28.083,2.42,1.67],[17.173,-15.725,2.43,.06],[11.897,53.695,2.44,.04],[7.402,-29.303,2.45,-.08],[9.369,-55.011,2.5,-.14],
+[.945,60.717,2.47,-.15],[23.079,15.205,2.49,-.04],[20.77,33.97,2.48,1.03],[16.091,-19.805,2.62,-.07],[14.848,-16.042,2.75,.15],
+[15.283,-9.383,2.61,-.07],[15.738,6.426,2.65,1.17],[1.911,20.808,2.64,.13],[21.31,62.586,2.44,.22],[12.263,-17.542,2.59,-.11],
+[12.573,-23.397,2.65,.89],[19.044,-29.88,2.6,.08],[18.35,-29.828,2.7,1.38],[18.466,-25.422,2.81,1.04],[19.771,10.613,2.72,1.52],
+[16.239,-3.694,2.73,1.58],[17.725,4.567,2.76,1.16],[8.159,-47.337,1.83,-.22],[14.699,-47.388,2.3,-.2],[14.976,-43.134,2.68,-.22],
+[13.665,-53.466,2.3,-.22],[14.592,-42.158,2.31,-.19],[13.926,-47.288,2.55,-.22],[12.139,-50.722,2.58,-.12],[13.343,-36.712,2.73,.07],
+[15.919,-63.431,2.83,.29],[12.252,-58.749,2.79,-.26],[10.716,-64.394,2.74,-.22],[12.257,57.033,3.31,.08],[1.907,63.67,3.37,-.15],
+[6.383,22.514,2.88,1.64],[4.95,33.166,2.69,1.53],[5.995,37.213,2.65,-.08],[3.791,24.105,2.87,-.09],[11.235,20.524,2.56,.12],
+[12.694,-1.449,2.74,.36],[13.036,10.959,2.83,.94],[13.912,18.398,2.68,.58],[17.513,-37.296,2.69,-.18],[16.598,-28.216,2.82,-.25],
+[18.097,-30.424,2.98,.98],[19.75,45.131,2.87,-.03],[19.512,27.96,3.05,1.09],[.221,15.183,2.83,-.19],[3.038,4.09,2.53,1.64],
+[5.131,-5.086,2.79,.16],[2.971,-40.305,2.88,.13],[8.126,-24.304,2.81,.43],[7.286,-37.097,2.7,1.62],[10.78,-49.42,2.69,.9],
+[16.619,-10.567,2.56,.02],[16.504,21.49,2.77,.94],[16.688,31.603,2.81,.65],[17.507,52.301,2.79,.98],[15.346,71.834,3.05,.06],
+[15.315,-68.68,2.87,0],[17.421,-55.53,2.84,1.46],[17.531,-49.876,2.84,-.17],[.429,-77.254,2.82,.62],[1.979,-61.57,2.86,.29],
+[5.661,-34.074,2.65,-.12],[5.546,-17.822,2.58,.21],[5.471,-20.759,2.84,.82],[7.453,8.289,2.89,-.1],[1.43,60.235,2.68,.13],
+[21.784,-16.127,2.87,.29],[12.498,-16.516,2.95,-.05],[12.169,-22.62,3,-.02]];
+// where a time zone is, for a machine with no zone table (Windows): lat, lon.
+// The Mac's server reads the OS's own table; this is the fallback
+const HZ_ZONES={"America/New_York":[40.71,-74.01],"America/Chicago":[41.88,-87.63],"America/Denver":[39.74,-104.99],
+"America/Los_Angeles":[34.05,-118.24],"America/Phoenix":[33.45,-112.07],"America/Anchorage":[61.22,-149.9],
+"Pacific/Honolulu":[21.31,-157.86],"America/Toronto":[43.65,-79.38],"America/Vancouver":[49.28,-123.12],
+"America/Edmonton":[53.55,-113.49],"America/Winnipeg":[49.9,-97.14],"America/Halifax":[44.65,-63.58],
+"America/St_Johns":[47.56,-52.71],"America/Mexico_City":[19.43,-99.13],"America/Bogota":[4.71,-74.07],
+"America/Lima":[-12.05,-77.04],"America/Santiago":[-33.45,-70.67],"America/Argentina/Buenos_Aires":[-34.6,-58.38],
+"America/Sao_Paulo":[-23.55,-46.63],"America/Montevideo":[-34.9,-56.16],"America/Caracas":[10.48,-66.9],
+"America/Havana":[23.13,-82.38],"America/Puerto_Rico":[18.47,-66.11],"America/Detroit":[42.33,-83.05],
+"America/Indiana/Indianapolis":[39.77,-86.16],"America/Boise":[43.62,-116.2],"America/Regina":[50.45,-104.62],
+"America/Guatemala":[14.63,-90.51],"America/Costa_Rica":[9.93,-84.08],"America/Panama":[8.98,-79.52],
+"America/La_Paz":[-16.5,-68.15],"America/Asuncion":[-25.26,-57.58],"America/Guayaquil":[-2.17,-79.92],
+"Europe/London":[51.51,-.13],"Europe/Dublin":[53.35,-6.26],"Europe/Lisbon":[38.72,-9.14],"Europe/Madrid":[40.42,-3.7],
+"Europe/Paris":[48.86,2.35],"Europe/Brussels":[50.85,4.35],"Europe/Amsterdam":[52.37,4.9],"Europe/Berlin":[52.52,13.41],
+"Europe/Zurich":[47.37,8.54],"Europe/Rome":[41.9,12.5],"Europe/Vienna":[48.21,16.37],"Europe/Prague":[50.08,14.44],
+"Europe/Warsaw":[52.23,21.01],"Europe/Stockholm":[59.33,18.07],"Europe/Oslo":[59.91,10.75],"Europe/Copenhagen":[55.68,12.57],
+"Europe/Helsinki":[60.17,24.94],"Europe/Athens":[37.98,23.73],"Europe/Istanbul":[41.01,28.98],"Europe/Kyiv":[50.45,30.52],
+"Europe/Moscow":[55.76,37.62],"Europe/Bucharest":[44.43,26.1],"Europe/Budapest":[47.5,19.04],"Europe/Belgrade":[44.79,20.47],
+"Europe/Zagreb":[45.81,15.98],"Europe/Riga":[56.95,24.11],"Europe/Vilnius":[54.69,25.28],"Europe/Tallinn":[59.44,24.75],
+"Europe/Minsk":[53.9,27.57],"Europe/Sofia":[42.7,23.32],"Atlantic/Reykjavik":[64.15,-21.94],"Africa/Cairo":[30.04,31.24],
+"Africa/Johannesburg":[-26.2,28.05],"Africa/Lagos":[6.52,3.38],"Africa/Nairobi":[-1.29,36.82],"Africa/Casablanca":[33.57,-7.59],
+"Asia/Dubai":[25.2,55.27],"Asia/Jerusalem":[31.77,35.21],"Asia/Riyadh":[24.69,46.72],"Asia/Tehran":[35.69,51.39],
+"Asia/Baghdad":[33.31,44.37],"Asia/Karachi":[24.86,67.01],"Asia/Kolkata":[22.57,88.36],"Asia/Dhaka":[23.81,90.41],
+"Asia/Kathmandu":[27.72,85.32],"Asia/Colombo":[6.93,79.86],"Asia/Bangkok":[13.76,100.5],"Asia/Jakarta":[-6.21,106.85],
+"Asia/Singapore":[1.35,103.82],"Asia/Kuala_Lumpur":[3.14,101.69],"Asia/Manila":[14.6,120.98],"Asia/Hong_Kong":[22.32,114.17],
+"Asia/Shanghai":[31.23,121.47],"Asia/Taipei":[25.03,121.57],"Asia/Seoul":[37.57,126.98],"Asia/Tokyo":[35.68,139.69],
+"Asia/Ho_Chi_Minh":[10.82,106.63],"Asia/Yangon":[16.87,96.2],"Asia/Kabul":[34.53,69.17],"Asia/Almaty":[43.24,76.95],
+"Asia/Tashkent":[41.3,69.24],"Asia/Baku":[40.41,49.87],"Asia/Tbilisi":[41.72,44.83],"Asia/Yerevan":[40.18,44.51],
+"Australia/Perth":[-31.95,115.86],"Australia/Adelaide":[-34.93,138.6],"Australia/Brisbane":[-27.47,153.03],
+"Australia/Sydney":[-33.87,151.21],"Australia/Melbourne":[-37.81,144.96],"Australia/Hobart":[-42.88,147.33],
+"Pacific/Auckland":[-36.85,174.76]};
+function hzFindPlace(){
+  const p=HZ_PLACE;
+  if(p&&typeof p.lat==="number"&&typeof p.lon==="number")return p;
+  let tz="";try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";}catch(e){}
+  const z=HZ_ZONES[tz];
+  if(z)return {lat:z[0],lon:z[1],city:tz.split("/").pop().replace(/_/g," "),src:"zone"};
+  return null;
+}
+function hzRng(seed){let a=(seed>>>0)||1;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+function hzHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function hzNow(){return hzS&&hzS.fixedNow?hzS.fixedNow:Date.now();}
+// the Moon's words, kept for the gauntlet's check of the phase arithmetic
+function hzMoonWords(m){
+  const syn=29.530588,toFull=(((180-m.elong)%360)+360)%360/360*syn,sinceFull=(((m.elong-180)%360)+360)%360/360*syn;
+  const toNew=((360-m.elong)%360)/360*syn,sinceNew=m.elong/360*syn;
+  const nights=d=>{const n=Math.round(d);return n===1?"One night":n===2?"Two nights":n===3?"Three nights":n===4?"Four nights":n===5?"Five nights":n+" nights";};
+  if(toFull<0.5||sinceFull<0.5)return "Full Moon tonight";
+  if(toNew<0.5||sinceNew<0.5)return "New Moon tonight";
+  if(toFull<=5.5)return nights(toFull)+" from full";
+  if(sinceFull<=4.5)return nights(sinceFull)+" past full";
+  if(Math.abs(m.elong-90)<6)return "First quarter tonight";
+  if(Math.abs(m.elong-270)<6)return "Last quarter tonight";
+  if(toNew<=4.5)return nights(toNew)+" from new";
+  if(sinceNew<=4.5)return nights(sinceNew)+" past new";
+  return m.waxing?"A waxing Moon":"A waning Moon";
+}
+// ---- the real stars, drawn to a texture the GPU sky samples: the sky's
+// horizon for them is the foot of the window; isotropic; facing the equator
+function hzGeom(){
+  const W=innerWidth,H=innerHeight,foot=H-40,ppd=Math.max(4,(foot-16)/90);
+  return {W:W,H:H,cx:W/2,R:1600,foot:foot,ppd:ppd,azC:(hzS.place&&hzS.place.lat<0)?0:180};
+}
+function hzProject(g,alt,az){
+  let da=az-g.azC;da=((da+540)%360)-180;
+  const x=g.cx+da*g.ppd,dx=x-g.cx;
+  return {x:x,y:g.foot+g.R-Math.sqrt(Math.max(0,g.R*g.R-dx*dx))-alt*g.ppd};
+}
+function hzStarColor(bv){
+  if(bv<0)return "rgba(205,222,255,A)";if(bv<0.5)return "rgba(255,255,255,A)";
+  if(bv<1)return "rgba(255,244,228,A)";return "rgba(255,230,200,A)";
+}
+function hzDrawStars(){
+  const cv=hzS.starCv;if(!cv)return;
+  const g=hzGeom(),t=hzNow(),p=hzS.place||{lat:40,lon:0};
+  cv.width=Math.max(2,Math.round(g.W/2));cv.height=Math.max(2,Math.round(g.H/2));
+  const x=cv.getContext("2d");x.clearRect(0,0,cv.width,cv.height);x.scale(.5,.5);
+  let n=0;
+  for(const s of HZ_STARS){
+    const aa=hzAltAz(s[0],s[1],p.lat,p.lon,t);if(aa.alt<1)continue;
+    const pt=hzProject(g,aa.alt,aa.az);if(pt.x<-4||pt.x>g.W+4||pt.y<-4)continue;
+    const m=s[2],r=Math.max(1.1,Math.min(2.2,2.1-0.3*m)),a=Math.max(0.35,Math.min(1,1.05-0.18*m)),col=hzStarColor(s[3]);
+    if(m<0.6){const gr=x.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,9);gr.addColorStop(0,col.replace("A",(a*.3).toFixed(3)));gr.addColorStop(1,col.replace("A","0"));
+      x.fillStyle=gr;x.beginPath();x.arc(pt.x,pt.y,9,0,7);x.fill();}
+    x.fillStyle=col.replace("A",a.toFixed(3));x.beginPath();x.arc(pt.x,pt.y,r,0,7);x.fill();n++;
+  }
+  hzS.starsShown=n;hzS.starsDirty=true;
+}
+// the Moon tonight: its real lit fraction, on the side it really is
+function hzMoonNow(){
+  const t=hzNow(),p=hzS.place,m=hzMoon(t);
+  hzS.moon=Object.assign(m,p?hzAltAz(m.ra,m.dec,p.lat,p.lon,t):{});
+  return m;
+}
+// ---- the GPU night (the reference mock's Sky, as the app's layer). One
+// canvas: the footage as a texture, a feedback pass that keeps the brightest
+// lights for a moment (a live long exposure) and the traced edges, a blur
+// pyramid at half and quarter size, the neon aurora at half size, then the
+// composite: the sky by the local hour, the real stars, moonlight, the Earth
+// footage at the foot, trails, bloom, a lens streak, a prism fringe, grain.
+const HZ_VS="attribute vec2 p;varying vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}";
+const HZ_BLUR_FS="precision highp float;varying vec2 uv;uniform sampler2D src;uniform vec2 stp;void main(){vec4 c=texture2D(src,uv);"
+  +"c+=(texture2D(src,uv+stp)+texture2D(src,uv-stp))*.8825;c+=(texture2D(src,uv+stp*2.)+texture2D(src,uv-stp*2.))*.6065;"
+  +"c+=(texture2D(src,uv+stp*3.)+texture2D(src,uv-stp*3.))*.3247;c+=(texture2D(src,uv+stp*4.)+texture2D(src,uv-stp*4.))*.1353;gl_FragColor=c/4.898;}";
+function hzProgram(gl,fs){
+  const sh=(k,src)=>{const x=gl.createShader(k);gl.shaderSource(x,src);gl.compileShader(x);
+    if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(x)||"shader");return x;};
+  const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,HZ_VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error("link");
+  const U={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
+  for(let i=0;i<n;i++){const u=gl.getActiveUniform(p,i);U[u.name.replace(/\[0\]$/,"")]=gl.getUniformLocation(p,u.name);}
+  p.U=U;return p;
+}
+function hzQuad(gl){const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  return p=>{gl.bindBuffer(gl.ARRAY_BUFFER,b);const l=gl.getAttribLocation(p,"p");gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,2,gl.FLOAT,false,0,0);};}
+function hzTex(gl,filter){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,filter||gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,filter||gl.LINEAR);return t;}
+function hzTarget(gl,w,h){const t=hzTex(gl);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  const f=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,f);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);return {t:t,f:f,w:w,h:h};}
+function hzBlur(gl,prog,quad,src,srcW,srcH,dst,dx,dy){gl.useProgram(prog);quad(prog);gl.bindFramebuffer(gl.FRAMEBUFFER,dst.f);gl.viewport(0,0,dst.w,dst.h);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(prog.U.src,0);gl.uniform2f(prog.U.stp,dx/srcW,dy/srcH);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
+// the sky's colours and the footage's grade by the local hour: [hour, ...]
+const HZ_GRADE=[[0,.68,.80,1.06,.92,0],[5,.68,.80,1.06,.92,0],[6.5,.86,.82,1.0,1.0,.85],[8,.80,.89,1.06,1.1,.1],[16.5,.80,.89,1.06,1.1,.1],[18.5,.88,.80,.98,1.0,.9],[20.5,.68,.80,1.06,.92,.05],[24,.68,.80,1.06,.92,0]];
+const HZ_SKYCOL=[[0,3,4,10,6,11,28,16,34,79],[5,3,4,10,6,11,28,16,34,79],[6.5,8,10,26,24,26,58,52,46,96],[8,6,14,38,14,34,84,34,74,150],[16.5,6,14,38,14,34,84,34,74,150],[18.5,6,8,22,22,22,56,64,46,96],[20.5,3,4,10,6,11,28,16,34,79],[24,3,4,10,6,11,28,16,34,79]];
+function hzKeyed(keys,h){for(let i=0;i<keys.length-1;i++){const a=keys[i],b=keys[i+1];if(h>=a[0]&&h<=b[0]){const t=(h-a[0])/(b[0]-a[0]||1);return a.map((v,k)=>v+(b[k]-v)*t);}}return keys[0];}
+function hzFxLevel(){try{return localStorage.getItem("millen.fxlevel")==="full"?"full":"balanced";}catch(e){return "balanced";}}
+function hzSkyBoot(){
+  const cv=$("#hz-gl"),vid=$("#hz-vid");if(!cv||!vid||hzS.sky!==undefined)return;
+  hzS.sky=null;
+  let gl=null;try{gl=cv.getContext("webgl",{alpha:false,antialias:false,premultipliedAlpha:false,powerPreference:"high-performance"});}catch(e){}
+  if(!gl){document.documentElement.classList.add("hz-novfx");return;}   // no WebGL: the plain footage shows
+  const HEAD="precision highp float;varying vec2 uv;uniform vec4 vmap;vec2 V(vec2 u){return u*vmap.xy+vmap.zw;}float L(vec3 c){return dot(c,vec3(.299,.587,.114));}";
+  const FEED=HEAD+"uniform sampler2D vid,prev;uniform vec2 vpx,tpx;uniform float decay,edecay,hiT;"
+    +"void main(){vec2 q=V(uv);vec3 c=texture2D(vid,q).rgb;float l=L(c);float hi=smoothstep(hiT,hiT+.54,l);"
+    +"float tl=L(texture2D(vid,q+vpx*vec2(-1.,1.)).rgb),tc=L(texture2D(vid,q+vpx*vec2(0.,1.)).rgb),tr=L(texture2D(vid,q+vpx*vec2(1.,1.)).rgb),"
+    +"ml=L(texture2D(vid,q+vpx*vec2(-1.,0.)).rgb),mr=L(texture2D(vid,q+vpx*vec2(1.,0.)).rgb),"
+    +"bl=L(texture2D(vid,q+vpx*vec2(-1.,-1.)).rgb),bc=L(texture2D(vid,q+vpx*vec2(0.,-1.)).rgb),br=L(texture2D(vid,q+vpx*vec2(1.,-1.)).rgb);"
+    +"float e=smoothstep(.12,.42,length(vec2(-tl-2.*ml-bl+tr+2.*mr+br,-tl-2.*tc-tr+bl+2.*bc+br)));"
+    +"vec4 p=texture2D(prev,uv)*.52+(texture2D(prev,uv+vec2(tpx.x,0.))+texture2D(prev,uv-vec2(tpx.x,0.))+texture2D(prev,uv+vec2(0.,tpx.y))+texture2D(prev,uv-vec2(0.,tpx.y)))*.12;"
+    +"gl_FragColor=vec4(max(c*hi,p.rgb*decay-1.5/255.),max(e,p.a*edecay-2./255.));}";
+  const SHOW=HEAD+"uniform sampler2D vid,trail,bl1,bl2,stk,aur,stars;uniform vec2 px,res,mpos;uniform float time,boost,expo,warm,moon,mrad,dscale,foot,rise,starsOn;uniform vec3 tint,skyTop,skyMid,skyLow;"
+    +"float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}"
+    +"float starLayer(vec2 p,float cell,float keep,float sz){vec2 c=floor(p/cell),f=p-c*cell;float h=hash(c);if(h<keep)return 0.;"
+    +"vec2 o=(vec2(hash(c+1.7),hash(c+3.1))*.8+.1)*cell;float d=length(f-o);return ((h-keep)/(1.-keep))*exp(-d*d/(sz*sz));}"
+    +"vec4 moonRamp(float r){vec4 a=vec4(.965,.945,.894,.5),b=vec4(.871,.902,1.,.2),c=vec4(.624,.753,1.,.07);"
+    +"if(r<.16)return mix(a,b,r/.16);if(r<.42)return mix(b,c,(r-.16)/.26);if(r<.68)return mix(c,vec4(c.rgb,0.),(r-.42)/.26);return vec4(0.);}"
+    +"vec3 screen(vec3 a,vec3 b){return 1.-(1.-a)*(1.-b);}"
+    +"void main(){vec2 pc=vec2(uv.x,1.-uv.y)*res/dscale;float s=1.-uv.y;"
+    +"vec3 sky=s<.56?mix(skyTop,skyMid,smoothstep(0.,.56,s)):mix(skyMid,skyLow,smoothstep(.56,.72,s));"
+    // the real stars (a texture drawn from the catalogue) and, under them, a faint dust that turns once in forty minutes
+    +"vec4 rs=texture2D(stars,vec2(uv.x,1.-uv.y));"
+    +"vec2 q=pc-vec2(res.x/dscale*.5,-res.y/dscale*.9);float ca=cos(time*.002618),sa=sin(time*.002618);q=mat2(ca,-sa,sa,ca)*q;"
+    +"float st=starLayer(q+31.,19.,.93,.55)*.35;"
+    +"sky+=vec3(.9,.93,1.)*st*smoothstep(.98,.4,s)+rs.rgb*rs.a*starsOn*smoothstep(1.,.5,s);"
+    +"float r=length(pc-mpos)/mrad;vec4 mg=moonRamp(r);float an=atan(pc.y-mpos.y,pc.x-mpos.x);"
+    +"float shafts=(.55+.45*sin(an*17.+time*.013)*sin(an*29.-time*.009))*exp(-r*1.7)*.08;"
+    +"vec3 moonL=(mg.rgb*mg.a+vec3(.8,.86,1.)*shafts)*moon;"
+    +"vec3 base=texture2D(vid,V(uv)).rgb;base=pow(base,vec3(1.12))*expo;float l=L(base);base=mix(vec3(l),base,.82)*tint;"
+    +"vec4 tc=texture2D(trail,uv);vec3 g1=vec3(texture2D(bl1,uv+vec2(px.x*5.,0.)).r,texture2D(bl1,uv).g,texture2D(bl1,uv-vec2(px.x*5.,0.)).b),g2=texture2D(bl2,uv).rgb;float sk=L(texture2D(stk,uv).rgb);"
+    +"float wf=foot*(1.-smoothstep(0.,rise,uv.y)),wl=min(1.,foot*2.4)*(1.-smoothstep(0.,rise*1.07,uv.y));"
+    +"vec3 earth=base*wf+(tc.rgb*.42+g1*1.15+g2*1.4+vec3(.55,.7,1.)*sk*.55)*boost*wl+vec3(.62,.76,1.)*tc.a*.1*wl;"
+    +"vec3 col=screen(screen(screen(sky,earth),moonL),texture2D(aur,uv).rgb);"
+    +"col+=vec3(1.,.62,.36)*warm*(1.-smoothstep(0.,.75,uv.y))*.07;"
+    +"vec2 d=(uv-vec2(.5,.48))*vec2(.9,1.15);col*=clamp(1.-dot(d,d)*.9,.35,1.);"
+    +"float g=fract(sin(dot(floor(uv*res)+fract(time*7.)*91.,vec2(12.9898,78.233)))*43758.5453)-.5;col+=g*.022;"
+    +"gl_FragColor=vec4(clamp(col,0.,1.),1.);}";
+  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon;"
+    +"float h1(float n){return fract(sin(n)*43758.5453123);}"
+    +"float nz(vec2 x){vec2 p=floor(x),f=fract(x);f=f*f*(3.-2.*f);float n=p.x+p.y*57.;return mix(mix(h1(n),h1(n+1.),f.x),mix(h1(n+57.),h1(n+58.),f.x),f.y);}"
+    +"float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*nz(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}"
+    +"vec3 pal(float t){vec3 a=vec3(.624,.659,1.),b=vec3(1.,.561,.769),c=vec3(1.,.773,.541),d=vec3(.498,.941,.839);t=fract(t)*4.;"
+    +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
+    +"void main(){vec2 p=vec2(uv.x*asp,uv.y);float t=time*.035;vec3 col=vec3(0.);"
+    +"for(int k=0;k<2;k++){float fk=float(k);float x=p.x;"
+    +"float wave=fbm(vec2(x*.9+t*.6+fk*3.7,t*.2+fk))*2.-1.;"
+    +"float base=.6+.1*fk+.1*wave+.03*sin(x*3.1+t*2.+fk);float d=p.y-base;"
+    +"float rays=smoothstep(.25,.95,fbm(vec2(x*(18.+fk*7.)+wave*2.+t*(1.2+fk*.5),d*.9+t*.2)));"
+    +"float body=smoothstep(-.035,0.,d)*exp(-max(d,0.)*(4.+fk*2.)),fringe=exp(-abs(d)*30.)*.8;"
+    +"float a=(body*(.25+rays*1.4)+fringe*rays*.6)*(.55-.15*fk);"
+    +"vec3 c=mix(vec3(.5,.94,.84),pal(x*.35+t*.15+fk*.3),smoothstep(0.,.08,d));"
+    +"c=mix(c,pal(x*.35+t*.15+fk*.3+.25),smoothstep(.08,.24,d));col+=c*a;}"
+    +"col*=smoothstep(0.,.25,uv.x)*smoothstep(1.,.75,uv.x)*smoothstep(.99,.8,uv.y);"
+    +"gl_FragColor=vec4(col*neon,1.);}";
+  let pF,pS,pA,pB;
+  try{pF=hzProgram(gl,FEED);pS=hzProgram(gl,SHOW);pA=hzProgram(gl,AUR);pB=hzProgram(gl,HZ_BLUR_FS);}
+  catch(e){document.documentElement.classList.add("hz-novfx");return;}
+  const quad=hzQuad(gl),vtex=hzTex(gl),stex=hzTex(gl);
+  const S={gl:gl,cv:cv,vid:vid,quad:quad,vtex:vtex,stex:stex,pF:pF,pS:pS,pA:pA,pB:pB,W:0,H:0,last:0,ready:false,
+    boost:1,boostTo:1,neon:.25,neonTo:.25,lvl:.25,busy:false,par:[0,0],parTo:[0,0],t0:performance.now(),raf:0,footMul:0,footTo:0};
+  S.size=function(){
+    const d=hzFxLevel()==="full"?Math.min(devicePixelRatio||1,1.5):.75;
+    S.W=Math.max(2,Math.round(innerWidth*d));S.H=Math.max(2,Math.round(innerHeight*d));cv.width=S.W;cv.height=S.H;
+    S.A=hzTarget(gl,S.W,S.H);S.B=hzTarget(gl,S.W,S.H);
+    const w2=Math.max(2,S.W>>1),h2=Math.max(2,S.H>>1),w4=Math.max(2,S.W>>2),h4=Math.max(2,S.H>>2);
+    S.h1=hzTarget(gl,w2,h2);S.v1=hzTarget(gl,w2,h2);S.h2=hzTarget(gl,w4,h4);S.v2=hzTarget(gl,w4,h4);S.sk=hzTarget(gl,w4,h4);S.au=hzTarget(gl,w2,h2);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  };
+  S.size();
+  addEventListener("pointermove",e=>{S.parTo=[e.clientX/innerWidth-.5,e.clientY/innerHeight-.5];},{passive:true});
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  hzS.sky=S;
+  S.vmap=function(t){
+    const va=(vid.videoWidth||16)/(vid.videoHeight||9),sa=S.W/S.H;let sx=1,sy=1;if(sa>va)sy=va/sa;else sx=sa/va;
+    const z=1.05+.035*Math.sin(t*2*Math.PI/80);sx/=z;sy/=z;
+    S.par[0]+=(S.parTo[0]-S.par[0])*.04;S.par[1]+=(S.parTo[1]-S.par[1])*.04;
+    const ox=S.par[0]*.018+.01*Math.sin(t*.05),oy=-S.par[1]*.014;
+    return [sx,sy,.5-.5*sx+ox,.5-.5*sy+oy];
+  };
+  S.frame=function(nowT){
+    S.raf=0;
+    if(!hzS.mediaOn)return;
+    S.raf=requestAnimationFrame(S.frame);
+    if(document.hidden)return;
+    const full=hzFxLevel()==="full",gap=hzS.gen&&hzS.genLocal?1000/15:(full?0:32);
+    if(gap&&nowT-S.last<gap)return;S.last=nowT;
+    const hasVid=vid.readyState>=2&&!!vid.dataset.i;
+    if(!S.ready){S.ready=true;cv.classList.add("on");}
+    const t=(nowT-S.t0)/1000,m=S.vmap(t);
+    S.boost+=(S.boostTo-S.boost)*.03;
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,vtex);
+    if(hasVid){try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,vid);}catch(e){hzS.mediaOn=false;document.documentElement.classList.add("hz-novfx");return;}}
+    else if(!S.blank){S.blank=true;gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,2,2,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(16));}
+    if(hzS.starsDirty&&hzS.starCv){hzS.starsDirty=false;gl.activeTexture(gl.TEXTURE6);gl.bindTexture(gl.TEXTURE_2D,stex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,hzS.starCv);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);}
+    gl.useProgram(pF);quad(pF);gl.bindFramebuffer(gl.FRAMEBUFFER,S.B.f);gl.viewport(0,0,S.W,S.H);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,vtex);gl.uniform1i(pF.U.vid,0);
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,S.A.t);gl.uniform1i(pF.U.prev,1);
+    gl.uniform4fv(pF.U.vmap,m);gl.uniform2f(pF.U.vpx,1.2/(vid.videoWidth||1920),1.2/(vid.videoHeight||1080));gl.uniform2f(pF.U.tpx,1/S.W,1/S.H);
+    gl.uniform1f(pF.U.decay,full?.955:.88);gl.uniform1f(pF.U.edecay,full?.86:.5);gl.uniform1f(pF.U.hiT,hzS.clip?hzS.clip.hi:.36);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    hzBlur(gl,pB,quad,S.B.t,S.W,S.H,S.h1,2.4,0);hzBlur(gl,pB,quad,S.h1.t,S.h1.w,S.h1.h,S.v1,0,1.2);
+    hzBlur(gl,pB,quad,S.v1.t,S.v1.w,S.v1.h,S.h2,2.4,0);hzBlur(gl,pB,quad,S.h2.t,S.h2.w,S.h2.h,S.v2,0,1.6);
+    hzBlur(gl,pB,quad,S.v2.t,S.v2.w,S.v2.h,S.sk,7,0);
+    S.neon+=(S.neonTo-S.neon)*.025;
+    gl.useProgram(pA);quad(pA);gl.bindFramebuffer(gl.FRAMEBUFFER,S.au.f);gl.viewport(0,0,S.au.w,S.au.h);
+    gl.uniform1f(pA.U.time,t);gl.uniform1f(pA.U.asp,S.W/S.H);gl.uniform1f(pA.U.neon,S.neon);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    gl.useProgram(pS);quad(pS);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,S.W,S.H);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,vtex);gl.uniform1i(pS.U.vid,0);
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,S.B.t);gl.uniform1i(pS.U.trail,1);
+    gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,S.v1.t);gl.uniform1i(pS.U.bl1,2);
+    gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,S.v2.t);gl.uniform1i(pS.U.bl2,3);
+    gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,S.sk.t);gl.uniform1i(pS.U.stk,4);
+    gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,S.au.t);gl.uniform1i(pS.U.aur,5);
+    gl.activeTexture(gl.TEXTURE6);gl.bindTexture(gl.TEXTURE_2D,stex);gl.uniform1i(pS.U.stars,6);
+    gl.uniform4fv(pS.U.vmap,m);gl.uniform2f(pS.U.px,1/S.W,1/S.H);gl.uniform2f(pS.U.res,S.W,S.H);gl.uniform1f(pS.U.time,t);
+    const mg=hzMoonGeom(),hr=hzHourNow(),G=hzKeyed(HZ_GRADE,hr),SK=hzKeyed(HZ_SKYCOL,hr).map(v=>v/255),lit=hzS.moon?hzS.moon.lit:.5;
+    gl.uniform2f(pS.U.mpos,mg.x,mg.y);gl.uniform1f(pS.U.mrad,mg.r);gl.uniform1f(pS.U.moon,.08+.62*lit);gl.uniform1f(pS.U.dscale,S.W/innerWidth);
+    S.footMul+=(S.footTo-S.footMul)*.045;
+    gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);gl.uniform1f(pS.U.rise,hzS.clip?hzS.clip.rise:.56);gl.uniform1f(pS.U.starsOn,hzS.starCv?1:0);
+    gl.uniform3f(pS.U.skyTop,SK[1],SK[2],SK[3]);gl.uniform3f(pS.U.skyMid,SK[4],SK[5],SK[6]);gl.uniform3f(pS.U.skyLow,SK[7],SK[8],SK[9]);
+    gl.uniform1f(pS.U.boost,S.boost);gl.uniform1f(pS.U.expo,G[4]*(.92+.16*lit));gl.uniform1f(pS.U.warm,G[5]);gl.uniform3f(pS.U.tint,G[1],G[2],G[3]);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    const A=S.A;S.A=S.B;S.B=A;
+  };
+  S.setNeon=function(){S.neonTo=S.lvl+(S.busy?.28:0);};
+  // the neon follows the mode and the effort, with a lift at Ultra (the reference's level(m,e)), and the work
+  S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};
+  S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};
+  // a new clip starts with clean trails
+  S.reset=function(){[S.A,S.B].forEach(T=>{gl.bindFramebuffer(gl.FRAMEBUFFER,T.f);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);});gl.bindFramebuffer(gl.FRAMEBUFFER,null);};
+  // one frame, for a still sky (reduced motion) whose footage just arrived
+  S.still=function(){if(S.raf)return;S.frame(performance.now());if(S.raf){cancelAnimationFrame(S.raf);S.raf=0;}};
+  addEventListener("resize",()=>{S.size();});
+  S.level(hzModeIndex(typeof tier==="string"?tier:""),hzEffort());
+}
+function hzHourNow(){const d=new Date(hzNow());return d.getHours()+d.getMinutes()/60;}
+// the moonlight's place: the Moon's real side (waxing: right; waning: left), high
+function hzMoonGeom(){const R=Math.min(380,innerWidth*.35),wax=!hzS.moon||hzS.moon.waxing;return {x:wax?innerWidth*1.04-R:-innerWidth*.04+R,y:-innerHeight*.06+R,r:R*1.414};}
+// ---- the backdrop (6b534, per Patrick: the whole Apple library; OVERRIDE 3): one
+// of the app's own aerials (HZ_CLIPS: every clip, the hours Apple's catalog says
+// it suits, its blend) that fits the viewer's hour and isn't one of the last three
+// shown (the history the server keeps beside the clips), different on every open.
+// A clip on this Mac plays at once; one that isn't is fetched quietly for a later
+// open while a cached one that fits plays now, so the opening never waits on a
+// download. City, aurora and orbital clips rise from the foot with light trails;
+// underwater ones spread faintly over the whole sky with none. When the hour moves
+// into another part of the day, the next one crossfades in.
+function hzBucket(h){return h<5||h>=20.5?"night":h<8?"dawn":h<17?"day":"dusk";}
+// pure: the clip to play now and the one to fetch for later. cached: the indexes on
+// disk; hist: the indexes shown, newest first; rnd: a 0..1 generator
+function hzClipChoose(clips,bucket,cached,hist,rnd){
+  hist=hist||[];
+  const has=new Set(cached||[]),recent=hist.slice(0,3);
+  const fit=clips.filter(c=>c.when.split(" ").indexOf(bucket)>=0);
+  const fresh=fit.filter(c=>recent.indexOf(c.i)<0);
+  const one=a=>a.length?a[Math.min(a.length-1,Math.floor(rnd()*a.length))]:null;
+  const want=one(fresh)||one(fit);
+  if(!want)return {play:null,later:null};
+  if(has.has(want.i))return {play:want,later:null};
+  const age=c=>{const k=hist.indexOf(c.i);return k<0?1e9:k;};
+  const now=one(fresh.filter(c=>has.has(c.i)))||fit.filter(c=>has.has(c.i)).sort((a,b)=>age(b)-age(a))[0]||null;
+  return {play:now,later:want};
+}
+async function hzClipPick(){
+  let cached=[],hist=[];
+  try{const sc=await(await api("/api/sky/cached")).json();cached=sc.cached||[];hist=sc.hist||[];}catch(e){}
+  return hzClipChoose(HZ_CLIPS.filter(c=>c.i<SKY_N),hzBucket(hzHourNow()),cached,hist,Math.random);
+}
+function hzMediaOK(){return document.documentElement.classList.contains("hz")&&!(typeof noVideo!=="undefined"&&noVideo);}
+async function hzVideoBoot(){
+  const v=$("#hz-vid");if(!v||!hzMediaOK()||v.dataset.i||typeof api!=="function")return;
+  if(hzS.debug&&hzS.debug.media==="0")return;
+  const tag=hzS.mediaGen;
+  let ch=null;
+  if(hzS.debug&&hzS.debug.clip!=null){const c=HZ_CLIPS.find(x=>x.i===+hzS.debug.clip);if(c)ch={play:c,later:null};}   // a dev copy may name one
+  if(!ch)ch=await hzClipPick();
+  if(tag!==hzS.mediaGen)return;
+  hzS.clipBucket=hzBucket(hzHourNow());
+  if(ch.later)api("/api/sky/status?i="+ch.later.i+"&warm=1").catch(()=>{});   // for a later open, never waited on
+  if(ch.play)hzClipLoad(ch.play);
+}
+function hzClipLoad(c){
+  const v=$("#hz-vid");if(!v)return;
+  hzS.clip=c;v.dataset.i=String(c.i);
+  const S=hzS.sky;if(S){S.footTo=0;S.footMul=0;S.reset();}
+  v.addEventListener("loadedmetadata",()=>{try{v.playbackRate=c.rate;}catch(e){}},{once:true});
+  v.addEventListener("loadeddata",()=>{document.documentElement.classList.add("hz-vid-on");
+    if(hzS.sky&&hzS.reduced){hzS.sky.footTo=hzS.sky.footMul=1;hzS.sky.still();}hzMediaSync();},{once:true});
+  v.addEventListener("playing",()=>{if(hzS.sky)hzS.sky.footTo=1;},{once:true});
+  v.src="/static/sky/"+c.i+".mov";v.load();
+  api("/api/sky/seen",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({i:c.i})}).catch(()=>{});
+}
+function hzClipCheck(){
+  if(!hzS.clip||!hzMediaOK())return;
+  const b=hzBucket(hzHourNow());if(b===hzS.clipBucket)return;
+  hzS.clipBucket=b;
+  if(hzS.clip.when.split(" ").indexOf(b)>=0)return;
+  const tag=hzS.mediaGen;
+  hzClipPick().then(ch=>{if(tag!==hzS.mediaGen||!ch.play||ch.play.i===hzS.clip.i)return;
+    if(ch.later)api("/api/sky/status?i="+ch.later.i+"&warm=1").catch(()=>{});
+    if(hzS.sky)hzS.sky.footTo=0;
+    setTimeout(()=>{if(tag===hzS.mediaGen)hzClipLoad(ch.play);},700);});
+}
+// the sky runs or rests with the window: hidden, long unfocused and effects off
+// rest it; reduced motion holds the footage on one frame and draws no trails
+function hzMediaSync(){
+  const v=$("#hz-vid"),S=hzS.sky;
+  const on=hzMediaOK()&&!document.hidden&&!hzS.blurred;
+  hzS.mediaOn=on;
+  if(v&&v.src){if(on&&!hzS.reduced){const p=v.play();if(p&&p.catch)p.catch(()=>{});}else if(!v.paused)v.pause();}
+  if(S){if(on&&!S.raf&&!hzS.reduced)S.raf=requestAnimationFrame(S.frame);
+    if((!on||hzS.reduced)&&S.raf){cancelAnimationFrame(S.raf);S.raf=0;}
+    if(hzS.reduced&&!S.ready&&on){S.frame(performance.now());if(S.raf){cancelAnimationFrame(S.raf);S.raf=0;}}}
+}
+function hzMediaBoot(){
+  hzS.mediaGen=(hzS.mediaGen||0)+1;
+  if(!hzMediaOK())return;
+  hzSkyBoot();hzVideoBoot();hzMediaSync();
+}
+// the whole sky, as it is right now (the stars every few minutes, the Moon)
+function hzSkyPaint(){
+  if(!hzS)return;
+  const day=Math.floor((hzNow()-new Date().getTimezoneOffset()*60000)/86400000);
+  if(hzS.dayKey!==day){hzS.dayKey=day;hzS.seed=hzHash(day+":"+hzS.salt);hzS.rnd=hzRng(hzS.seed);hzSeedDay();}
+  hzMoonNow();hzDrawStars();hzDrawAuroras();hzClipCheck();
+  hzS.skyAt=performance.now();
+  const g=$("#hz-moonglow");if(g){g.style.opacity=(0.08+0.62*(hzS.moon?hzS.moon.lit:.5)).toFixed(3);g.classList.toggle("left",!!(hzS.moon&&!hzS.moon.waxing));}
+}
+function hzSeedDay(){
+  const sky=$("#hz-sky");if(!sky)return;const r=hzS.rnd;
+  sky.style.setProperty("--hz-t-drift",(26+r()*6).toFixed(1)+"s");
+  const a1=$("#hz-aur1"),a2=$("#hz-aur2");
+  if(a1)a1.style.animationDelay=(-r()*40).toFixed(1)+"s";
+  if(a2)a2.style.animationDelay=(-r()*50).toFixed(1)+"s";
+}
+// the CSS ice rays, drawn at a quarter of their size (the upscale is the softness)
+function hzRayTile(period,stops,hgt){
+  const t=document.createElement("canvas");t.width=Math.max(2,Math.round(period));t.height=hgt;
+  const x=t.getContext("2d"),g=x.createLinearGradient(0,0,t.width,0);
+  for(const st of stops)g.addColorStop(Math.min(1,st[0]/period),st[1]);
+  x.fillStyle=g;x.fillRect(0,0,t.width,hgt);return t;
+}
+function hzDrawAuroraLayer(cv,o){
+  const w=o.w,h=o.h,sc=1/4,W=Math.max(48,Math.round(w*sc)),H=Math.max(24,Math.round(h*sc));
+  cv.width=W;cv.height=H;cv.style.width=w+"px";cv.style.height=h+"px";
+  const x=cv.getContext("2d");x.clearRect(0,0,W,H);
+  const col=o.rgb,c=a=>"rgba("+col+","+a.toFixed(3)+")",gain=o.gain||1,k=o.k||1;
+  const p1=43*k*sc,p2=150*k*sc,p3=97*k*sc;
+  const tiles=[
+    hzRayTile(p1,[[0,c(0)],[7*k*sc,c(.55*gain)],[15*k*sc,c(0)],[28*k*sc,c(0)],[34*k*sc,c(.32*gain)],[p1,c(0)]],H),
+    hzRayTile(p2,[[0,c(0)],[60*k*sc,c(.26*gain)],[p2,c(0)]],H),
+    hzRayTile(p3,[[0,c(0)],[40*k*sc,c(.14*gain)],[p3,c(0)]],H)];
+  if(o.glow){const g=x.createLinearGradient(0,0,W,0);
+    g.addColorStop(0,c(0));g.addColorStop(.28,c(.2*gain));g.addColorStop(.55,c(.26*gain));g.addColorStop(1,c(0));
+    x.fillStyle=g;x.fillRect(0,0,W,H);}
+  for(const t of tiles){x.fillStyle=x.createPattern(t,"repeat-x");x.fillRect(0,0,W,H);}
+  x.globalCompositeOperation="destination-in";
+  const ph=o.phase||0,env=x.createLinearGradient(0,0,W,0);
+  for(let i=0;i<=24;i++){const u=i/24,a=0.45+0.55*(0.5+0.5*Math.sin(u*6.283*1.6+ph)*Math.cos(u*6.283*0.7+ph*0.6));
+    env.addColorStop(u,"rgba(0,0,0,"+a.toFixed(3)+")");}
+  x.fillStyle=env;x.fillRect(0,0,W,H);
+  const m=x.createLinearGradient(0,0,0,H);
+  for(const st of o.mask)m.addColorStop(st[0],"rgba(0,0,0,"+st[1]+")");
+  x.fillStyle=m;x.fillRect(0,0,W,H);
+  x.globalCompositeOperation="source-over";
+}
+function hzDrawAuroras(){
+  const r=hzS.rnd,k=0.9+r()*0.25,gain=0.85+r()*0.3,fr=0.8+r()*0.4,ph=r()*6.283,ph2=r()*6.283;
+  const w1=$("#hz-aur1 canvas"),w2=$("#hz-aur2 canvas"),f1=$("#hz-aur1f");
+  if(w1)hzDrawAuroraLayer(w1,{w:1800,h:640,rgb:"168,198,255",k:k,gain:gain,glow:true,phase:ph,mask:[[0,0],[.42,.3],[.84,1],[1,0]]});
+  if(f1)hzDrawAuroraLayer(f1,{w:1800,h:640,rgb:"150,236,212",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});
+  if(w2)hzDrawAuroraLayer(w2,{w:1800,h:600,rgb:"186,208,255",k:k*0.45,gain:gain*0.55,phase:ph2,mask:[[0,0],[.1,0],[.6,.5],[.9,1],[1,0]]});
+}
+// the wash flowers on arriving home (the intro has its own moment)
+function hzWashBloom(){
+  const w=$("#hz-wash");if(!w||!hzMotionOK()||document.documentElement.classList.contains("hz-intro"))return;
+  w.classList.remove("bloom");void w.offsetWidth;w.classList.add("bloom");
+  clearTimeout(hzS.washT);hzS.washT=setTimeout(()=>w.classList.remove("bloom"),4700);
+}
+function hzDrawWash(){
+  const cv=$("#hz-wash");if(!cv)return;
+  const w=cv.clientWidth||innerWidth*1.24,h=cv.clientHeight||innerHeight*1.24;
+  const W=Math.max(60,Math.round(w/6)),H=Math.max(40,Math.round(h/6));
+  cv.width=W;cv.height=H;const x=cv.getContext("2d");x.clearRect(0,0,W,H);
+  const bloom=(cx,cy,rx,ry,col,a)=>{x.save();x.translate(cx*W,cy*H);x.scale(rx*W,ry*H);
+    const g=x.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,"rgba("+col+","+a+")");g.addColorStop(.72,"rgba("+col+",0)");g.addColorStop(1,"rgba("+col+",0)");
+    x.fillStyle=g;x.beginPath();x.arc(0,0,1,0,7);x.fill();x.restore();};
+  bloom(.24,.40,.42,.36,"98,96,255",.6);bloom(.72,.30,.38,.32,"255,118,178",.4);
+  bloom(.50,.64,.40,.30,"255,182,108",.44);bloom(.88,.58,.34,.30,"58,214,198",.34);
+}
+// ---- TRACED IN LIGHT (the reference's tracer): the same letters are drawn
+// into a mask; sparks leave the top of each outline and run both ways round
+// it; light floods inward; a small GPU pass blooms it; the real text follows
+function hzTraceKill(){if(hzS&&hzS.tracers){hzS.tracers.forEach(k=>k());hzS.tracers.clear();}}
+async function hzTraceIn(el,opts){
+  opts=Object.assign({margin:44,speed:640,spread:.85,ink:[.97,.98,1]},opts||{});
+  if(!hzMotionOK()||hzS.reduced)return;
+  try{await document.fonts.ready;}catch(e){}
+  const r=el.getBoundingClientRect();if(!r.width||!r.height)return;
+  const dpr=hzFxLevel()==="full"?Math.min(devicePixelRatio||1,2):1,M=opts.margin;
+  const cw=Math.ceil(r.width+M*2),ch=Math.ceil(r.height+M*2),w=Math.round(cw*dpr),h=Math.round(ch*dpr);
+  const off=document.createElement("canvas");off.width=w;off.height=h;const o=off.getContext("2d",{willReadFrequently:true});
+  o.scale(dpr,dpr);o.fillStyle="#fff";o.strokeStyle="#fff";o.lineJoin="round";
+  const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT),rg=document.createRange();let node;
+  while((node=walker.nextNode())){
+    const cs=getComputedStyle(node.parentElement),up=cs.textTransform==="uppercase",sw=parseFloat(cs.webkitTextStrokeWidth)||0;
+    o.font=cs.fontStyle+" "+cs.fontWeight+" "+cs.fontSize+" "+cs.fontFamily;o.lineWidth=sw;
+    const txt=node.textContent;
+    for(let i=0;i<txt.length;i++){const c=up?txt[i].toUpperCase():txt[i];if(!c.trim())continue;
+      rg.setStart(node,i);rg.setEnd(node,i+1);const b=rg.getClientRects()[0];if(!b)continue;
+      const mt=o.measureText(c),asc=mt.fontBoundingBoxAscent||parseFloat(cs.fontSize)*.8;
+      const x=b.left-r.left+M,y=b.top-r.top+M+asc;o.fillText(c,x,y);if(sw)o.strokeText(c,x,y);}
+  }
+  const px=o.getImageData(0,0,w,h).data,N=w*h,ink=new Uint8Array(N);
+  for(let i=0;i<N;i++)ink[i]=px[i*4+3];
+  const edge=new Uint8Array(N);
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;if(ink[i]>=128&&(ink[i-1]<128||ink[i+1]<128||ink[i-w]<128||ink[i+w]<128))edge[i]=1;}
+  const T=new Float32Array(N).fill(1e9),q=new Int32Array(N),sp=opts.speed*dpr,seen=new Uint8Array(N),comp=[];
+  for(let s=0;s<N;s++){if(!edge[s]||seen[s])continue;
+    let qh=0,qt=0;q[qt++]=s;seen[s]=1;let minx=s%w;const dmap=new Map([[s,0]]);
+    while(qh<qt){const i=q[qh++],d=dmap.get(i),x=i%w;if(x<minx)minx=x;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const j=i+dy*w+dx;if(j<0||j>=N||!edge[j]||seen[j])continue;seen[j]=1;dmap.set(j,d+1);q[qt++]=j;}}
+    comp.push({dmap:dmap,minx:minx});}
+  let tmax=0;const HUE=new Uint8Array(N);let ci=0;
+  for(const c of comp){const t0=.06+(c.minx/w)*opts.spread;ci++;for(const [i,d] of c.dmap){const t=t0+d/sp;T[i]=t;if(t>tmax)tmax=t;HUE[i]=1+Math.round((((d/(380*dpr))+ci*.17)%1)*254);}}
+  let qh=0,qt=0;for(let i=0;i<N;i++)if(edge[i])q[qt++]=i;
+  const fillSp=260*dpr;
+  while(qh<qt){const i=q[qh++],t=T[i]+1/fillSp;for(const j of [i-1,i+1,i-w,i+w]){if(j<0||j>=N||ink[j]===0||T[j]<=t)continue;if(T[j]<1e8)continue;T[j]=t;if(t>tmax)tmax=t;q[qt++]=j;}}
+  const TE=tmax+.001,data=new Uint8Array(N*4);
+  for(let i=0;i<N;i++){if(!ink[i])continue;const v=Math.min(65535,Math.round(Math.min(T[i],TE)/TE*65535));data[i*4]=v>>8;data[i*4+1]=v&255;data[i*4+2]=edge[i]?HUE[i]:0;data[i*4+3]=ink[i];}
+  const cv=document.createElement("canvas");cv.className="hz-tracefx";cv.width=w;cv.height=h;
+  Object.assign(cv.style,{left:(r.left-M)+"px",top:(r.top-M)+"px",width:cw+"px",height:ch+"px"});
+  let gl=null;try{gl=cv.getContext("webgl",{premultipliedAlpha:true,alpha:true,antialias:false});}catch(e){}
+  if(!gl)return;
+  const IFS="precision highp float;varying vec2 uv;uniform sampler2D map;uniform float t,TE;"
+    +"float tf(vec4 s){return (s.r*65280.+s.g*255.)/65535.*TE;}"
+    +"vec3 pal(float t){vec3 a=vec3(.624,.659,1.),b=vec3(1.,.561,.769),c=vec3(1.,.773,.541),d=vec3(.498,.941,.839);t=fract(t)*4.;"
+    +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
+    +"void main(){vec4 s=texture2D(map,vec2(uv.x,1.-uv.y));float d=t-tf(s);"
+    +"float e=step(.5/255.,s.b),hue=(s.b*255.-1.)/254.;vec3 neon=pal(hue+t*.18),ice=vec3(.62,.77,1.);"
+    +"float head=e*exp(-d*d/.0018),tr=e*step(0.,d)*(.3+.7*exp(-d/.42));"
+    +"gl_FragColor=vec4(neon*head*.5+mix(ice,neon,exp(-max(d,0.)/.32))*tr*.42,s.a*smoothstep(.16,.62,d));}";
+  const CFS="precision highp float;varying vec2 uv;uniform sampler2D I,b1,b2;uniform vec3 ink;"
+    +"void main(){vec4 s=texture2D(I,uv),g1=texture2D(b1,uv),g2=texture2D(b2,uv);float hv=max(s.r,max(s.g,s.b))*2.;"
+    +"vec3 col=ink*s.a+s.rgb*2.*(1.-s.a*.8)+vec3(smoothstep(.55,1.,hv))*.85+g1.rgb*4.4+g2.rgb*3.8+vec3(.72,.82,1.)*(g1.a*.22+g2.a*.34);"
+    +"float al=clamp(max(col.r,max(col.g,col.b)),0.,1.);gl_FragColor=vec4(min(col,vec3(al)),al);}";
+  let pI,pC,pBl;try{pI=hzProgram(gl,IFS);pC=hzProgram(gl,CFS);pBl=hzProgram(gl,HZ_BLUR_FS);}catch(e){return;}
+  const quad=hzQuad(gl),tex=hzTex(gl,gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,data);
+  const RI=hzTarget(gl,w,h),w2=Math.max(2,w>>1),h2=Math.max(2,h>>1),w4=Math.max(2,w>>2),h4=Math.max(2,h>>2);
+  const X1=hzTarget(gl,w2,h2),Y1=hzTarget(gl,w2,h2),X2=hzTarget(gl,w4,h4),Y2=hzTarget(gl,w4,h4);
+  document.body.appendChild(cv);
+  let alive=true,raf=0;
+  const kill=()=>{if(!alive)return;alive=false;cancelAnimationFrame(raf);cv.style.opacity=0;setTimeout(()=>{cv.remove();try{const x=gl.getExtension("WEBGL_lose_context");x&&x.loseContext();}catch(e){}},700);};
+  hzS.tracers.add(kill);
+  return new Promise(res=>{
+    const start=performance.now(),total=TE+.65;let told=false;
+    function f(n){if(!alive)return res();
+      let t=(n-start)/1000;if(hzS.freezeAt!=null)t=Math.min(t,Math.max(0,hzS.freezeAt-(start-hzS.introT0)/1000));
+      gl.useProgram(pI);quad(pI);gl.bindFramebuffer(gl.FRAMEBUFFER,RI.f);gl.viewport(0,0,w,h);
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(pI.U.map,0);gl.uniform1f(pI.U.t,t);gl.uniform1f(pI.U.TE,TE);
+      gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      hzBlur(gl,pBl,quad,RI.t,w,h,X1,2.2*dpr,0);hzBlur(gl,pBl,quad,X1.t,w2,h2,Y1,0,1.1*dpr);
+      hzBlur(gl,pBl,quad,Y1.t,w2,h2,X2,2.6*dpr,0);hzBlur(gl,pBl,quad,X2.t,w4,h4,Y2,0,1.6*dpr);
+      gl.useProgram(pC);quad(pC);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,w,h);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,RI.t);gl.uniform1i(pC.U.I,0);
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,Y1.t);gl.uniform1i(pC.U.b1,1);
+      gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,Y2.t);gl.uniform1i(pC.U.b2,2);gl.uniform3fv(pC.U.ink,opts.ink);
+      gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      if(!told&&t>total-.35){told=true;res();}
+      if(t>total+.2){kill();hzS.tracers.delete(kill);return;}
+      raf=requestAnimationFrame(f);}
+    raf=requestAnimationFrame(f);
+  });
+}
+// ---- words from data
+function hzGreeting(){
+  const d=new Date(hzNow()),h=d.getHours(),nm=(typeof NICK==="string"&&NICK)?NICK:"";
+  if(h<5)return nm?"Up late, "+nm+"?":"Up late?";
+  if(h<12)return "Good morning"+(nm?", "+nm:"")+".";
+  if(h<18)return "Good afternoon"+(nm?", "+nm:"")+".";
+  return "Good evening"+(nm?", "+nm:"")+".";
+}
+// the headline: three copies of the same words (a blurred prism copy under it,
+// the white fill, a passing sheen); traced in light the first time it shows
+function hzHeadline(g,text){
+  g.setAttribute("aria-label",text);
+  if(g.dataset.hzText===text)return;
+  g.dataset.hzText=text;g.innerHTML="";
+  const mk=(c,t)=>{const s=document.createElement("span");s.className=c;s.setAttribute("aria-hidden","true");s.textContent=t;return s;};
+  g.appendChild(mk("bloom",text));g.appendChild(mk("fill",text));g.appendChild(mk("sheen",text));
+  g.classList.remove("shown");
+}
+async function hzHeadlineShow(g){
+  if(!g||g.classList.contains("shown")||g.dataset.hzBusy)return;
+  g.dataset.hzBusy="1";
+  const fill=g.querySelector(".fill");
+  if(fill&&hzMotionOK()&&!hzS.reduced&&!document.documentElement.classList.contains("hz-intro"))
+    await hzTraceIn(fill,HZ_SEEN?{margin:48,speed:980,spread:.5}:{margin:56,speed:620,spread:.9});   // a quick trace after the first launch
+  g.classList.add("shown");delete g.dataset.hzBusy;
+}
+function hzHomePaint(){
+  if(!hzReady)return;
+  const g=$("#hero .greet");
+  if(g){hzHeadline(g,hzGreeting());if(!document.documentElement.classList.contains("hz-intro"))hzHeadlineShow(g);}
+  hzHistoryPaint();hzMachinesPaint();hzLanePaint();hzModesPaint();hzTitlePaint();hzGlowFit();
+}
+function hzWhen(ts){
+  if(!(ts>0))return "";
+  const d=new Date(ts),now=new Date(hzNow()),day=x=>Math.floor((x.getTime()-x.getTimezoneOffset()*60000)/86400000);
+  const dd=day(now)-day(d);
+  if(dd<=0)return "Today";if(dd===1)return "Yesterday";
+  if(dd<7)return d.toLocaleDateString(undefined,{weekday:"long"});
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+function hzK(n){return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e4?Math.round(n/1e3)+"K":n>=1e3?(n/1e3).toFixed(1)+"K":String(n);}
+function hzHistoryPaint(){
+  const box=$("#hz-history");if(!box)return;
+  if(!$("#hero")){box.hidden=true;return;}
+  const esc_=typeof esc==="function"?esc:(s=>String(s));
+  const laneOK=c=>(uiMode==="code"||uiMode==="funnel")?(c.lane||"ai")===uiMode:((c.lane||"ai")!=="code"&&(c.lane||"ai")!=="funnel");
+  const mine=(typeof chats!=="undefined"?chats:[]).filter(c=>c.id!==curChat&&laneOK(c)&&(c.title||"").trim()&&c.ts>0)
+    .sort((a,b)=>(+b.ts||0)-(+a.ts||0)).slice(0,3);
+  box.hidden=!mine.length;
+  box.innerHTML=mine.map(c=>'<button type="button" class="hz-row" data-id="'+esc_(c.id)+'"><span class="t">'+esc_(c.title)+'</span>'
+    +'<span class="w">'+esc_(hzWhen(c.ts))+'</span><span class="k">'+(typeof c.tokens==="number"&&c.tokens>0?hzK(c.tokens):"")+'</span></button>').join("");
+}
+// ---- the machines as dies in their makers' colours (this Mac, each paired
+// server by ITS name, never an assumed one; a server whose maker isn't known is
+// an ice die); a hover card; the one working pulses. data-machine and .rig let
+// the conversation's comets find a server's chip (6b528)
+function hzVendor(v){v=String(v||"").toLowerCase();return v.indexOf("nvidia")>=0||v==="cuda"?"nvidia":v.indexOf("amd")>=0||v==="rocm"?"amd":v.indexOf("intel")>=0?"intel":v.indexOf("mlx")>=0||v.indexOf("apple")>=0||v.indexOf("metal")>=0?"mlx":"";}
+function hzIsPC(){return typeof IS_PC!=="undefined"&&!!IS_PC;}
+function hzLocalName(){return hzIsPC()?"This PC":"This Mac";}
+function hzLocalV(){return hzVendor(hzS.accel||(hzIsPC()?"":"mlx"))||(hzIsPC()?"srv":"mlx");}
+function hzSrvV(name){const s=typeof srvList!=="undefined"?srvList.find(x=>x.name===name):null;return hzVendor(s&&s.gpu&&s.gpu.vendor)||"srv";}
+function hzMachines(){
+  const esc_=typeof esc==="function"?esc:(s=>String(s));
+  const out=[];
+  const chip=$("#spec-chip");
+  out.push({id:"local",v:hzLocalV(),name:hzLocalName(),hw:chip?chip.textContent.trim():"",st:hzS.gen&&hzS.genLocal?"Thinking":"Ready",working:!!(hzS.gen&&hzS.genLocal),asleep:false});
+  const srvs=typeof srvList!=="undefined"?srvList.filter(s=>s.paired):[];
+  srvs.forEach(s=>{const g=s.gpu||{},ok=!!(s.only&&s.only.ok),asleep=typeof srvAsleep==="function"&&srvAsleep(s);
+    out.push({id:s.id,v:hzVendor(g.vendor)||"srv",name:s.name,hw:[g.name||"",g.vram_bytes?Math.round(g.vram_bytes/1073741824)+" GB":""].filter(Boolean).join(", "),
+      st:hzS.gen&&hzS.srvWorking===s.name?"Thinking":ok?"Ready":asleep?"Asleep":"Offline",working:!!(hzS.gen&&hzS.srvWorking===s.name),asleep:!ok});});
+  return out.map(m=>({...m,label:{mlx:"MLX",nvidia:"NVIDIA",amd:"AMD",intel:"Intel"}[m.v]||m.name,esc:esc_}));
+}
+function hzMachinesPaint(){
+  const el=$("#hz-machines");if(!el)return;
+  const ms=hzMachines();
+  el.innerHTML=ms.map(m=>'<div class="hz-rig rig '+m.v+(m.asleep?" asleep":"")+(m.working?" working":"")+(hzS.inUse&&hzS.inUse.has(m.id)?" in-use":"")+'" role="listitem" tabindex="0" data-id="'+m.esc(m.id)+'" data-machine="'+m.esc(m.name)+'">'
+    +'<i class="die"></i><b>'+m.esc(m.label)+'</b><span class="tip"><strong>'+m.esc(m.name)+'</strong>'+(m.hw?'<span>'+m.esc(m.hw)+'</span>':'')+'<span class="st">'+m.esc(m.st)+'</span></span></div>').join("");
+  if(document.documentElement.classList.contains("hz-ready")||hzS.rigsOn)el.querySelectorAll(".hz-rig").forEach(r=>r.classList.add("on"));
+}
+function hzStats(gpu,mem){if(!hzReady)return;hzS.gpu=(typeof gpu==="number")?gpu:null;hzS.mem=mem;}
+function hzLanePaint(){
+  $$("#hz-lanes [role=tab]").forEach(b=>{const on=b.dataset.m===uiMode;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
+}
+function hzTitlePaint(){
+  const t=$("#hz-title");if(!t)return;
+  const c=(typeof chats!=="undefined"&&typeof curChat!=="undefined")?chats.find(x=>x.id===curChat):null;
+  t.textContent=c&&c.title?c.title:"";
+}
+// ---- the mode and the effort, apart (OVERRIDE 3, as Claude and ChatGPT keep them).
+// The picker shows the mode's name only and opens a glass menu: each mode, what it
+// is for, the dies of the machines it uses right now (/api/tiers), the current one
+// marked by a lit dot. Hovering or focusing a mode slides its real models out under
+// it (each with its machine's die; the machine in the tooltip) and lights those
+// machines in the header. Beside it, Effort: Low, Medium, High, Max over a real
+// range input, sent with every question (effort_polish on the server); Max
+// shimmers. The neon aurora follows both. Max, Cloud only, the servers and
+// Advanced stay in the engine menu (the More modes button).
+function hzModes(){return ["Fast","Thinking","Pro","Vera Rubin"].filter(n=>TIER_META[n]);}
+const HZ_EFFORT=["Low","Medium","High","Max","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;
+function hzEffort(){
+  if(hzS&&hzS.effort!=null)return hzS.effort;
+  let v=1;try{const s=localStorage.getItem("millen.effort");if(s!==null&&/^[0-4]$/.test(s))v=+s;}catch(e){}
+  return v;
+}
+function hzEffortWire(){return HZ_EFFORT_KEY[hzEffort()];}    // what a question carries
+function hzEffortSet(i){
+  i=Math.max(0,Math.min(HZ_EMAX,Math.round(+i||0)));hzS.effort=i;
+  try{localStorage.setItem("millen.effort",String(i));}catch(e){}
+  hzEffortPaint();
+}
+function hzModeIndex(t){
+  const ms=hzModes(),i=ms.indexOf(t);if(i>=0)return i;
+  const s=String(t||"").toLowerCase();
+  if(t==="Max"||/pro|max/.test(s))return ms.length-1;
+  if(/think/.test(s))return Math.min(1,ms.length-1);
+  if(/fast/.test(s))return 0;
+  return 1;
+}
+function hzOffLabel(t){
+  if(t==="Max")return t;
+  if(typeof isCloudMode==="function"&&isCloudMode(t))return "Cloud only";
+  if(typeof isSrvMode==="function"&&isSrvMode(t)){const s=typeof srvModeOf==="function"?srvModeOf(t):null;return s?s.name+" only":"Your server";}
+  if(typeof advOn!=="undefined"&&advOn)return "Your own council";
+  return "Your pick";
+}
+function hzModesPaint(){
+  const host=$("#hz-effort");if(!host)return;
+  const ms=hzModes();if(!ms.length){host.hidden=true;return;}
+  host.hidden=false;
+  if(!host.querySelector(".hz-pick")){
+    host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
+      +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
+      +'<div class="hz-sl"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
+      +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot'+(i===HZ_EMAX?" last":"")+'" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
+      +'<i class="hz-sl-halo"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
+      +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
+      +'<span class="hz-elevel" aria-hidden="true"></span>';
+    hzControlsWire(host);
+  }
+  const t=typeof tier==="string"?tier:"",on=ms.indexOf(t)>=0;
+  const nm=host.querySelector(".hz-pick b");
+  nm.textContent=on?modeName(t):hzOffLabel(t);
+  host.querySelector(".hz-pick").setAttribute("aria-label","Mode, "+nm.textContent);
+  hzEffortPaint();
+  const menu=$("#hz-menu");if(menu&&menu.classList.contains("open"))hzMenuBuild();
+}
+function hzEffortPaint(){
+  const host=$("#hz-effort"),sl=host&&host.querySelector(".hz-sl");if(!sl)return;
+  const inp=sl.querySelector("input"),i=hzEffort(),u=i/HZ_EMAX,pad=9;
+  const width=sl.getBoundingClientRect().width||(host.classList.contains("compact")?120:170);
+  sl.style.setProperty("--hz-eff-u",u.toFixed(4));
+  sl.style.setProperty("--hz-eff-px",(u*(width-pad*2)).toFixed(1)+"px");
+  sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k<=i));
+  if(+inp.value!==i)inp.value=String(i);
+  inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
+  // Max shimmers softly and the light runs round the composer softly; Ultra in full (OVERRIDE 4)
+  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("shim",i>=3);en.classList.toggle("soft",i===3);
+  const root=document.documentElement;root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
+  if(hzS.sky)hzS.sky.level(hzModeIndex(typeof tier==="string"?tier:""),i);
+}
+function hzControlsWire(host){
+  const sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input"),pick=host.querySelector(".hz-pick");
+  inp.addEventListener("input",()=>hzEffortSet(inp.value));
+  inp.addEventListener("pointerdown",()=>sl.classList.add("dragging"));
+  const up=()=>sl.classList.remove("dragging");
+  inp.addEventListener("pointerup",up);inp.addEventListener("pointercancel",up);inp.addEventListener("blur",up);
+  pick.addEventListener("click",e=>{e.stopPropagation();const m=$("#hz-menu");if(m&&m.classList.contains("open"))hzMenuClose(false);else hzMenuOpen();});
+  pick.addEventListener("keydown",e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();hzMenuOpen();}});
+}
+// what a mode runs, from the page's copy of /api/tiers (tierInfo): each seat is a
+// model on a machine; a server's seat carries its name before the separator
+function hzLineupOf(mode){
+  const info=(typeof tierInfo!=="undefined"&&tierInfo[mode])||{},rows=[];
+  const srvs=typeof srvList!=="undefined"?srvList.filter(s=>s.paired):[];
+  const sep=typeof SRV_SEP!=="undefined"?SRV_SEP:" · ";
+  (info.models||[]).forEach(m=>{
+    const k=m.indexOf(sep);
+    if(k>=0){const nm=m.slice(0,k),s=srvs.find(x=>x.name===nm);rows.push({n:m.slice(k+sep.length),m:nm,v:hzVendor(s&&s.gpu&&s.gpu.vendor)||"srv",id:s?s.id:nm});}
+    else rows.push({n:m,m:hzLocalName(),v:hzLocalV(),id:"local"});
+  });
+  return rows;
+}
+function hzMenuBuild(){
+  const menu=$("#hz-menu");if(!menu)return;
+  const t=typeof tier==="string"?tier:"";
+  menu.innerHTML="";
+  hzModes().forEach(m=>{
+    const rows=hzLineupOf(m),off=!!(typeof tierOff!=="undefined"&&tierOff[m]),o=document.createElement("button");
+    o.type="button";o.className="hz-opt"+(off?" off":"");o.setAttribute("role","menuitemradio");o.dataset.t=m;
+    o.setAttribute("aria-checked",String(m===t));if(off)o.setAttribute("aria-disabled","true");
+    const b=document.createElement("b");b.textContent=modeName(m);
+    const d=document.createElement("span");d.className="d";d.textContent=HZ_MODE_DESC[m]||"";
+    const dies=document.createElement("span");dies.className="dies";dies.setAttribute("aria-hidden","true");
+    [...new Set(rows.map(r=>r.v))].forEach(v=>{const x=document.createElement("i");x.className="die";x.dataset.v=v;dies.appendChild(x);});
+    const ms=document.createElement("span");ms.className="ms";
+    rows.forEach(r=>{const p=document.createElement("span");p.className="hz-mdl";p.dataset.v=r.v;p.title=r.m;
+      const x=document.createElement("i");x.className="die";const nb=document.createElement("b");nb.textContent=r.n;p.append(x,nb);ms.appendChild(p);});
+    o.setAttribute("aria-label",modeName(m)+". "+(HZ_MODE_DESC[m]||"")+(rows.length?" Uses "+rows.map(r=>r.n+" on "+r.m).join(", ")+".":""));
+    o.append(b,dies,d,ms);menu.appendChild(o);
+  });
+}
+// a mode looked at: its models slide out one after another, its machines light up
+function hzMenuHover(o){
+  const menu=$("#hz-menu");if(!menu||o.classList.contains("open"))return;
+  menu.querySelectorAll(".hz-opt").forEach(x=>{const on=x===o;x.classList.toggle("open",on);
+    x.querySelectorAll(".hz-mdl").forEach((p,k)=>{p.style.transitionDelay=on?(80+k*70)+"ms":"0ms";p.classList.toggle("in",on);});});
+  hzInUse(o.dataset.t?hzLineupOf(o.dataset.t):[]);
+}
+function hzInUse(rows){
+  hzS.inUse=new Set(rows.map(r=>r.id));
+  $$("#hz-machines .hz-rig").forEach(r=>r.classList.toggle("in-use",hzS.inUse.has(r.dataset.id)));
+}
+function hzMenuOpen(){
+  const menu=$("#hz-menu"),pick=$("#hz-effort .hz-pick");if(!menu||!pick)return;
+  hzMenuBuild();
+  const r=pick.getBoundingClientRect(),down=r.top<innerHeight/2,w=Math.min(340,innerWidth-32);
+  menu.classList.toggle("down",down);
+  menu.style.left=Math.max(16,Math.min(r.left-6,innerWidth-w-16)).toFixed(0)+"px";
+  if(down){menu.style.top=(r.bottom+10).toFixed(0)+"px";menu.style.bottom="auto";}
+  else{menu.style.top="auto";menu.style.bottom=(innerHeight-r.top+12).toFixed(0)+"px";}
+  menu.classList.add("open");pick.setAttribute("aria-expanded","true");
+  const cur=menu.querySelector('.hz-opt[aria-checked="true"]')||menu.querySelector(".hz-opt");
+  if(cur){hzMenuHover(cur);cur.focus({preventScroll:true});}
+}
+function hzMenuClose(refocus){
+  const menu=$("#hz-menu"),pick=$("#hz-effort .hz-pick");if(!menu)return;
+  const was=menu.classList.contains("open");
+  menu.classList.remove("open");if(pick)pick.setAttribute("aria-expanded","false");
+  menu.querySelectorAll(".hz-opt").forEach(x=>{x.classList.remove("open");x.querySelectorAll(".hz-mdl").forEach(p=>{p.style.transitionDelay="0ms";p.classList.remove("in");});});
+  if(hzS.inUse&&hzS.inUse.size)hzInUse([]);
+  if(was&&refocus&&pick)pick.focus({preventScroll:true});
+}
+function hzMenuWire(){
+  const menu=$("#hz-menu");if(!menu)return;
+  menu.addEventListener("pointerover",e=>{const o=e.target.closest(".hz-opt");if(o)hzMenuHover(o);});
+  menu.addEventListener("focusin",e=>{const o=e.target.closest(".hz-opt");if(o)hzMenuHover(o);});
+  menu.addEventListener("click",e=>{const o=e.target.closest(".hz-opt");if(!o)return;e.stopPropagation();
+    if(o.classList.contains("off"))return;
+    const m=o.dataset.t;hzMenuClose(true);
+    if(m&&m!==tier&&typeof setTier==="function")setTier(m);});
+  menu.addEventListener("keydown",e=>{
+    const os=[...menu.querySelectorAll(".hz-opt")],i=os.indexOf(document.activeElement);if(!os.length)return;
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();os[i<0?0:(i+(e.key==="ArrowDown"?1:os.length-1))%os.length].focus();}
+    else if(e.key==="Home"){e.preventDefault();os[0].focus();}
+    else if(e.key==="End"){e.preventDefault();os[os.length-1].focus();}
+    else if(e.key==="Tab")hzMenuClose(false);});
+  document.addEventListener("click",e=>{if(menu.classList.contains("open")&&!menu.contains(e.target))hzMenuClose(false);});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&menu.classList.contains("open")){e.stopPropagation();hzMenuClose(true);}},true);
+  addEventListener("resize",()=>{if(menu.classList.contains("open"))hzMenuClose(false);});
+}
+function hzPlaceEffort(){
+  const eff=$("#hz-effort"),slot=$("#hz-effort-slot"),crow=$("#crow");if(!eff||!slot||!crow)return;
+  const home=!!$("#hero");
+  if(home&&eff.parentElement!==crow){crow.insertBefore(eff,$("#model-chip"));eff.classList.remove("compact");hzMenuClose(false);hzModesPaint();}
+  else if(!home&&eff.parentElement!==slot){slot.appendChild(eff);eff.classList.add("compact");hzMenuClose(false);hzModesPaint();}
+}
+// ---- the header's first button and the sidebar: closed on the home unless
+// opened, open in a conversation unless hidden; the drawer under 760px
+function hzSidebarToggle(){
+  const root=document.documentElement;
+  if(innerWidth<=760){document.body.classList.toggle("sbopen");return;}
+  if($("#hero")){root.classList.toggle("hz-sbopen");}
+  else{const hide=!root.classList.contains("sbhide");root.classList.toggle("sbhide",hide);
+    try{localStorage.setItem("millen.sbhide",hide?"1":"0");}catch(e){}}
+  hzSidebarLabel();
+}
+function hzSidebarLabel(){
+  const b=$("#hz-sb");if(!b)return;
+  const sb=$("#sidebar"),open=!!(sb&&getComputedStyle(sb).display!=="none"&&getComputedStyle(sb).position!=="fixed")||document.body.classList.contains("sbopen");
+  b.setAttribute("aria-pressed",open?"true":"false");b.setAttribute("aria-label",open?"Hide chats":"Show chats");
+}
+function hzGlowFit(){
+  const g=$("#hz-cglow"),c=$("#composer");if(!g||!c)return;
+  const r=c.getBoundingClientRect();if(!(r.height>0)){g.hidden=true;return;}
+  g.hidden=false;
+  g.style.transform="translate("+(r.left+24).toFixed(0)+"px,"+(r.top+10).toFixed(0)+"px)";
+  g.style.width=(r.width-48).toFixed(0)+"px";g.style.height=(r.height-4).toFixed(0)+"px";
+}
+// ---- the send: two ice rings from the button; the night brightens while it
+// thinks (longer trails, the neon aurora up), the machine at work pulses.
+// Asking, as the home sees it (OVERRIDE 3): the question arcs from the composer
+// into the top of the chats (into the chats button while they're closed); its row
+// keeps a live die in the colour of the machine at work (from the RUN frames) until
+// the answer lands, and renames itself when the saved title arrives; the composer
+// glides from mid-page to the foot. The live line, the comets and the glowing words
+// are the conversation's (hz-chat, 6b528).
+function hzBeforeSend(text){
+  if(!hzReady||!document.documentElement.classList.contains("hz"))return;
+  const c=$("#composer"),i=$("#input");
+  hzS.sendFrom={home:!!$("#hero"),comp:c?c.getBoundingClientRect():null,inp:i?i.getBoundingClientRect():null,text:String(text||"").trim()};
+}
+function hzOnSend(){
+  if(!hzReady||!document.documentElement.classList.contains("hz"))return;
+  hzS.gen=true;hzS.genLocal=true;hzS.srvWorking="";hzS.stage="";hzS.genT0=performance.now();
+  hzS.liveChat=typeof genChat!=="undefined"?genChat:null;hzS.liveV=hzLocalV();
+  if(hzS.liveChat)hzS.watch.add(hzS.liveChat);
+  document.documentElement.classList.add("hz-busy");
+  hzMenuClose(false);
+  if(hzS.sky)hzS.sky.setBusy(true);
+  hzMachinesPaint();hzSideLive();
+  const from=hzS.sendFrom;hzS.sendFrom=null;
+  if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}
+  if(from&&from.home)hzArc(from,hzS.liveChat);
+}
+function hzGlide(from){
+  const c=$("#composer");if(!c||!from)return;
+  const to=c.getBoundingClientRect(),dx=from.left-to.left,dy=from.top-to.top;
+  if(Math.abs(dx)<4&&Math.abs(dy)<4)return;
+  c.style.transition="none";c.style.transform="translate("+dx.toFixed(1)+"px,"+dy.toFixed(1)+"px)";void c.offsetWidth;
+  c.style.transition="transform .9s var(--hz-ease-out)";c.style.transform="";
+  let over=false;const done=()=>{if(over)return;over=true;c.style.transition="";c.removeEventListener("transitionend",done);hzGlowFit();};
+  c.addEventListener("transitionend",done);setTimeout(done,1200);
+}
+// the question's arc: from where it was typed to its row (or to the chats button)
+function hzArc(from,chatId){
+  const text=from.text;if(!text)return;
+  const list=$("#chat-list"),sb=$("#sidebar"),btn=$("#hz-sb");
+  const row=list&&chatId?[...list.querySelectorAll(".chat-item")].find(r=>r.dataset.id===chatId):null;
+  const open=!!(row&&sb&&getComputedStyle(sb).display!=="none"&&row.getBoundingClientRect().width>0);
+  const ping=el=>{if(!el||!el.isConnected)return;const k=el===btn?"ping":"hz-landed";el.classList.remove(k);void el.offsetWidth;el.classList.add(k);setTimeout(()=>el.classList.remove(k),1000);};
+  const land=()=>ping(open?row:btn);
+  const a=from.inp||from.comp;
+  if(!hzMotionOK()||!a||!document.body.animate){land();return;}
+  let tgt=null;
+  if(open){const rr=row.getBoundingClientRect();tgt={x:rr.left+10,y:rr.top+rr.height/2};}
+  else if(btn){const br=btn.getBoundingClientRect();if(br.width)tgt={x:br.left+br.width/2-4,y:br.top+br.height/2};}
+  if(!tgt)return;
+  const g=document.createElement("div");g.className="hz-ghost";g.setAttribute("aria-hidden","true");
+  g.textContent=text.length>46?text.slice(0,44)+"…":text;document.body.appendChild(g);
+  g.style.left=(a.left+2).toFixed(0)+"px";g.style.top=(a.top+2).toFixed(0)+"px";
+  const gr=g.getBoundingClientRect(),dx=tgt.x-gr.left,dy=tgt.y-(gr.top+gr.height/2),k=open?13.5/17:.2;
+  g.animate([{transform:"translate(0,0) scale(1)",opacity:1},
+    {transform:"translate("+(dx*.42).toFixed(1)+"px,"+(dy*.42-46).toFixed(1)+"px) scale(.96)",opacity:1,offset:.42},
+    {transform:"translate("+(dx*.92).toFixed(1)+"px,"+(dy*.97).toFixed(1)+"px) scale("+(k*1.02).toFixed(3)+")",opacity:.9,offset:.86},
+    {transform:"translate("+dx.toFixed(1)+"px,"+dy.toFixed(1)+"px) scale("+k.toFixed(3)+")",opacity:0}],
+    {duration:820,easing:"cubic-bezier(.3,.7,.2,1)",fill:"forwards"}).onfinish=()=>{g.remove();land();};
+}
+// the answering chat's row: a live die in the working machine's colour, the title
+// shimmering, until the answer lands (kept through the list's own repaints)
+function hzSideLive(){
+  const list=$("#chat-list");if(!list)return;
+  const id=hzS.gen?hzS.liveChat:null;
+  list.querySelectorAll(".chat-item.hz-live").forEach(r=>{if(r.dataset.id!==id){r.classList.remove("hz-live");const d=r.querySelector(".hz-ldie");if(d)d.remove();}});
+  if(!id)return;
+  const row=[...list.querySelectorAll(".chat-item")].find(r=>r.dataset.id===id);if(!row)return;
+  row.classList.add("hz-live");
+  let d=row.querySelector(".hz-ldie");
+  if(!d){d=document.createElement("i");d.className="hz-ldie";d.setAttribute("aria-hidden","true");const ct=row.querySelector(".ct");if(ct)ct.after(d);else row.appendChild(d);}
+  d.dataset.v=hzS.liveV||hzLocalV();
+}
+// a row whose saved title arrived renames itself (chats asked in the last two minutes)
+function hzRenameCheck(){
+  const list=$("#chat-list");if(!list)return;
+  list.querySelectorAll(".chat-item").forEach(r=>{const id=r.dataset.id,ct=r.querySelector(".ct");if(!id||!ct)return;
+    const t=ct.textContent,was=hzS.titles.get(id);hzS.titles.set(id,t);
+    if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK()){r.classList.remove("hz-renamed");void r.offsetWidth;r.classList.add("hz-renamed");}});
+}
+function hzBoom(){
+  const b=$("#send");if(!b)return;const r=b.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  for(let i=0;i<2;i++){
+    const el=document.createElement("i");el.className="hz-ring";el.style.left=cx+"px";el.style.top=cy+"px";
+    document.body.appendChild(el);
+    const a=el.animate([{transform:"translate(-50%,-50%) scale(.25)",opacity:.9},{transform:"translate(-50%,-50%) scale("+(i?14:8)+")",opacity:0}],
+      {duration:i?980:640,delay:i*90,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+    a.onfinish=()=>el.remove();
+  }
+  b.animate([{transform:"scale(.92)"},{transform:"scale(1)"}],{duration:420,easing:"cubic-bezier(.34,1.56,.64,1)"});
+}
+// the stream's frames: who is working (RUN), and the stages (STATUS, STEP, DRAFT)
+function hzTele(kind,v){
+  if(!hzReady||!hzS.gen)return;
+  if(kind==="run"&&v){
+    if(v.w==="server"){hzS.srvWorking=String(v.s||"");hzS.genLocal=false;hzS.liveV=hzSrvV(hzS.srvWorking);}
+    else if(v.w==="local"){hzS.genLocal=true;hzS.srvWorking="";hzS.liveV=hzLocalV();}
+    else if(v.w==="mix"){hzS.genLocal=true;hzS.liveV=hzLocalV();}
+    else if(v.w==="cloud"){hzS.genLocal=false;hzS.liveV="cloud";}
+    hzMachinesPaint();hzSideLive();hzPulse();
+  }else if(kind==="status"){if(v!==hzS.stage){hzS.stage=v;hzPulse();}}
+  else if(kind==="step"||kind==="draft")hzPulse();
+}
+function hzPulse(){
+  const a=$("#hz-aur2");if(!a||!hzMotionOK())return;
+  a.classList.remove("hz-pulse");void a.offsetWidth;a.classList.add("hz-pulse");
+  clearTimeout(hzS.pulseT);hzS.pulseT=setTimeout(()=>a.classList.remove("hz-pulse"),800);
+}
+function hzOnLand(aborted){
+  if(!hzReady)return;
+  hzS.gen=false;hzS.srvWorking="";hzS.genLocal=false;
+  document.documentElement.classList.remove("hz-busy");
+  if(hzS.sky)hzS.sky.setBusy(false);
+  hzMachinesPaint();hzSideLive();
+  const id=hzS.liveChat;if(id)setTimeout(()=>hzS.watch.delete(id),120000);
+}
+// ---- stillness: effects off, reduced motion, hidden, or a minute unfocused
+function hzMotionOK(){
+  return !(typeof noVideo!=="undefined"&&noVideo)&&!hzS.reduced&&!document.hidden&&!hzS.blurred;
+}
+function hzPauseSync(){
+  const root=document.documentElement;
+  const pause=document.hidden||hzS.blurred||(typeof noVideo!=="undefined"&&noVideo);
+  root.classList.toggle("hz-pause",pause);
+  hzMediaSync();
+  if(!pause&&hzS&&performance.now()-(hzS.skyAt||0)>120000)hzSkyPaint();
+}
+// ---- the opening, on the first launch only (seen_opening) and never with effects
+// off or reduced motion: the night fades up; the lockup appears, its wing drawn
+// line by line and its word traced in light; a light streak crosses it, a prism
+// glint sweeps it once and a prism glow cycles; the wash blooms; the lockup lingers
+// and lifts away; the home fades in and the greeting is traced; the machines light up.
+// Any key, click, wheel or touch skips it; the key lands in the composer.
+function hzIntroKick(){
+  const root=document.documentElement;
+  if(!root.classList.contains("hz-intro")){hzIntroEnd(false);return;}
+  if(hzS.intro)return;
+  hzS.intro=true;hzS.introT0=performance.now();
+  try{sessionStorage.setItem("millen.hz.intro","1");}catch(e){}
+  const dbg=hzS.debug||{},frozen=dbg.intro!=null;
+  if(frozen){hzS.freezeAt=dbg.intro;window.hzFrozen=true;}
+  const skip=e=>{if(e&&e.type==="keydown"&&(e.metaKey||e.ctrlKey||e.altKey))return;hzIntroEnd(true);};
+  hzS.introSkip=skip;
+  ["keydown","pointerdown","wheel","touchstart"].forEach(k=>addEventListener(k,skip,{capture:true,passive:true}));
+  const at=(ms,fn)=>{if(frozen&&ms>dbg.intro*1000)return;hzS.introTimers.push(setTimeout(fn,ms));};
+  const mark=$("#hz-intro-mark"),word=mark&&mark.querySelector(".hz-word");
+  if(mark)mark.hidden=false;      // the lockup's stage (hidden again by hzIntroEnd)
+  // traced; then the streak (2.8 s), the glint (2.5 s, .55 s after the trace) and the prism glow (9 s)
+  at(300,()=>{root.classList.add("hz-markin");if(word)hzTraceIn(word,{margin:40,speed:520,spread:.7}).then(()=>{if(!hzS.intro)return;word.classList.add("shown");root.classList.add("hz-litmark");});});
+  at(1500,()=>{const w=$("#hz-wash");if(w){w.classList.remove("bloom");void w.offsetWidth;w.classList.add("bloom");}});
+  at(6200,()=>root.classList.add("hz-markout"));
+  at(6800,()=>{root.classList.add("hz-home");const g=$("#hero .greet");if(g){root.classList.remove("hz-intro");hzHeadlineShow(g);}});
+  at(7500,()=>{hzS.rigsOn=true;$$("#hz-machines .hz-rig").forEach((r,i)=>setTimeout(()=>r.classList.add("on"),i*170));});
+  at(8800,()=>hzIntroEnd(false));
+}
+function hzIntroEnd(skipped){
+  const root=document.documentElement;
+  if(hzS&&hzS.introTimers){hzS.introTimers.forEach(clearTimeout);hzS.introTimers=[];}
+  if(hzS&&hzS.introSkip){["keydown","pointerdown","wheel","touchstart"].forEach(k=>removeEventListener(k,hzS.introSkip,{capture:true}));hzS.introSkip=null;}
+  if(skipped)hzTraceKill();
+  const mark=$("#hz-intro-mark");if(mark){mark.hidden=true;const w=mark.querySelector(".hz-word");if(w)w.classList.add("shown");}
+  root.classList.remove("hz-intro","hz-markin","hz-markout","hz-litmark");root.classList.add("hz-ready","hz-home");
+  if(hzS&&hzS.intro&&typeof prefSet==="function"&&!(hzS.debug&&hzS.debug.intro!=null))prefSet({seen_opening:true});   // the full opening plays on the first launch only
+  if(hzS){hzS.intro=false;hzS.rigsOn=true;hzS.freezeAt=null;}
+  const g=$("#hero .greet");if(g){if(skipped){hzTraceKill();g.classList.add("shown");}else hzHeadlineShow(g);}
+  $$("#hz-machines .hz-rig").forEach(r=>r.classList.add("on"));
+  if(skipped){const i=$("#input");if(i&&document.activeElement!==i)i.focus();}
+}
+// ---- the Look and the Effects settings
+function setLook(v,quiet){
+  v=v==="classic"?"classic":"horizon";
+  try{localStorage.setItem("millen.look",v);}catch(e){}
+  const sel=$("#look-sel");if(sel&&sel.value!==v)sel.value=v;
+  const root=document.documentElement,was=root.classList.contains("hz");
+  if(v==="horizon"&&!was){root.classList.add("hz");hzStart();
+    const sk=$("#skyline");if(sk){sk.hidden=true;const vid=$("#sky-color");if(vid&&!vid.paused)vid.pause();}
+    const i=$("#input");if(i)i.placeholder="Ask anything";}
+  if(v==="classic"&&was){hzStop();root.classList.remove("hz","hz-ready","hz-home","hz-pause","sbhide","hz-sbopen","hz-busy");
+    const i=$("#input");if(i)i.placeholder="How can I help you today?";
+    const g=$("#hero .greet");if(g&&typeof greeting==="function"){g.innerHTML="";g.textContent=greeting();delete g.dataset.hzText;}
+    if(!quiet&&typeof bootSkyline==="function"){skyBooted=false;bootSkyline();}}
+}
+function setFxLevel(v){
+  v=v==="full"?"full":"balanced";
+  try{localStorage.setItem("millen.fxlevel",v);}catch(e){}
+  const sel=$("#fx-level");if(sel&&sel.value!==v)sel.value=v;
+  if(hzS&&hzS.sky)hzS.sky.size();
+}
+function hzStart(){
+  hzS.place=hzFindPlace();
+  if(!hzS.starCv)hzS.starCv=document.createElement("canvas");
+  hzSkyPaint();hzDrawWash();hzHomePaint();hzPlaceEffort();hzPauseSync();hzSidebarLabel();hzMediaBoot();
+  clearInterval(hzS.skyTimer);hzS.skyTimer=setInterval(()=>{if(!document.hidden)hzSkyPaint();},180000);
+  if(typeof api==="function")api("/api/setup").then(r=>r.json()).then(st=>{hzS.accel=st&&st.accel||"";hzMachinesPaint();}).catch(()=>{});
+}
+function hzStop(){
+  clearInterval(hzS.skyTimer);hzS.skyTimer=0;
+  hzS.mediaGen=(hzS.mediaGen||0)+1;hzS.mediaOn=false;
+  if(hzS.sky&&hzS.sky.raf){cancelAnimationFrame(hzS.sky.raf);hzS.sky.raf=0;}
+  const v=$("#hz-vid");if(v&&!v.paused)v.pause();
+  const eff=$("#hz-effort"),crow=$("#crow");if(eff&&crow&&eff.parentElement!==crow){crow.insertBefore(eff,$("#model-chip"));eff.classList.remove("compact");}
+  hzTraceKill();hzIntroEnd(false);
+}
+// ---- the dev copy's states (?hz=..., refused outside a dev copy)
+function hzDebugParse(spec){
+  const o={};if(!spec)return o;
+  String(spec).split(",").forEach(kv=>{
+    const m=/^intro@([\d.]+)$/.exec(kv);if(m){o.intro=+m[1];return;}
+    const i=kv.indexOf("=");if(i>0)o[kv.slice(0,i)]=kv.slice(i+1);else if(kv)o[kv]="1";
+  });
+  return o;
+}
+function hzDebugApply(){
+  const d=hzS.debug;if(!d)return;
+  const root=document.documentElement;
+  if(d.time){const t=Date.parse(d.time);if(t)hzS.fixedNow=t;}
+  if(d.place){const p=d.place.split(":");if(p.length>=2)hzS.place={lat:+p[0],lon:+p[1],city:p[2]||"",src:"debug"};}
+  if(d.sidebar==="1")root.classList.add("hz-sbopen");
+  if(d.fx==="0")document.body.classList.add("novideo");
+  if(d.time||d.place)hzSkyPaint();
+  if(d.state==="typing"){const i=$("#input");if(i){i.value=d.text||"Which of my two job offers makes more sense if I want to move abroad next year?";i.dispatchEvent(new Event("input"));}}
+  if(d.effort!=null&&/^[0-4]$/.test(d.effort)){hzS.effort=+d.effort;hzEffortPaint();}
+  if(d.state==="menu"){setTimeout(hzMenuOpen,600);}
+  if(d.state==="thinking"||d.state==="boom"||d.state==="landed"){
+    const hero=$("#hero");if(hero)hero.remove();
+    if(typeof addMsg==="function"){addMsg("user",d.text||"Which of my two job offers makes more sense if I want to move abroad next year?");
+      const ai=addMsg("assistant","");const b=ai.querySelector(".body");if(b)b.innerHTML='<span class="statusline"><i class="cspin"></i> Reading both offers</span>';}
+    hzPlaceEffort();hzTitlePaint();
+    if(d.state!=="landed"){document.body.classList.add("gen");hzS.gen=true;hzS.genLocal=d.server!=="1";root.classList.add("hz-busy");
+      if(d.server==="1"&&typeof srvList!=="undefined"&&srvList[0])hzS.srvWorking=srvList[0].name;
+      if(hzS.sky)hzS.sky.setBusy(true);
+      $("#send").classList.add("stop");$("#send").textContent="■";hzMachinesPaint();}
+    if(d.state==="boom"){
+      const b=$("#send"),r=b.getBoundingClientRect();
+      for(let i=0;i<2;i++){const el=document.createElement("i");el.className="hz-ring frozen";el.style.left=(r.left+r.width/2)+"px";el.style.top=(r.top+r.height/2)+"px";
+        el.style.transform="translate(-50%,-50%) scale("+(i?6:3.5)+")";el.style.opacity=i?".3":".55";document.body.appendChild(el);}}
+  }
+  setTimeout(hzGlowFit,80);
+}
+// ---- boot
+function hzInit(){
+  const root=document.documentElement;
+  let salt="";try{salt=localStorage.getItem("millen.hz.salt")||"";if(!salt){salt=String(Math.random()).slice(2,10);localStorage.setItem("millen.hz.salt",salt);}}catch(e){}
+  hzS={gen:false,genLocal:false,srvWorking:"",intro:false,blurred:false,introTimers:[],tracers:new Set(),salt:salt,
+    reduced:!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches),
+    debug:hzDebugParse(HZ_DEBUG),gpu:null,mem:null,seed:1,rnd:hzRng(1),dayKey:-1,skyAt:0,accel:"",inUse:new Set(),
+    effort:null,clip:null,liveChat:null,liveV:"",watch:new Set(),titles:new Map(),sendFrom:null};
+  if(hzS.debug&&hzS.debug.intro!=null&&root.classList.contains("hz"))root.classList.add("hz-intro");
+  hzReady=true;
+  try{if(!("registerProperty" in CSS)||!(CSS.supports("mask-composite","exclude")||CSS.supports("-webkit-mask-composite","xor")))root.classList.add("hz-ring-static");}catch(e){root.classList.add("hz-ring-static");}
+  const sbtn=$("#hz-sb");if(sbtn)sbtn.addEventListener("click",hzSidebarToggle);
+  try{if(localStorage.getItem("millen.sbhide")==="1")root.classList.add("sbhide");}catch(e){}
+  $$("#hz-lanes [role=tab]").forEach(b=>b.addEventListener("click",()=>{if(typeof switchLane==="function")switchLane(b.dataset.m);}));
+  const lanes=$("#hz-lanes");if(lanes)lanes.addEventListener("keydown",e=>{
+    const tabs=[...lanes.querySelectorAll("[role=tab]")],i=tabs.indexOf(document.activeElement);if(i<0)return;
+    const j=e.key==="ArrowRight"?(i+1)%tabs.length:e.key==="ArrowLeft"?(i+tabs.length-1)%tabs.length:-1;
+    if(j<0)return;e.preventDefault();tabs[j].focus();tabs[j].click();});
+  const mach=$("#hz-machines");if(mach)mach.addEventListener("click",e=>{if(e.target.closest(".hz-rig")&&typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
+  const gear=$("#hz-settings");if(gear)gear.addEventListener("click",()=>$("#settings-btn").click());
+  const hist=$("#hz-history");if(hist)hist.addEventListener("click",e=>{
+    const row=e.target.closest(".hz-row");if(row&&row.dataset.id&&typeof loadChat==="function")loadChat(row.dataset.id);});
+  const sel=$("#look-sel");
+  if(sel){try{sel.value=localStorage.getItem("millen.look")==="classic"?"classic":"horizon";}catch(e){}
+    sel.addEventListener("change",()=>setLook(sel.value));}
+  hzMenuWire();
+  const clist=$("#chat-list");
+  if(clist&&window.MutationObserver)new MutationObserver(()=>{if(root.classList.contains("hz")){hzSideLive();hzRenameCheck();}}).observe(clist,{childList:true});
+  const fsel=$("#fx-level");
+  if(fsel){fsel.value=hzFxLevel();fsel.addEventListener("change",()=>setFxLevel(fsel.value));}
+  const inp=$("#input");if(inp&&root.classList.contains("hz"))inp.placeholder="Ask anything";
+  addEventListener("visibilitychange",hzPauseSync);
+  addEventListener("blur",()=>{clearTimeout(hzS.blurT);hzS.blurT=setTimeout(()=>{hzS.blurred=true;hzPauseSync();},60000);});
+  addEventListener("focus",()=>{clearTimeout(hzS.blurT);if(hzS.blurred){hzS.blurred=false;hzPauseSync();}});
+  let rz=0;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(root.classList.contains("hz")){hzSkyPaint();hzDrawWash();hzModesPaint();hzGlowFit();}},150);});
+  if(window.ResizeObserver&&$("#composer"))new ResizeObserver(()=>{if(root.classList.contains("hz"))hzGlowFit();}).observe($("#composer"));
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(root.classList.contains("hz"))hzGlowFit();});
+  const inner=$("#chat-inner");
+  if(inner&&window.MutationObserver)new MutationObserver(()=>{if(!root.classList.contains("hz"))return;
+    hzPlaceEffort();hzHistoryPaint();hzTitlePaint();hzSidebarLabel();setTimeout(hzGlowFit,80);
+    const home=!!$("#hero");if(home&&!hzS.home){hzWashBloom();hzHomePaint();}hzS.home=home;}).observe(inner,{childList:true});
+  hzS.home=!!$("#hero");
+  if(root.classList.contains("hz")){
+    hzStart();
+    if(hzS.debug)hzDebugApply();
+    if(hzS.debug&&hzS.debug.intro!=null)hzIntroKick();
+    else if(!root.classList.contains("hz-intro")){root.classList.add("hz-home");hzWashBloom();}
+  }
+}
+hzInit();
+/* ===================================================== HORIZON end (6b526) */
+
 </script>
 </body>
 </html>

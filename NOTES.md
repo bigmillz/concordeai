@@ -17296,3 +17296,239 @@ page's <script> instead of at the board, and a new check keeps the board, the co
 The gauntlet came back 1199/1200: the servers review check (6b334) still pinned the board's own
 X-Models reader, which went with the board. It now pins the page's one remaining reader and counts
 it, so a second, undecoded reader still fails. That check alone was rerun against the source, green.
+
+## 6b526 — The Horizon look: the home as the real sky, the limb, the aurora, the Apple aerials, an intro, the effort slider (per Patrick)
+
+Patrick: "I love A, but I know you can do so much better... we need to eat ChatGPT for breakfast, lunch,
+dinner, and all its snacks", then "drop dead gorgeous, sharp, and clean", "Claude is so clean, but ChatGPT
+right now just looks like eye-opening magic", "a wash of color and then neutrality", "I do really love the
+space effect that you created", "make the headline much more centered... very dominant", "give the background
+more animation, but keep it steady", "we're missing out from the original design with the Apple backgrounds...
+incorporate them, like trace lines in the background", "I want the font and word mark that we had originally
+for now", "I don't want to sound too much like we're just running other junk... you have it on Zenith right
+now". The design system is `design/TOKENS.md` with the art director's `design/NORTHSTAR.md` and its owner
+override on top (`design/` is git-excluded).
+
+**The Look.** Settings > About > Look: Horizon (the default) or Classic. The head script reads
+`millen.look` before the first paint and sets `html.hz`; every Horizon rule is scoped under it (a gauntlet
+check scans each selector), so Classic is exactly what it was: its skyline, its wipe, its starter chips.
+`bootSkyline` returns under Horizon, the parallax rests, `kickWipe` runs Horizon's intro instead of the band.
+`setLook()` switches live. The Classic web fonts stay as the app always loaded them (the owner's override:
+Space Grotesk, IBM Plex Mono, Michroma); Michroma is also served from the bundled `fonts/` under
+`/static/fonts/` (cookie-only, like the clips) so the lockup renders offline. The `--hz-font-*` tokens hold
+the stacks and are the one place to change them.
+
+**The sky is the real sky.** `hz_place()` names where it is drawn for, with no network and no location
+permission: the town in Settings when its coordinates are already in the geocode cache, else the time
+zone's reference city from the OS zone table (`_zone_latlon`), else the page's own zone against a small
+built-in table (Windows). ~160 of the brightest stars (Yale Bright Star data: RA, Dec, V, B−V) are placed
+from GMST and the place, drawn once to a canvas and again every three minutes, static (no twinkle), small,
+the giants warm. The Moon is light, not a widget: `hzMoon()` (Schlyter's low-precision formulas, checked
+against the 2000-01 new and full moons to 1e−8) sets a moonlight glow whose opacity is 0.08 + 0.62 × the lit
+fraction, at the upper right while waxing, upper left while waning. The Sun is never drawn; civil twilight
+warms the limb's hairline and lifts the sky band; by day the stars are outshone. The gauntlet runs the
+page's own functions in node: GMST at J2000 (18.6974 h), Polaris within a degree of the latitude, Sirius
+culminating from Cape Town at 72.8°, the local sidereal time equal to its RA at that moment.
+
+**The limb.** A 3200 px circle whose top edge is the horizon; its peak sits at the composer's measured
+vertical centre (`hzLimbFit`: load, resize, fonts ready, every hero change, every composer growth), hidden
+behind the glass, the arc emerging from its sides. Its hairline is the only warmth (rgba(255,214,160,.92),
+#ffb58a in twilight); its light breathes as a separate shadow layer (opacity only). **The aurora** is ice
+rays, not blobs: three repeating ray periods, a glow and a mint fringe over the bottom quarter, drawn to
+canvases at a quarter of their size (the upscale is the softness; no filter ever runs), under an elliptical
+mask that fades before its box ends, in a wrapper that leans 3°; two layers sway ±64 px on 28 s and 37 s
+clocks, seeded per day with the install's salt (periods, lean, gain, phase), their opacity following the real
+GPU reading (.35–.5 idle, .62 while an answer runs, when they also sway at 16 s). **The wash** (per
+Patrick): indigo, rose, amber and teal blooms on a small canvas screened over the scene, flowering on first
+open and on arriving home (4.6 s, settling to .14), drifting 22 s and swelling 14 s, lifting to .4 while an
+answer runs. A meteor at seeded times (~every 40–90 minutes). Everything is transform or opacity.
+
+**The Apple aerials** (per Patrick), on the app's own backdrop system (the clip list, SKY_DARK, the day/night
+rule, the local cache, same-origin `/static/sky/`; `no-downloads` copies reuse cached files): below the limb
+the planet is a real orbital (GMT) clip, night ones at night, clipped inside the circle (`overflow:hidden`,
+the rim's light drawn by the sibling layers above) and graded by filters on the video alone (saturate .42,
+brightness .56, sepia .24, hue-rotate 176°, opacity .55); in the sky a WebGL Scharr edge pass over a city
+clip draws thin ice lines (premultiplied, blended in place at k=.34 so they flow rather than flicker) at half
+the window's size, 30 fps, 15 while a model answers, masked to mid-sky. Both pause when hidden, long
+unfocused or with effects off; reduced motion holds the Earth on a frame and draws no lines; no WebGL means
+no lines. A clip that isn't cached downloads in the background by the app's one-at-a-time rule; the planet
+stays painted meanwhile. Measured on this Mac with the window frontmost: the window's WebContent ~4% CPU,
+WebKit's GPU process ~10%, the server <1%; the system GPU was already at 60–75% from other sessions'
+model runs, so a clean GPU delta is still owed.
+
+**The home.** Header 72 px: the chats button, the app's own lockup (`.vghost`, unchanged), the lanes as text
+with an ice underline, the machines as dots with their real names (this Mac, each paired server by the name
+the app holds, the cloud when it is on), Settings. Only the headline, centred and dominant (clamp(54px, 8vw,
+104px), Space Grotesk 400, −.04em, a faint ice glow), by the time of day with the name from Settings; no
+subline. The composer on the limb (glass lit from below, radius 26, a breathing glow layer beneath, no focus
+rectangle on the textarea), its row: attach, the effort slider, More modes (the engine menu, never a model
+name), mic, send. Under it, recent chats as hairline rows (title, when, a token count only where a chat
+carries a real one). The sidebar is closed on the home unless opened; in a conversation it is open unless
+hidden (`hz-sbopen`, `sbhide`). **The effort slider**: Flare, Zenith, Meridian (Odyssey when its tier
+exists) over a real range input; a glowing thumb, a smooth drag by hundredths and a spring snap; arrows,
+Home and End; aria-valuetext; the name and plain description live while dragging; the real hint "Usually
+about 20 s for you" from the page's own `millen.speeds`; compact in the conversation header. At Meridian the
+name shimmers softly and a conic light ring travels the composer's edge (`@property --hz-ang`, masked to the
+border; a still gradient border where @property or mask-composite is missing); at Odyssey in full; Flare
+and Zenith have neither. **The modes' names** (`/* MODE NAMES (6b526) */`, declared at the top of the script:
+`tierLabel()` reads `modeName` during boot and a const further down was a TDZ throw that killed the page,
+seen live): the chip's line goes through `hzModeWords` ("Zenith · <server> only"), the engine menu's rows
+through `hzMenuBrand` after they land (the gauntlet pins `tierShown`, `modeRow`, `engMainRows` and the
+menu's `innerHTML` lines, so the names are applied one layer out and those pins hold); `/api/chat` also
+accepts Flare/Zenith/Meridian/Odyssey beside Smart/Best/Power; tiers, prefs and `/api/tiers` keys are
+unchanged.
+
+**The intro**, once per launch (sessionStorage), never with effects off or reduced motion: black, the stars,
+the limb rising under a warm flare with the wash blooming, the aurora, the lockup scaled up with its tracking
+settling from .42em to .15em and one line ("Your own AI. On your own machines."), its flight into the header,
+the headline and the composer rising. CSS keyframes delayed from `--hz-t`, the flight in Web Animations. Any
+key, click, wheel or touch skips it and the key lands in the composer, which has focus from the first frame.
+The head's dead-man's switch still drops a stranded intro at 5 s (a frozen dev state says it is alive).
+
+**Send, thinking, landing.** Two ice rings from the send button and a contrail along the limb; while an
+answer runs the aurora sways faster and brighter, pulses on every RUN/STATUS/STEP/DRAFT frame, and a second
+ice aurora rises from the far horizon only while a paired server works (`RUN w:server`); the writer's rate
+the page measures lifts the aurora a little. When the answer lands the limb warms for three seconds, longer
+and softer for the day's first answer.
+
+**Dev copies only:** `/?hz=<spec>` (and the `hz=<spec>` test hook) freezes any moment: `intro@1.4`,
+`state=typing|boom|thinking|landed`, `fx=0`, `media=0`, `time=`, `place=lat:lon:City`. Refused outside a
+dev copy like every hook: `hz_debug_spec(path, dev)` is None without `DEV_HOME`, and `/?anything` stays 403.
+
+**Deliberate deviations.** The stars move at the real sky's rate (a redraw every three minutes), not the
+demo's 2400 s rotation: they are the real sky. The status sentence and the Moon widget were built and then
+removed on the owner's word; `/api/home` (the day's cloud calls) stays as a small real fact for the other
+builders. Bundling Space Grotesk and IBM Plex Mono (OFL) is a follow-up that needs a download.
+
+**OVERRIDE 2 (the same day, per Patrick: "get rid of the semicircle", "maximum GPU with the night effect",
+"80% moon effect, 20% Apple", "neon colors, rainbows... being classy", "a trace for that opening title").**
+The limb, the Earth circle, the Earth window video and the separate trace-line layer are removed (not hidden), and
+with them `hzLimbFit`, the contrail and the limb's warming on landing. The background is now ONE full-screen WebGL
+canvas (`#hz-gl`, the art director's reference `nightmock/index.html` ported as the app's layer): the footage is the
+app's own orbital night clip (KOREA_JAPAN_NIGHT first, then the other dark GMT clips, from the cache; same-origin so
+the GPU may read it; 0.7× speed) as a texture; a feedback pass keeps the brightest lights for a moment (a live long
+exposure) and the traced edges with a short afterglow; a blur pyramid at half and quarter size makes the bloom and a
+soft lens streak; a half-size neon aurora pass (mint at its lower edge, the shimmer colours higher, curtains that
+fold) whose strength follows the effort slider (Flare .2, Zenith .28, Meridian .5, Odyssey .78) and the work (+.28,
+longer trails); the composite grades the sky and the footage by the local hour, draws the REAL stars from a texture
+the page paints from the catalogue (every three minutes; they move at the real sky's rate, a deliberate deviation from
+the reference's 40-minute turn, kept to a faint dust under them), the moonglow as bright as tonight's real Moon on the
+side it really is, the footage as about a fifth of the picture rising from the foot, a prism fringe and fine grain.
+The CSS ice rays stay at .42 (.85 while an answer runs), the wash stays. Effects (Settings > About): Full (1.5× pixel
+ratio, 60 fps, long trails: for when a server does the thinking) or Balanced (0.75×, 30 fps, short trails; the
+default); 15 fps while a local model answers; hidden, long unfocused and effects off rest it; reduced motion holds one
+frame; no WebGL shows the plain footage. The machines are dies in their makers' colours (MLX, NVIDIA, AMD, Intel; a
+sleeping one hollow; the one working pulses and its label shimmers; a hover card with the machine, its hardware and
+state), each paired server by its own name, never an assumed one. The effort slider slides the mode's real lineup
+(`tierInfo[mode].models` from `/api/tiers`, each seat on its machine with the maker's die) out under the composer while
+you hover or drag; leavers tuck back; the machines in use light up; gone 2.6 s after the last change.
+**The opening** is now the reference's: the lockup appears with its wing drawn line by line, its word traced in
+light (sparks in the shimmer colours run round every glyph from the top of each shape, cool to ice, light floods the
+letters, the text crossfades in), one line beneath, the wash blooms, the lockup lifts away, the home fades in and the
+greeting is traced; the machines light up one by one. **It plays in full on the first launch only** (per Patrick):
+the page posts `seen_opening` (a machine pref by the `seen_` prefix, prefs.json) when it ends, the server hands it
+back as `__HZ_SEEN__`, and every later open goes straight home with a quick title trace (speed 980, spread .5, about
+1.5 s). Reduced motion or effects off: no trace, the text alone. **Copy** (per Patrick: direct, Apple-like):
+"Ask anything, or drop a file here" → "Ask anything"; "More modes: Max, Cloud only, your servers, Advanced" → "More
+modes"; "Usually about 20 s for you" → "About 20 seconds" (and "About a minute"); "Every model you have, everywhere" →
+"Every model, everywhere"; the slider's label "How hard it thinks" → "Effort"; "Show the chats"/"Hide the chats" →
+"Show chats"/"Hide chats"; the Effects row's note is one line ("Full is best when a server does the thinking.").
+
+**Gauntlet.** Twelve checks with mutants: the page carries the layer; Michroma served by name only; no
+external URL in the Horizon blocks; the intro skippable; effects off and reduced motion gate it; every rule
+scoped and Classic intact; everything pauses hidden; `?hz=` refused outside dev; the sky math; the mode
+names; the aerials; the Look. The scorecard is in the commit message.
+
+## 6b534 — Horizon, the owner's final round: the Greek modes and five efforts apart, every Apple aerial by the hour, the wordmark's slower reveal, asking from the home (per Patrick)
+
+Builds on the handoff commit (the WIP of 6b526's OVERRIDE 2: the GPU night, the tracer, the machine dies, the
+first-launch opening, Effects Full/Balanced) and finishes NORTHSTAR's OVERRIDE 3 and 4 for the home.
+
+**The opening (OVERRIDE 3, then the coordinator's slower reveal, copied from the reference).** The tagline is gone;
+the wordmark is alone. The handoff's lockup never showed: `#hz-intro-mark` kept its `hidden` attribute (the old
+`.hz.hz-intro #hz-intro-mark{display:flex}` that overrode it had been replaced), so `hzIntroKick` now unhides it.
+When the trace completes (`hz-litmark`): a light streak crosses it (2.8 s, cubic-bezier(.22,.8,.25,1)), one prism
+glint sweeps it (2.5 s, .55 s after), a prism glow cycles (9 s). It lingers: markout at 6.2 s (a 1.2 s fade), home
+at 6.8 s, the machines from 7.5 s, the end at 8.8 s. `#hz-cglow`'s breathing animation overrode its hidden opacity
+during the opening (a glass-shaped glow under nothing): stilled until home. First launch only, as before.
+
+**The mode and the effort are separate controls.** A picker pill shows the mode's name only (OVERRIDE 4's Greek
+names: Alpha, Gamma, Sigma, Omega where its tier exists; Max, Cloud only, a server's own mode or Advanced by their names) and
+opens a glass menu (`#hz-menu`, fixed over the sky so its blur is the page's, placed from the pill: up from the
+home's composer, down from the conversation's header): each mode, what it is for, the dies of the machines its
+real lineup uses (`tierInfo` from `/api/tiers`), the current one marked with a lit dot, a mode that can't answer
+greyed. Hovering or focusing a mode slides its models out under it (die and name; the machine in the tooltip) and
+lights those machines in the header. Arrows, Home/End, Escape, Tab. The lineup under the composer (OVERRIDE 2) is
+gone. The slider beside it is **Effort**, five steps (OVERRIDE 4): Low, Medium,
+High, Max, Ultra over a real `<input type=range step=1>`, 170 px, detents at quarter steps, only the level name
+beside it; Max shimmers softly and runs the composer's light ring softly, Ultra gets the rainbow shimmer and the
+full ring (the ring and the shimmer follow effort now, not the mode: `hz-maxe`/`hz-ultra`). Kept in
+`millen.effort`. The neon aurora follows both (`S.level(m,e)`: the mode's .2/.28/.5/.62, plus .035 a step and
+.12 more at Ultra). More modes stays the quiet icon beside them.
+
+**The modes' names (OVERRIDE 4).** Alpha (Fast) "Fast answers", Gamma (Thinking) "Thinks it through", Sigma
+(Pro) "Every model weighs in", Omega (Vera Rubin) "Keeps going until you stop it". `MODE_NAMES` shows them;
+`MODE_ALIASES` takes them and still takes 6b526's Flare, Zenith, Meridian and Odyssey from older pages. The
+answer's signature ("Concorde Gamma") is hz-chat's and follows `modeName`.
+
+**What Effort does (real switches only).** The page sends `effort` (`low|medium|high|max|ultra`) with every
+question under Horizon; `/api/chat` takes only those five words, and each turns switches the pipeline already has:
+Low: no second pass on a single-model answer, and a server model that takes a reasoning level (gpt-oss, 6b518) is
+asked for "low". Medium: as before. High: the second pass always (even with Polish off), and a council's drafts are
+double-checked before the merge (`reflect`, with which a local Qwen seat also reasons natively). Max: High plus the
+council's peer review (`peer`: every seat rewrites from all the drafts; never in the Max mode, where every model
+already drafts). Ultra: Max plus "high" reasoning for a server model that takes it (measured on gpt-oss in 6b518:
+~55 s more before the first word). The pure rules are `effort_polish`, `effort_reflect`, `effort_peer`,
+`effort_think`. They ride the answering thread on `_srv_think` (`.level`, read by server_stream; `.effort`, read by
+run_council through a soft `globals()` lookup so the gauntlet's namespaces without it run as before), cleared per
+request by `_run`; the run_council call and signature are untouched (seven checks pin them). Not covered: a server
+call made on another thread (a parallel seat), and the cloud's per-role effort (6b307), left as measured.
+
+**Backdrops: every Apple aerial, by the hour (per Patrick, via the coordinator).** `SKY_HZ_TAGS` gives each of the
+89 clips Apple's own type and time of day (space / city / land / sea; day / twilight / night, from the aerial
+catalog's timeOfDay, as the community manifest carries it), keyed by the unique start of its file name;
+`SKY_HZ_BLEND` turns that into the hours the page picks by and the blend (sea: night and day, rise 1.6, no trails;
+space at night .3/.56/.36; aurora .28/.62/.42; city at night "night dusk"; twilight "dusk dawn"; day "day"). The
+art director's sixteen (`SKY_HZ_PICKED`) keep his values. The page gets the table as `HZ_CLIPS`
+(`__SKY_HZ__`). Each open: `hzClipChoose` picks one that fits the hour bucket (night before 5 and from 20:30, dawn
+to 8, day to 17, dusk) and isn't one of the last three in the server's own history (hist.json, which the window's
+storage can't lose); a cached one plays at once; one that isn't is warmed for a later open while a cached fitting
+one plays now (fresh first, else the one seen longest ago; none: the sky alone), so the opening never waits on a
+download. The clip's own trail threshold (`hiT`), rise and speed drive the shaders; a new clip starts with clean
+trails and fades its footage in on `playing`; when the hour moves to another part of the day the next one
+crossfades in (checked with the sky every three minutes). Seen clips are posted to `/api/sky/seen`.
+
+**Asking from the home.** `hzBeforeSend` (in send, before the hero goes) keeps where the composer and the words
+were. On send: the composer glides from mid-page to the foot (FLIP, .9 s); the question arcs from where it was
+typed into its new row at the top of the chats (into the chats button while they're hidden), which pops on
+arrival; the row keeps a live die in the colour of the machine at work (from the RUN frames: the server's maker,
+this Mac, or a hollow ice die for the cloud) with its title shimmering, until the answer lands; when the saved
+title arrives the row renames itself with a fade (chats asked in the last two minutes). A MutationObserver on
+`#chat-list` keeps the live row through the list's own repaints, so it works with either `renderChats` (this
+branch's Recents, or hz-chat's Today/Yesterday groups). The live line, the comets and the glowing words are
+hz-chat's (6b528): the header chips now carry `.rig` and `data-machine` so its `machineChip` finds a server's
+chip; its local lookup (`.rig.mlx`) misses a PC's chip, to settle at integration. The Horizon dies are scoped
+(`.hz .hz-rig .die`, `.hz-mdl`, `.hz-opt`, `.hz-ldie`), never a bare `.hz .die`, so hz-chat's dies keep their look.
+
+**Header.** A server whose GPU maker isn't known is an ice die labelled with its own name, never assumed NVIDIA;
+the local chip is "This PC" on Windows. **Phone width:** the lockup steps aside for the lanes, and the mode and
+effort take their own row in the composer (measured: no horizontal scroll at 390 px).
+
+**Copy (old -> new), per the owner's copy rules.** Opening: "Your own AI. On your own machines." -> (none). Modes:
+Flare -> Alpha, Zenith -> Gamma, Meridian -> Sigma, Odyssey -> Omega. Mode menu: "A quick answer" -> "Fast
+answers"; "Thinks it through and checks itself" -> "Thinks it through"; "Goes deep, every model weighs in" ->
+"Every model weighs in"; Omega's unchanged. Composer: the mode's description and the time hint ("About 20
+seconds", "About a minute") -> (none); the slider's label "Effort" (was the mode's name) with Low / Medium / High /
+Max / Ultra.
+
+**Verified** in Playwright's headless Chromium (Blink, rAF running) against a dev copy: the opening's frames, the
+menu with Sigma's eight models and Gamma's three out, Effort at Ultra, Max and Low, the compact header in a conversation, the arc, the
+live row through a repaint, the rename, 760 and 390 px. **Not verified:** WKWebView (the shipped app), and the
+footage itself (open-source Chromium plays no H.264, so the clips stayed black there); a real question was not
+sent (the engines lock).
+
+**Gauntlet.** The Horizon checks follow the new shape (menu, effort, the backdrop's GPU wiring, the scoped dies),
+and five are new, each with mutants: the 89-clip table (one entry each, the sixteen picks, underwater faint and
+trail-free); the chooser run in node (fits the hour, never one of the last three while a fresh one fits, plays from
+the cache and fetches the wanted one); the effort rules' truth tables with their call sites; the mode menu; the opening's timings; asking
+from the home. The scorecard is in the commit message.

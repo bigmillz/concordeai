@@ -2321,11 +2321,16 @@ check("first-run wizard present, gated on wizard_done",
       'id="wiz-veil"' in page and page.count('class="wstep"') == 4
       and "wizard_done" in page and "openWizard" in page
       and "platform.moonshot.ai" in page and "aistudio.google.com" in page)
+# (6b534) the Horizon look closes the sidebar on its home by its own scoped rules, each with
+# its open state beside it; the drawer rule holds for everything outside that block
+_page_nohz = (page[:page.index("/* ============================================================ HORIZON (6b526) */")]
+              + page[page.index("/* ============================================================ HORIZON end */"):])
 check("mobile drawer present and openable",
       'id="mburger"' in page and "body.sbopen #sidebar" in page
       and page.count("max-width:760px") == 1
       and "max-width:700px" not in page
-      and "#sidebar{display:none}" not in page)
+      and "#sidebar{display:none}" not in _page_nohz
+      and ".hz.hz-sbopen body:has(#main #hero):not(.sbopen) #sidebar{display:flex}" in page)
 # 6b242: ONE mode picker. The sidebar's copy of the tier list is gone —
 # the composer's engine pill is the only place modes are chosen, so guard
 # both halves: the picker is there, and the duplicate has not crept back.
@@ -2712,6 +2717,10 @@ _PAGE_HOST |= {"ClipboardItem", "FileReader", "ResizeObserver"}
 _PAGE_HOST |= {"ClipboardItem", "FileReader", "NodeFilter", "Number", "ResizeObserver"}   # browser globals the new features use
 _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
                "__DICT_TRACE__"}
+# the Horizon look (6b526, 6b534): its placeholders, and three host globals it uses
+# (Intl for the time zone, removeEventListener, globalThis for the hooks; all three on
+# window in WKWebView, WebView2 and Qt)
+_PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -23427,7 +23436,7 @@ def _p2c_pins(src):
         "fallback call": "                    _seat_res[0] = server_first_answer(\n                        lbl, _seat_fb[lbl], full_messages, memit, emit,\n"
                          "                        status, step,\n                        first_s=30.0 if tier == \"Fast\" else 60.0,\n"
                          "                        polish=_revise if _pol else None)\n                    hb_stop.set()\n                    return" in ch
-        and "                    _pol = (user_prefs(user_base).get(\"polish\", True)\n                            and not images and (not query or bookish)\n"
+        and "                    _pol = (effort_polish(user_prefs(user_base).get(\"polish\", True), _effort)\n                            and not images and (not query or bookish)\n"
             "                            and not _links\n"            # pasted pages write once (6b423)
             "                            and _is_substantive(prompt))" in ch
         and "REVISE_INSTRUCTION + \"QUESTION: \" + _sq" in ch,
@@ -37935,6 +37944,332 @@ _t519.excepthook = _r519_eh
 check("6b519's rules each break a check when broken (%d mutants)" % len(_R519_MUT), not _r519_caught,
       "%r" % _r519_caught)
 # ==== VERA RUBIN (6b519): end ====
+
+# ==== HORIZON (6b526, per Patrick): the home, the GPU night, the opening, the effort slider, the Look ====
+# The served page carries the Horizon layer; every rule of it is scoped under html.hz so
+# Classic is untouched; the opening is skippable, plays in full on the first launch only and
+# never with effects off or reduced motion; everything pauses while hidden; the dev-only ?hz=
+# flag is refused outside a dev copy; the sky's arithmetic lands on known stars; the modes
+# carry their brand names; there is no limb. Each rule has a mutant the same predicate must catch.
+_hz_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ============================================================ HORIZON (6b526) */"):
+                        _MILLENAI_SRC.index("/* ============================================================ HORIZON end */")]
+_hz_js = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ========================================================= HORIZON (6b526) */"):
+                       _MILLENAI_SRC.index("/* ===================================================== HORIZON end (6b526) */")]
+_hz_head = _MILLENAI_SRC[_MILLENAI_SRC.index('var hzLook="horizon";'):_MILLENAI_SRC.index('<title>MillenAI __APP_VER__</title>')]
+check("horizon: the served page carries the night canvas, the header, the mode picker and its menu, the Look and Effects rows, the tokens, and no unfilled template",
+      'id="hz-sky"' in page and '<canvas id="hz-gl"></canvas>' in page and 'id="hz-top"' in page and 'id="hz-effort"' in page
+      and '<div id="hz-menu" role="menu" aria-label="Mode"></div>' in page and 'id="look-sel"' in page and 'id="fx-level"' in page and 'id="hz-machines"' in page
+      and "/* HORIZON TOKENS (6b526) */" in page and "/* MODE NAMES (6b526) */" in page
+      and 'const MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};' in page
+      and "const modeName=t=>MODE_NAMES[t]||t;" in page
+      and "const HZ_PLACE=" in page and "const HZ_CLIPS=[" in page and "var hzSeen=" in page
+      and not any(tk in page for tk in ("__HZ_PLACE__", "__HZ_DEBUG__", "__HZ_FONTS__", "__SKY_ORBIT__", "__HZ_SEEN__", "__SKY_HZ__")), "")
+check("horizon: no limb, no Earth circle, no semicircle (OVERRIDE 2); the composer floats",
+      'id="hz-limb"' not in page and "#hz-limb" not in page and "hz-earth" not in page and "--hz-limb-y" not in page and "hzLimbFit" not in page
+      and "3200px" not in _hz_css, "")
+_hzf = req("/static/fonts/Michroma-Regular.ttf", token=False)
+check("horizon: Michroma is served from fonts/ for the lockup, by name only",
+      _hzf[0] == 200 and _hzf[1].get("Content-Type") == "font/ttf" and len(_hzf[2]) > 50000
+      and '@font-face{font-family:"Michroma";src:local("Michroma"),url(/static/fonts/Michroma-Regular.ttf)' in page
+      and req("/static/fonts/../../millenai.py", token=False)[0] in (403, 404)
+      and req("/static/fonts/nothing.ttf", token=False)[0] == 404, str(_hzf[0]))
+
+
+def _hz_no_external(css, js):
+    import re as _re
+    urls = _re.findall(r"https?://[^\s'\")]+", css + js)
+    return all(u.startswith("http://www.w3.org/2000/svg") for u in urls)
+
+
+check("horizon: the Horizon blocks reference no external URL (the app's pre-existing web-font stylesheet aside); the mutant is caught",
+      _hz_no_external(_hz_css, _hz_js) and page.count("fonts.googleapis.com") == 2
+      and not _hz_no_external(_hz_css + "\n.hz x{background:url(https://example.com/a.png)}", _hz_js), "")
+
+
+def _hz_skippable(js):
+    return ('["keydown","pointerdown","wheel","touchstart"].forEach(k=>addEventListener(k,skip,{capture:true,passive:true}));' in js
+            and "hzIntroEnd(true)" in js and "if(skipped)hzTraceKill();" in js
+            and 'if(skipped){const i=$("#input");if(i&&document.activeElement!==i)i.focus();}' in js)
+
+
+check("horizon: the opening is skipped by any key, click, wheel or touch (its tracers killed) and the key lands in the composer; the mutant is caught",
+      _hz_skippable(_hz_js) and not _hz_skippable(_hz_js.replace('"keydown",', "")), "")
+
+
+def _hz_intro_gated(head, css, js):
+    return ('if(!hzFxOff&&!hzIntroDone&&!hzReduced&&!hzSeen)document.documentElement.classList.add("hz-intro");' in head
+            and 'matchMedia("(prefers-reduced-motion: reduce)").matches' in head
+            and 'localStorage.getItem("millen.video")==="0"' in head
+            and "@media (prefers-reduced-motion:reduce){" in css
+            and ".hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}" in css
+            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}" in css
+            and "if(!hzMotionOK()||hzS.reduced)return;" in js)
+
+
+check("horizon: effects off and reduced motion disable the opening, the tracer and every sky animation; the mutants are caught",
+      _hz_intro_gated(_hz_head, _hz_css, _hz_js)
+      and not _hz_intro_gated(_hz_head.replace("!hzFxOff&&", ""), _hz_css, _hz_js)
+      and not _hz_intro_gated(_hz_head.replace("&&!hzReduced", ""), _hz_css, _hz_js)
+      and not _hz_intro_gated(_hz_head, _hz_css.replace("@media (prefers-reduced-motion:reduce){", "@media (x){"), _hz_js), "")
+# the full opening plays on the first launch only: the page posts seen_opening (a machine pref), the server hands it back
+check("horizon: the full opening is a first-launch moment: seen_opening posted after it, read into the page by the server, a quick trace afterwards",
+      'prefSet({seen_opening:true})' in _hz_js and '.replace("__HZ_SEEN__", json.dumps(hz_seen(self.ctx)))' in _MILLENAI_SRC
+      and 'prefs_view(ctx, strict=False).get("seen_opening") is True' in _MILLENAI_SRC
+      and "HZ_SEEN?{margin:48,speed:980,spread:.5}:{margin:56,speed:620,spread:.9}" in _hz_js
+      and "MACHINE_PREFIXES = (\"studio_\", \"last_\", \"seen_\"" in _MILLENAI_SRC, "")
+
+
+def _hz_scoped(css):
+    import re as _re
+    body = _re.sub(r"/\*.*?\*/", "", css, flags=_re.S)
+    body = _re.sub(r"@(?:keyframes|property)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", "", body)
+    body = _re.sub(r"@media[^{]*\{", "", body)
+    for sel in _re.findall(r"([^{}]+)\{", body):
+        for s_ in sel.split(","):
+            s_ = s_.strip()
+            if not s_ or s_.startswith(":root") or s_.startswith("__HZ_FONTS__"):
+                continue
+            if not (".hz" in s_ or s_.startswith("#hz-") or s_.startswith("#look-row") or s_.startswith("#fx-level") or s_.startswith(".hz-ring")):
+                return False
+    return True
+
+
+check("horizon: Classic is untouched: every Horizon rule is scoped, its backdrop, wipe and band are still there, and the mutant is caught",
+      _hz_scoped(_hz_css) and not _hz_scoped(_hz_css + "\n#composer{color:red}")
+      and 'id="skyline"' in page and "body.novideo #skyline{display:none}" in page
+      and "function rainbowWipe(){" in _MILLENAI_SRC
+      and 'if(document.documentElement.classList.contains("winwipe"))winWipeRun();\n  else rainbowWipe();' in _MILLENAI_SRC
+      and 'if(document.documentElement.classList.contains("hz"))return;   // Horizon has its own sky (6b526)' in _MILLENAI_SRC
+      and '<option value="classic">Classic</option>' in page
+      and 'localStorage.getItem("millen.look")==="classic"?"classic":"horizon"' in _hz_head, "")
+
+
+def _hz_pauses(js, css):
+    return ('addEventListener("visibilitychange",hzPauseSync);' in js
+            and 'const pause=document.hidden||hzS.blurred||(typeof noVideo!=="undefined"&&noVideo);' in js
+            and 'root.classList.toggle("hz-pause",pause);' in js
+            and ".hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}" in css
+            and "const on=hzMediaOK()&&!document.hidden&&!hzS.blurred;" in js
+            and "if(document.hidden)return;" in js)
+
+
+check("horizon: every animation, the footage and the GPU frame loop pause while the window is hidden or long unfocused; the mutant is caught",
+      _hz_pauses(_hz_js, _hz_css) and not _hz_pauses(_hz_js.replace("const pause=document.hidden||", "const pause="), _hz_css), "")
+_hzd_src = _MILLENAI_SRC[_MILLENAI_SRC.index("_HZ_DEBUG_RX = re.compile("):_MILLENAI_SRC.index("# THE BUNDLED FACE (6b526")]
+_hzd = {"re": re, "urllib": urllib}
+exec(_hzd_src, _hzd)
+_hzd_mut = {"re": re, "urllib": urllib}
+exec(_hzd_src.replace("    if not dev:\n        return None\n", ""), _hzd_mut)
+_hz_live = req("/?hz=intro@1.0", token=False)
+check("horizon: ?hz= freezes a dev copy's page and is refused outside one; the gate asks DEV_HOME; the mutant is caught",
+      _hzd["hz_debug_spec"]("/?hz=intro@1.0", False) is None
+      and _hzd["hz_debug_spec"]("/?hz=intro@1.0", True) == "intro@1.0"
+      and _hzd["hz_debug_spec"]("/?hz=state%3Dthinking", True) == "state=thinking"
+      and _hzd["hz_debug_spec"]("/?key=x", True) is None
+      and _hzd_mut["hz_debug_spec"]("/?hz=intro@1.0", False) is not None
+      and _MILLENAI_SRC.count("hz_debug_spec(self.path, bool(DEV_HOME))") == 2
+      and _hz_live[0] == 200 and 'HZ_DEBUG="intro@1.0"' in _hz_live[2].decode("utf-8", "replace")
+      and req("/?key=x", token=False)[0] == 403, str(_hz_live[0]))
+_hz_astro = _hz_js[_hz_js.index("function hzD(t)"):_hz_js.index("// the brightest stars")]
+
+
+def _hz_sky_math(src):
+    import tempfile as _tf
+    body = src + r"""
+const J=Date.UTC(2000,0,1,12,0,0),o={};
+o.gmst=hzGmst(J);
+o.polaris=hzAltAz(2.530,89.264,40.7128,-74.0060,Date.UTC(2026,10,8,3,0,0)).alt;
+let best=-99,bt=0;const t0=Date.UTC(2026,0,10);
+for(let k=0;k<1440;k++){const t=t0+k*60000,a=hzAltAz(6.752,-16.716,-33.9249,18.4241,t).alt;if(a>best){best=a;bt=t;}}
+o.sirius=best;o.lst=(hzGmst(bt)+18.4241/15)%24;
+o.newmoon=hzMoon(Date.UTC(2000,0,6,18,14)).lit;o.fullmoon=hzMoon(Date.UTC(2000,0,21,4,40)).lit;
+process.stdout.write(JSON.stringify(o));
+"""
+    f = os.path.join(_tf.mkdtemp(), "sky.js")
+    open(f, "w").write(body)
+    try:
+        o = json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=60).stdout)
+    except Exception:
+        return False
+    return (abs(o["gmst"] - 18.697374558) < 0.001 and abs(o["polaris"] - 40.7128) < 0.8
+            and abs(o["sirius"] - 72.79) < 0.5 and abs(o["lst"] - 6.752) < 0.05
+            and o["newmoon"] < 0.01 and o["fullmoon"] > 0.99)
+
+
+check("horizon: the real-sky math lands (GMST at J2000, Polaris at the latitude, Sirius culminating at 72.8 from Cape Town, the Moon new and full); the mutants are caught",
+      _hz_sky_math(_hz_astro)
+      and not _hz_sky_math(_hz_astro.replace("hzGmst(t)+lon/15-raH", "hzGmst(t)-lon/15-raH"))
+      and not _hz_sky_math(_hz_astro.replace(",d=hzD(t)+1.5,", ",d=hzD(t)+2.5,")), "")
+_hz_alias = {}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODE_ALIASES = {"):_MILLENAI_SRC.index("_HZ_PLACE_CACHE = profile_cache(")], _hz_alias)
+_hz_post = _MILLENAI_SRC[_MILLENAI_SRC.index('        if tier == "Power":'):_MILLENAI_SRC.index("_cl_mode, _cl_pid = cloud_tier_parse(tier)")]
+check("horizon: Alpha, Gamma, Sigma and Omega (and 6b526's Flare, Zenith, Meridian, Odyssey) are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and the home itself names no model",
+      _hz_alias["MODE_ALIASES"] == {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro", "Omega": "Vera Rubin",
+                                    "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro", "Odyssey": "Vera Rubin"}
+      and "tier = MODE_ALIASES[tier]" in _hz_post and "MODE_ALIASES[tier] in TIERS" in _hz_post
+      and 'function tierLabel(){return (typeof hzModeWords==="function"?hzModeWords(tierShown(tier)):tierShown(tier))||model;}' in _MILLENAI_SRC
+      and "hzMenuBrand(engMenu);" in _MILLENAI_SRC and "hzMenuBrand(engSub);" in _MILLENAI_SRC
+      and 'root.querySelectorAll(".engrow.mode .enm").forEach(e=>{e.textContent=modeName(e.textContent);});' in _MILLENAI_SRC
+      and 'return s?s.name+" only":"Your server";' in _hz_js and 'return "Your pick";' in _hz_js
+      and "tierLabel()" not in _hz_js[_hz_js.index("function hzModesPaint"):_hz_js.index("function hzEffortPaint")]
+      and "function hzLineupOf(mode)" in _hz_js and "const rows=hzLineupOf(m)" in _hz_js, "")
+# the GPU night: one WebGL canvas over the app's own aerial, same-origin; capped, pausable; a plain fallback
+check("horizon: the night is one GPU canvas over the app's own aerial (same-origin, the clip's own speed, trail threshold and rise), with trails, bloom, the neon aurora following the mode, the effort and the work, capped while a local model answers, plain footage without WebGL",
+      '<video id="hz-vid" muted loop playsinline preload="auto" crossorigin="anonymous"></video>' in page
+      and 'v.src="/static/sky/"+c.i+".mov";' in _hz_js and "v.playbackRate=c.rate;" in _hz_js
+      and "float hi=smoothstep(hiT,hiT+.54,l);" in _hz_js and "smoothstep(0.,rise,uv.y)" in _hz_js
+      and "gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);" in _hz_js
+      and 'powerPreference:"high-performance"' in _hz_js and "gap=hzS.gen&&hzS.genLocal?1000/15:(full?0:32);" in _hz_js
+      and 'document.documentElement.classList.add("hz-novfx")' in _hz_js and ".hz.hz-novfx #hz-vid{opacity:1;" in _hz_css
+      and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};" in _hz_js
+      and "S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};" in _hz_js
+      and "uniform1f(pS.U.moon,.08+.62*lit)" in _hz_js and 'localStorage.getItem("millen.fxlevel")==="full"' in _hz_js
+      and ".hz .hz-rig.mlx,.hz [data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz [data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}" in _hz_css
+      and ".hz .hz-rig.amd,.hz [data-v=amd]{--ac:#ed1c24;--ag:#ff4d55}.hz .hz-rig.intel,.hz [data-v=intel]{--ac:#0071c5;--ag:#3d9df5}" in _hz_css, "")
+
+# THE BACKDROPS (6b534, per Patrick: the whole Apple library): every clip of the catalog has
+# exactly one entry with Apple's hours; the art director's sixteen keep his values; the page's
+# chooser (run in node) fits the hour, never repeats one of the last three while a fresh one
+# fits, plays a cached clip now and fetches the one it wanted for a later open
+_hzb = {"hashlib": __import__("hashlib")}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("SKY_SOURCES = ["):_MILLENAI_SRC.index("# Clips that read DARK")], _hzb)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("SKY_HZ_TAGS = {"):_MILLENAI_SRC.index("_sky_lock = threading.Lock()")], _hzb)
+_hzb_keys = [_hzb["sky_hz_key"](u) for u in _hzb["SKY_SOURCES"]]
+_hzb_clips = _hzb["sky_hz_clips"]()
+_hzb_by = {c["i"]: c for c in _hzb_clips}
+check("horizon: every Apple aerial (all of SKY_SOURCES) has one catalog entry with its hours and blend; the art director's picks keep his values; underwater spreads faintly with no trails",
+      len(_hzb_clips) == len(_hzb["SKY_SOURCES"]) >= 89 and None not in _hzb_keys
+      and len(set(_hzb_keys)) == len(_hzb_keys) == len(_hzb["SKY_HZ_TAGS"])
+      and all(set(c["when"].split()) <= {"night", "dawn", "day", "dusk"} and c["when"] for c in _hzb_clips)
+      and all(any(b in c["when"].split() for c in _hzb_clips) for b in ("night", "dawn", "day", "dusk"))
+      and _hzb_by[3]["when"] == "night" and (_hzb_by[3]["foot"], _hzb_by[3]["rise"], _hzb_by[3]["hi"], _hzb_by[3]["rate"]) == (.3, .56, .36, .7)
+      and _hzb_by[38]["when"] == "night dusk" and _hzb_by[57]["when"] == "dawn day dusk" and _hzb_by[85]["when"] == "dawn"
+      and _hzb_by[67]["hi"] == .42 and _hzb_by[11]["when"] == "day"
+      and all(c["rise"] == 1.6 and c["hi"] == .97 for c in _hzb_clips if c["k"] == "sea")
+      and all(c["rise"] < 1 and c["hi"] < .97 for c in _hzb_clips if c["k"] != "sea")
+      and all("night" in c["when"] and "day" in c["when"] for c in _hzb_clips
+              if c["k"] == "sea" and _hzb_keys[c["i"]] not in _hzb["SKY_HZ_PICKED"])
+      and '.replace("__SKY_HZ__", json.dumps(sky_hz_clips()))' in _MILLENAI_SRC, str(len(_hzb_clips)))
+
+
+def _hz_choose(js):
+    import tempfile as _tf
+    fn = js[js.index("function hzClipChoose("):js.index("async function hzClipPick(")]
+    body = fn + r"""
+const C=[{i:1,when:"night"},{i:2,when:"night"},{i:3,when:"night day"},{i:4,when:"night"},{i:5,when:"day"},{i:6,when:"dawn"}];
+const seq=k=>{let n=0;return ()=>((n++*0.37+k)%1);};const o={fit:true,fresh:true,cached:null,fetchFor:null,none:null};
+for(let k=0;k<20;k++){const r=hzClipChoose(C,"night",[1,2,3,4,5,6],[1,2,3],seq(k/20));
+  if(!r.play||r.play.when.split(" ").indexOf("night")<0)o.fit=false;if(r.play&&[1,2,3].indexOf(r.play.i)>=0)o.fresh=false;}
+o.cached=hzClipChoose(C,"night",[4],[1,2,3],()=>0.99);
+o.fetchFor=hzClipChoose(C,"night",[2],[9],()=>0);
+o.none=hzClipChoose(C,"dawn",[1,2],[],()=>0);
+process.stdout.write(JSON.stringify(o));
+"""
+    f = os.path.join(_tf.mkdtemp(), "choose.js")
+    open(f, "w").write(body)
+    try:
+        o = json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=60).stdout)
+    except Exception:
+        return False
+    return (o["fit"] and o["fresh"] and o["cached"]["play"]["i"] == 4 and o["cached"]["later"] is None
+            and o["fetchFor"]["play"]["i"] == 2 and o["fetchFor"]["later"]["i"] == 1
+            and o["none"]["play"] is None and o["none"]["later"]["i"] == 6)
+
+
+check("horizon: the backdrop fits the hour, is never one of the last three while a fresh one fits, plays from the cache and fetches the one it wanted for a later open; the mutants are caught",
+      _hz_choose(_hz_js)
+      and not _hz_choose(_hz_js.replace("const fresh=fit.filter(c=>recent.indexOf(c.i)<0);", "const fresh=fit;"))
+      and not _hz_choose(_hz_js.replace("if(has.has(want.i))return {play:want,later:null};", "return {play:want,later:null};"))
+      and 'if(ch.later)api("/api/sky/status?i="+ch.later.i+"&warm=1").catch(()=>{});   // for a later open, never waited on' in _hz_js
+      and 'api("/api/sky/seen",{method:"POST"' in _hz_js and "hzMoonNow();hzDrawStars();hzDrawAuroras();hzClipCheck();" in _hz_js, "")
+
+# EFFORT (6b534): a separate control from the mode; the page sends it, the server takes only the
+# four words, and it decides the second pass of a single-model answer
+_hze = {}
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("EFFORT_LEVELS = ("):_MILLENAI_SRC.index("MODE_ALIASES = {")], _hze)
+
+
+def _hz_effort_ok(ns):
+    f, rf, pr, th = ns["effort_polish"], ns["effort_reflect"], ns["effort_peer"], ns["effort_think"]
+    return (f(True, "low") is False and f(False, "high") is True and f(False, "max") is True and f(False, "ultra") is True
+            and f(True, "medium") is True and f(False, "medium") is False and f(True, None) is True and f(False, None) is False
+            and [rf(False, e) for e in ("low", "medium", "high", "max", "ultra")] == [False, False, True, True, True]
+            and rf(True, "low") is True and pr(True, "low") is True
+            and [pr(False, e) for e in ("low", "medium", "high", "max", "ultra")] == [False, False, False, True, True]
+            and [th(e) for e in ("low", "medium", "high", "max", "ultra", None)] == ["low", None, None, None, "high", None])
+
+
+_hze_src = _MILLENAI_SRC[_MILLENAI_SRC.index("EFFORT_LEVELS = ("):_MILLENAI_SRC.index("MODE_ALIASES = {")]
+_hze, _hze_m1, _hze_m2 = {}, {}, {}
+exec(_hze_src, _hze)
+exec(_hze_src.replace('if effort == "low":\n        return False', 'if effort == "low":\n        return bool(pref)'), _hze_m1)
+exec(_hze_src.replace('{"low": "low", "ultra": "high"}', '{"low": "low", "ultra": "low"}'), _hze_m2)
+check("horizon: Effort (Low, Medium, High, Max, Ultra) is sent with each question and turns real switches: the second pass, the council's double-check and peer review, a server model's reasoning level (cleared per request); the mutants are caught",
+      _hze["EFFORT_LEVELS"] == ("low", "medium", "high", "max", "ultra") and _hz_effort_ok(_hze)
+      and not _hz_effort_ok(_hze_m1) and not _hz_effort_ok(_hze_m2)
+      and "_effort = _effort if _effort in EFFORT_LEVELS else None\n        _srv_think.level = effort_think(_effort)" in _MILLENAI_SRC
+      and "            _srv_think.level = _srv_think.effort = None\n            # the hurry registry entry dies" in _MILLENAI_SRC
+      and "        _srv_think.effort = _effort    # run_council reads it for its reviews" in _MILLENAI_SRC
+      and _MILLENAI_SRC.count('effort_polish(user_prefs(user_base).get("polish", True), _effort)') == 3
+      and 'user_prefs(user_base).get("polish", True)\n' not in _MILLENAI_SRC
+      and '_eff = getattr(globals().get("_srv_think"), "effort", None)\n    if _eff and not max_mode:\n        reflect, peer = effort_reflect(reflect, _eff), effort_peer(peer, _eff)\n' in _MILLENAI_SRC
+      and 'if(globalThis.hzReady&&document.documentElement.classList.contains("hz"))annExtra.effort=hzEffortWire();' in _MILLENAI_SRC
+      and 'const HZ_EFFORT=["Low","Medium","High","Max","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in _hz_js
+      and '<input type="range" min="0" max="\'+HZ_EMAX+\'" step="1" value="1">' in _hz_js
+      and 'inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);' in _hz_js
+      and 'en.classList.toggle("shim",i>=3);en.classList.toggle("soft",i===3);' in _hz_js
+      and 'root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);' in _hz_js
+      and ".hz.hz-ultra #composer::before{opacity:.9}" in _hz_css and ".hz .hz-sl{position:relative;width:170px;" in _hz_css
+      and "hz-ody" not in page and '"millen.fxlevel","millen.effort"]' in page, "")
+
+# THE MODE PICKER (OVERRIDE 3): the name only; a glass menu of the four modes, what each is for,
+# its machines' dies, its real models sliding out on hover, Escape and arrows; no hint in the composer
+check("horizon: the mode picker shows the name only and opens a menu of the modes (what each is for, its machines, its real models on hover, the current one marked); no description or time hint in the composer",
+      'const HZ_MODE_DESC={"Fast":"Fast answers","Thinking":"Thinks it through",' in _MILLENAI_SRC
+      and '"Pro":"Every model weighs in","Vera Rubin":"Keeps going until you stop it",' in _MILLENAI_SRC
+      and 'o.setAttribute("role","menuitemradio")' in _hz_js and 'o.setAttribute("aria-checked",String(m===t));' in _hz_js
+      and 'class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"' in _hz_js
+      and 'if(e.key==="Escape"&&menu.classList.contains("open")){e.stopPropagation();hzMenuClose(true);}' in _hz_js
+      and 'p.style.transitionDelay=on?(80+k*70)+"ms":"0ms"' in _hz_js and "hzInUse(o.dataset.t?hzLineupOf(o.dataset.t):[]);" in _hz_js
+      and ".hz .hz-opt[aria-checked=true]>b::after{" in _hz_css and "hzHint" not in _hz_js and "hz-sl-desc" not in page
+      and "About 20 seconds" not in page and 'id="hz-lineup"' not in page, "")
+
+# THE OPENING (OVERRIDE 3 and the reference's slower reveal): no tagline; when the trace completes
+# a light streak (2.8 s), one prism glint (2.5 s, .55 s after) and a prism glow (9 s); it lingers
+def _hz_opening(css, js, pg):
+    return ("Your own AI. On your own machines." not in pg and 'class="hz-tag"' not in pg
+            and ".hz.hz-litmark #hz-intro-mark .hz-flare{animation:hzFlare 2.8s cubic-bezier(.22,.8,.25,1) forwards}" in css
+            and ".hz.hz-litmark #hz-intro-mark .hz-glint .gm{animation:hzGlint1 2.5s cubic-bezier(.45,0,.25,1) .55s both}" in css
+            and ".hz.hz-litmark #hz-intro-mark .vghost{animation:hzPrism 9s ease-in-out infinite}" in css
+            and ".hz.hz-markout #hz-intro-mark{opacity:0;transform:translateY(-24px);transition:opacity 1.2s var(--hz-ease-out),transform 1.2s var(--hz-ease-out)}" in css
+            and 'word.classList.add("shown");root.classList.add("hz-litmark");' in js
+            and 'at(6200,()=>root.classList.add("hz-markout"));' in js and 'at(6800,()=>{root.classList.add("hz-home");' in js
+            and "if(mark)mark.hidden=false;" in js)
+
+
+check("horizon: the opening is the wordmark alone, traced, then a 2.8 s streak, a 2.5 s glint .55 s later and a 9 s prism glow, lingering to 6.2 s; the mutants are caught",
+      _hz_opening(_hz_css, _hz_js, page)
+      and not _hz_opening(_hz_css, _hz_js.replace("if(mark)mark.hidden=false;", ""), page)
+      and not _hz_opening(_hz_css.replace("hzFlare 2.8s", "hzFlare 1.7s"), _hz_js, page), "")
+
+# ASKING FROM THE HOME (OVERRIDE 3): the composer's place is taken before the hero goes; the
+# question arcs into its row (or the chats button), the row keeps a live die from the RUN frames
+# and renames itself; the list's repaints keep it (observed, not patched into renderChats)
+_hz_send = _MILLENAI_SRC[_MILLENAI_SRC.index("  if(globalThis.hzReady)hzBeforeSend(text);"):_MILLENAI_SRC.index("  if(globalThis.hzReady)hzOnSend();")]
+check("horizon: a question sent from the home glides the composer to the foot and arcs into its chat's row, which keeps a live die in the working machine's colour until the answer lands and renames itself",
+      "messages.push({role:\"user\",content:shown});\n  const uDiv=addMsg(\"user\",shown);" in _hz_send
+      and "if(from&&from.home)hzArc(from,hzS.liveChat);" in _hz_js and "if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}" in _hz_js
+      and 'if(v.w==="server"){hzS.srvWorking=String(v.s||"");hzS.genLocal=false;hzS.liveV=hzSrvV(hzS.srvWorking);}' in _hz_js
+      and 'new MutationObserver(()=>{if(root.classList.contains("hz")){hzSideLive();hzRenameCheck();}}).observe(clist,{childList:true});' in _hz_js
+      and "if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK())" in _hz_js
+      and ".hz .chat-item.hz-live .ct{" in _hz_css and 'data-machine="\'+m.esc(m.name)+\'"' in _hz_js
+      and ".hz .die{" not in _hz_css, "")
+check("horizon: the Look is Horizon by default, Classic by choice, with Effects Full or Balanced, kept in browser storage with the sidebar and the day's seed",
+      '"millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort"' in page
+      and "function setLook(v,quiet){" in _hz_js and 'sel.addEventListener("change",()=>setLook(sel.value));' in _hz_js
+      and "function setFxLevel(v){" in _hz_js and '<label id="look-row"><span>Look</span>' in page
+      and '<label id="fx-level-row"><span>Effects</span>' in page, "")
+# ==== HORIZON end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
