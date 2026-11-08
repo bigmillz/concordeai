@@ -17225,6 +17225,19 @@ marked `HORIZON CONVERSATION (6b528)`; they are dead weight to sweep once the th
 merged. The `HORIZON TOKENS (6b526)` block carries the north star's additions (`--hz-ink-read`, the hairlines,
 the aurora values) and Patrick's type override.
 
+**Later the same night.** Patrick's second override (no limb, no semicircle anywhere; the night sky drawn on the
+GPU; machine chips with maker-coloured dies): nothing here ever drew a limb, so nothing was removed; the marginalia's
+machine rows took the dies (MLX grey for this Mac, ice for a server whose maker the frames don't carry, hollow ice
+for the cloud) in place of status dots, and the `--hz-limb` value stays in the shared tokens block for the others to
+drop at the merge. The approved copy voice (labels of one to three words, buttons verb first, no middle-dot strings)
+changed these words: "Search your chats" → "Search chats"; "Pin to top" → "Pin"; "Collapse the sidebar" /
+"Expand the sidebar" → "Collapse sidebar" / "Expand sidebar"; "Good answer" → "Good"; "The answer" (a one-step
+run's row) → "Answer"; the byline's "applying the review" → "applying corrections"; the foot's "Some of it through
+the cloud" → "Some through the cloud"; "N older chats hidden · Show all" → the count and the link as two facts; a
+step's server detail ("3 notes · 1 correction") → separate facts 14px apart; the empty answer's "That answer didn't
+come through — the model was still warming up. Try again and it usually lands." → "No answer came through. Try
+again."
+
 **The gauntlet.** Changed for real, each explained in its comment: the brand guard allows exactly the byline's
 `SIGN_BRAND="Concorde"` constant (and a mutant proves a second bare Concorde still trips it); the 6b462
 pinwheel check became the marginalia check (the aside outside the prose, surviving repaints); the smooth-bar
