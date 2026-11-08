@@ -17135,3 +17135,7 @@ typing of a word with those letters could open the board and eat the end of the 
 trouble with the letter Z. Removed whole: its CSS, the #zito markup, the script, its seat in the
 Escape chain and in dictation's modal check. The 6302 setup-dialog check now ends its slice at the
 page's <script> instead of at the board, and a new check keeps the board, the combo and zitoEsc out.
+
+The gauntlet came back 1199/1200: the servers review check (6b334) still pinned the board's own
+X-Models reader, which went with the board. It now pins the page's one remaining reader and counts
+it, so a second, undecoded reader still fails. That check alone was rerun against the source, green.

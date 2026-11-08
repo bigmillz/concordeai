@@ -21150,7 +21150,9 @@ def _svc_review(src):
                      and 'self.send_header("X-Models", header_text(xm))' in src
                      and src.count('send_header("X-Models"') == 1
                      and 'lastModels=hdrText(resp.headers.get("X-Models"));' in src
-                     and 'const line=hdrText(resp.headers.get("X-Models"));' in src
+                     # the ZITO board's reader went with the board (6b525):
+                     # the page's one reader is the one above, decoded
+                     and src.count('resp.headers.get("X-Models")') == 1
                      and "function hdrText(v){try{return decodeURIComponent(v||\"\");}" in src
                      and 'resp.headers.get("X-Models")||' not in src)
     # the kept state: a removal takes servers.json's secrets, keeps the rest
